@@ -2765,7 +2765,7 @@ function loadSystemConsole(){
 async function scLoadOverview(){
   const el=document.getElementById('sc-overview-body'); if(!el) return;
   try {
-    const d=await api('GET','/api/system/overview');
+    const d=await api('/api/system/overview');
     el.innerHTML=`<dl class="sc-kv">
       <dt>App version</dt><dd>${esc(d.app_version)}</dd>
       <dt>Package</dt><dd>${esc(d.package_version)}</dd>
@@ -2784,7 +2784,7 @@ async function scLoadOverview(){
 async function scLoadHealth(){
   const el=document.getElementById('sc-health-body'); if(!el) return;
   try {
-    const d=await api('GET','/api/system/health');
+    const d=await api('/api/system/health');
     const dbCls=d.db==='ok'?'sc-status-ok':'sc-status-err';
     el.innerHTML=`<dl class="sc-kv">
       <dt>Backend</dt><dd class="sc-status-ok">${esc(d.backend)}</dd>
@@ -2799,7 +2799,7 @@ async function scLoadHealth(){
 async function scLoadScopeMap(){
   const el=document.getElementById('sc-scope-body'); if(!el) return;
   try {
-    const d=await api('GET','/api/system/scope-map');
+    const d=await api('/api/system/scope-map');
     if(!d.wings||!d.wings.length){ el.innerHTML='<div class="muted">No wings found.</div>'; return; }
     let h='';
     for(const w of d.wings){
@@ -2822,7 +2822,7 @@ async function scLoadScopeMap(){
 async function scArchiveWing(wingId, wingCode){
   if(!confirm(`Archive Wing '${wingCode}'?\n\nThis cannot be undone. All squadrons in this Wing must already be archived.`)) return;
   try {
-    await api('POST',`/api/wings/${wingId}/archive`);
+    await api(`/api/wings/${wingId}/archive`,{method:'POST'});
     alert(`Wing '${wingCode}' has been archived.`);
     scLoadScopeMap();
   } catch(e){ alert('Archive failed: '+(e.message||e)); }
@@ -2831,7 +2831,7 @@ async function scArchiveWing(wingId, wingCode){
 async function scArchiveSquadron(sqnId, sqnName){
   if(!confirm(`Archive unit '${sqnName}'?\n\nThis cannot be undone and will remove this unit from all active views.`)) return;
   try {
-    await api('POST',`/api/squadrons/${sqnId}/archive`);
+    await api(`/api/squadrons/${sqnId}/archive`,{method:'POST'});
     alert(`Unit '${sqnName}' has been archived.`);
     scLoadScopeMap();
   } catch(e){ alert('Archive failed: '+(e.message||e)); }
@@ -2840,7 +2840,7 @@ async function scArchiveSquadron(sqnId, sqnName){
 async function scPopulateWingSelect(){
   const sel=document.getElementById('sc-sqn-wing'); if(!sel) return;
   try {
-    const d=await api('GET','/api/system/scope-map');
+    const d=await api('/api/system/scope-map');
     sel.innerHTML='<option value="">Select wing…</option>';
     for(const w of (d.wings||[])){
       const o=document.createElement('option');
@@ -2858,7 +2858,7 @@ async function scCreateWing(){
   if(!code||!name){ msg.textContent='Wing Code and Full Name are required.'; msg.style.color='var(--danger)'; return; }
   msg.style.color='var(--muted)'; msg.textContent='Creating…';
   try {
-    const d=await api('POST','/api/wings',{code,name,short_name:short||null});
+    const d=await api('/api/wings',{method:'POST',body:JSON.stringify({code,name,short_name:short||null})});
     msg.style.color='var(--ok)'; msg.textContent=`Wing '${d.code}' created successfully.`;
     document.getElementById('sc-wing-code').value='';
     document.getElementById('sc-wing-name').value='';
@@ -2876,7 +2876,7 @@ async function scCreateSquadron(){
   if(!wing_id||!code||!name){ msg.textContent='Wing, Unit Code and Full Name are required.'; msg.style.color='var(--danger)'; return; }
   msg.style.color='var(--muted)'; msg.textContent='Creating…';
   try {
-    const d=await api('POST','/api/squadrons',{wing_id,code,name,unit_type});
+    const d=await api('/api/squadrons',{method:'POST',body:JSON.stringify({wing_id,code,name,unit_type})});
     msg.style.color='var(--ok)'; msg.textContent=`Unit '${d.code}' created successfully.`;
     document.getElementById('sc-sqn-code').value='';
     document.getElementById('sc-sqn-name').value='';
@@ -2887,7 +2887,7 @@ async function scCreateSquadron(){
 async function scLoadMaintenance(){
   const el=document.getElementById('sc-maint-body'); if(!el) return;
   try {
-    const d=await api('GET','/api/system/maintenance');
+    const d=await api('/api/system/maintenance');
     let h='';
     if(d.enabled){
       h+=`<div class="sc-maint-on">Maintenance mode is ON${d.message?' — '+esc(d.message):''}</div>`;
@@ -2906,7 +2906,7 @@ async function scEnableMaint(){
   const until=document.getElementById('sc-maint-until').value.trim();
   const confirm=document.getElementById('sc-maint-confirm').value.trim();
   try {
-    await api('POST','/api/system/maintenance/enable',{message:msg||null,until:until||null,confirm});
+    await api('/api/system/maintenance/enable',{method:'POST',body:JSON.stringify({message:msg||null,until:until||null,confirm})});
     document.getElementById('sc-maint-form').style.display='none';
     scLoadMaintenance();
     scLoadOverview();
@@ -2916,7 +2916,7 @@ async function scEnableMaint(){
 async function scDisableMaint(){
   if(!confirm('Disable maintenance mode and restore normal access?')) return;
   try {
-    await api('POST','/api/system/maintenance/disable');
+    await api('/api/system/maintenance/disable',{method:'POST'});
     scLoadMaintenance();
     scLoadOverview();
   } catch(e){ alert('Could not disable maintenance mode: '+(e.message||e)); }
@@ -2925,7 +2925,7 @@ async function scDisableMaint(){
 async function scLoadBackups(){
   const el=document.getElementById('sc-backup-body'); if(!el) return;
   try {
-    const d=await api('GET','/api/system/backups');
+    const d=await api('/api/system/backups');
     if(!d.backups||!d.backups.length){
       el.innerHTML='<div class="muted">No backups found in <code>'+esc(d.backup_dir||'./backups')+'</code>. Use the button below to create one.</div>';
       return;
@@ -2945,7 +2945,7 @@ async function scLoadBackups(){
 
 async function scCreateBackup(){
   try {
-    const d=await api('POST','/api/system/backups');
+    const d=await api('/api/system/backups',{method:'POST'});
     alert('Backup created: '+d.filename+' ('+Math.round((d.size_bytes||0)/1024)+'KB)');
     scLoadBackups();
     scLoadOverview();
@@ -2957,7 +2957,7 @@ async function scLoadAudit(){
   const action=document.getElementById('sc-audit-action');
   const q=action&&action.value?'?action='+encodeURIComponent(action.value)+'&limit=50':'?limit=50';
   try {
-    const d=await api('GET','/api/system/audit-summary'+q);
+    const d=await api('/api/system/audit-summary'+q);
     if(!d.logs||!d.logs.length){ el.innerHTML='<div class="muted">No audit entries found.</div>'; return; }
     let h='<div style="font-family:monospace;font-size:11px">';
     for(const e of d.logs){
