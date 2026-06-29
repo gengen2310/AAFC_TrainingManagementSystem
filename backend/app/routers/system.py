@@ -6,10 +6,12 @@ are returned from any endpoint here.
 import os
 import shutil
 import subprocess
+import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session as DBSession
@@ -256,15 +258,16 @@ def audit_summary(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
 def list_backups(p: Principal = Depends(get_principal)):
     require_system_admin(p)
     backup_dir = Path(settings.BACKUP_DIR)
+    db_type = _db_type()
     if not backup_dir.exists():
-        return {"backups": [], "backup_dir": str(backup_dir)}
+        return {"backups": [], "backup_dir": str(backup_dir), "db_type": db_type}
     files = sorted(backup_dir.glob("*.db"), key=lambda f: f.stat().st_mtime, reverse=True)
     return {"backups": [
         {"filename": f.name,
          "size_bytes": f.stat().st_size,
          "created_at": datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc).isoformat()}
         for f in files[:20]
-    ], "backup_dir": str(backup_dir)}
+    ], "backup_dir": str(backup_dir), "db_type": db_type}
 
 
 @router.post("/backups")
@@ -292,3 +295,84 @@ def create_backup(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
     audit(db, p, object_type="system", object_id="backup", action="backup_created",
           new={"filename": dest.name, "size_bytes": size})
     return {"filename": dest.name, "size_bytes": size, "created_at": created_at}
+
+
+# ── GET /api/system/backups/pg-dump ──────────────────────────────────────────
+
+@router.get("/backups/pg-dump")
+def pg_dump_backup(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Stream a pg_dump (custom format) of the PostgreSQL database directly to the
+    authenticated system_admin's browser. Nothing is written to the server filesystem.
+    DATABASE_URL is never returned, logged, or exposed in any response.
+    """
+    require_system_admin(p)
+    url = settings.DATABASE_URL
+    if "postgres" not in url:
+        raise HTTPException(400, detail={
+            "error": "not_postgresql",
+            "message": "pg_dump is only available for PostgreSQL databases.",
+        })
+
+    parsed = urllib.parse.urlparse(url)
+    qs = dict(urllib.parse.parse_qsl(parsed.query))
+    sslmode = qs.get("sslmode", "prefer")
+
+    # Pass credentials via environment — never via command-line arguments.
+    env = dict(os.environ)
+    env["PGPASSWORD"] = urllib.parse.unquote(parsed.password or "")
+    env.pop("DATABASE_URL", None)   # prevent subprocess from inheriting the full URI
+
+    hostname = parsed.hostname or ""
+    port = str(parsed.port or 5432)
+    username = parsed.username or "postgres"
+    dbname = (parsed.path or "/postgres").lstrip("/") or "postgres"
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    filename = f"aafc_tms_staging_{ts}.dump"
+
+    cmd = [
+        "pg_dump",
+        "--format=custom",
+        "--host", hostname,
+        "--port", port,
+        "--username", username,
+        "--dbname", dbname,
+        "--no-password",
+        f"--sslmode={sslmode}",
+    ]
+
+    try:
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+        )
+    except FileNotFoundError:
+        raise HTTPException(503, detail={
+            "error": "pg_dump_not_found",
+            "message": "pg_dump is not installed in this environment. "
+                       "Ensure postgresql-client is installed in the Docker image.",
+        })
+
+    # Audit before streaming; ignore DB errors here so the download still starts.
+    try:
+        _set_setting(db, "last_backup_at", datetime.now(timezone.utc).isoformat(), p.user_id)
+        audit(db, p, object_type="system", object_id="backup", action="pg_dump_initiated",
+              new={"filename": filename})
+    except Exception:
+        pass
+
+    def _generate():
+        try:
+            while True:
+                chunk = proc.stdout.read(65536)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            proc.stdout.close()
+            proc.wait()
+
+    return StreamingResponse(
+        _generate(),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

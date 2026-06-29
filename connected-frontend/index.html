@@ -891,6 +891,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- SYSTEM CONSOLE -->
       <div id="page-system-console" class="page">
+        <div id="sc-coldstart-warn" style="display:none;padding:10px 14px;background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;font-size:13px;margin-bottom:12px;color:#92400e">
+          Staging server is starting — this can take up to 30 seconds on Render's free tier. Panels will load automatically.
+        </div>
         <div class="ph">
           <div>
             <div class="ph-title">System Console</div>
@@ -985,9 +988,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="card sc-card" id="sc-backup-card">
           <div class="sc-section-hdr">Backup</div>
           <div id="sc-backup-body"><div class="muted">Loading…</div></div>
-          <div style="margin-top:10px">
-            <button class="btn btn-secondary" onclick="scCreateBackup()">Create Backup Now</button>
-          </div>
+          <div id="sc-backup-actions" style="margin-top:10px"></div>
         </div>
 
         <!-- Audit summary card -->
@@ -2550,15 +2551,16 @@ async function loadData(){
     try{ S.squadrons=await api('/api/squadrons'); }catch(_){ S.squadrons=[]; }
   }
   // National scope: wing roll-up + national readiness/coverage.
-  if(scope==='national'){
+  // system_admin has full national access; load the same data so national views are available.
+  if(scope==='national'||scope==='system_admin'){
     try{ S.national=await api('/api/national/overview'); }catch(_){ S.national=null; }
     try{ const no=await api('/api/reports/national-overview'); S.nationalReport={wings:(no&&no.wings)||[]}; }catch(_){ S.nationalReport={wings:[]}; }
     try{ S.natCap=await api('/api/reports/national-capability'); }catch(_){ S.natCap=null; }
     try{ S.wings=await api('/api/wings'); }catch(_){ S.wings=[]; }
     try{ S.squadrons=await api('/api/squadrons'); }catch(_){ S.squadrons=[]; }
   }
-  // Audit visibility (national + auditor).
-  if(scope==='national'||scope==='auditor'){
+  // Audit visibility (national + auditor + system_admin).
+  if(scope==='national'||scope==='auditor'||scope==='system_admin'){
     try{ S.audit=await api('/api/audit'); }catch(_){ S.audit=[]; }
   }
   // Timing templates (squadron scope only; safe to fetch for all sqn/admin roles).
@@ -2602,7 +2604,7 @@ const NAV_BY_SCOPE={
   wing:['wing-overview','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
   national:['national','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
   auditor:['reports','audit','accounts',..._PLANNING_PAGES],
-  system_admin:['system-console','audit','accounts']
+  system_admin:['system-console','national','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES]
 };
 const SCOPE_LANDING={squadron:'dashboard',wing:'wing-overview',national:'national',auditor:'reports',system_admin:'system-console'};
 // In Proxy Mode (Wing) or Delegated Intervention (NAT HQ) the UI shows the EXACT SQN workspace
@@ -2716,7 +2718,11 @@ function bootApp(){
 }
 function renderAll(){
   const scope=effectiveScope();
-  if(scope==='system_admin'){ return; } // System Console loads its own data on nav
+  if(scope==='system_admin'){
+    // National operational data loaded by loadData; pre-render national views for navigation.
+    renderNational(); renderReports(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); renderAudit();
+    return;
+  }
   if(scope==='squadron'){ renderDash();renderPN();renderCurr();renderActs();renderFacs();renderRooms();renderReports();renderActions(); }
   else { renderReports(); renderCurr(); }
   if(scope==='wing'){ renderWing(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); }
@@ -2764,8 +2770,14 @@ function loadSystemConsole(){
 
 async function scLoadOverview(){
   const el=document.getElementById('sc-overview-body'); if(!el) return;
+  el.innerHTML='<div class="muted">Loading…</div>';
+  const warn=document.getElementById('sc-coldstart-warn');
+  if(warn) warn.style.display='none';
+  const coldTimer=setTimeout(()=>{if(warn)warn.style.display='block';},8000);
   try {
     const d=await api('/api/system/overview');
+    clearTimeout(coldTimer);
+    if(warn) warn.style.display='none';
     el.innerHTML=`<dl class="sc-kv">
       <dt>App version</dt><dd>${esc(d.app_version)}</dd>
       <dt>Package</dt><dd>${esc(d.package_version)}</dd>
@@ -2778,7 +2790,7 @@ async function scLoadOverview(){
       <dt>Maintenance mode</dt><dd>${d.maintenance_mode?'<span class="sc-status-warn">ENABLED</span>':'<span class="sc-status-ok">Off</span>'}</dd>
       <dt>Last backup</dt><dd>${d.last_backup_at?esc(d.last_backup_at):'<span class="muted">No backup recorded</span>'}</dd>
     </dl>`;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(e.message)}</div>`; }
+  } catch(e){ clearTimeout(coldTimer); if(warn) warn.style.display='none'; el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scLoadHealth(){
@@ -2793,7 +2805,7 @@ async function scLoadHealth(){
       <dt>Cookie secure</dt><dd>${d.cookie_secure?'<span class="sc-status-ok">Yes</span>':'<span class="sc-status-warn">No (dev/staging only)</span>'}</dd>
       <dt>CORS origins</dt><dd style="font-family:monospace;font-size:11px">${(d.cors_origins||[]).map(o=>esc(o)).join('<br>')}</dd>
     </dl>`;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(e.message)}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scLoadScopeMap(){
@@ -2816,7 +2828,7 @@ async function scLoadScopeMap(){
       </div>`;
     }
     el.innerHTML=h;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(e.message)}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scArchiveWing(wingId, wingCode){
@@ -2825,7 +2837,7 @@ async function scArchiveWing(wingId, wingCode){
     await api(`/api/wings/${wingId}/archive`,{method:'POST'});
     alert(`Wing '${wingCode}' has been archived.`);
     scLoadScopeMap();
-  } catch(e){ alert('Archive failed: '+(e.message||e)); }
+  } catch(e){ alert('Archive failed: '+(apiErr(e))); }
 }
 
 async function scArchiveSquadron(sqnId, sqnName){
@@ -2834,7 +2846,7 @@ async function scArchiveSquadron(sqnId, sqnName){
     await api(`/api/squadrons/${sqnId}/archive`,{method:'POST'});
     alert(`Unit '${sqnName}' has been archived.`);
     scLoadScopeMap();
-  } catch(e){ alert('Archive failed: '+(e.message||e)); }
+  } catch(e){ alert('Archive failed: '+(apiErr(e))); }
 }
 
 async function scPopulateWingSelect(){
@@ -2864,7 +2876,7 @@ async function scCreateWing(){
     document.getElementById('sc-wing-name').value='';
     document.getElementById('sc-wing-short').value='';
     scLoadScopeMap();
-  } catch(e){ msg.style.color='var(--danger)'; msg.textContent='Error: '+(e.message||e); }
+  } catch(e){ msg.style.color='var(--danger)'; msg.textContent='Error: '+(apiErr(e)); }
 }
 
 async function scCreateSquadron(){
@@ -2881,7 +2893,7 @@ async function scCreateSquadron(){
     document.getElementById('sc-sqn-code').value='';
     document.getElementById('sc-sqn-name').value='';
     scLoadScopeMap();
-  } catch(e){ msg.style.color='var(--danger)'; msg.textContent='Error: '+(e.message||e); }
+  } catch(e){ msg.style.color='var(--danger)'; msg.textContent='Error: '+(apiErr(e)); }
 }
 
 async function scLoadMaintenance(){
@@ -2898,7 +2910,7 @@ async function scLoadMaintenance(){
       h+=`<button class="btn btn-secondary" onclick="document.getElementById('sc-maint-form').style.display='block';this.style.display='none'">Enable Maintenance Mode…</button>`;
     }
     el.innerHTML=h;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(e.message)}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scEnableMaint(){
@@ -2910,7 +2922,7 @@ async function scEnableMaint(){
     document.getElementById('sc-maint-form').style.display='none';
     scLoadMaintenance();
     scLoadOverview();
-  } catch(e){ alert('Could not enable maintenance mode: '+(e.message||e)); }
+  } catch(e){ alert('Could not enable maintenance mode: '+(apiErr(e))); }
 }
 
 async function scDisableMaint(){
@@ -2919,37 +2931,69 @@ async function scDisableMaint(){
     await api('/api/system/maintenance/disable',{method:'POST'});
     scLoadMaintenance();
     scLoadOverview();
-  } catch(e){ alert('Could not disable maintenance mode: '+(e.message||e)); }
+  } catch(e){ alert('Could not disable maintenance mode: '+(apiErr(e))); }
 }
 
 async function scLoadBackups(){
   const el=document.getElementById('sc-backup-body'); if(!el) return;
+  const acts=document.getElementById('sc-backup-actions');
   try {
     const d=await api('/api/system/backups');
-    if(!d.backups||!d.backups.length){
-      el.innerHTML='<div class="muted">No backups found in <code>'+esc(d.backup_dir||'./backups')+'</code>. Use the button below to create one.</div>';
-      return;
+    const isPg=(d.db_type||'').toLowerCase().includes('postgres');
+    if(isPg){
+      el.innerHTML=`<div class="muted" style="font-size:12.5px">Database: ${esc(d.db_type)}</div>
+        <div style="margin-top:8px;font-size:12.5px">Use the button below to download a pg_dump of the live database directly to your browser. No data is written to the server filesystem.</div>
+        <div style="margin-top:6px;font-size:11.5px;color:var(--muted)">To restore: <code>pg_restore --clean --if-exists -d &quot;DATABASE_URL&quot; filename.dump</code><br>
+        This is a controlled CLI operation. Do not share the dump file outside authorised personnel.</div>`;
+      if(acts) acts.innerHTML='<button id="sc-pgdump-btn" class="btn btn-secondary" onclick="scDownloadPgDump()">Download PostgreSQL Backup (pg_dump)</button>';
+    } else {
+      if(!d.backups||!d.backups.length){
+        el.innerHTML='<div class="muted">No backups found in <code>'+esc(d.backup_dir||'./backups')+'</code>.</div>';
+      } else {
+        let h=`<div class="muted" style="font-size:11.5px;margin-bottom:8px">Backup directory: <code>${esc(d.backup_dir)}</code></div>`;
+        for(const b of d.backups){
+          const kb=b.size_bytes?Math.round(b.size_bytes/1024)+'KB':'';
+          h+=`<div class="sc-backup-item"><span class="sc-filename">${esc(b.filename)}</span><span class="sc-bsize">${kb}</span><span class="muted">${b.created_at?esc(b.created_at.slice(0,19).replace('T',' '))+'Z':''}</span></div>`;
+        }
+        el.innerHTML=h;
+      }
+      if(acts) acts.innerHTML='<button class="btn btn-secondary" onclick="scCreateBackup()">Create Backup Now</button>';
     }
-    let h=`<div class="muted" style="font-size:11.5px;margin-bottom:8px">Backup directory: <code>${esc(d.backup_dir)}</code></div>`;
-    for(const b of d.backups){
-      const kb=b.size_bytes?Math.round(b.size_bytes/1024)+'KB':'';
-      h+=`<div class="sc-backup-item">
-        <span class="sc-filename">${esc(b.filename)}</span>
-        <span class="sc-bsize">${kb}</span>
-        <span class="muted">${b.created_at?esc(b.created_at.slice(0,19).replace('T',' '))+'Z':''}</span>
-      </div>`;
-    }
-    el.innerHTML=h;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(e.message)}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scCreateBackup(){
   try {
     const d=await api('/api/system/backups',{method:'POST'});
     alert('Backup created: '+d.filename+' ('+Math.round((d.size_bytes||0)/1024)+'KB)');
-    scLoadBackups();
+    scLoadBackups(); scLoadOverview();
+  } catch(e){ alert('Backup failed: '+apiErr(e)); }
+}
+
+async function scDownloadPgDump(){
+  const btn=document.getElementById('sc-pgdump-btn');
+  if(btn){btn.disabled=true;btn.textContent='Preparing download…';}
+  try{
+    const t=tokenGet();
+    const headers=t?{'Authorization':'Bearer '+t}:{};
+    const res=await fetch(API_BASE+'/api/system/backups/pg-dump',{headers,credentials:'include'});
+    if(!res.ok){
+      const body=await res.json().catch(()=>({}));
+      const msg=(body&&body.detail&&body.detail.message)||(body&&body.detail)||('Backup failed (HTTP '+res.status+').');
+      alert('Backup download failed: '+msg);
+      return;
+    }
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const cd=res.headers.get('Content-Disposition')||'';
+    const m=cd.match(/filename="([^"]+)"/);
+    a.href=url; a.download=m?m[1]:'aafc_tms_backup.dump';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     scLoadOverview();
-  } catch(e){ alert('Backup failed: '+(e.message||e)); }
+  }catch(e){alert('Backup download failed: '+apiErr(e));}
+  finally{if(btn){btn.disabled=false;btn.textContent='Download PostgreSQL Backup (pg_dump)';}}
 }
 
 async function scLoadAudit(){
@@ -2972,7 +3016,7 @@ async function scLoadAudit(){
     }
     h+='</div>';
     el.innerHTML=h;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(e.message)}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
 // ═══════════════════════════════════════════════════════════
