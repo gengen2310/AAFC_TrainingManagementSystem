@@ -1,0 +1,1031 @@
+from fastapi import APIRouter, Depends, Request, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session as DBSession
+
+from ..database import get_db, utcnow
+from ..models import (CurriculumItem, ParadeNight, Session, SessionStatusHistory,
+                      Facilitator, FacilitatorRankHistory, TrainingArea, Equipment,
+                      Activity, Cadet, Squadron, TimingTemplate, TimingBlock)
+from .timing import _effective_template
+from ..dependencies import get_principal, client_meta
+from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron)
+from ..services import (audit, score_parade, publish_blockers, close_blockers)
+
+router = APIRouter(prefix="/api", tags=["training"])
+
+VALID_STATUS = {"draft", "planned", "published", "delivered", "delivered_with_issue",
+                "cancelled", "cancelled_late", "rescheduled", "not_delivered",
+                "requires_review", "blocked", "closed"}
+
+
+def _active_squadron(p: Principal) -> str:
+    """The squadron a write should target: proxy/intervention target, else home."""
+    if p.acting_squadron_id:
+        return p.acting_squadron_id
+    return p.squadron_id
+
+
+def _sess_dict(s: Session) -> dict:
+    d = {c.name: getattr(s, c.name) for c in s.__table__.columns}
+    d["session_id"] = s.id  # alias for Night Builder compatibility
+    return d
+
+
+# ── CURRICULUM ──
+@router.get("/curriculum")
+def list_curriculum(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _active_squadron(p)
+    # Resolve the wing for the acting scope
+    wing_id: str | None = p.acting_wing_id or p.wing_id
+    if sq_id:
+        s = db.get(Squadron, sq_id)
+        if s:
+            wing_id = s.wing_id
+
+    from sqlalchemy import or_
+    conditions = [CurriculumItem.owning_level == "national"]
+    if wing_id:
+        conditions.append(
+            (CurriculumItem.owning_level == "wing") & (CurriculumItem.wing_id == wing_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        # National admin with no proxy/wing scope sees all wing curriculum across all wings
+        conditions.append(CurriculumItem.owning_level == "wing")
+    if sq_id:
+        conditions.append(CurriculumItem.squadron_id == sq_id)
+
+    items = db.query(CurriculumItem).filter(
+        CurriculumItem.is_archived == False,  # noqa: E712
+        or_(*conditions)
+    ).order_by(CurriculumItem.recommended_sequence).all()
+    out = []
+    for i in items:
+        sess = db.query(Session).filter(Session.curriculum_item_id == i.id,
+                                        Session.squadron_id == sq_id,
+                                        Session.is_archived == False).all()  # noqa: E712
+        statuses = [s.status for s in sess]
+        out.append({"curriculum_id": i.id, "code": i.code, "title": i.title, "phase": i.phase,
+                    "element": i.element, "duration_minutes": i.duration_minutes,
+                    "core_status": i.core_status, "learning_hub_url": i.learning_hub_url,
+                    "recommended_term": i.recommended_term, "owning_level": i.owning_level,
+                    "wing_id": i.wing_id, "squadron_id": i.squadron_id,
+                    "session_count": len(statuses), "progress": _progress(statuses)})
+    return {"items": out}
+
+
+def _progress(statuses: list[str]) -> str:
+    if not statuses:
+        return "unscheduled"
+    if "delivered" in statuses or "delivered_with_issue" in statuses:
+        return "delivered"
+    if all(s in ("cancelled", "cancelled_late") for s in statuses):
+        return "cancelled"
+    if "rescheduled" in statuses:
+        return "rescheduled"
+    if "not_delivered" in statuses:
+        return "not_delivered"
+    return "planned"
+
+
+@router.get("/curriculum/{cid}/sessions")
+def curriculum_sessions(cid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _active_squadron(p)
+    sess = db.query(Session).filter(Session.curriculum_item_id == cid,
+                                    Session.squadron_id == sq_id).all()
+    return [_sess_dict(s) for s in sess]
+
+
+# ── PARADE NIGHTS ──
+class ParadeIn(BaseModel):
+    date: str
+    term: str | None = "T1"
+    session_count: int | None = None  # None = use effective timing template or default
+    parade_type: str | None = "normal"
+
+
+@router.get("/parade-nights")
+def list_parades(squadron_id: str | None = None, db: DBSession = Depends(get_db),
+                 p: Principal = Depends(get_principal)):
+    sq_id = squadron_id or _active_squadron(p)
+    s = db.get(Squadron, sq_id)
+    if s:
+        require_can_view_squadron(p, s.id, s.wing_id)
+    pns = db.query(ParadeNight).filter(ParadeNight.squadron_id == sq_id,
+                                       ParadeNight.is_archived == False).order_by(ParadeNight.date).all()  # noqa: E712
+    out = []
+    for pn in pns:
+        sess = db.query(Session).filter(Session.parade_night_id == pn.id,
+                                        Session.is_archived == False).all()  # noqa: E712
+        out.append({**_pn_dict(pn), "sessions": [_sess_dict(x) for x in sess]})
+    return out
+
+
+@router.get("/parade-nights/{pnid}")
+def get_parade(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    pn = db.get(ParadeNight, pnid)
+    if not pn:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_view_squadron(p, pn.squadron_id, pn.wing_id)
+    sess = [_sess_dict(x) for x in db.query(Session).filter(Session.parade_night_id == pn.id,
+                                                            Session.is_archived == False).all()]  # noqa: E712
+    r = score_parade(sess)
+    return {**_pn_dict(pn), "sessions": sess, "readiness": r, "publish_blockers": publish_blockers(sess)}
+
+
+@router.post("/parade-nights")
+def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_db),
+                  p: Principal = Depends(get_principal)):
+    sq_id = _active_squadron(p)
+    # Roles that can never write squadron data get a clean 403 first.
+    if p.role in ("sqn_general", "wing_viewer", "national_viewer", "auditor"):
+        raise HTTPException(403, detail={"error": "forbidden"})
+    if not sq_id:
+        # Wing/National admins must enter Proxy / Delegated Intervention to gain a squadron scope.
+        require_can_write_squadron(p, "none", None)
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    s = db.get(Squadron, sq_id)
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    require_can_write_squadron(p, s.id, s.wing_id)
+    # Determine session count from effective timing template if one exists.
+    # session_count in the body can still override (e.g. user explicitly changes it).
+    effective_tmpl = _effective_template(db, s.id, body.date)
+    if effective_tmpl and body.session_count is None:
+        ip_count = sum(1 for b in effective_tmpl.blocks if b.is_instructional_period)
+        session_count = ip_count if ip_count > 0 else (s.default_session_count or 3)
+    else:
+        session_count = body.session_count or s.default_session_count or 3
+
+    pn = ParadeNight(squadron_id=s.id, wing_id=s.wing_id, date=body.date, term=body.term,
+                     start_time=s.default_start_time, end_time=s.default_end_time,
+                     session_count=session_count, parade_type=body.parade_type or "normal",
+                     timing_template_id=effective_tmpl.id if effective_tmpl else None,
+                     created_by=p.user_id)
+    db.add(pn); db.commit()
+    meta = client_meta(request)
+    audit(db, p, object_type="parade_night", object_id=pn.id, action="create",
+          new={"date": body.date}, ip=meta["ip"], ua=meta["ua"])
+    return {"ok": True, "parade_night_id": pn.id}
+
+
+def _pn_dict(pn: ParadeNight) -> dict:
+    return {"parade_night_id": pn.id, "squadron_id": pn.squadron_id, "date": pn.date, "term": pn.term,
+            "start_time": pn.start_time, "end_time": pn.end_time, "session_count": pn.session_count,
+            "parade_type": pn.parade_type, "published_status": pn.published_status,
+            "readiness_score": pn.readiness_score, "closeout_status": pn.closeout_status,
+            "timing_template_id": pn.timing_template_id}
+
+
+# ── SESSIONS ──
+class SessionIn(BaseModel):
+    parade_night_id: str
+    period_number: int = 1
+    cadet_group: str | None = None  # orientation/initial/junior/intermediate/senior
+    phase_at_time: str | None = "B. Initial"
+    curriculum_item_id: str | None = None
+    custom_title: str | None = None
+    facilitator_id: str | None = None
+    training_area_id: str | None = None
+    expected_attendance: int | None = None
+
+
+class StatusIn(BaseModel):
+    status: str
+    reason: str | None = None
+    rescheduled_to_date: str | None = None
+    actual_attendance: int | None = None
+
+
+def _recompute(db: DBSession, pn: ParadeNight):
+    sess = [_sess_dict(x) for x in db.query(Session).filter(Session.parade_night_id == pn.id,
+                                                            Session.is_archived == False).all()]  # noqa: E712
+    pn.readiness_score = score_parade(sess)["score"]
+    db.commit()
+
+
+@router.post("/sessions")
+def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    pn = db.get(ParadeNight, body.parade_night_id)
+    if not pn:
+        raise HTTPException(404, detail={"error": "parade_night_not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    s = Session(parade_night_id=pn.id, squadron_id=pn.squadron_id, period_number=body.period_number,
+                cadet_group=body.cadet_group, phase_at_time=body.phase_at_time, custom_title=body.custom_title,
+                expected_attendance=body.expected_attendance, status="planned", created_by=p.user_id)
+    _denormalise(db, s, body.curriculum_item_id, body.facilitator_id, body.training_area_id)
+    db.add(s); db.commit()
+    _recompute(db, pn)
+    audit(db, p, object_type="session", object_id=s.id, action="create")
+    return {"ok": True, "session_id": s.id}
+
+
+@router.put("/sessions/{sid}")
+def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    s = db.get(Session, sid)
+    if not s:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id)
+    require_can_write_squadron(p, s.squadron_id, pn.wing_id if pn else None)
+    old = {"facilitator_id": s.facilitator_id, "training_area_id": s.training_area_id}
+    s.period_number = body.period_number
+    s.cadet_group = body.cadet_group
+    s.phase_at_time = body.phase_at_time
+    s.custom_title = body.custom_title
+    s.expected_attendance = body.expected_attendance
+    _denormalise(db, s, body.curriculum_item_id, body.facilitator_id, body.training_area_id)
+    db.commit()
+    if pn:
+        _recompute(db, pn)
+    # Edits after publication require a reason (recorded in audit).
+    audit(db, p, object_type="session", object_id=s.id, action="edit", old=old,
+          new={"facilitator_id": s.facilitator_id, "training_area_id": s.training_area_id})
+    return {"ok": True}
+
+
+@router.post("/sessions/{sid}/status")
+def set_status(sid: str, body: StatusIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    s = db.get(Session, sid)
+    if not s:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id)
+    require_can_write_squadron(p, s.squadron_id, pn.wing_id if pn else None)
+    if body.status not in VALID_STATUS:
+        raise HTTPException(400, detail={"error": "invalid_status"})
+    if body.status == "not_delivered" and not (body.reason or "").strip():
+        raise HTTPException(400, detail={"error": "reason_required_not_delivered"})
+    old = s.status
+    s.status = body.status
+    if body.status == "not_delivered":
+        s.not_delivered_reason = body.reason
+    if body.status in ("cancelled", "cancelled_late"):
+        s.cancelled_reason = body.reason
+    if body.status == "rescheduled":
+        s.rescheduled_to_date = body.rescheduled_to_date
+    if body.actual_attendance is not None:
+        s.actual_attendance = body.actual_attendance
+    db.add(SessionStatusHistory(session_id=s.id, old_status=old, new_status=body.status,
+                                changed_by=p.user_id, reason=body.reason))
+    db.commit()
+    if pn:
+        _recompute(db, pn)
+    audit(db, p, object_type="session", object_id=s.id, action="status_change",
+          old={"status": old}, new={"status": body.status}, reason=body.reason)
+    return {"ok": True}
+
+
+def _denormalise(db, s: Session, cid, fid, rid):
+    if cid is not None:
+        s.curriculum_item_id = cid
+        c = db.get(CurriculumItem, cid) if cid else None
+        if c:
+            s.curriculum_code_at_time = c.code
+            s.curriculum_title_at_time = c.title
+            s.phase_at_time = c.phase
+            s.element_at_time = c.element
+    if fid is not None:
+        s.facilitator_id = fid
+        f = db.get(Facilitator, fid) if fid else None
+        if f:
+            s.facilitator_rank_at_time = f.current_rank
+            s.facilitator_display_name_at_time = " ".join(x for x in [f.current_rank, f.first_name, f.last_name] if x)
+        elif fid is None:
+            s.facilitator_display_name_at_time = None
+    if rid is not None:
+        s.training_area_id = rid
+        r = db.get(TrainingArea, rid) if rid else None
+        s.training_area_name_at_time = r.name if r else None
+
+
+@router.post("/parade-nights/{pnid}/publish")
+def publish(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    pn = db.get(ParadeNight, pnid)
+    if not pn:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    sess = [_sess_dict(x) for x in db.query(Session).filter(Session.parade_night_id == pn.id,
+                                                            Session.is_archived == False).all()]  # noqa: E712
+    blockers = publish_blockers(sess)
+    if blockers:
+        raise HTTPException(409, detail={"error": "publish_blocked", "blockers": blockers})
+    pn.published_status = True; pn.published_by = p.user_id; pn.published_at = utcnow()
+    db.query(Session).filter(Session.parade_night_id == pn.id,
+                             Session.status.in_(("draft", "planned"))).update({"status": "published"})
+    db.commit()
+    audit(db, p, object_type="parade_night", object_id=pn.id, action="publish")
+    return {"ok": True}
+
+
+@router.post("/parade-nights/{pnid}/close")
+def close(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    pn = db.get(ParadeNight, pnid)
+    if not pn:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    sess = [_sess_dict(x) for x in db.query(Session).filter(Session.parade_night_id == pn.id,
+                                                            Session.is_archived == False).all()]  # noqa: E712
+    blockers = close_blockers(sess)
+    if blockers:
+        raise HTTPException(409, detail={"error": "close_blocked", "blockers": blockers})
+    pn.closeout_status = "closed"; pn.closed_by = p.user_id; pn.closed_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="parade_night", object_id=pn.id, action="close")
+    return {"ok": True}
+
+
+# ── FACILITATORS ──
+_MAX_TAGS = 20
+_MAX_TAG_LEN = 80
+
+
+def _validate_subject_areas(raw: list[str] | None) -> list[str]:
+    """Trim, deduplicate (case-insensitive), and enforce limits on tag list."""
+    if not raw:
+        return []
+    seen: dict[str, str] = {}
+    for item in raw:
+        if not isinstance(item, str):
+            raise HTTPException(422, detail={"error": "subject_areas_invalid",
+                                             "message": "Each subject area must be a string."})
+        tag = item.strip()
+        if not tag:
+            continue
+        if len(tag) > _MAX_TAG_LEN:
+            raise HTTPException(422, detail={"error": "subject_areas_invalid",
+                                             "message": f"Tags must be {_MAX_TAG_LEN} characters or fewer."})
+        seen.setdefault(tag.lower(), tag)
+    result = list(seen.values())
+    if len(result) > _MAX_TAGS:
+        raise HTTPException(422, detail={"error": "subject_areas_invalid",
+                                         "message": f"A maximum of {_MAX_TAGS} subject areas is allowed."})
+    return result
+
+
+class FacIn(BaseModel):
+    first_name: str | None = None
+    last_name: str
+    current_rank: str | None = None
+    type: str | None = "Staff"
+    subject_areas: list[str] | None = None
+
+
+@router.get("/facilitators")
+def list_facs(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _active_squadron(p)
+    facs = db.query(Facilitator).filter(Facilitator.squadron_id == sq_id,
+                                        Facilitator.is_archived == False).all()  # noqa: E712
+    out = []
+    for f in facs:
+        out.append({"facilitator_id": f.id, "first_name": f.first_name, "last_name": f.last_name,
+                    "current_rank": f.current_rank, "type": f.type,
+                    "subject_areas": f.subject_areas or []})
+    return out
+
+
+@router.post("/facilitators")
+def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    sq_id = _active_squadron(p)
+    if not sq_id:
+        require_can_write_squadron(p, "none", None)
+    s = db.get(Squadron, sq_id)
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    require_can_write_squadron(p, s.id, s.wing_id)
+    f = Facilitator(squadron_id=s.id, wing_id=s.wing_id, first_name=body.first_name,
+                    last_name=body.last_name, current_rank=body.current_rank, type=body.type or "Staff",
+                    subject_areas=_validate_subject_areas(body.subject_areas))
+    db.add(f); db.commit()
+    db.add(FacilitatorRankHistory(facilitator_id=f.id, rank=body.current_rank, effective_from=str(utcnow().date())))
+    db.commit()
+    audit(db, p, object_type="facilitator", object_id=f.id, action="create")
+    return {"ok": True, "facilitator_id": f.id}
+
+
+class FacUpdateIn(BaseModel):
+    subject_areas: list[str] | None = None
+    type: str | None = None
+    current_rank: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+
+
+@router.patch("/facilitators/{fid}")
+def update_fac(fid: str, body: FacUpdateIn, db: DBSession = Depends(get_db),
+               p: Principal = Depends(get_principal)):
+    f = db.get(Facilitator, fid)
+    if not f:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, f.squadron_id, f.wing_id)
+    if body.subject_areas is not None:
+        f.subject_areas = _validate_subject_areas(body.subject_areas)
+    if body.type is not None:
+        f.type = body.type
+    if body.current_rank is not None:
+        f.current_rank = body.current_rank
+    if body.first_name is not None:
+        f.first_name = body.first_name
+    if body.last_name is not None:
+        f.last_name = body.last_name
+    db.commit()
+    audit(db, p, object_type="facilitator", object_id=f.id, action="update",
+          reason="subject-area tags" if body.subject_areas is not None else "update")
+    return {"ok": True, "facilitator_id": f.id,
+            "subject_areas": f.subject_areas or []}
+
+
+@router.get("/facilitators/{fid}/stats")
+def fac_stats(fid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    f = db.get(Facilitator, fid)
+    if not f:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_view_squadron(p, f.squadron_id, f.wing_id)
+    sess = db.query(Session).filter(Session.facilitator_id == fid).all()
+    counts, by_phase = {}, {}
+    for s in sess:
+        counts[s.status] = counts.get(s.status, 0) + 1
+        by_phase[s.phase_at_time] = by_phase.get(s.phase_at_time, 0) + 1
+    return {"facilitator": {"facilitator_id": f.id, "name": " ".join(x for x in [f.current_rank, f.first_name, f.last_name] if x)},
+            "counts": counts, "by_phase": by_phase, "load_score": len(sess) * 2,
+            "sessions": [_sess_dict(s) for s in sess]}
+
+
+# ── RESOURCES ──
+@router.get("/training-areas")
+def list_rooms(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _active_squadron(p)
+    rows = db.query(TrainingArea).filter(TrainingArea.squadron_id == sq_id,
+                                         TrainingArea.is_archived == False).all()  # noqa: E712
+    return [{"training_area_id": r.id, "name": r.name, "type": r.type, "capacity": r.capacity,
+             "indoor_outdoor": r.indoor_outdoor} for r in rows]
+
+
+@router.get("/equipment")
+def list_equipment(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _active_squadron(p)
+    rows = db.query(Equipment).filter(Equipment.squadron_id == sq_id,
+                                      Equipment.is_archived == False).all()  # noqa: E712
+    return [{"equipment_id": e.id, "name": e.name, "type": e.type, "quantity": e.quantity,
+             "available_quantity": e.available_quantity} for e in rows]
+
+
+@router.get("/resources/clashes")
+def resource_clashes(date: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Detect room/facilitator double-booking on a given parade date."""
+    sq_id = _active_squadron(p)
+    pn = db.query(ParadeNight).filter(ParadeNight.squadron_id == sq_id, ParadeNight.date == date).first()
+    clashes = []
+    if pn:
+        sess = db.query(Session).filter(Session.parade_night_id == pn.id).all()
+        rooms, facs = {}, {}
+        for s in sess:
+            if s.training_area_id:
+                rooms.setdefault(s.training_area_id, []).append(s.period_number)
+            if s.facilitator_id:
+                facs.setdefault(s.facilitator_id, []).append(s.period_number)
+        for rid, periods in rooms.items():
+            if len(periods) != len(set(periods)):
+                clashes.append({"type": "room_clash", "resource_id": rid})
+        for fid, periods in facs.items():
+            if len(periods) != len(set(periods)):
+                clashes.append({"type": "facilitator_clash", "resource_id": fid})
+    return {"date": date, "clashes": clashes}
+
+
+# ── CADETS (sensitive; sqn_general blocked) ──
+@router.get("/cadets")
+def list_cadets(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    if p.role == "sqn_general":
+        raise HTTPException(403, detail={"error": "forbidden"})
+    sq_id = _active_squadron(p)
+    rows = db.query(Cadet).filter(Cadet.squadron_id == sq_id, Cadet.is_archived == False).all()  # noqa: E712
+    # support_notes (sensitive) only for admins
+    can_sensitive = p.role in ("sqn_admin", "wing_admin", "national_admin", "system_admin")
+    out = []
+    for c in rows:
+        d = {"cadet_id": c.id, "service_number": c.service_number, "rank": c.rank,
+             "first_name": c.first_name, "last_name": c.last_name, "phase": c.phase,
+             "attendance_percentage": c.attendance_percentage,
+             "sitrep_part_1_status": c.sitrep_part_1_status, "support_flag": c.support_flag}
+        if can_sensitive:
+            d["support_notes"] = c.support_notes
+        out.append(d)
+    if any(c.support_notes for c in rows) and can_sensitive:
+        audit(db, p, object_type="cadet", object_id=sq_id, action="view_sensitive")
+    return out
+
+
+@router.get("/cadets/risk")
+def cadet_risk(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    if p.role == "sqn_general":
+        raise HTTPException(403, detail={"error": "forbidden"})
+    sq_id = _active_squadron(p)
+    rows = db.query(Cadet).filter(Cadet.squadron_id == sq_id, Cadet.is_archived == False).all()  # noqa: E712
+    flags = []
+    for c in rows:
+        reasons = []
+        if (c.attendance_percentage or 100) < 75:
+            reasons.append("Attendance below 75%")
+        if c.recent_attendance_trend == "declining":
+            reasons.append("Attendance declining")
+        if c.sitrep_part_1_status == "pending":
+            reasons.append("SITREP Part 1 missing")
+        if reasons:
+            flags.append({"cadet": f"{c.rank} {c.first_name} {c.last_name}", "reasons": reasons})
+    return flags
+
+
+# ── PARADE NIGHT BUILDER ────────────────────────────────────────────────────
+@router.get("/parade-nights/{pnid}/builder")
+def parade_night_builder(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Return timing template blocks + sessions grid (cadet_group × period_number) for Night Builder."""
+    pn = db.get(ParadeNight, pnid)
+    if not pn:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_view_squadron(p, pn.squadron_id, pn.wing_id)
+
+    # Timing template blocks
+    timing_blocks: list[dict] = []
+    session_count = pn.session_count or 3
+    tmpl = None
+    if pn.timing_template_id:
+        tmpl = db.get(TimingTemplate, pn.timing_template_id)
+    if not tmpl:
+        tmpl = _effective_template(db, pn.squadron_id, pn.date)
+    if tmpl:
+        blocks = db.query(TimingBlock).filter(
+            TimingBlock.timing_template_id == tmpl.id,
+        ).order_by(TimingBlock.display_order).all()
+        timing_blocks = [
+            {
+                "display_order": b.display_order, "block_name": b.block_name,
+                "block_type": b.block_type, "start_time": b.start_time, "end_time": b.end_time,
+                "duration_minutes": b.duration_minutes,
+                "is_instructional_period": b.is_instructional_period,
+                "period_number": b.period_number,
+            }
+            for b in blocks
+        ]
+        ip_count = sum(1 for b in blocks if b.is_instructional_period)
+        if ip_count > 0:
+            session_count = ip_count
+
+    sessions = db.query(Session).filter(
+        Session.parade_night_id == pnid,
+        Session.is_archived == False,  # noqa: E712
+    ).order_by(Session.period_number, Session.cadet_group).all()
+
+    return {
+        "parade_night_id": pnid,
+        "parade_date": pn.date,
+        "parade_type": pn.parade_type,
+        "squadron_id": pn.squadron_id,
+        "session_count": session_count,
+        "timing_template_id": tmpl.id if tmpl else None,
+        "timing_blocks": timing_blocks,
+        "cadet_groups": ["orientation", "initial", "junior", "intermediate", "senior"],
+        "sessions": [_sess_dict(s) for s in sessions],
+    }
+
+
+# ── PARADE NIGHT DELETE ──────────────────────────────────────────────────────
+@router.delete("/parade-nights/{pnid}")
+def delete_parade(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    pn = db.get(ParadeNight, pnid)
+    if not pn:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    pn.is_archived = True
+    pn.archived_at = utcnow()
+    db.query(Session).filter(Session.parade_night_id == pn.id).update(
+        {"is_archived": True}, synchronize_session=False)
+    db.commit()
+    audit(db, p, object_type="parade_night", object_id=pn.id, action="archive")
+    return {"ok": True}
+
+
+# ── FACILITATOR DELETE ───────────────────────────────────────────────────────
+@router.delete("/facilitators/{fid}")
+def delete_fac(fid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    f = db.get(Facilitator, fid)
+    if not f:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, f.squadron_id, f.wing_id)
+    f.is_archived = True
+    f.archived_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="facilitator", object_id=f.id, action="archive")
+    return {"ok": True}
+
+
+# ── TRAINING AREA WRITE ──────────────────────────────────────────────────────
+class TrainingAreaIn(BaseModel):
+    name: str
+    type: str | None = None
+    capacity: int | None = None
+    indoor_outdoor: str | None = None
+    notes: str | None = None
+
+
+class TrainingAreaUpdateIn(BaseModel):
+    name: str | None = None
+    type: str | None = None
+    capacity: int | None = None
+    indoor_outdoor: str | None = None
+    notes: str | None = None
+
+
+_WRITE_BLOCKED = ("sqn_general", "wing_viewer", "national_viewer", "auditor")
+
+
+@router.post("/training-areas")
+def create_room(body: TrainingAreaIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    sq_id = _active_squadron(p)
+    if not sq_id:
+        require_can_write_squadron(p, "none", None)
+    s = db.get(Squadron, sq_id)
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    require_can_write_squadron(p, s.id, s.wing_id)
+    r = TrainingArea(squadron_id=s.id, name=body.name, type=body.type,
+                     capacity=body.capacity, indoor_outdoor=body.indoor_outdoor, notes=body.notes)
+    db.add(r)
+    db.commit()
+    audit(db, p, object_type="training_area", object_id=r.id, action="create")
+    return {"ok": True, "training_area_id": r.id}
+
+
+@router.patch("/training-areas/{rid}")
+def update_room(rid: str, body: TrainingAreaUpdateIn, db: DBSession = Depends(get_db),
+                p: Principal = Depends(get_principal)):
+    r = db.get(TrainingArea, rid)
+    if not r:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, r.squadron_id)
+    require_can_write_squadron(p, r.squadron_id, s.wing_id if s else None)
+    if body.name is not None:
+        r.name = body.name
+    if body.type is not None:
+        r.type = body.type
+    if body.capacity is not None:
+        r.capacity = body.capacity
+    if body.indoor_outdoor is not None:
+        r.indoor_outdoor = body.indoor_outdoor
+    if body.notes is not None:
+        r.notes = body.notes
+    db.commit()
+    audit(db, p, object_type="training_area", object_id=r.id, action="update")
+    return {"ok": True, "training_area_id": r.id}
+
+
+@router.delete("/training-areas/{rid}")
+def delete_room(rid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    r = db.get(TrainingArea, rid)
+    if not r:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, r.squadron_id)
+    require_can_write_squadron(p, r.squadron_id, s.wing_id if s else None)
+    r.is_archived = True
+    r.archived_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="training_area", object_id=r.id, action="archive")
+    return {"ok": True}
+
+
+# ── EQUIPMENT WRITE ──────────────────────────────────────────────────────────
+class EquipIn(BaseModel):
+    name: str
+    type: str | None = None
+    quantity: int = 1
+    notes: str | None = None
+
+
+class EquipUpdateIn(BaseModel):
+    name: str | None = None
+    type: str | None = None
+    quantity: int | None = None
+    notes: str | None = None
+
+
+@router.post("/equipment")
+def create_equip(body: EquipIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    sq_id = _active_squadron(p)
+    if not sq_id:
+        require_can_write_squadron(p, "none", None)
+    s = db.get(Squadron, sq_id)
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    require_can_write_squadron(p, s.id, s.wing_id)
+    e = Equipment(squadron_id=s.id, name=body.name, type=body.type,
+                  quantity=body.quantity, available_quantity=body.quantity, notes=body.notes)
+    db.add(e)
+    db.commit()
+    audit(db, p, object_type="equipment", object_id=e.id, action="create")
+    return {"ok": True, "equipment_id": e.id}
+
+
+@router.patch("/equipment/{eid}")
+def update_equip(eid: str, body: EquipUpdateIn, db: DBSession = Depends(get_db),
+                 p: Principal = Depends(get_principal)):
+    e = db.get(Equipment, eid)
+    if not e:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, e.squadron_id)
+    require_can_write_squadron(p, e.squadron_id, s.wing_id if s else None)
+    if body.name is not None:
+        e.name = body.name
+    if body.type is not None:
+        e.type = body.type
+    if body.quantity is not None:
+        e.quantity = body.quantity
+        e.available_quantity = body.quantity
+    if body.notes is not None:
+        e.notes = body.notes
+    db.commit()
+    audit(db, p, object_type="equipment", object_id=e.id, action="update")
+    return {"ok": True, "equipment_id": e.id}
+
+
+@router.delete("/equipment/{eid}")
+def delete_equip(eid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    e = db.get(Equipment, eid)
+    if not e:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, e.squadron_id)
+    require_can_write_squadron(p, e.squadron_id, s.wing_id if s else None)
+    e.is_archived = True
+    e.archived_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="equipment", object_id=e.id, action="archive")
+    return {"ok": True}
+
+
+# ── ACTIVITIES CRUD ──────────────────────────────────────────────────────────
+class ActivityIn(BaseModel):
+    activity_name: str
+    activity_type: str | None = None
+    date_start: str
+    date_end: str | None = None
+    audience: list[str] | None = None
+    notes: str | None = None
+
+
+class ActivityUpdateIn(BaseModel):
+    activity_name: str | None = None
+    activity_type: str | None = None
+    date_start: str | None = None
+    date_end: str | None = None
+    audience: list[str] | None = None
+    notes: str | None = None
+    workflow_status: str | None = None
+
+
+@router.get("/activities")
+def list_activities(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _active_squadron(p)
+    rows = db.query(Activity).filter(Activity.squadron_id == sq_id,
+                                     Activity.is_archived == False).order_by(Activity.date_start).all()  # noqa: E712
+    return [{"activity_id": a.id, "activity_name": a.activity_name, "activity_type": a.activity_type,
+             "date_start": a.date_start, "date_end": a.date_end, "audience": a.audience or [],
+             "notes": a.notes, "workflow_status": a.workflow_status} for a in rows]
+
+
+@router.post("/activities")
+def create_activity(body: ActivityIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    sq_id = _active_squadron(p)
+    if not sq_id:
+        require_can_write_squadron(p, "none", None)
+    s = db.get(Squadron, sq_id)
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    require_can_write_squadron(p, s.id, s.wing_id)
+    a = Activity(squadron_id=s.id, wing_id=s.wing_id, activity_name=body.activity_name,
+                 activity_type=body.activity_type, date_start=body.date_start,
+                 date_end=body.date_end, audience=body.audience, notes=body.notes)
+    db.add(a)
+    db.commit()
+    audit(db, p, object_type="activity", object_id=a.id, action="create")
+    return {"ok": True, "activity_id": a.id}
+
+
+@router.patch("/activities/{aid}")
+def update_activity(aid: str, body: ActivityUpdateIn, db: DBSession = Depends(get_db),
+                    p: Principal = Depends(get_principal)):
+    a = db.get(Activity, aid)
+    if not a:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, a.squadron_id) if a.squadron_id else None
+    require_can_write_squadron(p, a.squadron_id, s.wing_id if s else None)
+    if body.activity_name is not None:
+        a.activity_name = body.activity_name
+    if body.activity_type is not None:
+        a.activity_type = body.activity_type
+    if body.date_start is not None:
+        a.date_start = body.date_start
+    if body.date_end is not None:
+        a.date_end = body.date_end
+    if body.audience is not None:
+        a.audience = body.audience
+    if body.notes is not None:
+        a.notes = body.notes
+    if body.workflow_status is not None:
+        a.workflow_status = body.workflow_status
+    db.commit()
+    audit(db, p, object_type="activity", object_id=a.id, action="update")
+    return {"ok": True, "activity_id": a.id}
+
+
+@router.delete("/activities/{aid}")
+def delete_activity(aid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    a = db.get(Activity, aid)
+    if not a:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, a.squadron_id) if a.squadron_id else None
+    require_can_write_squadron(p, a.squadron_id, s.wing_id if s else None)
+    a.is_archived = True
+    a.archived_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="activity", object_id=a.id, action="archive")
+    return {"ok": True}
+
+
+# ── CURRICULUM WRITE (SQN-owned items only) ──────────────────────────────────
+class CurriculumIn(BaseModel):
+    code: str
+    title: str
+    phase: str = "B. Initial"
+    element: str | None = None
+    recommended_term: str | None = None
+    duration_minutes: int = 60
+    learning_hub_url: str | None = None
+    wing_id: str | None = None  # NAT admins pass this for wing-owned curriculum
+
+
+class CurriculumUpdateIn(BaseModel):
+    title: str | None = None
+    phase: str | None = None
+    element: str | None = None
+    recommended_term: str | None = None
+    duration_minutes: int | None = None
+    learning_hub_url: str | None = None
+
+
+_NAT_ADMIN_ROLES = frozenset({"national_admin", "system_admin"})
+_WING_WRITE_ROLES = frozenset({"wing_admin", "national_admin", "system_admin"})
+
+
+@router.post("/curriculum")
+def create_curriculum(body: CurriculumIn, db: DBSession = Depends(get_db),
+                      p: Principal = Depends(get_principal)):
+    """Create a squadron-owned curriculum item (owning_level=squadron)."""
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    sq_id = _active_squadron(p)
+    if not sq_id:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    s = db.get(Squadron, sq_id)
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    require_can_write_squadron(p, s.id, s.wing_id)
+    exists = db.query(CurriculumItem).filter(
+        CurriculumItem.code == body.code,
+        CurriculumItem.squadron_id == sq_id,
+        CurriculumItem.is_archived == False).first()  # noqa: E712
+    if exists:
+        raise HTTPException(409, detail={"error": "code_exists"})
+    ci = CurriculumItem(squadron_id=s.id, wing_id=s.wing_id, owning_level="squadron",
+                        code=body.code, title=body.title, phase=body.phase, element=body.element,
+                        recommended_term=body.recommended_term, duration_minutes=body.duration_minutes,
+                        learning_hub_url=body.learning_hub_url, core_status="additional")
+    db.add(ci)
+    db.commit()
+    audit(db, p, object_type="curriculum_item", object_id=ci.id, action="create",
+          new={"owning_level": "squadron"})
+    return {"ok": True, "curriculum_id": ci.id}
+
+
+@router.post("/curriculum/wing")
+def create_wing_curriculum(body: CurriculumIn, db: DBSession = Depends(get_db),
+                           p: Principal = Depends(get_principal)):
+    """Create a Wing-owned curriculum item visible to all squadrons under that Wing."""
+    if p.role not in _WING_WRITE_ROLES:
+        raise HTTPException(403, detail={"error": "forbidden",
+                                          "message": "Only Wing or NAT HQ admin can create Wing curriculum."})
+    wing_id = body.wing_id or p.acting_wing_id or p.wing_id
+    if not wing_id:
+        raise HTTPException(400, detail={"error": "no_wing_scope",
+                                          "message": "Provide wing_id in the request body or enter proxy mode first."})
+    from ..models import Wing as WingModel
+    w = db.get(WingModel, wing_id)
+    if not w or w.is_archived:
+        raise HTTPException(404, detail={"error": "wing_not_found"})
+    exists = db.query(CurriculumItem).filter(
+        CurriculumItem.code == body.code,
+        CurriculumItem.wing_id == wing_id,
+        CurriculumItem.owning_level == "wing",
+        CurriculumItem.is_archived == False).first()  # noqa: E712
+    if exists:
+        raise HTTPException(409, detail={"error": "code_exists"})
+    ci = CurriculumItem(wing_id=wing_id, squadron_id=None, owning_level="wing",
+                        code=body.code, title=body.title, phase=body.phase, element=body.element,
+                        recommended_term=body.recommended_term, duration_minutes=body.duration_minutes,
+                        learning_hub_url=body.learning_hub_url, core_status="additional")
+    db.add(ci)
+    db.commit()
+    audit(db, p, object_type="curriculum_item", object_id=ci.id, action="create",
+          new={"owning_level": "wing", "wing_id": wing_id})
+    return {"ok": True, "curriculum_id": ci.id}
+
+
+@router.post("/curriculum/national")
+def create_national_curriculum(body: CurriculumIn, db: DBSession = Depends(get_db),
+                               p: Principal = Depends(get_principal)):
+    """Create a National curriculum item visible to all Wings and Squadrons."""
+    if p.role not in _NAT_ADMIN_ROLES:
+        raise HTTPException(403, detail={"error": "forbidden",
+                                          "message": "Only NAT HQ admin can create National curriculum."})
+    exists = db.query(CurriculumItem).filter(
+        CurriculumItem.code == body.code,
+        CurriculumItem.owning_level == "national",
+        CurriculumItem.is_archived == False).first()  # noqa: E712
+    if exists:
+        raise HTTPException(409, detail={"error": "code_exists"})
+    ci = CurriculumItem(wing_id=None, squadron_id=None, owning_level="national",
+                        code=body.code, title=body.title, phase=body.phase, element=body.element,
+                        recommended_term=body.recommended_term, duration_minutes=body.duration_minutes,
+                        learning_hub_url=body.learning_hub_url, core_status="core")
+    db.add(ci)
+    db.commit()
+    audit(db, p, object_type="curriculum_item", object_id=ci.id, action="create",
+          new={"owning_level": "national"})
+    return {"ok": True, "curriculum_id": ci.id}
+
+
+@router.patch("/curriculum/{cid}")
+def update_curriculum(cid: str, body: CurriculumUpdateIn, db: DBSession = Depends(get_db),
+                      p: Principal = Depends(get_principal)):
+    ci = db.get(CurriculumItem, cid)
+    if not ci:
+        raise HTTPException(404, detail={"error": "not_found"})
+    # Ownership check by level
+    if ci.owning_level == "national":
+        if p.role not in _NAT_ADMIN_ROLES:
+            raise HTTPException(403, detail={"error": "cannot_edit_national_curriculum"})
+    elif ci.owning_level == "wing":
+        if p.role not in _WING_WRITE_ROLES:
+            raise HTTPException(403, detail={"error": "cannot_edit_wing_curriculum"})
+        # NAT admins may edit any wing's curriculum; wing admins are scoped to their own wing
+        if p.role not in _NAT_ADMIN_ROLES:
+            actor_wing = p.acting_wing_id or p.wing_id
+            if ci.wing_id != actor_wing:
+                raise HTTPException(403, detail={"error": "out_of_scope"})
+    else:
+        sq_id = _active_squadron(p)
+        if ci.squadron_id != sq_id:
+            raise HTTPException(403, detail={"error": "forbidden"})
+    if body.title is not None:
+        ci.title = body.title
+    if body.phase is not None:
+        ci.phase = body.phase
+    if body.element is not None:
+        ci.element = body.element
+    if body.recommended_term is not None:
+        ci.recommended_term = body.recommended_term
+    if body.duration_minutes is not None:
+        ci.duration_minutes = body.duration_minutes
+    if body.learning_hub_url is not None:
+        ci.learning_hub_url = body.learning_hub_url
+    db.commit()
+    audit(db, p, object_type="curriculum_item", object_id=ci.id, action="update")
+    return {"ok": True}
+
+
+@router.delete("/curriculum/{cid}")
+def delete_curriculum(cid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    ci = db.get(CurriculumItem, cid)
+    if not ci:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if ci.owning_level == "national":
+        if p.role not in _NAT_ADMIN_ROLES:
+            raise HTTPException(403, detail={"error": "cannot_delete_national_curriculum"})
+    elif ci.owning_level == "wing":
+        if p.role not in _WING_WRITE_ROLES:
+            raise HTTPException(403, detail={"error": "cannot_delete_wing_curriculum"})
+        if p.role not in _NAT_ADMIN_ROLES:
+            actor_wing = p.acting_wing_id or p.wing_id
+            if ci.wing_id != actor_wing:
+                raise HTTPException(403, detail={"error": "out_of_scope"})
+    else:
+        sq_id = _active_squadron(p)
+        if ci.squadron_id != sq_id:
+            raise HTTPException(403, detail={"error": "forbidden"})
+    ci.is_archived = True
+    ci.archived_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="curriculum_item", object_id=ci.id, action="archive")
+    return {"ok": True}

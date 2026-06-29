@@ -1,0 +1,12 @@
+@media print {
+  .topbar, .sidenav, .banner, .no-print { display: none !important; }
+  .app, .body { display: block !important; }
+  .main { padding: 0 !important; }
+  .print-sheet { padding: 8mm; }
+  .print-head h2 { margin: 0 0 4px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #888; padding: 4px 6px; font-size: 11px; }
+  .print-foot { margin-top: 10mm; font-size: 10px; color: #555; }
+  @page { size: A4; margin: 12mm; }
+}
+.weekly .print-sheet { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-top: 14px; }

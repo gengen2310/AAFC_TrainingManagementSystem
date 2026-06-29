@@ -1,0 +1,11 @@
+*{box-sizing:border-box;}
+body{margin:0;font-family:Montserrat,Arial,system-ui,sans-serif;background:var(--background);color:var(--text);font-size:14px;}
+a{color:var(--aafc-royal-blue);}
+.skip-link{position:absolute;left:-999px;top:0;background:var(--primary);color:#fff;padding:8px;z-index:100;}
+.skip-link:focus{left:8px;}
+:focus-visible{outline:3px solid var(--aafc-blue);outline-offset:2px;}
+button{font-family:inherit;cursor:pointer;}
+h1,h2,h3{font-weight:800;}
+table{border-collapse:collapse;width:100%;}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);font-size:12.5px;}
+th{color:var(--muted-text);font-size:11px;text-transform:uppercase;letter-spacing:.04em;}

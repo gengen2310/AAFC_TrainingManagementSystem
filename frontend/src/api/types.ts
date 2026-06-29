@@ -1,0 +1,110 @@
+// Types mirror the backend response shapes exactly (read from the route handlers).
+export interface SessionInfo {
+  user_id: string; display_name: string; role: string;
+  wing_id: string | null; squadron_id: string | null; national_id: string | null;
+  is_wing: boolean; is_national: boolean;
+  proxy?: { mode: string; acting_squadron_id: string | null; acting_wing_id: string | null; proxy_session_id: string } | null;
+}
+export interface Squadron {
+  squadron_id: string; wing_id: string; code: string; name: string; short_name: string;
+  address: string | null; default_parade_day: string | null;
+  default_start_time: string | null; default_end_time: string | null; default_session_count: number | null;
+}
+export interface Wing { wing_id: string; code: string; name: string; }
+export interface UserRecord {
+  user_id: string; display_name: string; role: string;
+  wing_id: string | null; squadron_id: string | null; national_id: string | null;
+  squadron_code: string | null; wing_code: string | null;
+}
+export interface AccountRecord {
+  user_id: string; display_name: string; role: string; scope_type: string;
+  wing_id: string | null; squadron_id: string | null; national_id: string | null;
+  flight_id: string | null; squadron_code: string | null; wing_code: string | null;
+  active_status: boolean; last_login_at: string | null;
+  code_last_changed: string | null; code_changed_by: string | null;
+}
+export interface AccountCreateResult extends AccountRecord {
+  new_code: string; new_code_notice: string;
+}
+export interface Flight {
+  flight_id: string; squadron_id: string; squadron_code: string | null;
+  squadron_name: string | null; name: string; active_status: boolean;
+  created_at: string | null;
+}
+export interface CurriculumItem {
+  curriculum_id: string; code: string; title: string; phase: string; element: string;
+  duration_minutes: number; core_status: string; learning_hub_url: string | null;
+  recommended_term: number | null; session_count: number; progress: string;
+}
+export interface SessionRow {
+  id: string; parade_night_id: string; squadron_id: string; period_number: number;
+  status: string; phase_at_time: string | null; curriculum_item_id: string | null;
+  curriculum_code_at_time: string | null; curriculum_title_at_time: string | null;
+  custom_title: string | null; facilitator_id: string | null;
+  facilitator_display_name_at_time: string | null; training_area_id: string | null;
+  expected_attendance: number | null; actual_attendance: number | null;
+  not_delivered_reason: string | null; rescheduled_to_date: string | null;
+  [k: string]: unknown;
+}
+export interface ParadeNight {
+  parade_night_id: string; squadron_id: string; date: string; term: number | null;
+  start_time: string | null; end_time: string | null; session_count: number;
+  parade_type: string; published_status: boolean; readiness_score: number | null; closeout_status: string | null;
+}
+export interface ParadeNightWithSessions extends ParadeNight { sessions: SessionRow[]; }
+export interface ParadeNightDetail extends ParadeNightWithSessions {
+  readiness: { score: number; band: string; deductions: { reason: string; points: number }[] };
+  publish_blockers: string[];
+}
+export interface Facilitator {
+  facilitator_id: string; first_name: string; last_name: string;
+  current_rank: string | null; type: string; subject_areas: string[];
+}
+export interface FacilitatorStats {
+  facilitator: { facilitator_id: string; name: string };
+  counts: Record<string, number>; by_phase: Record<string, number>;
+  load_score: number; sessions: SessionRow[];
+}
+export interface TrainingArea { training_area_id: string; name: string; type: string | null; capacity: number | null; [k: string]: unknown; }
+export interface Equipment { equipment_id: string; name: string; type: string | null; quantity: number | null; [k: string]: unknown; }
+export interface ClashResult { date: string; clashes: { type: string; resource_id: string }[]; }
+export interface Cadet {
+  cadet_id: string; service_number: string | null; rank: string | null;
+  first_name: string; last_name: string; phase: string | null;
+  attendance_percentage: number | null; sitrep_part_1_status: string | null;
+  support_flag: boolean | null; support_notes?: string | null;
+}
+export interface CadetRiskFlag { cadet: string; reasons: string[]; }
+export interface AuditRow {
+  audit_id: string; timestamp: string; role: string; action: string;
+  object_type: string | null; object_id: string | null; reason: string | null; proxy_session_id: string | null;
+}
+export interface ActionItem {
+  action_id: string; title: string; description: string | null; owner: string | null;
+  due_date: string | null; status: string; severity: string | null; source: string | null;
+}
+// Reports
+export interface SummaryReport { title: string; counts: Record<string, number>; total: number; decision: string; }
+export interface ReadinessReport { title: string; parade_nights: { parade_night_id: string; date: string; score: number; band: string; deductions: { reason: string; points: number }[] }[]; decision: string; }
+export interface CoverageReport { title: string; total: number; scheduled: number; delivered: number; coverage_pct: number; unscheduled: { code: string; title: string; phase: string }[]; decision: string; }
+export interface FacLoadReport { title: string; facilitators: { name: string; facilitator_id: string | null; sessions: number; delivered: number; risk: string }[]; decision: string; }
+export interface NotDeliveredReport { title: string; sessions: { id: string; curriculum_code_at_time: string | null; not_delivered_reason: string | null; status: string }[]; decision: string; }
+export interface WingOverview { squadrons: WingSquadronRow[]; }
+export interface WingSquadronRow {
+  squadron_id: string; code: string; short_name: string; parade_day: string | null;
+  nights: number; published: number; sessions: number; delivered: number; pct: number;
+  readiness: number | null; no_future_plan: boolean; no_published_plan: boolean;
+  coverage_pct: number; not_delivered: number;
+}
+export interface WingPhaseCoverage { phases: string[]; squadrons: { squadron_id: string; short_name: string; phase_pct: Record<string, number> }[]; }
+export interface NationalOverview { wings: { wing_id: string; code: string; name: string; squadrons: number; sessions: number; delivered: number; not_delivered: number; coverage_pct: number }[]; }
+export interface NationalCapabilityWing {
+  wing_id: string; code: string; name: string;
+  squadrons: number; facilitator_total: number;
+  subject_none_sqns: Record<string, number>;
+  subject_distribution: Record<string, number>;
+}
+export interface NationalCapability { subjects: string[]; wings: NationalCapabilityWing[]; }
+// Imports
+export interface ImportPreview { headers: string[]; row_count: number; preview: Record<string, string>[]; detected: Record<string, string | null>; }
+export interface ImportCommitResult { ok: boolean; import_id: string; accepted: number; rejected: number; }

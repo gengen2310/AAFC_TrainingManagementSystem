@@ -1,0 +1,18 @@
+fastapi>=0.110
+uvicorn[standard]>=0.27
+sqlalchemy>=2.0
+pydantic>=2.6
+pydantic-settings>=2.1
+pyjwt>=2.8
+passlib>=1.7
+python-multipart>=0.0.9
+alembic>=1.13
+httpx>=0.26
+pytest>=8.0
+openpyxl>=3.1
+reportlab>=4.0
+# Production extras (install in prod image):
+# psycopg2-binary>=2.9
+# redis>=5.0
+# celery>=5.3
+# gunicorn>=21.2

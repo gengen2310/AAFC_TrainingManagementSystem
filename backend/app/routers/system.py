@@ -1,0 +1,294 @@
+"""System Admin Console endpoints — system_admin role required for all privileged operations.
+
+All state-changing actions are audited. No secrets, hashes, or access-code plaintext
+are returned from any endpoint here.
+"""
+import os
+import shutil
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.orm import Session as DBSession
+
+from ..config import settings
+from ..database import get_db
+from ..dependencies import get_principal
+from ..models import (
+    User, Wing, Squadron, AuditLog, SystemSetting, AccessCode,
+    PlanningYear, ParadeDate, Session, CurriculumItem,
+)
+from ..permissions import Principal, require_system_admin, require_audit_access
+from ..services import audit
+
+router = APIRouter(prefix="/api/system", tags=["system"])
+
+APP_VERSION = "17.1.0"
+PACKAGE_VERSION = "v17.1"
+
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+def _get_setting(db: DBSession, key: str, default: str | None = None) -> str | None:
+    row = db.get(SystemSetting, key)
+    return row.value if row else default
+
+
+def _set_setting(db: DBSession, key: str, value: str | None, updated_by: str) -> None:
+    row = db.get(SystemSetting, key)
+    if row is None:
+        row = SystemSetting(key=key)
+        db.add(row)
+    row.value = value
+    row.updated_at = datetime.now(timezone.utc)
+    row.updated_by = updated_by
+    db.commit()
+
+
+def _migration_head() -> str:
+    """Return current Alembic revision, or 'unknown' if alembic is unavailable."""
+    try:
+        result = subprocess.run(
+            ["python", "-m", "alembic", "current"],
+            capture_output=True, text=True, timeout=10,
+            cwd=Path(__file__).parent.parent.parent,
+        )
+        lines = [l.strip() for l in result.stdout.splitlines() if l.strip()]
+        return lines[-1] if lines else "unknown"
+    except Exception:
+        return "unknown"
+
+
+def _db_type() -> str:
+    url = settings.DATABASE_URL
+    if url.startswith("sqlite"):
+        return "SQLite (local demo)"
+    if "postgres" in url or "pg" in url:
+        return "PostgreSQL"
+    return "other"
+
+
+# ── GET /api/system/overview ──────────────────────────────────────────────────
+
+@router.get("/overview")
+def system_overview(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    wings = db.query(Wing).count()
+    sqns = db.query(Squadron).count()
+    users = db.query(User).count()
+    active_users = db.query(User).filter(User.active_status == True).count()  # noqa: E712
+    maint = _get_setting(db, "maintenance_mode", "off")
+    last_backup = _get_setting(db, "last_backup_at")
+    return {
+        "app_version": APP_VERSION,
+        "package_version": PACKAGE_VERSION,
+        "environment": settings.ENVIRONMENT,
+        "db_type": _db_type(),
+        "wings": wings,
+        "squadrons": sqns,
+        "users_total": users,
+        "users_active": active_users,
+        "maintenance_mode": maint == "on",
+        "maintenance_message": _get_setting(db, "maintenance_message"),
+        "maintenance_until": _get_setting(db, "maintenance_until"),
+        "last_backup_at": last_backup,
+    }
+
+
+# ── GET /api/system/health ────────────────────────────────────────────────────
+
+@router.get("/health")
+def system_health(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    db_ok = False
+    try:
+        db.execute(text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        pass
+    return {
+        "backend": "ok",
+        "db": "ok" if db_ok else "error",
+        "db_type": _db_type(),
+        "environment": settings.ENVIRONMENT,
+        "cookie_secure": settings.COOKIE_SECURE,
+        "cors_origins": settings.cors_origins,
+    }
+
+
+# ── GET /api/system/version ───────────────────────────────────────────────────
+
+@router.get("/version")
+def system_version(p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    return {"app_version": APP_VERSION, "package_version": PACKAGE_VERSION}
+
+
+# ── GET /api/system/migrations ───────────────────────────────────────────────
+
+@router.get("/migrations")
+def system_migrations(p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    return {
+        "expected_head": "e7a9c2f4b8d1",
+        "current": _migration_head(),
+    }
+
+
+# ── GET /api/system/maintenance ──────────────────────────────────────────────
+
+@router.get("/maintenance")
+def get_maintenance(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    return {
+        "enabled": _get_setting(db, "maintenance_mode", "off") == "on",
+        "message": _get_setting(db, "maintenance_message"),
+        "until": _get_setting(db, "maintenance_until"),
+        "updated_at": _get_setting(db, "maintenance_updated_at"),
+    }
+
+
+class MaintenanceIn(BaseModel):
+    message: str | None = None
+    until: str | None = None
+    confirm: str = ""
+
+
+@router.post("/maintenance/enable")
+def enable_maintenance(body: MaintenanceIn, db: DBSession = Depends(get_db),
+                       p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    if body.confirm != "ENABLE MAINTENANCE":
+        raise HTTPException(400, detail={"error": "confirmation_required",
+                                         "message": "Provide confirm='ENABLE MAINTENANCE' to proceed."})
+    _set_setting(db, "maintenance_mode", "on", p.user_id)
+    _set_setting(db, "maintenance_message", body.message or "System under maintenance. Please try again later.", p.user_id)
+    _set_setting(db, "maintenance_until", body.until, p.user_id)
+    _set_setting(db, "maintenance_updated_at",
+                 datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), p.user_id)
+    audit(db, p, object_type="system", object_id="maintenance",
+          action="maintenance_enabled",
+          new={"message": body.message, "until": body.until})
+    from ..main import invalidate_maintenance_cache
+    invalidate_maintenance_cache()
+    return {"enabled": True, "message": body.message, "until": body.until}
+
+
+@router.post("/maintenance/disable")
+def disable_maintenance(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    _set_setting(db, "maintenance_mode", "off", p.user_id)
+    _set_setting(db, "maintenance_updated_at",
+                 datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), p.user_id)
+    audit(db, p, object_type="system", object_id="maintenance", action="maintenance_disabled")
+    from ..main import invalidate_maintenance_cache
+    invalidate_maintenance_cache()
+    return {"enabled": False}
+
+
+# ── GET /api/system/scope-map ─────────────────────────────────────────────────
+
+@router.get("/scope-map")
+def scope_map(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    wings = db.query(Wing).all()
+    out = []
+    for w in wings:
+        sqns = db.query(Squadron).filter(Squadron.wing_id == w.id).all()
+        out.append({
+            "wing_id": w.id,
+            "wing_name": w.name,
+            "wing_code": getattr(w, "code", None),
+            "squadrons": [
+                {"id": s.id, "name": s.name,
+                 "unit_type": getattr(s, "unit_type", None),
+                 "active_status": s.active_status}
+                for s in sqns
+            ],
+        })
+    return {"wings": out}
+
+
+# ── GET /api/system/audit-summary ────────────────────────────────────────────
+
+@router.get("/audit-summary")
+def audit_summary(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
+                  limit: int = 100, action: str | None = None,
+                  role: str | None = None, since: str | None = None):
+    require_audit_access(p)
+    q = db.query(AuditLog)
+    if action:
+        q = q.filter(AuditLog.action == action)
+    if role:
+        q = q.filter(AuditLog.role == role)
+    if since:
+        try:
+            dt = datetime.fromisoformat(since)
+            q = q.filter(AuditLog.timestamp >= dt)
+        except ValueError:
+            raise HTTPException(400, detail={"error": "invalid_since_format"})
+    logs = q.order_by(AuditLog.timestamp.desc()).limit(min(limit, 500)).all()
+    # Never return access-code hashes, JWT secrets, or plaintext secrets in audit output
+    return {"count": len(logs), "logs": [
+        {
+            "id": e.id,
+            "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+            "user_id": e.user_id,
+            "role": e.role,
+            "scope": e.scope,
+            "wing_id": e.wing_id,
+            "squadron_id": e.squadron_id,
+            "object_type": e.object_type,
+            "object_id": e.object_id,
+            "action": e.action,
+            "ip_address": e.ip_address,
+        }
+        for e in logs
+    ]}
+
+
+# ── GET /api/system/backups ───────────────────────────────────────────────────
+
+@router.get("/backups")
+def list_backups(p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    backup_dir = Path(settings.BACKUP_DIR)
+    if not backup_dir.exists():
+        return {"backups": [], "backup_dir": str(backup_dir)}
+    files = sorted(backup_dir.glob("*.db"), key=lambda f: f.stat().st_mtime, reverse=True)
+    return {"backups": [
+        {"filename": f.name,
+         "size_bytes": f.stat().st_size,
+         "created_at": datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc).isoformat()}
+        for f in files[:20]
+    ], "backup_dir": str(backup_dir)}
+
+
+@router.post("/backups")
+def create_backup(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        raise HTTPException(400, detail={
+            "error": "not_sqlite",
+            "message": "File-copy backup is only available for SQLite (local demo). "
+                       "Use your managed PostgreSQL provider's backup tools in production."
+        })
+    db_path_raw = settings.DATABASE_URL.replace("sqlite:///", "").replace("sqlite://", "")
+    db_path = (Path(__file__).parent.parent.parent / db_path_raw).resolve()
+    if not db_path.exists():
+        raise HTTPException(404, detail={"error": "db_not_found", "path": str(db_path)})
+
+    backup_dir = Path(settings.BACKUP_DIR)
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    dest = backup_dir / f"aafc_tms_backup_{ts}.db"
+    shutil.copy2(db_path, dest)
+    size = dest.stat().st_size
+    created_at = datetime.now(timezone.utc).isoformat()
+    _set_setting(db, "last_backup_at", created_at, p.user_id)
+    audit(db, p, object_type="system", object_id="backup", action="backup_created",
+          new={"filename": dest.name, "size_bytes": size})
+    return {"filename": dest.name, "size_bytes": size, "created_at": created_at}

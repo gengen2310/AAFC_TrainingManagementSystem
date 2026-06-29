@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-wheel-metadata/
+
+# SQLite databases and WAL files
+*.db
+*.db-shm
+*.db-wal
+
+# Backups
+backups/
+
+# Test / coverage artefacts
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Logs
+*.log
+logs/
+
+# Distribution packages / delivery ZIPs
+*.zip
+*.tar.gz
+*.whl
+
+# Node
+node_modules/
+frontend/dist/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment files (never commit secrets)
+.env
+.env.*
+!.env.example
