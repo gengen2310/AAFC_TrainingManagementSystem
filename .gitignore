@@ -53,3 +53,9 @@ frontend/dist/
 .env
 .env.*
 !.env.example
+
+# Claude Code IDE — include project rules, exclude local/session files
+.claude/settings.local.json
+.claude/todos.json
+.claude/*.jsonl
+.claude/projects/
