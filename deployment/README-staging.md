@@ -10,106 +10,169 @@
 | **Total**    |                       |       | **$0/mo**  |
 
 > **Free-tier note:** Render's free web service spins down after 15 minutes of inactivity.
-> The first request after sleep takes ~30 seconds (cold start). This is acceptable for staging.
+> The first request after sleep takes ~30 seconds (cold start). Acceptable for staging.
 > Upgrade to Render Starter ($7/mo) to eliminate spin-down.
 
-### Commit
+**Branch:** `deployment/staging-v17.1`  
+**Based on:** `main` @ `79526d16f4d3beb6c7a3f2077c52d7017e4ad085`
 
-Branch: `deployment/staging-v17.1`  
-Based on: `main` @ `79526d16f4d3beb6c7a3f2077c52d7017e4ad085`
+---
+
+## Security model
+
+- No access codes, credentials or bootstrap secrets are ever printed to logs.
+- The initial system_admin access code is set via the environment variable
+  `STAGING_BOOTSTRAP_SYSADMIN_CODE`. It is hashed immediately on container start
+  and the plaintext is never stored or logged.
+- All other accounts (Wings, Squadrons, users) are created through the
+  System Console after first login.
+- After the sysadmin code is reset through the System Console, the bootstrap
+  environment variable is removed from Render and redeployment renders it inert.
 
 ---
 
 ## Step 1 — Provision Supabase PostgreSQL
 
-1. Go to **https://supabase.com** → Sign up (free, no credit card)
-2. Create a new project. Choose a region close to your users.
-3. When the project is ready: **Settings → Database → Connection string → URI**
-4. Copy the connection string. It looks like:
+1. Go to **https://supabase.com** → Sign up (free, no credit card required)
+2. **New project** → choose a name and a region close to your users
+3. Wait for the project to finish provisioning (~2 minutes)
+4. Go to **Settings → Database → Connection string**
+5. Select the **Session Pooler** tab (not Transaction Pooler, not Direct)
+6. Copy the URI. It looks like:
    ```
-   postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres
+   postgresql://postgres.[REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres
    ```
-5. Keep this string — you will enter it in Render in Step 3.
 
-> Supabase free tier: 500 MB database, 2 projects, no expiry.
+> **Why Session Pooler on port 5432?**  
+> Supabase's direct endpoint (`db.[REF].supabase.co`) resolves to an IPv6 address.
+> Render's network is IPv4-only. The Session Pooler endpoint is IPv4 and uses standard
+> port 5432. Do not use the Transaction Pooler (port 6543) — it uses pgBouncer's
+> transaction mode, which is incompatible with SQLAlchemy's default connection handling.
 
----
-
-## Step 2 — Connect GitHub to Render
-
-1. Go to **https://render.com** → Sign up (free, no credit card)
-2. Dashboard → **New → Blueprint**
-3. Connect your GitHub account and select the repository:
-   `gengen2310/AAFC_TrainingManagementSystem`
-4. Choose branch: **`deployment/staging-v17.1`**
-5. Render reads `render.yaml` automatically.
+Keep this URI — you will paste it into Render in Step 3.
+Do not share it. Do not paste it into this conversation.
 
 ---
 
-## Step 3 — Set environment variables
+## Step 2 — Choose a strong bootstrap code
 
-Render will prompt for two `sync: false` values:
+Choose a bootstrap access code for the initial system_admin account.
+Requirements:
+- At least 20 characters
+- Mix of letters and digits
+- Not a dictionary word
+- Not reused from any other system
 
-| Variable              | Value to enter                              |
-|-----------------------|---------------------------------------------|
-| `DATABASE_URL`        | Supabase connection string from Step 1      |
-| `CORS_ALLOWED_ORIGINS`| Enter **temporarily** as `https://placeholder.onrender.com` — update in Step 5 |
-
-`JWT_SECRET` and `SECRET_KEY` are **auto-generated** by Render (`generateValue: true`).
-They are never printed, never committed, and you do not need to set them.
-
-Click **Apply** to begin deployment.
-
----
-
-## Step 4 — Retrieve staging access codes
-
-On first startup, the backend container runs `staging_seed.py`, which:
-- Creates all org structure (National HQ, 7 Wing, 16 Squadrons)
-- Generates strong random access codes (format: `XXXX-XXXX-XXXX-XXXX`)
-- Prints them **once** to the deployment log
-- Stores only hashes — the codes cannot be retrieved again
-
-**To retrieve them:**
-1. Render Dashboard → `aafc-tms-backend-staging` → **Logs**
-2. Look for the section between `=== STAGING ACCESS CODES ===`
-3. Copy the codes immediately and distribute securely (do not save to email/Slack)
-
-If the codes were missed, rotate via `rotate_access_codes.py` (see Step 8).
-
----
-
-## Step 5 — Wire the frontend to the backend
-
-1. In Render Dashboard, find the deployed backend URL, e.g.:
-   `https://aafc-tms-backend-staging.onrender.com`
-2. In this repository, on branch `deployment/staging-v17.1`, edit:
-   `connected-frontend/index.html` line 8:
-   ```html
-   <meta name="aafc-api-base" content="https://aafc-tms-backend-staging.onrender.com">
-   ```
-3. Also update `CORS_ALLOWED_ORIGINS` in Render:
-   Render Dashboard → `aafc-tms-backend-staging` → Environment →
-   set `CORS_ALLOWED_ORIGINS` to the **frontend** URL, e.g.:
-   `https://aafc-tms-frontend-staging.onrender.com`
-4. Push the meta tag change → both services redeploy automatically.
-
----
-
-## Step 6 — Verify deployment
-
-```bash
-# Health check
-curl https://aafc-tms-backend-staging.onrender.com/api/health/ready
-
-# Expected: {"status":"ready","squadrons":16}
-
-# Version
-curl https://aafc-tms-backend-staging.onrender.com/
-# Expected: {"version":"17.1.0",...}
+Example format (do not use this exact value):
+```
+AAFC-STAGE-2026-ADMIN-XQ7R
 ```
 
-Then run the test suite against the live staging URLs:
+Do not write it down in any note-taking app, email or Slack.
+You will enter it directly into the Render dashboard in Step 3.
+After first login and code reset, this value becomes permanently inert.
+
+---
+
+## Step 3 — Deploy via Render Blueprint
+
+1. Go to **https://render.com** → Sign up (free, no credit card required)
+2. **New → Blueprint**
+3. Connect your GitHub account
+4. Select repository: `gengen2310/AAFC_TrainingManagementSystem`
+5. Select branch: **`deployment/staging-v17.1`**
+6. Render reads `render.yaml` automatically and shows the two services
+
+Render will prompt for these `sync: false` values:
+
+| Variable                         | What to enter                                                          |
+|----------------------------------|------------------------------------------------------------------------|
+| `DATABASE_URL`                   | Supabase Session Pooler URI from Step 1 (port 5432)                   |
+| `STAGING_BOOTSTRAP_SYSADMIN_CODE`| Strong bootstrap code chosen in Step 2                                |
+| `CORS_ALLOWED_ORIGINS`           | `https://aafc-tms-frontend-staging.onrender.com` (exact, no wildcard) |
+
+`JWT_SECRET` and `SECRET_KEY` are **auto-generated by Render** (`generateValue: true`).
+You do not set them. They are never shown and never committed.
+
+Click **Apply** to begin deployment. Both services will appear in your Render dashboard.
+
+---
+
+## Step 4 — Confirm deployment
+
+Watch the backend service logs in Render Dashboard → `aafc-tms-backend-staging` → **Logs**.
+
+Expected sequence:
+```
+[entrypoint] Running Alembic migrations...
+INFO  [alembic.runtime.migration] Running upgrade  -> ..., v17 system admin
+[entrypoint] Migrations complete.
+[entrypoint] No system_admin found — running bootstrap seed...
+[staging_seed] Bootstrap complete: system_admin account created.
+[staging_seed] Log in, reset the code via System Console, then remove
+[staging_seed] STAGING_BOOTSTRAP_SYSADMIN_CODE from the Render environment.
+[entrypoint] Starting gunicorn (2 workers)...
+```
+
+Verify both services are live:
+
+```bash
+# Backend health check
+curl https://aafc-tms-backend-staging.onrender.com/api/health/ready
+# Expected: {"status":"ready"}
+
+# Frontend
+open https://aafc-tms-frontend-staging.onrender.com
+# Expected: AAFC TMS login screen
+```
+
+---
+
+## Step 5 — First login and code rotation
+
+1. Open `https://aafc-tms-frontend-staging.onrender.com`
+2. Log in with:
+   - Role: `system_admin`
+   - Code: the value you set for `STAGING_BOOTSTRAP_SYSADMIN_CODE` in Step 3
+3. Navigate to **System Console → Account → Reset access code**
+4. The System Console generates a new code and displays it once
+5. Record the new code securely
+6. Verify login works with the new code before proceeding to Step 6
+
+---
+
+## Step 6 — Remove the bootstrap environment variable
+
+Once the sysadmin code has been reset and verified:
+
+1. Render Dashboard → `aafc-tms-backend-staging` → **Environment**
+2. Delete the variable `STAGING_BOOTSTRAP_SYSADMIN_CODE`
+3. Click **Save Changes** → Render redeploys the backend
+4. On redeployment the log shows:
+   ```
+   [staging_seed] STAGING_BOOTSTRAP_SYSADMIN_CODE not set — skipping bootstrap.
+   [staging_seed] system_admin already exists — skipping (idempotent).
+   ```
+5. The bootstrap variable is now permanently inert — removing it has no effect on the
+   existing database record
+
+---
+
+## Step 7 — Provision all other accounts
+
+All Wings, Squadrons and users are created through the System Console:
+
+1. Log in as `system_admin`
+2. System Console → **Organisation → Wings** → create 7 Wing
+3. System Console → **Organisation → Squadrons** → create each squadron under 7 Wing
+4. System Console → **Accounts** → create accounts for each role
+5. Each account is assigned a one-time access code through the System Console UI
+
+---
+
+## Step 8 — Run staging tests
+
+Run these against the live staging URLs after all accounts are provisioned:
 
 ```bash
 BASE=https://aafc-tms-backend-staging.onrender.com \
@@ -121,23 +184,14 @@ BASE=https://aafc-tms-backend-staging.onrender.com \
 
 ---
 
-## Step 7 — Database migrations
+## Database migrations
 
 Migrations run automatically on every container start via `docker-entrypoint-staging.sh`:
-
 ```sh
 alembic upgrade head
 ```
 
-Expected output in logs:
-```
-Running Alembic migrations...
-INFO  [alembic.runtime.migration] Running upgrade  -> ..., v17 system admin
-INFO  [alembic.runtime.migration] Context impl PostgreSQLImpl.
-```
-
-The migration chain for V17.1:
-
+Migration chain for V17.1:
 ```
 b3e9f4c2a0d1  (v6 account management)
 c4d8e1f3a0b2  (v8 timing templates)
@@ -149,82 +203,34 @@ d1e3f5a7c9b0  (v14 training planner)
 e7a9c2f4b8d1  (v17 system admin) ← HEAD
 ```
 
-All migrations tested against an empty PostgreSQL database.
-
----
-
-## Step 8 — Rotate access codes
-
-If codes were lost from the logs or need rotating:
-
-1. Render Dashboard → `aafc-tms-backend-staging` → **Shell** (requires Starter plan)
-2. Run:
-   ```bash
-   cd /app
-   python rotate_access_codes.py --out /tmp/new_codes.csv
-   cat /tmp/new_codes.csv
-   rm /tmp/new_codes.csv
-   ```
-
-On the free plan (no shell): deploy a temporary one-off service or upgrade to Starter.
-
 ---
 
 ## Rollback procedure
 
-1. **Code rollback:** Revert the deployment branch to a previous commit and push.
-   Render auto-redeploys.
+**Code rollback:** Revert the deployment branch to a previous commit and push.
+Render auto-redeploys.
 
-2. **Database rollback:**
-   ```bash
-   # In the Render shell or as a one-off job:
-   alembic downgrade -1
-   ```
-   Then redeploy the previous version.
+**Database rollback:**
+```bash
+# Via Render shell (Starter plan required) or one-off Docker run:
+alembic downgrade -1
+```
 
-3. **Full rollback:** Restore from Supabase point-in-time backup:
-   Supabase Dashboard → Database → Backups → select a restore point.
-
----
-
-## Monthly cost estimate
-
-| Service          | Plan     | Cost    |
-|------------------|----------|---------|
-| Render backend   | Free     | $0      |
-| Render frontend  | Free     | $0      |
-| Supabase DB      | Free     | $0      |
-| **Total**        |          | **$0**  |
-
-**Paid upgrades (optional):**
-| Service          | Plan      | Cost   | Benefit                        |
-|------------------|-----------|--------|--------------------------------|
-| Render backend   | Starter   | $7/mo  | No spin-down, more RAM         |
-| Render PostgreSQL| Starter   | $7/mo  | Alternative to Supabase        |
-
----
-
-## Automatic deployment behaviour
-
-When any commit is pushed to `deployment/staging-v17.1`:
-- Render automatically rebuilds and redeploys both services
-- Zero-downtime deploy: new container starts before old one stops
-- Migrations run on new container start before traffic is accepted
+**Full rollback:** Supabase Dashboard → Database → Backups → select a restore point.
 
 ---
 
 ## Known gaps (staging vs. production)
 
-| Gap                         | Staging state            | Production requirement          |
-|-----------------------------|--------------------------|----------------------------------|
-| Sleep on inactivity         | Yes (free plan)          | Upgrade to Render Starter        |
-| TLS                         | Render-managed (free)    | Custom domain + TLS              |
-| COOKIE_SAMESITE             | `lax`                    | `strict` for production          |
-| Backup automation           | Supabase daily           | Point-in-time recovery confirmed |
-| Log aggregation             | Render log stream        | CloudWatch / Loki in production  |
-| Multi-worker                | 2 gunicorn workers       | 4+ in production                 |
-| Rate limiter persistence    | In-memory (resets on restart) | Redis in production          |
-| Real user data              | None — random codes only | After formal onboarding process  |
+| Gap                         | Staging state                 | Production requirement          |
+|-----------------------------|-------------------------------|---------------------------------|
+| Sleep on inactivity         | Yes (Render free plan)        | Upgrade to Render Starter       |
+| Custom domain + TLS         | Render subdomain only         | Custom domain + TLS certificate |
+| COOKIE_SAMESITE             | `lax`                         | `strict` in production          |
+| Backup automation           | Supabase daily snapshots      | Point-in-time recovery tested   |
+| Log aggregation             | Render log stream             | CloudWatch / Loki               |
+| Rate limiter persistence    | In-memory (resets on restart) | Redis in production             |
+| Real user data              | None                          | After formal onboarding process |
 
 ---
 
