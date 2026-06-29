@@ -1,0 +1,59 @@
+# Render Blueprint — AAFC TMS Staging
+# Deploys: backend (Docker web service) + frontend (static site)
+# Database: set DATABASE_URL from your Supabase project (see README-staging.md)
+#
+# To deploy:
+#   1. Create a Supabase project → copy the PostgreSQL connection string
+#   2. Connect this GitHub repo to Render → New Blueprint
+#   3. Enter DATABASE_URL and CORS_ALLOWED_ORIGINS when prompted
+#   4. After backend deploys, note the backend URL
+#   5. Update connected-frontend/index.html <meta name="aafc-api-base"> to the backend URL
+#   6. Push → frontend redeploys automatically
+
+services:
+  - type: web
+    name: aafc-tms-backend-staging
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    branch: deployment/staging-v17.1
+    plan: free
+    healthCheckPath: /api/health/ready
+    envVars:
+      - key: ENVIRONMENT
+        value: staging
+      - key: DATABASE_URL
+        sync: false           # Enter your Supabase PostgreSQL URL when prompted
+      - key: JWT_SECRET
+        generateValue: true   # Render auto-generates a cryptographically strong value
+      - key: SECRET_KEY
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false           # Enter the frontend URL after it is known (see step 5 above)
+      - key: LOG_LEVEL
+        value: INFO
+
+  - type: web
+    name: aafc-tms-frontend-staging
+    runtime: static
+    staticPublishPath: ./connected-frontend
+    branch: deployment/staging-v17.1
+    plan: free
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-store, no-cache
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
