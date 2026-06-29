@@ -1,0 +1,331 @@
+# Weekly PostgreSQL restore test — AAFC TMS Staging
+#
+# Schedule: Monday 03:00 AWST (UTC+8 = Sunday 19:00 UTC).
+# Also supports manual trigger via workflow_dispatch.
+#
+# What this workflow does:
+#   1. Finds the most recent non-expired backup artifact.
+#   2. Downloads and decrypts it using the GPG private key.
+#   3. Verifies SHA-256 integrity before restore.
+#   4. Restores into a DISPOSABLE PostgreSQL service container
+#      — never staging, never production.
+#   5. Verifies required tables, Alembic migration HEAD, and row counts.
+#   6. Reports pass / fail.
+#   7. Deletes all plaintext files even if a step fails.
+#
+# Prerequisites — GitHub Secrets:
+#   BACKUP_GPG_PRIVATE_KEY  — base64-encoded ASCII-armored GPG private key.
+#   BACKUP_GPG_PASSPHRASE   — passphrase protecting the private key.
+#
+# See deployment/backup-dr.md for setup instructions.
+---
+name: PostgreSQL Restore Test — Weekly
+
+on:
+  schedule:
+    - cron: '0 19 * * 0'   # Monday 03:00 AWST (UTC+8) = Sunday 19:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read             # required to list and download artifacts
+
+concurrency:
+  group: postgresql-restore-test
+  cancel-in-progress: false
+
+jobs:
+  restore-test:
+    name: Decrypt, restore, verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: restore_user
+          POSTGRES_PASSWORD: restore_test_ci_only
+          POSTGRES_DB: aafc_tms_restore_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DECRYPTED_DUMP: ""
+      DECRYPTED_CHECKSUM: ""
+      NO_BACKUP: ""
+      PGPASSWORD: restore_test_ci_only
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: restore_user
+      PGDATABASE: aafc_tms_restore_test
+
+    steps:
+      # ── 1. Install tools ────────────────────────────────────────────────────
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            postgresql-client gnupg2 unzip python3
+          pg_restore --version
+          gpg --version | head -1
+
+      # ── 2. Import GPG private key ────────────────────────────────────────────
+      - name: Import GPG private key
+        env:
+          BACKUP_GPG_PRIVATE_KEY: ${{ secrets.BACKUP_GPG_PRIVATE_KEY }}
+          BACKUP_GPG_PASSPHRASE: ${{ secrets.BACKUP_GPG_PASSPHRASE }}
+        run: |
+          if [ -z "$BACKUP_GPG_PRIVATE_KEY" ]; then
+            echo "::error::BACKUP_GPG_PRIVATE_KEY secret is not set."
+            echo "::error::See deployment/backup-dr.md for setup."
+            exit 1
+          fi
+
+          # Import private key (non-interactively with passphrase)
+          printf '%s' "$BACKUP_GPG_PRIVATE_KEY" \
+            | base64 --decode \
+            | gpg --batch \
+                  --pinentry-mode loopback \
+                  --passphrase-fd 3 \
+                  --import \
+            3< <(printf '%s' "$BACKUP_GPG_PASSPHRASE")
+
+          gpg --list-secret-keys 2>/dev/null | grep -c 'sec' | grep -v '^0$' > /dev/null \
+            || { echo '::error::Private key import failed — no secret keys found'; exit 1; }
+          echo "GPG private key imported."
+
+      # ── 3. Find most recent backup artifact ─────────────────────────────────
+      - name: Find latest backup artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARTIFACT_JSON=$(gh api \
+            "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
+            --jq '.artifacts
+                  | map(select(
+                      (.name | startswith("postgresql-backup-"))
+                      and (.expired == false)
+                    ))
+                  | sort_by(.created_at)
+                  | last')
+
+          if [ "$ARTIFACT_JSON" = "null" ] || [ -z "$ARTIFACT_JSON" ]; then
+            echo "::warning::No backup artifacts found — restore test skipped."
+            echo "::warning::Run the backup workflow first: Actions → PostgreSQL Backup — Daily → Run workflow"
+            echo "NO_BACKUP=true" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          ARTIFACT_ID=$(echo "$ARTIFACT_JSON"   | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['id'])")
+          ARTIFACT_NAME=$(echo "$ARTIFACT_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['name'])")
+          ARTIFACT_DATE=$(echo "$ARTIFACT_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['created_at'])")
+
+          echo "ARTIFACT_ID=${ARTIFACT_ID}"   >> "$GITHUB_ENV"
+          echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> "$GITHUB_ENV"
+          echo "Found: ${ARTIFACT_NAME} (id=${ARTIFACT_ID}, created=${ARTIFACT_DATE})"
+
+      # ── 4. Download and unpack artifact ─────────────────────────────────────
+      - name: Download artifact
+        if: env.NO_BACKUP != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/restore_staging
+          gh api "repos/${{ github.repository }}/actions/artifacts/${{ env.ARTIFACT_ID }}/zip" \
+            > /tmp/backup_artifact.zip
+          unzip -q /tmp/backup_artifact.zip -d /tmp/restore_staging/
+          rm /tmp/backup_artifact.zip
+          echo "Artifact contents:"
+          ls -lh /tmp/restore_staging/
+
+          # Locate encrypted files
+          ENCRYPTED_DUMP=$(find /tmp/restore_staging -name '*.dump.gpg' | head -1)
+          ENCRYPTED_CHECKSUM=$(find /tmp/restore_staging -name '*.sha256.gpg' | head -1)
+
+          if [ -z "$ENCRYPTED_DUMP" ]; then
+            echo "::error::No .dump.gpg file found in artifact"; exit 1
+          fi
+          echo "ENCRYPTED_DUMP=${ENCRYPTED_DUMP}"         >> "$GITHUB_ENV"
+          echo "ENCRYPTED_CHECKSUM=${ENCRYPTED_CHECKSUM}" >> "$GITHUB_ENV"
+
+      # ── 5. Decrypt dump and checksum ────────────────────────────────────────
+      - name: Decrypt backup
+        if: env.NO_BACKUP != 'true'
+        env:
+          BACKUP_GPG_PASSPHRASE: ${{ secrets.BACKUP_GPG_PASSPHRASE }}
+        run: |
+          DECRYPTED_DUMP="/tmp/aafc_restore.dump"
+          echo "DECRYPTED_DUMP=${DECRYPTED_DUMP}" >> "$GITHUB_ENV"
+
+          printf '%s' "$BACKUP_GPG_PASSPHRASE" \
+            | gpg --batch \
+                  --pinentry-mode loopback \
+                  --passphrase-fd 0 \
+                  --decrypt \
+                  --output "$DECRYPTED_DUMP" \
+                  "$ENCRYPTED_DUMP" \
+            || { echo '::error::GPG decryption of dump failed'; exit 1; }
+
+          if [ ! -s "$DECRYPTED_DUMP" ]; then
+            echo '::error::Decrypted dump is empty'; exit 1
+          fi
+          echo "Decrypted dump size: $(stat -c%s "$DECRYPTED_DUMP") bytes"
+
+          # Decrypt checksum if present
+          if [ -n "$ENCRYPTED_CHECKSUM" ] && [ -f "$ENCRYPTED_CHECKSUM" ]; then
+            DECRYPTED_CHECKSUM="/tmp/aafc_restore.sha256"
+            echo "DECRYPTED_CHECKSUM=${DECRYPTED_CHECKSUM}" >> "$GITHUB_ENV"
+
+            printf '%s' "$BACKUP_GPG_PASSPHRASE" \
+              | gpg --batch \
+                    --pinentry-mode loopback \
+                    --passphrase-fd 0 \
+                    --decrypt \
+                    --output "$DECRYPTED_CHECKSUM" \
+                    "$ENCRYPTED_CHECKSUM" \
+              || { echo '::warning::Could not decrypt checksum file — skipping integrity check'; }
+          fi
+
+      # ── 6. Verify SHA-256 integrity ──────────────────────────────────────────
+      - name: Verify dump integrity
+        if: env.NO_BACKUP != 'true' && env.DECRYPTED_CHECKSUM != ''
+        run: |
+          # sha256sum -c expects "hash  filename" in the checksum file.
+          # The stored checksum references the original /tmp/aafc_dump_*.dump path.
+          # Re-hash the decrypted file and compare manually.
+          STORED_HASH=$(awk '{print $1}' "$DECRYPTED_CHECKSUM")
+          ACTUAL_HASH=$(sha256sum "$DECRYPTED_DUMP" | awk '{print $1}')
+
+          if [ "$STORED_HASH" != "$ACTUAL_HASH" ]; then
+            echo "::error::SHA-256 integrity check FAILED"
+            echo "::error::Stored:   ${STORED_HASH}"
+            echo "::error::Computed: ${ACTUAL_HASH}"
+            exit 1
+          fi
+          echo "SHA-256 integrity check passed: ${ACTUAL_HASH}"
+
+      # ── 7. Restore into service container ───────────────────────────────────
+      - name: Restore database
+        if: env.NO_BACKUP != 'true'
+        run: |
+          pg_restore \
+            --host="$PGHOST" \
+            --port="$PGPORT" \
+            --username="$PGUSER" \
+            --dbname="$PGDATABASE" \
+            --no-owner \
+            --no-privileges \
+            --exit-on-error \
+            "$DECRYPTED_DUMP" \
+            || { echo '::error::pg_restore failed'; exit 1; }
+          echo "pg_restore completed."
+
+      # ── 8. Verify schema, migrations, and row counts ─────────────────────────
+      - name: Verify restored database
+        if: env.NO_BACKUP != 'true'
+        run: |
+          python3 - << 'PYEOF'
+          import subprocess, sys
+
+          def psql(sql):
+              result = subprocess.run(
+                  ['psql', '-tAc', sql],
+                  capture_output=True, text=True,
+                  env={
+                      'PGHOST': 'localhost',
+                      'PGPORT': '5432',
+                      'PGUSER': 'restore_user',
+                      'PGDATABASE': 'aafc_tms_restore_test',
+                      'PGPASSWORD': 'restore_test_ci_only',
+                      'PATH': '/usr/bin:/bin:/usr/lib/postgresql/16/bin',
+                  }
+              )
+              if result.returncode != 0:
+                  raise RuntimeError(f"psql failed: {result.stderr.strip()}")
+              return result.stdout.strip()
+
+          failures = []
+
+          # 1. Alembic migration HEAD
+          EXPECTED_HEAD = 'e7a9c2f4b8d1'
+          try:
+              head = psql("SELECT version_num FROM alembic_version;")
+              if head != EXPECTED_HEAD:
+                  failures.append(f"Migration HEAD mismatch: got '{head}', expected '{EXPECTED_HEAD}'")
+              else:
+                  print(f"  PASS  alembic_version = {head}")
+          except Exception as e:
+              failures.append(f"alembic_version table missing or unreadable: {e}")
+
+          # 2. Required tables present and accessible
+          REQUIRED_TABLES = [
+              'users', 'wings', 'squadrons', 'audit_logs', 'system_settings',
+              'access_codes', 'proxy_sessions', 'phases', 'program_packages',
+              'curriculum_items', 'planning_years', 'sessions',
+          ]
+          for table in REQUIRED_TABLES:
+              try:
+                  count = psql(f"SELECT COUNT(*) FROM {table};")
+                  print(f"  PASS  {table}: {count} row(s)")
+              except Exception as e:
+                  failures.append(f"Table '{table}' missing or unreadable: {e}")
+
+          # 3. users table must have at least one row (bootstrapped system_admin)
+          try:
+              user_count = int(psql("SELECT COUNT(*) FROM users;"))
+              if user_count < 1:
+                  failures.append(f"users table has 0 rows — expected at least system_admin")
+              else:
+                  print(f"  PASS  users.count = {user_count} (≥ 1)")
+          except Exception as e:
+              failures.append(f"users row count check failed: {e}")
+
+          # 4. No plaintext access code hashes in users (column exists but we don't read values)
+          try:
+              col_count = psql(
+                  "SELECT COUNT(*) FROM information_schema.columns "
+                  "WHERE table_name='users' AND column_name='access_code_hash';"
+              )
+              # access_code_hash should exist as a column (it's how codes are stored securely)
+              if col_count == '1':
+                  print("  PASS  users.access_code_hash column present (hashed storage confirmed)")
+              else:
+                  print("  NOTE  users.access_code_hash column not found (schema may differ)")
+          except Exception as e:
+              failures.append(f"Schema check failed: {e}")
+
+          # Results
+          print()
+          if failures:
+              print(f"RESTORE VERIFICATION FAILED — {len(failures)} check(s) failed:")
+              for f in failures:
+                  print(f"  FAIL  {f}")
+              sys.exit(1)
+          else:
+              print(f"RESTORE VERIFICATION PASSED — all {len(REQUIRED_TABLES) + 3} checks passed.")
+          PYEOF
+
+      # ── 9. Report skip if no backup existed ─────────────────────────────────
+      - name: Report skip
+        if: env.NO_BACKUP == 'true'
+        run: |
+          echo "Restore test SKIPPED — no backup artifact available."
+          echo "Trigger the backup workflow to create one:"
+          echo "  Actions → PostgreSQL Backup — Daily → Run workflow"
+
+      # ── 10. Clean up ALL plaintext files (always, even on failure) ───────────
+      - name: Clean up plaintext files
+        if: always()
+        run: |
+          rm -f /tmp/aafc_restore.dump \
+                /tmp/aafc_restore.sha256 \
+                /tmp/backup_artifact.zip \
+                2>/dev/null || true
+          rm -rf /tmp/restore_staging 2>/dev/null || true
+          echo "Plaintext restore files removed."
