@@ -70,7 +70,6 @@ services:
     runtime: static
     staticPublishPath: ./connected-frontend
     branch: deployment/staging-v17.1
-    plan: free
     headers:
       - path: /*
         name: Cache-Control
