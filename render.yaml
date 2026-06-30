@@ -43,7 +43,7 @@ services:
     dockerContext: ./backend
     branch: deployment/staging-v17.1
     plan: free
-    # region: singapore   # Uncomment + upgrade to Starter plan for APAC latency fix
+    region: singapore     # Requires Render Starter plan — see region note above
     healthCheckPath: /api/health/ready
     envVars:
       - key: ENVIRONMENT
