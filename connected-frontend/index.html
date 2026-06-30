@@ -603,7 +603,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-curriculum" class="page">
         <div class="ph">
           <div class="ph-title">Curriculum</div>
-          <div class="ph-sub">National and squadron curriculum items</div>
+          <div class="ph-sub">Curriculum</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" id="btn-add-curr-sqn" style="display:none" onclick="openAddCurr()">+ Add Squadron Curriculum</button>
             <button class="btn btn-dk admin-el" id="btn-add-curr-wing" style="display:none" onclick="openAddCurrWing()">+ Add Wing Curriculum</button>
@@ -1194,9 +1194,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <p class="muted">Access codes are stored as hashes and are never visible after creation. The backend is the single source of truth for all roles and permissions.</p>
   </div>
 
-  <div class="card" style="border-color:var(--border);background:var(--bg-surface)">
-    <p class="muted" style="margin:0;font-size:0.82rem">AAFC TMS — V15 &bull; Connected Pilot Package &bull; Training Planner Module</p>
-  </div>
 </div>
 
 <!-- 2. Annual Program (Parade Dates) -->
@@ -5201,7 +5198,6 @@ function renderNational(){
       S.natCap.wings.map(w=>{const nn=w.subject_none_sqns||{};return `<tr><td style="font-weight:800">${w.name||w.code}</td>${SUBJECTS.map(s=>`<td style="text-align:center">${nn[s.key]?`<span class="badge b-red">${nn[s.key]}</span>`:'<span class="badge b-ok">&#10003;</span>'}</td>`).join('')}</tr>`;}).join('')+
       `</tbody></table></div><div style="font-size:10px;color:var(--muted);margin-top:8px">Red = number of SQNs in that Wing with no facilitator tagged in the subject. Refer to Facilitator Load and Training Balance for detail.</div></div>`;
   }
-  html+=`<div class="card" style="font-size:11px;color:var(--muted)">National curriculum-assurance adoption rates, audit/compliance counters (access-code changes, Proxy/Intervention use), data-confidence and intervention-priority tracking are planned NAT HQ panels pending the supporting backend endpoints; current panels use live roll-up data only.</div>`;
   host.innerHTML=html;
 }
 function nationalDrill(wid){
@@ -5423,7 +5419,6 @@ function renderRisk(){
     html+=`<div class="stats-grid"><div class="stat ${flagged.length?'s-red':'s-ok'}"><div class="sval">${flagged.length}</div><div class="slbl">Needing Attention</div></div><div class="stat s-ok"><div class="sval">${ok}</div><div class="slbl">On Track</div></div></div>`;
     html+=riskCard('Squadrons needing attention', flagged);
   }
-  html+=`<div class="card" style="font-size:11px;color:var(--muted)">Facilitator/role-load bottlenecks (single-point-of-failure roles, missing subject specialists, over-scheduled instructors) require per-squadron facilitator scheduling data and are surfaced when viewing a squadron via Proxy Mode. Cross-SQN role-gap heatmaps are a planned addition pending a Wing facilitator-load endpoint.</div>`;
   host.innerHTML=html;
 }
 function riskCard(title, flagged){
