@@ -985,6 +985,14 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
 
         <!-- Backup card -->
+        <!-- Staging bootstrap card — creates 703SQN + initial accounts with one-time codes -->
+        <div class="card sc-card" id="sc-bootstrap-card">
+          <div class="sc-section-hdr">Initial Account Setup</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Creates 703 SQN under 7WG (if missing) and one account each for national_admin, 7WG wing_admin, and 703 SQN sqn_admin. Codes are generated server-side, shown once, and never retrievable again. Safe to re-run — only missing accounts are created.</div>
+          <button class="btn" style="background:#7c3aed;color:#fff;border:none" onclick="scBootstrapStaging()">Bootstrap Staging Accounts</button>
+          <div id="sc-bootstrap-msg" style="font-size:12px;margin-top:8px;font-weight:700"></div>
+        </div>
+
         <div class="card sc-card" id="sc-backup-card">
           <div class="sc-section-hdr">Backup</div>
           <div id="sc-backup-body"><div class="muted">Loading…</div></div>
@@ -1005,6 +1013,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <option value="access_code_reset">access_code_reset</option>
               <option value="account_created">account_created</option>
               <option value="account_disabled">account_disabled</option>
+              <option value="code_generated">code_generated</option>
+              <option value="pg_dump_initiated">pg_dump_initiated</option>
+              <option value="backup_created">backup_created</option>
             </select>
             <button class="btn btn-secondary btn-sm" onclick="scLoadAudit()">Filter</button>
           </div>
@@ -1918,6 +1929,20 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     </div>
     <div class="modal-foot">
       <button class="btn btn-dk" onclick="closeNewCodeModal()">I have noted this code</button>
+    </div>
+  </div>
+</div>
+
+<!-- SYSTEM CONSOLE: Staging Bootstrap Codes Modal (one-time, multiple accounts) -->
+<div class="modal-bg" id="m-bootstrap-codes">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-hdr"><div class="modal-title">Staging Accounts Created</div></div>
+    <div class="modal-body">
+      <div class="alert a-warn" style="font-weight:700;margin-bottom:12px">⚠️ These codes will NOT be shown again. Copy all codes now before closing.</div>
+      <div id="m-bootstrap-results"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-dk" onclick="closeModal('m-bootstrap-codes')">I have noted all codes</button>
     </div>
   </div>
 </div>
@@ -3019,6 +3044,39 @@ async function scLoadAudit(){
   } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
+async function scBootstrapStaging(){
+  const msg=document.getElementById('sc-bootstrap-msg');
+  msg.textContent='Creating accounts…'; msg.style.color='var(--muted)';
+  try{
+    const r=await api('/api/system/bootstrap-staging',{method:'POST'});
+    msg.textContent='';
+    const all=r.results||[];
+    const codes=r.accounts_created||[];
+    let html='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px"><thead>';
+    html+='<tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:4px 8px">Type</th><th style="text-align:left;padding:4px 8px">Name / Code</th><th style="text-align:left;padding:4px 8px">Result</th></tr></thead><tbody>';
+    for(const x of all){
+      const created=x.created?'<span style="color:var(--ok);font-weight:700">Created</span>':'<span style="color:var(--muted)">Already existed</span>';
+      const label=x.display_name||x.name||x.code||'';
+      html+=`<tr><td style="padding:4px 8px;text-transform:capitalize">${esc(x.type)}</td><td style="padding:4px 8px">${esc(label)}</td><td style="padding:4px 8px">${created}</td></tr>`;
+    }
+    html+='</tbody></table>';
+    if(codes.length){
+      html+='<div style="font-size:12px;font-weight:700;margin-bottom:10px">Access codes — copy all now, they will not appear again:</div>';
+      for(const a of codes){
+        html+=`<div style="margin-bottom:12px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${esc(_ROLE_LABELS[a.role]||a.role)} — ${esc(a.display_name)}</div>
+          <div style="background:#1a1a2e;color:#7efff5;font-family:monospace;font-size:20px;font-weight:900;letter-spacing:3px;text-align:center;padding:12px;border-radius:6px;user-select:all">${esc(a.new_code)}</div>
+        </div>`;
+      }
+    } else {
+      html+='<div class="alert a-info" style="font-size:12px">All accounts already existed — no new codes generated.</div>';
+    }
+    document.getElementById('m-bootstrap-results').innerHTML=html;
+    openModal('m-bootstrap-codes');
+    scLoadOverview();
+  }catch(e){ msg.textContent=apiErr(e); msg.style.color='var(--red)'; }
+}
+
 // ═══════════════════════════════════════════════════════════
 //  ACCOUNT MANAGEMENT
 // ═══════════════════════════════════════════════════════════
@@ -3328,6 +3386,11 @@ function onCreateAccountRoleChange(){
 function onCreateAccountWingChange(){
   const wingId=document.getElementById('ca-wing').value;
   _populateCreateSqns(wingId||null);
+}
+
+function onCreateAccountSqnChange(){
+  // No-op: squadron selection has no downstream effects in this modal.
+  // Defined to satisfy the onchange reference on the ca-sqn select element.
 }
 
 function onCodeModeChange(){

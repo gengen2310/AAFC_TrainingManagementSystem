@@ -19,11 +19,13 @@ from sqlalchemy.orm import Session as DBSession
 from ..config import settings
 from ..database import get_db
 from ..dependencies import get_principal
+from ..database import utcnow
 from ..models import (
     User, Wing, Squadron, AuditLog, SystemSetting, AccessCode,
-    PlanningYear, ParadeDate, Session, CurriculumItem,
+    PlanningYear, ParadeDate, Session, CurriculumItem, NationalEntity,
 )
 from ..permissions import Principal, require_system_admin, require_audit_access
+from ..security import generate_code, hash_code
 from ..services import audit
 
 router = APIRouter(prefix="/api/system", tags=["system"])
@@ -376,3 +378,111 @@ def pg_dump_backup(db: DBSession = Depends(get_db), p: Principal = Depends(get_p
         media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ── POST /api/system/bootstrap-staging ───────────────────────────────────────
+
+@router.post("/bootstrap-staging")
+def bootstrap_staging(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """One-time setup helper for staging / development environments.
+
+    Creates 703SQN under 7WG (if missing) and one account each for
+    national_admin, wing_admin (7WG), and sqn_admin (703SQN) if no active
+    account of that role+scope already exists.
+
+    Returns newly created accounts with one-time access codes. Codes are never
+    stored in plaintext — only the hash is persisted. Rejected in production.
+    """
+    require_system_admin(p)
+    env = settings.ENVIRONMENT or ""
+    if env.lower() == "production":
+        raise HTTPException(403, detail={
+            "error": "not_allowed_in_production",
+            "message": "Bootstrap is not available in the production environment.",
+        })
+
+    results = []
+    created_accounts = []
+
+    nat = db.query(NationalEntity).first()
+    if not nat:
+        raise HTTPException(422, detail={
+            "error": "national_entity_missing",
+            "message": "No NationalEntity found. Run migrations and initial seed first.",
+        })
+
+    wing = db.query(Wing).filter(Wing.code == "7WG", Wing.is_archived == False).first()  # noqa: E712
+    if not wing:
+        raise HTTPException(422, detail={
+            "error": "7WG_not_found",
+            "message": "7WG not found. Create it first via System Console → Scope Map → Create Wing.",
+        })
+
+    # Create 703SQN if missing
+    sqn = db.query(Squadron).filter(Squadron.code == "703", Squadron.is_archived == False).first()  # noqa: E712
+    sqn_created = False
+    if not sqn:
+        sqn = Squadron(wing_id=wing.id, code="703", name="703 Squadron AAFC",
+                       short_name="703 SQN", unit_type="standard_squadron",
+                       active_status=True, created_by=p.user_id)
+        db.add(sqn)
+        db.flush()
+        audit(db, p, object_type="squadron", object_id=sqn.id, action="create",
+              new={"code": "703", "name": "703 Squadron AAFC", "wing": "7WG",
+                   "source": "staging_bootstrap"})
+        sqn_created = True
+    results.append({"type": "squadron", "code": "703", "name": sqn.name, "created": sqn_created})
+
+    account_specs = [
+        {"role": "national_admin", "display_name": "National Admin",
+         "national_id": nat.id, "wing_id": None, "squadron_id": None},
+        {"role": "wing_admin", "display_name": "7WG Wing Admin",
+         "national_id": None, "wing_id": wing.id, "squadron_id": None},
+        {"role": "sqn_admin", "display_name": "703 SQN Admin",
+         "national_id": None, "wing_id": wing.id, "squadron_id": sqn.id},
+    ]
+
+    for spec in account_specs:
+        q = db.query(User).filter(User.role == spec["role"], User.is_archived == False)  # noqa: E712
+        if spec["squadron_id"]:
+            q = q.filter(User.squadron_id == spec["squadron_id"])
+        elif spec["wing_id"]:
+            q = q.filter(User.wing_id == spec["wing_id"])
+        existing = q.first()
+
+        if existing:
+            results.append({"type": "account", "role": spec["role"],
+                            "display_name": existing.display_name, "created": False})
+            continue
+
+        u = User(display_name=spec["display_name"], role=spec["role"],
+                 national_id=spec["national_id"], wing_id=spec["wing_id"],
+                 squadron_id=spec["squadron_id"], active_status=True,
+                 created_by=p.user_id)
+        db.add(u)
+        db.flush()
+
+        plain = generate_code()
+        ac = AccessCode(user_id=u.id, code_hash=hash_code(plain), active_status=True,
+                        created_by=p.user_id, updated_by=p.user_id, updated_at=utcnow())
+        db.add(ac)
+
+        audit(db, p, object_type="account", object_id=u.id, action="account_created",
+              new={"role": spec["role"], "display_name": spec["display_name"],
+                   "source": "staging_bootstrap"})
+        audit(db, p, object_type="access_code", object_id=u.id, action="code_generated",
+              new={"source": "staging_bootstrap"})
+
+        results.append({"type": "account", "role": spec["role"],
+                        "display_name": spec["display_name"], "created": True})
+        created_accounts.append({"role": spec["role"], "display_name": spec["display_name"],
+                                  "new_code": plain})
+
+    db.commit()
+
+    return {
+        "environment": env,
+        "results": results,
+        "accounts_created": created_accounts,
+        "notice": "Codes shown here will NOT be retrievable again. Record each code now.",
+    }
