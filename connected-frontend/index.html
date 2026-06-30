@@ -539,7 +539,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- CALENDAR -->
       <div id="page-calendar" class="page">
-        <div class="ph"><div class="ph-title">Training Calendar</div><div class="ph-sub">Monthly overview — click any day to view or add</div></div>
+        <div class="ph"><div class="ph-title">Training Calendar</div><div class="ph-sub">Monthly overview</div></div>
         <div class="card">
           <div class="cal-nav">
             <button class="cal-nbtn" onclick="calMove(-1)">‹</button>
@@ -563,7 +563,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-parade-nights" class="page">
         <div class="ph">
           <div class="ph-title">Parade Nights</div>
-          <div class="ph-sub">Click any session to edit. Quick status buttons update immediately.</div>
+          <div class="ph-sub">Parade nights and session status</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk" onclick="openModal('m-add-pn')">+ Add Parade Night</button>
             <button class="btn btn-out" onclick="nav('calendar')">Calendar</button>
@@ -603,7 +603,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-curriculum" class="page">
         <div class="ph">
           <div class="ph-title">Curriculum</div>
-          <div class="ph-sub">Core national program + squadron additions. Progress derived from scheduled sessions. Click any item for detail and scheduling.</div>
+          <div class="ph-sub">National and squadron curriculum items</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" id="btn-add-curr-sqn" style="display:none" onclick="openAddCurr()">+ Add Squadron Curriculum</button>
             <button class="btn btn-dk admin-el" id="btn-add-curr-wing" style="display:none" onclick="openAddCurrWing()">+ Add Wing Curriculum</button>
@@ -647,7 +647,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-activities" class="page">
         <div class="ph">
           <div class="ph-title">Activities &amp; Events</div>
-          <div class="ph-sub">Key events and activities that anchor the training calendar</div>
+          <div class="ph-sub">Events and activities</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-act')">+ Add Activity</button>
           </div>
@@ -664,7 +664,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-facilitators" class="page">
         <div class="ph">
           <div class="ph-title">Facilitators</div>
-          <div class="ph-sub">Click any row to view the full delivery profile. Rank is stored separately to preserve historical accuracy.</div>
+          <div class="ph-sub">Facilitator delivery profiles</div>
           <div class="ph-actions no-print">
             <select id="fac-filter" onchange="S.facFilter=this.value;renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px">
               <option value="">All subject areas</option>
@@ -690,7 +690,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-resources" class="page">
         <div class="ph">
           <div class="ph-title">Resources &amp; Training Areas</div>
-          <div class="ph-sub">Rooms, equipment, and facilities. These appear as dropdown options when scheduling sessions.</div>
+          <div class="ph-sub">Rooms and equipment</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-room')">+ Add Room</button>
             <button class="btn btn-out admin-el" style="display:none" onclick="openModal('m-add-equip')">+ Add Equipment</button>
@@ -719,7 +719,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ph">
           <div class="ph-title print-only">Training Summary Report</div>
           <div class="ph-title no-print">Training Summary</div>
-          <div class="ph-sub no-print">Click any number to drill into sessions. All data is connected and actionable.</div>
           <div class="ph-actions no-print">
             <button class="btn btn-out" onclick="printReport()">Print This Report</button>
           </div>
@@ -769,7 +768,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- SETTINGS (admin only) -->
       <div id="page-settings" class="page">
-        <div class="ph"><div class="ph-title">Unit Settings</div><div class="ph-sub">Admin-only. Configure squadron details, session structure, and access codes.</div></div>
+        <div class="ph"><div class="ph-title">Unit Settings</div><div class="ph-sub">Unit configuration</div></div>
         <div class="card">
           <div class="ctitle">Squadron Details</div>
           <div class="form-row">
@@ -836,7 +835,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-accounts" class="page">
         <div class="ph">
           <div class="ph-title">Account Management</div>
-          <div class="ph-sub">Create and manage accounts within your authorised scope. Access codes are never shown or stored in plaintext. All actions are audited.</div>
+          <div class="ph-sub">Manage accounts within your authorised scope</div>
         </div>
         <!-- filter + create -->
         <div class="card">
@@ -4371,7 +4370,7 @@ function _resetCurrModal(){
 }
 function _setCurrTermOptional(optional){
   const lbl=document.getElementById('c-term-optional');
-  if(lbl)lbl.textContent=optional?' (optional — squadron sets delivery term)':'';
+  if(lbl)lbl.textContent=optional?' (optional)':'';
 }
 async function _populateCurrElements(){
   const sel=document.getElementById('c-el');if(!sel)return;
@@ -4479,8 +4478,7 @@ async function saveCurr(){
     document.getElementById('curr-modal-title').textContent='+ Add Curriculum Item';
   }catch(e){
     // Show human-readable error; 409 now includes a message field
-    const msg=e.msg||e.message||'Request failed';
-    alert(msg);
+    alert(apiErr(e));
   }
 }
 async function deleteCurrItem(id){
@@ -5119,7 +5117,7 @@ function renderWing(){
   const medRead=reads.length?(reads.length%2?reads[(reads.length-1)/2]:Math.round((reads[reads.length/2-1]+reads[reads.length/2])/2)):null;
   const highRisk=rows.filter(r=>r.no_published_plan||r.no_future_plan||(+r.not_delivered||0)>2||(+r.coverage_pct||0)<34).length;
   const noData=rows.filter(r=>(+r.nights||0)===0||(+r.sessions||0)===0).length;
-  let html=`<div class="ph"><div class="ph-title">${S.scopeName||'Wing'} — Training Assurance</div><div class="ph-sub">Oversight across ${rows.length} squadrons — live backend data</div></div>`;
+  let html=`<div class="ph"><div class="ph-title">${S.scopeName||'Wing'} — Training Assurance</div><div class="ph-sub">Oversight across ${rows.length} squadrons</div></div>`;
   html+=`<div class="stats-grid">
     <div class="stat"><div class="sval">${rows.length}</div><div class="slbl">Total SQNs</div></div>
     <div class="stat ${medRead==null?'':(medRead>=67?'s-ok':medRead>=34?'s-warn':'s-red')}"><div class="sval">${medRead==null?'—':medRead}</div><div class="slbl">Median Readiness</div></div>
@@ -5173,7 +5171,7 @@ function renderNational(){
   const delPct=sessions?Math.round(delivered/sessions*100):0;
   const avgCov=wings.length?Math.round(wings.reduce((a,w)=>a+(+w.coverage_pct||0),0)/wings.length):0;
   const atRisk=wings.filter(w=>(+w.not_delivered||0)>2||(+w.coverage_pct||0)<34).length;
-  let html=`<div class="ph"><div class="ph-title">National HQ — Assurance Overview</div><div class="ph-sub">${wings.length} wings · ${sqs} squadrons — live backend data</div></div>`;
+  let html=`<div class="ph"><div class="ph-title">National HQ — Assurance Overview</div><div class="ph-sub">${wings.length} wings · ${sqs} squadrons</div></div>`;
   html+=`<div class="stats-grid">
     <div class="stat s-purple"><div class="sval">${wings.length}</div><div class="slbl">Wings</div></div>
     <div class="stat"><div class="sval">${sqs}</div><div class="slbl">Squadrons</div></div>
@@ -5248,7 +5246,7 @@ function covBadge(p){ p=+p||0; return p>=67?'<span class="badge b-ok">On Track</
 function renderCoverage(){
   const host=document.getElementById('coverage-host'); if(!host)return;
   const scope=getScopeType();
-  let html=`<div class="ph"><div class="ph-title">Curriculum Coverage</div><div class="ph-sub">Coverage by phase across ${scope==='national'?'wings':'squadrons'} — live backend data</div></div>`;
+  let html=`<div class="ph"><div class="ph-title">Curriculum Coverage</div><div class="ph-sub">Coverage by phase across ${scope==='national'?'wings':'squadrons'}</div></div>`;
   if(scope!=='national' && S.wingPhase && S.wingPhase.phases){
     const rows=(S.wing&&S.wing.squadrons)||[];
     const byId={}; rows.forEach(r=>byId[r.squadron_id]=r);
@@ -5303,7 +5301,7 @@ function balScore(p){ if(!p._tot)return 0; const mx=Math.max(...SUBJECTS.map(s=>
 function renderBalance(){
   const host=document.getElementById('balance-host'); if(!host)return;
   const scope=getScopeType();
-  let html=`<div class="ph"><div class="ph-title">Training Balance</div><div class="ph-sub">Subject-area distribution per ${scope==='national'?'wing':'SQN'} vs the ${scope==='national'?'national':'7WG'} average — live backend data</div></div>`;
+  let html=`<div class="ph"><div class="ph-title">Training Balance</div><div class="ph-sub">Subject-area distribution vs average</div></div>`;
   if(scope!=='national' && S.cap && S.cap.squadrons){
     const rows=S.cap.squadrons, avg=S.cap.wing_avg||{};
     const withData=rows.filter(r=>(r.subject_sessions&&SUBJECTS.some(s=>r.subject_sessions[s.key]>0)));
@@ -5353,7 +5351,7 @@ function capCell(n){ const c=n===0?'b-red':n===1?'b-amber':'b-ok'; const t=n===0
 function renderFacLoad(){
   const host=document.getElementById('facload-host'); if(!host)return;
   const scope=getScopeType();
-  let html=`<div class="ph"><div class="ph-title">Facilitator Load and Capability</div><div class="ph-sub">Facilitator coverage by ${scope==='national'?'wing':'SQN'} and subject area — live backend data</div></div>`;
+  let html=`<div class="ph"><div class="ph-title">Facilitator Load and Capability</div><div class="ph-sub">Facilitator coverage by ${scope==='national'?'wing':'SQN'} and subject area</div></div>`;
   if(scope!=='national' && S.cap && S.cap.squadrons){
     const rows=S.cap.squadrons; const gaps=S.cap.capability_gaps||{};
     const totFac=rows.reduce((a,r)=>a+(r.facilitator_count||0),0);
@@ -5406,7 +5404,7 @@ function facDrill(sid){
 function renderRisk(){
   const host=document.getElementById('risk-host'); if(!host)return;
   const scope=getScopeType();
-  let html=`<div class="ph"><div class="ph-title">Risk and Bottlenecks</div><div class="ph-sub">Units requiring attention — ranked from live backend data</div></div>`;
+  let html=`<div class="ph"><div class="ph-title">Risk and Bottlenecks</div><div class="ph-sub">Units requiring attention</div></div>`;
   if(scope==='national'){
     const wings=(S.nationalReport&&S.nationalReport.wings)||[];
     const flagged=wings.map(w=>{const issues=[]; if((+w.coverage_pct||0)<34)issues.push('Low coverage'); if((+w.not_delivered||0)>2)issues.push(`${w.not_delivered} not delivered`); return {name:w.name||w.code,issues};}).filter(x=>x.issues.length);
@@ -5595,8 +5593,8 @@ async function loadMissions(yearId) {
     renderMissions();
     _updateDebugPanel(null);
   } catch(e) {
-    document.getElementById('missions-body').innerHTML = `<p class="muted">Error loading missions: ${esc(e.message)}</p>`;
-    _updateDebugPanel(e.message);
+    document.getElementById('missions-body').innerHTML = `<p class="muted">Error loading missions: ${esc(apiErr(e))}</p>`;
+    _updateDebugPanel(apiErr(e));
   }
 }
 
@@ -5813,7 +5811,7 @@ async function loadYearMap(yearId){
     P.annualProgramLoaded = true;
     datesCard.style.display=''; holCard.style.display='';
     await Promise.all([_renderParadeDates(yearId), _renderHolidays(yearId)]);
-  } catch(e){ body.innerHTML = `<p class="muted">Error loading year: ${esc(e.message)}</p>`; }
+  } catch(e){ body.innerHTML = `<p class="muted">Error loading year: ${esc(apiErr(e))}</p>`; }
 }
 
 // Annual Program: full-year month calendar, built from live API data
@@ -6070,7 +6068,7 @@ async function loadAnchors(yearId){
   try {
     P.anchors = await api(`/api/planning/years/${yearId}/anchors`);
     renderAnchors();
-  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(e.message)}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
 }
 
 function renderAnchors(){
@@ -6174,7 +6172,7 @@ async function loadTermPlanner(yearId, term){
         </div>
       </div>`;
     }).join('');
-  } catch(e){ body.innerHTML=`<p class="muted">Error: ${esc(e.message)}</p>`; }
+  } catch(e){ body.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
 }
 
 // ═══════════════
@@ -6265,7 +6263,7 @@ async function loadBuilderFromPn(pnId){
     if(pwSection) pwSection.style.display='';
     _renderBuilderWeeklyPreview(d.sessions||[], d.timing_blocks||[], d.parade_date);
   } catch(e){
-    empty.innerHTML=`<div class="empty"><div class="et">Error loading program</div><div class="es">${esc(e.message)}</div></div>`;
+    empty.innerHTML=`<div class="empty"><div class="et">Error loading program</div><div class="es">${esc(apiErr(e))}</div></div>`;
     card.style.display='none'; empty.style.display='';
   }
 }
@@ -6362,7 +6360,7 @@ async function loadBuilderGrid(dateId){
     const pwSection = document.getElementById('pw-preview-section');
     if(pwSection) pwSection.style.display='';
     loadWeeklyProgram(dateId);
-  } catch(e){ empty.innerHTML=`<div class="empty"><div class="ei">⚠️</div><div class="et">Error loading builder</div><div class="es">${esc(e.message)}</div></div>`; card.style.display='none'; empty.style.display=''; }
+  } catch(e){ empty.innerHTML=`<div class="empty"><div class="et">Error loading builder</div><div class="es">${esc(apiErr(e))}</div></div>`; card.style.display='none'; empty.style.display=''; }
 }
 
 function _statusBadge(st){ return st==='published'?'badge-green':st==='confirmed'?'badge-blue':'badge-grey'; }
@@ -6552,7 +6550,7 @@ async function loadWeeklyProgram(dateId){
     html+=`</tbody></table>`;
     body.innerHTML=html;
     card.style.display=''; if(empty)empty.style.display='none';
-  } catch(e){ if(empty)empty.innerHTML=`<p class="muted">Error loading weekly program: ${esc(e.message)}</p>`; card.style.display='none'; if(empty)empty.style.display=''; }
+  } catch(e){ if(empty)empty.innerHTML=`<p class="muted">Error loading weekly program: ${esc(apiErr(e))}</p>`; card.style.display='none'; if(empty)empty.style.display=''; }
 }
 
 // ═══════════════
@@ -6603,7 +6601,7 @@ async function loadLongRange(yearId){
     });
     document.getElementById('lr-body').innerHTML=html;
     card.style.display=''; empty.style.display='none';
-  } catch(e){ empty.innerHTML=`<p class="muted">Error: ${esc(e.message)}</p>`; card.style.display='none'; empty.style.display=''; }
+  } catch(e){ empty.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; card.style.display='none'; empty.style.display=''; }
 }
 
 // ═══════════════
@@ -6633,7 +6631,7 @@ async function loadLocations(){
         <td><span class="badge ${l.source==='real'?'badge-green':'badge-grey'}">${l.source==='real'?'Training Area':'Planning Only'}</span></td>
       </tr>`).join('')+
       `</tbody></table>`;
-  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(e.message)}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
 }
 
 async function loadPlanningFacilitators(){
@@ -6662,7 +6660,7 @@ async function loadPlanningFacilitators(){
         <td>${f.max_sessions_per_night}</td>
       </tr>`).join('')+
       `</tbody></table>`;
-  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(e.message)}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
 }
 
 function openAddLocationModal(){
@@ -6703,7 +6701,7 @@ async function loadPlanningChecks(yearId){
     _renderDecisionGuide(guide.checks);
     _renderConflicts(conflicts, yearId);
     card.style.display=''; empty.style.display='none';
-  } catch(e){ empty.innerHTML=`<p class="muted">Error: ${esc(e.message)}</p>`; card.style.display='none'; empty.style.display=''; }
+  } catch(e){ empty.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; card.style.display='none'; empty.style.display=''; }
 }
 
 function _renderDecisionGuide(checks){
