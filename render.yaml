@@ -8,6 +8,21 @@
 #   Use the Session Pooler connection string on port 5432 — not the direct
 #   endpoint, which uses IPv6 and is unreachable from Render's network.
 #
+# ── REGION NOTE ────────────────────────────────────────────────────────────────
+# The backend is currently deployed in Oregon (us-west), Render's free-plan
+# default. Supabase is in Singapore (ap-southeast-1).
+#
+# For APAC users this adds ≈180ms of backend-to-database round-trip latency
+# (Oregon ↔ Singapore) and ≈200ms of user-to-backend latency (AU → Oregon).
+#
+# To move the backend to Singapore:
+#   1. Upgrade aafc-tms-backend-staging to Render Starter ($7/month).
+#   2. Uncomment "region: singapore" on the backend service below.
+#   3. Push — Render will tear down the Oregon instance and provision in Singapore.
+#   4. Supabase is already in Singapore; the DB connection will become local.
+#   5. Expected warm API latency after move: 50–100ms (vs. 350–500ms from Oregon).
+# ───────────────────────────────────────────────────────────────────────────────
+#
 # Secrets marked sync: false are entered by the operator in the Render
 # dashboard and are never committed to source control.
 #
@@ -28,6 +43,7 @@ services:
     dockerContext: ./backend
     branch: deployment/staging-v17.1
     plan: free
+    # region: singapore   # Uncomment + upgrade to Starter plan for APAC latency fix
     healthCheckPath: /api/health/ready
     envVars:
       - key: ENVIRONMENT
