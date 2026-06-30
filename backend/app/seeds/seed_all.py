@@ -6,9 +6,19 @@ from datetime import datetime, timezone
 from ..database import SessionLocal, init_db, reset_db
 from ..security import hash_code
 from ..models import (NationalEntity, Wing, Squadron, Flight, User, AccessCode,
-                      CurriculumItem, Facilitator, FacilitatorRankHistory,
+                      CurriculumItem, CurriculumElement, Facilitator, FacilitatorRankHistory,
                       TrainingArea, Equipment, ParadeNight, Session, Cadet,
                       TimingTemplate, TimingBlock)
+
+_DEFAULT_ELEMENTS = [
+    ("Air_Space",         "Air & Space",                "national"),
+    ("Drill",             "Drill",                     "national"),
+    ("Field",             "Field Skills",               "national"),
+    ("Personal_Dev",      "Personal Development (PDL)", "national"),
+    ("Service_Community", "Service & Community",        "national"),
+    ("SQN_Affairs",       "Squadron Affairs",           "national"),
+    ("CDT_Skills",        "Cadet Skills",               "national"),
+]
 
 UNITS = [
     ("7WG", "7 Wing HQ", "7WG", "RAAF Base Pearce, Bullsbrook WA 6084", "Tuesday", "19:00", "22:00", 2, True),
@@ -220,6 +230,15 @@ def seed_all():
 
     seed_program(db, nat, wing, sqn_by_code, cur_by_code)
     seed_planning_data(db, wing, sqn_by_code)
+    # Seed default curriculum elements (idempotent)
+    for name, display_name, scope in _DEFAULT_ELEMENTS:
+        if not db.query(CurriculumElement).filter(
+            CurriculumElement.name == name,
+            CurriculumElement.scope_level == scope,
+        ).first():
+            db.add(CurriculumElement(name=name, display_name=display_name,
+                                     scope_level=scope, active_status=True))
+    db.commit()
     db.close()
     print("Seeded: National HQ, 7 Wing, 16 squadrons, users/access codes, 13 core curriculum items, 703 demo data (incl. Alpha/Bravo flights, planning year, WA holidays).")
 

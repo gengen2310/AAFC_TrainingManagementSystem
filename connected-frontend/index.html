@@ -1703,17 +1703,26 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <option value="J. Silver">Silver CLP</option><option value="K. Gold">Gold CLP</option>
           </select>
         </div>
-        <div class="ff"><label>Element</label>
-          <select id="c-el">
-            <option value="Drill">Drill</option><option value="Air_Space">Air &amp; Space</option>
-            <option value="Field">Field Skills</option><option value="Personal_Dev">Personal Dev / PDL</option>
-            <option value="Service_Community">Service &amp; Community</option><option value="SQN_Affairs">SQN Affairs</option>
-          </select>
+        <div class="ff">
+          <label>Element</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="c-el" style="flex:1"><option value="">— select element —</option></select>
+            <button type="button" class="btn" style="white-space:nowrap;font-size:11px;padding:4px 8px" onclick="openCreateElementInline()">+ New</button>
+          </div>
+          <div id="c-el-new" style="display:none;margin-top:6px">
+            <div style="display:flex;gap:6px;align-items:center">
+              <input id="c-el-new-name" placeholder="Element name (e.g. Leadership)" style="flex:1">
+              <button type="button" class="btn btn-dk" style="font-size:11px;padding:4px 8px" onclick="doCreateElementInline()">Create</button>
+              <button type="button" class="btn btn-out" style="font-size:11px;padding:4px 8px" onclick="document.getElementById('c-el-new').style.display='none'">×</button>
+            </div>
+            <div id="c-el-new-msg" style="font-size:11px;margin-top:3px;color:var(--red)"></div>
+          </div>
         </div>
       </div>
-      <div class="form-row">
-        <div class="ff"><label>Term</label>
-          <select id="c-term"><option value="T1">T1</option><option value="T2">T2</option><option value="T3">T3</option><option value="T4">T4</option></select>
+      <div class="form-row" id="c-term-row">
+        <div class="ff">
+          <label id="c-term-label">Term <span id="c-term-optional" class="muted" style="font-weight:400;font-size:10px"></span></label>
+          <select id="c-term"><option value="">— no term assigned —</option><option value="T1">T1</option><option value="T2">T2</option><option value="T3">T3</option><option value="T4">T4</option></select>
         </div>
         <div class="ff"><label>Hours</label><input type="number" id="c-hours" value="1" min="0.25" step="0.25"></div>
       </div>
@@ -2384,9 +2393,19 @@ function tokenClear(){sessionStorage.removeItem('aafc_token');}
 async function api(path, opts={}){
   const headers=Object.assign({'Content-Type':'application/json'}, opts.headers||{});
   const t=tokenGet(); if(t)headers['Authorization']='Bearer '+t;
+  // Auto-serialize plain JS objects so callers don't need to JSON.stringify manually.
+  // Strings (already serialised), FormData, Blob, URLSearchParams pass through unchanged.
+  let fetchOpts={...opts,headers,credentials:'include'};
+  if(fetchOpts.body!==undefined&&fetchOpts.body!==null
+     &&typeof fetchOpts.body==='object'
+     &&!(fetchOpts.body instanceof FormData)
+     &&!(fetchOpts.body instanceof Blob)
+     &&!(fetchOpts.body instanceof URLSearchParams)){
+    fetchOpts.body=JSON.stringify(fetchOpts.body);
+  }
   let res;
   try{
-    res=await fetch(API_BASE+path,{...opts,headers,credentials:'include'});
+    res=await fetch(API_BASE+path,fetchOpts);
   }catch(e){
     // fetch() throws only on true network failure or CORS preflight block — not on HTTP errors
     throw {kind:'network', msg:'Cannot reach the backend at '+(API_BASE||location.origin)+'. Check the backend is running and try again.'};
@@ -4347,23 +4366,68 @@ function _resetCurrModal(){
   ['c-code','c-title','c-lh','c-identifier'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const partEl=document.getElementById('c-part');if(partEl)partEl.value='1';
   document.getElementById('c-hours').value=1;
+  const termEl=document.getElementById('c-term');if(termEl)termEl.value='';
+  const newEl=document.getElementById('c-el-new');if(newEl)newEl.style.display='none';
+}
+function _setCurrTermOptional(optional){
+  const lbl=document.getElementById('c-term-optional');
+  if(lbl)lbl.textContent=optional?' (optional — squadron sets delivery term)':'';
+}
+async function _populateCurrElements(){
+  const sel=document.getElementById('c-el');if(!sel)return;
+  try{
+    const els=await api('/api/curriculum/elements');
+    sel.innerHTML='<option value="">— select element —</option>';
+    (els||[]).forEach(e=>{const o=new Option(e.display_name||e.name,e.name);sel.appendChild(o);});
+    sel.innerHTML+='';
+  }catch(_){
+    // fallback to built-in list if API unavailable
+    sel.innerHTML=`<option value="">— select element —</option>
+      <option value="Air_Space">Air &amp; Space</option>
+      <option value="Drill">Drill</option><option value="Field">Field Skills</option>
+      <option value="Personal_Dev">Personal Dev / PDL</option>
+      <option value="Service_Community">Service &amp; Community</option>
+      <option value="SQN_Affairs">SQN Affairs</option>`;
+  }
+}
+function openCreateElementInline(){
+  const el=document.getElementById('c-el-new');
+  if(el){el.style.display='block';document.getElementById('c-el-new-name').focus();}
+}
+async function doCreateElementInline(){
+  const nameInput=document.getElementById('c-el-new-name');
+  const msgEl=document.getElementById('c-el-new-msg');
+  const name=(nameInput.value||'').trim();
+  if(!name){msgEl.textContent='Element name is required.';return;}
+  msgEl.textContent='';
+  try{
+    const r=await api('/api/curriculum/elements',{method:'POST',body:{
+      name,display_name:name.replace(/_/g,' '),scope_level:'national'
+    }});
+    // Reload element list and select the new one
+    await _populateCurrElements();
+    const sel=document.getElementById('c-el');
+    if(sel)sel.value=r.name||name;
+    document.getElementById('c-el-new').style.display='none';
+    nameInput.value='';
+  }catch(e){msgEl.textContent=apiErr(e);}
 }
 function openAddCurr(){
   editCurrCode=null;_currSaveEndpoint='/api/curriculum';_hideCurrWingRow();
   document.getElementById('curr-modal-title').textContent='+ Add Squadron Curriculum';
-  _resetCurrModal();openModal('m-add-curr');
+  _resetCurrModal();_setCurrTermOptional(false);_populateCurrElements();openModal('m-add-curr');
 }
 function openAddCurrWing(){
   editCurrCode=null;_currSaveEndpoint='/api/curriculum/wing';
   document.getElementById('curr-modal-title').textContent='+ Add Wing Curriculum';
-  _resetCurrModal();
+  _resetCurrModal();_setCurrTermOptional(true);_populateCurrElements();
   if(S.isNational) _showCurrWingRow(); else _hideCurrWingRow();
   openModal('m-add-curr');
 }
 function openAddCurrNat(){
   editCurrCode=null;_currSaveEndpoint='/api/curriculum/national';_hideCurrWingRow();
   document.getElementById('curr-modal-title').textContent='+ Add National Curriculum';
-  _resetCurrModal();openModal('m-add-curr');
+  _resetCurrModal();_setCurrTermOptional(true);_populateCurrElements();openModal('m-add-curr');
 }
 function editCurr(code){
   const e=S.curr.find(x=>x.code===code&&canEditCurr(x));if(!e){alert('You do not have permission to edit this curriculum item.');return;}
@@ -5691,7 +5755,7 @@ async function doAssignMission() {
     });
     closeModal('m-assign-mission');
     await loadMissions(yearId);
-  } catch(e){ msgEl.textContent = e.message || 'Error assigning mission.'; }
+  } catch(e){ msgEl.textContent = apiErr(e); }
 }
 
 // ═══════════════
@@ -5715,7 +5779,7 @@ async function doCreateYear(){
     await _loadPlanningYears();
     const sel = document.getElementById('py-select');
     if(sel && P.years.length){ sel.value = P.years[0].planning_year_id; loadYearMap(P.years[0].planning_year_id); }
-  } catch(e){ document.getElementById('py-msg').textContent = e.message||'Error creating year.'; }
+  } catch(e){ document.getElementById('py-msg').textContent = apiErr(e); }
 }
 
 async function loadYearMap(yearId){
@@ -5938,12 +6002,12 @@ async function doAddParadeDate(){
         notes:document.getElementById('pd-notes-inp').value||null}
     });
     closeModal('m-add-pd'); await _renderParadeDates(P.currentYearId);
-  } catch(e){ document.getElementById('pd-msg').textContent=e.message||'Error.'; }
+  } catch(e){ document.getElementById('pd-msg').textContent=apiErr(e); }
 }
 async function deleteParadeDate(pdId, yearId){
   if(!confirm('Remove this parade date?')) return;
   try { await api(`/api/planning/parade-dates/${pdId}`,{method:'DELETE'}); await _renderParadeDates(yearId); }
-  catch(e){ alert(e.message||'Error removing date.'); }
+  catch(e){ alert(apiErr(e)); }
 }
 
 function openGenerateDatesModal(){
@@ -5967,7 +6031,7 @@ async function doGenerateDates(){
     closeModal('m-gen-dates');
     alert(`Generated ${r.created} new parade date${r.created!==1?'s':''}.`);
     await _renderParadeDates(P.currentYearId);
-  } catch(e){ document.getElementById('gen-msg').textContent=e.message||'Error.'; }
+  } catch(e){ document.getElementById('gen-msg').textContent=apiErr(e); }
 }
 
 function openAddHolidayModal(){
@@ -5987,12 +6051,12 @@ async function doAddHoliday(){
         affects_parade: document.getElementById('hol-affects-inp').checked }
     });
     closeModal('m-add-holiday'); await _renderHolidays(P.currentYearId);
-  } catch(e){ document.getElementById('hol-msg').textContent=e.message||'Error.'; }
+  } catch(e){ document.getElementById('hol-msg').textContent=apiErr(e); }
 }
 async function deleteHoliday(hId, yearId){
   if(!confirm('Remove this holiday period?')) return;
   try { await api(`/api/planning/holidays/${hId}`,{method:'DELETE'}); await _renderHolidays(yearId); }
-  catch(e){ alert(e.message||'Error.'); }
+  catch(e){ alert(apiErr(e)); }
 }
 
 // ═══════════════
@@ -6064,12 +6128,12 @@ async function doAddAnchor(){
     });
     closeModal('m-add-anchor');
     P.anchors.push(r); renderAnchors();
-  } catch(e){ document.getElementById('anch-msg').textContent=e.message||'Error.'; }
+  } catch(e){ document.getElementById('anch-msg').textContent=apiErr(e); }
 }
 async function deleteAnchor(anchorId){
   if(!confirm('Archive this anchor event? It will no longer appear in planning.')) return;
   try { await api(`/api/planning/anchors/${anchorId}`,{method:'DELETE'}); await loadAnchors(P.currentYearId); }
-  catch(e){ alert(e.message||'Error.'); }
+  catch(e){ alert(apiErr(e)); }
 }
 
 // ═══════════════
@@ -6434,7 +6498,7 @@ async function doSaveSession(){
     closeModal('m-edit-session');
     if(mode==='pn'){ await loadBuilderFromPn(dateId); }
     else { await loadBuilderGrid(dateId); }
-  } catch(e){ document.getElementById('sess-msg').textContent=e.message||'Error saving session.'; }
+  } catch(e){ document.getElementById('sess-msg').textContent=apiErr(e); }
 }
 
 // ═══════════════
@@ -6619,7 +6683,7 @@ async function doAddLocation(){
       notes: document.getElementById('loc-notes-inp').value||null,
     }});
     closeModal('m-add-location'); await loadLocations();
-  } catch(e){ document.getElementById('loc-msg').textContent=e.message||'Error.'; }
+  } catch(e){ document.getElementById('loc-msg').textContent=apiErr(e); }
 }
 
 // ═══════════════
@@ -6674,7 +6738,7 @@ async function runAllChecks(){
     const r=await api(`/api/planning/years/${P.currentYearId}/run-checks`,{method:'POST'});
     await loadPlanningChecks(P.currentYearId);
     alert(`Checks complete. ${r.conflicts_detected} conflict${r.conflicts_detected!==1?'s':''} detected.`);
-  } catch(e){ alert(e.message||'Error running checks.'); }
+  } catch(e){ alert(apiErr(e)); }
 }
 
 async function promptOverrideConflict(cId, yearId){
@@ -6683,7 +6747,7 @@ async function promptOverrideConflict(cId, yearId){
   try {
     await api(`/api/planning/conflicts/${cId}/override`,{method:'POST',body:{override_reason:reason.trim()}});
     await loadPlanningChecks(yearId);
-  } catch(e){ alert(e.message||'Error overriding conflict.'); }
+  } catch(e){ alert(apiErr(e)); }
 }
 </script>
 </body>

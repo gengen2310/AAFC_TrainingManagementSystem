@@ -270,3 +270,24 @@ class ParadeNightTimingOverride(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
         ForeignKey("timing_templates.id"), nullable=True, index=True,
     )
     reason: Mapped[str] = mapped_column(Text)
+
+
+# Scope constants (also used by the endpoint and migration)
+ELEMENT_SCOPE_LEVELS = frozenset({"national", "wing", "squadron", "system"})
+
+
+class CurriculumElement(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
+    """Managed subject/category groupings for curriculum items.
+
+    Elements are scoped: system > national > wing > squadron. Squadron users see
+    national elements, wing elements for their wing, and their own squadron elements.
+    Elements at higher scopes are read-only to lower-scope admins.
+    """
+    __tablename__ = "curriculum_elements"
+    name: Mapped[str] = mapped_column(String(60), index=True)
+    display_name: Mapped[str] = mapped_column(String(120))
+    scope_level: Mapped[str] = mapped_column(String(20), index=True)  # system|national|wing|squadron
+    wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    squadron_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    active_status: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)

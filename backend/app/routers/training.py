@@ -6,9 +6,10 @@ from typing import List, Optional
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
-from ..models import (CurriculumItem, ParadeNight, Session, SessionStatusHistory,
+from ..models import (CurriculumItem, CurriculumElement, ParadeNight, Session, SessionStatusHistory,
                       Facilitator, FacilitatorRankHistory, TrainingArea, Equipment,
                       Activity, Cadet, Squadron, TimingTemplate, TimingBlock)
+from ..models.training import ELEMENT_SCOPE_LEVELS
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
 from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron)
@@ -859,6 +860,157 @@ def delete_activity(aid: str, db: DBSession = Depends(get_db), p: Principal = De
     return {"ok": True}
 
 
+# ── CURRICULUM ELEMENTS ──────────────────────────────────────────────────────
+
+class ElementIn(BaseModel):
+    name: str           # short code, e.g. "Air_Space"
+    display_name: str   # human label, e.g. "Air & Space"
+    scope_level: str = "national"
+    wing_id: str | None = None
+    squadron_id: str | None = None
+
+
+def _can_create_element(p: Principal, scope_level: str,
+                        wing_id: str | None = None, squadron_id: str | None = None) -> None:
+    """Raise 403 if the actor cannot create an element at the requested scope."""
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden",
+                                          "message": "Viewers and auditors cannot create elements."})
+    if scope_level not in ELEMENT_SCOPE_LEVELS:
+        raise HTTPException(400, detail={"error": "invalid_scope",
+                                          "message": f"scope_level must be one of: {sorted(ELEMENT_SCOPE_LEVELS)}"})
+    if scope_level == "system":
+        if p.role != "system_admin":
+            raise HTTPException(403, detail={"error": "forbidden",
+                                              "message": "Only system_admin can create system-scope elements."})
+    elif scope_level == "national":
+        if p.role not in _NAT_ADMIN_ROLES:
+            raise HTTPException(403, detail={"error": "forbidden",
+                                              "message": "Only national_admin or system_admin can create national elements."})
+    elif scope_level == "wing":
+        if p.role not in _WING_WRITE_ROLES:
+            raise HTTPException(403, detail={"error": "forbidden",
+                                              "message": "Only wing_admin or above can create wing elements."})
+        effective_wing = wing_id or p.wing_id
+        if p.role == "wing_admin" and effective_wing != p.wing_id:
+            raise HTTPException(403, detail={"error": "out_of_scope",
+                                              "message": "Wing admin can only create elements for their own wing."})
+    elif scope_level == "squadron":
+        if p.role not in {*_WING_WRITE_ROLES, "sqn_admin"}:
+            raise HTTPException(403, detail={"error": "forbidden"})
+        if p.role == "sqn_admin" and squadron_id and squadron_id != p.squadron_id:
+            raise HTTPException(403, detail={"error": "out_of_scope",
+                                              "message": "Squadron admin can only create elements for their own squadron."})
+
+
+def _visible_elements(db: DBSession, p: Principal) -> list[CurriculumElement]:
+    """Return elements visible to this principal (scoped by role)."""
+    from sqlalchemy import or_
+    conditions = [
+        CurriculumElement.scope_level == "national",
+        CurriculumElement.scope_level == "system",
+    ]
+    wing_id = p.acting_wing_id or p.wing_id
+    sq_id = p.acting_squadron_id or p.squadron_id
+    if wing_id:
+        conditions.append(
+            (CurriculumElement.scope_level == "wing") & (CurriculumElement.wing_id == wing_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(CurriculumElement.scope_level == "wing")
+    if sq_id:
+        conditions.append(
+            (CurriculumElement.scope_level == "squadron") & (CurriculumElement.squadron_id == sq_id))
+    elif p.role == "wing_admin":
+        pass  # wing admin: no sqn-scope elements unless proxied
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(CurriculumElement.scope_level == "squadron")
+    return db.query(CurriculumElement).filter(
+        CurriculumElement.is_archived == False,  # noqa: E712
+        CurriculumElement.active_status == True,  # noqa: E712
+        or_(*conditions),
+    ).order_by(CurriculumElement.scope_level, CurriculumElement.display_name).all()
+
+
+@router.get("/curriculum/elements")
+def list_elements(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Return all curriculum elements visible to the caller's scope."""
+    return [{"element_id": e.id, "name": e.name, "display_name": e.display_name,
+             "scope_level": e.scope_level, "wing_id": e.wing_id, "squadron_id": e.squadron_id}
+            for e in _visible_elements(db, p)]
+
+
+@router.post("/curriculum/elements")
+def create_element(body: ElementIn, db: DBSession = Depends(get_db),
+                   p: Principal = Depends(get_principal)):
+    """Create a curriculum element at the requested scope."""
+    scope = body.scope_level
+    _can_create_element(p, scope, body.wing_id, body.squadron_id)
+    name = (body.name or "").strip().replace(" ", "_")
+    if not name:
+        raise HTTPException(400, detail={"error": "name_required"})
+    wing_id = body.wing_id or (p.wing_id if scope in ("wing", "squadron") else None)
+    sq_id = body.squadron_id or (p.squadron_id if scope == "squadron" else None)
+    # Idempotent: return existing element if same name + scope
+    existing = db.query(CurriculumElement).filter(
+        CurriculumElement.name == name,
+        CurriculumElement.scope_level == scope,
+        CurriculumElement.wing_id == wing_id,
+        CurriculumElement.squadron_id == sq_id,
+        CurriculumElement.is_archived == False,  # noqa: E712
+    ).first()
+    if existing:
+        return {"ok": True, "element_id": existing.id, "name": existing.name,
+                "display_name": existing.display_name, "scope_level": existing.scope_level, "existed": True}
+    el = CurriculumElement(
+        name=name, display_name=body.display_name or name,
+        scope_level=scope, wing_id=wing_id, squadron_id=sq_id,
+        active_status=True, created_by=p.user_id)
+    db.add(el)
+    db.commit()
+    audit(db, p, object_type="curriculum_element", object_id=el.id, action="create",
+          new={"name": name, "scope": scope})
+    return {"ok": True, "element_id": el.id, "name": el.name,
+            "display_name": el.display_name, "scope_level": el.scope_level, "existed": False}
+
+
+@router.post("/curriculum/elements/{eid}/archive")
+def archive_element(eid: str, db: DBSession = Depends(get_db),
+                    p: Principal = Depends(get_principal)):
+    el = db.get(CurriculumElement, eid)
+    if not el:
+        raise HTTPException(404, detail={"error": "not_found"})
+    # Only the owning scope or above can archive
+    _can_create_element(p, el.scope_level, el.wing_id, el.squadron_id)
+    el.is_archived = True
+    el.archived_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="curriculum_element", object_id=el.id, action="archive")
+    return {"ok": True}
+
+
+def _upsert_element(db: DBSession, name: str, scope: str = "national",
+                    wing_id: str | None = None, sq_id: str | None = None) -> str:
+    """Find or create an element by name+scope; return its id. Used by workbook import."""
+    name = (name or "").strip().replace(" ", "_")
+    if not name:
+        return None
+    existing = db.query(CurriculumElement).filter(
+        CurriculumElement.name == name,
+        CurriculumElement.scope_level == scope,
+        CurriculumElement.wing_id == wing_id,
+        CurriculumElement.squadron_id == sq_id,
+        CurriculumElement.is_archived == False,  # noqa: E712
+    ).first()
+    if existing:
+        return existing.id
+    el = CurriculumElement(name=name, display_name=name.replace("_", " "),
+                            scope_level=scope, wing_id=wing_id, squadron_id=sq_id,
+                            active_status=True)
+    db.add(el)
+    db.flush()  # get id without full commit
+    return el.id
+
+
 # ── CURRICULUM WRITE (SQN-owned items only) ──────────────────────────────────
 class CurriculumIn(BaseModel):
     code: str
@@ -1181,6 +1333,9 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                 ).first()
 
             if existing is None:
+                # Ensure the element exists in the managed table (idempotent)
+                if item.element:
+                    _upsert_element(db, item.element, scope="national")
                 # CREATE
                 ci = CurriculumItem(
                     owning_level=owning_level,
