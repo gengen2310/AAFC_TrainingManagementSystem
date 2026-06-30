@@ -16,7 +16,12 @@ class CurriculumItem(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     owning_level: Mapped[str] = mapped_column(String(20), default="national")  # national|wing|squadron
     wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     squadron_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    # identifier is the globally unique lesson/mission key from the curriculum workbook,
+    # e.g. "ORI-M01-01(2)". Multiple rows can share the same code (Module_Code) for
+    # different parts. The 409/uniqueness check uses identifier, not code alone.
+    identifier: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
     code: Mapped[str] = mapped_column(String(40), index=True)
+    part_number: Mapped[int] = mapped_column(Integer, default=1)
     title: Mapped[str] = mapped_column(String(200))
     phase: Mapped[str] = mapped_column(String(40), index=True)
     element: Mapped[str | None] = mapped_column(String(40))

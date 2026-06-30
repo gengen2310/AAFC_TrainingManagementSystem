@@ -137,7 +137,7 @@ def system_version(p: Principal = Depends(get_principal)):
 def system_migrations(p: Principal = Depends(get_principal)):
     require_system_admin(p)
     return {
-        "expected_head": "e7a9c2f4b8d1",
+        "expected_head": "f1a2b3c4d5e6",
         "current": _migration_head(),
     }
 

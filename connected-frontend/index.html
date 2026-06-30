@@ -985,6 +985,21 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
 
         <!-- Backup card -->
+        <!-- Curriculum import card — upload workbook or paste JSON to import curriculum items -->
+        <div class="card sc-card" id="sc-curriculum-import-card">
+          <div class="sc-section-hdr">Curriculum Import</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Upload the AAFC training schedule workbook (.xlsm) to import all curriculum items from <em>zz - Program backend</em>. Idempotent — safe to run multiple times.</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label class="btn" style="cursor:pointer;background:#0891b2;color:#fff;border:none">
+              Select Workbook (.xlsm)
+              <input type="file" id="sc-curr-import-file" accept=".xlsm,.xlsx" style="display:none" onchange="scImportCurriculum()">
+            </label>
+            <span id="sc-curr-import-filename" style="font-size:12px;color:var(--muted)"></span>
+          </div>
+          <div id="sc-curr-import-msg" style="font-size:12px;margin-top:8px;font-weight:700"></div>
+          <div id="sc-curr-import-results" style="font-size:12px;margin-top:8px"></div>
+        </div>
+
         <!-- Staging bootstrap card — creates 703SQN + initial accounts with one-time codes -->
         <div class="card sc-card" id="sc-bootstrap-card">
           <div class="sc-section-hdr">Initial Account Setup</div>
@@ -1674,6 +1689,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="form-row">
         <div class="ff"><label>Module Code</label><input id="c-code" placeholder="e.g. JNR-M99"></div>
         <div class="ff"><label>Title</label><input id="c-title" placeholder="Curriculum item title"></div>
+      </div>
+      <div class="form-row">
+        <div class="ff"><label>Identifier <span class="muted" style="font-weight:400;font-size:10px">(unique key, e.g. JNR-M99(1))</span></label><input id="c-identifier" placeholder="Optional — auto-set on import"></div>
+        <div class="ff"><label>Part Number</label><input type="number" id="c-part" value="1" min="1" step="1" style="max-width:100px"></div>
       </div>
       <div class="form-row">
         <div class="ff"><label>Phase</label>
@@ -2534,7 +2553,7 @@ async function loadData(){
   // Curriculum catalogue
   try{
     const cur=await api('/api/curriculum');
-    S.curr=((cur&&cur.items)||[]).map(i=>({id:i.curriculum_id,code:i.code,title:i.title,phase:i.phase,el:i.element,term:i.recommended_term,hours:Math.round((i.duration_minutes||0)/60),type:i.core_status,lh:i.learning_hub_url,progress:i.progress,sessions:i.session_count,owningLevel:i.owning_level,wingId:i.wing_id,owned:i.owning_level==='squadron'}));
+    S.curr=((cur&&cur.items)||[]).map(i=>({id:i.curriculum_id,code:i.code,identifier:i.identifier,partNumber:i.part_number,title:i.title,phase:i.phase,el:i.element,term:i.recommended_term,hours:Math.round((i.duration_minutes||0)/60),type:i.core_status,lh:i.learning_hub_url,progress:i.progress,sessions:i.session_count,owningLevel:i.owning_level,wingId:i.wing_id,owned:i.owning_level==='squadron'}));
   }catch(_){S.curr=[];}
   // Resources
   try{ const ta=await api('/api/training-areas'); S.rooms=(ta||[]).map(r=>({id:r.training_area_id||r.id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||''})); }catch(_){S.rooms=[];}
@@ -3042,6 +3061,47 @@ async function scLoadAudit(){
     h+='</div>';
     el.innerHTML=h;
   } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
+}
+
+async function scImportCurriculum(){
+  const input=document.getElementById('sc-curr-import-file');
+  const msg=document.getElementById('sc-curr-import-msg');
+  const results=document.getElementById('sc-curr-import-results');
+  const fname=document.getElementById('sc-curr-import-filename');
+  if(!input||!input.files||!input.files[0])return;
+  const file=input.files[0];
+  fname.textContent=file.name;
+  msg.textContent='Uploading and parsing…'; msg.style.color='var(--muted)';
+  results.innerHTML='';
+  const form=new FormData();
+  form.append('file',file);
+  try{
+    const base=document.querySelector('meta[name="aafc-api-base"]')?.content||'';
+    const token=sessionStorage.getItem('token')||'';
+    const r=await fetch(base+'/api/curriculum/import-xlsm',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+token},
+      body:form,
+    });
+    const d=await r.json();
+    if(!r.ok){
+      msg.textContent='Import failed: '+esc((d.detail?.message||d.detail?.error||JSON.stringify(d.detail)));
+      msg.style.color='var(--red)'; return;
+    }
+    msg.textContent=`Import complete — created: ${d.created}, updated: ${d.updated}, skipped: ${d.skipped}, failed: ${d.failed} of ${d.total}`;
+    msg.style.color=d.failed>0?'var(--amber)':'var(--ok)';
+    if(d.failed>0){
+      const failed=(d.results||[]).filter(x=>x.status==='failed');
+      results.innerHTML='<div style="color:var(--red);margin-top:4px">Failures:<br>'+
+        failed.map(x=>`${esc(x.identifier||x.code)}: ${esc(x.error)}`).join('<br>')+'</div>';
+    }
+    // Reload curriculum in state
+    try{const cur=await api('/api/curriculum');S.curr=((cur&&cur.items)||[]).map(i=>({id:i.curriculum_id,code:i.code,identifier:i.identifier,partNumber:i.part_number,title:i.title,phase:i.phase,el:i.element,term:i.recommended_term,hours:Math.round((i.duration_minutes||0)/60),type:i.core_status,lh:i.learning_hub_url,progress:i.progress,sessions:i.session_count,owningLevel:i.owning_level,wingId:i.wing_id,owned:i.owning_level==='squadron'}));}catch(_){}
+  }catch(e){
+    msg.textContent='Upload error: '+apiErr(e); msg.style.color='var(--red)';
+  } finally {
+    input.value='';
+  }
 }
 
 async function scBootstrapStaging(){
@@ -4283,25 +4343,27 @@ function _showCurrWingRow(){
   sel.innerHTML=(S.wings||[]).map(w=>`<option value="${esc(w.wing_id)}">${esc(w.code)} — ${esc(w.name)}</option>`).join('');
   row.style.display='';
 }
+function _resetCurrModal(){
+  ['c-code','c-title','c-lh','c-identifier'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const partEl=document.getElementById('c-part');if(partEl)partEl.value='1';
+  document.getElementById('c-hours').value=1;
+}
 function openAddCurr(){
   editCurrCode=null;_currSaveEndpoint='/api/curriculum';_hideCurrWingRow();
   document.getElementById('curr-modal-title').textContent='+ Add Squadron Curriculum';
-  ['c-code','c-title','c-lh'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('c-hours').value=1;openModal('m-add-curr');
+  _resetCurrModal();openModal('m-add-curr');
 }
 function openAddCurrWing(){
   editCurrCode=null;_currSaveEndpoint='/api/curriculum/wing';
   document.getElementById('curr-modal-title').textContent='+ Add Wing Curriculum';
-  ['c-code','c-title','c-lh'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('c-hours').value=1;
+  _resetCurrModal();
   if(S.isNational) _showCurrWingRow(); else _hideCurrWingRow();
   openModal('m-add-curr');
 }
 function openAddCurrNat(){
   editCurrCode=null;_currSaveEndpoint='/api/curriculum/national';_hideCurrWingRow();
   document.getElementById('curr-modal-title').textContent='+ Add National Curriculum';
-  ['c-code','c-title','c-lh'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('c-hours').value=1;openModal('m-add-curr');
+  _resetCurrModal();openModal('m-add-curr');
 }
 function editCurr(code){
   const e=S.curr.find(x=>x.code===code&&canEditCurr(x));if(!e){alert('You do not have permission to edit this curriculum item.');return;}
@@ -4321,15 +4383,26 @@ function editCurr(code){
 async function saveCurr(){
   const code=document.getElementById('c-code').value.trim();
   const title=document.getElementById('c-title').value.trim();
+  const identifierEl=document.getElementById('c-identifier');
+  const identifier=identifierEl?identifierEl.value.trim()||null:null;
+  const partEl=document.getElementById('c-part');
+  const partNumber=partEl?parseInt(partEl.value||'1',10)||1:1;
   if(!code||!title){alert('Code and title required.');return;}
-  const payload={title,phase:document.getElementById('c-phase').value,element:document.getElementById('c-el').value||null,recommended_term:document.getElementById('c-term').value||null,learning_hub_url:document.getElementById('c-lh').value||null,duration_minutes:(+document.getElementById('c-hours').value||1)*60};
+  const payload={title,phase:document.getElementById('c-phase').value,
+    element:document.getElementById('c-el').value||null,
+    recommended_term:document.getElementById('c-term').value||null,
+    learning_hub_url:document.getElementById('c-lh').value||null,
+    duration_minutes:(+document.getElementById('c-hours').value||1)*60,
+    identifier,part_number:partNumber};
   try{
     if(editCurrCode){
       const existing=S.curr.find(e=>e.code===editCurrCode&&canEditCurr(e));
       if(!existing||!existing.id){alert('Cannot edit — curriculum item not found.');return;}
       await api('/api/curriculum/'+existing.id,{method:'PATCH',body:JSON.stringify(payload)});
     } else {
-      if(allCurr().find(e=>e.code===code)){alert('Code already exists.');return;}
+      // Uniqueness is by identifier (if set) or (code, part_number) — NOT code alone.
+      const dup=allCurr().find(e=>identifier?e.identifier===identifier:(e.code===code&&(e.partNumber||1)===partNumber));
+      if(dup){alert('A curriculum item with this identifier/code+part already exists.');return;}
       if(_currSaveEndpoint==='/api/curriculum/wing'&&S.isNational){
         const wid=document.getElementById('c-wing-id').value;
         if(!wid){alert('Select a Wing.');return;}
@@ -4340,7 +4413,11 @@ async function saveCurr(){
     editCurrCode=null;
     await reloadAndRender(); closeModal('m-add-curr');
     document.getElementById('curr-modal-title').textContent='+ Add Curriculum Item';
-  }catch(e){ alert(apiErr(e)); }
+  }catch(e){
+    // Show human-readable error; 409 now includes a message field
+    const msg=e.msg||e.message||'Request failed';
+    alert(msg);
+  }
 }
 async function deleteCurrItem(id){
   if(!confirm('Archive this curriculum item? Sessions already linked are not affected.'))return;

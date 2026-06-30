@@ -1,5 +1,8 @@
-from fastapi import APIRouter, Depends, Request, HTTPException
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, Request, HTTPException, UploadFile, File
 from pydantic import BaseModel
+from typing import List, Optional
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
@@ -63,8 +66,10 @@ def list_curriculum(db: DBSession = Depends(get_db), p: Principal = Depends(get_
                                         Session.squadron_id == sq_id,
                                         Session.is_archived == False).all()  # noqa: E712
         statuses = [s.status for s in sess]
-        out.append({"curriculum_id": i.id, "code": i.code, "title": i.title, "phase": i.phase,
+        out.append({"curriculum_id": i.id, "code": i.code, "identifier": i.identifier,
+                    "part_number": i.part_number, "title": i.title, "phase": i.phase,
                     "element": i.element, "duration_minutes": i.duration_minutes,
+                    "part_count": i.part_count, "instructor_suitability": i.instructor_suitability,
                     "core_status": i.core_status, "learning_hub_url": i.learning_hub_url,
                     "recommended_term": i.recommended_term, "owning_level": i.owning_level,
                     "wing_id": i.wing_id, "squadron_id": i.squadron_id,
@@ -858,25 +863,87 @@ def delete_activity(aid: str, db: DBSession = Depends(get_db), p: Principal = De
 class CurriculumIn(BaseModel):
     code: str
     title: str
+    identifier: str | None = None  # globally unique mission key, e.g. "ORI-M01-01(2)"
+    part_number: int = 1
     phase: str = "B. Initial"
     element: str | None = None
     recommended_term: str | None = None
     duration_minutes: int = 60
+    part_count: int = 1
+    instructor_suitability: str | None = None
     learning_hub_url: str | None = None
     wing_id: str | None = None  # NAT admins pass this for wing-owned curriculum
 
 
 class CurriculumUpdateIn(BaseModel):
     title: str | None = None
+    identifier: str | None = None
+    part_number: int | None = None
     phase: str | None = None
     element: str | None = None
     recommended_term: str | None = None
     duration_minutes: int | None = None
+    part_count: int | None = None
+    instructor_suitability: str | None = None
     learning_hub_url: str | None = None
+
+
+class CurriculumImportItem(BaseModel):
+    identifier: str | None = None    # primary unique key
+    code: str                         # Module_Code (may repeat across parts)
+    part_number: int = 1
+    title: str
+    phase: str = "B. Initial"
+    element: str | None = None
+    duration_minutes: int = 60
+    part_count: int = 1
+    instructor_suitability: str | None = None
+    learning_hub_url: str | None = None
+    recommended_term: str | None = None
+    # Scheduling fields — used to link to existing parade night sessions
+    scheduled_date: str | None = None  # ISO date string e.g. "2026-02-13"
+    session_number: int | None = None  # period number (1, 2, 3)
+    facilitator_name: str | None = None
+    location: str | None = None
+    room: str | None = None
+
+
+class CurriculumImportIn(BaseModel):
+    items: List[CurriculumImportItem]
+    squadron_id: str | None = None  # if provided, link scheduled items to this sqn
+    owning_level: str = "national"  # national | wing | squadron
 
 
 _NAT_ADMIN_ROLES = frozenset({"national_admin", "system_admin"})
 _WING_WRITE_ROLES = frozenset({"wing_admin", "national_admin", "system_admin"})
+
+
+def _find_existing_curriculum(db: DBSession, body: CurriculumIn,
+                              owning_level: str,
+                              wing_id: str | None = None,
+                              squadron_id: str | None = None) -> CurriculumItem | None:
+    """Find an existing (non-archived) curriculum item by identifier or (code, part_number).
+
+    Multiple items can share the same code (Module_Code) for different parts, so
+    code alone is never a uniqueness criterion. The check hierarchy is:
+    1. If identifier is set: match by identifier + owning scope.
+    2. Else: match by (code, part_number) + owning scope.
+    """
+    q = db.query(CurriculumItem).filter(
+        CurriculumItem.owning_level == owning_level,
+        CurriculumItem.is_archived == False)  # noqa: E712
+    if owning_level == "wing":
+        q = q.filter(CurriculumItem.wing_id == wing_id)
+    elif owning_level == "squadron":
+        q = q.filter(CurriculumItem.squadron_id == squadron_id)
+
+    if body.identifier:
+        return q.filter(CurriculumItem.identifier == body.identifier).first()
+    # Fallback: (code, part_number) — allows same code with different parts
+    return q.filter(
+        CurriculumItem.code == body.code,
+        CurriculumItem.part_number == body.part_number,
+    ).first()
 
 
 @router.post("/curriculum")
@@ -892,16 +959,20 @@ def create_curriculum(body: CurriculumIn, db: DBSession = Depends(get_db),
     if not s:
         raise HTTPException(400, detail={"error": "no_squadron_scope"})
     require_can_write_squadron(p, s.id, s.wing_id)
-    exists = db.query(CurriculumItem).filter(
-        CurriculumItem.code == body.code,
-        CurriculumItem.squadron_id == sq_id,
-        CurriculumItem.is_archived == False).first()  # noqa: E712
+    exists = _find_existing_curriculum(db, body, "squadron", squadron_id=sq_id)
     if exists:
-        raise HTTPException(409, detail={"error": "code_exists"})
-    ci = CurriculumItem(squadron_id=s.id, wing_id=s.wing_id, owning_level="squadron",
-                        code=body.code, title=body.title, phase=body.phase, element=body.element,
-                        recommended_term=body.recommended_term, duration_minutes=body.duration_minutes,
-                        learning_hub_url=body.learning_hub_url, core_status="additional")
+        raise HTTPException(409, detail={
+            "error": "already_exists",
+            "message": f"Curriculum item '{body.identifier or body.code}' already exists.",
+            "curriculum_id": exists.id,
+        })
+    ci = CurriculumItem(
+        squadron_id=s.id, wing_id=s.wing_id, owning_level="squadron",
+        identifier=body.identifier, code=body.code, part_number=body.part_number,
+        title=body.title, phase=body.phase, element=body.element,
+        recommended_term=body.recommended_term, duration_minutes=body.duration_minutes,
+        part_count=body.part_count, instructor_suitability=body.instructor_suitability,
+        learning_hub_url=body.learning_hub_url, core_status="additional")
     db.add(ci)
     db.commit()
     audit(db, p, object_type="curriculum_item", object_id=ci.id, action="create",
@@ -924,17 +995,20 @@ def create_wing_curriculum(body: CurriculumIn, db: DBSession = Depends(get_db),
     w = db.get(WingModel, wing_id)
     if not w or w.is_archived:
         raise HTTPException(404, detail={"error": "wing_not_found"})
-    exists = db.query(CurriculumItem).filter(
-        CurriculumItem.code == body.code,
-        CurriculumItem.wing_id == wing_id,
-        CurriculumItem.owning_level == "wing",
-        CurriculumItem.is_archived == False).first()  # noqa: E712
+    exists = _find_existing_curriculum(db, body, "wing", wing_id=wing_id)
     if exists:
-        raise HTTPException(409, detail={"error": "code_exists"})
-    ci = CurriculumItem(wing_id=wing_id, squadron_id=None, owning_level="wing",
-                        code=body.code, title=body.title, phase=body.phase, element=body.element,
-                        recommended_term=body.recommended_term, duration_minutes=body.duration_minutes,
-                        learning_hub_url=body.learning_hub_url, core_status="additional")
+        raise HTTPException(409, detail={
+            "error": "already_exists",
+            "message": f"Curriculum item '{body.identifier or body.code}' already exists in this Wing.",
+            "curriculum_id": exists.id,
+        })
+    ci = CurriculumItem(
+        wing_id=wing_id, squadron_id=None, owning_level="wing",
+        identifier=body.identifier, code=body.code, part_number=body.part_number,
+        title=body.title, phase=body.phase, element=body.element,
+        recommended_term=body.recommended_term, duration_minutes=body.duration_minutes,
+        part_count=body.part_count, instructor_suitability=body.instructor_suitability,
+        learning_hub_url=body.learning_hub_url, core_status="additional")
     db.add(ci)
     db.commit()
     audit(db, p, object_type="curriculum_item", object_id=ci.id, action="create",
@@ -945,20 +1019,29 @@ def create_wing_curriculum(body: CurriculumIn, db: DBSession = Depends(get_db),
 @router.post("/curriculum/national")
 def create_national_curriculum(body: CurriculumIn, db: DBSession = Depends(get_db),
                                p: Principal = Depends(get_principal)):
-    """Create a National curriculum item visible to all Wings and Squadrons."""
+    """Create a National curriculum item visible to all Wings and Squadrons.
+
+    Uniqueness is by identifier (if provided) or (code, part_number).
+    Multiple parts of the same module share the same code but have distinct
+    identifiers / part_numbers — they are NOT duplicates.
+    """
     if p.role not in _NAT_ADMIN_ROLES:
         raise HTTPException(403, detail={"error": "forbidden",
                                           "message": "Only NAT HQ admin can create National curriculum."})
-    exists = db.query(CurriculumItem).filter(
-        CurriculumItem.code == body.code,
-        CurriculumItem.owning_level == "national",
-        CurriculumItem.is_archived == False).first()  # noqa: E712
+    exists = _find_existing_curriculum(db, body, "national")
     if exists:
-        raise HTTPException(409, detail={"error": "code_exists"})
-    ci = CurriculumItem(wing_id=None, squadron_id=None, owning_level="national",
-                        code=body.code, title=body.title, phase=body.phase, element=body.element,
-                        recommended_term=body.recommended_term, duration_minutes=body.duration_minutes,
-                        learning_hub_url=body.learning_hub_url, core_status="core")
+        raise HTTPException(409, detail={
+            "error": "already_exists",
+            "message": f"Curriculum item '{body.identifier or body.code}' (part {body.part_number}) already exists.",
+            "curriculum_id": exists.id,
+        })
+    ci = CurriculumItem(
+        wing_id=None, squadron_id=None, owning_level="national",
+        identifier=body.identifier, code=body.code, part_number=body.part_number,
+        title=body.title, phase=body.phase, element=body.element,
+        recommended_term=body.recommended_term, duration_minutes=body.duration_minutes,
+        part_count=body.part_count, instructor_suitability=body.instructor_suitability,
+        learning_hub_url=body.learning_hub_url, core_status="core")
     db.add(ci)
     db.commit()
     audit(db, p, object_type="curriculum_item", object_id=ci.id, action="create",
@@ -1029,3 +1112,303 @@ def delete_curriculum(cid: str, db: DBSession = Depends(get_db), p: Principal = 
     db.commit()
     audit(db, p, object_type="curriculum_item", object_id=ci.id, action="archive")
     return {"ok": True}
+
+
+# ── CURRICULUM BULK IMPORT ────────────────────────────────────────────────────
+
+@router.post("/curriculum/import")
+def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
+                      p: Principal = Depends(get_principal)):
+    """Bulk upsert curriculum items.
+
+    Uniqueness key: identifier (if set), else (code, part_number).
+    Multiple rows may share the same code (Module_Code) for different parts —
+    this is NOT a duplicate. A duplicate is a row whose identifier (or
+    code+part_number combo) already exists in the database.
+
+    For each item:
+    - If not found: create.
+    - If found and any field changed: update.
+    - If found and identical: skip.
+
+    Never raises 409 — returns per-item status in the response.
+
+    If squadron_id is supplied and a row has a scheduled_date + session_number,
+    the endpoint attempts to link the curriculum item to the corresponding
+    parade-night session for that squadron.
+    """
+    if p.role not in _NAT_ADMIN_ROLES:
+        raise HTTPException(403, detail={
+            "error": "forbidden",
+            "message": "Only national_admin or system_admin can bulk-import curriculum.",
+        })
+
+    owning_level = body.owning_level if body.owning_level in {"national", "wing", "squadron"} else "national"
+    sqn_id = body.squadron_id
+
+    created = updated = skipped = failed = 0
+    results = []
+
+    # Pre-fetch facilitators + training areas for schedule linking
+    fac_by_name: dict[str, str] = {}  # display_name -> id
+    room_by_name: dict[str, str] = {}  # name -> id
+    if sqn_id:
+        for f in db.query(Facilitator).filter(Facilitator.squadron_id == sqn_id).all():
+            key = (f.display_name or "").strip().lower()
+            if key:
+                fac_by_name[key] = f.id
+        for r in db.query(TrainingArea).filter(TrainingArea.squadron_id == sqn_id).all():
+            key = (r.name or "").strip().lower()
+            if key:
+                room_by_name[key] = r.id
+
+    for item in body.items:
+        try:
+            # Locate existing item
+            q = db.query(CurriculumItem).filter(
+                CurriculumItem.owning_level == owning_level,
+                CurriculumItem.is_archived == False)  # noqa: E712
+            if owning_level == "squadron":
+                q = q.filter(CurriculumItem.squadron_id == sqn_id)
+
+            existing: CurriculumItem | None = None
+            if item.identifier:
+                existing = q.filter(CurriculumItem.identifier == item.identifier).first()
+            if existing is None:
+                existing = q.filter(
+                    CurriculumItem.code == item.code,
+                    CurriculumItem.part_number == item.part_number,
+                ).first()
+
+            if existing is None:
+                # CREATE
+                ci = CurriculumItem(
+                    owning_level=owning_level,
+                    squadron_id=sqn_id if owning_level == "squadron" else None,
+                    identifier=item.identifier,
+                    code=item.code,
+                    part_number=item.part_number,
+                    title=item.title,
+                    phase=item.phase or "B. Initial",
+                    element=item.element,
+                    duration_minutes=item.duration_minutes or 60,
+                    part_count=item.part_count or 1,
+                    instructor_suitability=item.instructor_suitability,
+                    learning_hub_url=item.learning_hub_url,
+                    recommended_term=item.recommended_term,
+                    core_status="core" if owning_level == "national" else "additional",
+                    active_status=True,
+                )
+                db.add(ci)
+                db.flush()
+                created += 1
+                results.append({"identifier": item.identifier or item.code, "status": "created"})
+            else:
+                ci = existing
+                # Check if any field changed
+                changed = False
+                for field, val in [
+                    ("title", item.title),
+                    ("phase", item.phase),
+                    ("element", item.element),
+                    ("duration_minutes", item.duration_minutes),
+                    ("part_count", item.part_count),
+                    ("instructor_suitability", item.instructor_suitability),
+                    ("learning_hub_url", item.learning_hub_url),
+                    ("recommended_term", item.recommended_term),
+                    ("identifier", item.identifier),
+                    ("part_number", item.part_number),
+                ]:
+                    if val is not None and getattr(ci, field) != val:
+                        setattr(ci, field, val)
+                        changed = True
+                if changed:
+                    updated += 1
+                    results.append({"identifier": item.identifier or item.code, "status": "updated"})
+                else:
+                    skipped += 1
+                    results.append({"identifier": item.identifier or item.code, "status": "skipped"})
+
+            # Schedule linking: connect to parade night session if date provided
+            if sqn_id and item.scheduled_date and item.session_number:
+                _link_session(db, ci, sqn_id, item, fac_by_name, room_by_name)
+
+        except Exception as exc:
+            failed += 1
+            results.append({
+                "identifier": item.identifier or item.code,
+                "status": "failed",
+                "error": str(exc),
+            })
+
+    db.commit()
+
+    summary = {"created": created, "updated": updated, "skipped": skipped, "failed": failed,
+               "total": len(body.items)}
+    audit(db, p, object_type="curriculum_item", object_id="import", action="bulk_import",
+          new=summary)
+
+    return {"ok": True, **summary, "results": results}
+
+
+def _link_session(db: DBSession, ci: CurriculumItem, sqn_id: str,
+                  item: CurriculumImportItem,
+                  fac_by_name: dict, room_by_name: dict) -> None:
+    """Try to find the parade-night session for this date/period and assign the curriculum item."""
+    pn = db.query(ParadeNight).filter(
+        ParadeNight.squadron_id == sqn_id,
+        ParadeNight.date == item.scheduled_date,
+        ParadeNight.is_archived == False,  # noqa: E712
+    ).first()
+    if not pn:
+        return
+
+    sess = db.query(Session).filter(
+        Session.parade_night_id == pn.id,
+        Session.period_number == item.session_number,
+        Session.is_archived == False,  # noqa: E712
+    ).first()
+    if not sess:
+        return
+
+    # Only update if not already assigned to a different curriculum item
+    if sess.curriculum_item_id and sess.curriculum_item_id != ci.id:
+        return
+
+    fac_id = None
+    if item.facilitator_name:
+        fac_id = fac_by_name.get(item.facilitator_name.strip().lower())
+
+    room_id = None
+    if item.room:
+        room_id = room_by_name.get(item.room.strip().lower())
+
+    sess.curriculum_item_id = ci.id
+    sess.curriculum_code_at_time = ci.code
+    sess.curriculum_title_at_time = ci.title
+    sess.phase_at_time = ci.phase
+    sess.element_at_time = ci.element
+    if fac_id:
+        sess.facilitator_id = fac_id
+        sess.facilitator_display_name_at_time = item.facilitator_name
+    elif item.facilitator_name:
+        sess.facilitator_display_name_at_time = item.facilitator_name
+    if room_id:
+        sess.training_area_id = room_id
+        sess.training_area_name_at_time = item.room
+    elif item.room:
+        sess.training_area_name_at_time = item.room
+
+
+@router.post("/curriculum/import-xlsm")
+async def import_curriculum_xlsm(
+    file: UploadFile = File(...),
+    squadron_id: str | None = None,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Accept an .xlsm workbook upload and import curriculum from 'zz - Program backend' sheet.
+
+    Header row: 4. Unique key: Identifier (col 4), fallback (Module_Code, Part).
+    Non-curriculum rows (missing Module_Code or Title) are silently skipped.
+    """
+    if p.role not in _NAT_ADMIN_ROLES:
+        raise HTTPException(403, detail={"error": "forbidden",
+                                         "message": "Only national_admin or system_admin can import curriculum."})
+
+    content = await file.read()
+    try:
+        import io
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    except Exception as exc:
+        raise HTTPException(400, detail={"error": "invalid_file",
+                                          "message": f"Could not open workbook: {exc}"})
+
+    sheet_name = "zz - Program backend"
+    if sheet_name not in wb.sheetnames:
+        raise HTTPException(400, detail={
+            "error": "sheet_not_found",
+            "message": f"Sheet '{sheet_name}' not found. Available: {wb.sheetnames}",
+        })
+
+    ws = wb[sheet_name]
+    items = _parse_program_backend_sheet(ws)
+
+    body = CurriculumImportIn(items=items, squadron_id=squadron_id, owning_level="national")
+    return import_curriculum(body, db=db, p=p)
+
+
+_VALID_PROGRAMS = frozenset({
+    "A. Orientation", "B. Initial", "C. Junior", "D. Intermediate",
+    "E. Senior", "I. Bronze", "J. Silver", "K. Gold", "M. CDT Skills",
+})
+
+
+def _parse_program_backend_sheet(ws) -> list[CurriculumImportItem]:
+    """Parse 'zz - Program backend' worksheet rows into CurriculumImportItem objects.
+
+    Header row: 4. Skips rows where Module_Code or Module_Title is blank,
+    and rows where Program is not a recognised curriculum program.
+    """
+    from datetime import datetime as dt
+
+    hdr_row = list(ws[4])
+    HDR = {cell.value: idx for idx, cell in enumerate(hdr_row) if cell.value}
+
+    def col(row, name: str, default=None):
+        idx = HDR.get(name)
+        return row[idx] if idx is not None and idx < len(row) else default
+
+    items: list[CurriculumImportItem] = []
+    for row in ws.iter_rows(min_row=5, values_only=True):
+        if not any(v is not None for v in row[:10]):
+            continue  # blank row
+
+        program = col(row, 'Program')
+        module_code = col(row, 'Module_Code')
+        title = col(row, 'Module_Title')
+
+        # Skip non-curriculum rows (header/name rows, non-programme programs)
+        if not module_code or not title:
+            continue
+        if program and str(program).strip() not in _VALID_PROGRAMS:
+            continue
+
+        identifier = col(row, 'Identifier')
+        part = col(row, 'Part')
+        duration = col(row, 'Duration_Min')
+        url = col(row, 'URL')
+        suggested_parts = col(row, 'Suggested_#_Parts')
+        elements = col(row, 'Elements')
+        instr = col(row, 'Instructor_Suitability')
+        scheduled = col(row, 'Scheduled')
+        session_num = col(row, 'Session')
+
+        # Convert scheduled datetime to ISO date string
+        sched_date = None
+        if scheduled:
+            if isinstance(scheduled, dt):
+                sched_date = scheduled.strftime('%Y-%m-%d')
+            else:
+                sched_date = str(scheduled)[:10] if scheduled else None
+
+        items.append(CurriculumImportItem(
+            identifier=str(identifier).strip() if identifier else None,
+            code=str(module_code).strip().upper(),
+            part_number=int(part) if part else 1,
+            title=str(title).strip(),
+            phase=str(program).strip() if program else "B. Initial",
+            element=str(elements).strip() if elements else None,
+            duration_minutes=int(duration) if duration else 60,
+            part_count=int(suggested_parts) if suggested_parts else 1,
+            instructor_suitability=str(instr).strip() if instr else None,
+            learning_hub_url=str(url).strip() if url else None,
+            scheduled_date=sched_date,
+            session_number=int(session_num) if session_num else None,
+            facilitator_name=str(col(row, 'Facilitator') or '').strip() or None,
+            location=str(col(row, 'Location') or '').strip() or None,
+            room=str(col(row, 'Room') or '').strip() or None,
+        ))
+
+    return items
