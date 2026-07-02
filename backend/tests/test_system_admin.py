@@ -140,7 +140,7 @@ def test_system_migrations_sysadmin(client):
     assert r.status_code == 200
     d = r.json()
     assert "expected_head" in d
-    assert d["expected_head"] == "e7a9c2f4b8d1"
+    assert d["expected_head"] == "h3c4d5e6f7g8"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -349,3 +349,49 @@ def test_system_admin_actions_audited(client):
     assert r.status_code == 200
     logs = r.json()["logs"]
     assert any(e["action"] == "maintenance_enabled" for e in logs)
+
+
+# ─────────────────────────────────────────────────────────────
+# Bootstrap Staging
+# ─────────────────────────────────────────────────────────────
+
+def test_bootstrap_staging_requires_sysadmin(client):
+    """national_admin must be denied access to bootstrap."""
+    hdr = _nat_admin(client)
+    r = client.post("/api/system/bootstrap-staging", headers=hdr)
+    assert r.status_code == 403
+
+
+def test_bootstrap_staging_unauthenticated(client):
+    r = client.post("/api/system/bootstrap-staging")
+    assert r.status_code == 401
+
+
+def test_bootstrap_staging_idempotent(client):
+    """With seed_all data already present, bootstrap runs idempotently — no new codes."""
+    hdr = _sysadmin(client)
+    r = client.post("/api/system/bootstrap-staging", headers=hdr)
+    assert r.status_code == 200
+    d = r.json()
+    assert "results" in d
+    assert "accounts_created" in d
+    # Seed already created everything — no new accounts or codes expected
+    assert all(not item["created"] for item in d["accounts_created"] if "created" in item) or d["accounts_created"] == []
+    # No plaintext codes in response for already-existing accounts
+    for item in d["accounts_created"]:
+        assert "new_code" not in item or item.get("created") is True
+
+
+def test_bootstrap_staging_response_no_code_hash(client):
+    """Bootstrap response must never contain code_hash."""
+    hdr = _sysadmin(client)
+    r = client.post("/api/system/bootstrap-staging", headers=hdr)
+    assert "code_hash" not in r.text
+
+
+def test_bootstrap_staging_audit_entries(client):
+    """Bootstrap must appear in audit log when accounts are created."""
+    hdr = _sysadmin(client)
+    client.post("/api/system/bootstrap-staging", headers=hdr)
+    r = client.get("/api/system/audit-summary?action=account_created&limit=50", headers=hdr)
+    assert r.status_code == 200

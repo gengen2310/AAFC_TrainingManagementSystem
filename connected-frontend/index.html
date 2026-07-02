@@ -4,8 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AAFC Training System</title>
-<!-- Set the backend API base URL here (leave content empty when the API is served on the same origin behind a reverse proxy). -->
-<meta name="aafc-api-base" content="http://localhost:8000">
+<meta name="aafc-api-base" content="https://aafc-tms-backend-staging.onrender.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -540,7 +539,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- CALENDAR -->
       <div id="page-calendar" class="page">
-        <div class="ph"><div class="ph-title">Training Calendar</div><div class="ph-sub">Monthly overview — click any day to view or add</div></div>
+        <div class="ph"><div class="ph-title">Training Calendar</div><div class="ph-sub">Monthly overview</div></div>
         <div class="card">
           <div class="cal-nav">
             <button class="cal-nbtn" onclick="calMove(-1)">‹</button>
@@ -564,7 +563,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-parade-nights" class="page">
         <div class="ph">
           <div class="ph-title">Parade Nights</div>
-          <div class="ph-sub">Click any session to edit. Quick status buttons update immediately.</div>
+          <div class="ph-sub">Parade nights and session status</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk" onclick="openModal('m-add-pn')">+ Add Parade Night</button>
             <button class="btn btn-out" onclick="nav('calendar')">Calendar</button>
@@ -604,11 +603,13 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-curriculum" class="page">
         <div class="ph">
           <div class="ph-title">Curriculum</div>
-          <div class="ph-sub">Core national program + squadron additions. Progress derived from scheduled sessions. Click any item for detail and scheduling.</div>
+          <div class="ph-sub">Curriculum</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" id="btn-add-curr-sqn" style="display:none" onclick="openAddCurr()">+ Add Squadron Curriculum</button>
             <button class="btn btn-dk admin-el" id="btn-add-curr-wing" style="display:none" onclick="openAddCurrWing()">+ Add Wing Curriculum</button>
             <button class="btn btn-dk admin-el" id="btn-add-curr-nat" style="display:none" onclick="openAddCurrNat()">+ Add National Curriculum</button>
+            <button class="btn btn-out nat-admin-el" style="display:none" onclick="openCsvCurrImport()">Import CSV</button>
+            <button class="btn btn-out" onclick="exportCurriculum()" title="Export curriculum to Excel">Export XLSX</button>
             <a href="https://airforcecadets.net.au/lh/home" target="_blank" class="btn btn-sky no-print">Learning Hub</a>
           </div>
         </div>
@@ -648,9 +649,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-activities" class="page">
         <div class="ph">
           <div class="ph-title">Activities &amp; Events</div>
-          <div class="ph-sub">Key events and activities that anchor the training calendar</div>
+          <div class="ph-sub">Events and activities</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-act')">+ Add Activity</button>
+            <button class="btn btn-out admin-el" style="display:none" onclick="openCeaImport()">Import CEA</button>
           </div>
         </div>
         <div class="tw">
@@ -665,7 +667,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-facilitators" class="page">
         <div class="ph">
           <div class="ph-title">Facilitators</div>
-          <div class="ph-sub">Click any row to view the full delivery profile. Rank is stored separately to preserve historical accuracy.</div>
+          <div class="ph-sub">Facilitator delivery profiles</div>
           <div class="ph-actions no-print">
             <select id="fac-filter" onchange="S.facFilter=this.value;renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px">
               <option value="">All subject areas</option>
@@ -691,7 +693,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-resources" class="page">
         <div class="ph">
           <div class="ph-title">Resources &amp; Training Areas</div>
-          <div class="ph-sub">Rooms, equipment, and facilities. These appear as dropdown options when scheduling sessions.</div>
+          <div class="ph-sub">Rooms and equipment</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-room')">+ Add Room</button>
             <button class="btn btn-out admin-el" style="display:none" onclick="openModal('m-add-equip')">+ Add Equipment</button>
@@ -720,7 +722,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ph">
           <div class="ph-title print-only">Training Summary Report</div>
           <div class="ph-title no-print">Training Summary</div>
-          <div class="ph-sub no-print">Click any number to drill into sessions. All data is connected and actionable.</div>
           <div class="ph-actions no-print">
             <button class="btn btn-out" onclick="printReport()">Print This Report</button>
           </div>
@@ -770,7 +771,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- SETTINGS (admin only) -->
       <div id="page-settings" class="page">
-        <div class="ph"><div class="ph-title">Unit Settings</div><div class="ph-sub">Admin-only. Configure squadron details, session structure, and access codes.</div></div>
+        <div class="ph"><div class="ph-title">Unit Settings</div><div class="ph-sub">Unit configuration</div></div>
         <div class="card">
           <div class="ctitle">Squadron Details</div>
           <div class="form-row">
@@ -837,7 +838,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-accounts" class="page">
         <div class="ph">
           <div class="ph-title">Account Management</div>
-          <div class="ph-sub">Create and manage accounts within your authorised scope. Access codes are never shown or stored in plaintext. All actions are audited.</div>
+          <div class="ph-sub">Manage accounts within your authorised scope</div>
         </div>
         <!-- filter + create -->
         <div class="card">
@@ -892,6 +893,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- SYSTEM CONSOLE -->
       <div id="page-system-console" class="page">
+        <div id="sc-coldstart-warn" style="display:none;padding:10px 14px;background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;font-size:13px;margin-bottom:12px;color:#92400e">
+          Staging server is starting — this can take up to 30 seconds on Render's free tier. Panels will load automatically.
+        </div>
         <div class="ph">
           <div>
             <div class="ph-title">System Console</div>
@@ -983,12 +987,33 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
 
         <!-- Backup card -->
+        <!-- Curriculum import card — upload workbook or paste JSON to import curriculum items -->
+        <div class="card sc-card" id="sc-curriculum-import-card">
+          <div class="sc-section-hdr">Curriculum Import</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Upload the AAFC training schedule workbook (.xlsm) to import all curriculum items from <em>zz - Program backend</em>. Idempotent — safe to run multiple times.</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label class="btn" style="cursor:pointer;background:#0891b2;color:#fff;border:none">
+              Select Workbook (.xlsm)
+              <input type="file" id="sc-curr-import-file" accept=".xlsm,.xlsx" style="display:none" onchange="scImportCurriculum()">
+            </label>
+            <span id="sc-curr-import-filename" style="font-size:12px;color:var(--muted)"></span>
+          </div>
+          <div id="sc-curr-import-msg" style="font-size:12px;margin-top:8px;font-weight:700"></div>
+          <div id="sc-curr-import-results" style="font-size:12px;margin-top:8px"></div>
+        </div>
+
+        <!-- Staging bootstrap card — creates 703SQN + initial accounts with one-time codes -->
+        <div class="card sc-card" id="sc-bootstrap-card">
+          <div class="sc-section-hdr">Initial Account Setup</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Creates 703 SQN under 7WG (if missing) and one account each for national_admin, 7WG wing_admin, and 703 SQN sqn_admin. Codes are generated server-side, shown once, and never retrievable again. Safe to re-run — only missing accounts are created.</div>
+          <button class="btn" style="background:#7c3aed;color:#fff;border:none" onclick="scBootstrapStaging()">Bootstrap Staging Accounts</button>
+          <div id="sc-bootstrap-msg" style="font-size:12px;margin-top:8px;font-weight:700"></div>
+        </div>
+
         <div class="card sc-card" id="sc-backup-card">
           <div class="sc-section-hdr">Backup</div>
           <div id="sc-backup-body"><div class="muted">Loading…</div></div>
-          <div style="margin-top:10px">
-            <button class="btn btn-secondary" onclick="scCreateBackup()">Create Backup Now</button>
-          </div>
+          <div id="sc-backup-actions" style="margin-top:10px"></div>
         </div>
 
         <!-- Audit summary card -->
@@ -1005,6 +1030,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <option value="access_code_reset">access_code_reset</option>
               <option value="account_created">account_created</option>
               <option value="account_disabled">account_disabled</option>
+              <option value="code_generated">code_generated</option>
+              <option value="pg_dump_initiated">pg_dump_initiated</option>
+              <option value="backup_created">backup_created</option>
             </select>
             <button class="btn btn-secondary btn-sm" onclick="scLoadAudit()">Filter</button>
           </div>
@@ -1169,9 +1197,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <p class="muted">Access codes are stored as hashes and are never visible after creation. The backend is the single source of truth for all roles and permissions.</p>
   </div>
 
-  <div class="card" style="border-color:var(--border);background:var(--bg-surface)">
-    <p class="muted" style="margin:0;font-size:0.82rem">AAFC TMS — V15 &bull; Connected Pilot Package &bull; Training Planner Module</p>
-  </div>
 </div>
 
 <!-- 2. Annual Program (Parade Dates) -->
@@ -1182,12 +1207,21 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="page-subtitle">View the training year, key activities, holidays and available parade nights.</div>
     </div>
     <div class="page-actions">
-      <button class="btn btn-primary" id="py-new-btn" onclick="openNewYearModal()">New Planning Year</button>
+      <button class="btn btn-out" onclick="exportAnnualProgram()" title="Export to Excel">Export XLSX</button>
+      <button class="btn btn-primary plan-write-el" style="display:none" id="py-new-btn" onclick="openNewYearModal()">New Planning Year</button>
     </div>
   </div>
   <div class="card">
+    <div id="py-sqn-filter-row" style="display:none;margin-bottom:10px">
+      <label style="font-size:0.82rem;font-weight:600;color:var(--steel);margin-right:6px">Squadron:</label>
+      <select id="py-sqn-filter" onchange="_loadPlanningYears()" style="max-width:260px">
+        <option value="">— All squadrons —</option>
+      </select>
+      <span id="py-ctx-label" style="font-size:0.82rem;color:var(--muted);margin-left:10px"></span>
+    </div>
     <div class="form-row" style="gap:8px;margin-bottom:12px">
       <select id="py-select" onchange="loadYearMap(this.value)" style="max-width:340px"><option value="">— select a planning year —</option></select>
+      <span id="py-ctx-label-sqn" style="font-size:0.82rem;color:var(--muted);align-self:center"></span>
     </div>
     <div id="py-map-body"><div class="empty"><div class="et">No planning year selected</div><div class="es">Select a planning year above or click <strong>+ New Planning Year</strong> to create one. Once created, use Auto-Generate to populate parade dates, or add them individually.</div></div></div>
   </div>
@@ -1197,8 +1231,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <h3 style="margin:0">Parade Dates</h3>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-secondary" onclick="openGenerateDatesModal()">Auto-Generate</button>
-        <button class="btn btn-secondary" onclick="openAddDateModal()">+ Add Date</button>
+        <button class="btn btn-secondary plan-write-el" style="display:none" onclick="openGenerateDatesModal()">Auto-Generate</button>
+        <button class="btn btn-secondary plan-write-el" style="display:none" onclick="openAddDateModal()">+ Add Date</button>
       </div>
     </div>
     <div id="py-dates-body"></div>
@@ -1208,7 +1242,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="card" id="py-holidays-card" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <h3 style="margin:0">Holiday &amp; Stand-Down Periods</h3>
-      <button class="btn btn-secondary" onclick="openAddHolidayModal()">+ Add Holiday</button>
+      <button class="btn btn-secondary plan-write-el" style="display:none" onclick="openAddHolidayModal()">+ Add Holiday</button>
     </div>
     <div id="py-holidays-body"></div>
   </div>
@@ -1277,6 +1311,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="page-subtitle">Review one parade night by cadet group and session.</div>
     </div>
     <div class="page-actions">
+      <button class="btn btn-out" onclick="exportSchedule()" title="Export full schedule to Excel">Export XLSX</button>
+      <button class="btn btn-out plan-write-el" style="display:none" onclick="openSchedImport()" title="Import edited schedule from Excel">Import XLSX</button>
       <select id="builder-year-sel" onchange="loadBuilderDates(this.value)" style="max-width:200px"><option value="">— planning year —</option></select>
       <select id="builder-date-sel" onchange="loadBuilderGrid(this.value)" style="max-width:160px"><option value="">— select night —</option></select>
       <span style="color:var(--muted);font-size:0.82rem">or</span>
@@ -1425,6 +1461,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <h2>New Planning Year</h2>
     <div class="form-group"><label>Year *</label><input type="number" id="py-year-inp" placeholder="2026" min="2020" max="2040"></div>
     <div class="form-group"><label>Name *</label><input type="text" id="py-name-inp" placeholder="2026 Training Year"></div>
+    <div class="form-group" id="py-unit-row" style="display:none">
+      <label>Squadron <span class="muted" style="font-weight:400">(optional — leave blank for a wing-level year)</span></label>
+      <select id="py-unit-sel" style="width:100%"><option value="">— Wing-level year —</option></select>
+    </div>
     <p id="py-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-new-year')">Cancel</button>
@@ -1457,27 +1497,43 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Auto-Generate Parade Dates Modal -->
 <div class="modal-bg" id="m-gen-dates">
   <div class="modal">
-    <h2>Auto-Generate Parade Dates</h2>
-    <div class="form-group"><label>Day of Week *</label>
-      <select id="gen-weekday">
-        <option value="0">Monday</option>
-        <option value="1">Tuesday</option>
-        <option value="2">Wednesday</option>
-        <option value="3">Thursday</option>
-        <option value="4">Friday</option>
-        <option value="5">Saturday</option>
-        <option value="6">Sunday</option>
-      </select>
+    <div class="modal-hdr"><div class="modal-title">Bulk Generate Parade Dates</div><button class="modal-x" onclick="closeModal('m-gen-dates')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>Frequency</label>
+          <select id="gen-freq">
+            <option value="weekly">Weekly</option>
+            <option value="fortnightly">Fortnightly</option>
+            <option value="monthly">Monthly (first weekday)</option>
+            <option value="daily">Daily</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Day of Week</label>
+          <select id="gen-weekday">
+            <option value="0">Monday</option>
+            <option value="1">Tuesday</option>
+            <option value="2">Wednesday</option>
+            <option value="3">Thursday</option>
+            <option value="4">Friday</option>
+            <option value="5">Saturday</option>
+            <option value="6">Sunday</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Start Date *</label><input type="date" id="gen-start"></div>
+        <div class="form-group"><label>End Date</label><input type="date" id="gen-end"></div>
+      </div>
+      <div class="form-group"><label>Max Repeats (alternative to End Date)</label><input type="number" id="gen-max-repeats" min="1" max="200" placeholder="e.g. 30"></div>
+      <div class="form-group"><label>Excluded Dates (YYYY-MM-DD, comma or space separated)</label><input type="text" id="gen-excl-dates" placeholder="e.g. 2026-04-10, 2026-04-17"></div>
+      <div class="form-group"><label><input type="checkbox" id="gen-excl-hols" checked> Skip existing holiday periods</label></div>
+      <p id="gen-msg" style="color:var(--error)"></p>
+      <div id="gen-preview-area" style="display:none;margin-top:8px;max-height:180px;overflow-y:auto"></div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>Start Date *</label><input type="date" id="gen-start"></div>
-      <div class="form-group"><label>End Date *</label><input type="date" id="gen-end"></div>
-    </div>
-    <div class="form-group"><label><input type="checkbox" id="gen-excl-hols" checked> Skip holiday periods</label></div>
-    <p id="gen-msg" style="color:var(--error)"></p>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal('m-gen-dates')">Cancel</button>
-      <button class="btn btn-primary" onclick="doGenerateDates()">Generate</button>
+    <div class="modal-foot">
+      <button class="btn btn-out" onclick="closeModal('m-gen-dates')">Cancel</button>
+      <button class="btn btn-out" onclick="previewGenerateDates()">Preview</button>
+      <button class="btn btn-dk" onclick="doGenerateDates()">Generate</button>
     </div>
   </div>
 </div>
@@ -1665,6 +1721,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ff"><label>Title</label><input id="c-title" placeholder="Curriculum item title"></div>
       </div>
       <div class="form-row">
+        <div class="ff"><label>Identifier <span class="muted" style="font-weight:400;font-size:10px">(unique key, e.g. JNR-M99(1))</span></label><input id="c-identifier" placeholder="Optional — auto-set on import"></div>
+        <div class="ff"><label>Part Number</label><input type="number" id="c-part" value="1" min="1" step="1" style="max-width:100px"></div>
+      </div>
+      <div class="form-row">
         <div class="ff"><label>Phase</label>
           <select id="c-phase">
             <option value="A. Orientation">Orientation</option><option value="B. Initial">Initial</option>
@@ -1673,17 +1733,26 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <option value="J. Silver">Silver CLP</option><option value="K. Gold">Gold CLP</option>
           </select>
         </div>
-        <div class="ff"><label>Element</label>
-          <select id="c-el">
-            <option value="Drill">Drill</option><option value="Air_Space">Air &amp; Space</option>
-            <option value="Field">Field Skills</option><option value="Personal_Dev">Personal Dev / PDL</option>
-            <option value="Service_Community">Service &amp; Community</option><option value="SQN_Affairs">SQN Affairs</option>
-          </select>
+        <div class="ff">
+          <label>Element</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="c-el" style="flex:1"><option value="">— select element —</option></select>
+            <button type="button" class="btn" style="white-space:nowrap;font-size:11px;padding:4px 8px" onclick="openCreateElementInline()">+ New</button>
+          </div>
+          <div id="c-el-new" style="display:none;margin-top:6px">
+            <div style="display:flex;gap:6px;align-items:center">
+              <input id="c-el-new-name" placeholder="Element name (e.g. Leadership)" style="flex:1">
+              <button type="button" class="btn btn-dk" style="font-size:11px;padding:4px 8px" onclick="doCreateElementInline()">Create</button>
+              <button type="button" class="btn btn-out" style="font-size:11px;padding:4px 8px" onclick="document.getElementById('c-el-new').style.display='none'">×</button>
+            </div>
+            <div id="c-el-new-msg" style="font-size:11px;margin-top:3px;color:var(--red)"></div>
+          </div>
         </div>
       </div>
-      <div class="form-row">
-        <div class="ff"><label>Term</label>
-          <select id="c-term"><option value="T1">T1</option><option value="T2">T2</option><option value="T3">T3</option><option value="T4">T4</option></select>
+      <div class="form-row" id="c-term-row">
+        <div class="ff">
+          <label id="c-term-label">Term <span id="c-term-optional" class="muted" style="font-weight:400;font-size:10px"></span></label>
+          <select id="c-term"><option value="">— no term assigned —</option><option value="T1">T1</option><option value="T2">T2</option><option value="T3">T3</option><option value="T4">T4</option></select>
         </div>
         <div class="ff"><label>Hours</label><input type="number" id="c-hours" value="1" min="0.25" step="0.25"></div>
       </div>
@@ -1741,6 +1810,87 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   </div>
 </div>
 
+<!-- CEA Activity Import -->
+<div class="modal-bg" id="m-cea-import">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-hdr"><div class="modal-title">Import Activities from CEA</div><button class="modal-x" onclick="closeModal('m-cea-import')">×</button></div>
+    <div class="modal-body">
+      <div class="alert a-info">Upload a CEA export CSV. Columns: SeqNr, Name, Start date, Start time, End date, End time, Unit, Location, Activity Notes. Duplicate SeqNr records are skipped.</div>
+      <div class="form-group"><label>CSV File *</label><input type="file" id="cea-file" accept=".csv,text/csv"></div>
+      <p id="cea-msg" style="color:var(--error)"></p>
+      <div id="cea-preview-area" style="display:none;max-height:240px;overflow-y:auto;margin-top:8px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-out" onclick="closeModal('m-cea-import')">Cancel</button>
+      <button class="btn btn-out" onclick="previewCeaImport()">Preview</button>
+      <button class="btn btn-dk" id="cea-import-btn" style="display:none" onclick="commitCeaImport()">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- CSV Curriculum Import -->
+<div class="modal-bg" id="m-csv-curr-import">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-hdr"><div class="modal-title">Import Curriculum from CSV</div><button class="modal-x" onclick="closeModal('m-csv-curr-import')">×</button></div>
+    <div class="modal-body">
+      <div class="alert a-info">Upload a CSV with columns: Training Phase, Experiential Code, Title, Elements, Foundation or Extension, Instructor Suitability, Timing, Location, Learning Hub Link.</div>
+      <div class="form-row">
+        <div class="form-group"><label>CSV File *</label><input type="file" id="csv-curr-file" accept=".csv,text/csv"></div>
+        <div class="form-group"><label>Owning Level</label>
+          <select id="csv-curr-level">
+            <option value="national">National</option>
+            <option value="wing">Wing</option>
+            <option value="squadron">Squadron</option>
+          </select>
+        </div>
+      </div>
+      <p id="csv-curr-msg" style="color:var(--error)"></p>
+      <div id="csv-curr-result" style="display:none;margin-top:8px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-out" onclick="closeModal('m-csv-curr-import')">Cancel</button>
+      <button class="btn btn-dk" onclick="submitCsvCurr()">Upload &amp; Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule XLSX Import -->
+<div class="modal-bg" id="m-sched-import">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-hdr"><div class="modal-title">Import Schedule from XLSX</div><button class="modal-x" onclick="closeModal('m-sched-import')">×</button></div>
+    <div class="modal-body">
+      <div class="alert a-info" style="margin-bottom:10px">Upload an edited schedule XLSX. Expected columns: <strong>Date, Session, Group, Code, Title</strong>. Only curriculum code / title changes are imported — other session fields are unchanged. Changes are role-permission-gated.</div>
+      <div class="form-group">
+        <label>XLSX File *</label>
+        <input type="file" id="sched-import-file" accept=".xlsx">
+      </div>
+      <div id="sched-import-preview" style="display:none;margin-top:10px">
+        <div style="font-weight:600;margin-bottom:6px;font-size:0.87rem">Preview — <span id="sched-import-summary"></span></div>
+        <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+            <thead><tr style="background:#f5f7fa">
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Date</th>
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Session</th>
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Group</th>
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Action</th>
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Current Code</th>
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">New Code</th>
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Title</th>
+            </tr></thead>
+            <tbody id="sched-import-rows"></tbody>
+          </table>
+        </div>
+      </div>
+      <p id="sched-import-msg" style="color:var(--error);font-size:0.85rem;min-height:1.2em;margin-top:8px"></p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-out" onclick="closeModal('m-sched-import')">Cancel</button>
+      <button class="btn btn-secondary" id="sched-import-preview-btn" onclick="previewSchedImport()">Preview Changes</button>
+      <button class="btn btn-primary" id="sched-import-commit-btn" style="display:none" onclick="commitSchedImport()">Apply Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Facilitator -->
 <div class="modal-bg" id="m-add-fac">
   <div class="modal">
@@ -1750,7 +1900,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="form-row">
         <div class="ff"><label>Current Rank</label><input id="fac-rank" placeholder="e.g. FLTLT(AAFC), CUO, CPL(AAFC)"></div>
         <div class="ff"><label>Type</label>
-          <select id="fac-type"><option value="Staff">Staff Officer</option><option value="Senior Cadet">Senior Cadet</option><option value="Civilian">Civilian Instructor</option></select>
+          <select id="fac-type"><option value="Officer">Officer (AAFC)</option><option value="NCO">Warrant Officer / NCO (AAFC)</option><option value="Senior Cadet">Senior Cadet</option><option value="Civilian">Civilian Instructor</option></select>
         </div>
       </div>
       <div class="form-row">
@@ -1918,6 +2068,20 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     </div>
     <div class="modal-foot">
       <button class="btn btn-dk" onclick="closeNewCodeModal()">I have noted this code</button>
+    </div>
+  </div>
+</div>
+
+<!-- SYSTEM CONSOLE: Staging Bootstrap Codes Modal (one-time, multiple accounts) -->
+<div class="modal-bg" id="m-bootstrap-codes">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-hdr"><div class="modal-title">Staging Accounts Created</div></div>
+    <div class="modal-body">
+      <div class="alert a-warn" style="font-weight:700;margin-bottom:12px">⚠️ These codes will NOT be shown again. Copy all codes now before closing.</div>
+      <div id="m-bootstrap-results"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-dk" onclick="closeModal('m-bootstrap-codes')">I have noted all codes</button>
     </div>
   </div>
 </div>
@@ -2340,9 +2504,19 @@ function tokenClear(){sessionStorage.removeItem('aafc_token');}
 async function api(path, opts={}){
   const headers=Object.assign({'Content-Type':'application/json'}, opts.headers||{});
   const t=tokenGet(); if(t)headers['Authorization']='Bearer '+t;
+  // Auto-serialize plain JS objects so callers don't need to JSON.stringify manually.
+  // Strings (already serialised), FormData, Blob, URLSearchParams pass through unchanged.
+  let fetchOpts={...opts,headers,credentials:'include'};
+  if(fetchOpts.body!==undefined&&fetchOpts.body!==null
+     &&typeof fetchOpts.body==='object'
+     &&!(fetchOpts.body instanceof FormData)
+     &&!(fetchOpts.body instanceof Blob)
+     &&!(fetchOpts.body instanceof URLSearchParams)){
+    fetchOpts.body=JSON.stringify(fetchOpts.body);
+  }
   let res;
   try{
-    res=await fetch(API_BASE+path,{...opts,headers,credentials:'include'});
+    res=await fetch(API_BASE+path,fetchOpts);
   }catch(e){
     // fetch() throws only on true network failure or CORS preflight block — not on HTTP errors
     throw {kind:'network', msg:'Cannot reach the backend at '+(API_BASE||location.origin)+'. Check the backend is running and try again.'};
@@ -2476,6 +2650,14 @@ function canWriteSquadron(){
 }
 function canWriteWing(){ return ['national_admin','system_admin'].includes(S.role); }
 function canWriteNational(){ return ['national_admin','system_admin'].includes(S.role); }
+// Planning-level write: sqn_admin + wing_admin can edit parade dates / holidays / planning years
+// without needing proxy mode (they are managing their own unit's calendar, not squadron records).
+function canWritePlan(){
+  if(isReadOnly()) return false;
+  const r=S.role||'';
+  if(r==='wing_admin') return true;
+  return canWriteSquadron();
+}
 function proxyActive(){ return !!(S.proxy && S.proxy.active); }
 function proxyMode(){ return (S.proxy && S.proxy.mode) || null; } // 'proxy' | 'intervention'
 // Wing admins must enter Proxy Mode before squadron writes; National admins use Delegated Intervention.
@@ -2487,85 +2669,90 @@ function isInterventionRequired(){ return ['national_admin','system_admin'].incl
 // ═══════════════════════════════════════════════════════════
 function _facName(s){return s.facilitator_display_name_at_time||'';}
 async function loadData(){
-  // Parade nights + sessions -> S.pns in the shape the views expect (keyed by date, with ids for writes).
-  try{
-    const pns=await api('/api/parade-nights');
-    S.pns=(Array.isArray(pns)?pns:[]).map(pn=>({
-      id:pn.parade_night_id, date:pn.date, term:pn.term, nsess:pn.session_count,
-      notes:pn.parade_type||'', published:!!pn.published_status, closeout:pn.closeout_status,
-      readiness:pn.readiness_score,
-      sessions:(pn.sessions||[]).sort((a,b)=>(a.period_number||0)-(b.period_number||0)).map(s=>({
-        id:s.id, phase:s.phase_at_time||'', code:s.curriculum_code_at_time||'',
-        exp:s.curriculum_title_at_time||s.custom_title||'', facId:s.facilitator_id||'',
-        facName:_facName(s), room:s.training_area_name_at_time||'', status:s.status||'planned'
-      }))
-    }));
-  }catch(e){S.pns=[];S.loadErr=apiErr(e);}
-  // Facilitators
-  try{
-    const facs=await api('/api/facilitators');
-    S.facs=(facs||[]).map(f=>({id:f.facilitator_id,rank:f.current_rank||'',first:f.first_name||'',last:f.last_name||'',type:f.type||'',areas:f.subject_areas||[]}));
-  }catch(_){S.facs=[];}
-  // Curriculum catalogue
-  try{
-    const cur=await api('/api/curriculum');
-    S.curr=((cur&&cur.items)||[]).map(i=>({id:i.curriculum_id,code:i.code,title:i.title,phase:i.phase,el:i.element,term:i.recommended_term,hours:Math.round((i.duration_minutes||0)/60),type:i.core_status,lh:i.learning_hub_url,progress:i.progress,sessions:i.session_count,owningLevel:i.owning_level,wingId:i.wing_id,owned:i.owning_level==='squadron'}));
-  }catch(_){S.curr=[];}
-  // Resources
-  try{ const ta=await api('/api/training-areas'); S.rooms=(ta||[]).map(r=>({id:r.training_area_id||r.id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||''})); }catch(_){S.rooms=[];}
-  try{ const eq=await api('/api/equipment'); S.equip=(eq||[]).map(x=>({id:x.equipment_id||x.id,name:x.name,qty:x.quantity||x.qty,notes:x.notes||''})); }catch(_){S.equip=[];}
-  // Action items
-  try{
-    const acts=await api('/api/action-items');
-    S.actionItems=(acts||[]).map(a=>({id:a.action_id,title:a.title,description:a.description,owner:a.owner,due:a.due_date,status:a.status,severity:a.severity,source:a.source}));
-  }catch(_){S.actionItems=[];}
-  // Dashboard reports (real backend figures, with drill-down handled by the views)
-  S.reports={};
-  for(const [k,path] of [['summary','/api/reports/summary'],['readiness','/api/reports/readiness'],['coverage','/api/reports/curriculum-coverage'],['facload','/api/reports/facilitator-load'],['notdelivered','/api/reports/not-delivered']]){
-    try{ S.reports[k]=await api(path); }catch(_){ S.reports[k]=null; }
-  }
-  // Activities — loaded from backend.
-  try{
-    const acts=await api('/api/activities');
-    S.acts=(acts||[]).map(a=>({id:a.activity_id,name:a.activity_name,date:a.date_start,type:a.activity_type||'Optional',audience:a.audience||[],notes:a.notes||''}));
-  }catch(_){S.acts=[];}
-  // SQN-owned curriculum items for the add/edit curriculum form.
-  // Unit config: load from backend for current squadron; fallback to session-derived info.
-  S.cfg={day:'',start:'',end:'',sess:3,dur:35,addr:''};
-  const _sqnId=S.session&&S.session.squadron_id;
-  if(_sqnId){
-    try{
-      const sqnData=await api('/api/squadrons/'+_sqnId);
-      S.cfg={day:sqnData.default_parade_day||'',start:sqnData.default_start_time||'',end:sqnData.default_end_time||'',sess:sqnData.default_session_count||3,dur:35,addr:sqnData.address||''};
-      S.currentSqnId=sqnData.squadron_id;
-    }catch(_){}
-  }
-  // Proxy / Delegated Intervention state (drives banners + write gating).
-  try{ S.proxy=await api('/api/proxy/current'); }catch(_){ S.proxy={active:false}; }
   const scope=getScopeType();
-  // Wing scope: squadron comparison + phase coverage across the wing.
+  const _sqnId=S.session&&S.session.squadron_id;
+  const _proxyWasActive=proxyActive();
+
+  // Fire all requests in parallel — no await until Promise.all below.
+  const p_pns=api('/api/parade-nights').catch(e=>{S.loadErr=apiErr(e);return null;});
+  const p_facs=api('/api/facilitators').catch(()=>null);
+  const p_cur=api('/api/curriculum').catch(()=>null);
+  const p_ta=api('/api/training-areas').catch(()=>null);
+  const p_eq=api('/api/equipment').catch(()=>null);
+  const p_ai=api('/api/action-items').catch(()=>null);
+  const p_acts=api('/api/activities').catch(()=>null);
+  const p_proxy=api('/api/proxy/current').catch(()=>({active:false}));
+  const p_sum=api('/api/reports/summary').catch(()=>null);
+  const p_read=api('/api/reports/readiness').catch(()=>null);
+  const p_cov=api('/api/reports/curriculum-coverage').catch(()=>null);
+  const p_fload=api('/api/reports/facilitator-load').catch(()=>null);
+  const p_ndel=api('/api/reports/not-delivered').catch(()=>null);
+  const p_sqnData=_sqnId?api('/api/squadrons/'+_sqnId).catch(()=>null):Promise.resolve(null);
+  const p_timing=(scope==='squadron'||_proxyWasActive)?api('/api/timing-templates').catch(()=>[]):Promise.resolve([]);
+  const p_audit=(scope==='national'||scope==='auditor'||scope==='system_admin')?api('/api/audit').catch(()=>[]):Promise.resolve([]);
+  const p_wov=scope==='wing'?api('/api/reports/wing-overview').catch(()=>null):Promise.resolve(null);
+  const p_wph=scope==='wing'?api('/api/reports/wing-phase-coverage').catch(()=>null):Promise.resolve(null);
+  const p_wcap=scope==='wing'?api('/api/reports/wing-capability').catch(()=>null):Promise.resolve(null);
+  const p_wsqns=scope==='wing'?api('/api/squadrons').catch(()=>[]):Promise.resolve([]);
+  const p_nat=(scope==='national'||scope==='system_admin')?api('/api/national/overview').catch(()=>null):Promise.resolve(null);
+  const p_natov=(scope==='national'||scope==='system_admin')?api('/api/reports/national-overview').catch(()=>null):Promise.resolve(null);
+  const p_natcap=(scope==='national'||scope==='system_admin')?api('/api/reports/national-capability').catch(()=>null):Promise.resolve(null);
+  const p_wings=(scope==='national'||scope==='system_admin')?api('/api/wings').catch(()=>[]):Promise.resolve([]);
+  const p_nsqns=(scope==='national'||scope==='system_admin')?api('/api/squadrons').catch(()=>[]):Promise.resolve([]);
+
+  const[
+    pns,facs,cur,ta,eq,ai,acts,proxy,
+    repSum,repRead,repCov,repFload,repNdel,
+    sqnData,timing,auditData,
+    wov,wph,wcap,wsqns,
+    nat,natov,natcap,wings,nsqns,
+  ]=await Promise.all([
+    p_pns,p_facs,p_cur,p_ta,p_eq,p_ai,p_acts,p_proxy,
+    p_sum,p_read,p_cov,p_fload,p_ndel,
+    p_sqnData,p_timing,p_audit,
+    p_wov,p_wph,p_wcap,p_wsqns,
+    p_nat,p_natov,p_natcap,p_wings,p_nsqns,
+  ]);
+
+  // Set state from resolved results
+  S.pns=(Array.isArray(pns)?pns:[]).map(pn=>({
+    id:pn.parade_night_id, date:pn.date, term:pn.term, nsess:pn.session_count,
+    notes:pn.parade_type||'', published:!!pn.published_status, closeout:pn.closeout_status,
+    readiness:pn.readiness_score,
+    sessions:(pn.sessions||[]).sort((a,b)=>(a.period_number||0)-(b.period_number||0)).map(s=>({
+      id:s.id, phase:s.phase_at_time||'', code:s.curriculum_code_at_time||'',
+      exp:s.curriculum_title_at_time||s.custom_title||'', facId:s.facilitator_id||'',
+      facName:_facName(s), room:s.training_area_name_at_time||'', status:s.status||'planned'
+    }))
+  }));
+  S.facs=(facs||[]).map(f=>({id:f.facilitator_id,rank:f.current_rank||'',first:f.first_name||'',last:f.last_name||'',type:f.type||'',areas:f.subject_areas||[]}));
+  S.curr=((cur&&cur.items)||[]).map(i=>({id:i.curriculum_id,code:i.code,identifier:i.identifier,partNumber:i.part_number,title:i.title,phase:i.phase,el:i.element,term:i.recommended_term,hours:Math.round((i.duration_minutes||0)/60),type:i.core_status,lh:i.learning_hub_url,progress:i.progress,sessions:i.session_count,owningLevel:i.owning_level,wingId:i.wing_id,owned:i.owning_level==='squadron'}));
+  S.rooms=(ta||[]).map(r=>({id:r.training_area_id||r.id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||''}));
+  S.equip=(eq||[]).map(x=>({id:x.equipment_id||x.id,name:x.name,qty:x.quantity||x.qty,notes:x.notes||''}));
+  S.actionItems=(ai||[]).map(a=>({id:a.action_id,title:a.title,description:a.description,owner:a.owner,due:a.due_date,status:a.status,severity:a.severity,source:a.source}));
+  S.acts=(acts||[]).map(a=>({id:a.activity_id,name:a.activity_name,date:a.date_start,dateEnd:a.date_end,timeStart:a.time_start,timeEnd:a.time_end,type:a.activity_type||'Optional',location:a.location||'',audience:a.audience||[],notes:a.notes||'',ceaSeqNr:a.cea_seq_nr||''}));
+  S.proxy=proxy||{active:false};
+  S.reports={summary:repSum,readiness:repRead,coverage:repCov,facload:repFload,notdelivered:repNdel};
+  S.cfg={day:'',start:'',end:'',sess:3,dur:35,addr:''};
+  if(sqnData){
+    S.cfg={day:sqnData.default_parade_day||'',start:sqnData.default_start_time||'',end:sqnData.default_end_time||'',sess:sqnData.default_session_count||3,dur:35,addr:sqnData.address||''};
+    S.currentSqnId=sqnData.squadron_id;
+  }
+  S.timingTemplates=timing||[];
+  S.audit=auditData||[];
   if(scope==='wing'){
-    try{ const wo=await api('/api/reports/wing-overview'); S.wing={squadrons:(wo&&wo.squadrons)||[]}; }catch(_){ S.wing={squadrons:[]}; }
-    try{ S.wingPhase=await api('/api/reports/wing-phase-coverage'); }catch(_){ S.wingPhase=null; }
-    try{ S.cap=await api('/api/reports/wing-capability'); }catch(_){ S.cap=null; }
-    try{ S.squadrons=await api('/api/squadrons'); }catch(_){ S.squadrons=[]; }
+    S.wing={squadrons:(wov&&wov.squadrons)||[]};
+    S.wingPhase=wph||null;
+    S.cap=wcap||null;
+    S.squadrons=wsqns||[];
   }
-  // National scope: wing roll-up + national readiness/coverage.
-  if(scope==='national'){
-    try{ S.national=await api('/api/national/overview'); }catch(_){ S.national=null; }
-    try{ const no=await api('/api/reports/national-overview'); S.nationalReport={wings:(no&&no.wings)||[]}; }catch(_){ S.nationalReport={wings:[]}; }
-    try{ S.natCap=await api('/api/reports/national-capability'); }catch(_){ S.natCap=null; }
-    try{ S.wings=await api('/api/wings'); }catch(_){ S.wings=[]; }
-    try{ S.squadrons=await api('/api/squadrons'); }catch(_){ S.squadrons=[]; }
+  if(scope==='national'||scope==='system_admin'){
+    S.national=nat||null;
+    S.nationalReport={wings:(natov&&natov.wings)||[]};
+    S.natCap=natcap||null;
+    S.wings=wings||[];
+    S.squadrons=nsqns||[];
   }
-  // Audit visibility (national + auditor).
-  if(scope==='national'||scope==='auditor'){
-    try{ S.audit=await api('/api/audit'); }catch(_){ S.audit=[]; }
-  }
-  // Timing templates (squadron scope only; safe to fetch for all sqn/admin roles).
-  if(scope==='squadron'||proxyActive()){
-    try{ S.timingTemplates=await api('/api/timing-templates'); }catch(_){ S.timingTemplates=[]; }
-  } else { S.timingTemplates=[]; }
 }
 // Writes now go to the backend then re-load. save() is retained as a no-op so existing
 // handlers that call it do not break; real persistence happens via the API helpers below.
@@ -2603,7 +2790,7 @@ const NAV_BY_SCOPE={
   wing:['wing-overview','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
   national:['national','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
   auditor:['reports','audit','accounts',..._PLANNING_PAGES],
-  system_admin:['system-console','audit','accounts']
+  system_admin:['system-console','national','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES]
 };
 const SCOPE_LANDING={squadron:'dashboard',wing:'wing-overview',national:'national',auditor:'reports',system_admin:'system-console'};
 // In Proxy Mode (Wing) or Delegated Intervention (NAT HQ) the UI shows the EXACT SQN workspace
@@ -2691,10 +2878,29 @@ function bootApp(){
   document.querySelectorAll('.admin-el').forEach(el=>{el.style.display=(canWrite||(scope!=='squadron'&&proxyActive()))?'inline-flex':'none';});
   if(isReadOnly()){ document.body.classList.add('readonly'); document.querySelectorAll('.admin-el').forEach(el=>el.style.display='none'); }
   else { document.body.classList.remove('readonly'); }
-  // Curriculum creation buttons: show based on current scope
+  // Planning-write controls: visible for sqn_admin + wing_admin (own calendar, no proxy needed).
+  const canPlanWrite = canWritePlan();
+  document.querySelectorAll('.plan-write-el').forEach(el=>{el.style.display=canPlanWrite?'inline-flex':'none';});
+  // Wing admin squadron filter on Annual Program page
   const role=S.role||'';
   const isNatAdmin=['national_admin','system_admin'].includes(role);
   const isWingAdmin=['wing_admin'].includes(role);
+  const pySqnFilterRow=document.getElementById('py-sqn-filter-row');
+  if(pySqnFilterRow){
+    pySqnFilterRow.style.display=(isWingAdmin&&!proxyActive())?'':'none';
+    if(isWingAdmin&&!proxyActive()){
+      const sqnSel=document.getElementById('py-sqn-filter');
+      if(sqnSel){
+        sqnSel.innerHTML='<option value="">— All squadrons —</option>';
+        (S.wsqns||[]).forEach(sq=>{
+          const o=document.createElement('option'); o.value=sq.squadron_id;
+          o.textContent=`${sq.squadron_code||''} — ${sq.name||sq.squadron_id}`;
+          sqnSel.appendChild(o);
+        });
+      }
+    }
+  }
+  // Curriculum creation buttons: show based on current scope
   const isSqnAdmin=canWrite;
   const btnSqn=document.getElementById('btn-add-curr-sqn');
   const btnWing=document.getElementById('btn-add-curr-wing');
@@ -2703,6 +2909,7 @@ function bootApp(){
     if(btnSqn) btnSqn.style.display=isSqnAdmin?'inline-flex':'none';
     if(btnWing) btnWing.style.display=(isWingAdmin||isNatAdmin)?'inline-flex':'none';
     if(btnNat) btnNat.style.display=isNatAdmin?'inline-flex':'none';
+    document.querySelectorAll('.nat-admin-el').forEach(el=>{el.style.display=isNatAdmin?'inline-flex':'none';});
   }
   // Settings page mirrors unit config; access codes are never shown/editable here.
   const setVal=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v;};
@@ -2717,7 +2924,11 @@ function bootApp(){
 }
 function renderAll(){
   const scope=effectiveScope();
-  if(scope==='system_admin'){ return; } // System Console loads its own data on nav
+  if(scope==='system_admin'){
+    // National operational data loaded by loadData; pre-render national views for navigation.
+    renderNational(); renderReports(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); renderAudit();
+    return;
+  }
   if(scope==='squadron'){ renderDash();renderPN();renderCurr();renderActs();renderFacs();renderRooms();renderReports();renderActions(); }
   else { renderReports(); renderCurr(); }
   if(scope==='wing'){ renderWing(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); }
@@ -2765,8 +2976,14 @@ function loadSystemConsole(){
 
 async function scLoadOverview(){
   const el=document.getElementById('sc-overview-body'); if(!el) return;
+  el.innerHTML='<div class="muted">Loading…</div>';
+  const warn=document.getElementById('sc-coldstart-warn');
+  if(warn) warn.style.display='none';
+  const coldTimer=setTimeout(()=>{if(warn)warn.style.display='block';},8000);
   try {
-    const d=await api('GET','/api/system/overview');
+    const d=await api('/api/system/overview');
+    clearTimeout(coldTimer);
+    if(warn) warn.style.display='none';
     el.innerHTML=`<dl class="sc-kv">
       <dt>App version</dt><dd>${esc(d.app_version)}</dd>
       <dt>Package</dt><dd>${esc(d.package_version)}</dd>
@@ -2779,13 +2996,13 @@ async function scLoadOverview(){
       <dt>Maintenance mode</dt><dd>${d.maintenance_mode?'<span class="sc-status-warn">ENABLED</span>':'<span class="sc-status-ok">Off</span>'}</dd>
       <dt>Last backup</dt><dd>${d.last_backup_at?esc(d.last_backup_at):'<span class="muted">No backup recorded</span>'}</dd>
     </dl>`;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(e.message)}</div>`; }
+  } catch(e){ clearTimeout(coldTimer); if(warn) warn.style.display='none'; el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scLoadHealth(){
   const el=document.getElementById('sc-health-body'); if(!el) return;
   try {
-    const d=await api('GET','/api/system/health');
+    const d=await api('/api/system/health');
     const dbCls=d.db==='ok'?'sc-status-ok':'sc-status-err';
     el.innerHTML=`<dl class="sc-kv">
       <dt>Backend</dt><dd class="sc-status-ok">${esc(d.backend)}</dd>
@@ -2794,13 +3011,13 @@ async function scLoadHealth(){
       <dt>Cookie secure</dt><dd>${d.cookie_secure?'<span class="sc-status-ok">Yes</span>':'<span class="sc-status-warn">No (dev/staging only)</span>'}</dd>
       <dt>CORS origins</dt><dd style="font-family:monospace;font-size:11px">${(d.cors_origins||[]).map(o=>esc(o)).join('<br>')}</dd>
     </dl>`;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(e.message)}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scLoadScopeMap(){
   const el=document.getElementById('sc-scope-body'); if(!el) return;
   try {
-    const d=await api('GET','/api/system/scope-map');
+    const d=await api('/api/system/scope-map');
     if(!d.wings||!d.wings.length){ el.innerHTML='<div class="muted">No wings found.</div>'; return; }
     let h='';
     for(const w of d.wings){
@@ -2817,31 +3034,31 @@ async function scLoadScopeMap(){
       </div>`;
     }
     el.innerHTML=h;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(e.message)}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scArchiveWing(wingId, wingCode){
   if(!confirm(`Archive Wing '${wingCode}'?\n\nThis cannot be undone. All squadrons in this Wing must already be archived.`)) return;
   try {
-    await api('POST',`/api/wings/${wingId}/archive`);
+    await api(`/api/wings/${wingId}/archive`,{method:'POST'});
     alert(`Wing '${wingCode}' has been archived.`);
     scLoadScopeMap();
-  } catch(e){ alert('Archive failed: '+(e.message||e)); }
+  } catch(e){ alert('Archive failed: '+(apiErr(e))); }
 }
 
 async function scArchiveSquadron(sqnId, sqnName){
   if(!confirm(`Archive unit '${sqnName}'?\n\nThis cannot be undone and will remove this unit from all active views.`)) return;
   try {
-    await api('POST',`/api/squadrons/${sqnId}/archive`);
+    await api(`/api/squadrons/${sqnId}/archive`,{method:'POST'});
     alert(`Unit '${sqnName}' has been archived.`);
     scLoadScopeMap();
-  } catch(e){ alert('Archive failed: '+(e.message||e)); }
+  } catch(e){ alert('Archive failed: '+(apiErr(e))); }
 }
 
 async function scPopulateWingSelect(){
   const sel=document.getElementById('sc-sqn-wing'); if(!sel) return;
   try {
-    const d=await api('GET','/api/system/scope-map');
+    const d=await api('/api/system/scope-map');
     sel.innerHTML='<option value="">Select wing…</option>';
     for(const w of (d.wings||[])){
       const o=document.createElement('option');
@@ -2859,13 +3076,13 @@ async function scCreateWing(){
   if(!code||!name){ msg.textContent='Wing Code and Full Name are required.'; msg.style.color='var(--danger)'; return; }
   msg.style.color='var(--muted)'; msg.textContent='Creating…';
   try {
-    const d=await api('POST','/api/wings',{code,name,short_name:short||null});
+    const d=await api('/api/wings',{method:'POST',body:JSON.stringify({code,name,short_name:short||null})});
     msg.style.color='var(--ok)'; msg.textContent=`Wing '${d.code}' created successfully.`;
     document.getElementById('sc-wing-code').value='';
     document.getElementById('sc-wing-name').value='';
     document.getElementById('sc-wing-short').value='';
     scLoadScopeMap();
-  } catch(e){ msg.style.color='var(--danger)'; msg.textContent='Error: '+(e.message||e); }
+  } catch(e){ msg.style.color='var(--danger)'; msg.textContent='Error: '+(apiErr(e)); }
 }
 
 async function scCreateSquadron(){
@@ -2877,18 +3094,18 @@ async function scCreateSquadron(){
   if(!wing_id||!code||!name){ msg.textContent='Wing, Unit Code and Full Name are required.'; msg.style.color='var(--danger)'; return; }
   msg.style.color='var(--muted)'; msg.textContent='Creating…';
   try {
-    const d=await api('POST','/api/squadrons',{wing_id,code,name,unit_type});
+    const d=await api('/api/squadrons',{method:'POST',body:JSON.stringify({wing_id,code,name,unit_type})});
     msg.style.color='var(--ok)'; msg.textContent=`Unit '${d.code}' created successfully.`;
     document.getElementById('sc-sqn-code').value='';
     document.getElementById('sc-sqn-name').value='';
     scLoadScopeMap();
-  } catch(e){ msg.style.color='var(--danger)'; msg.textContent='Error: '+(e.message||e); }
+  } catch(e){ msg.style.color='var(--danger)'; msg.textContent='Error: '+(apiErr(e)); }
 }
 
 async function scLoadMaintenance(){
   const el=document.getElementById('sc-maint-body'); if(!el) return;
   try {
-    const d=await api('GET','/api/system/maintenance');
+    const d=await api('/api/system/maintenance');
     let h='';
     if(d.enabled){
       h+=`<div class="sc-maint-on">Maintenance mode is ON${d.message?' — '+esc(d.message):''}</div>`;
@@ -2899,7 +3116,7 @@ async function scLoadMaintenance(){
       h+=`<button class="btn btn-secondary" onclick="document.getElementById('sc-maint-form').style.display='block';this.style.display='none'">Enable Maintenance Mode…</button>`;
     }
     el.innerHTML=h;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(e.message)}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scEnableMaint(){
@@ -2907,50 +3124,82 @@ async function scEnableMaint(){
   const until=document.getElementById('sc-maint-until').value.trim();
   const confirm=document.getElementById('sc-maint-confirm').value.trim();
   try {
-    await api('POST','/api/system/maintenance/enable',{message:msg||null,until:until||null,confirm});
+    await api('/api/system/maintenance/enable',{method:'POST',body:JSON.stringify({message:msg||null,until:until||null,confirm})});
     document.getElementById('sc-maint-form').style.display='none';
     scLoadMaintenance();
     scLoadOverview();
-  } catch(e){ alert('Could not enable maintenance mode: '+(e.message||e)); }
+  } catch(e){ alert('Could not enable maintenance mode: '+(apiErr(e))); }
 }
 
 async function scDisableMaint(){
   if(!confirm('Disable maintenance mode and restore normal access?')) return;
   try {
-    await api('POST','/api/system/maintenance/disable');
+    await api('/api/system/maintenance/disable',{method:'POST'});
     scLoadMaintenance();
     scLoadOverview();
-  } catch(e){ alert('Could not disable maintenance mode: '+(e.message||e)); }
+  } catch(e){ alert('Could not disable maintenance mode: '+(apiErr(e))); }
 }
 
 async function scLoadBackups(){
   const el=document.getElementById('sc-backup-body'); if(!el) return;
+  const acts=document.getElementById('sc-backup-actions');
   try {
-    const d=await api('GET','/api/system/backups');
-    if(!d.backups||!d.backups.length){
-      el.innerHTML='<div class="muted">No backups found in <code>'+esc(d.backup_dir||'./backups')+'</code>. Use the button below to create one.</div>';
-      return;
+    const d=await api('/api/system/backups');
+    const isPg=(d.db_type||'').toLowerCase().includes('postgres');
+    if(isPg){
+      el.innerHTML=`<div class="muted" style="font-size:12.5px">Database: ${esc(d.db_type)}</div>
+        <div style="margin-top:8px;font-size:12.5px">Use the button below to download a pg_dump of the live database directly to your browser. No data is written to the server filesystem.</div>
+        <div style="margin-top:6px;font-size:11.5px;color:var(--muted)">To restore: <code>pg_restore --clean --if-exists -d &quot;DATABASE_URL&quot; filename.dump</code><br>
+        This is a controlled CLI operation. Do not share the dump file outside authorised personnel.</div>`;
+      if(acts) acts.innerHTML='<button id="sc-pgdump-btn" class="btn btn-secondary" onclick="scDownloadPgDump()">Download PostgreSQL Backup (pg_dump)</button>';
+    } else {
+      if(!d.backups||!d.backups.length){
+        el.innerHTML='<div class="muted">No backups found in <code>'+esc(d.backup_dir||'./backups')+'</code>.</div>';
+      } else {
+        let h=`<div class="muted" style="font-size:11.5px;margin-bottom:8px">Backup directory: <code>${esc(d.backup_dir)}</code></div>`;
+        for(const b of d.backups){
+          const kb=b.size_bytes?Math.round(b.size_bytes/1024)+'KB':'';
+          h+=`<div class="sc-backup-item"><span class="sc-filename">${esc(b.filename)}</span><span class="sc-bsize">${kb}</span><span class="muted">${b.created_at?esc(b.created_at.slice(0,19).replace('T',' '))+'Z':''}</span></div>`;
+        }
+        el.innerHTML=h;
+      }
+      if(acts) acts.innerHTML='<button class="btn btn-secondary" onclick="scCreateBackup()">Create Backup Now</button>';
     }
-    let h=`<div class="muted" style="font-size:11.5px;margin-bottom:8px">Backup directory: <code>${esc(d.backup_dir)}</code></div>`;
-    for(const b of d.backups){
-      const kb=b.size_bytes?Math.round(b.size_bytes/1024)+'KB':'';
-      h+=`<div class="sc-backup-item">
-        <span class="sc-filename">${esc(b.filename)}</span>
-        <span class="sc-bsize">${kb}</span>
-        <span class="muted">${b.created_at?esc(b.created_at.slice(0,19).replace('T',' '))+'Z':''}</span>
-      </div>`;
-    }
-    el.innerHTML=h;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(e.message)}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scCreateBackup(){
   try {
-    const d=await api('POST','/api/system/backups');
+    const d=await api('/api/system/backups',{method:'POST'});
     alert('Backup created: '+d.filename+' ('+Math.round((d.size_bytes||0)/1024)+'KB)');
-    scLoadBackups();
+    scLoadBackups(); scLoadOverview();
+  } catch(e){ alert('Backup failed: '+apiErr(e)); }
+}
+
+async function scDownloadPgDump(){
+  const btn=document.getElementById('sc-pgdump-btn');
+  if(btn){btn.disabled=true;btn.textContent='Preparing download…';}
+  try{
+    const t=tokenGet();
+    const headers=t?{'Authorization':'Bearer '+t}:{};
+    const res=await fetch(API_BASE+'/api/system/backups/pg-dump',{headers,credentials:'include'});
+    if(!res.ok){
+      const body=await res.json().catch(()=>({}));
+      const msg=(body&&body.detail&&body.detail.message)||(body&&body.detail)||('Backup failed (HTTP '+res.status+').');
+      alert('Backup download failed: '+msg);
+      return;
+    }
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const cd=res.headers.get('Content-Disposition')||'';
+    const m=cd.match(/filename="([^"]+)"/);
+    a.href=url; a.download=m?m[1]:'aafc_tms_backup.dump';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     scLoadOverview();
-  } catch(e){ alert('Backup failed: '+(e.message||e)); }
+  }catch(e){alert('Backup download failed: '+apiErr(e));}
+  finally{if(btn){btn.disabled=false;btn.textContent='Download PostgreSQL Backup (pg_dump)';}}
 }
 
 async function scLoadAudit(){
@@ -2958,7 +3207,7 @@ async function scLoadAudit(){
   const action=document.getElementById('sc-audit-action');
   const q=action&&action.value?'?action='+encodeURIComponent(action.value)+'&limit=50':'?limit=50';
   try {
-    const d=await api('GET','/api/system/audit-summary'+q);
+    const d=await api('/api/system/audit-summary'+q);
     if(!d.logs||!d.logs.length){ el.innerHTML='<div class="muted">No audit entries found.</div>'; return; }
     let h='<div style="font-family:monospace;font-size:11px">';
     for(const e of d.logs){
@@ -2973,7 +3222,81 @@ async function scLoadAudit(){
     }
     h+='</div>';
     el.innerHTML=h;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(e.message)}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
+}
+
+async function scImportCurriculum(){
+  const input=document.getElementById('sc-curr-import-file');
+  const msg=document.getElementById('sc-curr-import-msg');
+  const results=document.getElementById('sc-curr-import-results');
+  const fname=document.getElementById('sc-curr-import-filename');
+  if(!input||!input.files||!input.files[0])return;
+  const file=input.files[0];
+  fname.textContent=file.name;
+  msg.textContent='Uploading and parsing…'; msg.style.color='var(--muted)';
+  results.innerHTML='';
+  const form=new FormData();
+  form.append('file',file);
+  try{
+    const base=document.querySelector('meta[name="aafc-api-base"]')?.content||'';
+    const token=sessionStorage.getItem('token')||'';
+    const r=await fetch(base+'/api/curriculum/import-xlsm',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+token},
+      body:form,
+    });
+    const d=await r.json();
+    if(!r.ok){
+      msg.textContent='Import failed: '+esc((d.detail?.message||d.detail?.error||JSON.stringify(d.detail)));
+      msg.style.color='var(--red)'; return;
+    }
+    msg.textContent=`Import complete — created: ${d.created}, updated: ${d.updated}, skipped: ${d.skipped}, failed: ${d.failed} of ${d.total}`;
+    msg.style.color=d.failed>0?'var(--amber)':'var(--ok)';
+    if(d.failed>0){
+      const failed=(d.results||[]).filter(x=>x.status==='failed');
+      results.innerHTML='<div style="color:var(--red);margin-top:4px">Failures:<br>'+
+        failed.map(x=>`${esc(x.identifier||x.code)}: ${esc(x.error)}`).join('<br>')+'</div>';
+    }
+    // Reload curriculum in state
+    try{const cur=await api('/api/curriculum');S.curr=((cur&&cur.items)||[]).map(i=>({id:i.curriculum_id,code:i.code,identifier:i.identifier,partNumber:i.part_number,title:i.title,phase:i.phase,el:i.element,term:i.recommended_term,hours:Math.round((i.duration_minutes||0)/60),type:i.core_status,lh:i.learning_hub_url,progress:i.progress,sessions:i.session_count,owningLevel:i.owning_level,wingId:i.wing_id,owned:i.owning_level==='squadron'}));}catch(_){}
+  }catch(e){
+    msg.textContent='Upload error: '+apiErr(e); msg.style.color='var(--red)';
+  } finally {
+    input.value='';
+  }
+}
+
+async function scBootstrapStaging(){
+  const msg=document.getElementById('sc-bootstrap-msg');
+  msg.textContent='Creating accounts…'; msg.style.color='var(--muted)';
+  try{
+    const r=await api('/api/system/bootstrap-staging',{method:'POST'});
+    msg.textContent='';
+    const all=r.results||[];
+    const codes=r.accounts_created||[];
+    let html='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px"><thead>';
+    html+='<tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:4px 8px">Type</th><th style="text-align:left;padding:4px 8px">Name / Code</th><th style="text-align:left;padding:4px 8px">Result</th></tr></thead><tbody>';
+    for(const x of all){
+      const created=x.created?'<span style="color:var(--ok);font-weight:700">Created</span>':'<span style="color:var(--muted)">Already existed</span>';
+      const label=x.display_name||x.name||x.code||'';
+      html+=`<tr><td style="padding:4px 8px;text-transform:capitalize">${esc(x.type)}</td><td style="padding:4px 8px">${esc(label)}</td><td style="padding:4px 8px">${created}</td></tr>`;
+    }
+    html+='</tbody></table>';
+    if(codes.length){
+      html+='<div style="font-size:12px;font-weight:700;margin-bottom:10px">Access codes — copy all now, they will not appear again:</div>';
+      for(const a of codes){
+        html+=`<div style="margin-bottom:12px">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${esc(_ROLE_LABELS[a.role]||a.role)} — ${esc(a.display_name)}</div>
+          <div style="background:#1a1a2e;color:#7efff5;font-family:monospace;font-size:20px;font-weight:900;letter-spacing:3px;text-align:center;padding:12px;border-radius:6px;user-select:all">${esc(a.new_code)}</div>
+        </div>`;
+      }
+    } else {
+      html+='<div class="alert a-info" style="font-size:12px">All accounts already existed — no new codes generated.</div>';
+    }
+    document.getElementById('m-bootstrap-results').innerHTML=html;
+    openModal('m-bootstrap-codes');
+    scLoadOverview();
+  }catch(e){ msg.textContent=apiErr(e); msg.style.color='var(--red)'; }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3285,6 +3608,11 @@ function onCreateAccountRoleChange(){
 function onCreateAccountWingChange(){
   const wingId=document.getElementById('ca-wing').value;
   _populateCreateSqns(wingId||null);
+}
+
+function onCreateAccountSqnChange(){
+  // No-op: squadron selection has no downstream effects in this modal.
+  // Defined to satisfy the onchange reference on the ca-sqn select element.
 }
 
 function onCodeModeChange(){
@@ -4177,25 +4505,72 @@ function _showCurrWingRow(){
   sel.innerHTML=(S.wings||[]).map(w=>`<option value="${esc(w.wing_id)}">${esc(w.code)} — ${esc(w.name)}</option>`).join('');
   row.style.display='';
 }
+function _resetCurrModal(){
+  ['c-code','c-title','c-lh','c-identifier'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const partEl=document.getElementById('c-part');if(partEl)partEl.value='1';
+  document.getElementById('c-hours').value=1;
+  const termEl=document.getElementById('c-term');if(termEl)termEl.value='';
+  const newEl=document.getElementById('c-el-new');if(newEl)newEl.style.display='none';
+}
+function _setCurrTermOptional(optional){
+  const lbl=document.getElementById('c-term-optional');
+  if(lbl)lbl.textContent=optional?' (optional)':'';
+}
+async function _populateCurrElements(){
+  const sel=document.getElementById('c-el');if(!sel)return;
+  try{
+    const els=await api('/api/curriculum/elements');
+    sel.innerHTML='<option value="">— select element —</option>';
+    (els||[]).forEach(e=>{const o=new Option(e.display_name||e.name,e.name);sel.appendChild(o);});
+    sel.innerHTML+='';
+  }catch(_){
+    // fallback to built-in list if API unavailable
+    sel.innerHTML=`<option value="">— select element —</option>
+      <option value="Air_Space">Air &amp; Space</option>
+      <option value="Drill">Drill</option><option value="Field">Field Skills</option>
+      <option value="Personal_Dev">Personal Dev / PDL</option>
+      <option value="Service_Community">Service &amp; Community</option>
+      <option value="SQN_Affairs">SQN Affairs</option>`;
+  }
+}
+function openCreateElementInline(){
+  const el=document.getElementById('c-el-new');
+  if(el){el.style.display='block';document.getElementById('c-el-new-name').focus();}
+}
+async function doCreateElementInline(){
+  const nameInput=document.getElementById('c-el-new-name');
+  const msgEl=document.getElementById('c-el-new-msg');
+  const name=(nameInput.value||'').trim();
+  if(!name){msgEl.textContent='Element name is required.';return;}
+  msgEl.textContent='';
+  try{
+    const r=await api('/api/curriculum/elements',{method:'POST',body:{
+      name,display_name:name.replace(/_/g,' '),scope_level:'national'
+    }});
+    // Reload element list and select the new one
+    await _populateCurrElements();
+    const sel=document.getElementById('c-el');
+    if(sel)sel.value=r.name||name;
+    document.getElementById('c-el-new').style.display='none';
+    nameInput.value='';
+  }catch(e){msgEl.textContent=apiErr(e);}
+}
 function openAddCurr(){
   editCurrCode=null;_currSaveEndpoint='/api/curriculum';_hideCurrWingRow();
   document.getElementById('curr-modal-title').textContent='+ Add Squadron Curriculum';
-  ['c-code','c-title','c-lh'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('c-hours').value=1;openModal('m-add-curr');
+  _resetCurrModal();_setCurrTermOptional(false);_populateCurrElements();openModal('m-add-curr');
 }
 function openAddCurrWing(){
   editCurrCode=null;_currSaveEndpoint='/api/curriculum/wing';
   document.getElementById('curr-modal-title').textContent='+ Add Wing Curriculum';
-  ['c-code','c-title','c-lh'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('c-hours').value=1;
+  _resetCurrModal();_setCurrTermOptional(true);_populateCurrElements();
   if(S.isNational) _showCurrWingRow(); else _hideCurrWingRow();
   openModal('m-add-curr');
 }
 function openAddCurrNat(){
   editCurrCode=null;_currSaveEndpoint='/api/curriculum/national';_hideCurrWingRow();
   document.getElementById('curr-modal-title').textContent='+ Add National Curriculum';
-  ['c-code','c-title','c-lh'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('c-hours').value=1;openModal('m-add-curr');
+  _resetCurrModal();_setCurrTermOptional(true);_populateCurrElements();openModal('m-add-curr');
 }
 function editCurr(code){
   const e=S.curr.find(x=>x.code===code&&canEditCurr(x));if(!e){alert('You do not have permission to edit this curriculum item.');return;}
@@ -4215,15 +4590,26 @@ function editCurr(code){
 async function saveCurr(){
   const code=document.getElementById('c-code').value.trim();
   const title=document.getElementById('c-title').value.trim();
+  const identifierEl=document.getElementById('c-identifier');
+  const identifier=identifierEl?identifierEl.value.trim()||null:null;
+  const partEl=document.getElementById('c-part');
+  const partNumber=partEl?parseInt(partEl.value||'1',10)||1:1;
   if(!code||!title){alert('Code and title required.');return;}
-  const payload={title,phase:document.getElementById('c-phase').value,element:document.getElementById('c-el').value||null,recommended_term:document.getElementById('c-term').value||null,learning_hub_url:document.getElementById('c-lh').value||null,duration_minutes:(+document.getElementById('c-hours').value||1)*60};
+  const payload={title,phase:document.getElementById('c-phase').value,
+    element:document.getElementById('c-el').value||null,
+    recommended_term:document.getElementById('c-term').value||null,
+    learning_hub_url:document.getElementById('c-lh').value||null,
+    duration_minutes:(+document.getElementById('c-hours').value||1)*60,
+    identifier,part_number:partNumber};
   try{
     if(editCurrCode){
       const existing=S.curr.find(e=>e.code===editCurrCode&&canEditCurr(e));
       if(!existing||!existing.id){alert('Cannot edit — curriculum item not found.');return;}
       await api('/api/curriculum/'+existing.id,{method:'PATCH',body:JSON.stringify(payload)});
     } else {
-      if(allCurr().find(e=>e.code===code)){alert('Code already exists.');return;}
+      // Uniqueness is by identifier (if set) or (code, part_number) — NOT code alone.
+      const dup=allCurr().find(e=>identifier?e.identifier===identifier:(e.code===code&&(e.partNumber||1)===partNumber));
+      if(dup){alert('A curriculum item with this identifier/code+part already exists.');return;}
       if(_currSaveEndpoint==='/api/curriculum/wing'&&S.isNational){
         const wid=document.getElementById('c-wing-id').value;
         if(!wid){alert('Select a Wing.');return;}
@@ -4234,7 +4620,10 @@ async function saveCurr(){
     editCurrCode=null;
     await reloadAndRender(); closeModal('m-add-curr');
     document.getElementById('curr-modal-title').textContent='+ Add Curriculum Item';
-  }catch(e){ alert(apiErr(e)); }
+  }catch(e){
+    // Show human-readable error; 409 now includes a message field
+    alert(apiErr(e));
+  }
 }
 async function deleteCurrItem(id){
   if(!confirm('Archive this curriculum item? Sessions already linked are not affected.'))return;
@@ -4308,7 +4697,7 @@ function renderFacs(){
       <td style="font-weight:700">${f.rank||'—'}</td>
       <td>${f.first||'—'}</td>
       <td style="font-weight:700">${f.last||'—'}</td>
-      <td><span class="badge b-grey">${f.type}</span></td>
+      <td><span class="badge b-grey">${{Officer:'Officer',NCO:'WO/NCO','Senior Cadet':'Sr Cadet',Civilian:'Civilian',Staff:'Officer','Senior Cadet':'Sr Cadet'}[f.type]||f.type||'—'}</span></td>
       <td>${(f.areas||[]).map(a=>elBadge(a)).join(' ')||'<span style="color:var(--muted);font-size:11px">untagged</span>'}</td>
       <td style="text-align:center"><button class="btn-lnk" onclick="event.stopPropagation();showFacProfile('${f.id}')">${tot}</button></td>
       <td class="no-print" onclick="event.stopPropagation()">
@@ -4403,21 +4792,26 @@ function showFacProfile(id){
     :'<div class="alert a-info">No sessions assigned yet.</div>'}`;
   openModal('m-fac-profile');
 }
+function _readFacAreas(){
+  const areas=[];
+  ['drill','air','field','pd','sc','sqn'].forEach(k=>{if(document.getElementById('fa-'+k)&&document.getElementById('fa-'+k).checked)areas.push({drill:'Drill',air:'Air_Space',field:'Field',pd:'Personal_Dev',sc:'Service_Community',sqn:'SQN_Affairs'}[k]);});
+  return areas;
+}
 function saveFac(){
   const rank=document.getElementById('fac-rank').value.trim();
   const first=document.getElementById('fac-first').value.trim();
   const last=document.getElementById('fac-last').value.trim();
   if(!last){alert('Last name required.');return;}
-  const areas=[];
-  ['drill','air','field','pd','sc','sqn'].forEach(k=>{if(document.getElementById('fa-'+k).checked)areas.push({drill:'Drill',air:'Air_Space',field:'Field',pd:'Personal_Dev',sc:'Service_Community',sqn:'SQN_Affairs'}[k]);});
+  const areas=_readFacAreas();
+  const type=document.getElementById('fac-type').value;
   if(editFacId){
     const fid=editFacId; editFacId=null;
-    api('/api/facilitators/'+fid,{method:'PATCH',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type:document.getElementById('fac-type').value})})
+    api('/api/facilitators/'+fid,{method:'PATCH',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type,subject_areas:areas})})
       .then(async()=>{ await reloadAndRender(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; })
       .catch(e=>alert(apiErr(e)));
     return;
   }
-  api('/api/facilitators',{method:'POST',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type:document.getElementById('fac-type').value,subject_areas:areas})})
+  api('/api/facilitators',{method:'POST',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type,subject_areas:areas})})
     .then(async()=>{ await reloadAndRender(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; })
     .catch(e=>alert(apiErr(e)));
 }
@@ -4425,7 +4819,7 @@ function editFac(id){
   const f=facById(id);if(!f)return;editFacId=id;
   document.getElementById('fac-modal-title').textContent='Edit Facilitator';
   document.getElementById('fac-rank').value=f.rank||'';document.getElementById('fac-first').value=f.first||'';
-  document.getElementById('fac-last').value=f.last||'';document.getElementById('fac-type').value=f.type||'Staff';
+  document.getElementById('fac-last').value=f.last||'';document.getElementById('fac-type').value=({Staff:'Officer',Civilian:'Civilian','Senior Cadet':'Senior Cadet',NCO:'NCO',Officer:'Officer'}[f.type]||f.type||'Officer');
   ['drill','air','field','pd','sc','sqn'].forEach(k=>{const a={drill:'Drill',air:'Air_Space',field:'Field',pd:'Personal_Dev',sc:'Service_Community',sqn:'SQN_Affairs'}[k];document.getElementById('fa-'+k).checked=(f.areas||[]).includes(a);});
   openModal('m-add-fac');
 }
@@ -4872,7 +5266,7 @@ function renderWing(){
   const medRead=reads.length?(reads.length%2?reads[(reads.length-1)/2]:Math.round((reads[reads.length/2-1]+reads[reads.length/2])/2)):null;
   const highRisk=rows.filter(r=>r.no_published_plan||r.no_future_plan||(+r.not_delivered||0)>2||(+r.coverage_pct||0)<34).length;
   const noData=rows.filter(r=>(+r.nights||0)===0||(+r.sessions||0)===0).length;
-  let html=`<div class="ph"><div class="ph-title">${S.scopeName||'Wing'} — Training Assurance</div><div class="ph-sub">Oversight across ${rows.length} squadrons — live backend data</div></div>`;
+  let html=`<div class="ph"><div class="ph-title">${S.scopeName||'Wing'} — Training Assurance</div><div class="ph-sub">Oversight across ${rows.length} squadrons</div></div>`;
   html+=`<div class="stats-grid">
     <div class="stat"><div class="sval">${rows.length}</div><div class="slbl">Total SQNs</div></div>
     <div class="stat ${medRead==null?'':(medRead>=67?'s-ok':medRead>=34?'s-warn':'s-red')}"><div class="sval">${medRead==null?'—':medRead}</div><div class="slbl">Median Readiness</div></div>
@@ -4926,7 +5320,7 @@ function renderNational(){
   const delPct=sessions?Math.round(delivered/sessions*100):0;
   const avgCov=wings.length?Math.round(wings.reduce((a,w)=>a+(+w.coverage_pct||0),0)/wings.length):0;
   const atRisk=wings.filter(w=>(+w.not_delivered||0)>2||(+w.coverage_pct||0)<34).length;
-  let html=`<div class="ph"><div class="ph-title">National HQ — Assurance Overview</div><div class="ph-sub">${wings.length} wings · ${sqs} squadrons — live backend data</div></div>`;
+  let html=`<div class="ph"><div class="ph-title">National HQ — Assurance Overview</div><div class="ph-sub">${wings.length} wings · ${sqs} squadrons</div></div>`;
   html+=`<div class="stats-grid">
     <div class="stat s-purple"><div class="sval">${wings.length}</div><div class="slbl">Wings</div></div>
     <div class="stat"><div class="sval">${sqs}</div><div class="slbl">Squadrons</div></div>
@@ -4956,7 +5350,6 @@ function renderNational(){
       S.natCap.wings.map(w=>{const nn=w.subject_none_sqns||{};return `<tr><td style="font-weight:800">${w.name||w.code}</td>${SUBJECTS.map(s=>`<td style="text-align:center">${nn[s.key]?`<span class="badge b-red">${nn[s.key]}</span>`:'<span class="badge b-ok">&#10003;</span>'}</td>`).join('')}</tr>`;}).join('')+
       `</tbody></table></div><div style="font-size:10px;color:var(--muted);margin-top:8px">Red = number of SQNs in that Wing with no facilitator tagged in the subject. Refer to Facilitator Load and Training Balance for detail.</div></div>`;
   }
-  html+=`<div class="card" style="font-size:11px;color:var(--muted)">National curriculum-assurance adoption rates, audit/compliance counters (access-code changes, Proxy/Intervention use), data-confidence and intervention-priority tracking are planned NAT HQ panels pending the supporting backend endpoints; current panels use live roll-up data only.</div>`;
   host.innerHTML=html;
 }
 function nationalDrill(wid){
@@ -5001,7 +5394,7 @@ function covBadge(p){ p=+p||0; return p>=67?'<span class="badge b-ok">On Track</
 function renderCoverage(){
   const host=document.getElementById('coverage-host'); if(!host)return;
   const scope=getScopeType();
-  let html=`<div class="ph"><div class="ph-title">Curriculum Coverage</div><div class="ph-sub">Coverage by phase across ${scope==='national'?'wings':'squadrons'} — live backend data</div></div>`;
+  let html=`<div class="ph"><div class="ph-title">Curriculum Coverage</div><div class="ph-sub">Coverage by phase across ${scope==='national'?'wings':'squadrons'}</div></div>`;
   if(scope!=='national' && S.wingPhase && S.wingPhase.phases){
     const rows=(S.wing&&S.wing.squadrons)||[];
     const byId={}; rows.forEach(r=>byId[r.squadron_id]=r);
@@ -5056,7 +5449,7 @@ function balScore(p){ if(!p._tot)return 0; const mx=Math.max(...SUBJECTS.map(s=>
 function renderBalance(){
   const host=document.getElementById('balance-host'); if(!host)return;
   const scope=getScopeType();
-  let html=`<div class="ph"><div class="ph-title">Training Balance</div><div class="ph-sub">Subject-area distribution per ${scope==='national'?'wing':'SQN'} vs the ${scope==='national'?'national':'7WG'} average — live backend data</div></div>`;
+  let html=`<div class="ph"><div class="ph-title">Training Balance</div><div class="ph-sub">Subject-area distribution vs average</div></div>`;
   if(scope!=='national' && S.cap && S.cap.squadrons){
     const rows=S.cap.squadrons, avg=S.cap.wing_avg||{};
     const withData=rows.filter(r=>(r.subject_sessions&&SUBJECTS.some(s=>r.subject_sessions[s.key]>0)));
@@ -5106,7 +5499,7 @@ function capCell(n){ const c=n===0?'b-red':n===1?'b-amber':'b-ok'; const t=n===0
 function renderFacLoad(){
   const host=document.getElementById('facload-host'); if(!host)return;
   const scope=getScopeType();
-  let html=`<div class="ph"><div class="ph-title">Facilitator Load and Capability</div><div class="ph-sub">Facilitator coverage by ${scope==='national'?'wing':'SQN'} and subject area — live backend data</div></div>`;
+  let html=`<div class="ph"><div class="ph-title">Facilitator Load and Capability</div><div class="ph-sub">Facilitator coverage by ${scope==='national'?'wing':'SQN'} and subject area</div></div>`;
   if(scope!=='national' && S.cap && S.cap.squadrons){
     const rows=S.cap.squadrons; const gaps=S.cap.capability_gaps||{};
     const totFac=rows.reduce((a,r)=>a+(r.facilitator_count||0),0);
@@ -5159,7 +5552,7 @@ function facDrill(sid){
 function renderRisk(){
   const host=document.getElementById('risk-host'); if(!host)return;
   const scope=getScopeType();
-  let html=`<div class="ph"><div class="ph-title">Risk and Bottlenecks</div><div class="ph-sub">Units requiring attention — ranked from live backend data</div></div>`;
+  let html=`<div class="ph"><div class="ph-title">Risk and Bottlenecks</div><div class="ph-sub">Units requiring attention</div></div>`;
   if(scope==='national'){
     const wings=(S.nationalReport&&S.nationalReport.wings)||[];
     const flagged=wings.map(w=>{const issues=[]; if((+w.coverage_pct||0)<34)issues.push('Low coverage'); if((+w.not_delivered||0)>2)issues.push(`${w.not_delivered} not delivered`); return {name:w.name||w.code,issues};}).filter(x=>x.issues.length);
@@ -5178,7 +5571,6 @@ function renderRisk(){
     html+=`<div class="stats-grid"><div class="stat ${flagged.length?'s-red':'s-ok'}"><div class="sval">${flagged.length}</div><div class="slbl">Needing Attention</div></div><div class="stat s-ok"><div class="sval">${ok}</div><div class="slbl">On Track</div></div></div>`;
     html+=riskCard('Squadrons needing attention', flagged);
   }
-  html+=`<div class="card" style="font-size:11px;color:var(--muted)">Facilitator/role-load bottlenecks (single-point-of-failure roles, missing subject specialists, over-scheduled instructors) require per-squadron facilitator scheduling data and are surfaced when viewing a squadron via Proxy Mode. Cross-SQN role-gap heatmaps are a planned addition pending a Wing facilitator-load endpoint.</div>`;
   host.innerHTML=html;
 }
 function riskCard(title, flagged){
@@ -5247,23 +5639,35 @@ async function _loadPlanningYears() {
   try {
     const data = await api('/api/planning/years');
     P.years = data || [];
-    // Auto-select: prefer the active year; fall back to first in list
-    if(!P.currentYearId && P.years.length) {
-      const active = P.years.find(y=>y.active_status) || P.years[0];
+    // Wing admin: filter by selected squadron if filter is active
+    const sqnFilterSel = document.getElementById('py-sqn-filter');
+    const filterSqnId = sqnFilterSel ? sqnFilterSel.value : '';
+    const visibleYears = filterSqnId
+      ? P.years.filter(y=>y.unit_id===filterSqnId)
+      : P.years;
+    // Auto-select: prefer the active year in visible set; fall back to first
+    if(!P.currentYearId && visibleYears.length) {
+      const active = visibleYears.find(y=>y.active_status) || visibleYears[0];
       P.currentYearId = active.planning_year_id;
     }
     const selIds = [
       'mission-year-sel','py-select','anch-year-sel','term-year-sel',
       'builder-year-sel','lr-year-sel','checks-year-sel'
     ];
+    const showUnitPrefix = ['wing_admin','national_admin','system_admin'].includes(S.role||'');
     selIds.forEach(sid=>{
       const el = document.getElementById(sid);
       if(!el) return;
       el.innerHTML = '<option value="">— select a planning year —</option>';
-      P.years.forEach(y=>{
+      // py-select respects squadron filter; other selectors show all
+      const yrs = (sid==='py-select') ? visibleYears : P.years;
+      yrs.forEach(y=>{
         const o = document.createElement('option');
         o.value = y.planning_year_id;
-        o.textContent = y.name || y.year;
+        const prefix = showUnitPrefix
+          ? (y.unit_code ? `${y.unit_code} — ` : y.wing_code ? `${y.wing_code} — ` : '')
+          : '';
+        o.textContent = prefix + (y.name || String(y.year));
         el.appendChild(o);
       });
       if(P.currentYearId) el.value = P.currentYearId;
@@ -5348,8 +5752,8 @@ async function loadMissions(yearId) {
     renderMissions();
     _updateDebugPanel(null);
   } catch(e) {
-    document.getElementById('missions-body').innerHTML = `<p class="muted">Error loading missions: ${esc(e.message)}</p>`;
-    _updateDebugPanel(e.message);
+    document.getElementById('missions-body').innerHTML = `<p class="muted">Error loading missions: ${esc(apiErr(e))}</p>`;
+    _updateDebugPanel(apiErr(e));
   }
 }
 
@@ -5508,7 +5912,7 @@ async function doAssignMission() {
     });
     closeModal('m-assign-mission');
     await loadMissions(yearId);
-  } catch(e){ msgEl.textContent = e.message || 'Error assigning mission.'; }
+  } catch(e){ msgEl.textContent = apiErr(e); }
 }
 
 // ═══════════════
@@ -5519,6 +5923,25 @@ function openNewYearModal(){
   document.getElementById('py-year-inp').value = new Date().getFullYear();
   document.getElementById('py-name-inp').value = '';
   document.getElementById('py-msg').textContent = '';
+  const unitRow = document.getElementById('py-unit-row');
+  if(unitRow){
+    const isWA = S.role==='wing_admin';
+    unitRow.style.display = isWA ? '' : 'none';
+    if(isWA){
+      const unitSel = document.getElementById('py-unit-sel');
+      if(unitSel){
+        unitSel.innerHTML = '<option value="">— Wing-level year —</option>';
+        (S.wsqns||[]).forEach(sq=>{
+          const o=document.createElement('option'); o.value=sq.squadron_id;
+          o.textContent=`${sq.squadron_code||''} — ${sq.name||sq.squadron_id}`;
+          unitSel.appendChild(o);
+        });
+        // Pre-select the squadron currently in the filter if set
+        const sqnFilter = document.getElementById('py-sqn-filter');
+        if(sqnFilter && sqnFilter.value) unitSel.value = sqnFilter.value;
+      }
+    }
+  }
   openModal('m-new-year');
 }
 
@@ -5526,13 +5949,17 @@ async function doCreateYear(){
   const year = parseInt(document.getElementById('py-year-inp').value);
   const name = document.getElementById('py-name-inp').value.trim();
   if(!name || !year){ document.getElementById('py-msg').textContent='Year and Name are required.'; return; }
+  const unitSel = document.getElementById('py-unit-sel');
+  const unit_id = (unitSel && unitSel.style.display!=='none') ? (unitSel.value||undefined) : undefined;
   try {
-    await api('/api/planning/years',{method:'POST',body:{year,name}});
+    const body = {year, name};
+    if(unit_id) body.unit_id = unit_id;
+    await api('/api/planning/years',{method:'POST',body});
     closeModal('m-new-year');
     await _loadPlanningYears();
     const sel = document.getElementById('py-select');
     if(sel && P.years.length){ sel.value = P.years[0].planning_year_id; loadYearMap(P.years[0].planning_year_id); }
-  } catch(e){ document.getElementById('py-msg').textContent = e.message||'Error creating year.'; }
+  } catch(e){ document.getElementById('py-msg').textContent = apiErr(e); }
 }
 
 async function loadYearMap(yearId){
@@ -5540,9 +5967,20 @@ async function loadYearMap(yearId){
   const body = document.getElementById('py-map-body');
   const datesCard = document.getElementById('py-dates-card');
   const holCard = document.getElementById('py-holidays-card');
-  if(!yearId){ body.innerHTML='<p class="muted">Select a planning year above.</p>'; datesCard.style.display='none'; holCard.style.display='none'; return; }
+  const ctxLbl = document.getElementById('py-ctx-label-sqn');
+  if(!yearId){
+    body.innerHTML='<p class="muted">Select a planning year above.</p>';
+    datesCard.style.display='none'; holCard.style.display='none';
+    if(ctxLbl) ctxLbl.textContent='';
+    return;
+  }
   try {
     const yr = P.years.find(y=>y.planning_year_id===yearId) || {};
+    if(ctxLbl){
+      if(yr.unit_name) ctxLbl.textContent=`Viewing ${esc(yr.unit_name)}'s program`;
+      else if(yr.wing_code) ctxLbl.textContent=`Wing ${esc(yr.wing_code)} program`;
+      else ctxLbl.textContent='';
+    }
     // Load annual program summary
     let annualHtml = '';
     try {
@@ -5566,7 +6004,7 @@ async function loadYearMap(yearId){
     P.annualProgramLoaded = true;
     datesCard.style.display=''; holCard.style.display='';
     await Promise.all([_renderParadeDates(yearId), _renderHolidays(yearId)]);
-  } catch(e){ body.innerHTML = `<p class="muted">Error loading year: ${esc(e.message)}</p>`; }
+  } catch(e){ body.innerHTML = `<p class="muted">Error loading year: ${esc(apiErr(e))}</p>`; }
 }
 
 // Annual Program: full-year month calendar, built from live API data
@@ -5755,12 +6193,12 @@ async function doAddParadeDate(){
         notes:document.getElementById('pd-notes-inp').value||null}
     });
     closeModal('m-add-pd'); await _renderParadeDates(P.currentYearId);
-  } catch(e){ document.getElementById('pd-msg').textContent=e.message||'Error.'; }
+  } catch(e){ document.getElementById('pd-msg').textContent=apiErr(e); }
 }
 async function deleteParadeDate(pdId, yearId){
   if(!confirm('Remove this parade date?')) return;
   try { await api(`/api/planning/parade-dates/${pdId}`,{method:'DELETE'}); await _renderParadeDates(yearId); }
-  catch(e){ alert(e.message||'Error removing date.'); }
+  catch(e){ alert(apiErr(e)); }
 }
 
 function openGenerateDatesModal(){
@@ -5771,20 +6209,48 @@ function openGenerateDatesModal(){
   document.getElementById('gen-msg').textContent='';
   openModal('m-gen-dates');
 }
+function _buildGenBody(){
+  const weekday=parseInt(document.getElementById('gen-weekday').value);
+  const start=document.getElementById('gen-start').value;
+  const end=document.getElementById('gen-end').value||null;
+  const maxREl=document.getElementById('gen-max-repeats');
+  const maxR=maxREl&&maxREl.value?parseInt(maxREl.value)||null:null;
+  const freq=(document.getElementById('gen-freq')&&document.getElementById('gen-freq').value)||'weekly';
+  const exclRaw=(document.getElementById('gen-excl-dates')&&document.getElementById('gen-excl-dates').value)||'';
+  const excluded_dates=exclRaw.split(/[\s,]+/).map(s=>s.trim()).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s));
+  const excHols=document.getElementById('gen-excl-hols').checked;
+  return{weekday,start_date:start,end_date:end,frequency:freq,exclude_holidays:excHols,excluded_dates,max_repeats:maxR};
+}
+async function previewGenerateDates(){
+  const msg=document.getElementById('gen-msg');
+  const area=document.getElementById('gen-preview-area');
+  if(!P.currentYearId){ msg.textContent='Select a planning year first.'; return; }
+  const b=_buildGenBody();
+  if(!b.start_date){ msg.textContent='Start date is required.'; return; }
+  if(!b.end_date&&!b.max_repeats){ msg.textContent='Provide an end date or number of repeats.'; return; }
+  msg.textContent='Loading preview…';
+  area.style.display='none';
+  try{
+    const r=await api(`/api/planning/years/${P.currentYearId}/preview-parade-dates`,{method:'POST',body:b});
+    msg.textContent=`${r.new_count} new date${r.new_count!==1?'s':''} of ${r.total} total.`;
+    area.innerHTML='<table style="width:100%;font-size:12px"><thead><tr><th>Date</th><th>Status</th></tr></thead><tbody>'+
+      (r.dates||[]).map(d=>`<tr><td>${esc(d.date)}</td><td><span class="badge ${d.new?'b-ok':'b-grey'}">${d.new?'New':'Exists'}</span></td></tr>`).join('')+
+      '</tbody></table>';
+    area.style.display='block';
+  }catch(e){ msg.textContent=apiErr(e); }
+}
 async function doGenerateDates(){
-  const weekday = parseInt(document.getElementById('gen-weekday').value);
-  const start = document.getElementById('gen-start').value;
-  const end = document.getElementById('gen-end').value;
-  if(!start||!end){ document.getElementById('gen-msg').textContent='Start and end dates are required.'; return; }
+  const msg=document.getElementById('gen-msg');
+  if(!P.currentYearId){ msg.textContent='Select a planning year first.'; return; }
+  const b=_buildGenBody();
+  if(!b.start_date){ msg.textContent='Start date is required.'; return; }
+  if(!b.end_date&&!b.max_repeats){ msg.textContent='Provide an end date or number of repeats.'; return; }
   try {
-    const r = await api(`/api/planning/years/${P.currentYearId}/generate-parade-dates`,{
-      method:'POST', body:{ weekday, start_date:start, end_date:end,
-        exclude_holidays: document.getElementById('gen-excl-hols').checked }
-    });
+    const r = await api(`/api/planning/years/${P.currentYearId}/generate-parade-dates`,{method:'POST',body:b});
     closeModal('m-gen-dates');
     alert(`Generated ${r.created} new parade date${r.created!==1?'s':''}.`);
     await _renderParadeDates(P.currentYearId);
-  } catch(e){ document.getElementById('gen-msg').textContent=e.message||'Error.'; }
+  } catch(e){ msg.textContent=apiErr(e); }
 }
 
 function openAddHolidayModal(){
@@ -5794,22 +6260,24 @@ function openAddHolidayModal(){
   openModal('m-add-holiday');
 }
 async function doAddHoliday(){
+  const hm=document.getElementById('hol-msg');
+  if(!P.currentYearId){ hm.textContent='Select a planning year first.'; return; }
   const name = document.getElementById('hol-name-inp').value.trim();
   const start = document.getElementById('hol-start-inp').value;
   const end = document.getElementById('hol-end-inp').value;
-  if(!name||!start||!end){ document.getElementById('hol-msg').textContent='All fields required.'; return; }
+  if(!name||!start||!end){ hm.textContent='All fields required.'; return; }
   try {
     await api(`/api/planning/years/${P.currentYearId}/holidays`,{
       method:'POST', body:{ name, start_date:start, end_date:end,
         affects_parade: document.getElementById('hol-affects-inp').checked }
     });
     closeModal('m-add-holiday'); await _renderHolidays(P.currentYearId);
-  } catch(e){ document.getElementById('hol-msg').textContent=e.message||'Error.'; }
+  } catch(e){ hm.textContent=apiErr(e); }
 }
 async function deleteHoliday(hId, yearId){
   if(!confirm('Remove this holiday period?')) return;
   try { await api(`/api/planning/holidays/${hId}`,{method:'DELETE'}); await _renderHolidays(yearId); }
-  catch(e){ alert(e.message||'Error.'); }
+  catch(e){ alert(apiErr(e)); }
 }
 
 // ═══════════════
@@ -5823,7 +6291,7 @@ async function loadAnchors(yearId){
   try {
     P.anchors = await api(`/api/planning/years/${yearId}/anchors`);
     renderAnchors();
-  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(e.message)}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
 }
 
 function renderAnchors(){
@@ -5881,12 +6349,12 @@ async function doAddAnchor(){
     });
     closeModal('m-add-anchor');
     P.anchors.push(r); renderAnchors();
-  } catch(e){ document.getElementById('anch-msg').textContent=e.message||'Error.'; }
+  } catch(e){ document.getElementById('anch-msg').textContent=apiErr(e); }
 }
 async function deleteAnchor(anchorId){
   if(!confirm('Archive this anchor event? It will no longer appear in planning.')) return;
   try { await api(`/api/planning/anchors/${anchorId}`,{method:'DELETE'}); await loadAnchors(P.currentYearId); }
-  catch(e){ alert(e.message||'Error.'); }
+  catch(e){ alert(apiErr(e)); }
 }
 
 // ═══════════════
@@ -5927,7 +6395,7 @@ async function loadTermPlanner(yearId, term){
         </div>
       </div>`;
     }).join('');
-  } catch(e){ body.innerHTML=`<p class="muted">Error: ${esc(e.message)}</p>`; }
+  } catch(e){ body.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
 }
 
 // ═══════════════
@@ -6018,7 +6486,7 @@ async function loadBuilderFromPn(pnId){
     if(pwSection) pwSection.style.display='';
     _renderBuilderWeeklyPreview(d.sessions||[], d.timing_blocks||[], d.parade_date);
   } catch(e){
-    empty.innerHTML=`<div class="empty"><div class="et">Error loading program</div><div class="es">${esc(e.message)}</div></div>`;
+    empty.innerHTML=`<div class="empty"><div class="et">Error loading program</div><div class="es">${esc(apiErr(e))}</div></div>`;
     card.style.display='none'; empty.style.display='';
   }
 }
@@ -6115,7 +6583,7 @@ async function loadBuilderGrid(dateId){
     const pwSection = document.getElementById('pw-preview-section');
     if(pwSection) pwSection.style.display='';
     loadWeeklyProgram(dateId);
-  } catch(e){ empty.innerHTML=`<div class="empty"><div class="ei">⚠️</div><div class="et">Error loading builder</div><div class="es">${esc(e.message)}</div></div>`; card.style.display='none'; empty.style.display=''; }
+  } catch(e){ empty.innerHTML=`<div class="empty"><div class="et">Error loading builder</div><div class="es">${esc(apiErr(e))}</div></div>`; card.style.display='none'; empty.style.display=''; }
 }
 
 function _statusBadge(st){ return st==='published'?'badge-green':st==='confirmed'?'badge-blue':'badge-grey'; }
@@ -6251,7 +6719,7 @@ async function doSaveSession(){
     closeModal('m-edit-session');
     if(mode==='pn'){ await loadBuilderFromPn(dateId); }
     else { await loadBuilderGrid(dateId); }
-  } catch(e){ document.getElementById('sess-msg').textContent=e.message||'Error saving session.'; }
+  } catch(e){ document.getElementById('sess-msg').textContent=apiErr(e); }
 }
 
 // ═══════════════
@@ -6305,7 +6773,7 @@ async function loadWeeklyProgram(dateId){
     html+=`</tbody></table>`;
     body.innerHTML=html;
     card.style.display=''; if(empty)empty.style.display='none';
-  } catch(e){ if(empty)empty.innerHTML=`<p class="muted">Error loading weekly program: ${esc(e.message)}</p>`; card.style.display='none'; if(empty)empty.style.display=''; }
+  } catch(e){ if(empty)empty.innerHTML=`<p class="muted">Error loading weekly program: ${esc(apiErr(e))}</p>`; card.style.display='none'; if(empty)empty.style.display=''; }
 }
 
 // ═══════════════
@@ -6356,7 +6824,7 @@ async function loadLongRange(yearId){
     });
     document.getElementById('lr-body').innerHTML=html;
     card.style.display=''; empty.style.display='none';
-  } catch(e){ empty.innerHTML=`<p class="muted">Error: ${esc(e.message)}</p>`; card.style.display='none'; empty.style.display=''; }
+  } catch(e){ empty.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; card.style.display='none'; empty.style.display=''; }
 }
 
 // ═══════════════
@@ -6386,7 +6854,7 @@ async function loadLocations(){
         <td><span class="badge ${l.source==='real'?'badge-green':'badge-grey'}">${l.source==='real'?'Training Area':'Planning Only'}</span></td>
       </tr>`).join('')+
       `</tbody></table>`;
-  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(e.message)}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
 }
 
 async function loadPlanningFacilitators(){
@@ -6415,7 +6883,7 @@ async function loadPlanningFacilitators(){
         <td>${f.max_sessions_per_night}</td>
       </tr>`).join('')+
       `</tbody></table>`;
-  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(e.message)}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
 }
 
 function openAddLocationModal(){
@@ -6436,7 +6904,7 @@ async function doAddLocation(){
       notes: document.getElementById('loc-notes-inp').value||null,
     }});
     closeModal('m-add-location'); await loadLocations();
-  } catch(e){ document.getElementById('loc-msg').textContent=e.message||'Error.'; }
+  } catch(e){ document.getElementById('loc-msg').textContent=apiErr(e); }
 }
 
 // ═══════════════
@@ -6456,7 +6924,7 @@ async function loadPlanningChecks(yearId){
     _renderDecisionGuide(guide.checks);
     _renderConflicts(conflicts, yearId);
     card.style.display=''; empty.style.display='none';
-  } catch(e){ empty.innerHTML=`<p class="muted">Error: ${esc(e.message)}</p>`; card.style.display='none'; empty.style.display=''; }
+  } catch(e){ empty.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; card.style.display='none'; empty.style.display=''; }
 }
 
 function _renderDecisionGuide(checks){
@@ -6491,7 +6959,7 @@ async function runAllChecks(){
     const r=await api(`/api/planning/years/${P.currentYearId}/run-checks`,{method:'POST'});
     await loadPlanningChecks(P.currentYearId);
     alert(`Checks complete. ${r.conflicts_detected} conflict${r.conflicts_detected!==1?'s':''} detected.`);
-  } catch(e){ alert(e.message||'Error running checks.'); }
+  } catch(e){ alert(apiErr(e)); }
 }
 
 async function promptOverrideConflict(cId, yearId){
@@ -6500,7 +6968,212 @@ async function promptOverrideConflict(cId, yearId){
   try {
     await api(`/api/planning/conflicts/${cId}/override`,{method:'POST',body:{override_reason:reason.trim()}});
     await loadPlanningChecks(yearId);
-  } catch(e){ alert(e.message||'Error overriding conflict.'); }
+  } catch(e){ alert(apiErr(e)); }
+}
+
+// ═══════════════════════
+//  CEA ACTIVITY IMPORT
+// ═══════════════════════
+
+let _ceaPreviewRows=null;
+function openCeaImport(){
+  _ceaPreviewRows=null;
+  document.getElementById('cea-file').value='';
+  document.getElementById('cea-msg').textContent='';
+  document.getElementById('cea-preview-area').style.display='none';
+  document.getElementById('cea-preview-area').innerHTML='';
+  document.getElementById('cea-import-btn').style.display='none';
+  openModal('m-cea-import');
+}
+async function previewCeaImport(){
+  const msg=document.getElementById('cea-msg');
+  const area=document.getElementById('cea-preview-area');
+  const fileEl=document.getElementById('cea-file');
+  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select a CSV file first.'; return; }
+  msg.textContent='Loading preview…';
+  area.style.display='none';
+  const form=new FormData();
+  form.append('file',fileEl.files[0]);
+  try{
+    const res=await fetch(API_BASE+'/api/activities/import-cea?preview=true',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+tokenGet()},
+      body:form,
+    });
+    const d=await res.json();
+    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||'Error'; return; }
+    _ceaPreviewRows=d.rows||[];
+    const newRows=_ceaPreviewRows.filter(r=>r.status!=='duplicate');
+    const dupRows=_ceaPreviewRows.filter(r=>r.status==='duplicate');
+    msg.textContent=`${newRows.length} new, ${dupRows.length} duplicate (will be skipped).`+(d.parse_errors&&d.parse_errors.length?' '+d.parse_errors.length+' parse error(s).':'');
+    area.innerHTML='<table class="data-table" style="font-size:11px"><thead><tr><th>SeqNr</th><th>Name</th><th>Date</th><th>Time</th><th>Location</th><th>Status</th></tr></thead><tbody>'+
+      _ceaPreviewRows.map(r=>`<tr>
+        <td>${esc(r.cea_seq_nr||'—')}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(r.activity_name)}</td>
+        <td>${esc(r.date_start||'—')}</td>
+        <td>${esc((r.time_start||'')+(r.time_end?' – '+r.time_end:''))}</td>
+        <td>${esc(r.location||'—')}</td>
+        <td><span class="badge ${r.status==='duplicate'?'b-grey':'b-ok'}">${r.status==='duplicate'?'Skip':'New'}</span></td>
+      </tr>`).join('')+'</tbody></table>';
+    area.style.display='block';
+    if(newRows.length>0) document.getElementById('cea-import-btn').style.display='';
+  }catch(e){ msg.textContent=apiErr(e); }
+}
+async function commitCeaImport(){
+  const msg=document.getElementById('cea-msg');
+  const fileEl=document.getElementById('cea-file');
+  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select a CSV file first.'; return; }
+  msg.textContent='Importing…';
+  document.getElementById('cea-import-btn').disabled=true;
+  const form=new FormData();
+  form.append('file',fileEl.files[0]);
+  try{
+    const res=await fetch(API_BASE+'/api/activities/import-cea?preview=false',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+tokenGet()},
+      body:form,
+    });
+    const d=await res.json();
+    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||'Error'; document.getElementById('cea-import-btn').disabled=false; return; }
+    closeModal('m-cea-import');
+    await reloadAndRender();
+    alert(`Imported ${d.created} activit${d.created!==1?'ies':'y'}. ${d.skipped} duplicate${d.skipped!==1?'s':''} skipped.`);
+  }catch(e){ msg.textContent=apiErr(e); document.getElementById('cea-import-btn').disabled=false; }
+}
+
+// ════════════════════════════
+//  CSV CURRICULUM IMPORT
+// ════════════════════════════
+
+function openCsvCurrImport(){
+  document.getElementById('csv-curr-file').value='';
+  document.getElementById('csv-curr-msg').textContent='';
+  document.getElementById('csv-curr-result').style.display='none';
+  openModal('m-csv-curr-import');
+}
+async function submitCsvCurr(){
+  const msg=document.getElementById('csv-curr-msg');
+  const fileEl=document.getElementById('csv-curr-file');
+  const level=document.getElementById('csv-curr-level').value;
+  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select a CSV file first.'; return; }
+  msg.textContent='Uploading…';
+  const form=new FormData();
+  form.append('file',fileEl.files[0]);
+  try{
+    const res=await fetch(API_BASE+`/api/curriculum/import-csv?owning_level=${encodeURIComponent(level)}`,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+tokenGet()},
+      body:form,
+    });
+    const d=await res.json();
+    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||JSON.stringify(d.detail); return; }
+    msg.textContent='';
+    const result=document.getElementById('csv-curr-result');
+    result.innerHTML=`<div class="alert a-ok">Import complete: ${d.created} created, ${d.updated} updated, ${d.skipped} unchanged.${d.failed?' '+d.failed+' failed.':''}</div>`+
+      (d.parse_errors&&d.parse_errors.length?`<div style="font-size:11px;color:var(--warn);margin-top:4px">${d.parse_errors.slice(0,5).map(e=>`<div>${esc(e)}</div>`).join('')}</div>`:'');
+    result.style.display='block';
+    await reloadAndRender();
+  }catch(e){ msg.textContent=apiErr(e); }
+}
+
+// ── Spreadsheet Export ──────────────────────────────────────
+function _downloadExport(url, filename){
+  const tok=tokenGet();
+  fetch(API_BASE+url,{headers:{'Authorization':'Bearer '+tok}})
+    .then(r=>{
+      if(!r.ok) return r.json().then(d=>{ throw new Error(d.detail?.message||d.detail?.error||r.statusText); });
+      return r.blob();
+    })
+    .then(blob=>{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    })
+    .catch(e=>alert('Export failed: '+e.message));
+}
+
+function exportAnnualProgram(){
+  if(!P.currentYearId){ alert('Select a planning year first.'); return; }
+  _downloadExport(`/api/planning/years/${P.currentYearId}/export.xlsx`,`annual-program.xlsx`);
+}
+
+function exportCurriculum(){
+  _downloadExport('/api/curriculum/export.xlsx','curriculum.xlsx');
+}
+
+function exportSchedule(){
+  if(!P.currentYearId){ alert('Select a planning year first.'); return; }
+  _downloadExport(`/api/planning/years/${P.currentYearId}/schedule/export.xlsx`,`schedule.xlsx`);
+}
+
+// ── Schedule XLSX Import ────────────────────────────────────
+function openSchedImport(){
+  if(!P.currentYearId){ alert('Select a planning year first.'); return; }
+  document.getElementById('sched-import-file').value='';
+  document.getElementById('sched-import-msg').textContent='';
+  document.getElementById('sched-import-preview').style.display='none';
+  document.getElementById('sched-import-commit-btn').style.display='none';
+  document.getElementById('sched-import-preview-btn').style.display='inline-flex';
+  openModal('m-sched-import');
+}
+
+async function previewSchedImport(){
+  const msg=document.getElementById('sched-import-msg');
+  const fileEl=document.getElementById('sched-import-file');
+  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select an XLSX file first.'; return; }
+  if(!P.currentYearId){ msg.textContent='No planning year selected.'; return; }
+  msg.textContent='Parsing…';
+  const form=new FormData();
+  form.append('file',fileEl.files[0]);
+  try{
+    const res=await fetch(API_BASE+`/api/planning/years/${P.currentYearId}/schedule/import?preview=true`,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+tokenGet()},
+      body:form,
+    });
+    const d=await res.json();
+    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||JSON.stringify(d.detail); return; }
+    msg.textContent='';
+    const updateRows=d.rows.filter(r=>r.action==='update');
+    const summary=`${updateRows.length} change(s) to apply · ${d.rows.filter(r=>r.action==='unchanged').length} unchanged · ${d.not_found} not found`;
+    document.getElementById('sched-import-summary').textContent=summary;
+    const tbody=document.getElementById('sched-import-rows');
+    const ACTION_CLR={update:'color:var(--blue);font-weight:600',unchanged:'color:var(--muted)',not_found:'color:var(--error)'};
+    tbody.innerHTML=d.rows.map(r=>`<tr>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.date||'')}</td>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(String(r.session||''))}</td>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.group||'')}</td>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border);${ACTION_CLR[r.action]||''}">${esc(r.action||'')}</td>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border);color:var(--muted)">${esc(r.current_code||'')}</td>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.code||'')}</td>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.title||'')}</td>
+    </tr>`).join('');
+    document.getElementById('sched-import-preview').style.display='';
+    document.getElementById('sched-import-commit-btn').style.display=updateRows.length?'inline-flex':'none';
+  }catch(e){ msg.textContent=apiErr(e); }
+}
+
+async function commitSchedImport(){
+  const msg=document.getElementById('sched-import-msg');
+  const fileEl=document.getElementById('sched-import-file');
+  if(!fileEl.files||!fileEl.files[0]||!P.currentYearId){ return; }
+  msg.textContent='Applying changes…';
+  const form=new FormData();
+  form.append('file',fileEl.files[0]);
+  try{
+    const res=await fetch(API_BASE+`/api/planning/years/${P.currentYearId}/schedule/import?preview=false`,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+tokenGet()},
+      body:form,
+    });
+    const d=await res.json();
+    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||JSON.stringify(d.detail); return; }
+    msg.textContent=`Done: ${d.updated} session(s) updated, ${d.skipped} unchanged, ${d.not_found} not found.`;
+    document.getElementById('sched-import-commit-btn').style.display='none';
+  }catch(e){ msg.textContent=apiErr(e); }
 }
 </script>
 </body>

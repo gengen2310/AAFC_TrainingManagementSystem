@@ -16,7 +16,12 @@ class CurriculumItem(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     owning_level: Mapped[str] = mapped_column(String(20), default="national")  # national|wing|squadron
     wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     squadron_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    # identifier is the globally unique lesson/mission key from the curriculum workbook,
+    # e.g. "ORI-M01-01(2)". Multiple rows can share the same code (Module_Code) for
+    # different parts. The 409/uniqueness check uses identifier, not code alone.
+    identifier: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
     code: Mapped[str] = mapped_column(String(40), index=True)
+    part_number: Mapped[int] = mapped_column(Integer, default=1)
     title: Mapped[str] = mapped_column(String(200))
     phase: Mapped[str] = mapped_column(String(40), index=True)
     element: Mapped[str | None] = mapped_column(String(40))
@@ -172,6 +177,9 @@ class Activity(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     date_end: Mapped[str | None] = mapped_column(String(10))
     audience: Mapped[list | None] = mapped_column(JSON, nullable=True)
     location: Mapped[str | None] = mapped_column(String(200))
+    time_start: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    time_end: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    cea_seq_nr: Mapped[str | None] = mapped_column(String(30), nullable=True, index=True)
     oic: Mapped[str | None] = mapped_column(String(120))
     twoic: Mapped[str | None] = mapped_column(String(120))
     risk_status: Mapped[str] = mapped_column(String(20), default="pending")
@@ -265,3 +273,24 @@ class ParadeNightTimingOverride(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
         ForeignKey("timing_templates.id"), nullable=True, index=True,
     )
     reason: Mapped[str] = mapped_column(Text)
+
+
+# Scope constants (also used by the endpoint and migration)
+ELEMENT_SCOPE_LEVELS = frozenset({"national", "wing", "squadron", "system"})
+
+
+class CurriculumElement(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
+    """Managed subject/category groupings for curriculum items.
+
+    Elements are scoped: system > national > wing > squadron. Squadron users see
+    national elements, wing elements for their wing, and their own squadron elements.
+    Elements at higher scopes are read-only to lower-scope admins.
+    """
+    __tablename__ = "curriculum_elements"
+    name: Mapped[str] = mapped_column(String(60), index=True)
+    display_name: Mapped[str] = mapped_column(String(120))
+    scope_level: Mapped[str] = mapped_column(String(20), index=True)  # system|national|wing|squadron
+    wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    squadron_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    active_status: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
