@@ -775,6 +775,9 @@ class ActivityIn(BaseModel):
     activity_type: str | None = None
     date_start: str
     date_end: str | None = None
+    time_start: str | None = None
+    time_end: str | None = None
+    location: str | None = None
     audience: list[str] | None = None
     notes: str | None = None
 
@@ -784,9 +787,24 @@ class ActivityUpdateIn(BaseModel):
     activity_type: str | None = None
     date_start: str | None = None
     date_end: str | None = None
+    time_start: str | None = None
+    time_end: str | None = None
+    location: str | None = None
     audience: list[str] | None = None
     notes: str | None = None
     workflow_status: str | None = None
+    cea_seq_nr: str | None = None
+
+
+def _activity_out(a: Activity) -> dict:
+    return {
+        "activity_id": a.id, "activity_name": a.activity_name,
+        "activity_type": a.activity_type, "date_start": a.date_start,
+        "date_end": a.date_end, "time_start": a.time_start, "time_end": a.time_end,
+        "location": a.location, "audience": a.audience or [],
+        "notes": a.notes, "workflow_status": a.workflow_status,
+        "cea_seq_nr": a.cea_seq_nr,
+    }
 
 
 @router.get("/activities")
@@ -794,9 +812,7 @@ def list_activities(db: DBSession = Depends(get_db), p: Principal = Depends(get_
     sq_id = _active_squadron(p)
     rows = db.query(Activity).filter(Activity.squadron_id == sq_id,
                                      Activity.is_archived == False).order_by(Activity.date_start).all()  # noqa: E712
-    return [{"activity_id": a.id, "activity_name": a.activity_name, "activity_type": a.activity_type,
-             "date_start": a.date_start, "date_end": a.date_end, "audience": a.audience or [],
-             "notes": a.notes, "workflow_status": a.workflow_status} for a in rows]
+    return [_activity_out(a) for a in rows]
 
 
 @router.post("/activities")
@@ -812,7 +828,8 @@ def create_activity(body: ActivityIn, db: DBSession = Depends(get_db), p: Princi
     require_can_write_squadron(p, s.id, s.wing_id)
     a = Activity(squadron_id=s.id, wing_id=s.wing_id, activity_name=body.activity_name,
                  activity_type=body.activity_type, date_start=body.date_start,
-                 date_end=body.date_end, audience=body.audience, notes=body.notes)
+                 date_end=body.date_end, time_start=body.time_start, time_end=body.time_end,
+                 location=body.location, audience=body.audience, notes=body.notes)
     db.add(a)
     db.commit()
     audit(db, p, object_type="activity", object_id=a.id, action="create")
@@ -835,12 +852,20 @@ def update_activity(aid: str, body: ActivityUpdateIn, db: DBSession = Depends(ge
         a.date_start = body.date_start
     if body.date_end is not None:
         a.date_end = body.date_end
+    if body.time_start is not None:
+        a.time_start = body.time_start
+    if body.time_end is not None:
+        a.time_end = body.time_end
+    if body.location is not None:
+        a.location = body.location
     if body.audience is not None:
         a.audience = body.audience
     if body.notes is not None:
         a.notes = body.notes
     if body.workflow_status is not None:
         a.workflow_status = body.workflow_status
+    if body.cea_seq_nr is not None:
+        a.cea_seq_nr = body.cea_seq_nr
     db.commit()
     audit(db, p, object_type="activity", object_id=a.id, action="update")
     return {"ok": True, "activity_id": a.id}
@@ -1567,3 +1592,294 @@ def _parse_program_backend_sheet(ws) -> list[CurriculumImportItem]:
         ))
 
     return items
+
+
+# ── CSV CURRICULUM IMPORT ─────────────────────────────────────────────────────
+
+_CSV_CURR_COL_MAP = {
+    # CSV header (lower-stripped) → CurriculumImportItem field
+    "training phase": "phase",
+    "phase": "phase",
+    "experiential code": "code",
+    "code": "code",
+    "module code": "code",
+    "module_code": "code",
+    "title": "title",
+    "module title": "title",
+    "module_title": "title",
+    "elements": "element",
+    "element": "element",
+    "foundation or extension": "core_status",
+    "type": "core_status",
+    "instructor suitability": "instructor_suitability",
+    "instructor_suitability": "instructor_suitability",
+    "timing": "duration_minutes",
+    "duration": "duration_minutes",
+    "duration_min": "duration_minutes",
+    "location": "location",
+    "learning hub link": "learning_hub_url",
+    "learning hub url": "learning_hub_url",
+    "url": "learning_hub_url",
+}
+
+
+def _parse_duration(raw: str) -> int:
+    """Parse a duration string like '60', '60 min', '1 hr', '1.5 hrs' → minutes."""
+    if not raw:
+        return 60
+    raw = raw.strip().lower()
+    import re
+    m = re.match(r'(\d+(?:\.\d+)?)\s*(hr|hour|h)', raw)
+    if m:
+        return int(float(m.group(1)) * 60)
+    m = re.match(r'(\d+)', raw)
+    if m:
+        return int(m.group(1))
+    return 60
+
+
+@router.post("/curriculum/import-csv")
+async def import_curriculum_csv(
+    file: UploadFile = File(...),
+    owning_level: str = "national",
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Import curriculum from a CSV file.
+
+    Expected columns (case-insensitive, order-independent):
+    Training Phase, Experiential Code, Title, Elements,
+    Foundation or Extension, Instructor Suitability, Timing,
+    Location, Learning Hub Link
+
+    Returns the same summary as /curriculum/import.
+    """
+    import csv, io
+    if p.role not in _NAT_ADMIN_ROLES:
+        raise HTTPException(403, detail={
+            "error": "forbidden",
+            "message": "Only national_admin or system_admin can import curriculum.",
+        })
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(text))
+    items: list[CurriculumImportItem] = []
+    parse_errors: list[str] = []
+
+    for i, row in enumerate(reader, start=2):
+        # Normalise headers to lower-stripped
+        norm = {k.strip().lower(): (v or "").strip() for k, v in row.items()}
+        mapped: dict = {}
+        for hdr, field in _CSV_CURR_COL_MAP.items():
+            if hdr in norm and norm[hdr]:
+                mapped[field] = norm[hdr]
+
+        code = mapped.get("code", "").upper()
+        title = mapped.get("title", "")
+        if not code or not title:
+            parse_errors.append(f"Row {i}: missing code or title — skipped.")
+            continue
+
+        # duration: parse "60 min", "1 hr", bare integer
+        dur_raw = mapped.get("duration_minutes", "60")
+        duration = _parse_duration(dur_raw)
+
+        # core_status: "Foundation" → "core", "Extension" → "additional"
+        cs_raw = mapped.get("core_status", "").lower()
+        core_status = "core" if "foundation" in cs_raw or cs_raw in ("core", "f") else "additional"
+
+        items.append(CurriculumImportItem(
+            code=code,
+            title=title,
+            phase=mapped.get("phase", "B. Initial"),
+            element=mapped.get("element") or None,
+            duration_minutes=duration,
+            instructor_suitability=mapped.get("instructor_suitability") or None,
+            learning_hub_url=mapped.get("learning_hub_url") or None,
+            location=mapped.get("location") or None,
+        ))
+
+    if not items and parse_errors:
+        raise HTTPException(400, detail={
+            "error": "csv_parse_failed",
+            "message": "No valid rows found. " + "; ".join(parse_errors[:5]),
+        })
+
+    import_body = CurriculumImportIn(items=items, owning_level=owning_level)
+    result = import_curriculum(import_body, db, p)
+    result["parse_errors"] = parse_errors
+    return result
+
+
+# ── CEA ACTIVITY IMPORT ───────────────────────────────────────────────────────
+
+_CEA_DATE_FMTS = ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y", "%d %b %Y"]
+
+
+def _parse_cea_date(raw: str) -> str | None:
+    """Parse a CEA export date to ISO YYYY-MM-DD."""
+    if not raw:
+        return None
+    from datetime import datetime
+    for fmt in _CEA_DATE_FMTS:
+        try:
+            return datetime.strptime(raw.strip(), fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+    return raw.strip()[:10] or None
+
+
+def _parse_cea_time(raw: str) -> str | None:
+    """Normalise a time string to HH:MM:SS (8 chars max)."""
+    if not raw:
+        return None
+    raw = raw.strip()
+    # Accept HH:MM, HH:MM:SS, H:MM
+    parts = raw.split(":")
+    if len(parts) >= 2:
+        try:
+            hh = int(parts[0])
+            mm = int(parts[1])
+            return f"{hh:02d}:{mm:02d}"
+        except ValueError:
+            pass
+    return raw[:8] or None
+
+
+@router.post("/activities/import-cea")
+async def import_activities_cea(
+    file: UploadFile = File(...),
+    preview: bool = False,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Import activities from a CEA export CSV.
+
+    Expected columns (case-insensitive):
+    SeqNr, Name, Start date, Start time, End date, End time,
+    Unit, Location, Activity Notes
+
+    Deduplication: if a row's SeqNr already exists in the squadron's
+    activities, that row is skipped (not duplicated).
+
+    If preview=true, returns parsed rows without writing to the database.
+    Permissions: squadron_admin or higher (writes to the active squadron).
+    """
+    import csv, io
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+
+    sq_id = _active_squadron(p)
+    if not sq_id:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    s = db.get(Squadron, sq_id)
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    if not preview:
+        require_can_write_squadron(p, s.id, s.wing_id)
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(text))
+    parse_errors: list[str] = []
+    preview_rows: list[dict] = []
+    created = skipped = failed = 0
+
+    # Load existing seq numbers for deduplication
+    existing_seq = {
+        a.cea_seq_nr for a in
+        db.query(Activity.cea_seq_nr).filter(
+            Activity.squadron_id == sq_id,
+            Activity.cea_seq_nr.isnot(None),
+            Activity.is_archived == False,  # noqa: E712
+        ).all()
+        if a.cea_seq_nr
+    }
+
+    for i, row in enumerate(reader, start=2):
+        norm = {k.strip().lower(): (v or "").strip() for k, v in row.items()}
+
+        seq_nr = norm.get("seqnr") or norm.get("seq nr") or norm.get("seq_nr") or norm.get("seq") or ""
+        name = norm.get("name") or norm.get("activity name") or norm.get("activity") or ""
+        date_start_raw = norm.get("start date") or norm.get("startdate") or norm.get("start_date") or ""
+        time_start_raw = norm.get("start time") or norm.get("starttime") or norm.get("start_time") or ""
+        date_end_raw = norm.get("end date") or norm.get("enddate") or norm.get("end_date") or ""
+        time_end_raw = norm.get("end time") or norm.get("endtime") or norm.get("end_time") or ""
+        unit = norm.get("unit") or ""
+        location = norm.get("location") or ""
+        notes = norm.get("activity notes") or norm.get("notes") or norm.get("activity_notes") or ""
+
+        if not name or not date_start_raw:
+            parse_errors.append(f"Row {i}: missing Name or Start date — skipped.")
+            continue
+
+        date_start = _parse_cea_date(date_start_raw)
+        date_end = _parse_cea_date(date_end_raw) if date_end_raw else None
+        time_start = _parse_cea_time(time_start_raw) if time_start_raw else None
+        time_end = _parse_cea_time(time_end_raw) if time_end_raw else None
+
+        if not date_start:
+            parse_errors.append(f"Row {i}: unrecognised date format '{date_start_raw}' — skipped.")
+            continue
+
+        row_data = {
+            "cea_seq_nr": seq_nr or None,
+            "activity_name": name,
+            "date_start": date_start,
+            "date_end": date_end,
+            "time_start": time_start,
+            "time_end": time_end,
+            "location": location or None,
+            "notes": (notes + (f"\nUnit: {unit}" if unit else "")).strip() or None,
+            "activity_type": "CEA",
+            "status": "duplicate" if seq_nr and seq_nr in existing_seq else "new",
+        }
+
+        if preview:
+            preview_rows.append(row_data)
+            continue
+
+        if seq_nr and seq_nr in existing_seq:
+            skipped += 1
+            continue
+
+        try:
+            a = Activity(
+                squadron_id=s.id, wing_id=s.wing_id,
+                activity_name=name, activity_type="CEA",
+                date_start=date_start, date_end=date_end,
+                time_start=time_start, time_end=time_end,
+                location=location or None,
+                notes=(notes + (f"\nUnit: {unit}" if unit else "")).strip() or None,
+                cea_seq_nr=seq_nr or None,
+            )
+            db.add(a)
+            if seq_nr:
+                existing_seq.add(seq_nr)
+            created += 1
+        except Exception as exc:
+            failed += 1
+            parse_errors.append(f"Row {i}: save failed — {exc}")
+
+    if preview:
+        return {"ok": True, "preview": True, "rows": preview_rows, "parse_errors": parse_errors}
+
+    db.commit()
+    audit(db, p, object_type="activity", object_id="cea_import", action="bulk_import",
+          new={"created": created, "skipped": skipped, "failed": failed})
+
+    return {
+        "ok": True, "preview": False,
+        "created": created, "skipped": skipped, "failed": failed,
+        "total": created + skipped + failed,
+        "parse_errors": parse_errors,
+    }

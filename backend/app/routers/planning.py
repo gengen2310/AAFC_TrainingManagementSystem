@@ -354,9 +354,12 @@ class ParadeDateIn(BaseModel):
 class GenerateParadeDatesIn(BaseModel):
     weekday: int          # 0=Mon … 6=Sun
     start_date: str       # ISO YYYY-MM-DD
-    end_date: str         # ISO YYYY-MM-DD
+    end_date: str | None = None   # ISO YYYY-MM-DD; omit if max_repeats given
     parade_type: str = "standard"
     exclude_holidays: bool = True
+    frequency: str = "weekly"          # weekly | fortnightly | monthly | daily
+    excluded_dates: list[str] = []     # specific ISO dates to skip
+    max_repeats: int | None = None     # alternative to end_date
 
 
 @router.get("/years/{year_id}/parade-dates")
@@ -410,6 +413,106 @@ def add_parade_date(
     return _date_out(pd)
 
 
+def _compute_candidate_dates(body: GenerateParadeDatesIn, holidays: list) -> list[str]:
+    """Return ISO date strings that should become parade dates given the body parameters.
+
+    Supports weekly, fortnightly, monthly (first weekday in month), and daily frequencies.
+    excluded_dates and max_repeats are applied here. Holiday exclusion is optional.
+    """
+    try:
+        start = date.fromisoformat(body.start_date)
+    except ValueError:
+        raise HTTPException(400, detail={"error": "invalid_date_format"})
+
+    end: date | None = None
+    if body.end_date:
+        try:
+            end = date.fromisoformat(body.end_date)
+        except ValueError:
+            raise HTTPException(400, detail={"error": "invalid_date_format"})
+
+    if end is None and body.max_repeats is None:
+        raise HTTPException(400, detail={
+            "error": "end_date_or_max_repeats_required",
+            "message": "Provide either end_date or max_repeats.",
+        })
+
+    excluded_set = set(body.excluded_dates or [])
+
+    def in_holiday(d: date) -> bool:
+        ds = d.isoformat()
+        return any(h.start_date <= ds <= h.end_date for h in holidays)
+
+    freq = (body.frequency or "weekly").lower()
+    candidates: list[str] = []
+    d = start
+    last_occurrence: date | None = None
+
+    while True:
+        if end and d > end:
+            break
+        if body.max_repeats is not None and len(candidates) >= body.max_repeats:
+            break
+
+        include = False
+        if freq == "daily":
+            include = True
+        elif freq in ("weekly", "fortnightly"):
+            if d.weekday() == body.weekday:
+                if freq == "weekly":
+                    include = True
+                else:
+                    # fortnightly: every second occurrence
+                    if last_occurrence is None or (d - last_occurrence).days >= 14:
+                        include = True
+        elif freq == "monthly":
+            # First occurrence of weekday in the calendar month
+            if d.weekday() == body.weekday:
+                # Is this the first occurrence of this weekday in the month?
+                if d.day <= 7:
+                    include = True
+        else:
+            # Unknown frequency falls back to weekly
+            if d.weekday() == body.weekday:
+                include = True
+
+        if include:
+            ds = d.isoformat()
+            skip = ds in excluded_set
+            if body.exclude_holidays and in_holiday(d):
+                skip = True
+            if not skip:
+                candidates.append(ds)
+                last_occurrence = d
+
+        d += timedelta(days=1)
+
+    return candidates
+
+
+@router.post("/years/{year_id}/preview-parade-dates")
+def preview_parade_dates(
+    year_id: str,
+    body: GenerateParadeDatesIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Return candidate dates without creating them. Marks which already exist."""
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py)
+    holidays = db.query(HolidayPeriod).filter(
+        HolidayPeriod.planning_year_id == year_id,
+        HolidayPeriod.affects_parade == True,  # noqa: E712
+    ).all() if body.exclude_holidays else []
+    existing = {
+        pd.parade_date for pd in
+        db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).all()
+    }
+    candidates = _compute_candidate_dates(body, holidays)
+    rows = [{"date": ds, "new": ds not in existing} for ds in candidates]
+    return {"dates": rows, "new_count": sum(1 for r in rows if r["new"]), "total": len(rows)}
+
+
 @router.post("/years/{year_id}/generate-parade-dates")
 def generate_parade_dates(
     year_id: str,
@@ -424,41 +527,25 @@ def generate_parade_dates(
         HolidayPeriod.affects_parade == True,  # noqa: E712
     ).all() if body.exclude_holidays else []
 
-    def in_holiday(d: date) -> bool:
-        ds = d.isoformat()
-        for h in holidays:
-            if h.start_date <= ds <= h.end_date:
-                return True
-        return False
-
-    try:
-        start = date.fromisoformat(body.start_date)
-        end   = date.fromisoformat(body.end_date)
-    except ValueError:
-        raise HTTPException(400, detail={"error": "invalid_date_format"})
-
     existing = {
         pd.parade_date for pd in
         db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).all()
     }
+    candidates = _compute_candidate_dates(body, holidays)
     created = []
-    d = start
-    while d <= end:
-        if d.weekday() == body.weekday and not in_holiday(d):
-            ds = d.isoformat()
-            if ds not in existing:
-                pn = _find_or_create_parade_night(db, py.unit_id, ds, p)
-                pd = ParadeDate(
-                    id=str(uuid.uuid4()), planning_year_id=year_id,
-                    unit_id=py.unit_id, parade_date=ds,
-                    parade_type=body.parade_type, is_active=True,
-                    parade_night_id=pn.id if pn else None,
-                    created_at=utcnow(), updated_at=utcnow(),
-                )
-                db.add(pd)
-                existing.add(ds)
-                created.append(ds)
-        d += timedelta(days=1)
+    for ds in candidates:
+        if ds not in existing:
+            pn = _find_or_create_parade_night(db, py.unit_id, ds, p)
+            pd = ParadeDate(
+                id=str(uuid.uuid4()), planning_year_id=year_id,
+                unit_id=py.unit_id, parade_date=ds,
+                parade_type=body.parade_type, is_active=True,
+                parade_night_id=pn.id if pn else None,
+                created_at=utcnow(), updated_at=utcnow(),
+            )
+            db.add(pd)
+            existing.add(ds)
+            created.append(ds)
     db.commit()
     audit(db, p, object_type="planning_year", object_id=year_id, action="generate_parade_dates",
           new={"count": len(created)})

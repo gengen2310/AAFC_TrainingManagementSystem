@@ -608,6 +608,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <button class="btn btn-dk admin-el" id="btn-add-curr-sqn" style="display:none" onclick="openAddCurr()">+ Add Squadron Curriculum</button>
             <button class="btn btn-dk admin-el" id="btn-add-curr-wing" style="display:none" onclick="openAddCurrWing()">+ Add Wing Curriculum</button>
             <button class="btn btn-dk admin-el" id="btn-add-curr-nat" style="display:none" onclick="openAddCurrNat()">+ Add National Curriculum</button>
+            <button class="btn btn-out nat-admin-el" style="display:none" onclick="openCsvCurrImport()">Import CSV</button>
             <a href="https://airforcecadets.net.au/lh/home" target="_blank" class="btn btn-sky no-print">Learning Hub</a>
           </div>
         </div>
@@ -650,6 +651,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="ph-sub">Events and activities</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-act')">+ Add Activity</button>
+            <button class="btn btn-out admin-el" style="display:none" onclick="openCeaImport()">Import CEA</button>
           </div>
         </div>
         <div class="tw">
@@ -1479,27 +1481,43 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Auto-Generate Parade Dates Modal -->
 <div class="modal-bg" id="m-gen-dates">
   <div class="modal">
-    <h2>Auto-Generate Parade Dates</h2>
-    <div class="form-group"><label>Day of Week *</label>
-      <select id="gen-weekday">
-        <option value="0">Monday</option>
-        <option value="1">Tuesday</option>
-        <option value="2">Wednesday</option>
-        <option value="3">Thursday</option>
-        <option value="4">Friday</option>
-        <option value="5">Saturday</option>
-        <option value="6">Sunday</option>
-      </select>
+    <div class="modal-hdr"><div class="modal-title">Bulk Generate Parade Dates</div><button class="modal-x" onclick="closeModal('m-gen-dates')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>Frequency</label>
+          <select id="gen-freq">
+            <option value="weekly">Weekly</option>
+            <option value="fortnightly">Fortnightly</option>
+            <option value="monthly">Monthly (first weekday)</option>
+            <option value="daily">Daily</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Day of Week</label>
+          <select id="gen-weekday">
+            <option value="0">Monday</option>
+            <option value="1">Tuesday</option>
+            <option value="2">Wednesday</option>
+            <option value="3">Thursday</option>
+            <option value="4">Friday</option>
+            <option value="5">Saturday</option>
+            <option value="6">Sunday</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Start Date *</label><input type="date" id="gen-start"></div>
+        <div class="form-group"><label>End Date</label><input type="date" id="gen-end"></div>
+      </div>
+      <div class="form-group"><label>Max Repeats (alternative to End Date)</label><input type="number" id="gen-max-repeats" min="1" max="200" placeholder="e.g. 30"></div>
+      <div class="form-group"><label>Excluded Dates (YYYY-MM-DD, comma or space separated)</label><input type="text" id="gen-excl-dates" placeholder="e.g. 2026-04-10, 2026-04-17"></div>
+      <div class="form-group"><label><input type="checkbox" id="gen-excl-hols" checked> Skip existing holiday periods</label></div>
+      <p id="gen-msg" style="color:var(--error)"></p>
+      <div id="gen-preview-area" style="display:none;margin-top:8px;max-height:180px;overflow-y:auto"></div>
     </div>
-    <div class="form-row">
-      <div class="form-group"><label>Start Date *</label><input type="date" id="gen-start"></div>
-      <div class="form-group"><label>End Date *</label><input type="date" id="gen-end"></div>
-    </div>
-    <div class="form-group"><label><input type="checkbox" id="gen-excl-hols" checked> Skip holiday periods</label></div>
-    <p id="gen-msg" style="color:var(--error)"></p>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal('m-gen-dates')">Cancel</button>
-      <button class="btn btn-primary" onclick="doGenerateDates()">Generate</button>
+    <div class="modal-foot">
+      <button class="btn btn-out" onclick="closeModal('m-gen-dates')">Cancel</button>
+      <button class="btn btn-out" onclick="previewGenerateDates()">Preview</button>
+      <button class="btn btn-dk" onclick="doGenerateDates()">Generate</button>
     </div>
   </div>
 </div>
@@ -1776,6 +1794,50 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   </div>
 </div>
 
+<!-- CEA Activity Import -->
+<div class="modal-bg" id="m-cea-import">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-hdr"><div class="modal-title">Import Activities from CEA</div><button class="modal-x" onclick="closeModal('m-cea-import')">×</button></div>
+    <div class="modal-body">
+      <div class="alert a-info">Upload a CEA export CSV. Columns: SeqNr, Name, Start date, Start time, End date, End time, Unit, Location, Activity Notes. Duplicate SeqNr records are skipped.</div>
+      <div class="form-group"><label>CSV File *</label><input type="file" id="cea-file" accept=".csv,text/csv"></div>
+      <p id="cea-msg" style="color:var(--error)"></p>
+      <div id="cea-preview-area" style="display:none;max-height:240px;overflow-y:auto;margin-top:8px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-out" onclick="closeModal('m-cea-import')">Cancel</button>
+      <button class="btn btn-out" onclick="previewCeaImport()">Preview</button>
+      <button class="btn btn-dk" id="cea-import-btn" style="display:none" onclick="commitCeaImport()">Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- CSV Curriculum Import -->
+<div class="modal-bg" id="m-csv-curr-import">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-hdr"><div class="modal-title">Import Curriculum from CSV</div><button class="modal-x" onclick="closeModal('m-csv-curr-import')">×</button></div>
+    <div class="modal-body">
+      <div class="alert a-info">Upload a CSV with columns: Training Phase, Experiential Code, Title, Elements, Foundation or Extension, Instructor Suitability, Timing, Location, Learning Hub Link.</div>
+      <div class="form-row">
+        <div class="form-group"><label>CSV File *</label><input type="file" id="csv-curr-file" accept=".csv,text/csv"></div>
+        <div class="form-group"><label>Owning Level</label>
+          <select id="csv-curr-level">
+            <option value="national">National</option>
+            <option value="wing">Wing</option>
+            <option value="squadron">Squadron</option>
+          </select>
+        </div>
+      </div>
+      <p id="csv-curr-msg" style="color:var(--error)"></p>
+      <div id="csv-curr-result" style="display:none;margin-top:8px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-out" onclick="closeModal('m-csv-curr-import')">Cancel</button>
+      <button class="btn btn-dk" onclick="submitCsvCurr()">Upload &amp; Import</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Facilitator -->
 <div class="modal-bg" id="m-add-fac">
   <div class="modal">
@@ -1785,7 +1847,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="form-row">
         <div class="ff"><label>Current Rank</label><input id="fac-rank" placeholder="e.g. FLTLT(AAFC), CUO, CPL(AAFC)"></div>
         <div class="ff"><label>Type</label>
-          <select id="fac-type"><option value="Staff">Staff Officer</option><option value="Senior Cadet">Senior Cadet</option><option value="Civilian">Civilian Instructor</option></select>
+          <select id="fac-type"><option value="Officer">Officer (AAFC)</option><option value="NCO">Warrant Officer / NCO (AAFC)</option><option value="Senior Cadet">Senior Cadet</option><option value="Civilian">Civilian Instructor</option></select>
         </div>
       </div>
       <div class="form-row">
@@ -2546,86 +2608,90 @@ function isInterventionRequired(){ return ['national_admin','system_admin'].incl
 // ═══════════════════════════════════════════════════════════
 function _facName(s){return s.facilitator_display_name_at_time||'';}
 async function loadData(){
-  // Parade nights + sessions -> S.pns in the shape the views expect (keyed by date, with ids for writes).
-  try{
-    const pns=await api('/api/parade-nights');
-    S.pns=(Array.isArray(pns)?pns:[]).map(pn=>({
-      id:pn.parade_night_id, date:pn.date, term:pn.term, nsess:pn.session_count,
-      notes:pn.parade_type||'', published:!!pn.published_status, closeout:pn.closeout_status,
-      readiness:pn.readiness_score,
-      sessions:(pn.sessions||[]).sort((a,b)=>(a.period_number||0)-(b.period_number||0)).map(s=>({
-        id:s.id, phase:s.phase_at_time||'', code:s.curriculum_code_at_time||'',
-        exp:s.curriculum_title_at_time||s.custom_title||'', facId:s.facilitator_id||'',
-        facName:_facName(s), room:s.training_area_name_at_time||'', status:s.status||'planned'
-      }))
-    }));
-  }catch(e){S.pns=[];S.loadErr=apiErr(e);}
-  // Facilitators
-  try{
-    const facs=await api('/api/facilitators');
-    S.facs=(facs||[]).map(f=>({id:f.facilitator_id,rank:f.current_rank||'',first:f.first_name||'',last:f.last_name||'',type:f.type||'',areas:f.subject_areas||[]}));
-  }catch(_){S.facs=[];}
-  // Curriculum catalogue
-  try{
-    const cur=await api('/api/curriculum');
-    S.curr=((cur&&cur.items)||[]).map(i=>({id:i.curriculum_id,code:i.code,identifier:i.identifier,partNumber:i.part_number,title:i.title,phase:i.phase,el:i.element,term:i.recommended_term,hours:Math.round((i.duration_minutes||0)/60),type:i.core_status,lh:i.learning_hub_url,progress:i.progress,sessions:i.session_count,owningLevel:i.owning_level,wingId:i.wing_id,owned:i.owning_level==='squadron'}));
-  }catch(_){S.curr=[];}
-  // Resources
-  try{ const ta=await api('/api/training-areas'); S.rooms=(ta||[]).map(r=>({id:r.training_area_id||r.id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||''})); }catch(_){S.rooms=[];}
-  try{ const eq=await api('/api/equipment'); S.equip=(eq||[]).map(x=>({id:x.equipment_id||x.id,name:x.name,qty:x.quantity||x.qty,notes:x.notes||''})); }catch(_){S.equip=[];}
-  // Action items
-  try{
-    const acts=await api('/api/action-items');
-    S.actionItems=(acts||[]).map(a=>({id:a.action_id,title:a.title,description:a.description,owner:a.owner,due:a.due_date,status:a.status,severity:a.severity,source:a.source}));
-  }catch(_){S.actionItems=[];}
-  // Dashboard reports (real backend figures, with drill-down handled by the views)
-  S.reports={};
-  for(const [k,path] of [['summary','/api/reports/summary'],['readiness','/api/reports/readiness'],['coverage','/api/reports/curriculum-coverage'],['facload','/api/reports/facilitator-load'],['notdelivered','/api/reports/not-delivered']]){
-    try{ S.reports[k]=await api(path); }catch(_){ S.reports[k]=null; }
-  }
-  // Activities — loaded from backend.
-  try{
-    const acts=await api('/api/activities');
-    S.acts=(acts||[]).map(a=>({id:a.activity_id,name:a.activity_name,date:a.date_start,type:a.activity_type||'Optional',audience:a.audience||[],notes:a.notes||''}));
-  }catch(_){S.acts=[];}
-  // SQN-owned curriculum items for the add/edit curriculum form.
-  // Unit config: load from backend for current squadron; fallback to session-derived info.
-  S.cfg={day:'',start:'',end:'',sess:3,dur:35,addr:''};
-  const _sqnId=S.session&&S.session.squadron_id;
-  if(_sqnId){
-    try{
-      const sqnData=await api('/api/squadrons/'+_sqnId);
-      S.cfg={day:sqnData.default_parade_day||'',start:sqnData.default_start_time||'',end:sqnData.default_end_time||'',sess:sqnData.default_session_count||3,dur:35,addr:sqnData.address||''};
-      S.currentSqnId=sqnData.squadron_id;
-    }catch(_){}
-  }
-  // Proxy / Delegated Intervention state (drives banners + write gating).
-  try{ S.proxy=await api('/api/proxy/current'); }catch(_){ S.proxy={active:false}; }
   const scope=getScopeType();
-  // Wing scope: squadron comparison + phase coverage across the wing.
+  const _sqnId=S.session&&S.session.squadron_id;
+  const _proxyWasActive=proxyActive();
+
+  // Fire all requests in parallel — no await until Promise.all below.
+  const p_pns=api('/api/parade-nights').catch(e=>{S.loadErr=apiErr(e);return null;});
+  const p_facs=api('/api/facilitators').catch(()=>null);
+  const p_cur=api('/api/curriculum').catch(()=>null);
+  const p_ta=api('/api/training-areas').catch(()=>null);
+  const p_eq=api('/api/equipment').catch(()=>null);
+  const p_ai=api('/api/action-items').catch(()=>null);
+  const p_acts=api('/api/activities').catch(()=>null);
+  const p_proxy=api('/api/proxy/current').catch(()=>({active:false}));
+  const p_sum=api('/api/reports/summary').catch(()=>null);
+  const p_read=api('/api/reports/readiness').catch(()=>null);
+  const p_cov=api('/api/reports/curriculum-coverage').catch(()=>null);
+  const p_fload=api('/api/reports/facilitator-load').catch(()=>null);
+  const p_ndel=api('/api/reports/not-delivered').catch(()=>null);
+  const p_sqnData=_sqnId?api('/api/squadrons/'+_sqnId).catch(()=>null):Promise.resolve(null);
+  const p_timing=(scope==='squadron'||_proxyWasActive)?api('/api/timing-templates').catch(()=>[]):Promise.resolve([]);
+  const p_audit=(scope==='national'||scope==='auditor'||scope==='system_admin')?api('/api/audit').catch(()=>[]):Promise.resolve([]);
+  const p_wov=scope==='wing'?api('/api/reports/wing-overview').catch(()=>null):Promise.resolve(null);
+  const p_wph=scope==='wing'?api('/api/reports/wing-phase-coverage').catch(()=>null):Promise.resolve(null);
+  const p_wcap=scope==='wing'?api('/api/reports/wing-capability').catch(()=>null):Promise.resolve(null);
+  const p_wsqns=scope==='wing'?api('/api/squadrons').catch(()=>[]):Promise.resolve([]);
+  const p_nat=(scope==='national'||scope==='system_admin')?api('/api/national/overview').catch(()=>null):Promise.resolve(null);
+  const p_natov=(scope==='national'||scope==='system_admin')?api('/api/reports/national-overview').catch(()=>null):Promise.resolve(null);
+  const p_natcap=(scope==='national'||scope==='system_admin')?api('/api/reports/national-capability').catch(()=>null):Promise.resolve(null);
+  const p_wings=(scope==='national'||scope==='system_admin')?api('/api/wings').catch(()=>[]):Promise.resolve([]);
+  const p_nsqns=(scope==='national'||scope==='system_admin')?api('/api/squadrons').catch(()=>[]):Promise.resolve([]);
+
+  const[
+    pns,facs,cur,ta,eq,ai,acts,proxy,
+    repSum,repRead,repCov,repFload,repNdel,
+    sqnData,timing,auditData,
+    wov,wph,wcap,wsqns,
+    nat,natov,natcap,wings,nsqns,
+  ]=await Promise.all([
+    p_pns,p_facs,p_cur,p_ta,p_eq,p_ai,p_acts,p_proxy,
+    p_sum,p_read,p_cov,p_fload,p_ndel,
+    p_sqnData,p_timing,p_audit,
+    p_wov,p_wph,p_wcap,p_wsqns,
+    p_nat,p_natov,p_natcap,p_wings,p_nsqns,
+  ]);
+
+  // Set state from resolved results
+  S.pns=(Array.isArray(pns)?pns:[]).map(pn=>({
+    id:pn.parade_night_id, date:pn.date, term:pn.term, nsess:pn.session_count,
+    notes:pn.parade_type||'', published:!!pn.published_status, closeout:pn.closeout_status,
+    readiness:pn.readiness_score,
+    sessions:(pn.sessions||[]).sort((a,b)=>(a.period_number||0)-(b.period_number||0)).map(s=>({
+      id:s.id, phase:s.phase_at_time||'', code:s.curriculum_code_at_time||'',
+      exp:s.curriculum_title_at_time||s.custom_title||'', facId:s.facilitator_id||'',
+      facName:_facName(s), room:s.training_area_name_at_time||'', status:s.status||'planned'
+    }))
+  }));
+  S.facs=(facs||[]).map(f=>({id:f.facilitator_id,rank:f.current_rank||'',first:f.first_name||'',last:f.last_name||'',type:f.type||'',areas:f.subject_areas||[]}));
+  S.curr=((cur&&cur.items)||[]).map(i=>({id:i.curriculum_id,code:i.code,identifier:i.identifier,partNumber:i.part_number,title:i.title,phase:i.phase,el:i.element,term:i.recommended_term,hours:Math.round((i.duration_minutes||0)/60),type:i.core_status,lh:i.learning_hub_url,progress:i.progress,sessions:i.session_count,owningLevel:i.owning_level,wingId:i.wing_id,owned:i.owning_level==='squadron'}));
+  S.rooms=(ta||[]).map(r=>({id:r.training_area_id||r.id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||''}));
+  S.equip=(eq||[]).map(x=>({id:x.equipment_id||x.id,name:x.name,qty:x.quantity||x.qty,notes:x.notes||''}));
+  S.actionItems=(ai||[]).map(a=>({id:a.action_id,title:a.title,description:a.description,owner:a.owner,due:a.due_date,status:a.status,severity:a.severity,source:a.source}));
+  S.acts=(acts||[]).map(a=>({id:a.activity_id,name:a.activity_name,date:a.date_start,dateEnd:a.date_end,timeStart:a.time_start,timeEnd:a.time_end,type:a.activity_type||'Optional',location:a.location||'',audience:a.audience||[],notes:a.notes||'',ceaSeqNr:a.cea_seq_nr||''}));
+  S.proxy=proxy||{active:false};
+  S.reports={summary:repSum,readiness:repRead,coverage:repCov,facload:repFload,notdelivered:repNdel};
+  S.cfg={day:'',start:'',end:'',sess:3,dur:35,addr:''};
+  if(sqnData){
+    S.cfg={day:sqnData.default_parade_day||'',start:sqnData.default_start_time||'',end:sqnData.default_end_time||'',sess:sqnData.default_session_count||3,dur:35,addr:sqnData.address||''};
+    S.currentSqnId=sqnData.squadron_id;
+  }
+  S.timingTemplates=timing||[];
+  S.audit=auditData||[];
   if(scope==='wing'){
-    try{ const wo=await api('/api/reports/wing-overview'); S.wing={squadrons:(wo&&wo.squadrons)||[]}; }catch(_){ S.wing={squadrons:[]}; }
-    try{ S.wingPhase=await api('/api/reports/wing-phase-coverage'); }catch(_){ S.wingPhase=null; }
-    try{ S.cap=await api('/api/reports/wing-capability'); }catch(_){ S.cap=null; }
-    try{ S.squadrons=await api('/api/squadrons'); }catch(_){ S.squadrons=[]; }
+    S.wing={squadrons:(wov&&wov.squadrons)||[]};
+    S.wingPhase=wph||null;
+    S.cap=wcap||null;
+    S.squadrons=wsqns||[];
   }
-  // National scope: wing roll-up + national readiness/coverage.
-  // system_admin has full national access; load the same data so national views are available.
   if(scope==='national'||scope==='system_admin'){
-    try{ S.national=await api('/api/national/overview'); }catch(_){ S.national=null; }
-    try{ const no=await api('/api/reports/national-overview'); S.nationalReport={wings:(no&&no.wings)||[]}; }catch(_){ S.nationalReport={wings:[]}; }
-    try{ S.natCap=await api('/api/reports/national-capability'); }catch(_){ S.natCap=null; }
-    try{ S.wings=await api('/api/wings'); }catch(_){ S.wings=[]; }
-    try{ S.squadrons=await api('/api/squadrons'); }catch(_){ S.squadrons=[]; }
+    S.national=nat||null;
+    S.nationalReport={wings:(natov&&natov.wings)||[]};
+    S.natCap=natcap||null;
+    S.wings=wings||[];
+    S.squadrons=nsqns||[];
   }
-  // Audit visibility (national + auditor + system_admin).
-  if(scope==='national'||scope==='auditor'||scope==='system_admin'){
-    try{ S.audit=await api('/api/audit'); }catch(_){ S.audit=[]; }
-  }
-  // Timing templates (squadron scope only; safe to fetch for all sqn/admin roles).
-  if(scope==='squadron'||proxyActive()){
-    try{ S.timingTemplates=await api('/api/timing-templates'); }catch(_){ S.timingTemplates=[]; }
-  } else { S.timingTemplates=[]; }
 }
 // Writes now go to the backend then re-load. save() is retained as a no-op so existing
 // handlers that call it do not break; real persistence happens via the API helpers below.
@@ -2763,6 +2829,7 @@ function bootApp(){
     if(btnSqn) btnSqn.style.display=isSqnAdmin?'inline-flex':'none';
     if(btnWing) btnWing.style.display=(isWingAdmin||isNatAdmin)?'inline-flex':'none';
     if(btnNat) btnNat.style.display=isNatAdmin?'inline-flex':'none';
+    document.querySelectorAll('.nat-admin-el').forEach(el=>{el.style.display=isNatAdmin?'inline-flex':'none';});
   }
   // Settings page mirrors unit config; access codes are never shown/editable here.
   const setVal=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v;};
@@ -4550,7 +4617,7 @@ function renderFacs(){
       <td style="font-weight:700">${f.rank||'—'}</td>
       <td>${f.first||'—'}</td>
       <td style="font-weight:700">${f.last||'—'}</td>
-      <td><span class="badge b-grey">${f.type}</span></td>
+      <td><span class="badge b-grey">${{Officer:'Officer',NCO:'WO/NCO','Senior Cadet':'Sr Cadet',Civilian:'Civilian',Staff:'Officer','Senior Cadet':'Sr Cadet'}[f.type]||f.type||'—'}</span></td>
       <td>${(f.areas||[]).map(a=>elBadge(a)).join(' ')||'<span style="color:var(--muted);font-size:11px">untagged</span>'}</td>
       <td style="text-align:center"><button class="btn-lnk" onclick="event.stopPropagation();showFacProfile('${f.id}')">${tot}</button></td>
       <td class="no-print" onclick="event.stopPropagation()">
@@ -4645,21 +4712,26 @@ function showFacProfile(id){
     :'<div class="alert a-info">No sessions assigned yet.</div>'}`;
   openModal('m-fac-profile');
 }
+function _readFacAreas(){
+  const areas=[];
+  ['drill','air','field','pd','sc','sqn'].forEach(k=>{if(document.getElementById('fa-'+k)&&document.getElementById('fa-'+k).checked)areas.push({drill:'Drill',air:'Air_Space',field:'Field',pd:'Personal_Dev',sc:'Service_Community',sqn:'SQN_Affairs'}[k]);});
+  return areas;
+}
 function saveFac(){
   const rank=document.getElementById('fac-rank').value.trim();
   const first=document.getElementById('fac-first').value.trim();
   const last=document.getElementById('fac-last').value.trim();
   if(!last){alert('Last name required.');return;}
-  const areas=[];
-  ['drill','air','field','pd','sc','sqn'].forEach(k=>{if(document.getElementById('fa-'+k).checked)areas.push({drill:'Drill',air:'Air_Space',field:'Field',pd:'Personal_Dev',sc:'Service_Community',sqn:'SQN_Affairs'}[k]);});
+  const areas=_readFacAreas();
+  const type=document.getElementById('fac-type').value;
   if(editFacId){
     const fid=editFacId; editFacId=null;
-    api('/api/facilitators/'+fid,{method:'PATCH',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type:document.getElementById('fac-type').value})})
+    api('/api/facilitators/'+fid,{method:'PATCH',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type,subject_areas:areas})})
       .then(async()=>{ await reloadAndRender(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; })
       .catch(e=>alert(apiErr(e)));
     return;
   }
-  api('/api/facilitators',{method:'POST',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type:document.getElementById('fac-type').value,subject_areas:areas})})
+  api('/api/facilitators',{method:'POST',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type,subject_areas:areas})})
     .then(async()=>{ await reloadAndRender(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; })
     .catch(e=>alert(apiErr(e)));
 }
@@ -4667,7 +4739,7 @@ function editFac(id){
   const f=facById(id);if(!f)return;editFacId=id;
   document.getElementById('fac-modal-title').textContent='Edit Facilitator';
   document.getElementById('fac-rank').value=f.rank||'';document.getElementById('fac-first').value=f.first||'';
-  document.getElementById('fac-last').value=f.last||'';document.getElementById('fac-type').value=f.type||'Staff';
+  document.getElementById('fac-last').value=f.last||'';document.getElementById('fac-type').value=({Staff:'Officer',Civilian:'Civilian','Senior Cadet':'Senior Cadet',NCO:'NCO',Officer:'Officer'}[f.type]||f.type||'Officer');
   ['drill','air','field','pd','sc','sqn'].forEach(k=>{const a={drill:'Drill',air:'Air_Space',field:'Field',pd:'Personal_Dev',sc:'Service_Community',sqn:'SQN_Affairs'}[k];document.getElementById('fa-'+k).checked=(f.areas||[]).includes(a);});
   openModal('m-add-fac');
 }
@@ -6011,20 +6083,48 @@ function openGenerateDatesModal(){
   document.getElementById('gen-msg').textContent='';
   openModal('m-gen-dates');
 }
+function _buildGenBody(){
+  const weekday=parseInt(document.getElementById('gen-weekday').value);
+  const start=document.getElementById('gen-start').value;
+  const end=document.getElementById('gen-end').value||null;
+  const maxREl=document.getElementById('gen-max-repeats');
+  const maxR=maxREl&&maxREl.value?parseInt(maxREl.value)||null:null;
+  const freq=(document.getElementById('gen-freq')&&document.getElementById('gen-freq').value)||'weekly';
+  const exclRaw=(document.getElementById('gen-excl-dates')&&document.getElementById('gen-excl-dates').value)||'';
+  const excluded_dates=exclRaw.split(/[\s,]+/).map(s=>s.trim()).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s));
+  const excHols=document.getElementById('gen-excl-hols').checked;
+  return{weekday,start_date:start,end_date:end,frequency:freq,exclude_holidays:excHols,excluded_dates,max_repeats:maxR};
+}
+async function previewGenerateDates(){
+  const msg=document.getElementById('gen-msg');
+  const area=document.getElementById('gen-preview-area');
+  if(!P.currentYearId){ msg.textContent='Select a planning year first.'; return; }
+  const b=_buildGenBody();
+  if(!b.start_date){ msg.textContent='Start date is required.'; return; }
+  if(!b.end_date&&!b.max_repeats){ msg.textContent='Provide an end date or number of repeats.'; return; }
+  msg.textContent='Loading preview…';
+  area.style.display='none';
+  try{
+    const r=await api(`/api/planning/years/${P.currentYearId}/preview-parade-dates`,{method:'POST',body:b});
+    msg.textContent=`${r.new_count} new date${r.new_count!==1?'s':''} of ${r.total} total.`;
+    area.innerHTML='<table style="width:100%;font-size:12px"><thead><tr><th>Date</th><th>Status</th></tr></thead><tbody>'+
+      (r.dates||[]).map(d=>`<tr><td>${esc(d.date)}</td><td><span class="badge ${d.new?'b-ok':'b-grey'}">${d.new?'New':'Exists'}</span></td></tr>`).join('')+
+      '</tbody></table>';
+    area.style.display='block';
+  }catch(e){ msg.textContent=apiErr(e); }
+}
 async function doGenerateDates(){
-  const weekday = parseInt(document.getElementById('gen-weekday').value);
-  const start = document.getElementById('gen-start').value;
-  const end = document.getElementById('gen-end').value;
-  if(!start||!end){ document.getElementById('gen-msg').textContent='Start and end dates are required.'; return; }
+  const msg=document.getElementById('gen-msg');
+  if(!P.currentYearId){ msg.textContent='Select a planning year first.'; return; }
+  const b=_buildGenBody();
+  if(!b.start_date){ msg.textContent='Start date is required.'; return; }
+  if(!b.end_date&&!b.max_repeats){ msg.textContent='Provide an end date or number of repeats.'; return; }
   try {
-    const r = await api(`/api/planning/years/${P.currentYearId}/generate-parade-dates`,{
-      method:'POST', body:{ weekday, start_date:start, end_date:end,
-        exclude_holidays: document.getElementById('gen-excl-hols').checked }
-    });
+    const r = await api(`/api/planning/years/${P.currentYearId}/generate-parade-dates`,{method:'POST',body:b});
     closeModal('m-gen-dates');
     alert(`Generated ${r.created} new parade date${r.created!==1?'s':''}.`);
     await _renderParadeDates(P.currentYearId);
-  } catch(e){ document.getElementById('gen-msg').textContent=apiErr(e); }
+  } catch(e){ msg.textContent=apiErr(e); }
 }
 
 function openAddHolidayModal(){
@@ -6034,17 +6134,19 @@ function openAddHolidayModal(){
   openModal('m-add-holiday');
 }
 async function doAddHoliday(){
+  const hm=document.getElementById('hol-msg');
+  if(!P.currentYearId){ hm.textContent='Select a planning year first.'; return; }
   const name = document.getElementById('hol-name-inp').value.trim();
   const start = document.getElementById('hol-start-inp').value;
   const end = document.getElementById('hol-end-inp').value;
-  if(!name||!start||!end){ document.getElementById('hol-msg').textContent='All fields required.'; return; }
+  if(!name||!start||!end){ hm.textContent='All fields required.'; return; }
   try {
     await api(`/api/planning/years/${P.currentYearId}/holidays`,{
       method:'POST', body:{ name, start_date:start, end_date:end,
         affects_parade: document.getElementById('hol-affects-inp').checked }
     });
     closeModal('m-add-holiday'); await _renderHolidays(P.currentYearId);
-  } catch(e){ document.getElementById('hol-msg').textContent=apiErr(e); }
+  } catch(e){ hm.textContent=apiErr(e); }
 }
 async function deleteHoliday(hId, yearId){
   if(!confirm('Remove this holiday period?')) return;
@@ -6741,6 +6843,111 @@ async function promptOverrideConflict(cId, yearId){
     await api(`/api/planning/conflicts/${cId}/override`,{method:'POST',body:{override_reason:reason.trim()}});
     await loadPlanningChecks(yearId);
   } catch(e){ alert(apiErr(e)); }
+}
+
+// ═══════════════════════
+//  CEA ACTIVITY IMPORT
+// ═══════════════════════
+
+let _ceaPreviewRows=null;
+function openCeaImport(){
+  _ceaPreviewRows=null;
+  document.getElementById('cea-file').value='';
+  document.getElementById('cea-msg').textContent='';
+  document.getElementById('cea-preview-area').style.display='none';
+  document.getElementById('cea-preview-area').innerHTML='';
+  document.getElementById('cea-import-btn').style.display='none';
+  openModal('m-cea-import');
+}
+async function previewCeaImport(){
+  const msg=document.getElementById('cea-msg');
+  const area=document.getElementById('cea-preview-area');
+  const fileEl=document.getElementById('cea-file');
+  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select a CSV file first.'; return; }
+  msg.textContent='Loading preview…';
+  area.style.display='none';
+  const form=new FormData();
+  form.append('file',fileEl.files[0]);
+  try{
+    const res=await fetch(API_BASE+'/api/activities/import-cea?preview=true',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+tokenGet()},
+      body:form,
+    });
+    const d=await res.json();
+    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||'Error'; return; }
+    _ceaPreviewRows=d.rows||[];
+    const newRows=_ceaPreviewRows.filter(r=>r.status!=='duplicate');
+    const dupRows=_ceaPreviewRows.filter(r=>r.status==='duplicate');
+    msg.textContent=`${newRows.length} new, ${dupRows.length} duplicate (will be skipped).`+(d.parse_errors&&d.parse_errors.length?' '+d.parse_errors.length+' parse error(s).':'');
+    area.innerHTML='<table class="data-table" style="font-size:11px"><thead><tr><th>SeqNr</th><th>Name</th><th>Date</th><th>Time</th><th>Location</th><th>Status</th></tr></thead><tbody>'+
+      _ceaPreviewRows.map(r=>`<tr>
+        <td>${esc(r.cea_seq_nr||'—')}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(r.activity_name)}</td>
+        <td>${esc(r.date_start||'—')}</td>
+        <td>${esc((r.time_start||'')+(r.time_end?' – '+r.time_end:''))}</td>
+        <td>${esc(r.location||'—')}</td>
+        <td><span class="badge ${r.status==='duplicate'?'b-grey':'b-ok'}">${r.status==='duplicate'?'Skip':'New'}</span></td>
+      </tr>`).join('')+'</tbody></table>';
+    area.style.display='block';
+    if(newRows.length>0) document.getElementById('cea-import-btn').style.display='';
+  }catch(e){ msg.textContent=apiErr(e); }
+}
+async function commitCeaImport(){
+  const msg=document.getElementById('cea-msg');
+  const fileEl=document.getElementById('cea-file');
+  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select a CSV file first.'; return; }
+  msg.textContent='Importing…';
+  document.getElementById('cea-import-btn').disabled=true;
+  const form=new FormData();
+  form.append('file',fileEl.files[0]);
+  try{
+    const res=await fetch(API_BASE+'/api/activities/import-cea?preview=false',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+tokenGet()},
+      body:form,
+    });
+    const d=await res.json();
+    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||'Error'; document.getElementById('cea-import-btn').disabled=false; return; }
+    closeModal('m-cea-import');
+    await reloadAndRender();
+    alert(`Imported ${d.created} activit${d.created!==1?'ies':'y'}. ${d.skipped} duplicate${d.skipped!==1?'s':''} skipped.`);
+  }catch(e){ msg.textContent=apiErr(e); document.getElementById('cea-import-btn').disabled=false; }
+}
+
+// ════════════════════════════
+//  CSV CURRICULUM IMPORT
+// ════════════════════════════
+
+function openCsvCurrImport(){
+  document.getElementById('csv-curr-file').value='';
+  document.getElementById('csv-curr-msg').textContent='';
+  document.getElementById('csv-curr-result').style.display='none';
+  openModal('m-csv-curr-import');
+}
+async function submitCsvCurr(){
+  const msg=document.getElementById('csv-curr-msg');
+  const fileEl=document.getElementById('csv-curr-file');
+  const level=document.getElementById('csv-curr-level').value;
+  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select a CSV file first.'; return; }
+  msg.textContent='Uploading…';
+  const form=new FormData();
+  form.append('file',fileEl.files[0]);
+  try{
+    const res=await fetch(API_BASE+`/api/curriculum/import-csv?owning_level=${encodeURIComponent(level)}`,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+tokenGet()},
+      body:form,
+    });
+    const d=await res.json();
+    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||JSON.stringify(d.detail); return; }
+    msg.textContent='';
+    const result=document.getElementById('csv-curr-result');
+    result.innerHTML=`<div class="alert a-ok">Import complete: ${d.created} created, ${d.updated} updated, ${d.skipped} unchanged.${d.failed?' '+d.failed+' failed.':''}</div>`+
+      (d.parse_errors&&d.parse_errors.length?`<div style="font-size:11px;color:var(--warn);margin-top:4px">${d.parse_errors.slice(0,5).map(e=>`<div>${esc(e)}</div>`).join('')}</div>`:'');
+    result.style.display='block';
+    await reloadAndRender();
+  }catch(e){ msg.textContent=apiErr(e); }
 }
 </script>
 </body>
