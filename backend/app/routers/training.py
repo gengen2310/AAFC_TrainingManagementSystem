@@ -92,6 +92,63 @@ def _progress(statuses: list[str]) -> str:
     return "planned"
 
 
+@router.get("/curriculum/export.xlsx")
+def export_curriculum_xlsx(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Export the visible curriculum catalogue as XLSX."""
+    import io, openpyxl
+    from fastapi.responses import StreamingResponse
+    from openpyxl.styles import Font, PatternFill
+    from ..services import audit as _audit
+
+    sq_id = _active_squadron(p)
+    wing_id: str | None = p.acting_wing_id or p.wing_id
+    if sq_id:
+        s = db.get(Squadron, sq_id)
+        if s:
+            wing_id = s.wing_id
+    from sqlalchemy import or_
+    conditions = [CurriculumItem.owning_level == "national"]
+    if wing_id:
+        conditions.append((CurriculumItem.owning_level == "wing") & (CurriculumItem.wing_id == wing_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(CurriculumItem.owning_level == "wing")
+    if sq_id:
+        conditions.append(CurriculumItem.squadron_id == sq_id)
+    items = db.query(CurriculumItem).filter(
+        CurriculumItem.is_archived == False,  # noqa: E712
+        or_(*conditions)
+    ).order_by(CurriculumItem.recommended_sequence).all()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active; ws.title = "Curriculum"
+    hdr_fill = PatternFill("solid", fgColor="002F65")
+    hdr_font = Font(color="FFFFFF", bold=True)
+    headers = ["Code", "Identifier", "Title", "Phase", "Element", "Duration (min)",
+               "Core Status", "Instructor Suitability", "Recommended Term",
+               "Owning Level", "Learning Hub URL"]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.fill = hdr_fill; cell.font = hdr_font
+
+    def _n(v):
+        s = str(v) if v is not None else ""
+        return ("'" + s) if s[:1] in ("=", "+", "-", "@") else s
+
+    for i in items:
+        ws.append([_n(i.code), _n(i.identifier), _n(i.title), _n(i.phase),
+                   _n(i.element), i.duration_minutes or "",
+                   _n(i.core_status or ""), _n(i.instructor_suitability or ""),
+                   _n(i.recommended_term or ""), _n(i.owning_level),
+                   _n(i.learning_hub_url or "")])
+
+    bio = io.BytesIO(); wb.save(bio); bio.seek(0)
+    _audit(db, p, object_type="export", object_id=None, action="export",
+           new={"type": "curriculum", "fmt": "xlsx", "rows": len(items)})
+    return StreamingResponse(bio,
+                             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": "attachment; filename=curriculum.xlsx"})
+
+
 @router.get("/curriculum/{cid}/sessions")
 def curriculum_sessions(cid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     sq_id = _active_squadron(p)

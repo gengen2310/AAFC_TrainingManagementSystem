@@ -609,6 +609,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <button class="btn btn-dk admin-el" id="btn-add-curr-wing" style="display:none" onclick="openAddCurrWing()">+ Add Wing Curriculum</button>
             <button class="btn btn-dk admin-el" id="btn-add-curr-nat" style="display:none" onclick="openAddCurrNat()">+ Add National Curriculum</button>
             <button class="btn btn-out nat-admin-el" style="display:none" onclick="openCsvCurrImport()">Import CSV</button>
+            <button class="btn btn-out" onclick="exportCurriculum()" title="Export curriculum to Excel">Export XLSX</button>
             <a href="https://airforcecadets.net.au/lh/home" target="_blank" class="btn btn-sky no-print">Learning Hub</a>
           </div>
         </div>
@@ -1206,12 +1207,21 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="page-subtitle">View the training year, key activities, holidays and available parade nights.</div>
     </div>
     <div class="page-actions">
-      <button class="btn btn-primary" id="py-new-btn" onclick="openNewYearModal()">New Planning Year</button>
+      <button class="btn btn-out" onclick="exportAnnualProgram()" title="Export to Excel">Export XLSX</button>
+      <button class="btn btn-primary plan-write-el" style="display:none" id="py-new-btn" onclick="openNewYearModal()">New Planning Year</button>
     </div>
   </div>
   <div class="card">
+    <div id="py-sqn-filter-row" style="display:none;margin-bottom:10px">
+      <label style="font-size:0.82rem;font-weight:600;color:var(--steel);margin-right:6px">Squadron:</label>
+      <select id="py-sqn-filter" onchange="_loadPlanningYears()" style="max-width:260px">
+        <option value="">— All squadrons —</option>
+      </select>
+      <span id="py-ctx-label" style="font-size:0.82rem;color:var(--muted);margin-left:10px"></span>
+    </div>
     <div class="form-row" style="gap:8px;margin-bottom:12px">
       <select id="py-select" onchange="loadYearMap(this.value)" style="max-width:340px"><option value="">— select a planning year —</option></select>
+      <span id="py-ctx-label-sqn" style="font-size:0.82rem;color:var(--muted);align-self:center"></span>
     </div>
     <div id="py-map-body"><div class="empty"><div class="et">No planning year selected</div><div class="es">Select a planning year above or click <strong>+ New Planning Year</strong> to create one. Once created, use Auto-Generate to populate parade dates, or add them individually.</div></div></div>
   </div>
@@ -1221,8 +1231,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <h3 style="margin:0">Parade Dates</h3>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-secondary" onclick="openGenerateDatesModal()">Auto-Generate</button>
-        <button class="btn btn-secondary" onclick="openAddDateModal()">+ Add Date</button>
+        <button class="btn btn-secondary plan-write-el" style="display:none" onclick="openGenerateDatesModal()">Auto-Generate</button>
+        <button class="btn btn-secondary plan-write-el" style="display:none" onclick="openAddDateModal()">+ Add Date</button>
       </div>
     </div>
     <div id="py-dates-body"></div>
@@ -1232,7 +1242,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="card" id="py-holidays-card" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <h3 style="margin:0">Holiday &amp; Stand-Down Periods</h3>
-      <button class="btn btn-secondary" onclick="openAddHolidayModal()">+ Add Holiday</button>
+      <button class="btn btn-secondary plan-write-el" style="display:none" onclick="openAddHolidayModal()">+ Add Holiday</button>
     </div>
     <div id="py-holidays-body"></div>
   </div>
@@ -1301,6 +1311,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="page-subtitle">Review one parade night by cadet group and session.</div>
     </div>
     <div class="page-actions">
+      <button class="btn btn-out" onclick="exportSchedule()" title="Export full schedule to Excel">Export XLSX</button>
+      <button class="btn btn-out plan-write-el" style="display:none" onclick="openSchedImport()" title="Import edited schedule from Excel">Import XLSX</button>
       <select id="builder-year-sel" onchange="loadBuilderDates(this.value)" style="max-width:200px"><option value="">— planning year —</option></select>
       <select id="builder-date-sel" onchange="loadBuilderGrid(this.value)" style="max-width:160px"><option value="">— select night —</option></select>
       <span style="color:var(--muted);font-size:0.82rem">or</span>
@@ -1449,6 +1461,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <h2>New Planning Year</h2>
     <div class="form-group"><label>Year *</label><input type="number" id="py-year-inp" placeholder="2026" min="2020" max="2040"></div>
     <div class="form-group"><label>Name *</label><input type="text" id="py-name-inp" placeholder="2026 Training Year"></div>
+    <div class="form-group" id="py-unit-row" style="display:none">
+      <label>Squadron <span class="muted" style="font-weight:400">(optional — leave blank for a wing-level year)</span></label>
+      <select id="py-unit-sel" style="width:100%"><option value="">— Wing-level year —</option></select>
+    </div>
     <p id="py-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-new-year')">Cancel</button>
@@ -1834,6 +1850,43 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-csv-curr-import')">Cancel</button>
       <button class="btn btn-dk" onclick="submitCsvCurr()">Upload &amp; Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Schedule XLSX Import -->
+<div class="modal-bg" id="m-sched-import">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-hdr"><div class="modal-title">Import Schedule from XLSX</div><button class="modal-x" onclick="closeModal('m-sched-import')">×</button></div>
+    <div class="modal-body">
+      <div class="alert a-info" style="margin-bottom:10px">Upload an edited schedule XLSX. Expected columns: <strong>Date, Session, Group, Code, Title</strong>. Only curriculum code / title changes are imported — other session fields are unchanged. Changes are role-permission-gated.</div>
+      <div class="form-group">
+        <label>XLSX File *</label>
+        <input type="file" id="sched-import-file" accept=".xlsx">
+      </div>
+      <div id="sched-import-preview" style="display:none;margin-top:10px">
+        <div style="font-weight:600;margin-bottom:6px;font-size:0.87rem">Preview — <span id="sched-import-summary"></span></div>
+        <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+            <thead><tr style="background:#f5f7fa">
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Date</th>
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Session</th>
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Group</th>
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Action</th>
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Current Code</th>
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">New Code</th>
+              <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Title</th>
+            </tr></thead>
+            <tbody id="sched-import-rows"></tbody>
+          </table>
+        </div>
+      </div>
+      <p id="sched-import-msg" style="color:var(--error);font-size:0.85rem;min-height:1.2em;margin-top:8px"></p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-out" onclick="closeModal('m-sched-import')">Cancel</button>
+      <button class="btn btn-secondary" id="sched-import-preview-btn" onclick="previewSchedImport()">Preview Changes</button>
+      <button class="btn btn-primary" id="sched-import-commit-btn" style="display:none" onclick="commitSchedImport()">Apply Changes</button>
     </div>
   </div>
 </div>
@@ -2597,6 +2650,14 @@ function canWriteSquadron(){
 }
 function canWriteWing(){ return ['national_admin','system_admin'].includes(S.role); }
 function canWriteNational(){ return ['national_admin','system_admin'].includes(S.role); }
+// Planning-level write: sqn_admin + wing_admin can edit parade dates / holidays / planning years
+// without needing proxy mode (they are managing their own unit's calendar, not squadron records).
+function canWritePlan(){
+  if(isReadOnly()) return false;
+  const r=S.role||'';
+  if(r==='wing_admin') return true;
+  return canWriteSquadron();
+}
 function proxyActive(){ return !!(S.proxy && S.proxy.active); }
 function proxyMode(){ return (S.proxy && S.proxy.mode) || null; } // 'proxy' | 'intervention'
 // Wing admins must enter Proxy Mode before squadron writes; National admins use Delegated Intervention.
@@ -2817,10 +2878,29 @@ function bootApp(){
   document.querySelectorAll('.admin-el').forEach(el=>{el.style.display=(canWrite||(scope!=='squadron'&&proxyActive()))?'inline-flex':'none';});
   if(isReadOnly()){ document.body.classList.add('readonly'); document.querySelectorAll('.admin-el').forEach(el=>el.style.display='none'); }
   else { document.body.classList.remove('readonly'); }
-  // Curriculum creation buttons: show based on current scope
+  // Planning-write controls: visible for sqn_admin + wing_admin (own calendar, no proxy needed).
+  const canPlanWrite = canWritePlan();
+  document.querySelectorAll('.plan-write-el').forEach(el=>{el.style.display=canPlanWrite?'inline-flex':'none';});
+  // Wing admin squadron filter on Annual Program page
   const role=S.role||'';
   const isNatAdmin=['national_admin','system_admin'].includes(role);
   const isWingAdmin=['wing_admin'].includes(role);
+  const pySqnFilterRow=document.getElementById('py-sqn-filter-row');
+  if(pySqnFilterRow){
+    pySqnFilterRow.style.display=(isWingAdmin&&!proxyActive())?'':'none';
+    if(isWingAdmin&&!proxyActive()){
+      const sqnSel=document.getElementById('py-sqn-filter');
+      if(sqnSel){
+        sqnSel.innerHTML='<option value="">— All squadrons —</option>';
+        (S.wsqns||[]).forEach(sq=>{
+          const o=document.createElement('option'); o.value=sq.squadron_id;
+          o.textContent=`${sq.squadron_code||''} — ${sq.name||sq.squadron_id}`;
+          sqnSel.appendChild(o);
+        });
+      }
+    }
+  }
+  // Curriculum creation buttons: show based on current scope
   const isSqnAdmin=canWrite;
   const btnSqn=document.getElementById('btn-add-curr-sqn');
   const btnWing=document.getElementById('btn-add-curr-wing');
@@ -5559,23 +5639,35 @@ async function _loadPlanningYears() {
   try {
     const data = await api('/api/planning/years');
     P.years = data || [];
-    // Auto-select: prefer the active year; fall back to first in list
-    if(!P.currentYearId && P.years.length) {
-      const active = P.years.find(y=>y.active_status) || P.years[0];
+    // Wing admin: filter by selected squadron if filter is active
+    const sqnFilterSel = document.getElementById('py-sqn-filter');
+    const filterSqnId = sqnFilterSel ? sqnFilterSel.value : '';
+    const visibleYears = filterSqnId
+      ? P.years.filter(y=>y.unit_id===filterSqnId)
+      : P.years;
+    // Auto-select: prefer the active year in visible set; fall back to first
+    if(!P.currentYearId && visibleYears.length) {
+      const active = visibleYears.find(y=>y.active_status) || visibleYears[0];
       P.currentYearId = active.planning_year_id;
     }
     const selIds = [
       'mission-year-sel','py-select','anch-year-sel','term-year-sel',
       'builder-year-sel','lr-year-sel','checks-year-sel'
     ];
+    const showUnitPrefix = ['wing_admin','national_admin','system_admin'].includes(S.role||'');
     selIds.forEach(sid=>{
       const el = document.getElementById(sid);
       if(!el) return;
       el.innerHTML = '<option value="">— select a planning year —</option>';
-      P.years.forEach(y=>{
+      // py-select respects squadron filter; other selectors show all
+      const yrs = (sid==='py-select') ? visibleYears : P.years;
+      yrs.forEach(y=>{
         const o = document.createElement('option');
         o.value = y.planning_year_id;
-        o.textContent = y.name || y.year;
+        const prefix = showUnitPrefix
+          ? (y.unit_code ? `${y.unit_code} — ` : y.wing_code ? `${y.wing_code} — ` : '')
+          : '';
+        o.textContent = prefix + (y.name || String(y.year));
         el.appendChild(o);
       });
       if(P.currentYearId) el.value = P.currentYearId;
@@ -5831,6 +5923,25 @@ function openNewYearModal(){
   document.getElementById('py-year-inp').value = new Date().getFullYear();
   document.getElementById('py-name-inp').value = '';
   document.getElementById('py-msg').textContent = '';
+  const unitRow = document.getElementById('py-unit-row');
+  if(unitRow){
+    const isWA = S.role==='wing_admin';
+    unitRow.style.display = isWA ? '' : 'none';
+    if(isWA){
+      const unitSel = document.getElementById('py-unit-sel');
+      if(unitSel){
+        unitSel.innerHTML = '<option value="">— Wing-level year —</option>';
+        (S.wsqns||[]).forEach(sq=>{
+          const o=document.createElement('option'); o.value=sq.squadron_id;
+          o.textContent=`${sq.squadron_code||''} — ${sq.name||sq.squadron_id}`;
+          unitSel.appendChild(o);
+        });
+        // Pre-select the squadron currently in the filter if set
+        const sqnFilter = document.getElementById('py-sqn-filter');
+        if(sqnFilter && sqnFilter.value) unitSel.value = sqnFilter.value;
+      }
+    }
+  }
   openModal('m-new-year');
 }
 
@@ -5838,8 +5949,12 @@ async function doCreateYear(){
   const year = parseInt(document.getElementById('py-year-inp').value);
   const name = document.getElementById('py-name-inp').value.trim();
   if(!name || !year){ document.getElementById('py-msg').textContent='Year and Name are required.'; return; }
+  const unitSel = document.getElementById('py-unit-sel');
+  const unit_id = (unitSel && unitSel.style.display!=='none') ? (unitSel.value||undefined) : undefined;
   try {
-    await api('/api/planning/years',{method:'POST',body:{year,name}});
+    const body = {year, name};
+    if(unit_id) body.unit_id = unit_id;
+    await api('/api/planning/years',{method:'POST',body});
     closeModal('m-new-year');
     await _loadPlanningYears();
     const sel = document.getElementById('py-select');
@@ -5852,9 +5967,20 @@ async function loadYearMap(yearId){
   const body = document.getElementById('py-map-body');
   const datesCard = document.getElementById('py-dates-card');
   const holCard = document.getElementById('py-holidays-card');
-  if(!yearId){ body.innerHTML='<p class="muted">Select a planning year above.</p>'; datesCard.style.display='none'; holCard.style.display='none'; return; }
+  const ctxLbl = document.getElementById('py-ctx-label-sqn');
+  if(!yearId){
+    body.innerHTML='<p class="muted">Select a planning year above.</p>';
+    datesCard.style.display='none'; holCard.style.display='none';
+    if(ctxLbl) ctxLbl.textContent='';
+    return;
+  }
   try {
     const yr = P.years.find(y=>y.planning_year_id===yearId) || {};
+    if(ctxLbl){
+      if(yr.unit_name) ctxLbl.textContent=`Viewing ${esc(yr.unit_name)}'s program`;
+      else if(yr.wing_code) ctxLbl.textContent=`Wing ${esc(yr.wing_code)} program`;
+      else ctxLbl.textContent='';
+    }
     // Load annual program summary
     let annualHtml = '';
     try {
@@ -6947,6 +7073,106 @@ async function submitCsvCurr(){
       (d.parse_errors&&d.parse_errors.length?`<div style="font-size:11px;color:var(--warn);margin-top:4px">${d.parse_errors.slice(0,5).map(e=>`<div>${esc(e)}</div>`).join('')}</div>`:'');
     result.style.display='block';
     await reloadAndRender();
+  }catch(e){ msg.textContent=apiErr(e); }
+}
+
+// ── Spreadsheet Export ──────────────────────────────────────
+function _downloadExport(url, filename){
+  const tok=tokenGet();
+  fetch(API_BASE+url,{headers:{'Authorization':'Bearer '+tok}})
+    .then(r=>{
+      if(!r.ok) return r.json().then(d=>{ throw new Error(d.detail?.message||d.detail?.error||r.statusText); });
+      return r.blob();
+    })
+    .then(blob=>{
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download=filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    })
+    .catch(e=>alert('Export failed: '+e.message));
+}
+
+function exportAnnualProgram(){
+  if(!P.currentYearId){ alert('Select a planning year first.'); return; }
+  _downloadExport(`/api/planning/years/${P.currentYearId}/export.xlsx`,`annual-program.xlsx`);
+}
+
+function exportCurriculum(){
+  _downloadExport('/api/curriculum/export.xlsx','curriculum.xlsx');
+}
+
+function exportSchedule(){
+  if(!P.currentYearId){ alert('Select a planning year first.'); return; }
+  _downloadExport(`/api/planning/years/${P.currentYearId}/schedule/export.xlsx`,`schedule.xlsx`);
+}
+
+// ── Schedule XLSX Import ────────────────────────────────────
+function openSchedImport(){
+  if(!P.currentYearId){ alert('Select a planning year first.'); return; }
+  document.getElementById('sched-import-file').value='';
+  document.getElementById('sched-import-msg').textContent='';
+  document.getElementById('sched-import-preview').style.display='none';
+  document.getElementById('sched-import-commit-btn').style.display='none';
+  document.getElementById('sched-import-preview-btn').style.display='inline-flex';
+  openModal('m-sched-import');
+}
+
+async function previewSchedImport(){
+  const msg=document.getElementById('sched-import-msg');
+  const fileEl=document.getElementById('sched-import-file');
+  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select an XLSX file first.'; return; }
+  if(!P.currentYearId){ msg.textContent='No planning year selected.'; return; }
+  msg.textContent='Parsing…';
+  const form=new FormData();
+  form.append('file',fileEl.files[0]);
+  try{
+    const res=await fetch(API_BASE+`/api/planning/years/${P.currentYearId}/schedule/import?preview=true`,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+tokenGet()},
+      body:form,
+    });
+    const d=await res.json();
+    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||JSON.stringify(d.detail); return; }
+    msg.textContent='';
+    const updateRows=d.rows.filter(r=>r.action==='update');
+    const summary=`${updateRows.length} change(s) to apply · ${d.rows.filter(r=>r.action==='unchanged').length} unchanged · ${d.not_found} not found`;
+    document.getElementById('sched-import-summary').textContent=summary;
+    const tbody=document.getElementById('sched-import-rows');
+    const ACTION_CLR={update:'color:var(--blue);font-weight:600',unchanged:'color:var(--muted)',not_found:'color:var(--error)'};
+    tbody.innerHTML=d.rows.map(r=>`<tr>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.date||'')}</td>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(String(r.session||''))}</td>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.group||'')}</td>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border);${ACTION_CLR[r.action]||''}">${esc(r.action||'')}</td>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border);color:var(--muted)">${esc(r.current_code||'')}</td>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.code||'')}</td>
+      <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.title||'')}</td>
+    </tr>`).join('');
+    document.getElementById('sched-import-preview').style.display='';
+    document.getElementById('sched-import-commit-btn').style.display=updateRows.length?'inline-flex':'none';
+  }catch(e){ msg.textContent=apiErr(e); }
+}
+
+async function commitSchedImport(){
+  const msg=document.getElementById('sched-import-msg');
+  const fileEl=document.getElementById('sched-import-file');
+  if(!fileEl.files||!fileEl.files[0]||!P.currentYearId){ return; }
+  msg.textContent='Applying changes…';
+  const form=new FormData();
+  form.append('file',fileEl.files[0]);
+  try{
+    const res=await fetch(API_BASE+`/api/planning/years/${P.currentYearId}/schedule/import?preview=false`,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+tokenGet()},
+      body:form,
+    });
+    const d=await res.json();
+    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||JSON.stringify(d.detail); return; }
+    msg.textContent=`Done: ${d.updated} session(s) updated, ${d.skipped} unchanged, ${d.not_found} not found.`;
+    document.getElementById('sched-import-commit-btn').style.display='none';
   }catch(e){ msg.textContent=apiErr(e); }
 }
 </script>

@@ -6,10 +6,11 @@ builder, scheduled sessions, locations, facilitators (planning view),
 conflict detection, and weekly/long-range program output.
 """
 from __future__ import annotations
-import uuid
+import io, uuid
 from datetime import date, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
@@ -107,10 +108,12 @@ def _find_or_create_parade_night(db: DBSession, unit_id: str, date_str: str, p: 
 # Serialisers
 # ─────────────────────────────────────────────────────────────
 
-def _year_out(py: PlanningYear) -> dict:
+def _year_out(py: PlanningYear, unit_code: str | None = None,
+              unit_name: str | None = None, wing_code: str | None = None) -> dict:
     return {
         "planning_year_id": py.id, "unit_id": py.unit_id, "wing_id": py.wing_id,
         "year": py.year, "name": py.name, "active_status": py.active_status,
+        "unit_code": unit_code, "unit_name": unit_name, "wing_code": wing_code,
         "created_by": py.created_by, "updated_by": py.updated_by,
         "created_at": py.created_at.isoformat() if py.created_at else None,
         "updated_at": py.updated_at.isoformat() if py.updated_at else None,
@@ -278,7 +281,24 @@ def list_planning_years(
         q = q.filter(PlanningYear.unit_id == unit_id)
     if wing_id:
         q = q.filter(PlanningYear.wing_id == wing_id)
-    return [_year_out(py) for py in q.order_by(PlanningYear.year.desc()).all()]
+    years = q.order_by(PlanningYear.year.desc()).all()
+
+    # Preload squadrons and wings for label enrichment
+    sqn_ids = {py.unit_id for py in years if py.unit_id}
+    wing_ids = {py.wing_id for py in years if py.wing_id}
+    sqns = {s.id: s for s in db.query(Squadron).filter(Squadron.id.in_(sqn_ids)).all()} if sqn_ids else {}
+    wings = {w.id: w for w in db.query(Wing).filter(Wing.id.in_(wing_ids)).all()} if wing_ids else {}
+
+    out = []
+    for py in years:
+        sq = sqns.get(py.unit_id) if py.unit_id else None
+        wg = wings.get(py.wing_id) if py.wing_id else None
+        out.append(_year_out(py,
+            unit_code=sq.code if sq else None,
+            unit_name=sq.name if sq else None,
+            wing_code=wg.code if wg else None,
+        ))
+    return out
 
 
 @router.post("/years")
@@ -307,7 +327,11 @@ def create_planning_year(
     db.add(py); db.commit()
     audit(db, p, object_type="planning_year", object_id=py.id, action="create",
           new={"year": body.year, "name": body.name})
-    return _year_out(py)
+    sq = db.get(Squadron, py.unit_id) if py.unit_id else None
+    wg = db.get(Wing, py.wing_id) if py.wing_id else None
+    return _year_out(py,
+        unit_code=sq.code if sq else None, unit_name=sq.name if sq else None,
+        wing_code=wg.code if wg else None)
 
 
 @router.get("/years/{year_id}")
@@ -318,7 +342,11 @@ def get_planning_year(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py)
-    return _year_out(py)
+    sq = db.get(Squadron, py.unit_id) if py.unit_id else None
+    wg = db.get(Wing, py.wing_id) if py.wing_id else None
+    return _year_out(py,
+        unit_code=sq.code if sq else None, unit_name=sq.name if sq else None,
+        wing_code=wg.code if wg else None)
 
 
 @router.patch("/years/{year_id}")
@@ -337,7 +365,11 @@ def update_planning_year(
     py.updated_by = p.user_id; py.updated_at = utcnow()
     db.commit()
     audit(db, p, object_type="planning_year", object_id=py.id, action="update")
-    return _year_out(py)
+    sq = db.get(Squadron, py.unit_id) if py.unit_id else None
+    wg = db.get(Wing, py.wing_id) if py.wing_id else None
+    return _year_out(py,
+        unit_code=sq.code if sq else None, unit_name=sq.name if sq else None,
+        wing_code=wg.code if wg else None)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -2157,3 +2189,326 @@ def rollover_year(
         "parade_dates_copied": dates_copied,
         "incomplete_sessions_noted": sessions_carried,
     }
+
+
+# ─────────────────────────────────────────────────────────────
+# Spreadsheet Export — Annual Program + Schedule
+# ─────────────────────────────────────────────────────────────
+
+def _neutralise_cell(v):
+    """Prevent CSV/formula injection in spreadsheet cells."""
+    s = str(v) if v is not None else ""
+    return ("'" + s) if s[:1] in ("=", "+", "-", "@") else s
+
+
+@router.get("/years/{year_id}/export.xlsx")
+def export_annual_program_xlsx(
+    year_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Export the annual program (parade dates, holidays, anchors) as XLSX."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py)
+
+    wb = openpyxl.Workbook()
+
+    # Sheet 1 — Parade Dates
+    ws1 = wb.active
+    ws1.title = "Parade Dates"
+    hdr_fill = PatternFill("solid", fgColor="002F65")
+    hdr_font = Font(color="FFFFFF", bold=True)
+    dates_headers = ["Date", "Day", "Type", "Active", "Notes", "Term"]
+    ws1.append(dates_headers)
+    for cell in ws1[1]:
+        cell.fill = hdr_fill; cell.font = hdr_font
+    all_dates = db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).order_by(ParadeDate.parade_date).all()
+    yr_str = str(py.year)
+    def _term_label(ds: str) -> str:
+        for t_num, (ts, te) in sorted(_WA_TERM_RANGES.items()):
+            if f"{yr_str}-{ts}" <= ds <= f"{yr_str}-{te}":
+                return f"T{t_num}"
+        return ""
+    for d in all_dates:
+        try:
+            dow = date.fromisoformat(d.parade_date).strftime("%A")
+        except Exception:
+            dow = ""
+        ws1.append([d.parade_date, dow, d.parade_type or "standard",
+                    "Yes" if d.is_active else "No",
+                    _neutralise_cell(d.notes or ""), _term_label(d.parade_date)])
+
+    # Sheet 2 — Holidays
+    ws2 = wb.create_sheet("Holidays")
+    ws2.append(["Name", "Start Date", "End Date", "Type", "Affects Parade"])
+    for cell in ws2[1]:
+        cell.fill = hdr_fill; cell.font = hdr_font
+    for h in db.query(HolidayPeriod).filter(HolidayPeriod.planning_year_id == year_id).order_by(HolidayPeriod.start_date).all():
+        ws2.append([_neutralise_cell(h.name), h.start_date, h.end_date,
+                    h.holiday_type or "", "Yes" if h.affects_parade else "No"])
+
+    # Sheet 3 — Anchor Events
+    ws3 = wb.create_sheet("Anchor Events")
+    ws3.append(["Name", "Start Date", "End Date", "Type", "Importance", "Location", "Notes"])
+    for cell in ws3[1]:
+        cell.fill = hdr_fill; cell.font = hdr_font
+    for a in db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id, AnchorEvent.is_archived == False).order_by(AnchorEvent.start_date).all():  # noqa: E712
+        ws3.append([_neutralise_cell(a.name), a.start_date, a.end_date or "",
+                    a.event_type or "", a.importance_level or "",
+                    _neutralise_cell(a.location or ""), _neutralise_cell(a.description or "")])
+
+    bio = io.BytesIO(); wb.save(bio); bio.seek(0)
+    audit(db, p, object_type="export", object_id=year_id, action="export",
+          new={"type": "annual_program", "fmt": "xlsx"})
+    fname = f"annual-program-{py.year}.xlsx"
+    return StreamingResponse(bio, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": f"attachment; filename={fname}"})
+
+
+@router.get("/years/{year_id}/schedule/export.xlsx")
+def export_schedule_xlsx(
+    year_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Export all scheduled sessions for a planning year as XLSX."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py)
+    sq_id = p.acting_squadron_id or p.squadron_id
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Schedule"
+    hdr_fill = PatternFill("solid", fgColor="002F65")
+    hdr_font = Font(color="FFFFFF", bold=True)
+    headers = ["Date", "Day", "Term", "Session", "Group", "Phase", "Code", "Title", "Facilitator", "Room", "Status"]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.fill = hdr_fill; cell.font = hdr_font
+
+    yr_str = str(py.year)
+    def _term_lbl(ds: str) -> str:
+        for t_num, (ts, te) in sorted(_WA_TERM_RANGES.items()):
+            if f"{yr_str}-{ts}" <= ds <= f"{yr_str}-{te}":
+                return f"T{t_num}"
+        return ""
+
+    all_dates = db.query(ParadeDate).filter(
+        ParadeDate.planning_year_id == year_id,
+        ParadeDate.is_active == True,  # noqa: E712
+    ).order_by(ParadeDate.parade_date).all()
+
+    for pd_obj in all_dates:
+        if not pd_obj.parade_night_id:
+            continue
+        pn = db.get(ParadeNight, pd_obj.parade_night_id)
+        if not pn:
+            continue
+        try:
+            dow = date.fromisoformat(pd_obj.parade_date).strftime("%A")
+        except Exception:
+            dow = ""
+        term = _term_lbl(pd_obj.parade_date)
+        sessions = db.query(TrainingSession).filter(
+            TrainingSession.parade_night_id == pn.id,
+            TrainingSession.is_archived == False,  # noqa: E712
+            *([] if sq_id is None else [TrainingSession.squadron_id == sq_id]),
+        ).order_by(TrainingSession.period_number).all()
+        for s in sessions:
+            ws.append([
+                pd_obj.parade_date, dow, term,
+                _neutralise_cell(s.period_number),
+                _neutralise_cell(s.cadet_group or ""),
+                _neutralise_cell(s.phase_at_time or ""),
+                _neutralise_cell(s.curriculum_code_at_time or ""),
+                _neutralise_cell(s.curriculum_title_at_time or s.custom_title or ""),
+                _neutralise_cell(s.facilitator_display_name_at_time or ""),
+                _neutralise_cell(s.training_area_name_at_time or ""),
+                _neutralise_cell(s.status or "planned"),
+            ])
+
+    bio = io.BytesIO(); wb.save(bio); bio.seek(0)
+    audit(db, p, object_type="export", object_id=year_id, action="export",
+          new={"type": "schedule", "fmt": "xlsx"})
+    fname = f"schedule-{py.year}.xlsx"
+    return StreamingResponse(bio, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": f"attachment; filename={fname}"})
+
+
+@router.post("/years/{year_id}/schedule/import")
+async def import_schedule_xlsx(
+    year_id: str,
+    preview: bool = Query(False),
+    file: UploadFile = File(...),
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Import an edited schedule XLSX back into the planning year.
+
+    Expected columns (case-insensitive): Date, Session, Group, Code, Title, Facilitator.
+    Returns a row-level diff when preview=true; applies changes when preview=false.
+    Only updates curriculum_item_id and custom_title — all other session fields are untouched.
+    Permission-gated: same write rules as schedule edits.
+    """
+    import openpyxl
+    from ..config import settings
+
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py, write=True)
+
+    raw = await file.read()
+    if len(raw) > settings.UPLOAD_MAX_MB * 1024 * 1024:
+        raise HTTPException(413, detail={"error": "file_too_large"})
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+    except Exception as exc:
+        raise HTTPException(400, detail={"error": "unreadable_workbook", "message": str(exc)[:120]})
+
+    ws = wb.active
+    rows_iter = ws.iter_rows(values_only=True)
+    raw_headers = next(rows_iter, None)
+    if not raw_headers:
+        raise HTTPException(400, detail={"error": "empty_sheet"})
+    headers = [str(h).strip().lower() if h is not None else "" for h in raw_headers]
+
+    def _col(name: str) -> int | None:
+        aliases = {"date": ["date"], "session": ["session", "period", "session #", "period number"],
+                   "group": ["group", "cadet group"], "code": ["code", "curriculum code"],
+                   "title": ["title", "custom title"], "facilitator": ["facilitator"]}
+        for a in aliases.get(name, [name]):
+            if a in headers:
+                return headers.index(a)
+        return None
+
+    ci = {k: _col(k) for k in ("date", "session", "group", "code", "title")}
+    if ci["date"] is None or ci["session"] is None:
+        raise HTTPException(400, detail={"error": "missing_required_columns",
+                                         "message": "Sheet must have Date and Session columns"})
+
+    # Build parade-date → parade-night index for this year
+    all_pd = db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).all()
+    pd_by_date = {d.parade_date: d for d in all_pd}
+
+    sq_id = p.acting_squadron_id or p.squadron_id
+
+    preview_rows: list[dict] = []
+    updated = skipped = not_found = 0
+
+    for raw_row in rows_iter:
+        if all(c is None for c in raw_row):
+            continue
+        def _cell(idx):
+            if idx is None: return ""
+            v = raw_row[idx] if idx < len(raw_row) else None
+            return str(v).strip() if v is not None else ""
+
+        date_val = _cell(ci["date"])
+        session_val = _cell(ci["session"])
+        group_val = _cell(ci["group"]) if ci["group"] is not None else ""
+        code_val = _cell(ci["code"]) if ci["code"] is not None else ""
+        title_val = _cell(ci["title"]) if ci["title"] is not None else ""
+
+        if not date_val or not session_val:
+            continue
+
+        # Normalise date (handle date objects from openpyxl)
+        try:
+            if hasattr(date_val, "strftime"):
+                date_str = date_val.strftime("%Y-%m-%d")
+            else:
+                date_str = str(date_val)[:10]
+        except Exception:
+            date_str = str(date_val)[:10]
+
+        try:
+            period = int(session_val)
+        except (ValueError, TypeError):
+            not_found += 1
+            preview_rows.append({"date": date_str, "session": session_val, "group": group_val,
+                                  "code": code_val, "title": title_val,
+                                  "action": "not_found", "reason": "invalid_session_number"})
+            continue
+
+        pd_obj = pd_by_date.get(date_str)
+        if not pd_obj or not pd_obj.parade_night_id:
+            not_found += 1
+            preview_rows.append({"date": date_str, "session": period, "group": group_val,
+                                  "code": code_val, "title": title_val,
+                                  "action": "not_found", "reason": "no_parade_night_on_date"})
+            continue
+
+        q = db.query(TrainingSession).filter(
+            TrainingSession.parade_night_id == pd_obj.parade_night_id,
+            TrainingSession.period_number == period,
+            TrainingSession.is_archived == False,  # noqa: E712
+        )
+        if group_val:
+            q = q.filter(TrainingSession.cadet_group == group_val)
+        if sq_id:
+            q = q.filter(TrainingSession.squadron_id == sq_id)
+        sess_obj = q.first()
+
+        if not sess_obj:
+            not_found += 1
+            preview_rows.append({"date": date_str, "session": period, "group": group_val,
+                                  "code": code_val, "title": title_val,
+                                  "action": "not_found", "reason": "no_session_record"})
+            continue
+
+        cur_code = sess_obj.curriculum_code_at_time or ""
+        cur_title = sess_obj.curriculum_title_at_time or sess_obj.custom_title or ""
+
+        # Resolve curriculum_item_id from code if provided
+        new_ci_id = sess_obj.curriculum_item_id
+        new_code = code_val or cur_code
+        new_title = title_val or cur_title
+        if code_val and code_val != cur_code:
+            ci_match = db.query(CurriculumItem).filter(
+                CurriculumItem.identifier == code_val,
+                CurriculumItem.is_archived == False,  # noqa: E712
+            ).first()
+            if not ci_match:
+                ci_match = db.query(CurriculumItem).filter(
+                    CurriculumItem.code == code_val,
+                    CurriculumItem.is_archived == False,  # noqa: E712
+                ).first()
+            if ci_match:
+                new_ci_id = ci_match.id
+                new_code = ci_match.identifier or ci_match.code
+                new_title = ci_match.title
+
+        changed = (new_ci_id != sess_obj.curriculum_item_id) or (new_title != cur_title)
+
+        if not changed:
+            skipped += 1
+            preview_rows.append({"date": date_str, "session": period, "group": group_val,
+                                  "code": new_code, "title": new_title,
+                                  "current_code": cur_code, "current_title": cur_title,
+                                  "action": "unchanged"})
+            continue
+
+        preview_rows.append({"date": date_str, "session": period, "group": group_val,
+                              "code": new_code, "title": new_title,
+                              "current_code": cur_code, "current_title": cur_title,
+                              "action": "update"})
+
+        if not preview:
+            sess_obj.curriculum_item_id = new_ci_id
+            sess_obj.curriculum_code_at_time = new_code
+            sess_obj.curriculum_title_at_time = new_title
+            if not code_val and title_val:
+                sess_obj.curriculum_item_id = None
+                sess_obj.custom_title = title_val
+            updated += 1
+
+    if not preview:
+        db.commit()
+        audit(db, p, object_type="schedule_import", object_id=year_id, action="import",
+              new={"updated": updated, "skipped": skipped, "not_found": not_found})
+
+    return {"ok": True, "preview": preview, "rows": preview_rows,
+            "updated": updated, "skipped": skipped, "not_found": not_found}
