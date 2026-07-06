@@ -12,8 +12,25 @@ from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase, Mapped, mappe
 
 from .config import settings
 
-connect_args = {"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(settings.DATABASE_URL, connect_args=connect_args, pool_pre_ping=True, future=True)
+_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
+connect_args = {"check_same_thread": False} if _is_sqlite else {}
+
+# Supabase Session Pooler caps connections at 15.  With 2 gunicorn workers
+# each pool must stay under 8 (7 + 1 pre-ping headroom = 14 total < 15).
+# Switch DATABASE_URL to port 6543 (Transaction Pooler) for higher concurrency.
+_pool_kwargs = (
+    {}
+    if _is_sqlite
+    else {"pool_size": 5, "max_overflow": 2, "pool_timeout": 30, "pool_recycle": 1800}
+)
+
+engine = create_engine(
+    settings.DATABASE_URL,
+    connect_args=connect_args,
+    pool_pre_ping=True,
+    future=True,
+    **_pool_kwargs,
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 

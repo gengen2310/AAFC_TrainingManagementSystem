@@ -3239,7 +3239,7 @@ async function scImportCurriculum(){
   form.append('file',file);
   try{
     const base=document.querySelector('meta[name="aafc-api-base"]')?.content||'';
-    const token=sessionStorage.getItem('token')||'';
+    const token=tokenGet();
     const r=await fetch(base+'/api/curriculum/import-xlsm',{
       method:'POST',
       headers:{'Authorization':'Bearer '+token},
