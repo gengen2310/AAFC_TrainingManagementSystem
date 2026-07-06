@@ -69,7 +69,10 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .fg select,.fg input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;color:var(--text);background:white;transition:border-color .15s,box-shadow .15s;}
 .fg select:focus,.fg input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(81,176,227,.15);}
 .btn-auth{width:100%;padding:11px;background:var(--dark);color:white;border:none;border-radius:6px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.04em;transition:background .15s;margin-top:6px;}
-.btn-auth:hover{background:var(--royal);}
+.btn-auth:hover:not(:disabled){background:var(--royal);}
+.btn-auth:disabled{background:var(--muted);cursor:not-allowed;opacity:.7;}
+.auth-progress{height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;display:none;}
+.auth-progress-fill{height:100%;background:var(--royal);border-radius:2px;width:0%;transition:width .12s linear;}
 .auth-err{background:#fdeaea;border:1.5px solid #f5a5a5;border-radius:6px;padding:9px 12px;font-size:12px;color:#8b1a1a;margin-top:10px;display:none;}
 
 /* ── APP SHELL ── */
@@ -403,9 +406,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="auth-div"></div>
     </div>
     <div class="fg"><label>Access Code</label><input type="password" id="auth-code" placeholder="Access code" autocomplete="off"></div>
-    <button class="btn-auth" onclick="doLogin()">Sign In</button>
+    <button class="btn-auth" id="auth-btn" onclick="doLogin()">Sign In</button>
+    <div class="auth-progress" id="auth-progress"><div class="auth-progress-fill" id="auth-progress-bar"></div></div>
     <div style="font-size:10.5px;color:var(--muted);margin-top:14px;line-height:1.55">Use is limited to authorised personnel. Access and administrative actions are recorded.</div>
-    <div class="auth-err" id="auth-err">Access code not recognised. Verify your code and try again.</div>
+    <div class="auth-err" id="auth-err"></div>
   </div>
 </div>
 
@@ -2521,7 +2525,12 @@ async function api(path, opts={}){
     // fetch() throws only on true network failure or CORS preflight block — not on HTTP errors
     throw {kind:'network', msg:'Cannot reach the backend at '+(API_BASE||location.origin)+'. Check the backend is running and try again.'};
   }
-  if(res.status===401){ tokenClear(); throw {kind:'auth', status:401, msg:'Your session has expired. Please sign in again.'}; }
+  if(res.status===401){
+    tokenClear();
+    let b401=null; try{b401=await res.json();}catch(_){}
+    const c401=(b401&&b401.detail&&typeof b401.detail==='object'&&b401.detail.error)||'';
+    throw {kind:'auth', status:401, code:c401, msg:'Your session has expired. Please sign in again.'};
+  }
   let body=null; try{ body=await res.json(); }catch(_){}
   if(!res.ok){
     // Extract structured error code (custom responses only — not present on standard FastAPI errors)
@@ -2582,18 +2591,46 @@ function gate(n){ alert((n||'This action')+' is not available in this pilot buil
 async function doLogin(){
   const code=document.getElementById('auth-code').value.trim();
   const err=document.getElementById('auth-err');
+  const btn=document.getElementById('auth-btn');
+  const prog=document.getElementById('auth-progress');
+  const bar=document.getElementById('auth-progress-bar');
+
   err.style.display='none';
   if(!code){err.style.display='block';err.textContent='Please enter your access code.';return;}
+
+  // Lock the form and animate progress to 75% while the request is in flight.
+  btn.disabled=true; btn.textContent='Signing in…';
+  prog.style.display='block'; bar.style.width='0%';
+  let pct=0;
+  const tick=setInterval(()=>{ pct=Math.min(pct+5,75); bar.style.width=pct+'%'; },100);
+
+  function _resetForm(){
+    clearInterval(tick);
+    bar.style.width='0%'; prog.style.display='none';
+    btn.disabled=false; btn.textContent='Sign In';
+  }
+
   try{
     const out=await api('/api/auth/login',{method:'POST',body:JSON.stringify({code})});
+    clearInterval(tick); bar.style.width='100%';
     tokenSet(out.token);
     S.session=out.session;
     applySession(out.session);
     await loadData();
     bootApp();
   }catch(e){
+    _resetForm();
     err.style.display='block';
-    err.textContent=(e.kind==='http'&&e.status===401)?'Incorrect access code.':apiErr(e);
+    if(e.status===401){
+      if(e.code==='invalid_user')
+        err.textContent='This account is inactive. Contact your Wing HQ to restore access.';
+      else
+        err.textContent='Incorrect access code. Check your code and try again.';
+    }else if(e.status===429){
+      err.textContent='Too many incorrect attempts. Access is temporarily locked — try again in 15 minutes.';
+    }else{
+      err.textContent=apiErr(e);
+    }
   }
 }
 document.getElementById('auth-code').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
