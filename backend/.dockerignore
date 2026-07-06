@@ -1,0 +1,31 @@
+# Local dev database — must never ship in a Docker image
+aafc_tms.db
+*.db
+*.sqlite
+*.sqlite3
+backups/
+
+# Temporary import/export files
+*.csv
+*.xlsx
+*.xls
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Dev tooling
+.env
+.env.*
+*.log
+
+# Tests (optional — remove if you want them in the image)
+tests/

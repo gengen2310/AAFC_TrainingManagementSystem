@@ -35,6 +35,7 @@ class CurriculumItem(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
     retired_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     replacement_curriculum_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    location_type: Mapped[str | None] = mapped_column(String(60), nullable=True)
     internal_admin_notes: Mapped[str | None] = mapped_column(Text)
 
 
