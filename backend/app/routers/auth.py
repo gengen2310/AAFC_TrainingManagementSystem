@@ -237,6 +237,34 @@ def change_code(body: ChangeCodeIn, db: DBSession = Depends(get_db),
     return {"ok": True}
 
 
+@router.get("/organisations")
+def list_organisations(db: DBSession = Depends(get_db)):
+    """Public — returns Wing/Squadron list for the login selector.
+    Returns only safe public data (codes + names). No users, codes, or hashes.
+    """
+    wings = (db.query(Wing)
+               .filter(Wing.is_archived == False, Wing.active_status == True)
+               .order_by(Wing.code)
+               .all())
+    result = []
+    for wing in wings:
+        sqns = (db.query(Squadron)
+                  .filter(Squadron.wing_id == wing.id,
+                          Squadron.is_archived == False,
+                          Squadron.active_status == True)
+                  .order_by(Squadron.unit_number, Squadron.code)
+                  .all())
+        result.append({
+            "code": wing.code,
+            "name": wing.name,
+            "squadrons": [
+                {"code": s.code, "name": s.name, "unit_type": s.unit_type}
+                for s in sqns
+            ],
+        })
+    return {"wings": result}
+
+
 def _me(user: User, db: DBSession | None = None) -> dict:
     wing_code = None
     if user.wing_id and db:

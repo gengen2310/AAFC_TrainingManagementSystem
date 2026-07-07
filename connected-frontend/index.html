@@ -420,10 +420,22 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <option value="national">National / System</option>
         </select>
       </div>
-      <div class="fg" id="auth-ident-wrap" style="display:none">
-        <label id="auth-ident-lbl">Squadron number</label>
-        <input type="text" id="auth-ident" placeholder="e.g. 703" autocomplete="off" oninput="onAuthFieldChange()">
+      <!-- Wing selector (squadron + wing login types) -->
+      <div class="fg" id="auth-wing-wrap" style="display:none">
+        <label>Wing</label>
+        <select id="auth-wing-select" onchange="onAuthWingChange()">
+          <option value="">Select wing…</option>
+        </select>
       </div>
+      <!-- Squadron / Unit selector (squadron login type only) -->
+      <div class="fg" id="auth-sqn-wrap" style="display:none">
+        <label>Squadron / Unit</label>
+        <select id="auth-sqn-select" onchange="onAuthFieldChange()">
+          <option value="">Select squadron…</option>
+        </select>
+      </div>
+      <!-- Hidden identifier — set programmatically from the dropdowns above -->
+      <input type="hidden" id="auth-ident" value="">
       <div class="fg" id="auth-role-wrap" style="display:none">
         <label>Role</label>
         <select id="auth-role" onchange="onAuthFieldChange()">
@@ -2626,6 +2638,8 @@ function gate(n){ alert((n||'This action')+' is not available in this pilot buil
 //  No access codes or hashes are stored in the browser.
 // ═══════════════════════════════════════════════════════════
 let _authUserId=null;
+let _aafcOrgs=null;   // [{code, name, squadrons:[{code,name,unit_type}]}]
+let _authSqnName='';  // display name of the selected squadron/unit
 
 const _AUTH_ROLES={
   squadron:[{v:'sqn_admin',l:'Admin'},{v:'sqn_general',l:'Viewer'}],
@@ -2633,23 +2647,86 @@ const _AUTH_ROLES={
   national:[{v:'national_admin',l:'National Admin'},{v:'national_viewer',l:'National Viewer'},
             {v:'system_admin',l:'System Admin'},{v:'auditor',l:'Auditor'}],
 };
-const _ROLE_LABELS={sqn_admin:'Admin',sqn_general:'Viewer',wing_admin:'Admin',wing_viewer:'Viewer',
-  national_admin:'National Admin',national_viewer:'National Viewer',system_admin:'System Admin',auditor:'Auditor'};
+// _ROLE_LABELS is defined later (global); use the global for the auth banner
 
-function onAuthTypeChange(){
+async function _loadOrgs(){
+  if(_aafcOrgs) return _aafcOrgs;
+  try{ _aafcOrgs=(await api('/api/auth/organisations')).wings||[]; }
+  catch(e){ _aafcOrgs=[]; }
+  return _aafcOrgs;
+}
+
+function _populateWingSelect(type){
+  const sel=document.getElementById('auth-wing-select');
+  const orgs=_aafcOrgs||[];
+  sel.innerHTML='<option value="">Select wing…</option>';
+  // For wing-type login, only show wings that have squadrons? No — show all wings.
+  orgs.forEach(w=>{
+    const opt=document.createElement('option');
+    opt.value=w.code;
+    opt.textContent=w.name;
+    sel.appendChild(opt);
+  });
+}
+
+function onAuthWingChange(){
   const type=document.getElementById('auth-type').value;
-  const identWrap=document.getElementById('auth-ident-wrap');
-  const identLbl=document.getElementById('auth-ident-lbl');
+  const wingCode=document.getElementById('auth-wing-select').value;
+  const sqnWrap=document.getElementById('auth-sqn-wrap');
+  const sqnSel=document.getElementById('auth-sqn-select');
+  const identEl=document.getElementById('auth-ident');
+  // For wing-type login the wing code IS the identifier
+  if(type==='wing'){ identEl.value=wingCode; onAuthFieldChange(); return; }
+  // Squadron type: populate squadron dropdown
+  sqnSel.innerHTML='<option value="">Select squadron…</option>';
+  identEl.value='';
+  _authSqnName='';
+  if(!wingCode){ sqnWrap.style.display='none'; onAuthFieldChange(); return; }
+  const orgs=_aafcOrgs||[];
+  const wing=orgs.find(w=>w.code===wingCode);
+  const sqns=wing?wing.squadrons:[];
+  if(sqns.length===0){
+    const opt=document.createElement('option');
+    opt.value=''; opt.disabled=true;
+    opt.textContent='No squadrons configured for this wing yet';
+    sqnSel.appendChild(opt);
+  } else {
+    sqns.forEach(s=>{
+      const opt=document.createElement('option');
+      opt.value=s.code;
+      opt.textContent=s.name;
+      sqnSel.appendChild(opt);
+    });
+  }
+  sqnWrap.style.display='';
+  onAuthFieldChange();
+}
+
+async function onAuthTypeChange(){
+  const type=document.getElementById('auth-type').value;
+  const wingWrap=document.getElementById('auth-wing-wrap');
+  const sqnWrap=document.getElementById('auth-sqn-wrap');
   const identEl=document.getElementById('auth-ident');
   const roleWrap=document.getElementById('auth-role-wrap');
   const roleEl=document.getElementById('auth-role');
   document.getElementById('auth-err').style.display='none';
+  // Reset downstream selectors
+  document.getElementById('auth-wing-select').innerHTML='<option value="">Select wing…</option>';
+  document.getElementById('auth-sqn-select').innerHTML='<option value="">Select squadron…</option>';
+  identEl.value=''; _authSqnName='';
   roleEl.innerHTML='<option value="">Select…</option>';
   (_AUTH_ROLES[type]||[]).forEach(o=>{const opt=document.createElement('option');opt.value=o.v;opt.textContent=o.l;roleEl.appendChild(opt);});
-  if(type==='squadron'){identLbl.textContent='Squadron number';identEl.placeholder='e.g. 703';identWrap.style.display='';}
-  else if(type==='wing'){identLbl.textContent='Wing code';identEl.placeholder='e.g. 7WG';identWrap.style.display='';}
-  else{identWrap.style.display='none';identEl.value='';}
   roleWrap.style.display=type?'':'none';
+  if(type==='squadron'||type==='wing'){
+    wingWrap.style.display='';
+    sqnWrap.style.display='none';
+    // Load org list if not cached yet
+    await _loadOrgs();
+    _populateWingSelect(type);
+  } else {
+    wingWrap.style.display='none';
+    sqnWrap.style.display='none';
+  }
   onAuthFieldChange();
 }
 
@@ -2658,7 +2735,17 @@ function onAuthFieldChange(){
   const ident=document.getElementById('auth-ident').value.trim();
   const role=document.getElementById('auth-role').value;
   const needsIdent=(type==='squadron'||type==='wing');
-  document.getElementById('auth-continue-btn').disabled=!(type&&role&&(!needsIdent||ident));
+  // For squadron type also require a squadron selection
+  const sqnOk=(type!=='squadron')||!!document.getElementById('auth-sqn-select').value;
+  document.getElementById('auth-continue-btn').disabled=!(type&&role&&(!needsIdent||ident)&&sqnOk);
+  // Track selected squadron name for better error messages
+  if(type==='squadron'){
+    const sqnSel=document.getElementById('auth-sqn-select');
+    const sel=sqnSel.options[sqnSel.selectedIndex];
+    _authSqnName=(sel&&sel.value)?sel.textContent:'';
+    // Set identifier from squadron dropdown
+    document.getElementById('auth-ident').value=sqnSel.value;
+  }
 }
 
 async function doLookup(){
@@ -2678,7 +2765,13 @@ async function doLookup(){
     if(type!=='national') body.identifier=ident;
     const r=await api('/api/auth/lookup',{method:'POST',body:JSON.stringify(body)});
     _authUserId=r.user_id;
-    const unitLabel=type==='squadron'?ident+' Squadron':type==='wing'?ident+' Wing':'National / System';
+    let unitLabel;
+    if(type==='squadron') unitLabel=_authSqnName||ident;
+    else if(type==='wing'){
+      const orgs=_aafcOrgs||[];
+      const w=orgs.find(x=>x.code===ident);
+      unitLabel=w?w.name:ident+' Wing';
+    } else { unitLabel='National / System'; }
     document.getElementById('auth-acct-banner').textContent=unitLabel+' — '+(_ROLE_LABELS[role]||role);
     bar.style.width='100%';
     document.getElementById('auth-step1').style.display='none';
@@ -2688,12 +2781,17 @@ async function doLookup(){
   }catch(e){
     _resetContinue();
     err.style.display='block';
-    err.textContent=(e.status===404)?'No account found for that selection. Check the number/code and role and try again.':apiErr(e);
+    if(e.status===404){
+      const unitName=_authSqnName||ident;
+      err.textContent=unitName
+        ?'No account has been created for '+unitName+' yet. Contact the system administrator to create one.'
+        :'No account found for that selection.';
+    } else { err.textContent=apiErr(e); }
   }
 }
 
 function showAuthStep1(){
-  _authUserId=null;
+  _authUserId=null; _authSqnName='';
   document.getElementById('auth-step2').style.display='none';
   document.getElementById('auth-step1').style.display='';
   document.getElementById('auth-err').style.display='none';
@@ -2702,6 +2800,7 @@ function showAuthStep1(){
   btn.disabled=false; btn.textContent='Continue →';
   document.getElementById('auth-progress1').style.display='none';
   document.getElementById('auth-bar1').style.width='0%';
+  onAuthFieldChange();
 }
 
 async function doLogin(){
