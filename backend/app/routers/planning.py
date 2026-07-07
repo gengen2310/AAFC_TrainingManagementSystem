@@ -6,7 +6,7 @@ builder, scheduled sessions, locations, facilitators (planning view),
 conflict detection, and weekly/long-range program output.
 """
 from __future__ import annotations
-import io, uuid
+import io, json as _json, uuid
 from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -32,6 +32,22 @@ from ..services import audit
 from .timing import _effective_template
 
 router = APIRouter(prefix="/api/planning", tags=["planning"])
+
+
+def _parse_json_list(val) -> list:
+    """Return val as a list, JSON-parsing it if stored as a TEXT string (Postgres TEXT vs JSON/JSONB mismatch)."""
+    if not val:
+        return []
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str):
+        try:
+            result = _json.loads(val)
+            return result if isinstance(result, list) else []
+        except (_json.JSONDecodeError, TypeError):
+            return []
+    return []
+
 
 # ─────────────────────────────────────────────────────────────
 # RBAC helpers
@@ -559,12 +575,14 @@ def generate_parade_dates(
         HolidayPeriod.affects_parade == True,  # noqa: E712
     ).all() if body.exclude_holidays else []
 
-    existing = {
-        pd.parade_date for pd in
-        db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).all()
+    existing_rows = db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).all()
+    existing = {pd.parade_date for pd in existing_rows}
+    unlinked_by_date = {
+        pd.parade_date: pd for pd in existing_rows if pd.parade_night_id is None
     }
     candidates = _compute_candidate_dates(body, holidays)
     created = []
+    linked = []
     for ds in candidates:
         if ds not in existing:
             pn = _find_or_create_parade_night(db, py.unit_id, ds, p)
@@ -578,10 +596,16 @@ def generate_parade_dates(
             db.add(pd)
             existing.add(ds)
             created.append(ds)
+        elif py.unit_id and ds in unlinked_by_date:
+            # Backfill the parade night link for an existing unlinked date
+            pn = _find_or_create_parade_night(db, py.unit_id, ds, p)
+            if pn:
+                unlinked_by_date[ds].parade_night_id = pn.id
+                linked.append(ds)
     db.commit()
     audit(db, p, object_type="planning_year", object_id=year_id, action="generate_parade_dates",
-          new={"count": len(created)})
-    return {"ok": True, "created": len(created), "dates": created}
+          new={"created": len(created), "linked": len(linked)})
+    return {"ok": True, "created": len(created), "linked": len(linked), "dates": created}
 
 
 @router.delete("/parade-dates/{date_id}")
@@ -1416,7 +1440,7 @@ def list_planning_facilitators(
             "display_name": f"{f.current_rank or ''} {f.last_name}".strip(),
             "first_name": f.first_name, "last_name": f.last_name,
             "rank": f.current_rank, "type": f.type,
-            "subject_areas": f.subject_areas or [],
+            "subject_areas": _parse_json_list(f.subject_areas),
             "max_sessions_per_night": f.max_sessions_per_night,
             "unit_id": f.squadron_id,
         }

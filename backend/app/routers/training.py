@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json as _json
+
 from fastapi import APIRouter, Depends, Request, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import List, Optional
@@ -20,6 +22,21 @@ router = APIRouter(prefix="/api", tags=["training"])
 VALID_STATUS = {"draft", "planned", "published", "delivered", "delivered_with_issue",
                 "cancelled", "cancelled_late", "rescheduled", "not_delivered",
                 "requires_review", "blocked", "closed"}
+
+
+def _parse_json_list(val) -> list:
+    """Return val as a list, JSON-parsing it if stored as a TEXT string (Postgres TEXT vs JSON/JSONB mismatch)."""
+    if not val:
+        return []
+    if isinstance(val, list):
+        return val
+    if isinstance(val, str):
+        try:
+            result = _json.loads(val)
+            return result if isinstance(result, list) else []
+        except (_json.JSONDecodeError, TypeError):
+            return []
+    return []
 
 
 def _active_squadron(p: Principal) -> str:
@@ -456,7 +473,7 @@ def list_facs(db: DBSession = Depends(get_db), p: Principal = Depends(get_princi
     for f in facs:
         out.append({"facilitator_id": f.id, "first_name": f.first_name, "last_name": f.last_name,
                     "current_rank": f.current_rank, "type": f.type,
-                    "subject_areas": f.subject_areas or []})
+                    "subject_areas": _parse_json_list(f.subject_areas)})
     return out
 
 
@@ -510,7 +527,7 @@ def update_fac(fid: str, body: FacUpdateIn, db: DBSession = Depends(get_db),
     audit(db, p, object_type="facilitator", object_id=f.id, action="update",
           reason="subject-area tags" if body.subject_areas is not None else "update")
     return {"ok": True, "facilitator_id": f.id,
-            "subject_areas": f.subject_areas or []}
+            "subject_areas": _parse_json_list(f.subject_areas)}
 
 
 @router.get("/facilitators/{fid}/stats")

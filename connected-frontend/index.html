@@ -2977,7 +2977,8 @@ async function loadData(){
       facName:_facName(s), room:s.training_area_name_at_time||'', status:s.status||'planned'
     }))
   }));
-  S.facs=(facs||[]).map(f=>({id:f.facilitator_id,rank:f.current_rank||'',first:f.first_name||'',last:f.last_name||'',type:f.type||'',areas:f.subject_areas||[]}));
+  const _parseAreas=a=>{if(!a)return[];if(Array.isArray(a))return a;if(typeof a==='string'){try{const r=JSON.parse(a);return Array.isArray(r)?r:[];}catch(_){return[];}}return[];};
+  S.facs=(facs||[]).map(f=>({id:f.facilitator_id,rank:f.current_rank||'',first:f.first_name||'',last:f.last_name||'',type:f.type||'',areas:_parseAreas(f.subject_areas)}));
   S.curr=((cur&&cur.items)||[]).map(i=>({id:i.curriculum_id,code:i.code,identifier:i.identifier,partNumber:i.part_number,title:i.title,phase:i.phase,el:i.element,term:i.recommended_term,hours:Math.round((i.duration_minutes||0)/60),type:i.core_status,lh:i.learning_hub_url,progress:i.progress,sessions:i.session_count,owningLevel:i.owning_level,wingId:i.wing_id,owned:i.owning_level==='squadron'}));
   S.rooms=(ta||[]).map(r=>({id:r.training_area_id||r.id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||''}));
   S.equip=(eq||[]).map(x=>({id:x.equipment_id||x.id,name:x.name,qty:x.quantity||x.qty,notes:x.notes||''}));
@@ -6803,7 +6804,7 @@ async function loadBuilderGrid(dateId){
     // If this date has a linked parade night, show that in info banner
     if(infoBanner){
       infoBanner.style.display='';
-      const linked = d.parade_night_id ? '✓ linked to real parade night' : '⚠️ not linked to a real parade night — generate dates to link';
+      const linked = d.parade_night_id ? '✓ linked to parade night' : '⚠️ not linked to a parade night — re-run Generate Dates to fix';
       infoBanner.innerHTML=`<strong>${esc(d.parade_date)}</strong> (${_dayName(d.parade_date)}) &bull; ${linked} &bull; ${d.session_count} periods`;
     }
 
@@ -7135,7 +7136,7 @@ async function loadPlanningFacilitators(){
       facilitator_id: f.id||f.facilitator_id,
       display_name: facDisplay ? facDisplay(f) : `${f.current_rank||''} ${f.last_name||''}`.trim(),
       type: f.type,
-      subject_areas: f.subject_areas||[],
+      subject_areas: f.areas||f.subject_areas||[],
       max_sessions_per_night: f.max_sessions_per_night||'—',
       unit_id: f.squadron_id,
     }));
