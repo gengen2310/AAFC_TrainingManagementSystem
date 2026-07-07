@@ -21,6 +21,7 @@ import { Accounts } from "./routes/Accounts";
 import { Settings } from "./routes/Settings";
 import { ReportCatalogue } from "./routes/ReportCatalogue";
 import { WingOverview, NationalOverview } from "./routes/Overviews";
+import { PlanningWorkspace } from "./routes/PlanningWorkspace";
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
 
@@ -67,6 +68,7 @@ export default function App() {
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/wing-overview" element={<WingOverview />} />
                 <Route path="/national-overview" element={<NationalOverview />} />
+                <Route path="/planning" element={<PlanningWorkspace />} />
                 <Route path="*" element={<div className="empty">Page not found or access not permitted.</div>} />
               </Routes>
             </AppShell>

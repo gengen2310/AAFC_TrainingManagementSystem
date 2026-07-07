@@ -108,3 +108,117 @@ export interface NationalCapability { subjects: string[]; wings: NationalCapabil
 // Imports
 export interface ImportPreview { headers: string[]; row_count: number; preview: Record<string, string>[]; detected: Record<string, string | null>; }
 export interface ImportCommitResult { ok: boolean; import_id: string; accepted: number; rejected: number; }
+
+// ─── Planning Workspace types ───────────────────────────────────────────────
+export interface PlanningYear {
+  planning_year_id: string; unit_id: string | null; wing_id: string | null;
+  year: number; name: string; active_status: boolean;
+}
+export interface ParadeDate {
+  parade_date_id: string; planning_year_id: string; unit_id: string | null;
+  parade_date: string; parade_type: string; term: string | null;
+  week_number: number | null; is_active: boolean;
+  notes: string | null; parade_night_id: string | null;
+}
+export interface PlanningSession {
+  session_id: string; parade_night_id: string; squadron_id: string;
+  cadet_group: string | null; session_number: number; part_number: number | null;
+  curriculum_id: string | null; curriculum_code: string | null;
+  curriculum_title: string | null; element: string | null;
+  activity_title: string | null;
+  facilitator_id: string | null; facilitator_name: string | null;
+  assistant_facilitator_id: string | null; assistant_facilitator_name: string | null;
+  location_id: string | null; location_name: string | null;
+  status: string; notes: string | null; is_combined: boolean;
+  override_conflict: boolean; created_at: string | null;
+}
+export interface TimingBlock {
+  sequence: number; name: string; block_type: string;
+  start_time: string | null; end_time: string | null;
+  duration_minutes: number; is_instructional: boolean; period_number: number | null;
+}
+export interface PlanningConflict {
+  conflict_id: string; planning_year_id: string | null; parade_date_id: string | null;
+  scheduled_session_id: string | null; conflict_type: string; severity: string;
+  message: string; is_resolved: boolean; override_reason: string | null;
+  created_at: string | null;
+}
+export interface WeeklyProgramData {
+  parade_date_id: string; parade_night_id: string | null;
+  parade_date: string; unit_id: string | null;
+  timing_blocks: TimingBlock[]; sessions: PlanningSession[];
+  conflicts: PlanningConflict[]; has_unresolved_conflicts: boolean;
+}
+export interface AnchorEvent {
+  anchor_id: string; planning_year_id: string; event_name: string;
+  event_type: string; importance: string; importance_level: number | null;
+  start_date: string; end_date: string | null;
+  audience_orientation: boolean; audience_initial: boolean;
+  audience_junior: boolean; audience_intermediate: boolean; audience_senior: boolean;
+  audience_staff_only: boolean; planning_impact: string | null; notes: string | null;
+}
+export interface HolidayPeriod {
+  holiday_id: string; name: string; start_date: string; end_date: string;
+  holiday_type: string; affects_parade: boolean;
+}
+export interface AnnualProgramTerm {
+  term: string; term_label: string; start_date: string; end_date: string;
+  parade_dates: (ParadeDate & { session_count: number; filled_count: number; in_holiday: boolean })[];
+  holidays: HolidayPeriod[];
+  anchors: AnchorEvent[];
+}
+export interface AnnualProgram {
+  planning_year_id: string; year: number; terms: AnnualProgramTerm[];
+}
+export interface LongRangeRow {
+  parade_date: ParadeDate; sessions: PlanningSession[];
+  session_count: number; filled_slots: number; conflicts: PlanningConflict[];
+}
+export interface LongRangeView {
+  planning_year_id: string; from_date: string; to_date: string;
+  weeks: number; parade_dates: LongRangeRow[]; anchors: AnchorEvent[];
+}
+export interface MissionItem {
+  curriculum_id: string; code: string; title: string;
+  phase: string; element: string | null; recommended_term: string | null;
+  part_count: number | null; duration_minutes: number;
+  core_status: string; is_scheduled: boolean;
+  scheduled_count: number; instructor_suitability: string | null;
+  scheduled_sessions: {
+    session_id: string; parade_date: string | null; term: string | null;
+    session_number: number; part_number: number | null; cadet_group: string | null;
+    facilitator_name: string | null; location_name: string | null; status: string;
+  }[];
+}
+export interface PlanningLocation {
+  location_id: string; unit_id: string; name: string;
+  location_type: string; capacity: number | null; active_status: boolean;
+}
+export interface PlanningFacilitator {
+  facilitator_id: string; display_name: string; rank: string | null;
+  type: string; subject_areas: string[]; max_sessions_per_night: number;
+}
+export interface LocalLesson {
+  local_lesson_id: string; lesson_code: string; lesson_name: string;
+  squadron_id: string | null; description: string | null;
+  subject_area: string | null; default_duration_mins: number | null;
+}
+export interface WingHQEvent {
+  event_id: string; wing_id: string; year: number; title: string;
+  event_type: string; start_date: string; end_date: string | null;
+  planning_importance: string; audience: string[] | null;
+  location: string | null; notes: string | null;
+  requires_squadron_action: boolean; is_planning_anchor: boolean;
+  sqn_status: { status: string; notes: string | null } | null;
+}
+export interface CommandCentreData {
+  planning_year_id: string | null;
+  year: number | null;
+  upcoming_anchors: AnchorEvent[];
+  prep_gaps: { anchor_event_id: string; event_name: string; start_date: string; days_until: number }[];
+  unreviewed_wing: { wing_event_id: string; title: string; start_date: string; days_until: number }[];
+  active_conflicts: { conflict_id: string; type: string; message: string; parade_date: string | null }[];
+  unscheduled_required: { curriculum_id: string; code: string; title: string; phase: string }[];
+  recent_imports: { import_type: string; created_at: string | null }[];
+  nights_missing_facilitator: number;
+}

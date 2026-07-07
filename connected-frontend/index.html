@@ -156,7 +156,28 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .badge-green,.b-ok{background:#d4f0e3;color:#1a5c35;}
 .badge-grey,.b-grey{background:#eef0f2;color:var(--steel);}
 .badge-red,.b-red{background:#fde8e8;color:#8b1a1a;}
+.badge-orange{background:#ffe8d4;color:#7a3a00;}
+.badge-blue{background:#d4eeff;color:#0a3a6b;}
+.badge-light{background:#f4f4f4;color:#999;}
 .badge-amber,.badge-yellow,.b-amber{background:#fff3cd;color:#7a5200;}
+/* Filter chips */
+.filter-chips{display:flex;gap:6px;flex-wrap:wrap;}
+.chip{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:var(--border);color:var(--steel);border:1.5px solid transparent;transition:all .15s;}
+.chip:hover{border-color:var(--accent);color:var(--dark);}
+.chip-active{background:var(--accent-light);color:var(--dark);border-color:var(--accent);}
+/* Command Centre */
+.cc-summary-row{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+.cc-stat{background:white;border:1px solid var(--border);border-radius:8px;padding:12px 18px;text-align:center;min-width:120px;flex:1;}
+.cc-stat-warn{border-color:#ffe8d4;}
+.cc-stat-info{border-color:#d4eeff;}
+.cc-stat-alert{border-color:#fde8e8;}
+.cc-stat-num{display:block;font-size:28px;font-weight:700;color:var(--dark);}
+.cc-stat-lbl{font-size:11px;color:var(--steel);font-weight:600;}
+.cc-grid{display:flex;flex-direction:column;gap:12px;}
+.cc-card{}
+.cc-card-alert{border-left:3px solid #c0392b;}
+.cc-card-warn{border-left:3px solid #e67e22;}
+.cc-card-info{border-left:3px solid #2980b9;}
 .b-blue{background:var(--accent-light);color:var(--dark);}
 .b-dark{background:var(--dark);color:white;}
 .b-teal{background:#d4f5f0;color:#0a5c50;}
@@ -491,6 +512,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-item" onclick="nav('activities')">Activities</div>
       <!-- Planning module — sub-items within Training, shown only when planner nav is active -->
       <div class="nav-planning-hdr" id="nav-planning-lbl" style="display:none">Planning</div>
+      <div class="nav-item nav-subitem" id="nav-command-centre" style="display:none" onclick="nav('command-centre')">Command Centre</div>
+      <div class="nav-item nav-subitem" id="nav-activity-calendar" style="display:none" onclick="nav('activity-calendar')">Activity Calendar</div>
       <div class="nav-item nav-subitem" id="nav-planning-year" style="display:none" onclick="nav('planning-year')">Annual Program</div>
       <div class="nav-item nav-subitem" id="nav-planning-missions" style="display:none" onclick="nav('planning-missions')">Training Planner</div>
       <div class="nav-item nav-subitem" id="nav-planning-builder" style="display:none" onclick="nav('planning-builder')">Parade Night Program</div>
@@ -1202,6 +1225,64 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 </div>
 
 <!-- 1. Planning Guide -->
+<!-- Training Command Centre -->
+<div class="page" id="page-command-centre">
+  <div class="page-header">
+    <div>
+      <h1>Command Centre</h1>
+      <div class="page-subtitle">What needs attention now — upcoming events, prep gaps, unresolved conflicts.</div>
+    </div>
+    <div class="page-header-actions">
+      <button class="btn btn-secondary" onclick="loadCommandCentre()">Refresh</button>
+    </div>
+  </div>
+
+  <div id="cc-summary-row" class="cc-summary-row" style="display:none">
+    <div class="cc-stat" id="cc-stat-anchors"><span class="cc-stat-num" id="cc-n-anchors">—</span><span class="cc-stat-lbl">Upcoming Events</span></div>
+    <div class="cc-stat cc-stat-warn" id="cc-stat-gaps"><span class="cc-stat-num" id="cc-n-gaps">—</span><span class="cc-stat-lbl">Prep Gaps</span></div>
+    <div class="cc-stat cc-stat-info" id="cc-stat-wing"><span class="cc-stat-num" id="cc-n-wing">—</span><span class="cc-stat-lbl">Unreviewed Wing Events</span></div>
+    <div class="cc-stat cc-stat-alert" id="cc-stat-conflicts"><span class="cc-stat-num" id="cc-n-conflicts">—</span><span class="cc-stat-lbl">Active Conflicts</span></div>
+    <div class="cc-stat cc-stat-warn" id="cc-stat-nofac"><span class="cc-stat-num" id="cc-n-nofac">—</span><span class="cc-stat-lbl">Nights Missing Facilitator</span></div>
+  </div>
+
+  <div class="cc-grid" id="cc-grid">
+    <div class="empty"><div class="et">Loading Command Centre…</div></div>
+  </div>
+</div>
+
+<!-- Activity Calendar -->
+<div class="page" id="page-activity-calendar">
+  <div class="page-header">
+    <div>
+      <h1>Activity Calendar</h1>
+      <div class="page-subtitle">All planned activities — filter by audience and priority to plan who attends what.</div>
+    </div>
+  </div>
+
+  <div class="toolbar" style="flex-wrap:wrap;gap:8px;margin-bottom:12px">
+    <div class="filter-chips" id="ac-importance-chips">
+      <span class="chip chip-active" data-val="" onclick="acSetImportance(this,'')">All</span>
+      <span class="chip" data-val="must_attend" onclick="acSetImportance(this,'must_attend')">Must Attend</span>
+      <span class="chip" data-val="key_event" onclick="acSetImportance(this,'key_event')">Key Event</span>
+      <span class="chip" data-val="home_parade" onclick="acSetImportance(this,'home_parade')">Home Parade</span>
+      <span class="chip" data-val="optional" onclick="acSetImportance(this,'optional')">Optional</span>
+    </div>
+    <select id="ac-audience-sel" onchange="loadActivityCalendar()" style="margin-left:auto">
+      <option value="">All Audiences</option>
+      <option value="staff">Staff Only</option>
+      <option value="seniors">Seniors</option>
+      <option value="juniors">Juniors / Proficient</option>
+      <option value="first_years">First Years</option>
+    </select>
+    <input type="month" id="ac-month-from" onchange="loadActivityCalendar()" title="From month">
+    <input type="month" id="ac-month-to" onchange="loadActivityCalendar()" title="To month">
+  </div>
+
+  <div id="ac-body">
+    <div class="empty"><div class="et">No planning year selected</div><div class="es">Select a planning year first. Activities from all imported programs and Wing HQ overlays will appear here.</div></div>
+  </div>
+</div>
+
 <div class="page" id="page-planning-guide">
   <div class="page-header">
     <div>
@@ -1211,12 +1292,48 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   </div>
 
   <div class="card">
+    <h3>Where Do I Start?</h3>
+    <p>New to planning? Use the <strong>Command Centre</strong> as your starting point every week — it surfaces what needs attention right now. Then follow the four-layer planning framework below.</p>
+    <p style="margin-top:8px"><a href="#" onclick="nav('command-centre');return false" class="btn btn-primary" style="text-decoration:none">Open Command Centre</a></p>
+  </div>
+
+  <div class="card">
+    <h3>Four-Layer Planning Framework</h3>
+    <p>Plan top-down. Each layer constrains the next.</p>
+    <table class="data-table">
+      <thead><tr><th>Layer</th><th>What it is</th><th>Where in the app</th></tr></thead>
+      <tbody>
+        <tr><td><strong>1 — Wing &amp; External Events</strong></td><td>Must-Attend and Key Events set by 7WG, AOW, or National. Non-negotiable fixed dates.</td><td>Activity Calendar → filter "Must Attend"</td></tr>
+        <tr><td><strong>2 — Squadron Anchor Events</strong></td><td>Your unit's own fixed commitments: dining-in, inspection, local competition. Mark preparation sessions to run 2–4 weeks before each one.</td><td>Annual Program → Key Activities</td></tr>
+        <tr><td><strong>3 — Curriculum Scheduling</strong></td><td>Assign national curriculum missions to parade nights by cadet group. Aim to cover all mandatory elements before mid-year.</td><td>Training Planner</td></tr>
+        <tr><td><strong>4 — Local &amp; Skills Lessons</strong></td><td>Fill remaining slots with admin sessions, activity briefings, catch-ups, and team building. These are Skills-01 through Skills-14 lesson types.</td><td>Parade Night Program → add session → select Local Lesson</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Activity Priority Guide</h3>
+    <p>When classifying activities in the Activity Calendar, use these definitions:</p>
+    <table class="data-table">
+      <thead><tr><th>Priority</th><th>Meaning</th><th>Typical examples</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-red">Must Attend</span></td><td>Mandatory attendance. Absence requires a reason. Plan preparation 2–4 weeks ahead.</td><td>Fieldcraft exercise, Wing Inspection, Gliding Day</td></tr>
+        <tr><td><span class="badge badge-orange">Key Event</span></td><td>High value. Strongly encourage attendance. Plan who is eligible.</td><td>Biathlon, Aerospace Day, Wing Dining-In</td></tr>
+        <tr><td><span class="badge badge-blue">Home Parade</span></td><td>Normal weekly parade night. Show in schedule but no special planning needed.</td><td>Weekly parade, term parade nights</td></tr>
+        <tr><td><span class="badge badge-grey">Optional</span></td><td>Attendance is open but not encouraged as a unit. Good for self-directed cadets.</td><td>National gliding course, sport competition</td></tr>
+        <tr><td><span class="badge badge-light">Noting</span></td><td>Awareness only. Not relevant for most cadets this year.</td><td>National-level events your unit won't attend</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
     <h3>Planning Cycle</h3>
-    <p>The Training Planner follows a three-stage cycle each training year:</p>
+    <p>The Training Planner follows a four-stage cycle each training year:</p>
     <ol>
-      <li><strong>Anchor first</strong> — Identify all confirmed activities (camps, competitions, inspections, dining-in). These are fixed dates that sessions must work around.</li>
-      <li><strong>Assign curriculum second</strong> — Use the Training Planner to assign curriculum missions to remaining parade nights across the year, balancing cadet levels and instructional load.</li>
-      <li><strong>Adjust weekly</strong> — Review the Parade Night Program and Weekly Program before each night to confirm facilitators, locations, and session order are correct.</li>
+      <li><strong>Map the year</strong> — Review the Activity Calendar. Classify all 7WG and AOW events with audience flags and priority. Identify your Must Attend and Key Events.</li>
+      <li><strong>Anchor events</strong> — Add your unit's own anchor events (camps, competitions, dining-in) under Key Activities. Set preparation session reminders 2–4 weeks before each one.</li>
+      <li><strong>Schedule curriculum</strong> — Use the Training Planner to assign curriculum missions to parade nights, balanced across cadet groups and instructional load.</li>
+      <li><strong>Adjust weekly</strong> — Before each parade night, confirm facilitators, locations, and session order in the Parade Night Program. Use the Weekly Program to communicate the night to staff.</li>
     </ol>
   </div>
 
@@ -3218,7 +3335,7 @@ function roomById(id){return (S.rooms||[]).find(r=>r.id===id);}
 // Pages each scope may see. Backend still authorises every request.
 // Pilot-visible planning pages. Remaining tabs (anchors, term, long-range, rooms, checks) are hidden from nav for this pilot.
 // Pilot-visible planning pages. Remaining tabs (anchors, term, long-range, rooms, checks) are hidden from nav for this pilot.
-const _PLANNING_PAGES=['planning-missions','planning-guide','planning-year','planning-builder'];
+const _PLANNING_PAGES=['command-centre','activity-calendar','planning-missions','planning-guide','planning-year','planning-builder'];
 const NAV_BY_SCOPE={
   squadron:['dashboard','calendar','parade-nights','weekly-program','curriculum','activities','facilitators','resources','reports','action-items','settings','accounts',..._PLANNING_PAGES],
   wing:['wing-overview','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
@@ -6130,7 +6247,11 @@ async function _loadPlanningYears() {
 const _origNav = nav;
 nav = function(pg) {
   _origNav(pg);
-  if(pg === 'planning-missions') {
+  if(pg === 'command-centre') {
+    loadCommandCentre();
+  } else if(pg === 'activity-calendar') {
+    _loadPlanningYears().then(()=>loadActivityCalendar());
+  } else if(pg === 'planning-missions') {
     _loadPlanningYears().then(id=>{ if(id) loadMissions(id); });
   } else if(pg === 'planning-guide') {
     /* static — no API call needed */
@@ -8065,6 +8186,233 @@ async function loadYearMap(yearId){
 
 // ─── nav() integration ────────────────────────────────────────────────────────
 // loadWingCalendar() is called when nav('wing-calendar') fires via nav() switch
+
+// ═══════════════════════════════════════════════════════════════════
+// TRAINING COMMAND CENTRE
+// ═══════════════════════════════════════════════════════════════════
+
+let _ccYearId = null;
+
+async function loadCommandCentre() {
+  const grid = document.getElementById('cc-grid');
+  const summRow = document.getElementById('cc-summary-row');
+  if(!grid) return;
+  grid.innerHTML = '<div class="empty"><div class="et">Loading…</div></div>';
+  if(summRow) summRow.style.display = 'none';
+
+  try {
+    const qs = _ccYearId ? `?year_id=${_ccYearId}` : '';
+    const d = await api(`/api/planning/command-centre${qs}`);
+
+    // Summary bar
+    if(summRow) {
+      document.getElementById('cc-n-anchors').textContent = d.summary.upcoming_anchors;
+      document.getElementById('cc-n-gaps').textContent    = d.summary.prep_gaps;
+      document.getElementById('cc-n-wing').textContent    = d.summary.unreviewed_wing_events;
+      document.getElementById('cc-n-conflicts').textContent = d.summary.active_conflicts;
+      document.getElementById('cc-n-nofac').textContent   = d.summary.parade_nights_missing_facilitators;
+      summRow.style.display = 'flex';
+    }
+
+    let html = '';
+
+    // Prep gaps (highest urgency)
+    if(d.prep_gaps.length) {
+      html += `<div class="card cc-card cc-card-alert"><h3>Preparation Gaps <span class="badge badge-red">${d.prep_gaps.length}</span></h3>
+      <p class="muted">Must-attend events in the next 8 weeks with no preparation sessions scheduled.</p><ul>`;
+      for(const g of d.prep_gaps) {
+        const days = g.days_until;
+        const urgency = days <= 14 ? 'text-red' : days <= 28 ? 'text-orange' : '';
+        html += `<li><strong class="${urgency}">${esc(g.event_name)}</strong> — ${esc(g.start_date)} <span class="muted">(${days} days)</span>
+        <a href="#" onclick="nav('planning-anchors');return false" class="btn btn-sm btn-secondary" style="margin-left:8px">Add Prep</a></li>`;
+      }
+      html += '</ul></div>';
+    }
+
+    // Unreviewed wing events
+    if(d.unreviewed_wing_events.length) {
+      html += `<div class="card cc-card cc-card-info"><h3>Unreviewed Wing Events <span class="badge badge-orange">${d.unreviewed_wing_events.length}</span></h3>
+      <p class="muted">Wing HQ events in the next 8 weeks you haven't reviewed yet.</p><ul>`;
+      for(const w of d.unreviewed_wing_events) {
+        html += `<li><strong>${esc(w.title)}</strong> — ${esc(w.start_date)}
+        <span class="badge badge-${w.planning_importance==='must_attend'?'red':'orange'}">${esc(w.planning_importance.replace('_',' '))}</span>
+        <a href="#" onclick="nav('wing-calendar');return false" class="btn btn-sm btn-secondary" style="margin-left:8px">Review</a></li>`;
+      }
+      html += '</ul></div>';
+    }
+
+    // Active conflicts
+    if(d.active_conflicts.length) {
+      html += `<div class="card cc-card cc-card-warn"><h3>Active Conflicts <span class="badge badge-orange">${d.active_conflicts.length}</span></h3>
+      <p class="muted">Unresolved scheduling conflicts in the next 4 parade nights.</p><ul>`;
+      for(const c of d.active_conflicts) {
+        const sev = c.severity === 'critical' ? 'badge-red' : 'badge-orange';
+        html += `<li><span class="badge ${sev}">${esc(c.severity)}</span> <strong>${esc(c.parade_date)}</strong> — ${esc(c.message)}</li>`;
+      }
+      html += '</ul></div>';
+    }
+
+    // Sessions missing facilitators
+    if(d.unfacilitated_sessions.length) {
+      html += `<div class="card cc-card cc-card-warn"><h3>Missing Facilitators</h3>
+      <p class="muted">Upcoming parade nights with sessions that have no facilitator assigned.</p><ul>`;
+      for(const u of d.unfacilitated_sessions) {
+        html += `<li><strong>${esc(u.parade_date)}</strong> — ${u.sessions_without_facilitator} session${u.sessions_without_facilitator!==1?'s':''} unassigned
+        <a href="#" onclick="nav('planning-builder');return false" class="btn btn-sm btn-secondary" style="margin-left:8px">Open Builder</a></li>`;
+      }
+      html += '</ul></div>';
+    }
+
+    // Upcoming anchors
+    if(d.upcoming_anchors.length) {
+      html += `<div class="card cc-card"><h3>Upcoming Events — Next 8 Weeks</h3><ul>`;
+      for(const a of d.upcoming_anchors) {
+        const lvl = a.importance_level;
+        const badge = lvl===1 ? 'badge-red' : lvl===2 ? 'badge-orange' : 'badge-blue';
+        const label = lvl===1 ? 'Must Attend' : lvl===2 ? 'Key Event' : 'Event';
+        html += `<li><span class="badge ${badge}">${label}</span> <strong>${esc(a.event_name)}</strong> — ${esc(a.start_date)}</li>`;
+      }
+      html += '</ul></div>';
+    }
+
+    if(!html) {
+      html = '<div class="card"><div class="empty"><div class="et">All clear</div><div class="es">No prep gaps, unreviewed events, or conflicts in the next 8 weeks.</div></div></div>';
+    }
+
+    grid.innerHTML = html;
+  } catch(e) {
+    grid.innerHTML = `<div class="empty"><div class="et">Could not load Command Centre</div><div class="es">${esc(String(e))}</div></div>`;
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// ACTIVITY CALENDAR
+// ═══════════════════════════════════════════════════════════════════
+
+let _acImportance = '';
+
+function acSetImportance(el, val) {
+  _acImportance = val;
+  document.querySelectorAll('#ac-importance-chips .chip').forEach(c => c.classList.remove('chip-active'));
+  el.classList.add('chip-active');
+  loadActivityCalendar();
+}
+
+async function loadActivityCalendar() {
+  const body = document.getElementById('ac-body');
+  if(!body) return;
+  body.innerHTML = '<div class="empty"><div class="et">Loading…</div></div>';
+
+  const imp = _acImportance;
+  const aud = (document.getElementById('ac-audience-sel')||{}).value || '';
+  const fromEl = document.getElementById('ac-month-from');
+  const toEl   = document.getElementById('ac-month-to');
+  const fromVal = fromEl && fromEl.value ? fromEl.value + '-01' : '';
+  const toVal   = toEl && toEl.value   ? toEl.value   + '-28' : '';
+
+  let qs = [];
+  if(imp) qs.push(`planning_importance=${encodeURIComponent(imp)}`);
+  if(aud) qs.push(`audience=${encodeURIComponent(aud)}`);
+  if(fromVal) qs.push(`start_date=${fromVal}`);
+  if(toVal)   qs.push(`end_date=${toVal}`);
+
+  try {
+    const items = await api(`/api/planning/activities${qs.length?'?'+qs.join('&'):''}`);
+
+    if(!items.length) {
+      body.innerHTML = '<div class="empty"><div class="et">No activities match the current filters</div><div class="es">Try removing filters or importing activities from the Annual Program page.</div></div>';
+      return;
+    }
+
+    const IMPORT_LABELS = {must_attend:'Must Attend',key_event:'Key Event',home_parade:'Home Parade',optional:'Optional',noting:'Noting'};
+    const BADGE_CLASS = {must_attend:'badge-red',key_event:'badge-orange',home_parade:'badge-blue',optional:'badge-grey',noting:'badge-light'};
+
+    // Group by month
+    const byMonth = {};
+    for(const a of items) {
+      const m = (a.date_start||'').slice(0,7);
+      if(!byMonth[m]) byMonth[m] = [];
+      byMonth[m].push(a);
+    }
+
+    let html = '';
+    for(const [month, acts] of Object.entries(byMonth).sort()) {
+      const [yr, mo] = month.split('-');
+      const label = new Date(+yr, +mo-1, 1).toLocaleString('default',{month:'long',year:'numeric'});
+      html += `<div class="card"><h3>${esc(label)}</h3><table class="data-table"><thead>
+        <tr><th>Date</th><th>Activity</th><th>Priority</th><th>Audience</th><th>Actions</th></tr></thead><tbody>`;
+      for(const a of acts) {
+        const imp2 = a.planning_importance || '';
+        const badge = BADGE_CLASS[imp2] || 'badge-light';
+        const label2 = IMPORT_LABELS[imp2] || 'Unclassified';
+        const aud2 = (a.audience||[]).join(', ') || '—';
+        html += `<tr>
+          <td>${esc(a.date_start)}${a.date_end && a.date_end!==a.date_start ? ' – '+esc(a.date_end):''}</td>
+          <td><strong>${esc(a.activity_name)}</strong></td>
+          <td><span class="badge ${badge}">${esc(label2)}</span></td>
+          <td><span class="muted">${esc(aud2)}</span></td>
+          <td><button class="btn btn-sm btn-secondary" onclick="openActivityClassify(${JSON.stringify(a)})">Classify</button></td>
+        </tr>`;
+      }
+      html += '</tbody></table></div>';
+    }
+    body.innerHTML = html;
+  } catch(e) {
+    body.innerHTML = `<div class="empty"><div class="et">Could not load activities</div><div class="es">${esc(String(e))}</div></div>`;
+  }
+}
+
+function openActivityClassify(act) {
+  const imp = act.planning_importance || '';
+  const lvl = act.importance_level || '';
+  const aud = (act.audience||[]).join(',');
+
+  const OPTS = [
+    ['must_attend','Must Attend (1)'],['key_event','Key Event (2)'],
+    ['home_parade','Home Parade (3)'],['optional','Optional (4)'],['noting','Noting (5)'],
+  ];
+  let selHtml = OPTS.map(([v,l])=>`<option value="${v}" ${imp===v?'selected':''}>${l}</option>`).join('');
+
+  openModal(`
+    <h3>Classify Activity</h3>
+    <p><strong>${esc(act.activity_name)}</strong> — ${esc(act.date_start)}</p>
+    <div class="form-group">
+      <label>Priority</label>
+      <select id="cls-imp">${selHtml}</select>
+    </div>
+    <div class="form-group">
+      <label>Audience (comma-separated)</label>
+      <input id="cls-aud" value="${esc(aud)}" placeholder="e.g. first_years,seniors">
+      <div class="muted" style="margin-top:4px">Values: staff, seniors, juniors, first_years, all</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveActivityClassify('${act.activity_id}')">Save</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+    </div>
+  `);
+}
+
+async function saveActivityClassify(activityId) {
+  const impEl = document.getElementById('cls-imp');
+  const audEl = document.getElementById('cls-aud');
+  if(!impEl) return;
+
+  const impVal = impEl.value;
+  const audRaw = (audEl?.value||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const LEVEL_MAP = {must_attend:1,key_event:2,home_parade:3,optional:4,noting:5};
+
+  try {
+    await api(`/api/planning/activities/${activityId}/classify`, {
+      method: 'PATCH',
+      body: {planning_importance: impVal, importance_level: LEVEL_MAP[impVal]||null, audience: audRaw},
+    });
+    closeModal();
+    loadActivityCalendar();
+  } catch(e) {
+    showError('Could not save classification: ' + String(e));
+  }
+}
 </script>
 </body>
 </html>

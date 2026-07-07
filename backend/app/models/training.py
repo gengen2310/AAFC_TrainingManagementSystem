@@ -181,6 +181,8 @@ class Activity(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     time_start: Mapped[str | None] = mapped_column(String(8), nullable=True)
     time_end: Mapped[str | None] = mapped_column(String(8), nullable=True)
     cea_seq_nr: Mapped[str | None] = mapped_column(String(30), nullable=True, index=True)
+    planning_importance: Mapped[str | None] = mapped_column(String(30), nullable=True)  # must_attend/key_event/home_parade/optional/noting
+    importance_level: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 1=Must Attend … 5=Noting
     oic: Mapped[str | None] = mapped_column(String(120))
     twoic: Mapped[str | None] = mapped_column(String(120))
     risk_status: Mapped[str] = mapped_column(String(20), default="pending")

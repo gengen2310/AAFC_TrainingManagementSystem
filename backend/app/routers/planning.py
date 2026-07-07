@@ -22,13 +22,14 @@ from ..models import Session as TrainingSession
 from ..models.planning import (
     PlanningYear, ParadeDate, HolidayPeriod, AnchorEvent,
     AnchorPrepRule, AnchorPrepPlan, ScheduledSession,
-    PlanningLocation, PlanningConflict,
+    PlanningLocation, PlanningConflict, LocalLesson,
     CADET_GROUPS, IMPORTANCE_LEVELS, EVENT_TYPES,
+    LOCAL_LESSON_DEFAULTS,
 )
 from ..models.training import TimingTemplate, TimingBlock, Activity
-from ..models.wing_calendar import WingHQEvent
+from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
-from ..permissions import Principal, require_role, require_can_write_squadron
+from ..permissions import Principal, require_role, require_can_write_squadron, require_can_view_squadron
 from ..services import audit
 from .timing import _effective_template
 
@@ -317,18 +318,27 @@ def _real_session_out(s: TrainingSession, db: DBSession) -> dict:
         ra = db.get(TrainingArea, s.training_area_id)
         if ra:
             room_name = ra.name
+    asst_name = None
+    if s.assistant_facilitator_id:
+        af = db.get(Facilitator, s.assistant_facilitator_id)
+        if af:
+            asst_name = " ".join(x for x in [af.current_rank, af.first_name, af.last_name] if x)
     return {
         "session_id": s.id,
         "parade_night_id": s.parade_night_id,
         "squadron_id": s.squadron_id,
         "cadet_group": s.cadet_group,
         "session_number": s.period_number,
+        "part_number": s.part_number,
         "curriculum_id": s.curriculum_item_id,
         "curriculum_code": s.curriculum_code_at_time,
         "curriculum_title": s.curriculum_title_at_time,
+        "element": s.element_at_time,
         "activity_title": s.curriculum_title_at_time or s.custom_title,
         "facilitator_id": s.facilitator_id,
         "facilitator_name": s.facilitator_display_name_at_time,
+        "assistant_facilitator_id": s.assistant_facilitator_id,
+        "assistant_facilitator_name": asst_name,
         "location_id": s.training_area_id,
         "location_name": room_name,
         "status": s.status,
@@ -1127,7 +1137,10 @@ class ScheduledSessionUpdateIn(BaseModel):
     curriculum_id: Optional[str] = None
     activity_title: Optional[str] = None
     facilitator_id: Optional[str] = None
+    assistant_facilitator_id: Optional[str] = None
     location_id: Optional[str] = None
+    cadet_group: Optional[str] = None
+    part_number: Optional[int] = None
     is_combined: Optional[bool] = None
     combined_groups: Optional[list] = None
     override_conflict: Optional[bool] = None
@@ -1256,6 +1269,14 @@ def update_session(
         else:
             s.training_area_id = None
             s.training_area_name_at_time = None
+    if body.assistant_facilitator_id is not None:
+        s.assistant_facilitator_id = body.assistant_facilitator_id or None
+    if body.cadet_group is not None:
+        if body.cadet_group and body.cadet_group not in CADET_GROUPS:
+            raise HTTPException(422, detail={"error": "invalid_cadet_group"})
+        s.cadet_group = body.cadet_group or None
+    if body.part_number is not None:
+        s.part_number = body.part_number
     if body.status is not None:
         s.status = body.status
     if body.notes is not None:
@@ -2839,3 +2860,411 @@ async def import_annual_program(
         "total_rows": created_parade_dates + created_activities + skipped,
         "parse_errors": parse_errors,
     }
+
+
+# ─────────────────────────────────────────────────────────────
+# Training Command Centre
+# ─────────────────────────────────────────────────────────────
+
+IMPORTANCE_LABEL = {
+    1: "Must Attend", 2: "Key Event", 3: "Home Parade", 4: "Optional", 5: "Noting",
+}
+
+
+def _activity_out(a: Activity) -> dict:
+    return {
+        "activity_id": a.id, "activity_name": a.activity_name,
+        "activity_type": a.activity_type,
+        "date_start": a.date_start, "date_end": a.date_end,
+        "audience": _parse_json_list(a.audience),
+        "planning_importance": a.planning_importance,
+        "importance_level": a.importance_level,
+        "cea_seq_nr": a.cea_seq_nr,
+        "location": a.location,
+        "workflow_status": a.workflow_status,
+        "notes": a.notes,
+        "squadron_id": a.squadron_id, "wing_id": a.wing_id,
+    }
+
+
+@router.get("/command-centre")
+def get_command_centre(
+    year_id: Optional[str] = None,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Aggregate attention items for TRGO dashboard — surfaces what needs action now."""
+    today = date.today().isoformat()
+    horizon_8w = (date.today() + timedelta(weeks=8)).isoformat()
+    horizon_4w = (date.today() + timedelta(weeks=4)).isoformat()
+
+    # Resolve squadron scope
+    sqn_id = p.squadron_id
+    wing_id = p.wing_id
+
+    # Find the active planning year if not specified
+    py: PlanningYear | None = None
+    if year_id:
+        py = db.get(PlanningYear, year_id)
+    if not py and sqn_id:
+        py = db.query(PlanningYear).filter(
+            PlanningYear.unit_id == sqn_id,
+            PlanningYear.active_status == True,  # noqa: E712
+        ).order_by(PlanningYear.year.desc()).first()
+
+    year_id_resolved = py.id if py else None
+
+    # 1. Upcoming must-attend + key anchor events in next 8 weeks
+    anchor_q = db.query(AnchorEvent).filter(
+        AnchorEvent.is_archived == False,  # noqa: E712
+        AnchorEvent.start_date >= today,
+        AnchorEvent.start_date <= horizon_8w,
+        AnchorEvent.importance_level.in_([1, 2]),
+    )
+    if year_id_resolved:
+        anchor_q = anchor_q.filter(AnchorEvent.planning_year_id == year_id_resolved)
+    elif sqn_id:
+        anchor_q = anchor_q.filter(AnchorEvent.unit_id == sqn_id)
+    upcoming_anchors = anchor_q.order_by(AnchorEvent.start_date).all()
+
+    # 2. Prep gaps: must-attend events in next 8 weeks with no prep plan scheduled
+    prep_gaps = []
+    for anchor in upcoming_anchors:
+        if anchor.importance_level != 1:
+            continue
+        prep_count = db.query(AnchorPrepPlan).filter(
+            AnchorPrepPlan.anchor_event_id == anchor.id,
+        ).count()
+        if prep_count == 0:
+            prep_gaps.append({
+                "anchor_event_id": anchor.id,
+                "event_name": anchor.event_name,
+                "start_date": anchor.start_date,
+                "importance_level": anchor.importance_level,
+                "days_until": (date.fromisoformat(anchor.start_date) - date.today()).days,
+            })
+
+    # 3. Unreviewed wing events (for squadron scope: wing events not yet reviewed)
+    unreviewed_wing = []
+    if sqn_id and wing_id:
+        wing_events = db.query(WingHQEvent).filter(
+            WingHQEvent.wing_id == wing_id,
+            WingHQEvent.is_archived == False,  # noqa: E712
+            WingHQEvent.start_date >= today,
+            WingHQEvent.start_date <= horizon_8w,
+        ).all()
+        reviewed_ids = {
+            r.wing_event_id
+            for r in db.query(SquadronEventStatus).filter(
+                SquadronEventStatus.squadron_id == sqn_id,
+                SquadronEventStatus.status != "not_reviewed",
+            ).all()
+        }
+        for we in wing_events:
+            if we.id not in reviewed_ids and we.planning_importance in ("must_attend", "key_event"):
+                unreviewed_wing.append({
+                    "wing_event_id": we.id, "title": we.title,
+                    "start_date": we.start_date, "planning_importance": we.planning_importance,
+                    "days_until": (date.fromisoformat(we.start_date) - date.today()).days,
+                })
+
+    # 4. Unresolved conflicts in next 4 parade nights
+    active_conflicts = []
+    if year_id_resolved:
+        upcoming_dates = db.query(ParadeDate).filter(
+            ParadeDate.planning_year_id == year_id_resolved,
+            ParadeDate.is_active == True,  # noqa: E712
+            ParadeDate.parade_date >= today,
+            ParadeDate.parade_date <= horizon_4w,
+        ).order_by(ParadeDate.parade_date).all()
+        for pd_obj in upcoming_dates:
+            conflicts = db.query(PlanningConflict).filter(
+                PlanningConflict.parade_date_id == pd_obj.id,
+                PlanningConflict.is_resolved == False,  # noqa: E712
+            ).all()
+            for c in conflicts:
+                active_conflicts.append({
+                    "conflict_id": c.id, "parade_date": pd_obj.parade_date,
+                    "conflict_type": c.conflict_type, "severity": c.severity,
+                    "message": c.message,
+                })
+
+    # 5. Sessions without facilitators in next 4 parade nights
+    unfacilitated = []
+    if year_id_resolved:
+        for pd_obj in upcoming_dates:  # type: ignore[possibly-undefined]
+            if not pd_obj.parade_night_id:
+                continue
+            from ..models import Session as TSession
+            empty = db.query(TSession).filter(
+                TSession.parade_night_id == pd_obj.parade_night_id,
+                TSession.facilitator_id == None,  # noqa: E711
+                TSession.is_archived == False,  # noqa: E712
+            ).count()
+            if empty > 0:
+                unfacilitated.append({
+                    "parade_date": pd_obj.parade_date,
+                    "sessions_without_facilitator": empty,
+                })
+
+    return {
+        "planning_year_id": year_id_resolved,
+        "as_of": today,
+        "horizon_weeks": 8,
+        "summary": {
+            "upcoming_anchors": len(upcoming_anchors),
+            "prep_gaps": len(prep_gaps),
+            "unreviewed_wing_events": len(unreviewed_wing),
+            "active_conflicts": len(active_conflicts),
+            "parade_nights_missing_facilitators": len(unfacilitated),
+        },
+        "upcoming_anchors": [_anchor_out(a) for a in upcoming_anchors],
+        "prep_gaps": prep_gaps,
+        "unreviewed_wing_events": unreviewed_wing,
+        "active_conflicts": active_conflicts,
+        "unfacilitated_sessions": unfacilitated,
+    }
+
+
+# ─────────────────────────────────────────────────────────────
+# Activity Calendar — classification and filtering
+# ─────────────────────────────────────────────────────────────
+
+PLANNING_IMPORTANCE_VALUES = frozenset({
+    "must_attend", "key_event", "home_parade", "optional", "noting",
+})
+
+
+class ActivityClassifyIn(BaseModel):
+    planning_importance: Optional[str] = None
+    importance_level: Optional[int] = None
+    audience: Optional[list] = None
+    notes: Optional[str] = None
+
+
+@router.get("/activities")
+def list_activities(
+    planning_importance: Optional[str] = None,
+    audience: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    squadron_id: Optional[str] = None,
+    wing_id_filter: Optional[str] = None,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Return activities filterable by audience and planning importance — the Activity Calendar feed."""
+    q = db.query(Activity).filter(Activity.is_archived == False)  # noqa: E712
+
+    # Scope
+    if p.role == "sqn_admin":
+        q = q.filter(Activity.squadron_id == p.squadron_id)
+    elif p.role in ("wing_admin", "wing_viewer"):
+        sqn_ids = [s.id for s in db.query(Squadron).filter(
+            Squadron.wing_id == p.wing_id, Squadron.is_archived == False  # noqa: E712
+        ).all()]
+        q = q.filter(Activity.squadron_id.in_(sqn_ids))
+    if squadron_id and p.role not in ("sqn_admin",):
+        q = q.filter(Activity.squadron_id == squadron_id)
+
+    if planning_importance:
+        q = q.filter(Activity.planning_importance == planning_importance)
+    if start_date:
+        q = q.filter(Activity.date_start >= start_date)
+    if end_date:
+        q = q.filter(Activity.date_start <= end_date)
+
+    activities = q.order_by(Activity.date_start).limit(500).all()
+
+    # Audience post-filter (audience stored as JSON list)
+    if audience:
+        activities = [
+            a for a in activities
+            if audience in (_parse_json_list(a.audience) or [])
+        ]
+
+    return [_activity_out(a) for a in activities]
+
+
+@router.patch("/activities/{activity_id}/classify")
+def classify_activity(
+    activity_id: str,
+    body: ActivityClassifyIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Set audience, planning_importance, and importance_level on an activity."""
+    _require_plan_write(p)
+    act = db.get(Activity, activity_id)
+    if not act or act.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if p.role == "sqn_admin" and act.squadron_id != p.squadron_id:
+        raise HTTPException(403, detail={"error": "out_of_scope"})
+
+    if body.planning_importance is not None:
+        if body.planning_importance not in PLANNING_IMPORTANCE_VALUES:
+            raise HTTPException(422, detail={"error": "invalid_planning_importance",
+                                             "valid": sorted(PLANNING_IMPORTANCE_VALUES)})
+        act.planning_importance = body.planning_importance
+    if body.importance_level is not None:
+        if body.importance_level not in range(1, 6):
+            raise HTTPException(422, detail={"error": "invalid_importance_level", "valid": [1, 2, 3, 4, 5]})
+        act.importance_level = body.importance_level
+    if body.audience is not None:
+        act.audience = body.audience
+    if body.notes is not None:
+        act.notes = body.notes
+
+    db.commit()
+    audit(db, p, object_type="activity", object_id=act.id, action="classify",
+          new={"planning_importance": act.planning_importance, "importance_level": act.importance_level})
+    return _activity_out(act)
+
+
+# ─────────────────────────────────────────────────────────────
+# Local Lessons
+# ─────────────────────────────────────────────────────────────
+
+def _local_lesson_out(ll: LocalLesson) -> dict:
+    return {
+        "local_lesson_id": ll.id, "lesson_code": ll.lesson_code, "lesson_name": ll.lesson_name,
+        "description": ll.description, "subject_area": ll.subject_area,
+        "default_duration_mins": ll.default_duration_mins,
+        "is_template": ll.is_template, "squadron_id": ll.squadron_id,
+        "created_by": ll.created_by,
+        "created_at": ll.created_at.isoformat() if ll.created_at else None,
+    }
+
+
+class LocalLessonIn(BaseModel):
+    lesson_code: str
+    lesson_name: str
+    description: Optional[str] = None
+    subject_area: Optional[str] = None
+    default_duration_mins: Optional[int] = None
+    squadron_id: Optional[str] = None
+
+
+class LocalLessonPatch(BaseModel):
+    lesson_name: Optional[str] = None
+    description: Optional[str] = None
+    subject_area: Optional[str] = None
+    default_duration_mins: Optional[int] = None
+
+
+@router.get("/local-lessons")
+def list_local_lessons(
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Return system templates plus squadron-specific custom local lessons."""
+    q = db.query(LocalLesson).filter(LocalLesson.is_archived == False)  # noqa: E712
+    # Always include system templates (squadron_id=None) plus own squadron overrides
+    if p.role == "sqn_admin":
+        q = q.filter(
+            (LocalLesson.squadron_id == None) | (LocalLesson.squadron_id == p.squadron_id)  # noqa: E711
+        )
+    elif p.role in ("wing_admin", "wing_viewer"):
+        sqn_ids = [s.id for s in db.query(Squadron).filter(
+            Squadron.wing_id == p.wing_id, Squadron.is_archived == False  # noqa: E712
+        ).all()]
+        q = q.filter(
+            (LocalLesson.squadron_id == None) | (LocalLesson.squadron_id.in_(sqn_ids))  # noqa: E711
+        )
+    return [_local_lesson_out(ll) for ll in q.order_by(LocalLesson.lesson_code).all()]
+
+
+@router.post("/local-lessons")
+def create_local_lesson(
+    body: LocalLessonIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    _require_plan_write(p)
+    sqn_id = body.squadron_id or p.squadron_id
+    if p.role == "sqn_admin":
+        sqn_id = p.squadron_id
+    ll = LocalLesson(
+        id=str(uuid.uuid4()), squadron_id=sqn_id,
+        lesson_code=body.lesson_code.strip(), lesson_name=body.lesson_name.strip(),
+        description=body.description, subject_area=body.subject_area,
+        default_duration_mins=body.default_duration_mins,
+        is_template=False, created_by=p.user_id,
+        created_at=utcnow(), updated_at=utcnow(),
+    )
+    db.add(ll); db.commit()
+    audit(db, p, object_type="local_lesson", object_id=ll.id, action="create",
+          new={"lesson_code": ll.lesson_code, "lesson_name": ll.lesson_name})
+    return _local_lesson_out(ll)
+
+
+@router.patch("/local-lessons/{lesson_id}")
+def update_local_lesson(
+    lesson_id: str,
+    body: LocalLessonPatch,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    _require_plan_write(p)
+    ll = db.get(LocalLesson, lesson_id)
+    if not ll or ll.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if ll.squadron_id and p.role == "sqn_admin" and ll.squadron_id != p.squadron_id:
+        raise HTTPException(403, detail={"error": "out_of_scope"})
+    for field in ("lesson_name", "description", "subject_area", "default_duration_mins"):
+        val = getattr(body, field)
+        if val is not None:
+            setattr(ll, field, val)
+    ll.updated_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="local_lesson", object_id=ll.id, action="update")
+    return _local_lesson_out(ll)
+
+
+@router.delete("/local-lessons/{lesson_id}")
+def delete_local_lesson(
+    lesson_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    _require_plan_write(p)
+    ll = db.get(LocalLesson, lesson_id)
+    if not ll or ll.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if ll.squadron_id and p.role == "sqn_admin" and ll.squadron_id != p.squadron_id:
+        raise HTTPException(403, detail={"error": "out_of_scope"})
+    ll.is_archived = True; ll.archived_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="local_lesson", object_id=ll.id, action="archive")
+    return {"ok": True}
+
+
+@router.post("/local-lessons/seed-defaults")
+def seed_default_local_lessons(
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Create the system-template local lessons (Skills-01..14) if they don't exist yet.
+    Idempotent — skips codes that already exist as templates.
+    """
+    if p.role not in ("system_admin", "national_admin"):
+        raise HTTPException(403, detail={"error": "forbidden"})
+    existing_codes = {
+        ll.lesson_code for ll in
+        db.query(LocalLesson).filter(
+            LocalLesson.squadron_id == None, LocalLesson.is_archived == False  # noqa: E711, E712
+        ).all()
+    }
+    created = []
+    for code, name in LOCAL_LESSON_DEFAULTS:
+        if code not in existing_codes:
+            ll = LocalLesson(
+                id=str(uuid.uuid4()), squadron_id=None,
+                lesson_code=code, lesson_name=name,
+                is_template=True, created_by=p.user_id,
+                created_at=utcnow(), updated_at=utcnow(),
+            )
+            db.add(ll)
+            created.append(code)
+    db.commit()
+    return {"ok": True, "created": created, "already_existed": len(LOCAL_LESSON_DEFAULTS) - len(created)}

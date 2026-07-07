@@ -6,6 +6,9 @@ import type {
   CadetRiskFlag, AuditRow, ActionItem, SummaryReport, ReadinessReport, CoverageReport,
   FacLoadReport, NotDeliveredReport, WingOverview, NationalOverview, NationalCapability,
   WingPhaseCoverage, ImportPreview, ImportCommitResult,
+  PlanningYear, AnnualProgram, LongRangeView, WeeklyProgramData,
+  MissionItem, PlanningLocation, PlanningFacilitator, LocalLesson,
+  WingHQEvent, CommandCentreData, PlanningConflict,
 } from "./types";
 
 export const authApi = {
@@ -116,4 +119,59 @@ export const accountApi = {
 export const healthApi = {
   health: () => api.get<{ status: string }>("/api/health"),
   ready: () => api.get<{ status: string }>("/api/health/ready"),
+};
+
+// ─── Planning Workspace API ─────────────────────────────────────────────────
+export const planningApi = {
+  years: () => api.get<PlanningYear[]>("/api/planning/years"),
+  commandCentre: (year_id?: string) =>
+    api.get<CommandCentreData>(`/api/planning/command-centre${year_id ? `?year_id=${year_id}` : ""}`),
+  annualProgram: (year_id: string) =>
+    api.get<AnnualProgram>(`/api/planning/years/${year_id}/annual-program`),
+  longRange: (year_id: string, weeks = 8, from_date?: string) => {
+    const p = new URLSearchParams({ weeks: String(weeks) });
+    if (from_date) p.set("from_date", from_date);
+    return api.get<LongRangeView>(`/api/planning/years/${year_id}/long-range?${p}`);
+  },
+  weeklyProgram: (date_id: string) =>
+    api.get<WeeklyProgramData>(`/api/planning/parade-dates/${date_id}/weekly-program`),
+  missions: (year_id: string, opts: { status?: string; phase?: string; search?: string } = {}) => {
+    const p = new URLSearchParams();
+    if (opts.status) p.set("status", opts.status);
+    if (opts.phase) p.set("phase", opts.phase);
+    if (opts.search) p.set("search", opts.search);
+    const qs = p.toString();
+    return api.get<{ planning_year_id: string; year: number; total: number; scheduled_count: number; missions: MissionItem[] }>(
+      `/api/planning/years/${year_id}/missions${qs ? `?${qs}` : ""}`
+    );
+  },
+  locations: () => api.get<PlanningLocation[]>("/api/planning/locations"),
+  facilitators: () => api.get<PlanningFacilitator[]>("/api/planning/facilitators"),
+  localLessons: () => api.get<LocalLesson[]>("/api/planning/local-lessons"),
+  conflicts: (year_id: string) =>
+    api.get<{ conflicts: PlanningConflict[] }>(`/api/planning/years/${year_id}/conflicts`),
+  runChecks: (year_id: string) =>
+    api.post<{ ok: boolean; conflicts_detected: number }>(`/api/planning/years/${year_id}/run-checks`, {}),
+  createSession: (date_id: string, body: {
+    cadet_group: string; session_number: number; curriculum_id?: string;
+    activity_title?: string; facilitator_id?: string; location_id?: string;
+    part_number?: number; notes?: string;
+  }) => api.post<Record<string, unknown>>(`/api/planning/parade-dates/${date_id}/sessions`, body),
+  updateSession: (session_id: string, body: {
+    curriculum_id?: string | null; activity_title?: string | null;
+    facilitator_id?: string | null; assistant_facilitator_id?: string | null;
+    location_id?: string | null; cadet_group?: string | null;
+    part_number?: number | null; notes?: string | null;
+  }) => api.patch<Record<string, unknown>>(`/api/planning/sessions/${session_id}`, body),
+  deleteSession: (session_id: string) =>
+    api.delete<{ ok: boolean }>(`/api/planning/sessions/${session_id}`),
+  overrideConflict: (conflict_id: string, override_reason: string) =>
+    api.post<{ ok: boolean }>(`/api/planning/conflicts/${conflict_id}/override`, { override_reason }),
+  wingEvents: (wing_id: string, year: number, squadron_id?: string) => {
+    const p = new URLSearchParams({ wing_id, year: String(year) });
+    if (squadron_id) p.set("squadron_id", squadron_id);
+    return api.get<WingHQEvent[]>(`/api/wing-calendar/squadron-overlay?${p}`);
+  },
+  reviewWingEvent: (event_id: string, status: string, notes?: string) =>
+    api.patch<{ ok: boolean }>(`/api/wing-calendar/events/${event_id}/squadron-status`, { status, notes }),
 };

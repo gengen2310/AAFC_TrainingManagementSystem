@@ -150,6 +150,46 @@ class PlanningLocation(Base, UUIDMixin, TimestampMixin):
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
 
+LOCAL_LESSON_CODES = (
+    "Skills-01", "Skills-02", "Skills-03", "Skills-04", "Skills-05", "Skills-06",
+    "Skills-07", "Skills-08", "Skills-09", "Skills-10", "Skills-11", "Skills-12",
+    "Skills-13", "Skills-14",
+)
+
+LOCAL_LESSON_DEFAULTS = [
+    ("Skills-01", "Admin Session"),
+    ("Skills-02", "Term Briefing"),
+    ("Skills-03", "Activity Prep"),
+    ("Skills-04", "Activity Briefing"),
+    ("Skills-05", "Activity Debrief"),
+    ("Skills-06", "Activity Day"),
+    ("Skills-07", "Guest Speaker"),
+    ("Skills-08", "Term Overview"),
+    ("Skills-09", "Recruit Administration"),
+    ("Skills-10", "Catch-Up / Consolidation"),
+    ("Skills-11", "Team Building"),
+    ("Skills-12", "Assessment"),
+    ("Skills-13", "No Parade — Holiday"),
+    ("Skills-14", "No Parade — Activity"),
+]
+
+
+class LocalLesson(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
+    """Custom squadron lesson type — not part of the national curriculum.
+    Covers administrative, activity-support, and special session types (Skills-01..14).
+    squadron_id=None means it is a system-level template available to all squadrons.
+    """
+    __tablename__ = "local_lessons"
+    squadron_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
+    lesson_code: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    lesson_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    subject_area: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    default_duration_mins: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_template: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+
 class PlanningConflict(Base, UUIDMixin, TimestampMixin):
     """A detected planning conflict, with optional override."""
     __tablename__ = "planning_conflicts"
