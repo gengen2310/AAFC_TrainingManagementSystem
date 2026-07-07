@@ -16,7 +16,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, model_validator
+from sqlalchemy import cast, String
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
@@ -133,10 +134,28 @@ def _load_links(event_id: str, db: DBSession) -> list[dict]:
     links = db.query(WingEventCurriculumLink).filter(
         WingEventCurriculumLink.wing_event_id == event_id
     ).all()
-    result = []
+    if not links:
+        return []
+    ci_ids = [lnk.curriculum_item_id for lnk in links]
+    ci_map = {ci.id: ci for ci in db.query(CurriculumItem).filter(CurriculumItem.id.in_(ci_ids)).all()}
+    return [_link_out(lnk, ci_map[lnk.curriculum_item_id].code if lnk.curriculum_item_id in ci_map else None,
+                      ci_map[lnk.curriculum_item_id].title if lnk.curriculum_item_id in ci_map else None)
+            for lnk in links]
+
+
+def _load_links_for_events(event_ids: list[str], db: DBSession) -> dict[str, list[dict]]:
+    """Batch-load curriculum links for a list of events — avoids N+1 on list endpoints."""
+    if not event_ids:
+        return {}
+    links = db.query(WingEventCurriculumLink).filter(
+        WingEventCurriculumLink.wing_event_id.in_(event_ids)
+    ).all()
+    ci_ids = list({lnk.curriculum_item_id for lnk in links})
+    ci_map = {ci.id: ci for ci in db.query(CurriculumItem).filter(CurriculumItem.id.in_(ci_ids)).all()} if ci_ids else {}
+    result: dict[str, list[dict]] = {eid: [] for eid in event_ids}
     for lnk in links:
-        ci = db.get(CurriculumItem, lnk.curriculum_item_id)
-        result.append(_link_out(lnk, ci.code if ci else None, ci.title if ci else None))
+        ci = ci_map.get(lnk.curriculum_item_id)
+        result[lnk.wing_event_id].append(_link_out(lnk, ci.code if ci else None, ci.title if ci else None))
     return result
 
 
@@ -153,6 +172,16 @@ def _load_sqn_status(event_id: str, squadron_id: str | None, db: DBSession) -> d
 # ─────────────────────────────────────────────────────────────
 # Pydantic models
 # ─────────────────────────────────────────────────────────────
+
+def _validate_iso_date(v: str | None) -> str | None:
+    if v is None:
+        return v
+    try:
+        datetime.strptime(v, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError(f"Date must be YYYY-MM-DD, got: {v!r}")
+    return v
+
 
 class WingEventIn(BaseModel):
     title: str
@@ -174,6 +203,34 @@ class WingEventIn(BaseModel):
     source_reference: Optional[str] = None
     source_event_code: Optional[str] = None
 
+    @field_validator("title")
+    @classmethod
+    def title_nonempty(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Title cannot be empty.")
+        if len(v) > 300:
+            raise ValueError("Title cannot exceed 300 characters.")
+        return v
+
+    @field_validator("start_date")
+    @classmethod
+    def start_date_iso(cls, v: str) -> str:
+        _validate_iso_date(v)
+        return v
+
+    @field_validator("end_date")
+    @classmethod
+    def end_date_iso(cls, v: str | None) -> str | None:
+        return _validate_iso_date(v)
+
+    @field_validator("status")
+    @classmethod
+    def status_valid(cls, v: str) -> str:
+        if v not in WING_EVENT_STATUS:
+            raise ValueError(f"status must be one of {sorted(WING_EVENT_STATUS)}")
+        return v
+
 
 class WingEventPatch(BaseModel):
     title: Optional[str] = None
@@ -191,6 +248,30 @@ class WingEventPatch(BaseModel):
     requires_squadron_action: Optional[bool] = None
     is_planning_anchor: Optional[bool] = None
     notes: Optional[str] = None
+
+    @field_validator("title")
+    @classmethod
+    def title_nonempty(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("Title cannot be empty.")
+        if len(v) > 300:
+            raise ValueError("Title cannot exceed 300 characters.")
+        return v
+
+    @field_validator("start_date", "end_date")
+    @classmethod
+    def dates_iso(cls, v: str | None) -> str | None:
+        return _validate_iso_date(v)
+
+    @field_validator("status")
+    @classmethod
+    def status_valid(cls, v: str | None) -> str | None:
+        if v is not None and v not in WING_EVENT_STATUS:
+            raise ValueError(f"status must be one of {sorted(WING_EVENT_STATUS)}")
+        return v
 
 
 class CurriculumLinkIn(BaseModel):
@@ -217,6 +298,8 @@ def list_wing_events(
     planning_importance: Optional[str] = Query(default=None),
     audience: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -237,10 +320,18 @@ def list_wing_events(
         q = q.filter(WingHQEvent.status == status)
     else:
         q = q.filter(WingHQEvent.status != "cancelled")
+    # Audience filter: push to DB as a JSON-string contains check (works for both
+    # SQLite text and PostgreSQL JSON/JSONB); fall back gracefully on unsupported dialects.
+    if audience:
+        try:
+            q = q.filter(cast(WingHQEvent.audience, String).contains(audience))
+        except Exception:
+            pass  # filter applied in Python below if the DB cast fails
 
-    events = q.order_by(WingHQEvent.start_date).all()
+    events = q.order_by(WingHQEvent.start_date).offset(offset).limit(limit).all()
 
     sqn_id = p.squadron_id
+    links_map = _load_links_for_events([e.id for e in events], db)
     result = []
     for e in events:
         if audience:
@@ -249,7 +340,7 @@ def list_wing_events(
                 continue
         result.append(_event_out(
             e,
-            curriculum_links=_load_links(e.id, db),
+            curriculum_links=links_map.get(e.id, []),
             sqn_status=_load_sqn_status(e.id, sqn_id, db),
         ))
     return result
@@ -559,10 +650,21 @@ def get_squadron_overlay(
         q = q.filter(WingHQEvent.planning_importance == importance)
 
     events = q.order_by(WingHQEvent.start_date).all()
-    sqn_id = squadron_id or p.squadron_id
 
+    # Resolve which squadron's status to include; enforce scope.
+    sqn_id = squadron_id or p.squadron_id
+    if squadron_id and squadron_id != p.squadron_id:
+        # Cross-squadron status lookup only allowed for wing/national/system scope
+        if p.role in ("sqn_admin", "sqn_general"):
+            raise HTTPException(403, detail={"error": "out_of_scope"})
+        if p.role in ("wing_admin", "wing_viewer"):
+            sqn = db.get(Squadron, squadron_id)
+            if not sqn or sqn.wing_id != p.wing_id:
+                raise HTTPException(403, detail={"error": "out_of_scope"})
+
+    links_map = _load_links_for_events([e.id for e in events], db)
     return [_event_out(
         e,
-        curriculum_links=_load_links(e.id, db),
+        curriculum_links=links_map.get(e.id, []),
         sqn_status=_load_sqn_status(e.id, sqn_id, db),
     ) for e in events]

@@ -300,10 +300,15 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
             raise HTTPException(422, detail={"error": "flight_not_in_squadron"})
         flight_id = fl.id
 
-    # Derive nat_id for national-scope roles
+    # Derive nat_id for national-scope roles; derive wing_id from squadron for sqn-scope roles
+    # so that p.wing_id is populated for wing calendar scope checks.
     nat_id = body.national_id
     wing_id = body.wing_id
     sqn_id = body.squadron_id
+    if _scope_type(body.role) == "squadron" and not wing_id and sqn_id:
+        sqn_obj = db.get(Squadron, sqn_id)
+        if sqn_obj:
+            wing_id = sqn_obj.wing_id
     if _scope_type(body.role) == "national" and not nat_id:
         nat = db.query(NationalEntity).first()
         nat_id = nat.id if nat else None

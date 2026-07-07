@@ -2700,10 +2700,14 @@ async def import_annual_program(
     is_xlsx = fname.endswith(".xlsx") or (file.content_type or "").startswith("application/vnd")
 
     content = await file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(413, detail={"error": "file_too_large",
+                                         "message": "File exceeds the 5 MB limit."})
     try:
         rows = _parse_program_file(content, is_xlsx)
-    except Exception as exc:
-        raise HTTPException(400, detail={"error": "file_parse_failed", "message": str(exc)})
+    except Exception:
+        raise HTTPException(400, detail={"error": "file_parse_failed",
+                                         "message": "The file could not be parsed. Ensure it is a valid CSV or XLSX."})
 
     if not rows:
         raise HTTPException(400, detail={"error": "empty_file"})

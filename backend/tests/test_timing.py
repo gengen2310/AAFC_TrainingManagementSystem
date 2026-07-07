@@ -447,7 +447,7 @@ def test_remove_timing_override(client):
 
 def test_override_reason_required(client):
     h = login(client, "ADMIN703")
-    pnid = _create_pn(client, h, date="2026-10-09")
+    pnid = _create_pn(client, h, date="2028-04-19")
     short = _create_template(client, h, name="No Reason Test", effective_from="2026-01-01",
                               blocks=[{"display_order": 0, "block_name": "P1",
                                        "block_type": "instructional_period",
