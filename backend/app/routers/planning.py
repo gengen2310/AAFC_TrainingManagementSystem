@@ -6,7 +6,7 @@ builder, scheduled sessions, locations, facilitators (planning view),
 conflict detection, and weekly/long-range program output.
 """
 from __future__ import annotations
-import io, json as _json, uuid
+import csv as _csv, io, json as _json, re, uuid
 from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -25,7 +25,7 @@ from ..models.planning import (
     PlanningLocation, PlanningConflict,
     CADET_GROUPS, IMPORTANCE_LEVELS, EVENT_TYPES,
 )
-from ..models.training import TimingTemplate, TimingBlock
+from ..models.training import TimingTemplate, TimingBlock, Activity
 from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_write_squadron
 from ..services import audit
@@ -47,6 +47,92 @@ def _parse_json_list(val) -> list:
         except (_json.JSONDecodeError, TypeError):
             return []
     return []
+
+
+# ── Annual Program import helpers ────────────────────────────
+
+_PROG_DATE_FMTS = ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y", "%d %b %Y"]
+
+
+def _parse_prog_date(raw: str) -> str | None:
+    """Parse a date string to ISO YYYY-MM-DD."""
+    if not raw:
+        return None
+    from datetime import datetime
+    for fmt in _PROG_DATE_FMTS:
+        try:
+            return datetime.strptime(raw.strip(), fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+    return raw.strip()[:10] or None
+
+
+def _parse_prog_time(raw: str) -> str | None:
+    """Normalise a time string to HH:MM."""
+    if not raw:
+        return None
+    raw = raw.strip()
+    parts = raw.split(":")
+    if len(parts) >= 2:
+        try:
+            return f"{int(parts[0]):02d}:{int(parts[1]):02d}"
+        except ValueError:
+            pass
+    return raw[:5] or None
+
+
+_PARADE_KWORDS = ("parade night", "training night", "parade ngt", "parade nt")
+
+
+def _is_parade_row(name: str) -> bool:
+    n = name.strip().lower()
+    return any(kw in n for kw in _PARADE_KWORDS)
+
+
+def _resolve_unit_sqn(unit_str: str, all_sqns: list) -> "Squadron | None":
+    """Match a Unit column value to a Squadron by code or number prefix."""
+    if not unit_str:
+        return None
+    u_up = unit_str.strip().upper()
+    for sq in all_sqns:
+        if sq.code and sq.code.strip().upper() == u_up:
+            return sq
+    m = re.match(r'^(\d+)', unit_str.strip())
+    if m:
+        num = m.group(1)
+        for sq in all_sqns:
+            if sq.code and re.match(r'^' + re.escape(num) + r'\b', sq.code.strip()):
+                return sq
+    u_lo = unit_str.strip().lower()
+    for sq in all_sqns:
+        if sq.name and u_lo in sq.name.lower():
+            return sq
+    return None
+
+
+def _parse_program_file(content: bytes, is_xlsx: bool) -> list[dict]:
+    """Decode CSV or XLSX bytes into a list of {header: value} dicts."""
+    if is_xlsx:
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+        ws = wb.active
+        rows_iter = ws.iter_rows(values_only=True)
+        header_row = next(rows_iter, None)
+        if not header_row:
+            return []
+        headers = [str(c).strip() if c is not None else "" for c in header_row]
+        result = []
+        for row in rows_iter:
+            if all(v is None for v in row):
+                continue
+            result.append({h: (str(v) if v is not None else "") for h, v in zip(headers, row)})
+        return result
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+    reader = _csv.DictReader(io.StringIO(text))
+    return [dict(row) for row in reader]
 
 
 # ─────────────────────────────────────────────────────────────
@@ -2536,3 +2622,182 @@ async def import_schedule_xlsx(
 
     return {"ok": True, "preview": preview, "rows": preview_rows,
             "updated": updated, "skipped": skipped, "not_found": not_found}
+
+
+# ── ANNUAL PROGRAM IMPORT ─────────────────────────────────────────────────────
+
+@router.post("/years/{year_id}/import-program")
+async def import_annual_program(
+    year_id: str,
+    preview: bool = Query(default=False),
+    file: UploadFile = File(...),
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Import Annual Program schedule from CSV or XLSX (CADET.Net export format).
+
+    Expected columns (case-insensitive):
+    SeqNr, Name, Start date, Start time, End date, End time, Unit, Owner, Status, Last Updated
+
+    - Rows whose Name contains 'parade night' or 'training night' become
+      ParadeDate + ParadeNight records linked to this planning year.
+    - All other rows become Activity records.
+    - For wing/national planning years the Unit column routes each row to
+      the correct squadron within scope.
+    - Duplicate parade dates (same date + unit) and duplicate SeqNr
+      activities are skipped.
+    - preview=true: classify and validate rows without writing to the database.
+    """
+    _require_plan_write(p)
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py, write=True)
+
+    # Build the set of squadrons in scope for unit resolution
+    sqn_q = db.query(Squadron).filter(Squadron.is_archived == False)  # noqa: E712
+    if py.unit_id:
+        sqn_q = sqn_q.filter(Squadron.id == py.unit_id)
+    elif py.wing_id:
+        sqn_q = sqn_q.filter(Squadron.wing_id == py.wing_id)
+    all_sqns = sqn_q.all()
+    default_sqn = db.get(Squadron, py.unit_id) if py.unit_id else None
+
+    # Detect file format from filename / content-type
+    fname = (file.filename or "").lower()
+    is_xlsx = fname.endswith(".xlsx") or (file.content_type or "").startswith("application/vnd")
+
+    content = await file.read()
+    try:
+        rows = _parse_program_file(content, is_xlsx)
+    except Exception as exc:
+        raise HTTPException(400, detail={"error": "file_parse_failed", "message": str(exc)})
+
+    if not rows:
+        raise HTTPException(400, detail={"error": "empty_file"})
+
+    # Deduplication sets
+    existing_pdate_keys: set[tuple[str, str | None]] = {
+        (pd.parade_date, pd.unit_id)
+        for pd in db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).all()
+    }
+    act_q = db.query(Activity.cea_seq_nr).filter(
+        Activity.cea_seq_nr.isnot(None),
+        Activity.is_archived == False,  # noqa: E712
+    )
+    if py.unit_id:
+        act_q = act_q.filter(Activity.squadron_id == py.unit_id)
+    elif py.wing_id:
+        act_q = act_q.filter(Activity.wing_id == py.wing_id)
+    existing_seq_nrs: set[str] = {a.cea_seq_nr for a in act_q.all() if a.cea_seq_nr}
+
+    parse_errors: list[str] = []
+    preview_rows: list[dict] = []
+    created_parade_dates = created_activities = skipped = 0
+
+    for i, raw_row in enumerate(rows, start=2):
+        norm = {k.strip().lower(): (v or "").strip() for k, v in raw_row.items()}
+
+        seq_nr = norm.get("seqnr") or norm.get("seq nr") or norm.get("seq_nr") or norm.get("seq") or ""
+        name = norm.get("name") or norm.get("activity name") or ""
+        date_start_raw = norm.get("start date") or norm.get("startdate") or norm.get("start_date") or ""
+        time_start_raw = norm.get("start time") or norm.get("starttime") or norm.get("start_time") or ""
+        date_end_raw = norm.get("end date") or norm.get("enddate") or norm.get("end_date") or ""
+        time_end_raw = norm.get("end time") or norm.get("endtime") or norm.get("end_time") or ""
+        unit_col = norm.get("unit") or ""
+        owner = norm.get("owner") or ""
+
+        if not name or not date_start_raw:
+            parse_errors.append(f"Row {i}: missing Name or Start date — skipped.")
+            continue
+
+        date_start = _parse_prog_date(date_start_raw)
+        date_end = _parse_prog_date(date_end_raw) if date_end_raw else None
+        time_start = _parse_prog_time(time_start_raw) if time_start_raw else None
+        time_end = _parse_prog_time(time_end_raw) if time_end_raw else None
+
+        if not date_start:
+            parse_errors.append(f"Row {i}: unrecognised date '{date_start_raw}' — skipped.")
+            continue
+
+        # Resolve squadron
+        if py.unit_id:
+            resolved_sqn = default_sqn
+        elif unit_col:
+            resolved_sqn = _resolve_unit_sqn(unit_col, all_sqns)
+            if not resolved_sqn:
+                parse_errors.append(f"Row {i}: Unit '{unit_col}' not found in scope — skipped.")
+                continue
+        else:
+            resolved_sqn = None  # wing/national activity with no unit specified
+
+        is_parade = _is_parade_row(name)
+        row_type = "parade_date" if is_parade else "activity"
+
+        if preview:
+            preview_rows.append({
+                "row": i, "seq_nr": seq_nr or None, "name": name, "type": row_type,
+                "date_start": date_start, "date_end": date_end,
+                "time_start": time_start, "time_end": time_end,
+                "unit": unit_col,
+                "resolved_sqn": resolved_sqn.code if resolved_sqn else None,
+                "owner": owner or None,
+                "status": "new",
+            })
+            continue
+
+        if is_parade:
+            key = (date_start, resolved_sqn.id if resolved_sqn else None)
+            if key in existing_pdate_keys:
+                skipped += 1
+                continue
+            pn = _find_or_create_parade_night(
+                db, resolved_sqn.id if resolved_sqn else None, date_start, p
+            )
+            pd_obj = ParadeDate(
+                id=str(uuid.uuid4()), planning_year_id=year_id,
+                unit_id=resolved_sqn.id if resolved_sqn else py.unit_id,
+                parade_date=date_start, parade_type="normal", is_active=True,
+                parade_night_id=pn.id if pn else None,
+                created_at=utcnow(), updated_at=utcnow(),
+            )
+            db.add(pd_obj)
+            existing_pdate_keys.add(key)
+            created_parade_dates += 1
+        else:
+            if seq_nr and seq_nr in existing_seq_nrs:
+                skipped += 1
+                continue
+            sqn_id = resolved_sqn.id if resolved_sqn else py.unit_id
+            w_id = resolved_sqn.wing_id if resolved_sqn else py.wing_id
+            a = Activity(
+                squadron_id=sqn_id, wing_id=w_id,
+                owning_level="squadron" if sqn_id else "wing",
+                activity_name=name, activity_type="program_import",
+                date_start=date_start, date_end=date_end,
+                time_start=time_start, time_end=time_end,
+                oic=owner or None, cea_seq_nr=seq_nr or None,
+            )
+            db.add(a)
+            if seq_nr:
+                existing_seq_nrs.add(seq_nr)
+            created_activities += 1
+
+    if preview:
+        return {
+            "ok": True, "preview": True, "rows": preview_rows,
+            "parse_errors": parse_errors,
+        }
+
+    db.commit()
+    audit(db, p, object_type="planning_program", object_id=year_id, action="import",
+          new={"created_parade_dates": created_parade_dates,
+               "created_activities": created_activities,
+               "skipped": skipped})
+
+    return {
+        "ok": True, "preview": False,
+        "created_parade_dates": created_parade_dates,
+        "created_activities": created_activities,
+        "skipped": skipped,
+        "total_rows": created_parade_dates + created_activities + skipped,
+        "parse_errors": parse_errors,
+    }
