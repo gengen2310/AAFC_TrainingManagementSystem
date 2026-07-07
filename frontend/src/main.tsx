@@ -6,7 +6,6 @@ import "./styles/base.css";
 import "./styles/layout.css";
 import "./styles/components.css";
 import "./styles/print.css";
-import "./styles/planning.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode><App /></React.StrictMode>

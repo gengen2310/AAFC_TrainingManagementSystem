@@ -30,8 +30,8 @@ from ..services import audit
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
-APP_VERSION = "17.2.0"
-PACKAGE_VERSION = "v17.2"
+APP_VERSION = "17.1.0"
+PACKAGE_VERSION = "v17.1"
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -137,7 +137,7 @@ def system_version(p: Principal = Depends(get_principal)):
 def system_migrations(p: Principal = Depends(get_principal)):
     require_system_admin(p)
     return {
-        "expected_head": "r3s4t5u6v7w8",
+        "expected_head": "q2r3s4t5u6v7",
         "current": _migration_head(),
     }
 

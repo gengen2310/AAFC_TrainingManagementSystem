@@ -120,8 +120,8 @@ def test_system_version_sysadmin(client):
     r = client.get("/api/system/version", headers=hdr)
     assert r.status_code == 200
     d = r.json()
-    assert d["app_version"] == "17.2.0"
-    assert d["package_version"] == "v17.2"
+    assert d["app_version"] == "17.1.0"
+    assert d["package_version"] == "v17.1"
 
 
 def test_system_version_forbidden(client):
@@ -140,7 +140,7 @@ def test_system_migrations_sysadmin(client):
     assert r.status_code == 200
     d = r.json()
     assert "expected_head" in d
-    assert d["expected_head"] == "r3s4t5u6v7w8"
+    assert d["expected_head"] == "q2r3s4t5u6v7"
 
 
 # ─────────────────────────────────────────────────────────────

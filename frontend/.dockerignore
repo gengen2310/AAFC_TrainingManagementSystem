@@ -1,8 +1,0 @@
-node_modules
-.git
-*.md
-e2e
-playwright.config.ts
-tsconfig.tsbuildinfo
-src
-
