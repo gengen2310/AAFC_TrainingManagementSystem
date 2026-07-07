@@ -195,7 +195,7 @@ def list_parades(squadron_id: str | None = None, db: DBSession = Depends(get_db)
 @router.get("/parade-nights/{pnid}")
 def get_parade(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     pn = db.get(ParadeNight, pnid)
-    if not pn:
+    if not pn or pn.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     require_can_view_squadron(p, pn.squadron_id, pn.wing_id)
     sess = [_sess_dict(x) for x in db.query(Session).filter(Session.parade_night_id == pn.id,
@@ -219,6 +219,13 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
     if not s:
         raise HTTPException(400, detail={"error": "no_squadron_scope"})
     require_can_write_squadron(p, s.id, s.wing_id)
+    existing = db.query(ParadeNight).filter(
+        ParadeNight.squadron_id == s.id,
+        ParadeNight.date == body.date,
+        ParadeNight.is_archived == False,  # noqa: E712
+    ).first()
+    if existing:
+        raise HTTPException(409, detail={"error": "duplicate_date", "existing_id": existing.id})
     # Determine session count from effective timing template if one exists.
     # session_count in the body can still override (e.g. user explicitly changes it).
     effective_tmpl = _effective_template(db, s.id, body.date)
@@ -278,7 +285,7 @@ def _recompute(db: DBSession, pn: ParadeNight):
 @router.post("/sessions")
 def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     pn = db.get(ParadeNight, body.parade_night_id)
-    if not pn:
+    if not pn or pn.is_archived:
         raise HTTPException(404, detail={"error": "parade_night_not_found"})
     require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
     s = Session(parade_night_id=pn.id, squadron_id=pn.squadron_id, period_number=body.period_number,
@@ -294,7 +301,7 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
 @router.put("/sessions/{sid}")
 def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     s = db.get(Session, sid)
-    if not s:
+    if not s or s.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     pn = db.get(ParadeNight, s.parade_night_id)
     require_can_write_squadron(p, s.squadron_id, pn.wing_id if pn else None)
@@ -317,7 +324,7 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
 @router.post("/sessions/{sid}/status")
 def set_status(sid: str, body: StatusIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     s = db.get(Session, sid)
-    if not s:
+    if not s or s.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     pn = db.get(ParadeNight, s.parade_night_id)
     require_can_write_squadron(p, s.squadron_id, pn.wing_id if pn else None)
@@ -371,7 +378,7 @@ def _denormalise(db, s: Session, cid, fid, rid):
 @router.post("/parade-nights/{pnid}/publish")
 def publish(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     pn = db.get(ParadeNight, pnid)
-    if not pn:
+    if not pn or pn.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
     sess = [_sess_dict(x) for x in db.query(Session).filter(Session.parade_night_id == pn.id,
@@ -390,7 +397,7 @@ def publish(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(g
 @router.post("/parade-nights/{pnid}/close")
 def close(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     pn = db.get(ParadeNight, pnid)
-    if not pn:
+    if not pn or pn.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
     sess = [_sess_dict(x) for x in db.query(Session).filter(Session.parade_night_id == pn.id,

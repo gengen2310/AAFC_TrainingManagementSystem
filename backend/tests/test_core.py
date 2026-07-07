@@ -99,7 +99,7 @@ def test_proxy_enter_enables_edit_and_audits(client):
     r = client.post(f"/api/proxy/enter/{s703}", headers=h, json={"reason": "Assist July planning"})
     assert r.status_code == 200
     # now editing 703 works
-    r2 = client.post("/api/parade-nights", headers=h, json={"date": "2026-09-11", "session_count": 1})
+    r2 = client.post("/api/parade-nights", headers=h, json={"date": "2027-01-08", "session_count": 1})
     assert r2.status_code == 200
     # audit shows proxy_enter
     aud = client.get("/api/audit", headers=h).json()

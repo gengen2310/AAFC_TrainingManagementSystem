@@ -5,6 +5,7 @@ consider argon2. Tokens are signed JWTs delivered in an HTTP-only cookie.
 """
 import secrets
 import time
+import uuid
 import jwt
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
@@ -45,7 +46,8 @@ def verify_code(code: str, code_hash: str) -> bool:
 def create_token(sub: str, extra: dict, ttl_min: int | None = None) -> str:
     ttl = ttl_min or settings.ACCESS_TOKEN_TTL_MIN
     now = datetime.now(timezone.utc)
-    payload = {"sub": sub, "iat": now, "exp": now + timedelta(minutes=ttl), **extra}
+    payload = {"sub": sub, "iat": now, "exp": now + timedelta(minutes=ttl),
+               "jti": str(uuid.uuid4()), **extra}
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
 
 

@@ -811,7 +811,7 @@ def test_parade_night_builder_endpoint_returns_timing_blocks(client):
     hdr = _sqn_admin_hdr(client)
     # Create a parade night directly
     pn_r = client.post("/api/parade-nights",
-                       json={"date": "2026-12-04", "term": "T4"}, headers=hdr)
+                       json={"date": "2027-02-05", "term": "T4"}, headers=hdr)
     assert pn_r.status_code == 200
     pnid = pn_r.json()["parade_night_id"]
     r = client.get(f"/api/parade-nights/{pnid}/builder", headers=hdr)
@@ -906,7 +906,7 @@ def test_parade_night_links_timing_template_after_seed(client):
     """Creating a parade night for 703 on a fresh seeded DB links to the default timing template."""
     hdr = _sqn_admin_hdr(client)
     pn_r = client.post("/api/parade-nights",
-                       json={"date": "2026-11-06", "term": "T3"}, headers=hdr)
+                       json={"date": "2027-01-15", "term": "T3"}, headers=hdr)
     assert pn_r.status_code == 200
     pnid = pn_r.json()["parade_night_id"]
     r = client.get(f"/api/parade-nights/{pnid}/builder", headers=hdr)
@@ -920,7 +920,7 @@ def test_builder_returns_nonempty_timing_blocks(client):
     """Builder for a 703 parade night must return all 12 timing blocks."""
     hdr = _sqn_admin_hdr(client)
     pn_r = client.post("/api/parade-nights",
-                       json={"date": "2026-11-13", "term": "T3"}, headers=hdr)
+                       json={"date": "2027-01-22", "term": "T3"}, headers=hdr)
     assert pn_r.status_code == 200
     pnid = pn_r.json()["parade_night_id"]
     r = client.get(f"/api/parade-nights/{pnid}/builder", headers=hdr)
