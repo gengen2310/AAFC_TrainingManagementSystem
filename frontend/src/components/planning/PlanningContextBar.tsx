@@ -20,12 +20,11 @@ const MODES: { key: ViewMode; label: string }[] = [
 ];
 
 export function PlanningContextBar({ session, year, cc, viewMode, onModeChange }: Props) {
-  const squadronCode = session?.squadron_id ? "SQN" : "";
   const scopeLabel = session?.is_national
     ? "National HQ"
     : session?.is_wing
-    ? `Wing${session.wing_id ? "" : ""}`
-    : `${squadronCode}`;
+    ? `Wing ${session.wing_id ?? ""}`.trim()
+    : session?.display_name ?? "Squadron";
   const roleLabel = session?.role?.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) ?? "—";
 
   const conflicts = cc?.active_conflicts?.length ?? 0;

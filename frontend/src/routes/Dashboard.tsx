@@ -18,7 +18,8 @@ export function Dashboard() {
 
   if (summary.isLoading) return <Loading />;
   if (summary.error) return <ErrorNote error={summary.error} />;
-  const c = summary.data!.counts;
+  if (!summary.data) return <ErrorNote error={new Error("Dashboard data unavailable. Please refresh.")} />;
+  const c = summary.data.counts;
   const worstBand = readiness.data?.parade_nights?.[0]?.band ?? "—";
   const upcoming = (parades.data ?? []).filter((p) => !p.published_status || true).slice(0, 6);
 

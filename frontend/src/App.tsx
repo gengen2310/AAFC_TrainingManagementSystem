@@ -22,6 +22,7 @@ import { Settings } from "./routes/Settings";
 import { ReportCatalogue } from "./routes/ReportCatalogue";
 import { WingOverview, NationalOverview } from "./routes/Overviews";
 import { PlanningWorkspace } from "./routes/PlanningWorkspace";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
 
@@ -48,6 +49,7 @@ export default function App() {
         <Router basename={BASENAME}>
           <RequireAuth>
             <AppShell>
+              <ErrorBoundary>
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/dashboard" element={<Dashboard />} />
@@ -71,6 +73,7 @@ export default function App() {
                 <Route path="/planning" element={<PlanningWorkspace />} />
                 <Route path="*" element={<div className="empty">Page not found or access not permitted.</div>} />
               </Routes>
+              </ErrorBoundary>
             </AppShell>
           </RequireAuth>
         </Router>
