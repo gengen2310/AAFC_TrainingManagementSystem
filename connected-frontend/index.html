@@ -512,6 +512,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-item" id="nav-accounts" style="display:none" onclick="nav('accounts')">Account Management</div>
       <div class="nav-lbl nav-scope" id="hq-lbl" style="display:none">Command</div>
       <div class="nav-item nav-scope" id="nav-wing" style="display:none" onclick="nav('wing-overview')">Wing Overview</div>
+      <div class="nav-item nav-scope" id="nav-wing-calendar" style="display:none" onclick="nav('wing-calendar')">Wing HQ Calendar</div>
       <div class="nav-item nav-scope" id="nav-national" style="display:none" onclick="nav('national')">National Overview</div>
       <div class="nav-item nav-scope" style="display:none" onclick="nav('curriculum-coverage')">Curriculum Coverage</div>
       <div class="nav-item nav-scope" style="display:none" onclick="nav('training-balance')">Training Balance</div>
@@ -929,6 +930,51 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- WING OVERVIEW -->
       <div id="page-wing-overview" class="page"><div id="wing-dash"></div></div>
+
+      <!-- WING HQ CALENDAR -->
+      <div id="page-wing-calendar" class="page">
+        <div class="page-header">
+          <div>
+            <h1>Wing HQ Calendar</h1>
+            <div class="page-subtitle">Authoritative Wing-level events. Squadrons see these as inherited overlays in their Annual Program.</div>
+          </div>
+          <div class="page-actions">
+            <select id="wc-wing-sel" style="display:none;max-width:160px" onchange="loadWingCalendar()"><option value="">— Select Wing —</option></select>
+            <select id="wc-year-sel" onchange="loadWingCalendar()" style="max-width:120px">
+              <option value="2025">2025</option>
+              <option value="2026" selected>2026</option>
+              <option value="2027">2027</option>
+            </select>
+            <select id="wc-type-filter" onchange="renderWingCalendar()" style="max-width:180px">
+              <option value="">All event types</option>
+              <option value="wing_event">Wing Event</option>
+              <option value="cadet_training">Cadet Training</option>
+              <option value="adult_training">Adult Training</option>
+              <option value="meeting">Meeting / Conference</option>
+              <option value="competition">Competition</option>
+              <option value="ceremony">Ceremony</option>
+              <option value="staff_activity">Staff Activity</option>
+              <option value="course">Course</option>
+              <option value="public_holiday">Public Holiday</option>
+              <option value="school_holiday">School Holiday</option>
+              <option value="home_parade">Home Parade</option>
+              <option value="noting">Noting</option>
+            </select>
+            <select id="wc-imp-filter" onchange="renderWingCalendar()" style="max-width:180px">
+              <option value="">All importance</option>
+              <option value="must_attend">Must Attend</option>
+              <option value="key_event">Key Event</option>
+              <option value="recommended">Recommended</option>
+              <option value="optional">Optional</option>
+              <option value="noting">Noting</option>
+            </select>
+            <button class="btn btn-secondary" id="wc-create-btn" style="display:none" onclick="openWingEventModal()">+ New Event</button>
+          </div>
+        </div>
+        <div class="card" id="wc-card">
+          <div id="wc-body"><p class="muted">Loading Wing HQ Calendar…</p></div>
+        </div>
+      </div>
       <div id="page-national" class="page"><div id="national-dash"></div></div>
       <div id="page-curriculum-coverage" class="page"><div id="coverage-host"></div></div>
       <div id="page-training-balance" class="page"><div id="balance-host"></div></div>
@@ -1290,6 +1336,24 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div id="py-dates-body"></div>
   </div>
 
+  <!-- Wing HQ Events overlay card -->
+  <div class="card" id="py-wing-events-card" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 style="margin:0">Wing HQ Events <span class="badge b-blue" style="font-size:9px;vertical-align:middle">Overlay</span></h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="py-we-imp-filter" onchange="_renderWingEventsOverlay()" style="font-size:11px;max-width:160px">
+          <option value="">All importance</option>
+          <option value="must_attend">Must Attend</option>
+          <option value="key_event">Key Event</option>
+          <option value="recommended">Recommended</option>
+          <option value="optional">Optional</option>
+        </select>
+      </div>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin:0 0 8px">These events are managed by Wing HQ. Your squadron cannot edit them, but can record your preparation status.</p>
+    <div id="py-wing-events-body"></div>
+  </div>
+
   <!-- Holiday Periods card -->
   <div class="card" id="py-holidays-card" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -1586,6 +1650,104 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <button class="btn btn-out" onclick="closeModal('m-gen-dates')">Cancel</button>
       <button class="btn btn-out" onclick="previewGenerateDates()">Preview</button>
       <button class="btn btn-dk" onclick="doGenerateDates()">Generate</button>
+    </div>
+  </div>
+</div>
+
+<!-- Wing HQ Event Create/Edit Modal -->
+<div class="modal-bg" id="m-wing-event">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-hdr">
+      <div class="modal-title" id="we-modal-title">New Wing HQ Event</div>
+      <button class="modal-x" onclick="closeModal('m-wing-event')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="we-edit-id">
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>Title *</label>
+          <input type="text" id="we-title" placeholder="e.g. Gold 1 Consolidation Day">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Event Type *</label>
+          <select id="we-type">
+            <option value="wing_event">Wing Event</option>
+            <option value="cadet_training">Cadet Training</option>
+            <option value="adult_training">Adult Training</option>
+            <option value="meeting">Meeting / Conference</option>
+            <option value="competition">Competition</option>
+            <option value="ceremony">Ceremony</option>
+            <option value="staff_activity">Staff Activity</option>
+            <option value="course">Course</option>
+            <option value="home_parade">Home Parade</option>
+            <option value="noting">Noting</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Start Date *</label><input type="date" id="we-start"></div>
+        <div class="form-group"><label>End Date</label><input type="date" id="we-end"></div>
+        <div class="form-group"><label>Start Time</label><input type="time" id="we-start-time"></div>
+        <div class="form-group"><label>End Time</label><input type="time" id="we-end-time"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>Importance *</label>
+          <select id="we-importance">
+            <option value="must_attend">Must Attend</option>
+            <option value="key_event" selected>Key Event</option>
+            <option value="recommended">Recommended</option>
+            <option value="optional">Optional</option>
+            <option value="noting">Noting</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:2">
+          <label>Location</label>
+          <input type="text" id="we-location" placeholder="e.g. RAAF Base Pearce">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Audience</label>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:4px;font-size:12px">
+          <label><input type="checkbox" class="we-aud" value="staff"> Staff</label>
+          <label><input type="checkbox" class="we-aud" value="seniors"> Seniors</label>
+          <label><input type="checkbox" class="we-aud" value="juniors"> Juniors</label>
+          <label><input type="checkbox" class="we-aud" value="first_years"> First Years</label>
+          <label><input type="checkbox" class="we-aud" value="all_cadets"> All Cadets</label>
+          <label><input type="checkbox" class="we-aud" value="all_personnel"> All Personnel</label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label><input type="checkbox" id="we-sqn-action"> Requires squadron action</label>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label><input type="checkbox" id="we-anchor"> Is a planning anchor</label>
+        </div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="we-notes" rows="2" placeholder="Additional details, source code, etc."></textarea></div>
+      <p id="we-msg" style="color:var(--error);font-size:12px;min-height:1.2em"></p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-out" onclick="closeModal('m-wing-event')">Cancel</button>
+      <button class="btn btn-dk" onclick="saveWingEvent()">Save Event</button>
+    </div>
+  </div>
+</div>
+
+<!-- Wing HQ Event Detail Modal (read-only for squadron users) -->
+<div class="modal-bg" id="m-wing-event-detail">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-hdr">
+      <div class="modal-title">Wing HQ Event</div>
+      <button class="modal-x" onclick="closeModal('m-wing-event-detail')">×</button>
+    </div>
+    <div class="modal-body" id="we-detail-body">
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-out" onclick="closeModal('m-wing-event-detail')">Close</button>
+      <button class="btn btn-secondary" id="we-detail-mark-btn" style="display:none" onclick="markWingEventReviewed()">Mark Reviewed</button>
+      <button class="btn btn-primary" id="we-detail-plan-btn" style="display:none" onclick="markWingEventPlanned()">Plan Preparation</button>
     </div>
   </div>
 </div>
@@ -3059,10 +3221,10 @@ function roomById(id){return (S.rooms||[]).find(r=>r.id===id);}
 const _PLANNING_PAGES=['planning-missions','planning-guide','planning-year','planning-builder'];
 const NAV_BY_SCOPE={
   squadron:['dashboard','calendar','parade-nights','weekly-program','curriculum','activities','facilitators','resources','reports','action-items','settings','accounts',..._PLANNING_PAGES],
-  wing:['wing-overview','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
-  national:['national','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
+  wing:['wing-overview','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
+  national:['national','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
   auditor:['reports','audit','accounts',..._PLANNING_PAGES],
-  system_admin:['system-console','national','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES]
+  system_admin:['system-console','national','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES]
 };
 const SCOPE_LANDING={squadron:'dashboard',wing:'wing-overview',national:'national',auditor:'reports',system_admin:'system-console'};
 // In Proxy Mode (Wing) or Delegated Intervention (NAT HQ) the UI shows the EXACT SQN workspace
@@ -5981,6 +6143,8 @@ nav = function(pg) {
   } else if(pg === 'planning-builder') {
     _loadPlanningYears().then(id=>{ if(id) loadBuilderDates(id).then(()=>_autoSelectFirstDate('builder-date-sel','loadBuilderGrid')); });
     _loadDirectPnSelector();
+  } else if(pg === 'wing-calendar') {
+    loadWingCalendar();
   } else if(pg === 'planning-longrange') {
     _loadPlanningYears().then(id=>{ if(id) loadLongRange(id); });
   } else if(pg === 'planning-rooms') {
@@ -7543,6 +7707,364 @@ async function commitSchedImport(){
     document.getElementById('sched-import-commit-btn').style.display='none';
   }catch(e){ msg.textContent=apiErr(e); }
 }
+
+// ══════════════════════════════════════════
+//  WING HQ CALENDAR
+// ══════════════════════════════════════════
+
+// State
+let _wingCalEvents=[];
+let _wingCalWingId=null;
+let _wcDetailEventId=null;
+
+// ─── Importance badge / label ────────────────────────────────────────────────
+const _WC_IMP_BADGE={
+  must_attend:'badge-red', key_event:'b-blue', recommended:'b-ok',
+  optional:'b-grey', home_parade:'b-grey', noting:'b-grey',
+};
+const _WC_IMP_LABEL={
+  must_attend:'Must Attend', key_event:'Key Event', recommended:'Recommended',
+  optional:'Optional', home_parade:'Home Parade', noting:'Noting',
+};
+const _WC_TYPE_LABEL={
+  wing_event:'Wing Event', cadet_training:'Cadet Training', adult_training:'Adult Training',
+  meeting:'Meeting', competition:'Competition', ceremony:'Ceremony', course:'Course',
+  staff_activity:'Staff Activity', home_parade:'Home Parade', public_holiday:'Public Holiday',
+  school_holiday:'School Holiday', noting:'Noting',
+};
+
+// ─── Load Wing HQ Calendar page ──────────────────────────────────────────────
+async function loadWingCalendar(){
+  const body=document.getElementById('wc-body');
+  if(!body) return;
+  const year=document.getElementById('wc-year-sel')?.value||'2026';
+  const isWingWrite=['wing_admin','national_admin','system_admin'].includes(S.role);
+  const btn=document.getElementById('wc-create-btn');
+  if(btn) btn.style.display=isWingWrite?'':'none';
+
+  // Populate wing selector for national/system_admin, hide for wing_admin
+  const wingSel=document.getElementById('wc-wing-sel');
+  if(wingSel){
+    const isNatOrSys=['national_admin','system_admin'].includes(S.role);
+    wingSel.style.display=isNatOrSys?'':'none';
+    if(isNatOrSys && wingSel.options.length<=1 && S.wings){
+      S.wings.forEach(w=>{ const o=new Option(w.code||w.name,w.wing_id); wingSel.appendChild(o); });
+    }
+  }
+  // Get wing_id from session (wing_admin has it in session; national/sys use selector)
+  const wid=(S.session&&S.session.wing_id)||wingSel?.value||'';
+  if(!wid){
+    body.innerHTML='<p class="muted">No wing scope. Select a wing or log in as Wing Admin.</p>';
+    return;
+  }
+  _wingCalWingId=wid;
+  body.innerHTML='<p class="muted">Loading…</p>';
+  try{
+    _wingCalEvents=await api(`/api/wing-calendar/events?wing_id=${wid}&year=${year}`);
+    renderWingCalendar();
+  }catch(e){ body.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
+}
+
+function renderWingCalendar(){
+  const body=document.getElementById('wc-body');
+  if(!body) return;
+  const typeF=document.getElementById('wc-type-filter')?.value||'';
+  const impF=document.getElementById('wc-imp-filter')?.value||'';
+  const isWingWrite=['wing_admin','national_admin','system_admin'].includes(S.role);
+
+  let rows=_wingCalEvents;
+  if(typeF) rows=rows.filter(e=>e.event_type===typeF);
+  if(impF)  rows=rows.filter(e=>e.planning_importance===impF);
+
+  if(!rows.length){
+    body.innerHTML='<p class="muted">No Wing HQ events for this year. Use <strong>+ New Event</strong> to add one, or run the import script with the 7WG Master Schedule.</p>';
+    return;
+  }
+
+  body.innerHTML=`<table class="data-table"><thead><tr>
+    <th>Date</th><th>Title</th><th>Type</th><th>Importance</th><th>Audience</th><th>Action?</th>
+    ${isWingWrite?'<th></th>':''}
+  </tr></thead><tbody>`+
+  rows.map(e=>{
+    const dateStr=e.start_date+(e.end_date&&e.end_date!==e.start_date?' – '+e.end_date:'');
+    const aud=(e.audience||[]).join(', ')||'—';
+    return `<tr style="cursor:pointer" onclick="openWingEventDetail('${esc(e.id)}')">
+      <td>${esc(dateStr)}</td>
+      <td><strong>${esc(e.title)}</strong>${e.location?`<br><span class="muted" style="font-size:10px">${esc(e.location)}</span>`:''}</td>
+      <td><span class="badge b-grey" style="font-size:9px">${esc(_WC_TYPE_LABEL[e.event_type]||e.event_type)}</span></td>
+      <td><span class="badge ${_WC_IMP_BADGE[e.planning_importance]||'b-grey'}">${esc(_WC_IMP_LABEL[e.planning_importance]||e.planning_importance)}</span></td>
+      <td style="font-size:10px">${esc(aud)}</td>
+      <td>${e.requires_squadron_action?'<span class="badge b-amber">Action needed</span>':''}</td>
+      ${isWingWrite?`<td><button class="btn-xs btn-secondary" onclick="event.stopPropagation();editWingEvent('${esc(e.id)}')">Edit</button>
+        <button class="btn-xs btn-danger" onclick="event.stopPropagation();archiveWingEvent('${esc(e.id)}')">Archive</button></td>`:''}
+    </tr>`;
+  }).join('')+
+  `</tbody></table>`;
+}
+
+// ─── Wing Event Detail Modal ──────────────────────────────────────────────────
+async function openWingEventDetail(eventId){
+  _wcDetailEventId=eventId;
+  const body=document.getElementById('we-detail-body');
+  if(!body) return;
+  body.innerHTML='<p class="muted">Loading…</p>';
+  openModal('m-wing-event-detail');
+  try{
+    const e=await api(`/api/wing-calendar/events/${eventId}`);
+    const dateStr=e.start_date+(e.end_date&&e.end_date!==e.start_date?' – '+e.end_date:'');
+    const impBadge=`<span class="badge ${_WC_IMP_BADGE[e.planning_importance]||'b-grey'}">${esc(_WC_IMP_LABEL[e.planning_importance]||e.planning_importance)}</span>`;
+    const typeBadge=`<span class="badge b-grey">${esc(_WC_TYPE_LABEL[e.event_type]||e.event_type)}</span>`;
+    const srcBadge=`<span class="badge" style="background:#ede9fe;color:#4c1d95">7WG HQ Calendar</span>`;
+
+    let curLinks='';
+    if(e.curriculum_links&&e.curriculum_links.length){
+      curLinks=`<div style="margin-top:10px"><div style="font-size:11px;font-weight:700;margin-bottom:4px">Linked Curriculum</div>`+
+        e.curriculum_links.map(l=>`<div style="font-size:11px;padding:3px 0"><span class="badge b-grey">${esc(l.curriculum_code||'—')}</span> ${esc(l.curriculum_title||'')}</div>`).join('')+
+        `</div>`;
+    }
+    let sqnStatus='';
+    if(e.squadron_status){
+      const ss=e.squadron_status;
+      const ssCol={'reviewed':'badge-green','preparation_planned':'badge-green','not_applicable':'b-grey'}[ss.status]||'b-grey';
+      sqnStatus=`<div style="margin-top:10px;padding:8px;background:var(--bg);border-radius:6px">
+        <div style="font-size:11px;font-weight:700;margin-bottom:4px">Your Squadron's Status</div>
+        <span class="badge ${ssCol}">${esc(ss.status.replace(/_/g,' '))}</span>
+        ${ss.notes?`<span style="font-size:11px;margin-left:6px">${esc(ss.notes)}</span>`:''}
+      </div>`;
+    }
+    body.innerHTML=`
+      <div style="margin-bottom:10px">${srcBadge} ${impBadge} ${typeBadge}</div>
+      <div style="font-size:16px;font-weight:800;margin-bottom:8px">${esc(e.title)}</div>
+      <div style="display:flex;gap:16px;font-size:12px;flex-wrap:wrap;margin-bottom:8px">
+        <div><span class="muted">Date:</span> <strong>${esc(dateStr)}</strong></div>
+        ${e.location?`<div><span class="muted">Location:</span> <strong>${esc(e.location)}</strong></div>`:''}
+        ${e.start_time?`<div><span class="muted">Time:</span> <strong>${esc(e.start_time)}${e.end_time?' – '+esc(e.end_time):''}</strong></div>`:''}
+        <div><span class="muted">Audience:</span> <strong>${esc((e.audience||[]).join(', ')||'—')}</strong></div>
+      </div>
+      ${e.description?`<p style="font-size:12px;margin-bottom:8px">${esc(e.description)}</p>`:''}
+      ${e.notes?`<p style="font-size:11px;color:var(--steel);margin-bottom:8px">${esc(e.notes)}</p>`:''}
+      ${e.requires_squadron_action?'<div class="alert a-warn" style="font-size:12px;margin-bottom:8px">This event requires squadron action. Mark your preparation status below.</div>':''}
+      ${curLinks}${sqnStatus}`;
+
+    const markBtn=document.getElementById('we-detail-mark-btn');
+    const planBtn=document.getElementById('we-detail-plan-btn');
+    const isSqnAdmin=['sqn_admin'].includes(S.role);
+    if(markBtn) markBtn.style.display=isSqnAdmin&&(!e.squadron_status||e.squadron_status.status==='not_reviewed')?'':'none';
+    if(planBtn) planBtn.style.display=isSqnAdmin?'':'none';
+  }catch(ex){ body.innerHTML=`<p class="muted">Error: ${esc(apiErr(ex))}</p>`; }
+}
+
+async function markWingEventReviewed(){
+  if(!_wcDetailEventId) return;
+  try{
+    await api(`/api/wing-calendar/events/${_wcDetailEventId}/squadron-status`,{
+      method:'PATCH', body:{status:'reviewed'},
+    });
+    openWingEventDetail(_wcDetailEventId);
+  }catch(e){ alert(apiErr(e)); }
+}
+async function markWingEventPlanned(){
+  if(!_wcDetailEventId) return;
+  try{
+    await api(`/api/wing-calendar/events/${_wcDetailEventId}/squadron-status`,{
+      method:'PATCH', body:{status:'preparation_planned'},
+    });
+    openWingEventDetail(_wcDetailEventId);
+  }catch(e){ alert(apiErr(e)); }
+}
+
+// ─── Create / Edit Wing Event (wing_admin only) ──────────────────────────────
+let _weEditId=null;
+
+function openWingEventModal(existingEvent){
+  _weEditId=existingEvent?existingEvent.id:null;
+  document.getElementById('we-modal-title').textContent=existingEvent?'Edit Wing HQ Event':'New Wing HQ Event';
+  document.getElementById('we-edit-id').value=_weEditId||'';
+  document.getElementById('we-title').value=existingEvent?.title||'';
+  document.getElementById('we-type').value=existingEvent?.event_type||'wing_event';
+  document.getElementById('we-start').value=existingEvent?.start_date||'';
+  document.getElementById('we-end').value=existingEvent?.end_date||'';
+  document.getElementById('we-start-time').value=existingEvent?.start_time||'';
+  document.getElementById('we-end-time').value=existingEvent?.end_time||'';
+  document.getElementById('we-importance').value=existingEvent?.planning_importance||'key_event';
+  document.getElementById('we-location').value=existingEvent?.location||'';
+  document.getElementById('we-sqn-action').checked=existingEvent?.requires_squadron_action||false;
+  document.getElementById('we-anchor').checked=existingEvent?.is_planning_anchor||false;
+  document.getElementById('we-notes').value=existingEvent?.notes||'';
+  // Audience checkboxes
+  const audSet=new Set(existingEvent?.audience||[]);
+  document.querySelectorAll('.we-aud').forEach(cb=>{ cb.checked=audSet.has(cb.value); });
+  document.getElementById('we-msg').textContent='';
+  openModal('m-wing-event');
+}
+
+async function editWingEvent(eventId){
+  try{
+    const e=await api(`/api/wing-calendar/events/${eventId}`);
+    openWingEventModal(e);
+  }catch(ex){ alert(apiErr(ex)); }
+}
+
+async function saveWingEvent(){
+  const msg=document.getElementById('we-msg');
+  const title=document.getElementById('we-title').value.trim();
+  const start=document.getElementById('we-start').value;
+  if(!title||!start){ msg.textContent='Title and Start Date are required.'; return; }
+
+  const aud=[...document.querySelectorAll('.we-aud:checked')].map(c=>c.value);
+  const body={
+    title,
+    event_type:document.getElementById('we-type').value,
+    start_date:start,
+    end_date:document.getElementById('we-end').value||null,
+    start_time:document.getElementById('we-start-time').value||null,
+    end_time:document.getElementById('we-end-time').value||null,
+    planning_importance:document.getElementById('we-importance').value,
+    location:document.getElementById('we-location').value||null,
+    requires_squadron_action:document.getElementById('we-sqn-action').checked,
+    is_planning_anchor:document.getElementById('we-anchor').checked,
+    notes:document.getElementById('we-notes').value||null,
+    audience:aud,
+  };
+  try{
+    if(_weEditId){
+      await api(`/api/wing-calendar/events/${_weEditId}`,{method:'PATCH',body});
+    } else {
+      const wid=_wingCalWingId||(S.session&&S.session.wing_id)||'';
+      if(!wid){ msg.textContent='No wing scope.'; return; }
+      await api(`/api/wing-calendar/events?wing_id=${wid}`,{method:'POST',body});
+    }
+    closeModal('m-wing-event');
+    await loadWingCalendar();
+  }catch(e){ msg.textContent=apiErr(e); }
+}
+
+async function archiveWingEvent(eventId){
+  if(!confirm('Archive this Wing HQ event? It will no longer appear in squadron overlays.')) return;
+  try{
+    await api(`/api/wing-calendar/events/${eventId}/archive`,{method:'POST',body:{}});
+    await loadWingCalendar();
+  }catch(e){ alert(apiErr(e)); }
+}
+
+// ─── Annual Program Wing HQ Events overlay ────────────────────────────────────
+let _pyWingEvents=[];
+
+async function _loadAndRenderWingEventsOverlay(wingId, year){
+  const card=document.getElementById('py-wing-events-card');
+  if(!card) return;
+  if(!wingId){ card.style.display='none'; return; }
+  try{
+    _pyWingEvents=await api(`/api/wing-calendar/squadron-overlay?wing_id=${wingId}&year=${year}`);
+    card.style.display='';
+    _renderWingEventsOverlay();
+  }catch(e){
+    // Non-fatal: wing calendar may not have events yet
+    card.style.display='none';
+  }
+}
+
+function _renderWingEventsOverlay(){
+  const body=document.getElementById('py-wing-events-body');
+  if(!body) return;
+  const impF=document.getElementById('py-we-imp-filter')?.value||'';
+  let rows=_pyWingEvents;
+  if(impF) rows=rows.filter(e=>e.planning_importance===impF);
+
+  if(!rows.length){
+    body.innerHTML='<p class="muted" style="font-size:11px">No Wing HQ events for this year.</p>';
+    return;
+  }
+  body.innerHTML=`<table class="data-table" style="font-size:11px"><thead><tr>
+    <th>Date</th><th>Title</th><th>Importance</th><th>Audience</th><th>Status</th><th></th>
+  </tr></thead><tbody>`+
+  rows.map(e=>{
+    const ds=e.start_date+(e.end_date&&e.end_date!==e.start_date?' – '+e.end_date:'');
+    const ss=e.squadron_status;
+    const ssLabel=ss?ss.status.replace(/_/g,' '):'not reviewed';
+    const ssCls={'reviewed':'badge-green','preparation_planned':'badge-green','not_applicable':'b-grey'}[ss?.status]||'b-grey';
+    return `<tr>
+      <td>${esc(ds)}</td>
+      <td><strong>${esc(e.title)}</strong>${e.location?`<br><span class="muted">${esc(e.location)}</span>`:''}</td>
+      <td><span class="badge ${_WC_IMP_BADGE[e.planning_importance]||'b-grey'}" style="font-size:9px">${esc(_WC_IMP_LABEL[e.planning_importance]||e.planning_importance)}</span></td>
+      <td style="font-size:10px">${esc((e.audience||[]).join(', ')||'—')}</td>
+      <td><span class="badge ${ssCls}" style="font-size:9px">${esc(ssLabel)}</span></td>
+      <td><button class="btn-xs btn-secondary" onclick="openWingEventDetail('${esc(e.id)}')">Detail</button></td>
+    </tr>`;
+  }).join('')+
+  `</tbody></table>`;
+}
+
+// ─── Patch _renderAnnualCalendar to show Wing HQ events in monthly grid ──────
+// Override to also index wing events by date for calendar overlay
+
+const _origRenderAnnualCalendar=_renderAnnualCalendar;
+function _renderAnnualCalendar(ap){
+  // Index wing events by date for the month grid
+  const WE={};
+  (ap.wing_events||[]).forEach(e=>{
+    let cur=new Date((e.start_date||'')+'T00:00:00');
+    const endD=new Date((e.end_date||e.start_date||'')+'T00:00:00');
+    while(cur<=endD){
+      const ds=cur.toISOString().slice(0,10);
+      if(!WE[ds]) WE[ds]=[];
+      WE[ds].push(e);
+      cur.setDate(cur.getDate()+1);
+    }
+  });
+  window._AP_DATA=window._AP_DATA||{};
+  window._AP_DATA.WE=WE;
+
+  // Call original but we patch _renderApMonth via WE global
+  const result=_origRenderAnnualCalendar(ap);
+
+  // After calendar rendered, add wing event legend entry
+  return result.replace(
+    '<span style="color:var(--muted)">Click any date for detail.</span>',
+    '<span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ede9fe;border:1px solid #c4b5fd"></span>Wing HQ event</span><span style="color:var(--muted)">Click any date for detail.</span>'
+  );
+}
+
+// Patch _apShowDateDetail to also show Wing events
+const _origApShowDateDetail=_apShowDateDetail;
+function _apShowDateDetail(ds){
+  _origApShowDateDetail(ds);
+  const D=window._AP_DATA;
+  if(!D||!D.WE) return;
+  const we=D.WE[ds]||[];
+  if(!we.length) return;
+  const body=document.getElementById('ap-detail-body');
+  if(!body) return;
+  let h='<div style="margin-top:8px">';
+  we.forEach(e=>{
+    const bc=e.planning_importance==='must_attend'?'#7c3aed':e.planning_importance==='key_event'?'#8b5cf6':'#a78bfa';
+    h+=`<div style="padding:6px 8px;border-left:3px solid ${bc};margin-bottom:5px;background:#f5f3ff;border-radius:0 4px 4px 0;cursor:pointer"
+      onclick="openWingEventDetail('${esc(e.id)}')">
+      <span class="badge" style="background:#ede9fe;color:#4c1d95;font-size:8px">7WG HQ</span>
+      <strong style="font-size:11px;margin-left:4px">${esc(e.title)}</strong>
+      <span class="badge ${_WC_IMP_BADGE[e.planning_importance]||'b-grey'}" style="font-size:8px;margin-left:4px">${esc(_WC_IMP_LABEL[e.planning_importance]||e.planning_importance)}</span>
+    </div>`;
+  });
+  h+='</div>';
+  body.innerHTML+=h;
+}
+
+// ─── Patch loadYearMap to also load Wing HQ events ───────────────────────────
+const _origLoadYearMap=loadYearMap;
+async function loadYearMap(yearId){
+  await _origLoadYearMap(yearId);
+  if(!yearId) return;
+  // Load wing events overlay after year map loads
+  const yr=P.years?.find(y=>y.planning_year_id===yearId)||{};
+  const wid=yr.wing_id||(S.session&&S.session.wing_id)||'';
+  if(wid){
+    const year=yr.year||new Date().getFullYear();
+    await _loadAndRenderWingEventsOverlay(wid, year);
+  }
+}
+
+// ─── nav() integration ────────────────────────────────────────────────────────
+// loadWingCalendar() is called when nav('wing-calendar') fires via nav() switch
 </script>
 </body>
 </html>

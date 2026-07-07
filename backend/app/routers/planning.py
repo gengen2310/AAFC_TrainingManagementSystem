@@ -26,6 +26,7 @@ from ..models.planning import (
     CADET_GROUPS, IMPORTANCE_LEVELS, EVENT_TYPES,
 )
 from ..models.training import TimingTemplate, TimingBlock, Activity
+from ..models.wing_calendar import WingHQEvent
 from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_write_squadron
 from ..services import audit
@@ -2159,6 +2160,37 @@ def get_annual_program(
         total_sessions = total_slots
         filled_sessions = len([s for s in all_ts if s.curriculum_item_id or s.custom_title])
 
+    # Wing HQ event overlay — resolve wing_id from planning year or squadron
+    overlay_wing_id = py.wing_id
+    if not overlay_wing_id and py.unit_id:
+        sq = db.get(Squadron, py.unit_id)
+        if sq:
+            overlay_wing_id = sq.wing_id
+
+    wing_events = []
+    if overlay_wing_id:
+        we_rows = db.query(WingHQEvent).filter(
+            WingHQEvent.wing_id == overlay_wing_id,
+            WingHQEvent.year == py.year,
+            WingHQEvent.is_archived == False,  # noqa: E712
+            WingHQEvent.status != "cancelled",
+        ).order_by(WingHQEvent.start_date).all()
+        for we in we_rows:
+            wing_events.append({
+                "id": we.id,
+                "title": we.title,
+                "event_type": we.event_type,
+                "start_date": we.start_date,
+                "end_date": we.end_date,
+                "planning_importance": we.planning_importance,
+                "audience": we.audience or [],
+                "location": we.location,
+                "requires_squadron_action": we.requires_squadron_action,
+                "is_planning_anchor": we.is_planning_anchor,
+                "notes": we.notes,
+                "source": "wing_hq",
+            })
+
     return {
         "planning_year_id": year_id,
         "year": py.year,
@@ -2168,6 +2200,8 @@ def get_annual_program(
         "total_session_slots": total_sessions,
         "filled_session_slots": filled_sessions,
         "terms": terms,
+        "wing_events": wing_events,
+        "wing_id": overlay_wing_id,
     }
 
 
