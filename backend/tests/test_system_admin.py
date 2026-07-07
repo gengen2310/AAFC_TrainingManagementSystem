@@ -140,7 +140,7 @@ def test_system_migrations_sysadmin(client):
     assert r.status_code == 200
     d = r.json()
     assert "expected_head" in d
-    assert d["expected_head"] == "h3c4d5e6f7g8"
+    assert d["expected_head"] == "m8h9i0j1k2l3"
 
 
 # ─────────────────────────────────────────────────────────────

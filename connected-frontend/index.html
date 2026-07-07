@@ -74,6 +74,9 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .auth-progress{height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;display:none;}
 .auth-progress-fill{height:100%;background:var(--royal);border-radius:2px;width:0%;transition:width .12s linear;}
 .auth-err{background:#fdeaea;border:1.5px solid #f5a5a5;border-radius:6px;padding:9px 12px;font-size:12px;color:#8b1a1a;margin-top:10px;display:none;}
+.auth-acct-banner{background:#f0f7ff;border:1.5px solid #bee3f8;border-radius:6px;padding:9px 12px;font-size:12.5px;font-weight:600;color:var(--dark);margin-bottom:14px;text-align:center;}
+.auth-back-btn{display:block;background:none;border:none;color:var(--steel);font-size:11.5px;cursor:pointer;padding:4px 0;margin-top:8px;text-decoration:underline;width:100%;text-align:center;}
+.auth-back-btn:hover{color:var(--dark);}
 
 /* ── APP SHELL ── */
 #app{display:none;flex-direction:column;min-height:100vh;}
@@ -405,9 +408,41 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="auth-wm">AAFC Training Management System</div>
       <div class="auth-div"></div>
     </div>
-    <div class="fg"><label>Access Code</label><input type="password" id="auth-code" placeholder="Access code" autocomplete="off"></div>
-    <button class="btn-auth" id="auth-btn" onclick="doLogin()">Sign In</button>
-    <div class="auth-progress" id="auth-progress"><div class="auth-progress-fill" id="auth-progress-bar"></div></div>
+
+    <!-- Step 1 — identify account -->
+    <div id="auth-step1">
+      <div class="fg">
+        <label>Account type</label>
+        <select id="auth-type" onchange="onAuthTypeChange()">
+          <option value="">Select…</option>
+          <option value="squadron">Squadron</option>
+          <option value="wing">Wing</option>
+          <option value="national">National / System</option>
+        </select>
+      </div>
+      <div class="fg" id="auth-ident-wrap" style="display:none">
+        <label id="auth-ident-lbl">Squadron number</label>
+        <input type="text" id="auth-ident" placeholder="e.g. 703" autocomplete="off" oninput="onAuthFieldChange()">
+      </div>
+      <div class="fg" id="auth-role-wrap" style="display:none">
+        <label>Role</label>
+        <select id="auth-role" onchange="onAuthFieldChange()">
+          <option value="">Select…</option>
+        </select>
+      </div>
+      <button class="btn-auth" id="auth-continue-btn" onclick="doLookup()" disabled>Continue →</button>
+      <div class="auth-progress" id="auth-progress1"><div class="auth-progress-fill" id="auth-bar1"></div></div>
+    </div>
+
+    <!-- Step 2 — enter access code -->
+    <div id="auth-step2" style="display:none">
+      <div class="auth-acct-banner" id="auth-acct-banner"></div>
+      <div class="fg"><label>Access Code</label><input type="password" id="auth-code" placeholder="Access code" autocomplete="off"></div>
+      <button class="btn-auth" id="auth-btn" onclick="doLogin()">Sign In</button>
+      <div class="auth-progress" id="auth-progress"><div class="auth-progress-fill" id="auth-progress-bar"></div></div>
+      <button type="button" class="auth-back-btn" onclick="showAuthStep1()">← Change account</button>
+    </div>
+
     <div style="font-size:10.5px;color:var(--muted);margin-top:14px;line-height:1.55">Use is limited to authorised personnel. Access and administrative actions are recorded.</div>
     <div class="auth-err" id="auth-err"></div>
   </div>
@@ -2529,7 +2564,8 @@ async function api(path, opts={}){
     tokenClear();
     let b401=null; try{b401=await res.json();}catch(_){}
     const c401=(b401&&b401.detail&&typeof b401.detail==='object'&&b401.detail.error)||'';
-    throw {kind:'auth', status:401, code:c401, msg:'Your session has expired. Please sign in again.'};
+    const msg401=c401==='invalid_user'?'Your account has been deactivated. Contact your Wing HQ.':'Your session has expired. Please sign in again.';
+    throw {kind:'auth', status:401, code:c401, msg:msg401};
   }
   let body=null; try{ body=await res.json(); }catch(_){}
   if(!res.ok){
@@ -2571,7 +2607,7 @@ async function api(path, opts={}){
     if(res.status===422&&code==='squadron_id_required')  msg='Squadron / Specialist Unit is required.';
     if(res.status===422&&code==='wing_id_required')      msg='Wing is required.';
     if(res.status===409&&code==='code_exists'&&body&&body.detail&&body.detail.message) msg=body.detail.message;
-    if(res.status===429) msg='Too many attempts. Please wait and try again.';
+    if(res.status===429 && !msg) msg='Too many attempts. Please wait and try again.';
     throw {kind:'http', status:res.status, code, msg};
   }
   return body;
@@ -2586,8 +2622,88 @@ function apiErr(e){
 function gate(n){ alert((n||'This action')+' is not available in this pilot build. If you see this message, please report which action triggered it.'); }
 
 // ═══════════════════════════════════════════════════════════
-//  AUTH  (real backend login; no codes or data stored in the browser)
+//  AUTH  (two-step: identify account → enter access code)
+//  No access codes or hashes are stored in the browser.
 // ═══════════════════════════════════════════════════════════
+let _authUserId=null;
+
+const _AUTH_ROLES={
+  squadron:[{v:'sqn_admin',l:'Admin'},{v:'sqn_general',l:'Viewer'}],
+  wing:    [{v:'wing_admin',l:'Admin'},{v:'wing_viewer',l:'Viewer'}],
+  national:[{v:'national_admin',l:'National Admin'},{v:'national_viewer',l:'National Viewer'},
+            {v:'system_admin',l:'System Admin'},{v:'auditor',l:'Auditor'}],
+};
+const _ROLE_LABELS={sqn_admin:'Admin',sqn_general:'Viewer',wing_admin:'Admin',wing_viewer:'Viewer',
+  national_admin:'National Admin',national_viewer:'National Viewer',system_admin:'System Admin',auditor:'Auditor'};
+
+function onAuthTypeChange(){
+  const type=document.getElementById('auth-type').value;
+  const identWrap=document.getElementById('auth-ident-wrap');
+  const identLbl=document.getElementById('auth-ident-lbl');
+  const identEl=document.getElementById('auth-ident');
+  const roleWrap=document.getElementById('auth-role-wrap');
+  const roleEl=document.getElementById('auth-role');
+  document.getElementById('auth-err').style.display='none';
+  roleEl.innerHTML='<option value="">Select…</option>';
+  (_AUTH_ROLES[type]||[]).forEach(o=>{const opt=document.createElement('option');opt.value=o.v;opt.textContent=o.l;roleEl.appendChild(opt);});
+  if(type==='squadron'){identLbl.textContent='Squadron number';identEl.placeholder='e.g. 703';identWrap.style.display='';}
+  else if(type==='wing'){identLbl.textContent='Wing code';identEl.placeholder='e.g. 7WG';identWrap.style.display='';}
+  else{identWrap.style.display='none';identEl.value='';}
+  roleWrap.style.display=type?'':'none';
+  onAuthFieldChange();
+}
+
+function onAuthFieldChange(){
+  const type=document.getElementById('auth-type').value;
+  const ident=document.getElementById('auth-ident').value.trim();
+  const role=document.getElementById('auth-role').value;
+  const needsIdent=(type==='squadron'||type==='wing');
+  document.getElementById('auth-continue-btn').disabled=!(type&&role&&(!needsIdent||ident));
+}
+
+async function doLookup(){
+  const type=document.getElementById('auth-type').value;
+  const ident=document.getElementById('auth-ident').value.trim();
+  const role=document.getElementById('auth-role').value;
+  const err=document.getElementById('auth-err');
+  const btn=document.getElementById('auth-continue-btn');
+  const prog=document.getElementById('auth-progress1');
+  const bar=document.getElementById('auth-bar1');
+  err.style.display='none';
+  btn.disabled=true; btn.textContent='Looking up…';
+  prog.style.display='block'; bar.style.width='60%';
+  function _resetContinue(){prog.style.display='none';bar.style.width='0%';btn.disabled=false;btn.textContent='Continue →';}
+  try{
+    const body={unit_type:type,role};
+    if(type!=='national') body.identifier=ident;
+    const r=await api('/api/auth/lookup',{method:'POST',body:JSON.stringify(body)});
+    _authUserId=r.user_id;
+    const unitLabel=type==='squadron'?ident+' Squadron':type==='wing'?ident+' Wing':'National / System';
+    document.getElementById('auth-acct-banner').textContent=unitLabel+' — '+(_ROLE_LABELS[role]||role);
+    bar.style.width='100%';
+    document.getElementById('auth-step1').style.display='none';
+    document.getElementById('auth-step2').style.display='';
+    document.getElementById('auth-code').value='';
+    document.getElementById('auth-code').focus();
+  }catch(e){
+    _resetContinue();
+    err.style.display='block';
+    err.textContent=(e.status===404)?'No account found for that selection. Check the number/code and role and try again.':apiErr(e);
+  }
+}
+
+function showAuthStep1(){
+  _authUserId=null;
+  document.getElementById('auth-step2').style.display='none';
+  document.getElementById('auth-step1').style.display='';
+  document.getElementById('auth-err').style.display='none';
+  document.getElementById('auth-code').value='';
+  const btn=document.getElementById('auth-continue-btn');
+  btn.disabled=false; btn.textContent='Continue →';
+  document.getElementById('auth-progress1').style.display='none';
+  document.getElementById('auth-bar1').style.width='0%';
+}
+
 async function doLogin(){
   const code=document.getElementById('auth-code').value.trim();
   const err=document.getElementById('auth-err');
@@ -2598,7 +2714,6 @@ async function doLogin(){
   err.style.display='none';
   if(!code){err.style.display='block';err.textContent='Please enter your access code.';return;}
 
-  // Lock the form and animate progress to 75% while the request is in flight.
   btn.disabled=true; btn.textContent='Signing in…';
   prog.style.display='block'; bar.style.width='0%';
   let pct=0;
@@ -2611,7 +2726,7 @@ async function doLogin(){
   }
 
   try{
-    const out=await api('/api/auth/login',{method:'POST',body:JSON.stringify({code})});
+    const out=await api('/api/auth/login',{method:'POST',body:JSON.stringify({user_id:_authUserId,code})});
     clearInterval(tick); bar.style.width='100%';
     tokenSet(out.token);
     S.session=out.session;
@@ -2623,11 +2738,11 @@ async function doLogin(){
     err.style.display='block';
     if(e.status===401){
       if(e.code==='invalid_user')
-        err.textContent='This account is inactive. Contact your Wing HQ to restore access.';
+        err.textContent='Your account has been deactivated. Contact your Wing HQ.';
       else
         err.textContent='Incorrect access code. Check your code and try again.';
     }else if(e.status===429){
-      err.textContent='Too many incorrect attempts. Access is temporarily locked — try again in 15 minutes.';
+      err.textContent=e.msg||'Too many incorrect attempts. Access is temporarily locked.';
     }else{
       err.textContent=apiErr(e);
     }
@@ -2638,6 +2753,7 @@ async function doLogout(){
   try{ await api('/api/auth/logout',{method:'POST'}); }catch(_){}
   tokenClear();
   S={sqn:null,isAdmin:false,isWing:false,session:null,pns:[],facs:[],acts:[],rooms:[],equip:[],cfg:{},curr:[],reports:{}};
+  showAuthStep1();
   document.getElementById('auth-screen').style.display='flex';
   document.getElementById('app').style.display='none';
 }
@@ -3438,18 +3554,25 @@ function _renderAccountTable(){
     return '—';
   };
 
-  const statusBadge=u=>u.active_status!==false?'<span class="badge b-ok">Active</span>':'<span class="badge b-red">Disabled</span>';
+  const isLocked=u=>u.locked_until&&new Date(u.locked_until)>new Date();
+  const statusBadge=u=>{
+    const active=u.active_status!==false?'<span class="badge b-ok">Active</span>':'<span class="badge b-red">Disabled</span>';
+    const lock=isLocked(u)?'<span class="badge b-red" style="margin-left:3px">Locked</span>':'';
+    return active+lock;
+  };
   const lastLogin=u=>u.last_login_at?new Date(u.last_login_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'Never';
   const lastChanged=u=>(u.code_last_changed||u.code_last_changed_at)?new Date(u.code_last_changed||u.code_last_changed_at).toLocaleDateString('en-AU',{day:'numeric',month:'short'}):'—';
 
   const actions=u=>{
     if(!canWrite) return '';
-    const resetBtn=`<button class="btn btn-xs btn-sky" onclick="openAccountResetCode('${u.user_id}','${(u.display_name||'').replace(/'/g,"\\'")}')" title="Reset access code">Reset access code</button>`;
+    const dn=(u.display_name||'').replace(/'/g,"\\'");
+    const resetBtn=`<button class="btn btn-xs btn-sky" onclick="openAccountResetCode('${u.user_id}','${dn}')" title="Reset access code">Reset access code</button>`;
+    const unlockBtn=isLocked(u)?`<button class="btn btn-xs btn-ok" onclick="doUnlockAccount('${u.user_id}','${dn}')">Unlock</button>`:'';
     const toggleBtn=u.active_status!==false
-      ? `<button class="btn btn-xs" style="border-color:var(--red);color:var(--red)" onclick="doDisableAccount('${u.user_id}','${(u.display_name||'').replace(/'/g,"\\'")}')">Disable</button>`
-      : `<button class="btn btn-xs btn-ok" onclick="doReactivateAccount('${u.user_id}','${(u.display_name||'').replace(/'/g,"\\'")}')">Reactivate</button>`;
+      ? `<button class="btn btn-xs" style="border-color:var(--red);color:var(--red)" onclick="doDisableAccount('${u.user_id}','${dn}')">Disable</button>`
+      : `<button class="btn btn-xs btn-ok" onclick="doReactivateAccount('${u.user_id}','${dn}')">Reactivate</button>`;
     const editBtn=`<button class="btn btn-xs" onclick="openEditAccountModal('${u.user_id}')">Edit</button>`;
-    return `<div style="display:flex;gap:4px;flex-wrap:wrap">${editBtn}${resetBtn}${toggleBtn}</div>`;
+    return `<div style="display:flex;gap:4px;flex-wrap:wrap">${editBtn}${resetBtn}${unlockBtn}${toggleBtn}</div>`;
   };
 
   el.innerHTML='<div class="tw"><table><thead><tr><th>Name</th><th>Role</th><th>Scope</th><th>Unit</th><th>Status</th><th>Last Login</th><th>Code Last Changed</th>'+(canWrite?'<th class="no-print">Actions</th>':'')+'</tr></thead><tbody>'+
@@ -3763,6 +3886,13 @@ async function doReactivateAccount(userId, displayName){
     S.accountList=null; renderAccounts();
   }catch(e){ alert('Could not reactivate: '+apiErr(e)); }
 }
+async function doUnlockAccount(userId, displayName){
+  if(!confirm('Unlock account for '+displayName+'? This will clear the login lockout so they can sign in again.'))return;
+  try{
+    await api('/api/accounts/'+userId+'/unlock',{method:'POST'});
+    S.accountList=null; renderAccounts();
+  }catch(e){ alert('Could not unlock: '+apiErr(e)); }
+}
 
 // ── Flights ───────────────────────────────────────────────
 function openCreateFlightModal(){
@@ -3893,9 +4023,9 @@ function renderUserDir(){
     </tr>`).join('')+
     '</tbody></table></div>';
 }
-let _resetUserId=null;
+let _resetUserId=null, _resetUserName=null;
 function openResetCodeModal(userId,name,role,unit){
-  _resetUserId=userId;
+  _resetUserId=userId; _resetUserName=name;
   const ROLE_L={sqn_general:'SQN General',sqn_admin:'SQN Admin',wing_viewer:'Wing Viewer',wing_admin:'Wing Admin',
     national_viewer:'NAT Viewer',national_admin:'NAT Admin',system_admin:'System',auditor:'Auditor'};
   document.getElementById('m-reset-title').textContent='Reset Code — '+name;
@@ -3911,11 +4041,13 @@ async function doResetCode(){
   const cf=(document.getElementById('m-reset-confirm').value||'').trim();
   if(!nw||!cf){msg.textContent='Enter and confirm the new code.';return;}
   if(nw!==cf){msg.textContent='Codes do not match.';return;}
+  if(nw.length<6){msg.textContent='Code must be at least 6 characters.';return;}
   msg.textContent='Saving…'; msg.style.color='var(--muted)';
   try{
-    await api('/api/auth/change-code',{method:'POST',body:JSON.stringify({user_id:_resetUserId,new_code:nw})});
-    msg.textContent='✅ Code reset. Use at next sign-in.'; msg.style.color='var(--ok)';
+    const r=await api('/api/accounts/'+_resetUserId+'/reset-code',{method:'POST',body:JSON.stringify({new_code:nw})});
+    closeModal('m-reset-code');
     document.getElementById('m-reset-new').value=''; document.getElementById('m-reset-confirm').value='';
+    _showNewCodeModal(r.new_code, _resetUserName);
   }catch(e){ msg.textContent='Could not reset: '+apiErr(e); msg.style.color='var(--red)'; }
 }
 

@@ -198,6 +198,7 @@ def _account_out(u: User, db: DBSession) -> dict:
         "code_active": ac.active_status if ac else False,
         "code_last_changed": ac.updated_at.isoformat() if ac and ac.updated_at else None,
         "code_changed_by": ac.updated_by if ac else None,
+        "locked_until": ac.locked_until.isoformat() if ac and ac.locked_until else None,
     }
 
 
@@ -276,6 +277,14 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
     if body.role not in _ALL_ROLES:
         raise HTTPException(422, detail={"error": "invalid_role"})
 
+    name = body.display_name.strip()
+    if not name:
+        raise HTTPException(422, detail={"error": "invalid_display_name",
+                                         "message": "Display name cannot be empty."})
+    if len(name) > 100:
+        raise HTTPException(422, detail={"error": "invalid_display_name",
+                                         "message": "Display name cannot exceed 100 characters."})
+
     # Validate actor authority and scope
     _validate_create_scope(p, body.role, body.national_id, body.wing_id, body.squadron_id, db)
 
@@ -299,7 +308,7 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
         nat = db.query(NationalEntity).first()
         nat_id = nat.id if nat else None
 
-    u = User(display_name=body.display_name.strip(), role=body.role,
+    u = User(display_name=name, role=body.role,
              national_id=nat_id, wing_id=wing_id, squadron_id=sqn_id,
              flight_id=flight_id, active_status=True, created_by=p.user_id)
     db.add(u)
@@ -346,7 +355,14 @@ def update_account(uid: str, body: AccountUpdateIn, db: DBSession = Depends(get_
     _require_manage_authority(p, u, db)
 
     if body.display_name is not None:
-        u.display_name = body.display_name.strip()
+        name = body.display_name.strip()
+        if not name:
+            raise HTTPException(422, detail={"error": "invalid_display_name",
+                                             "message": "Display name cannot be empty."})
+        if len(name) > 100:
+            raise HTTPException(422, detail={"error": "invalid_display_name",
+                                             "message": "Display name cannot exceed 100 characters."})
+        u.display_name = name
 
     if body.flight_id is not None:
         if body.flight_id == "":
@@ -385,7 +401,17 @@ def reset_code(uid: str, body: ResetCodeIn, db: DBSession = Depends(get_db),
     if uid != p.user_id:
         _require_manage_authority(p, u, db)
 
-    plain = body.new_code.strip() if body.new_code else generate_code()
+    raw = (body.new_code or "").strip()
+    if raw:
+        if len(raw) < 6:
+            raise HTTPException(422, detail={"error": "invalid_code",
+                                             "message": "Access code must be at least 6 characters."})
+        if len(raw) > 128:
+            raise HTTPException(422, detail={"error": "invalid_code",
+                                             "message": "Access code is too long (maximum 128 characters)."})
+        plain = raw
+    else:
+        plain = generate_code()
     ac = db.query(AccessCode).filter(AccessCode.user_id == u.id).first()
     if not ac:
         ac = AccessCode(user_id=u.id, code_hash="", created_by=p.user_id)
@@ -440,6 +466,31 @@ def reactivate_account(uid: str, db: DBSession = Depends(get_db), p: Principal =
         ac.active_status = True
     db.commit()
     audit(db, p, object_type="account", object_id=u.id, action="account_reactivated",
+          new={"display_name": u.display_name, "role": u.role})
+    return {"ok": True}
+
+
+@router.post("/accounts/{uid}/unlock")
+def unlock_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Reset the per-account login lockout for a user.
+
+    Clears failed_attempts and locked_until on the user's active access code.
+    Requires the same management authority as reset-code (wing_admin for squadron
+    accounts in their wing, national_admin / system_admin for wider scope).
+    """
+    _require_write_actor(p)
+    u = db.get(User, uid)
+    if not u or u.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    _require_manage_authority(p, u, db)
+    ac = db.query(AccessCode).filter(AccessCode.user_id == u.id,
+                                     AccessCode.active_status == True).first()  # noqa: E712
+    if not ac:
+        raise HTTPException(404, detail={"error": "not_found"})
+    ac.failed_attempts = 0
+    ac.locked_until = None
+    db.commit()
+    audit(db, p, object_type="access_code", object_id=u.id, action="lockout_reset",
           new={"display_name": u.display_name, "role": u.role})
     return {"ok": True}
 

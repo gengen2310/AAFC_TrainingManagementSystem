@@ -94,22 +94,20 @@ def require_can_view_squadron(p: Principal, squadron_id: str, wing_id: str | Non
 
 def require_role(p: Principal, *roles: str):
     if p.role not in roles:
-        raise HTTPException(403, detail={"error": "forbidden", "needs": list(roles)})
+        raise HTTPException(403, detail={"error": "forbidden"})
 
 
 def require_system_admin(p: Principal):
     if not p.is_system_admin:
-        raise HTTPException(403, detail={"error": "forbidden", "needs": ["system_admin"]})
+        raise HTTPException(403, detail={"error": "forbidden"})
 
 
 def require_system_or_nat_admin(p: Principal):
     if p.role not in ("system_admin", "national_admin"):
-        raise HTTPException(403, detail={"error": "forbidden",
-                                         "needs": ["system_admin", "national_admin"]})
+        raise HTTPException(403, detail={"error": "forbidden"})
 
 
 def require_audit_access(p: Principal):
     """Roles permitted to read audit logs."""
     if p.role not in ("system_admin", "national_admin", "auditor"):
-        raise HTTPException(403, detail={"error": "forbidden",
-                                         "needs": ["system_admin", "national_admin", "auditor"]})
+        raise HTTPException(403, detail={"error": "forbidden"})

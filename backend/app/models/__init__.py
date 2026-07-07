@@ -4,7 +4,7 @@ from .planning import (
     AnchorPrepPlan, ScheduledSession, PlanningLocation, PlanningConflict,
 )
 from .organisations import (
-    NationalEntity, Wing, Squadron, Flight, User, AccessCode, ProxySession,
+    NationalEntity, Wing, Squadron, Flight, User, AccessCode, ProxySession, IpLoginAttempt,
 )
 from .training import (
     CurriculumItem, CurriculumElement, CustomPhase, ParadeNight, Session, SessionStatusHistory,
@@ -20,7 +20,7 @@ from .program import (
 )
 
 __all__ = [
-    "NationalEntity", "Wing", "Squadron", "Flight", "User", "AccessCode", "ProxySession",
+    "NationalEntity", "Wing", "Squadron", "Flight", "User", "AccessCode", "ProxySession", "IpLoginAttempt",
     "CurriculumItem", "CurriculumElement", "CustomPhase", "ParadeNight", "Session", "SessionStatusHistory",
     "Facilitator", "FacilitatorRankHistory", "TrainingArea", "Equipment", "Activity", "Cadet",
     "TimingTemplate", "TimingBlock", "ParadeNightTimingOverride",

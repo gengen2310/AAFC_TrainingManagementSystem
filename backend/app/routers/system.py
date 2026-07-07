@@ -126,8 +126,7 @@ def system_health(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
 # ── GET /api/system/version ───────────────────────────────────────────────────
 
 @router.get("/version")
-def system_version(p: Principal = Depends(get_principal)):
-    require_system_admin(p)
+def system_version():
     return {"app_version": APP_VERSION, "package_version": PACKAGE_VERSION}
 
 
@@ -137,7 +136,7 @@ def system_version(p: Principal = Depends(get_principal)):
 def system_migrations(p: Principal = Depends(get_principal)):
     require_system_admin(p)
     return {
-        "expected_head": "h3c4d5e6f7g8",
+        "expected_head": "m8h9i0j1k2l3",
         "current": _migration_head(),
     }
 

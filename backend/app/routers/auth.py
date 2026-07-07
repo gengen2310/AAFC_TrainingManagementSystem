@@ -1,22 +1,39 @@
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, Response, Request, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db
 from ..config import settings
 from ..security import (verify_code, create_token, hash_code,
-                        login_blocked, record_login_failure, record_login_success)
+                        login_blocked_db, record_login_failure_db, record_login_success_db)
 from ..database import utcnow
-from ..models import User, AccessCode, Wing
+from ..models import User, AccessCode, Wing, Squadron, NationalEntity
 from ..dependencies import get_principal, client_meta
 from ..permissions import Principal
 from ..services import audit
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+_LOCKOUT_MSG = ("Account locked after too many incorrect attempts. "
+                "Contact 7 Wing SOCAD for access.")
+_LOCKOUT_THRESHOLD = 5
+_LOCKOUT_HOURS = 24
+
+_NATIONAL_ROLES = {"national_admin", "national_viewer", "system_admin", "auditor"}
+
 
 class LoginIn(BaseModel):
-    code: str
+    code: str = Field(max_length=128)
+    user_id: str | None = None  # when provided, verification is scoped to this account only
+
+
+class LookupIn(BaseModel):
+    unit_type: str        # "squadron" | "wing" | "national"
+    identifier: str | None = None  # squadron code or wing code; omit for national
+    role: str
 
 
 class ChangeCodeIn(BaseModel):
@@ -24,26 +41,100 @@ class ChangeCodeIn(BaseModel):
     new_code: str
 
 
+@router.post("/lookup")
+def lookup(body: LookupIn, db: DBSession = Depends(get_db)):
+    """Resolve unit + role to a single account record without touching any credentials."""
+    _NOT_FOUND = HTTPException(404, detail={"error": "not_found",
+                                            "message": "No account found for that combination."})
+    unit_type = (body.unit_type or "").strip()
+    role = (body.role or "").strip()
+    ident = (body.identifier or "").strip()
+
+    if unit_type == "squadron":
+        sqn = db.query(Squadron).filter(
+            func.upper(Squadron.code) == ident.upper()
+        ).first()
+        if not sqn:
+            raise _NOT_FOUND
+        user = db.query(User).filter(
+            User.squadron_id == sqn.id,
+            User.role == role,
+            User.active_status == True  # noqa: E712
+        ).first()
+    elif unit_type == "wing":
+        wing = db.query(Wing).filter(
+            func.upper(Wing.code) == ident.upper()
+        ).first()
+        if not wing:
+            raise _NOT_FOUND
+        user = db.query(User).filter(
+            User.wing_id == wing.id,
+            User.role == role,
+            User.active_status == True  # noqa: E712
+        ).first()
+    elif unit_type == "national":
+        if role not in _NATIONAL_ROLES:
+            raise _NOT_FOUND
+        user = db.query(User).filter(
+            User.role == role,
+            User.active_status == True  # noqa: E712
+        ).first()
+    else:
+        raise _NOT_FOUND
+
+    if not user:
+        raise _NOT_FOUND
+    return {"user_id": user.id, "display_name": user.display_name}
+
+
 @router.post("/login")
 def login(body: LoginIn, request: Request, response: Response, db: DBSession = Depends(get_db)):
     key = (request.client.host if request.client else "anon")
-    if login_blocked(key):
+    if login_blocked_db(key, db):
         raise HTTPException(429, detail={"error": "locked_out",
                                          "message": "Too many attempts. Try again later."})
     code = (body.code or "").strip()
-    matched = None
-    for ac in db.query(AccessCode).filter(AccessCode.active_status == True).all():  # noqa: E712
-        if verify_code(code, ac.code_hash):
-            matched = ac
-            break
-    if not matched:
-        record_login_failure(key)
-        raise HTTPException(401, detail={"error": "invalid_code"})
-    record_login_success(key)
+
+    if body.user_id:
+        # Scoped path: verify only against the identified account.
+        # This is the path taken by every production login (after /lookup).
+        ac = db.query(AccessCode).filter(
+            AccessCode.user_id == body.user_id,
+            AccessCode.active_status == True  # noqa: E712
+        ).first()
+        # Per-account lockout check before touching the code
+        if ac:
+            _raise_if_locked(ac)
+        if not ac or not verify_code(code, ac.code_hash):
+            # Scoped path: only increment per-account counter, not the IP counter.
+            # The IP rate limiter defends scan-all brute force; per-account counter
+            # defends targeted attacks on a specific account.
+            if ac:
+                ac.failed_attempts = (ac.failed_attempts or 0) + 1
+                if ac.failed_attempts >= _LOCKOUT_THRESHOLD:
+                    ac.locked_until = utcnow() + timedelta(hours=_LOCKOUT_HOURS)
+                db.commit()
+            raise HTTPException(401, detail={"error": "invalid_code"})
+        matched = ac
+    else:
+        # Legacy scan-all path (used by tests; production always provides user_id via /lookup).
+        matched = None
+        for ac in db.query(AccessCode).filter(AccessCode.active_status == True).all():  # noqa: E712
+            if verify_code(code, ac.code_hash):
+                matched = ac
+                break
+        if not matched:
+            record_login_failure_db(key, db)
+            raise HTTPException(401, detail={"error": "invalid_code"})
+        _raise_if_locked(matched)
+
+    record_login_success_db(key, db)
     user = db.get(User, matched.user_id)
     if not user or not user.active_status:
         raise HTTPException(401, detail={"error": "invalid_user"})
     user.last_login_at = utcnow()
+    matched.failed_attempts = 0
+    matched.locked_until = None
     db.commit()
     token = create_token(user.id, {"role": user.role})
     response.set_cookie(settings.COOKIE_NAME, token, httponly=True,
@@ -54,6 +145,16 @@ def login(body: LoginIn, request: Request, response: Response, db: DBSession = D
                   squadron_id=user.squadron_id, national_id=user.national_id)
     audit(db, p, object_type="auth", object_id=user.id, action="login", ip=meta["ip"], ua=meta["ua"])
     return {"token": token, "session": _me(user, db)}
+
+
+def _raise_if_locked(ac: AccessCode):
+    locked = ac.locked_until
+    if locked is None:
+        return
+    now = utcnow().replace(tzinfo=None)
+    locked_naive = locked.replace(tzinfo=None) if locked.tzinfo else locked
+    if locked_naive > now:
+        raise HTTPException(429, detail={"error": "locked_out", "message": _LOCKOUT_MSG})
 
 
 @router.post("/logout")
@@ -100,22 +201,39 @@ def change_code(body: ChangeCodeIn, db: DBSession = Depends(get_db),
                 p: Principal = Depends(get_principal)):
     is_self = body.user_id == p.user_id
     # Any authenticated user may change their own code.
-    # Changing another user's code requires an admin role.
+    # Changing another user's code requires an admin role + management authority over that account.
     if not is_self and p.role not in ("system_admin", "national_admin", "wing_admin", "sqn_admin"):
         raise HTTPException(403, detail={"error": "forbidden"})
     target = db.get(User, body.user_id)
     if not target:
         raise HTTPException(404, detail={"error": "not_found"})
+    # Scope check: the actor must have management authority over the target account.
+    # (Mirrors the check in accounts.py:reset_code — prevents cross-scope code takeover.)
+    if not is_self:
+        from .accounts import _require_manage_authority
+        _require_manage_authority(p, target, db)
+    # Validate the new code: strip, non-empty, minimum length, maximum length.
+    plain = (body.new_code or "").strip()
+    if not plain:
+        raise HTTPException(422, detail={"error": "invalid_code",
+                                         "message": "Access code cannot be empty."})
+    if len(plain) < 6:
+        raise HTTPException(422, detail={"error": "invalid_code",
+                                         "message": "Access code must be at least 6 characters."})
+    if len(plain) > 128:
+        raise HTTPException(422, detail={"error": "invalid_code",
+                                         "message": "Access code is too long (maximum 128 characters)."})
     ac = db.query(AccessCode).filter(AccessCode.user_id == target.id).first()
     if not ac:
         ac = AccessCode(user_id=target.id, code_hash="", created_by=p.user_id)
         db.add(ac)
-    ac.code_hash = hash_code(body.new_code)
+    ac.code_hash = hash_code(plain)
     ac.updated_at = utcnow()
     ac.updated_by = p.user_id
     db.commit()
     action = "change_own_code" if is_self else "reset_access"
-    audit(db, p, object_type="access_code", object_id=target.id, action=action)
+    new_info = {} if is_self else {"target_display_name": target.display_name, "target_role": target.role}
+    audit(db, p, object_type="access_code", object_id=target.id, action=action, new=new_info)
     return {"ok": True}
 
 

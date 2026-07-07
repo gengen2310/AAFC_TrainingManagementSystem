@@ -61,12 +61,22 @@ def list_curriculum(db: DBSession = Depends(get_db), p: Principal = Depends(get_
         CurriculumItem.is_archived == False,  # noqa: E712
         or_(*conditions)
     ).order_by(CurriculumItem.recommended_sequence).all()
+
+    # Preload all sessions for this squadron in one query, then group by curriculum_item_id.
+    item_ids = [i.id for i in items]
+    all_sess = db.query(Session).filter(
+        Session.curriculum_item_id.in_(item_ids),
+        Session.squadron_id == sq_id,
+        Session.is_archived == False,  # noqa: E712
+    ).all() if item_ids else []
+    from collections import defaultdict
+    sess_by_item: dict[str, list] = defaultdict(list)
+    for s in all_sess:
+        sess_by_item[s.curriculum_item_id].append(s)
+
     out = []
     for i in items:
-        sess = db.query(Session).filter(Session.curriculum_item_id == i.id,
-                                        Session.squadron_id == sq_id,
-                                        Session.is_archived == False).all()  # noqa: E712
-        statuses = [s.status for s in sess]
+        statuses = [s.status for s in sess_by_item[i.id]]
         out.append({"curriculum_id": i.id, "code": i.code, "identifier": i.identifier,
                     "part_number": i.part_number, "title": i.title, "phase": i.phase,
                     "element": i.element, "duration_minutes": i.duration_minutes,
@@ -1761,11 +1771,9 @@ async def import_curriculum_csv(
             location=mapped.get("location") or None,
         ))
 
-    if not items and parse_errors:
-        raise HTTPException(400, detail={
-            "error": "csv_parse_failed",
-            "message": "No valid rows found. " + "; ".join(parse_errors[:5]),
-        })
+    if not items:
+        msg = "No valid rows found. " + "; ".join(parse_errors[:5]) if parse_errors else "File is empty or contains no data rows."
+        raise HTTPException(400, detail={"error": "csv_parse_failed", "message": msg})
 
     import_body = CurriculumImportIn(items=items, owning_level=owning_level)
     result = import_curriculum(import_body, db, p)

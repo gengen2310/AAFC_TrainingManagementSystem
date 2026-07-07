@@ -1,0 +1,340 @@
+"""Per-account and DB-backed IP lockout tests."""
+from datetime import datetime, timedelta
+
+import pytest
+from sqlalchemy import text
+from app.database import SessionLocal, engine
+from app.models import AccessCode, IpLoginAttempt
+from tests.conftest import login
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _find_ac_id(user_code: str) -> str:
+    """Return the primary key of the active AccessCode whose hash matches user_code."""
+    from app.security import verify_code
+    db = SessionLocal()
+    try:
+        for ac in db.query(AccessCode).filter(AccessCode.active_status == True).all():  # noqa: E712
+            if verify_code(user_code, ac.code_hash):
+                return ac.id
+    finally:
+        db.close()
+    raise ValueError(f"No active AccessCode found for code {user_code!r}")
+
+
+def _set_account_locked(user_code: str, minutes: int = 30) -> None:
+    """Directly set locked_until on the AccessCode matching user_code hash.
+    Uses raw SQL to bypass the ORM identity map so subsequent requests see fresh state.
+    """
+    ac_id = _find_ac_id(user_code)
+    locked_dt = datetime.utcnow() + timedelta(minutes=minutes)
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE access_codes SET locked_until=:lu, failed_attempts=5 WHERE id=:id"),
+            {"lu": locked_dt, "id": ac_id},
+        )
+    engine.dispose()
+
+
+def _clear_account_lock(user_code: str) -> None:
+    ac_id = _find_ac_id(user_code)
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE access_codes SET locked_until=NULL, failed_attempts=0 WHERE id=:id"),
+            {"id": ac_id},
+        )
+    engine.dispose()
+
+
+# ── DB-backed IP lockout ──────────────────────────────────────────────────────
+
+def test_db_ip_lockout_fires_after_five_wrong_codes(client):
+    for _ in range(5):
+        r = client.post("/api/auth/login", json={"code": "WRONGCODE1"})
+        assert r.status_code == 401
+    # 6th attempt should be locked
+    r = client.post("/api/auth/login", json={"code": "WRONGCODE1"})
+    assert r.status_code == 429
+    assert r.json()["detail"]["error"] == "locked_out"
+
+
+def test_db_ip_lockout_persists_in_table(client):
+    for _ in range(5):
+        client.post("/api/auth/login", json={"code": "WRONGCODEIP"})
+    db = SessionLocal()
+    try:
+        row = db.get(IpLoginAttempt, "testclient")
+        assert row is not None
+        assert row.locked_until is not None
+    finally:
+        db.close()
+
+
+def test_successful_login_clears_ip_lockout(client):
+    # Accumulate 4 failures
+    for _ in range(4):
+        client.post("/api/auth/login", json={"code": "WRONGCODEOK"})
+    # Successful login resets counter
+    r = client.post("/api/auth/login", json={"code": "ADMIN703"})
+    assert r.status_code == 200
+    db = SessionLocal()
+    try:
+        row = db.get(IpLoginAttempt, "testclient")
+        # Row may or may not exist; if it does, locked_until must be cleared
+        if row:
+            assert row.locked_until is None
+    finally:
+        db.close()
+
+
+# ── Per-account lockout ───────────────────────────────────────────────────────
+
+def test_account_lockout_blocks_correct_code(client):
+    _set_account_locked("703SQN2026")
+    try:
+        r = client.post("/api/auth/login", json={"code": "703SQN2026"})
+        assert r.status_code == 429
+        assert r.json()["detail"]["error"] == "locked_out"
+    finally:
+        _clear_account_lock("703SQN2026")
+
+
+def test_account_lockout_does_not_affect_other_accounts(client):
+    _set_account_locked("703SQN2026")
+    try:
+        r = client.post("/api/auth/login", json={"code": "ADMIN703"})
+        assert r.status_code == 200
+    finally:
+        _clear_account_lock("703SQN2026")
+
+
+def test_successful_login_resets_account_lockout(client):
+    # Directly set a past locked_until (already expired) so login still succeeds but resets counters
+    ac_id = _find_ac_id("ADMIN703")
+    expired_dt = datetime.utcnow() - timedelta(minutes=1)
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE access_codes SET locked_until=:lu, failed_attempts=3 WHERE id=:id"),
+            {"lu": expired_dt, "id": ac_id},
+        )
+    engine.dispose()
+
+    # Login should succeed (lock expired)
+    r = client.post("/api/auth/login", json={"code": "ADMIN703"})
+    assert r.status_code == 200
+
+    # Confirm counters were reset in DB
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT failed_attempts, locked_until FROM access_codes WHERE id=:id"),
+            {"id": ac_id},
+        ).fetchone()
+    assert row.failed_attempts == 0
+    assert row.locked_until is None
+
+
+# ── Unlock endpoint ───────────────────────────────────────────────────────────
+
+def test_wing_admin_can_unlock_sqn_account(client):
+    # Create a fresh user so test is not affected by other tests adding sqn_general users
+    h_nat = login(client, "ADMINNATIONAL")
+    h_wing = login(client, "ADMIN7WG")
+    accounts_resp = client.get("/api/accounts", headers=h_wing).json()
+    account_list = accounts_resp if isinstance(accounts_resp, list) else accounts_resp.get("accounts", [])
+    sqn703 = next((a for a in account_list if a.get("squadron_code") == "703" and a["role"] == "sqn_admin"), None)
+    assert sqn703 is not None
+    sqn_id = sqn703["squadron_id"]
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Unlock Test User",
+        "role": "sqn_general",
+        "squadron_id": sqn_id,
+    })
+    assert create_r.status_code == 200
+    uid = create_r.json()["user_id"]
+    test_code = create_r.json()["new_code"]
+
+    # Lock via raw SQL using the access code id
+    ac_id = _find_ac_id(test_code)
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE access_codes SET locked_until=datetime('now','+30 minutes'), failed_attempts=5 WHERE id=:id"),
+            {"id": ac_id},
+        )
+    engine.dispose()
+
+    # Confirm login is blocked
+    r_blocked = client.post("/api/auth/login", json={"code": test_code})
+    assert r_blocked.status_code == 429
+
+    # Wing admin unlocks
+    r_unlock = client.post(f"/api/accounts/{uid}/unlock", headers=h_wing)
+    assert r_unlock.status_code == 200
+    assert r_unlock.json()["ok"] is True
+
+    # Confirm lock is cleared
+    r2 = client.post("/api/auth/login", json={"code": test_code})
+    assert r2.status_code == 200
+
+
+def test_sqn_general_cannot_unlock(client):
+    # Get a user id to attempt to unlock (the sqn_admin account)
+    h_wing = login(client, "ADMIN7WG")
+    accounts = client.get("/api/accounts", headers=h_wing).json()
+    account_list = accounts if isinstance(accounts, list) else accounts.get("accounts", [])
+    adm = next((a for a in account_list if a["role"] == "sqn_admin"
+                and a.get("squadron_code") == "703"), None)
+    assert adm is not None
+    uid = adm["user_id"]
+
+    # sqn_general tries to call unlock — should be 403 (_require_write_actor blocks non-write roles)
+    h_gen = login(client, "703SQN2026")
+    r = client.post(f"/api/accounts/{uid}/unlock", headers=h_gen)
+    assert r.status_code == 403
+
+
+def test_unlock_nonexistent_user_returns_404(client):
+    h_wing = login(client, "ADMIN7WG")
+    r = client.post("/api/accounts/nonexistent-uuid-1234/unlock", headers=h_wing)
+    assert r.status_code == 404
+
+
+def _find_user_id_for_code(user_code: str) -> str:
+    """Return the user_id that owns the active AccessCode matching user_code."""
+    ac_id = _find_ac_id(user_code)
+    db = SessionLocal()
+    try:
+        ac = db.get(AccessCode, ac_id)
+        return ac.user_id
+    finally:
+        db.close()
+
+
+def test_locked_account_visible_in_account_detail(client):
+    _set_account_locked("703SQN2026")
+    try:
+        uid = _find_user_id_for_code("703SQN2026")
+        h_wing = login(client, "ADMIN7WG")
+        detail = client.get(f"/api/accounts/{uid}", headers=h_wing).json()
+        assert detail.get("locked_until") is not None
+    finally:
+        _clear_account_lock("703SQN2026")
+
+
+# ── Scoped-path per-account lockout (user_id provided) ───────────────────────
+
+def test_scoped_login_increments_failed_attempts(client):
+    uid = _find_user_id_for_code("703SQN2026")
+    ac_id = _find_ac_id("703SQN2026")
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE access_codes SET failed_attempts=0, locked_until=NULL WHERE id=:id"),
+                     {"id": ac_id})
+    engine.dispose()
+
+    for _ in range(5):
+        r = client.post("/api/auth/login", json={"user_id": uid, "code": "WRONGCODE"})
+        assert r.status_code == 401
+
+    # 6th attempt with user_id → account locked → 429
+    r = client.post("/api/auth/login", json={"user_id": uid, "code": "WRONGCODE"})
+    assert r.status_code == 429
+    assert r.json()["detail"]["error"] == "locked_out"
+    _clear_account_lock("703SQN2026")
+
+
+def test_scoped_lockout_does_not_affect_sibling_account(client):
+    uid_viewer = _find_user_id_for_code("703SQN2026")
+    ac_id = _find_ac_id("703SQN2026")
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE access_codes SET failed_attempts=0, locked_until=NULL WHERE id=:id"),
+                     {"id": ac_id})
+    engine.dispose()
+
+    for _ in range(5):
+        client.post("/api/auth/login", json={"user_id": uid_viewer, "code": "WRONGCODE"})
+
+    # Viewer is now locked
+    r = client.post("/api/auth/login", json={"user_id": uid_viewer, "code": "WRONGCODE"})
+    assert r.status_code == 429
+
+    # Admin at the same squadron is unaffected
+    h = login(client, "ADMIN703")
+    assert h is not None
+    _clear_account_lock("703SQN2026")
+
+
+def test_admin_code_rejected_for_viewer_account(client):
+    """Core isolation test: Admin code must not authenticate as the Viewer account."""
+    uid_viewer = _find_user_id_for_code("703SQN2026")
+    r = client.post("/api/auth/login", json={"user_id": uid_viewer, "code": "ADMIN703"})
+    assert r.status_code == 401
+
+
+def test_viewer_code_rejected_for_admin_account(client):
+    """Symmetric isolation: Viewer code must not authenticate as the Admin account."""
+    uid_admin = _find_user_id_for_code("ADMIN703")
+    r = client.post("/api/auth/login", json={"user_id": uid_admin, "code": "703SQN2026"})
+    assert r.status_code == 401
+
+
+# ── Lookup endpoint ───────────────────────────────────────────────────────────
+
+def test_lookup_squadron_admin(client):
+    r = client.post("/api/auth/lookup", json={"unit_type": "squadron", "identifier": "703", "role": "sqn_admin"})
+    assert r.status_code == 200
+    d = r.json()
+    assert "user_id" in d and "display_name" in d
+
+
+def test_lookup_squadron_viewer(client):
+    r = client.post("/api/auth/lookup", json={"unit_type": "squadron", "identifier": "703", "role": "sqn_general"})
+    assert r.status_code == 200
+
+
+def test_lookup_nonexistent_squadron(client):
+    r = client.post("/api/auth/lookup", json={"unit_type": "squadron", "identifier": "999", "role": "sqn_admin"})
+    assert r.status_code == 404
+
+
+def test_lookup_wrong_role_for_squadron(client):
+    r = client.post("/api/auth/lookup", json={"unit_type": "squadron", "identifier": "703", "role": "wing_admin"})
+    assert r.status_code == 404
+
+
+def test_lookup_wing(client):
+    r = client.post("/api/auth/lookup", json={"unit_type": "wing", "identifier": "7WG", "role": "wing_admin"})
+    assert r.status_code == 200
+
+
+def test_lookup_wing_case_insensitive(client):
+    r = client.post("/api/auth/lookup", json={"unit_type": "wing", "identifier": "7wg", "role": "wing_admin"})
+    assert r.status_code == 200
+
+
+def test_lookup_national_system_admin(client):
+    r = client.post("/api/auth/lookup", json={"unit_type": "national", "role": "system_admin"})
+    assert r.status_code == 200
+
+
+def test_lookup_national_wrong_role(client):
+    r = client.post("/api/auth/lookup", json={"unit_type": "national", "role": "sqn_admin"})
+    assert r.status_code == 404
+
+
+def test_lookup_then_login_full_flow(client):
+    """End-to-end: lookup resolves user_id, login with user_id + correct code succeeds."""
+    r = client.post("/api/auth/lookup", json={"unit_type": "squadron", "identifier": "703", "role": "sqn_admin"})
+    assert r.status_code == 200
+    uid = r.json()["user_id"]
+    r2 = client.post("/api/auth/login", json={"user_id": uid, "code": "ADMIN703"})
+    assert r2.status_code == 200
+    assert "token" in r2.json()
+
+
+def test_lookup_user_id_scope_prevents_wrong_code(client):
+    """lookup gives admin uid; entering viewer code against it must fail."""
+    r = client.post("/api/auth/lookup", json={"unit_type": "squadron", "identifier": "703", "role": "sqn_admin"})
+    uid = r.json()["user_id"]
+    r2 = client.post("/api/auth/login", json={"user_id": uid, "code": "703SQN2026"})
+    assert r2.status_code == 401

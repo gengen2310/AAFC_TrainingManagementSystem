@@ -8,8 +8,12 @@ import time
 import jwt
 from datetime import datetime, timedelta, timezone
 from passlib.context import CryptContext
+from typing import TYPE_CHECKING
 
 from .config import settings
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session as DBSession
 
 _pwd = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
@@ -86,3 +90,56 @@ def record_login_success(key: str) -> None:
 def reset_rate_limiter() -> None:
     _attempts.clear()
     _lockouts.clear()
+
+
+# ── DB-backed per-IP rate limiter (works across gunicorn workers) ──────────────
+# Replaces the in-memory dicts above for production use. Uses IpLoginAttempt
+# table so state is shared across all workers.
+
+def login_blocked_db(key: str, db: "DBSession") -> bool:
+    from .models import IpLoginAttempt
+    row = db.get(IpLoginAttempt, key)
+    if not row:
+        return False
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    locked = row.locked_until
+    if locked is None:
+        return False
+    # strip tz if stored as naive (SQLite stores naive datetimes)
+    locked_naive = locked.replace(tzinfo=None) if locked.tzinfo else locked
+    if locked_naive > now:
+        return True
+    # Lock expired — reset
+    row.attempt_count = 0
+    row.locked_until = None
+    db.commit()
+    return False
+
+
+def record_login_failure_db(key: str, db: "DBSession") -> None:
+    from .models import IpLoginAttempt
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    row = db.get(IpLoginAttempt, key)
+    if not row:
+        row = IpLoginAttempt(ip=key, attempt_count=0, window_start=now)
+        db.add(row)
+    window_start = row.window_start
+    if window_start and window_start.tzinfo:
+        window_start = window_start.replace(tzinfo=None)
+    elapsed = (now - window_start).total_seconds() if window_start else settings.LOGIN_WINDOW_SEC + 1
+    if elapsed > settings.LOGIN_WINDOW_SEC:
+        row.attempt_count = 0
+        row.window_start = now
+    row.attempt_count += 1
+    if row.attempt_count >= settings.LOGIN_MAX_ATTEMPTS:
+        row.locked_until = now + timedelta(seconds=settings.LOGIN_LOCKOUT_SEC)
+    db.commit()
+
+
+def record_login_success_db(key: str, db: "DBSession") -> None:
+    from .models import IpLoginAttempt
+    row = db.get(IpLoginAttempt, key)
+    if row:
+        row.attempt_count = 0
+        row.locked_until = None
+        db.commit()

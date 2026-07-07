@@ -80,11 +80,28 @@ class AccessCode(Base, UUIDMixin, TimestampMixin):
     """Hashed access code → user. The plaintext code is never stored or returned.
 
     updated_at / updated_by (from TimestampMixin) record the last reset date and actor.
+    failed_attempts / locked_until support per-account lockout (see auth.py).
     """
     __tablename__ = "access_codes"
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     code_hash: Mapped[str] = mapped_column(String(255), index=True)
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
+    failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class IpLoginAttempt(Base):
+    """DB-backed per-IP login rate-limit state.
+
+    Replaces the in-memory _attempts/_lockouts dicts in security.py, which do not
+    survive across gunicorn workers. One row per unique client IP — upserted on each
+    failed login, cleared on success.
+    """
+    __tablename__ = "ip_login_attempts"
+    ip: Mapped[str] = mapped_column(String(45), primary_key=True)  # IPv6 max 45 chars
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0)
+    window_start: Mapped[datetime] = mapped_column(DateTime)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class ProxySession(Base, UUIDMixin, TimestampMixin):
