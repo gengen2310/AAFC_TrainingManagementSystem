@@ -5,16 +5,19 @@ body.pw-active .main {
   padding: 0;
   max-width: none;
   overflow: hidden;
-  /* fill remaining height after topbar + optional proxy banner */
   display: flex;
   flex-direction: column;
 }
 
+/*
+ * pw-root uses flex (not grid) so the body row can flex:1 without needing
+ * a definite parent height. Grid fr units require a definite container height
+ * which .main cannot guarantee when .body is in an auto grid row.
+ */
 .pw-root {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  height: 100%;
-  min-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 48px);
   overflow: hidden;
   background: var(--background);
 }
@@ -60,7 +63,8 @@ body.pw-active .main {
   grid-template-columns: 220px 1fr;
   overflow: hidden;
   transition: grid-template-columns .18s ease;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
 }
 .pw-body.right-open { grid-template-columns: 220px 1fr 380px; }
 
