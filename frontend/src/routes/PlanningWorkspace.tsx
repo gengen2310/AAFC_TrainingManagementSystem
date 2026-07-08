@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthProvider";
 import { planningApi } from "../api";
 import { PlanningContextBar, type ViewMode } from "../components/planning/PlanningContextBar";
@@ -11,12 +11,14 @@ import { TermView } from "../components/planning/views/TermView";
 import { EightWeekView } from "../components/planning/views/EightWeekView";
 import { TwoWeekView } from "../components/planning/views/TwoWeekView";
 import { ParadeNightGridView } from "../components/planning/views/ParadeNightGridView";
+import { SetupPanel } from "../components/planning/SetupPanel";
 import type { PlanningSession } from "../api/types";
 
 type BottomTab = "backlog" | "facilitators" | "rooms" | "notices";
 
 export function PlanningWorkspace() {
   const { session } = useAuth();
+  const qc = useQueryClient();
 
   // Body class to remove .main padding/max-width
   useEffect(() => {
@@ -96,11 +98,18 @@ export function PlanningWorkspace() {
     setDrawerItem({ type: "session", session: s, dateId, date, conflicts: [] });
   }
 
-  function handleBacklogItemClick(type: string, id: string) {
+  async function handleBacklogItemClick(type: string, id: string) {
     if (type === "curriculum") {
       const cc_item = cc?.unscheduled_required.find(u => u.curriculum_id === id);
       if (cc_item) {
         setDrawerItem({ type: "curriculum", curriculum: cc_item });
+      }
+    } else if (type === "wing-event") {
+      try {
+        const event = await planningApi.getWingEvent(id);
+        setDrawerItem({ type: "wing-event", event });
+      } catch {
+        // silently ignore — event may not be accessible
       }
     }
   }
@@ -113,6 +122,14 @@ export function PlanningWorkspace() {
   // ── Canvas content ────────────────────────────────────────────────────────────
   function renderCanvas() {
     if (yearsLoading) return <div className="pw-loading">Loading planning years…</div>;
+    if (!yearsLoading && years && years.length === 0) {
+      return (
+        <SetupPanel
+          session={session}
+          onYearCreated={() => qc.invalidateQueries({ queryKey: ["planning-years"] })}
+        />
+      );
+    }
     if (!selectedYearId) {
       return (
         <div className="pw-empty">
@@ -127,6 +144,7 @@ export function PlanningWorkspace() {
         <YearView
           yearId={selectedYearId}
           onDateClick={handleDateClick}
+          layers={layers}
         />
       );
     }
@@ -135,6 +153,7 @@ export function PlanningWorkspace() {
         <TermView
           yearId={selectedYearId}
           onDateClick={handleDateClick}
+          layers={layers}
         />
       );
     }
@@ -146,6 +165,7 @@ export function PlanningWorkspace() {
           facilitators={facilitators}
           onDateClick={handleDateClick}
           onSessionClick={handleSessionClick}
+          layers={layers}
         />
       );
     }
@@ -194,19 +214,31 @@ export function PlanningWorkspace() {
         onModeChange={handleViewModeChange}
       />
 
-      {/* Year selector (when multiple years exist) */}
-      {yearOptions && (
+      {/* Year selector + quick actions */}
+      {selectedYearId && (
         <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)", padding: "4px 14px", display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-text)" }}>Planning year:</span>
-          {yearOptions.map(y => (
-            <button
-              key={y.planning_year_id}
-              className={`pw-chip${selectedYearId === y.planning_year_id ? " on" : ""}`}
-              onClick={() => { setSelectedYearId(y.planning_year_id); setSelectedDateId(null); }}
-            >
-              {y.name}
-            </button>
-          ))}
+          {yearOptions && (
+            <>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-text)" }}>Year:</span>
+              {yearOptions.map(y => (
+                <button
+                  key={y.planning_year_id}
+                  className={`pw-chip${selectedYearId === y.planning_year_id ? " on" : ""}`}
+                  onClick={() => { setSelectedYearId(y.planning_year_id); setSelectedDateId(null); }}
+                >
+                  {y.name}
+                </button>
+              ))}
+              <span style={{ width: 1, height: 18, background: "var(--border)", margin: "0 4px" }} />
+            </>
+          )}
+          <button
+            className="btn sm out"
+            style={{ fontSize: 11, padding: "3px 10px" }}
+            onClick={() => setDrawerItem({ type: "new-anchor", yearId: selectedYearId })}
+          >
+            + Anchor event
+          </button>
         </div>
       )}
 

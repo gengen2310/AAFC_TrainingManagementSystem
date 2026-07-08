@@ -90,35 +90,49 @@ function FacilitatorsContent({ facilitators }: { facilitators: PlanningFacilitat
   );
 }
 
-function RoomsContent({ locations }: { locations: PlanningLocation[] }) {
-  if (locations.length === 0) {
-    return <div className="pw-empty" style={{ padding: "20px" }}>No rooms on record.</div>;
-  }
+function RoomsContent({ locations, onAddLocation, onEditLocation }: {
+  locations: PlanningLocation[];
+  onAddLocation: () => void;
+  onEditLocation: (loc: PlanningLocation) => void;
+}) {
   return (
-    <table className="pw-fac-table">
-      <thead>
-        <tr>
-          <th>Room</th>
-          <th>Type</th>
-          <th>Capacity</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {locations.map((l) => (
-          <tr key={l.location_id}>
-            <td>{l.name}</td>
-            <td style={{ textTransform: "capitalize" }}>{l.location_type}</td>
-            <td style={{ textAlign: "center" }}>{l.capacity ?? "—"}</td>
-            <td>
-              <span style={{ fontSize: 11, fontWeight: 700, color: l.active_status ? "var(--success)" : "var(--muted-text)" }}>
-                {l.active_status ? "Active" : "Inactive"}
-              </span>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div>
+      <div style={{ padding: "8px 14px 0", display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn sm primary" onClick={onAddLocation}>+ Add Room</button>
+      </div>
+      {locations.length === 0 ? (
+        <div className="pw-empty" style={{ padding: "20px" }}>No rooms on record. Add one to start assigning sessions to rooms.</div>
+      ) : (
+        <table className="pw-fac-table">
+          <thead>
+            <tr>
+              <th>Room</th>
+              <th>Type</th>
+              <th>Capacity</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {locations.map((l) => (
+              <tr key={l.location_id}>
+                <td>{l.name}</td>
+                <td style={{ textTransform: "capitalize" }}>{l.location_type}</td>
+                <td style={{ textAlign: "center" }}>{l.capacity ?? "—"}</td>
+                <td>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: l.active_status ? "var(--success)" : "var(--muted-text)" }}>
+                    {l.active_status ? "Active" : "Inactive"}
+                  </span>
+                </td>
+                <td>
+                  <button className="btn sm out" style={{ fontSize: 11, padding: "3px 8px" }} onClick={() => onEditLocation(l)}>Edit</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
   );
 }
 
@@ -171,7 +185,13 @@ export function PlanningBottomDrawer({ yearId, tab, onTabChange, onClose, facili
         {tab === "backlog" && yearId && <BacklogContent yearId={yearId} onItemClick={onItemClick} />}
         {tab === "backlog" && !yearId && <div className="pw-empty">No planning year selected.</div>}
         {tab === "facilitators" && <FacilitatorsContent facilitators={facilitators} />}
-        {tab === "rooms" && <RoomsContent locations={locations} />}
+        {tab === "rooms" && (
+          <RoomsContent
+            locations={locations}
+            onAddLocation={() => { onItemClick({ type: "new-location" }); onClose(); }}
+            onEditLocation={(loc) => { onItemClick({ type: "new-location", location: loc }); onClose(); }}
+          />
+        )}
         {tab === "notices" && yearId && <NoticesContent yearId={yearId} />}
         {tab === "notices" && !yearId && <div className="pw-empty">No planning year selected.</div>}
       </div>

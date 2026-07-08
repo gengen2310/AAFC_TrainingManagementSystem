@@ -174,4 +174,28 @@ export const planningApi = {
   },
   reviewWingEvent: (event_id: string, status: string, notes?: string) =>
     api.patch<{ ok: boolean }>(`/api/wing-calendar/events/${event_id}/squadron-status`, { status, notes }),
+  getWingEvent: (event_id: string) =>
+    api.get<WingHQEvent>(`/api/wing-calendar/events/${event_id}`),
+  createYear: (body: { year: number; name: string }) =>
+    api.post<PlanningYear>("/api/planning/years", body),
+  generateParadeDates: (year_id: string, body: {
+    weekday: number; start_date: string; end_date?: string;
+    parade_type?: string; exclude_holidays?: boolean;
+    frequency?: string; max_repeats?: number; excluded_dates?: string[];
+  }) => api.post<{ ok: boolean; created: number; linked: number; dates: string[] }>(
+    `/api/planning/years/${year_id}/generate-parade-dates`, body,
+  ),
+  createAnchor: (year_id: string, body: {
+    event_name: string; event_type?: string; importance?: string;
+    start_date: string; end_date?: string;
+    audience_orientation?: boolean; audience_initial?: boolean;
+    audience_junior?: boolean; audience_intermediate?: boolean; audience_senior?: boolean;
+    planning_impact?: string; notes?: string;
+  }) => api.post<Record<string, unknown>>(`/api/planning/years/${year_id}/anchors`, body),
+  createLocation: (body: { name: string; location_type?: string; capacity?: number; notes?: string }) =>
+    api.post<PlanningLocation>("/api/planning/locations", body),
+  updateLocation: (location_id: string, body: {
+    name?: string; location_type?: string; capacity?: number;
+    notes?: string; active_status?: boolean;
+  }) => api.patch<PlanningLocation>(`/api/planning/locations/${location_id}`, body),
 };

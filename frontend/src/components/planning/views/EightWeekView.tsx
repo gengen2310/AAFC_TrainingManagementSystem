@@ -8,6 +8,7 @@ interface Props {
   facilitators: PlanningFacilitator[];
   onDateClick: (dateId: string, date: string) => void;
   onSessionClick: (session: PlanningSession, dateId: string, date: string) => void;
+  layers?: { conflicts?: boolean; wingHQEvents?: boolean };
 }
 
 function detectConflict(s: PlanningSession, siblings: PlanningSession[]): "room" | "fac" | null {
@@ -17,7 +18,9 @@ function detectConflict(s: PlanningSession, siblings: PlanningSession[]): "room"
   return null;
 }
 
-export function EightWeekView({ yearId, weeks = 8, facilitators, onDateClick, onSessionClick }: Props) {
+export function EightWeekView({ yearId, weeks = 8, facilitators, onDateClick, onSessionClick, layers }: Props) {
+  const showConflicts = layers?.conflicts ?? true;
+  const showAnchors = layers?.wingHQEvents ?? true;
   const { data, isLoading, error } = useQuery({
     queryKey: ["planning-long-range", yearId, weeks],
     queryFn: () => planningApi.longRange(yearId, weeks),
@@ -37,7 +40,7 @@ export function EightWeekView({ yearId, weeks = 8, facilitators, onDateClick, on
 
   return (
     <div className="pw-8week">
-      {data.anchors.length > 0 && (
+      {showAnchors && data.anchors.length > 0 && (
         <div className="pw-anchor-strip" style={{ marginBottom: 8 }}>
           {data.anchors.map((a, i) => (
             <span key={a.anchor_event_id ?? a.anchor_id ?? String(i)} className={`pw-anchor-pill ${a.importance ?? "optional"}`}>
@@ -77,7 +80,7 @@ export function EightWeekView({ yearId, weeks = 8, facilitators, onDateClick, on
               <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted-text)" }}>
                 {row.filled_slots}/{row.session_count} filled
               </span>
-              {hasConflict && <span className="pw-conflict-badge room">⚠ conflict</span>}
+              {showConflicts && hasConflict && <span className="pw-conflict-badge room">⚠ conflict</span>}
             </div>
 
             {row.sessions.length === 0 ? (
@@ -105,9 +108,9 @@ export function EightWeekView({ yearId, weeks = 8, facilitators, onDateClick, on
                       </div>
                       <div className="pw-sess-mini-title">{s.activity_title ?? "—"}</div>
                       <div className="pw-sess-mini-fac">{s.facilitator_name ?? "No facilitator"}</div>
-                      {c === "room" && <span className="pw-conflict-badge room">🔴 room</span>}
-                      {c === "fac" && <span className="pw-conflict-badge fac">🟡 fac</span>}
-                      {overload && <span className="pw-conflict-badge load">🟠 load</span>}
+                      {showConflicts && c === "room" && <span className="pw-conflict-badge room">🔴 room</span>}
+                      {showConflicts && c === "fac" && <span className="pw-conflict-badge fac">🟡 fac</span>}
+                      {showConflicts && overload && <span className="pw-conflict-badge load">🟠 load</span>}
                     </div>
                   );
                 })}

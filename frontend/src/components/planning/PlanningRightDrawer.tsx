@@ -1,14 +1,16 @@
-import { useState, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect, useRef } from "react";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../api";
-import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent } from "../../api/types";
+import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem } from "../../api/types";
 
 // ─── Drawer item discriminated union ──────────────────────────────────────────
 export type DrawerItem =
   | { type: "session"; session: PlanningSession; dateId: string; date: string; conflicts: PlanningConflict[] }
   | { type: "new-session"; cadetGroup: string; periodNumber: number; dateId: string }
   | { type: "wing-event"; event: WingHQEvent }
-  | { type: "curriculum"; curriculum: { curriculum_id: string; code: string; title: string; phase: string } };
+  | { type: "curriculum"; curriculum: { curriculum_id: string; code: string; title: string; phase: string } }
+  | { type: "new-anchor"; yearId: string }
+  | { type: "new-location"; location?: PlanningLocation };
 
 const CADET_GROUPS = ["orientation", "initial", "junior", "intermediate", "senior"] as const;
 
@@ -35,6 +37,10 @@ function SessionForm({
   const existing = isEdit ? item.session : null;
 
   const [title, setTitle] = useState(existing?.activity_title ?? "");
+  const [curriculumId, setCurriculumId] = useState<string | null>(existing?.curriculum_id ?? null);
+  const [currSearch, setCurrSearch] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const [cadetGroup, setCadetGroup] = useState(
     existing?.cadet_group ?? (item.type === "new-session" ? item.cadetGroup : "junior"),
   );
@@ -49,11 +55,47 @@ function SessionForm({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [overrideConflict, setOverrideConflict] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
   const [overridingId, setOverridingId] = useState<string | null>(null);
   const [overrideErr, setOverrideErr] = useState<string | null>(null);
   const [overrideSaving, setOverrideSaving] = useState(false);
+
+  const { data: missionsData } = useQuery({
+    queryKey: ["planning-missions", yearId],
+    queryFn: () => planningApi.missions(yearId!),
+    enabled: !!yearId,
+  });
+
+  const allMissions: MissionItem[] = missionsData?.missions ?? [];
+  const linkedMission = curriculumId ? allMissions.find(m => m.curriculum_id === curriculumId) : null;
+  const searchResults = currSearch.length >= 2
+    ? allMissions.filter(m =>
+        m.code.toLowerCase().includes(currSearch.toLowerCase()) ||
+        m.title.toLowerCase().includes(currSearch.toLowerCase()),
+      ).slice(0, 10)
+    : [];
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  function selectCurriculum(m: MissionItem) {
+    setCurriculumId(m.curriculum_id);
+    setTitle(m.title);
+    setCurrSearch("");
+    setPickerOpen(false);
+  }
+
+  function clearCurriculum() {
+    setCurriculumId(null);
+    setCurrSearch("");
+  }
 
   const conflicts = item.type === "session" ? item.conflicts : [];
   const dateId = item.type === "session" ? item.dateId : item.dateId;
@@ -64,6 +106,7 @@ function SessionForm({
     try {
       if (isEdit && existing) {
         await planningApi.updateSession(existing.session_id, {
+          curriculum_id: curriculumId ?? null,
           activity_title: title || null,
           facilitator_id: facilitatorId || null,
           assistant_facilitator_id: asstFacId || null,
@@ -76,6 +119,7 @@ function SessionForm({
         await planningApi.createSession(dateId, {
           cadet_group: cadetGroup,
           session_number: periodNumber,
+          curriculum_id: curriculumId ?? undefined,
           activity_title: title || undefined,
           facilitator_id: facilitatorId || undefined,
           location_id: locationId || undefined,
@@ -174,6 +218,48 @@ function SessionForm({
       )}
 
       <div className="pw-drawer-form">
+        <div ref={pickerRef} style={{ position: "relative", marginBottom: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-text)", marginBottom: 4 }}>
+            Curriculum link
+          </div>
+          {curriculumId && linkedMission ? (
+            <div className="pw-curric-linked">
+              <span className="pw-curric-code">{linkedMission.code}</span>
+              <span style={{ flex: 1, fontSize: 12 }}>{linkedMission.title}</span>
+              <button type="button" className="pw-curric-clear" onClick={clearCurriculum} aria-label="Unlink curriculum">✕</button>
+            </div>
+          ) : (
+            <>
+              <input
+                placeholder="Search by code or title…"
+                value={currSearch}
+                onChange={e => { setCurrSearch(e.target.value); setPickerOpen(true); }}
+                onFocus={() => setPickerOpen(true)}
+                style={{ width: "100%", fontSize: 12, padding: "6px 9px", borderRadius: 6, border: "1.5px solid var(--border)" }}
+              />
+              {pickerOpen && searchResults.length > 0 && (
+                <div className="pw-curric-dropdown">
+                  {searchResults.map(m => (
+                    <div
+                      key={m.curriculum_id}
+                      className="pw-curric-item"
+                      onMouseDown={() => selectCurriculum(m)}
+                    >
+                      <span className="pw-curric-code">{m.code}</span>
+                      <span style={{ flex: 1 }}>{m.title}</span>
+                      {m.is_scheduled && <span style={{ fontSize: 10, color: "var(--muted-text)" }}>scheduled</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {pickerOpen && currSearch.length >= 2 && searchResults.length === 0 && (
+                <div className="pw-curric-dropdown" style={{ padding: "10px 12px", color: "var(--muted-text)", fontSize: 12 }}>
+                  No curriculum found
+                </div>
+              )}
+            </>
+          )}
+        </div>
         <label>
           Activity title
           <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Navigation using compass" />
@@ -313,6 +399,163 @@ function WingEventPanel({ event, onClose }: { event: WingHQEvent; onClose: () =>
   );
 }
 
+// ─── Create anchor event form ─────────────────────────────────────────────────
+const ANCHOR_TYPES = ["inspection", "competition", "training_weekend", "ceremonial", "admin", "other"] as const;
+const ANCHOR_IMPORTANCE = ["mandatory", "key_event", "recommended", "optional"] as const;
+const AUDIENCE_FIELDS: { key: string; label: string }[] = [
+  { key: "audience_orientation", label: "Orientation" },
+  { key: "audience_initial", label: "Initial" },
+  { key: "audience_junior", label: "Junior" },
+  { key: "audience_intermediate", label: "Intermediate" },
+  { key: "audience_senior", label: "Senior" },
+];
+
+function CreateAnchorForm({ yearId, onClose }: { yearId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [eventName, setEventName] = useState("");
+  const [eventType, setEventType] = useState<string>("other");
+  const [importance, setImportance] = useState<string>("key_event");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [audience, setAudience] = useState({ audience_orientation: true, audience_initial: true, audience_junior: true, audience_intermediate: true, audience_senior: true });
+  const [planningImpact, setPlanningImpact] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handleSave() {
+    if (!eventName.trim()) { setErr("Event name is required."); return; }
+    if (!startDate) { setErr("Start date is required."); return; }
+    setSaving(true); setErr(null);
+    try {
+      await planningApi.createAnchor(yearId, {
+        event_name: eventName.trim(),
+        event_type: eventType,
+        importance,
+        start_date: startDate,
+        end_date: endDate || undefined,
+        ...audience,
+        planning_impact: planningImpact || undefined,
+        notes: notes || undefined,
+      });
+      await qc.invalidateQueries({ queryKey: ["planning-annual"] });
+      await qc.invalidateQueries({ queryKey: ["planning-cc"] });
+      await qc.invalidateQueries({ queryKey: ["planning-long-range"] });
+      onClose();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="pw-drawer-form">
+      <label>Event name *<input value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Annual Inspection" autoFocus /></label>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <label>Type
+          <select value={eventType} onChange={e => setEventType(e.target.value)}>
+            {ANCHOR_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+          </select>
+        </label>
+        <label>Importance
+          <select value={importance} onChange={e => setImportance(e.target.value)}>
+            {ANCHOR_IMPORTANCE.map(i => <option key={i} value={i}>{i.replace(/_/g, " ")}</option>)}
+          </select>
+        </label>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <label>Start date *<input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} /></label>
+        <label>End date<input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></label>
+      </div>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-text)", marginBottom: 6 }}>Audience</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {AUDIENCE_FIELDS.map(({ key, label }) => (
+            <label key={key} style={{ display: "flex", gap: 5, alignItems: "center", fontSize: 12, fontWeight: 400 }}>
+              <input type="checkbox" checked={audience[key as keyof typeof audience]} onChange={e => setAudience(prev => ({ ...prev, [key]: e.target.checked }))} />
+              {label}
+            </label>
+          ))}
+        </div>
+      </div>
+      <label>Planning impact<input value={planningImpact} onChange={e => setPlanningImpact(e.target.value)} placeholder="e.g. No parade night that week" /></label>
+      <label>Notes<textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Additional context" /></label>
+      {err && <div className="pw-err">{err}</div>}
+      <div className="pw-drawer-actions" style={{ marginTop: 14 }}>
+        <button className="btn primary" onClick={handleSave} disabled={saving}>{saving ? "Saving…" : "Add anchor event"}</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Create / edit location form ───────────────────────────────────────────────
+const LOCATION_TYPES = ["indoor", "outdoor", "gym", "classroom", "range", "hangar", "other"] as const;
+
+function LocationForm({ location, onClose }: {
+  location?: PlanningLocation;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [name, setName] = useState(location?.name ?? "");
+  const [locType, setLocType] = useState(location?.location_type ?? "indoor");
+  const [capacity, setCapacity] = useState(location?.capacity?.toString() ?? "");
+  const [active, setActive] = useState(location?.active_status ?? true);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handleSave() {
+    if (!name.trim()) { setErr("Name is required."); return; }
+    setSaving(true); setErr(null);
+    try {
+      if (location) {
+        await planningApi.updateLocation(location.location_id, {
+          name: name.trim(), location_type: locType,
+          capacity: capacity ? Number(capacity) : undefined,
+          active_status: active,
+        });
+      } else {
+        await planningApi.createLocation({
+          name: name.trim(), location_type: locType,
+          capacity: capacity ? Number(capacity) : undefined,
+        });
+      }
+      await qc.invalidateQueries({ queryKey: ["planning-locations"] });
+      onClose();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="pw-drawer-form">
+      <label>Name *<input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Main Classroom" autoFocus /></label>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <label>Type
+          <select value={locType} onChange={e => setLocType(e.target.value)}>
+            {LOCATION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
+        <label>Capacity<input type="number" min={1} value={capacity} onChange={e => setCapacity(e.target.value)} placeholder="—" /></label>
+      </div>
+      {location && (
+        <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400 }}>
+          <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} />
+          Active
+        </label>
+      )}
+      {err && <div className="pw-err">{err}</div>}
+      <div className="pw-drawer-actions" style={{ marginTop: 14 }}>
+        <button className="btn primary" onClick={handleSave} disabled={saving}>
+          {saving ? "Saving…" : location ? "Save changes" : "Add location"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main drawer ───────────────────────────────────────────────────────────────
 export function PlanningRightDrawer({ item, facilitators, locations, yearId, onClose }: Props) {
   const [key, setKey] = useState(0);
@@ -324,6 +567,8 @@ export function PlanningRightDrawer({ item, facilitators, locations, yearId, onC
     item.type === "session" ? (item.session.activity_title ?? "Session")
     : item.type === "new-session" ? "Add Session"
     : item.type === "wing-event" ? item.event.title
+    : item.type === "new-anchor" ? "New Anchor Event"
+    : item.type === "new-location" ? (item.location ? `Edit: ${item.location.name}` : "Add Location")
     : `${item.curriculum.code} — ${item.curriculum.title}`;
 
   return (
@@ -338,6 +583,12 @@ export function PlanningRightDrawer({ item, facilitators, locations, yearId, onC
         )}
         {item.type === "wing-event" && (
           <WingEventPanel event={item.event} onClose={onClose} />
+        )}
+        {item.type === "new-anchor" && (
+          <CreateAnchorForm yearId={item.yearId} onClose={onClose} />
+        )}
+        {item.type === "new-location" && (
+          <LocationForm location={item.location} onClose={onClose} />
         )}
         {item.type === "curriculum" && (
           <div>

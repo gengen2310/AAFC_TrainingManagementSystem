@@ -4,9 +4,12 @@ import { planningApi } from "../../../api";
 interface Props {
   yearId: string;
   onDateClick: (dateId: string, date: string) => void;
+  layers?: { holidays?: boolean; wingHQEvents?: boolean };
 }
 
-export function YearView({ yearId, onDateClick }: Props) {
+export function YearView({ yearId, onDateClick, layers }: Props) {
+  const showHolidays = layers?.holidays ?? true;
+  const showAnchors = layers?.wingHQEvents ?? true;
   const { data, isLoading, error } = useQuery({
     queryKey: ["planning-annual", yearId],
     queryFn: () => planningApi.annualProgram(yearId),
@@ -26,7 +29,7 @@ export function YearView({ yearId, onDateClick }: Props) {
             </span>
           </div>
 
-          {(term.activities ?? []).length > 0 && (
+          {showAnchors && (term.activities ?? []).length > 0 && (
             <div className="pw-anchor-strip" style={{ marginBottom: 8 }}>
               {(term.activities ?? []).map((a, i) => (
                 <span key={a.anchor_event_id ?? String(i)} className={`pw-anchor-pill ${a.importance ?? "optional"}`}>
@@ -40,7 +43,7 @@ export function YearView({ yearId, onDateClick }: Props) {
             {term.parade_dates.map((pd) => (
               <div
                 key={pd.parade_date_id}
-                className={`pw-date-cell${pd.in_holiday ? " holiday" : ""}`}
+                className={`pw-date-cell${showHolidays && pd.in_holiday ? " holiday" : ""}`}
                 role="button"
                 tabIndex={0}
                 onClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
@@ -53,7 +56,7 @@ export function YearView({ yearId, onDateClick }: Props) {
                   })}
                 </div>
                 <div className="pw-date-type">{pd.parade_type}</div>
-                {pd.in_holiday && (
+                {showHolidays && pd.in_holiday && (
                   <div style={{ fontSize: 10, color: "#C97A00", fontWeight: 700 }}>Stand-down</div>
                 )}
                 <div className="pw-date-fill">
