@@ -158,8 +158,10 @@ export interface AnchorEvent {
   audience_staff_only: boolean; planning_impact: string | null; notes: string | null;
 }
 export interface HolidayPeriod {
-  holiday_id: string; name: string; start_date: string; end_date: string;
+  holiday_id: string; planning_year_id: string; name: string;
+  start_date: string; end_date: string;
   holiday_type: string; affects_parade: boolean;
+  jurisdiction: string | null; notes: string | null;
 }
 export interface AnnualProgramTerm {
   term: string; start_date: string; end_date: string;

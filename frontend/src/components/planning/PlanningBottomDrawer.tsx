@@ -1,9 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { planningApi } from "../../api";
 import type { PlanningFacilitator, PlanningLocation } from "../../api/types";
 import type { DrawerItem } from "./PlanningRightDrawer";
 
-type BottomTab = "backlog" | "facilitators" | "rooms" | "notices";
+type BottomTab = "backlog" | "facilitators" | "rooms" | "holidays" | "notices";
 
 interface Props {
   yearId: string | null;
@@ -19,6 +20,7 @@ const TABS: { key: BottomTab; label: string }[] = [
   { key: "backlog", label: "Mission Backlog" },
   { key: "facilitators", label: "Facilitators" },
   { key: "rooms", label: "Rooms" },
+  { key: "holidays", label: "Holidays" },
   { key: "notices", label: "Notices" },
 ];
 
@@ -136,6 +138,172 @@ function RoomsContent({ locations, onAddLocation, onEditLocation }: {
   );
 }
 
+const HOLIDAY_TYPES = [
+  { value: "school_holiday", label: "School holiday" },
+  { value: "statutory", label: "Statutory / public holiday" },
+  { value: "civic", label: "Civic holiday" },
+  { value: "training_stand_down", label: "Training stand-down" },
+  { value: "other", label: "Other" },
+];
+
+function HolidaysContent({ yearId }: { yearId: string }) {
+  const qc = useQueryClient();
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [holidayType, setHolidayType] = useState("school_holiday");
+  const [affectsParade, setAffectsParade] = useState(true);
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const { data: holidays = [], isLoading } = useQuery({
+    queryKey: ["planning-holidays", yearId],
+    queryFn: () => planningApi.holidays(yearId),
+  });
+
+  function resetForm() {
+    setName(""); setStartDate(""); setEndDate("");
+    setHolidayType("school_holiday"); setAffectsParade(true);
+    setNotes(""); setErr(null); setAdding(false);
+  }
+
+  async function handleAdd() {
+    if (!name.trim()) { setErr("Name is required."); return; }
+    if (!startDate || !endDate) { setErr("Start and end dates are required."); return; }
+    if (endDate < startDate) { setErr("End date must be on or after start date."); return; }
+    setSaving(true); setErr(null);
+    try {
+      await planningApi.createHoliday(yearId, {
+        name: name.trim(), start_date: startDate, end_date: endDate,
+        holiday_type: holidayType, affects_parade: affectsParade,
+        notes: notes || undefined,
+      });
+      await qc.invalidateQueries({ queryKey: ["planning-holidays", yearId] });
+      await qc.invalidateQueries({ queryKey: ["planning-annual"] });
+      resetForm();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Failed to add holiday");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(holiday_id: string) {
+    if (!window.confirm("Delete this holiday period?")) return;
+    setDeletingId(holiday_id);
+    try {
+      await planningApi.deleteHoliday(holiday_id);
+      await qc.invalidateQueries({ queryKey: ["planning-holidays", yearId] });
+      await qc.invalidateQueries({ queryKey: ["planning-annual"] });
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  if (isLoading) return <div className="pw-loading" style={{ padding: "20px" }}>Loading holidays…</div>;
+
+  return (
+    <div>
+      <div style={{ padding: "8px 14px 0", display: "flex", justifyContent: "flex-end" }}>
+        {!adding && (
+          <button className="btn sm primary" onClick={() => setAdding(true)}>+ Add Holiday Period</button>
+        )}
+      </div>
+
+      {adding && (
+        <div style={{ padding: "10px 14px", background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+            <label style={{ gridColumn: "1 / -1", fontSize: 12, fontWeight: 700, display: "flex", flexDirection: "column", gap: 4 }}>
+              Name *
+              <input
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="e.g. Spring Break"
+                autoFocus
+                style={{ fontWeight: 400, padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12 }}
+              />
+            </label>
+            <label style={{ fontSize: 12, fontWeight: 700, display: "flex", flexDirection: "column", gap: 4 }}>
+              Start *
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12 }} />
+            </label>
+            <label style={{ fontSize: 12, fontWeight: 700, display: "flex", flexDirection: "column", gap: 4 }}>
+              End *
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12 }} />
+            </label>
+            <label style={{ fontSize: 12, fontWeight: 700, display: "flex", flexDirection: "column", gap: 4 }}>
+              Type
+              <select value={holidayType} onChange={e => setHolidayType(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12 }}>
+                {HOLIDAY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </label>
+          </div>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, marginBottom: 8 }}>
+            <input type="checkbox" checked={affectsParade} onChange={e => setAffectsParade(e.target.checked)} />
+            Affects parade nights (stand-down)
+          </label>
+          {err && <div style={{ color: "var(--aafc-red)", fontSize: 12, marginBottom: 6 }}>{err}</div>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn sm primary" onClick={handleAdd} disabled={saving}>
+              {saving ? "Saving…" : "Add holiday"}
+            </button>
+            <button className="btn sm out" onClick={resetForm}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {holidays.length === 0 && !adding ? (
+        <div className="pw-empty" style={{ padding: "20px" }}>
+          No holiday periods defined. Add one to mark stand-downs on the calendar.
+        </div>
+      ) : (
+        <table className="pw-fac-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Dates</th>
+              <th>Type</th>
+              <th>Stand-down</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {holidays.map(h => (
+              <tr key={h.holiday_id}>
+                <td style={{ fontWeight: 600 }}>{h.name}</td>
+                <td style={{ fontSize: 11 }}>
+                  {h.start_date}{h.end_date !== h.start_date ? ` → ${h.end_date}` : ""}
+                </td>
+                <td style={{ fontSize: 11, textTransform: "capitalize" }}>
+                  {h.holiday_type.replace(/_/g, " ")}
+                </td>
+                <td style={{ textAlign: "center" }}>
+                  <span style={{ fontWeight: 700, color: h.affects_parade ? "var(--warning)" : "var(--muted-text)" }}>
+                    {h.affects_parade ? "Yes" : "No"}
+                  </span>
+                </td>
+                <td>
+                  <button
+                    className="btn sm out"
+                    style={{ fontSize: 11, padding: "3px 8px", color: "var(--aafc-red)" }}
+                    onClick={() => handleDelete(h.holiday_id)}
+                    disabled={deletingId === h.holiday_id}
+                  >
+                    {deletingId === h.holiday_id ? "…" : "Delete"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 function NoticesContent({ yearId }: { yearId: string }) {
   const { data, isLoading } = useQuery({
     queryKey: ["planning-cc", yearId],
@@ -192,6 +360,8 @@ export function PlanningBottomDrawer({ yearId, tab, onTabChange, onClose, facili
             onEditLocation={(loc) => { onItemClick({ type: "new-location", location: loc }); onClose(); }}
           />
         )}
+        {tab === "holidays" && yearId && <HolidaysContent yearId={yearId} />}
+        {tab === "holidays" && !yearId && <div className="pw-empty">No planning year selected.</div>}
         {tab === "notices" && yearId && <NoticesContent yearId={yearId} />}
         {tab === "notices" && !yearId && <div className="pw-empty">No planning year selected.</div>}
       </div>

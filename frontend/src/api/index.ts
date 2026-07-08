@@ -8,7 +8,7 @@ import type {
   WingPhaseCoverage, ImportPreview, ImportCommitResult,
   PlanningYear, AnnualProgram, LongRangeView, WeeklyProgramData,
   MissionItem, PlanningLocation, PlanningFacilitator, LocalLesson,
-  WingHQEvent, CommandCentreData, PlanningConflict,
+  WingHQEvent, CommandCentreData, PlanningConflict, HolidayPeriod,
 } from "./types";
 
 export const authApi = {
@@ -148,6 +148,15 @@ export const planningApi = {
   locations: () => api.get<PlanningLocation[]>("/api/planning/locations"),
   facilitators: () => api.get<PlanningFacilitator[]>("/api/planning/facilitators"),
   localLessons: () => api.get<LocalLesson[]>("/api/planning/local-lessons"),
+  holidays: (year_id: string) =>
+    api.get<HolidayPeriod[]>(`/api/planning/years/${year_id}/holidays`),
+  createHoliday: (year_id: string, body: {
+    name: string; start_date: string; end_date: string;
+    holiday_type?: string; affects_parade?: boolean;
+    jurisdiction?: string; notes?: string;
+  }) => api.post<HolidayPeriod>(`/api/planning/years/${year_id}/holidays`, body),
+  deleteHoliday: (holiday_id: string) =>
+    api.delete<{ ok: boolean }>(`/api/planning/holidays/${holiday_id}`),
   conflicts: (year_id: string) =>
     api.get<{ conflicts: PlanningConflict[] }>(`/api/planning/years/${year_id}/conflicts`),
   runChecks: (year_id: string) =>

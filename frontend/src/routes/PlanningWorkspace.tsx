@@ -14,7 +14,7 @@ import { ParadeNightGridView } from "../components/planning/views/ParadeNightGri
 import { SetupPanel } from "../components/planning/SetupPanel";
 import type { PlanningSession } from "../api/types";
 
-type BottomTab = "backlog" | "facilitators" | "rooms" | "notices";
+type BottomTab = "backlog" | "facilitators" | "rooms" | "holidays" | "notices";
 
 export function PlanningWorkspace() {
   const { session } = useAuth();
