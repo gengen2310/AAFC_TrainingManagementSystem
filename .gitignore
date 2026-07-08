@@ -37,6 +37,7 @@ logs/
 # Node
 node_modules/
 frontend/dist/
+*.tsbuildinfo
 
 # macOS
 .DS_Store
