@@ -1,13 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
+import { filterAnchors } from "../../../utils/planningFilters";
 
 interface Props {
   yearId: string;
   onDateClick: (dateId: string, date: string) => void;
   layers?: { holidays?: boolean; wingHQEvents?: boolean };
+  audience?: Set<string>;
+  priority?: Set<string>;
 }
 
-export function YearView({ yearId, onDateClick, layers }: Props) {
+export function YearView({ yearId, onDateClick, layers, audience, priority }: Props) {
   const showHolidays = layers?.holidays ?? true;
   const showAnchors = layers?.wingHQEvents ?? true;
   const { data, isLoading, error } = useQuery({
@@ -29,15 +32,18 @@ export function YearView({ yearId, onDateClick, layers }: Props) {
             </span>
           </div>
 
-          {showAnchors && (term.activities ?? []).length > 0 && (
-            <div className="pw-anchor-strip" style={{ marginBottom: 8 }}>
-              {(term.activities ?? []).map((a, i) => (
-                <span key={a.anchor_event_id ?? String(i)} className={`pw-anchor-pill ${a.importance ?? "optional"}`}>
-                  {a.event_name}
-                </span>
-              ))}
-            </div>
-          )}
+          {showAnchors && (() => {
+            const visible = filterAnchors(term.activities ?? [], audience ?? new Set(), priority ?? new Set());
+            return visible.length > 0 ? (
+              <div className="pw-anchor-strip" style={{ marginBottom: 8 }}>
+                {visible.map((a, i) => (
+                  <span key={a.anchor_event_id ?? String(i)} className={`pw-anchor-pill ${a.importance ?? "optional"}`}>
+                    {a.event_name}
+                  </span>
+                ))}
+              </div>
+            ) : null;
+          })()}
 
           <div className="pw-month-grid">
             {term.parade_dates.map((pd) => (

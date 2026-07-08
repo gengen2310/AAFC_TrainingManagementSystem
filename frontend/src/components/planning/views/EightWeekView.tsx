@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
 import type { PlanningSession, PlanningFacilitator } from "../../../api/types";
+import { filterAnchors } from "../../../utils/planningFilters";
 
 interface Props {
   yearId: string;
@@ -9,6 +10,8 @@ interface Props {
   onDateClick: (dateId: string, date: string) => void;
   onSessionClick: (session: PlanningSession, dateId: string, date: string) => void;
   layers?: { conflicts?: boolean; wingHQEvents?: boolean };
+  audience?: Set<string>;
+  priority?: Set<string>;
 }
 
 function detectConflict(s: PlanningSession, siblings: PlanningSession[]): "room" | "fac" | null {
@@ -18,7 +21,7 @@ function detectConflict(s: PlanningSession, siblings: PlanningSession[]): "room"
   return null;
 }
 
-export function EightWeekView({ yearId, weeks = 8, facilitators, onDateClick, onSessionClick, layers }: Props) {
+export function EightWeekView({ yearId, weeks = 8, facilitators, onDateClick, onSessionClick, layers, audience, priority }: Props) {
   const showConflicts = layers?.conflicts ?? true;
   const showAnchors = layers?.wingHQEvents ?? true;
   const { data, isLoading, error } = useQuery({
@@ -40,15 +43,18 @@ export function EightWeekView({ yearId, weeks = 8, facilitators, onDateClick, on
 
   return (
     <div className="pw-8week">
-      {showAnchors && data.anchors.length > 0 && (
-        <div className="pw-anchor-strip" style={{ marginBottom: 8 }}>
-          {data.anchors.map((a, i) => (
-            <span key={a.anchor_event_id ?? a.anchor_id ?? String(i)} className={`pw-anchor-pill ${a.importance ?? "optional"}`}>
-              {a.event_name} · {a.start_date}
-            </span>
-          ))}
-        </div>
-      )}
+      {showAnchors && (() => {
+        const visibleAnchors = filterAnchors(data.anchors, audience ?? new Set(), priority ?? new Set());
+        return visibleAnchors.length > 0 ? (
+          <div className="pw-anchor-strip" style={{ marginBottom: 8 }}>
+            {visibleAnchors.map((a, i) => (
+              <span key={a.anchor_event_id ?? a.anchor_id ?? String(i)} className={`pw-anchor-pill ${a.importance ?? "optional"}`}>
+                {a.event_name} · {a.start_date}
+              </span>
+            ))}
+          </div>
+        ) : null;
+      })()}
 
       {data.parade_dates.map((row) => {
         const pd = row.parade_date;

@@ -145,6 +145,8 @@ export function PlanningWorkspace() {
           yearId={selectedYearId}
           onDateClick={handleDateClick}
           layers={layers}
+          audience={audience}
+          priority={priority}
         />
       );
     }
@@ -154,6 +156,8 @@ export function PlanningWorkspace() {
           yearId={selectedYearId}
           onDateClick={handleDateClick}
           layers={layers}
+          audience={audience}
+          priority={priority}
         />
       );
     }
@@ -166,6 +170,8 @@ export function PlanningWorkspace() {
           onDateClick={handleDateClick}
           onSessionClick={handleSessionClick}
           layers={layers}
+          audience={audience}
+          priority={priority}
         />
       );
     }
