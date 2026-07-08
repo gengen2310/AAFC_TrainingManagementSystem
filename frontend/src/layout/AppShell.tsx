@@ -46,6 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* SQUADRON — full operational workspace */}
           {squadron && <>
             <div className="nav-group">Operations</div>
+            <NavItem to="/planning" label="Planning Workspace" />
             <NavItem to="/dashboard" label="Dashboard" />
             <NavItem to="/calendar" label="Calendar" />
             <NavItem to="/parade-nights" label="Parade Nights" />
