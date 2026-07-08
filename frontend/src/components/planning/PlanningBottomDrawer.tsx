@@ -137,8 +137,8 @@ function NoticesContent({ yearId }: { yearId: string }) {
 
   return (
     <div className="pw-backlog-grid">
-      {anchors.map((a) => (
-        <div key={a.anchor_id} className="pw-backlog-card">
+      {anchors.map((a, i) => (
+        <div key={a.anchor_event_id ?? a.anchor_id ?? String(i)} className="pw-backlog-card">
           <div className="pw-backlog-card-code">{a.event_type}</div>
           <div className="pw-backlog-card-title">{a.event_name}</div>
           <div className="pw-backlog-card-meta">

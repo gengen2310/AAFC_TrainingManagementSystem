@@ -150,7 +150,7 @@ export interface WeeklyProgramData {
   conflicts: PlanningConflict[]; has_unresolved_conflicts: boolean;
 }
 export interface AnchorEvent {
-  anchor_id: string; planning_year_id: string; event_name: string;
+  anchor_event_id: string; anchor_id?: string; planning_year_id: string; event_name: string;
   event_type: string; importance: string; importance_level: number | null;
   start_date: string; end_date: string | null;
   audience_orientation: boolean; audience_initial: boolean;
@@ -162,10 +162,10 @@ export interface HolidayPeriod {
   holiday_type: string; affects_parade: boolean;
 }
 export interface AnnualProgramTerm {
-  term: string; term_label: string; start_date: string; end_date: string;
+  term: string; start_date: string; end_date: string;
   parade_dates: (ParadeDate & { session_count: number; filled_count: number; in_holiday: boolean })[];
   holidays: HolidayPeriod[];
-  anchors: AnchorEvent[];
+  activities: AnchorEvent[];
 }
 export interface AnnualProgram {
   planning_year_id: string; year: number; terms: AnnualProgramTerm[];

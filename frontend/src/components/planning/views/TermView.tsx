@@ -31,23 +31,23 @@ export function TermView({ yearId, onDateClick }: Props) {
             style={{ border: "1.5px solid var(--border)", color: i === termIndex ? "#fff" : "var(--text)", background: i === termIndex ? "var(--aafc-dark-blue)" : "var(--surface)" }}
             onClick={() => setTermIndex(i)}
           >
-            {t.term_label}
+            {t.term}
           </button>
         ))}
       </div>
 
       <div className="pw-term">
         <div className="pw-term-hdr">
-          <span>{term.term_label}</span>
+          <span>{term.term}</span>
           <span style={{ fontSize: 11, fontWeight: 400 }}>
             {term.start_date} → {term.end_date} · {term.parade_dates.length} nights
           </span>
         </div>
 
-        {term.anchors.length > 0 && (
+        {(term.activities ?? []).length > 0 && (
           <div className="pw-anchor-strip" style={{ marginBottom: 10 }}>
-            {term.anchors.map((a) => (
-              <span key={a.anchor_id} className={`pw-anchor-pill ${a.importance ?? "optional"}`}>
+            {(term.activities ?? []).map((a, i) => (
+              <span key={a.anchor_event_id ?? String(i)} className={`pw-anchor-pill ${a.importance ?? "optional"}`}>
                 {a.event_name} · {a.start_date}
               </span>
             ))}

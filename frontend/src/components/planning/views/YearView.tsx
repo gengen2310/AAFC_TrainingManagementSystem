@@ -20,16 +20,16 @@ export function YearView({ yearId, onDateClick }: Props) {
       {data.terms.map((term) => (
         <div key={term.term} className="pw-term">
           <div className="pw-term-hdr">
-            <span>{term.term_label}</span>
+            <span>{term.term}</span>
             <span style={{ fontSize: 11, fontWeight: 400, color: "var(--muted-text)" }}>
               {term.start_date} → {term.end_date}
             </span>
           </div>
 
-          {term.anchors.length > 0 && (
+          {(term.activities ?? []).length > 0 && (
             <div className="pw-anchor-strip" style={{ marginBottom: 8 }}>
-              {term.anchors.map((a) => (
-                <span key={a.anchor_id} className={`pw-anchor-pill ${a.importance ?? "optional"}`}>
+              {(term.activities ?? []).map((a, i) => (
+                <span key={a.anchor_event_id ?? String(i)} className={`pw-anchor-pill ${a.importance ?? "optional"}`}>
                   {a.event_name}
                 </span>
               ))}
