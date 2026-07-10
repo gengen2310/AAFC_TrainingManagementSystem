@@ -254,8 +254,9 @@ export function ParadeNightBlock({
     ? `Wk ${weekNumber}`
     : null;
 
-  const fillLabel = sessionCount && sessionCount > 0
-    ? `${filledSlots ?? 0}/${sessionCount} filled`
+  const totalCells = (sessionCount ?? 0) * BLOCK_GROUPS.length;
+  const fillLabel = totalCells > 0
+    ? `${filledSlots ?? 0} / ${totalCells} classes planned`
     : null;
 
   const blockCls = [

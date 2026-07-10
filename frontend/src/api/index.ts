@@ -13,6 +13,15 @@ import type {
   FacilitatorWorkload, EquipmentItem, AnchorEvent,
 } from "./types";
 
+/** Handles both legacy array shape `[...]` and current `{"conflicts":[...]}` shape. */
+export function parseConflictsList(raw: unknown): PlanningConflict[] {
+  if (Array.isArray(raw)) return raw as PlanningConflict[];
+  if (raw !== null && typeof raw === "object" && "conflicts" in raw) {
+    return (raw as { conflicts: PlanningConflict[] }).conflicts ?? [];
+  }
+  return [];
+}
+
 export const authApi = {
   login: (code: string) => api.post<{ token: string; session: SessionInfo }>("/api/auth/login", { code }),
   me: () => api.get<{ session: SessionInfo }>("/api/auth/me"),
@@ -160,7 +169,7 @@ export const planningApi = {
   deleteHoliday: (holiday_id: string) =>
     api.delete<{ ok: boolean }>(`/api/planning/holidays/${holiday_id}`),
   conflicts: (year_id: string) =>
-    api.get<{ conflicts: PlanningConflict[] }>(`/api/planning/years/${year_id}/conflicts`),
+    api.get<unknown>(`/api/planning/years/${year_id}/conflicts`).then(parseConflictsList),
   runChecks: (year_id: string) =>
     api.post<{ ok: boolean; conflicts_detected: number }>(`/api/planning/years/${year_id}/run-checks`, {}),
   createSession: (date_id: string, body: {
