@@ -1,33 +1,41 @@
+import { useState } from "react";
 import type { CommandCentreData } from "../../api/types";
 
 export interface LayerState {
-  wingHQEvents: boolean;
-  squadronEvents: boolean;
-  ceaActivities: boolean;
-  paradeNights: boolean;
-  curriculum: boolean;
-  localLessons: boolean;
-  holidays: boolean;
-  conflicts: boolean;
-  notes: boolean;
+  nationalHQ: boolean;
+  wingHQEvents: boolean;      // "7WG HQ" — key unchanged so views still work
+  aow: boolean;
+  specialistFlights: boolean;
+  unitActivity: boolean;      // own squadron activity
+  allWGActivities: boolean;   // all other 7WG squadron activities
+  holidays: boolean;          // key unchanged so YearView / TermView still work
+  conflicts: boolean;         // "Warnings" — key unchanged so EightWeekView still works
+  notes: boolean;             // "Notices"
 }
 
 export const defaultLayers: LayerState = {
-  wingHQEvents: true, squadronEvents: true, ceaActivities: true,
-  paradeNights: true, curriculum: true, localLessons: true,
-  holidays: true, conflicts: true, notes: false,
+  nationalHQ: true, wingHQEvents: true, aow: false, specialistFlights: false,
+  unitActivity: true, allWGActivities: false,
+  holidays: true, conflicts: true, notes: true,
 };
 
 const LAYER_DEFS: { key: keyof LayerState; label: string; color: string }[] = [
-  { key: "wingHQEvents", label: "Wing HQ events", color: "#004B8D" },
-  { key: "squadronEvents", label: "Squadron events", color: "#1A7F4B" },
-  { key: "ceaActivities", label: "CEA activities", color: "#7C3AED" },
-  { key: "paradeNights", label: "Home parade nights", color: "#51B0E3" },
-  { key: "curriculum", label: "Curriculum sessions", color: "#002F65" },
-  { key: "localLessons", label: "Local lessons", color: "#455560" },
-  { key: "holidays", label: "Holidays / stand-down", color: "#C97A00" },
-  { key: "conflicts", label: "Conflicts", color: "#E51937" },
-  { key: "notes", label: "Notes", color: "#B0B7BB" },
+  { key: "nationalHQ",        label: "National HQ",        color: "#4A1080" },
+  { key: "wingHQEvents",      label: "7WG HQ",             color: "#004B8D" },
+  { key: "aow",               label: "AOW",                color: "#1A5276" },
+  { key: "specialistFlights", label: "Specialist flights",  color: "#21618C" },
+  { key: "unitActivity",      label: "Unit activity",       color: "#1A7F4B" },
+  { key: "allWGActivities",   label: "All 7WG activities",  color: "#7C3AED" },
+  { key: "holidays",          label: "Holidays",            color: "#C97A00" },
+  { key: "conflicts",         label: "Warnings",            color: "#E51937" },
+  { key: "notes",             label: "Notices",             color: "#B0B7BB" },
+];
+
+const LEGEND_ITEMS = [
+  { color: "#E51937", label: "Room conflict",         sub: "Double-booked space"    },
+  { color: "#F57C00", label: "Facilitator conflict",  sub: "Double-booked staff"    },
+  { color: "#FFB300", label: "Workload warning",      sub: "Overloaded facilitator" },
+  { color: "#B0B7BB", label: "Stand-down / empty",    sub: "No sessions planned"    },
 ];
 
 const AUDIENCE_OPTIONS = ["All Cadets", "Staff", "Seniors", "Juniors", "First Years", "All Personnel"];
@@ -48,17 +56,20 @@ export function PlanningLeftPanel({
   layers, onLayerToggle, audience, onAudienceToggle, priority, onPriorityToggle,
   cc, onBacklogItemClick,
 }: Props) {
-  const prepGaps = cc?.prep_gaps ?? [];
-  const unscheduled = cc?.unscheduled_required ?? [];
+  const [legendOpen, setLegendOpen] = useState(true);
+
+  const prepGaps        = cc?.prep_gaps ?? [];
+  const unscheduled     = cc?.unscheduled_required ?? [];
   const activeConflicts = cc?.active_conflicts ?? [];
-  const unreviewed = cc?.unreviewed_wing ?? [];
-  const totalBacklog = prepGaps.length + unscheduled.length + activeConflicts.length + unreviewed.length;
+  const unreviewed      = cc?.unreviewed_wing ?? [];
+  const totalBacklog    = prepGaps.length + unscheduled.length + activeConflicts.length + unreviewed.length;
 
   return (
     <div className="pw-left" aria-label="Planning filters and backlog">
-      {/* Layers */}
+
+      {/* ── Filters (renamed from "Layers") ───────────────── */}
       <div className="pw-section">
-        <div className="pw-section-hdr">Layers</div>
+        <div className="pw-section-hdr">Filters</div>
         {LAYER_DEFS.map(({ key, label, color }) => (
           <label key={key} className="pw-layer-row" title={`Toggle ${label}`}>
             <input
@@ -73,7 +84,7 @@ export function PlanningLeftPanel({
         ))}
       </div>
 
-      {/* Audience */}
+      {/* ── Audience ──────────────────────────────────────── */}
       <div className="pw-section">
         <div className="pw-section-hdr">Audience</div>
         <div className="pw-filter-chips">
@@ -90,7 +101,7 @@ export function PlanningLeftPanel({
         </div>
       </div>
 
-      {/* Priority */}
+      {/* ── Priority ──────────────────────────────────────── */}
       <div className="pw-section">
         <div className="pw-section-hdr">Priority</div>
         <div className="pw-filter-chips">
@@ -107,10 +118,41 @@ export function PlanningLeftPanel({
         </div>
       </div>
 
-      {/* Backlog */}
+      {/* ── Warning Legend ────────────────────────────────── */}
+      <div className="pw-section">
+        <div
+          className="pw-section-hdr pw-section-hdr-toggle"
+          onClick={() => setLegendOpen(o => !o)}
+          role="button"
+          aria-expanded={legendOpen}
+          tabIndex={0}
+          onKeyDown={e => e.key === "Enter" && setLegendOpen(o => !o)}
+        >
+          Warning Legend
+          <span className="pw-section-toggle-icon">{legendOpen ? "▲" : "▼"}</span>
+        </div>
+        {legendOpen && (
+          <div className="pw-legend">
+            {LEGEND_ITEMS.map(item => (
+              <div key={item.label} className="pw-legend-row">
+                <span className="pw-legend-dot" style={{ background: item.color }} aria-hidden />
+                <div>
+                  <div className="pw-legend-label">{item.label}</div>
+                  <div className="pw-legend-sub">{item.sub}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Backlog ───────────────────────────────────────── */}
       <div className="pw-section">
         <div className="pw-section-hdr">
-          Backlog {totalBacklog > 0 && <span style={{ color: "var(--aafc-red)", fontWeight: 900 }}>({totalBacklog})</span>}
+          Backlog{" "}
+          {totalBacklog > 0 && (
+            <span style={{ color: "var(--aafc-red)", fontWeight: 900 }}>({totalBacklog})</span>
+          )}
         </div>
 
         {unreviewed.length > 0 && (

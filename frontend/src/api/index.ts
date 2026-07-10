@@ -9,7 +9,18 @@ import type {
   PlanningYear, AnnualProgram, LongRangeView, WeeklyProgramData,
   MissionItem, PlanningLocation, PlanningFacilitator, LocalLesson,
   WingHQEvent, CommandCentreData, PlanningConflict, HolidayPeriod,
+  NightSummariesResponse, PlanningFacilitatorLeave, FacilitatorLeaveResult,
+  FacilitatorWorkload, EquipmentItem, AnchorEvent,
 } from "./types";
+
+/** Handles both legacy array shape `[...]` and current `{"conflicts":[...]}` shape. */
+export function parseConflictsList(raw: unknown): PlanningConflict[] {
+  if (Array.isArray(raw)) return raw as PlanningConflict[];
+  if (raw !== null && typeof raw === "object" && "conflicts" in raw) {
+    return (raw as { conflicts: PlanningConflict[] }).conflicts ?? [];
+  }
+  return [];
+}
 
 export const authApi = {
   login: (code: string) => api.post<{ token: string; session: SessionInfo }>("/api/auth/login", { code }),
@@ -158,7 +169,7 @@ export const planningApi = {
   deleteHoliday: (holiday_id: string) =>
     api.delete<{ ok: boolean }>(`/api/planning/holidays/${holiday_id}`),
   conflicts: (year_id: string) =>
-    api.get<{ conflicts: PlanningConflict[] }>(`/api/planning/years/${year_id}/conflicts`),
+    api.get<unknown>(`/api/planning/years/${year_id}/conflicts`).then(parseConflictsList),
   runChecks: (year_id: string) =>
     api.post<{ ok: boolean; conflicts_detected: number }>(`/api/planning/years/${year_id}/run-checks`, {}),
   createSession: (date_id: string, body: {
@@ -194,6 +205,8 @@ export const planningApi = {
   }) => api.post<{ ok: boolean; created: number; linked: number; dates: string[] }>(
     `/api/planning/years/${year_id}/generate-parade-dates`, body,
   ),
+  listAnchors: (year_id: string) =>
+    api.get<AnchorEvent[]>(`/api/planning/years/${year_id}/anchors`),
   createAnchor: (year_id: string, body: {
     event_name: string; event_type?: string; importance?: string;
     start_date: string; end_date?: string;
@@ -207,4 +220,66 @@ export const planningApi = {
     name?: string; location_type?: string; capacity?: number;
     notes?: string; active_status?: boolean;
   }) => api.patch<PlanningLocation>(`/api/planning/locations/${location_id}`, body),
+
+  // ── Night summaries ─────────────────────────────────────────────────────────
+  nightSummaries: (year_id: string) =>
+    api.get<NightSummariesResponse>(`/api/planning/years/${year_id}/night-summaries`),
+
+  // ── Facilitator Leave ───────────────────────────────────────────────────────
+  facilitatorLeave: (fac_id: string) =>
+    api.get<{ leave: PlanningFacilitatorLeave[] }>(`/api/planning/facilitators/${fac_id}/leave`),
+  addFacilitatorLeave: (fac_id: string, body: { start_date: string; end_date: string; reason?: string; notes?: string }) =>
+    api.post<FacilitatorLeaveResult>(`/api/planning/facilitators/${fac_id}/leave`, body),
+  deleteFacilitatorLeave: (leave_id: string) =>
+    api.delete<{ ok: boolean }>(`/api/planning/facilitator-leave/${leave_id}`),
+
+  // ── Facilitator Workload ────────────────────────────────────────────────────
+  facilitatorWorkload: (year_id: string, fac_id: string) =>
+    api.get<FacilitatorWorkload>(`/api/planning/years/${year_id}/facilitators/${fac_id}/workload`),
+
+  // ── Facilitator create (via training endpoint) ──────────────────────────────
+  createFacilitator: (body: { first_name: string; last_name: string; current_rank?: string; type?: string; subject_areas?: string[] }) =>
+    api.post<{ ok: boolean; facilitator_id: string }>('/api/facilitators', body),
+
+  // ── Equipment ───────────────────────────────────────────────────────────────
+  listEquipment: () => api.get<EquipmentItem[]>('/api/equipment'),
+  addEquipment: (body: { name: string; type?: string; quantity?: number; available_quantity?: number; notes?: string }) =>
+    api.post<{ ok: boolean }>('/api/equipment', body),
+
+  // ── Notices ─────────────────────────────────────────────────────────────────
+  listNotices: (date_id: string) =>
+    api.get<import("./types").ParadeNotice[]>(`/api/planning/parade-dates/${date_id}/notices`),
+  createNotice: (date_id: string, body: { notice_text: string; priority?: string; audience?: string }) =>
+    api.post<{ ok: boolean; notice_id: string }>(`/api/planning/parade-dates/${date_id}/notices`, body),
+  updateNotice: (notice_id: string, body: { notice_text?: string; priority?: string; audience?: string }) =>
+    api.patch<{ ok: boolean }>(`/api/planning/notices/${notice_id}`, body),
+  archiveNotice: (notice_id: string) =>
+    api.post<{ ok: boolean }>(`/api/planning/notices/${notice_id}/archive`, {}),
+
+  // ── Anchors (update / delete) ────────────────────────────────────────────────
+  updateAnchor: (anchor_id: string, body: Record<string, unknown>) =>
+    api.patch<Record<string, unknown>>(`/api/planning/anchors/${anchor_id}`, body),
+  deleteAnchor: (anchor_id: string) =>
+    api.delete<{ ok: boolean }>(`/api/planning/anchors/${anchor_id}`),
+
+  // ── CEA Activities ───────────────────────────────────────────────────────────
+  ceaActivities: (year_id: string, status?: string) =>
+    api.get<import("./types").CeaActivity[]>(
+      `/api/planning/years/${year_id}/cea/activities${status ? `?status=${status}` : ""}`,
+    ).then(r => (Array.isArray(r) ? r : (r as { activities: import("./types").CeaActivity[] }).activities)),
+  ceaBatches: (year_id: string) =>
+    api.get<{ batches: import("./types").CeaImportBatch[] }>(`/api/planning/years/${year_id}/cea/batches`),
+  ceaImport: (year_id: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.postForm<import("./types").CeaImportResult>(`/api/planning/years/${year_id}/cea/import`, form);
+  },
+  ceaClassify: (
+    activity_id: string,
+    body: { importance?: string; audience_staff_only?: boolean; audience_seniors?: boolean; audience_proficient?: boolean; audience_first_years?: boolean },
+  ) => api.patch<{ ok: boolean }>(`/api/planning/cea/${activity_id}/classify`, body),
+  ceaLocalHide: (activity_id: string, body: { is_hidden: boolean; local_note?: string }) =>
+    api.post<{ ok: boolean }>(`/api/planning/cea/${activity_id}/local-hide`, body),
+  createManualActivity: (year_id: string, body: Record<string, unknown>) =>
+    api.post<{ ok: boolean; id: string }>(`/api/planning/years/${year_id}/cea/activities`, body),
 };
