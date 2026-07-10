@@ -22,11 +22,12 @@ from ..models import Session as TrainingSession
 from ..models.planning import (
     PlanningYear, ParadeDate, HolidayPeriod, AnchorEvent,
     AnchorPrepRule, AnchorPrepPlan, ScheduledSession,
-    PlanningLocation, PlanningConflict,
+    PlanningLocation, PlanningConflict, PlanningFacilitatorLeave, PlanningNotice,
+    CeaImportBatch, CeaActivity, ActivityLocalHide,
     CADET_GROUPS, IMPORTANCE_LEVELS, EVENT_TYPES,
 )
 from ..models.training import TimingTemplate, TimingBlock, Activity
-from ..models.wing_calendar import WingHQEvent
+from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_write_squadron
 from ..services import audit
@@ -252,6 +253,16 @@ def _anchor_out(a: AnchorEvent) -> dict:
         "event_name": a.event_name, "event_type": a.event_type, "importance": a.importance,
         "importance_level": getattr(a, "importance_level", None),
         "start_date": a.start_date, "end_date": a.end_date,
+        # Flat audience fields (expected by frontend TS type)
+        "audience_orientation": a.audience_orientation,
+        "audience_initial": a.audience_initial,
+        "audience_junior": a.audience_junior,
+        "audience_intermediate": a.audience_intermediate,
+        "audience_senior": a.audience_senior,
+        "audience_staff_only": getattr(a, "audience_staff_only", False),
+        "audience_proficient": getattr(a, "audience_proficient", False),
+        "audience_first_years": getattr(a, "audience_first_years", False),
+        # Nested audience object (kept for backward compatibility)
         "audience": {
             "orientation": a.audience_orientation, "initial": a.audience_initial,
             "junior": a.audience_junior, "intermediate": a.audience_intermediate,
@@ -716,6 +727,14 @@ def delete_parade_date(
 # Holidays
 # ─────────────────────────────────────────────────────────────
 
+def _validate_iso_date(v: str, field_name: str) -> str:
+    try:
+        date.fromisoformat(v)
+    except ValueError:
+        raise ValueError(f"{field_name} must be a valid ISO-8601 date (YYYY-MM-DD), got '{v}'")
+    return v
+
+
 class HolidayIn(BaseModel):
     name: str
     start_date: str
@@ -724,6 +743,12 @@ class HolidayIn(BaseModel):
     holiday_type: str = "school_holiday"
     affects_parade: bool = True
     notes: Optional[str] = None
+
+    def model_post_init(self, __context) -> None:
+        _validate_iso_date(self.start_date, "start_date")
+        _validate_iso_date(self.end_date, "end_date")
+        if self.end_date < self.start_date:
+            raise ValueError("end_date must not be before start_date")
 
 
 @router.get("/years/{year_id}/holidays")
@@ -1635,7 +1660,7 @@ def get_conflicts(
     )
     if severity:
         q = q.filter(PlanningConflict.severity == severity)
-    return [_conflict_out(c) for c in q.order_by(PlanningConflict.created_at.desc()).all()]
+    return {"conflicts": [_conflict_out(c) for c in q.order_by(PlanningConflict.created_at.desc()).all()]}
 
 
 class ConflictOverrideIn(BaseModel):
@@ -1766,6 +1791,207 @@ def get_decision_guide(
     })
 
     return {"planning_year_id": year_id, "checks": checks}
+
+
+# ─────────────────────────────────────────────────────────────
+# Command Centre dashboard aggregation
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/command-centre")
+def get_command_centre(
+    year_id: Optional[str] = None,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    from sqlalchemy import or_, func
+
+    today = date.today().isoformat()
+
+    # Resolve planning year
+    py: PlanningYear | None = None
+    if year_id:
+        py = db.get(PlanningYear, year_id)
+        if py:
+            _require_year_access(p, py)
+    else:
+        q = db.query(PlanningYear)
+        if p.role in ("sqn_admin", "sqn_general"):
+            q = q.filter(PlanningYear.unit_id == p.squadron_id)
+        elif p.role in ("wing_admin", "wing_viewer"):
+            q = q.filter(PlanningYear.wing_id == p.wing_id)
+        py = q.filter(PlanningYear.active_status == True).order_by(PlanningYear.year.desc()).first()  # noqa: E712
+        if py is None:
+            py = q.order_by(PlanningYear.year.desc()).first()
+
+    if py is None:
+        return {
+            "planning_year_id": None, "year": None,
+            "upcoming_anchors": [], "prep_gaps": [], "unreviewed_wing": [],
+            "active_conflicts": [], "unscheduled_required": [],
+            "recent_imports": [], "nights_missing_facilitator": 0,
+        }
+
+    # Upcoming anchor events (within the next 90 days)
+    cutoff_90 = (date.today() + timedelta(days=90)).isoformat()
+    anchor_rows = (
+        db.query(AnchorEvent)
+        .filter(
+            AnchorEvent.planning_year_id == py.id,
+            AnchorEvent.is_archived == False,  # noqa: E712
+            AnchorEvent.start_date >= today,
+            AnchorEvent.start_date <= cutoff_90,
+        )
+        .order_by(AnchorEvent.start_date)
+        .limit(20)
+        .all()
+    )
+    upcoming_anchors = [_anchor_out(a) for a in anchor_rows]
+
+    # Prep gaps: anchor events with readiness_requirements but no linked prep plans
+    anchors_needing_prep = (
+        db.query(AnchorEvent)
+        .filter(
+            AnchorEvent.planning_year_id == py.id,
+            AnchorEvent.is_archived == False,  # noqa: E712
+            AnchorEvent.start_date >= today,
+            AnchorEvent.readiness_requirements != None,  # noqa: E711
+        )
+        .all()
+    )
+    anchor_ids_with_plans = {
+        row[0]
+        for row in db.query(AnchorPrepPlan.anchor_event_id)
+        .filter(AnchorPrepPlan.anchor_event_id.in_([a.id for a in anchors_needing_prep]))
+        .all()
+    } if anchors_needing_prep else set()
+
+    prep_gaps = [
+        {
+            "anchor_event_id": a.id,
+            "event_name": a.event_name,
+            "start_date": a.start_date,
+            "days_until": (date.fromisoformat(a.start_date) - date.today()).days,
+        }
+        for a in anchors_needing_prep
+        if a.id not in anchor_ids_with_plans
+    ]
+
+    # Active (unresolved) conflicts
+    conflict_rows = (
+        db.query(PlanningConflict)
+        .filter(
+            PlanningConflict.planning_year_id == py.id,
+            PlanningConflict.is_resolved == False,  # noqa: E712
+        )
+        .limit(50)
+        .all()
+    )
+    active_conflicts = [
+        {
+            "conflict_id": c.id,
+            "type": c.conflict_type,
+            "message": c.message,
+            "parade_date": None,
+        }
+        for c in conflict_rows
+    ]
+
+    # Unreviewed wing events for this squadron
+    unreviewed_wing: list[dict] = []
+    if p.squadron_id:
+        sqn = db.get(Squadron, p.squadron_id)
+        wing_id = sqn.wing_id if sqn else py.wing_id
+        if wing_id:
+            wing_events = (
+                db.query(WingHQEvent)
+                .filter(
+                    WingHQEvent.wing_id == wing_id,
+                    WingHQEvent.year == py.year,
+                    WingHQEvent.is_archived == False,  # noqa: E712
+                    WingHQEvent.start_date >= today,
+                )
+                .all()
+            )
+            reviewed_ids = {
+                row[0]
+                for row in db.query(SquadronEventStatus.wing_event_id)
+                .filter(
+                    SquadronEventStatus.squadron_id == p.squadron_id,
+                    SquadronEventStatus.wing_event_id.in_([e.id for e in wing_events]),
+                    SquadronEventStatus.status != "not_reviewed",
+                )
+                .all()
+            } if wing_events else set()
+            unreviewed_wing = [
+                {
+                    "wing_event_id": e.id,
+                    "title": e.title,
+                    "start_date": e.start_date,
+                    "days_until": (date.fromisoformat(e.start_date) - date.today()).days,
+                }
+                for e in wing_events
+                if e.id not in reviewed_ids
+            ]
+
+    # Unscheduled required curriculum items (core items with no session this year)
+    parade_date_ids = [
+        row[0]
+        for row in db.query(ParadeDate.id)
+        .filter(ParadeDate.planning_year_id == py.id)
+        .all()
+    ]
+    scheduled_curriculum_ids: set[str] = set()
+    if parade_date_ids:
+        scheduled_curriculum_ids = {
+            row[0]
+            for row in db.query(ScheduledSession.curriculum_id)
+            .filter(
+                ScheduledSession.parade_date_id.in_(parade_date_ids),
+                ScheduledSession.curriculum_id != None,  # noqa: E711
+                ScheduledSession.is_archived == False,  # noqa: E712
+            )
+            .all()
+        }
+
+    curriculum_q = _curriculum_scope_query(db, p).filter(
+        CurriculumItem.core_status == "core",
+    )
+    unscheduled_required = [
+        {
+            "curriculum_id": ci.id,
+            "code": ci.code,
+            "title": ci.title,
+            "phase": ci.phase,
+        }
+        for ci in curriculum_q.limit(200).all()
+        if ci.id not in scheduled_curriculum_ids
+    ]
+
+    # Nights missing facilitator: parade dates where at least one session has no facilitator
+    nights_missing_fac = 0
+    if parade_date_ids:
+        sessions_no_fac = (
+            db.query(func.count(func.distinct(ScheduledSession.parade_date_id)))
+            .filter(
+                ScheduledSession.parade_date_id.in_(parade_date_ids),
+                ScheduledSession.facilitator_id == None,  # noqa: E711
+                ScheduledSession.is_archived == False,  # noqa: E712
+            )
+            .scalar()
+        )
+        nights_missing_fac = sessions_no_fac or 0
+
+    return {
+        "planning_year_id": py.id,
+        "year": py.year,
+        "upcoming_anchors": upcoming_anchors,
+        "prep_gaps": prep_gaps,
+        "unreviewed_wing": unreviewed_wing,
+        "active_conflicts": active_conflicts,
+        "unscheduled_required": unscheduled_required,
+        "recent_imports": [],
+        "nights_missing_facilitator": nights_missing_fac,
+    }
 
 
 # ─────────────────────────────────────────────────────────────
@@ -2839,3 +3065,865 @@ async def import_annual_program(
         "total_rows": created_parade_dates + created_activities + skipped,
         "parse_errors": parse_errors,
     }
+
+
+# ─── Facilitator Leave / Unavailability ───────────────────────────────────────
+
+class FacilitatorLeaveIn(BaseModel):
+    start_date: str
+    end_date: str
+    reason: Optional[str] = None
+    notes: Optional[str] = None
+    planning_year_id: Optional[str] = None
+
+
+@router.get("/facilitators/{fac_id}/leave")
+def list_facilitator_leave(
+    fac_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """List all active leave periods for a facilitator."""
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    fac = db.get(Facilitator, fac_id)
+    if not fac:
+        raise HTTPException(404, detail={"error": "facilitator_not_found"})
+    rows = (
+        db.query(PlanningFacilitatorLeave)
+        .filter(
+            PlanningFacilitatorLeave.facilitator_id == fac_id,
+            PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
+        )
+        .order_by(PlanningFacilitatorLeave.start_date)
+        .all()
+    )
+    return {
+        "leave": [
+            {
+                "id": r.id, "facilitator_id": r.facilitator_id,
+                "planning_year_id": r.planning_year_id,
+                "start_date": r.start_date, "end_date": r.end_date,
+                "reason": r.reason, "notes": r.notes,
+                "created_by": r.created_by,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.post("/facilitators/{fac_id}/leave")
+def add_facilitator_leave(
+    fac_id: str,
+    body: FacilitatorLeaveIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Add a leave period for a facilitator and return affected scheduled sessions."""
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    fac = db.get(Facilitator, fac_id)
+    if not fac:
+        raise HTTPException(404, detail={"error": "facilitator_not_found"})
+    if body.start_date > body.end_date:
+        raise HTTPException(400, detail={"error": "start_date_after_end_date"})
+
+    leave = PlanningFacilitatorLeave(
+        id=str(uuid.uuid4()),
+        facilitator_id=fac_id,
+        planning_year_id=body.planning_year_id,
+        start_date=body.start_date,
+        end_date=body.end_date,
+        reason=body.reason,
+        notes=body.notes,
+        created_by=p.user_id,
+        is_archived=False,
+    )
+    db.add(leave)
+    db.flush()
+
+    # Find ScheduledSessions that use this facilitator on parade dates in the leave window
+    affected: list[dict] = []
+    sessions_with_fac = (
+        db.query(ScheduledSession)
+        .filter(
+            ScheduledSession.facilitator_id == fac_id,
+            ScheduledSession.is_archived == False,  # noqa: E712
+        )
+        .all()
+    )
+    for s in sessions_with_fac:
+        pd_obj = db.get(ParadeDate, s.parade_date_id)
+        if pd_obj and body.start_date <= pd_obj.parade_date <= body.end_date:
+            title = s.activity_title
+            if not title and s.curriculum_id:
+                ci = db.get(CurriculumItem, s.curriculum_id)
+                if ci:
+                    title = ci.title
+            affected.append({
+                "session_id": s.id,
+                "parade_date": pd_obj.parade_date,
+                "session_number": s.session_number,
+                "cadet_group": s.cadet_group,
+                "title": title,
+            })
+
+    db.commit()
+    audit(db, p, object_type="facilitator_leave", object_id=leave.id, action="create",
+          new={"facilitator_id": fac_id, "start": body.start_date, "end": body.end_date})
+
+    return {
+        "ok": True,
+        "leave": {
+            "id": leave.id, "facilitator_id": leave.facilitator_id,
+            "planning_year_id": leave.planning_year_id,
+            "start_date": leave.start_date, "end_date": leave.end_date,
+            "reason": leave.reason, "notes": leave.notes,
+            "created_by": leave.created_by,
+            "created_at": leave.created_at.isoformat() if leave.created_at else None,
+        },
+        "affected_sessions": affected,
+    }
+
+
+@router.delete("/facilitator-leave/{leave_id}")
+def delete_facilitator_leave(
+    leave_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Soft-delete a facilitator leave record."""
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    leave = db.get(PlanningFacilitatorLeave, leave_id)
+    if not leave or leave.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    leave.is_archived = True
+    db.commit()
+    audit(db, p, object_type="facilitator_leave", object_id=leave_id, action="archive")
+    return {"ok": True}
+
+
+@router.get("/years/{year_id}/facilitators/{fac_id}/workload")
+def facilitator_workload(
+    year_id: str,
+    fac_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Return workload stats for a facilitator within a planning year."""
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py)
+
+    fac = db.get(Facilitator, fac_id)
+    if not fac:
+        raise HTTPException(404, detail={"error": "facilitator_not_found"})
+
+    # Get all parade date IDs in this year
+    year_date_ids = {
+        pd.id: pd.parade_date
+        for pd in db.query(ParadeDate).filter(
+            ParadeDate.planning_year_id == year_id,
+            ParadeDate.is_active == True,  # noqa: E712
+        ).all()
+    }
+
+    # Find all scheduled sessions for this facilitator in this year
+    sessions = (
+        db.query(ScheduledSession)
+        .filter(
+            ScheduledSession.facilitator_id == fac_id,
+            ScheduledSession.parade_date_id.in_(list(year_date_ids.keys())),
+            ScheduledSession.is_archived == False,  # noqa: E712
+        )
+        .all()
+    )
+
+    total_scheduled = len(sessions)
+    # Group by parade_date_id
+    by_night: dict[str, list] = {}
+    for s in sessions:
+        by_night.setdefault(s.parade_date_id, []).append(s)
+
+    nights_with_sessions = len(by_night)
+    counts_per_night = [len(v) for v in by_night.values()]
+    avg_per_night = round(sum(counts_per_night) / len(counts_per_night), 1) if counts_per_night else 0.0
+    max_per_night = max(counts_per_night) if counts_per_night else 0
+    min_per_night = min(counts_per_night) if counts_per_night else 0
+
+    today = date.today().isoformat()
+    upcoming: list[dict] = []
+    for s in sessions:
+        pd_date = year_date_ids.get(s.parade_date_id, "")
+        if pd_date >= today:
+            title = s.activity_title
+            if not title and s.curriculum_id:
+                ci = db.get(CurriculumItem, s.curriculum_id)
+                if ci:
+                    title = ci.title
+            loc_name = None
+            if s.location_id:
+                loc = db.get(PlanningLocation, s.location_id)
+                if loc:
+                    loc_name = loc.name
+            upcoming.append({
+                "session_id": s.id,
+                "parade_date": pd_date,
+                "session_number": s.session_number,
+                "cadet_group": s.cadet_group,
+                "title": title,
+                "location_name": loc_name,
+            })
+    upcoming.sort(key=lambda x: (x["parade_date"], x["session_number"]))
+
+    return {
+        "total_scheduled": total_scheduled,
+        "nights_with_sessions": nights_with_sessions,
+        "avg_per_night": avg_per_night,
+        "max_per_night": max_per_night,
+        "min_per_night": min_per_night,
+        "upcoming_sessions": upcoming,
+    }
+
+
+# ── Night Summaries ──────────────────────────────────────────────────────────
+
+def _notice_out(n: PlanningNotice) -> dict:
+    return {
+        "notice_id": n.id,
+        "planning_year_id": n.planning_year_id,
+        "parade_date_id": n.parade_date_id,
+        "notice_text": n.notice_text,
+        "audience": n.audience,
+        "priority": n.priority,
+        "created_by": n.created_by,
+        "is_archived": n.is_archived,
+        "created_at": n.created_at.isoformat() if n.created_at else None,
+        "updated_at": n.updated_at.isoformat() if n.updated_at else None,
+    }
+
+
+@router.get("/years/{year_id}/night-summaries")
+def night_summaries(
+    year_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Return all parade dates with session/conflict/notice summary for the planning grid."""
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py)
+
+    all_dates = (
+        db.query(ParadeDate)
+        .filter(
+            ParadeDate.planning_year_id == year_id,
+            ParadeDate.is_active == True,  # noqa: E712
+        )
+        .order_by(ParadeDate.parade_date)
+        .all()
+    )
+
+    date_ids = [pd.id for pd in all_dates]
+
+    # Batch-load sessions
+    all_sessions = (
+        db.query(ScheduledSession)
+        .filter(
+            ScheduledSession.parade_date_id.in_(date_ids),
+            ScheduledSession.is_archived == False,  # noqa: E712
+        )
+        .all()
+    ) if date_ids else []
+
+    sessions_by_date: dict[str, list[ScheduledSession]] = {}
+    for s in all_sessions:
+        sessions_by_date.setdefault(s.parade_date_id, []).append(s)
+
+    # Batch-load curriculum titles
+    curr_ids = list({s.curriculum_id for s in all_sessions if s.curriculum_id})
+    curr_map: dict[str, tuple[str, str]] = {}
+    if curr_ids:
+        for ci in db.query(CurriculumItem).filter(CurriculumItem.id.in_(curr_ids)).all():
+            curr_map[ci.id] = (ci.code, ci.title)
+
+    # Batch-load facilitator display names
+    fac_ids = list({s.facilitator_id for s in all_sessions if s.facilitator_id})
+    fac_map: dict[str, str] = {}
+    if fac_ids:
+        for f in db.query(Facilitator).filter(Facilitator.id.in_(fac_ids)).all():
+            fac_map[f.id] = f"{f.current_rank or ''} {f.last_name}".strip()
+
+    # Batch-load location names
+    loc_ids = list({s.location_id for s in all_sessions if s.location_id})
+    loc_map: dict[str, str] = {}
+    if loc_ids:
+        for loc in db.query(PlanningLocation).filter(PlanningLocation.id.in_(loc_ids)).all():
+            loc_map[loc.id] = loc.name
+
+    # Batch-load unresolved conflict counts
+    conflict_counts: dict[str, int] = {}
+    if date_ids:
+        for c in db.query(PlanningConflict).filter(
+            PlanningConflict.parade_date_id.in_(date_ids),
+            PlanningConflict.is_resolved == False,  # noqa: E712
+        ).all():
+            conflict_counts[c.parade_date_id] = conflict_counts.get(c.parade_date_id, 0) + 1
+
+    # Batch-load notices
+    notices_by_date: dict[str, list[PlanningNotice]] = {}
+    if date_ids:
+        for n in db.query(PlanningNotice).filter(
+            PlanningNotice.parade_date_id.in_(date_ids),
+            PlanningNotice.is_archived == False,  # noqa: E712
+        ).all():
+            notices_by_date.setdefault(n.parade_date_id, []).append(n)
+
+    summaries = []
+    for pd in all_dates:
+        pd_sessions = sessions_by_date.get(pd.id, [])
+        session_summaries = []
+        for s in pd_sessions:
+            code, title = curr_map.get(s.curriculum_id, (None, None)) if s.curriculum_id else (None, None)
+            session_summaries.append({
+                "session_id": s.id,
+                "period": s.session_number,
+                "cadet_group": s.cadet_group,
+                "title": s.activity_title or title,
+                "curriculum_code": code,
+                "facilitator": fac_map.get(s.facilitator_id) if s.facilitator_id else None,
+                "location": loc_map.get(s.location_id) if s.location_id else None,
+            })
+
+        # parade night notes from linked ParadeNight
+        pn_notes = None
+        if pd.parade_night_id:
+            pn = db.get(ParadeNight, pd.parade_night_id)
+            if pn:
+                pn_notes = getattr(pn, "notes", None)
+
+        summaries.append({
+            "parade_date_id": pd.id,
+            "parade_date": pd.parade_date,
+            "parade_type": pd.parade_type,
+            "term": getattr(pd, "term", None),
+            "week_number": getattr(pd, "week_number", None),
+            "notes": pd.notes,
+            "parade_night_notes": pn_notes,
+            "parade_night_id": pd.parade_night_id,
+            "sessions": session_summaries,
+            "conflict_count": conflict_counts.get(pd.id, 0),
+            "notices": [_notice_out(n) for n in notices_by_date.get(pd.id, [])],
+        })
+
+    return {"planning_year_id": year_id, "summaries": summaries}
+
+
+# ── Parade Date Notices ──────────────────────────────────────────────────────
+
+class NoticeIn(BaseModel):
+    notice_text: str
+    priority: str = "normal"
+    audience: str | None = None
+
+
+@router.get("/parade-dates/{date_id}/notices")
+def list_notices(
+    date_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    pd = db.get(ParadeDate, date_id)
+    if not pd:
+        raise HTTPException(404, detail={"error": "parade_date_not_found"})
+    notices = (
+        db.query(PlanningNotice)
+        .filter(
+            PlanningNotice.parade_date_id == date_id,
+            PlanningNotice.is_archived == False,  # noqa: E712
+        )
+        .order_by(PlanningNotice.created_at)
+        .all()
+    )
+    return [_notice_out(n) for n in notices]
+
+
+@router.post("/parade-dates/{date_id}/notices")
+def create_notice(
+    date_id: str,
+    body: NoticeIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    pd = db.get(ParadeDate, date_id)
+    if not pd:
+        raise HTTPException(404, detail={"error": "parade_date_not_found"})
+    notice = PlanningNotice(
+        planning_year_id=pd.planning_year_id,
+        parade_date_id=date_id,
+        notice_text=body.notice_text.strip(),
+        priority=body.priority,
+        audience=body.audience,
+        created_by=p.user_id,
+    )
+    db.add(notice)
+    db.commit()
+    db.refresh(notice)
+    audit(db, p, object_type="PlanningNotice", object_id=notice.id, action="create")
+    return {"ok": True, "notice_id": notice.id}
+
+
+class NoticeUpdateIn(BaseModel):
+    notice_text: str | None = None
+    priority: str | None = None
+    audience: str | None = None
+
+
+@router.patch("/notices/{notice_id}")
+def update_notice(
+    notice_id: str,
+    body: NoticeUpdateIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    notice = db.get(PlanningNotice, notice_id)
+    if not notice or notice.is_archived:
+        raise HTTPException(404, detail={"error": "notice_not_found"})
+    if body.notice_text is not None:
+        notice.notice_text = body.notice_text.strip()
+    if body.priority is not None:
+        notice.priority = body.priority
+    if body.audience is not None:
+        notice.audience = body.audience
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/notices/{notice_id}/archive")
+def archive_notice(
+    notice_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    notice = db.get(PlanningNotice, notice_id)
+    if not notice:
+        raise HTTPException(404, detail={"error": "notice_not_found"})
+    notice.is_archived = True
+    db.commit()
+    audit(db, p, object_type="PlanningNotice", object_id=notice_id, action="archive")
+    return {"ok": True}
+
+
+# ── CEA Activities ────────────────────────────────────────────────────────────
+
+def _cea_activity_out(a: CeaActivity) -> dict:
+    return {
+        "id": a.id,
+        "import_batch_id": a.import_batch_id,
+        "planning_year_id": a.planning_year_id,
+        "wing_id": a.wing_id,
+        "unit_id": a.unit_id,
+        "cea_activity_id": a.cea_activity_id,
+        "activity_type": a.activity_type,
+        "status_name": a.status_name,
+        "parent_unit": a.parent_unit,
+        "host_unit": a.host_unit,
+        "activity_name": a.activity_name,
+        "nomination_start_date": a.nomination_start_date,
+        "nomination_end_date": a.nomination_end_date,
+        "activity_start_date": a.activity_start_date,
+        "activity_end_date": a.activity_end_date,
+        "start_time": a.start_time,
+        "end_time": a.end_time,
+        "location": a.location,
+        "activity_poc": a.activity_poc,
+        "notes": a.notes,
+        "source_type": a.source_type,
+        "classification_status": a.classification_status,
+        "importance": a.importance,
+        "audience_staff_only": a.audience_staff_only,
+        "audience_seniors": a.audience_seniors,
+        "audience_proficient": a.audience_proficient,
+        "audience_first_years": a.audience_first_years,
+        "classified_by": a.classified_by,
+        "classified_at": a.classified_at,
+        "is_removed_from_cea": a.is_removed_from_cea,
+        "is_archived": a.is_archived,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+    }
+
+
+@router.get("/years/{year_id}/cea/activities")
+def list_cea_activities(
+    year_id: str,
+    status: str | None = Query(None, description="needs_review | classified | irrelevant"),
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    from sqlalchemy import select
+    stmt = select(CeaActivity).where(
+        CeaActivity.planning_year_id == year_id,
+        CeaActivity.is_archived.is_(False),
+    )
+    if status:
+        stmt = stmt.where(CeaActivity.classification_status == status)
+    rows = db.scalars(stmt.order_by(CeaActivity.activity_start_date)).all()
+    return {"activities": [_cea_activity_out(r) for r in rows]}
+
+
+@router.get("/years/{year_id}/cea/batches")
+def list_cea_batches(
+    year_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    from sqlalchemy import select
+    rows = db.scalars(
+        select(CeaImportBatch)
+        .where(CeaImportBatch.planning_year_id == year_id)
+        .order_by(CeaImportBatch.created_at.desc())
+        .limit(20)
+    ).all()
+    return {"batches": [
+        {
+            "id": b.id,
+            "imported_by": b.imported_by,
+            "source_file_name": b.source_file_name,
+            "row_count": b.row_count,
+            "created_count": b.created_count,
+            "updated_count": b.updated_count,
+            "duplicate_count": b.duplicate_count,
+            "skipped_count": b.skipped_count,
+            "error_count": b.error_count,
+            "created_at": b.created_at.isoformat() if b.created_at else None,
+        }
+        for b in rows
+    ]}
+
+
+def _parse_cea_date(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    raw = raw.strip()
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%m/%d/%Y", "%d-%m-%Y"):
+        try:
+            from datetime import datetime as _dt
+            return _dt.strptime(raw, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return raw[:10] if len(raw) >= 10 else raw
+
+
+def _parse_cea_time(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    raw = raw.strip()
+    if len(raw) >= 5 and ":" in raw:
+        return raw[:5]
+    return None
+
+
+def _normalise_cea_row(row: dict) -> dict:
+    """Map both full-export and simple-export CSV column names to internal fields."""
+    def g(*keys: str) -> str | None:
+        for k in keys:
+            v = row.get(k, "").strip()
+            if v:
+                return v
+        return None
+
+    return {
+        "cea_activity_id": g("ActivityID", "SeqNr"),
+        "activity_type": g("ActivityTypeName", "SupportRequestType"),
+        "status_name": g("StatusName"),
+        "parent_unit": g("UnitParentName"),
+        "host_unit": g("UnitName", "Unit"),
+        "activity_name": g("SeqNrAndName", "Name", "ActivityName"),
+        "nomination_start_date": _parse_cea_date(g("NominationStartDate")),
+        "nomination_end_date": _parse_cea_date(g("NominationEndDate")),
+        "activity_start_date": _parse_cea_date(g("StartDate", "Start date")),
+        "activity_end_date": _parse_cea_date(g("EndDate", "End date")),
+        "start_time": _parse_cea_time(g("StartTime", "Start time")),
+        "end_time": _parse_cea_time(g("EndTime", "End time")),
+        "location": g("Location"),
+        "activity_poc": g("POC"),
+        "notes": g("ActivityNotes", "Activity Notes", "SupportRequestTypeCode"),
+    }
+
+
+@router.post("/years/{year_id}/cea/import")
+async def import_cea_csv(
+    year_id: str,
+    file: UploadFile = File(...),
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    require_role(p, "wing_admin", "national_admin", "system_admin")
+    year = db.get(PlanningYear, year_id)
+    if not year:
+        raise HTTPException(404, detail={"error": "year_not_found"})
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+
+    reader = _csv.DictReader(io.StringIO(text))
+    rows = list(reader)
+
+    batch = CeaImportBatch(
+        id=str(uuid.uuid4()),
+        planning_year_id=year_id,
+        wing_id=p.wing_id,
+        imported_by=p.user_id,
+        source_file_name=file.filename,
+        row_count=len(rows),
+        created_at=utcnow(),
+        updated_at=utcnow(),
+    )
+    db.add(batch)
+    db.flush()
+
+    from sqlalchemy import select
+
+    created = updated = duplicates = skipped = errors = 0
+    previews = []
+
+    # Load existing activities for this year to detect duplicates/updates
+    existing_by_cea_id: dict[str, CeaActivity] = {}
+    existing_by_name_date: dict[tuple, list[CeaActivity]] = {}
+    for act in db.scalars(
+        select(CeaActivity).where(
+            CeaActivity.planning_year_id == year_id,
+            CeaActivity.is_archived.is_(False),
+        )
+    ).all():
+        if act.cea_activity_id:
+            existing_by_cea_id[act.cea_activity_id] = act
+        key = (act.activity_name or "", act.activity_start_date or "")
+        existing_by_name_date.setdefault(key, []).append(act)
+
+    for row in rows:
+        try:
+            parsed = _normalise_cea_row(row)
+            name = parsed.get("activity_name") or ""
+            if not name:
+                skipped += 1
+                continue
+
+            cea_id = parsed.get("cea_activity_id")
+            start_date = parsed.get("activity_start_date") or ""
+            key = (name, start_date)
+
+            action = "create"
+            existing: CeaActivity | None = None
+
+            if cea_id and cea_id in existing_by_cea_id:
+                existing = existing_by_cea_id[cea_id]
+                action = "update"
+            elif key in existing_by_name_date:
+                existing = existing_by_name_date[key][0]
+                action = "duplicate"
+
+            previews.append({
+                "action": action,
+                "cea_activity_id": cea_id,
+                "activity_name": name,
+                "activity_start_date": start_date,
+                "activity_end_date": parsed.get("activity_end_date"),
+                "host_unit": parsed.get("host_unit"),
+                "parent_unit": parsed.get("parent_unit"),
+                "location": parsed.get("location"),
+                "existing_id": existing.id if existing else None,
+            })
+
+            if action == "create":
+                act = CeaActivity(
+                    id=str(uuid.uuid4()),
+                    import_batch_id=batch.id,
+                    planning_year_id=year_id,
+                    wing_id=p.wing_id,
+                    created_by=p.user_id,
+                    created_at=utcnow(),
+                    updated_at=utcnow(),
+                    **{k: v for k, v in parsed.items()},
+                )
+                db.add(act)
+                created += 1
+            elif action == "update" and existing:
+                for k, v in parsed.items():
+                    if v is not None:
+                        setattr(existing, k, v)
+                existing.updated_by = p.user_id
+                existing.updated_at = utcnow()
+                updated += 1
+            else:
+                duplicates += 1
+
+        except Exception:
+            errors += 1
+
+    # Mark activities no longer present in the import
+    current_cea_ids = {
+        r.get("cea_activity_id") or r.get("ActivityID") or r.get("SeqNr", "")
+        for r in rows
+    }
+    for act in existing_by_cea_id.values():
+        if act.cea_activity_id not in current_cea_ids:
+            act.is_removed_from_cea = True
+            act.updated_at = utcnow()
+
+    batch.created_count = created
+    batch.updated_count = updated
+    batch.duplicate_count = duplicates
+    batch.skipped_count = skipped
+    batch.error_count = errors
+
+    db.commit()
+    audit(db, p, object_type="CeaImportBatch", object_id=batch.id, action="import_cea")
+
+    return {
+        "ok": True,
+        "batch_id": batch.id,
+        "row_count": len(rows),
+        "created": created,
+        "updated": updated,
+        "duplicates": duplicates,
+        "skipped": skipped,
+        "errors": errors,
+        "preview": previews[:50],
+    }
+
+
+class CeaClassifyIn(BaseModel):
+    importance: str | None = None
+    audience_staff_only: bool = False
+    audience_seniors: bool = False
+    audience_proficient: bool = False
+    audience_first_years: bool = False
+
+
+@router.patch("/cea/{activity_id}/classify")
+def classify_cea_activity(
+    activity_id: str,
+    body: CeaClassifyIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    act = db.get(CeaActivity, activity_id)
+    if not act or act.is_archived:
+        raise HTTPException(404, detail={"error": "activity_not_found"})
+    act.importance = body.importance
+    act.audience_staff_only = body.audience_staff_only
+    act.audience_seniors = body.audience_seniors
+    act.audience_proficient = body.audience_proficient
+    act.audience_first_years = body.audience_first_years
+    act.classification_status = "classified" if body.importance else "needs_review"
+    act.classified_by = p.user_id
+    from datetime import datetime as _dt
+    act.classified_at = _dt.utcnow().isoformat()
+    act.updated_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="CeaActivity", object_id=activity_id, action="classify")
+    return {"ok": True}
+
+
+class ActivityLocalHideIn(BaseModel):
+    is_hidden: bool = True
+    local_note: str | None = None
+
+
+@router.post("/cea/{activity_id}/local-hide")
+def set_local_hide(
+    activity_id: str,
+    body: ActivityLocalHideIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    if not p.unit_id:
+        raise HTTPException(400, detail={"error": "no_unit_scope"})
+    from sqlalchemy import select
+    existing = db.scalar(
+        select(ActivityLocalHide).where(
+            ActivityLocalHide.cea_activity_id == activity_id,
+            ActivityLocalHide.unit_id == p.unit_id,
+        )
+    )
+    if existing:
+        existing.is_hidden = body.is_hidden
+        existing.local_note = body.local_note
+        existing.updated_at = utcnow()
+    else:
+        db.add(ActivityLocalHide(
+            id=str(uuid.uuid4()),
+            cea_activity_id=activity_id,
+            unit_id=p.unit_id,
+            is_hidden=body.is_hidden,
+            local_note=body.local_note,
+            hidden_by=p.user_id,
+            created_at=utcnow(),
+            updated_at=utcnow(),
+        ))
+    db.commit()
+    return {"ok": True}
+
+
+class ManualActivityIn(BaseModel):
+    activity_name: str
+    activity_start_date: str | None = None
+    activity_end_date: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    location: str | None = None
+    notes: str | None = None
+    importance: str | None = None
+    audience_staff_only: bool = False
+    audience_seniors: bool = False
+    audience_proficient: bool = False
+    audience_first_years: bool = False
+
+
+@router.post("/years/{year_id}/cea/activities")
+def create_manual_activity(
+    year_id: str,
+    body: ManualActivityIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    act = CeaActivity(
+        id=str(uuid.uuid4()),
+        planning_year_id=year_id,
+        wing_id=p.wing_id,
+        unit_id=p.squadron_id,
+        activity_name=body.activity_name.strip(),
+        activity_start_date=body.activity_start_date,
+        activity_end_date=body.activity_end_date,
+        start_time=body.start_time,
+        end_time=body.end_time,
+        location=body.location,
+        notes=body.notes,
+        source_type="manual",
+        importance=body.importance,
+        classification_status="classified" if body.importance else "needs_review",
+        audience_staff_only=body.audience_staff_only,
+        audience_seniors=body.audience_seniors,
+        audience_proficient=body.audience_proficient,
+        audience_first_years=body.audience_first_years,
+        created_by=p.user_id,
+        created_at=utcnow(),
+        updated_at=utcnow(),
+    )
+    db.add(act)
+    db.commit()
+    db.refresh(act)
+    audit(db, p, object_type="CeaActivity", object_id=act.id, action="create_manual")
+    return {"ok": True, "id": act.id, "activity": _cea_activity_out(act)}

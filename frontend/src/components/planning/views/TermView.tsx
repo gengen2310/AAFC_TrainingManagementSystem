@@ -1,19 +1,39 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
+import type { AnchorEvent, NightSummary } from "../../../api/types";
 import { filterAnchors } from "../../../utils/planningFilters";
+import { ParadeNightBlock, fromNightSummary } from "../ParadeNightBlock";
+import { ActivityDetailBlock, anchorToDisplay } from "../ActivityDetailBlock";
+
+function fmtDay(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return d.getDate() + " " + d.toLocaleDateString("en-GB", { month: "short" });
+}
+
+function fmtTermRange(start: string, end: string): string {
+  const sy = new Date(start + "T00:00:00").getFullYear();
+  const ey = new Date(end + "T00:00:00").getFullYear();
+  if (sy === ey) return `${fmtDay(start)} – ${fmtDay(end)} ${sy}`;
+  return `${fmtDay(start)} ${sy} – ${fmtDay(end)} ${ey}`;
+}
 
 interface Props {
   yearId: string;
   onDateClick: (dateId: string, date: string) => void;
+  onAnchorClick?: (anchor: AnchorEvent) => void;
   layers?: { holidays?: boolean; wingHQEvents?: boolean };
   audience?: Set<string>;
   priority?: Set<string>;
 }
 
-export function TermView({ yearId, onDateClick, layers, audience, priority }: Props) {
+function anchorsOnDate(date: string, all: AnchorEvent[]): AnchorEvent[] {
+  return all.filter(a => a.start_date <= date && date <= (a.end_date ?? a.start_date));
+}
+
+export function TermView({ yearId, onDateClick, onAnchorClick, layers, audience, priority }: Props) {
   const showHolidays = layers?.holidays ?? true;
-  const showAnchors = layers?.wingHQEvents ?? true;
+  const showAnchors  = layers?.wingHQEvents ?? true;
   const [termIndex, setTermIndex] = useState(0);
 
   const { data, isLoading, error } = useQuery({
@@ -21,20 +41,42 @@ export function TermView({ yearId, onDateClick, layers, audience, priority }: Pr
     queryFn: () => planningApi.annualProgram(yearId),
   });
 
+  const { data: nightData } = useQuery({
+    queryKey: ["planning-night-summaries", yearId],
+    queryFn: () => planningApi.nightSummaries(yearId),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const summaryMap = useMemo(
+    () => new Map<string, NightSummary>(
+      nightData?.summaries.map(s => [s.parade_date_id, s]) ?? [],
+    ),
+    [nightData],
+  );
+
   if (isLoading) return <div className="pw-loading">Loading term view…</div>;
   if (error || !data) return <div className="pw-err">Failed to load term data.</div>;
 
   const term = data.terms[termIndex];
   if (!term) return <div className="pw-empty">No terms found.</div>;
 
+  const visibleAnchors = showAnchors
+    ? filterAnchors(term.activities ?? [], audience ?? new Set(), priority ?? new Set())
+    : [];
+
   return (
     <div>
+      {/* Term selector tabs */}
       <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
         {data.terms.map((t, i) => (
           <button
             key={t.term}
             className={`pw-mode-btn${i === termIndex ? " active" : ""}`}
-            style={{ border: "1.5px solid var(--border)", color: i === termIndex ? "#fff" : "var(--text)", background: i === termIndex ? "var(--aafc-dark-blue)" : "var(--surface)" }}
+            style={{
+              border: "1.5px solid var(--border)",
+              color: i === termIndex ? "#fff" : "var(--text)",
+              background: i === termIndex ? "var(--aafc-dark-blue)" : "var(--surface)",
+            }}
             onClick={() => setTermIndex(i)}
           >
             {t.term}
@@ -46,52 +88,89 @@ export function TermView({ yearId, onDateClick, layers, audience, priority }: Pr
         <div className="pw-term-hdr">
           <span>{term.term}</span>
           <span style={{ fontSize: 11, fontWeight: 400 }}>
-            {term.start_date} → {term.end_date} · {term.parade_dates.length} nights
+            {fmtTermRange(term.start_date, term.end_date)} · {term.parade_dates.length} parade night{term.parade_dates.length !== 1 ? "s" : ""}
           </span>
         </div>
 
-        {showAnchors && (() => {
-          const visible = filterAnchors(term.activities ?? [], audience ?? new Set(), priority ?? new Set());
-          return visible.length > 0 ? (
-            <div className="pw-anchor-strip" style={{ marginBottom: 10 }}>
-              {visible.map((a, i) => (
-                <span key={a.anchor_event_id ?? String(i)} className={`pw-anchor-pill ${a.importance ?? "optional"}`}>
-                  {a.event_name} · {a.start_date}
-                </span>
-              ))}
-            </div>
-          ) : null;
-        })()}
+        {visibleAnchors.length > 0 && (
+          <div className="pw-anchor-strip" style={{ marginBottom: 10 }}>
+            {visibleAnchors.map((a, i) => (
+              <ActivityDetailBlock
+                key={a.anchor_event_id ?? String(i)}
+                activity={anchorToDisplay(a)}
+                compact={false}
+                onClick={onAnchorClick ? () => onAnchorClick(a) : undefined}
+              />
+            ))}
+          </div>
+        )}
 
-        <div className="pw-month-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}>
-          {term.parade_dates.map((pd) => (
-            <div
-              key={pd.parade_date_id}
-              className={`pw-date-cell${showHolidays && pd.in_holiday ? " holiday" : ""}`}
-              role="button"
-              tabIndex={0}
-              onClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
-              onKeyDown={(e) => e.key === "Enter" && onDateClick(pd.parade_date_id, pd.parade_date)}
-            >
-              <div className="pw-date-label">
-                {new Date(pd.parade_date + "T00:00:00").toLocaleDateString("en-CA", {
-                  weekday: "long", month: "short", day: "numeric",
-                })}
+        {/* Term view: vertical list of full-table blocks, same style as 8-week */}
+        <div className="pw-8week">
+          {term.parade_dates.map(pd => {
+            const night = summaryMap.get(pd.parade_date_id);
+            const inHoliday = showHolidays && pd.in_holiday;
+            const dateAnchors = showAnchors ? anchorsOnDate(pd.parade_date, term.activities ?? []) : [];
+
+            if (night) {
+              return (
+                <div key={pd.parade_date_id}>
+                  <ParadeNightBlock
+                    dateId={pd.parade_date_id}
+                    date={night.parade_date}
+                    weekNumber={night.week_number}
+                    term={night.term}
+                    notices={night.notices}
+                    sessions={fromNightSummary(night.sessions)}
+                    sessionCount={pd.session_count}
+                    filledSlots={pd.filled_count}
+                    conflictCount={night.conflict_count}
+                    inHoliday={!!inHoliday}
+                    compact={false}
+                    onHeaderClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
+                  />
+                  {dateAnchors.length > 0 && (
+                    <div className="pw-anchor-strip" style={{ marginTop: 4, marginBottom: 2 }}>
+                      {dateAnchors.map((a, i) => (
+                        <ActivityDetailBlock
+                          key={a.anchor_event_id ?? String(i)}
+                          activity={anchorToDisplay(a)}
+                          compact
+                          onClick={onAnchorClick ? () => onAnchorClick(a) : undefined}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // Fallback skeleton while summaries load
+            return (
+              <div
+                key={pd.parade_date_id}
+                className={`pw-block standard skeleton${inHoliday ? " holiday" : ""}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
+                onKeyDown={e => e.key === "Enter" && onDateClick(pd.parade_date_id, pd.parade_date)}
+              >
+                <div className="pw-block-hdr" style={{ pointerEvents: "none" }}>
+                  <span className="pw-block-date">
+                    {(() => {
+                      const d = new Date(pd.parade_date + "T00:00:00");
+                      return `${d.toLocaleDateString("en-GB", { weekday: "long" })}, ${d.getDate()} ${d.toLocaleDateString("en-GB", { month: "short" })}`;
+                    })()}
+                  </span>
+                  <span className="pw-block-fill">{pd.filled_count}/{pd.session_count}</span>
+                  {inHoliday && <span className="pw-block-standdown">Stand-down</span>}
+                </div>
+                <div style={{ padding: "6px 14px 8px", fontSize: 11, color: "var(--muted-text)", fontStyle: "italic" }}>
+                  Loading sessions…
+                </div>
               </div>
-              <div className="pw-date-type">
-                {pd.parade_type}{pd.week_number ? ` · Wk ${pd.week_number}` : ""}
-              </div>
-              {showHolidays && pd.in_holiday && <div style={{ fontSize: 10, color: "#C97A00", fontWeight: 700 }}>Stand-down</div>}
-              <div className="pw-date-fill">
-                <div style={{ fontSize: 10, color: "var(--muted-text)" }}>{pd.filled_count}/{pd.session_count} sessions filled</div>
-                {pd.session_count > 0 && (
-                  <div className="pw-fill-bar">
-                    <div className="pw-fill-bar-inner" style={{ width: `${Math.round((pd.filled_count / pd.session_count) * 100)}%` }} />
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

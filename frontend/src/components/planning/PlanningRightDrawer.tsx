@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../api";
-import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem } from "../../api/types";
+import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent } from "../../api/types";
+import { ActivityFullDetail, anchorToDisplay } from "./ActivityDetailBlock";
 
 // ─── Drawer item discriminated union ──────────────────────────────────────────
 export type DrawerItem =
@@ -10,6 +11,7 @@ export type DrawerItem =
   | { type: "wing-event"; event: WingHQEvent }
   | { type: "curriculum"; curriculum: { curriculum_id: string; code: string; title: string; phase: string } }
   | { type: "new-anchor"; yearId: string }
+  | { type: "anchor"; anchor: AnchorEvent; yearId: string }
   | { type: "new-location"; location?: PlanningLocation };
 
 const CADET_GROUPS = ["orientation", "initial", "junior", "intermediate", "senior"] as const;
@@ -556,6 +558,218 @@ function LocationForm({ location, onClose }: {
   );
 }
 
+// ─── Schedule from Backlog panel ──────────────────────────────────────────────
+
+const CADET_GROUP_LABELS: Record<string, string> = {
+  orientation: "Orientation",
+  initial: "Initial",
+  junior: "Junior",
+  intermediate: "Intermediate",
+  senior: "Senior",
+};
+
+function ScheduleFromBacklogPanel({
+  curriculum, yearId, facilitators, locations, onClose,
+}: {
+  curriculum: { curriculum_id: string; code: string; title: string; phase: string };
+  yearId: string;
+  facilitators: PlanningFacilitator[];
+  locations: PlanningLocation[];
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [dateId, setDateId] = useState("");
+  const [period, setPeriod] = useState(1);
+  const [cadetGroup, setCadetGroup] = useState("junior");
+  const [facilitatorId, setFacilitatorId] = useState("");
+  const [locationId, setLocationId] = useState("");
+  const [partNumber, setPartNumber] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const { data: missionsData } = useQuery({
+    queryKey: ["planning-missions", yearId],
+    queryFn: () => planningApi.missions(yearId!),
+    enabled: !!yearId,
+  });
+  const { data: nightData } = useQuery({
+    queryKey: ["planning-night-summaries", yearId],
+    queryFn: () => planningApi.nightSummaries(yearId!),
+    enabled: !!yearId,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const allMissions: MissionItem[] = missionsData?.missions ?? [];
+  const mission = allMissions.find(m => m.curriculum_id === curriculum.curriculum_id);
+  const summaries = nightData?.summaries ?? [];
+
+  async function handleSave() {
+    if (!dateId) { setErr("Select a parade night."); return; }
+    setSaving(true); setErr(null);
+    try {
+      await planningApi.createSession(dateId, {
+        cadet_group: cadetGroup,
+        session_number: period,
+        curriculum_id: curriculum.curriculum_id,
+        facilitator_id: facilitatorId || undefined,
+        location_id: locationId || undefined,
+        part_number: partNumber ? Number(partNumber) : undefined,
+        notes: notes || undefined,
+      });
+      await qc.invalidateQueries({ queryKey: ["planning-missions", yearId] });
+      await qc.invalidateQueries({ queryKey: ["planning-night-summaries", yearId] });
+      setSuccess(true);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (success) {
+    return (
+      <div>
+        <div style={{ color: "var(--success)", fontWeight: 700, fontSize: 14, marginBottom: 10 }}>
+          Session scheduled successfully.
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn sm primary" onClick={() => { setSuccess(false); setDateId(""); }}>Schedule again</button>
+          <button className="btn sm out" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Mission detail */}
+      <div className="pw-drawer-section">
+        <div className="pw-drawer-label">Code</div>
+        <div className="pw-drawer-value">{curriculum.code}</div>
+      </div>
+      <div className="pw-drawer-section">
+        <div className="pw-drawer-label">Phase</div>
+        <div className="pw-drawer-value">{curriculum.phase}</div>
+      </div>
+      {mission && (
+        <>
+          {mission.element && (
+            <div className="pw-drawer-section">
+              <div className="pw-drawer-label">Element</div>
+              <div className="pw-drawer-value">{mission.element}</div>
+            </div>
+          )}
+          <div className="pw-drawer-section">
+            <div className="pw-drawer-label">Duration</div>
+            <div className="pw-drawer-value">{mission.duration_minutes} min</div>
+          </div>
+          <div className="pw-drawer-section">
+            <div className="pw-drawer-label">Core status</div>
+            <div className="pw-drawer-value" style={{ textTransform: "capitalize" }}>{mission.core_status}</div>
+          </div>
+          {mission.instructor_suitability && (
+            <div className="pw-drawer-section">
+              <div className="pw-drawer-label">Instructor suitability</div>
+              <div className="pw-drawer-value">{mission.instructor_suitability}</div>
+            </div>
+          )}
+          {mission.part_count && mission.part_count > 1 && (
+            <div className="pw-drawer-section">
+              <div className="pw-drawer-label">Parts</div>
+              <div className="pw-drawer-value">{mission.part_count} parts</div>
+            </div>
+          )}
+          {mission.scheduled_sessions.length > 0 && (
+            <div className="pw-drawer-section">
+              <div className="pw-drawer-label" style={{ marginBottom: 4 }}>Already scheduled</div>
+              {mission.scheduled_sessions.map(ss => (
+                <div key={ss.session_id} style={{ fontSize: 11, marginBottom: 2, color: "var(--muted-text)" }}>
+                  {ss.parade_date} · P{ss.session_number} · {ss.cadet_group ?? "—"}
+                  {ss.facilitator_name ? ` · ${ss.facilitator_name}` : ""}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      <div style={{ borderTop: "1px solid var(--border)", margin: "12px 0", paddingTop: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: "var(--aafc-dark-blue)", marginBottom: 10 }}>
+          Schedule this mission
+        </div>
+        <div className="pw-drawer-form">
+          <label>
+            Parade night *
+            <select value={dateId} onChange={e => setDateId(e.target.value)}>
+              <option value="">— Select night —</option>
+              {summaries.map(s => (
+                <option key={s.parade_date_id} value={s.parade_date_id}>
+                  {s.parade_date}{s.term ? ` (${s.term})` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <label>
+              Period
+              <select value={period} onChange={e => setPeriod(Number(e.target.value))}>
+                <option value={1}>P1</option>
+                <option value={2}>P2</option>
+                <option value={3}>P3</option>
+              </select>
+            </label>
+            {mission?.part_count && mission.part_count > 1 && (
+              <label>
+                Part #
+                <input type="number" min={1} max={mission.part_count} value={partNumber}
+                  onChange={e => setPartNumber(e.target.value)} placeholder="—" />
+              </label>
+            )}
+          </div>
+          <label>
+            Cadet group
+            <select value={cadetGroup} onChange={e => setCadetGroup(e.target.value)}>
+              {Object.entries(CADET_GROUP_LABELS).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Facilitator
+            <select value={facilitatorId} onChange={e => setFacilitatorId(e.target.value)}>
+              <option value="">— None —</option>
+              {facilitators.map(f => (
+                <option key={f.facilitator_id} value={f.facilitator_id}>{f.display_name}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Room / Location
+            <select value={locationId} onChange={e => setLocationId(e.target.value)}>
+              <option value="">— None —</option>
+              {locations.map(l => (
+                <option key={l.location_id} value={l.location_id}>{l.name}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Notes
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes" />
+          </label>
+        </div>
+        {err && <div className="pw-err" style={{ marginTop: 8 }}>{err}</div>}
+        <div className="pw-drawer-actions" style={{ marginTop: 14 }}>
+          <button className="btn primary" onClick={handleSave} disabled={saving}>
+            {saving ? "Scheduling…" : "Schedule session"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main drawer ───────────────────────────────────────────────────────────────
 export function PlanningRightDrawer({ item, facilitators, locations, yearId, onClose }: Props) {
   const [key, setKey] = useState(0);
@@ -568,6 +782,7 @@ export function PlanningRightDrawer({ item, facilitators, locations, yearId, onC
     : item.type === "new-session" ? "Add Session"
     : item.type === "wing-event" ? item.event.title
     : item.type === "new-anchor" ? "New Anchor Event"
+    : item.type === "anchor" ? item.anchor.event_name
     : item.type === "new-location" ? (item.location ? `Edit: ${item.location.name}` : "Add Location")
     : `${item.curriculum.code} — ${item.curriculum.title}`;
 
@@ -587,29 +802,20 @@ export function PlanningRightDrawer({ item, facilitators, locations, yearId, onC
         {item.type === "new-anchor" && (
           <CreateAnchorForm yearId={item.yearId} onClose={onClose} />
         )}
+        {item.type === "anchor" && (
+          <ActivityFullDetail activity={anchorToDisplay(item.anchor)} />
+        )}
         {item.type === "new-location" && (
           <LocationForm location={item.location} onClose={onClose} />
         )}
         {item.type === "curriculum" && (
-          <div>
-            <div className="pw-drawer-section">
-              <div className="pw-drawer-label">Code</div>
-              <div className="pw-drawer-value">{item.curriculum.code}</div>
-            </div>
-            <div className="pw-drawer-section">
-              <div className="pw-drawer-label">Title</div>
-              <div className="pw-drawer-value">{item.curriculum.title}</div>
-            </div>
-            <div className="pw-drawer-section">
-              <div className="pw-drawer-label">Phase</div>
-              <div className="pw-drawer-value">{item.curriculum.phase}</div>
-            </div>
-            <div className="pw-drawer-section">
-              <div style={{ fontSize: 12, color: "var(--muted-text)" }}>
-                Navigate to a parade night and click a cell to schedule this curriculum item.
-              </div>
-            </div>
-          </div>
+          <ScheduleFromBacklogPanel
+            curriculum={item.curriculum}
+            yearId={yearId!}
+            facilitators={facilitators}
+            locations={locations}
+            onClose={onClose}
+          />
         )}
       </div>
     </div>

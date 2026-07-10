@@ -238,7 +238,7 @@ def test_holiday_conflict_flagged_on_parade_date(client):
     # Confirm conflict exists
     r = client.get(f"/api/planning/years/{yr_id}/conflicts", headers=hdr)
     assert r.status_code == 200
-    types = [c["conflict_type"] for c in r.json()]
+    types = [c["conflict_type"] for c in r.json()["conflicts"]]
     assert "holiday_conflict" in types
 
 
@@ -578,7 +578,7 @@ def test_facilitator_double_booking_detected(client):
                       "facilitator_id": fac_id}, headers=hdr)
     r = client.get(f"/api/planning/years/{yr_id}/conflicts", headers=hdr)
     assert r.status_code == 200
-    types = [c["conflict_type"] for c in r.json()]
+    types = [c["conflict_type"] for c in r.json()["conflicts"]]
     assert "facilitator_double_booked" in types
 
 
@@ -600,7 +600,7 @@ def test_conflict_override_requires_reason(client):
     client.post(f"/api/planning/years/{yr_id}/parade-dates",
                 json={"parade_date": "2026-10-09"}, headers=hdr)
     client.post(f"/api/planning/years/{yr_id}/run-checks", headers=hdr)
-    conflicts = client.get(f"/api/planning/years/{yr_id}/conflicts", headers=hdr).json()
+    conflicts = client.get(f"/api/planning/years/{yr_id}/conflicts", headers=hdr).json()["conflicts"]
     if not conflicts:
         pytest.skip("No conflicts to override")
     c_id = conflicts[0]["conflict_id"]
@@ -616,7 +616,7 @@ def test_conflict_override_with_reason(client):
     client.post(f"/api/planning/years/{yr_id}/parade-dates",
                 json={"parade_date": "2026-10-16"}, headers=hdr)
     client.post(f"/api/planning/years/{yr_id}/run-checks", headers=hdr)
-    conflicts = client.get(f"/api/planning/years/{yr_id}/conflicts", headers=hdr).json()
+    conflicts = client.get(f"/api/planning/years/{yr_id}/conflicts", headers=hdr).json()["conflicts"]
     if not conflicts:
         pytest.skip("No conflicts present")
     c_id = conflicts[0]["conflict_id"]
