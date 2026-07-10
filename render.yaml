@@ -1,8 +1,8 @@
-# Render Blueprint — AAFC TMS Staging (V17.1)
+# Render Blueprint — AAFC TMS Staging (Planning Workspace v17.1)
 #
-# Services deployed from branch: deployment/staging-v17.1
+# Services deployed from branch: deployment/staging-pw-v17-1
 #   - aafc-tms-backend-staging  (Docker web service, port 8000)
-#   - aafc-tms-frontend-staging (static site, connected-frontend/)
+#   - aafc-tms-frontend-staging (static site built from frontend/ via Vite)
 #
 # Database: Supabase PostgreSQL (free tier, provisioned separately).
 #   Use the Session Pooler connection string on port 5432 — not the direct
@@ -28,12 +28,14 @@
 #
 # Deployment sequence:
 #   1. Provision Supabase project → copy Session Pooler URI (port 5432).
-#   2. New Blueprint → select this repo → branch deployment/staging-v17.1.
+#   2. New Blueprint → select this repo → branch deployment/staging-pw-v17-1.
 #   3. Render prompts for DATABASE_URL and STAGING_BOOTSTRAP_SYSADMIN_CODE.
 #   4. After both services are live, note the actual URLs from Render dashboard.
 #   5. Set CORS_ALLOWED_ORIGINS on the backend to the exact frontend URL.
-#   6. Update <meta name="aafc-api-base"> in index.html to the exact backend URL.
-#   7. Push → both services redeploy → run tests.
+#   6. Set VITE_API_BASE_URL on the frontend service to the exact backend URL.
+#      Example: https://aafc-tms-backend-staging.onrender.com
+#      This is baked in at Vite build time — redeploy frontend after setting it.
+#   7. Push → both services redeploy → run smoke tests.
 
 services:
   - type: web
@@ -41,7 +43,7 @@ services:
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    branch: deployment/staging-v17.1
+    branch: deployment/staging-pw-v17-1
     plan: free
     region: singapore     # Requires Render Starter plan — see region note above
     healthCheckPath: /api/health/ready
@@ -84,8 +86,14 @@ services:
   - type: web
     name: aafc-tms-frontend-staging
     runtime: static
-    staticPublishPath: ./connected-frontend
-    branch: deployment/staging-v17.1
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    branch: deployment/staging-pw-v17-1
+    envVars:
+      # Backend URL baked in at Vite build time — set this in the Render dashboard
+      # before deploying. Format: https://aafc-tms-backend-staging.onrender.com
+      - key: VITE_API_BASE_URL
+        sync: false
     headers:
       - path: /*
         name: Cache-Control
