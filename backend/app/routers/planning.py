@@ -3954,7 +3954,7 @@ def set_local_hide(
     p: Principal = Depends(get_principal),
 ):
     require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
-    if not p.unit_id:
+    if not p.squadron_id:
         raise HTTPException(400, detail={"error": "no_unit_scope"})
     act = db.get(CeaActivity, activity_id)
     if not act or act.is_archived:
@@ -3965,7 +3965,7 @@ def set_local_hide(
     existing = db.scalar(
         select(ActivityLocalHide).where(
             ActivityLocalHide.cea_activity_id == activity_id,
-            ActivityLocalHide.unit_id == p.unit_id,
+            ActivityLocalHide.unit_id == p.squadron_id,
         )
     )
     if existing:
@@ -3976,7 +3976,7 @@ def set_local_hide(
         db.add(ActivityLocalHide(
             id=str(uuid.uuid4()),
             cea_activity_id=activity_id,
-            unit_id=p.unit_id,
+            unit_id=p.squadron_id,
             is_hidden=body.is_hidden,
             local_note=body.local_note,
             hidden_by=p.user_id,
