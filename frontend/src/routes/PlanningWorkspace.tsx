@@ -229,10 +229,26 @@ export function PlanningWorkspace() {
       );
     }
     if (viewRange === "custom") {
+      if (!customStart || !customEnd) {
+        return (
+          <div className="pw-empty">
+            <span>Select a date range above.</span>
+            <span style={{ fontSize: 11 }}>Use the From and To inputs in the toolbar to set your range.</span>
+          </div>
+        );
+      }
+      if (customEnd < customStart) {
+        return (
+          <div className="pw-empty pw-empty-warn">
+            <span>End date must be after start date.</span>
+          </div>
+        );
+      }
       return (
         <EightWeekView
           yearId={selectedYearId}
-          weeks={25}
+          customStart={customStart}
+          customEnd={customEnd}
           facilitators={facilitators}
           onDateClick={handleDateClick}
           onSessionClick={handleSessionClick}

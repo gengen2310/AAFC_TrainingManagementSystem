@@ -139,9 +139,10 @@ export const planningApi = {
     api.get<CommandCentreData>(`/api/planning/command-centre${year_id ? `?year_id=${year_id}` : ""}`),
   annualProgram: (year_id: string) =>
     api.get<AnnualProgram>(`/api/planning/years/${year_id}/annual-program`),
-  longRange: (year_id: string, weeks = 8, from_date?: string) => {
+  longRange: (year_id: string, weeks = 8, from_date?: string, end_date?: string) => {
     const p = new URLSearchParams({ weeks: String(weeks) });
     if (from_date) p.set("from_date", from_date);
+    if (end_date) p.set("end_date", end_date);
     return api.get<LongRangeView>(`/api/planning/years/${year_id}/long-range?${p}`);
   },
   weeklyProgram: (date_id: string) =>

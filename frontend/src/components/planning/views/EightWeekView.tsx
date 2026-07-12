@@ -14,6 +14,8 @@ import { ActivityDetailBlock, anchorToDisplay } from "../ActivityDetailBlock";
 interface Props {
   yearId: string;
   weeks?: number;
+  customStart?: string;
+  customEnd?: string;
   facilitators: PlanningFacilitator[];
   onDateClick: (dateId: string, date: string) => void;
   onSessionClick: (session: PlanningSession, dateId: string, date: string) => void;
@@ -24,16 +26,19 @@ interface Props {
 }
 
 export function EightWeekView({
-  yearId, weeks = 8, facilitators,
+  yearId, weeks = 8, customStart, customEnd, facilitators,
   onDateClick, onSessionClick, onAnchorClick,
   layers, audience, priority,
 }: Props) {
   const showConflicts = layers?.conflicts ?? true;
   const showAnchors = layers?.wingHQEvents ?? true;
 
+  const isCustom = !!(customStart && customEnd);
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["planning-long-range", yearId, weeks],
-    queryFn: () => planningApi.longRange(yearId, weeks),
+    queryKey: ["planning-long-range", yearId, customStart ?? weeks, customEnd ?? ""],
+    queryFn: () => planningApi.longRange(yearId, weeks, customStart, customEnd),
+    enabled: !isCustom || customEnd! >= customStart!,
   });
 
   const { data: nightData } = useQuery({

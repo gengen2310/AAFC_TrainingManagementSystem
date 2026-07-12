@@ -1381,8 +1381,9 @@ def get_weekly_program(
 @router.get("/years/{year_id}/long-range")
 def get_long_range(
     year_id: str,
-    weeks: int = Query(default=8, ge=1, le=20),
+    weeks: int = Query(default=8, ge=1, le=52),
     from_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -1395,7 +1396,16 @@ def get_long_range(
         start_dt = date.fromisoformat(start)
     except ValueError:
         start_dt = date.today()
-    end_dt = start_dt + timedelta(weeks=weeks)
+
+    if end_date:
+        try:
+            end_dt = date.fromisoformat(end_date)
+        except ValueError:
+            raise HTTPException(422, detail={"error": "invalid_end_date", "message": "end_date must be YYYY-MM-DD"})
+        if end_dt < start_dt:
+            raise HTTPException(422, detail={"error": "end_before_start", "message": "end_date must not be before from_date"})
+    else:
+        end_dt = start_dt + timedelta(weeks=weeks)
 
     parade_dates = db.query(ParadeDate).filter(
         ParadeDate.planning_year_id == year_id,
