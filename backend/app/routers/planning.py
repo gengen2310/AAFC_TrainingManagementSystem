@@ -3170,6 +3170,10 @@ def list_facilitator_leave(
     fac = db.get(Facilitator, fac_id)
     if not fac:
         raise HTTPException(404, detail={"error": "facilitator_not_found"})
+    if p.role == "sqn_admin" and fac.squadron_id != p.squadron_id:
+        raise HTTPException(403, detail={"error": "out_of_scope"})
+    if p.role in ("wing_admin", "wing_viewer") and fac.wing_id != p.wing_id:
+        raise HTTPException(403, detail={"error": "out_of_scope"})
     rows = (
         db.query(PlanningFacilitatorLeave)
         .filter(
@@ -3206,6 +3210,10 @@ def add_facilitator_leave(
     fac = db.get(Facilitator, fac_id)
     if not fac:
         raise HTTPException(404, detail={"error": "facilitator_not_found"})
+    if p.role == "sqn_admin" and fac.squadron_id != p.squadron_id:
+        raise HTTPException(403, detail={"error": "out_of_scope"})
+    if p.role in ("wing_admin", "wing_viewer") and fac.wing_id != p.wing_id:
+        raise HTTPException(403, detail={"error": "out_of_scope"})
     if body.start_date > body.end_date:
         raise HTTPException(400, detail={"error": "start_date_after_end_date"})
 
@@ -3518,6 +3526,8 @@ def list_notices(
     pd = db.get(ParadeDate, date_id)
     if not pd:
         raise HTTPException(404, detail={"error": "parade_date_not_found"})
+    py = _get_year_or_404(pd.planning_year_id, db)
+    _require_year_access(p, py)
     notices = (
         db.query(PlanningNotice)
         .filter(
@@ -3541,6 +3551,8 @@ def create_notice(
     pd = db.get(ParadeDate, date_id)
     if not pd:
         raise HTTPException(404, detail={"error": "parade_date_not_found"})
+    py = _get_year_or_404(pd.planning_year_id, db)
+    _require_year_access(p, py, write=True)
     notice = PlanningNotice(
         planning_year_id=pd.planning_year_id,
         parade_date_id=date_id,
@@ -3573,6 +3585,8 @@ def update_notice(
     notice = db.get(PlanningNotice, notice_id)
     if not notice or notice.is_archived:
         raise HTTPException(404, detail={"error": "notice_not_found"})
+    py = _get_year_or_404(notice.planning_year_id, db)
+    _require_year_access(p, py, write=True)
     if body.notice_text is not None:
         notice.notice_text = body.notice_text.strip()
     if body.priority is not None:
@@ -3593,6 +3607,8 @@ def archive_notice(
     notice = db.get(PlanningNotice, notice_id)
     if not notice:
         raise HTTPException(404, detail={"error": "notice_not_found"})
+    py = _get_year_or_404(notice.planning_year_id, db)
+    _require_year_access(p, py, write=True)
     notice.is_archived = True
     db.commit()
     audit(db, p, object_type="PlanningNotice", object_id=notice_id, action="archive")
@@ -3646,6 +3662,8 @@ def list_cea_activities(
     p: Principal = Depends(get_principal),
 ):
     require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py)
     from sqlalchemy import select
     stmt = select(CeaActivity).where(
         CeaActivity.planning_year_id == year_id,
@@ -3664,6 +3682,8 @@ def list_cea_batches(
     p: Principal = Depends(get_principal),
 ):
     require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py)
     from sqlalchemy import select
     rows = db.scalars(
         select(CeaImportBatch)
@@ -3746,11 +3766,13 @@ async def import_cea_csv(
     p: Principal = Depends(get_principal),
 ):
     require_role(p, "wing_admin", "national_admin", "system_admin")
-    year = db.get(PlanningYear, year_id)
-    if not year:
-        raise HTTPException(404, detail={"error": "year_not_found"})
+    year = _get_year_or_404(year_id, db)
+    _require_year_access(p, year, write=True)
 
+    from ..config import settings as _settings
     content = await file.read()
+    if len(content) > _settings.UPLOAD_MAX_MB * 1024 * 1024:
+        raise HTTPException(413, detail={"error": "file_too_large"})
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -3902,6 +3924,8 @@ def classify_cea_activity(
     act = db.get(CeaActivity, activity_id)
     if not act or act.is_archived:
         raise HTTPException(404, detail={"error": "activity_not_found"})
+    py = _get_year_or_404(act.planning_year_id, db)
+    _require_year_access(p, py, write=True)
     act.importance = body.importance
     act.audience_staff_only = body.audience_staff_only
     act.audience_seniors = body.audience_seniors
@@ -3932,6 +3956,11 @@ def set_local_hide(
     require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     if not p.unit_id:
         raise HTTPException(400, detail={"error": "no_unit_scope"})
+    act = db.get(CeaActivity, activity_id)
+    if not act or act.is_archived:
+        raise HTTPException(404, detail={"error": "activity_not_found"})
+    py = _get_year_or_404(act.planning_year_id, db)
+    _require_year_access(p, py, write=True)
     from sqlalchemy import select
     existing = db.scalar(
         select(ActivityLocalHide).where(
@@ -3981,6 +4010,8 @@ def create_manual_activity(
     p: Principal = Depends(get_principal),
 ):
     require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py, write=True)
     act = CeaActivity(
         id=str(uuid.uuid4()),
         planning_year_id=year_id,
