@@ -42,7 +42,7 @@ export function YearView({ yearId, onDateClick, onAnchorClick, layers, audience,
     queryFn: () => planningApi.annualProgram(yearId),
   });
 
-  const { data: nightData } = useQuery({
+  const { data: nightData, isLoading: summariesLoading, error: summariesError } = useQuery({
     queryKey: ["planning-night-summaries", yearId],
     queryFn: () => planningApi.nightSummaries(yearId),
     staleTime: 2 * 60 * 1000,
@@ -117,7 +117,7 @@ export function YearView({ yearId, onDateClick, onAnchorClick, layers, audience,
 
                 {/* Equal-width block grid for this term's parade nights */}
                 <div className="pw-year-block-grid">
-                  {term.parade_dates.map(pd => {
+                  {term.parade_dates.filter(pd => pd.is_active !== false).map(pd => {
                     const night = summaryMap.get(pd.parade_date_id);
                     const inHoliday = showHolidays && pd.in_holiday;
                     const dateAnchors = showAnchors
@@ -178,7 +178,7 @@ export function YearView({ yearId, onDateClick, onAnchorClick, layers, audience,
                           {inHoliday && <span className="pw-block-standdown">Stand-down</span>}
                         </div>
                         <div style={{ padding: "6px 10px 8px", fontSize: 11, color: "var(--muted-text)", fontStyle: "italic" }}>
-                          Loading…
+                          {!summariesLoading && summariesError ? "Data unavailable" : "Loading…"}
                         </div>
                       </div>
                     );

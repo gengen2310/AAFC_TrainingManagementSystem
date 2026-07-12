@@ -3309,7 +3309,7 @@ def night_summaries(
     p: Principal = Depends(get_principal),
 ):
     """Return all parade dates with session/conflict/notice summary for the planning grid."""
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    require_role(p, "sqn_admin", "sqn_general", "wing_admin", "national_admin", "system_admin")
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py)
 
