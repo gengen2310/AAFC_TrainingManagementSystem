@@ -15,6 +15,13 @@ if [ -n "$API_BASE" ]; then
         /usr/share/nginx/html/index.html
 fi
 
+# Inject module mode — when MODULE_MODE=true, replace login form with "Return to TMS" message.
+if [ "${MODULE_MODE:-false}" = "true" ]; then
+    sed -i \
+        's|<meta name="aafc-module-mode" content="">|<meta name="aafc-module-mode" content="true">|' \
+        /usr/share/nginx/html/index.html
+fi
+
 # Inject runtime port into nginx config
 sed -i "s/__PORT__/${PORT}/g" /etc/nginx/conf.d/default.conf
 

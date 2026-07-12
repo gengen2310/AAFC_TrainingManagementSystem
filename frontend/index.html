@@ -7,6 +7,9 @@
     <!-- Operators: set content to your backend URL (e.g. http://localhost:8000).
          Leave empty when the API is served on the same origin via a reverse proxy. -->
     <meta name="aafc-api-base" content="">
+    <!-- Set content="true" at runtime (via docker-entrypoint.sh MODULE_MODE=true) to hide the
+         login form and show "Return to TMS" when no session is present. Empty = normal login. -->
+    <meta name="aafc-module-mode" content="">
   </head>
   <body>
     <a href="#main" class="skip-link">Skip to main content</a>

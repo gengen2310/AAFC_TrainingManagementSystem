@@ -22,7 +22,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     catch { setSession(null); }
   }, []);
 
-  useEffect(() => { (async () => { if (tokenStore.get()) await refresh(); setLoading(false); })(); }, [refresh]);
+  // Always try /api/me on mount — cookie auth works even when sessionStorage token is absent
+  // (e.g. when opened in a new tab from the connected-frontend).
+  useEffect(() => { (async () => { await refresh(); setLoading(false); })(); }, [refresh]);
 
   const login = async (code: string) => {
     const r = await authApi.login(code);
