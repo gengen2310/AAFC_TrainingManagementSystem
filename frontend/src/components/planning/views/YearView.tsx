@@ -6,9 +6,13 @@ import { filterAnchors } from "../../../utils/planningFilters";
 import { ParadeNightBlock, fromNightSummary } from "../ParadeNightBlock";
 import { ActivityDetailBlock, anchorToDisplay } from "../ActivityDetailBlock";
 
+const STALE_5MIN = 5 * 60 * 1000;
+
 interface Props {
   yearId: string;
   onDateClick: (dateId: string, date: string) => void;
+  onSessionClick?: (sessionId: string, dateId: string, date: string) => void;
+  onEmptyCellClick?: (dateId: string, date: string, cadetGroup: string, period: number) => void;
   onAnchorClick?: (anchor: AnchorEvent) => void;
   layers?: { holidays?: boolean; wingHQEvents?: boolean };
   audience?: Set<string>;
@@ -31,7 +35,7 @@ function anchorsOnDate(date: string, all: AnchorEvent[]): AnchorEvent[] {
   return all.filter(a => a.start_date <= date && date <= (a.end_date ?? a.start_date));
 }
 
-export function YearView({ yearId, onDateClick, onAnchorClick, layers, audience, priority }: Props) {
+export function YearView({ yearId, onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick, layers, audience, priority }: Props) {
   const showHolidays = layers?.holidays ?? true;
   const showAnchors  = layers?.wingHQEvents ?? true;
 
@@ -40,20 +44,32 @@ export function YearView({ yearId, onDateClick, onAnchorClick, layers, audience,
   const { data, isLoading, error } = useQuery({
     queryKey: ["planning-annual", yearId],
     queryFn: () => planningApi.annualProgram(yearId),
+    staleTime: STALE_5MIN,
   });
 
-  const { data: nightData, isLoading: summariesLoading, error: summariesError } = useQuery({
-    queryKey: ["planning-night-summaries", yearId],
-    queryFn: () => planningApi.nightSummaries(yearId),
-    staleTime: 2 * 60 * 1000,
-  });
-
-  const summaryMap = useMemo(
-    () => new Map<string, NightSummary>(
-      nightData?.summaries.map(s => [s.parade_date_id, s]) ?? [],
-    ),
-    [nightData],
-  );
+  // Session details, conflict counts, and notices are now embedded in the annual-program
+  // response — no separate night-summaries call needed.
+  const summaryMap = useMemo((): Map<string, NightSummary> => {
+    if (!data) return new Map();
+    return new Map(
+      data.terms.flatMap(t => t.parade_dates).map(pd => [
+        pd.parade_date_id,
+        {
+          parade_date_id: pd.parade_date_id,
+          parade_date: pd.parade_date,
+          parade_type: pd.parade_type ?? "standard",
+          term: (pd as { term?: string | null }).term ?? null,
+          week_number: pd.week_number ?? null,
+          notes: pd.notes ?? null,
+          parade_night_notes: null,
+          parade_night_id: pd.parade_night_id ?? null,
+          sessions: pd.sessions_summary ?? [],
+          conflict_count: pd.conflict_count ?? 0,
+          notices: pd.notices ?? [],
+        } satisfies NightSummary,
+      ]),
+    );
+  }, [data]);
 
   function toggleTerm(termName: string) {
     setCollapsedTerms(prev => {
@@ -65,6 +81,22 @@ export function YearView({ yearId, onDateClick, onAnchorClick, layers, audience,
 
   if (isLoading) return <div className="pw-loading">Loading annual programme…</div>;
   if (error || !data) return <div className="pw-err">Failed to load annual programme.</div>;
+
+  const totalActiveDates = data.terms.reduce(
+    (sum, t) => sum + t.parade_dates.filter(pd => pd.is_active !== false).length,
+    0,
+  );
+
+  if (totalActiveDates === 0) {
+    return (
+      <div className="pw-empty">
+        <span>No parade nights have been set up for this planning year.</span>
+        <span style={{ fontSize: 11 }}>
+          Generate parade dates using the setup wizard, or add individual nights from the Year panel.
+        </span>
+      </div>
+    );
+  }
 
   // One unified CSS grid — term headers span all columns, blocks auto-place into columns.
   // This enforces equal-width blocks across all terms.
@@ -117,6 +149,11 @@ export function YearView({ yearId, onDateClick, onAnchorClick, layers, audience,
 
                 {/* Equal-width block grid for this term's parade nights */}
                 <div className="pw-year-block-grid">
+                  {term.parade_dates.filter(pd => pd.is_active !== false).length === 0 && (
+                    <div style={{ padding: "14px 16px", fontSize: 13, color: "var(--muted-text)", fontStyle: "italic", gridColumn: "1 / -1" }}>
+                      No parade nights scheduled for this term.
+                    </div>
+                  )}
                   {term.parade_dates.filter(pd => pd.is_active !== false).map(pd => {
                     const night = summaryMap.get(pd.parade_date_id);
                     const inHoliday = showHolidays && pd.in_holiday;
@@ -141,6 +178,12 @@ export function YearView({ yearId, onDateClick, onAnchorClick, layers, audience,
                             compact={false}
                             blockSize="sm"
                             onHeaderClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
+                            onSessionClick={onSessionClick
+                              ? (ds) => onSessionClick(ds.session_id, pd.parade_date_id, pd.parade_date)
+                              : undefined}
+                            onEmptyCellClick={onEmptyCellClick
+                              ? (cg, period) => onEmptyCellClick(pd.parade_date_id, pd.parade_date, cg, period)
+                              : undefined}
                           />
                           {dateAnchors.length > 0 && (
                             <div className="pw-anchor-strip" style={{ marginTop: 4 }}>
@@ -158,11 +201,11 @@ export function YearView({ yearId, onDateClick, onAnchorClick, layers, audience,
                       );
                     }
 
-                    // Skeleton while summaries load
+                    // Fallback block (summaryMap is always populated from annual-program)
                     return (
                       <div
                         key={pd.parade_date_id}
-                        className={`pw-block standard pw-block-sm skeleton${inHoliday ? " holiday" : ""}`}
+                        className={`pw-block standard pw-block-sm${inHoliday ? " holiday" : ""}`}
                         role="button"
                         tabIndex={0}
                         onClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
@@ -176,9 +219,6 @@ export function YearView({ yearId, onDateClick, onAnchorClick, layers, audience,
                             })()}
                           </span>
                           {inHoliday && <span className="pw-block-standdown">Stand-down</span>}
-                        </div>
-                        <div style={{ padding: "6px 10px 8px", fontSize: 11, color: "var(--muted-text)", fontStyle: "italic" }}>
-                          {!summariesLoading && summariesError ? "Data unavailable" : "Loading…"}
                         </div>
                       </div>
                     );

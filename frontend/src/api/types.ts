@@ -170,7 +170,12 @@ export interface HolidayPeriod {
 }
 export interface AnnualProgramTerm {
   term: string; start_date: string; end_date: string;
-  parade_dates: (ParadeDate & { session_count: number; filled_count: number; in_holiday: boolean })[];
+  parade_dates: (ParadeDate & {
+    session_count: number; filled_count: number; in_holiday: boolean;
+    sessions_summary: NightSessionSummary[];
+    conflict_count: number;
+    notices: ParadeNotice[];
+  })[];
   holidays: HolidayPeriod[];
   activities: AnchorEvent[];
 }
@@ -192,9 +197,10 @@ export interface MissionItem {
   core_status: string; is_scheduled: boolean;
   scheduled_count: number; instructor_suitability: string | null;
   scheduled_sessions: {
-    session_id: string; parade_date: string | null; term: string | null;
+    session_id: string; parade_date: string | null; parade_date_id: string | null; term: string | null;
     session_number: number; part_number: number | null; cadet_group: string | null;
-    facilitator_name: string | null; location_name: string | null; status: string;
+    facilitator_id: string | null; facilitator_name: string | null;
+    location_id: string | null; location_name: string | null; status: string;
   }[];
 }
 export interface PlanningLocation {

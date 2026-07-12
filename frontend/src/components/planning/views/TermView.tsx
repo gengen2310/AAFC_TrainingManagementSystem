@@ -6,6 +6,8 @@ import { filterAnchors } from "../../../utils/planningFilters";
 import { ParadeNightBlock, fromNightSummary } from "../ParadeNightBlock";
 import { ActivityDetailBlock, anchorToDisplay } from "../ActivityDetailBlock";
 
+const STALE_5MIN = 5 * 60 * 1000;
+
 function fmtDay(iso: string): string {
   const d = new Date(iso + "T00:00:00");
   return d.getDate() + " " + d.toLocaleDateString("en-GB", { month: "short" });
@@ -21,6 +23,8 @@ function fmtTermRange(start: string, end: string): string {
 interface Props {
   yearId: string;
   onDateClick: (dateId: string, date: string) => void;
+  onSessionClick?: (sessionId: string, dateId: string, date: string) => void;
+  onEmptyCellClick?: (dateId: string, date: string, cadetGroup: string, period: number) => void;
   onAnchorClick?: (anchor: AnchorEvent) => void;
   layers?: { holidays?: boolean; wingHQEvents?: boolean };
   audience?: Set<string>;
@@ -31,7 +35,7 @@ function anchorsOnDate(date: string, all: AnchorEvent[]): AnchorEvent[] {
   return all.filter(a => a.start_date <= date && date <= (a.end_date ?? a.start_date));
 }
 
-export function TermView({ yearId, onDateClick, onAnchorClick, layers, audience, priority }: Props) {
+export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick, layers, audience, priority }: Props) {
   const showHolidays = layers?.holidays ?? true;
   const showAnchors  = layers?.wingHQEvents ?? true;
   const [termIndex, setTermIndex] = useState(0);
@@ -39,20 +43,31 @@ export function TermView({ yearId, onDateClick, onAnchorClick, layers, audience,
   const { data, isLoading, error } = useQuery({
     queryKey: ["planning-annual", yearId],
     queryFn: () => planningApi.annualProgram(yearId),
+    staleTime: STALE_5MIN,
   });
 
-  const { data: nightData } = useQuery({
-    queryKey: ["planning-night-summaries", yearId],
-    queryFn: () => planningApi.nightSummaries(yearId),
-    staleTime: 2 * 60 * 1000,
-  });
-
-  const summaryMap = useMemo(
-    () => new Map<string, NightSummary>(
-      nightData?.summaries.map(s => [s.parade_date_id, s]) ?? [],
-    ),
-    [nightData],
-  );
+  // Session details, conflict counts, and notices are embedded in annual-program data.
+  const summaryMap = useMemo((): Map<string, NightSummary> => {
+    if (!data) return new Map();
+    return new Map(
+      data.terms.flatMap(t => t.parade_dates).map(pd => [
+        pd.parade_date_id,
+        {
+          parade_date_id: pd.parade_date_id,
+          parade_date: pd.parade_date,
+          parade_type: pd.parade_type ?? "standard",
+          term: (pd as { term?: string | null }).term ?? null,
+          week_number: pd.week_number ?? null,
+          notes: pd.notes ?? null,
+          parade_night_notes: null,
+          parade_night_id: pd.parade_night_id ?? null,
+          sessions: pd.sessions_summary ?? [],
+          conflict_count: pd.conflict_count ?? 0,
+          notices: pd.notices ?? [],
+        } satisfies NightSummary,
+      ]),
+    );
+  }, [data]);
 
   if (isLoading) return <div className="pw-loading">Loading term view…</div>;
   if (error || !data) return <div className="pw-err">Failed to load term data.</div>;
@@ -105,7 +120,6 @@ export function TermView({ yearId, onDateClick, onAnchorClick, layers, audience,
           </div>
         )}
 
-        {/* Term view: vertical list of full-table blocks, same style as 8-week */}
         <div className="pw-8week">
           {term.parade_dates.map(pd => {
             const night = summaryMap.get(pd.parade_date_id);
@@ -128,6 +142,12 @@ export function TermView({ yearId, onDateClick, onAnchorClick, layers, audience,
                     inHoliday={!!inHoliday}
                     compact={false}
                     onHeaderClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
+                    onSessionClick={onSessionClick
+                      ? (ds) => onSessionClick(ds.session_id, pd.parade_date_id, pd.parade_date)
+                      : undefined}
+                    onEmptyCellClick={onEmptyCellClick
+                      ? (cg, period) => onEmptyCellClick(pd.parade_date_id, pd.parade_date, cg, period)
+                      : undefined}
                   />
                   {dateAnchors.length > 0 && (
                     <div className="pw-anchor-strip" style={{ marginTop: 4, marginBottom: 2 }}>
@@ -145,11 +165,10 @@ export function TermView({ yearId, onDateClick, onAnchorClick, layers, audience,
               );
             }
 
-            // Fallback skeleton while summaries load
             return (
               <div
                 key={pd.parade_date_id}
-                className={`pw-block standard skeleton${inHoliday ? " holiday" : ""}`}
+                className={`pw-block standard${inHoliday ? " holiday" : ""}`}
                 role="button"
                 tabIndex={0}
                 onClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
@@ -164,9 +183,6 @@ export function TermView({ yearId, onDateClick, onAnchorClick, layers, audience,
                   </span>
                   <span className="pw-block-fill">{pd.filled_count}/{pd.session_count}</span>
                   {inHoliday && <span className="pw-block-standdown">Stand-down</span>}
-                </div>
-                <div style={{ padding: "6px 14px 8px", fontSize: 11, color: "var(--muted-text)", fontStyle: "italic" }}>
-                  Loading sessions…
                 </div>
               </div>
             );
