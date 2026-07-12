@@ -29,6 +29,7 @@ interface Props {
 }
 
 const TABS: { key: BottomTab; label: string }[] = [
+  { key: "activities", label: "Activities" },
   { key: "backlog", label: "Mission Backlog" },
   { key: "training-planner", label: "Training Planner" },
   { key: "facilitators", label: "Facilitators" },
@@ -36,8 +37,7 @@ const TABS: { key: BottomTab; label: string }[] = [
   { key: "equipment", label: "Equipment" },
   { key: "holidays", label: "Holidays" },
   { key: "notices", label: "Notices" },
-  { key: "activities", label: "Activities" },
-  { key: "import-review", label: "Import Review" },
+  { key: "import-review", label: "CEA History" },
 ];
 
 // ─── Styles helpers ───────────────────────────────────────────────────────────
@@ -1060,6 +1060,37 @@ const STATUS_COLORS: Record<string, string> = {
   irrelevant: "var(--muted-text)",
 };
 
+const SOURCE_COLORS: Record<string, string> = {
+  cea: "#1A4D8F",
+  manual: "#1A7F4B",
+  anchor: "#7c3aed",
+  holiday: "#b45309",
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  cea: "CEA",
+  manual: "Manual",
+  anchor: "Anchor",
+  holiday: "Holiday",
+};
+
+type UnifiedActivity = {
+  id: string;
+  source: "cea" | "manual" | "anchor" | "holiday";
+  name: string;
+  start_date: string | null;
+  end_date: string | null;
+  location: string | null;
+  importance: string | null;
+  classification_status: string | null;
+  unit: string | null;
+  extra: string | null;
+  is_removed: boolean;
+  raw_cea: import("../../api/types").CeaActivity | null;
+  raw_anchor: import("../../api/types").AnchorEvent | null;
+  raw_holiday: import("../../api/types").HolidayPeriod | null;
+};
+
 function ClassifyModal({
   activity,
   onSave,
@@ -1145,19 +1176,141 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
   const qc = useQueryClient();
   const [classifying, setClassifying] = useState<import("../../api/types").CeaActivity | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [importResult, setImportResult] = useState<import("../../api/types").CeaImportResult | null>(null);
+  const [importErr, setImportErr] = useState<string | null>(null);
+  // Filters
+  const [fSource, setFSource] = useState("all");
+  const [fStatus, setFStatus] = useState("all");
+  const [fSearch, setFSearch] = useState("");
+  const [fStart, setFStart] = useState("");
+  const [fEnd, setFEnd] = useState("");
+  // Sort
+  const [sortCol, setSortCol] = useState("start_date");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  // Create form
   const [newName, setNewName] = useState("");
   const [newStart, setNewStart] = useState("");
   const [newEnd, setNewEnd] = useState("");
   const [newLocation, setNewLocation] = useState("");
   const [newImportance, setNewImportance] = useState("");
   const [creating, setCreating] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<string>("all");
 
-  const { data: activities = [], isLoading } = useQuery({
+  const { data: ceaData = [], isLoading: ceaLoading } = useQuery({
     queryKey: ["cea-activities", yearId],
     queryFn: () => planningApi.ceaActivities(yearId),
     staleTime: 2 * 60 * 1000,
   });
+
+  const { data: anchorsData = [], isLoading: anchorsLoading } = useQuery({
+    queryKey: ["planning-anchors", yearId],
+    queryFn: () => planningApi.listAnchors(yearId),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: holidaysData = [], isLoading: holidaysLoading } = useQuery({
+    queryKey: ["planning-holidays", yearId],
+    queryFn: () => planningApi.holidays(yearId),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const isLoading = ceaLoading || anchorsLoading || holidaysLoading;
+
+  const unified = useMemo((): UnifiedActivity[] => {
+    const rows: UnifiedActivity[] = [];
+    for (const a of ceaData) {
+      rows.push({
+        id: a.id,
+        source: a.source_type === "manual" ? "manual" : "cea",
+        name: a.activity_name,
+        start_date: a.activity_start_date,
+        end_date: a.activity_end_date,
+        location: a.location,
+        importance: a.importance,
+        classification_status: a.classification_status,
+        unit: a.host_unit ?? a.parent_unit,
+        extra: a.cea_activity_id,
+        is_removed: a.is_removed_from_cea,
+        raw_cea: a,
+        raw_anchor: null,
+        raw_holiday: null,
+      });
+    }
+    for (const a of anchorsData) {
+      rows.push({
+        id: a.anchor_event_id,
+        source: "anchor",
+        name: a.event_name,
+        start_date: a.start_date,
+        end_date: a.end_date ?? null,
+        location: null,
+        importance: a.importance,
+        classification_status: "classified",
+        unit: a.unit_name,
+        extra: a.event_type,
+        is_removed: false,
+        raw_cea: null,
+        raw_anchor: a,
+        raw_holiday: null,
+      });
+    }
+    for (const h of holidaysData) {
+      rows.push({
+        id: h.holiday_id,
+        source: "holiday",
+        name: h.name,
+        start_date: h.start_date,
+        end_date: h.end_date,
+        location: null,
+        importance: null,
+        classification_status: "classified",
+        unit: null,
+        extra: h.holiday_type.replace(/_/g, " "),
+        is_removed: false,
+        raw_cea: null,
+        raw_anchor: null,
+        raw_holiday: h,
+      });
+    }
+    return rows;
+  }, [ceaData, anchorsData, holidaysData]);
+
+  const filtered = useMemo(() => {
+    const q = fSearch.toLowerCase();
+    return [...unified]
+      .filter(r => {
+        if (fSource !== "all" && r.source !== fSource) return false;
+        if (fStatus === "needs_review" && r.classification_status !== "needs_review") return false;
+        if (fStatus === "classified" && r.classification_status !== "classified") return false;
+        if (fStart && r.start_date && r.start_date < fStart) return false;
+        if (fEnd && r.start_date && r.start_date > fEnd) return false;
+        if (q && !r.name.toLowerCase().includes(q) && !(r.unit ?? "").toLowerCase().includes(q)) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        let av = "", bv = "";
+        if (sortCol === "name") { av = a.name; bv = b.name; }
+        else if (sortCol === "source") { av = a.source; bv = b.source; }
+        else if (sortCol === "start_date") { av = a.start_date ?? ""; bv = b.start_date ?? ""; }
+        else if (sortCol === "importance") { av = a.importance ?? ""; bv = b.importance ?? ""; }
+        else if (sortCol === "status") { av = a.classification_status ?? ""; bv = b.classification_status ?? ""; }
+        const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+  }, [unified, fSource, fStatus, fSearch, fStart, fEnd, sortCol, sortDir]);
+
+  function handleSort(col: string) {
+    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortCol(col); setSortDir("asc"); }
+  }
+
+  function SortTh({ col, label, style }: { col: string; label: string; style?: React.CSSProperties }) {
+    return (
+      <th onClick={() => handleSort(col)} style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap", ...style }}>
+        {label}{sortCol === col ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+      </th>
+    );
+  }
 
   async function handleCreate() {
     if (!newName.trim()) return;
@@ -1178,141 +1331,207 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
     }
   }
 
-  const filtered = activities.filter(a =>
-    filterStatus === "all" ? true : a.classification_status === filterStatus,
-  );
+  async function handleFileImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true); setImportErr(null); setImportResult(null);
+    try {
+      const res = await planningApi.ceaImport(yearId, file);
+      setImportResult(res);
+      await qc.invalidateQueries({ queryKey: ["cea-activities"] });
+      await qc.invalidateQueries({ queryKey: ["cea-batches"] });
+    } catch (ex) {
+      setImportErr(ex instanceof Error ? ex.message : "Import failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  const needsReviewCount = unified.filter(r => r.classification_status === "needs_review").length;
 
   if (isLoading) return <div className="pw-loading" style={{ padding: "20px" }}>Loading activities…</div>;
 
   return (
-    <div style={{ padding: "10px 14px" }}>
-      {/* Header toolbar */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: "var(--aafc-dark-blue)" }}>
-          Activities ({activities.length})
-        </div>
-        <div style={{ display: "flex", gap: 4 }}>
-          {[["all", "All"], ["needs_review", "Needs review"], ["classified", "Classified"]].map(([k, l]) => (
-            <button
-              key={k}
-              onClick={() => setFilterStatus(k)}
-              style={{
-                fontSize: 11, padding: "3px 8px", borderRadius: 4, border: "1px solid var(--border)",
-                background: filterStatus === k ? "var(--aafc-dark-blue)" : "#fff",
-                color: filterStatus === k ? "#fff" : "var(--text)",
-                cursor: "pointer",
-              }}
-            >{l}</button>
-          ))}
-        </div>
-        <div style={{ marginLeft: "auto" }}>
-          <button className="btn sm primary" style={{ fontSize: 11 }} onClick={() => setShowCreate(v => !v)}>
-            + Add manual activity
-          </button>
-        </div>
+    <div>
+      {/* Toolbar */}
+      <div style={{
+        padding: "6px 14px", background: "var(--surface)", borderBottom: "1px solid var(--border)",
+        display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap",
+      }}>
+        <input
+          value={fSearch}
+          onChange={e => setFSearch(e.target.value)}
+          placeholder="Search name or unit…"
+          style={{ ...inputSx, width: 180 }}
+        />
+        <select value={fSource} onChange={e => setFSource(e.target.value)} style={{ ...inputSx, width: 120 }}>
+          <option value="all">All sources</option>
+          <option value="cea">CEA</option>
+          <option value="manual">Manual</option>
+          <option value="anchor">Anchor</option>
+          <option value="holiday">Holiday</option>
+        </select>
+        <select value={fStatus} onChange={e => setFStatus(e.target.value)} style={{ ...inputSx, width: 140 }}>
+          <option value="all">All statuses</option>
+          <option value="needs_review">Needs review{needsReviewCount > 0 ? ` (${needsReviewCount})` : ""}</option>
+          <option value="classified">Classified</option>
+        </select>
+        <input
+          type="date" value={fStart} onChange={e => setFStart(e.target.value)}
+          title="From date" style={{ ...inputSx, width: 130 }}
+        />
+        <span style={{ fontSize: 11, color: "var(--muted-text)" }}>→</span>
+        <input
+          type="date" value={fEnd} onChange={e => setFEnd(e.target.value)}
+          title="To date" style={{ ...inputSx, width: 130 }}
+        />
+        <button
+          className="btn sm out" style={{ fontSize: 11, padding: "3px 8px" }}
+          onClick={() => { setFSearch(""); setFSource("all"); setFStatus("all"); setFStart(""); setFEnd(""); }}
+        >
+          Reset
+        </button>
+        <span style={{ fontSize: 11, color: "var(--muted-text)", marginLeft: "auto", whiteSpace: "nowrap" }}>
+          {filtered.length} of {unified.length}
+        </span>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+          <input type="file" accept=".csv,.txt" style={{ display: "none" }} onChange={handleFileImport} disabled={uploading} />
+          <span className="btn sm out" style={{ fontSize: 11, padding: "3px 9px", pointerEvents: "none", whiteSpace: "nowrap" }}>
+            {uploading ? "Importing…" : "Import CEA"}
+          </span>
+        </label>
+        <button className="btn sm primary" style={{ fontSize: 11, whiteSpace: "nowrap" }} onClick={() => setShowCreate(v => !v)}>
+          + Add activity
+        </button>
       </div>
+
+      {/* Import result banner */}
+      {importResult && (
+        <div style={{ padding: "6px 14px", background: "#f0fff4", borderBottom: "1px solid var(--border)", fontSize: 11, display: "flex", gap: 14, alignItems: "center" }}>
+          <span style={{ fontWeight: 700, color: "#1A7F4B" }}>Import complete</span>
+          <span>{importResult.created} new</span>
+          <span>{importResult.updated} updated</span>
+          <span style={{ color: "var(--muted-text)" }}>{importResult.duplicates} duplicates · {importResult.skipped} skipped</span>
+          {importResult.errors > 0 && <span style={{ color: "var(--aafc-red)" }}>{importResult.errors} errors</span>}
+          <button onClick={() => setImportResult(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--muted-text)" }}>×</button>
+        </div>
+      )}
+      {importErr && (
+        <div style={{ padding: "6px 14px", background: "#fff0f0", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--aafc-red)", display: "flex", alignItems: "center", gap: 8 }}>
+          Import failed: {importErr}
+          <button onClick={() => setImportErr(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>×</button>
+        </div>
+      )}
 
       {/* Manual create form */}
       {showCreate && (
-        <div style={{ background: "#f0f5ff", border: "1px solid var(--border)", borderRadius: 8, padding: 12, marginBottom: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <div style={{ gridColumn: "1/-1" }}>
-            <label style={{ fontSize: 11, fontWeight: 700 }}>Activity name *</label>
-            <input value={newName} onChange={e => setNewName(e.target.value)} style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 12, marginTop: 2 }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700 }}>Start date</label>
-            <input type="date" value={newStart} onChange={e => setNewStart(e.target.value)} style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 12, marginTop: 2 }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700 }}>End date</label>
-            <input type="date" value={newEnd} onChange={e => setNewEnd(e.target.value)} style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 12, marginTop: 2 }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700 }}>Location</label>
-            <input value={newLocation} onChange={e => setNewLocation(e.target.value)} style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 12, marginTop: 2 }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700 }}>Importance</label>
-            <select value={newImportance} onChange={e => setNewImportance(e.target.value)} style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 12, marginTop: 2 }}>
+        <div style={{ padding: "10px 14px", background: "#f0f5ff", borderBottom: "1px solid var(--border)", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+          <label style={{ gridColumn: "1 / 3", ...labelSx }}>
+            Activity name *
+            <input value={newName} onChange={e => setNewName(e.target.value)} autoFocus style={{ ...inputSx, fontWeight: 400 }} />
+          </label>
+          <label style={labelSx}>
+            Start date
+            <input type="date" value={newStart} onChange={e => setNewStart(e.target.value)} style={inputSx} />
+          </label>
+          <label style={labelSx}>
+            End date
+            <input type="date" value={newEnd} onChange={e => setNewEnd(e.target.value)} style={inputSx} />
+          </label>
+          <label style={{ gridColumn: "1 / 3", ...labelSx }}>
+            Location
+            <input value={newLocation} onChange={e => setNewLocation(e.target.value)} style={inputSx} />
+          </label>
+          <label style={labelSx}>
+            Importance
+            <select value={newImportance} onChange={e => setNewImportance(e.target.value)} style={inputSx}>
               <option value="">— select —</option>
               {Object.entries(IMPORTANCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
-          </div>
-          <div style={{ gridColumn: "1/-1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button className="btn sm out" style={{ fontSize: 11 }} onClick={() => setShowCreate(false)}>Cancel</button>
-            <button className="btn sm primary" style={{ fontSize: 11 }} onClick={handleCreate} disabled={creating || !newName.trim()}>
-              {creating ? "Saving…" : "Save activity"}
+          </label>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+            <button className="btn sm primary" onClick={handleCreate} disabled={creating || !newName.trim()} style={{ fontSize: 11 }}>
+              {creating ? "Saving…" : "Save"}
             </button>
+            <button className="btn sm out" onClick={() => setShowCreate(false)} style={{ fontSize: 11 }}>Cancel</button>
           </div>
         </div>
       )}
 
-      {/* Activities table */}
+      {/* Unified activities table */}
       {filtered.length === 0 ? (
-        <div className="pw-empty" style={{ padding: "20px" }}>No activities. Import a CEA file or create a manual activity.</div>
+        <div className="pw-empty" style={{ padding: "24px" }}>
+          {unified.length === 0
+            ? "No activities yet. Import a CEA file, add anchor events, or create a manual activity."
+            : "No activities match your filters."}
+        </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table className="pw-fac-table" style={{ fontSize: 11, minWidth: 900 }}>
             <thead>
               <tr>
-                <th>CEA ID</th>
-                <th>Activity name</th>
-                <th>Start date</th>
-                <th>End date</th>
-                <th>Source</th>
-                <th>Parent unit</th>
-                <th>Host unit</th>
-                <th>Location</th>
-                <th>POC</th>
-                <th>Importance</th>
-                <th>Audience</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <SortTh col="source" label="Source" style={{ minWidth: 70 }} />
+                <SortTh col="name" label="Activity / Event" style={{ minWidth: 220 }} />
+                <SortTh col="start_date" label="Start" style={{ minWidth: 90 }} />
+                <th style={{ minWidth: 90 }}>End</th>
+                <th style={{ minWidth: 130 }}>Unit</th>
+                <th style={{ minWidth: 90 }}>Location</th>
+                <th style={{ minWidth: 70 }}>Detail</th>
+                <SortTh col="importance" label="Importance" style={{ minWidth: 100 }} />
+                <SortTh col="status" label="Status" style={{ minWidth: 100 }} />
+                <th style={{ minWidth: 70 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(a => (
-                <tr key={a.id} style={{ background: a.is_removed_from_cea ? "#fff3cd" : undefined }}>
-                  <td style={{ color: "var(--muted-text)" }}>{a.cea_activity_id ?? "—"}</td>
-                  <td style={{ fontWeight: 600 }}>
-                    {a.activity_name}
-                    {a.is_removed_from_cea && (
-                      <span style={{ marginLeft: 4, fontSize: 10, color: "var(--warning)", fontWeight: 700 }}>[Not in latest import]</span>
-                    )}
-                  </td>
-                  <td>{a.activity_start_date ?? "—"}</td>
-                  <td>{a.activity_end_date ?? "—"}</td>
-                  <td style={{ textTransform: "capitalize" }}>{a.source_type}</td>
-                  <td style={{ color: "var(--muted-text)" }}>{a.parent_unit ?? "—"}</td>
-                  <td>{a.host_unit ?? "—"}</td>
-                  <td style={{ color: "var(--muted-text)" }}>{a.location ?? "—"}</td>
-                  <td style={{ color: "var(--muted-text)" }}>{a.activity_poc ?? "—"}</td>
+              {filtered.map(r => (
+                <tr key={`${r.source}-${r.id}`} style={{ background: r.is_removed ? "#fff3cd" : undefined }}>
                   <td>
-                    {a.importance
-                      ? <span style={{ fontWeight: 600, color: "var(--aafc-dark-blue)" }}>{IMPORTANCE_LABELS[a.importance] ?? a.importance}</span>
-                      : <span style={{ color: "var(--muted-text)" }}>—</span>}
-                  </td>
-                  <td style={{ fontSize: 10 }}>
-                    {[
-                      a.audience_staff_only && "Staff",
-                      a.audience_seniors && "Seniors",
-                      a.audience_proficient && "Proficient",
-                      a.audience_first_years && "1st Yr",
-                    ].filter(Boolean).join(", ") || "—"}
-                  </td>
-                  <td>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_COLORS[a.classification_status] ?? "var(--muted-text)" }}>
-                      {a.classification_status === "needs_review" ? "Needs review" : a.classification_status === "classified" ? "Classified" : a.classification_status}
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 3,
+                      background: SOURCE_COLORS[r.source] + "22",
+                      color: SOURCE_COLORS[r.source],
+                      border: `1px solid ${SOURCE_COLORS[r.source]}44`,
+                      textTransform: "uppercase", letterSpacing: "0.04em",
+                    }}>
+                      {SOURCE_LABELS[r.source]}
                     </span>
                   </td>
+                  <td style={{ fontWeight: 600, maxWidth: 260 }}>
+                    {r.name}
+                    {r.is_removed && (
+                      <span style={{ marginLeft: 4, fontSize: 9, color: "var(--warning)", fontWeight: 700 }}>[Not in latest import]</span>
+                    )}
+                  </td>
+                  <td style={{ whiteSpace: "nowrap" }}>{r.start_date ?? "—"}</td>
+                  <td style={{ whiteSpace: "nowrap", color: "var(--muted-text)" }}>{r.end_date ?? "—"}</td>
+                  <td style={{ fontSize: 10, color: "var(--muted-text)", maxWidth: 150 }}>{r.unit ?? "—"}</td>
+                  <td style={{ fontSize: 10, color: "var(--muted-text)" }}>{r.location ?? "—"}</td>
+                  <td style={{ fontSize: 10, color: "var(--muted-text)", textTransform: "capitalize" }}>{r.extra ?? "—"}</td>
                   <td>
-                    <button
-                      className="btn sm out"
-                      style={{ fontSize: 10, padding: "2px 6px" }}
-                      onClick={() => setClassifying(a)}
-                    >
-                      Classify
-                    </button>
+                    {r.importance
+                      ? <span style={{ fontWeight: 600, color: "var(--aafc-dark-blue)", fontSize: 10 }}>{IMPORTANCE_LABELS[r.importance] ?? r.importance}</span>
+                      : <span style={{ color: "var(--muted-text)" }}>—</span>}
+                  </td>
+                  <td>
+                    {r.classification_status === "needs_review" ? (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_COLORS.needs_review }}>Needs review</span>
+                    ) : r.classification_status === "classified" ? (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_COLORS.classified }}>Classified</span>
+                    ) : (
+                      <span style={{ fontSize: 10, color: "var(--muted-text)" }}>{r.classification_status ?? "—"}</span>
+                    )}
+                  </td>
+                  <td>
+                    {r.raw_cea && (
+                      <button
+                        className="btn sm out"
+                        style={{ fontSize: 10, padding: "2px 6px" }}
+                        onClick={() => setClassifying(r.raw_cea!)}
+                      >
+                        Classify
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

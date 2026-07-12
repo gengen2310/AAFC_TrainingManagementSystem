@@ -45,7 +45,7 @@ export function PlanningWorkspace() {
   }, []);
   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
   const [bottomOpen, setBottomOpen] = useState(false);
-  const [bottomTab, setBottomTab] = useState<BottomTab>("backlog");
+  const [bottomTab, setBottomTab] = useState<BottomTab>("activities");
   const [layers, setLayers] = useState<LayerState>(defaultLayers);
   const [audience, setAudience] = useState<Set<string>>(new Set());
   const [priority, setPriority] = useState<Set<string>>(new Set());
@@ -369,7 +369,7 @@ export function PlanningWorkspace() {
               }}
               onClick={() => setBottomOpen(true)}
             >
-              Mission Backlog ▲
+              Activities ▲
             </button>
           )}
         </div>
