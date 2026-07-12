@@ -2,19 +2,19 @@ import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthProvider";
 import { planningApi } from "../api";
-import { PlanningContextBar, type ViewMode } from "../components/planning/PlanningContextBar";
+import { PlanningContextBar, type ViewMode, type DisplayMode } from "../components/planning/PlanningContextBar";
+import { ListView } from "../components/planning/views/ListView";
 import { PlanningLeftPanel, defaultLayers, type LayerState } from "../components/planning/PlanningLeftPanel";
 import { PlanningRightDrawer, type DrawerItem } from "../components/planning/PlanningRightDrawer";
-import { PlanningBottomDrawer } from "../components/planning/PlanningBottomDrawer";
+import { PlanningBottomDrawer, type BottomTab } from "../components/planning/PlanningBottomDrawer";
 import { YearView } from "../components/planning/views/YearView";
 import { TermView } from "../components/planning/views/TermView";
 import { EightWeekView } from "../components/planning/views/EightWeekView";
 import { TwoWeekView } from "../components/planning/views/TwoWeekView";
 import { ParadeNightGridView } from "../components/planning/views/ParadeNightGridView";
 import { SetupPanel } from "../components/planning/SetupPanel";
-import type { PlanningSession } from "../api/types";
+import type { PlanningSession, AnchorEvent } from "../api/types";
 
-type BottomTab = "backlog" | "facilitators" | "rooms" | "holidays" | "notices";
 
 export function PlanningWorkspace() {
   const { session } = useAuth();
@@ -26,7 +26,10 @@ export function PlanningWorkspace() {
     return () => { document.body.classList.remove("pw-active"); };
   }, []);
 
-  const [viewMode, setViewMode] = useState<ViewMode>("year");
+  const [viewRange, setViewRange] = useState<ViewMode>("year");
+  const [displayMode, setDisplayMode] = useState<DisplayMode>("calendar");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
   const [selectedYearId, setSelectedYearId] = useState<string | null>(null);
   const [selectedDateId, setSelectedDateId] = useState<string | null>(null);
   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
@@ -91,11 +94,16 @@ export function PlanningWorkspace() {
 
   function handleDateClick(dateId: string, _date: string) {
     setSelectedDateId(dateId);
-    setViewMode("parade-night");
+    setViewRange("parade-night");
   }
 
   function handleSessionClick(s: PlanningSession, dateId: string, date: string) {
     setDrawerItem({ type: "session", session: s, dateId, date, conflicts: [] });
+  }
+
+  function handleAnchorClick(anchor: AnchorEvent) {
+    if (!selectedYearId) return;
+    setDrawerItem({ type: "anchor", anchor, yearId: selectedYearId });
   }
 
   async function handleBacklogItemClick(type: string, id: string) {
@@ -114,8 +122,8 @@ export function PlanningWorkspace() {
     }
   }
 
-  function handleViewModeChange(mode: ViewMode) {
-    setViewMode(mode);
+  function handleViewRangeChange(mode: ViewMode) {
+    setViewRange(mode);
     if (mode !== "parade-night") setSelectedDateId(null);
   }
 
@@ -139,29 +147,45 @@ export function PlanningWorkspace() {
       );
     }
 
-    if (viewMode === "year") {
+    // List view applies across all range types
+    if (displayMode === "list" && viewRange !== "parade-night") {
+      return (
+        <ListView
+          yearId={selectedYearId}
+          viewRange={viewRange}
+          customStart={customStart}
+          customEnd={customEnd}
+          onDateClick={handleDateClick}
+          onAnchorClick={handleAnchorClick}
+        />
+      );
+    }
+
+    if (viewRange === "year") {
       return (
         <YearView
           yearId={selectedYearId}
           onDateClick={handleDateClick}
+          onAnchorClick={handleAnchorClick}
           layers={layers}
           audience={audience}
           priority={priority}
         />
       );
     }
-    if (viewMode === "term") {
+    if (viewRange === "term") {
       return (
         <TermView
           yearId={selectedYearId}
           onDateClick={handleDateClick}
+          onAnchorClick={handleAnchorClick}
           layers={layers}
           audience={audience}
           priority={priority}
         />
       );
     }
-    if (viewMode === "8week") {
+    if (viewRange === "8week") {
       return (
         <EightWeekView
           yearId={selectedYearId}
@@ -169,13 +193,14 @@ export function PlanningWorkspace() {
           facilitators={facilitators}
           onDateClick={handleDateClick}
           onSessionClick={handleSessionClick}
+          onAnchorClick={handleAnchorClick}
           layers={layers}
           audience={audience}
           priority={priority}
         />
       );
     }
-    if (viewMode === "2week") {
+    if (viewRange === "2week") {
       return (
         <TwoWeekView
           yearId={selectedYearId}
@@ -185,13 +210,13 @@ export function PlanningWorkspace() {
         />
       );
     }
-    if (viewMode === "parade-night") {
+    if (viewRange === "parade-night") {
       if (!selectedDateId) {
         return (
           <div className="pw-empty">
             <span>No parade night selected.</span>
             <span style={{ fontSize: 11 }}>Switch to Year or 8-week view and click a parade date.</span>
-            <button className="btn sm out" onClick={() => setViewMode("year")}>Go to Year view</button>
+            <button className="btn sm out" onClick={() => setViewRange("year")}>Go to Year view</button>
           </div>
         );
       }
@@ -200,6 +225,20 @@ export function PlanningWorkspace() {
           dateId={selectedDateId}
           facilitators={facilitators}
           onCellClick={setDrawerItem}
+        />
+      );
+    }
+    if (viewRange === "custom") {
+      return (
+        <EightWeekView
+          yearId={selectedYearId}
+          weeks={25}
+          facilitators={facilitators}
+          onDateClick={handleDateClick}
+          onSessionClick={handleSessionClick}
+          layers={layers}
+          audience={audience}
+          priority={priority}
         />
       );
     }
@@ -216,8 +255,14 @@ export function PlanningWorkspace() {
         session={session}
         year={selectedYear}
         cc={cc ?? null}
-        viewMode={viewMode}
-        onModeChange={handleViewModeChange}
+        viewRange={viewRange}
+        displayMode={displayMode}
+        customStart={customStart}
+        customEnd={customEnd}
+        onRangeChange={handleViewRangeChange}
+        onDisplayModeChange={setDisplayMode}
+        onCustomStartChange={setCustomStart}
+        onCustomEndChange={setCustomEnd}
       />
 
       {/* Year selector + quick actions */}
@@ -299,7 +344,7 @@ export function PlanningWorkspace() {
         <PlanningBottomDrawer
           yearId={selectedYearId}
           tab={bottomTab}
-          onTabChange={(t) => setBottomTab(t as BottomTab)}
+          onTabChange={(t) => setBottomTab(t)}
           onClose={() => setBottomOpen(false)}
           facilitators={facilitators}
           locations={locations}
@@ -309,3 +354,5 @@ export function PlanningWorkspace() {
     </div>
   );
 }
+
+export { PlanningWorkspace as PlanningWorkspaceRoute };

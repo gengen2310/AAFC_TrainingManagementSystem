@@ -162,3 +162,94 @@ class PlanningConflict(Base, UUIDMixin, TimestampMixin):
     is_resolved: Mapped[bool] = mapped_column(Boolean, default=False)
     override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     resolved_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+
+class PlanningFacilitatorLeave(Base, UUIDMixin, TimestampMixin):
+    """Facilitator leave/unavailability period for planning conflict detection."""
+    __tablename__ = "planning_facilitator_leave"
+    facilitator_id: Mapped[str] = mapped_column(ForeignKey("facilitators.id"), nullable=False, index=True)
+    planning_year_id: Mapped[str | None] = mapped_column(ForeignKey("planning_years.id"), nullable=True, index=True)
+    start_date: Mapped[str] = mapped_column(String(10), nullable=False)
+    end_date: Mapped[str] = mapped_column(String(10), nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class PlanningNotice(Base, UUIDMixin, TimestampMixin):
+    """A notice attached to a specific parade date (shown in planning views)."""
+    __tablename__ = "planning_notices"
+    planning_year_id: Mapped[str | None] = mapped_column(ForeignKey("planning_years.id"), nullable=True, index=True)
+    parade_date_id: Mapped[str] = mapped_column(ForeignKey("parade_dates.id"), nullable=False, index=True)
+    notice_text: Mapped[str] = mapped_column(Text, nullable=False)
+    audience: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    priority: Mapped[str] = mapped_column(String(20), default="normal")
+    created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class CeaImportBatch(Base, UUIDMixin, TimestampMixin):
+    """Tracks each CEA activity import run."""
+    __tablename__ = "cea_import_batches"
+    planning_year_id: Mapped[str | None] = mapped_column(ForeignKey("planning_years.id"), nullable=True, index=True)
+    wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    imported_by: Mapped[str] = mapped_column(String(36), nullable=False)
+    source_file_name: Mapped[str | None] = mapped_column(String(260), nullable=True)
+    row_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_count: Mapped[int] = mapped_column(Integer, default=0)
+    updated_count: Mapped[int] = mapped_column(Integer, default=0)
+    duplicate_count: Mapped[int] = mapped_column(Integer, default=0)
+    skipped_count: Mapped[int] = mapped_column(Integer, default=0)
+    error_count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class CeaActivity(Base, UUIDMixin, TimestampMixin):
+    """An activity imported from CEA or manually created for planning overlay."""
+    __tablename__ = "cea_activities"
+    import_batch_id: Mapped[str | None] = mapped_column(ForeignKey("cea_import_batches.id"), nullable=True, index=True)
+    planning_year_id: Mapped[str | None] = mapped_column(ForeignKey("planning_years.id"), nullable=True, index=True)
+    wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    unit_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
+    # CEA source identifiers
+    cea_activity_id: Mapped[str | None] = mapped_column(String(60), nullable=True, index=True)
+    activity_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    status_name: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    parent_unit: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    host_unit: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Core fields
+    activity_name: Mapped[str] = mapped_column(String(300), nullable=False)
+    nomination_start_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    nomination_end_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    activity_start_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    activity_end_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    start_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    end_time: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    location: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    activity_poc: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_type: Mapped[str] = mapped_column(String(20), default="cea")  # cea / manual
+    # Classification (required before appearing as active overlay)
+    classification_status: Mapped[str] = mapped_column(String(20), default="needs_review")
+    importance: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    audience_staff_only: Mapped[bool] = mapped_column(Boolean, default=False)
+    audience_seniors: Mapped[bool] = mapped_column(Boolean, default=False)
+    audience_proficient: Mapped[bool] = mapped_column(Boolean, default=False)
+    audience_first_years: Mapped[bool] = mapped_column(Boolean, default=False)
+    classified_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    classified_at: Mapped[str | None] = mapped_column(String(26), nullable=True)
+    # Lifecycle flags
+    is_removed_from_cea: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+
+class ActivityLocalHide(Base, UUIDMixin, TimestampMixin):
+    """Per-squadron local hide/note on a CEA activity overlay."""
+    __tablename__ = "activity_local_hides"
+    cea_activity_id: Mapped[str] = mapped_column(ForeignKey("cea_activities.id"), nullable=False, index=True)
+    unit_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), nullable=False, index=True)
+    is_hidden: Mapped[bool] = mapped_column(Boolean, default=True)
+    local_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hidden_by: Mapped[str | None] = mapped_column(String(36), nullable=True)

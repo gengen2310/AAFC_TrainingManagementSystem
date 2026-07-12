@@ -151,11 +151,16 @@ export interface WeeklyProgramData {
 }
 export interface AnchorEvent {
   anchor_event_id: string; anchor_id?: string; planning_year_id: string; event_name: string;
-  event_type: string; importance: string; importance_level: number | null;
+  event_type: string | null; importance: string | null; importance_level: number | null;
   start_date: string; end_date: string | null;
   audience_orientation: boolean; audience_initial: boolean;
   audience_junior: boolean; audience_intermediate: boolean; audience_senior: boolean;
-  audience_staff_only: boolean; planning_impact: string | null; notes: string | null;
+  audience_staff_only: boolean; audience_proficient: boolean; audience_first_years: boolean;
+  nomination_end_date: string | null;
+  unit_name: string | null;
+  cea_activity_id: string | null;
+  planning_impact: string | null; notes: string | null;
+  owning_level?: string;
 }
 export interface HolidayPeriod {
   holiday_id: string; planning_year_id: string; name: string;
@@ -223,4 +228,196 @@ export interface CommandCentreData {
   unscheduled_required: { curriculum_id: string; code: string; title: string; phase: string }[];
   recent_imports: { import_type: string; created_at: string | null }[];
   nights_missing_facilitator: number;
+}
+
+export interface NightSessionSummary {
+  session_id: string;
+  period: number;
+  cadet_group: string | null;
+  title: string | null;
+  curriculum_code: string | null;
+  facilitator: string | null;
+  location: string | null;
+}
+export interface ParadeNotice {
+  notice_id: string;
+  planning_year_id: string | null;
+  parade_date_id: string;
+  notice_text: string;
+  audience: string | null;
+  priority: string;
+  created_by: string | null;
+  is_archived: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+export interface NightSummary {
+  parade_date_id: string;
+  parade_date: string;
+  parade_type: string;
+  term: string | null;
+  week_number: number | null;
+  notes: string | null;
+  parade_night_notes: string | null;
+  parade_night_id: string | null;
+  sessions: NightSessionSummary[];
+  conflict_count: number;
+  notices: ParadeNotice[];
+}
+export interface NightSummariesResponse {
+  planning_year_id: string;
+  summaries: NightSummary[];
+}
+
+export interface PlanningActivityRecord {
+  id: string;
+  planning_year_id: string | null;
+  import_batch_id: string | null;
+  owning_squadron_id: string | null;
+  source_type: string;
+  activity_id: string | null;
+  activity_type: string | null;
+  parent_unit: string | null;
+  host_unit: string | null;
+  activity_name: string;
+  nomination_start_date: string | null;
+  nomination_end_date: string | null;
+  activity_start_date: string | null;
+  activity_end_date: string | null;
+  location: string | null;
+  activity_poc: string | null;
+  staff_only: boolean;
+  seniors: boolean;
+  proficient: boolean;
+  first_years: boolean;
+  activity_importance: string | null;
+  is_reviewed: boolean;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  status: string;
+  is_archived: boolean;
+  is_hidden: boolean;
+  local_notes: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface PlanningFacilitatorLeave {
+  id: string;
+  facilitator_id: string;
+  planning_year_id: string | null;
+  start_date: string;
+  end_date: string;
+  reason: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string | null;
+}
+
+export interface FacilitatorLeaveResult {
+  ok: boolean;
+  leave: PlanningFacilitatorLeave;
+  affected_sessions: Array<{
+    session_id: string;
+    parade_date: string;
+    session_number: number;
+    cadet_group: string | null;
+    title: string | null;
+  }>;
+}
+
+export interface FacilitatorWorkload {
+  total_scheduled: number;
+  nights_with_sessions: number;
+  avg_per_night: number;
+  max_per_night: number;
+  min_per_night: number;
+  upcoming_sessions: Array<{
+    session_id: string;
+    parade_date: string;
+    session_number: number;
+    cadet_group: string | null;
+    title: string | null;
+    location_name: string | null;
+  }>;
+}
+
+export interface EquipmentItem {
+  equipment_id: string;
+  name: string;
+  type: string | null;
+  quantity: number;
+  available_quantity: number;
+  condition: string | null;
+  notes: string | null;
+}
+
+export interface CeaActivity {
+  id: string;
+  import_batch_id: string | null;
+  planning_year_id: string | null;
+  wing_id: string | null;
+  unit_id: string | null;
+  cea_activity_id: string | null;
+  activity_type: string | null;
+  status_name: string | null;
+  parent_unit: string | null;
+  host_unit: string | null;
+  activity_name: string;
+  nomination_start_date: string | null;
+  nomination_end_date: string | null;
+  activity_start_date: string | null;
+  activity_end_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  location: string | null;
+  activity_poc: string | null;
+  notes: string | null;
+  source_type: string;
+  classification_status: string;
+  importance: string | null;
+  audience_staff_only: boolean;
+  audience_seniors: boolean;
+  audience_proficient: boolean;
+  audience_first_years: boolean;
+  classified_by: string | null;
+  classified_at: string | null;
+  is_removed_from_cea: boolean;
+  is_archived: boolean;
+  created_at: string | null;
+}
+
+export interface CeaImportBatch {
+  id: string;
+  imported_by: string;
+  source_file_name: string | null;
+  row_count: number;
+  created_count: number;
+  updated_count: number;
+  duplicate_count: number;
+  skipped_count: number;
+  error_count: number;
+  created_at: string | null;
+}
+
+export interface CeaImportResult {
+  ok: boolean;
+  batch_id: string;
+  row_count: number;
+  created: number;
+  updated: number;
+  duplicates: number;
+  skipped: number;
+  errors: number;
+  preview: Array<{
+    action: "create" | "update" | "duplicate";
+    cea_activity_id: string | null;
+    activity_name: string;
+    activity_start_date: string | null;
+    activity_end_date: string | null;
+    host_unit: string | null;
+    parent_unit: string | null;
+    location: string | null;
+    existing_id: string | null;
+  }>;
 }

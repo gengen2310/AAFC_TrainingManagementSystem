@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
-import type { PlanningSession, PlanningFacilitator, PlanningConflict, TimingBlock } from "../../../api/types";
+import type { PlanningSession, PlanningFacilitator, PlanningConflict, TimingBlock, ParadeNotice } from "../../../api/types";
 import type { DrawerItem } from "../PlanningRightDrawer";
 
 const DISPLAY_GROUPS = [
@@ -100,6 +101,91 @@ function sessionForCell(
   );
 }
 
+// ─── Inline notice form ───────────────────────────────────────────────────────
+
+function AddNoticeForm({ dateId, onDone }: { dateId: string; onDone: () => void }) {
+  const qc = useQueryClient();
+  const [text, setText] = useState("");
+  const [priority, setPriority] = useState("normal");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handleSave() {
+    if (!text.trim()) { setErr("Notice text required."); return; }
+    setSaving(true); setErr(null);
+    try {
+      await planningApi.createNotice(dateId, { notice_text: text.trim(), priority });
+      await qc.invalidateQueries({ queryKey: ["planning-night-summaries"] });
+      await qc.invalidateQueries({ queryKey: ["pn-notices", dateId] });
+      onDone();
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="pw-block-notice-form">
+      <textarea
+        className="pw-block-notice-input"
+        placeholder="Notice text…"
+        value={text}
+        onChange={e => setText(e.target.value)}
+        autoFocus
+        rows={2}
+      />
+      <div className="pw-block-notice-form-row">
+        <select value={priority} onChange={e => setPriority(e.target.value)} className="pw-block-notice-priority">
+          <option value="normal">Normal</option>
+          <option value="urgent">Urgent</option>
+        </select>
+        {err && <span style={{ fontSize: 11, color: "var(--aafc-red)", marginLeft: 6 }}>{err}</span>}
+        <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+          <button className="btn sm primary" onClick={handleSave} disabled={saving}>{saving ? "…" : "Save"}</button>
+          <button className="btn sm out" onClick={onDone}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Notice line with archive ─────────────────────────────────────────────────
+
+function NoticeRow({ notice, dateId }: { notice: ParadeNotice; dateId: string }) {
+  const qc = useQueryClient();
+  const [archiving, setArchiving] = useState(false);
+
+  async function handleArchive() {
+    setArchiving(true);
+    try {
+      await planningApi.archiveNotice(notice.notice_id);
+      await qc.invalidateQueries({ queryKey: ["planning-night-summaries"] });
+      await qc.invalidateQueries({ queryKey: ["pn-notices", dateId] });
+    } finally {
+      setArchiving(false);
+    }
+  }
+
+  return (
+    <div className={`pw-block-notice${notice.priority === "urgent" ? " urgent" : ""}`}>
+      <span className="pw-block-notice-pfx">{notice.priority === "urgent" ? "!" : "·"}</span>
+      <span className="pw-block-notice-body" style={{ flex: 1 }}>{notice.notice_text}</span>
+      <button
+        className="pw-block-notice-archive"
+        onClick={handleArchive}
+        disabled={archiving}
+        title="Archive notice"
+        aria-label="Archive this notice"
+      >
+        {archiving ? "…" : "×"}
+      </button>
+    </div>
+  );
+}
+
+// ─── Main view ────────────────────────────────────────────────────────────────
+
 interface Props {
   dateId: string;
   facilitators: PlanningFacilitator[];
@@ -107,9 +193,17 @@ interface Props {
 }
 
 export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props) {
+  const [addingNotice, setAddingNotice] = useState(false);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["planning-weekly", dateId],
     queryFn: () => planningApi.weeklyProgram(dateId),
+  });
+
+  const { data: notices = [], refetch: refetchNotices } = useQuery({
+    queryKey: ["pn-notices", dateId],
+    queryFn: () => planningApi.listNotices(dateId),
+    staleTime: 60 * 1000,
   });
 
   if (isLoading) return <div className="pw-loading">Loading parade night…</div>;
@@ -119,30 +213,68 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
   const blocks = data.timing_blocks;
   const unresolvedConflicts: PlanningConflict[] = data.conflicts.filter(c => !c.is_resolved);
 
+  const dateLabel = (() => {
+    const d = new Date(data.parade_date + "T00:00:00");
+    const wd = d.toLocaleDateString("en-GB", { weekday: "long" });
+    const day = d.getDate();
+    const mon = d.toLocaleDateString("en-GB", { month: "long" });
+    const yr = d.getFullYear();
+    return `${wd}, ${day} ${mon} ${yr}`;
+  })();
+
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 14, fontWeight: 800, color: "var(--aafc-dark-blue)" }}>
-          {new Date(data.parade_date + "T00:00:00").toLocaleDateString("en-CA", {
-            weekday: "long", year: "numeric", month: "long", day: "numeric",
-          })}
-        </span>
-        {unresolvedConflicts.length > 0 && (
-          <span className="pw-conflict-badge room">
-            ⚠ {unresolvedConflicts.length} conflict{unresolvedConflicts.length !== 1 ? "s" : ""}
-          </span>
+      {/* ── Date header ────────────────────────────────────────────────────── */}
+      <div className="pw-pn-view-hdr">
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span className="pw-pn-view-date">{dateLabel}</span>
+          {unresolvedConflicts.length > 0 && (
+            <span className="pw-conflict-badge room">
+              ⚠ {unresolvedConflicts.length} conflict{unresolvedConflicts.length !== 1 ? "s" : ""}
+            </span>
+          )}
+          {!data.parade_night_id && (
+            <span style={{ fontSize: 11, color: "var(--muted-text)" }}>Draft — not yet linked to a parade night</span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Notices ────────────────────────────────────────────────────────── */}
+      <div className="pw-pn-view-notices">
+        {notices.map(n => (
+          <NoticeRow key={n.notice_id} notice={n} dateId={dateId} />
+        ))}
+        {addingNotice ? (
+          <AddNoticeForm
+            dateId={dateId}
+            onDone={() => { setAddingNotice(false); refetchNotices(); }}
+          />
+        ) : (
+          <button
+            className="pw-pn-add-notice-btn"
+            onClick={() => setAddingNotice(true)}
+          >
+            + Add notice
+          </button>
         )}
-        {!data.parade_night_id && (
-          <span style={{ fontSize: 11, color: "var(--muted-text)" }}>Draft — not yet linked to a parade night</span>
+        {notices.length === 0 && !addingNotice && (
+          <span style={{ fontSize: 11, color: "var(--muted-text)", fontStyle: "italic" }}>No notices</span>
         )}
       </div>
 
+      {/* ── Equipment ──────────────────────────────────────────────────────── */}
+      <div className="pw-pn-view-equipment">
+        <span className="pw-block-equip-lbl">Equipment:</span>
+        <span className="pw-block-equip-val">not set</span>
+      </div>
+
+      {/* ── Timing grid ────────────────────────────────────────────────────── */}
       <div className="pn-grid-wrap">
         <table className="pn-grid">
           <thead>
             <tr>
               <th>Group</th>
-              {blocks.map((b) => (
+              {blocks.map(b => (
                 <th key={b.sequence} className={b.block_type === "break" ? "break-col" : ""}>
                   {b.name}
                   {b.start_time && b.end_time && (
@@ -155,10 +287,10 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
             </tr>
           </thead>
           <tbody>
-            {DISPLAY_GROUPS.map((dg) => (
+            {DISPLAY_GROUPS.map(dg => (
               <tr key={dg.label}>
                 <th>{dg.label}</th>
-                {blocks.map((b) => {
+                {blocks.map(b => {
                   if (b.block_type === "break" || !b.is_instructional || b.period_number === null) {
                     return (
                       <td key={b.sequence} className="pn-grid-cell">
@@ -211,7 +343,7 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
                         }
                         role="button"
                         tabIndex={0}
-                        onKeyDown={(e) =>
+                        onKeyDown={e =>
                           e.key === "Enter" &&
                           onCellClick({ type: "session", session, dateId, date: data.parade_date, conflicts: sessionConflicts })
                         }

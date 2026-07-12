@@ -1,36 +1,67 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
-import type { PlanningSession, PlanningFacilitator } from "../../../api/types";
+import type { PlanningSession, PlanningFacilitator, AnchorEvent, NightSummary } from "../../../api/types";
 import { filterAnchors } from "../../../utils/planningFilters";
+import {
+  ParadeNightBlock,
+  fromPlanningSession,
+  computeConflicts,
+  type DisplaySession,
+} from "../ParadeNightBlock";
+import { ActivityDetailBlock, anchorToDisplay } from "../ActivityDetailBlock";
 
 interface Props {
   yearId: string;
-  weeks?: 2 | 8;
+  weeks?: number;
   facilitators: PlanningFacilitator[];
   onDateClick: (dateId: string, date: string) => void;
   onSessionClick: (session: PlanningSession, dateId: string, date: string) => void;
+  onAnchorClick?: (anchor: AnchorEvent) => void;
   layers?: { conflicts?: boolean; wingHQEvents?: boolean };
   audience?: Set<string>;
   priority?: Set<string>;
 }
 
-function detectConflict(s: PlanningSession, siblings: PlanningSession[]): "room" | "fac" | null {
-  const same = siblings.filter(x => x.session_id !== s.session_id && x.session_number === s.session_number);
-  if (s.location_id && same.some(x => x.location_id === s.location_id)) return "room";
-  if (s.facilitator_id && same.some(x => x.facilitator_id === s.facilitator_id)) return "fac";
-  return null;
-}
-
-export function EightWeekView({ yearId, weeks = 8, facilitators, onDateClick, onSessionClick, layers, audience, priority }: Props) {
+export function EightWeekView({
+  yearId, weeks = 8, facilitators,
+  onDateClick, onSessionClick, onAnchorClick,
+  layers, audience, priority,
+}: Props) {
   const showConflicts = layers?.conflicts ?? true;
   const showAnchors = layers?.wingHQEvents ?? true;
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["planning-long-range", yearId, weeks],
     queryFn: () => planningApi.longRange(yearId, weeks),
   });
 
-  if (isLoading) return <div className="pw-loading">Loading {weeks}-week view…</div>;
-  if (error || !data) return <div className="pw-err">Failed to load long-range view.</div>;
+  const { data: nightData } = useQuery({
+    queryKey: ["planning-night-summaries", yearId],
+    queryFn: () => planningApi.nightSummaries(yearId),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const nightSummaryMap = useMemo(
+    () => new Map<string, NightSummary>(
+      nightData?.summaries.map(s => [s.parade_date_id, s]) ?? [],
+    ),
+    [nightData],
+  );
+
+  if (isLoading) return <div className="pw-loading">Loading {weeks}-week programme…</div>;
+  if (error || !data) {
+    const msg = error instanceof Error ? error.message : "Unknown error";
+    return (
+      <div className="pw-err" style={{ padding: 16 }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load planning data</div>
+        <div style={{ fontSize: 12, opacity: .8 }}>{msg}</div>
+        <div style={{ fontSize: 11, marginTop: 6, color: "var(--muted-text)" }}>
+          Check that the backend is running and the date range is valid.
+        </div>
+      </div>
+    );
+  }
 
   if (data.parade_dates.length === 0) {
     return (
@@ -41,88 +72,61 @@ export function EightWeekView({ yearId, weeks = 8, facilitators, onDateClick, on
     );
   }
 
+  const visibleAnchors = showAnchors
+    ? filterAnchors(data.anchors, audience ?? new Set(), priority ?? new Set())
+    : [];
+
   return (
     <div className="pw-8week">
-      {showAnchors && (() => {
-        const visibleAnchors = filterAnchors(data.anchors, audience ?? new Set(), priority ?? new Set());
-        return visibleAnchors.length > 0 ? (
-          <div className="pw-anchor-strip" style={{ marginBottom: 8 }}>
-            {visibleAnchors.map((a, i) => (
-              <span key={a.anchor_event_id ?? a.anchor_id ?? String(i)} className={`pw-anchor-pill ${a.importance ?? "optional"}`}>
-                {a.event_name} · {a.start_date}
-              </span>
-            ))}
-          </div>
-        ) : null;
-      })()}
+      {visibleAnchors.length > 0 && (
+        <div className="pw-anchor-strip" style={{ marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {visibleAnchors.map((a, i) => (
+            <div key={a.anchor_event_id ?? a.anchor_id ?? String(i)} style={{ minWidth: 220, maxWidth: 320, flex: "0 0 auto" }}>
+              <ActivityDetailBlock
+                activity={anchorToDisplay(a)}
+                compact={false}
+                onClick={onAnchorClick ? () => onAnchorClick(a) : undefined}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
-      {data.parade_dates.map((row) => {
+      {data.parade_dates.map(row => {
         const pd = row.parade_date;
-        const hasConflict = row.conflicts.some(c => !c.is_resolved);
-        const facOverloaded = new Set<string>();
-        const facPeriods = new Map<string, Set<number>>();
-        for (const s of row.sessions) {
-          if (s.facilitator_id) {
-            if (!facPeriods.has(s.facilitator_id)) facPeriods.set(s.facilitator_id, new Set());
-            facPeriods.get(s.facilitator_id)!.add(s.session_number);
+        const night = nightSummaryMap.get(pd.parade_date_id);
+
+        const conflictMap = showConflicts
+          ? computeConflicts(row.sessions, facilitators)
+          : undefined;
+        const displaySessions = fromPlanningSession(row.sessions, conflictMap);
+        const unresolvedCount = row.conflicts.filter(c => !c.is_resolved).length;
+
+        function handleSessionClick(ds: DisplaySession) {
+          if (ds.source) {
+            onSessionClick(ds.source, pd.parade_date_id, pd.parade_date);
+          } else {
+            onDateClick(pd.parade_date_id, pd.parade_date);
           }
-        }
-        for (const [fid, periods] of facPeriods) {
-          const fac = facilitators.find(f => f.facilitator_id === fid);
-          if (periods.size > (fac?.max_sessions_per_night ?? 2)) facOverloaded.add(fid);
         }
 
         return (
-          <div key={pd.parade_date_id} className="pw-week-card">
-            <div className="pw-week-hdr" onClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}>
-              <span className="pw-week-date">
-                {new Date(pd.parade_date + "T00:00:00").toLocaleDateString("en-CA", {
-                  weekday: "long", month: "long", day: "numeric",
-                })}
-              </span>
-              {pd.term && (
-                <span className="pw-week-term">Term {pd.term}{pd.week_number ? ` · Wk ${pd.week_number}` : ""}</span>
-              )}
-              <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--muted-text)" }}>
-                {row.filled_slots}/{row.session_count} filled
-              </span>
-              {showConflicts && hasConflict && <span className="pw-conflict-badge room">⚠ conflict</span>}
-            </div>
-
-            {row.sessions.length === 0 ? (
-              <div style={{ padding: "10px 14px", fontSize: 11, color: "var(--muted-text)" }}>
-                No sessions planned — click to open night
-              </div>
-            ) : (
-              <div className="pw-week-sessions">
-                {row.sessions.map((s) => {
-                  const c = detectConflict(s, row.sessions);
-                  const overload = s.facilitator_id ? facOverloaded.has(s.facilitator_id) : false;
-                  return (
-                    <div
-                      key={s.session_id}
-                      className={`pw-sess-mini${c === "room" ? " conflict-room" : c === "fac" ? " conflict-fac" : ""}`}
-                      onClick={() => onSessionClick(s, pd.parade_date_id, pd.parade_date)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => e.key === "Enter" && onSessionClick(s, pd.parade_date_id, pd.parade_date)}
-                    >
-                      <div className="pw-sess-mini-period">
-                        S{s.session_number}
-                        {s.part_number ? `.${s.part_number}` : ""}
-                        {s.cadet_group ? ` · ${s.cadet_group}` : ""}
-                      </div>
-                      <div className="pw-sess-mini-title">{s.activity_title ?? "—"}</div>
-                      <div className="pw-sess-mini-fac">{s.facilitator_name ?? "No facilitator"}</div>
-                      {showConflicts && c === "room" && <span className="pw-conflict-badge room">🔴 room</span>}
-                      {showConflicts && c === "fac" && <span className="pw-conflict-badge fac">🟡 fac</span>}
-                      {showConflicts && overload && <span className="pw-conflict-badge load">🟠 load</span>}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <ParadeNightBlock
+            key={pd.parade_date_id}
+            dateId={pd.parade_date_id}
+            date={pd.parade_date}
+            weekNumber={pd.week_number}
+            term={pd.term}
+            notices={night?.notices ?? []}
+            sessions={displaySessions}
+            sessionCount={row.session_count}
+            filledSlots={row.filled_slots}
+            conflictCount={unresolvedCount}
+            inHoliday={false}
+            compact={false}
+            onHeaderClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
+            onSessionClick={handleSessionClick}
+          />
         );
       })}
     </div>

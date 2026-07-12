@@ -3,6 +3,8 @@ from .wing_calendar import WingHQEvent, SquadronEventStatus, WingEventCurriculum
 from .planning import (
     PlanningYear, ParadeDate, HolidayPeriod, AnchorEvent, AnchorPrepRule,
     AnchorPrepPlan, ScheduledSession, PlanningLocation, PlanningConflict,
+    PlanningFacilitatorLeave, PlanningNotice,
+    CeaImportBatch, CeaActivity, ActivityLocalHide,
 )
 from .organisations import (
     NationalEntity, Wing, Squadron, Flight, User, AccessCode, ProxySession, IpLoginAttempt,
@@ -30,5 +32,7 @@ __all__ = [
     "SourceFile", "SourceConflict", "PromotionRequest", "JobStatus",
     "PlanningYear", "ParadeDate", "HolidayPeriod", "AnchorEvent", "AnchorPrepRule",
     "AnchorPrepPlan", "ScheduledSession", "PlanningLocation", "PlanningConflict",
+    "PlanningFacilitatorLeave", "PlanningNotice",
+    "CeaImportBatch", "CeaActivity", "ActivityLocalHide",
     "WingHQEvent", "SquadronEventStatus", "WingEventCurriculumLink",
 ]

@@ -71,10 +71,28 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
+async function requestForm<T>(path: string, form: FormData, method = "POST"): Promise<T> {
+  const headers: Record<string, string> = {};
+  const tok = tokenStore.get();
+  if (tok) headers["Authorization"] = `Bearer ${tok}`;
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, { method, headers, credentials: "include", body: form });
+  } catch {
+    throw new ApiError(0, { error: "network_error" }, true);
+  }
+  if (res.status === 401) tokenStore.clear();
+  const ct = res.headers.get("content-type") || "";
+  const body = ct.includes("application/json") ? await res.json().catch(() => ({})) : await res.text();
+  if (!res.ok) throw new ApiError(res.status, (typeof body === "object" ? body : { message: String(body) }) as ApiErrorShape);
+  return body as T;
+}
+
 export const api = {
   get: <T>(p: string) => request<T>(p),
   post: <T>(p: string, b?: unknown) => request<T>(p, { method: "POST", body: b !== undefined ? JSON.stringify(b) : undefined }),
   put: <T>(p: string, b?: unknown) => request<T>(p, { method: "PUT", body: b !== undefined ? JSON.stringify(b) : undefined }),
   patch: <T>(p: string, b?: unknown) => request<T>(p, { method: "PATCH", body: b !== undefined ? JSON.stringify(b) : undefined }),
   delete: <T>(p: string) => request<T>(p, { method: "DELETE" }),
+  postForm: <T>(p: string, form: FormData) => requestForm<T>(p, form, "POST"),
 };
