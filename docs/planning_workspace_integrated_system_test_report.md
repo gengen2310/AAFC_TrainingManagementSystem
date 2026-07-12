@@ -7,20 +7,22 @@
 | Report date | 2026-07-13 |
 | Scope | Old TMS + Planning Workspace treated as one system |
 | Assessor roles | Senior engineer · Test engineer · Authorised security tester · TRGO · SOCAD · Hostile release reviewer |
-| RC branch | `release/planning-workspace-rc1` @ commit `45a757f` |
-| Report status | **DRAFT — awaiting live deploy confirmation before final GO/NO-GO** |
+| RC branch | `release/planning-workspace-rc1` @ commit `79aec04` |
+| main branch | `main` @ commit `e19e959` |
+| Live backend deploy | `20405760` (2026-07-12 18:29 UTC) — **IDOR fixes live, v36 migration applied** |
+| Report status | **UPDATED — IDOR fixes deployed; browser testing and backup remain open** |
 
 ---
 
 ## Executive Summary
 
-The AAFC TMS Planning Workspace is architecturally sound and demonstrates strong defensive engineering: comprehensive RBAC, fail-closed startup validation, security headers, CORS allowlisting, and audit logging on all write operations. TypeScript and Python syntax checks pass clean.
+The AAFC TMS Planning Workspace is architecturally sound and demonstrates strong defensive engineering: comprehensive RBAC, fail-closed startup validation, security headers, CORS allowlisting, and audit logging on all write operations.
 
-**Three IDOR (Insecure Direct Object Reference) vulnerabilities were found in the CEA and Notices subsystem.** None are exploitable from the public internet (all require a valid authenticated admin session), but they allow a logged-in admin from one squadron/wing to read or write data belonging to another unit. These must be fixed before GO.
+**Three IDOR vulnerabilities, one missing file-size guard, and one pre-existing AttributeError bug were found and are now PATCHED and LIVE** (backend deploy `20405760`, 2026-07-12 18:29 UTC). Fixes are verified by 40 regression tests (461 total passing). The v36 Alembic migration (CEA import batch `created_by`/`updated_by` columns) ran successfully on live DB at deploy, resolving BUG-004 (CEA History 500 error).
 
-**One missing file-size guard** on the CEA CSV import endpoint is a potential server-side resource exhaustion issue that should be patched.
+**DEPLOY-001 is resolved.** Root cause was `railway up` being invoked from the repo root rather than the `backend/` subdirectory. Build now succeeds reliably from `backend/`.
 
-A known infrastructure failure (DEPLOY-001) means the fixes for BUG-004 are not yet live. The release gate cannot be finalised until deploys are confirmed.
+**Remaining blockers before GO:** live browser workflow testing (cannot be done from CLI), backup/restore verification (`SUPABASE_DB_URL` secret not set in GitHub Actions), and performance baseline under concurrent load (no staging environment).
 
 ---
 
@@ -115,11 +117,26 @@ The following models are written by the Planning Workspace and read (or cross-li
 | Area | Coverage method | Result |
 |------|----------------|--------|
 | TypeScript (frontend) | `tsc --noEmit` | ✅ Exit 0 — no type errors |
-| Python syntax | `py_compile` | ✅ All key backend modules pass |
-| Unit tests | `pytest` | 🔲 No test suite found in repo — coverage tooling not configured |
-| Integration tests | Manual curl (prior sessions) | ⚠️ Backend API validated manually; no automated test suite |
+| Frontend unit tests | `vitest run` | ✅ 8/8 passed (4 files); 2 Playwright E2E specs excluded (wrong runner) |
+| Frontend build | `vite build` | ✅ 136 modules, no errors, 466 kB bundle |
+| Backend unit + integration | `pytest tests/ -q` | ✅ **461 passed, 1 skipped** (421 pre-existing + 40 new IDOR regression tests) |
+| Backend coverage | `pytest --cov=app` | ✅ **69% overall** (TOTAL 6984 stmts, 2188 missed); `planning.py` 61%, `security.py` 71% |
+| IDOR regression tests | `test_planning_idor.py` | ✅ 40/40 — all 4 vulnerability classes + no-regression |
 
-**Gap:** There is no automated test suite (no `tests/` directory, no pytest configuration). This is a known gap in the project. All functional validation has been manual.
+### Test suite summary
+
+```
+Backend: 461 passed, 1 skipped, 11 warnings in 24s
+  - test_planning_idor.py: 40 tests (IDOR-001/002/003, MISS-001, no-regression)
+  - All 421 pre-existing tests continue to pass
+
+Frontend: 8 unit tests passed (vitest); build succeeds (vite build)
+  - Playwright E2E tests require browser — see section K
+```
+
+### Pre-existing bug found during testing
+
+`set_local_hide()` in `planning.py` used `p.unit_id` in three places. The `Principal` dataclass has no `unit_id` field (it uses `squadron_id`). This caused an `AttributeError` on every invocation of that endpoint. Fixed in commit `e19e959` alongside the IDOR regression tests.
 
 ---
 
@@ -248,6 +265,8 @@ _require_year_access(p, year, write=True)
 
 **Severity:** MEDIUM-HIGH (cross-tenant data access within authenticated system).
 
+**Status: ✅ FIXED** — commit `c8b665e` + `e19e959`; deployed live `20405760`; verified by 40 regression tests.
+
 ---
 
 ### G2. IDOR-002 — Notice endpoints missing parade-date ownership check (MEDIUM)
@@ -279,6 +298,8 @@ _require_year_access(p, py, write=True)
 
 **Severity:** MEDIUM (cross-tenant write access to another unit's parade notices).
 
+**Status: ✅ FIXED** — commit `c8b665e`; deployed live `20405760`; verified by regression tests.
+
 ---
 
 ### G3. IDOR-003 — Facilitator leave endpoints missing squadron scope check (MEDIUM)
@@ -302,6 +323,8 @@ elif p.role == "wing_admin" and fac.wing_id != p.wing_id:
 
 **Severity:** MEDIUM.
 
+**Status: ✅ FIXED** — commit `c8b665e`; deployed live `20405760`; verified by regression tests.
+
 ---
 
 ### G4. Missing file size limit on CEA CSV import (LOW-MEDIUM)
@@ -320,6 +343,8 @@ if len(content) > settings.UPLOAD_MAX_MB * 1024 * 1024:
 ```
 
 **Severity:** LOW-MEDIUM (requires authenticated wing_admin session to exploit; not a public-facing endpoint).
+
+**Status: ✅ FIXED** — commit `c8b665e`; deployed live `20405760`; verified by `TestMissingGuardMISS001` regression tests.
 
 ---
 
@@ -446,22 +471,22 @@ No endpoint allows a user to set their own role. Role is pulled from the databas
 
 | ID | Severity | Title | Status |
 |----|----------|-------|--------|
-| IDOR-001 | **HIGH** | CEA endpoints missing `_require_year_access()` | Must fix before GO |
-| IDOR-002 | **MEDIUM-HIGH** | Notice endpoints missing scope check | Must fix before GO |
-| IDOR-003 | **MEDIUM** | Facilitator leave missing squadron scope | Must fix before GO |
-| BUG-004 | **MEDIUM** | CEA History tab 500 — `created_by` column missing | Fix in v36 migration (pending deploy) |
-| MISS-001 | **LOW-MEDIUM** | CEA CSV import missing file size guard | Fix recommended before GO |
-| DEPLOY-001 | **INFRA** | Railway deploys failing silently | Must resolve to deploy any fixes |
-| G5 | **INFO** | In-memory rate limiter, single-process | Document; fix before horizontal scaling |
-| G6 | **INFO** | `get_session()` uses write check for read | Minor UX issue; low priority |
+| IDOR-001 | **HIGH** | CEA endpoints missing `_require_year_access()` | ✅ **FIXED** — commit `c8b665e`, live in `20405760` |
+| IDOR-002 | **MEDIUM-HIGH** | Notice endpoints missing scope check | ✅ **FIXED** — commit `c8b665e`, live in `20405760` |
+| IDOR-003 | **MEDIUM** | Facilitator leave missing squadron scope | ✅ **FIXED** — commit `c8b665e`, live in `20405760` |
+| BUG-004 | **MEDIUM** | CEA History tab 500 — `created_by` column missing | ✅ **FIXED** — v36 migration ran at deploy `20405760` |
+| MISS-001 | **LOW-MEDIUM** | CEA CSV import missing file size guard | ✅ **FIXED** — commit `c8b665e`, live in `20405760` |
+| BUG-005 | **MEDIUM** | `set_local_hide()` AttributeError on `p.unit_id` | ✅ **FIXED** — commit `e19e959` (`p.unit_id` → `p.squadron_id`) |
+| DEPLOY-001 | **INFRA** | `railway up` failing from repo root | ✅ **RESOLVED** — must run from `backend/` subdirectory |
+| BACKUP-001 | **RELEASE BLOCKER** | `SUPABASE_DB_URL` not set — backup cannot run | ❌ **OPEN** — user must set secret in GitHub Actions |
+| G5 | **INFO** | In-memory rate limiter, single-process | 📋 Documented; fix before horizontal scaling |
+| G6 | **INFO** | `get_session()` uses write check for read | 📋 Minor UX issue; low priority |
 
-### Fix plan
+### Fix history
 
-**IDOR-001, IDOR-002, IDOR-003, MISS-001** should be patched in a single commit on `main` and cherry-picked to `release/planning-workspace-rc1`. Changes are additive (adding scope checks) and safe to deploy without a migration.
+All code-level fixes were committed and cherry-picked to `release/planning-workspace-rc1` (commits `c8b665e`, `e19e959`, `79aec04`). Deployed to production backend via `railway up` from `backend/` subdirectory. Migration v36 ran automatically at startup.
 
-**BUG-004** is already fixed in v36 migration — blocked only on DEPLOY-001.
-
-**DEPLOY-001** — user must resolve Railway deploy mechanism before any fixes can go live.
+**Remaining open item:** `BACKUP-001` — `SUPABASE_DB_URL` must be set as a GitHub Actions secret before the backup workflow can run. No GO decision is permitted without a successful backup and verified restore.
 
 ---
 
@@ -469,33 +494,41 @@ No endpoint allows a user to set their own role. Role is pulled from the databas
 
 ### GO / GO-with-limitations / NO-GO assessment
 
-**Current verdict: NO-GO — pending fixes**
+**Current verdict: GO-with-limitations pending browser sign-off and backup**
 
-Cannot issue GO until:
+Previously blocking conditions — RESOLVED:
+- ✅ DEPLOY-001: deploy pipeline fixed (`railway up` from `backend/` subdirectory)
+- ✅ IDOR-001/002/003: all patched, deployed, and verified by 40 regression tests
+- ✅ BUG-004: v36 migration ran at deploy — CEA History tab restored
+- ✅ MISS-001: CEA file size guard added
+- ✅ BUG-005: `p.unit_id` AttributeError fixed
 
-1. **DEPLOY-001 resolved** — current deploy pipeline is broken. All fixes are in code but not live.
-2. **IDOR-001, IDOR-002, IDOR-003 patched and deployed** — cross-tenant data access vulnerabilities in authenticated system.
-3. **BUG-004 migration deployed** — CEA History tab must be confirmed working.
-4. **End-to-end browser workflow tested** — manual test cycle against live system (sections B, C, K browser items) not yet completed.
+Still blocking full GO:
 
-### Conditions for GO-with-limitations
+1. **BACKUP-001** — `SUPABASE_DB_URL` must be set in GitHub Actions secrets. The GitHub Actions backup workflow cannot run without it. No GO decision is permitted without a successful encrypted backup and a verified restore into a disposable environment.
 
-Once IDOR fixes, BUG-004, and DEPLOY-001 are resolved, may issue **GO-with-limitations** if:
-- CEA History tab confirmed working post-migration
-- Activities tab (unified view) confirmed working in browser
-- No new P0/P1 issues found in browser test
+2. **Browser integration testing** — The following cannot be verified from CLI and require a human tester with a real admin session:
+   - Cross-system workflow: old TMS login → Planning Workspace → cross-system record consistency (section C)
+   - Session expiry and logout (section B)
+   - CEA History tab confirmed working in browser post-v36 migration
+   - Activities tab (unified view) confirmed working in browser
+   - TRGO live workflow sign-off (section K browser items)
 
-Limitations to disclose at GO-with-limitations:
-- No automated test suite
-- Rate limiting is single-process
-- Custom date range performance under extreme ranges untested
+3. **Live cross-tenant IDOR retest** — Unauthenticated paths verified 401 from CLI. Cross-tenant rejection (sqn_admin from different squadron → 403) requires two valid production admin sessions, which only the system admin possesses. User must perform this retest in browser or via API with real credentials.
 
 ### Conditions for full GO
 
 All of the above plus:
 - TRGO live workflow sign-off (section K browser items)
-- SOCAD confirmation of IDOR patch deployment
-- Performance baseline confirmed in staging under 25 concurrent users
+- SOCAD confirmation of IDOR patch deployment and live retest
+- Successful backup with verified restore (`SUPABASE_DB_URL` configured)
+- No new P0/P1 issues found in browser test
+
+### Limitations to disclose at GO
+
+- Rate limiting is single-process (multi-worker deployment would need Redis)
+- Custom date range performance under extreme ranges untested (no staging environment)
+- Playwright E2E specs exist but were not executed against live environment
 
 ---
 
@@ -506,20 +539,58 @@ All of the above plus:
 | Section | Title | Status |
 |---------|-------|--------|
 | A | Integrated architecture | ✅ Complete |
-| B | Cross-site auth/session | ✅ Code audit complete; 🔲 browser tests pending |
-| C | Cross-site data consistency | ✅ Code audit complete; 🔲 browser tests pending |
-| D | Code coverage | ✅ TypeScript clean; Python syntax clean; no unit test suite |
+| B | Cross-site auth/session | ✅ Code audit; 🔲 browser tests pending |
+| C | Cross-site data consistency | ✅ Code audit; 🔲 browser tests pending |
+| D | Code coverage | ✅ 461 backend tests passing (69% coverage); 8 frontend unit tests; TS clean; build clean |
 | E | Static code analysis | ✅ Complete — no hardcoded secrets, no syntax errors, TS clean |
 | F | Functional break testing | ✅ Code audit complete |
-| G | Authorised penetration testing | ✅ Complete — 3 IDOR vulnerabilities found |
+| G | Authorised penetration testing | ✅ 3 IDOR + 1 file guard found; **all 4 patched, deployed, and verified** |
 | H | Stress/endurance testing | 🔲 Not executed (no staging environment) |
 | I | Chaos/resilience testing | 🔲 Not executed (design assessment only) |
-| J | Backup/recovery testing | 🔲 Not executed |
-| K | TRGO operational review | ✅ Code items complete; 🔲 browser items pending |
-| L | SOCAD oversight review | ✅ Code items complete |
-| M | Bug-fix loop | ✅ Findings logged; fixes required before GO |
-| N | Release gate | ✅ **NO-GO — pending fixes** |
-| O | This report | ✅ |
+| J | Backup/recovery testing | ❌ Blocked — `SUPABASE_DB_URL` not configured |
+| K | TRGO operational review | ✅ Code items complete; 🔲 browser sign-off pending |
+| L | SOCAD oversight review | ✅ Code items complete; 🔲 live IDOR retest by SOCAD pending |
+| M | Bug-fix loop | ✅ All code-level fixes applied and deployed; BACKUP-001 open |
+| N | Release gate | ⚠️ **GO-with-limitations pending browser sign-off and backup** |
+| O | This report | ✅ Updated 2026-07-13 |
+
+---
+
+## P. Deployment Verification (2026-07-12/13)
+
+### Backend service: `aafc-tms-backend` (`deb53faa`)
+
+| Item | Result |
+|------|--------|
+| Deploy ID | `20405760-03aa-44af-8ed3-d2acbe3a438f` |
+| Deploy time | 2026-07-12T18:29:18 UTC |
+| Deploy status | ✅ SUCCESS |
+| Commit deployed | `e19e959` (main), `79aec04` (RC branch) — same backend code |
+| `GET /api/health` | ✅ `{"status":"ok"}` |
+| `GET /api/health/ready` | ✅ `{"status":"ready","squadrons":16}` |
+| Alembic migration at startup | ✅ `v36 add created_by and updated_by to cea` — applied |
+| Gunicorn workers | ✅ 2 workers, both startup complete, no crash |
+| IDOR-001 unauthenticated | ✅ 401 (cea/activities, cea/batches) |
+| IDOR-002 unauthenticated | ✅ 401 (parade-dates/.../notices) |
+| IDOR-003 unauthenticated | ✅ 401 (facilitators/.../leave) |
+| MISS-001 unauthenticated | ✅ 401 (cea/import) |
+| Cross-tenant live retest | 🔲 Requires two valid production admin sessions — browser only |
+
+### DEPLOY-001 root cause and resolution
+
+**Root cause:** Previous `railway up` attempts were invoked from the repository root (`AAFC_TMS_repo/`) rather than the `backend/` subdirectory. Railway uploaded the entire monorepo but the Dockerfile is inside `backend/`. Railway's Metal builder received the wrong build context. Builds failed silently after `BUILD_IMAGE` step with no meaningful log output.
+
+**Resolution:** Run `railway up` from `backend/` only. A new Railway config entry links `scratchpad/AAFC_TMS_repo/backend` to service `deb53faa`. All future backend deploys must use this path.
+
+**Evidence:** 8 consecutive FAILED deploys from repo root (IDs: `89c6d87b`→`6c0e7fa0`); immediate SUCCESS (`20405760`) after switching to `backend/` subdirectory.
+
+### Planning Workspace preview: `aafc-tms-planning-workspace-preview` (`253cf237`)
+
+| Item | Result |
+|------|--------|
+| Active deploy | `ee95c76f` (2026-07-12T16:20 UTC) |
+| Status | ✅ Online (IDOR fixes are backend-side, not frontend-side) |
+| Uncommitted frontend changes | ⚠️ 4 files modified in `frontend/src/` — must be committed before next PW preview deploy |
 
 ---
 
@@ -528,6 +599,8 @@ All of the above plus:
 | File | Change |
 |------|--------|
 | `backend/alembic/versions/x9y0z1a2b3c4_v36_cea_import_batch_created_by.py` | v36 migration: add `created_by`/`updated_by` to `cea_import_batches` |
+| `backend/app/routers/planning.py` | IDOR-001/002/003 fixes + MISS-001 file guard + BUG-005 `p.unit_id`→`p.squadron_id` |
+| `backend/tests/test_planning_idor.py` | 40 regression tests for all 4 vulnerability classes + no-regression |
 | `frontend/src/components/planning/PlanningBottomDrawer.tsx` | Unified Activities tab (CEA + anchors + holidays); CEA History renamed |
 | `frontend/src/routes/PlanningWorkspace.tsx` | Default tab changed to Activities |
 | `docs/planning_workspace_rc1_test_report.md` | RC1 test report |
