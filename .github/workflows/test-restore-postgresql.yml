@@ -42,7 +42,10 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        # Must match the source server's major version (Railway's
+        # postgres-ssl:18 image) — pg_restore of a custom-format dump from a
+        # newer major version into an older server is not supported.
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: restore_user
           POSTGRES_PASSWORD: restore_test_ci_only
@@ -67,11 +70,17 @@ jobs:
 
     steps:
       # ── 1. Install tools ────────────────────────────────────────────────────
+      # Match the backup workflow's client version (PGDG postgresql-client-18)
+      # so pg_restore is compatible with a custom-format dump taken by pg_dump 18.
       - name: Install tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            postgresql-client gnupg2 unzip python3
+            curl ca-certificates gnupg2 lsb-release unzip python3
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client-18
           pg_restore --version
           gpg --version | head -1
 
@@ -253,7 +262,11 @@ jobs:
           failures = []
 
           # 1. Alembic migration HEAD
-          EXPECTED_HEAD = 'e7a9c2f4b8d1'
+          # NOTE: this was last found hardcoded to 'e7a9c2f4b8d1' (~9 migrations
+          # stale) which would have failed restore verification even on a
+          # fully successful restore. Update this whenever the migration
+          # chain's head changes — check with `alembic heads` in backend/.
+          EXPECTED_HEAD = 'v7w8x9y0z1a2'
           try:
               head = psql("SELECT version_num FROM alembic_version;")
               if head != EXPECTED_HEAD:

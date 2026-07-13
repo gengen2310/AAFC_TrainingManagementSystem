@@ -53,10 +53,18 @@ jobs:
 
     steps:
       # ── 1. Install tools ────────────────────────────────────────────────────
+      # Ubuntu's default postgresql-client is version 16, but the target
+      # server runs PostgreSQL 18 (Railway's postgres-ssl:18 image) — pg_dump
+      # refuses to dump from a newer major server version, so install the
+      # matching client from the official PGDG apt repository instead.
       - name: Install postgresql-client and gpg
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends postgresql-client gnupg2
+          sudo apt-get install -y --no-install-recommends curl ca-certificates gnupg2 lsb-release
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client-18
           pg_dump --version
           gpg --version | head -1
 
