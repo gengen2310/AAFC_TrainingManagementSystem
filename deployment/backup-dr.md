@@ -86,21 +86,29 @@ git push origin deployment/staging-v17.1
 Go to:
 **GitHub → Repository → Settings → Secrets and variables → Actions → New repository secret**
 
-Add all three secrets. Enter the values directly — never paste them into this conversation.
+Enter values directly — never paste them into a conversation with an AI assistant or
+anywhere else outside the GitHub secret form.
 
-| Secret name | Value to enter | Where to find it |
-|---|---|---|
-| `SUPABASE_DB_URL` | Supabase Session Pooler URI (port 5432) | Supabase Dashboard → Settings → Database → Session Pooler |
-| `BACKUP_GPG_PRIVATE_KEY` | Contents of `/tmp/backup-private-key.b64` | Generated in Step 2 |
-| `BACKUP_GPG_PASSPHRASE` | Passphrase chosen when generating the key | Your password manager |
+**Backup/restore is split into separate production and staging workflows** (2026-07) —
+each targets a different database and cannot be confused for the other's evidence:
 
-> `SUPABASE_DB_URL` may already be set if you followed the main deployment guide.
-> If so, skip it — you do not need to create it again.
+| Secret name | Used by | Value to enter | Where to find it |
+|---|---|---|---|
+| `PROD_DATABASE_BACKUP_URL` | `backup-postgresql-production.yml` | Production Postgres **session-mode** URI, port 5432, `sslmode=require` | Supabase Dashboard → Settings → Database → Session Pooler. **Do not use the Transaction Pooler (port 6543)** — that's what the app's own `DATABASE_URL` uses at runtime, and pg_dump against it is unsupported/unreliable. |
+| `SUPABASE_DB_URL` | `backup-postgresql-staging.yml` | Staging Postgres URI (Railway's staging Postgres, public proxy, port 5432) | `railway variable list --service Postgres --environment staging --json` → `DATABASE_PUBLIC_URL`. Name kept for continuity with earlier setup — despite the name, this secret is **staging-only**. |
+| `BACKUP_GPG_PRIVATE_KEY` | both restore-test workflows | Contents of `/tmp/backup-private-key.b64` | Generated in Step 2 |
+| `BACKUP_GPG_PASSPHRASE` | both restore-test workflows | Passphrase chosen when generating the key | Your password manager |
 
-After adding all three, the Secrets page should show:
+Both backup workflows run a source-verification preflight that computes a non-secret
+SHA-256 fingerprint of the target hostname and refuses to run if it matches the *other*
+environment's known fingerprint — a copy/paste mistake between the two secrets fails
+loudly instead of silently backing up (or overwriting evidence for) the wrong database.
+
+After adding all secrets, the Secrets page should show:
 ```
 BACKUP_GPG_PASSPHRASE
 BACKUP_GPG_PRIVATE_KEY
+PROD_DATABASE_BACKUP_URL
 SUPABASE_DB_URL
 ```
 
@@ -108,8 +116,9 @@ SUPABASE_DB_URL
 
 ## Step 5 — Run a manual backup to confirm setup
 
-1. Go to: **GitHub → Actions → PostgreSQL Backup — Daily**
-2. Click **Run workflow** → select `deployment/staging-v17.1` → **Run workflow**
+1. Go to: **GitHub → Actions → PostgreSQL Backup — Production — Daily** (or
+   **PostgreSQL Backup — Staging — Manual** for a staging-only backup)
+2. Click **Run workflow** → select the release branch → **Run workflow**
 3. Watch the run. All steps should pass.
 4. On success, the run summary shows:
    ```
@@ -235,9 +244,12 @@ Run this checklist quarterly:
 
 | File | Purpose |
 |---|---|
-| `.github/workflows/backup-postgresql.yml` | Daily backup job |
-| `.github/workflows/test-restore-postgresql.yml` | Weekly restore verification |
+| `.github/workflows/backup-postgresql-production.yml` | Daily production backup job (scheduled + manual) |
+| `.github/workflows/backup-postgresql-staging.yml` | Manual-only staging backup job |
+| `.github/workflows/test-restore-postgresql-production.yml` | Weekly production restore verification (scheduled + manual) |
+| `.github/workflows/test-restore-postgresql-staging.yml` | Manual-only staging restore verification |
 | `.github/backup-public-key.asc` | GPG public key (safe to commit) |
+| `backend/scripts/compute_alembic_head.py` | Computes the expected Alembic head from the checked-out migration files at restore-test time — never hardcode this value in a workflow again |
 
 ---
 

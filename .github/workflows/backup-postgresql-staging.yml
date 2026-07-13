@@ -1,0 +1,229 @@
+# Manual PostgreSQL backup — AAFC TMS STAGING
+#
+# Manual trigger only (workflow_dispatch) — staging is synthetic test data,
+# there is no need for a scheduled daily backup of it. For the production
+# backup, see backup-postgresql-production.yml (separate secret, separate
+# schedule, separate artifact naming — the two cannot be confused).
+#
+# Prerequisites — GitHub Secrets:
+#   SUPABASE_DB_URL — staging PostgreSQL URI (Railway's staging Postgres
+#                     public proxy, port 5432). Despite the name (inherited
+#                     from before this workflow was split), this secret is
+#                     STAGING-ONLY — see deployment/backup-dr.md.
+#
+# Prerequisites — Repo file:
+#   .github/backup-public-key.asc  — same GPG public key used by production.
+#
+# Credentials never appear in logs. Only a non-secret SHA-256 hostname
+# fingerprint is ever printed, for source-verification purposes.
+---
+name: PostgreSQL Backup — Staging — Manual
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: postgresql-backup-staging
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Dump, encrypt, upload (staging)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    env:
+      DUMP_PATH: ""
+      CHECKSUM_PATH: ""
+      ENCRYPTED_DUMP: ""
+      ENCRYPTED_CHECKSUM: ""
+      TIMESTAMP: ""
+      # Known production Postgres hostname fingerprint (SHA-256 of the
+      # hostname only). Used to refuse running this STAGING workflow against
+      # the production database.
+      FORBIDDEN_HOST_FINGERPRINT: "48de339b89ad325c27447d39c07b2ee3d56ebc155d46e517bc820b520a70c943"
+
+    steps:
+      - name: Install postgresql-client and gpg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends curl ca-certificates gnupg2 lsb-release
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client-18
+          pg_dump --version
+          gpg --version | head -1
+
+      - name: Checkout public key
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/backup-public-key.asc
+          sparse-checkout-cone-mode: false
+
+      - name: Validate public key file
+        run: |
+          if grep -q '^PLACEHOLDER' .github/backup-public-key.asc 2>/dev/null; then
+            echo "::error::backup-public-key.asc contains only the placeholder."
+            exit 1
+          fi
+          if ! grep -q 'BEGIN PGP PUBLIC KEY' .github/backup-public-key.asc 2>/dev/null; then
+            echo "::error::backup-public-key.asc does not appear to be a PGP public key block."
+            exit 1
+          fi
+          echo "Public key file looks valid."
+
+      - name: Import GPG public key
+        run: |
+          gpg --import --batch .github/backup-public-key.asc
+          gpg --list-keys 2>/dev/null | grep -c 'pub' | grep -v '^0$' > /dev/null \
+            || { echo '::error::GPG public key import failed'; exit 1; }
+          echo "GPG public key imported successfully."
+
+      # ── Source preflight — verify secret is set and is NOT production ───────
+      - name: Verify staging source
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          python3 - << 'PYEOF'
+          import os, sys, hashlib, urllib.parse
+
+          url = os.environ.get('SUPABASE_DB_URL', '')
+          if not url:
+              print('::error::SUPABASE_DB_URL secret is not set', flush=True)
+              sys.exit(1)
+
+          p = urllib.parse.urlparse(url)
+          hostname = p.hostname or ''
+          fp = hashlib.sha256(hostname.encode()).hexdigest()
+          forbidden = os.environ.get('FORBIDDEN_HOST_FINGERPRINT', '')
+
+          print(f'source label: staging')
+          print(f'host fingerprint (sha256, non-reversible): {fp}')
+
+          if fp == forbidden:
+              print('::error::SUPABASE_DB_URL host fingerprint matches the KNOWN PRODUCTION database.', flush=True)
+              print('::error::Refusing to run — this workflow must only ever target staging.', flush=True)
+              sys.exit(1)
+
+          print('Source verification passed.')
+          PYEOF
+
+      - name: Dump database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          TIMESTAMP=$(date -u +%Y%m%d_%H%M%S)
+          DUMP_PATH="/tmp/aafc_dump_staging_${TIMESTAMP}.dump"
+          echo "TIMESTAMP=${TIMESTAMP}" >> "$GITHUB_ENV"
+          echo "DUMP_PATH=${DUMP_PATH}" >> "$GITHUB_ENV"
+
+          cat > /tmp/_dump_helper.py << 'PYEOF'
+          import os, sys, subprocess, urllib.parse
+
+          dump_path = sys.argv[1]
+          url = os.environ.get('SUPABASE_DB_URL', '')
+          if not url:
+              print('::error::SUPABASE_DB_URL secret is not set', flush=True)
+              sys.exit(1)
+
+          p = urllib.parse.urlparse(url)
+          password = urllib.parse.unquote(p.password or '')
+          hostname = p.hostname or ''
+          port     = str(p.port or 5432)
+          username = p.username or 'postgres'
+          dbname   = (p.path or '/postgres').lstrip('/') or 'postgres'
+          qs       = dict(urllib.parse.parse_qsl(p.query))
+          sslmode  = qs.get('sslmode', 'require')
+
+          env = {k: v for k, v in os.environ.items()}
+          env['PGPASSWORD'] = password
+          env['PGSSLMODE']  = sslmode
+          env.pop('SUPABASE_DB_URL', None)
+
+          cmd = [
+              'pg_dump', '--format=custom', '--no-owner', '--no-privileges', '--no-password',
+              '--host', hostname, '--port', port, '--username', username, '--dbname', dbname,
+              '--file', dump_path,
+          ]
+
+          result = subprocess.run(cmd, env=env, capture_output=True)
+          if result.returncode != 0:
+              stderr = result.stderr.decode('utf-8', errors='replace')
+              safe_lines = [
+                  l for l in stderr.splitlines()
+                  if not any(kw in l.lower()
+                             for kw in ['password', 'supabase', 'connection string', hostname.lower()])
+              ]
+              for line in safe_lines:
+                  print(line, file=sys.stderr, flush=True)
+              print(f'::error::pg_dump failed with exit code {result.returncode}', flush=True)
+              sys.exit(1)
+
+          size = os.path.getsize(dump_path)
+          if size == 0:
+              print('::error::pg_dump produced an empty file', flush=True)
+              sys.exit(1)
+
+          print(f'Dump complete: {size:,} bytes')
+          PYEOF
+
+          python3 /tmp/_dump_helper.py "$DUMP_PATH"
+
+      - name: Compute checksum
+        run: |
+          CHECKSUM_PATH="/tmp/aafc_dump_staging_${TIMESTAMP}.sha256"
+          echo "CHECKSUM_PATH=${CHECKSUM_PATH}" >> "$GITHUB_ENV"
+          sha256sum "$DUMP_PATH" > "$CHECKSUM_PATH"
+          echo "Checksum: $(cat "$CHECKSUM_PATH")"
+
+      - name: Encrypt backup
+        run: |
+          ENCRYPTED_DUMP="/tmp/aafc_tms_backup_staging_${TIMESTAMP}.dump.gpg"
+          ENCRYPTED_CHECKSUM="/tmp/aafc_tms_backup_staging_${TIMESTAMP}.sha256.gpg"
+          echo "ENCRYPTED_DUMP=${ENCRYPTED_DUMP}" >> "$GITHUB_ENV"
+          echo "ENCRYPTED_CHECKSUM=${ENCRYPTED_CHECKSUM}" >> "$GITHUB_ENV"
+
+          gpg --trust-model always --encrypt --recipient-file .github/backup-public-key.asc \
+            --output "$ENCRYPTED_DUMP" "$DUMP_PATH"
+          gpg --trust-model always --encrypt --recipient-file .github/backup-public-key.asc \
+            --output "$ENCRYPTED_CHECKSUM" "$CHECKSUM_PATH"
+
+          echo "Encrypted dump size:     $(stat -c%s "$ENCRYPTED_DUMP") bytes"
+          echo "Encrypted checksum size: $(stat -c%s "$ENCRYPTED_CHECKSUM") bytes"
+
+      - name: Validate encrypted files
+        run: |
+          for f in "$ENCRYPTED_DUMP" "$ENCRYPTED_CHECKSUM"; do
+            if [ ! -s "$f" ]; then
+              echo "::error::Encrypted file is empty: $f"; exit 1
+            fi
+            gpg --batch --list-packets "$f" 2>&1 \
+              | grep -qi 'encrypted\|session key\|public.key.encrypted' \
+              || { echo "::error::File does not contain GPG encrypted packets: $f"; exit 1; }
+          done
+          echo "Both encrypted files validated."
+
+      - name: Stage artifact files
+        run: |
+          mkdir -p /tmp/backup_artifact
+          cp "$ENCRYPTED_DUMP"     /tmp/backup_artifact/
+          cp "$ENCRYPTED_CHECKSUM" /tmp/backup_artifact/
+          ls -lh /tmp/backup_artifact/
+
+      - name: Upload encrypted backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgresql-staging-backup-${{ env.TIMESTAMP }}
+          path: /tmp/backup_artifact/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Clean up plaintext files
+        if: always()
+        run: |
+          rm -f "$DUMP_PATH" "$CHECKSUM_PATH" /tmp/_dump_helper.py 2>/dev/null || true
+          echo "Plaintext dump and checksum removed."

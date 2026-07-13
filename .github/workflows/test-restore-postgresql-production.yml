@@ -1,10 +1,15 @@
-# Weekly PostgreSQL restore test — AAFC TMS Staging
+# Weekly PostgreSQL restore test — AAFC TMS PRODUCTION
 #
 # Schedule: Monday 03:00 AWST (UTC+8 = Sunday 19:00 UTC).
 # Also supports manual trigger via workflow_dispatch.
 #
+# Restores the most recent PRODUCTION backup artifact
+# (postgresql-production-backup-*) — see test-restore-postgresql-staging.yml
+# for the staging equivalent (postgresql-staging-backup-*). The two cannot
+# be confused: each only ever looks for its own artifact name prefix.
+#
 # What this workflow does:
-#   1. Finds the most recent non-expired backup artifact.
+#   1. Finds the most recent non-expired production backup artifact.
 #   2. Downloads and decrypts it using the GPG private key.
 #   3. Verifies SHA-256 integrity before restore.
 #   4. Restores into a DISPOSABLE PostgreSQL service container
@@ -19,7 +24,7 @@
 #
 # See deployment/backup-dr.md for setup instructions.
 ---
-name: PostgreSQL Restore Test — Weekly
+name: PostgreSQL Restore Test — Production — Weekly
 
 on:
   schedule:
@@ -31,7 +36,7 @@ permissions:
   actions: read             # required to list and download artifacts
 
 concurrency:
-  group: postgresql-restore-test
+  group: postgresql-restore-test-production
   cancel-in-progress: false
 
 jobs:
@@ -109,7 +114,25 @@ jobs:
             || { echo '::error::Private key import failed — no secret keys found'; exit 1; }
           echo "GPG private key imported."
 
-      # ── 3. Find most recent backup artifact ─────────────────────────────────
+      # ── 3. Determine expected Alembic head from the checked-out repo ────────
+      # Dynamic, not hardcoded — fails loudly if the migration chain branches
+      # instead of silently trusting a value that goes stale after every
+      # new migration.
+      - name: Checkout migration files
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            backend/alembic/versions
+            backend/scripts/compute_alembic_head.py
+          sparse-checkout-cone-mode: false
+
+      - name: Compute expected Alembic head
+        run: |
+          HEAD=$(python3 backend/scripts/compute_alembic_head.py backend/alembic/versions)
+          echo "Computed head: ${HEAD}"
+          echo "EXPECTED_ALEMBIC_HEAD=${HEAD}" >> "$GITHUB_ENV"
+
+      # ── 4. Find most recent backup artifact ─────────────────────────────────
       - name: Find latest backup artifact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -118,15 +141,15 @@ jobs:
             "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
             --jq '.artifacts
                   | map(select(
-                      (.name | startswith("postgresql-backup-"))
+                      (.name | startswith("postgresql-production-backup-"))
                       and (.expired == false)
                     ))
                   | sort_by(.created_at)
                   | last')
 
           if [ "$ARTIFACT_JSON" = "null" ] || [ -z "$ARTIFACT_JSON" ]; then
-            echo "::warning::No backup artifacts found — restore test skipped."
-            echo "::warning::Run the backup workflow first: Actions → PostgreSQL Backup — Daily → Run workflow"
+            echo "::warning::No production backup artifacts found — restore test skipped."
+            echo "::warning::Run the backup workflow first: Actions → PostgreSQL Backup — Production — Daily → Run workflow"
             echo "NO_BACKUP=true" >> "$GITHUB_ENV"
             exit 0
           fi
@@ -240,7 +263,7 @@ jobs:
         if: env.NO_BACKUP != 'true'
         run: |
           python3 - << 'PYEOF'
-          import subprocess, sys
+          import subprocess, sys, os
 
           def psql(sql):
               result = subprocess.run(
@@ -252,7 +275,7 @@ jobs:
                       'PGUSER': 'restore_user',
                       'PGDATABASE': 'aafc_tms_restore_test',
                       'PGPASSWORD': 'restore_test_ci_only',
-                      'PATH': '/usr/bin:/bin:/usr/lib/postgresql/16/bin',
+                      'PATH': '/usr/bin:/bin:/usr/lib/postgresql/18/bin',
                   }
               )
               if result.returncode != 0:
@@ -261,12 +284,11 @@ jobs:
 
           failures = []
 
-          # 1. Alembic migration HEAD
-          # NOTE: this was last found hardcoded to 'e7a9c2f4b8d1' (~9 migrations
-          # stale) which would have failed restore verification even on a
-          # fully successful restore. Update this whenever the migration
-          # chain's head changes — check with `alembic heads` in backend/.
-          EXPECTED_HEAD = 'v7w8x9y0z1a2'
+          # 1. Alembic migration HEAD — computed dynamically by the
+          # "Compute expected Alembic head" step earlier in this job (from
+          # the actual checked-out migration files, not a hardcoded value
+          # that would silently go stale after every new migration).
+          EXPECTED_HEAD = os.environ['EXPECTED_ALEMBIC_HEAD']
           try:
               head = psql("SELECT version_num FROM alembic_version;")
               if head != EXPECTED_HEAD:
