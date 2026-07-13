@@ -86,7 +86,15 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 
 ## DEFECT-006 — BLOCKER — Backup/restore has never succeeded
 
-**Status**: **RESOLVED and proven end-to-end** (2026-07-13).
+**Status**: **PARTIALLY RESOLVED — do not treat as closed.** Split into three distinct claims, only the first is proven:
+
+| Claim | Status |
+|---|---|
+| A. Backup/restore *mechanism* works (secrets, pg_dump/pg_restore version compatibility, encryption, checksum, upload, decryption, schema/row restore) | **Proven** — but only against the **staging** database. |
+| B. Production database is actually backed up by this mechanism | **Not proven.** `SUPABASE_DB_URL` was set to the staging Postgres's connection string specifically so as not to touch production. No production backup has been taken. |
+| C. Restored data is readable through the running application (backend + both frontends), not just via `psql` | **Not done.** The restore-test workflow validates schema/rows directly with `psql`; nothing has started a backend against restored data yet. |
+
+**Do not close this defect, and do not treat the production backup release gate as passed, until B and C are proven.** See Phase 2–5 work below for the corrected production-backup design and its proof.
 
 **Root cause (secrets)**: the committed `.github/backup-public-key.asc` had no corresponding `BACKUP_GPG_PRIVATE_KEY`/`BACKUP_GPG_PASSPHRASE` GitHub secret — a matching secret key existed only in a local GPG keyring whose passphrase was never recorded anywhere accessible. `SUPABASE_DB_URL` was also never set. Every daily backup run failed for at least 10 consecutive days (2026-07-03 → 2026-07-12); both restore-test runs failed.
 
@@ -117,7 +125,7 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 | DEFECT-003 | MEDIUM | Open, under investigation |
 | DEFECT-004 | MEDIUM | Open, under investigation |
 | DEFECT-005 | HIGH | Fixed on release branch, staging-verified; **open in production** |
-| DEFECT-006 | BLOCKER | **Resolved and proven end-to-end** |
+| DEFECT-006 | BLOCKER | **Mechanism proven on staging only — production backup and application-level restore proof still outstanding** |
 | DEFECT-007 | LOW | Fixed |
 
 **One of two BLOCKERs fully resolved (backup/restore). The other (DEFECT-001, live-production IDOR) is fixed and verified on the release branch/staging but requires a production deploy + approval to close. Zero unresolved-high-defect count is not yet zero (DEFECT-002, DEFECT-005-in-production). Not release-ready.**
