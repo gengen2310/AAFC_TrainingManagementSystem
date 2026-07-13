@@ -27,6 +27,14 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 100_000_000,
       rollupOptions: { output: { inlineDynamicImports: true } },
     } : {},
-    test: { globals: true, environment: "jsdom", setupFiles: ["./src/tests/setup.ts"] },
+    test: {
+      globals: true,
+      environment: "jsdom",
+      setupFiles: ["./src/tests/setup.ts"],
+      // e2e/**  are Playwright specs (run via `npm run test:e2e`), not Vitest —
+      // without this exclude, `vitest run` tries to execute them directly and
+      // fails with "Playwright Test did not expect test() to be called here."
+      exclude: ["**/node_modules/**", "e2e/**"],
+    },
   };
 });
