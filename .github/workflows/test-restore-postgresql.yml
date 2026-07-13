@@ -118,13 +118,12 @@ jobs:
       # Dynamic, not hardcoded — fails loudly if the migration chain branches
       # instead of silently trusting a value that goes stale after every
       # new migration.
-      - name: Checkout migration files
+      - name: Checkout backend
         uses: actions/checkout@v4
         with:
           sparse-checkout: |
-            backend/alembic/versions
-            backend/scripts/compute_alembic_head.py
-          sparse-checkout-cone-mode: false
+            backend
+          sparse-checkout-cone-mode: true
 
       - name: Compute expected Alembic head
         run: |
@@ -246,6 +245,12 @@ jobs:
       - name: Restore database
         if: env.NO_BACKUP != 'true'
         run: |
+          # --clean --if-exists: the target database already has a default
+          # `public` schema (every fresh Postgres database does) — without
+          # this, restoring a dump that explicitly includes `CREATE SCHEMA
+          # public;` fails with "schema already exists". --if-exists makes
+          # the preceding DROP statements tolerant of objects that aren't
+          # there yet on a truly empty database.
           pg_restore \
             --host="$PGHOST" \
             --port="$PGPORT" \
@@ -253,6 +258,8 @@ jobs:
             --dbname="$PGDATABASE" \
             --no-owner \
             --no-privileges \
+            --clean \
+            --if-exists \
             --exit-on-error \
             "$DECRYPTED_DUMP" \
             || { echo '::error::pg_restore failed'; exit 1; }
@@ -345,6 +352,150 @@ jobs:
           else:
               print(f"RESTORE VERIFICATION PASSED — all {len(REQUIRED_TABLES) + 3} checks passed.")
           PYEOF
+
+      # ── 8b. Application-level restore proof ──────────────────────────────────
+      # Schema/row verification above only proves PostgreSQL restored — it
+      # doesn't prove the application can actually read the data. Starts a
+      # real backend against the restored (disposable) database, creates a
+      # throwaway test admin directly via the ORM (no real production access
+      # code is ever used or needed), and drives a representative set of
+      # authenticated reads through the real API. Everything here is
+      # destroyed with the rest of the ephemeral runner at the end of the job
+      # — nothing persists, nothing touches staging or production.
+      - name: Set up Python for application-level check
+        if: env.NO_BACKUP != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install backend dependencies
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        run: |
+          pip install -q -r requirements.txt
+          pip install -q "psycopg2-binary>=2.9"
+
+      - name: Create throwaway test admin in the restored database
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://restore_user:restore_test_ci_only@localhost:5432/aafc_tms_restore_test"
+          ENVIRONMENT: "test"
+          JWT_SECRET: "restore-test-jwt-secret-at-least-32-bytes-long"
+          SECRET_KEY: "restore-test-secret-key-at-least-32-bytes-long"
+        run: |
+          python3 - << 'PYEOF'
+          import secrets
+          from app.database import SessionLocal
+          from app.models import User, AccessCode
+          from app.security import hash_code
+
+          code = secrets.token_hex(8).upper()
+          db = SessionLocal()
+          try:
+              admin = User(display_name="Restore-Test Throwaway Admin", role="system_admin", active_status=True)
+              db.add(admin)
+              db.flush()
+              db.add(AccessCode(user_id=admin.id, code_hash=hash_code(code)))
+              db.commit()
+          finally:
+              db.close()
+
+          with open("/tmp/restore_test_admin_code.txt", "w") as f:
+              f.write(code)
+          print("Throwaway test admin created (code never logged).")
+          PYEOF
+
+      - name: Start backend against restored database
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://restore_user:restore_test_ci_only@localhost:5432/aafc_tms_restore_test"
+          ENVIRONMENT: "test"
+          JWT_SECRET: "restore-test-jwt-secret-at-least-32-bytes-long"
+          SECRET_KEY: "restore-test-secret-key-at-least-32-bytes-long"
+        run: |
+          nohup python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/restore_test_backend.log 2>&1 &
+          echo $! > /tmp/restore_test_backend.pid
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/api/health > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8000/api/health || { echo "::error::Backend did not become ready"; cat /tmp/restore_test_backend.log; exit 1; }
+          echo "Backend is up against the restored database."
+
+      - name: Drive authenticated reads through the real API
+        if: env.NO_BACKUP != 'true'
+        run: |
+          python3 - << 'PYEOF'
+          import json
+          import urllib.request
+          import urllib.error
+
+          BASE = "http://127.0.0.1:8000"
+          with open("/tmp/restore_test_admin_code.txt") as f:
+              code = f.read().strip()
+
+          def call(method, path, token=None, body=None):
+              req = urllib.request.Request(
+                  f"{BASE}{path}",
+                  data=json.dumps(body).encode() if body is not None else None,
+                  method=method,
+                  headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {token}"} if token else {})},
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=10) as resp:
+                      return resp.status, json.loads(resp.read())
+              except urllib.error.HTTPError as e:
+                  return e.code, None
+
+          failures = []
+
+          status, body = call("POST", "/api/auth/login", body={"code": code})
+          if status != 200 or not body or "token" not in body:
+              print(f"::error::Login failed: status={status}")
+              raise SystemExit(1)
+          token = body["token"]
+          print("  PASS  login as throwaway restore-test admin")
+
+          status, body = call("GET", "/api/health/ready")
+          if status != 200:
+              failures.append(f"/api/health/ready -> {status}")
+          else:
+              print(f"  PASS  /api/health/ready -> squadrons={body.get('squadrons')}")
+
+          checks = [
+              ("GET", "/api/auth/me"),
+              ("GET", "/api/wings"),
+              ("GET", "/api/squadrons"),
+              ("GET", "/api/users"),
+              ("GET", "/api/planning/years"),
+              ("GET", "/api/planning/facilitators"),
+          ]
+          for method, path in checks:
+              status, body = call(method, path, token=token)
+              if status != 200:
+                  failures.append(f"{path} -> {status}")
+              else:
+                  size = len(body) if isinstance(body, list) else "n/a"
+                  print(f"  PASS  {path} -> 200 (items={size})" if size != "n/a" else f"  PASS  {path} -> 200")
+
+          print()
+          if failures:
+              print(f"APPLICATION-LEVEL RESTORE CHECK FAILED — {len(failures)} check(s) failed:")
+              for f in failures:
+                  print(f"  FAIL  {f}")
+              raise SystemExit(1)
+          print(f"APPLICATION-LEVEL RESTORE CHECK PASSED — all {2 + len(checks)} authenticated reads succeeded against restored production data.")
+          PYEOF
+
+      - name: Stop temporary backend
+        if: always()
+        run: |
+          if [ -f /tmp/restore_test_backend.pid ]; then
+            kill "$(cat /tmp/restore_test_backend.pid)" 2>/dev/null || true
+          fi
+          rm -f /tmp/restore_test_admin_code.txt /tmp/restore_test_backend.pid /tmp/restore_test_backend.log 2>/dev/null || true
 
       # ── 9. Report skip if no backup existed ─────────────────────────────────
       - name: Report skip
