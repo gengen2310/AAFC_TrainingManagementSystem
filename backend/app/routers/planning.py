@@ -29,7 +29,7 @@ from ..models.planning import (
 from ..models.training import TimingTemplate, TimingBlock, Activity
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
-from ..permissions import Principal, require_role, require_can_write_squadron
+from ..permissions import Principal, require_role, require_can_write_squadron, require_can_view_squadron
 from ..services import audit
 from .timing import _effective_template
 
@@ -3084,10 +3084,10 @@ def list_facilitator_leave(
     p: Principal = Depends(get_principal),
 ):
     """List all active leave periods for a facilitator."""
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     fac = db.get(Facilitator, fac_id)
     if not fac:
         raise HTTPException(404, detail={"error": "facilitator_not_found"})
+    require_can_view_squadron(p, fac.squadron_id, fac.wing_id)
     rows = (
         db.query(PlanningFacilitatorLeave)
         .filter(
@@ -3120,10 +3120,10 @@ def add_facilitator_leave(
     p: Principal = Depends(get_principal),
 ):
     """Add a leave period for a facilitator and return affected scheduled sessions."""
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     fac = db.get(Facilitator, fac_id)
     if not fac:
         raise HTTPException(404, detail={"error": "facilitator_not_found"})
+    require_can_write_squadron(p, fac.squadron_id, fac.wing_id)
     if body.start_date > body.end_date:
         raise HTTPException(400, detail={"error": "start_date_after_end_date"})
 
@@ -3192,10 +3192,13 @@ def delete_facilitator_leave(
     p: Principal = Depends(get_principal),
 ):
     """Soft-delete a facilitator leave record."""
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     leave = db.get(PlanningFacilitatorLeave, leave_id)
     if not leave or leave.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
+    fac = db.get(Facilitator, leave.facilitator_id)
+    if not fac:
+        raise HTTPException(404, detail={"error": "facilitator_not_found"})
+    require_can_write_squadron(p, fac.squadron_id, fac.wing_id)
     leave.is_archived = True
     db.commit()
     audit(db, p, object_type="facilitator_leave", object_id=leave_id, action="archive")
@@ -3432,10 +3435,10 @@ def list_notices(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     pd = db.get(ParadeDate, date_id)
     if not pd:
         raise HTTPException(404, detail={"error": "parade_date_not_found"})
+    _require_year_access(p, _get_year_or_404(pd.planning_year_id, db), write=False)
     notices = (
         db.query(PlanningNotice)
         .filter(
@@ -3455,10 +3458,10 @@ def create_notice(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     pd = db.get(ParadeDate, date_id)
     if not pd:
         raise HTTPException(404, detail={"error": "parade_date_not_found"})
+    _require_year_access(p, _get_year_or_404(pd.planning_year_id, db), write=True)
     notice = PlanningNotice(
         planning_year_id=pd.planning_year_id,
         parade_date_id=date_id,
@@ -3487,10 +3490,13 @@ def update_notice(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     notice = db.get(PlanningNotice, notice_id)
     if not notice or notice.is_archived:
         raise HTTPException(404, detail={"error": "notice_not_found"})
+    pd = db.get(ParadeDate, notice.parade_date_id)
+    if not pd:
+        raise HTTPException(404, detail={"error": "parade_date_not_found"})
+    _require_year_access(p, _get_year_or_404(pd.planning_year_id, db), write=True)
     if body.notice_text is not None:
         notice.notice_text = body.notice_text.strip()
     if body.priority is not None:
@@ -3507,10 +3513,13 @@ def archive_notice(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     notice = db.get(PlanningNotice, notice_id)
     if not notice:
         raise HTTPException(404, detail={"error": "notice_not_found"})
+    pd = db.get(ParadeDate, notice.parade_date_id)
+    if not pd:
+        raise HTTPException(404, detail={"error": "parade_date_not_found"})
+    _require_year_access(p, _get_year_or_404(pd.planning_year_id, db), write=True)
     notice.is_archived = True
     db.commit()
     audit(db, p, object_type="PlanningNotice", object_id=notice_id, action="archive")
@@ -3563,7 +3572,7 @@ def list_cea_activities(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    _require_year_access(p, _get_year_or_404(year_id, db), write=False)
     from sqlalchemy import select
     stmt = select(CeaActivity).where(
         CeaActivity.planning_year_id == year_id,
@@ -3581,7 +3590,7 @@ def list_cea_batches(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    _require_year_access(p, _get_year_or_404(year_id, db), write=False)
     from sqlalchemy import select
     rows = db.scalars(
         select(CeaImportBatch)
@@ -3667,6 +3676,7 @@ async def import_cea_csv(
     year = db.get(PlanningYear, year_id)
     if not year:
         raise HTTPException(404, detail={"error": "year_not_found"})
+    _require_year_access(p, year, write=True)
 
     content = await file.read()
     try:
@@ -3816,10 +3826,10 @@ def classify_cea_activity(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     act = db.get(CeaActivity, activity_id)
     if not act or act.is_archived:
         raise HTTPException(404, detail={"error": "activity_not_found"})
+    _require_year_access(p, _get_year_or_404(act.planning_year_id, db), write=True)
     act.importance = body.importance
     act.audience_staff_only = body.audience_staff_only
     act.audience_seniors = body.audience_seniors
@@ -3898,7 +3908,7 @@ def create_manual_activity(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    _require_year_access(p, _get_year_or_404(year_id, db), write=True)
     act = CeaActivity(
         id=str(uuid.uuid4()),
         planning_year_id=year_id,
