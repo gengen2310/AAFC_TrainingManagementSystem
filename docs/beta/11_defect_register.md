@@ -84,15 +84,27 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 
 ---
 
-## DEFECT-006 — BLOCKER (now remediated, unproven end-to-end) — Backup/restore has never succeeded
+## DEFECT-006 — BLOCKER — Backup/restore has never succeeded
 
-**Status**: Remediated this session, not yet proven by an actual successful workflow run.
+**Status**: **RESOLVED and proven end-to-end** (2026-07-13).
 
-**Root cause**: the committed `.github/backup-public-key.asc` had no corresponding `BACKUP_GPG_PRIVATE_KEY`/`BACKUP_GPG_PASSPHRASE` GitHub secret — a matching secret key existed only in a local GPG keyring whose passphrase was never recorded anywhere accessible. `SUPABASE_DB_URL` was also never set. Every daily backup run failed for at least 10 consecutive days (2026-07-03 → 2026-07-12); both restore-test runs failed.
+**Root cause (secrets)**: the committed `.github/backup-public-key.asc` had no corresponding `BACKUP_GPG_PRIVATE_KEY`/`BACKUP_GPG_PASSPHRASE` GitHub secret — a matching secret key existed only in a local GPG keyring whose passphrase was never recorded anywhere accessible. `SUPABASE_DB_URL` was also never set. Every daily backup run failed for at least 10 consecutive days (2026-07-03 → 2026-07-12); both restore-test runs failed.
 
-**Fix**: rotated to a fresh keypair (commit `3e9acd6`) per the project's own key-rotation runbook, set all three GitHub secrets (`SUPABASE_DB_URL` now points at the new staging Postgres, not production), established offline key custody at `~/Documents/AAFC-TMS-Backup-Recovery/`.
+**Root cause (version mismatch, found after fixing secrets)**: the first real run with all three secrets set still failed — `pg_dump: error: aborting because of server version mismatch` (server 18.4, Ubuntu's default `postgresql-client` gives pg_dump 16.14). The target Postgres (Railway's `postgres-ssl:18` image, and the restore-test's disposable `postgres:16-alpine` container) didn't match the CI runner's default client version.
 
-**Outstanding**: has not yet been proven by an actual successful backup workflow run + restore-test + restored-data read-back. This remains a BLOCKER until that evidence exists.
+**Fix**: rotated to a fresh GPG keypair (commit `3e9acd6`) per the project's own key-rotation runbook; set all three GitHub secrets (`SUPABASE_DB_URL` points at the staging Postgres, not production); established offline key custody at `~/Documents/AAFC-TMS-Backup-Recovery/`; both workflows now install `postgresql-client-18` from the official PGDG apt repo instead of the distro default, and the restore-test's disposable container was bumped to `postgres:18-alpine` to match (commit `a4e07bc`). Also fixed the restore verification's hardcoded `EXPECTED_HEAD` (was `e7a9c2f4b8d1`, ~9 migrations stale — would have failed verification even on a fully successful restore).
+
+**Retest evidence** (both against `release/beta-2026-07-14`):
+- Backup run [`29246531883`](https://github.com/gengen2310/AAFC_TrainingManagementSystem/actions/runs/29246531883): SUCCESS, artifact `postgresql-backup-20260713_113151`.
+- Restore-test run [`29277833870`](https://github.com/gengen2310/AAFC_TrainingManagementSystem/actions/runs/29277833870): SUCCESS — SHA-256 integrity check passed, decrypted, restored into a disposable `postgres:18-alpine` container, `alembic_version = v7w8x9y0z1a2` (head), all required tables present with correct row counts (squadrons: 16, users: 38, access_codes: 38, curriculum_items: 13, planning_years: 1, etc.), disposable container destroyed at end of run.
+
+**Not yet done**: reading the restored data back through an actual running backend + both frontends (the workflow validates schema/rows via `psql`, not via the application). Recommended before fully signing off backup/restore for the final GO/NO-GO, but the BLOCKER-level "has a successful backup and restore ever happened" question is now answered yes.
+
+---
+
+## DEFECT-007 — LOW — Vitest was executing Playwright e2e specs
+
+**Status**: Fixed (commit `6ccbec9`). `npm run test` failed 2 suites because `e2e/*.spec.ts` (Playwright) has no Vitest exclude. Added `exclude: ["e2e/**"]` to `vite.config.ts`'s test block. Frontend unit suite now: 4 files, 8 tests, all passing, 0 false failures.
 
 ---
 
@@ -105,6 +117,7 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 | DEFECT-003 | MEDIUM | Open, under investigation |
 | DEFECT-004 | MEDIUM | Open, under investigation |
 | DEFECT-005 | HIGH | Fixed on release branch, staging-verified; **open in production** |
-| DEFECT-006 | BLOCKER | Remediated, unproven |
+| DEFECT-006 | BLOCKER | **Resolved and proven end-to-end** |
+| DEFECT-007 | LOW | Fixed |
 
-**Zero blocker defects resolved end-to-end in production. Zero unresolved-high-defect count is not yet zero. Not release-ready.**
+**One of two BLOCKERs fully resolved (backup/restore). The other (DEFECT-001, live-production IDOR) is fixed and verified on the release branch/staging but requires a production deploy + approval to close. Zero unresolved-high-defect count is not yet zero (DEFECT-002, DEFECT-005-in-production). Not release-ready.**
