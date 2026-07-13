@@ -1,28 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { reportApi } from "../api";
 import { Card, Empty, Loading, ErrorNote, Bar } from "../components/ui";
-import { StatusBadge, DecisionBadge } from "../components/status/StatusBadge";
+import { DecisionBadge } from "../components/status/StatusBadge";
 import { useAuth } from "../auth/AuthProvider";
 import { isWing, isNational } from "../auth/permissions";
 
-// Only implemented backend reports are shown. No fabricated reports.
+// Only implemented backend reports are shown. Training summary has moved to Dashboard.
 export function Reports() {
   const { session } = useAuth();
-  const summary = useQuery({ queryKey: ["summary"], queryFn: reportApi.summary });
   const coverage = useQuery({ queryKey: ["coverage"], queryFn: reportApi.coverage });
   const load = useQuery({ queryKey: ["fac-load"], queryFn: reportApi.facLoad });
   const nd = useQuery({ queryKey: ["nd"], queryFn: reportApi.notDelivered });
 
   return (
     <div>
-      <h1>Reports</h1>
-      <Card title="Training summary" action={summary.data && <DecisionBadge decision={summary.data.decision} />}>
-        {summary.isLoading ? <Loading /> : summary.error ? <ErrorNote error={summary.error} /> : (
-          <table><caption className="vis-hidden">Summary by status</caption>
-            <thead><tr><th>Status</th><th>Count</th></tr></thead>
-            <tbody>{Object.entries(summary.data!.counts).map(([k, v]) => <tr key={k}><td><StatusBadge status={k} /></td><td>{v}</td></tr>)}</tbody></table>
-        )}
-      </Card>
+      <h1>Training Reports</h1>
 
       <Card title="Curriculum coverage" action={coverage.data && <DecisionBadge decision={coverage.data.decision} />}>
         {coverage.isLoading ? <Loading /> : coverage.error ? <ErrorNote error={coverage.error} /> : (

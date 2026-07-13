@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import type { CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { planningApi } from "../../api";
 import type {
@@ -9,6 +10,7 @@ import type { DrawerItem } from "./PlanningRightDrawer";
 
 export type BottomTab =
   | "backlog"
+  | "training-planner"
   | "facilitators"
   | "rooms"
   | "equipment"
@@ -28,65 +30,345 @@ interface Props {
 }
 
 const TABS: { key: BottomTab; label: string }[] = [
+  { key: "activities", label: "Activities" },
   { key: "backlog", label: "Mission Backlog" },
+  { key: "training-planner", label: "Training Planner" },
   { key: "facilitators", label: "Facilitators" },
   { key: "rooms", label: "Rooms" },
   { key: "equipment", label: "Equipment" },
   { key: "holidays", label: "Holidays" },
   { key: "notices", label: "Notices" },
-  { key: "activities", label: "Activities" },
-  { key: "import-review", label: "Import Review" },
+  { key: "import-review", label: "CEA History" },
 ];
 
 // ─── Styles helpers ───────────────────────────────────────────────────────────
 
-const inputSx: React.CSSProperties = {
+const inputSx: CSSProperties = {
   padding: "5px 8px", borderRadius: 6,
   border: "1.5px solid var(--border)", fontSize: 12, width: "100%",
 };
-const labelSx: React.CSSProperties = {
+const labelSx: CSSProperties = {
   fontSize: 12, fontWeight: 700,
   display: "flex", flexDirection: "column", gap: 4,
 };
 
 // ─── BacklogContent ───────────────────────────────────────────────────────────
 
+type SortDir = "asc" | "desc";
+
+function getProgramType(cs: string): "foundation" | "extension" | "optional" {
+  if (cs === "foundation" || cs === "core") return "foundation";
+  if (cs === "optional") return "optional";
+  return "extension";
+}
+
+const PROG_TYPE_STYLE: Record<string, CSSProperties> = {
+  foundation: { fontSize: 9, fontWeight: 700, color: "#1A7F4B", background: "#d1fae5", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
+  extension:  { fontSize: 9, fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
+  optional:   { fontSize: 9, fontWeight: 700, color: "#6b7a87", background: "#f1f5f9", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
+};
+
+const SUITABILITY_SHORT: Record<string, string> = {
+  "Staff": "Staff",
+  "Staff or Senior Cadet": "Staff / Sr Cdt",
+  "Senior Cadet": "Sr Cdt",
+  "Any Cadet": "Any Cdt",
+};
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
 function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: (item: DrawerItem) => void }) {
+  const [search, setSearch] = useState("");
+  const [sortCol, setSortCol] = useState("phase");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [fPhase, setFPhase] = useState("");
+  const [fElement, setFElement] = useState("");
+  const [fSuitability, setFSuitability] = useState("");
+  const [fStatus, setFStatus] = useState("unscheduled");
+  const [fCore, setFCore] = useState("");
+  const [fTerm, setFTerm] = useState("");
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["planning-missions", yearId],
-    queryFn: () => planningApi.missions(yearId, { status: "unscheduled" }),
+    queryKey: ["planning-missions", yearId, "backlog"],
+    queryFn: () => planningApi.missions(yearId),
+    staleTime: 3 * 60 * 1000,
   });
 
-  if (isLoading) return <div className="pw-loading" style={{ padding: "20px" }}>Loading missions…</div>;
-  if (error || !data) return <div className="pw-err">Failed to load missions.</div>;
+  const opts = useMemo(() => {
+    if (!data) return { phases: [], elements: [], suitabilities: [], terms: [] };
+    const phases = [...new Set(data.missions.map(m => m.phase))].sort();
+    const elements = [...new Set(data.missions.map(m => m.element).filter(Boolean))].sort() as string[];
+    const suitabilities = [...new Set(data.missions.map(m => m.instructor_suitability).filter(Boolean))].sort() as string[];
+    const terms = [...new Set(data.missions.map(m => m.recommended_term).filter(Boolean))].sort() as string[];
+    return { phases, elements, suitabilities, terms };
+  }, [data]);
 
-  const unscheduled = data.missions.filter(m => !m.is_scheduled);
+  const displayed = useMemo(() => {
+    if (!data) return [];
+    const q = search.toLowerCase();
+    let rows = data.missions.filter(m => {
+      if (fPhase && m.phase !== fPhase) return false;
+      if (fElement && m.element !== fElement) return false;
+      if (fSuitability && m.instructor_suitability !== fSuitability) return false;
+      if (fCore && getProgramType(m.core_status) !== fCore) return false;
+      if (fTerm && m.recommended_term !== fTerm) return false;
+      if (fStatus === "scheduled" && !m.is_scheduled) return false;
+      if (fStatus === "unscheduled" && m.is_scheduled) return false;
+      if (q && !m.code.toLowerCase().includes(q) && !m.title.toLowerCase().includes(q)) return false;
+      return true;
+    });
 
-  if (unscheduled.length === 0) {
-    return <div className="pw-empty" style={{ padding: "20px" }}>All required curriculum is scheduled.</div>;
+    rows = [...rows].sort((a, b) => {
+      let av: string | number = "";
+      let bv: string | number = "";
+      if (sortCol === "phase") { av = a.phase; bv = b.phase; }
+      else if (sortCol === "code") { av = a.code; bv = b.code; }
+      else if (sortCol === "title") { av = a.title; bv = b.title; }
+      else if (sortCol === "element") { av = a.element ?? ""; bv = b.element ?? ""; }
+      else if (sortCol === "suitability") { av = a.instructor_suitability ?? ""; bv = b.instructor_suitability ?? ""; }
+      else if (sortCol === "duration") { av = a.duration_minutes; bv = b.duration_minutes; }
+      else if (sortCol === "term") { av = a.recommended_term ?? ""; bv = b.recommended_term ?? ""; }
+      else if (sortCol === "status") { av = a.is_scheduled ? 1 : 0; bv = b.is_scheduled ? 1 : 0; }
+      else if (sortCol === "date") {
+        av = a.scheduled_sessions[0]?.parade_date ?? "";
+        bv = b.scheduled_sessions[0]?.parade_date ?? "";
+      }
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return rows;
+  }, [data, search, fPhase, fElement, fSuitability, fCore, fTerm, fStatus, sortCol, sortDir]);
+
+  function handleSort(col: string) {
+    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortCol(col); setSortDir("asc"); }
   }
 
+  function SortHdr({ col, label, style }: { col: string; label: string; style?: CSSProperties }) {
+    const active = sortCol === col;
+    return (
+      <th
+        onClick={() => handleSort(col)}
+        style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap", ...style }}
+      >
+        {label}{active ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+      </th>
+    );
+  }
+
+  const selSx: CSSProperties = {
+    fontSize: 11, padding: "2px 4px", borderRadius: 4,
+    border: "1px solid var(--border)", width: "100%", background: "#fff",
+  };
+
+  if (isLoading) return <div className="pw-loading" style={{ padding: "20px" }}>Loading missions…</div>;
+  if (error || !data) return <div className="pw-err" style={{ padding: 16 }}>Failed to load missions.</div>;
+
+  const total = data.missions.length;
+  const scheduledCount = data.scheduled_count;
+
   return (
-    <div className="pw-backlog-grid">
-      {unscheduled.map((m) => (
-        <div
-          key={m.curriculum_id}
-          className="pw-backlog-card"
-          onClick={() => onItemClick({ type: "curriculum", curriculum: { curriculum_id: m.curriculum_id, code: m.code, title: m.title, phase: m.phase } })}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === "Enter" && onItemClick({ type: "curriculum", curriculum: { curriculum_id: m.curriculum_id, code: m.code, title: m.title, phase: m.phase } })}
+    <div>
+      {/* Toolbar */}
+      <div style={{
+        padding: "6px 14px", background: "var(--surface)", borderBottom: "1px solid var(--border)",
+        display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap",
+      }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search code or title…"
+          style={{ ...inputSx, width: 190 }}
+        />
+        <select value={fStatus} onChange={e => setFStatus(e.target.value)} style={{ ...inputSx, width: 130 }}>
+          <option value="">All statuses</option>
+          <option value="unscheduled">Unscheduled</option>
+          <option value="scheduled">Scheduled</option>
+        </select>
+        <select value={fPhase} onChange={e => setFPhase(e.target.value)} style={{ ...inputSx, width: 150 }}>
+          <option value="">All phases</option>
+          {opts.phases.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select value={fElement} onChange={e => setFElement(e.target.value)} style={{ ...inputSx, width: 140 }}>
+          <option value="">All elements</option>
+          {opts.elements.map(e => <option key={e} value={e}>{e.replace(/_/g, " ")}</option>)}
+        </select>
+        <select value={fSuitability} onChange={e => setFSuitability(e.target.value)} style={{ ...inputSx, width: 140 }}>
+          <option value="">All instructors</option>
+          {opts.suitabilities.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select value={fCore} onChange={e => setFCore(e.target.value)} style={{ ...inputSx, width: 120 }}>
+          <option value="">All types</option>
+          <option value="foundation">Foundation</option>
+          <option value="extension">Extension</option>
+          <option value="optional">Optional</option>
+        </select>
+        {opts.terms.length > 0 && (
+          <select value={fTerm} onChange={e => setFTerm(e.target.value)} style={{ ...inputSx, width: 110 }}>
+            <option value="">All terms</option>
+            {opts.terms.map(t => <option key={t} value={t}>Term {t}</option>)}
+          </select>
+        )}
+        <button
+          className="btn sm out"
+          style={{ fontSize: 11, padding: "3px 8px", whiteSpace: "nowrap" }}
+          onClick={() => { setSearch(""); setFPhase(""); setFElement(""); setFSuitability(""); setFCore(""); setFTerm(""); setFStatus("unscheduled"); }}
         >
-          <div className="pw-backlog-card-code">{m.code}</div>
-          <div className="pw-backlog-card-title">{m.title}</div>
-          <div className="pw-backlog-card-meta">
-            Phase {m.phase}{m.element ? ` · ${m.element}` : ""}{m.recommended_term ? ` · Term ${m.recommended_term}` : ""}
-          </div>
-          {m.core_status === "core" && (
-            <span style={{ fontSize: 10, fontWeight: 700, color: "var(--aafc-red)", marginTop: 2, display: "block" }}>CORE</span>
-          )}
+          Reset
+        </button>
+        <span style={{ fontSize: 11, color: "var(--muted-text)", marginLeft: "auto", whiteSpace: "nowrap" }}>
+          {displayed.length} of {total} · {scheduledCount} scheduled
+        </span>
+      </div>
+
+      {/* Table */}
+      {displayed.length === 0 ? (
+        <div className="pw-empty" style={{ padding: "20px" }}>
+          {fStatus === "unscheduled" && data.missions.every(m => m.is_scheduled)
+            ? "All curriculum is scheduled."
+            : "No items match your filters."}
         </div>
-      ))}
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table className="pw-fac-table" style={{ fontSize: 11, minWidth: 1100 }}>
+            <thead>
+              <tr>
+                <SortHdr col="code" label="Code" style={{ minWidth: 80 }} />
+                <SortHdr col="title" label="Title" style={{ minWidth: 200 }} />
+                <SortHdr col="phase" label="Phase" style={{ minWidth: 120 }} />
+                <SortHdr col="element" label="Element" style={{ minWidth: 110 }} />
+                <SortHdr col="suitability" label="Instructor" style={{ minWidth: 100 }} />
+                <SortHdr col="duration" label="Dur." style={{ minWidth: 50 }} />
+                <SortHdr col="term" label="Rec. Term" style={{ minWidth: 80 }} />
+                <th style={{ minWidth: 80 }}>Type</th>
+                <SortHdr col="status" label="Status" style={{ minWidth: 90 }} />
+                <SortHdr col="date" label="Date" style={{ minWidth: 80 }} />
+                <th style={{ minWidth: 50 }}>Period</th>
+                <th style={{ minWidth: 90 }}>Group</th>
+                <th style={{ minWidth: 110 }}>Facilitator</th>
+                <th style={{ minWidth: 90 }}>Room</th>
+                <th style={{ minWidth: 70 }}>Warnings</th>
+                <th style={{ minWidth: 80 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayed.map(m => {
+                const s0 = m.scheduled_sessions[0] ?? null;
+                const extraSessions = m.scheduled_sessions.length - 1;
+                const partCount = m.part_count ?? 1;
+                const isPartial = m.is_scheduled && m.scheduled_count < partCount;
+
+                const warnNoFac = m.is_scheduled && s0 && !s0.facilitator_id;
+                const warnNoRoom = m.is_scheduled && s0 && !s0.location_id;
+                const progType = getProgramType(m.core_status);
+                const warnCoreUnsched = !m.is_scheduled && progType === "foundation";
+
+                return (
+                  <tr key={m.curriculum_id}>
+                    {/* Code */}
+                    <td style={{ fontWeight: 700, color: "var(--aafc-dark-blue)", whiteSpace: "nowrap" }}>{m.code}</td>
+                    {/* Title */}
+                    <td style={{ maxWidth: 240 }}>{m.title}</td>
+                    {/* Phase */}
+                    <td style={{ fontSize: 10, color: "var(--muted-text)" }}>{m.phase}</td>
+                    {/* Element */}
+                    <td style={{ fontSize: 10 }}>{m.element ? m.element.replace(/_/g, " ") : "—"}</td>
+                    {/* Instructor suitability */}
+                    <td style={{ fontSize: 10 }}>{m.instructor_suitability ? (SUITABILITY_SHORT[m.instructor_suitability] ?? m.instructor_suitability) : "—"}</td>
+                    {/* Duration */}
+                    <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{m.duration_minutes}m</td>
+                    {/* Rec. Term */}
+                    <td style={{ textAlign: "center" }}>{m.recommended_term ? `T${m.recommended_term}` : "—"}</td>
+                    {/* Type */}
+                    <td style={{ textAlign: "center" }}>
+                      <span style={PROG_TYPE_STYLE[progType]}>
+                        {progType.toUpperCase()}
+                      </span>
+                    </td>
+                    {/* Status */}
+                    <td>
+                      {!m.is_scheduled ? (
+                        <span style={{ color: "var(--muted-text)", fontWeight: 600 }}>Unscheduled</span>
+                      ) : isPartial ? (
+                        <span style={{ color: "var(--warning, #d97706)", fontWeight: 600 }}>Partial {m.scheduled_count}/{partCount}</span>
+                      ) : (
+                        <span style={{ color: "var(--success, #1A7F4B)", fontWeight: 600 }}>
+                          Scheduled{m.scheduled_count > 1 ? ` ×${m.scheduled_count}` : ""}
+                        </span>
+                      )}
+                    </td>
+                    {/* Date */}
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      {s0 ? (
+                        <span>
+                          {fmtDate(s0.parade_date)}
+                          {extraSessions > 0 && (
+                            <span style={{ fontSize: 9, color: "var(--muted-text)", marginLeft: 3 }}>+{extraSessions}</span>
+                          )}
+                        </span>
+                      ) : "—"}
+                    </td>
+                    {/* Period */}
+                    <td style={{ textAlign: "center" }}>{s0 ? `P${s0.session_number}` : "—"}</td>
+                    {/* Group */}
+                    <td style={{ textTransform: "capitalize" }}>{s0?.cadet_group ?? "—"}</td>
+                    {/* Facilitator */}
+                    <td>
+                      {s0?.facilitator_name ?? (s0 ? <span style={{ color: "var(--muted-text)" }}>None</span> : "—")}
+                    </td>
+                    {/* Room */}
+                    <td>
+                      {s0?.location_name ?? (s0 ? <span style={{ color: "var(--muted-text)" }}>—</span> : "—")}
+                    </td>
+                    {/* Warnings */}
+                    <td>
+                      {warnCoreUnsched && <span title="Foundation lesson not scheduled" style={{ color: "var(--aafc-red)", fontSize: 11 }}>⚠ Foundation</span>}
+                      {warnNoFac && <span title="No facilitator assigned" style={{ color: "var(--warning, #d97706)", fontSize: 11 }}>⚠ Fac</span>}
+                      {warnNoRoom && !warnCoreUnsched && <span title="No room assigned" style={{ color: "var(--muted-text)", fontSize: 11 }}>⚠ Room</span>}
+                    </td>
+                    {/* Actions */}
+                    <td>
+                      {s0 ? (
+                        <button
+                          className="btn sm out"
+                          style={{ fontSize: 10, padding: "2px 7px" }}
+                          onClick={async () => {
+                            const full = await planningApi.getSession(s0.session_id);
+                            onItemClick({
+                              type: "session", session: full,
+                              dateId: s0.parade_date_id ?? "", date: s0.parade_date ?? "",
+                              conflicts: [],
+                            });
+                          }}
+                        >
+                          Edit
+                        </button>
+                      ) : (
+                        <button
+                          className="btn sm out"
+                          style={{ fontSize: 10, padding: "2px 7px" }}
+                          onClick={() => onItemClick({ type: "curriculum", curriculum: {
+                            curriculum_id: m.curriculum_id,
+                            code: m.code,
+                            title: m.title,
+                            phase: m.phase,
+                          }})}
+                        >
+                          Schedule
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -794,6 +1076,37 @@ const STATUS_COLORS: Record<string, string> = {
   irrelevant: "var(--muted-text)",
 };
 
+const SOURCE_COLORS: Record<string, string> = {
+  cea: "#1A4D8F",
+  manual: "#1A7F4B",
+  anchor: "#7c3aed",
+  holiday: "#b45309",
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  cea: "CEA",
+  manual: "Manual",
+  anchor: "Anchor",
+  holiday: "Holiday",
+};
+
+type UnifiedActivity = {
+  id: string;
+  source: "cea" | "manual" | "anchor" | "holiday";
+  name: string;
+  start_date: string | null;
+  end_date: string | null;
+  location: string | null;
+  importance: string | null;
+  classification_status: string | null;
+  unit: string | null;
+  extra: string | null;
+  is_removed: boolean;
+  raw_cea: import("../../api/types").CeaActivity | null;
+  raw_anchor: import("../../api/types").AnchorEvent | null;
+  raw_holiday: import("../../api/types").HolidayPeriod | null;
+};
+
 function ClassifyModal({
   activity,
   onSave,
@@ -879,19 +1192,141 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
   const qc = useQueryClient();
   const [classifying, setClassifying] = useState<import("../../api/types").CeaActivity | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [importResult, setImportResult] = useState<import("../../api/types").CeaImportResult | null>(null);
+  const [importErr, setImportErr] = useState<string | null>(null);
+  // Filters
+  const [fSource, setFSource] = useState("all");
+  const [fStatus, setFStatus] = useState("all");
+  const [fSearch, setFSearch] = useState("");
+  const [fStart, setFStart] = useState("");
+  const [fEnd, setFEnd] = useState("");
+  // Sort
+  const [sortCol, setSortCol] = useState("start_date");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  // Create form
   const [newName, setNewName] = useState("");
   const [newStart, setNewStart] = useState("");
   const [newEnd, setNewEnd] = useState("");
   const [newLocation, setNewLocation] = useState("");
   const [newImportance, setNewImportance] = useState("");
   const [creating, setCreating] = useState(false);
-  const [filterStatus, setFilterStatus] = useState<string>("all");
 
-  const { data: activities = [], isLoading } = useQuery({
+  const { data: ceaData = [], isLoading: ceaLoading } = useQuery({
     queryKey: ["cea-activities", yearId],
     queryFn: () => planningApi.ceaActivities(yearId),
     staleTime: 2 * 60 * 1000,
   });
+
+  const { data: anchorsData = [], isLoading: anchorsLoading } = useQuery({
+    queryKey: ["planning-anchors", yearId],
+    queryFn: () => planningApi.listAnchors(yearId),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: holidaysData = [], isLoading: holidaysLoading } = useQuery({
+    queryKey: ["planning-holidays", yearId],
+    queryFn: () => planningApi.holidays(yearId),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const isLoading = ceaLoading || anchorsLoading || holidaysLoading;
+
+  const unified = useMemo((): UnifiedActivity[] => {
+    const rows: UnifiedActivity[] = [];
+    for (const a of ceaData) {
+      rows.push({
+        id: a.id,
+        source: a.source_type === "manual" ? "manual" : "cea",
+        name: a.activity_name,
+        start_date: a.activity_start_date,
+        end_date: a.activity_end_date,
+        location: a.location,
+        importance: a.importance,
+        classification_status: a.classification_status,
+        unit: a.host_unit ?? a.parent_unit,
+        extra: a.cea_activity_id,
+        is_removed: a.is_removed_from_cea,
+        raw_cea: a,
+        raw_anchor: null,
+        raw_holiday: null,
+      });
+    }
+    for (const a of anchorsData) {
+      rows.push({
+        id: a.anchor_event_id,
+        source: "anchor",
+        name: a.event_name,
+        start_date: a.start_date,
+        end_date: a.end_date ?? null,
+        location: null,
+        importance: a.importance,
+        classification_status: "classified",
+        unit: a.unit_name,
+        extra: a.event_type,
+        is_removed: false,
+        raw_cea: null,
+        raw_anchor: a,
+        raw_holiday: null,
+      });
+    }
+    for (const h of holidaysData) {
+      rows.push({
+        id: h.holiday_id,
+        source: "holiday",
+        name: h.name,
+        start_date: h.start_date,
+        end_date: h.end_date,
+        location: null,
+        importance: null,
+        classification_status: "classified",
+        unit: null,
+        extra: h.holiday_type.replace(/_/g, " "),
+        is_removed: false,
+        raw_cea: null,
+        raw_anchor: null,
+        raw_holiday: h,
+      });
+    }
+    return rows;
+  }, [ceaData, anchorsData, holidaysData]);
+
+  const filtered = useMemo(() => {
+    const q = fSearch.toLowerCase();
+    return [...unified]
+      .filter(r => {
+        if (fSource !== "all" && r.source !== fSource) return false;
+        if (fStatus === "needs_review" && r.classification_status !== "needs_review") return false;
+        if (fStatus === "classified" && r.classification_status !== "classified") return false;
+        if (fStart && r.start_date && r.start_date < fStart) return false;
+        if (fEnd && r.start_date && r.start_date > fEnd) return false;
+        if (q && !r.name.toLowerCase().includes(q) && !(r.unit ?? "").toLowerCase().includes(q)) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        let av = "", bv = "";
+        if (sortCol === "name") { av = a.name; bv = b.name; }
+        else if (sortCol === "source") { av = a.source; bv = b.source; }
+        else if (sortCol === "start_date") { av = a.start_date ?? ""; bv = b.start_date ?? ""; }
+        else if (sortCol === "importance") { av = a.importance ?? ""; bv = b.importance ?? ""; }
+        else if (sortCol === "status") { av = a.classification_status ?? ""; bv = b.classification_status ?? ""; }
+        const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+  }, [unified, fSource, fStatus, fSearch, fStart, fEnd, sortCol, sortDir]);
+
+  function handleSort(col: string) {
+    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortCol(col); setSortDir("asc"); }
+  }
+
+  function SortTh({ col, label, style }: { col: string; label: string; style?: CSSProperties }) {
+    return (
+      <th onClick={() => handleSort(col)} style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap", ...style }}>
+        {label}{sortCol === col ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
+      </th>
+    );
+  }
 
   async function handleCreate() {
     if (!newName.trim()) return;
@@ -912,141 +1347,207 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
     }
   }
 
-  const filtered = activities.filter(a =>
-    filterStatus === "all" ? true : a.classification_status === filterStatus,
-  );
+  async function handleFileImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true); setImportErr(null); setImportResult(null);
+    try {
+      const res = await planningApi.ceaImport(yearId, file);
+      setImportResult(res);
+      await qc.invalidateQueries({ queryKey: ["cea-activities"] });
+      await qc.invalidateQueries({ queryKey: ["cea-batches"] });
+    } catch (ex) {
+      setImportErr(ex instanceof Error ? ex.message : "Import failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  const needsReviewCount = unified.filter(r => r.classification_status === "needs_review").length;
 
   if (isLoading) return <div className="pw-loading" style={{ padding: "20px" }}>Loading activities…</div>;
 
   return (
-    <div style={{ padding: "10px 14px" }}>
-      {/* Header toolbar */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: "var(--aafc-dark-blue)" }}>
-          Activities ({activities.length})
-        </div>
-        <div style={{ display: "flex", gap: 4 }}>
-          {[["all", "All"], ["needs_review", "Needs review"], ["classified", "Classified"]].map(([k, l]) => (
-            <button
-              key={k}
-              onClick={() => setFilterStatus(k)}
-              style={{
-                fontSize: 11, padding: "3px 8px", borderRadius: 4, border: "1px solid var(--border)",
-                background: filterStatus === k ? "var(--aafc-dark-blue)" : "#fff",
-                color: filterStatus === k ? "#fff" : "var(--text)",
-                cursor: "pointer",
-              }}
-            >{l}</button>
-          ))}
-        </div>
-        <div style={{ marginLeft: "auto" }}>
-          <button className="btn sm primary" style={{ fontSize: 11 }} onClick={() => setShowCreate(v => !v)}>
-            + Add manual activity
-          </button>
-        </div>
+    <div>
+      {/* Toolbar */}
+      <div style={{
+        padding: "6px 14px", background: "var(--surface)", borderBottom: "1px solid var(--border)",
+        display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap",
+      }}>
+        <input
+          value={fSearch}
+          onChange={e => setFSearch(e.target.value)}
+          placeholder="Search name or unit…"
+          style={{ ...inputSx, width: 180 }}
+        />
+        <select value={fSource} onChange={e => setFSource(e.target.value)} style={{ ...inputSx, width: 120 }}>
+          <option value="all">All sources</option>
+          <option value="cea">CEA</option>
+          <option value="manual">Manual</option>
+          <option value="anchor">Anchor</option>
+          <option value="holiday">Holiday</option>
+        </select>
+        <select value={fStatus} onChange={e => setFStatus(e.target.value)} style={{ ...inputSx, width: 140 }}>
+          <option value="all">All statuses</option>
+          <option value="needs_review">Needs review{needsReviewCount > 0 ? ` (${needsReviewCount})` : ""}</option>
+          <option value="classified">Classified</option>
+        </select>
+        <input
+          type="date" value={fStart} onChange={e => setFStart(e.target.value)}
+          title="From date" style={{ ...inputSx, width: 130 }}
+        />
+        <span style={{ fontSize: 11, color: "var(--muted-text)" }}>→</span>
+        <input
+          type="date" value={fEnd} onChange={e => setFEnd(e.target.value)}
+          title="To date" style={{ ...inputSx, width: 130 }}
+        />
+        <button
+          className="btn sm out" style={{ fontSize: 11, padding: "3px 8px" }}
+          onClick={() => { setFSearch(""); setFSource("all"); setFStatus("all"); setFStart(""); setFEnd(""); }}
+        >
+          Reset
+        </button>
+        <span style={{ fontSize: 11, color: "var(--muted-text)", marginLeft: "auto", whiteSpace: "nowrap" }}>
+          {filtered.length} of {unified.length}
+        </span>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+          <input type="file" accept=".csv,.txt" style={{ display: "none" }} onChange={handleFileImport} disabled={uploading} />
+          <span className="btn sm out" style={{ fontSize: 11, padding: "3px 9px", pointerEvents: "none", whiteSpace: "nowrap" }}>
+            {uploading ? "Importing…" : "Import CEA"}
+          </span>
+        </label>
+        <button className="btn sm primary" style={{ fontSize: 11, whiteSpace: "nowrap" }} onClick={() => setShowCreate(v => !v)}>
+          + Add activity
+        </button>
       </div>
+
+      {/* Import result banner */}
+      {importResult && (
+        <div style={{ padding: "6px 14px", background: "#f0fff4", borderBottom: "1px solid var(--border)", fontSize: 11, display: "flex", gap: 14, alignItems: "center" }}>
+          <span style={{ fontWeight: 700, color: "#1A7F4B" }}>Import complete</span>
+          <span>{importResult.created} new</span>
+          <span>{importResult.updated} updated</span>
+          <span style={{ color: "var(--muted-text)" }}>{importResult.duplicates} duplicates · {importResult.skipped} skipped</span>
+          {importResult.errors > 0 && <span style={{ color: "var(--aafc-red)" }}>{importResult.errors} errors</span>}
+          <button onClick={() => setImportResult(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--muted-text)" }}>×</button>
+        </div>
+      )}
+      {importErr && (
+        <div style={{ padding: "6px 14px", background: "#fff0f0", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--aafc-red)", display: "flex", alignItems: "center", gap: 8 }}>
+          Import failed: {importErr}
+          <button onClick={() => setImportErr(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>×</button>
+        </div>
+      )}
 
       {/* Manual create form */}
       {showCreate && (
-        <div style={{ background: "#f0f5ff", border: "1px solid var(--border)", borderRadius: 8, padding: 12, marginBottom: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <div style={{ gridColumn: "1/-1" }}>
-            <label style={{ fontSize: 11, fontWeight: 700 }}>Activity name *</label>
-            <input value={newName} onChange={e => setNewName(e.target.value)} style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 12, marginTop: 2 }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700 }}>Start date</label>
-            <input type="date" value={newStart} onChange={e => setNewStart(e.target.value)} style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 12, marginTop: 2 }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700 }}>End date</label>
-            <input type="date" value={newEnd} onChange={e => setNewEnd(e.target.value)} style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 12, marginTop: 2 }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700 }}>Location</label>
-            <input value={newLocation} onChange={e => setNewLocation(e.target.value)} style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 12, marginTop: 2 }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 11, fontWeight: 700 }}>Importance</label>
-            <select value={newImportance} onChange={e => setNewImportance(e.target.value)} style={{ width: "100%", padding: "4px 8px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 12, marginTop: 2 }}>
+        <div style={{ padding: "10px 14px", background: "#f0f5ff", borderBottom: "1px solid var(--border)", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
+          <label style={{ gridColumn: "1 / 3", ...labelSx }}>
+            Activity name *
+            <input value={newName} onChange={e => setNewName(e.target.value)} autoFocus style={{ ...inputSx, fontWeight: 400 }} />
+          </label>
+          <label style={labelSx}>
+            Start date
+            <input type="date" value={newStart} onChange={e => setNewStart(e.target.value)} style={inputSx} />
+          </label>
+          <label style={labelSx}>
+            End date
+            <input type="date" value={newEnd} onChange={e => setNewEnd(e.target.value)} style={inputSx} />
+          </label>
+          <label style={{ gridColumn: "1 / 3", ...labelSx }}>
+            Location
+            <input value={newLocation} onChange={e => setNewLocation(e.target.value)} style={inputSx} />
+          </label>
+          <label style={labelSx}>
+            Importance
+            <select value={newImportance} onChange={e => setNewImportance(e.target.value)} style={inputSx}>
               <option value="">— select —</option>
               {Object.entries(IMPORTANCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
-          </div>
-          <div style={{ gridColumn: "1/-1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button className="btn sm out" style={{ fontSize: 11 }} onClick={() => setShowCreate(false)}>Cancel</button>
-            <button className="btn sm primary" style={{ fontSize: 11 }} onClick={handleCreate} disabled={creating || !newName.trim()}>
-              {creating ? "Saving…" : "Save activity"}
+          </label>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+            <button className="btn sm primary" onClick={handleCreate} disabled={creating || !newName.trim()} style={{ fontSize: 11 }}>
+              {creating ? "Saving…" : "Save"}
             </button>
+            <button className="btn sm out" onClick={() => setShowCreate(false)} style={{ fontSize: 11 }}>Cancel</button>
           </div>
         </div>
       )}
 
-      {/* Activities table */}
+      {/* Unified activities table */}
       {filtered.length === 0 ? (
-        <div className="pw-empty" style={{ padding: "20px" }}>No activities. Import a CEA file or create a manual activity.</div>
+        <div className="pw-empty" style={{ padding: "24px" }}>
+          {unified.length === 0
+            ? "No activities yet. Import a CEA file, add anchor events, or create a manual activity."
+            : "No activities match your filters."}
+        </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table className="pw-fac-table" style={{ fontSize: 11, minWidth: 900 }}>
             <thead>
               <tr>
-                <th>CEA ID</th>
-                <th>Activity name</th>
-                <th>Start date</th>
-                <th>End date</th>
-                <th>Source</th>
-                <th>Parent unit</th>
-                <th>Host unit</th>
-                <th>Location</th>
-                <th>POC</th>
-                <th>Importance</th>
-                <th>Audience</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <SortTh col="source" label="Source" style={{ minWidth: 70 }} />
+                <SortTh col="name" label="Activity / Event" style={{ minWidth: 220 }} />
+                <SortTh col="start_date" label="Start" style={{ minWidth: 90 }} />
+                <th style={{ minWidth: 90 }}>End</th>
+                <th style={{ minWidth: 130 }}>Unit</th>
+                <th style={{ minWidth: 90 }}>Location</th>
+                <th style={{ minWidth: 70 }}>Detail</th>
+                <SortTh col="importance" label="Importance" style={{ minWidth: 100 }} />
+                <SortTh col="status" label="Status" style={{ minWidth: 100 }} />
+                <th style={{ minWidth: 70 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map(a => (
-                <tr key={a.id} style={{ background: a.is_removed_from_cea ? "#fff3cd" : undefined }}>
-                  <td style={{ color: "var(--muted-text)" }}>{a.cea_activity_id ?? "—"}</td>
-                  <td style={{ fontWeight: 600 }}>
-                    {a.activity_name}
-                    {a.is_removed_from_cea && (
-                      <span style={{ marginLeft: 4, fontSize: 10, color: "var(--warning)", fontWeight: 700 }}>[Not in latest import]</span>
-                    )}
-                  </td>
-                  <td>{a.activity_start_date ?? "—"}</td>
-                  <td>{a.activity_end_date ?? "—"}</td>
-                  <td style={{ textTransform: "capitalize" }}>{a.source_type}</td>
-                  <td style={{ color: "var(--muted-text)" }}>{a.parent_unit ?? "—"}</td>
-                  <td>{a.host_unit ?? "—"}</td>
-                  <td style={{ color: "var(--muted-text)" }}>{a.location ?? "—"}</td>
-                  <td style={{ color: "var(--muted-text)" }}>{a.activity_poc ?? "—"}</td>
+              {filtered.map(r => (
+                <tr key={`${r.source}-${r.id}`} style={{ background: r.is_removed ? "#fff3cd" : undefined }}>
                   <td>
-                    {a.importance
-                      ? <span style={{ fontWeight: 600, color: "var(--aafc-dark-blue)" }}>{IMPORTANCE_LABELS[a.importance] ?? a.importance}</span>
-                      : <span style={{ color: "var(--muted-text)" }}>—</span>}
-                  </td>
-                  <td style={{ fontSize: 10 }}>
-                    {[
-                      a.audience_staff_only && "Staff",
-                      a.audience_seniors && "Seniors",
-                      a.audience_proficient && "Proficient",
-                      a.audience_first_years && "1st Yr",
-                    ].filter(Boolean).join(", ") || "—"}
-                  </td>
-                  <td>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_COLORS[a.classification_status] ?? "var(--muted-text)" }}>
-                      {a.classification_status === "needs_review" ? "Needs review" : a.classification_status === "classified" ? "Classified" : a.classification_status}
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 3,
+                      background: SOURCE_COLORS[r.source] + "22",
+                      color: SOURCE_COLORS[r.source],
+                      border: `1px solid ${SOURCE_COLORS[r.source]}44`,
+                      textTransform: "uppercase", letterSpacing: "0.04em",
+                    }}>
+                      {SOURCE_LABELS[r.source]}
                     </span>
                   </td>
+                  <td style={{ fontWeight: 600, maxWidth: 260 }}>
+                    {r.name}
+                    {r.is_removed && (
+                      <span style={{ marginLeft: 4, fontSize: 9, color: "var(--warning)", fontWeight: 700 }}>[Not in latest import]</span>
+                    )}
+                  </td>
+                  <td style={{ whiteSpace: "nowrap" }}>{r.start_date ?? "—"}</td>
+                  <td style={{ whiteSpace: "nowrap", color: "var(--muted-text)" }}>{r.end_date ?? "—"}</td>
+                  <td style={{ fontSize: 10, color: "var(--muted-text)", maxWidth: 150 }}>{r.unit ?? "—"}</td>
+                  <td style={{ fontSize: 10, color: "var(--muted-text)" }}>{r.location ?? "—"}</td>
+                  <td style={{ fontSize: 10, color: "var(--muted-text)", textTransform: "capitalize" }}>{r.extra ?? "—"}</td>
                   <td>
-                    <button
-                      className="btn sm out"
-                      style={{ fontSize: 10, padding: "2px 6px" }}
-                      onClick={() => setClassifying(a)}
-                    >
-                      Classify
-                    </button>
+                    {r.importance
+                      ? <span style={{ fontWeight: 600, color: "var(--aafc-dark-blue)", fontSize: 10 }}>{IMPORTANCE_LABELS[r.importance] ?? r.importance}</span>
+                      : <span style={{ color: "var(--muted-text)" }}>—</span>}
+                  </td>
+                  <td>
+                    {r.classification_status === "needs_review" ? (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_COLORS.needs_review }}>Needs review</span>
+                    ) : r.classification_status === "classified" ? (
+                      <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_COLORS.classified }}>Classified</span>
+                    ) : (
+                      <span style={{ fontSize: 10, color: "var(--muted-text)" }}>{r.classification_status ?? "—"}</span>
+                    )}
+                  </td>
+                  <td>
+                    {r.raw_cea && (
+                      <button
+                        className="btn sm out"
+                        style={{ fontSize: 10, padding: "2px 6px" }}
+                        onClick={() => setClassifying(r.raw_cea!)}
+                      >
+                        Classify
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -1232,6 +1733,280 @@ function ImportReviewContent({ yearId }: { yearId: string }) {
   );
 }
 
+// ─── TrainingPlannerContent ───────────────────────────────────────────────────
+
+const STATUS_SESSION: Record<string, string> = {
+  planned: "Planned",
+  delivered: "Delivered",
+  not_delivered: "Not delivered",
+  cancelled: "Cancelled",
+};
+
+function TrainingPlannerContent({
+  yearId,
+  onItemClick,
+}: {
+  yearId: string;
+  onItemClick: (item: DrawerItem) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [phaseFilter, setPhaseFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "scheduled" | "unscheduled">("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["planning-missions", yearId, "planner", phaseFilter],
+    queryFn: () => planningApi.missions(yearId, { phase: phaseFilter || undefined }),
+    staleTime: 60 * 1000,
+  });
+
+  const phases = useMemo(() => {
+    if (!data) return [];
+    return [...new Set(data.missions.map(m => m.phase))].sort();
+  }, [data]);
+
+  const filtered = useMemo(() => {
+    if (!data) return [];
+    const q = search.toLowerCase();
+    return data.missions.filter(m => {
+      if (statusFilter === "scheduled" && !m.is_scheduled) return false;
+      if (statusFilter === "unscheduled" && m.is_scheduled) return false;
+      if (q && !m.code.toLowerCase().includes(q) && !m.title.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [data, search, statusFilter]);
+
+  if (isLoading) return <div className="pw-loading" style={{ padding: "20px" }}>Loading curriculum…</div>;
+  if (error || !data) return <div className="pw-err" style={{ padding: 16 }}>Failed to load training plan.</div>;
+
+  const total = data.missions.length;
+  const scheduledCount = data.scheduled_count;
+  const pct = total > 0 ? Math.round((scheduledCount / total) * 100) : 0;
+
+  return (
+    <div>
+      {/* Summary bar */}
+      <div style={{
+        padding: "8px 14px", background: "var(--surface)", borderBottom: "1px solid var(--border)",
+        display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap",
+      }}>
+        <div style={{ fontSize: 12, color: "var(--aafc-dark-blue)", fontWeight: 700 }}>
+          {scheduledCount} / {total} curriculum items scheduled
+        </div>
+        <div style={{ flex: 1, minWidth: 120, maxWidth: 240, height: 8, background: "var(--border)", borderRadius: 4, overflow: "hidden" }}>
+          <div style={{ width: `${pct}%`, height: "100%", background: pct === 100 ? "var(--success, #1A7F4B)" : "var(--aafc-dark-blue)", borderRadius: 4, transition: "width .3s" }} />
+        </div>
+        <div style={{ fontSize: 11, color: "var(--muted-text)" }}>{pct}% complete</div>
+      </div>
+
+      {/* Toolbar */}
+      <div style={{
+        padding: "8px 14px", background: "var(--surface)", borderBottom: "1px solid var(--border)",
+        display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap",
+      }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search code or title…"
+          style={{ ...inputSx, width: 200, flex: "0 0 auto" }}
+        />
+        <select value={phaseFilter} onChange={e => setPhaseFilter(e.target.value)} style={{ ...inputSx, width: 130 }}>
+          <option value="">All phases</option>
+          {phases.map(p => <option key={p} value={p}>Phase {p}</option>)}
+        </select>
+        <div style={{ display: "flex", gap: 3 }}>
+          {(["all", "scheduled", "unscheduled"] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              style={{
+                fontSize: 11, padding: "3px 9px", borderRadius: 4,
+                border: "1px solid var(--border)", cursor: "pointer",
+                background: statusFilter === s ? "var(--aafc-dark-blue)" : "#fff",
+                color: statusFilter === s ? "#fff" : "var(--text)",
+              }}
+            >
+              {s === "all" ? "All" : s === "scheduled" ? "Scheduled" : "Unscheduled"}
+            </button>
+          ))}
+        </div>
+        <span style={{ fontSize: 11, color: "var(--muted-text)", marginLeft: "auto" }}>
+          Showing {filtered.length} of {total}
+        </span>
+      </div>
+
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <div className="pw-empty" style={{ padding: "20px" }}>No curriculum items match your filters.</div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table className="pw-fac-table" style={{ fontSize: 12, minWidth: 800 }}>
+            <thead>
+              <tr>
+                <th style={{ width: 28 }}></th>
+                <th>Code</th>
+                <th>Title</th>
+                <th>Phase</th>
+                <th>Element</th>
+                <th>Duration</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(m => {
+                const isExpanded = expandedId === m.curriculum_id;
+                const partCount = m.part_count ?? 1;
+                const isFullyScheduled = m.scheduled_count >= partCount && m.is_scheduled;
+                const isPartial = m.is_scheduled && !isFullyScheduled;
+
+                return (
+                  <>
+                    <tr
+                      key={m.curriculum_id}
+                      style={{
+                        background: isExpanded ? "#f0f5ff" : undefined,
+                        cursor: m.is_scheduled ? "pointer" : undefined,
+                      }}
+                      onClick={m.is_scheduled ? () => setExpandedId(isExpanded ? null : m.curriculum_id) : undefined}
+                    >
+                      <td style={{ textAlign: "center", paddingRight: 0 }}>
+                        {m.is_scheduled && (
+                          <span style={{ fontSize: 10, color: "var(--muted-text)" }}>
+                            {isExpanded ? "▲" : "▼"}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ fontWeight: 700, color: "var(--aafc-dark-blue)", whiteSpace: "nowrap" }}>{m.code}</td>
+                      <td style={{ maxWidth: 280 }}>{m.title}</td>
+                      <td>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 3,
+                          background: "var(--surface-alt, #f0f5ff)", color: "var(--aafc-dark-blue)",
+                        }}>
+                          {m.phase}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: 11, color: "var(--muted-text)" }}>{m.element ?? "—"}</td>
+                      <td style={{ textAlign: "center", whiteSpace: "nowrap", fontSize: 11 }}>
+                        {m.duration_minutes}m
+                      </td>
+                      <td style={{ textAlign: "center" }}>
+                        {(() => { const pt = getProgramType(m.core_status); return <span style={PROG_TYPE_STYLE[pt]}>{pt.toUpperCase()}</span>; })()}
+                      </td>
+                      <td>
+                        {!m.is_scheduled ? (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-text)" }}>Unscheduled</span>
+                        ) : isPartial ? (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--warning, #d97706)" }}>
+                            Partial ({m.scheduled_count}/{partCount})
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--success, #1A7F4B)" }}>
+                            Scheduled {m.scheduled_count > 1 ? `×${m.scheduled_count}` : ""}
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          className="btn sm out"
+                          style={{ fontSize: 11, padding: "3px 9px", whiteSpace: "nowrap" }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            onItemClick({ type: "curriculum", curriculum: {
+                              curriculum_id: m.curriculum_id,
+                              code: m.code,
+                              title: m.title,
+                              phase: m.phase,
+                            }});
+                          }}
+                        >
+                          {m.is_scheduled ? "+ Add part" : "Schedule"}
+                        </button>
+                      </td>
+                    </tr>
+
+                    {/* Expanded sessions sub-table */}
+                    {isExpanded && m.scheduled_sessions.length > 0 && (
+                      <tr key={`${m.curriculum_id}-expanded`} style={{ background: "#f7f9ff" }}>
+                        <td colSpan={9} style={{ padding: "0 0 8px 32px" }}>
+                          <table style={{ fontSize: 11, width: "100%", borderCollapse: "collapse" }}>
+                            <thead>
+                              <tr style={{ color: "var(--muted-text)", fontWeight: 700 }}>
+                                <th style={{ textAlign: "left", padding: "4px 8px 2px", fontWeight: 700 }}>Date</th>
+                                <th style={{ textAlign: "left", padding: "4px 8px 2px", fontWeight: 700 }}>Term</th>
+                                <th style={{ textAlign: "center", padding: "4px 8px 2px", fontWeight: 700 }}>Period</th>
+                                <th style={{ textAlign: "center", padding: "4px 8px 2px", fontWeight: 700 }}>Part</th>
+                                <th style={{ textAlign: "left", padding: "4px 8px 2px", fontWeight: 700 }}>Group</th>
+                                <th style={{ textAlign: "left", padding: "4px 8px 2px", fontWeight: 700 }}>Facilitator</th>
+                                <th style={{ textAlign: "left", padding: "4px 8px 2px", fontWeight: 700 }}>Room</th>
+                                <th style={{ textAlign: "left", padding: "4px 8px 2px", fontWeight: 700 }}>Status</th>
+                                <th style={{ padding: "4px 8px 2px" }}></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {m.scheduled_sessions.map(s => (
+                                <tr
+                                  key={s.session_id}
+                                  style={{ borderTop: "1px solid var(--border)" }}
+                                >
+                                  <td style={{ padding: "4px 8px", color: "var(--aafc-dark-blue)", fontWeight: 600, whiteSpace: "nowrap" }}>
+                                    {s.parade_date
+                                      ? new Date(s.parade_date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+                                      : "—"}
+                                  </td>
+                                  <td style={{ padding: "4px 8px" }}>{s.term ?? "—"}</td>
+                                  <td style={{ padding: "4px 8px", textAlign: "center" }}>P{s.session_number}</td>
+                                  <td style={{ padding: "4px 8px", textAlign: "center" }}>{s.part_number ?? "—"}</td>
+                                  <td style={{ padding: "4px 8px", textTransform: "capitalize" }}>{s.cadet_group ?? "—"}</td>
+                                  <td style={{ padding: "4px 8px" }}>{s.facilitator_name ?? <span style={{ color: "var(--muted-text)" }}>None</span>}</td>
+                                  <td style={{ padding: "4px 8px" }}>{s.location_name ?? <span style={{ color: "var(--muted-text)" }}>—</span>}</td>
+                                  <td style={{ padding: "4px 8px" }}>
+                                    <span style={{
+                                      fontWeight: 600,
+                                      color: s.status === "delivered" ? "var(--success, #1A7F4B)"
+                                        : s.status === "not_delivered" ? "var(--aafc-red)"
+                                        : s.status === "cancelled" ? "var(--muted-text)"
+                                        : "var(--aafc-dark-blue)",
+                                    }}>
+                                      {STATUS_SESSION[s.status] ?? s.status}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: "4px 8px" }}>
+                                    <button
+                                      className="btn sm out"
+                                      style={{ fontSize: 10, padding: "2px 7px" }}
+                                      onClick={async () => {
+                                        const full = await planningApi.getSession(s.session_id);
+                                        onItemClick({
+                                          type: "session", session: full,
+                                          dateId: s.parade_date_id ?? "", date: s.parade_date ?? "",
+                                          conflicts: [],
+                                        });
+                                      }}
+                                    >
+                                      Edit
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── PlanningBottomDrawer ─────────────────────────────────────────────────────
 
 export function PlanningBottomDrawer({ yearId, tab, onTabChange, onClose, facilitators, locations, onItemClick }: Props) {
@@ -1253,6 +2028,9 @@ export function PlanningBottomDrawer({ yearId, tab, onTabChange, onClose, facili
       <div className="pw-bottom-content">
         {tab === "backlog" && yearId && <BacklogContent yearId={yearId} onItemClick={onItemClick} />}
         {tab === "backlog" && !yearId && <div className="pw-empty">No planning year selected.</div>}
+
+        {tab === "training-planner" && yearId && <TrainingPlannerContent yearId={yearId} onItemClick={onItemClick} />}
+        {tab === "training-planner" && !yearId && <div className="pw-empty">No planning year selected.</div>}
 
         {tab === "facilitators" && (
           <FacilitatorsContent yearId={yearId} facilitators={facilitators} />

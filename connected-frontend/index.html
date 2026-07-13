@@ -105,6 +105,8 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .nav-subitem:hover{background:var(--bg);color:var(--dark);}
 .nav-subitem.active{background:#deeefa;color:var(--dark);border-left-color:var(--blue);font-weight:700;}
 .nav-planning-hdr{font-size:9px;font-weight:700;color:var(--pale);letter-spacing:.10em;text-transform:uppercase;padding:10px 18px 4px 30px;}
+.nav-item-ext{display:flex;align-items:center;padding:8px 18px;font-size:12.5px;font-weight:500;color:var(--steel);cursor:pointer;transition:background .1s,color .1s;border-left:3px solid transparent;gap:8px;user-select:none;text-decoration:none;}
+.nav-item-ext:hover{background:var(--bg);color:var(--dark);}
 .nav-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0;opacity:.6;}
 .main{flex:1;padding:24px 28px;overflow-y:auto;min-width:0;}
 .page{display:none;}.page.active{display:block;}
@@ -501,6 +503,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-item nav-subitem" id="nav-planning-longrange" style="display:none" onclick="nav('planning-longrange')">Long-Range View</div>
       <div class="nav-item nav-subitem" id="nav-planning-rooms" style="display:none" onclick="nav('planning-rooms')">Locations and Facilitators</div>
       <div class="nav-item nav-subitem" id="nav-planning-checks" style="display:none" onclick="nav('planning-checks')">Program Checks</div>
+      <div class="nav-lbl" id="nav-lbl-pw" style="display:none">Planning Workspace</div>
+      <a id="nav-pw-link" class="nav-item-ext" href="https://aafc-tms-planning-workspace-preview-production.up.railway.app/planning" target="_blank" rel="noopener noreferrer" style="display:none">Planning Workspace ↗</a>
       <div class="nav-lbl">People &amp; Resources</div>
       <div class="nav-item" onclick="nav('facilitators')">Facilitators</div>
       <div class="nav-item" onclick="nav('resources')">Locations and Resources</div>
@@ -3307,6 +3311,9 @@ function bootApp(){
   chip.textContent=info.short; chip.className='sqn-chip'+(S.isAdmin?' admin':'');
   updateScopeBanner(); updateModeBanner(); updateDebugBar();
   applyNavScope();
+  // Planning Workspace preview link — visible for squadron scope (sqn_admin + sqn_general) only.
+  const pwLink=document.getElementById('nav-pw-link'), pwLbl=document.getElementById('nav-lbl-pw');
+  const showPW=scope==='squadron'; if(pwLink)pwLink.style.display=showPW?'flex':'none'; if(pwLbl)pwLbl.style.display=showPW?'block':'none';
   // Write controls: visible only where this role/scope can currently write; auditor/viewers read-only.
   const canWrite = scope==='squadron' ? canWriteSquadron() : false; // wing/national write only via proxy into a squadron
   document.querySelectorAll('.admin-el').forEach(el=>{el.style.display=(canWrite||(scope!=='squadron'&&proxyActive()))?'inline-flex':'none';});

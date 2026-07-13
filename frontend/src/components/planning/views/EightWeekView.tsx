@@ -14,9 +14,12 @@ import { ActivityDetailBlock, anchorToDisplay } from "../ActivityDetailBlock";
 interface Props {
   yearId: string;
   weeks?: number;
+  customStart?: string;
+  customEnd?: string;
   facilitators: PlanningFacilitator[];
   onDateClick: (dateId: string, date: string) => void;
   onSessionClick: (session: PlanningSession, dateId: string, date: string) => void;
+  onEmptyCellClick?: (dateId: string, date: string, cadetGroup: string, period: number) => void;
   onAnchorClick?: (anchor: AnchorEvent) => void;
   layers?: { conflicts?: boolean; wingHQEvents?: boolean };
   audience?: Set<string>;
@@ -24,22 +27,26 @@ interface Props {
 }
 
 export function EightWeekView({
-  yearId, weeks = 8, facilitators,
-  onDateClick, onSessionClick, onAnchorClick,
+  yearId, weeks = 8, customStart, customEnd, facilitators,
+  onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick,
   layers, audience, priority,
 }: Props) {
   const showConflicts = layers?.conflicts ?? true;
   const showAnchors = layers?.wingHQEvents ?? true;
 
+  const isCustom = !!(customStart && customEnd);
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ["planning-long-range", yearId, weeks],
-    queryFn: () => planningApi.longRange(yearId, weeks),
+    queryKey: ["planning-long-range", yearId, customStart ?? weeks, customEnd ?? ""],
+    queryFn: () => planningApi.longRange(yearId, weeks, customStart, customEnd),
+    enabled: !isCustom || customEnd! >= customStart!,
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: nightData } = useQuery({
     queryKey: ["planning-night-summaries", yearId],
     queryFn: () => planningApi.nightSummaries(yearId),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 
   const nightSummaryMap = useMemo(
@@ -126,6 +133,9 @@ export function EightWeekView({
             compact={false}
             onHeaderClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
             onSessionClick={handleSessionClick}
+            onEmptyCellClick={onEmptyCellClick
+              ? (cg, period) => onEmptyCellClick(pd.parade_date_id, pd.parade_date, cg, period)
+              : undefined}
           />
         );
       })}

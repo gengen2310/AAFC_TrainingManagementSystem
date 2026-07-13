@@ -7,6 +7,7 @@ import { ActivityFullDetail, anchorToDisplay } from "./ActivityDetailBlock";
 // ─── Drawer item discriminated union ──────────────────────────────────────────
 export type DrawerItem =
   | { type: "session"; session: PlanningSession; dateId: string; date: string; conflicts: PlanningConflict[] }
+  | { type: "session-by-id"; sessionId: string; dateId: string; date: string }
   | { type: "new-session"; cadetGroup: string; periodNumber: number; dateId: string }
   | { type: "wing-event"; event: WingHQEvent }
   | { type: "curriculum"; curriculum: { curriculum_id: string; code: string; title: string; phase: string } }
@@ -666,8 +667,12 @@ function ScheduleFromBacklogPanel({
             <div className="pw-drawer-value">{mission.duration_minutes} min</div>
           </div>
           <div className="pw-drawer-section">
-            <div className="pw-drawer-label">Core status</div>
-            <div className="pw-drawer-value" style={{ textTransform: "capitalize" }}>{mission.core_status}</div>
+            <div className="pw-drawer-label">Program type</div>
+            <div className="pw-drawer-value" style={{ textTransform: "capitalize" }}>
+              {mission.core_status === "foundation" || mission.core_status === "core" ? "Foundation"
+                : mission.core_status === "optional" ? "Optional"
+                : "Extension"}
+            </div>
           </div>
           {mission.instructor_suitability && (
             <div className="pw-drawer-section">
@@ -779,6 +784,7 @@ export function PlanningRightDrawer({ item, facilitators, locations, yearId, onC
 
   const title =
     item.type === "session" ? (item.session.activity_title ?? "Session")
+    : item.type === "session-by-id" ? "Session"
     : item.type === "new-session" ? "Add Session"
     : item.type === "wing-event" ? item.event.title
     : item.type === "new-anchor" ? "New Anchor Event"
@@ -795,6 +801,10 @@ export function PlanningRightDrawer({ item, facilitators, locations, yearId, onC
       <div className="pw-drawer-body" key={key}>
         {(item.type === "session" || item.type === "new-session") && (
           <SessionForm item={item} facilitators={facilitators} locations={locations} yearId={yearId} onClose={onClose} />
+        )}
+        {item.type === "session-by-id" && (
+          <SessionByIdLoader sessionId={item.sessionId} dateId={item.dateId} date={item.date}
+            facilitators={facilitators} locations={locations} yearId={yearId} onClose={onClose} />
         )}
         {item.type === "wing-event" && (
           <WingEventPanel event={item.event} onClose={onClose} />
@@ -820,4 +830,19 @@ export function PlanningRightDrawer({ item, facilitators, locations, yearId, onC
       </div>
     </div>
   );
+}
+
+function SessionByIdLoader({ sessionId, dateId, date, facilitators, locations, yearId, onClose }: {
+  sessionId: string; dateId: string; date: string;
+  facilitators: PlanningFacilitator[]; locations: PlanningLocation[];
+  yearId: string | null; onClose: () => void;
+}) {
+  const q = useQuery({
+    queryKey: ["planning-session", sessionId],
+    queryFn: () => planningApi.getSession(sessionId),
+  });
+  if (q.isLoading) return <p className="muted">Loading session…</p>;
+  if (!q.data) return <p className="muted">Session not found.</p>;
+  const item: DrawerItem = { type: "session", session: q.data, dateId, date, conflicts: [] };
+  return <SessionForm item={item} facilitators={facilitators} locations={locations} yearId={yearId} onClose={onClose} />;
 }

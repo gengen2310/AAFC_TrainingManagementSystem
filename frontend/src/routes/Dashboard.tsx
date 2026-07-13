@@ -21,7 +21,11 @@ export function Dashboard() {
   if (!summary.data) return <ErrorNote error={new Error("Dashboard data unavailable. Please refresh.")} />;
   const c = summary.data.counts;
   const worstBand = readiness.data?.parade_nights?.[0]?.band ?? "—";
-  const upcoming = (parades.data ?? []).filter((p) => !p.published_status || true).slice(0, 6);
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = (parades.data ?? [])
+    .filter((p) => p.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 6);
 
   return (
     <div>
@@ -38,6 +42,16 @@ export function Dashboard() {
       <Card title="Training decision">
         <DecisionBadge decision={summary.data!.decision} /> &nbsp;
         <span className="muted">Based on {summary.data!.total} sessions this training year.</span>
+      </Card>
+
+      <Card title="Training summary">
+        <table>
+          <caption className="vis-hidden">Sessions by status</caption>
+          <thead><tr><th>Status</th><th>Count</th></tr></thead>
+          <tbody>{Object.entries(c).map(([k, v]) => (
+            <tr key={k}><td><StatusBadge status={k} /></td><td>{v as number}</td></tr>
+          ))}</tbody>
+        </table>
       </Card>
 
       <Card title="Upcoming parade nights">
@@ -64,7 +78,7 @@ export function Dashboard() {
       {drill === "not_delivered" && <NotDeliveredDrill onClose={() => setDrill(null)} />}
       {drill === "coverage" && <CoverageDrill onClose={() => setDrill(null)} />}
       {drill === "readiness" && <ReadinessDrill onClose={() => setDrill(null)} />}
-      {drill === "delivered" && <DrilldownPanel title="Delivered sessions" onClose={() => setDrill(null)}><p className="muted">Delivered count comes from session statuses. See Reports → Summary for the full breakdown.</p></DrilldownPanel>}
+      {drill === "delivered" && <DrilldownPanel title="Delivered sessions" onClose={() => setDrill(null)}><p className="muted">Delivered count comes from session statuses. See the Training summary card on this page for the full status breakdown.</p></DrilldownPanel>}
     </div>
   );
 }

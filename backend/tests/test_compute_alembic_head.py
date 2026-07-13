@@ -23,9 +23,14 @@ def _write_migration(tmp_path, filename: str, revision: str, down_revision: str 
 
 
 def test_computes_the_real_repo_head():
-    """Sanity check against the actual repository migration chain."""
+    """Sanity check against the actual repository migration chain.
+
+    Update this value whenever a new migration is added — that's expected
+    maintenance for a direct sanity check, and it fails loudly with a clear
+    diff (unlike the workflow-level hardcoding this script replaced, which
+    failed silently and was found stale by ~9 migrations in production)."""
     head = compute_head("alembic/versions")
-    assert head == "v7w8x9y0z1a2"
+    assert head == "x9y0z1a2b3c4"
 
 
 def test_single_linear_chain(tmp_path):

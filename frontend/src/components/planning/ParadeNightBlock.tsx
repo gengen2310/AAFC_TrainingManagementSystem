@@ -230,13 +230,14 @@ interface ParadeNightBlockProps {
   blockSize?: "sm" | "md";
   onHeaderClick: () => void;
   onSessionClick?: (session: DisplaySession) => void;
+  onEmptyCellClick?: (cadetGroup: string, period: number) => void;
 }
 
 export function ParadeNightBlock({
   dateId, date, weekNumber, term, notices = [],
   sessions, sessionCount, filledSlots, conflictCount = 0,
   inHoliday = false, compact = false, blockSize = "md",
-  onHeaderClick, onSessionClick,
+  onHeaderClick, onSessionClick, onEmptyCellClick,
 }: ParadeNightBlockProps) {
   const [addingNotice, setAddingNotice] = useState(false);
 
@@ -373,15 +374,18 @@ export function ParadeNightBlock({
                   {BLOCK_PERIODS.map(period => {
                     const cell = getCell(sessions, g.cadetGroups, period);
                     if (!cell) {
+                      const handleEmptyClick = onEmptyCellClick
+                        ? () => onEmptyCellClick(g.cadetGroups[0], period)
+                        : onHeaderClick;
                       return (
                         <td
                           key={period}
                           className="pw-night-cell empty"
-                          onClick={onHeaderClick}
+                          onClick={handleEmptyClick}
                           role="button"
                           tabIndex={0}
-                          onKeyDown={e => e.key === "Enter" && onHeaderClick()}
-                          aria-label="No lesson — click to open night detail"
+                          onKeyDown={e => e.key === "Enter" && handleEmptyClick()}
+                          aria-label={onEmptyCellClick ? "Click to add a session" : "No lesson — click to open night detail"}
                         >
                           <div className="pw-night-cell-inner">
                             <span className="pw-nc-empty">No lesson</span>

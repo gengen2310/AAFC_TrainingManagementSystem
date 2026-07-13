@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+
+const PW_YEAR_KEY = "aafc_pw_year_id";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthProvider";
 import { planningApi } from "../api";
@@ -30,11 +32,20 @@ export function PlanningWorkspace() {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("calendar");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
-  const [selectedYearId, setSelectedYearId] = useState<string | null>(null);
+  // Initialise from localStorage so year-scoped queries fire immediately without waiting
+  // for the /years response (eliminates ~1.6s waterfall on repeat visits).
+  const [selectedYearId, setSelectedYearId] = useState<string | null>(
+    () => localStorage.getItem(PW_YEAR_KEY),
+  );
   const [selectedDateId, setSelectedDateId] = useState<string | null>(null);
+
+  const persistYear = useCallback((id: string) => {
+    localStorage.setItem(PW_YEAR_KEY, id);
+    setSelectedYearId(id);
+  }, []);
   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
   const [bottomOpen, setBottomOpen] = useState(false);
-  const [bottomTab, setBottomTab] = useState<BottomTab>("backlog");
+  const [bottomTab, setBottomTab] = useState<BottomTab>("activities");
   const [layers, setLayers] = useState<LayerState>(defaultLayers);
   const [audience, setAudience] = useState<Set<string>>(new Set());
   const [priority, setPriority] = useState<Set<string>>(new Set());
@@ -43,15 +54,18 @@ export function PlanningWorkspace() {
   const { data: years, isLoading: yearsLoading } = useQuery({
     queryKey: ["planning-years"],
     queryFn: planningApi.years,
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Auto-select the first active year
+  // Validate/update the cached year_id once the years response arrives.
   useEffect(() => {
-    if (years && !selectedYearId) {
-      const active = years.find(y => y.active_status) ?? years[0];
-      if (active) setSelectedYearId(active.planning_year_id);
+    if (!years) return;
+    const active = years.find(y => y.active_status) ?? years[0];
+    if (!active) return;
+    if (active.planning_year_id !== selectedYearId) {
+      persistYear(active.planning_year_id);
     }
-  }, [years, selectedYearId]);
+  }, [years]);
 
   const selectedYear = years?.find(y => y.planning_year_id === selectedYearId) ?? null;
 
@@ -59,16 +73,19 @@ export function PlanningWorkspace() {
     queryKey: ["planning-cc", selectedYearId],
     queryFn: () => planningApi.commandCentre(selectedYearId!),
     enabled: !!selectedYearId,
+    staleTime: 2 * 60 * 1000,
   });
 
   const { data: facilitators = [] } = useQuery({
     queryKey: ["planning-facilitators"],
     queryFn: planningApi.facilitators,
+    staleTime: 10 * 60 * 1000,
   });
 
   const { data: locations = [] } = useQuery({
     queryKey: ["planning-locations"],
     queryFn: planningApi.locations,
+    staleTime: 10 * 60 * 1000,
   });
 
   // ── Handlers ───────────────────────────────────────────────────────────────────
@@ -99,6 +116,15 @@ export function PlanningWorkspace() {
 
   function handleSessionClick(s: PlanningSession, dateId: string, date: string) {
     setDrawerItem({ type: "session", session: s, dateId, date, conflicts: [] });
+  }
+
+  async function handleSessionByIdClick(sessionId: string, dateId: string, date: string) {
+    const s = await planningApi.getSession(sessionId);
+    setDrawerItem({ type: "session", session: s, dateId, date, conflicts: [] });
+  }
+
+  function handleEmptyCellClick(dateId: string, date: string, cadetGroup: string, period: number) {
+    setDrawerItem({ type: "new-session", cadetGroup, periodNumber: period, dateId });
   }
 
   function handleAnchorClick(anchor: AnchorEvent) {
@@ -166,6 +192,8 @@ export function PlanningWorkspace() {
         <YearView
           yearId={selectedYearId}
           onDateClick={handleDateClick}
+          onSessionClick={handleSessionByIdClick}
+          onEmptyCellClick={handleEmptyCellClick}
           onAnchorClick={handleAnchorClick}
           layers={layers}
           audience={audience}
@@ -178,6 +206,8 @@ export function PlanningWorkspace() {
         <TermView
           yearId={selectedYearId}
           onDateClick={handleDateClick}
+          onSessionClick={handleSessionByIdClick}
+          onEmptyCellClick={handleEmptyCellClick}
           onAnchorClick={handleAnchorClick}
           layers={layers}
           audience={audience}
@@ -193,6 +223,7 @@ export function PlanningWorkspace() {
           facilitators={facilitators}
           onDateClick={handleDateClick}
           onSessionClick={handleSessionClick}
+          onEmptyCellClick={handleEmptyCellClick}
           onAnchorClick={handleAnchorClick}
           layers={layers}
           audience={audience}
@@ -229,13 +260,30 @@ export function PlanningWorkspace() {
       );
     }
     if (viewRange === "custom") {
+      if (!customStart || !customEnd) {
+        return (
+          <div className="pw-empty">
+            <span>Select a date range above.</span>
+            <span style={{ fontSize: 11 }}>Use the From and To inputs in the toolbar to set your range.</span>
+          </div>
+        );
+      }
+      if (customEnd < customStart) {
+        return (
+          <div className="pw-empty pw-empty-warn">
+            <span>End date must be after start date.</span>
+          </div>
+        );
+      }
       return (
         <EightWeekView
           yearId={selectedYearId}
-          weeks={25}
+          customStart={customStart}
+          customEnd={customEnd}
           facilitators={facilitators}
           onDateClick={handleDateClick}
           onSessionClick={handleSessionClick}
+          onEmptyCellClick={handleEmptyCellClick}
           layers={layers}
           audience={audience}
           priority={priority}
@@ -275,7 +323,7 @@ export function PlanningWorkspace() {
                 <button
                   key={y.planning_year_id}
                   className={`pw-chip${selectedYearId === y.planning_year_id ? " on" : ""}`}
-                  onClick={() => { setSelectedYearId(y.planning_year_id); setSelectedDateId(null); }}
+                  onClick={() => { persistYear(y.planning_year_id); setSelectedDateId(null); }}
                 >
                   {y.name}
                 </button>
@@ -322,7 +370,7 @@ export function PlanningWorkspace() {
               }}
               onClick={() => setBottomOpen(true)}
             >
-              Mission Backlog ▲
+              Activities ▲
             </button>
           )}
         </div>

@@ -10,7 +10,7 @@ import type {
   MissionItem, PlanningLocation, PlanningFacilitator, LocalLesson,
   WingHQEvent, CommandCentreData, PlanningConflict, HolidayPeriod,
   NightSummariesResponse, PlanningFacilitatorLeave, FacilitatorLeaveResult,
-  FacilitatorWorkload, EquipmentItem, AnchorEvent,
+  FacilitatorWorkload, EquipmentItem, AnchorEvent, PlanningSession,
 } from "./types";
 
 /** Handles both legacy array shape `[...]` and current `{"conflicts":[...]}` shape. */
@@ -139,9 +139,10 @@ export const planningApi = {
     api.get<CommandCentreData>(`/api/planning/command-centre${year_id ? `?year_id=${year_id}` : ""}`),
   annualProgram: (year_id: string) =>
     api.get<AnnualProgram>(`/api/planning/years/${year_id}/annual-program`),
-  longRange: (year_id: string, weeks = 8, from_date?: string) => {
+  longRange: (year_id: string, weeks = 8, from_date?: string, end_date?: string) => {
     const p = new URLSearchParams({ weeks: String(weeks) });
     if (from_date) p.set("from_date", from_date);
+    if (end_date) p.set("end_date", end_date);
     return api.get<LongRangeView>(`/api/planning/years/${year_id}/long-range?${p}`);
   },
   weeklyProgram: (date_id: string) =>
@@ -177,6 +178,8 @@ export const planningApi = {
     activity_title?: string; facilitator_id?: string; location_id?: string;
     part_number?: number; notes?: string;
   }) => api.post<Record<string, unknown>>(`/api/planning/parade-dates/${date_id}/sessions`, body),
+  getSession: (session_id: string) =>
+    api.get<PlanningSession>(`/api/planning/sessions/${session_id}`),
   updateSession: (session_id: string, body: {
     curriculum_id?: string | null; activity_title?: string | null;
     facilitator_id?: string | null; assistant_facilitator_id?: string | null;

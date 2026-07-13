@@ -328,18 +328,26 @@ def _real_session_out(s: TrainingSession, db: DBSession) -> dict:
         ra = db.get(TrainingArea, s.training_area_id)
         if ra:
             room_name = ra.name
+    asst_name: str | None = None
+    if s.assistant_facilitator_id:
+        af = db.get(Facilitator, s.assistant_facilitator_id)
+        if af:
+            asst_name = " ".join(x for x in [af.current_rank, af.first_name, af.last_name] if x)
     return {
         "session_id": s.id,
         "parade_night_id": s.parade_night_id,
         "squadron_id": s.squadron_id,
         "cadet_group": s.cadet_group,
         "session_number": s.period_number,
+        "part_number": s.part_number,
         "curriculum_id": s.curriculum_item_id,
         "curriculum_code": s.curriculum_code_at_time,
         "curriculum_title": s.curriculum_title_at_time,
         "activity_title": s.curriculum_title_at_time or s.custom_title,
         "facilitator_id": s.facilitator_id,
         "facilitator_name": s.facilitator_display_name_at_time,
+        "assistant_facilitator_id": s.assistant_facilitator_id,
+        "assistant_facilitator_name": asst_name,
         "location_id": s.training_area_id,
         "location_name": room_name,
         "status": s.status,
@@ -1234,6 +1242,21 @@ def create_session(
     return _real_session_out(s, db)
 
 
+@router.get("/sessions/{session_id}")
+def get_session(
+    session_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    s = db.get(TrainingSession, session_id)
+    if not s or s.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id) if s.parade_night_id else None
+    if pn:
+        require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    return _real_session_out(s, db)
+
+
 @router.patch("/sessions/{session_id}")
 def update_session(
     session_id: str,
@@ -1381,8 +1404,9 @@ def get_weekly_program(
 @router.get("/years/{year_id}/long-range")
 def get_long_range(
     year_id: str,
-    weeks: int = Query(default=8, ge=1, le=20),
+    weeks: int = Query(default=8, ge=1, le=52),
     from_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -1395,7 +1419,16 @@ def get_long_range(
         start_dt = date.fromisoformat(start)
     except ValueError:
         start_dt = date.today()
-    end_dt = start_dt + timedelta(weeks=weeks)
+
+    if end_date:
+        try:
+            end_dt = date.fromisoformat(end_date)
+        except ValueError:
+            raise HTTPException(422, detail={"error": "invalid_end_date", "message": "end_date must be YYYY-MM-DD"})
+        if end_dt < start_dt:
+            raise HTTPException(422, detail={"error": "end_before_start", "message": "end_date must not be before from_date"})
+    else:
+        end_dt = start_dt + timedelta(weeks=weeks)
 
     parade_dates = db.query(ParadeDate).filter(
         ParadeDate.planning_year_id == year_id,
@@ -2301,6 +2334,44 @@ def get_annual_program(
         AnchorEvent.is_archived == False,  # noqa: E712
     ).order_by(AnchorEvent.start_date).all()
 
+    # Bulk-fetch all parade nights and sessions in 2 queries (avoids N+1)
+    all_pn_ids_pre = [d.parade_night_id for d in all_dates if d.parade_night_id]
+    pn_map: dict = {}
+    ts_by_pn: dict = {}
+    if all_pn_ids_pre:
+        pn_rows = db.query(ParadeNight).filter(ParadeNight.id.in_(all_pn_ids_pre)).all()
+        pn_map = {pn.id: pn for pn in pn_rows}
+        ts_rows = db.query(TrainingSession).filter(
+            TrainingSession.parade_night_id.in_(all_pn_ids_pre),
+            TrainingSession.is_archived == False,  # noqa: E712
+        ).all()
+        for ts in ts_rows:
+            ts_by_pn.setdefault(ts.parade_night_id, []).append(ts)
+
+    # Build per-date-id session index (eliminates need for a separate /night-summaries call)
+    pn_to_date_id = {d.parade_night_id: d.id for d in all_dates if d.parade_night_id}
+    ts_by_date_id: dict[str, list] = {}
+    for pn_id, sess_list in ts_by_pn.items():
+        date_id = pn_to_date_id.get(pn_id)
+        if date_id:
+            ts_by_date_id[date_id] = sess_list
+
+    # Bulk-load conflict counts and notices per parade date (2 extra queries, no N+1)
+    all_date_ids = [d.id for d in all_dates]
+    conflict_counts_map: dict[str, int] = {}
+    notices_by_date_id: dict[str, list] = {}
+    if all_date_ids:
+        for c in db.query(PlanningConflict).filter(
+            PlanningConflict.parade_date_id.in_(all_date_ids),
+            PlanningConflict.is_resolved == False,  # noqa: E712
+        ).all():
+            conflict_counts_map[c.parade_date_id] = conflict_counts_map.get(c.parade_date_id, 0) + 1
+        for n in db.query(PlanningNotice).filter(
+            PlanningNotice.parade_date_id.in_(all_date_ids),
+            PlanningNotice.is_archived == False,  # noqa: E712
+        ).all():
+            notices_by_date_id.setdefault(n.parade_date_id, []).append(n)
+
     def _in_range(d: str, start: str, end: str) -> bool:
         return start <= d <= end
 
@@ -2318,27 +2389,41 @@ def get_annual_program(
         t_anchors = [a for a in all_anchors
                      if _in_range(a.start_date, t_start, t_end)]
 
-        # Per-date session fill summary
+        # Per-date session fill summary (uses pre-fetched pn_map / ts_by_pn)
         date_summaries = []
         for pd_obj in t_dates:
             session_count = 0
             filled = 0
-            pn = db.get(ParadeNight, pd_obj.parade_night_id) if pd_obj.parade_night_id else None
+            pn = pn_map.get(pd_obj.parade_night_id) if pd_obj.parade_night_id else None
             if pn:
-                sessions = db.query(TrainingSession).filter(
-                    TrainingSession.parade_night_id == pn.id,
-                    TrainingSession.is_archived == False,  # noqa: E712
-                ).all()
+                sessions = ts_by_pn.get(pn.id, [])
                 session_count = pn.session_count
                 filled = len([s for s in sessions if s.curriculum_item_id or s.custom_title])
             in_hol = any(_in_range(pd_obj.parade_date, h.start_date, h.end_date)
                          for h in t_holidays if h.affects_parade)
+            # Inline session summaries — facilitator & location are denormalized on TrainingSession
+            date_sessions = ts_by_date_id.get(pd_obj.id, [])
+            sessions_summary = [
+                {
+                    "session_id": s.id,
+                    "period": s.period_number,
+                    "cadet_group": s.cadet_group,
+                    "title": s.curriculum_title_at_time or s.custom_title,
+                    "curriculum_code": s.curriculum_code_at_time,
+                    "facilitator": s.facilitator_display_name_at_time,
+                    "location": s.training_area_name_at_time,
+                }
+                for s in date_sessions
+            ]
             date_summaries.append({
                 **_date_out(pd_obj),
                 "term": term_label,
                 "session_count": session_count,
                 "filled_count": filled,
                 "in_holiday": in_hol,
+                "sessions_summary": sessions_summary,
+                "conflict_count": conflict_counts_map.get(pd_obj.id, 0),
+                "notices": [_notice_out(n) for n in notices_by_date_id.get(pd_obj.id, [])],
             })
 
         def _anchor_v14_out(a: AnchorEvent) -> dict:
@@ -2368,19 +2453,16 @@ def get_annual_program(
             "activities": [_anchor_v14_out(a) for a in t_anchors],
         })
 
-    # Overall stats
+    # Overall stats (uses pn_map / ts_by_pn already fetched above — no extra queries)
     total_dates = len(all_dates)
     active_dates = sum(1 for d in all_dates if d.is_active)
-    all_pn_ids = [d.parade_night_id for d in all_dates if d.parade_night_id]
+    all_pn_ids = all_pn_ids_pre
     total_sessions = 0
     filled_sessions = 0
     if all_pn_ids:
-        all_ts = db.query(TrainingSession).filter(
-            TrainingSession.parade_night_id.in_(all_pn_ids),
-            TrainingSession.is_archived == False,  # noqa: E712
-        ).all()
+        all_ts = [s for sessions in ts_by_pn.values() for s in sessions]
         total_slots = sum(
-            (db.get(ParadeNight, pnid).session_count if db.get(ParadeNight, pnid) else 3)
+            pn_map[pnid].session_count if pnid in pn_map else 3
             for pnid in all_pn_ids
         ) * len(CADET_GROUPS)
         total_sessions = total_slots
@@ -3312,7 +3394,7 @@ def night_summaries(
     p: Principal = Depends(get_principal),
 ):
     """Return all parade dates with session/conflict/notice summary for the planning grid."""
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    require_role(p, "sqn_admin", "sqn_general", "wing_admin", "national_admin", "system_admin")
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py)
 
@@ -3328,39 +3410,43 @@ def night_summaries(
 
     date_ids = [pd.id for pd in all_dates]
 
-    # Batch-load sessions
-    all_sessions = (
-        db.query(ScheduledSession)
-        .filter(
-            ScheduledSession.parade_date_id.in_(date_ids),
-            ScheduledSession.is_archived == False,  # noqa: E712
-        )
-        .all()
-    ) if date_ids else []
+    # Bulk-fetch all linked ParadeNight records (avoids N+1 in loop below)
+    pn_ids = [pd.parade_night_id for pd in all_dates if pd.parade_night_id]
+    pn_map: dict[str, ParadeNight] = {}
+    if pn_ids:
+        for pn_row in db.query(ParadeNight).filter(ParadeNight.id.in_(pn_ids)).all():
+            pn_map[pn_row.id] = pn_row
 
-    sessions_by_date: dict[str, list[ScheduledSession]] = {}
-    for s in all_sessions:
-        sessions_by_date.setdefault(s.parade_date_id, []).append(s)
+    # Map parade_night_id → parade_date_id for session grouping
+    pn_to_date_id = {pd.parade_night_id: pd.id for pd in all_dates if pd.parade_night_id}
 
-    # Batch-load curriculum titles
-    curr_ids = list({s.curriculum_id for s in all_sessions if s.curriculum_id})
-    curr_map: dict[str, tuple[str, str]] = {}
-    if curr_ids:
-        for ci in db.query(CurriculumItem).filter(CurriculumItem.id.in_(curr_ids)).all():
-            curr_map[ci.id] = (ci.code, ci.title)
+    # Batch-load sessions from TrainingSession (the real/current model, linked via parade_night_id)
+    # NOTE: legacy ScheduledSession records are not loaded — they predate the v14 rewrite
+    all_ts: list[TrainingSession] = []
+    if pn_ids:
+        all_ts = db.query(TrainingSession).filter(
+            TrainingSession.parade_night_id.in_(pn_ids),
+            TrainingSession.is_archived == False,  # noqa: E712
+        ).all()
+
+    ts_by_date: dict[str, list[TrainingSession]] = {}
+    for s in all_ts:
+        date_id = pn_to_date_id.get(s.parade_night_id)
+        if date_id:
+            ts_by_date.setdefault(date_id, []).append(s)
 
     # Batch-load facilitator display names
-    fac_ids = list({s.facilitator_id for s in all_sessions if s.facilitator_id})
+    fac_ids = list({s.facilitator_id for s in all_ts if s.facilitator_id})
     fac_map: dict[str, str] = {}
     if fac_ids:
         for f in db.query(Facilitator).filter(Facilitator.id.in_(fac_ids)).all():
             fac_map[f.id] = f"{f.current_rank or ''} {f.last_name}".strip()
 
     # Batch-load location names
-    loc_ids = list({s.location_id for s in all_sessions if s.location_id})
+    loc_ids = list({s.training_area_id for s in all_ts if s.training_area_id})
     loc_map: dict[str, str] = {}
     if loc_ids:
-        for loc in db.query(PlanningLocation).filter(PlanningLocation.id.in_(loc_ids)).all():
+        for loc in db.query(TrainingArea).filter(TrainingArea.id.in_(loc_ids)).all():
             loc_map[loc.id] = loc.name
 
     # Batch-load unresolved conflict counts
@@ -3383,26 +3469,22 @@ def night_summaries(
 
     summaries = []
     for pd in all_dates:
-        pd_sessions = sessions_by_date.get(pd.id, [])
+        pd_sessions = ts_by_date.get(pd.id, [])
         session_summaries = []
         for s in pd_sessions:
-            code, title = curr_map.get(s.curriculum_id, (None, None)) if s.curriculum_id else (None, None)
             session_summaries.append({
                 "session_id": s.id,
-                "period": s.session_number,
+                "period": s.period_number,
                 "cadet_group": s.cadet_group,
-                "title": s.activity_title or title,
-                "curriculum_code": code,
+                "title": s.curriculum_title_at_time or s.custom_title,
+                "curriculum_code": s.curriculum_code_at_time,
                 "facilitator": fac_map.get(s.facilitator_id) if s.facilitator_id else None,
-                "location": loc_map.get(s.location_id) if s.location_id else None,
+                "location": (s.training_area_name_at_time or loc_map.get(s.training_area_id))
+                             if s.training_area_id else None,
             })
 
-        # parade night notes from linked ParadeNight
-        pn_notes = None
-        if pd.parade_night_id:
-            pn = db.get(ParadeNight, pd.parade_night_id)
-            if pn:
-                pn_notes = getattr(pn, "notes", None)
+        pn = pn_map.get(pd.parade_night_id) if pd.parade_night_id else None
+        pn_notes = getattr(pn, "notes", None) if pn else None
 
         summaries.append({
             "parade_date_id": pd.id,
@@ -3435,6 +3517,7 @@ def list_notices(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     pd = db.get(ParadeDate, date_id)
     if not pd:
         raise HTTPException(404, detail={"error": "parade_date_not_found"})
@@ -3572,6 +3655,7 @@ def list_cea_activities(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     _require_year_access(p, _get_year_or_404(year_id, db), write=False)
     from sqlalchemy import select
     stmt = select(CeaActivity).where(
@@ -3590,6 +3674,7 @@ def list_cea_batches(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     _require_year_access(p, _get_year_or_404(year_id, db), write=False)
     from sqlalchemy import select
     rows = db.scalars(
@@ -3673,12 +3758,13 @@ async def import_cea_csv(
     p: Principal = Depends(get_principal),
 ):
     require_role(p, "wing_admin", "national_admin", "system_admin")
-    year = db.get(PlanningYear, year_id)
-    if not year:
-        raise HTTPException(404, detail={"error": "year_not_found"})
+    year = _get_year_or_404(year_id, db)
     _require_year_access(p, year, write=True)
 
+    from ..config import settings as _settings
     content = await file.read()
+    if len(content) > _settings.UPLOAD_MAX_MB * 1024 * 1024:
+        raise HTTPException(413, detail={"error": "file_too_large"})
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -3826,6 +3912,7 @@ def classify_cea_activity(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     act = db.get(CeaActivity, activity_id)
     if not act or act.is_archived:
         raise HTTPException(404, detail={"error": "activity_not_found"})
@@ -3858,13 +3945,18 @@ def set_local_hide(
     p: Principal = Depends(get_principal),
 ):
     require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
-    if not p.unit_id:
+    if not p.squadron_id:
         raise HTTPException(400, detail={"error": "no_unit_scope"})
+    act = db.get(CeaActivity, activity_id)
+    if not act or act.is_archived:
+        raise HTTPException(404, detail={"error": "activity_not_found"})
+    py = _get_year_or_404(act.planning_year_id, db)
+    _require_year_access(p, py, write=True)
     from sqlalchemy import select
     existing = db.scalar(
         select(ActivityLocalHide).where(
             ActivityLocalHide.cea_activity_id == activity_id,
-            ActivityLocalHide.unit_id == p.unit_id,
+            ActivityLocalHide.unit_id == p.squadron_id,
         )
     )
     if existing:
@@ -3875,7 +3967,7 @@ def set_local_hide(
         db.add(ActivityLocalHide(
             id=str(uuid.uuid4()),
             cea_activity_id=activity_id,
-            unit_id=p.unit_id,
+            unit_id=p.squadron_id,
             is_hidden=body.is_hidden,
             local_note=body.local_note,
             hidden_by=p.user_id,
@@ -3908,6 +4000,7 @@ def create_manual_activity(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     _require_year_access(p, _get_year_or_404(year_id, db), write=True)
     act = CeaActivity(
         id=str(uuid.uuid4()),
