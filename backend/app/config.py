@@ -45,6 +45,21 @@ class Settings(BaseSettings):
 
     TRAINING_YEAR: int = 2026
 
+    # Defense in depth for reset_db()/seed_all(): SHA-256 fingerprints (of the
+    # DATABASE_URL hostname only — never the credentials) of databases that
+    # must never be destructively reset, regardless of what ENVIRONMENT says.
+    # This exists because production's ENVIRONMENT was found set to "staging"
+    # in practice — see docs/beta/11_defect_register.md — so ENVIRONMENT alone
+    # is not a sufficient guard. Comma-separated; extend via env var without
+    # a code change if another protected database is added.
+    PROTECTED_DB_HOST_FINGERPRINTS: str = (
+        "48de339b89ad325c27447d39c07b2ee3d56ebc155d46e517bc820b520a70c943"
+    )
+
+    @property
+    def protected_db_host_fingerprints(self) -> set[str]:
+        return {f.strip() for f in self.PROTECTED_DB_HOST_FINGERPRINTS.split(",") if f.strip()}
+
     @property
     def cors_origins(self) -> list[str]:
         return [o.strip() for o in self.CORS_ALLOWED_ORIGINS.split(",") if o.strip()]
