@@ -145,7 +145,11 @@ jobs:
           env.pop('SUPABASE_DB_URL', None)
 
           cmd = [
+              # --schema=public: matches the production workflow — the app
+              # only ever uses the public schema (see backup-postgresql.yml
+              # for why this matters even where it's a no-op today).
               'pg_dump', '--format=custom', '--no-owner', '--no-privileges', '--no-password',
+              '--schema=public',
               '--host', hostname, '--port', port, '--username', username, '--dbname', dbname,
               '--file', dump_path,
           ]

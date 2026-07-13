@@ -198,6 +198,16 @@ jobs:
               '--no-owner',
               '--no-privileges',
               '--no-password',
+              # Supabase projects also provision auth/storage/realtime/vault/
+              # graphql/pgbouncer schemas alongside the app's own `public`
+              # schema. Those are Supabase-platform-managed, not application
+              # data, and some (e.g. vault's supabase_vault extension) don't
+              # exist on a disposable vanilla Postgres restore target at all
+              # — a prior restore-test run failed on exactly that. The AAFC
+              # TMS application only ever uses the `public` schema (no model
+              # declares otherwise), so that's the only schema worth backing
+              # up or restoring for disaster recovery purposes.
+              '--schema=public',
               '--host',     hostname,
               '--port',     port,
               '--username', username,
