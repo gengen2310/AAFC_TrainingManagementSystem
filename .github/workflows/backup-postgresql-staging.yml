@@ -2,7 +2,7 @@
 #
 # Manual trigger only (workflow_dispatch) — staging is synthetic test data,
 # there is no need for a scheduled daily backup of it. For the production
-# backup, see backup-postgresql-production.yml (separate secret, separate
+# backup, see backup-postgresql.yml (separate secret, separate
 # schedule, separate artifact naming — the two cannot be confused).
 #
 # Prerequisites — GitHub Secrets:

@@ -2,7 +2,7 @@
 #
 # Manual trigger only (workflow_dispatch). Restores the most recent STAGING
 # backup artifact (postgresql-staging-backup-*) — see
-# test-restore-postgresql-production.yml for the production equivalent
+# test-restore-postgresql.yml for the production equivalent
 # (postgresql-production-backup-*, scheduled weekly). The two cannot be
 # confused: each only ever looks for its own artifact name prefix.
 #
@@ -258,7 +258,7 @@ jobs:
           failures = []
 
           # Computed dynamically by the "Compute expected Alembic head" step
-          # earlier in this job — see test-restore-postgresql-production.yml
+          # earlier in this job — see test-restore-postgresql.yml
           # for the identical mechanism.
           EXPECTED_HEAD = os.environ['EXPECTED_ALEMBIC_HEAD']
           try:

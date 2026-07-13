@@ -76,7 +76,7 @@ Commit and push:
 ```bash
 git add .github/backup-public-key.asc
 git commit -m "chore: add GPG public key for automated backup encryption"
-git push origin deployment/staging-v17.1
+git push origin release/beta-2026-07-14 (or the current release branch)
 ```
 
 ---
@@ -94,7 +94,7 @@ each targets a different database and cannot be confused for the other's evidenc
 
 | Secret name | Used by | Value to enter | Where to find it |
 |---|---|---|---|
-| `PROD_DATABASE_BACKUP_URL` | `backup-postgresql-production.yml` | Production Postgres **session-mode** URI, port 5432, `sslmode=require` | Supabase Dashboard → Settings → Database → Session Pooler. **Do not use the Transaction Pooler (port 6543)** — that's what the app's own `DATABASE_URL` uses at runtime, and pg_dump against it is unsupported/unreliable. |
+| `PROD_DATABASE_BACKUP_URL` | `backup-postgresql.yml` | Production Postgres **session-mode** URI, port 5432, `sslmode=require` | Supabase Dashboard → Settings → Database → Session Pooler. **Do not use the Transaction Pooler (port 6543)** — that's what the app's own `DATABASE_URL` uses at runtime, and pg_dump against it is unsupported/unreliable. |
 | `SUPABASE_DB_URL` | `backup-postgresql-staging.yml` | Staging Postgres URI (Railway's staging Postgres, public proxy, port 5432) | `railway variable list --service Postgres --environment staging --json` → `DATABASE_PUBLIC_URL`. Name kept for continuity with earlier setup — despite the name, this secret is **staging-only**. |
 | `BACKUP_GPG_PRIVATE_KEY` | both restore-test workflows | Contents of `/tmp/backup-private-key.b64` | Generated in Step 2 |
 | `BACKUP_GPG_PASSPHRASE` | both restore-test workflows | Passphrase chosen when generating the key | Your password manager |
@@ -131,8 +131,8 @@ SUPABASE_DB_URL
 
 ## Step 6 — Run a manual restore test
 
-1. Go to: **GitHub → Actions → PostgreSQL Restore Test — Weekly**
-2. Click **Run workflow** → select `deployment/staging-v17.1` → **Run workflow**
+1. Go to: **GitHub → Actions → PostgreSQL Restore Test — Production — Weekly**
+2. Click **Run workflow** → select `release/beta-2026-07-14 (or the current release branch)` → **Run workflow**
 3. All steps should pass, ending with:
    ```
    RESTORE VERIFICATION PASSED — all 15 checks passed.
@@ -146,7 +146,7 @@ SUPABASE_DB_URL
 
 If you need a backup outside the scheduled window:
 
-1. Go to **GitHub → Actions → PostgreSQL Backup — Daily**
+1. Go to **GitHub → Actions → PostgreSQL Backup — Production — Daily**
 2. Click **Run workflow**
 3. Wait for completion (typically 2–5 minutes warm)
 4. Download the artifact from the run summary
@@ -156,7 +156,7 @@ If you need a backup outside the scheduled window:
 ## Download and decrypt a backup
 
 ```bash
-# 1. Go to: GitHub → Actions → PostgreSQL Backup — Daily
+# 1. Go to: GitHub → Actions → PostgreSQL Backup — Production — Daily
 #    Find the run whose backup you want → Artifacts → download the .zip
 
 # 2. Unzip
@@ -244,9 +244,9 @@ Run this checklist quarterly:
 
 | File | Purpose |
 |---|---|
-| `.github/workflows/backup-postgresql-production.yml` | Daily production backup job (scheduled + manual) |
+| `.github/workflows/backup-postgresql.yml` | Daily production backup job (scheduled + manual) |
 | `.github/workflows/backup-postgresql-staging.yml` | Manual-only staging backup job |
-| `.github/workflows/test-restore-postgresql-production.yml` | Weekly production restore verification (scheduled + manual) |
+| `.github/workflows/test-restore-postgresql.yml` | Weekly production restore verification (scheduled + manual) |
 | `.github/workflows/test-restore-postgresql-staging.yml` | Manual-only staging restore verification |
 | `.github/backup-public-key.asc` | GPG public key (safe to commit) |
 | `backend/scripts/compute_alembic_head.py` | Computes the expected Alembic head from the checked-out migration files at restore-test time — never hardcode this value in a workflow again |
