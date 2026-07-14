@@ -1,17 +1,42 @@
 # AAFC TMS — Release State Checkpoint
 
 Living document. Update in place rather than appending — stale entries here are worse than none.
-Last updated: 2026-07-13 (session covering staging provisioning + backup-secret remediation).
+Last updated: 2026-07-14 (session covering staging provisioning, backup/restore redesign, and
+reconciliation with a parallel session's work on `main`).
+
+## ⚠️ Two Claude Code sessions worked this release in parallel — read this first
+
+A separate session worked the same release-readiness mandate directly against `main` while this
+session worked `release/beta-2026-07-14`. `main` advanced 18 commits past the point this branch
+diverged from, including its own fix for the same IDOR vulnerabilities (commits `c8b665e`,
+`e19e959`), migrations v35/v36, and substantial Planning Workspace frontend work. Discovered when
+the production restore-test surfaced an Alembic revision (`x9y0z1a2b3c4`) absent from this branch's
+history — traced to `origin/main`, not corruption. **Reconciled**: `origin/main` merged into
+`release/beta-2026-07-14` (commit `906f59f`), conflicts resolved by comparing both fixes on their
+merits (see `docs/beta/11_defect_register.md` DEFECT-001 for the facilitator-leave decision, and
+below for what was adopted from `main`). Full detail on the resolution and its verification is in
+commit `906f59f`'s message.
+
+**Still outstanding — a live migration revision-ID collision**: while investigating, this session
+found the *other* session's local uncommitted working tree contains
+`backend/alembic/versions/w8x9y0z1a2b3_v35_program_type.py` (renames `curriculum_items.core_status`
+values), reusing revision id `w8x9y0z1a2b3` — which `main` already uses for a *different* migration
+(`v35_planning_notices_updated_by`, now merged into this branch too). **That other session must
+rename their local migration's revision id (and update its `down_revision` to `x9y0z1a2b3c4`, the
+new actual head) before committing it**, or Alembic will reject it as a duplicate revision. This
+session did not touch that file — it remains stashed, untouched, in that session's own working
+tree/stash for them to resolve. Flagging here so it's visible before anyone hits it blind.
 
 ## Repository
 
 | Item | Value |
 |---|---|
-| Branch | `release/beta-2026-07-14` (created this session from `main` @ `96f2781`) |
-| HEAD | `96584e9` — "fix: add missing Dockerfile for Planning Workspace preview service" |
-| `main` HEAD | `96f2781` — unchanged, release branch not yet merged back |
-| Working tree | Clean except `CLAUDE.md` (rewrite in progress) and untracked `.claude/worktrees/agent-a384acc669dbfca9c/` (stale leftover from a prior agent session, not investigated further, not touched) |
-| Commits on release branch (not yet on `main`) | `3cfda93` (CEA/notices/facilitator-leave/planning-activities feature — migrations v30–v34), `3e9acd6` (backup GPG key rotation), `96584e9` (Planning Workspace Dockerfile fix) |
+| Branch | `release/beta-2026-07-14` (created 2026-07-13 from `main` @ `96f2781`) |
+| HEAD | `6db4bf8` — "docs: mark DEFECT-002 (destructive reset_db) as fixed" |
+| `main` HEAD (as of merge) | `bc40777` — merged into this branch at commit `906f59f`; `main` may have advanced further since |
+| Working tree | Clean except untracked `.claude/worktrees/agent-a384acc669dbfca9c/` (stale leftover from a prior agent session, not investigated further, not touched) |
+| Alembic head (this branch, post-merge) | `x9y0z1a2b3c4` (v36 — matches production's actual live schema revision) |
+| Key commits on release branch (not yet on `main`) | `3cfda93` (CEA/notices/facilitator-leave/planning-activities feature), `051ba4d` (IDOR fix, since reconciled with `main`'s independent fix), `27f1902`–`d22fbbd` (backup/restore redesign), `9e7a179` (reset_db safety guard), `906f59f` (merge reconciliation with `origin/main`) |
 
 ## ⚠️ Deployment provenance is untraceable
 

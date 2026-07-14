@@ -12,6 +12,8 @@ unsafe year rollover, failed rollback, CEA reimport losing local data).
 
 **Status**: Fixed on `release/beta-2026-07-14` (commit `051ba4d`), verified in staging. **Still live and unfixed in production** as of this writing — production has not been redeployed.
 
+**Update (2026-07-14, merge reconciliation)**: a separate concurrent session independently found and fixed the same three IDOR categories directly on `main` (commits `c8b665e`, `e19e959`) — good independent confirmation this was a real vulnerability. Reconciled via merge (commit `906f59f`): kept this branch's `require_can_view_squadron`/`require_can_write_squadron` fix for facilitator-leave over `main`'s ad-hoc role checks, which omit the proxy/delegated-intervention requirement this codebase enforces everywhere else for `wing_admin`/`national_admin` writes; combined both sides' checks for CEA/notices reads; adopted `main`'s `UPLOAD_MAX_MB` file-size guard on CEA import (a real gap this branch's fix missed); adopted `main`'s fix for a genuine pre-existing crash bug in `set_local_hide` (`p.unit_id` doesn't exist on `Principal`, only `p.squadron_id` — see the correction to the "Not affected" note below).
+
 **Reproducible failure**: An authenticated `sqn_admin` (or, for CEA import, `wing_admin`) could read and write facilitator-leave, notices, and CEA records belonging to a *different* squadron/wing than their own, by supplying that object's ID directly. `wing_admin`/`national_admin` could also write to any squadron's facilitator-leave without going through this codebase's otherwise-universal proxy/delegated-intervention mode.
 
 Reproduction (against the pre-fix code, `git stash` of commit `051ba4d`):
@@ -28,7 +30,7 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 - `GET/POST /api/planning/parade-dates/{date_id}/notices`, `PATCH /api/planning/notices/{notice_id}`, `POST /api/planning/notices/{notice_id}/archive`
 - `GET /api/planning/years/{year_id}/cea/activities`, `GET /api/planning/years/{year_id}/cea/batches`, `POST /api/planning/years/{year_id}/cea/import`, `PATCH /api/planning/cea/{activity_id}/classify`, `POST /api/planning/years/{year_id}/cea/activities`
 
-**Not affected** (checked, found correctly self-scoped): `POST /api/planning/cea/{activity_id}/local-hide` writes only to a row keyed by the caller's own `unit_id` — no target-object tenancy check is needed since it can't touch another org's data by construction.
+**Not affected by IDOR** (tenancy is correctly self-scoped): `POST /api/planning/cea/{activity_id}/local-hide` writes only to a row keyed by the caller's own scope — no target-object tenancy check is needed since it can't touch another org's data by construction. **Correction**: this session's original review stopped there without tracing the actual code, and missed that the endpoint referenced `p.unit_id` — an attribute that doesn't exist on `Principal` (only `p.squadron_id` does) — causing an `AttributeError` (500) on *every* call, unrelated to tenancy. A separate concurrent session found and fixed this (see the Update above). Lesson: "safe as-is" needs the same code-tracing rigor as a vulnerability fix, not just a design read-through.
 
 **Smallest safe fix**: fetch the target object first, then call the existing scope helper before mutating/returning anything — no new permission abstraction added. See commit `051ba4d`.
 
@@ -82,33 +84,44 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 
 ## DEFECT-006 — BLOCKER — Backup/restore has never succeeded
 
-**Status**: **PARTIALLY RESOLVED — do not treat as closed.** Split into three distinct claims, only the first is proven:
+**Status**: **Mechanism and production backup proven. Production restore proven at the PostgreSQL level. Application-level restore proof is code-complete but UNVERIFIED** — its one test run was interrupted by discovering the branch-divergence issue (see `docs/beta/00_release_state.md`) before completing. Do not treat as closed until that run is confirmed green.
 
 | Claim | Status |
 |---|---|
-| A. Backup/restore *mechanism* works (secrets, pg_dump/pg_restore version compatibility, encryption, checksum, upload, decryption, schema/row restore) | **Proven** — but only against the **staging** database. |
-| B. Production database is actually backed up by this mechanism | **Not proven.** `SUPABASE_DB_URL` was set to the staging Postgres's connection string specifically so as not to touch production. No production backup has been taken. |
-| C. Restored data is readable through the running application (backend + both frontends), not just via `psql` | **Not done.** The restore-test workflow validates schema/rows directly with `psql`; nothing has started a backend against restored data yet. |
+| A. Backup/restore *mechanism* works (secrets, pg_dump/pg_restore version compatibility, encryption, checksum, upload, decryption) | **Proven** — against both staging and production. |
+| B. Production database is actually backed up | **Proven.** Real production backup succeeded: run [`29281190414`](https://github.com/gengen2310/AAFC_TrainingManagementSystem/actions/runs/29281190414), 432,758-byte dump, artifact `postgresql-production-backup-20260713_200837`. |
+| C. Production backup restores into a disposable database at the schema/row level | **Proven** (after two additional real bugs found and fixed — see below). |
+| D. Restored data is readable through the running application, not just via `psql` | **Code complete, not yet verified.** Added to `test-restore-postgresql.yml`: installs backend deps, creates a throwaway `system_admin` via the ORM (no real production access code used), starts a real backend against the restored database, drives 7 authenticated reads through the actual API. Committed (`17b268d`) but never actually re-run — work paused here to reconcile with a concurrent session's changes on `main` first. **Re-run this workflow before treating backup/restore as release-ready.** |
 
-**Do not close this defect, and do not treat the production backup release gate as passed, until B and C are proven.** See Phase 2–5 work below for the corrected production-backup design and its proof.
+**Root cause (secrets)**: the committed `.github/backup-public-key.asc` had no corresponding `BACKUP_GPG_PRIVATE_KEY`/`BACKUP_GPG_PASSPHRASE` GitHub secret — a matching secret key existed only in a local GPG keyring whose passphrase was never recorded anywhere accessible. `SUPABASE_DB_URL` was also never set. Every daily backup run failed for at least 10 consecutive days (2026-07-03 → 2026-07-12).
 
-**Root cause (secrets)**: the committed `.github/backup-public-key.asc` had no corresponding `BACKUP_GPG_PRIVATE_KEY`/`BACKUP_GPG_PASSPHRASE` GitHub secret — a matching secret key existed only in a local GPG keyring whose passphrase was never recorded anywhere accessible. `SUPABASE_DB_URL` was also never set. Every daily backup run failed for at least 10 consecutive days (2026-07-03 → 2026-07-12); both restore-test runs failed.
+**Root cause (client/server version mismatch)**: first real run failed — `pg_dump: error: aborting because of server version mismatch` (Ubuntu's default `postgresql-client` is v16; production is Postgres 17.6, staging is 18.4). Fixed by installing `postgresql-client-18` from the official PGDG apt repo in both workflows (client ≥ server is the supported direction either way).
 
-**Root cause (version mismatch, found after fixing secrets)**: the first real run with all three secrets set still failed — `pg_dump: error: aborting because of server version mismatch` (server 18.4, Ubuntu's default `postgresql-client` gives pg_dump 16.14). The target Postgres (Railway's `postgres-ssl:18` image, and the restore-test's disposable `postgres:16-alpine` container) didn't match the CI runner's default client version.
+**Root cause (Supabase-internal schemas)**: first real *production* restore failed — `ERROR: extension "supabase_vault" is not available`. Production's Supabase project provisions `auth`/`extensions`/`graphql`/`pgbouncer`/`realtime`/`storage`/`vault` schemas alongside the app's own `public` schema; confirmed via direct read-only query that the app only ever uses `public`. Fixed with `pg_dump --schema=public`.
 
-**Fix**: rotated to a fresh GPG keypair (commit `3e9acd6`) per the project's own key-rotation runbook; set all three GitHub secrets (`SUPABASE_DB_URL` points at the staging Postgres, not production); established offline key custody at `~/Documents/AAFC-TMS-Backup-Recovery/`; both workflows now install `postgresql-client-18` from the official PGDG apt repo instead of the distro default, and the restore-test's disposable container was bumped to `postgres:18-alpine` to match (commit `a4e07bc`). Also fixed the restore verification's hardcoded `EXPECTED_HEAD` (was `e7a9c2f4b8d1`, ~9 migrations stale — would have failed verification even on a fully successful restore).
+**Root cause (schema-already-exists)**: with `--schema=public` added, the *next* restore attempt failed — `ERROR: schema "public" already exists` (the disposable target's default schema conflicts with the dump's explicit `CREATE SCHEMA public;`). Fixed with `pg_restore --clean --if-exists`.
 
-**Retest evidence** (both against `release/beta-2026-07-14`):
-- Backup run [`29246531883`](https://github.com/gengen2310/AAFC_TrainingManagementSystem/actions/runs/29246531883): SUCCESS, artifact `postgresql-backup-20260713_113151`.
-- Restore-test run [`29277833870`](https://github.com/gengen2310/AAFC_TrainingManagementSystem/actions/runs/29277833870): SUCCESS — SHA-256 integrity check passed, decrypted, restored into a disposable `postgres:18-alpine` container, `alembic_version = v7w8x9y0z1a2` (head), all required tables present with correct row counts (squadrons: 16, users: 38, access_codes: 38, curriculum_items: 13, planning_years: 1, etc.), disposable container destroyed at end of run.
+**Also fixed along the way**: split into separate production/staging workflows with distinct secrets (`PROD_DATABASE_BACKUP_URL` vs `SUPABASE_DB_URL`) and a non-secret hostname-fingerprint cross-check so one can never be run against the other's database by mistake; replaced the restore-test's hardcoded `EXPECTED_HEAD` (found stale by ~9 migrations) with `backend/scripts/compute_alembic_head.py`, which derives the head dynamically from the checked-out migration files and fails loudly on a branched chain (5 unit tests, `test_compute_alembic_head.py`).
 
-**Not yet done**: reading the restored data back through an actual running backend + both frontends (the workflow validates schema/rows via `psql`, not via the application). Recommended before fully signing off backup/restore for the final GO/NO-GO, but the BLOCKER-level "has a successful backup and restore ever happened" question is now answered yes.
+**Retest evidence (production, PostgreSQL-level)**: restore run [`29281292666`](https://github.com/gengen2310/AAFC_TrainingManagementSystem/actions/runs/29281292666) SUCCESS — SHA-256 integrity passed, restored into a disposable `postgres:18-alpine` container, `alembic_version = x9y0z1a2b3c4`, all required tables present with real production row counts (wings: 8, squadrons: 16, users: 39, audit_logs: 431, curriculum_items: 217, planning_years: 10), container destroyed at end of run.
+
+**Outstanding**: re-run the restore-test workflow (now including the application-level check) against the reconciled, merged branch to get claim D's actual evidence before signing off.
 
 ---
 
 ## DEFECT-007 — LOW — Vitest was executing Playwright e2e specs
 
 **Status**: Fixed (commit `6ccbec9`). `npm run test` failed 2 suites because `e2e/*.spec.ts` (Playwright) has no Vitest exclude. Added `exclude: ["e2e/**"]` to `vite.config.ts`'s test block. Frontend unit suite now: 4 files, 8 tests, all passing, 0 false failures.
+
+---
+
+## DEFECT-008 — HIGH (process, not yet materialized) — Migration revision-ID collision pending on `main`
+
+**Status**: Open — belongs to a different (concurrent) session to resolve; not touched here.
+
+**Detail**: a parallel Claude Code session working the same release directly against `main` has an uncommitted local migration `backend/alembic/versions/w8x9y0z1a2b3_v35_program_type.py` (renames `curriculum_items.core_status` values from `core`/`additional` to `foundation`/`extension`) that reuses revision id `w8x9y0z1a2b3` — already used by a *different* migration already committed to `main` and merged into `release/beta-2026-07-14` (`v35_planning_notices_updated_by`, commit `906f59f`). Confirmed production still has the old `core`/`additional` values (queried directly, read-only) — so this migration hasn't been applied anywhere yet.
+
+**Required fix (not this session's to make)**: before that migration is committed, its `revision` must be changed to a new unique id and its `down_revision` updated to `x9y0z1a2b3c4` (the current actual head, per `backend/scripts/compute_alembic_head.py`), not `v7w8x9y0z1a2`. Left untouched in the other session's stash/working tree per explicit instruction not to touch their uncommitted work.
 
 ---
 
@@ -121,7 +134,8 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 | DEFECT-003 | MEDIUM | Open, under investigation |
 | DEFECT-004 | MEDIUM | Open, under investigation |
 | DEFECT-005 | HIGH | Fixed on release branch, staging-verified; **open in production** |
-| DEFECT-006 | BLOCKER | **Mechanism proven on staging only — production backup and application-level restore proof still outstanding** |
+| DEFECT-006 | BLOCKER | Backup + PostgreSQL-level restore proven on production; **application-level restore check code-complete but unverified — re-run required** |
 | DEFECT-007 | LOW | Fixed |
+| DEFECT-008 | HIGH (process) | Open — belongs to a concurrent session, flagged not fixed |
 
-**One of two BLOCKERs fully resolved (backup/restore). The other (DEFECT-001, live-production IDOR) is fixed and verified on the release branch/staging but requires a production deploy + approval to close. Zero unresolved-high-defect count is not yet zero (DEFECT-002, DEFECT-005-in-production). Not release-ready.**
+**Neither BLOCKER is fully closed yet.** DEFECT-001 (live-production IDOR) is fixed and verified on the release branch/staging but requires a production deploy + approval to close there. DEFECT-006 (backup/restore) has real production backup and restore evidence but its final application-level check has not actually been re-run since being added. Not release-ready.
