@@ -1,8 +1,18 @@
 # AAFC TMS — Release State Checkpoint
 
 Living document. Update in place rather than appending — stale entries here are worse than none.
-Last updated: 2026-07-14 (session covering staging provisioning, backup/restore redesign, and
-reconciliation with a parallel session's work on `main`).
+Last updated: 2026-07-14 (session covering staging provisioning, backup/restore redesign,
+reconciliation with a parallel session's work on `main`, and the production
+ENVIRONMENT/COOKIE_SAMESITE investigation).
+
+## Production ENVIRONMENT / COOKIE_SAMESITE — investigation complete
+
+Full findings, the behaviour table, and the empirical `SameSite` test results are in
+`docs/beta/11_defect_register.md` (DEFECT-003, DEFECT-004) — not duplicated here. Summary: one
+concrete live risk found and code-fixed (`bootstrap-staging` not rejecting in production, commit
+`f303895`); the production `ENVIRONMENT=production` variable change itself is prepared and
+verified safe but **not applied — needs your approval**. `COOKIE_SAMESITE=none` is confirmed
+required by the architecture, not a misconfiguration — do not change it.
 
 ## ⚠️ Two Claude Code sessions worked this release in parallel — read this first
 
