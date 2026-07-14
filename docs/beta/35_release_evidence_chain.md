@@ -16,11 +16,12 @@ This document provides traceability from source code to production deployment. I
 | Field | Value |
 |---|---|
 | Branch | `release/beta-2026-07-14` |
-| Release candidate commit | `e918f3e654179355fe100fda285452844bdcbea0` |
-| RC tag | `beta-2026-07-14-rc1` |
-| Tag object | Lightweight tag on `e918f3e` |
+| Release candidate commit | `e539d02c25b00bc11a197b3324eb52c71efdb093` |
+| RC tag | `beta-2026-07-14-rc2` |
+| Tag object | Annotated tag on `e539d02` |
 | Tag status | Created locally; pushed to origin: PENDING |
-| Commit message | `feat: remove 9 dead planning divs, simplify nav hook, fix ops N+1` |
+| Commit message | `fix: replace useBlocker with useLocation in useProxyGuard; fix 35 Playwright E2E tests` |
+| Prior RC (superseded) | `beta-2026-07-14-rc1` → `e918f3e` — superseded; rc2 includes all rc1 changes plus the useBlocker crash fix |
 | Files changed (total) | 4 source files + documentation |
 | Evidence file | `docs/beta/34_release_candidate_record.md` |
 
@@ -33,18 +34,14 @@ This document provides traceability from source code to production deployment. I
 | Metric | Value |
 |---|---|
 | Test runner | pytest |
-| Total tests | 503 |
-| Test outcome | PENDING re-run on clean RC (run before production deployment) |
-| Test files | `backend/tests/` — 22 test modules |
-| Key regression tests | `test_lockout.py`, `test_planning_access.py`, `test_idor_prevention.py`, `test_audit.py` |
+| Total tests | 541 |
+| Test outcome | 541 passed, 1 skipped, 0 failures |
+| Test files | `backend/tests/` — 23 test modules |
+| Key regression tests | `test_lockout.py`, `test_planning_access.py`, `test_idor_prevention.py`, `test_audit.py`, `test_session_lifecycle.py` |
 | `datetime.utcnow()` deprecations | 0 (fixed on this branch) |
-| Required evidence | pytest exit code 0 from `backend/` on commit `e918f3e` |
-
-**Before production deployment**: run `cd backend && python -m pytest` and record the result in this document.
-
-Actual test run result: **503 passed, 1 skipped, 0 failures**
-Test run timestamp: 2026-07-14T08:47:05Z
-Test run commit: `467e0fa22480fbfd471cc508606978fd0e69b97a` (HEAD on `release/beta-2026-07-14`, contains `e918f3e` RC source)
+| Playwright E2E | 35/35 passed (useBlocker crash fixed in rc2) |
+| Test run commit | `e539d02` (rc2) |
+| Test run timestamp | 2026-07-14T13:15:00+0800 |
 
 ---
 
@@ -174,7 +171,7 @@ Minimum acceptable evidence before release:
 | Field | Value |
 |---|---|
 | GO/NO-GO gate document | `docs/beta/13_executive_go_no_go.md` |
-| Current status | CONDITIONAL GO |
+| Current status | NO-GO (staging rehearsal, load test, push not done) |
 | Remaining gates to close | Production deployment approval, browser verification, UAT, rollback rehearsal |
 | Final approval authority | Named person — PENDING |
 | Approval method | ___________________  |
@@ -186,8 +183,8 @@ Minimum acceptable evidence before release:
 
 | Link | Description | Status |
 |---|---|---|
-| 1 | Git commit `e918f3e` / tag `beta-2026-07-14-rc1` | COMPLETE (tag push pending) |
-| 2 | Automated tests: 503 tests | PENDING re-run on RC |
+| 1 | Git commit `e539d02` / tag `beta-2026-07-14-rc2` | COMPLETE (tag push pending) |
+| 2 | Backend: 541 tests pass; Playwright E2E: 35/35 pass | COMPLETE on rc2 |
 | 3 | Staging deployment of `e918f3e` | PENDING |
 | 4 | Database migration `x9y0z1a2b3c4` applied | PENDING |
 | 5 | Backend health `squadrons:16` | PENDING |
@@ -199,6 +196,6 @@ Minimum acceptable evidence before release:
 | 11 | Rollback rehearsal in staging | PENDING |
 | 12 | Final GO/NO-GO approval | PENDING |
 
-**Links 1 is complete. Links 2–12 are pending human execution, approval, or external action.**
+**Links 1–2 are complete. Links 3–12 are pending human execution, approval, or external action.**
 
 This document must be fully populated before the release is approved.

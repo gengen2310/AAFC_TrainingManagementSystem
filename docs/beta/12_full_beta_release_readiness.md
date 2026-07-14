@@ -9,7 +9,7 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) addit
 
 | Check | Required | Status | Evidence |
 |---|---|---|---|
-| Backend tests: all pass | 0 failures | ✅ PASS | 503 passed, 1 skipped (2026-07-14) |
+| Backend tests: all pass | 0 failures | ✅ PASS | 541 passed, 1 skipped (2026-07-14, commit e539d02) |
 | TypeScript: 0 errors | 0 errors | ✅ PASS | `npx tsc --noEmit` (2026-07-14) |
 | No `datetime.utcnow()` deprecations | 0 in production code | ✅ PASS | Grep clean (2026-07-14) |
 | Security grep 1: removed wording | 0 matches | ✅ PASS | Grep clean (2026-07-14) |
@@ -73,7 +73,9 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) addit
 | Branch fixes deployed to prod | Required for GA | ⚠️ PENDING | DEFECT-001, DEFECT-003, DEFECT-005 |
 | Deployment rehearsal (staging) | Must be completed | ⚠️ PENDING | `41_deployment_rehearsal.md` |
 | Rollback rehearsal (staging) | Must be completed | ⚠️ PENDING | `41_deployment_rehearsal.md` (Steps R1–R5) |
-| RC tag pushed to origin | Must be pushed | ⚠️ PENDING | `beta-2026-07-14-rc1` local only |
+| RC tag pushed to origin | Must be pushed | ⚠️ PENDING | `beta-2026-07-14-rc2` at e539d02 — local only; push required |
+| Playwright E2E: 35 tests pass | 0 failures | ✅ PASS | 35/35 at commit e539d02 (2026-07-14) |
+| 100-user concurrent load test | Mandatory pre-release | ❌ NOT DONE | Must run against staging before production |
 
 ---
 
@@ -141,13 +143,23 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) addit
 | 2: Migration and Schema | ✅ PASS | — |
 | 3: Security | ⚠️ PARTIAL | DEFECT-001, DEFECT-003 awaiting deploy |
 | 4: Backup and Recovery | ⚠️ PARTIAL | Backup key custody (human) |
-| 5: Deployment | ⚠️ PARTIAL | Branch fixes not in production; rehearsal needed |
+| 5: Deployment | ❌ FAIL | Playwright E2E gate now PASS; RC tag created (rc2); load test NOT DONE; rehearsal NOT DONE |
 | 6: Documentation | ⚠️ PARTIAL | All docs written; 26 blocked (browser); governance pending |
 | 7: Human Acceptance | ⚠️ PENDING | UAT, browser verification, approvals, smoke test |
 
-**Overall**: 2 of 7 gates fully cleared. All remaining blockers are in one of three categories:
-1. Production deployment approval + execution (DEFECT-001, DEFECT-003, DEFECT-005)
-2. Staging rehearsal (deploy + rollback, then populate `41_deployment_rehearsal.md`)
-3. Human acceptance actions (UAT, governance, key custody, smoke test)
+**Overall**: 2 of 7 gates fully cleared (Code Quality; Migration/Schema).
 
-**Recommendation**: Request production deployment approval. Once approved and executed, all technical gates can be closed. Human acceptance then follows in parallel.
+**Completed since last update (2026-07-14, commit e539d02, tag `beta-2026-07-14-rc2`):**
+- Backend tests: 541 passed (36 new session-lifecycle, training-area, equipment, cadet tests)
+- Playwright E2E: 35/35 passing (root cause: `useBlocker` crash in `useProxyGuard` fixed)
+- RC2 tag created at e539d02
+
+**Remaining mandatory technical gates before production approval may be requested:**
+1. Push `beta-2026-07-14-rc2` to origin
+2. Staging deployment rehearsal (Steps D1–D7 in `41_deployment_rehearsal.md`)
+3. Staging rollback rehearsal (Steps R1–R5 in `41_deployment_rehearsal.md`)
+4. 100-user concurrent load test against staging (45 minutes minimum)
+5. Deploy DEFECT-001, DEFECT-003, DEFECT-005 fixes to production
+
+**Then human gates:**
+6. UAT, governance, key custody, browser verification, smoke test, explicit approval
