@@ -83,8 +83,9 @@ def rep_coverage(db: DBSession = Depends(get_db), p: Principal = Depends(get_pri
     items = db.query(CurriculumItem).filter(
         (CurriculumItem.owning_level == "national") | (CurriculumItem.squadron_id == sq),
         CurriculumItem.is_archived == False).all()  # noqa: E712
-    scheduled = {s.curriculum_item_id for s in _all_sessions(db, sq) if s.curriculum_item_id}
-    delivered = {s.curriculum_item_id for s in _all_sessions(db, sq)
+    all_sess = _all_sessions(db, sq)
+    scheduled = {s.curriculum_item_id for s in all_sess if s.curriculum_item_id}
+    delivered = {s.curriculum_item_id for s in all_sess
                  if s.curriculum_item_id and s.status in ("delivered", "delivered_with_issue")}
     total = len(items)
     sched = len([i for i in items if i.id in scheduled])
