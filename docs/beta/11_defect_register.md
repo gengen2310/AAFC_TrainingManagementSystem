@@ -56,17 +56,44 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 
 ---
 
-## DEFECT-003 — MEDIUM — Production `ENVIRONMENT` variable reads `staging`, not `production`
+## DEFECT-003 — HIGH — Production `ENVIRONMENT` variable reads `staging`, not `production`
 
-**Status**: Open, investigation not complete. Not changed — do not change without further verification (see `docs/beta/00_release_state.md`, Phase G).
+**Status**: Investigation complete. Root cause understood, one concrete live risk found and fixed in code (commit `f303895`), the underlying variable itself not yet changed on production — prepared below, pending approval per rule 13.
 
-**Detail**: `backend/app/config.py`'s `is_production`/`validate_for_production()` fail-closed startup checks key off `ENVIRONMENT == "production"/"prod"`. Production's Railway backend service currently has `ENVIRONMENT=staging`. Confirmed **not** to expose `/docs` (that's hardcoded off in `main.py` regardless of environment). Full trace of what else this disables is not yet complete.
+**Every place `ENVIRONMENT`/`is_prod` actually controls behaviour** (traced exhaustively via `grep` across `app/`, not inferred):
+
+| Behaviour | Code | Effect of `ENVIRONMENT=staging` on production right now | Risk if left as-is |
+|---|---|---|---|
+| Fail-closed startup validation (`validate_for_production()`) — refuses to start with a weak `SECRET_KEY`/`JWT_SECRET`, `COOKIE_SECURE=false`, empty/wildcard/localhost CORS, or a SQLite `DATABASE_URL` | `config.py` | **Disabled.** Currently benign — checked directly (without printing secrets): `SECRET_KEY`/`JWT_SECRET` are both 54 chars (not dev-prefixed), `COOKIE_SECURE=true`, CORS has no wildcard/localhost, `DATABASE_URL` is not SQLite. All would already pass if this check were active. | HIGH but currently latent — this safety net is silently off; if any of those settings were ever weakened by mistake in the future, the app would start anyway instead of refusing. |
+| HSTS header (`Strict-Transport-Security`) | `main.py` security-headers middleware | **Not sent.** Real production traffic is HTTPS-only (Railway terminates TLS) regardless, but browsers aren't told to enforce HTTPS-only for future requests to this host. | MEDIUM — narrows, doesn't eliminate, a downgrade-to-HTTP MITM window. |
+| `POST /api/system/bootstrap-staging` — creates `national_admin`/`wing_admin`/`sqn_admin` accounts with fresh one-time access codes, explicitly "Rejected in production" per its own docstring | `routers/system.py` | **Was not rejected** — the guard checked `ENVIRONMENT.lower() == "production"` literally, so with `ENVIRONMENT=staging` it passed straight through. Confirmed via static trace, not executed against production (would have been a write action). | **HIGH — the one concrete, currently-exploitable consequence.** Gated behind `require_system_admin`, so not open to any authenticated user, but a compromised/malicious system_admin session (the highest-privilege role) could invoke this against production today. **Fixed in code** (commit `f303895`, switched to `settings.is_prod` for consistency) — but this fix alone does not close the live risk, since `is_prod` is *also* false while `ENVIRONMENT=staging`. Closing it requires the variable correction below. |
+| `/docs`, `/redoc`, `/openapi.json` | `main.py` `FastAPI(... docs_url=None, redoc_url=None, openapi_url=None)` | **Unaffected** — hardcoded off unconditionally, not gated by environment at all. | None. |
+| Debug/error detail leakage | `main.py` `server_error` handler | **Unaffected** — always returns a generic `{"error": "internal_error"}`, no `debug=True` anywhere. | None. |
+| Rate limiting | `security.py` | **Unaffected** — not environment-gated. | None. |
+| `reset_db()` destructive-seed guard (this session's own new code, DEFECT-002) | `database.py` | **Partially bypassed** by this specific check (since `ENVIRONMENT != "production"`), but the separate hostname-fingerprint check added in the same fix catches production independently of `ENVIRONMENT` — deliberately designed that way *because* of this exact finding. | Mitigated already. |
+| `/api/system/status` `environment` field | `routers/system.py` | Reports `"staging"` — misleading to anyone checking operational status. | LOW — cosmetic/confusing, not a security hole. |
+
+**Overall classification: HIGH**, not the MEDIUM this was originally logged as — the `bootstrap-staging` finding is concrete and currently live, not theoretical.
+
+**Recommended production change** (prepared, not applied — needs your approval): set `ENVIRONMENT=production` on the `aafc-tms-backend` service in the Railway `production` environment. Verified safe to apply — production's current `SECRET_KEY`/`JWT_SECRET`/`COOKIE_SECURE`/`CORS_ALLOWED_ORIGINS`/`DATABASE_URL` were all checked (without exposing values) and would pass `validate_for_production()` cleanly, so flipping this variable will not crash-loop the app on next restart. After changing it: confirm `/api/system/status` reports `"production"`, confirm the HSTS header appears on a response, and confirm `POST /api/system/bootstrap-staging` now returns 403 for a system_admin (do this against **staging with `ENVIRONMENT` temporarily set to `production`** first, not production directly, to avoid any live write risk during verification).
 
 ---
 
-## DEFECT-004 — MEDIUM — Production `COOKIE_SAMESITE=none` vs. project rule of `strict`
+## DEFECT-004 — RESOLVED (not a defect) — Production `COOKIE_SAMESITE=none` is required by the current architecture, not a misconfiguration
 
-**Status**: Open, investigation not complete — do not change without testing (frontend/backend are cross-subdomain; changing this could break login). See `docs/beta/00_release_state.md`, Phase G.
+**Status**: Investigated empirically against staging. **`none` is correct and must not be changed** — closing this as "working as required," not open.
+
+**Architecture context found first**: the two frontends use *different* auth mechanisms entirely. The React Planning Workspace (`frontend/`) stores its JWT in `sessionStorage` and sends it as an `Authorization: Bearer` header on every request (`frontend/src/api/client.ts`) — `SameSite` is irrelevant to it, since `backend/app/dependencies.py`'s `_token_from_request()` checks the header first and only falls back to the cookie if there is no header. The legacy `connected-frontend/` has no such token storage (per the project's own rule against storing tokens client-side) and relies purely on the browser automatically attaching the `aafc_session` cookie on every cross-origin request to the backend.
+
+**Why this is genuinely cross-site**: `up.railway.app` is on the public suffix list (confirmed: `curl https://publicsuffix.org/list/public_suffix_list.dat | grep -x up.railway.app` matches) — so `aafc-tms-frontend-*.up.railway.app`, `aafc-tms-backend-*.up.railway.app`, and `aafc-tms-planning-workspace-preview-*.up.railway.app` are each a distinct "site" to the browser, not subdomains of one shared site. Cross-site cookies require `SameSite=None; Secure` to be sent at all.
+
+**Empirical proof (staging, real Chromium via Playwright, not just reasoning)**:
+1. Baseline, `COOKIE_SAMESITE=none`: cross-origin `fetch` from the frontend origin to the backend origin with `credentials: 'include'` — login succeeds (200, cookie set with `sameSite=None, secure=true, httpOnly=true`), and a **subsequent cross-origin request with no `Authorization` header at all** — pure cookie auth — succeeds (`GET /api/auth/me` → 200, correct session data).
+2. Toggled `COOKIE_SAMESITE=lax` on staging, redeployed, repeated the identical test: login still returns 200, but **the cookie no longer appears in the browser's cookie jar at all**, and the follow-up cookie-only request gets `401 auth_required`. Cookie-based auth is completely broken.
+3. `strict` was not separately tested — it is strictly more restrictive than `lax`, which already failed; there is no scenario where `strict` would succeed where `lax` didn't.
+4. Reverted `COOKIE_SAMESITE` back to `none` on staging and confirmed the backend redeployed healthy and the health endpoint responds correctly again.
+
+**Recommendation**: keep `COOKIE_SAMESITE=none` in production. Changing it to `lax` or `strict` would completely break the legacy TMS's ability to authenticate against the backend (confirmed, not theoretical). The project rule this was checked against ("`.claude/rules/deployment.md`: `COOKIE_SAMESITE=strict` required in production") predates the current multi-subdomain Railway architecture and is itself the stale artifact — not production's configuration. Recommend updating that rule doc rather than production. The durable fix, if ever wanted, is deploying all services under one registered domain (e.g. `tms.aafc.org` + `api.tms.aafc.org`) so they share an eTLD+1 and are no longer cross-site by the browser's definition — a real infrastructure change, out of scope before this release.
 
 ---
 
@@ -133,11 +160,11 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 |---|---|---|
 | DEFECT-001 | BLOCKER | Fixed on release branch, staging-verified; **open in production** |
 | DEFECT-002 | HIGH | **Fixed** |
-| DEFECT-003 | MEDIUM | Open, under investigation |
-| DEFECT-004 | MEDIUM | Open, under investigation |
+| DEFECT-003 | **HIGH** (reclassified from MEDIUM) | `bootstrap-staging` code fixed (`f303895`); production `ENVIRONMENT` variable change prepared, **pending approval** |
+| DEFECT-004 | N/A | **Resolved as not-a-defect** — `SameSite=none` proven required by the current architecture, empirically tested on staging |
 | DEFECT-005 | HIGH | Fixed on release branch, staging-verified; **open in production** |
 | DEFECT-006 | BLOCKER | **Resolved — proven end-to-end (backup, restore, application-level reads), all against real production data** |
 | DEFECT-007 | LOW | Fixed |
 | DEFECT-008 | HIGH (process) | Open — belongs to a concurrent session, flagged not fixed |
 
-**One of two BLOCKERs fully resolved (DEFECT-006, backup/restore — proven end-to-end).** DEFECT-001 (live-production IDOR) is fixed and verified on the release branch/staging but requires a production deploy + approval to close there. Not release-ready until that deploy happens, DEFECT-002/DEFECT-005-in-production are addressed, and DEFECT-008 (migration-ID collision, owned by a concurrent session) is resolved.
+**One of two BLOCKERs fully resolved (DEFECT-006, backup/restore — proven end-to-end).** DEFECT-001 (live-production IDOR) is fixed and verified on the release branch/staging but requires a production deploy + approval to close there. DEFECT-003 was reclassified HIGH after finding a concrete, currently-live consequence (`bootstrap-staging` not rejecting in production) — code-fixed, but the underlying production `ENVIRONMENT` variable still needs your approval to change. DEFECT-004 turned out not to be a defect at all. Not release-ready until: the production IDOR deploy happens, DEFECT-003's production variable change is approved and applied, DEFECT-005 (Planning Workspace Dockerfile) is deployed to production, and DEFECT-008 (migration-ID collision, owned by a concurrent session) is resolved.
