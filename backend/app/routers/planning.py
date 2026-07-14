@@ -153,10 +153,10 @@ def _require_plan_write(p: Principal) -> None:
 
 
 def _require_year_access(p: Principal, py: PlanningYear, write: bool = False) -> None:
-    """Enforce scope: sqn_admin → own sqn; wing_admin → own wing; nat → all."""
+    """Enforce scope: sqn_admin/sqn_general → own sqn; wing_admin → own wing; nat → all."""
     if write and p.role in _WRITE_BLOCKED:
         raise HTTPException(403, detail={"error": "forbidden"})
-    if p.role == "sqn_admin":
+    if p.role in ("sqn_admin", "sqn_general"):
         if py.unit_id != p.squadron_id:
             raise HTTPException(403, detail={"error": "out_of_scope"})
     elif p.role == "wing_admin":
@@ -165,7 +165,7 @@ def _require_year_access(p: Principal, py: PlanningYear, write: bool = False) ->
     elif p.role in ("wing_viewer", "national_viewer", "auditor"):
         if p.role == "wing_viewer" and py.wing_id != p.wing_id:
             raise HTTPException(403, detail={"error": "out_of_scope"})
-    # nat/system: unrestricted
+    # national_admin, system_admin: unrestricted
 
 
 def _get_year_or_404(year_id: str, db: DBSession) -> PlanningYear:
@@ -3924,8 +3924,8 @@ def classify_cea_activity(
     act.audience_first_years = body.audience_first_years
     act.classification_status = "classified" if body.importance else "needs_review"
     act.classified_by = p.user_id
-    from datetime import datetime as _dt
-    act.classified_at = _dt.utcnow().isoformat()
+    from datetime import datetime, timezone
+    act.classified_at = datetime.now(timezone.utc).isoformat()
     act.updated_at = utcnow()
     db.commit()
     audit(db, p, object_type="CeaActivity", object_id=activity_id, action="classify")

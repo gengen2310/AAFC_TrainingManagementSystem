@@ -1,5 +1,5 @@
 """Per-account and DB-backed IP lockout tests."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import text
@@ -112,7 +112,7 @@ def test_account_lockout_does_not_affect_other_accounts(client):
 def test_successful_login_resets_account_lockout(client):
     # Directly set a past locked_until (already expired) so login still succeeds but resets counters
     ac_id = _find_ac_id("ADMIN703")
-    expired_dt = datetime.utcnow() - timedelta(minutes=1)
+    expired_dt = datetime.now(timezone.utc) - timedelta(minutes=1)
     with engine.begin() as conn:
         conn.execute(
             text("UPDATE access_codes SET locked_until=:lu, failed_attempts=3 WHERE id=:id"),

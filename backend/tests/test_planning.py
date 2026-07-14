@@ -1223,3 +1223,61 @@ def test_cea_same_squadron_admin_allowed(client):
     r = client.patch(f"/api/planning/cea/{activity_id}/classify",
                       json={"importance": "high"}, headers=hdr703)
     assert r.status_code == 200, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# sqn_general scope restriction in _require_year_access
+#
+# sqn_general (read-only squadron user) was falling through
+# _require_year_access without any squadron-scope check, meaning
+# a 701 SQN general user could read 703 SQN planning data.
+# Fixed by adding "sqn_general" to the sqn_admin branch.
+# ─────────────────────────────────────────────────────────────
+
+def _other_sqn_general_hdr(client):
+    """sqn_general user for squadron 701 — different from 703."""
+    return login(client, "701SQN2026")
+
+
+def test_sqn_general_cannot_read_other_sqn_planning_year(client):
+    """sqn_general from 701 must not read a 703 planning year."""
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+
+    other_general = _other_sqn_general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/annual-program", headers=other_general)
+    assert r.status_code == 403, r.text
+
+
+def test_sqn_general_cannot_read_other_sqn_missions(client):
+    """sqn_general from 701 must not read 703 mission backlog."""
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+
+    other_general = _other_sqn_general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/missions", headers=other_general)
+    assert r.status_code == 403, r.text
+
+
+def test_sqn_general_cannot_read_other_sqn_cea(client):
+    """sqn_general from 701 must not read 703 CEA activities."""
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+
+    other_general = _other_sqn_general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/cea/activities", headers=other_general)
+    assert r.status_code == 403, r.text
+
+
+def test_sqn_general_can_read_own_sqn_planning_year(client):
+    """Regression guard: sqn_general must still read their own squadron's data."""
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+
+    own_general = _general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/annual-program", headers=own_general)
+    assert r.status_code == 200, r.text
