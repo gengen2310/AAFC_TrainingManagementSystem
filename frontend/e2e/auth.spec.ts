@@ -48,10 +48,12 @@ test.describe("Login", () => {
     await page.getByLabel("Access code").fill("ADMIN703");
     await page.getByRole("button", { name: "Log in" }).click();
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
-    // Clear the token to simulate expiry
-    await page.evaluate(() => sessionStorage.removeItem("aafc_token"));
+    // Simulate session expiry: use the Sign out button (which calls the backend logout
+    // endpoint AND clears the HttpOnly session cookie). Clearing sessionStorage alone
+    // does not work — the backend falls back to the cookie on reload.
+    await page.getByRole("button", { name: /sign out/i }).click();
+    await expect(page.getByRole("button", { name: "Log in" })).toBeVisible({ timeout: 5000 });
     await page.reload();
-    // Should return to login
     await expect(page.getByRole("button", { name: "Log in" })).toBeVisible({ timeout: 5000 });
   });
 });
@@ -68,14 +70,16 @@ test.describe("Role-based landing", () => {
     await page.goto("/");
     await page.getByLabel("Access code").fill("ADMIN7WG");
     await page.getByRole("button", { name: "Log in" }).click();
-    await expect(page.getByRole("heading", { name: /wing overview/i })).toBeVisible({ timeout: 10000 });
+    // WingOverview renders <h1>Wing Assurance</h1>
+    await expect(page.getByRole("heading", { name: /wing assurance/i })).toBeVisible({ timeout: 10000 });
   });
 
   test("national_admin user reaches national overview", async ({ page }) => {
     await page.goto("/");
     await page.getByLabel("Access code").fill("ADMINNATIONAL");
     await page.getByRole("button", { name: "Log in" }).click();
-    await expect(page.getByRole("heading", { name: /national overview/i })).toBeVisible({ timeout: 10000 });
+    // NationalOverview renders <h1>National Assurance</h1>
+    await expect(page.getByRole("heading", { name: /national assurance/i })).toBeVisible({ timeout: 10000 });
   });
 
   test("auditor user reaches audit log", async ({ page }) => {

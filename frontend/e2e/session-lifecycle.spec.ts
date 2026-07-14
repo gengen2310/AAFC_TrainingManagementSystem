@@ -22,18 +22,18 @@ test("parade night list shows planned nights", async ({ page }) => {
 test("can open a parade night detail", async ({ page }) => {
   await page.goto("/parade-nights");
   await expect(page.getByRole("heading", { name: /parade night/i })).toBeVisible({ timeout: 8000 });
-  // Click the first parade night link/button
-  const nightLink = page.getByRole("link", { name: /2026|parade/i }).first();
-  if (await nightLink.count() > 0) {
-    await nightLink.click();
-    // Should navigate to a detail page
-    await expect(page).toHaveURL(/\/parade-nights\/.+/);
+  // ParadeNights opens a modal via "Open" button (not URL navigation)
+  const openBtn = page.getByRole("button", { name: "Open" }).first();
+  if (await openBtn.count() > 0) {
+    await openBtn.click();
+    // A modal dialog should appear
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 5000 });
   }
 });
 
 test("facilitator statistics show on facilitators page", async ({ page }) => {
   await page.goto("/facilitators");
   await expect(page.getByRole("heading", { name: /facilitator/i })).toBeVisible({ timeout: 8000 });
-  // 703 has 5 seeded facilitators
-  await expect(page.getByText(/Daley|Flanders|McGhie|Milligen|Daniels/i)).toBeVisible({ timeout: 5000 });
+  // 703 has 5 seeded facilitators — use .first() to avoid strict-mode violation
+  await expect(page.getByText(/Daley|Flanders|McGhie|Milligen|Daniels/i).first()).toBeVisible({ timeout: 5000 });
 });

@@ -1,14 +1,15 @@
-import { useEffect } from "react";
-import { useBlocker } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
 
 /**
  * Attaches two proxy-mode guards when proxy / delegated-intervention is active:
  *
- *  1. React Router blocker — silently exits proxy on any SPA navigation so the
- *     backend scope is cleared before the next page renders. The navigation is
- *     held until the exit call resolves; it proceeds regardless of whether the
- *     call succeeds (best-effort).
+ *  1. Location watcher — exits proxy in the background when a SPA navigation
+ *     changes the pathname. Non-blocking: navigation proceeds immediately and
+ *     the backend scope is cleared asynchronously (best-effort).
+ *     Note: useBlocker (blocking variant) requires a data router created with
+ *     createBrowserRouter; BrowserRouter does not support it in RR v6.
  *
  *  2. beforeunload — browser native warning when the user closes the tab, forces
  *     a full-page reload, or follows an external link while proxy is active.
@@ -18,26 +19,24 @@ import { useAuth } from "./AuthProvider";
 export function useProxyGuard(): void {
   const { session, exitProxy } = useAuth();
   const proxyActive = !!session?.proxy;
+  const location = useLocation();
+  const prevPathRef = useRef(location.pathname);
 
-  // Guard 1: SPA navigation via React Router.
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      proxyActive && currentLocation.pathname !== nextLocation.pathname,
-  );
-
+  // Guard 1: SPA navigation — exit proxy when the pathname changes.
   useEffect(() => {
-    if (blocker.state !== "blocked") return;
-    exitProxy()
-      .catch(() => { /* proceed even if the server call fails */ })
-      .finally(() => blocker.proceed());
-  }, [blocker, exitProxy]);
+    const prev = prevPathRef.current;
+    const next = location.pathname;
+    if (proxyActive && prev !== next) {
+      exitProxy().catch(() => { /* best-effort */ });
+    }
+    prevPathRef.current = next;
+  }, [location.pathname, proxyActive, exitProxy]);
 
   // Guard 2: Hard navigation (tab close, reload, external link).
   useEffect(() => {
     if (!proxyActive) return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      // Chrome requires returnValue to be set to trigger the native dialog.
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", onBeforeUnload);

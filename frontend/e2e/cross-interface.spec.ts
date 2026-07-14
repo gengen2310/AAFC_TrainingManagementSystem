@@ -18,8 +18,8 @@ test("planning workspace loads without second login", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Log in" })).not.toBeVisible();
   // Should see the planning workspace content (not the "Session not found" error)
   await expect(page.getByText(/session not found|please.*log in.*first/i)).not.toBeVisible();
-  // Planning workspace heading or tab structure must be visible
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible({ timeout: 10000 });
+  // PlanningWorkspace renders <div role="main" aria-label="Planning workspace"> (no h1)
+  await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
 });
 
 test("logout from main app also loses planning workspace access", async ({ page }) => {
@@ -27,17 +27,14 @@ test("logout from main app also loses planning workspace access", async ({ page 
   await page.goto("/planning");
   await expect(page.getByRole("button", { name: "Log in" })).not.toBeVisible();
 
-  // Log out from main app
+  // Log out from main app via Sign out button in AppShell
   await page.goto("/dashboard");
-  await page.getByRole("button", { name: /log out|sign out/i }).click();
+  await page.getByRole("button", { name: /sign out/i }).click();
   await expect(page.getByRole("button", { name: "Log in" })).toBeVisible({ timeout: 5000 });
 
-  // Now planning workspace should require login
+  // Now /planning shows LoginPage (full app mode — not module "Session not found" message)
   await page.goto("/planning");
-  // Should show "Session not found" because token was cleared
-  await expect(
-    page.getByText(/session not found|please.*log in.*first|return to tms/i)
-  ).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("button", { name: "Log in" })).toBeVisible({ timeout: 5000 });
 });
 
 test("planning workspace shows correct squadron context", async ({ page }) => {

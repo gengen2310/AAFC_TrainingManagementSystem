@@ -7,7 +7,8 @@ test("wing admin can enter and exit proxy mode", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("Access code").fill("ADMIN7WG");
   await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByRole("heading", { name: /wing overview/i })).toBeVisible({ timeout: 10000 });
+  // WingOverview renders <h1>Wing Assurance</h1>
+  await expect(page.getByRole("heading", { name: /wing assurance/i })).toBeVisible({ timeout: 10000 });
   // Select a squadron and enter proxy
   await page.getByLabel(/squadron/i).selectOption({ index: 1 });
   await page.getByPlaceholder(/reason/i).fill("Assisting squadron with planning");
@@ -15,14 +16,15 @@ test("wing admin can enter and exit proxy mode", async ({ page }) => {
   await expect(page.getByText(/proxy mode active/i)).toBeVisible({ timeout: 5000 });
   // Exit proxy
   await page.getByRole("button", { name: /exit proxy/i }).click();
-  await expect(page.getByRole("heading", { name: /wing overview/i })).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("heading", { name: /wing assurance/i })).toBeVisible({ timeout: 5000 });
 });
 
 test("wing viewer cannot enter proxy mode", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("Access code").fill("7WG2026");
   await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByRole("heading", { name: /wing overview/i })).toBeVisible({ timeout: 10000 });
-  // Wing viewer should not see the proxy entry button
-  await expect(page.getByRole("button", { name: /enter proxy/i })).not.toBeVisible();
+  // WingOverview renders <h1>Wing Assurance</h1>
+  await expect(page.getByRole("heading", { name: /wing assurance/i })).toBeVisible({ timeout: 10000 });
+  // Wing viewer sees the proxy entry button but it must be disabled (not clickable)
+  await expect(page.getByRole("button", { name: /enter proxy/i })).toBeDisabled();
 });

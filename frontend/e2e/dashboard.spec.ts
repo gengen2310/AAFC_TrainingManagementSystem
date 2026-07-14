@@ -14,7 +14,8 @@ test("dashboard shows readiness stat", async ({ page }) => {
 });
 
 test("dashboard shows parade nights count", async ({ page }) => {
-  await expect(page.getByText(/parade nights/i)).toBeVisible();
+  // Use exact match to avoid matching the nav link and card title simultaneously
+  await expect(page.getByText("Parade nights", { exact: true })).toBeVisible();
 });
 
 test("dashboard shows training decision card", async ({ page }) => {

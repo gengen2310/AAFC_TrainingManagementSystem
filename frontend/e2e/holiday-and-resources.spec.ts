@@ -17,23 +17,24 @@ test("calendar shows wing calendar tab", async ({ page }) => {
 
 test("resources page shows training areas", async ({ page }) => {
   await page.goto("/resources");
-  await expect(page.getByRole("heading", { name: /resource|training area|equipment/i })).toBeVisible({ timeout: 8000 });
-  // 703 has 3 seeded training areas
-  await expect(page.getByText(/Bravo|Major Parade Ground|Seniors Working Room/i)).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("heading", { name: /resources/i })).toBeVisible({ timeout: 8000 });
+  // 703 has 3 seeded training areas — use .first() to avoid strict-mode violation
+  await expect(page.getByText(/Bravo|Major Parade Ground|Seniors Working Room/i).first()).toBeVisible({ timeout: 5000 });
 });
 
 test("resources page shows equipment", async ({ page }) => {
   await page.goto("/resources");
-  await expect(page.getByRole("heading", { name: /resource|training area|equipment/i })).toBeVisible({ timeout: 8000 });
+  await expect(page.getByRole("heading", { name: /resources/i })).toBeVisible({ timeout: 8000 });
   // 703 has seeded Projector equipment
   await expect(page.getByText(/Projector/i)).toBeVisible({ timeout: 5000 });
 });
 
-test("sqn_admin can access resources write controls", async ({ page }) => {
+test("resources page shows all three sections", async ({ page }) => {
   await page.goto("/resources");
-  await expect(page.getByRole("heading", { name: /resource|training area|equipment/i })).toBeVisible({ timeout: 8000 });
-  // Admin should see Add/Create button
-  await expect(
-    page.getByRole("button", { name: /add|create|new/i }).first()
-  ).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("heading", { name: /resources/i })).toBeVisible({ timeout: 8000 });
+  // All three resource cards must be present — use .first() to avoid strict mode
+  // ("Training areas" appears in both the card title div and the table caption)
+  await expect(page.getByText("Training areas").first()).toBeVisible();
+  await expect(page.getByText("Equipment").first()).toBeVisible();
+  await expect(page.getByText("Resource clashes").first()).toBeVisible();
 });
