@@ -1281,3 +1281,160 @@ def test_sqn_general_can_read_own_sqn_planning_year(client):
     own_general = _general_hdr(client)
     r = client.get(f"/api/planning/years/{yr_id}/annual-program", headers=own_general)
     assert r.status_code == 200, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# Night summaries endpoint
+# ─────────────────────────────────────────────────────────────
+
+def test_night_summaries_returns_list(client):
+    """night-summaries returns a list keyed on all parade-date IDs in the year."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.get(f"/api/planning/years/{yr_id}/night-summaries", headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert "summaries" in d
+    assert isinstance(d["summaries"], list)
+
+
+def test_night_summaries_requires_auth(client):
+    # Fresh client with no prior login — use a dummy UUID so we don't need a real year.
+    import uuid
+    r = client.get(f"/api/planning/years/{uuid.uuid4()}/night-summaries")
+    assert r.status_code == 401
+
+
+def test_night_summaries_sqn_general_allowed(client):
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+    gen_hdr = _general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/night-summaries", headers=gen_hdr)
+    assert r.status_code == 200, r.text
+
+
+def test_night_summaries_sqn_general_cross_sqn_denied(client):
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+    other_gen = _other_sqn_general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/night-summaries", headers=other_gen)
+    assert r.status_code == 403, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# Facilitator workload endpoint
+# ─────────────────────────────────────────────────────────────
+
+def test_facilitator_workload_returns_stats(client):
+    """Facilitator workload returns a valid structure for a seeded facilitator."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+
+    facs_r = client.get("/api/planning/facilitators", headers=hdr)
+    assert facs_r.status_code == 200
+    facs = facs_r.json()
+    if not facs:
+        import pytest
+        pytest.skip("No facilitators seeded for 703")
+    fac_id = facs[0]["facilitator_id"]
+
+    r = client.get(f"/api/planning/years/{yr_id}/facilitators/{fac_id}/workload", headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert "total_scheduled" in d
+    assert "nights_with_sessions" in d
+    assert "avg_per_night" in d
+
+
+def test_facilitator_workload_requires_auth(client):
+    # Fresh client with no prior login
+    import uuid
+    from fastapi.testclient import TestClient
+    from app.main import app as _app
+    fresh = TestClient(_app)
+    r = fresh.get(f"/api/planning/years/{uuid.uuid4()}/facilitators/{uuid.uuid4()}/workload")
+    assert r.status_code == 401
+
+
+def test_facilitator_workload_sqn_general_blocked(client):
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    facs_r = client.get("/api/planning/facilitators", headers=hdr)
+    facs = facs_r.json()
+    if not facs:
+        import pytest
+        pytest.skip("No facilitators seeded")
+    fac_id = facs[0]["facilitator_id"]
+    gen_hdr = _general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/facilitators/{fac_id}/workload", headers=gen_hdr)
+    assert r.status_code == 403, r.text
+
+
+def test_facilitator_workload_nonexistent_facilitator(client):
+    import uuid
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.get(f"/api/planning/years/{yr_id}/facilitators/{uuid.uuid4()}/workload", headers=hdr)
+    assert r.status_code == 404, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# Planning year Excel export
+# ─────────────────────────────────────────────────────────────
+
+def test_planning_year_excel_export_returns_xlsx(client):
+    """Planning year export produces a valid xlsx response."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.get(f"/api/planning/years/{yr_id}/export.xlsx", headers=hdr)
+    assert r.status_code == 200, r.text
+    ct = r.headers.get("content-type", "")
+    assert "spreadsheetml" in ct or "octet-stream" in ct or "excel" in ct, f"unexpected content-type: {ct}"
+
+
+def test_planning_year_excel_export_requires_auth(client):
+    # Fresh client with no prior login
+    import uuid
+    from fastapi.testclient import TestClient
+    from app.main import app as _app
+    fresh = TestClient(_app)
+    r = fresh.get(f"/api/planning/years/{uuid.uuid4()}/export.xlsx")
+    assert r.status_code == 401
+
+
+def test_schedule_export_returns_xlsx(client):
+    """Schedule export endpoint produces a valid xlsx response."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.get(f"/api/planning/years/{yr_id}/schedule/export.xlsx", headers=hdr)
+    assert r.status_code == 200, r.text
+    ct = r.headers.get("content-type", "")
+    assert "spreadsheetml" in ct or "octet-stream" in ct or "excel" in ct, f"unexpected content-type: {ct}"
+
+
+def test_schedule_export_sqn_general_allowed(client):
+    """sqn_general can download the schedule export for their own squadron."""
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+    gen_hdr = _general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/schedule/export.xlsx", headers=gen_hdr)
+    assert r.status_code == 200, r.text
+
+
+def test_schedule_export_cross_sqn_denied(client):
+    """sqn_general from another squadron cannot download the schedule export."""
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+    other_gen = _other_sqn_general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/schedule/export.xlsx", headers=other_gen)
+    assert r.status_code == 403, r.text
