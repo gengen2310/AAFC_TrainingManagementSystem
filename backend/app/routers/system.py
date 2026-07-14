@@ -394,8 +394,7 @@ def bootstrap_staging(db: DBSession = Depends(get_db), p: Principal = Depends(ge
     stored in plaintext — only the hash is persisted. Rejected in production.
     """
     require_system_admin(p)
-    env = settings.ENVIRONMENT or ""
-    if env.lower() == "production":
+    if settings.is_prod:
         raise HTTPException(403, detail={
             "error": "not_allowed_in_production",
             "message": "Bootstrap is not available in the production environment.",
@@ -481,7 +480,7 @@ def bootstrap_staging(db: DBSession = Depends(get_db), p: Principal = Depends(ge
     db.commit()
 
     return {
-        "environment": env,
+        "environment": settings.ENVIRONMENT,
         "results": results,
         "accounts_created": created_accounts,
         "notice": "Codes shown here will NOT be retrievable again. Record each code now.",

@@ -367,6 +367,29 @@ def test_bootstrap_staging_unauthenticated(client):
     assert r.status_code == 401
 
 
+def test_bootstrap_staging_rejected_when_is_prod(client):
+    """Must be rejected once ENVIRONMENT genuinely reads as production/prod.
+
+    Regression guard: this endpoint used to check `ENVIRONMENT.lower() ==
+    "production"` directly instead of the shared settings.is_prod property —
+    missing the "prod" abbreviation is_prod also accepts, and (found live)
+    silently NOT rejecting when a deployment's ENVIRONMENT variable is
+    mislabelled as anything other than the literal string "production" (as
+    production's actually was, set to "staging" — see
+    docs/beta/11_defect_register.md DEFECT-003). Scoped patch of the
+    `is_prod` property only — reverts automatically, no cross-test state.
+    """
+    from unittest.mock import patch, PropertyMock
+    from app.config import Settings
+
+    hdr = _sysadmin(client)
+    with patch.object(Settings, "is_prod", new_callable=PropertyMock) as mock_is_prod:
+        mock_is_prod.return_value = True
+        r = client.post("/api/system/bootstrap-staging", headers=hdr)
+    assert r.status_code == 403
+    assert r.json()["detail"]["error"] == "not_allowed_in_production"
+
+
 def test_bootstrap_staging_idempotent(client):
     """With seed_all data already present, bootstrap runs idempotently — no new codes."""
     hdr = _sysadmin(client)
