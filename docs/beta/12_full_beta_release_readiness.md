@@ -1,7 +1,7 @@
 # AAFC TMS — Full Beta Release Readiness Checklist
 
 Gate document for beta release of v17.1.
-Created: 2026-07-14. Updated in place as gates are cleared.
+Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) additions.
 
 ---
 
@@ -55,6 +55,7 @@ Created: 2026-07-14. Updated in place as gates are cleared.
 | Application-level restore | Proven | ✅ PASS | Run `29297143467` |
 | Daily backup schedule | Active | ✅ PASS | `.github/workflows/backup-postgresql.yml` |
 | Weekly restore-test schedule | Active | ✅ PASS | `.github/workflows/test-restore-postgresql.yml` |
+| Backup key custody | Human checklist | ⚠️ PENDING | `36_backup_key_custody_checklist.md` — 5 human actions |
 
 ---
 
@@ -70,6 +71,9 @@ Created: 2026-07-14. Updated in place as gates are cleared.
 | Production frontend: online | Must be online | ✅ PASS | Deployment `719cc4c8` online |
 | Production Planning Workspace | Dockerfile fix deployed | ⚠️ PENDING | Fix on branch; stale build in prod |
 | Branch fixes deployed to prod | Required for GA | ⚠️ PENDING | DEFECT-001, DEFECT-003, DEFECT-005 |
+| Deployment rehearsal (staging) | Must be completed | ⚠️ PENDING | `41_deployment_rehearsal.md` |
+| Rollback rehearsal (staging) | Must be completed | ⚠️ PENDING | `41_deployment_rehearsal.md` (Steps R1–R5) |
+| RC tag pushed to origin | Must be pushed | ⚠️ PENDING | `beta-2026-07-14-rc1` local only |
 
 ---
 
@@ -88,25 +92,44 @@ Created: 2026-07-14. Updated in place as gates are cleared.
 | `30_final_consolidation_report.md` | Consolidation summary | ✅ Written |
 | `31_final_user_workflow_review.md` | Workflow review | ✅ Written |
 | `32_final_stress_and_resilience_report.md` | Stress/resilience | ✅ Written |
+| `33_feature_freeze.md` | Feature freeze record | ✅ Written |
+| `34_release_candidate_record.md` | RC evidence | ✅ Written |
+| `35_release_evidence_chain.md` | Evidence chain | ✅ Written (PENDING population) |
+| `36_backup_key_custody_checklist.md` | Key custody | ✅ Written (PENDING human actions) |
+| `37_user_acceptance_test_plan.md` | UAT plan | ✅ Written |
+| `38_user_acceptance_results.md` | UAT results | ✅ Written (PENDING UAT) |
+| `39_account_and_role_release_matrix.md` | Account matrix | ✅ Written (PENDING account creation) |
+| `40_production_configuration_review.md` | Config review | ✅ Written (PENDING ENVIRONMENT var) |
+| `41_deployment_rehearsal.md` | Deployment rehearsal | ✅ Written (PENDING execution) |
+| `42_release_stop_and_rollback_plan.md` | Rollback plan | ✅ Written |
+| `43_release_monitoring_plan.md` | Monitoring plan | ✅ Written |
+| `44_beta_release_communication.md` | User communication | ✅ Written |
+| `45_support_triage_guide.md` | Triage guide | ✅ Written |
+| `46_data_governance_and_approval.md` | Governance | ✅ Written (PENDING approvals) |
+| `47_known_limitation_acceptance.md` | Limitation acceptance | ✅ Written (PENDING owner sign-off) |
+| `48_final_production_smoke_test.md` | Smoke test plan | ✅ Written |
+| `49_all_at_once_release_control.md` | Release control | ✅ Written |
+| `50_post_release_review_plan.md` | Post-release plan | ✅ Written |
 | `12_full_beta_release_readiness.md` | This document | ✅ Written |
-| `13_executive_go_no_go.md` | GO/NO-GO decision | ✅ Written |
+| `13_executive_go_no_go.md` | GO/NO-GO decision | ✅ Written (CONDITIONAL) |
 
 ---
 
-## Gate 7: Browser Verification (Human-Gated)
+## Gate 7: Human Acceptance and Verification
 
-| Check | Required for beta | Status |
-|---|---|---|
-| Connected-frontend loads in browser | Must load | ⚠️ PENDING |
-| Login as sqn_admin: squadron pages visible | Must work | ⚠️ PENDING |
-| Login as sqn_general: planning nav items NOT visible | Must be absent | ⚠️ PENDING |
-| Login as wing_admin: wing pages visible | Must work | ⚠️ PENDING |
-| Login as system_admin: system console loads | Must work | ⚠️ PENDING |
-| Planning Workspace loads at `/planning` | Must load | ⚠️ PENDING |
-| Planning Workspace: 7 bottom tabs visible | Exact count | ⚠️ PENDING |
-| No console errors on any page | 0 errors | ⚠️ PENDING |
-| CEA import: file upload works | End-to-end | ⚠️ PENDING |
-| Weekly program: printable output renders | Must render | ⚠️ PENDING |
+| Check | Required | Status | Evidence source |
+|---|---|---|---|
+| Browser login: sqn_admin | Must work | ⚠️ PENDING | `26_squadron_verification_matrix.md` |
+| Browser login: sqn_general | Must work | ⚠️ PENDING | `26_squadron_verification_matrix.md` |
+| Browser login: wing_admin | Must work | ⚠️ PENDING | `26_squadron_verification_matrix.md` |
+| Browser login: national_admin | Must work | ⚠️ PENDING | `26_squadron_verification_matrix.md` |
+| Planning Workspace: no second login | Must work | ⚠️ PENDING | `31_final_user_workflow_review.md` |
+| UAT: 20 tasks completed by 4 testers | Required | ⚠️ PENDING | `38_user_acceptance_results.md` |
+| Data governance sign-off | Required | ⚠️ PENDING | `46_data_governance_and_approval.md` |
+| Known limitation acceptance | Required | ⚠️ PENDING | `47_known_limitation_acceptance.md` |
+| Backup key custody: 5 human actions | Required | ⚠️ PENDING | `36_backup_key_custody_checklist.md` |
+| Production deployment approval | Required | ⚠️ PENDING | Explicit approval from project owner |
+| Smoke test: all 20 steps PASS | Required | ⚠️ PENDING | `48_final_production_smoke_test.md` |
 
 ---
 
@@ -117,11 +140,14 @@ Created: 2026-07-14. Updated in place as gates are cleared.
 | 1: Code Quality | ✅ PASS | — |
 | 2: Migration and Schema | ✅ PASS | — |
 | 3: Security | ⚠️ PARTIAL | DEFECT-001, DEFECT-003 awaiting deploy |
-| 4: Backup and Recovery | ✅ PASS | — |
-| 5: Deployment | ⚠️ PARTIAL | Branch fixes not in production; Planning Workspace stale |
-| 6: Documentation | ⚠️ PARTIAL | `26_squadron_verification_matrix.md` blocked (browser) |
-| 7: Browser Verification | ⚠️ PENDING | Human action required |
+| 4: Backup and Recovery | ⚠️ PARTIAL | Backup key custody (human) |
+| 5: Deployment | ⚠️ PARTIAL | Branch fixes not in production; rehearsal needed |
+| 6: Documentation | ⚠️ PARTIAL | All docs written; 26 blocked (browser); governance pending |
+| 7: Human Acceptance | ⚠️ PENDING | UAT, browser verification, approvals, smoke test |
 
-**Overall**: 3 of 7 gates fully cleared. The 4 partial/pending gates are all blocked by the same root cause: production deployment of branch fixes (DEFECT-001, DEFECT-003, DEFECT-005) + browser verification. Once those are actioned, gates 3, 5, 6, and 7 can be cleared.
+**Overall**: 2 of 7 gates fully cleared. All remaining blockers are in one of three categories:
+1. Production deployment approval + execution (DEFECT-001, DEFECT-003, DEFECT-005)
+2. Staging rehearsal (deploy + rollback, then populate `41_deployment_rehearsal.md`)
+3. Human acceptance actions (UAT, governance, key custody, smoke test)
 
-**Recommendation**: Obtain approval for production deployment, deploy branch fixes, complete browser verification matrix, then sign off as release-ready.
+**Recommendation**: Request production deployment approval. Once approved and executed, all technical gates can be closed. Human acceptance then follows in parallel.
