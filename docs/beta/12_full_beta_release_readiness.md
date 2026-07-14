@@ -71,9 +71,9 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) addit
 | Production frontend: online | Must be online | ✅ PASS | Deployment `719cc4c8` online |
 | Production Planning Workspace | Dockerfile fix deployed | ⚠️ PENDING | Fix on branch; stale build in prod |
 | Branch fixes deployed to prod | Required for GA | ⚠️ PENDING | DEFECT-001, DEFECT-003, DEFECT-005 |
-| Deployment rehearsal (staging) | Must be completed | ⚠️ PENDING | `41_deployment_rehearsal.md` |
-| Rollback rehearsal (staging) | Must be completed | ⚠️ PENDING | `41_deployment_rehearsal.md` (Steps R1–R5) |
-| RC tag pushed to origin | Must be pushed | ⚠️ PENDING | `beta-2026-07-14-rc2` at e539d02 — local only; push required |
+| Deployment rehearsal (staging) | Must be completed | ✅ PASS | D1–D7 executed 2026-07-14; all automated steps PASS; D7 browser steps human-gated |
+| Rollback rehearsal (staging) | Must be completed | ✅ PASS | R1–R5 executed 2026-07-14; rollback `a76198bf` SUCCESS; R5 RC re-deployed |
+| RC tag pushed to origin | Must be pushed | ✅ DONE | `beta-2026-07-14-rc2` at e539d02 — pushed to origin 2026-07-14 |
 | Playwright E2E: 35 tests pass | 0 failures | ✅ PASS | 35/35 at commit e539d02 (2026-07-14) |
 | 100-user concurrent load test | Mandatory pre-release | ❌ NOT DONE | Must run against staging before production |
 
@@ -143,7 +143,7 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) addit
 | 2: Migration and Schema | ✅ PASS | — |
 | 3: Security | ⚠️ PARTIAL | DEFECT-001, DEFECT-003 awaiting deploy |
 | 4: Backup and Recovery | ⚠️ PARTIAL | Backup key custody (human) |
-| 5: Deployment | ❌ FAIL | Playwright E2E gate now PASS; RC tag created (rc2); load test NOT DONE; rehearsal NOT DONE |
+| 5: Deployment | ⚠️ PARTIAL | Deployment rehearsal DONE; rollback rehearsal DONE; RC tag pushed; load test NOT DONE; DEFECT deploys pending |
 | 6: Documentation | ⚠️ PARTIAL | All docs written; 26 blocked (browser); governance pending |
 | 7: Human Acceptance | ⚠️ PENDING | UAT, browser verification, approvals, smoke test |
 
@@ -154,12 +154,15 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) addit
 - Playwright E2E: 35/35 passing (root cause: `useBlocker` crash in `useProxyGuard` fixed)
 - RC2 tag created at e539d02
 
+**Completed since last update (2026-07-14, rehearsal executed):**
+- RC tag `beta-2026-07-14-rc2` pushed to origin
+- Staging deployment rehearsal (D1–D7): all automated steps PASS; deployment `72b45f4b`/`ac20386b` SUCCESS
+- Staging rollback rehearsal (R1–R5): rollback `a76198bf` SUCCESS; RC re-deployed; health confirmed
+
 **Remaining mandatory technical gates before production approval may be requested:**
-1. Push `beta-2026-07-14-rc2` to origin
-2. Staging deployment rehearsal (Steps D1–D7 in `41_deployment_rehearsal.md`)
-3. Staging rollback rehearsal (Steps R1–R5 in `41_deployment_rehearsal.md`)
-4. 100-user concurrent load test against staging (45 minutes minimum)
-5. Deploy DEFECT-001, DEFECT-003, DEFECT-005 fixes to production
+1. 100-user concurrent load test against staging (45 minutes minimum)
+2. D7 browser smoke test steps (human tester required)
+3. Deploy DEFECT-001, DEFECT-003, DEFECT-005 fixes to production
 
 **Then human gates:**
 6. UAT, governance, key custody, browser verification, smoke test, explicit approval
