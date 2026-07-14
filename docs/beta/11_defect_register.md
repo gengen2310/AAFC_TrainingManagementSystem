@@ -84,7 +84,7 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 
 ## DEFECT-006 — BLOCKER — Backup/restore has never succeeded
 
-**Status**: **Mechanism and production backup proven. Production restore proven at the PostgreSQL level. Application-level restore proof is code-complete but UNVERIFIED** — its one test run was interrupted by discovering the branch-divergence issue (see `docs/beta/00_release_state.md`) before completing. Do not treat as closed until that run is confirmed green.
+**Status**: **RESOLVED — proven end-to-end, all four claims.** Full chain now verified: real production backup → PostgreSQL-level restore into a disposable container → application-level reads through a real running backend against the restored data.
 
 | Claim | Status |
 |---|---|
@@ -105,7 +105,9 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 
 **Retest evidence (production, PostgreSQL-level)**: restore run [`29281292666`](https://github.com/gengen2310/AAFC_TrainingManagementSystem/actions/runs/29281292666) SUCCESS — SHA-256 integrity passed, restored into a disposable `postgres:18-alpine` container, `alembic_version = x9y0z1a2b3c4`, all required tables present with real production row counts (wings: 8, squadrons: 16, users: 39, audit_logs: 431, curriculum_items: 217, planning_years: 10), container destroyed at end of run.
 
-**Outstanding**: re-run the restore-test workflow (now including the application-level check) against the reconciled, merged branch to get claim D's actual evidence before signing off.
+**Retest evidence (application level, against the reconciled/merged branch)**: run [`29297143467`](https://github.com/gengen2310/AAFC_TrainingManagementSystem/actions/runs/29297143467) — PostgreSQL-level: `alembic_version = x9y0z1a2b3c4` (correct head, post-merge), all 15 schema/row checks passed with real production row counts (wings: 8, squadrons: 16, users: 39, audit_logs: 441). Application-level: backend started cleanly against the restored data, throwaway test admin created via the ORM, all 8 authenticated API reads succeeded (`/api/health/ready` → squadrons=16, `/api/auth/me`, `/api/wings` → 8, `/api/squadrons` → 16, `/api/users` → 40, `/api/planning/years` → 10, `/api/planning/facilitators` → 1) — `APPLICATION-LEVEL RESTORE CHECK PASSED`. Disposable container and backend both destroyed at end of run; no data persisted anywhere outside the ephemeral CI runner.
+
+**Incidental finding while redeploying staging with the merged code**: staging's backend crashed on restart — migrations v35/v36 tried to `ADD COLUMN` for fields that already existed physically (staging's tables were originally built via `reset_db()`'s `create_all()` from the current model classes, which already declared these fields, rather than via Alembic). Fixed by running `alembic stamp head` directly against staging's database (not production) after confirming the physical schema already matched what those migrations would have produced — a one-time, staging-only operational fix, not a code change. Staging backend redeployed successfully afterward.
 
 ---
 
@@ -134,8 +136,8 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 | DEFECT-003 | MEDIUM | Open, under investigation |
 | DEFECT-004 | MEDIUM | Open, under investigation |
 | DEFECT-005 | HIGH | Fixed on release branch, staging-verified; **open in production** |
-| DEFECT-006 | BLOCKER | Backup + PostgreSQL-level restore proven on production; **application-level restore check code-complete but unverified — re-run required** |
+| DEFECT-006 | BLOCKER | **Resolved — proven end-to-end (backup, restore, application-level reads), all against real production data** |
 | DEFECT-007 | LOW | Fixed |
 | DEFECT-008 | HIGH (process) | Open — belongs to a concurrent session, flagged not fixed |
 
-**Neither BLOCKER is fully closed yet.** DEFECT-001 (live-production IDOR) is fixed and verified on the release branch/staging but requires a production deploy + approval to close there. DEFECT-006 (backup/restore) has real production backup and restore evidence but its final application-level check has not actually been re-run since being added. Not release-ready.
+**One of two BLOCKERs fully resolved (DEFECT-006, backup/restore — proven end-to-end).** DEFECT-001 (live-production IDOR) is fixed and verified on the release branch/staging but requires a production deploy + approval to close there. Not release-ready until that deploy happens, DEFECT-002/DEFECT-005-in-production are addressed, and DEFECT-008 (migration-ID collision, owned by a concurrent session) is resolved.
