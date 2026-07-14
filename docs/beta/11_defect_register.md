@@ -42,19 +42,15 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 
 ---
 
-## DEFECT-002 — HIGH (foot-gun, not yet exploited) — `seed_all.py` is unconditionally destructive
+## DEFECT-002 — HIGH — `seed_all.py` was unconditionally destructive
 
-**Status**: Open, not fixed.
+**Status**: **Fixed** (commit `9e7a179`).
 
-**Reproducible failure**: `backend/app/seeds/seed_all.py`'s `seed_all()` calls `reset_db()` (`Base.metadata.drop_all()` + `create_all()`) unconditionally at the top of the function, with no environment guard or confirmation prompt.
+**Reproducible failure**: `backend/app/seeds/seed_all.py`'s `seed_all()` calls `reset_db()` (`Base.metadata.drop_all()` + `create_all()`) unconditionally, with no environment guard or confirmation prompt — a real hazard if ever invoked against a database containing real data.
 
-**Root cause**: no safety check on the destructive path.
+**Fix**: `reset_db()` now calls `check_destructive_reset_allowed()`, which refuses when (1) `ENVIRONMENT` is `production`/`prod` — absolute, no override; (2) the target hostname's SHA-256 fingerprint matches a protected database (`config.py`'s `PROTECTED_DB_HOST_FINGERPRINTS`) — absolute and independent of `ENVIRONMENT`, specifically because production's own `ENVIRONMENT` was found set to `staging` in this exact repo (DEFECT-003), so that variable alone can't be trusted; (3) the database is not SQLite and `ALLOW_DESTRUCTIVE_SEED != "true"`. SQLite (local dev, the test suite) is exempt — inherently local/disposable.
 
-**Severity rationale**: not itself a live incident, but a real hazard — if ever invoked against a database containing real data (wrong `DATABASE_URL`, muscle-memory command in a real environment), it silently deletes everything with no confirmation.
-
-**Recommended fix**: gate `reset_db()` behind an explicit check (e.g. refuse when `settings.ENVIRONMENT == "production"`, or require an explicit `--i-am-sure` / confirmation env var) before it's used for anything beyond fresh local/CI databases.
-
-**Regression test**: not yet written.
+**Regression test**: 6 new tests (`test_reset_db_safety.py`) against a pure, parameterized guard function — no monkeypatching of global settings/module reload (a first attempt did that and silently broke 95 unrelated tests via shared engine/session state; rewritten). Full suite: 445 passed, 1 skipped at the time (zero regressions).
 
 ---
 
@@ -121,7 +117,7 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 | ID | Severity | Status |
 |---|---|---|
 | DEFECT-001 | BLOCKER | Fixed on release branch, staging-verified; **open in production** |
-| DEFECT-002 | HIGH | Open |
+| DEFECT-002 | HIGH | **Fixed** |
 | DEFECT-003 | MEDIUM | Open, under investigation |
 | DEFECT-004 | MEDIUM | Open, under investigation |
 | DEFECT-005 | HIGH | Fixed on release branch, staging-verified; **open in production** |
