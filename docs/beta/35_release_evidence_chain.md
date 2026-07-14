@@ -42,9 +42,9 @@ This document provides traceability from source code to production deployment. I
 
 **Before production deployment**: run `cd backend && python -m pytest` and record the result in this document.
 
-Actual test run result: **PENDING**
-Test run timestamp: ___________
-Test run commit: ___________
+Actual test run result: **503 passed, 1 skipped, 0 failures**
+Test run timestamp: 2026-07-14T08:47:05Z
+Test run commit: `467e0fa22480fbfd471cc508606978fd0e69b97a` (HEAD on `release/beta-2026-07-14`, contains `e918f3e` RC source)
 
 ---
 

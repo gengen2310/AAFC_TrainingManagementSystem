@@ -1,13 +1,28 @@
 import { test, expect } from "@playwright/test";
-// Wing Admin proxy workflow. Requires seeded ADMIN7WG.
+
+// ── Wing proxy workflow ───────────────────────────────────────────────────────
+// Requires seeded ADMIN7WG and backend on :8000.
+
 test("wing admin can enter and exit proxy mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel(/access code/i).fill("ADMIN7WG");
-  await page.getByRole("button", { name: /log in/i }).click();
-  await expect(page.getByRole("heading", { name: /Wing Overview/i })).toBeVisible();
-  await page.getByLabel(/Squadron/i).selectOption({ index: 1 });
-  await page.getByPlaceholder(/Reason/i).fill("Assisting squadron with planning");
-  await page.getByRole("button", { name: /Enter proxy mode/i }).click();
-  await expect(page.getByText(/PROXY MODE ACTIVE/i)).toBeVisible();
-  await page.getByRole("button", { name: /Exit proxy mode/i }).click();
+  await page.getByLabel("Access code").fill("ADMIN7WG");
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page.getByRole("heading", { name: /wing overview/i })).toBeVisible({ timeout: 10000 });
+  // Select a squadron and enter proxy
+  await page.getByLabel(/squadron/i).selectOption({ index: 1 });
+  await page.getByPlaceholder(/reason/i).fill("Assisting squadron with planning");
+  await page.getByRole("button", { name: /enter proxy/i }).click();
+  await expect(page.getByText(/proxy mode active/i)).toBeVisible({ timeout: 5000 });
+  // Exit proxy
+  await page.getByRole("button", { name: /exit proxy/i }).click();
+  await expect(page.getByRole("heading", { name: /wing overview/i })).toBeVisible({ timeout: 5000 });
+});
+
+test("wing viewer cannot enter proxy mode", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Access code").fill("7WG2026");
+  await page.getByRole("button", { name: "Log in" }).click();
+  await expect(page.getByRole("heading", { name: /wing overview/i })).toBeVisible({ timeout: 10000 });
+  // Wing viewer should not see the proxy entry button
+  await expect(page.getByRole("button", { name: /enter proxy/i })).not.toBeVisible();
 });

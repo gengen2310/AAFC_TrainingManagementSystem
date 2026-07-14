@@ -60,6 +60,8 @@ frontend/dist/
 .claude/todos.json
 .claude/*.jsonl
 .claude/projects/
+.claude/worktrees/
 
 # Stress / smoke test scripts contain hardcoded dev seed codes — never commit
 tools/stress/
+frontend/test-results/
