@@ -491,12 +491,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-item" onclick="nav('weekly-program')">Weekly Program</div>
       <div class="nav-item" onclick="nav('curriculum')">Curriculum</div>
       <div class="nav-item" onclick="nav('activities')">Activities</div>
-      <!-- Planning module — sub-items within Training, shown only when planner nav is active -->
-      <div class="nav-planning-hdr" id="nav-planning-lbl" style="display:none">Planning</div>
-      <div class="nav-item nav-subitem" id="nav-planning-year" style="display:none" onclick="nav('planning-year')">Annual Program</div>
-      <div class="nav-item nav-subitem" id="nav-planning-missions" style="display:none" onclick="nav('planning-missions')">Training Planner</div>
-      <div class="nav-item nav-subitem" id="nav-planning-builder" style="display:none" onclick="nav('planning-builder')">Parade Night Program</div>
-      <div class="nav-item nav-subitem" id="nav-planning-guide" style="display:none" onclick="nav('planning-guide')">Planner Help</div>
       <!-- Hidden for pilot: Anchor Events, Term Planner, Long-Range View, Locations, Checks -->
       <div class="nav-item nav-subitem" id="nav-planning-anchors" style="display:none" onclick="nav('planning-anchors')">Key Activities</div>
       <div class="nav-item nav-subitem" id="nav-planning-term" style="display:none" onclick="nav('planning-term')">Term Program</div>
@@ -659,7 +653,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-curriculum" class="page">
         <div class="ph">
           <div class="ph-title">Curriculum</div>
-          <div class="ph-sub">Curriculum</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" id="btn-add-curr-sqn" style="display:none" onclick="openAddCurr()">+ Add Squadron Curriculum</button>
             <button class="btn btn-dk admin-el" id="btn-add-curr-wing" style="display:none" onclick="openAddCurrWing()">+ Add Wing Curriculum</button>
@@ -705,7 +698,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-activities" class="page">
         <div class="ph">
           <div class="ph-title">Activities &amp; Events</div>
-          <div class="ph-sub">Events and activities</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-act')">+ Add Activity</button>
             <button class="btn btn-out admin-el" style="display:none" onclick="openCeaImport()">Import CEA</button>
@@ -723,7 +715,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-facilitators" class="page">
         <div class="ph">
           <div class="ph-title">Facilitators</div>
-          <div class="ph-sub">Facilitator delivery profiles</div>
           <div class="ph-actions no-print">
             <select id="fac-filter" onchange="S.facFilter=this.value;renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px">
               <option value="">All subject areas</option>
@@ -749,7 +740,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-resources" class="page">
         <div class="ph">
           <div class="ph-title">Resources &amp; Training Areas</div>
-          <div class="ph-sub">Rooms and equipment</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-room')">+ Add Room</button>
             <button class="btn btn-out admin-el" style="display:none" onclick="openModal('m-add-equip')">+ Add Equipment</button>
@@ -3222,7 +3212,7 @@ function roomById(id){return (S.rooms||[]).find(r=>r.id===id);}
 // Pages each scope may see. Backend still authorises every request.
 // Pilot-visible planning pages. Remaining tabs (anchors, term, long-range, rooms, checks) are hidden from nav for this pilot.
 // Pilot-visible planning pages. Remaining tabs (anchors, term, long-range, rooms, checks) are hidden from nav for this pilot.
-const _PLANNING_PAGES=['planning-missions','planning-guide','planning-year','planning-builder'];
+const _PLANNING_PAGES=[];
 const NAV_BY_SCOPE={
   squadron:['dashboard','calendar','parade-nights','weekly-program','curriculum','activities','facilitators','resources','reports','action-items','settings','accounts',..._PLANNING_PAGES],
   wing:['wing-overview','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
@@ -3382,6 +3372,10 @@ function renderAll(){
 //  NAVIGATION
 // ═══════════════════════════════════════════════════════════
 function nav(id){
+  if(id==='planning-year')    id='activities';
+  if(id==='planning-missions')id='activities';
+  if(id==='planning-builder') id='parade-nights';
+  if(id==='planning-guide')   id='dashboard';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');
@@ -4662,12 +4656,6 @@ function addPN(){
     .then(async(r)=>{
       await reloadAndRender(); closeModal('m-add-pn');
       document.getElementById('pn-date').value='';document.getElementById('pn-notes').value='';document.getElementById('pn-slots').innerHTML='';
-      // Navigate directly to Parade Night Program for this parade night
-      if(r && r.parade_night_id){
-        P._directPnId = r.parade_night_id;
-        nav('planning-builder');
-        await loadBuilderFromPn(r.parade_night_id);
-      }
     })
     .catch(e=>alert(apiErr(e)));
 }
@@ -6137,19 +6125,10 @@ async function _loadPlanningYears() {
 const _origNav = nav;
 nav = function(pg) {
   _origNav(pg);
-  if(pg === 'planning-missions') {
-    _loadPlanningYears().then(id=>{ if(id) loadMissions(id); });
-  } else if(pg === 'planning-guide') {
-    /* static — no API call needed */
-  } else if(pg === 'planning-year') {
-    _loadPlanningYears().then(id=>{ if(id) loadYearMap(id); });
-  } else if(pg === 'planning-anchors') {
+  if(pg === 'planning-anchors') {
     _loadPlanningYears().then(id=>{ if(id) loadAnchors(id); });
   } else if(pg === 'planning-term') {
     _loadPlanningYears().then(id=>{ if(id) loadTermPlanner(id, null); });
-  } else if(pg === 'planning-builder') {
-    _loadPlanningYears().then(id=>{ if(id) loadBuilderDates(id).then(()=>_autoSelectFirstDate('builder-date-sel','loadBuilderGrid')); });
-    _loadDirectPnSelector();
   } else if(pg === 'wing-calendar') {
     loadWingCalendar();
   } else if(pg === 'planning-longrange') {
@@ -6571,10 +6550,6 @@ function _apShowDateDetail(ds){
         <div><span class="muted">Sessions assigned:</span> <strong>${filled}</strong> of <strong>${slots}</strong> slots</div>
         ${fillBadge}
         ${pd.in_holiday?'<span class="badge badge-amber">In holiday period</span>':''}
-      </div>
-      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-xs btn-primary" onclick="nav('planning-builder')">Parade Night Program</button>
-        <button class="btn btn-xs btn-secondary" onclick="nav('planning-missions')">Training Planner</button>
       </div>
     </div>`;
   }

@@ -43,8 +43,6 @@ export function PlanningContextBar({
     ? session.role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : "—";
 
-  const conflicts   = cc?.active_conflicts?.length  ?? 0;
-  const unscheduled = cc?.unscheduled_required?.length ?? 0;
   const unreviewed  = cc?.unreviewed_wing?.length   ?? 0;
   const prepGaps    = cc?.prep_gaps?.length         ?? 0;
 
@@ -59,19 +57,9 @@ export function PlanningContextBar({
 
       {/* Health chips */}
       <div className="pw-ctx-health" aria-label="Planning health">
-        {conflicts > 0 && (
-          <span className="pw-health-chip err" title="Active conflicts">
-            {conflicts} conflict{conflicts !== 1 ? "s" : ""}
-          </span>
-        )}
         {prepGaps > 0 && (
           <span className="pw-health-chip warn" title="Prep gaps">
             {prepGaps} prep gap{prepGaps !== 1 ? "s" : ""}
-          </span>
-        )}
-        {unscheduled > 0 && (
-          <span className="pw-health-chip warn" title="Required curriculum not yet scheduled">
-            {unscheduled} unscheduled
           </span>
         )}
         {unreviewed > 0 && (
@@ -79,7 +67,7 @@ export function PlanningContextBar({
             {unreviewed} to review
           </span>
         )}
-        {conflicts === 0 && unscheduled === 0 && unreviewed === 0 && prepGaps === 0 && cc && (
+        {unreviewed === 0 && prepGaps === 0 && cc && (
           <span className="pw-health-chip ok">Healthy</span>
         )}
       </div>
