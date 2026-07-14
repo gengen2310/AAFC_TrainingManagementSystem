@@ -28,7 +28,7 @@ def _set_account_locked(user_code: str, minutes: int = 30) -> None:
     Uses raw SQL to bypass the ORM identity map so subsequent requests see fresh state.
     """
     ac_id = _find_ac_id(user_code)
-    locked_dt = datetime.utcnow() + timedelta(minutes=minutes)
+    locked_dt = datetime.now(timezone.utc) + timedelta(minutes=minutes)
     with engine.begin() as conn:
         conn.execute(
             text("UPDATE access_codes SET locked_until=:lu, failed_attempts=5 WHERE id=:id"),
