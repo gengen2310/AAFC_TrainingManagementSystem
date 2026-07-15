@@ -9,7 +9,7 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) addit
 
 | Check | Required | Status | Evidence |
 |---|---|---|---|
-| Backend tests: all pass | 0 failures | ✅ PASS | 541 passed, 1 skipped (2026-07-14, commit e539d02) |
+| Backend tests: all pass | 0 failures | ✅ PASS | 543 passed, 1 skipped (2026-07-15, commit d95e67d / rc3) |
 | TypeScript: 0 errors | 0 errors | ✅ PASS | `npx tsc --noEmit` (2026-07-14) |
 | No `datetime.utcnow()` deprecations | 0 in production code | ✅ PASS | Grep clean (2026-07-14) |
 | Security grep 1: removed wording | 0 matches | ✅ PASS | Grep clean (2026-07-14) |
@@ -34,7 +34,8 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) addit
 
 | Check | Required | Status | Evidence |
 |---|---|---|---|
-| IDOR fix: sqn_general scope | Deployed + tested | ⚠️ PARTIAL | Fixed on branch; not in production |
+| IDOR fix: sqn_general scope (DEFECT-001) | Deployed + tested | ⚠️ PARTIAL | Fixed on branch; not in production |
+| IDOR fix: sqn_general planning years (DEFECT-007) | Fixed in rc3 | ✅ PASS | `planning.py` filter; 2 regression tests; 543 suite PASS |
 | IDOR fix: other scopes | Deployed + tested | ✅ PASS | `test_planning_idor.py` — 50 scenarios |
 | Rate limiting (IP lockout) | Proven in tests | ✅ PASS | `test_lockout.py` |
 | Per-account lockout | Proven in tests | ✅ PASS | `test_lockout.py` |
@@ -74,8 +75,10 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) addit
 | Deployment rehearsal (staging) | Must be completed | ✅ PASS | D1–D7 executed 2026-07-14; all automated steps PASS; D7 browser steps human-gated |
 | Rollback rehearsal (staging) | Must be completed | ✅ PASS | R1–R5 executed 2026-07-14; rollback `a76198bf` SUCCESS; R5 RC re-deployed |
 | RC tag pushed to origin | Must be pushed | ✅ DONE | `beta-2026-07-14-rc2` at e539d02 — pushed to origin 2026-07-14 |
-| Playwright E2E: 35 tests pass | 0 failures | ✅ PASS | 35/35 at commit e539d02 (2026-07-14) |
-| 100-user concurrent load test | Mandatory pre-release | ❌ NOT DONE | Must run against staging before production |
+| Playwright E2E: 35 tests pass | 0 failures | ✅ PASS | 35/35 at commit d95e67d / rc3 (2026-07-15, local backend) |
+| Playwright E2E (staging via proxy) | Informational | ⚠️ PARTIAL | 3/35 pass; 32 CORS-blocked (intentional security restriction); human browser required |
+| Post-load data integrity | Squadron isolation, health recovery | ✅ PASS | 2026-07-15: parade-nights isolation confirmed; health 412ms |
+| 100-user concurrent load test | Mandatory pre-release | ⏳ IN PROGRESS | Run 3 (btitxok60) running; run 2 proved 4/5 endpoints P95 530ms; years path corrected |
 
 ---
 
@@ -141,9 +144,9 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) addit
 |---|---|---|
 | 1: Code Quality | ✅ PASS | — |
 | 2: Migration and Schema | ✅ PASS | — |
-| 3: Security | ⚠️ PARTIAL | DEFECT-001, DEFECT-003 awaiting deploy |
+| 3: Security | ⚠️ PARTIAL | DEFECT-001, DEFECT-003 production deploy pending; DEFECT-007 fixed in rc3 |
 | 4: Backup and Recovery | ⚠️ PARTIAL | Backup key custody (human) |
-| 5: Deployment | ⚠️ PARTIAL | Deployment rehearsal DONE; rollback rehearsal DONE; RC tag pushed; load test NOT DONE; DEFECT deploys pending |
+| 5: Deployment | ⚠️ PARTIAL | Rehearsal DONE; rollback DONE; RC tag (rc3) pushed; load test run 3 IN PROGRESS; DEFECT deploys pending |
 | 6: Documentation | ⚠️ PARTIAL | All docs written; 26 blocked (browser); governance pending |
 | 7: Human Acceptance | ⚠️ PENDING | UAT, browser verification, approvals, smoke test |
 
@@ -154,13 +157,17 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) addit
 - Playwright E2E: 35/35 passing (root cause: `useBlocker` crash in `useProxyGuard` fixed)
 - RC2 tag created at e539d02
 
-**Completed since last update (2026-07-14, rehearsal executed):**
-- RC tag `beta-2026-07-14-rc2` pushed to origin
-- Staging deployment rehearsal (D1–D7): all automated steps PASS; deployment `72b45f4b`/`ac20386b` SUCCESS
-- Staging rollback rehearsal (R1–R5): rollback `a76198bf` SUCCESS; RC re-deployed; health confirmed
+**Completed since last update (2026-07-14–15):**
+- RC tag `beta-2026-07-14-rc3` pushed to origin (commit `d95e67d`)
+- DEFECT-007 found (sqn_general planning years IDOR), fixed, 2 regression tests added
+- 543 backend tests pass at rc3
+- 35/35 Playwright E2E pass at rc3 (local backend)
+- Post-load data integrity checks: PASS (squadron isolation, health recovery 412ms)
+- Tasks 10–13 classified: 10 DEFERRED (known limitation), 11 DEFERRED (audit only), 12 COMPLETE, 13 COMPLETE
+- Third load test (run 3, task btitxok60) launched with corrected `/api/planning/years` path
 
 **Remaining mandatory technical gates before production approval may be requested:**
-1. 100-user concurrent load test against staging (45 minutes minimum)
+1. 100-user load test run 3 (in progress): confirm `/api/planning/years` under load, zero 5xx
 2. D7 browser smoke test steps (human tester required)
 3. Deploy DEFECT-001, DEFECT-003, DEFECT-005 fixes to production
 

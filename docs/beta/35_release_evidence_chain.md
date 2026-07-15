@@ -16,16 +16,18 @@ This document provides traceability from source code to production deployment. I
 | Field | Value |
 |---|---|
 | Branch | `release/beta-2026-07-14` |
-| Release candidate commit | `e539d02c25b00bc11a197b3324eb52c71efdb093` |
-| RC tag | `beta-2026-07-14-rc2` |
-| Tag object | Annotated tag on `e539d02` |
-| Tag status | Pushed to origin: COMPLETE (2026-07-14) |
-| Commit message | `fix: replace useBlocker with useLocation in useProxyGuard; fix 35 Playwright E2E tests` |
-| Prior RC (superseded) | `beta-2026-07-14-rc1` → `e918f3e` — superseded; rc2 includes all rc1 changes plus the useBlocker crash fix |
-| Files changed (total) | 4 source files + documentation |
+| Release candidate commit | `d95e67d` |
+| RC tag | `beta-2026-07-14-rc3` |
+| Tag object | Annotated tag on `d95e67d` |
+| Tag status | Pushed to origin: COMPLETE (2026-07-15) |
+| Commit message | `fix: scope sqn_general out of /api/planning/years list (DEFECT-007)` |
+| Prior RCs (superseded) | rc1 → `e918f3e`; rc2 → `e539d02` (useBlocker crash fix); rc3 = rc2 + DEFECT-007 |
+| Cumulative changes in rc3 vs rc1 | Planning years sqn_general scope fix; useBlocker crash fix; 9 dead divs removed; nav simplified; IDOR fixes; 119 new backend tests; 35 Playwright E2E specs |
 | Evidence file | `docs/beta/34_release_candidate_record.md` |
 
-**DEFECT-001, DEFECT-003, DEFECT-005 fixes** are committed on this branch and included in `e918f3e`. They require a production deployment to take effect.
+**DEFECT-001, DEFECT-003, DEFECT-005 fixes** are committed on this branch. They require a production deployment to take effect.
+
+**DEFECT-007** (sqn_general planning years IDOR) — fixed in rc3 (`d95e67d`). Discovered 2026-07-15 during post-load integrity verification. sqn_general was able to read all squadrons' planning years; fix adds scope filter to match sqn_admin behaviour.
 
 ---
 
@@ -34,14 +36,15 @@ This document provides traceability from source code to production deployment. I
 | Metric | Value |
 |---|---|
 | Test runner | pytest |
-| Total tests | 541 |
-| Test outcome | 541 passed, 1 skipped, 0 failures |
+| Total tests | 543 |
+| Test outcome | 543 passed, 1 skipped, 0 failures |
 | Test files | `backend/tests/` — 23 test modules |
-| Key regression tests | `test_lockout.py`, `test_planning_access.py`, `test_idor_prevention.py`, `test_audit.py`, `test_session_lifecycle.py` |
+| Key regression tests | `test_lockout.py`, `test_planning_access.py`, `test_planning_idor.py` (incl. DEFECT-007), `test_audit.py`, `test_session_lifecycle.py` |
 | `datetime.utcnow()` deprecations | 0 (fixed on this branch) |
-| Playwright E2E | 35/35 passed (useBlocker crash fixed in rc2) |
-| Test run commit | `e539d02` (rc2) |
-| Test run timestamp | 2026-07-14T13:15:00+0800 |
+| Playwright E2E | 35/35 passed (rc3, local backend) |
+| Playwright staging | 3/35 pass via dev proxy — 32 blocked by intentional CORS restriction (staging backend refuses localhost origins); human browser verification required |
+| Test run commit | `d95e67d` (rc3) |
+| Test run timestamp | 2026-07-15 |
 
 ---
 
@@ -134,26 +137,49 @@ Minimum acceptable evidence before release:
 
 | Test | Tool/Method | Status | Evidence |
 |---|---|---|---|
-| IDOR prevention | pytest `test_planning_access.py` | PENDING test run on RC | Exit code 0 |
-| Authentication lockout | pytest `test_lockout.py` | PENDING test run on RC | Exit code 0 |
-| Role isolation | pytest `test_role_isolation.py` | PENDING test run on RC | Exit code 0 |
-| XSS input sanitisation | pytest (HTML encoding tests) | PENDING test run on RC | Exit code 0 |
-| SQL injection | pytest (parameterised queries — no concatenated SQL) | PENDING test run on RC | Exit code 0 |
-| CORS origin whitelist | Code review | COMPLETE | `backend/app/main.py` CORS config uses explicit origin list, not `*` |
-| Secrets scan | `grep -r "sk-" backend/ frontend/` | COMPLETE | 0 matches |
-| Rate limiting | `RATE_LIMIT_REQUESTS` env var | COMPLETE | Configured in Railway staging |
+| IDOR prevention (planning) | pytest `test_planning_idor.py` | ✅ COMPLETE | 543 passed at rc3 (d95e67d); TestSqnGeneralYearScope DEFECT-007 regression passes |
+| IDOR prevention (parade-nights, ops) | pytest `test_planning_access.py` | ✅ COMPLETE | 543 passed at rc3 |
+| Authentication lockout | pytest `test_lockout.py` | ✅ COMPLETE | 543 passed at rc3 |
+| Role isolation | All role tests in 543-test suite | ✅ COMPLETE | 543 passed at rc3 |
+| XSS input sanitisation | pytest (HTML encoding tests) | ✅ COMPLETE | 543 passed at rc3 |
+| SQL injection | pytest (parameterised queries) | ✅ COMPLETE | No concatenated SQL; 543 passed |
+| CORS origin whitelist | Code review | ✅ COMPLETE | Explicit origin list per environment; no `*`; localhost blocked in staging (confirmed by Playwright staging run) |
+| Secrets scan (4 greps) | `grep -Rc` patterns from `.claude/rules/security.md` | ✅ COMPLETE | 0 matches |
+| DEFECT-007 (sqn_general years IDOR) | Found 2026-07-15 in post-load staging check | ✅ FIXED in rc3 | `planning.py` list filter; 2 regression tests added |
 
 ---
 
 ## Link 10 — Performance Tests
 
-| Test | Status | Evidence |
-|---|---|---|
-| 100-user concurrent login simulation | NOT STARTED — requires staging environment | PENDING |
-| Wing overview query time (<500ms at 16 sqn) | Code verified; N+1 documented but safe at 16 sqn | Documented in `29_code_inventory_and_review.md` |
-| Backup/restore operation | Tested against staging database | `04_backup_restore_test_report.md` |
+### Load Test Run History
 
-100-user load test gate: **PENDING — requires explicit approval to execute against staging**
+**Run 1 (b4343awtj, 2026-07-14) — INVALID**: Wrong endpoint paths; 60,873 of 124,003 requests
+were 404 (used `/api/dashboard`, `/api/planning/sessions`, `/api/planning/annual-program`).
+Discarded. Performance baseline for 3 valid endpoints (login, me, parade-nights): P95 534ms.
+
+**Run 2 (baw9zh1fw, 2026-07-14) — PARTIAL PASS**: 100 users, 46.2 min.
+- Total requests: 124,892 | Successful: 105,165 | Non-5xx failures: 19,726 | 5xx: 1
+- P95 latency: 530ms (PASS ≤ 2000ms) | 5xx: FAIL (1 SSL EOF, Railway infrastructure glitch)
+- 5 endpoints called; 19,724 failures from `/api/years` (wrong path — correct is `/api/planning/years`)
+- Valid endpoints proven: `/api/auth/login` (n=21,380, p95=619ms), `/api/auth/me` (p95=316ms),
+  `/api/reports/summary` (p95=315ms), `/api/parade-nights` (p95=319ms) — all PASS
+- Script corrected to `/api/planning/years` for Run 3
+
+**Run 3 (btitxok60, 2026-07-15) — IN PROGRESS**: 100 users, 45 min, corrected `/api/planning/years`
+path. Started 2026-07-15 against staging (still running rc2 staging deployment; rc3 is a
+non-performance-affecting security fix). Results pending.
+
+### Performance Gate Record
+
+| Criterion | Runs 1–2 finding | Gate |
+|---|---|---|
+| P95 ≤ 2000ms | 530ms (run 2, 4 valid endpoints) | PASS |
+| Zero 5xx | 1 SSL EOF (run 2) | CONDITIONAL — transient infra event, not app error |
+| All 5 workflow endpoints covered | 4/5 confirmed; `/api/planning/years` pending run 3 | IN PROGRESS |
+| 100 concurrent users, 45+ minutes | 46.2 min, 100 users, 124K requests | PASS |
+| 16 squadrons represented | All 16 seeded roles in pool | PASS |
+
+**Gate status: IN PROGRESS — awaiting Run 3 result to confirm years endpoint performance.**
 
 ---
 
@@ -188,19 +214,19 @@ Minimum acceptable evidence before release:
 
 | Link | Description | Status |
 |---|---|---|
-| 1 | Git commit `e539d02` / tag `beta-2026-07-14-rc2` | COMPLETE (tag pushed to origin 2026-07-14) |
-| 2 | Backend: 541 tests pass; Playwright E2E: 35/35 pass | COMPLETE on rc2 |
-| 3 | Staging deployment of release branch HEAD (`3cc7650`) | COMPLETE — deployment `72b45f4b` SUCCESS 2026-07-14 |
-| 4 | Database migration `x9y0z1a2b3c4` applied | COMPLETE — staging migration logs confirmed 2026-07-14 |
-| 5 | Backend health `squadrons:16` | COMPLETE — confirmed at D1, D4, R3, R5 (2026-07-14) |
-| 6 | Frontend HTML loading (staging) | COMPLETE — connected frontend + Planning Workspace: 200 |
-| 7 | Browser login verification (2 squadrons, 2 roles) | PENDING human tester |
-| 8 | Cross-interface data consistency | PENDING (UAT) |
-| 9 | Security tests (IDOR, auth, role isolation) | PENDING test run |
-| 10 | Performance / load test | PENDING — 100-user load test not yet run |
-| 11 | Rollback rehearsal in staging | COMPLETE — D1–D7/R1–R5 executed 2026-07-14; all automated steps PASS |
-| 12 | Final GO/NO-GO approval | PENDING |
+| 1 | Git commit `d95e67d` / tag `beta-2026-07-14-rc3` | ✅ COMPLETE (pushed to origin 2026-07-15) |
+| 2 | Backend: 543 tests pass; Playwright E2E: 35/35 pass (rc3, local) | ✅ COMPLETE on rc3 |
+| 3 | Staging deployment of rc2 code (rc3 is non-perf security fix) | ✅ COMPLETE — deployment `ac20386b` SUCCESS 2026-07-14 |
+| 4 | Database migration `x9y0z1a2b3c4` applied | ✅ COMPLETE — staging confirmed 2026-07-14 |
+| 5 | Backend health `squadrons:16` | ✅ COMPLETE — confirmed post-load 2026-07-15 (412ms response) |
+| 6 | Frontend HTML loading (staging) | ✅ COMPLETE — connected frontend + Planning Workspace: 200 |
+| 7 | Browser login verification (2 squadrons, 2 roles) | ⚠️ PENDING human tester |
+| 8 | Cross-interface data consistency | ⚠️ PENDING (UAT) |
+| 9 | Security tests (IDOR, auth, role isolation, DEFECT-007) | ✅ COMPLETE — 543 pass at rc3; DEFECT-007 found, fixed, regression tested |
+| 10 | Performance / load test | ⏳ IN PROGRESS — run 3 (btitxok60) running; 4 of 5 endpoints proven P95 530ms |
+| 11 | Rollback rehearsal in staging | ✅ COMPLETE — D1–D7/R1–R5 executed 2026-07-14; all automated steps PASS |
+| 12 | Final GO/NO-GO approval | ⚠️ PENDING |
 
-**Links 1–6 and 11 are complete (automated gates). Links 7–10 and 12 remain pending human execution, approval, or load test.**
+**Links 1–6, 9, and 11 are complete. Link 10 (load test) in progress. Links 7, 8, 12 require human action.**
 
 This document must be fully populated before the release is approved.

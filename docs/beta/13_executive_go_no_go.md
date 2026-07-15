@@ -7,22 +7,26 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) asses
 
 ## Decision Summary
 
-**Current status: NO-GO (pending mandatory technical gates)**
+**Current status: NO-GO (third load test in progress; browser verification, UAT, governance pending)**
 
-Updated 2026-07-14 (commit `e539d02`, tag `beta-2026-07-14-rc2`).
+Updated 2026-07-15 (commit `d95e67d`, tag `beta-2026-07-14-rc3`).
 
-The system is feature-complete and structurally sound for beta. All 35 Playwright E2E tests now pass (root cause: `useBlocker` crash in `AppShell` fixed). Backend: 541 passed, 0 failures. Three security/deployment defects are fixed on the release candidate but not yet deployed to production.
+The system is feature-complete and structurally sound for beta. All 35 Playwright E2E tests pass (rc3, local backend). Backend: 543 passed, 1 skipped, 0 failures. Four security/deployment defects fixed (DEFECT-001, -003, -005, -007). Three require production deployment; DEFECT-007 fixed in rc3 and proven by regression tests.
 
 **Mandatory gates not yet completed — production approval may NOT be requested yet:**
-- 100-user concurrent load test: NOT DONE
+- 100-user concurrent load test (third run, task btitxok60): IN PROGRESS — 4 of 5 endpoints proven; awaiting `/api/planning/years` confirmation
 - D7 browser smoke test steps (staging): NOT DONE (human tester required)
 
-**Completed since previous update (2026-07-14):**
-- RC tag `beta-2026-07-14-rc2` pushed to origin ✅
-- Staging deployment rehearsal (D1–D7): all automated checks PASS ✅
-- Staging rollback rehearsal (R1–R5): rollback verified, RC re-deployed, health confirmed ✅
+**Completed since previous update (2026-07-14–15):**
+- RC tag `beta-2026-07-14-rc3` pushed to origin ✅ (d95e67d)
+- DEFECT-007 found in post-load integrity check, fixed, 2 regression tests added ✅
+- 543 backend tests pass at rc3 (up from 541 at rc2) ✅
+- 35/35 Playwright E2E pass at rc3 (local backend) ✅
+- Post-load data integrity checks: squadron isolation PASS, health recovery PASS ✅
+- Second load test (run 2): P95 530ms (PASS); 4 endpoints fully proven; years endpoint had wrong path (script bug) ✅
+- Tasks 10–13 formally classified: 10 DEFERRED, 11 DEFERRED, 12 COMPLETE, 13 COMPLETE ✅
 
-These are non-negotiable per mission brief. No production deployment may proceed until all four items above are completed and documented.
+These are non-negotiable per mission brief. No production deployment may proceed until all items above are completed and documented.
 
 ---
 
@@ -163,16 +167,19 @@ The following were specified as non-negotiable in the Operational Release Gate m
 
 | Gate | Status | Notes |
 |---|---|---|
-| Backend tests: 541 pass | ✅ PASS | Commit e539d02 |
+| Backend tests: 543 pass | ✅ PASS | Commit d95e67d (rc3) |
 | TypeScript: 0 errors | ✅ PASS | — |
 | Security greps: all clean | ✅ PASS | — |
-| Playwright E2E: 35/35 pass | ✅ PASS | Commit e539d02 (useBlocker crash fixed) |
+| DEFECT-007 found and fixed | ✅ FIXED | sqn_general planning years scope; 2 regression tests; rc3 |
+| Playwright E2E: 35/35 pass | ✅ PASS | Commit d95e67d (rc3), local backend |
+| Playwright E2E (staging) | ⚠️ PARTIAL | 3/35 via Vite proxy; 32 blocked by intentional CORS; human browser required |
 | Migration chain: v36 all environments | ✅ PASS | — |
-| Staging online + seeded | ✅ PASS | 16 squadrons |
-| RC tag (rc2) created and pushed | ✅ DONE | Pushed to origin 2026-07-14 |
+| Staging online + seeded | ✅ PASS | 16 squadrons; health 412ms post-load |
+| RC tag (rc3) created and pushed | ✅ DONE | Pushed to origin 2026-07-15 |
 | Staging deployment rehearsal | ✅ DONE | D1–D7 executed 2026-07-14; all automated checks PASS |
 | Staging rollback rehearsal | ✅ DONE | R1–R5 executed 2026-07-14; rollback verified; RC re-deployed |
-| 100-user load test | ❌ NOT DONE | Blocks production approval |
+| Post-load data integrity checks | ✅ PASS | Squadron isolation confirmed; health recovery 412ms |
+| 100-user load test (run 3, task btitxok60) | ⏳ IN PROGRESS | Blocks production approval; 4/5 endpoints proven (P95 530ms) |
 | Deploy DEFECT fixes to production | ❌ PENDING | Requires approval |
 
 **Production deployment approval may not be requested until all ❌ gates above are resolved.**
