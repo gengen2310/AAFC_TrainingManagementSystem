@@ -47,6 +47,23 @@ Also found and fixed two bugs in `tools/stress/load_test_staging.py` (gitignored
 
 Validated the fix with a 10-user/30s smoke run first: 173 requests, 0 failures, 0 5xx, P95 484ms — PASS. Then launched the full `--users 100 --duration-minutes 45 --ramp-seconds 60` run (background task `bh2yppp8g`), logging to `docs/beta/evidence/load_test_100user_2026-07-15.log`. At the 160s mark: 6,083 requests, 0 5xx — on track. Update this section and `docs/beta/35_release_evidence_chain.md` / `13_executive_go_no_go.md` with the final P95/5xx numbers once it completes (~46 min total run time); do not mark this gate closed until that final number is recorded.
 
+## Two "open technical tasks" from the stale checkpoint are already answered elsewhere
+
+`docs/beta/51_current_execution_checkpoint.md` (task 11: visual consistency, task 13: doc-phase
+classification) marks both "NEEDS ASSESSMENT"/"NEEDS CLASSIFICATION" — but later docs from the same
+doc suite already resolve them:
+- Task 11 (visual consistency / shared design tokens): `docs/beta/33_feature_freeze.md` explicitly
+  lists this as Task #11, a P2 item **deferred to post-beta**, not blocking. The checkpoint's
+  "needs assessment" note appears to just not cross-reference this.
+- Task 13 (beta doc "phases 19–22"): there is no separate 19–22 sub-scheme. Phase 19 = 14 known
+  limitations documented (`15_known_limitations.md`); Phase 20 = the final consolidation/workflow/
+  stress doc trio (`30`, `31`, `32`). Docs 33–51 are a *different* numbering track ("Operational
+  Release Gate" phases 1–19, per `12_full_beta_release_readiness.md`'s own heading) — not a
+  continuation of the 0–20 track. No gap found; nothing further to write for this task.
+
+Re-run backend suite at current HEAD to confirm the 541-pass claim still holds: `541 passed, 1
+skipped` — matches, gate 1 (backend tests) still green.
+
 ## Repository-native release-gate scaffolding added (2026-07-15)
 
 `CLAUDE.md` referenced two files that didn't exist yet — created both:
