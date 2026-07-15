@@ -37,6 +37,27 @@ new actual head) before committing it**, or Alembic will reject it as a duplicat
 session did not touch that file — it remains stashed, untouched, in that session's own working
 tree/stash for them to resolve. Flagging here so it's visible before anyone hits it blind.
 
+## 100-user concurrent load test — in progress (2026-07-15)
+
+Discovered a second, independent trace of the parallel session's work: `docs/beta/51_current_execution_checkpoint.md` (committed at `0ca4fe8`, not superseded by any later commit) records that session starting its own "corrected" 100-user load test (task `baw9zh1fw`, expected completion ~2026-07-14T16:34Z). No later commit records that run's results — the evidence-recording steps in that checkpoint's own action list (update `35_release_evidence_chain.md`, `13_executive_go_no_go.md`, commit) were never done. Given the elapsed time since expected completion, treat that run as abandoned/unrecorded, not as a completed gate.
+
+Also found and fixed two bugs in `tools/stress/load_test_staging.py` (gitignored — local tool only, not committed) before trusting it for evidence:
+- `_get(session, "/api/years")` → `/api/planning/years` (verified via curl against live staging with a real token: `/api/years` returns 404, `/api/planning/years` returns 200 — the router's prefix is `/api/planning`). Note: `51_current_execution_checkpoint.md` claims `/api/years` as a *correct* path from the other session's own fix pass — that claim does not match this session's direct curl verification against the real server; trust the curl result.
+- Gate-record output printed `Users: 0` always (`len(set())` — an empty literal, not the actual pool). Fixed to report the real `--users` value.
+
+Validated the fix with a 10-user/30s smoke run first: 173 requests, 0 failures, 0 5xx, P95 484ms — PASS. Then launched the full `--users 100 --duration-minutes 45 --ramp-seconds 60` run (background task `bh2yppp8g`), logging to `docs/beta/evidence/load_test_100user_2026-07-15.log`. At the 160s mark: 6,083 requests, 0 5xx — on track. Update this section and `docs/beta/35_release_evidence_chain.md` / `13_executive_go_no_go.md` with the final P95/5xx numbers once it completes (~46 min total run time); do not mark this gate closed until that final number is recorded.
+
+## Repository-native release-gate scaffolding added (2026-07-15)
+
+`CLAUDE.md` referenced two files that didn't exist yet — created both:
+- `.claude/rules/architecture.md` — the two-frontend split, session/auth mechanism, tenancy vs.
+  Flight, and permission-helper selection rules, pulled from findings already proven empirically
+  earlier in this release program (SameSite behaviour, proxy-aware vs. simple scope checks).
+- `.claude/skills/beta-release/SKILL.md` — the release-gate checklist, mapping each gate to its
+  evidence doc in `docs/beta/`, plus the non-negotiable rules and the "check for a concurrent
+  session before starting destructive/long-running staging work" practice this session had to learn
+  the hard way.
+
 ## Repository
 
 | Item | Value |
