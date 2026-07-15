@@ -395,7 +395,7 @@ def list_planning_years(
     p: Principal = Depends(get_principal),
 ):
     q = db.query(PlanningYear)
-    if p.role == "sqn_admin":
+    if p.role in ("sqn_admin", "sqn_general"):
         q = q.filter(PlanningYear.unit_id == p.squadron_id)
     elif p.role in ("wing_admin", "wing_viewer"):
         q = q.filter(PlanningYear.wing_id == p.wing_id)
