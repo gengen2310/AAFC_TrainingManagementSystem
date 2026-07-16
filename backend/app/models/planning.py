@@ -35,6 +35,7 @@ class PlanningYear(Base, UUIDMixin, TimestampMixin):
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
 class ParadeDate(Base, UUIDMixin, TimestampMixin):
@@ -91,6 +92,7 @@ class AnchorEvent(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
 class AnchorPrepRule(Base, UUIDMixin, TimestampMixin):
@@ -136,6 +138,7 @@ class ScheduledSession(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
 class PlanningLocation(Base, UUIDMixin, TimestampMixin):
@@ -186,7 +189,9 @@ class PlanningNotice(Base, UUIDMixin, TimestampMixin):
     audience: Mapped[str | None] = mapped_column(String(60), nullable=True)
     priority: Mapped[str] = mapped_column(String(20), default="normal")
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
 class CeaImportBatch(Base, UUIDMixin, TimestampMixin):

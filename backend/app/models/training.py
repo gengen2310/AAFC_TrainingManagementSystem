@@ -103,6 +103,7 @@ class Session(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     follow_up_due_date: Mapped[str | None] = mapped_column(String(10))
     evidence_text: Mapped[str | None] = mapped_column(Text)
     evidence_url: Mapped[str | None] = mapped_column(String(400))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
 class SessionStatusHistory(Base, UUIDMixin):

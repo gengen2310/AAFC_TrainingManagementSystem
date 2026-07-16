@@ -19,6 +19,16 @@ from ..services import (audit, score_parade, publish_blockers, close_blockers)
 
 router = APIRouter(prefix="/api", tags=["training"])
 
+
+def _check_version(obj, client_version: int | None) -> None:
+    """Raise 409 if the client's version is stale (optimistic locking)."""
+    if client_version is not None and obj.version != client_version:
+        raise HTTPException(409, detail={
+            "error": "version_conflict",
+            "current_version": obj.version,
+        })
+
+
 VALID_STATUS = {"draft", "planned", "published", "delivered", "delivered_with_issue",
                 "cancelled", "cancelled_late", "rescheduled", "not_delivered",
                 "requires_review", "blocked", "closed"}
@@ -283,6 +293,7 @@ class SessionIn(BaseModel):
     facilitator_id: str | None = None
     training_area_id: str | None = None
     expected_attendance: int | None = None
+    version: int | None = None
 
 
 class StatusIn(BaseModel):
@@ -322,6 +333,7 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
         raise HTTPException(404, detail={"error": "not_found"})
     pn = db.get(ParadeNight, s.parade_night_id)
     require_can_write_squadron(p, s.squadron_id, pn.wing_id if pn else None)
+    _check_version(s, body.version)
     old = {"facilitator_id": s.facilitator_id, "training_area_id": s.training_area_id}
     s.period_number = body.period_number
     s.cadet_group = body.cadet_group
@@ -329,6 +341,7 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
     s.custom_title = body.custom_title
     s.expected_attendance = body.expected_attendance
     _denormalise(db, s, body.curriculum_item_id, body.facilitator_id, body.training_area_id)
+    s.version += 1
     db.commit()
     if pn:
         _recompute(db, pn)

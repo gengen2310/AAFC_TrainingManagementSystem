@@ -36,6 +36,15 @@ from .timing import _effective_template
 router = APIRouter(prefix="/api/planning", tags=["planning"])
 
 
+def _check_version(obj, client_version: int | None) -> None:
+    """Raise 409 if the client's version is stale (optimistic locking)."""
+    if client_version is not None and obj.version != client_version:
+        raise HTTPException(409, detail={
+            "error": "version_conflict",
+            "current_version": obj.version,
+        })
+
+
 def _parse_json_list(val) -> list:
     """Return val as a list, JSON-parsing it if stored as a TEXT string (Postgres TEXT vs JSON/JSONB mismatch)."""
     if not val:
@@ -221,6 +230,7 @@ def _year_out(py: PlanningYear, unit_code: str | None = None,
         "created_by": py.created_by, "updated_by": py.updated_by,
         "created_at": py.created_at.isoformat() if py.created_at else None,
         "updated_at": py.updated_at.isoformat() if py.updated_at else None,
+        "version": py.version,
     }
 
 
@@ -279,6 +289,7 @@ def _anchor_out(a: AnchorEvent) -> dict:
         "notes": a.notes, "is_archived": a.is_archived,
         "created_by": a.created_by,
         "created_at": a.created_at.isoformat() if a.created_at else None,
+        "version": a.version,
     }
 
 
@@ -355,6 +366,7 @@ def _real_session_out(s: TrainingSession, db: DBSession) -> dict:
         "is_combined": False,
         "override_conflict": False,
         "created_at": s.created_at.isoformat() if s.created_at else None,
+        "version": s.version,
     }
 
 
@@ -385,6 +397,7 @@ class PlanningYearIn(BaseModel):
 class PlanningYearUpdateIn(BaseModel):
     name: Optional[str] = None
     active_status: Optional[bool] = None
+    version: Optional[int] = None
 
 
 @router.get("/years")
@@ -480,11 +493,13 @@ def update_planning_year(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True)
+    _check_version(py, body.version)
     if body.name is not None:
         py.name = body.name
     if body.active_status is not None:
         py.active_status = body.active_status
     py.updated_by = p.user_id; py.updated_at = utcnow()
+    py.version += 1
     db.commit()
     audit(db, p, object_type="planning_year", object_id=py.id, action="update")
     sq = db.get(Squadron, py.unit_id) if py.unit_id else None
@@ -843,6 +858,7 @@ class AnchorEventUpdateIn(BaseModel):
     planning_impact: Optional[str] = None
     readiness_requirements: Optional[str] = None
     notes: Optional[str] = None
+    version: Optional[int] = None
 
 
 @router.get("/years/{year_id}/anchors")
@@ -913,12 +929,14 @@ def update_anchor(
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(a.planning_year_id, db)
     _require_year_access(p, py, write=True)
+    _check_version(a, body.version)
     for field in ("event_name", "importance", "start_date", "end_date",
                   "planning_impact", "readiness_requirements", "notes"):
         val = getattr(body, field)
         if val is not None:
             setattr(a, field, val)
     a.updated_by = p.user_id; a.updated_at = utcnow()
+    a.version += 1
     db.commit()
     audit(db, p, object_type="anchor_event", object_id=a.id, action="update")
     return _anchor_out(a)
@@ -1167,6 +1185,7 @@ class ScheduledSessionUpdateIn(BaseModel):
     override_reason: Optional[str] = None
     status: Optional[str] = None
     notes: Optional[str] = None
+    version: Optional[int] = None
 
 
 @router.post("/parade-dates/{date_id}/sessions")
@@ -1270,6 +1289,7 @@ def update_session(
     pn = db.get(ParadeNight, s.parade_night_id) if s.parade_night_id else None
     if pn:
         require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    _check_version(s, body.version)
 
     if body.curriculum_id is not None:
         if body.curriculum_id:
@@ -1308,6 +1328,7 @@ def update_session(
         s.status = body.status
     if body.notes is not None:
         s.delivery_notes = body.notes
+    s.version += 1
     db.commit()
     audit(db, p, object_type="session", object_id=s.id, action="update")
     return _real_session_out(s, db)
@@ -3564,6 +3585,7 @@ class NoticeUpdateIn(BaseModel):
     notice_text: str | None = None
     priority: str | None = None
     audience: str | None = None
+    version: int | None = None
 
 
 @router.patch("/notices/{notice_id}")
@@ -3580,12 +3602,14 @@ def update_notice(
     if not pd:
         raise HTTPException(404, detail={"error": "parade_date_not_found"})
     _require_year_access(p, _get_year_or_404(pd.planning_year_id, db), write=True)
+    _check_version(notice, body.version)
     if body.notice_text is not None:
         notice.notice_text = body.notice_text.strip()
     if body.priority is not None:
         notice.priority = body.priority
     if body.audience is not None:
         notice.audience = body.audience
+    notice.version += 1
     db.commit()
     return {"ok": True}
 
