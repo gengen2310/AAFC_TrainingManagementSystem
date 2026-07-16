@@ -13,6 +13,15 @@ if [ -n "$AAFC_API_BASE" ]; then
     /usr/share/nginx/html/index.html
 fi
 
+# Inject the Planning Workspace URL so the nav link points to the correct environment.
+# Set AAFC_PW_BASE in Railway's environment variables panel.
+# Example staging: https://aafc-tms-planning-workspace-preview-staging.up.railway.app/planning
+if [ -n "${AAFC_PW_BASE:-}" ]; then
+  sed -i \
+    "s|<meta name=\"aafc-pw-base\" content=\"[^\"]*\">|<meta name=\"aafc-pw-base\" content=\"${AAFC_PW_BASE}\">|" \
+    /usr/share/nginx/html/index.html
+fi
+
 # Inject the runtime port into the nginx config
 sed -i "s/__PORT__/${PORT}/g" /etc/nginx/conf.d/default.conf
 

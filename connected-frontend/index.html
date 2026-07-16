@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AAFC Training System</title>
 <meta name="aafc-api-base" content="https://aafc-tms-backend-production.up.railway.app">
+<meta name="aafc-pw-base" content="https://aafc-tms-planning-workspace-preview-production.up.railway.app/planning">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -2925,6 +2926,8 @@ function bootApp(){
   applyNavScope();
   // Planning Workspace preview link — visible for squadron scope (sqn_admin + sqn_general) only.
   const pwLink=document.getElementById('nav-pw-link'), pwLbl=document.getElementById('nav-lbl-pw');
+  // Use environment-injected URL from <meta name="aafc-pw-base"> if available.
+  if(pwLink){const pwMeta=document.querySelector('meta[name="aafc-pw-base"]');if(pwMeta&&pwMeta.content)pwLink.href=pwMeta.content;}
   const showPW=scope==='squadron'; if(pwLink)pwLink.style.display=showPW?'flex':'none'; if(pwLbl)pwLbl.style.display=showPW?'block':'none';
   // Write controls: visible only where this role/scope can currently write; auditor/viewers read-only.
   const canWrite = scope==='squadron' ? canWriteSquadron() : false; // wing/national write only via proxy into a squadron

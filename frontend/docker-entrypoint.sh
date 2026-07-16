@@ -22,6 +22,15 @@ if [ "${MODULE_MODE:-false}" = "true" ]; then
         /usr/share/nginx/html/index.html
 fi
 
+# Inject the connected-frontend TMS URL so "Return to TMS" links are environment-aware.
+# Set AAFC_TMS_BASE to the URL of the connected-frontend service for this environment.
+# Example staging: https://aafc-tms-frontend-staging.up.railway.app
+if [ -n "${AAFC_TMS_BASE:-}" ]; then
+    sed -i \
+        "s|<meta name=\"aafc-tms-base\" content=\"[^\"]*\">|<meta name=\"aafc-tms-base\" content=\"${AAFC_TMS_BASE}\">|" \
+        /usr/share/nginx/html/index.html
+fi
+
 # Inject runtime port into nginx config
 sed -i "s/__PORT__/${PORT}/g" /etc/nginx/conf.d/default.conf
 

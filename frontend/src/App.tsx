@@ -30,7 +30,9 @@ const qc = new QueryClient({ defaultOptions: { queries: { retry: false, refetchO
 const USE_HASH = import.meta.env.VITE_HASH_ROUTER === "true";
 const BASENAME = USE_HASH ? "/" : (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "/";
 
-const TMS_URL = "https://aafc-tms-frontend-production.up.railway.app";
+const TMS_URL =
+  (document.querySelector('meta[name="aafc-tms-base"]') as HTMLMetaElement | null)
+    ?.content || "https://aafc-tms-frontend-production.up.railway.app";
 const MODULE_MODE =
   (document.querySelector('meta[name="aafc-module-mode"]') as HTMLMetaElement | null)
     ?.content === "true";

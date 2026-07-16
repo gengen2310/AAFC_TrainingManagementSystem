@@ -6,6 +6,10 @@ import { isWing, isNational, isAuditor, isAdmin, isSystemAdmin, canManageAccount
 import { ProxyControls } from "./ProxyControls";
 import { useProxyGuard } from "../auth/useProxyGuard";
 
+const TMS_URL =
+  (document.querySelector('meta[name="aafc-tms-base"]') as HTMLMetaElement | null)
+    ?.content || "https://aafc-tms-frontend-production.up.railway.app";
+
 const THEMES = ["light", "dark", "hc"] as const;
 type Theme = typeof THEMES[number];
 
@@ -109,6 +113,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* Account — visible to every authenticated user */}
           <div className="nav-group">Account</div>
           <NavItem to="/settings" label="Access Codes" />
+          <a href={TMS_URL} className="nav-item nav-item-ext" rel="noopener noreferrer">&#8592; Main TMS</a>
         </nav>
         <main id="main" className="main" tabIndex={-1}>{children}</main>
       </div>
