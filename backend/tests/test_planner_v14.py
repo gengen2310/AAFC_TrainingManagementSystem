@@ -598,6 +598,55 @@ def test_rollover_blocked_for_general_user(client):
     assert r.status_code == 403
 
 
+def test_rollover_parade_dates_advanced_by_one_year(client):
+    """Rollover must copy parade dates with dates advanced by exactly one year."""
+    hdr = _sqn_admin(client)
+    py = _make_year(client, hdr, year=2061, name="Rollover Date Advance")
+    year_id = py["planning_year_id"]
+    _make_parade_date(client, hdr, year_id, "2061-09-04")
+    _make_parade_date(client, hdr, year_id, "2061-09-11")
+
+    r = client.post(f"/api/planning/years/{year_id}/rollover", json={}, headers=hdr)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["parade_dates_copied"] == 2
+
+    # Verify dates in the new year are advanced by exactly 1 year
+    new_id = d["new_planning_year_id"]
+    dr = client.get(f"/api/planning/years/{new_id}/parade-dates", headers=hdr)
+    assert dr.status_code == 200
+    dates = [row["parade_date"] for row in dr.json()]
+    assert "2062-09-04" in dates
+    assert "2062-09-11" in dates
+    # Source dates must NOT appear in the new year
+    assert "2061-09-04" not in dates
+    assert "2061-09-11" not in dates
+
+
+def test_rollover_source_year_sessions_unchanged(client):
+    """Rollover must not modify or delete sessions in the source year."""
+    hdr = _sqn_admin(client)
+    py = _make_year(client, hdr, year=2062, name="Rollover Source Unchanged")
+    year_id = py["planning_year_id"]
+    _make_parade_date(client, hdr, year_id, "2062-10-06")
+
+    # Record the source year's parade dates before rollover
+    dr_before = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=hdr)
+    assert dr_before.status_code == 200
+    dates_before = dr_before.json()
+
+    client.post(f"/api/planning/years/{year_id}/rollover", json={}, headers=hdr)
+
+    # Source year dates must be identical after rollover
+    dr_after = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=hdr)
+    assert dr_after.status_code == 200
+    dates_after = dr_after.json()
+    assert len(dates_before) == len(dates_after)
+    ids_before = {d["parade_date_id"] for d in dates_before}
+    ids_after = {d["parade_date_id"] for d in dates_after}
+    assert ids_before == ids_after, "Rollover must not alter source year's parade date IDs"
+
+
 # ─────────────────────────────────────────────────────────────
 # Prep rules (seeded)
 # ─────────────────────────────────────────────────────────────
