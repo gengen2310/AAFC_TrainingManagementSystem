@@ -6839,7 +6839,7 @@ async function loadLongRange(yearId){
     } else { anchRow.innerHTML='<span class="muted">No anchor events in this window.</span>'; }
     // Main grid
     if(!d.parade_dates.length){
-      document.getElementById('lr-body').innerHTML='<div class="empty"><div class="et">No parade dates in this range</div><div class="es">Generate parade dates for your planning year to see them here. <a href="#" onclick="nav(\'planning-year\');return false">Go to Annual Program</a>.</div></div>';
+      document.getElementById('lr-body').innerHTML='<div class="empty"><div class="et">No parade dates in this range</div><div class="es">Generate parade dates for your planning year to see them here. <a href="#" onclick="nav(\'activities\');return false">Go to Activities</a>.</div></div>';
       card.style.display=''; empty.style.display='none'; return;
     }
     let html='';
