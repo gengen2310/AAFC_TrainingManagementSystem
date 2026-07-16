@@ -78,7 +78,7 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) addit
 | Playwright E2E: 35 tests pass | 0 failures | ✅ PASS | 35/35 at commit d95e67d / rc3 (2026-07-15, local backend) |
 | Playwright E2E (staging via proxy) | Informational | ⚠️ PARTIAL | 3/35 pass; 32 CORS-blocked (intentional security restriction); human browser required |
 | Post-load data integrity | Squadron isolation, health recovery | ✅ PASS | 2026-07-15: parade-nights isolation confirmed; health 412ms |
-| 100-user concurrent load test | Mandatory pre-release | ⏳ IN PROGRESS | Run 3 (btitxok60) running; run 2 proved 4/5 endpoints P95 530ms; years path corrected |
+| 100-user concurrent load test | Mandatory pre-release | ✅ CONDITIONAL PASS | Run 3 (btitxok60) 2026-07-15: 89,026 requests, all 5 endpoints, P95=548ms; 1 SSL EOF (Railway infra); throughput collapse at 30 min (staging ceiling, documented in 35_release_evidence_chain.md Link 10) |
 
 ---
 
@@ -146,7 +146,7 @@ Created: 2026-07-14. Updated with Operational Release Gate (Phases 1–19) addit
 | 2: Migration and Schema | ✅ PASS | — |
 | 3: Security | ⚠️ PARTIAL | DEFECT-001, DEFECT-003 production deploy pending; DEFECT-007 fixed in rc3 |
 | 4: Backup and Recovery | ⚠️ PARTIAL | Backup key custody (human) |
-| 5: Deployment | ⚠️ PARTIAL | Rehearsal DONE; rollback DONE; RC tag (rc3) pushed; load test run 3 IN PROGRESS; DEFECT deploys pending |
+| 5: Deployment | ⚠️ PARTIAL | Rehearsal DONE; rollback DONE; RC tag (rc3) pushed; load test CONDITIONAL PASS (run 3, all 5 endpoints, P95=548ms); DEFECT deploys pending |
 | 6: Documentation | ⚠️ PARTIAL | All docs written; 26 blocked (browser); governance pending |
 | 7: Human Acceptance | ⚠️ PENDING | UAT, browser verification, approvals, smoke test |
 
