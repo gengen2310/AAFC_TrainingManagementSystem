@@ -69,10 +69,24 @@ artifact of that doubling, or may be a genuine capacity issue — cannot be dete
 contaminated runs. No load test process was running on the machine when this was discovered
 (confirmed via `ps aux`), so a clean solo re-run is possible now.
 
-**Action taken**: launched a third, solo run after confirming no other load-test process is active.
-See below for its result once complete — that is the run to cite for this gate, not either of the
-two above. Added a "check for a running load test / read the other session's checkpoint before
-starting" step to `.claude/skills/beta-release/SKILL.md` so this doesn't recur.
+**Resolved 2026-07-16 — clean result obtained**: after confirming via `ps aux` that no other
+load-test process was running, launched a third, solo run (background task `bo8g2d7kc`, log
+`docs/beta/evidence/load_test_100user_clean_rerun_2026-07-16.log`). Result: **106,151 requests, 0
+real 5xx, 3,996 (3.8%) non-5xx failures, P95 830ms, max 17,657ms — PASS** on both mandated criteria.
+Post-test `/api/health/ready` checks confirmed staging recovered to normal latency (~0.3–0.5s).
+**This is the authoritative 100-user load test result for the release gate** — cite this run, not
+either of the two contaminated ones above.
+
+One genuine, non-contaminated finding from this clean run: `/api/auth/login` P95 was 1,967ms
+(average 843ms) — far higher than every other endpoint (~260–280ms avg) and close to the 2,000ms
+threshold, and the dominant source of the run's failures (connect/read timeouts, all on the login
+endpoint). Each virtual user re-authenticates every workflow loop, so this reflects sustained
+concurrent login load, not a one-off. Likely cause: the intentionally-expensive password hash
+becoming a real contention point at 100 concurrent users. Not a gate failure (still under 2000ms,
+zero 5xx) but flagged in `docs/beta/11_defect_register.md` (DEFECT-010) for post-beta attention.
+
+Added a "check for a running load test / read the other session's checkpoint before starting" step
+to `.claude/skills/beta-release/SKILL.md` so the collision doesn't recur.
 
 ## Two "open technical tasks" from the stale checkpoint are already answered elsewhere
 

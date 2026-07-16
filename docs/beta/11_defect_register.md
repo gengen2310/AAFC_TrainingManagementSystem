@@ -220,9 +220,27 @@ discovered — too late to prevent this instance of it.
 `load_test_staging.py` process (and cross-reference the other session's checkpoint docs) before
 launching a load test; documented in `.claude/skills/beta-release/SKILL.md`.
 
-**Regression test**: N/A (process defect, not code). **Retest evidence**: a clean, solo re-run is
-required to close this — do not treat either contaminated run as the authoritative 100-user gate
-result. See `docs/beta/00_release_state.md` for the clean re-run's outcome once available.
+**Regression test**: N/A (process defect, not code).
+
+**Retest evidence — RESOLVED 2026-07-16**: confirmed via `ps aux | grep load_test_staging` that no
+load-test process was running anywhere on the machine, then ran a clean, solo 100-user/45-min run
+(background task `bo8g2d7kc`, log `docs/beta/evidence/load_test_100user_clean_rerun_2026-07-16.log`).
+Result: **106,151 requests, 0 real 5xx, 3,996 (3.8%) non-5xx failures, P95 830ms, max 17,657ms —
+PASS** on both mandated criteria (P95 ≤ 2000ms, zero 5xx). Post-test health check confirmed staging
+recovered to normal latency (~0.3–0.5s on `/api/health/ready`, vs. sub-second during the two
+contaminated runs). **This is the authoritative 100-user load test result — cite this one, not
+either of the two contaminated runs above.**
+
+**New, non-contaminated observation from the clean run** (not a gate failure, but worth flagging):
+`/api/auth/login` P95 was 1,967ms — close to the 2,000ms threshold, average 843ms vs. ~260–280ms for
+every other endpoint, and the dominant source of the run's failures (connect-timeout and
+read-timeout errors, all on `/api/auth/login`). Each virtual user re-authenticates on every workflow
+loop, so 100 concurrent users produce sustained concurrent login load. Likely cause: the
+intentionally-expensive password hashing (bcrypt/PBKDF2) on the login path becomes a real
+contention point at this concurrency — expected behaviour for a deliberately slow hash, but worth a
+post-beta look (e.g. hash cost tuning, connection pool sizing for the auth endpoint specifically) if
+real beta traffic clusters logins the way this synthetic workflow does (every loop iteration, not
+just once per session).
 
 ---
 
@@ -239,7 +257,7 @@ result. See `docs/beta/00_release_state.md` for the clean re-run's outcome once 
 | DEFECT-007 | LOW | Fixed |
 | DEFECT-008 | HIGH (process) | Open — belongs to a concurrent session, flagged not fixed |
 | DEFECT-009 | BLOCKER | **Fixed** (`d95e67d`) — cross-squadron planning-years leak for `sqn_general` |
-| DEFECT-010 | MEDIUM (inconclusive) | **Open** — two overlapping load-test runs contaminated each other; clean re-run required |
+| DEFECT-010 | MEDIUM (informational) | **Resolved 2026-07-16** — clean solo re-run: 106,151 req, 0 real 5xx, P95 830ms, PASS |
 
 **One of two original BLOCKERs fully resolved (DEFECT-006, backup/restore — proven end-to-end); a
 third BLOCKER (DEFECT-009) found and fixed this session.** DEFECT-001 and DEFECT-009 (live-production
@@ -247,8 +265,9 @@ IDORs) are fixed and verified on the release branch/staging but require a produc
 approval to close there. DEFECT-003 was reclassified HIGH after finding a concrete, currently-live
 consequence (`bootstrap-staging` not rejecting in production) — code-fixed, but the underlying
 production `ENVIRONMENT` variable still needs your approval to change. DEFECT-004 turned out not to
-be a defect at all. **The 100-user load test gate is not yet cleanly closed** (DEFECT-010) — a clean
-solo re-run is required before this can be marked ✅. Not release-ready until: the production IDOR
-deploys happen, DEFECT-003's production variable change is approved and applied, DEFECT-005
-(Planning Workspace Dockerfile) is deployed to production, DEFECT-008 (migration-ID collision, owned
-by a concurrent session) is resolved, and DEFECT-010 is closed with a clean load test run.
+be a defect at all. **The 100-user load test gate is now cleanly closed** — a solo, uncontaminated
+run (task `bo8g2d7kc`, 2026-07-16) passed both mandated criteria (P95 830ms ≤ 2000ms; 0 real 5xx).
+The `/api/auth/login` P95-under-load observation is flagged for post-beta attention, not blocking.
+Not release-ready until: the production IDOR deploys happen, DEFECT-003's production variable change
+is approved and applied, DEFECT-005 (Planning Workspace Dockerfile) is deployed to production, and
+DEFECT-008 (migration-ID collision, owned by a concurrent session) is resolved.

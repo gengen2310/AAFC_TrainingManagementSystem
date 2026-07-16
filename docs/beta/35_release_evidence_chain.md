@@ -191,33 +191,86 @@ Discarded. Performance baseline for 3 valid endpoints (login, me, parade-nights)
 
 **All 5 endpoints confirmed. `/api/planning/years` proven: n=12,552, P95=352ms.**
 
-**Throughput collapse analysis**: At ~1797s (30 min into a 46-min run), request rate dropped from
-~40 req/s to ~2 req/s. The 9,937 non-5xx failures are `Read timed out (read timeout=15)` errors.
-The 5xx count stayed at 1 throughout (no new application errors during the collapse). This is
-consistent with Railway staging hitting a connection/memory resource ceiling — a sudden external
-infrastructure event, not a gradual application degradation. Production environment uses a separate,
-higher-tier Railway service.
+**Throughput collapse analysis — REVISED, see Run 4/5 finding below**: At ~1797s (30 min into a
+46-min run), request rate dropped from ~40 req/s to ~2 req/s. The 9,937 non-5xx failures are `Read
+timed out (read timeout=15)` errors. The commit that first documented this (`43b880c`) attributed it
+to "Railway staging hitting a connection/memory resource ceiling — a sudden external infrastructure
+event, not a gradual application degradation." **That commit was made after `03cc7d5` (this same
+branch) had already filed DEFECT-010, flagging that a second, independent 100-user run (Run 4,
+`bh2yppp8g`) was launched from this session at essentially the same time as this one (Run 3) — but
+`43b880c` doesn't consider or rule out that alternative before concluding "Railway ceiling."** See
+the correction directly below; a later clean run (Run 5) disproves the "inherent Railway ceiling"
+reading.
 
 **1 5xx error**: Same SSL EOF pattern as run 2 (appeared at 866s, count never incremented again).
-This is a transient TLS event at the Railway infrastructure layer, not an application error.
+Still plausibly a transient TLS event — not contradicted by the correction below, which concerns the
+throughput-collapse interpretation specifically, not this single error.
 
-**Classification: CONDITIONAL PASS** — All 5 endpoints proven under sustained 100-user load,
-P95=548ms (well under 2000ms threshold). Single SSL EOF is a recurring Railway infrastructure
-artifact (not application error). Throughput collapse at 30 min is a Railway staging resource
-ceiling; documented as infrastructure constraint, not application defect. Load test gate is closed.
+**CORRECTION (2026-07-16, this session)** — Run 3 and Run 4 (`bh2yppp8g`, this session, launched
+without knowledge Run 3 was active) ran concurrently against the same staging backend:
+- Both report an **identical P95 (548ms)** and near-identical max latency (17,381ms vs. 17,562ms)
+  despite fully independent virtual-user pools and traffic generators — very unlikely by chance if
+  the two runs didn't share the same backend contention.
+- Run 4's own log also shows a throughput slowdown in its final ~4 minutes (from ~44 req/s down to
+  ~10 req/s over its last 250s) — a smaller-magnitude version of the same pattern Run 3 shows, not
+  the flat, constant rate Run 4 sustains everywhere else.
+- **Run 5** (`bo8g2d7kc`, 2026-07-16) — a solo run confirmed via `ps aux` to have no concurrent
+  load-test process running anywhere on the machine — ran the identical workload for the identical
+  duration (46.3 min, 100 users) against the identical staging backend and showed **no throughput
+  collapse anywhere in its timeline and 0 real 5xx errors** (full breakdown below). If a genuine,
+  load-independent Railway staging resource ceiling caused Run 3's collapse, Run 5 should have hit it
+  too — it didn't. **This is strong evidence the Run 3 collapse was caused by the accidental doubling
+  of concurrent load (~200 combined virtual users) during the Run 3/Run 4 overlap, not an inherent
+  ~30-minute Railway staging ceiling.** Filed as DEFECT-010, resolved 2026-07-16.
+
+**Revised classification of Run 3: CONTAMINATED — do not cite as gate evidence.** Its raw numbers are
+kept above for the record, but neither its P95 nor its "CONDITIONAL PASS" classification should be
+treated as this release's load-test evidence. **Run 5, below, is the authoritative result.**
+
+**Run 5 (bo8g2d7kc, 2026-07-16) — CLEAN, PASS — this is the authoritative gate evidence**:
+- Confirmed via `ps aux | grep load_test_staging` that no other load-test process was active before
+  starting.
+- Duration: 2778s (46.3 min) | Total requests: 106,151 | Successful: 102,155 | Non-5xx failures:
+  3,996 (3.8%) | 5xx: **0**
+- P95 latency: 830ms (PASS ≤ 2000ms) | Max: 17,657ms
+- Gate record:
+  ```
+  Timestamp   : 2026-07-16T07:00:44.093467+00:00
+  Users       : 100
+  Duration    : 2778s
+  Requests    : 106151
+  P95 latency : 830ms
+  5xx errors  : 0
+  Result      : PASS (script exit code 0)
+  ```
+- Per-endpoint: `/api/auth/login` n=21,339 avg=843ms **P95=1,967ms** (close to the 2,000ms
+  threshold — see note below); `/api/auth/me` n=17,486 avg=261ms P95=266ms; `/api/parade-nights`
+  n=33,663 avg=280ms P95=297ms; `/api/planning/years` n=16,177 avg=267ms P95=271ms;
+  `/api/reports/summary` n=17,486 avg=260ms P95=267ms.
+- Post-test health check: `/api/health/ready` returned in 0.3–0.5s across 3 checks, confirming
+  staging recovered to normal (non-loaded) latency.
+- **Non-contaminated observation, not a gate failure**: `/api/auth/login` P95 (1,967ms) and avg
+  (843ms) are far higher than every other endpoint (~260–280ms avg) and the dominant source of this
+  run's failures (connect/read timeouts). Each virtual user re-authenticates every workflow loop, so
+  this is sustained concurrent login load, not a one-off — plausibly the intentionally-expensive
+  password hash becoming a real contention point at 100 concurrent users. Worth a post-beta look
+  (hash cost tuning, connection pool sizing for the auth path) if real beta traffic clusters logins
+  the way this synthetic workflow does. Recorded in `docs/beta/11_defect_register.md` DEFECT-010.
 
 ### Performance Gate Record
 
-| Criterion | Evidence | Gate |
+| Criterion | Evidence (Run 5 — clean, authoritative) | Gate |
 |---|---|---|
-| P95 ≤ 2000ms | 548ms (run 3, all 5 endpoints) | ✅ PASS |
-| Zero 5xx | 1 SSL EOF (run 3; same pattern as run 2 at 866s; Railway infra artifact) | ⚠️ CONDITIONAL — transient infra event, not app error |
-| All 5 workflow endpoints covered | All 5 confirmed in run 3 | ✅ PASS |
-| 100 concurrent users, 45+ minutes | 46.3 min, 100 users, 89,026 requests | ✅ PASS |
+| P95 ≤ 2000ms | 830ms (all 5 endpoints; login P95 1,967ms is the closest to threshold) | ✅ PASS |
+| Zero 5xx | 0 | ✅ PASS |
+| All 5 workflow endpoints covered | All 5 confirmed | ✅ PASS |
+| 100 concurrent users, 45+ minutes | 46.3 min, 100 users, 106,151 requests, confirmed solo (`ps aux`) | ✅ PASS |
 | 16 squadrons represented | All 16 seeded roles in pool | ✅ PASS |
-| Throughput stability | Collapse at ~30 min (Railway staging ceiling); production tier differs | ⚠️ DOCUMENTED — infrastructure caveat |
+| Throughput stability | No collapse anywhere in the run | ✅ PASS |
 
-**Gate status: ✅ CONDITIONAL PASS — load test gate CLOSED. All 5 endpoints proven. Throughput collapse and 1 SSL EOF documented as Railway staging infrastructure constraints.**
+**Gate status: ✅ COMPLETE — Run 5 (`bo8g2d7kc`, 2026-07-16) is clean, solo-confirmed, and passes
+every mandated criterion. Runs 1–4 are superseded and must not be cited as this gate's evidence;
+Run 3 in particular should not be read as "Railway staging ceiling" — see the correction above.**
 
 ---
 
@@ -260,8 +313,8 @@ ceiling; documented as infrastructure constraint, not application defect. Load t
 | 6 | Frontend HTML loading (staging) | ✅ COMPLETE — connected frontend + Planning Workspace: 200 |
 | 7 | Browser login verification (2 squadrons, 2 roles) | ⚠️ PENDING human tester |
 | 8 | Cross-interface data consistency | ⚠️ PENDING (UAT) |
-| 9 | Security tests (IDOR, auth, role isolation, DEFECT-007) | ✅ COMPLETE — 543 pass at rc3; DEFECT-007 found, fixed, regression tested |
-| 10 | Performance / load test | ✅ CONDITIONAL PASS — run 3 (btitxok60) complete; all 5 endpoints proven, P95=548ms; 1 SSL EOF (Railway infra artifact); throughput collapse at 30 min (Railway staging ceiling, documented) |
+| 9 | Security tests (IDOR, auth, role isolation, DEFECT-007/009) | ✅ COMPLETE — 543 pass at rc3; DEFECT-007 and DEFECT-009 (sqn_general years IDOR) found, fixed, regression tested |
+| 10 | Performance / load test | ✅ COMPLETE — Run 5 (`bo8g2d7kc`, 2026-07-16), clean solo-confirmed run: 106,151 req, 0 real 5xx, P95 830ms. Runs 1–4 superseded/contaminated (DEFECT-010) — do not cite; Run 3's "Railway ceiling" reading is corrected above |
 | 11 | Rollback rehearsal in staging | ✅ COMPLETE — D1–D7/R1–R5 executed 2026-07-14; all automated steps PASS |
 | 12 | Final GO/NO-GO approval | ⚠️ PENDING |
 

@@ -14,7 +14,15 @@ Updated 2026-07-15 (commit `d95e67d`, tag `beta-2026-07-14-rc3`).
 The system is feature-complete and structurally sound for beta. All 35 Playwright E2E tests pass (rc3, local backend). Backend: 543 passed, 1 skipped, 0 failures. Four security/deployment defects fixed (DEFECT-001, -003, -005, -007). Three require production deployment; DEFECT-007 fixed in rc3 and proven by regression tests.
 
 **Mandatory gates not yet completed — production approval may NOT be requested yet:**
-- 100-user concurrent load test (third run, task btitxok60): ✅ CONDITIONAL PASS — all 5 endpoints proven, P95=548ms; 1 SSL EOF (Railway infra artifact); throughput collapse at 30 min is Railway staging ceiling (documented in 35_release_evidence_chain.md)
+- 100-user concurrent load test: ✅ COMPLETE — but not via the "run 3 / task btitxok60" result cited
+  in this doc's history below. **Correction (2026-07-16)**: run 3 (`btitxok60`) and this session's
+  own run 4 (`bh2yppp8g`) were, unknown to either session at launch, running concurrently against
+  the same staging backend — identical P95s and matching latency spikes across independent traffic
+  are the evidence. The "Railway staging ceiling" explanation for run 3's throughput collapse does
+  not hold: a subsequent clean, solo-confirmed run (run 5, `bo8g2d7kc`, 2026-07-16) executed the
+  identical workload for the identical duration with **no collapse and 0 real 5xx** (106,151
+  requests, P95 830ms). **Run 5 is the gate's real evidence; run 3 must not be cited.** Full detail:
+  `docs/beta/35_release_evidence_chain.md` Link 10, `docs/beta/11_defect_register.md` DEFECT-010.
 - D7 browser smoke test steps (staging): NOT DONE (human tester required)
 
 **Completed since previous update (2026-07-14–15):**
@@ -24,6 +32,7 @@ The system is feature-complete and structurally sound for beta. All 35 Playwrigh
 - 35/35 Playwright E2E pass at rc3 (local backend) ✅
 - Post-load data integrity checks: squadron isolation PASS, health recovery PASS ✅
 - Second load test (run 2): P95 530ms (PASS); 4 endpoints fully proven; years endpoint had wrong path (script bug) ✅
+- Fifth load test (run 5, clean solo re-run after runs 3/4 were found to have overlapped): 106,151 requests, 0 real 5xx, P95 830ms — PASS, authoritative ✅
 - Tasks 10–13 formally classified: 10 DEFERRED, 11 DEFERRED, 12 COMPLETE, 13 COMPLETE ✅
 
 These are non-negotiable per mission brief. No production deployment may proceed until all items above are completed and documented.
@@ -92,7 +101,8 @@ These are non-negotiable per mission brief. No production deployment may proceed
 | Planning Workspace stale in production | HIGH | Fix on branch, deploy needed | Users see outdated UI at `/planning` |
 | ENVIRONMENT mismatch | HIGH | Fix ready | Bootstrap-staging endpoint accessible; medium risk |
 | No deployment rehearsal completed | HIGH | Plan written | Cannot confidently execute without rehearsal |
-| 100-user load test throughput collapse | LOW | Documented | Railway staging ceiling; production tier differs; all 5 endpoints proven P95=548ms |
+| 100-user load test throughput collapse (run 3) | N/A — reclassified | Explained | Not a Railway ceiling: run 3 overlapped with a second concurrent 100-user run (DEFECT-010). A clean solo re-run (run 5) showed no collapse, P95 830ms, 0 real 5xx |
+| `/api/auth/login` P95 approaches threshold under 100-user load | LOW | Documented, not blocking | Run 5 (clean): login P95 1,967ms vs. ~270ms for other endpoints; likely password-hash cost under concurrency; post-beta follow-up recommended |
 | Room/facilitator duplication | MEDIUM | Documented + workaround | Users informed in release communication |
 | No browser verification complete | MEDIUM | Plan written | All workflows code-verified; browser check is the remaining gap |
 | Data governance not signed off | MEDIUM | Checklist written | Must be completed by organisation, not by Claude Code |
@@ -143,7 +153,7 @@ The following were specified as non-negotiable in the Operational Release Gate m
 ## What This Release Does NOT Claim
 
 - Browser E2E: 35/35 pass (as of rc2; Playwright via Chromium headless against port 5173)
-- 100-user load tested: ✅ CONDITIONAL PASS (run 3, 2026-07-15) — all 5 endpoints, P95=548ms; throughput collapse at 30 min (Railway staging ceiling) documented; gate closed
+- 100-user load tested: ✅ PASS (run 5, `bo8g2d7kc`, 2026-07-16 — clean, solo-confirmed) — all 5 endpoints, P95=830ms, 0 real 5xx; gate closed. Run 3 (2026-07-15) is superseded — its throughput collapse was caused by an accidental second concurrent 100-user run (DEFECT-010), not a Railway ceiling; do not cite it
 - Physical space consolidation (`TrainingArea`/`PlanningLocation`): DEFERRED post-beta
 - Facilitator deduplication: DEFERRED post-beta
 - Stash `stash@{0}` applied: NO (DEFECT-008 revision collision; investigate post-release)
@@ -179,7 +189,7 @@ The following were specified as non-negotiable in the Operational Release Gate m
 | Staging deployment rehearsal | ✅ DONE | D1–D7 executed 2026-07-14; all automated checks PASS |
 | Staging rollback rehearsal | ✅ DONE | R1–R5 executed 2026-07-14; rollback verified; RC re-deployed |
 | Post-load data integrity checks | ✅ PASS | Squadron isolation confirmed; health recovery 412ms |
-| 100-user load test (run 3, task btitxok60) | ✅ CONDITIONAL PASS | All 5 endpoints proven, P95=548ms; 1 SSL EOF (Railway infra artifact); throughput collapse at 30 min (Railway staging ceiling); gate closed — see 35_release_evidence_chain.md Link 10 |
+| 100-user load test (run 5, task bo8g2d7kc, clean solo re-run) | ✅ PASS | 106,151 requests, 0 real 5xx, P95 830ms; gate closed. Run 3 superseded (DEFECT-010: overlapped with a second concurrent run, causing its throughput collapse — not a Railway ceiling) — see `35_release_evidence_chain.md` Link 10 |
 | Deploy DEFECT fixes to production | ❌ PENDING | Requires approval |
 
 **Production deployment approval may not be requested until all ❌ gates above are resolved.**
