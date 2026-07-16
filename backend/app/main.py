@@ -1,6 +1,7 @@
 """FastAPI application entrypoint with security headers, CORS lockdown and routers."""
 import logging
 import time as _time
+import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -126,15 +127,17 @@ async def maintenance_gate(request: Request, call_next):
 async def access_log(request: Request, call_next):
     # Structured access log for monitoring / log aggregation (one line per request).
     # In production point LOG_LEVEL=INFO and ship stdout to your aggregator (e.g. Loki/CloudWatch).
-    import time as _t
-    start = _t.perf_counter()
+    # X-Request-ID: accepted from client if provided, otherwise generated. Echoed in response.
+    req_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    start = _time.perf_counter()
     response = await call_next(request)
-    dur_ms = round((_t.perf_counter() - start) * 1000, 1)
+    dur_ms = round((_time.perf_counter() - start) * 1000, 1)
     client = request.client.host if request.client else "-"
     logging.getLogger("access").info(
-        '{"method":"%s","path":"%s","status":%d,"dur_ms":%s,"client":"%s"}',
-        request.method, request.url.path, response.status_code, dur_ms, client)
+        '{"method":"%s","path":"%s","status":%d,"dur_ms":%s,"client":"%s","req_id":"%s"}',
+        request.method, request.url.path, response.status_code, dur_ms, client, req_id)
     response.headers["X-Response-Time-ms"] = str(dur_ms)
+    response.headers["X-Request-ID"] = req_id
     return response
 
 
