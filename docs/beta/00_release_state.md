@@ -37,15 +37,42 @@ new actual head) before committing it**, or Alembic will reject it as a duplicat
 session did not touch that file — it remains stashed, untouched, in that session's own working
 tree/stash for them to resolve. Flagging here so it's visible before anyone hits it blind.
 
-## 100-user concurrent load test — in progress (2026-07-15)
+## 100-user concurrent load test — NOT cleanly closed: two runs collided (2026-07-15)
 
-Discovered a second, independent trace of the parallel session's work: `docs/beta/51_current_execution_checkpoint.md` (committed at `0ca4fe8`, not superseded by any later commit) records that session starting its own "corrected" 100-user load test (task `baw9zh1fw`, expected completion ~2026-07-14T16:34Z). No later commit records that run's results — the evidence-recording steps in that checkpoint's own action list (update `35_release_evidence_chain.md`, `13_executive_go_no_go.md`, commit) were never done. Given the elapsed time since expected completion, treat that run as abandoned/unrecorded, not as a completed gate.
+**Do not treat this gate as ✅ complete from either run described below.** Full detail and defect
+entry: `docs/beta/11_defect_register.md` DEFECT-010. Summary:
 
-Also found and fixed two bugs in `tools/stress/load_test_staging.py` (gitignored — local tool only, not committed) before trusting it for evidence:
-- `_get(session, "/api/years")` → `/api/planning/years` (verified via curl against live staging with a real token: `/api/years` returns 404, `/api/planning/years` returns 200 — the router's prefix is `/api/planning`). Note: `51_current_execution_checkpoint.md` claims `/api/years` as a *correct* path from the other session's own fix pass — that claim does not match this session's direct curl verification against the real server; trust the curl result.
-- Gate-record output printed `Users: 0` always (`len(set())` — an empty literal, not the actual pool). Fixed to report the real `--users` value.
+This session fixed two real bugs in `tools/stress/load_test_staging.py` (gitignored, local-only —
+never committed) before trusting it: a wrong endpoint path (`/api/years` → `/api/planning/years`,
+confirmed by curl against live staging) and a `Users: 0` always-zero reporting bug (`len(set())`
+instead of the real `--users` value). Validated with a 10-user/30s smoke run (PASS) before committing
+to the full run.
 
-Validated the fix with a 10-user/30s smoke run first: 173 requests, 0 failures, 0 5xx, P95 484ms — PASS. Then launched the full `--users 100 --duration-minutes 45 --ramp-seconds 60` run (background task `bh2yppp8g`), logging to `docs/beta/evidence/load_test_100user_2026-07-15.log`. At the 160s mark: 6,083 requests, 0 5xx — on track. Update this section and `docs/beta/35_release_evidence_chain.md` / `13_executive_go_no_go.md` with the final P95/5xx numbers once it completes (~46 min total run time); do not mark this gate closed until that final number is recorded.
+Then launched the full 100-user/45-min run (background task `bh2yppp8g`). It completed: 115,306
+requests, **0 real 5xx**, 2,567 (2.2%) client-side read-timeouts, P95 548ms, max 17,562ms — PASS per
+the script's own criteria.
+
+**But**: the concurrent session was, unbeknownst to this session at launch time, running its *own*
+independent 100-user/45-min run at essentially the same time (task `btitxok60`, per its checkpoint
+`docs/beta/51`, expected window ~00:44–01:30Z that day). That run completed with 89,026 requests,
+**1 real 5xx**, 9,937 (11.2%) read-timeouts, P95 548ms, max 17,381ms — **FAIL** (their own script's
+"zero 5xx" criterion did not pass). Discovered by reading their still-current, not-yet-superseded
+checkpoint doc, then confirmed by reading their raw output file directly
+(`/private/tmp/claude-501/-Users-jennydv/fa4ea2d6-cc66-4422-b865-406dd21c7fe8/tasks/btitxok60.output`
+— readable from this session's filesystem since both sessions share one machine/working directory).
+
+**Why neither run counts as clean evidence**: both runs report an *identical* P95 (548ms) and
+near-identical max latency (~17.4–17.6s) despite independently-generated traffic — strong evidence
+the two runs actually overlapped, meaning real combined concurrent load was up to ~200 virtual
+users, not the specified 100. The one real 5xx and elevated timeout rate in the other run may be an
+artifact of that doubling, or may be a genuine capacity issue — cannot be determined from these two
+contaminated runs. No load test process was running on the machine when this was discovered
+(confirmed via `ps aux`), so a clean solo re-run is possible now.
+
+**Action taken**: launched a third, solo run after confirming no other load-test process is active.
+See below for its result once complete — that is the run to cite for this gate, not either of the
+two above. Added a "check for a running load test / read the other session's checkpoint before
+starting" step to `.claude/skills/beta-release/SKILL.md` so this doesn't recur.
 
 ## Two "open technical tasks" from the stale checkpoint are already answered elsewhere
 

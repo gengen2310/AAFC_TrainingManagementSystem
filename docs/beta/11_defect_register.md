@@ -154,6 +154,78 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 
 ---
 
+## DEFECT-009 — BLOCKER — IDOR: `sqn_general` could read other squadrons' planning years
+
+**Note on numbering**: the concurrent session that found and fixed this called it "DEFECT-007" in its
+commit message (`d95e67d`), code comments, and test class name (`TestSqnGeneralYearScope`) — but this
+register already has an unrelated DEFECT-007 (Vitest/Playwright collision, LOW, fixed earlier).
+Using DEFECT-009 here to avoid a second collision; the two "DEFECT-007"s are different defects
+found by different sessions. Do not confuse them.
+
+**Status**: Fixed on `release/beta-2026-07-14` (commit `d95e67d`, tag `beta-2026-07-14-rc3`), verified
+in staging via a live probe (see below) and via 2 new regression tests.
+
+**Reproducible failure**: `GET /api/planning/years` for an authenticated `sqn_general` user of
+squadron 701 returned a year belonging to squadron 703 — a direct cross-squadron data leak.
+
+**Root cause**: `list_planning_years` (`backend/app/routers/planning.py`) filtered results by squadron
+for the `sqn_admin` role but applied no filter at all for `sqn_general` — an omitted branch, same
+class of bug as DEFECT-001 (a scope check that exists for one role but was never extended to a
+sibling role added later).
+
+**Discovery context**: found during this release program's own post-load staging verification (see
+the Discovery Note under DEFECT-001's siblings) — an example of exactly the kind of live-staging
+probing this release program has repeatedly found value in, beyond unit tests alone.
+
+**Smallest safe fix**: added `sqn_general` to the existing `sqn_admin` scope-filter branch. No new
+abstraction.
+
+**Regression test**: `test_sqn_general_sees_own_year`, `test_sqn_general_cannot_see_other_squadron_year`
+in `TestSqnGeneralYearScope` (`backend/tests/test_planning_idor.py`).
+
+**Retest evidence**: 543 passed, 1 skipped (up from 541) at commit `d95e67d`.
+
+---
+
+## DEFECT-010 — MEDIUM (unresolved — needs a clean re-run to classify) — 100-user load test: one real 5xx and elevated timeout rate, but two independent test runs overlapped
+
+**Status**: Open — inconclusive pending a clean, non-overlapping re-run (in progress at time of
+writing).
+
+**What happened**: two Claude Code sessions working this same release branch in the same shared
+working directory each independently launched a full `--users 100 --duration-minutes 45` run of
+`tools/stress/load_test_staging.py` against the same staging backend, without coordinating:
+- This session's run (background task `bh2yppp8g`): 115,306 requests, **0** real 5xx, 2,567 (2.2%)
+  client-side read-timeouts, P95 548ms, max 17,562ms. Exit code 0 (PASS per the script's own
+  criteria).
+- The concurrent session's run (`btitxok60`, per its own checkpoint `docs/beta/51`): 89,026
+  requests, **1** real 5xx, 9,937 (11.2%) client-side read-timeouts, P95 548ms, max 17,381ms. Exit
+  code 1 (FAIL — the script's own "Zero 5xx" criterion did not pass).
+
+**Why this isn't clean evidence either way**: both runs report an *identical* P95 (548ms) and
+near-identical max latency (~17.4–17.6s) despite independent traffic generators — strong
+circumstantial evidence the two runs executed concurrently (or very nearly so) against the same
+backend, meaning actual combined concurrent load during the overlap was up to ~200 virtual users,
+not the mandated 100. The one real 5xx and the elevated timeout rate in the concurrent session's run
+may be an artifact of this accidental doubling rather than a genuine defect at the specified 100-user
+scale — but it may also be real. Neither can be determined from these two runs alone.
+
+**Root cause**: no cross-session coordination mechanism exists to prevent two Claude Code sessions
+sharing one working directory from both launching long-running load tests against the same shared
+staging environment. Process/mtime checks (`ps aux | grep load_test_staging`) were added to this
+session's own practice (see `.claude/skills/beta-release/SKILL.md`) only after this collision was
+discovered — too late to prevent this instance of it.
+
+**Smallest safe fix**: none to the application. Process fix: check for a running
+`load_test_staging.py` process (and cross-reference the other session's checkpoint docs) before
+launching a load test; documented in `.claude/skills/beta-release/SKILL.md`.
+
+**Regression test**: N/A (process defect, not code). **Retest evidence**: a clean, solo re-run is
+required to close this — do not treat either contaminated run as the authoritative 100-user gate
+result. See `docs/beta/00_release_state.md` for the clean re-run's outcome once available.
+
+---
+
 ## Summary
 
 | ID | Severity | Status |
@@ -166,5 +238,17 @@ python -m pytest tests/test_planning.py -q -k cross_squadron
 | DEFECT-006 | BLOCKER | **Resolved — proven end-to-end (backup, restore, application-level reads), all against real production data** |
 | DEFECT-007 | LOW | Fixed |
 | DEFECT-008 | HIGH (process) | Open — belongs to a concurrent session, flagged not fixed |
+| DEFECT-009 | BLOCKER | **Fixed** (`d95e67d`) — cross-squadron planning-years leak for `sqn_general` |
+| DEFECT-010 | MEDIUM (inconclusive) | **Open** — two overlapping load-test runs contaminated each other; clean re-run required |
 
-**One of two BLOCKERs fully resolved (DEFECT-006, backup/restore — proven end-to-end).** DEFECT-001 (live-production IDOR) is fixed and verified on the release branch/staging but requires a production deploy + approval to close there. DEFECT-003 was reclassified HIGH after finding a concrete, currently-live consequence (`bootstrap-staging` not rejecting in production) — code-fixed, but the underlying production `ENVIRONMENT` variable still needs your approval to change. DEFECT-004 turned out not to be a defect at all. Not release-ready until: the production IDOR deploy happens, DEFECT-003's production variable change is approved and applied, DEFECT-005 (Planning Workspace Dockerfile) is deployed to production, and DEFECT-008 (migration-ID collision, owned by a concurrent session) is resolved.
+**One of two original BLOCKERs fully resolved (DEFECT-006, backup/restore — proven end-to-end); a
+third BLOCKER (DEFECT-009) found and fixed this session.** DEFECT-001 and DEFECT-009 (live-production
+IDORs) are fixed and verified on the release branch/staging but require a production deploy +
+approval to close there. DEFECT-003 was reclassified HIGH after finding a concrete, currently-live
+consequence (`bootstrap-staging` not rejecting in production) — code-fixed, but the underlying
+production `ENVIRONMENT` variable still needs your approval to change. DEFECT-004 turned out not to
+be a defect at all. **The 100-user load test gate is not yet cleanly closed** (DEFECT-010) — a clean
+solo re-run is required before this can be marked ✅. Not release-ready until: the production IDOR
+deploys happen, DEFECT-003's production variable change is approved and applied, DEFECT-005
+(Planning Workspace Dockerfile) is deployed to production, DEFECT-008 (migration-ID collision, owned
+by a concurrent session) is resolved, and DEFECT-010 is closed with a clean load test run.
