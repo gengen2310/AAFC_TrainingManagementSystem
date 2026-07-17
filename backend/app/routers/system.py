@@ -382,13 +382,24 @@ def pg_dump_backup(db: DBSession = Depends(get_db), p: Principal = Depends(get_p
 
 # ── POST /api/system/bootstrap-staging ───────────────────────────────────────
 
+class BootstrapIn(BaseModel):
+    wing_code: str | None = None   # defaults to the first active Wing in the DB
+    sqn_code: str | None = None    # defaults to first active Squadron under that Wing
+    sqn_name: str | None = None    # name to use when creating the squadron (if absent)
+
+
 @router.post("/bootstrap-staging")
-def bootstrap_staging(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def bootstrap_staging(body: BootstrapIn | None = None,
+                      db: DBSession = Depends(get_db),
+                      p: Principal = Depends(get_principal)):
     """One-time setup helper for staging / development environments.
 
-    Creates 703SQN under 7WG (if missing) and one account each for
-    national_admin, wing_admin (7WG), and sqn_admin (703SQN) if no active
-    account of that role+scope already exists.
+    Creates the first available squadron under the requested (or first) wing,
+    plus one account each for national_admin, wing_admin, and sqn_admin if no
+    active account of that role+scope already exists.
+
+    Accepts optional JSON body: {"wing_code": "7WG", "sqn_code": "703", "sqn_name": "703 SQN AAFC"}
+    If omitted, uses the first active Wing and first active Squadron found.
 
     Returns newly created accounts with one-time access codes. Codes are never
     stored in plaintext — only the hash is persisted. Rejected in production.
@@ -400,6 +411,7 @@ def bootstrap_staging(db: DBSession = Depends(get_db), p: Principal = Depends(ge
             "message": "Bootstrap is not available in the production environment.",
         })
 
+    bdy = body or BootstrapIn()
     results = []
     created_accounts = []
 
@@ -410,34 +422,44 @@ def bootstrap_staging(db: DBSession = Depends(get_db), p: Principal = Depends(ge
             "message": "No NationalEntity found. Run migrations and initial seed first.",
         })
 
-    wing = db.query(Wing).filter(Wing.code == "7WG", Wing.is_archived == False).first()  # noqa: E712
+    # Resolve wing: use provided code, or fall back to first active Wing.
+    wing_q = db.query(Wing).filter(Wing.is_archived == False)  # noqa: E712
+    if bdy.wing_code:
+        wing_q = wing_q.filter(Wing.code == bdy.wing_code)
+    wing = wing_q.first()
     if not wing:
-        raise HTTPException(422, detail={
-            "error": "7WG_not_found",
-            "message": "7WG not found. Create it first via System Console → Scope Map → Create Wing.",
-        })
+        detail_msg = (
+            f"Wing '{bdy.wing_code}' not found." if bdy.wing_code
+            else "No active Wing found. Create one first via System Console → Scope Map."
+        )
+        raise HTTPException(422, detail={"error": "wing_not_found", "message": detail_msg})
 
-    # Create 703SQN if missing
-    sqn = db.query(Squadron).filter(Squadron.code == "703", Squadron.is_archived == False).first()  # noqa: E712
+    # Resolve squadron: use provided code under this wing, or fall back to first active.
+    sqn_q = db.query(Squadron).filter(Squadron.wing_id == wing.id, Squadron.is_archived == False)  # noqa: E712
+    if bdy.sqn_code:
+        sqn_q = sqn_q.filter(Squadron.code == bdy.sqn_code)
+    sqn = sqn_q.first()
     sqn_created = False
     if not sqn:
-        sqn = Squadron(wing_id=wing.id, code="703", name="703 Squadron AAFC",
-                       short_name="703 SQN", unit_type="standard_squadron",
+        sqn_code = bdy.sqn_code or "001"
+        sqn_name = bdy.sqn_name or f"{sqn_code} Squadron AAFC"
+        sqn = Squadron(wing_id=wing.id, code=sqn_code, name=sqn_name,
+                       short_name=f"{sqn_code} SQN", unit_type="standard_squadron",
                        active_status=True, created_by=p.user_id)
         db.add(sqn)
         db.flush()
         audit(db, p, object_type="squadron", object_id=sqn.id, action="create",
-              new={"code": "703", "name": "703 Squadron AAFC", "wing": "7WG",
+              new={"code": sqn_code, "name": sqn_name, "wing": wing.code,
                    "source": "staging_bootstrap"})
         sqn_created = True
-    results.append({"type": "squadron", "code": "703", "name": sqn.name, "created": sqn_created})
+    results.append({"type": "squadron", "code": sqn.code, "name": sqn.name, "created": sqn_created})
 
     account_specs = [
         {"role": "national_admin", "display_name": "National Admin",
          "national_id": nat.id, "wing_id": None, "squadron_id": None},
-        {"role": "wing_admin", "display_name": "7WG Wing Admin",
+        {"role": "wing_admin", "display_name": f"{wing.code} Wing Admin",
          "national_id": None, "wing_id": wing.id, "squadron_id": None},
-        {"role": "sqn_admin", "display_name": "703 SQN Admin",
+        {"role": "sqn_admin", "display_name": f"{sqn.code} SQN Admin",
          "national_id": None, "wing_id": wing.id, "squadron_id": sqn.id},
     ]
 

@@ -1097,7 +1097,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <!-- Staging bootstrap card — creates 703SQN + initial accounts with one-time codes -->
         <div class="card sc-card" id="sc-bootstrap-card">
           <div class="sc-section-hdr">Initial Account Setup</div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Creates 703 SQN under 7WG (if missing) and one account each for national_admin, 7WG wing_admin, and 703 SQN sqn_admin. Codes are generated server-side, shown once, and never retrievable again. Safe to re-run — only missing accounts are created.</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Creates the first available squadron under the first active Wing (if missing) and one account each for national_admin, wing_admin, and sqn_admin. Codes are generated server-side, shown once, and never retrievable again. Safe to re-run — only missing accounts are created. Use optional body <code>{"wing_code":"…","sqn_code":"…"}</code> to target a specific Wing.</div>
           <button class="btn" style="background:#7c3aed;color:#fff;border:none" onclick="scBootstrapStaging()">Bootstrap Staging Accounts</button>
           <div id="sc-bootstrap-msg" style="font-size:12px;margin-top:8px;font-weight:700"></div>
         </div>
@@ -5532,13 +5532,14 @@ function renderBalance(){
     // Heatmap SQN x subject + Wing average row
     html+=`<div class="card"><div class="ctitle">SQN × Subject Area — share of delivered/scheduled sessions</div><div class="tw"><table>
       <thead><tr><th>Squadron</th>${SUBJECTS.map(s=>`<th style="text-align:center;font-size:10px" title="${s.label}">${s.emoji} ${s.label}</th>`).join('')}<th>Balance</th></tr></thead><tbody>`;
-    html+=`<tr style="background:var(--surface)"><td style="font-weight:800">7WG Average</td>${SUBJECTS.map(s=>`<td style="text-align:center;font-weight:800">${avg[s.key]||0}%</td>`).join('')}<td>—</td></tr>`;
+    const wingLabel=(S.session&&S.session.wing_code)||'Wing';
+    html+=`<tr style="background:var(--surface)"><td style="font-weight:800">${wingLabel} Average</td>${SUBJECTS.map(s=>`<td style="text-align:center;font-weight:800">${avg[s.key]||0}%</td>`).join('')}<td>—</td></tr>`;
     rows.forEach(r=>{ const p=balPct(r);
       html+=`<tr class="drow" onclick="balDrill('${r.squadron_id}')"><td style="font-weight:800">${r.short_name}</td>`+
         SUBJECTS.map(s=>{const v=p[s.key];const bg=p._tot?heatColor(v*1.5):'transparent';return `<td style="text-align:center;${p._tot?`background:${bg};color:#fff;`:''}font-weight:700;font-size:10px">${p._tot?v+'%':'—'}</td>`;}).join('')+
         `<td>${balBadge(p)}</td></tr>`;
     });
-    html+=`</tbody></table></div><div style="font-size:10px;color:var(--muted);margin-top:8px">Cells show each SQN's share of its own subject-tagged sessions. Compare a row against the 7WG Average row. Click a row to drill in.</div></div>`;
+    html+=`</tbody></table></div><div style="font-size:10px;color:var(--muted);margin-top:8px">Cells show each SQN's share of its own subject-tagged sessions. Compare a row against the Wing Average row. Click a row to drill in.</div></div>`;
     // Ranked balance score
     const scored=rows.map(r=>({n:r.short_name,p:balPct(r)})).filter(x=>x.p._tot).map(x=>({n:x.n,sc:balScore(x.p)})).sort((a,b)=>a.sc-b.sc);
     if(scored.length){ html+=`<div class="card"><div class="ctitle">Balance Score (lower = more concentrated)</div>`+
@@ -7372,7 +7373,7 @@ function renderWingCalendar(){
   if(impF)  rows=rows.filter(e=>e.planning_importance===impF);
 
   if(!rows.length){
-    body.innerHTML='<p class="muted">No Wing HQ events for this year. Use <strong>+ New Event</strong> to add one, or run the import script with the 7WG Master Schedule.</p>';
+    body.innerHTML='<p class="muted">No Wing HQ events for this year. Use <strong>+ New Event</strong> to add one, or import from your Wing Master Schedule.</p>';
     return;
   }
 
@@ -7409,7 +7410,8 @@ async function openWingEventDetail(eventId){
     const dateStr=e.start_date+(e.end_date&&e.end_date!==e.start_date?' – '+e.end_date:'');
     const impBadge=`<span class="badge ${_WC_IMP_BADGE[e.planning_importance]||'b-grey'}">${esc(_WC_IMP_LABEL[e.planning_importance]||e.planning_importance)}</span>`;
     const typeBadge=`<span class="badge b-grey">${esc(_WC_TYPE_LABEL[e.event_type]||e.event_type)}</span>`;
-    const srcBadge=`<span class="badge" style="background:#ede9fe;color:#4c1d95">7WG HQ Calendar</span>`;
+    const wcWingCode=(S.session&&S.session.wing_code)||'Wing';
+    const srcBadge=`<span class="badge" style="background:#ede9fe;color:#4c1d95">${esc(wcWingCode)} HQ Calendar</span>`;
 
     let curLinks='';
     if(e.curriculum_links&&e.curriculum_links.length){
@@ -7635,7 +7637,7 @@ function _apShowDateDetail(ds){
     const bc=e.planning_importance==='must_attend'?'#7c3aed':e.planning_importance==='key_event'?'#8b5cf6':'#a78bfa';
     h+=`<div style="padding:6px 8px;border-left:3px solid ${bc};margin-bottom:5px;background:#f5f3ff;border-radius:0 4px 4px 0;cursor:pointer"
       onclick="openWingEventDetail('${esc(e.id)}')">
-      <span class="badge" style="background:#ede9fe;color:#4c1d95;font-size:8px">7WG HQ</span>
+      <span class="badge" style="background:#ede9fe;color:#4c1d95;font-size:8px">${esc((S.session&&S.session.wing_code)||'Wing')} HQ</span>
       <strong style="font-size:11px;margin-left:4px">${esc(e.title)}</strong>
       <span class="badge ${_WC_IMP_BADGE[e.planning_importance]||'b-grey'}" style="font-size:8px;margin-left:4px">${esc(_WC_IMP_LABEL[e.planning_importance]||e.planning_importance)}</span>
     </div>`;

@@ -18,7 +18,7 @@ from ..services import audit
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 _LOCKOUT_MSG = ("Account locked after too many incorrect attempts. "
-                "Contact 7 Wing SOCAD for access.")
+                "Contact your Wing SOCAD for access.")
 _LOCKOUT_THRESHOLD = 5
 _LOCKOUT_HOURS = 24
 

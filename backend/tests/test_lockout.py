@@ -338,3 +338,17 @@ def test_lookup_user_id_scope_prevents_wrong_code(client):
     uid = r.json()["user_id"]
     r2 = client.post("/api/auth/login", json={"user_id": uid, "code": "703SQN2026"})
     assert r2.status_code == 401
+
+
+def test_lockout_message_is_generic_not_7wg_specific(client):
+    """Lockout message must not mention '7 Wing' — it must be Wing-agnostic."""
+    _set_account_locked("703SQN2026")
+    try:
+        r = client.post("/api/auth/login", json={"code": "703SQN2026"})
+        assert r.status_code == 429
+        detail = r.json().get("detail", {})
+        msg = detail.get("message", "")
+        assert "7 Wing" not in msg, f"Lockout message is Wing-specific: {msg!r}"
+        assert "Wing SOCAD" in msg or "SOCAD" in msg, f"Expected SOCAD contact hint in: {msg!r}"
+    finally:
+        _clear_account_lock("703SQN2026")

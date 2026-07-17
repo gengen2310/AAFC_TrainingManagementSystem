@@ -418,3 +418,31 @@ def test_bootstrap_staging_audit_entries(client):
     client.post("/api/system/bootstrap-staging", headers=hdr)
     r = client.get("/api/system/audit-summary?action=account_created&limit=50", headers=hdr)
     assert r.status_code == 200
+
+
+def test_bootstrap_staging_generic_wing_code_body(client):
+    """Bootstrap accepts optional wing_code/sqn_code body and resolves that Wing."""
+    hdr = _sysadmin(client)
+    # seed_all.py creates 7WG; target it explicitly via the new generic body param.
+    # All accounts already exist from the seed, so no new codes are generated —
+    # the important thing is the endpoint accepts the body and resolves 7WG correctly.
+    r = client.post("/api/system/bootstrap-staging",
+                    json={"wing_code": "7WG", "sqn_code": "703"},
+                    headers=hdr)
+    assert r.status_code == 200
+    d = r.json()
+    assert "results" in d
+    # Squadron result should reference 703
+    sqn_results = [item for item in d["results"] if item.get("type") == "squadron"]
+    assert sqn_results, f"No squadron in results: {d['results']}"
+    assert sqn_results[0]["code"] == "703"
+
+
+def test_bootstrap_staging_unknown_wing_returns_422(client):
+    """Bootstrap with a wing_code that does not exist must return 422."""
+    hdr = _sysadmin(client)
+    r = client.post("/api/system/bootstrap-staging",
+                    json={"wing_code": "UNKNOWN_WING_XYZ"},
+                    headers=hdr)
+    assert r.status_code == 422
+    assert "wing_not_found" in r.text
