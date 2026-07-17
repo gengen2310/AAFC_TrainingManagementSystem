@@ -425,6 +425,7 @@ def reset_code(uid: str, body: ResetCodeIn, db: DBSession = Depends(get_db),
     ac.active_status = True
     ac.updated_at = utcnow()
     ac.updated_by = p.user_id
+    u.token_version = (u.token_version or 0) + 1
     db.commit()
 
     action = "change_own_code" if uid == p.user_id else "reset_access"

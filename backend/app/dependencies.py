@@ -29,6 +29,8 @@ def get_principal(request: Request, db: DBSession = Depends(get_db)) -> Principa
     user = db.get(User, payload.get("sub"))
     if not user or not user.active_status:
         raise HTTPException(401, detail={"error": "invalid_user"})
+    if payload.get("tv", 0) != user.token_version:
+        raise HTTPException(401, detail={"error": "session_revoked"})
     p = Principal(user_id=user.id, role=user.role, wing_id=user.wing_id,
                   squadron_id=user.squadron_id, national_id=user.national_id)
     # overlay active proxy/intervention
