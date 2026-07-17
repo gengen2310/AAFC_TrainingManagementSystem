@@ -123,6 +123,35 @@ async def maintenance_gate(request: Request, call_next):
     )
 
 
+_RATE_LIMIT_EXEMPT = frozenset({
+    "/api/auth/login",   # has its own DB-backed per-IP + per-account limiter
+    "/api/health",
+    "/api/health/db",
+    "/api/health/ready",
+    "/",
+})
+
+
+@app.middleware("http")
+async def api_rate_limit(request: Request, call_next):
+    """Per-IP sliding window rate limiter for all non-exempt API endpoints.
+
+    Login has its own DB-backed limiter; health probes must never be blocked.
+    All other /api/ routes share this limit to prevent automated bulk enumeration.
+    """
+    if request.url.path not in _RATE_LIMIT_EXEMPT and request.url.path.startswith("/api/"):
+        from .security import check_api_rate
+        ip = request.client.host if request.client else "anon"
+        if check_api_rate(ip):
+            return JSONResponse(
+                status_code=429,
+                content={"error": "rate_limited",
+                         "message": "Too many requests. Please slow down."},
+                headers={"Retry-After": str(settings.API_RATE_WINDOW_SEC)},
+            )
+    return await call_next(request)
+
+
 @app.middleware("http")
 async def access_log(request: Request, call_next):
     # Structured access log for monitoring / log aggregation (one line per request).

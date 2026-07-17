@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     LOGIN_WINDOW_SEC: int = 300
     LOGIN_LOCKOUT_SEC: int = 900
 
+    # General API rate limiting (non-login endpoints, per-IP, in-memory sliding window)
+    API_RATE_LIMIT: int = 300       # requests allowed per window
+    API_RATE_WINDOW_SEC: int = 60   # window length in seconds
+
     # Uploads / exports
     UPLOAD_MAX_MB: int = 5
     EXPORT_DIR: str = "./exports"

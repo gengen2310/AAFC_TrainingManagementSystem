@@ -1,0 +1,85 @@
+"""Regression tests: general API rate limiter (Phase 14).
+
+The rate limiter is an in-memory sliding window that returns 429 when an
+IP exceeds settings.API_RATE_LIMIT requests in settings.API_RATE_WINDOW_SEC.
+Login and health endpoints are exempt from this limiter.
+"""
+import time
+
+import pytest
+
+from tests.conftest import login
+from app.security import reset_api_rate_limiter, _api_hits, settings
+
+
+def _prefill_hits(ip: str, count: int) -> None:
+    """Inject `count` hit timestamps for `ip` so the very next request crosses the limit."""
+    now = time.time()
+    _api_hits[ip] = [now - 0.1] * count
+
+
+@pytest.fixture(autouse=True)
+def _clear_api_rate(monkeypatch):
+    reset_api_rate_limiter()
+    yield
+    reset_api_rate_limiter()
+
+
+def test_api_rate_limiter_unit_check():
+    """Direct unit test: check_api_rate returns False below limit, True at/above."""
+    from app.security import check_api_rate
+    ip = "10.0.0.1"
+    limit = settings.API_RATE_LIMIT
+    for _ in range(limit):
+        assert check_api_rate(ip) is False
+    # One more pushes over
+    assert check_api_rate(ip) is True
+
+
+def test_rate_limit_429_on_api_endpoint(client):
+    """Prefill the limiter to the threshold; the next request must return 429."""
+    hdr = login(client, "ADMIN703")
+    ip = "testclient"  # TestClient always reports this as the client host
+    _prefill_hits(ip, settings.API_RATE_LIMIT)
+    r = client.get("/api/auth/me", headers=hdr)
+    assert r.status_code == 429
+    assert r.json()["error"] == "rate_limited"
+    assert "Retry-After" in r.headers
+
+
+def test_rate_limit_does_not_block_health(client):
+    """Health endpoints must never return 429 regardless of the rate counter."""
+    ip = "testclient"
+    _prefill_hits(ip, settings.API_RATE_LIMIT + 50)
+    # /api/health is exempt
+    r = client.get("/api/health")
+    assert r.status_code == 200
+
+
+def test_rate_limit_does_not_block_login(client):
+    """Login endpoint must not be blocked by the general rate limiter."""
+    ip = "testclient"
+    _prefill_hits(ip, settings.API_RATE_LIMIT + 50)
+    r = client.post("/api/auth/login", json={"code": "ADMIN703"})
+    assert r.status_code == 200
+
+
+def test_rate_limit_resets_after_window(client):
+    """After the sliding window expires, the counter resets and requests succeed."""
+    from app.security import check_api_rate
+    ip = "10.0.0.2"
+    past = time.time() - settings.API_RATE_WINDOW_SEC - 5
+    _api_hits[ip] = [past] * (settings.API_RATE_LIMIT + 10)
+    # All old hits are outside the window; new request should not be blocked
+    assert check_api_rate(ip) is False
+
+
+def test_rate_limit_different_ips_are_independent(client):
+    """Exceeding the limit for one IP must not block a different IP."""
+    from app.security import check_api_rate
+    ip_a = "10.0.0.10"
+    ip_b = "10.0.0.11"
+    _prefill_hits(ip_a, settings.API_RATE_LIMIT)
+    check_api_rate(ip_a)  # pushes ip_a over limit
+    # ip_b has no hits yet
+    assert check_api_rate(ip_b) is False

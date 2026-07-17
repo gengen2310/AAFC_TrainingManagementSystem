@@ -95,6 +95,26 @@ def reset_rate_limiter() -> None:
     _lockouts.clear()
 
 
+# ── Per-IP general API rate limiter (non-login endpoints) ───────────────────
+# In-memory sliding window. Same caveat as above: replace with Redis for
+# true distribution across gunicorn workers in production.
+_api_hits: dict[str, list[float]] = {}
+
+
+def check_api_rate(ip: str) -> bool:
+    """Return True if the IP has exceeded the API rate limit (caller must 429)."""
+    now = time.time()
+    window = settings.API_RATE_WINDOW_SEC
+    hits = [t for t in _api_hits.get(ip, []) if now - t < window]
+    hits.append(now)
+    _api_hits[ip] = hits
+    return len(hits) > settings.API_RATE_LIMIT
+
+
+def reset_api_rate_limiter() -> None:
+    _api_hits.clear()
+
+
 # ── DB-backed per-IP rate limiter (works across gunicorn workers) ──────────────
 # Replaces the in-memory dicts above for production use. Uses IpLoginAttempt
 # table so state is shared across all workers.

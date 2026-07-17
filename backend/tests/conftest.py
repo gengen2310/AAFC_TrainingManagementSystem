@@ -13,7 +13,7 @@ os.environ["SECRET_KEY"] = "test-secret"
 from fastapi.testclient import TestClient  # noqa: E402
 from app.main import app                    # noqa: E402
 from app.seeds.seed_all import seed_all     # noqa: E402
-from app.security import reset_rate_limiter # noqa: E402
+from app.security import reset_rate_limiter, reset_api_rate_limiter # noqa: E402
 from app.database import SessionLocal, engine  # noqa: E402
 from app.models import IpLoginAttempt, AccessCode  # noqa: E402
 
@@ -27,6 +27,7 @@ def _seed():
 @pytest.fixture()
 def client():
     reset_rate_limiter()
+    reset_api_rate_limiter()
     # Clear DB-backed lockout state so tests are isolated
     db = SessionLocal()
     try:
