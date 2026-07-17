@@ -25,4 +25,9 @@ fi
 # Inject the runtime port into the nginx config
 sed -i "s/__PORT__/${PORT}/g" /etc/nginx/conf.d/default.conf
 
+# Inject CSP connect-src: if AAFC_API_BASE is set, allow that specific origin;
+# otherwise fall back to 'https:' (all HTTPS origins) so the app still works.
+CSP_CONNECT="${AAFC_API_BASE:-https:}"
+sed -i "s|__CSP_CONNECT_SRC__|${CSP_CONNECT}|g" /etc/nginx/conf.d/default.conf
+
 exec nginx -g "daemon off;"
