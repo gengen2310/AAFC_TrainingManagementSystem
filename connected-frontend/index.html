@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AAFC Training System</title>
 <meta name="aafc-api-base" content="https://aafc-tms-backend-production.up.railway.app">
-<meta name="aafc-pw-base" content="https://aafc-tms-planning-workspace-preview-production.up.railway.app/planning">
+<meta name="aafc-pw-base" content="">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -510,6 +510,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-item nav-scope" id="nav-audit" style="display:none" onclick="nav('audit')">Audit</div>
       <div class="nav-lbl" id="nav-system-lbl" style="display:none">System</div>
       <div class="nav-item" id="nav-system-console" style="display:none" onclick="nav('system-console')">System Console</div>
+      <div class="nav-lbl" id="nav-lbl-pw" style="display:none">Workspace</div>
+      <a class="nav-item-ext" id="nav-pw-link" href="#" target="_blank" rel="noopener" style="display:none">Planning Workspace ↗</a>
     </nav>
 
     <main class="main">
@@ -615,6 +617,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="ph-sub">Parade nights and session status</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk" onclick="openModal('m-add-pn')">+ Add Parade Night</button>
+            <button class="btn btn-sky plan-write-el" style="display:none" onclick="openGenerateDatesModal()">Generate Parade Nights</button>
             <button class="btn btn-out" onclick="nav('calendar')">Calendar</button>
             <button class="btn btn-out" onclick="nav('weekly-program')">Weekly Program</button>
           </div>
@@ -699,8 +702,19 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="ph-title">Activities &amp; Events</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-act')">+ Add Activity</button>
+            <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddHolidayModal()">+ Add Holiday</button>
             <button class="btn btn-out admin-el" style="display:none" onclick="openCeaImport()">Import CEA</button>
           </div>
+        </div>
+        <div class="fbar no-print">
+          <select id="act-f-type" onchange="renderActs()">
+            <option value="all">All Types</option>
+            <option value="Must Attend">Must Attend</option>
+            <option value="Key Event">Key Event</option>
+            <option value="Optional">Optional</option>
+            <option value="Holiday">Holidays</option>
+          </select>
+          <input id="act-search" placeholder="Search activities…" oninput="renderActs()" style="min-width:180px;">
         </div>
         <div class="tw">
           <table>
@@ -717,12 +731,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="ph-actions no-print">
             <select id="fac-filter" onchange="S.facFilter=this.value;renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px">
               <option value="">All subject areas</option>
-              <option value="service">Service Knowledge</option>
-              <option value="drill">Drill and Ceremonial</option>
-              <option value="field">Field Skills</option>
-              <option value="lead">Personal Development and Leadership</option>
-              <option value="comm">Community Engagement</option>
-              <option value="stem">Aviation and Air Power</option>
             </select>
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-fac')">+ Add Facilitator</button>
           </div>
@@ -1788,9 +1796,16 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title" id="m-tag-title">Edit Subject Areas</div><button class="modal-x" onclick="closeModal('m-tag-fac')">×</button></div>
     <div class="modal-body">
-      <p style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Click a tag to toggle it. Use the custom field for tags not in the list. Max 20 tags.</p>
+      <p style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Click a tag to toggle it. Dashed border = unit-created tag. Max 20 tags.</p>
       <div id="m-tag-checks" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px"></div>
-      <div class="ff"><label>Custom tags (comma-separated)</label><input id="m-tag-custom" placeholder="e.g. Navigation, Survival"></div>
+      <div class="ff"><label>Other tags (comma-separated)</label><input id="m-tag-custom" placeholder="e.g. Navigation, Survival"></div>
+      <div id="m-tag-create-section" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <label style="font-size:11px;font-weight:700;color:var(--muted);display:block;margin-bottom:6px">CREATE NEW UNIT TAG</label>
+        <div style="display:flex;gap:8px">
+          <input id="m-tag-new-name" placeholder="New tag name…" style="flex:1;padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px">
+          <button class="btn btn-sky" id="m-tag-create-btn" style="display:none" onclick="createAndAddTag()">+ Create</button>
+        </div>
+      </div>
     </div>
     <div class="modal-foot">
       <div id="m-tag-msg" style="font-size:11px;color:var(--red);margin-right:auto;font-weight:700"></div>
@@ -2415,6 +2430,7 @@ async function api(path, opts={}){
     if(res.status===422&&code==='squadron_id_required')  msg='Squadron / Specialist Unit is required.';
     if(res.status===422&&code==='wing_id_required')      msg='Wing is required.';
     if(res.status===409&&code==='code_exists'&&body&&body.detail&&body.detail.message) msg=body.detail.message;
+    if(res.status===409&&code==='tag_already_exists') msg='A tag with that name already exists.';
     if(res.status===429 && !msg) msg='Too many attempts. Please wait and try again.';
     throw {kind:'http', status:res.status, code, msg};
   }
@@ -2722,6 +2738,8 @@ async function loadData(){
   const _proxyWasActive=proxyActive();
 
   // Fire all requests in parallel — no await until Promise.all below.
+  const p_uicfg=fetch(API_BASE+'/api/health/ui-config').then(r=>r.json()).catch(()=>null);
+  const p_tags=api('/api/subject-area-tags').catch(()=>[]);
   const p_pns=api('/api/parade-nights').catch(e=>{S.loadErr=apiErr(e);return null;});
   const p_facs=api('/api/facilitators').catch(()=>null);
   const p_cur=api('/api/curriculum').catch(()=>null);
@@ -2749,12 +2767,14 @@ async function loadData(){
   const p_nsqns=(scope==='national'||scope==='system_admin')?api('/api/squadrons').catch(()=>[]):Promise.resolve([]);
 
   const[
+    uicfg,tags,
     pns,facs,cur,ta,eq,ai,acts,proxy,
     repSum,repRead,repCov,repFload,repNdel,
     sqnData,timing,auditData,
     wov,wph,wcap,wsqns,
     nat,natov,natcap,wings,nsqns,
   ]=await Promise.all([
+    p_uicfg,p_tags,
     p_pns,p_facs,p_cur,p_ta,p_eq,p_ai,p_acts,p_proxy,
     p_sum,p_read,p_cov,p_fload,p_ndel,
     p_sqnData,p_timing,p_audit,
@@ -2781,6 +2801,9 @@ async function loadData(){
   S.actionItems=(ai||[]).map(a=>({id:a.action_id,title:a.title,description:a.description,owner:a.owner,due:a.due_date,status:a.status,severity:a.severity,source:a.source}));
   S.acts=(acts||[]).map(a=>({id:a.activity_id,name:a.activity_name,date:a.date_start,dateEnd:a.date_end,timeStart:a.time_start,timeEnd:a.time_end,type:a.activity_type||'Optional',location:a.location||'',audience:a.audience||[],notes:a.notes||'',ceaSeqNr:a.cea_seq_nr||''}));
   S.proxy=proxy||{active:false};
+  S.pwUrl=(uicfg&&uicfg.planning_workspace_url)||null;
+  S.trainingYear=(uicfg&&uicfg.training_year)||2026;
+  S.subjectAreaTags=Array.isArray(tags)?tags.filter(t=>t.is_active):[];
   S.reports={summary:repSum,readiness:repRead,coverage:repCov,facload:repFload,notdelivered:repNdel};
   S.cfg={day:'',start:'',end:'',sess:3,dur:35,addr:''};
   if(sqnData){
@@ -2922,11 +2945,12 @@ function bootApp(){
   chip.textContent=info.short; chip.className='sqn-chip'+(S.isAdmin?' admin':'');
   updateScopeBanner(); updateModeBanner(); updateDebugBar();
   applyNavScope();
-  // Planning Workspace preview link — visible for squadron scope (sqn_admin + sqn_general) only.
+  // Planning Workspace link — visible for squadron/wing/national if URL is configured via API.
   const pwLink=document.getElementById('nav-pw-link'), pwLbl=document.getElementById('nav-lbl-pw');
-  // Use environment-injected URL from <meta name="aafc-pw-base"> if available.
-  if(pwLink){const pwMeta=document.querySelector('meta[name="aafc-pw-base"]');if(pwMeta&&pwMeta.content)pwLink.href=pwMeta.content;}
-  const showPW=scope==='squadron'; if(pwLink)pwLink.style.display=showPW?'flex':'none'; if(pwLbl)pwLbl.style.display=showPW?'block':'none';
+  const pwUrl=S.pwUrl;
+  if(pwLink&&pwUrl)pwLink.href=pwUrl;
+  const showPW=!!pwUrl&&['squadron','wing','national'].includes(scope);
+  if(pwLink)pwLink.style.display=showPW?'flex':'none'; if(pwLbl)pwLbl.style.display=showPW?'block':'none';
   // Write controls: visible only where this role/scope can currently write; auditor/viewers read-only.
   const canWrite = scope==='squadron' ? canWriteSquadron() : false; // wing/national write only via proxy into a squadron
   document.querySelectorAll('.admin-el').forEach(el=>{el.style.display=(canWrite||(scope!=='squadron'&&proxyActive()))?'inline-flex':'none';});
@@ -4031,7 +4055,7 @@ function drillFacDel(facKey){
 function renderDash(){
   const info=getCurrentUnitInfo();
   document.getElementById('dash-title').textContent=info.name+' — Training Dashboard';
-  document.getElementById('dash-sub').textContent=`2026 · ${S.cfg.day} Parade Nights · ${new Date().toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}`;
+  document.getElementById('dash-sub').textContent=`${S.trainingYear||2026} Training Year`;
   const sess=allSess();
   const cnt=(st)=>sess.filter(s=>s.status===st).length;
   document.getElementById('s-pn').textContent=S.pns.length;
@@ -4737,18 +4761,23 @@ async function deleteCurrItem(id){
 // ═══════════════════════════════════════════════════════════
 function renderActs(){
   const td=today();
-  document.getElementById('act-tbody').innerHTML=[...S.acts].sort((a,b)=>a.date.localeCompare(b.date)).map((act)=>{
+  const typeFilter=(document.getElementById('act-f-type')||{}).value||'all';
+  const search=((document.getElementById('act-search')||{}).value||'').toLowerCase().trim();
+  let list=[...S.acts].sort((a,b)=>a.date.localeCompare(b.date));
+  if(typeFilter!=='all')list=list.filter(a=>a.type===typeFilter);
+  if(search)list=list.filter(a=>(a.name||'').toLowerCase().includes(search)||(a.notes||'').toLowerCase().includes(search));
+  document.getElementById('act-tbody').innerHTML=list.length?list.map((act)=>{
     const past=new Date(act.date+'T00:00:00')<td;
-    const tb=act.type==='Must Attend'?'<span class="badge b-red">Must Attend</span>':act.type==='Key Event'?'<span class="badge b-blue">Key Event</span>':'<span class="badge b-grey">Optional</span>';
+    const tb=act.type==='Must Attend'?'<span class="badge b-red">Must Attend</span>':act.type==='Key Event'?'<span class="badge b-blue">Key Event</span>':act.type==='Holiday'?'<span class="badge b-amber">Holiday</span>':'<span class="badge b-grey">Optional</span>';
     return `<tr ${past?'style="opacity:.58"':''}>
-      <td style="font-weight:700">${act.name}</td>
+      <td style="font-weight:700">${esc(act.name)}</td>
       <td style="white-space:nowrap">${fmtD(act.date,{day:'numeric',month:'short',year:'numeric'})}</td>
       <td>${tb}</td>
-      <td style="font-size:11.5px">${(act.audience||[]).join(', ')}</td>
-      <td style="font-size:11.5px;color:var(--muted)">${act.notes||''}</td>
+      <td style="font-size:11.5px">${esc((act.audience||[]).join(', '))}</td>
+      <td style="font-size:11.5px;color:var(--muted)">${esc(act.notes||'')}</td>
       <td class="no-print">${S.isAdmin?`<button class="btn btn-xs btn-sky" onclick="editAct('${act.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delAct('${act.id}')">×</button>`:'—'}</td>
     </tr>`;
-  }).join('');
+  }).join(''):`<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:14px">No activities${typeFilter!=='all'?' of this type':''}${search?' matching "'+esc(search)+'"':''}.</td></tr>`;
 }
 let _editActId=null;
 async function saveAct(){
@@ -4786,11 +4815,34 @@ async function delAct(id){
 // ═══════════════════════════════════════════════════════════
 //  FACILITATORS
 // ═══════════════════════════════════════════════════════════
+function _populateFacFilter(){
+  const sel=document.getElementById('fac-filter'); if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">All subject areas</option>';
+  SUBJECTS.forEach(s=>{const o=document.createElement('option');o.value=s.key;o.textContent=s.label;sel.appendChild(o);});
+  const customTags=(S.subjectAreaTags||[]).filter(t=>!SUBJECTS.some(s=>s.label.toLowerCase()===t.display_name.toLowerCase()));
+  if(customTags.length){
+    const grp=document.createElement('optgroup');grp.label='Unit Tags';
+    customTags.forEach(t=>{const o=document.createElement('option');o.value='tag:'+t.tag_id;o.textContent=t.display_name;grp.appendChild(o);});
+    sel.appendChild(grp);
+  }
+  if(cur)sel.value=cur;
+}
 function renderFacs(){
+  _populateFacFilter();
   const counts={};
   allSess().forEach(s=>{const k=s.facId||s.facName;if(!k)return;counts[k]=(counts[k]||0)+1;});
   const flt=S.facFilter||'';
-  const list=flt?S.facs.filter(f=>(f.areas||[]).some(a=>subjectOf(a)===flt)):S.facs;
+  let list;
+  if(!flt){list=S.facs;}
+  else if(flt.startsWith('tag:')){
+    const tagId=flt.slice(4);
+    const tagName=(S.subjectAreaTags||[]).find(t=>t.tag_id===tagId);
+    const matchName=tagName?tagName.display_name.toLowerCase():'';
+    list=S.facs.filter(f=>(f.areas||[]).some(a=>a.toLowerCase()===matchName));
+  } else {
+    list=S.facs.filter(f=>(f.areas||[]).some(a=>subjectOf(a)===flt));
+  }
   document.getElementById('fac-tbody').innerHTML=list.length?list.map((f,i)=>{
     const k=f.id;const tot=counts[k]||0;
     return `<tr class="clk-row" onclick="showFacProfile('${f.id}')">
@@ -4817,19 +4869,42 @@ function tagFac(id){
   const name=[f.rank,f.first,f.last].filter(Boolean).join(' ');
   document.getElementById('m-tag-title').textContent='Subject Areas — '+name;
   document.getElementById('m-tag-msg').textContent='';
-  // Build toggle chips for known vocab
+  // Build toggle chips: standard vocab + user-created API tags
+  const apiTagNames=(S.subjectAreaTags||[]).map(t=>t.display_name);
+  const allVocab=[...new Set([...FAC_TAG_VOCAB,...apiTagNames])];
   const el=document.getElementById('m-tag-checks');
-  el.innerHTML=FAC_TAG_VOCAB.map(v=>{
+  el.innerHTML=allVocab.map(v=>{
     const on=cur.includes(v);
+    const isApiTag=apiTagNames.includes(v)&&!FAC_TAG_VOCAB.includes(v);
     return `<button type="button" onclick="toggleTagVocab(this,'${v.replace(/'/g,"\\'")}',${on?'false':'true'})"
       style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;
-             border:1.5px solid var(--royal);background:${on?'var(--royal)':'white'};color:${on?'white':'var(--royal)'}"
-      data-active="${on}">${v}</button>`;
+             border:1.5px solid var(--royal);background:${on?'var(--royal)':'white'};color:${on?'white':'var(--royal)'}${isApiTag?';border-style:dashed':''}"
+      data-active="${on}" title="${isApiTag?'Unit-created tag':''}">${v}</button>`;
   }).join('');
-  // Custom tags (not in vocab) go in the text field
-  const custom=cur.filter(t=>!FAC_TAG_VOCAB.includes(t));
+  // Custom tags (not in any vocab) go in the text field
+  const custom=cur.filter(t=>!allVocab.includes(t));
   document.getElementById('m-tag-custom').value=custom.join(', ');
+  // Show tag creation section for sqn_admin
+  const createSection=document.getElementById('m-tag-create-section');
+  const createBtn=document.getElementById('m-tag-create-btn');
+  if(createSection)createSection.style.display=S.isAdmin?'block':'none';
+  if(createBtn)createBtn.style.display=S.isAdmin?'inline-flex':'none';
   openModal('m-tag-fac');
+}
+async function createAndAddTag(){
+  const input=document.getElementById('m-tag-new-name'); if(!input)return;
+  const name=input.value.trim(); if(!name)return;
+  const msg=document.getElementById('m-tag-msg');
+  msg.textContent='Creating…';
+  try{
+    const t=await api('/api/subject-area-tags',{method:'POST',body:JSON.stringify({display_name:name})});
+    S.subjectAreaTags=[...(S.subjectAreaTags||[]),t];
+    input.value='';
+    tagFac(_tagFacId); // re-render modal with new tag
+    msg.textContent='Tag "'+t.display_name+'" created.';
+  }catch(e){
+    msg.textContent=e.code==='tag_already_exists'?'That tag already exists.':'Could not create tag: '+apiErr(e);
+  }
 }
 function toggleTagVocab(btn,val,makeActive){
   const active=makeActive==='true'||makeActive===true;
