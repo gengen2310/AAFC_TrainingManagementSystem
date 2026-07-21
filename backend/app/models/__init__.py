@@ -11,7 +11,7 @@ from .organisations import (
 )
 from .training import (
     CurriculumItem, CurriculumElement, CustomPhase, ParadeNight, Session, SessionStatusHistory,
-    Facilitator, FacilitatorRankHistory, TrainingArea, Equipment, Activity, Cadet,
+    Facilitator, FacilitatorRankHistory, SubjectAreaTag, TrainingArea, Equipment, Activity, Cadet,
     TimingTemplate, TimingBlock, ParadeNightTimingOverride,
 )
 from .operations import (
@@ -25,7 +25,7 @@ from .program import (
 __all__ = [
     "NationalEntity", "Wing", "Squadron", "Flight", "User", "AccessCode", "ProxySession", "IpLoginAttempt",
     "CurriculumItem", "CurriculumElement", "CustomPhase", "ParadeNight", "Session", "SessionStatusHistory",
-    "Facilitator", "FacilitatorRankHistory", "TrainingArea", "Equipment", "Activity", "Cadet",
+    "Facilitator", "FacilitatorRankHistory", "SubjectAreaTag", "TrainingArea", "Equipment", "Activity", "Cadet",
     "TimingTemplate", "TimingBlock", "ParadeNightTimingOverride",
     "ActionItem", "Exception", "AuditLog", "ImportLog", "ExportLog", "SystemSetting",
     "Phase", "ProgramPackage", "ProgramItem", "LearningHubResource", "ProgramItemDeployment",

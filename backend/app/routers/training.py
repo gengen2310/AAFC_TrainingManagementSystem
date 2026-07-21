@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
 from ..models import (CurriculumItem, CurriculumElement, ParadeNight, Session, SessionStatusHistory,
-                      Facilitator, FacilitatorRankHistory, TrainingArea, Equipment,
+                      Facilitator, FacilitatorRankHistory, SubjectAreaTag, TrainingArea, Equipment,
                       Activity, Cadet, Squadron, TimingTemplate, TimingBlock)
 from ..models.training import ELEMENT_SCOPE_LEVELS
 from .timing import _effective_template
@@ -1997,3 +1997,135 @@ async def import_activities_cea(
         "total": created + skipped + failed,
         "parse_errors": parse_errors,
     }
+
+
+# ═══════════════════════════════════════════════════
+#  SUBJECT AREA TAGS
+# ═══════════════════════════════════════════════════
+
+def _normalise_tag(name: str) -> str:
+    """Lower-case, collapse internal whitespace, strip edges."""
+    import re
+    return re.sub(r"\s+", " ", name.strip().lower())
+
+
+def _tag_out(t: SubjectAreaTag) -> dict:
+    return {
+        "tag_id": t.id,
+        "display_name": t.display_name,
+        "normalised_name": t.normalised_name,
+        "scope": t.scope,
+        "squadron_id": t.squadron_id,
+        "wing_id": t.wing_id,
+        "is_active": t.is_active,
+        "created_by": t.created_by,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+    }
+
+
+class SubjectAreaTagIn(BaseModel):
+    display_name: str
+    scope: str = "squadron"
+
+
+@router.get("/subject-area-tags")
+def list_subject_area_tags(
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Return all active tags visible to the caller's squadron and wing."""
+    sq = db.get(Squadron, p.squadron_id) if p.squadron_id else None
+    sq_id = sq.id if sq else None
+    wing_id = sq.wing_id if sq else p.wing_id
+    require_can_view_squadron(p, sq_id or "", wing_id)
+    rows = (
+        db.query(SubjectAreaTag)
+        .filter(
+            SubjectAreaTag.is_active == True,  # noqa: E712
+            (
+                (SubjectAreaTag.squadron_id == sq_id) |
+                (SubjectAreaTag.wing_id == wing_id) |
+                (SubjectAreaTag.scope == "global")
+            ),
+        )
+        .order_by(SubjectAreaTag.display_name)
+        .all()
+    )
+    return [_tag_out(t) for t in rows]
+
+
+@router.post("/subject-area-tags", status_code=201)
+def create_subject_area_tag(
+    body: SubjectAreaTagIn,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Create a new subject-area tag (sqn_admin or wing_admin only)."""
+    from ..permissions import require_role
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    sq = db.get(Squadron, p.squadron_id) if p.squadron_id else None
+    if not sq:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    require_can_write_squadron(p, sq.id, sq.wing_id)
+
+    display = body.display_name.strip()
+    if not display:
+        raise HTTPException(400, detail={"error": "tag_name_blank"})
+    if len(display) > 80:
+        raise HTTPException(400, detail={"error": "tag_name_too_long", "max": 80})
+
+    norm = _normalise_tag(display)
+
+    scope = body.scope if body.scope in ("global", "wing", "squadron") else "squadron"
+    wing_id = sq.wing_id if scope in ("wing", "squadron") else None
+    squadron_id = sq.id if scope == "squadron" else None
+
+    existing = (
+        db.query(SubjectAreaTag)
+        .filter(
+            SubjectAreaTag.normalised_name == norm,
+            SubjectAreaTag.is_active == True,  # noqa: E712
+            (
+                (SubjectAreaTag.squadron_id == squadron_id) |
+                (SubjectAreaTag.wing_id == wing_id) |
+                (SubjectAreaTag.scope == "global")
+            ),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(409, detail={"error": "tag_already_exists", "existing_id": existing.id})
+
+    tag = SubjectAreaTag(
+        squadron_id=squadron_id,
+        wing_id=wing_id,
+        scope=scope,
+        display_name=display,
+        normalised_name=norm,
+        is_active=True,
+        created_by=p.user_id,
+    )
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    audit(db, p, object_type="SubjectAreaTag", object_id=tag.id, action="create",
+          new={"display_name": tag.display_name, "scope": tag.scope})
+    return _tag_out(tag)
+
+
+@router.delete("/subject-area-tags/{tag_id}", status_code=200)
+def archive_subject_area_tag(
+    tag_id: str,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Archive a subject-area tag (does not remove existing facilitator references)."""
+    from ..permissions import require_role
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    tag = db.get(SubjectAreaTag, tag_id)
+    if not tag:
+        raise HTTPException(404, detail={"error": "tag_not_found"})
+    tag.is_active = False
+    db.commit()
+    audit(db, p, object_type="SubjectAreaTag", object_id=tag_id, action="archive")
+    return {"ok": True}

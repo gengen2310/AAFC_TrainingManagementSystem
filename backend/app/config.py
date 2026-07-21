@@ -49,6 +49,10 @@ class Settings(BaseSettings):
 
     TRAINING_YEAR: int = 2026
 
+    # URL for the Planning Workspace frontend (served separately).
+    # Set this env var in each Railway environment. Empty string = no link shown.
+    PLANNING_WORKSPACE_URL: str = ""
+
     # Defense in depth for reset_db()/seed_all(): SHA-256 fingerprints (of the
     # DATABASE_URL hostname only — never the credentials) of databases that
     # must never be destructively reset, regardless of what ENVIRONMENT says.

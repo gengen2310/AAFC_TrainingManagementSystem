@@ -142,6 +142,18 @@ class FacilitatorRankHistory(Base, UUIDMixin):
     reason: Mapped[str | None] = mapped_column(Text)
 
 
+class SubjectAreaTag(Base, UUIDMixin, TimestampMixin):
+    """Canonical subject-area tags; user-creatable, scoped to squadron/wing/global."""
+    __tablename__ = "subject_area_tags"
+    squadron_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
+    wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    scope: Mapped[str] = mapped_column(String(20), default="squadron")  # global / wing / squadron
+    display_name: Mapped[str] = mapped_column(String(80))
+    normalised_name: Mapped[str] = mapped_column(String(80), index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str | None] = mapped_column(String(36))
+
+
 class TrainingArea(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "training_areas"
     squadron_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), index=True)
