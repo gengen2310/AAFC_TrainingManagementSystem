@@ -156,6 +156,30 @@ def wing_overview(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
     return {"squadrons": out}
 
 
+@router.get("/reports/wing-not-delivered")
+def wing_not_delivered(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Wing-wide aggregation of not-delivered sessions, ranked by squadron count."""
+    require_role(p, "wing_viewer", "wing_admin", "national_viewer", "national_admin", "system_admin", "auditor")
+    wing_id = p.wing_id if p.is_wing else None
+    q = db.query(Squadron).filter(Squadron.is_archived == False)  # noqa: E712
+    if wing_id:
+        q = q.filter(Squadron.wing_id == wing_id)
+    out = []
+    for s in q.all():
+        rows = [x for x in _all_sessions(db, s.id) if x.status == "not_delivered"]
+        if rows:
+            out.append({
+                "squadron_id": s.id, "code": s.code, "short_name": s.short_name,
+                "not_delivered_count": len(rows),
+                "sessions": [{"id": x.id, "curriculum_code_at_time": x.curriculum_code_at_time,
+                              "not_delivered_reason": x.not_delivered_reason} for x in rows],
+            })
+    out.sort(key=lambda x: -x["not_delivered_count"])
+    return {"title": "Cross-squadron not-delivered", "squadrons": out,
+            "total_not_delivered": sum(x["not_delivered_count"] for x in out),
+            "decision": "action_required" if out else "no_action"}
+
+
 @router.get("/reports/wing-phase-coverage")
 def wing_phase_coverage(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     """Squadron x phase coverage matrix for the Wing heatmap.
