@@ -230,8 +230,11 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .empty .es{font-size:12px;max-width:290px;margin:0 auto;line-height:1.55;}
 
 /* ── DASH GRID ── */
-.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
 @media(max-width:860px){.dash-grid{grid-template-columns:1fr;}}
+.dash-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px;}
+@media(max-width:1000px){.dash-grid-3{grid-template-columns:1fr 1fr;}}
+@media(max-width:680px){.dash-grid-3{grid-template-columns:1fr;}}
 
 /* ── PHASE ROW ── */
 .ph-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
@@ -242,6 +245,32 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 /* ── DRILL PANEL ── */
 .drill-panel{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:12px;display:none;}
 .drill-panel.show{display:block;}
+
+/* ── DASHBOARD CHART STYLES ── */
+.dash-section{margin-bottom:24px;}
+.dash-sec-hdr{font-size:10px;font-weight:800;color:var(--steel);letter-spacing:.14em;text-transform:uppercase;padding:10px 0 4px;border-top:2px solid var(--border);margin-bottom:4px;}
+.dash-sec-sub{font-size:11.5px;color:var(--muted);margin-bottom:12px;}
+.chart-insight{font-size:11.5px;color:var(--royal);font-weight:600;padding:6px 10px;background:var(--accent-light);border-radius:5px;margin-top:8px;border-left:3px solid var(--blue);}
+.chart-skeleton{background:linear-gradient(90deg,#f0f4f8 25%,#e4eaf0 50%,#f0f4f8 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;height:80px;}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.pbar{background:var(--border);border-radius:3px;height:14px;overflow:hidden;}
+.readiness-donut{display:flex;align-items:center;gap:20px;}
+.rdp-ring{width:84px;height:84px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.rdp-inner{background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;}
+.sched-lane{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);}
+.sched-lane:last-child{border-bottom:none;}
+.heatmap-grid{display:grid;gap:2px;font-size:9px;}
+.heatmap-cell{border-radius:3px;display:flex;align-items:center;justify-content:center;font-weight:700;cursor:default;}
+.hm-ok{background:#d4f0e3;color:#1a5c35;}
+.hm-warn{background:#fff3cd;color:#7a5200;}
+.hm-critical{background:#fde8e8;color:#8b1a1a;}
+.hm-empty{background:#f0f0f0;color:#999;}
+.stacked-seg{height:100%;transition:width .3s;}
+.stacked-seg:first-child{border-radius:3px 0 0 3px;}
+.stacked-seg:last-child{border-radius:0 3px 3px 0;}
+.dash-filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:white;border-radius:8px;box-shadow:var(--sh);border:1px solid var(--border);}
+.dash-filter-bar select{padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:11.5px;color:var(--text);}
+.dash-filter-bar label{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
 .drill-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .drill-title{font-size:12px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.04em;}
 
@@ -519,16 +548,19 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <!-- DASHBOARD -->
       <div id="page-dashboard" class="page active">
         <div class="ph">
-          <div class="ph-title" id="dash-title">Training Dashboard</div>
-        </div>
-        <div class="stats-grid">
-          <div class="stat"><div class="slbl">Parade Nights</div><div class="sval" id="s-pn">0</div><div class="ssub">scheduled 2026</div></div>
-          <div class="stat s-ok clk" onclick="drillStatus('delivered')"><div class="slbl">Delivered</div><div class="sval lnk" id="s-del">0</div><div class="ssub">click to view</div></div>
-          <div class="stat clk" onclick="drillStatus('planned')"><div class="slbl">Planned</div><div class="sval lnk" id="s-pln">0</div><div class="ssub">upcoming</div></div>
-          <div class="stat s-warn clk" onclick="drillStatus('not_delivered')"><div class="slbl">Not Delivered</div><div class="sval lnk" id="s-nd">0</div><div class="ssub">capacity constraints</div></div>
-          <div class="stat s-red clk" onclick="drillStatus('cancelled')"><div class="slbl">Cancelled</div><div class="sval lnk" id="s-can">0</div><div class="ssub">this year</div></div>
-          <div class="stat s-purple clk" onclick="drillStatus('rescheduled')"><div class="slbl">Rescheduled</div><div class="sval lnk" id="s-res">0</div><div class="ssub">deferred</div></div>
-          <div class="stat s-dark"><div class="slbl">Curriculum</div><div class="sval" id="s-curr">0</div><div class="ssub">required + enrichment</div></div>
+          <div>
+            <div class="ph-title" id="dash-title">Training Dashboard</div>
+            <div class="ph-sub" id="dash-scope-label"></div>
+          </div>
+          <div class="ph-actions no-print" style="gap:6px">
+            <label for="dash-window" style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Period</label>
+            <select id="dash-window" onchange="loadDashCharts()" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px">
+              <option value="term">This Term</option>
+              <option value="week">This Week</option>
+              <option value="year">This Year</option>
+            </select>
+            <select id="dash-sqn-filter" onchange="loadDashCharts()" style="display:none;padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px"><option value="">All Squadrons</option></select>
+          </div>
         </div>
 
         <!-- Drill-down panel -->
@@ -538,69 +570,146 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <button class="btn btn-xs btn-out no-print" onclick="hideDrill('dash-drill')">Close ×</button>
           </div>
           <div class="tw"><table>
-            <thead><tr><th>Date</th><th>Sess</th><th>Phase</th><th>Curriculum Item</th><th>Facilitator</th><th>Room</th><th>Status</th><th class="no-print"></th></tr></thead>
+            <thead><tr><th>Date</th><th>Sess</th><th>Phase</th><th>Curriculum Item</th><th>Facilitator</th><th>Room</th><th>Status</th></tr></thead>
             <tbody id="dash-drill-body"></tbody>
           </table></div>
         </div>
 
-        <div class="dash-grid">
+        <!-- ══════════ A. TONIGHT ══════════ -->
+        <div class="dash-section">
+          <div class="dash-sec-hdr">A — Tonight &amp; This Week</div>
+          <div class="dash-sec-sub">Readiness for the next parade night and upcoming staffing issues.</div>
+          <div id="dash-tonight-section"><div class="card"><div class="chart-skeleton"></div></div></div>
+          <div id="dash-upcoming-readiness-section"></div>
+        </div>
+
+        <!-- ══════════ B. THIS TERM ══════════ -->
+        <div class="dash-section">
+          <div class="dash-sec-hdr">B — This Term — Session Delivery</div>
+          <div class="dash-sec-sub">Session outcomes, weekly delivery and trends over the selected period.</div>
+          <div class="dash-grid">
+            <div class="card">
+              <div class="ctitle">Training delivered each week</div>
+              <div class="ssub" id="exp-weekly-outcomes" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+              <div id="chart-weekly-outcomes"><div class="chart-skeleton"></div></div>
+              <div id="insight-weekly-outcomes" class="chart-insight" style="display:none"></div>
+            </div>
+            <div class="card">
+              <div class="ctitle">Delivery reliability — 12 weeks <span id="trend-thresholds" style="font-weight:400;color:var(--muted);font-size:9px;text-transform:none;letter-spacing:0"> · green ≥80% · amber ≥60%</span></div>
+              <div class="ssub" id="exp-delivery-trend" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+              <div id="chart-delivery-trend"><div class="chart-skeleton"></div></div>
+              <div id="insight-delivery-trend" class="chart-insight" style="display:none"></div>
+            </div>
+          </div>
+          <div class="dash-grid">
+            <div class="card">
+              <div class="ctitle">Session outcomes</div>
+              <div id="chart-session-outcomes"><div class="chart-skeleton"></div></div>
+              <div id="insight-session-outcomes" class="chart-insight" style="display:none"></div>
+            </div>
+            <div class="card">
+              <div class="ctitle">Cancellation &amp; not-delivered reasons</div>
+              <div id="chart-cancellation-reasons"><div class="chart-skeleton"></div></div>
+              <div id="insight-cancellation-reasons" class="chart-insight" style="display:none"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════ C. CURRICULUM ══════════ -->
+        <div class="dash-section">
+          <div class="dash-sec-hdr">C — Curriculum Progress</div>
+          <div class="dash-sec-sub">Sessions recorded per curriculum phase — delivered, planned and not delivered.</div>
           <div class="card">
-            <div class="ctitle">Progress by Phase</div>
-            <div id="phase-prog"></div>
+            <div class="ctitle">Progress by phase</div>
+            <div class="ssub" id="exp-curriculum-progress" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+            <div id="chart-curriculum-progress"><div class="chart-skeleton" style="height:160px"></div></div>
+            <div id="insight-curriculum-progress" class="chart-insight" style="display:none"></div>
+          </div>
+          <div class="dash-grid">
+            <div class="card">
+              <div class="ctitle">Curriculum backlog — past sessions not delivered</div>
+              <div id="chart-curriculum-backlog"><div class="chart-skeleton"></div></div>
+              <div id="insight-curriculum-backlog" class="chart-insight" style="display:none"></div>
+            </div>
+            <div class="card">
+              <div class="ctitle">Facilitator workload — sessions per facilitator</div>
+              <div id="chart-facilitator-workload"><div class="chart-skeleton"></div></div>
+              <div id="insight-facilitator-workload" class="chart-insight" style="display:none"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══════════ D. STRATEGIC ══════════ -->
+        <div class="dash-section" id="dash-strategic-section" style="display:none">
+          <div class="dash-sec-hdr">D — Staffing Resilience &amp; Long-Term Trends</div>
+          <div class="dash-sec-sub">Capability risks, facilitator dependency and delivery trend across terms.</div>
+          <div class="dash-grid">
+            <div class="card">
+              <div class="ctitle">Capability dependency — who carries the most sessions?</div>
+              <div id="chart-capability-dependency"><div class="chart-skeleton"></div></div>
+              <div id="insight-capability-dependency" class="chart-insight" style="display:none"></div>
+            </div>
+            <div class="card">
+              <div class="ctitle">Subject area resilience — qualified facilitators per area</div>
+              <div id="chart-subject-area-resilience"><div class="chart-skeleton"></div></div>
+              <div id="insight-subject-area-resilience" class="chart-insight" style="display:none"></div>
+            </div>
           </div>
           <div class="card">
-            <div class="ctitle">Upcoming — Parade Nights &amp; Activities</div>
-            <div id="upcoming"></div>
+            <div class="ctitle">Long-term delivery trend by term</div>
+            <div id="chart-long-term-trend"><div class="chart-skeleton"></div></div>
           </div>
         </div>
 
-        <!-- Graph row: Session Outcomes + Facilitator Workload -->
-        <div class="dash-grid" style="margin-top:0">
+        <!-- ══════════ WING COMPARISON ══════════ -->
+        <div class="dash-section" id="dash-wing-section" style="display:none">
+          <div class="dash-sec-hdr">Wing — Squadron Comparison</div>
+          <div class="dash-sec-sub">How squadrons compare across the Wing for the selected period.</div>
           <div class="card">
-            <div class="ctitle">Session Outcomes</div>
-            <div id="dash-outcomes" style="min-height:80px"></div>
+            <div class="ctitle">Squadron delivery readiness — ranked</div>
+            <div id="chart-squadron-readiness"><div class="chart-skeleton"></div></div>
+            <div id="insight-squadron-readiness" class="chart-insight" style="display:none"></div>
           </div>
-          <div class="card">
-            <div class="ctitle">Facilitator Workload</div>
-            <div id="dash-workload" style="min-height:80px"></div>
+          <div class="dash-grid">
+            <div class="card">
+              <div class="ctitle">Squadron session outcomes comparison</div>
+              <div id="chart-squadron-delivery"><div class="chart-skeleton"></div></div>
+            </div>
+            <div class="card">
+              <div class="ctitle">Wing subject-area facilitator coverage</div>
+              <div id="chart-wing-subject-gaps"><div class="chart-skeleton"></div></div>
+              <div id="insight-wing-subject-gaps" class="chart-insight" style="display:none"></div>
+            </div>
           </div>
         </div>
 
-        <!-- Upcoming Parade Night Readiness -->
-        <div class="card">
-          <div class="ctitle">Upcoming Parade Night Readiness</div>
-          <div id="dash-readiness" style="min-height:60px"></div>
+        <!-- ══════════ NATIONAL COMPARISON ══════════ -->
+        <div class="dash-section" id="dash-national-section" style="display:none">
+          <div class="dash-sec-hdr">National — Wing Comparison</div>
+          <div class="dash-sec-sub">How Wings compare across the national system.</div>
+          <div class="dash-grid">
+            <div class="card">
+              <div class="ctitle">Wing delivery readiness — ranked</div>
+              <div id="chart-wing-readiness"><div class="chart-skeleton"></div></div>
+              <div id="insight-wing-readiness" class="chart-insight" style="display:none"></div>
+            </div>
+            <div class="card">
+              <div class="ctitle">Wing session outcomes comparison</div>
+              <div id="chart-wing-delivery"><div class="chart-skeleton"></div></div>
+            </div>
+          </div>
         </div>
 
-        <div class="card no-print">
-          <div class="ctitle">Resource Availability — Tonight</div>
-          <div class="ssub" style="margin-bottom:10px;color:var(--muted);" id="res-tonight-date">—</div>
-          <div class="res-grid" id="res-tonight"></div>
-        </div>
-
-        <div class="card no-print">
-          <div class="ctitle">Available Facilitators — Tonight</div>
-          <div class="ssub" style="margin-bottom:10px;color:var(--muted);" id="fac-tonight-date">—</div>
-          <div id="fac-tonight-stats" class="stats-grid" style="margin-bottom:12px"></div>
-          <div id="fac-tonight"></div>
-        </div>
-
-        <div class="card">
-          <div class="ctitle">Facilitator Summary</div>
-          <div class="tw"><table>
-            <thead><tr><th>Facilitator</th><th>Del</th><th>Planned</th><th>Not Del</th><th>Cancelled</th><th>Total</th></tr></thead>
-            <tbody id="dash-fac-summary"></tbody>
-          </table></div>
-        </div>
-
+        <!-- Quick Actions -->
         <div class="card no-print">
           <div class="ctitle">Quick Actions</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-dk" onclick="openModal('m-add-pn')">+ Parade Night</button>
             <button class="btn btn-sky" onclick="nav('calendar')">Calendar</button>
             <button class="btn btn-out" onclick="nav('action-items')">Needs Attention</button>
             <button class="btn btn-out" onclick="nav('weekly-program')">Weekly Program</button>
-            <button class="btn btn-out admin-el" style="display:none" onclick="openAddCurr()">+ Add Curriculum Item</button>
+            <button class="btn btn-out admin-el" style="display:none" onclick="openAddCurr()">+ Add Curriculum</button>
+            <button class="btn btn-out" id="btn-load-strategic" onclick="_loadDashStrategic()" title="Load resilience and long-term charts">Load Resilience Charts ↓</button>
           </div>
         </div>
       </div>
@@ -4171,196 +4280,323 @@ function drillFacDel(facKey){
 }
 
 // ═══════════════════════════════════════════════════════════
-//  DASHBOARD
+//  DASHBOARD CHART HELPERS
 // ═══════════════════════════════════════════════════════════
+function _dEmptyChart(msg){return `<div class="empty" style="padding:16px 12px"><div class="es">${esc(msg)}</div></div>`;}
+
+function _dSetInsight(id,text){const el=document.getElementById(id);if(!el)return;if(text){el.textContent=text;el.style.display='';}else el.style.display='none';}
+
+function _dSetExp(id,text){const el=document.getElementById(id);if(el&&text)el.textContent=text;}
+
+// Horizontal bar chart — handles multiple value-key conventions from the API
+function _chartHBar(chart){
+  const rows=chart.data||[];
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
+  const r0=rows[0];
+  const valKey=r0.readiness_pct!==undefined?'readiness_pct':r0.delivered!==undefined?'delivered':r0.count!==undefined?'count':r0.value!==undefined?'value':'count';
+  const maxV=Math.max(...rows.map(r=>+(r[valKey])||0),1);
+  const colorFor=r=>{
+    if(r.color)return r.color;
+    if(r.readiness_pct!==undefined){const p=r.readiness_pct;return p>=80?'var(--ok)':p>=60?'var(--warn)':'var(--red)';}
+    if(r.risk==='ok')return 'var(--ok)';if(r.risk==='warn')return 'var(--warn)';if(r.risk==='critical')return 'var(--red)';
+    return 'var(--royal)';
+  };
+  const lblFor=r=>{
+    if(r.readiness_pct!==undefined)return r.readiness_pct+'%';
+    if(r.delivered!==undefined&&r.total!==undefined)return r.delivered+' / '+r.total;
+    return String(r[valKey]!==undefined?r[valKey]:'');
+  };
+  return rows.map(r=>{
+    const v=+(r[valKey])||0;const w=Math.round(v/maxV*100);const lbl=String(r.label||r.name||'—').substring(0,32);
+    const drill=chart.drill_down&&r.drill_id?`onclick="drillDashChart('${esc(chart.chart_id)}','${esc(r.drill_id)}')" style="cursor:pointer"`:'';
+    return `<div class="ph-row" style="margin-bottom:5px" role="img" aria-label="${esc(lbl)}: ${lblFor(r)}" ${drill}>
+      <div class="ph-name" style="min-width:110px;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.label||r.name||'')}">${esc(lbl)}</div>
+      <div class="ph-bar" style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${colorFor(r)};border-radius:3px;transition:width .3s" title="${lblFor(r)}"></div></div></div>
+      <div class="ph-cnt" style="min-width:52px;text-align:right;font-size:11px;color:var(--muted)">${lblFor(r)}</div>
+    </div>`;
+  }).join('');
+}
+
+// Stacked vertical bar — chart.data rows have per-series keys; chart.series=[{key,label,color}]
+function _chartStackedBar(chart){
+  const rows=chart.data||[];const series=chart.series||[];
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
+  const totals=rows.map(r=>series.reduce((s,se)=>s+(+(r[se.key])||0),0));
+  const maxV=Math.max(...totals,1);const BAR_H=80;
+  let html=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">`+
+    series.map(s=>`<span style="display:flex;align-items:center;gap:4px;font-size:10px"><span style="display:inline-block;width:10px;height:10px;background:${s.color||'var(--royal)'};border-radius:2px"></span>${esc(s.label)}</span>`).join('')+`</div>`;
+  html+=`<div style="overflow-x:auto"><div style="display:flex;align-items:flex-end;gap:3px;min-width:${Math.max(rows.length*44,280)}px;height:${BAR_H+28}px">`;
+  rows.forEach((row,ri)=>{
+    const total=totals[ri];const hPx=Math.round(total/maxV*BAR_H);
+    html+=`<div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:32px">
+      <div style="width:100%;max-width:36px;height:${hPx}px;display:flex;flex-direction:column-reverse;border-radius:3px 3px 0 0;overflow:hidden">
+        ${series.map(se=>{const v=+(row[se.key])||0;return v?`<div style="flex:${v};width:100%;background:${se.color||'var(--royal)'}" title="${esc(se.label)}: ${v}"></div>`:''}).join('')}
+      </div>
+      <div style="font-size:8px;color:var(--muted);margin-top:3px;text-align:center;writing-mode:vertical-rl;transform:rotate(180deg);height:22px;overflow:hidden;white-space:nowrap" title="${esc(row.label||'')}">${esc((row.label||'').substring(0,8))}</div>
+    </div>`;
+  });
+  html+=`</div></div>`;return html;
+}
+
+// Stacked horizontal bar — for curriculum progress by phase
+function _chartStackedBarH(chart){
+  const rows=chart.data||[];
+  const series=chart.series||[{key:'delivered',label:'Delivered',color:'#2e7d32'},{key:'planned',label:'Planned',color:'#51b0e3'},{key:'not_delivered',label:'Not Delivered',color:'#78909c'},{key:'cancelled',label:'Cancelled',color:'#e51937'}];
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No curriculum data');
+  const maxV=Math.max(...rows.map(r=>series.reduce((a,s)=>a+(+(r[s.key])||0),0)),1);
+  let html=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">`+
+    series.map(s=>`<span style="display:flex;align-items:center;gap:4px;font-size:10px"><span style="display:inline-block;width:10px;height:10px;background:${s.color};border-radius:2px"></span>${esc(s.label)}</span>`).join('')+`</div>`;
+  rows.forEach(row=>{
+    const total=series.reduce((a,s)=>a+(+(row[s.key])||0),0);
+    const name=row.phase?(PH_S[row.phase]||row.phase):(row.label||'—');
+    const pctDel=total?Math.round((+(row.delivered)||0)/total*100):0;
+    html+=`<div class="ph-row" style="margin-bottom:6px" role="img" aria-label="${esc(name)}: ${pctDel}% delivered">
+      <div class="ph-name" style="min-width:84px;font-size:10.5px">${esc(name.substring(0,14))}</div>
+      <div class="ph-bar" style="flex:1">
+        <div style="display:flex;height:14px;border-radius:3px;overflow:hidden;background:var(--bg)">
+          ${series.map(s=>{const v=+(row[s.key])||0;return v?`<div style="flex:${v};background:${s.color};height:100%" title="${esc(s.label)}: ${v}"></div>`:''}).join('')}
+          ${total<maxV?`<div style="flex:${maxV-total};height:100%"></div>`:''}
+        </div>
+      </div>
+      <div class="ph-cnt" style="min-width:44px;text-align:right;font-size:10.5px;color:var(--muted)">${total||0}</div>
+    </div>`;
+  });
+  return html;
+}
+
+// SVG line chart — chart.data=[{label,reliability_pct}], chart.thresholds={green,amber}
+function _chartLine(chart){
+  const rows=chart.data||[];if(!rows.length)return _dEmptyChart(chart.empty_state||'No trend data');
+  const W=560,H=120,PT=10,PR=8,PB=32,PL=28;const IW=W-PL-PR;const IH=H-PT-PB;
+  const th=chart.thresholds||{};const tg=th.green||80;const ta=th.amber||60;
+  const vals=rows.map(r=>r.reliability_pct!=null?+r.reliability_pct:null);
+  const defined=vals.filter(v=>v!==null);
+  const minV=defined.length?Math.max(0,Math.min(...defined)-10):0;
+  const xOf=i=>PL+(i/Math.max(rows.length-1,1))*IW;
+  const yOf=v=>PT+(1-(v-minV)/(100-minV))*IH;
+  const pts=rows.map((r,i)=>({x:xOf(i),y:vals[i]!=null?yOf(vals[i]):null}));
+  let path='';pts.forEach((p,i)=>{if(p.y==null)return;const prev=pts[i-1];path+=(path===''||!prev||prev.y==null?`M${p.x.toFixed(1)},${p.y.toFixed(1)}`:`L${p.x.toFixed(1)},${p.y.toFixed(1)}`);});
+  const yg=yOf(tg).toFixed(1);const ya=yOf(ta).toFixed(1);
+  const step=Math.ceil(rows.length/8);
+  return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:${H}px;font-family:inherit" role="img" aria-label="Delivery trend chart">
+    <title>Delivery Reliability</title>
+    <rect x="${PL}" y="${PT}" width="${IW}" height="${(+yg-PT).toFixed(1)}" fill="#e8f5e9" opacity=".4"/>
+    <rect x="${PL}" y="${yg}" width="${IW}" height="${(+ya-+yg).toFixed(1)}" fill="#fff8e1" opacity=".4"/>
+    <rect x="${PL}" y="${ya}" width="${IW}" height="${(PT+IH-+ya).toFixed(1)}" fill="#fce4e4" opacity=".4"/>
+    <line x1="${PL}" y1="${yg}" x2="${PL+IW}" y2="${yg}" stroke="#2e7d32" stroke-width="1" stroke-dasharray="3,3" opacity=".7"/>
+    <line x1="${PL}" y1="${ya}" x2="${PL+IW}" y2="${ya}" stroke="#f57f17" stroke-width="1" stroke-dasharray="3,3" opacity=".7"/>
+    <text x="${PL+IW-2}" y="${+yg-2}" font-size="7" fill="#2e7d32" text-anchor="end">${tg}%</text>
+    <text x="${PL+IW-2}" y="${+ya-2}" font-size="7" fill="#f57f17" text-anchor="end">${ta}%</text>
+    ${[0,20,40,60,80,100].filter(v=>v>=minV).map(v=>`<text x="${PL-3}" y="${(yOf(v)+3).toFixed(1)}" font-size="7" fill="#6b7a87" text-anchor="end">${v}</text><line x1="${PL-2}" y1="${yOf(v).toFixed(1)}" x2="${PL+IW}" y2="${yOf(v).toFixed(1)}" stroke="#d1dce8" stroke-width=".5"/>`).join('')}
+    ${path?`<path d="${path}" fill="none" stroke="var(--royal)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`:''}
+    ${pts.map((p,i)=>p.y!=null?`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="${vals[i]>=tg?'#2e7d32':vals[i]>=ta?'#f57f17':'#e51937'}" stroke="white" stroke-width="1.5"><title>${esc(rows[i].label||'')}: ${vals[i]}%</title></circle>`:'').join('')}
+    ${rows.filter((_,i)=>i%step===0||i===rows.length-1).map(r=>{const i=rows.indexOf(r);return `<text x="${xOf(i).toFixed(1)}" y="${H-4}" font-size="7" fill="#6b7a87" text-anchor="middle">${esc(r.label||'')}</text>`;}).join('')}
+    <line x1="${PL}" y1="${PT}" x2="${PL}" y2="${PT+IH}" stroke="#d1dce8"/>
+    <line x1="${PL}" y1="${PT+IH}" x2="${PL+IW}" y2="${PT+IH}" stroke="#d1dce8"/>
+  </svg></div>`;
+}
+
+// Donut chart — chart.data=[{status,label,count,color}]
+function _chartDonut(chart){
+  const rows=chart.data||[];if(!rows.length)return _dEmptyChart(chart.empty_state||'No session data');
+  const total=rows.reduce((s,r)=>s+(+(r.count)||0),0);
+  if(!total)return _dEmptyChart(chart.empty_state||'No sessions recorded');
+  const R=32;const circ=2*Math.PI*R;
+  const ST_COL={delivered:'#2e7d32',delivered_with_issue:'#558b2f',not_delivered:'#78909c',cancelled:'#e51937',rescheduled:'#f57f17',planned:'#51b0e3'};
+  const clr=r=>r.color||ST_COL[r.status]||'var(--muted)';
+  let offset=0;
+  const arcs=rows.filter(r=>+(r.count)>0).map(r=>{const cnt=+(r.count);const dash=cnt/total*circ;const arc={offset,dash,gap:circ-dash,...r};offset+=dash;return arc;});
+  const conicArgs=arcs.map(a=>`${clr(a)} ${(a.offset/circ*100).toFixed(1)}% ${((a.offset+a.dash)/circ*100).toFixed(1)}%`).join(',');
+  const legend=rows.filter(r=>+(r.count)>0).map(r=>{const pct=Math.round(+(r.count)/total*100);return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="display:inline-block;width:10px;height:10px;background:${clr(r)};border-radius:50%;flex-shrink:0"></span><span style="font-size:11px;color:var(--text)">${esc(r.label||r.status||'—')}</span><span style="font-size:11px;color:var(--muted);margin-left:auto">${r.count} <span style="font-size:9px">(${pct}%)</span></span></div>`;}).join('');
+  return `<div class="readiness-donut">
+    <div class="rdp-ring" style="background:conic-gradient(${conicArgs})" role="img" aria-label="Session outcomes">
+      <div class="rdp-inner" style="width:60px;height:60px;font-size:14px;color:var(--dark)">${total}</div>
+    </div>
+    <div style="flex:1">${legend}</div>
+  </div>`;
+}
+
+// Tonight readiness card — chart_type=readiness_card
+function _renderTonightReadiness(chart){
+  const d=chart.data||{};
+  if(!d.date)return `<div class="card">${_dEmptyChart(chart.empty_state||'No parade night scheduled tonight or this week')}</div>`;
+  const pct=d.readiness_pct||0;const rdC=pct>=80?'var(--ok)':pct>=60?'var(--warn)':'var(--red)';
+  const conic=`conic-gradient(${rdC} ${pct}%, var(--border) 0)`;
+  const sessHtml=(d.sessions||[]).map((s,i)=>`<div class="sched-lane">
+    <span style="font-size:10px;color:var(--muted);min-width:48px">Sess ${i+1}</span>
+    <span style="font-size:11.5px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.curriculum_item||s.exp||'Unassigned')}</span>
+    <span style="font-size:10.5px;color:${s.facilitator?'var(--muted)':'var(--red)'}">${esc(s.facilitator||'Unstaffed')}</span>
+  </div>`).join('');
+  return `<div class="card">
+    <div class="ctitle">Tonight — <span style="font-weight:400">${fmtD(d.date,{weekday:'long',day:'numeric',month:'long'})}</span></div>
+    <div class="readiness-donut" style="align-items:flex-start">
+      <div>
+        <div class="rdp-ring" style="background:${conic};width:72px;height:72px">
+          <div class="rdp-inner" style="width:52px;height:52px;font-size:15px;color:${rdC}">${pct}%</div>
+        </div>
+        ${d.unstaffed>0?`<div style="font-size:10.5px;color:var(--red);font-weight:700;margin-top:4px;text-align:center">⚠ ${d.unstaffed} unstaffed</div>`:''}
+      </div>
+      <div style="flex:1">
+        <div style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Session Plan</div>
+        ${sessHtml||'<div style="font-size:11px;color:var(--muted)">No sessions scheduled</div>'}
+        ${d.insight?`<div class="chart-insight" style="margin-top:10px">${esc(d.insight)}</div>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+
+// Upcoming readiness grid — chart_type=readiness_grid
+function _renderUpcomingReadiness(chart){
+  const rows=(chart.data||[]).slice(0,8);if(!rows.length)return '';
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;margin-top:12px">`+
+    rows.map(r=>{const pct=r.readiness_pct||0;const col=pct>=80?'var(--ok)':pct>=60?'var(--warn)':'var(--red)';
+      return `<div style="border:1.5px solid var(--border);border-radius:8px;padding:10px" role="img" aria-label="${r.date}: ${pct}% ready">
+        <div style="font-size:10.5px;font-weight:800;color:var(--dark)">${fmtD(r.date,{weekday:'short',day:'numeric',month:'short'})}</div>
+        <div class="pbar" style="margin:5px 0"><div style="height:100%;width:${pct}%;background:${col};border-radius:3px"></div></div>
+        <div style="font-size:10.5px;color:${col};font-weight:700">${pct}% ready</div>
+        ${r.unstaffed?`<div style="font-size:10px;color:var(--warn);font-weight:700">⚠ ${r.unstaffed} unstaffed</div>`:''}
+        <div style="font-size:9.5px;color:var(--muted)">${r.sessions_total||0} sessions</div>
+      </div>`;
+    }).join('')+`</div>`;
+}
+
+// Heatmap — chart.data=[{label,cells:[{label,count,risk}]}]
+function _renderHeatmap(chart){
+  const rows=chart.data||[];if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
+  const subjects=(rows[0]?.cells||[]).map(c=>c.label);
+  return `<div style="overflow-x:auto"><table style="font-size:10px;border-collapse:separate;border-spacing:3px">
+    <thead><tr><th></th>${subjects.map(s=>`<th style="font-size:9px;color:var(--muted);padding:2px 4px;white-space:nowrap;writing-mode:vertical-rl;transform:rotate(180deg);height:56px;text-align:left">${esc(s)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(row=>`<tr><td style="font-size:10.5px;font-weight:700;padding:3px 8px;white-space:nowrap">${esc(row.label)}</td>
+      ${(row.cells||[]).map(c=>{const cls=c.risk==='ok'?'hm-ok':c.risk==='warn'?'hm-warn':c.risk==='critical'?'hm-critical':'hm-empty';
+        return `<td class="heatmap-cell ${cls}" style="width:34px;height:24px" title="${esc(row.label)} — ${esc(c.label)}: ${c.count} facilitator${c.count!==1?'s':''}">${c.count||0}</td>`;}).join('')}
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+// Grouped bar — chart.data=[{label,<series_key>:n}], chart.series=[{key,label,color}]
+function _chartGroupedBar(chart){
+  const rows=chart.data||[];const series=chart.series||[];
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
+  const maxV=Math.max(...rows.flatMap(r=>series.map(s=>+(r[s.key])||0)),1);
+  const BAR_H=60;const gW=series.length*14+8;const totW=Math.max(rows.length*(gW+8),280);
+  let html=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">`+
+    series.map(s=>`<span style="display:flex;align-items:center;gap:4px;font-size:10px"><span style="display:inline-block;width:10px;height:10px;background:${s.color||'var(--royal)'};border-radius:2px"></span>${esc(s.label)}</span>`).join('')+`</div>`;
+  html+=`<div style="overflow-x:auto"><div style="display:flex;align-items:flex-end;gap:8px;min-width:${totW}px;height:${BAR_H+28}px">`;
+  rows.forEach(row=>{
+    html+=`<div style="display:flex;flex-direction:column;align-items:center;flex:1">
+      <div style="display:flex;align-items:flex-end;gap:2px;height:${BAR_H}px">
+        ${series.map(s=>{const v=+(row[s.key])||0;const h=Math.round(v/maxV*BAR_H);return `<div style="width:12px;height:${h}px;background:${s.color||'var(--royal)'};border-radius:2px 2px 0 0" title="${esc(s.label)}: ${v}"></div>`;}).join('')}
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:3px;text-align:center;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(row.label||'')}</div>
+    </div>`;
+  });
+  html+=`</div></div>`;return html;
+}
+
+// Internal: render a chart into a container div
+function _dRenderChart(containerId,chart,renderFn,insightId){
+  const el=document.getElementById(containerId);if(!el||!chart)return;
+  el.innerHTML=renderFn(chart);
+  if(insightId&&chart.insight)_dSetInsight(insightId,chart.insight);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DASHBOARD — API-DRIVEN CHART LOADER
+// ═══════════════════════════════════════════════════════════
+async function loadDashCharts(){
+  const win=document.getElementById('dash-window')?.value||'term';
+  const sqn=document.getElementById('dash-sqn-filter')?.value||'';
+  const params=new URLSearchParams({window:win});if(sqn)params.set('squadron_id',sqn);
+
+  // Skeletons while loading
+  ['chart-weekly-outcomes','chart-delivery-trend','chart-session-outcomes','chart-cancellation-reasons','chart-curriculum-progress','chart-curriculum-backlog','chart-facilitator-workload'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="chart-skeleton"></div>';});
+
+  let data;
+  try{data=await api('GET','/api/dashboard/charts?'+params);}
+  catch(e){
+    ['chart-weekly-outcomes','chart-curriculum-progress'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=_dEmptyChart('Could not load chart data. Try refreshing.');});
+    return;
+  }
+  const charts=data.charts||{};const scope=data.scope||'squadron';
+
+  // Scope label
+  const scopeEl=document.getElementById('dash-scope-label');
+  if(scopeEl)scopeEl.textContent={squadron:'Squadron view',wing:'Wing view',national:'National view'}[scope]||'';
+
+  // Section visibility
+  const wingEl=document.getElementById('dash-wing-section');const natEl=document.getElementById('dash-national-section');
+  if(wingEl)wingEl.style.display=scope==='wing'?'':'none';
+  if(natEl)natEl.style.display=scope==='national'?'':'none';
+
+  // A. Tonight & upcoming readiness (squadron only)
+  if(scope==='squadron'){
+    const tonightSec=document.getElementById('dash-tonight-section');
+    if(tonightSec&&charts.tonight)tonightSec.innerHTML=_renderTonightReadiness(charts.tonight);
+    else if(tonightSec)tonightSec.innerHTML='';
+    const upcomingSec=document.getElementById('dash-upcoming-readiness-section');
+    if(upcomingSec&&charts.upcoming_readiness){
+      const ur=charts.upcoming_readiness;
+      upcomingSec.innerHTML=(ur.data&&ur.data.length)?`<div class="dash-sec-sub" style="margin-top:4px">Next ${ur.data.length} parade nights</div>`+_renderUpcomingReadiness(ur):'';
+      if(ur.insight)upcomingSec.innerHTML+=`<div class="chart-insight" style="margin-top:8px">${esc(ur.insight)}</div>`;
+    }else if(upcomingSec)upcomingSec.innerHTML='';
+  }
+
+  // B. Delivery charts
+  _dRenderChart('chart-weekly-outcomes',charts.weekly_outcomes,_chartStackedBar,'insight-weekly-outcomes');
+  _dSetExp('exp-weekly-outcomes',charts.weekly_outcomes?.explanation);
+  _dRenderChart('chart-delivery-trend',charts.delivery_trend,_chartLine,'insight-delivery-trend');
+  _dSetExp('exp-delivery-trend',charts.delivery_trend?.explanation);
+  _dRenderChart('chart-session-outcomes',charts.session_outcomes,_chartDonut,'insight-session-outcomes');
+  _dRenderChart('chart-cancellation-reasons',charts.cancellation_reasons,_chartHBar,'insight-cancellation-reasons');
+
+  // C. Curriculum
+  _dRenderChart('chart-curriculum-progress',charts.curriculum_progress,_chartStackedBarH,'insight-curriculum-progress');
+  _dSetExp('exp-curriculum-progress',charts.curriculum_progress?.explanation);
+  _dRenderChart('chart-curriculum-backlog',charts.curriculum_backlog,_chartHBar,'insight-curriculum-backlog');
+  _dRenderChart('chart-facilitator-workload',charts.facilitator_workload,_chartHBar,'insight-facilitator-workload');
+
+  // Wing charts
+  if(scope==='wing'){
+    _dRenderChart('chart-squadron-readiness',charts.squadron_readiness,_chartHBar,'insight-squadron-readiness');
+    _dRenderChart('chart-squadron-delivery',charts.squadron_delivery_comparison,_chartGroupedBar);
+    _dRenderChart('chart-wing-subject-gaps',charts.wing_subject_area_gaps,_renderHeatmap,'insight-wing-subject-gaps');
+  }
+
+  // National charts
+  if(scope==='national'){
+    _dRenderChart('chart-wing-readiness',charts.wing_readiness,_chartHBar,'insight-wing-readiness');
+    _dRenderChart('chart-wing-delivery',charts.wing_delivery_comparison,_chartGroupedBar);
+  }
+}
+
+async function _loadDashStrategic(){
+  const btn=document.getElementById('btn-load-strategic');
+  if(btn){btn.textContent='Loading…';btn.disabled=true;}
+  const win=document.getElementById('dash-window')?.value||'term';
+  let data;
+  try{data=await api('GET','/api/dashboard/charts/strategic?window='+win);}
+  catch(e){if(btn){btn.textContent='Load Resilience Charts ↓';btn.disabled=false;}return;}
+  const charts=data.charts||{};
+  const sec=document.getElementById('dash-strategic-section');if(sec)sec.style.display='';
+  _dRenderChart('chart-capability-dependency',charts.capability_dependency,_chartHBar,'insight-capability-dependency');
+  _dRenderChart('chart-subject-area-resilience',charts.subject_area_resilience,_chartHBar,'insight-subject-area-resilience');
+  _dRenderChart('chart-long-term-trend',charts.long_term_delivery_trend,_chartLine);
+  if(btn)btn.style.display='none';
+}
+
+function drillDashChart(chartId,drillId){
+  // Drill to sessions filtered by the chart's drill context (phase, status, week)
+  const sess=allSess().filter(s=>{
+    if(chartId==='curriculum_progress'||chartId==='curriculum_backlog')return s.phase===drillId;
+    if(chartId==='cancellation_reasons')return s.cancel_reason===drillId;
+    return s.status===drillId;
+  });
+  showDrill('dash-drill','dash-drill-title','dash-drill-body',drillId,sess);
+}
+
 function renderDash(){
   const info=getCurrentUnitInfo();
   document.getElementById('dash-title').textContent=info.name+' — Training Dashboard';
-  const sess=allSess();
-  const cnt=(st)=>sess.filter(s=>s.status===st).length;
-  document.getElementById('s-pn').textContent=S.pns.length;
-  document.getElementById('s-del').textContent=cnt('delivered');
-  document.getElementById('s-pln').textContent=cnt('planned');
-  document.getElementById('s-nd').textContent=cnt('not_delivered');
-  document.getElementById('s-can').textContent=cnt('cancelled');
-  const resEl=document.getElementById('s-res');if(resEl)resEl.textContent=cnt('rescheduled');
-  document.getElementById('s-curr').textContent=allCurr().length;
-
-  // Phase progress
-  const phO=['A. Orientation','B. Initial','C. Junior','D. Intermediate','E. Senior','I. Bronze','J. Silver','K. Gold'];
-  const phC={};phO.forEach(p=>phC[p]={t:0,d:0});
-  sess.forEach(s=>{if(phC[s.phase]){phC[s.phase].t++;if(s.status==='delivered')phC[s.phase].d++;}});
-  document.getElementById('phase-prog').innerHTML=phO.map(ph=>{
-    const c=phC[ph];
-    const pct=c.t?Math.round(c.d/c.t*100):0;
-    const fc=pct>=80?'ok':pct>=40?'amber':'';
-    return `<div class="ph-row">
-      <div class="ph-name">${PH_S[ph]||ph}</div>
-      <div class="ph-bar"><div class="pbar"><div class="pfill ${fc}" style="width:${pct}%"></div></div></div>
-      <div class="ph-cnt"><button class="btn-lnk" onclick="drillPhaseDash('${ph}')" style="font-size:10px">${c.d}/${c.t}</button></div>
-    </div>`;
-  }).join('');
-
-  // Upcoming combined
-  const td=today();
-  const upPN=S.pns.filter(p=>new Date(p.date+'T00:00:00')>=td).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,4);
-  const upAct=S.acts.filter(a=>new Date(a.date+'T00:00:00')>=td).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
-  const combined=[
-    ...upPN.map(p=>({type:'pn',date:p.date,label:fmtD(p.date,{weekday:'short',day:'numeric',month:'short'}),sub:`${p.term} · ${(p.sessions||[]).length} sessions${p.notes?' · '+p.notes:''}`,onclick:`showPNDetail('${p.date}')`})),
-    ...upAct.map(a=>({type:'act',date:a.date,label:a.name.substring(0,35),sub:fmtD(a.date,{day:'numeric',month:'short',year:'numeric'}),badge:`<span class="badge ${a.type==='Must Attend'?'b-red':a.type==='Key Event'?'b-blue':'b-grey'}" style="font-size:8.5px">${a.type}</span>`}))
-  ].sort((a,b)=>a.date.localeCompare(b.date)).slice(0,7);
-  document.getElementById('upcoming').innerHTML=combined.length?combined.map(it=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);cursor:${it.onclick?'pointer':'default'}" ${it.onclick?`onclick="${it.onclick}"`:''}> 
-      <div>
-        <div style="font-size:12px;font-weight:800;color:var(--dark)">${it.type==='pn'?'':''} ${it.label}</div>
-        <div style="font-size:10px;color:var(--muted)">${it.sub||''}</div>
-      </div>
-      ${it.badge||''}
-    </div>`).join(''):`<div class="empty" style="padding:14px"><div class="es">No upcoming events.</div></div>`;
-
-  // Resource availability tonight
-  const nextPN=S.pns.filter(p=>new Date(p.date+'T00:00:00')>=td).sort((a,b)=>a.date.localeCompare(b.date))[0];
-  if(nextPN){
-    document.getElementById('res-tonight-date').textContent='Next parade night: '+fmtD(nextPN.date,{weekday:'long',day:'numeric',month:'long'});
-    const usedRooms=new Set((nextPN.sessions||[]).map(s=>s.room));
-    document.getElementById('res-tonight').innerHTML=S.rooms.slice(0,8).map(r=>{
-      const busy=usedRooms.has(r.name);
-      return `<div class="res-chip ${busy?'busy':'ok'}">
-        <div class="rc-name">${r.name}</div>
-        <div class="rc-status">${busy?'In use':'Available'} · Cap: ${r.capacity}</div>
-      </div>`;
-    }).join('');
-  } else {
-    document.getElementById('res-tonight-date').textContent='No upcoming parade nights scheduled.';
-    document.getElementById('res-tonight').innerHTML='';
-  }
-
-  // ── Available Facilitators Tonight ──
-  const ftDate=document.getElementById('fac-tonight-date'), ftStats=document.getElementById('fac-tonight-stats'), ftList=document.getElementById('fac-tonight');
-  if(ftDate&&ftList){
-    const np=S.pns.filter(p=>new Date(p.date+'T00:00:00')>=td).sort((a,b)=>a.date.localeCompare(b.date))[0];
-    if(!np){ ftDate.textContent='No upcoming parade night.'; ftStats.innerHTML=''; ftList.innerHTML=''; }
-    else{
-      ftDate.textContent='For '+fmtD(np.date,{weekday:'long',day:'numeric',month:'long'});
-      const sessions=np.sessions||[];
-      const load={}; sessions.forEach(s=>{ if(s.facId)load[s.facId]=(load[s.facId]||0)+1; });
-      const scheduledIds=new Set(Object.keys(load));
-      const scheduled=S.facs.filter(f=>scheduledIds.has(f.id));
-      const available=S.facs.filter(f=>!scheduledIds.has(f.id));
-      const unfilled=sessions.filter(s=>!s.facId).length;
-      const overloaded=scheduled.filter(f=>load[f.id]>=2);
-      ftStats.innerHTML=`
-        <div class="stat"><div class="sval">${scheduled.length}</div><div class="slbl">Scheduled</div></div>
-        <div class="stat s-ok"><div class="sval">${available.length}</div><div class="slbl">Available</div></div>
-        <div class="stat ${unfilled?'s-warn':''}"><div class="sval">${unfilled}</div><div class="slbl">Unfilled Roles</div></div>
-        <div class="stat ${overloaded.length?'s-red':''}"><div class="sval">${overloaded.length}</div><div class="slbl">Overloaded</div></div>`;
-      const chip=f=>{ const areas=(f.areas||[]).map(a=>{const sj=SUBJECTS.find(s=>s.els.some(e=>String(a).toLowerCase().includes(e.toLowerCase().split('_')[0])));return sj?`<span class="badge ${sj.cls}" style="font-size:8px">${sj.emoji}</span>`:'';}).join(' ');
-        return `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:4px 10px;margin:3px;font-size:11px;font-weight:700">${f.rank?f.rank+' ':''}${f.last||f.first||'—'} ${areas}</span>`; };
-      let h=`<div style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:4px 0">Available</div>`;
-      h+= available.length?available.map(chip).join(''):'<span style="color:var(--warn);font-weight:700;font-size:12px">⚠️ No facilitators free tonight</span>';
-      if(overloaded.length)h+=`<div style="margin-top:10px;font-size:11px;color:var(--red);font-weight:700">⚠️ Overloaded: ${overloaded.map(f=>(f.last||f.first)+' ('+load[f.id]+')').join(', ')}</div>`;
-      // Subject areas with no available facilitator
-      const availSubjects=new Set(); available.forEach(f=>(f.areas||[]).forEach(a=>{const k=subjectOf(a);if(k)availSubjects.add(k);}));
-      const gaps=SUBJECTS.filter(s=>!availSubjects.has(s.key));
-      if(gaps.length)h+=`<div style="margin-top:8px;font-size:11px;color:var(--warn)">No available cover for: ${gaps.map(g=>g.emoji+' '+g.label).join(', ')}</div>`;
-      ftList.innerHTML=h;
-    }
-  }
-
-  // ── Facilitator Summary (year-to-date) ──
-  const facSumEl=document.getElementById('dash-fac-summary');
-  if(facSumEl){
-    const facMap={};
-    sess.forEach(s=>{
-      const k=s.facId||s.facName||'Unassigned';
-      const n=s.facName||'Unassigned';
-      if(!facMap[k])facMap[k]={name:n,facId:s.facId,delivered:0,planned:0,not_delivered:0,cancelled:0,total:0};
-      facMap[k].total++;
-      if(s.status==='delivered')facMap[k].delivered++;
-      else if(s.status==='planned')facMap[k].planned++;
-      else if(s.status==='not_delivered')facMap[k].not_delivered++;
-      else if(s.status==='cancelled'||s.status==='cancelled_late')facMap[k].cancelled++;
-    });
-    facSumEl.innerHTML=Object.values(facMap).sort((a,b)=>b.total-a.total).map(f=>`<tr>
-      <td style="font-weight:700">${f.facId?`<button class="btn-lnk" onclick="showFacProfile('${f.facId}')">${esc(f.name)}</button>`:esc(f.name)}</td>
-      <td style="color:var(--ok);font-weight:800;text-align:center">${f.delivered}</td>
-      <td style="text-align:center">${f.planned}</td>
-      <td style="color:var(--steel);text-align:center">${f.not_delivered}</td>
-      <td style="color:var(--red);text-align:center">${f.cancelled}</td>
-      <td style="font-weight:800;text-align:center">${f.total}</td>
-    </tr>`).join('')||`<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">No session data yet</td></tr>`;
-  }
-
-  // ── B. Session Outcomes chart ──
-  const outEl=document.getElementById('dash-outcomes');
-  if(outEl){
-    const total=sess.length;
-    if(!total){outEl.innerHTML='<div class="empty" style="padding:12px"><div class="es">No sessions recorded yet.</div></div>';}
-    else{
-      const outcomes=[
-        {label:'Delivered',count:cnt('delivered'),color:'var(--ok)',pattern:''},
-        {label:'Not Delivered',count:cnt('not_delivered'),color:'var(--steel)',pattern:''},
-        {label:'Cancelled',count:cnt('cancelled'),color:'var(--red)',pattern:''},
-        {label:'Rescheduled',count:cnt('rescheduled'),color:'var(--warn)',pattern:''},
-        {label:'Planned',count:cnt('planned'),color:'var(--blue)',pattern:''},
-      ];
-      const maxW=Math.max(...outcomes.map(o=>o.count),1);
-      outEl.innerHTML=outcomes.map(o=>{
-        const pct=Math.round(o.count/total*100);
-        const w=Math.round(o.count/maxW*100);
-        return `<div class="ph-row" style="margin-bottom:5px" role="img" aria-label="${o.label}: ${o.count} (${pct}%)">
-          <div class="ph-name" style="min-width:90px;font-size:11px">${o.label}</div>
-          <div class="ph-bar" style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${o.color};border-radius:3px;transition:width .3s" title="${o.count} session${o.count!==1?'s':''}"></div></div></div>
-          <div class="ph-cnt" style="min-width:48px;text-align:right;font-size:11px;color:var(--muted)">${o.count} <span style="font-size:9px">(${pct}%)</span></div>
-        </div>`;
-      }).join('');
-    }
-  }
-
-  // ── D. Facilitator Workload chart ──
-  const wkEl=document.getElementById('dash-workload');
-  if(wkEl){
-    const wkMap={};
-    sess.forEach(s=>{ if(!s.facId&&!s.facName)return; const k=s.facId||s.facName; const n=s.facName||k; if(!wkMap[k])wkMap[k]={name:n,id:s.facId,count:0}; wkMap[k].count++; });
-    const wkList=Object.values(wkMap).sort((a,b)=>b.count-a.count).slice(0,10);
-    if(!wkList.length){wkEl.innerHTML='<div class="empty" style="padding:12px"><div class="es">No facilitator assignments.</div></div>';}
-    else{
-      const maxC=Math.max(...wkList.map(w=>w.count),1);
-      wkEl.innerHTML=wkList.map(w=>{
-        const pct=Math.round(w.count/maxC*100);
-        const name=w.name.length>20?w.name.substring(0,18)+'…':w.name;
-        return `<div class="ph-row" style="margin-bottom:4px" role="img" aria-label="${w.name}: ${w.count} sessions">
-          <div class="ph-name" style="min-width:90px;font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(w.name)}">${esc(name)}</div>
-          <div class="ph-bar" style="flex:1"><div class="pbar"><div style="height:100%;width:${pct}%;background:var(--royal);border-radius:3px" title="${w.count} sessions"></div></div></div>
-          <div class="ph-cnt" style="min-width:32px;text-align:right;font-size:11px;color:var(--muted)">${w.count}</div>
-        </div>`;
-      }).join('');
-    }
-  }
-
-  // ── C. Upcoming Parade Night Readiness ──
-  const rdEl=document.getElementById('dash-readiness');
-  if(rdEl){
-    const upcoming=S.pns.filter(p=>new Date(p.date+'T00:00:00')>=td).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8);
-    if(!upcoming.length){rdEl.innerHTML='<div class="empty" style="padding:12px"><div class="es">No upcoming parade nights.</div></div>';}
-    else{
-      rdEl.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;padding:4px 0">` +
-        upcoming.map(pn=>{
-          const sessions=pn.sessions||[];
-          const unstaffed=sessions.filter(s=>!s.facId).length;
-          const readinessPct=pn.readiness!=null?Math.round(pn.readiness*100):(sessions.length&&sessions.every(s=>s.status==='delivered')?100:sessions.length?Math.round(sessions.filter(s=>s.status==='delivered').length/sessions.length*100):0);
-          const rdCls=readinessPct>=80?'var(--ok)':readinessPct>=40?'var(--warn)':'var(--red)';
-          return `<div style="border:1.5px solid var(--border);border-radius:8px;padding:10px;position:relative" role="img" aria-label="${pn.date}: ${readinessPct}% ready">
-            <div style="font-size:10.5px;font-weight:800;color:var(--dark)">${fmtD(pn.date,{weekday:'short',day:'numeric',month:'short'})}</div>
-            <div style="font-size:9.5px;color:var(--muted);margin-bottom:6px">${pn.term}</div>
-            <div class="pbar" style="margin-bottom:5px"><div style="height:100%;width:${readinessPct}%;background:${rdCls};border-radius:3px" title="${readinessPct}% ready"></div></div>
-            <div style="font-size:10px;color:${rdCls};font-weight:700">${readinessPct}% ready</div>
-            ${unstaffed?`<div style="font-size:10px;color:var(--warn);font-weight:700" aria-label="${unstaffed} unstaffed">⚠ ${unstaffed} unstaffed</div>`:''}
-            ${sessions.length?`<div style="font-size:9.5px;color:var(--muted)">${sessions.length} session${sessions.length!==1?'s':''}</div>`:'<div style="font-size:9.5px;color:var(--muted)">No sessions</div>'}
-          </div>`;
-        }).join('')+`</div>`;
-    }
-  }
+  loadDashCharts();
 }
 
 // ═══════════════════════════════════════════════════════════
