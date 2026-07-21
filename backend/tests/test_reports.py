@@ -1,8 +1,9 @@
 """
-Gap #10 — Report Catalogue: shape and RBAC tests for all 10 report endpoints.
+Gap #10 — Report Catalogue: shape and RBAC tests for all report endpoints.
 
 Squadron-level reports: summary, readiness, curriculum-coverage, facilitator-load, not-delivered
-Wing-level reports:     wing-overview, wing-not-delivered, wing-phase-coverage, wing-capability
+Wing-level reports:     wing-overview, wing-not-delivered, wing-phase-coverage, wing-capability,
+                        wing-cancellation-trend
 National-level reports: national-overview, national-capability
 """
 import pytest
@@ -197,6 +198,7 @@ def test_sqn_general_can_access_squadron_reports(client, path):
     "/api/reports/wing-not-delivered",
     "/api/reports/wing-phase-coverage",
     "/api/reports/wing-capability",
+    "/api/reports/wing-cancellation-trend",
 ])
 def test_sqn_general_403_for_wing_reports(client, path):
     h = login(client, SQN_GENERAL)
@@ -209,6 +211,7 @@ def test_sqn_general_403_for_wing_reports(client, path):
     "/api/reports/wing-not-delivered",
     "/api/reports/wing-phase-coverage",
     "/api/reports/wing-capability",
+    "/api/reports/wing-cancellation-trend",
 ])
 def test_sqn_admin_403_for_wing_reports(client, path):
     h = login(client, SQN_ADMIN)
@@ -224,3 +227,56 @@ def test_wing_admin_403_for_national_reports(client, path):
     h = login(client, WING_ADMIN)
     r = client.get(path, headers=h)
     assert r.status_code == 403, f"{path} should be 403 for wing_admin, got {r.status_code}"
+
+
+# ── Wing-cancellation-trend ───────────────────────────────────────────────────
+
+def test_wing_cancellation_trend_shape_wing_admin(client):
+    h = login(client, WING_ADMIN)
+    r = client.get("/api/reports/wing-cancellation-trend", headers=h)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "title" in body and body["title"] == "Cancelled / rescheduled trend"
+    assert "squadrons" in body and isinstance(body["squadrons"], list)
+    assert "total_cancelled_sessions" in body and "total_cancelled_nights" in body
+    assert "decision" in body and body["decision"] in ("no_action", "action_required")
+    for sq in body["squadrons"]:
+        assert "squadron_id" in sq and "cancelled_sessions" in sq and "cancelled_nights" in sq
+        assert isinstance(sq["reasons"], list)
+        for reason in sq["reasons"]:
+            assert "reason" in reason and "count" in reason and reason["count"] >= 1
+
+
+def test_wing_cancellation_trend_accessible_to_national_viewer(client):
+    h = login(client, NAT_VIEWER)
+    r = client.get("/api/reports/wing-cancellation-trend", headers=h)
+    assert r.status_code == 200, r.text
+
+
+def test_wing_cancellation_trend_unauthenticated(client):
+    r = client.get("/api/reports/wing-cancellation-trend")
+    assert r.status_code == 401
+
+
+# ── Facilitator list — upcoming_leave enrichment (Gap 4) ─────────────────────
+
+def test_facilitators_list_includes_upcoming_leave_field(client):
+    h = login(client, SQN_ADMIN)
+    r = client.get("/api/facilitators", headers=h)
+    assert r.status_code == 200, r.text
+    facs = r.json()
+    assert isinstance(facs, list)
+    # upcoming_leave must be present on every facilitator (empty list when no leave booked)
+    for f in facs:
+        assert "upcoming_leave" in f, f"facilitator_id {f.get('facilitator_id')} missing upcoming_leave"
+        assert isinstance(f["upcoming_leave"], list)
+
+
+def test_facilitators_upcoming_leave_shape_when_present(client):
+    """Each leave record must have start_date, end_date, reason fields."""
+    h = login(client, SQN_ADMIN)
+    r = client.get("/api/facilitators", headers=h)
+    assert r.status_code == 200, r.text
+    for f in r.json():
+        for lv in f["upcoming_leave"]:
+            assert "start_date" in lv and "end_date" in lv and "reason" in lv

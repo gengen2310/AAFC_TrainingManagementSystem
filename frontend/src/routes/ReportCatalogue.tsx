@@ -20,7 +20,7 @@ const ROWS: Row[] = [
   { name: "Program coverage (sqn/wing)",   backend: "yes",     frontend: "yes", priority: "should", value: "Cadet Program core vs extension",           role: "Squadron+" },
   { name: "Learning Hub missing-link",     backend: "yes",     frontend: "yes", priority: "should", value: "Find items with no LH link",                role: "Squadron+" },
   { name: "Cross-squadron not-delivered",  backend: "yes",     frontend: "no",  priority: "should", value: "Wing-wide delivery gaps",                   role: "Wing+" },
-  { name: "Cancelled / rescheduled trend", backend: "partial", frontend: "no",  priority: "should", value: "Repeat-cancellation pattern",               role: "Wing+" },
+  { name: "Cancelled / rescheduled trend", backend: "yes",     frontend: "no",  priority: "should", value: "Repeat-cancellation pattern (endpoint: /reports/wing-cancellation-trend)", role: "Wing+" },
   { name: "National version-adoption",     backend: "no",      frontend: "no",  priority: "later",  value: "Program version uptake",                    role: "National" },
   { name: "Annual assurance pack",         backend: "no",      frontend: "no",  priority: "later",  value: "Year-end governance pack",                  role: "National" },
   { name: "Promotion pipeline",            backend: "partial",  frontend: "no",  priority: "later",  value: "Squadron→Wing→National promotions",         role: "Wing+" },

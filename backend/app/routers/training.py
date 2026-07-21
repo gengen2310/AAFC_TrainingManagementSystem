@@ -479,14 +479,26 @@ class FacIn(BaseModel):
 
 @router.get("/facilitators")
 def list_facs(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    from datetime import date, timedelta
+    from ..models.planning import PlanningFacilitatorLeave
     sq_id = _active_squadron(p)
     facs = db.query(Facilitator).filter(Facilitator.squadron_id == sq_id,
                                         Facilitator.is_archived == False).all()  # noqa: E712
+    today = date.today().isoformat()
+    horizon = (date.today() + timedelta(days=90)).isoformat()
     out = []
     for f in facs:
+        leave = (db.query(PlanningFacilitatorLeave)
+                 .filter(PlanningFacilitatorLeave.facilitator_id == f.id,
+                         PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
+                         PlanningFacilitatorLeave.end_date >= today,
+                         PlanningFacilitatorLeave.start_date <= horizon)
+                 .order_by(PlanningFacilitatorLeave.start_date).all())
         out.append({"facilitator_id": f.id, "first_name": f.first_name, "last_name": f.last_name,
                     "current_rank": f.current_rank, "type": f.type,
-                    "subject_areas": _parse_json_list(f.subject_areas)})
+                    "subject_areas": _parse_json_list(f.subject_areas),
+                    "upcoming_leave": [{"start_date": lv.start_date, "end_date": lv.end_date,
+                                        "reason": lv.reason} for lv in leave]})
     return out
 
 

@@ -156,6 +156,44 @@ def wing_overview(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
     return {"squadrons": out}
 
 
+@router.get("/reports/wing-cancellation-trend")
+def wing_cancellation_trend(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Per-squadron cancelled session and parade-night counts for Wing command review.
+
+    Cancelled sessions are those with Session.status == 'cancelled'.
+    Cancelled nights are ParadeNights with parade_type == 'cancelled' (stand-down / wash-out).
+    Reasons are aggregated from Session.cancelled_reason (free text, grouped by value).
+    """
+    require_role(p, "wing_viewer", "wing_admin", "national_viewer", "national_admin", "system_admin", "auditor")
+    wing_id = p.wing_id if p.is_wing else None
+    q = db.query(Squadron).filter(Squadron.is_archived == False)  # noqa: E712
+    if wing_id:
+        q = q.filter(Squadron.wing_id == wing_id)
+    out = []
+    for s in q.all():
+        cancelled_sess = [x for x in _all_sessions(db, s.id) if x.status == "cancelled"]
+        cancelled_nights = db.query(ParadeNight).filter(
+            ParadeNight.squadron_id == s.id,
+            ParadeNight.parade_type == "cancelled").count()
+        reason_counts: dict[str, int] = {}
+        for x in cancelled_sess:
+            key = (x.cancelled_reason or "unspecified").strip()[:80]
+            reason_counts[key] = reason_counts.get(key, 0) + 1
+        out.append({
+            "squadron_id": s.id, "code": s.code, "short_name": s.short_name,
+            "cancelled_sessions": len(cancelled_sess),
+            "cancelled_nights": cancelled_nights,
+            "reasons": sorted([{"reason": k, "count": v} for k, v in reason_counts.items()],
+                               key=lambda x: -x["count"]),
+        })
+    out.sort(key=lambda x: -(x["cancelled_sessions"] + x["cancelled_nights"]))
+    total_sess = sum(x["cancelled_sessions"] for x in out)
+    total_nights = sum(x["cancelled_nights"] for x in out)
+    return {"title": "Cancelled / rescheduled trend", "squadrons": out,
+            "total_cancelled_sessions": total_sess, "total_cancelled_nights": total_nights,
+            "decision": "action_required" if total_sess + total_nights > 0 else "no_action"}
+
+
 @router.get("/reports/wing-not-delivered")
 def wing_not_delivered(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     """Wing-wide aggregation of not-delivered sessions, ranked by squadron count."""
