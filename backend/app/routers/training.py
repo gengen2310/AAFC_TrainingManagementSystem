@@ -1001,6 +1001,233 @@ def delete_activity(aid: str, db: DBSession = Depends(get_db), p: Principal = De
     return {"ok": True}
 
 
+# ── ACTIVITY GENERATION ──────────────────────────────────────────────────────
+
+RECURRENCE_OPTS = frozenset({"daily", "weekly", "fortnightly", "monthly", "yearly"})
+
+
+class ActivityGenerateIn(BaseModel):
+    activity_name: str
+    activity_type: str = "Optional"
+    start_date: str           # YYYY-MM-DD — first possible date
+    end_date: str             # YYYY-MM-DD — last possible date (inclusive)
+    time_start: str | None = None
+    time_end: str | None = None
+    recurrence: str = "weekly"      # daily|weekly|fortnightly|monthly|yearly
+    weekday: int | None = None      # 0=Mon…6=Sun — required for weekly/fortnightly
+    excluded_dates: list[str] = []  # YYYY-MM-DD dates to skip
+    repeat_count: int | None = None # cap total occurrences if set
+    location: str | None = None
+    audience: list[str] = []
+    notes: str | None = None
+    planning_year_id: str | None = None   # optional; used for holiday lookups
+    preview_only: bool = True
+
+
+def _generate_dates(start: str, end: str, recurrence: str, weekday: int | None,
+                    excluded: set[str], repeat_count: int | None):
+    """Yield ISO date strings matching the recurrence rule within [start, end]."""
+    from datetime import date, timedelta
+    import calendar as _cal
+
+    sd = date.fromisoformat(start)
+    ed = date.fromisoformat(end)
+
+    if recurrence == "daily":
+        cur = sd
+        count = 0
+        while cur <= ed:
+            ds = cur.isoformat()
+            if ds not in excluded:
+                yield ds
+                count += 1
+                if repeat_count and count >= repeat_count:
+                    return
+            cur += timedelta(days=1)
+
+    elif recurrence in ("weekly", "fortnightly"):
+        if weekday is None:
+            weekday = sd.weekday()
+        step = timedelta(days=7 if recurrence == "weekly" else 14)
+        # Find first occurrence on or after start
+        days_ahead = (weekday - sd.weekday()) % 7
+        cur = sd + timedelta(days=days_ahead)
+        count = 0
+        while cur <= ed:
+            ds = cur.isoformat()
+            if ds not in excluded:
+                yield ds
+                count += 1
+                if repeat_count and count >= repeat_count:
+                    return
+            cur += step
+
+    elif recurrence == "monthly":
+        from datetime import date as _date
+        cur = sd.replace(day=1)
+        target_day = sd.day
+        count = 0
+        while cur <= ed:
+            last = _cal.monthrange(cur.year, cur.month)[1]
+            day = min(target_day, last)
+            candidate = _date(cur.year, cur.month, day)
+            if sd <= candidate <= ed:
+                ds = candidate.isoformat()
+                if ds not in excluded:
+                    yield ds
+                    count += 1
+                    if repeat_count and count >= repeat_count:
+                        return
+            if cur.month == 12:
+                cur = cur.replace(year=cur.year + 1, month=1)
+            else:
+                cur = cur.replace(month=cur.month + 1)
+
+    elif recurrence == "yearly":
+        from datetime import date as _date
+        import calendar as _cal
+        cur_year = sd.year
+        count = 0
+        while True:
+            try:
+                candidate = _date(cur_year, sd.month, sd.day)
+            except ValueError:
+                last = _cal.monthrange(cur_year, sd.month)[1]
+                candidate = _date(cur_year, sd.month, last)
+            if candidate > ed:
+                break
+            if candidate >= sd:
+                ds = candidate.isoformat()
+                if ds not in excluded:
+                    yield ds
+                    count += 1
+                    if repeat_count and count >= repeat_count:
+                        return
+            cur_year += 1
+
+
+@router.post("/activities/generate")
+def generate_activities(
+    body: ActivityGenerateIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Preview or batch-create recurring activities.
+
+    When preview_only=True (default), returns a preview list without writing.
+    When preview_only=False, creates all 'include' records and returns a summary.
+    """
+    if body.recurrence not in RECURRENCE_OPTS:
+        raise HTTPException(400, detail={"error": "invalid_recurrence",
+                                         "allowed": sorted(RECURRENCE_OPTS)})
+    if p.role in _WRITE_BLOCKED and not body.preview_only:
+        raise HTTPException(403, detail={"error": "forbidden"})
+
+    sq_id = _active_squadron(p)
+    s = db.get(Squadron, sq_id) if sq_id else None
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    if not body.preview_only:
+        require_can_write_squadron(p, s.id, s.wing_id)
+
+    # Build holiday date set for this squadron (from planning year if given)
+    holiday_dates: dict[str, str] = {}  # date → holiday name
+    if body.planning_year_id:
+        try:
+            from ..models.planning import HolidayPeriod, PlanningYear
+            from datetime import date, timedelta
+            py = db.get(PlanningYear, body.planning_year_id)
+            if py and (py.unit_id == s.id or py.wing_id == s.wing_id):
+                hols = db.query(HolidayPeriod).filter(
+                    HolidayPeriod.planning_year_id == body.planning_year_id
+                ).all()
+                for h in hols:
+                    hd = date.fromisoformat(h.start_date)
+                    end_hd = date.fromisoformat(h.end_date)
+                    while hd <= end_hd:
+                        holiday_dates[hd.isoformat()] = h.name
+                        hd += timedelta(days=1)
+        except Exception:
+            pass  # holiday lookup is best-effort; do not block generation
+
+    # Existing active activities for duplicate detection
+    existing = db.query(Activity).filter(
+        Activity.squadron_id == s.id,
+        Activity.is_archived == False,  # noqa: E712
+        Activity.activity_name == body.activity_name,
+    ).all()
+    existing_map: dict[str, str] = {a.date_start: a.id for a in existing}
+
+    excluded_set = set(body.excluded_dates or [])
+    preview_rows = []
+    for ds in _generate_dates(body.start_date, body.end_date, body.recurrence,
+                               body.weekday, excluded_set, body.repeat_count):
+        holiday_name = holiday_dates.get(ds)
+        dup_id = existing_map.get(ds)
+        if dup_id:
+            status, reason = "skip", "duplicate"
+        elif holiday_name:
+            status, reason = "skip", "holiday"
+        else:
+            status, reason = "include", None
+
+        preview_rows.append({
+            "date": ds,
+            "start_time": body.time_start,
+            "finish_time": body.time_end,
+            "status": status,
+            "reason": reason,
+            "existing_activity_id": dup_id,
+            "holiday_name": holiday_name,
+            "scope": "squadron",
+        })
+
+    if body.preview_only:
+        return {
+            "preview": preview_rows,
+            "would_create": sum(1 for r in preview_rows if r["status"] == "include"),
+            "would_skip": sum(1 for r in preview_rows if r["status"] == "skip"),
+        }
+
+    # Actual creation
+    created_ids = []
+    skipped = []
+    batch_note = f"batch_generate:{body.recurrence}:{body.start_date}:{body.end_date}"
+    for row in preview_rows:
+        if row["status"] != "include":
+            skipped.append({"date": row["date"], "reason": row["reason"]})
+            continue
+        a = Activity(
+            squadron_id=s.id,
+            wing_id=s.wing_id,
+            activity_name=body.activity_name,
+            activity_type=body.activity_type,
+            date_start=row["date"],
+            time_start=body.time_start,
+            time_end=body.time_end,
+            location=body.location,
+            audience=body.audience or [],
+            notes=body.notes,
+            cea_seq_nr=batch_note,
+        )
+        db.add(a)
+        db.flush()
+        created_ids.append(a.id)
+
+    db.commit()
+    audit(db, p, object_type="activity", object_id="batch",
+          action="generate_batch",
+          new={"count": len(created_ids), "name": body.activity_name,
+               "recurrence": body.recurrence, "ids": created_ids})
+    return {
+        "ok": True,
+        "created_count": len(created_ids),
+        "skipped_count": len(skipped),
+        "created_ids": created_ids,
+        "skipped": skipped,
+    }
+
+
 # ── CURRICULUM ELEMENTS ──────────────────────────────────────────────────────
 
 class ElementIn(BaseModel):
