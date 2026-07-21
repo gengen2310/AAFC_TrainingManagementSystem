@@ -7,12 +7,15 @@ import { DrilldownPanel } from "../components/DrilldownPanel";
 import { useAuth } from "../auth/AuthProvider";
 import { canViewCadets } from "../auth/permissions";
 
+const PHASE_ORDER = ["A. Orientation","B. Initial","C. Junior","D. Intermediate","E. Senior","I. Bronze","J. Silver","K. Gold"];
+
 export function Dashboard() {
   const { session } = useAuth();
   const summary = useQuery({ queryKey: ["summary"], queryFn: reportApi.summary });
   const readiness = useQuery({ queryKey: ["readiness"], queryFn: reportApi.readiness });
   const coverage = useQuery({ queryKey: ["coverage"], queryFn: reportApi.coverage });
   const parades = useQuery({ queryKey: ["parade-nights"], queryFn: () => trainingApi.paradeNights() });
+  const facLoad = useQuery({ queryKey: ["fac-load"], queryFn: reportApi.facLoad });
   const risk = useQuery({ queryKey: ["cadet-risk"], queryFn: trainingApi.cadetRisk, enabled: canViewCadets(session) });
   const [drill, setDrill] = useState<string | null>(null);
 
@@ -26,6 +29,32 @@ export function Dashboard() {
     .filter((p) => p.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 6);
+
+  // Phase breakdown from all sessions across parade nights
+  const allSessions = (parades.data ?? []).flatMap((p) => p.sessions);
+  const phaseMap: Record<string, { total: number; delivered: number; not_delivered: number }> = {};
+  for (const s of allSessions) {
+    const ph = s.phase_at_time ?? "—";
+    if (!phaseMap[ph]) phaseMap[ph] = { total: 0, delivered: 0, not_delivered: 0 };
+    phaseMap[ph].total++;
+    if (s.status === "delivered") phaseMap[ph].delivered++;
+    if (s.status === "not_delivered") phaseMap[ph].not_delivered++;
+  }
+  const phaseKeys = [...PHASE_ORDER.filter((p) => phaseMap[p]), ...Object.keys(phaseMap).filter((p) => !PHASE_ORDER.includes(p)).sort()];
+
+  // Facilitator session summary
+  const facMap: Record<string, { name: string; delivered: number; planned: number; not_delivered: number; cancelled: number; total: number }> = {};
+  for (const s of allSessions) {
+    const key = s.facilitator_id ?? s.facilitator_display_name_at_time ?? "Unassigned";
+    const name = s.facilitator_display_name_at_time ?? "Unassigned";
+    if (!facMap[key]) facMap[key] = { name, delivered: 0, planned: 0, not_delivered: 0, cancelled: 0, total: 0 };
+    facMap[key].total++;
+    if (s.status === "delivered") facMap[key].delivered++;
+    else if (s.status === "planned") facMap[key].planned++;
+    else if (s.status === "not_delivered") facMap[key].not_delivered++;
+    else if (s.status === "cancelled" || s.status === "cancelled_late") facMap[key].cancelled++;
+  }
+  const facRows = Object.values(facMap).sort((a, b) => b.total - a.total);
 
   return (
     <div>
@@ -53,6 +82,62 @@ export function Dashboard() {
           ))}</tbody>
         </table>
       </Card>
+
+      {facLoad.data && facLoad.data.facilitators.length > 0 && (() => {
+        const facs = facLoad.data!.facilitators;
+        const atRisk = facs.filter((f) => f.risk !== "ok").length;
+        return (
+          <Card title="Facilitator readiness" action={<DecisionBadge decision={facLoad.data!.decision} />}>
+            <p className="muted">
+              {facs.length} facilitator{facs.length !== 1 ? "s" : ""} ·{" "}
+              {atRisk > 0
+                ? <><span className="badge warn">{atRisk} at risk</span> — see Facilitators page for details</>
+                : <span className="badge ok">All within normal load</span>}
+            </p>
+          </Card>
+        );
+      })()}
+
+      {phaseKeys.length > 0 && (
+        <Card title="Progress by phase">
+          <table>
+            <caption className="vis-hidden">Sessions by phase</caption>
+            <thead><tr><th>Phase</th><th>Delivered</th><th>Total</th><th>Completion</th><th>Not delivered</th></tr></thead>
+            <tbody>{phaseKeys.map((ph) => {
+              const g = phaseMap[ph];
+              const pct = g.total ? Math.round(g.delivered / g.total * 100) : 0;
+              return (
+                <tr key={ph}>
+                  <td>{ph}</td>
+                  <td>{g.delivered}</td>
+                  <td>{g.total}</td>
+                  <td><span className={`badge ${pct >= 80 ? "ok" : pct >= 40 ? "warn" : "red"}`}>{pct}%</span></td>
+                  <td>{g.not_delivered > 0 ? <span className="badge warn">{g.not_delivered} ND</span> : <span className="muted">—</span>}</td>
+                </tr>
+              );
+            })}</tbody>
+          </table>
+        </Card>
+      )}
+
+      {facRows.length > 0 && (
+        <Card title="Facilitator summary">
+          <table>
+            <caption className="vis-hidden">Sessions by facilitator</caption>
+            <thead><tr><th>Facilitator</th><th>Delivered</th><th>Planned</th><th>Not del.</th><th>Cancelled</th><th>Total</th></tr></thead>
+            <tbody>{facRows.map((f) => (
+              <tr key={f.name}>
+                <td style={{ fontWeight: 700 }}>{f.name}</td>
+                <td>{f.delivered}</td>
+                <td>{f.planned}</td>
+                <td>{f.not_delivered > 0 ? <span className="badge warn">{f.not_delivered}</span> : 0}</td>
+                <td>{f.cancelled > 0 ? <span className="badge red">{f.cancelled}</span> : 0}</td>
+                <td style={{ fontWeight: 700 }}>{f.total}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </Card>
+      )}
 
       <Card title="Upcoming parade nights">
         {upcoming.length === 0 ? <Empty msg="No parade nights yet. Create one from the Parade Nights page." /> : (

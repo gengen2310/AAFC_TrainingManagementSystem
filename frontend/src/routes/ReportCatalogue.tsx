@@ -17,7 +17,7 @@ const ROWS: Row[] = [
   { name: "Wing capability",               backend: "yes",     frontend: "no",  priority: "must",   value: "Facilitator subject-balance per squadron",  role: "Wing+" },
   { name: "National overview",             backend: "yes",     frontend: "yes", priority: "must",   value: "Wing rollup for HQ",                        role: "National" },
   { name: "National capability",           backend: "yes",     frontend: "no",  priority: "must",   value: "Wing-level facilitator capability summary", role: "National" },
-  { name: "Program coverage (sqn/wing)",   backend: "yes",     frontend: "yes", priority: "should", value: "Cadet Program core vs extension",           role: "Squadron+" },
+  { name: "Program coverage (sqn/wing)",   backend: "yes",     frontend: "yes", priority: "should", value: "Cadet Program foundation vs extension",     role: "Squadron+" },
   { name: "Learning Hub missing-link",     backend: "yes",     frontend: "yes", priority: "should", value: "Find items with no LH link",                role: "Squadron+" },
   { name: "Cross-squadron not-delivered",  backend: "yes",     frontend: "no",  priority: "should", value: "Wing-wide delivery gaps",                   role: "Wing+" },
   { name: "Cancelled / rescheduled trend", backend: "yes",     frontend: "no",  priority: "should", value: "Repeat-cancellation pattern (endpoint: /reports/wing-cancellation-trend)", role: "Wing+" },

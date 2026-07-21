@@ -492,20 +492,12 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-item" onclick="nav('weekly-program')">Weekly Program</div>
       <div class="nav-item" onclick="nav('curriculum')">Curriculum</div>
       <div class="nav-item" onclick="nav('activities')">Activities</div>
-      <!-- Hidden for pilot: Anchor Events, Term Planner, Long-Range View, Locations, Checks -->
-      <div class="nav-item nav-subitem" id="nav-planning-anchors" style="display:none" onclick="nav('planning-anchors')">Key Activities</div>
-      <div class="nav-item nav-subitem" id="nav-planning-term" style="display:none" onclick="nav('planning-term')">Term Program</div>
-      <div class="nav-item nav-subitem" id="nav-planning-longrange" style="display:none" onclick="nav('planning-longrange')">Long-Range View</div>
-      <div class="nav-item nav-subitem" id="nav-planning-rooms" style="display:none" onclick="nav('planning-rooms')">Locations and Facilitators</div>
-      <div class="nav-item nav-subitem" id="nav-planning-checks" style="display:none" onclick="nav('planning-checks')">Program Checks</div>
-      <div class="nav-lbl" id="nav-lbl-pw" style="display:none">Planning Workspace</div>
-      <a id="nav-pw-link" class="nav-item-ext" href="https://aafc-tms-planning-workspace-preview-production.up.railway.app/planning" target="_blank" rel="noopener noreferrer" style="display:none">Planning Workspace ↗</a>
+      <div class="nav-item" onclick="nav('action-items')">Needs Attention</div>
       <div class="nav-lbl">People &amp; Resources</div>
       <div class="nav-item" onclick="nav('facilitators')">Facilitators</div>
       <div class="nav-item" onclick="nav('resources')">Locations and Resources</div>
       <div class="nav-lbl">Reports</div>
       <div class="nav-item" onclick="nav('reports')">Training Summary</div>
-      <div class="nav-item" onclick="nav('action-items')">Needs Attention</div>
       <div class="nav-lbl" id="admin-lbl" style="display:none">Admin</div>
       <div class="nav-item admin-el" style="display:none" onclick="nav('settings')">Unit Settings</div>
       <div class="nav-item" id="nav-accounts" style="display:none" onclick="nav('accounts')">Account Management</div>
@@ -536,7 +528,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="stat clk" onclick="drillStatus('planned')"><div class="slbl">Planned</div><div class="sval lnk" id="s-pln">0</div><div class="ssub">upcoming</div></div>
           <div class="stat s-warn clk" onclick="drillStatus('not_delivered')"><div class="slbl">Not Delivered</div><div class="sval lnk" id="s-nd">0</div><div class="ssub">capacity constraints</div></div>
           <div class="stat s-red clk" onclick="drillStatus('cancelled')"><div class="slbl">Cancelled</div><div class="sval lnk" id="s-can">0</div><div class="ssub">this year</div></div>
-          <div class="stat s-dark"><div class="slbl">Curriculum</div><div class="sval" id="s-curr">0</div><div class="ssub">core + additional</div></div>
+          <div class="stat s-purple clk" onclick="drillStatus('rescheduled')"><div class="slbl">Rescheduled</div><div class="sval lnk" id="s-res">0</div><div class="ssub">deferred</div></div>
+          <div class="stat s-dark"><div class="slbl">Curriculum</div><div class="sval" id="s-curr">0</div><div class="ssub">required + enrichment</div></div>
         </div>
 
         <!-- Drill-down panel -->
@@ -575,12 +568,19 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div id="fac-tonight"></div>
         </div>
 
+        <div class="card">
+          <div class="ctitle">Facilitator Summary</div>
+          <div class="tw"><table>
+            <thead><tr><th>Facilitator</th><th>Del</th><th>Planned</th><th>Not Del</th><th>Cancelled</th><th>Total</th></tr></thead>
+            <tbody id="dash-fac-summary"></tbody>
+          </table></div>
+        </div>
+
         <div class="card no-print">
           <div class="ctitle">Quick Actions</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button class="btn btn-dk" onclick="openModal('m-add-pn')">+ Parade Night</button>
             <button class="btn btn-sky" onclick="nav('calendar')">Calendar</button>
-            <button class="btn btn-out" onclick="nav('reports')">Reports</button>
             <button class="btn btn-out" onclick="nav('action-items')">Needs Attention</button>
             <button class="btn btn-out" onclick="nav('weekly-program')">Weekly Program</button>
             <button class="btn btn-out admin-el" style="display:none" onclick="openAddCurr()">+ Add Curriculum Item</button>
@@ -2837,7 +2837,7 @@ function roomById(id){return (S.rooms||[]).find(r=>r.id===id);}
 // Pilot-visible planning pages. Remaining tabs (anchors, term, long-range, rooms, checks) are hidden from nav for this pilot.
 const _PLANNING_PAGES=[];
 const NAV_BY_SCOPE={
-  squadron:['dashboard','calendar','parade-nights','weekly-program','curriculum','activities','facilitators','resources','reports','action-items','settings','accounts',..._PLANNING_PAGES],
+  squadron:['dashboard','calendar','parade-nights','weekly-program','curriculum','activities','facilitators','resources','action-items','settings','accounts',..._PLANNING_PAGES],
   wing:['wing-overview','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
   national:['national','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
   auditor:['reports','audit','accounts',..._PLANNING_PAGES],
@@ -2985,7 +2985,7 @@ function renderAll(){
     renderNational(); renderReports(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); renderAudit();
     return;
   }
-  if(scope==='squadron'){ renderDash();renderPN();renderCurr();renderActs();renderFacs();renderRooms();renderReports();renderActions(); }
+  if(scope==='squadron'){ renderDash();renderPN();renderCurr();renderActs();renderFacs();renderRooms();renderActions(); }
   else { renderReports(); renderCurr(); }
   if(scope==='wing'){ renderWing(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); }
   if(scope==='national'){ renderNational(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); }
@@ -2997,10 +2997,9 @@ function renderAll(){
 //  NAVIGATION
 // ═══════════════════════════════════════════════════════════
 function nav(id){
-  if(id==='planning-year')    id='activities';
-  if(id==='planning-missions')id='activities';
-  if(id==='planning-builder') id='parade-nights';
-  if(id==='planning-guide')   id='dashboard';
+  if(id==='planning-year'||id==='planning-anchors'||id==='planning-term'||id==='planning-missions')id='activities';
+  if(id==='planning-builder'||id==='planning-rooms')id='parade-nights';
+  if(id==='planning-guide'||id==='planning-longrange'||id==='planning-checks')id='dashboard';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');
@@ -4019,9 +4018,13 @@ function drillPhase(ph){
   const sess=allSess().filter(s=>s.phase===ph);
   showDrill('rep-drill','rep-drill-title','rep-drill-body',(PH_S[ph]||ph)+' — Sessions',sess);
 }
+function drillPhaseDash(ph){
+  const sess=allSess().filter(s=>s.phase===ph);
+  showDrill('dash-drill','dash-drill-title','dash-drill-body',(PH_S[ph]||ph)+' — Sessions',sess);
+}
 function drillFacDel(facKey){
   const sess=allSess().filter(s=>(s.facId===facKey||s.facName===facKey)&&s.status==='delivered');
-  showDrill('rep-drill','rep-drill-title','rep-drill-body','Delivered by '+facKey,sess);
+  showDrill('dash-drill','dash-drill-title','dash-drill-body','Delivered by '+facKey,sess);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4038,6 +4041,7 @@ function renderDash(){
   document.getElementById('s-pln').textContent=cnt('planned');
   document.getElementById('s-nd').textContent=cnt('not_delivered');
   document.getElementById('s-can').textContent=cnt('cancelled');
+  const resEl=document.getElementById('s-res');if(resEl)resEl.textContent=cnt('rescheduled');
   document.getElementById('s-curr').textContent=allCurr().length;
 
   // Phase progress
@@ -4051,7 +4055,7 @@ function renderDash(){
     return `<div class="ph-row">
       <div class="ph-name">${PH_S[ph]||ph}</div>
       <div class="ph-bar"><div class="pbar"><div class="pfill ${fc}" style="width:${pct}%"></div></div></div>
-      <div class="ph-cnt"><button class="btn-lnk" onclick="drillPhase('${ph}')" style="font-size:10px">${c.d}/${c.t}</button></div>
+      <div class="ph-cnt"><button class="btn-lnk" onclick="drillPhaseDash('${ph}')" style="font-size:10px">${c.d}/${c.t}</button></div>
     </div>`;
   }).join('');
 
@@ -4119,6 +4123,30 @@ function renderDash(){
       if(gaps.length)h+=`<div style="margin-top:8px;font-size:11px;color:var(--warn)">No available cover for: ${gaps.map(g=>g.emoji+' '+g.label).join(', ')}</div>`;
       ftList.innerHTML=h;
     }
+  }
+
+  // ── Facilitator Summary (year-to-date) ──
+  const facSumEl=document.getElementById('dash-fac-summary');
+  if(facSumEl){
+    const facMap={};
+    sess.forEach(s=>{
+      const k=s.facId||s.facName||'Unassigned';
+      const n=s.facName||'Unassigned';
+      if(!facMap[k])facMap[k]={name:n,facId:s.facId,delivered:0,planned:0,not_delivered:0,cancelled:0,total:0};
+      facMap[k].total++;
+      if(s.status==='delivered')facMap[k].delivered++;
+      else if(s.status==='planned')facMap[k].planned++;
+      else if(s.status==='not_delivered')facMap[k].not_delivered++;
+      else if(s.status==='cancelled'||s.status==='cancelled_late')facMap[k].cancelled++;
+    });
+    facSumEl.innerHTML=Object.values(facMap).sort((a,b)=>b.total-a.total).map(f=>`<tr>
+      <td style="font-weight:700">${f.facId?`<button class="btn-lnk" onclick="showFacProfile('${f.facId}')">${esc(f.name)}</button>`:esc(f.name)}</td>
+      <td style="color:var(--ok);font-weight:800;text-align:center">${f.delivered}</td>
+      <td style="text-align:center">${f.planned}</td>
+      <td style="color:var(--steel);text-align:center">${f.not_delivered}</td>
+      <td style="color:var(--red);text-align:center">${f.cancelled}</td>
+      <td style="font-weight:800;text-align:center">${f.total}</td>
+    </tr>`).join('')||`<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">No session data yet</td></tr>`;
   }
 }
 
@@ -4519,7 +4547,7 @@ function renderCurr(){
           const editable=canEditCurr(e);
           return `<div class="exp-item" onclick="showCurrDetail('${e.code}')">
             <div style="flex:1;min-width:0">
-              <div class="exp-code">${esc(e.code)} · ${e.hours}h · ${e.type==='core'?'Core':'Additional'} ${sourceBadge(e)}</div>
+              <div class="exp-code">${esc(e.code)} · ${e.hours}h · ${e.type==='core'?'Foundation':'Extension'} ${sourceBadge(e)}</div>
               <div class="exp-title">${esc(e.title)}</div>
               <div class="exp-meta">
                 ${elBadge(e.el)}
@@ -4544,7 +4572,7 @@ function showCurrDetail(code){
   const sess=allSess().filter(s=>s.code===code);
   document.getElementById('cd-title').textContent=e.title;
   document.getElementById('cd-body').innerHTML=`
-    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${phBadge(e.phase)} ${elBadge(e.el)} <span class="badge b-blue">${e.term}</span> <span class="badge b-grey">${e.hours}h</span> <span class="badge ${e.type==='core'?'b-dark':'b-teal'}">${e.type==='core'?'Core':'Additional'}</span></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${phBadge(e.phase)} ${elBadge(e.el)} <span class="badge b-blue">${e.term}</span> <span class="badge b-grey">${e.hours}h</span> <span class="badge ${e.type==='core'?'b-dark':'b-teal'}">${e.type==='core'?'Foundation':'Extension'}</span></div>
     ${e.lh?`<div style="margin-bottom:12px"><a href="${e.lh}" target="_blank" class="lh-btn" style="font-size:12px">View on Learning Hub ↗</a></div>`:''}
     <div style="font-size:11.5px;margin-bottom:12px"><b>Instructor:</b> ${e.instr||'—'}</div>
     ${sess.length?`
@@ -4564,8 +4592,13 @@ function showCurrDetail(code){
 function drillCurr(code){
   const e=allCurr().find(x=>x.code===code);
   const sess=allSess().filter(s=>s.code===code);
-  nav('reports');
-  setTimeout(()=>showDrill('rep-drill','rep-drill-title','rep-drill-body',(e?e.title:code)+' — Sessions',sess),50);
+  if(effectiveScope()==='squadron'){
+    nav('dashboard');
+    setTimeout(()=>showDrill('dash-drill','dash-drill-title','dash-drill-body',(e?e.title:code)+' — Sessions',sess),50);
+  } else {
+    nav('reports');
+    setTimeout(()=>showDrill('rep-drill','rep-drill-title','rep-drill-body',(e?e.title:code)+' — Sessions',sess),50);
+  }
 }
 let _currSaveEndpoint='/api/curriculum';
 function _hideCurrWingRow(){document.getElementById('c-wing-row').style.display='none';}

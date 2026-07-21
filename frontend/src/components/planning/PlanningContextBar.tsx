@@ -30,7 +30,7 @@ const RANGES: { key: ViewRange; label: string }[] = [
 ];
 
 export function PlanningContextBar({
-  session, year, cc,
+  session, year,
   viewRange, displayMode, customStart, customEnd,
   onRangeChange, onDisplayModeChange, onCustomStartChange, onCustomEndChange,
 }: Props) {
@@ -43,10 +43,6 @@ export function PlanningContextBar({
     ? session.role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : "—";
 
-  const unreviewed  = cc?.unreviewed_wing?.length   ?? 0;
-  const prepGaps    = cc?.prep_gaps?.length         ?? 0;
-
-
   return (
     <div className="pw-ctx" role="banner" aria-label="Planning workspace context">
       {/* Identity */}
@@ -54,23 +50,6 @@ export function PlanningContextBar({
       <span className="pw-ctx-sep">·</span>
       <span className="pw-ctx-year">{year?.year ?? new Date().getFullYear()}</span>
       <span className="pw-ctx-role" title={roleLabel}>{roleLabel} · {scopeLabel}</span>
-
-      {/* Health chips */}
-      <div className="pw-ctx-health" aria-label="Planning health">
-        {prepGaps > 0 && (
-          <span className="pw-health-chip warn" title="Prep gaps">
-            {prepGaps} prep gap{prepGaps !== 1 ? "s" : ""}
-          </span>
-        )}
-        {unreviewed > 0 && (
-          <span className="pw-health-chip warn" title="Wing events not yet reviewed">
-            {unreviewed} to review
-          </span>
-        )}
-        {unreviewed === 0 && prepGaps === 0 && cc && (
-          <span className="pw-health-chip ok">Healthy</span>
-        )}
-      </div>
 
       {/* Range + display mode controls */}
       <div className="pw-ctx-range-wrap" role="toolbar" aria-label="Range and view mode">

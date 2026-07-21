@@ -1,9 +1,10 @@
 import { useState, useRef, type KeyboardEvent, type ChangeEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { trainingApi } from "../api";
+import { trainingApi, reportApi } from "../api";
 import { Card, Empty, Loading, ErrorNote, Button } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { DrilldownPanel } from "../components/DrilldownPanel";
+import { DecisionBadge } from "../components/status/StatusBadge";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { canWriteSquadron } from "../auth/permissions";
@@ -13,6 +14,7 @@ export function Facilitators() {
   const { session } = useAuth();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["facilitators"], queryFn: trainingApi.facilitators });
+  const load = useQuery({ queryKey: ["fac-load"], queryFn: reportApi.facLoad });
   const [adding, setAdding] = useState(false);
   const [tagsFor, setTagsFor] = useState<Facilitator | null>(null);
   const [statsId, setStatsId] = useState<string | null>(null);
@@ -22,7 +24,7 @@ export function Facilitators() {
   return (
     <div>
       <h1>Facilitators</h1>
-      <Card title="Facilitators" action={canWrite && <Button onClick={() => setAdding(true)}>Add facilitator</Button>}>
+      <Card action={canWrite && <Button onClick={() => setAdding(true)}>Add facilitator</Button>}>
         {(q.data ?? []).length === 0 ? <Empty msg="No facilitators yet." /> : (
           <table>
             <caption className="vis-hidden">Facilitators</caption>
@@ -48,6 +50,25 @@ export function Facilitators() {
         )}
         <p className="muted">Rank is shown point-in-time on historical sessions; updating a facilitator does not rewrite past session rank.</p>
       </Card>
+
+      <Card title="Delivery statistics" action={load.data && <DecisionBadge decision={load.data.decision} />}>
+        {load.isLoading ? <Loading /> : load.error ? <ErrorNote error={load.error} /> :
+          (load.data!.facilitators.length === 0 ? <Empty msg="No session data yet." /> : (
+            <table>
+              <caption className="vis-hidden">Facilitator delivery statistics</caption>
+              <thead><tr><th>Facilitator</th><th>Sessions</th><th>Delivered</th><th>Load risk</th></tr></thead>
+              <tbody>{load.data!.facilitators.map((f) => (
+                <tr key={f.name}>
+                  <td>{f.name}</td>
+                  <td>{f.sessions}</td>
+                  <td>{f.delivered}</td>
+                  <td><span className={`badge ${f.risk === "ok" ? "ok" : f.risk === "high" ? "warn" : "red"}`}>{f.risk}</span></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          ))}
+      </Card>
+
       {adding && <AddFacModal onClose={() => setAdding(false)} onDone={() => { setAdding(false); qc.invalidateQueries({ queryKey: ["facilitators"] }); }} />}
       {tagsFor && <TagsModal fac={tagsFor} onClose={() => setTagsFor(null)} onDone={() => { setTagsFor(null); qc.invalidateQueries({ queryKey: ["facilitators"] }); }} />}
       {statsId && <FacStats id={statsId} onClose={() => setStatsId(null)} />}

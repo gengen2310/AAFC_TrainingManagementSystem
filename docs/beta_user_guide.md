@@ -146,12 +146,20 @@ Manage the list of staff and instructors who deliver sessions at your squadron. 
 
 Record the physical spaces available at your squadron (training rooms, ranges, outdoor areas). These are used in session planning and resource clash detection.
 
+### Dashboard
+
+The **Dashboard** provides a consolidated training overview:
+- **Training summary** — session counts by status (Delivered, Planned, Not Delivered, Cancelled, Rescheduled)
+- **Progress by phase** — delivery completion per curriculum phase with a visual indicator
+- **Facilitator summary** — who delivered what across the training year
+- **Upcoming parade nights** — next scheduled nights with readiness score
+
 ### Reports
 
-The **Reports** section provides:
-- **Training Summary** — overall delivery rate and readiness score for your squadron
+The **Training Reports** section provides detailed drilldowns:
 - **Not Delivered** — sessions that did not proceed, with reasons
 - **Curriculum Coverage** — which curriculum items have been delivered and how often
+- **Facilitator load** — session count and risk level per facilitator
 
 Wing Admins have access to Wing-wide overview reports across all 16 squadrons.
 
