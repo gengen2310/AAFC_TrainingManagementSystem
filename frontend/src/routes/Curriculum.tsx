@@ -30,7 +30,6 @@ export function Curriculum() {
   return (
     <div>
       <h1>Curriculum</h1>
-      <p className="muted">Progress is derived from sessions, not entered here.</p>
       <Card title="Filters">
         <div className="filter-bar">
           <select value={phase} onChange={(e) => setPhase(e.target.value)} aria-label="Phase"><option value="">All phases</option>{phases.map((p) => <option key={p}>{p}</option>)}</select>

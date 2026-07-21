@@ -496,8 +496,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-lbl">People &amp; Resources</div>
       <div class="nav-item" onclick="nav('facilitators')">Facilitators</div>
       <div class="nav-item" onclick="nav('resources')">Locations and Resources</div>
-      <div class="nav-lbl">Reports</div>
-      <div class="nav-item" onclick="nav('reports')">Training Summary</div>
       <div class="nav-lbl" id="admin-lbl" style="display:none">Admin</div>
       <div class="nav-item admin-el" style="display:none" onclick="nav('settings')">Unit Settings</div>
       <div class="nav-item" id="nav-accounts" style="display:none" onclick="nav('accounts')">Account Management</div>
@@ -931,7 +929,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="page-header">
           <div>
             <h1>Wing HQ Calendar</h1>
-            <div class="page-subtitle">Authoritative Wing-level events. Squadrons see these as inherited overlays in their Annual Program.</div>
+            <div class="page-subtitle">Authoritative Wing-level events. Squadrons see these as inherited overlays on their parade night calendar.</div>
           </div>
           <div class="page-actions">
             <select id="wc-wing-sel" style="display:none;max-width:160px" onchange="loadWingCalendar()"><option value="">— Select Wing —</option></select>
@@ -2838,12 +2836,12 @@ function roomById(id){return (S.rooms||[]).find(r=>r.id===id);}
 const _PLANNING_PAGES=[];
 const NAV_BY_SCOPE={
   squadron:['dashboard','calendar','parade-nights','weekly-program','curriculum','activities','facilitators','resources','action-items','settings','accounts',..._PLANNING_PAGES],
-  wing:['wing-overview','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
-  national:['national','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES],
-  auditor:['reports','audit','accounts',..._PLANNING_PAGES],
-  system_admin:['system-console','national','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','reports','audit','accounts',..._PLANNING_PAGES]
+  wing:['wing-overview','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','audit','accounts',..._PLANNING_PAGES],
+  national:['national','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','audit','accounts',..._PLANNING_PAGES],
+  auditor:['audit','accounts',..._PLANNING_PAGES],
+  system_admin:['system-console','national','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','audit','accounts',..._PLANNING_PAGES]
 };
-const SCOPE_LANDING={squadron:'dashboard',wing:'wing-overview',national:'national',auditor:'reports',system_admin:'system-console'};
+const SCOPE_LANDING={squadron:'dashboard',wing:'wing-overview',national:'national',auditor:'audit',system_admin:'system-console'};
 // In Proxy Mode (Wing) or Delegated Intervention (NAT HQ) the UI shows the EXACT SQN workspace
 // for the acting squadron; the backend returns that squadron's data while proxy is active.
 function effectiveScope(){ const sc=getScopeType(); return (proxyActive()&&sc!=='system_admin') ? 'squadron' : sc; }
@@ -2982,11 +2980,11 @@ function renderAll(){
   const scope=effectiveScope();
   if(scope==='system_admin'){
     // National operational data loaded by loadData; pre-render national views for navigation.
-    renderNational(); renderReports(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); renderAudit();
+    renderNational(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); renderAudit();
     return;
   }
   if(scope==='squadron'){ renderDash();renderPN();renderCurr();renderActs();renderFacs();renderRooms();renderActions(); }
-  else { renderReports(); renderCurr(); }
+  else { renderCurr(); }
   if(scope==='wing'){ renderWing(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); }
   if(scope==='national'){ renderNational(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); }
   if(scope==='national'||scope==='auditor'){ renderAudit(); }
@@ -3000,6 +2998,7 @@ function nav(id){
   if(id==='planning-year'||id==='planning-anchors'||id==='planning-term'||id==='planning-missions')id='activities';
   if(id==='planning-builder'||id==='planning-rooms')id='parade-nights';
   if(id==='planning-guide'||id==='planning-longrange'||id==='planning-checks')id='dashboard';
+  if(id==='reports'){const land=SCOPE_LANDING[effectiveScope()];id=land&&land!=='reports'?land:'dashboard';}
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');
@@ -3007,7 +3006,6 @@ function nav(id){
   if(id==='calendar')renderCal();
   if(id==='weekly-program'){populateWPDD();renderWP();}
   if(id==='dashboard')renderDash();
-  if(id==='reports')renderReports();
   if(id==='wing-overview')renderWing();
   if(id==='national')renderNational();
   if(id==='audit')renderAudit();
@@ -4049,8 +4047,8 @@ function renderDash(){
   const phC={};phO.forEach(p=>phC[p]={t:0,d:0});
   sess.forEach(s=>{if(phC[s.phase]){phC[s.phase].t++;if(s.status==='delivered')phC[s.phase].d++;}});
   document.getElementById('phase-prog').innerHTML=phO.map(ph=>{
-    const c=phC[ph];if(!c.t)return '';
-    const pct=Math.round(c.d/c.t*100);
+    const c=phC[ph];
+    const pct=c.t?Math.round(c.d/c.t*100):0;
     const fc=pct>=80?'ok':pct>=40?'amber':'';
     return `<div class="ph-row">
       <div class="ph-name">${PH_S[ph]||ph}</div>

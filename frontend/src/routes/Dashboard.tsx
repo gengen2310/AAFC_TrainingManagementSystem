@@ -33,6 +33,7 @@ export function Dashboard() {
   // Phase breakdown from all sessions across parade nights
   const allSessions = (parades.data ?? []).flatMap((p) => p.sessions);
   const phaseMap: Record<string, { total: number; delivered: number; not_delivered: number }> = {};
+  for (const ph of PHASE_ORDER) phaseMap[ph] = { total: 0, delivered: 0, not_delivered: 0 };
   for (const s of allSessions) {
     const ph = s.phase_at_time ?? "—";
     if (!phaseMap[ph]) phaseMap[ph] = { total: 0, delivered: 0, not_delivered: 0 };

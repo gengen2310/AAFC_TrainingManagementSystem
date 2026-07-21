@@ -965,6 +965,15 @@ function HolidaysContent({ yearId }: { yearId: string }) {
             <input type="checkbox" checked={affectsParade} onChange={e => setAffectsParade(e.target.checked)} />
             Affects parade nights (stand-down)
           </label>
+          <label style={{ fontSize: 12, fontWeight: 700, display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+            Notes (optional)
+            <input
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="e.g. State school holiday — check local gazette for exact dates"
+              style={{ fontWeight: 400, padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12 }}
+            />
+          </label>
           {err && <div style={{ color: "var(--aafc-red)", fontSize: 12, marginBottom: 6 }}>{err}</div>}
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn sm primary" onClick={handleAdd} disabled={saving}>
