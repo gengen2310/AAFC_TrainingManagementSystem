@@ -825,7 +825,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <!-- ACTIVITIES -->
       <div id="page-activities" class="page">
         <div class="ph">
-          <div class="ph-title">Activities &amp; Events</div>
+          <div class="ph-title">Activities</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-act')">+ Add Activity</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openGenerateActivitiesModal()">Generate Activities</button>
@@ -1540,23 +1540,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   </div>
 </div>
 
-<!-- Annual Program Import Modal -->
-<div class="modal-bg" id="m-import-program">
-  <div class="modal" style="max-width:720px">
-    <div class="modal-hdr"><div class="modal-title">Import Annual Program</div><button class="modal-x" onclick="closeModal('m-import-program')">×</button></div>
-    <div class="modal-body">
-      <div class="alert a-info">Upload a CADET.Net export CSV or XLSX. Columns: SeqNr, Name, Start date, Start time, End date, End time, Unit, Owner, Status, Last Updated.<br>Rows named <em>Parade Night / Training Night</em> create parade dates; all other rows create activities. For wing/national accounts the <strong>Unit</strong> column routes each row to the correct squadron.</div>
-      <div class="form-group"><label>CSV or Excel File *</label><input type="file" id="prog-import-file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
-      <p id="prog-import-msg" style="color:var(--error)"></p>
-      <div id="prog-import-preview" style="display:none;max-height:260px;overflow-y:auto;margin-top:8px"></div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-out" onclick="closeModal('m-import-program')">Cancel</button>
-      <button class="btn btn-out" onclick="previewImportProgram()">Preview</button>
-      <button class="btn btn-dk" id="prog-import-btn" style="display:none" onclick="commitImportProgram()">Import</button>
-    </div>
-  </div>
-</div>
 
 <!-- Add Holiday Modal -->
 <div class="modal-bg" id="m-add-holiday">
@@ -7127,7 +7110,7 @@ async function loadBuilderFromPn(pnId){
     const d = await api(`/api/parade-nights/${pnId}/builder`);
     if(infoBanner){
       infoBanner.style.display='';
-      infoBanner.innerHTML=`<strong>Parade Night Program</strong> — ${esc(d.parade_date)} (${_dayName(d.parade_date)}) &bull; Template: ${d.timing_template_id?'loaded':'none'} &bull; Sessions: ${d.session_count} periods`;
+      infoBanner.innerHTML=`<strong>Weekly Program</strong> — ${esc(d.parade_date)} (${_dayName(d.parade_date)}) &bull; Template: ${d.timing_template_id?'loaded':'none'} &bull; Sessions: ${d.session_count} periods`;
     }
     const conflBanner = document.getElementById('builder-conflicts-banner');
     if(conflBanner) conflBanner.style.display='none';
@@ -7720,86 +7703,6 @@ async function commitCeaImport(){
     await reloadAndRender();
     alert(`Imported ${d.created} activit${d.created!==1?'ies':'y'}. ${d.skipped} duplicate${d.skipped!==1?'s':''} skipped.`);
   }catch(e){ msg.textContent=apiErr(e); document.getElementById('cea-import-btn').disabled=false; }
-}
-
-// ═══════════════════════════════════
-//  ANNUAL PROGRAM IMPORT
-// ═══════════════════════════════════
-
-let _progImportPreviewRows=null;
-function openImportProgramModal(){
-  _progImportPreviewRows=null;
-  const f=document.getElementById('prog-import-file');
-  if(f) f.value='';
-  document.getElementById('prog-import-msg').textContent='';
-  document.getElementById('prog-import-preview').style.display='none';
-  document.getElementById('prog-import-preview').innerHTML='';
-  document.getElementById('prog-import-btn').style.display='none';
-  openModal('m-import-program');
-}
-async function previewImportProgram(){
-  const msg=document.getElementById('prog-import-msg');
-  const area=document.getElementById('prog-import-preview');
-  const fileEl=document.getElementById('prog-import-file');
-  const yearId=document.getElementById('py-select').value;
-  if(!yearId){ msg.textContent='No planning year selected.'; return; }
-  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select a CSV or Excel file first.'; return; }
-  msg.textContent='Loading preview…';
-  area.style.display='none';
-  const form=new FormData();
-  form.append('file',fileEl.files[0]);
-  try{
-    const res=await fetch(API_BASE+'/api/planning/years/'+yearId+'/import-program?preview=true',{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+tokenGet()},
-      body:form,
-    });
-    const d=await res.json();
-    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||'Preview failed'; return; }
-    _progImportPreviewRows=d.rows||[];
-    const parades=_progImportPreviewRows.filter(r=>r.type==='parade_date').length;
-    const acts=_progImportPreviewRows.filter(r=>r.type==='activity').length;
-    const errCount=(d.parse_errors||[]).length;
-    msg.style.color=errCount?'var(--error)':'var(--muted)';
-    msg.textContent=`${parades} parade date${parades!==1?'s':''}, ${acts} activit${acts!==1?'ies':'y'} to import.`+(errCount?' '+errCount+' row(s) skipped (see below).':'');
-    let html='<table class="data-table" style="font-size:11px"><thead><tr><th>#</th><th>Name</th><th>Type</th><th>Date</th><th>Unit</th><th>Owner</th></tr></thead><tbody>';
-    html+=_progImportPreviewRows.map(r=>`<tr>
-      <td>${esc(r.seq_nr||String(r.row))}</td>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.name)}</td>
-      <td><span class="badge ${r.type==='parade_date'?'b-blue':'b-grey'}">${r.type==='parade_date'?'Parade':'Activity'}</span></td>
-      <td>${esc(r.date_start||'—')}</td>
-      <td>${esc(r.resolved_sqn||r.unit||'—')}</td>
-      <td>${esc(r.owner||'—')}</td>
-    </tr>`).join('');
-    if(errCount){ html+=(d.parse_errors||[]).map(e=>`<tr style="color:var(--error)"><td colspan="6">${esc(e)}</td></tr>`).join(''); }
-    html+='</tbody></table>';
-    area.innerHTML=html;
-    area.style.display='block';
-    if(_progImportPreviewRows.length>0) document.getElementById('prog-import-btn').style.display='';
-  }catch(e){ msg.textContent=apiErr(e); }
-}
-async function commitImportProgram(){
-  const msg=document.getElementById('prog-import-msg');
-  const fileEl=document.getElementById('prog-import-file');
-  const yearId=document.getElementById('py-select').value;
-  if(!yearId){ msg.textContent='No planning year selected.'; return; }
-  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select a file first.'; return; }
-  msg.textContent='Importing…';
-  document.getElementById('prog-import-btn').disabled=true;
-  const form=new FormData();
-  form.append('file',fileEl.files[0]);
-  try{
-    const res=await fetch(API_BASE+'/api/planning/years/'+yearId+'/import-program?preview=false',{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+tokenGet()},
-      body:form,
-    });
-    const d=await res.json();
-    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||'Import failed'; document.getElementById('prog-import-btn').disabled=false; return; }
-    closeModal('m-import-program');
-    await loadYearMap(yearId);
-    alert(`Import complete.\n${d.created_parade_dates} parade date(s) created, ${d.created_activities} activit${d.created_activities!==1?'ies':'y'} created, ${d.skipped} duplicate(s) skipped.${(d.parse_errors||[]).length?' '+d.parse_errors.length+' row(s) had errors.':''}`);
-  }catch(e){ msg.textContent=apiErr(e); document.getElementById('prog-import-btn').disabled=false; }
 }
 
 // ════════════════════════════
