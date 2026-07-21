@@ -152,6 +152,8 @@ def get_maintenance(db: DBSession = Depends(get_db), p: Principal = Depends(get_
         "message": _get_setting(db, "maintenance_message"),
         "until": _get_setting(db, "maintenance_until"),
         "updated_at": _get_setting(db, "maintenance_updated_at"),
+        "block_reads": _get_setting(db, "maintenance_block_reads", "false") == "true",
+        "block_logins": _get_setting(db, "maintenance_block_logins", "false") == "true",
     }
 
 
@@ -159,6 +161,8 @@ class MaintenanceIn(BaseModel):
     message: str | None = None
     until: str | None = None
     confirm: str = ""
+    block_reads: bool = False
+    block_logins: bool = False
 
 
 @router.post("/maintenance/enable")
@@ -171,26 +175,32 @@ def enable_maintenance(body: MaintenanceIn, db: DBSession = Depends(get_db),
     _set_setting(db, "maintenance_mode", "on", p.user_id)
     _set_setting(db, "maintenance_message", body.message or "System under maintenance. Please try again later.", p.user_id)
     _set_setting(db, "maintenance_until", body.until, p.user_id)
+    _set_setting(db, "maintenance_block_reads", "true" if body.block_reads else "false", p.user_id)
+    _set_setting(db, "maintenance_block_logins", "true" if body.block_logins else "false", p.user_id)
     _set_setting(db, "maintenance_updated_at",
                  datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), p.user_id)
     audit(db, p, object_type="system", object_id="maintenance",
           action="maintenance_enabled",
-          new={"message": body.message, "until": body.until})
+          new={"message": body.message, "until": body.until,
+               "block_reads": body.block_reads, "block_logins": body.block_logins})
     from ..main import invalidate_maintenance_cache
     invalidate_maintenance_cache()
-    return {"enabled": True, "message": body.message, "until": body.until}
+    return {"enabled": True, "message": body.message, "until": body.until,
+            "block_reads": body.block_reads, "block_logins": body.block_logins}
 
 
 @router.post("/maintenance/disable")
 def disable_maintenance(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     require_system_admin(p)
     _set_setting(db, "maintenance_mode", "off", p.user_id)
+    _set_setting(db, "maintenance_block_reads", "false", p.user_id)
+    _set_setting(db, "maintenance_block_logins", "false", p.user_id)
     _set_setting(db, "maintenance_updated_at",
                  datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), p.user_id)
     audit(db, p, object_type="system", object_id="maintenance", action="maintenance_disabled")
     from ..main import invalidate_maintenance_cache
     invalidate_maintenance_cache()
-    return {"enabled": False}
+    return {"enabled": False, "block_reads": False, "block_logins": False}
 
 
 # ── GET /api/system/scope-map ─────────────────────────────────────────────────

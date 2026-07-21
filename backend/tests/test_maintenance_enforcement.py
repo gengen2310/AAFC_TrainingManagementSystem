@@ -153,10 +153,12 @@ def test_get_requests_work_during_maintenance(client):
 
 
 def test_login_works_during_maintenance(client):
-    """Login endpoint is exempt from maintenance gate."""
+    """Login is not blocked by default maintenance (block_logins=False)."""
     sysadmin_hdr = _sysadmin(client)
     _enable_maintenance(client, sysadmin_hdr)
     try:
+        # Clear cookie so the login is genuinely unauthenticated (not sysadmin bypass)
+        client.cookies.clear()
         r = client.post("/api/auth/login", json={"code": "ADMIN703"})
         assert r.status_code == 200
     finally:
@@ -306,3 +308,147 @@ def test_archive_squadron_forbidden_sqn_general(client):
     sqn_hdr = login(client, "703SQN2026")
     r = client.post("/api/squadrons/some-id/archive", headers=sqn_hdr)
     assert r.status_code == 403
+
+
+# ─────────────────────────────────────────────────────────────
+# block_reads flag (Gap #18)
+# ─────────────────────────────────────────────────────────────
+
+def _enable_maintenance_opts(client, sysadmin_hdr, block_reads=False, block_logins=False):
+    r = client.post("/api/system/maintenance/enable", json={
+        "confirm": "ENABLE MAINTENANCE",
+        "message": "Test maintenance window",
+        "block_reads": block_reads,
+        "block_logins": block_logins,
+    }, headers=sysadmin_hdr)
+    assert r.status_code == 200, r.text
+
+
+def test_block_reads_false_allows_get_during_maintenance(client):
+    """Default: block_reads=False means GET requests succeed even during maintenance."""
+    sysadmin_hdr = _sysadmin(client)
+    sqn_hdr = _sqn_admin(client)
+    _enable_maintenance(client, sysadmin_hdr)
+    try:
+        r = client.get("/api/curriculum", headers=sqn_hdr)
+        assert r.status_code != 503
+    finally:
+        _disable_maintenance(client, sysadmin_hdr)
+
+
+def test_block_reads_true_blocks_get_during_maintenance(client):
+    """block_reads=True causes GET /api/* to return 503 for non-system_admin."""
+    sysadmin_hdr = _sysadmin(client)
+    sqn_hdr = _sqn_admin(client)
+    _enable_maintenance_opts(client, sysadmin_hdr, block_reads=True)
+    try:
+        r = client.get("/api/curriculum", headers=sqn_hdr)
+        assert r.status_code == 503
+        assert r.json()["error"] == "maintenance_mode"
+    finally:
+        _disable_maintenance(client, sysadmin_hdr)
+
+
+def test_block_reads_true_still_allows_health(client):
+    """Health endpoints are always exempt even when block_reads=True."""
+    sysadmin_hdr = _sysadmin(client)
+    _enable_maintenance_opts(client, sysadmin_hdr, block_reads=True)
+    try:
+        r = client.get("/api/health")
+        assert r.status_code == 200
+    finally:
+        _disable_maintenance(client, sysadmin_hdr)
+
+
+def test_block_reads_true_still_allows_auth_me(client):
+    """GET /api/auth/me must always be accessible so users see maintenance status."""
+    sysadmin_hdr = _sysadmin(client)
+    sqn_hdr = _sqn_admin(client)
+    _enable_maintenance_opts(client, sysadmin_hdr, block_reads=True)
+    try:
+        r = client.get("/api/auth/me", headers=sqn_hdr)
+        assert r.status_code != 503
+    finally:
+        _disable_maintenance(client, sysadmin_hdr)
+
+
+def test_block_reads_true_sysadmin_can_still_read(client):
+    """system_admin bypasses block_reads and can still issue GET requests."""
+    sysadmin_hdr = _sysadmin(client)
+    _enable_maintenance_opts(client, sysadmin_hdr, block_reads=True)
+    try:
+        r = client.get("/api/curriculum", headers=sysadmin_hdr)
+        assert r.status_code != 503
+    finally:
+        _disable_maintenance(client, sysadmin_hdr)
+
+
+# ─────────────────────────────────────────────────────────────
+# block_logins flag (Gap #18)
+# ─────────────────────────────────────────────────────────────
+
+def test_block_logins_false_allows_login_during_maintenance(client):
+    """Default: block_logins=False means /api/auth/login succeeds during maintenance."""
+    sysadmin_hdr = _sysadmin(client)
+    _enable_maintenance(client, sysadmin_hdr)
+    try:
+        r = client.post("/api/auth/login", json={"code": "ADMIN703"})
+        assert r.status_code == 200
+    finally:
+        _disable_maintenance(client, sysadmin_hdr)
+
+
+def test_block_logins_true_blocks_login_during_maintenance(client):
+    """block_logins=True causes /api/auth/login to return 503 for unauthenticated users."""
+    sysadmin_hdr = _sysadmin(client)
+    _enable_maintenance_opts(client, sysadmin_hdr, block_logins=True)
+    try:
+        # Clear the sysadmin session cookie so the login request is unauthenticated.
+        # Without clearing, TestClient sends the sysadmin cookie which bypasses the gate.
+        client.cookies.clear()
+        r = client.post("/api/auth/login", json={"code": "ADMIN703"})
+        assert r.status_code == 503
+        assert r.json()["error"] == "maintenance_mode"
+    finally:
+        # Use the Bearer token from sysadmin_hdr — don't re-login (block_logins is still True).
+        _disable_maintenance(client, sysadmin_hdr)
+
+
+def test_block_logins_true_logout_me_refresh_still_accessible(client):
+    """block_logins=True must not block already-authenticated users' session endpoints."""
+    sysadmin_hdr = _sysadmin(client)
+    sqn_hdr = _sqn_admin(client)
+    _enable_maintenance_opts(client, sysadmin_hdr, block_logins=True)
+    try:
+        r = client.get("/api/auth/me", headers=sqn_hdr)
+        assert r.status_code != 503
+        r2 = client.post("/api/auth/refresh", headers=sqn_hdr)
+        assert r2.status_code != 503
+    finally:
+        _disable_maintenance(client, sysadmin_hdr)
+
+
+def test_maintenance_get_returns_block_flags(client):
+    """GET /api/system/maintenance now includes block_reads and block_logins fields."""
+    sysadmin_hdr = _sysadmin(client)
+    _enable_maintenance_opts(client, sysadmin_hdr, block_reads=True, block_logins=True)
+    try:
+        r = client.get("/api/system/maintenance", headers=sysadmin_hdr)
+        assert r.status_code == 200
+        d = r.json()
+        assert d["block_reads"] is True
+        assert d["block_logins"] is True
+    finally:
+        _disable_maintenance(client, sysadmin_hdr)
+
+
+def test_disable_maintenance_clears_block_flags(client):
+    """Disabling maintenance resets block_reads and block_logins to False."""
+    sysadmin_hdr = _sysadmin(client)
+    _enable_maintenance_opts(client, sysadmin_hdr, block_reads=True, block_logins=True)
+    _disable_maintenance(client, sysadmin_hdr)
+    r = client.get("/api/system/maintenance", headers=sysadmin_hdr)
+    d = r.json()
+    assert d["enabled"] is False
+    assert d["block_reads"] is False
+    assert d["block_logins"] is False
