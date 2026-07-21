@@ -520,7 +520,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-dashboard" class="page active">
         <div class="ph">
           <div class="ph-title" id="dash-title">Training Dashboard</div>
-          <div class="ph-sub" id="dash-sub">2026 Training Year</div>
         </div>
         <div class="stats-grid">
           <div class="stat"><div class="slbl">Parade Nights</div><div class="sval" id="s-pn">0</div><div class="ssub">scheduled 2026</div></div>
@@ -553,6 +552,24 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <div class="ctitle">Upcoming — Parade Nights &amp; Activities</div>
             <div id="upcoming"></div>
           </div>
+        </div>
+
+        <!-- Graph row: Session Outcomes + Facilitator Workload -->
+        <div class="dash-grid" style="margin-top:0">
+          <div class="card">
+            <div class="ctitle">Session Outcomes</div>
+            <div id="dash-outcomes" style="min-height:80px"></div>
+          </div>
+          <div class="card">
+            <div class="ctitle">Facilitator Workload</div>
+            <div id="dash-workload" style="min-height:80px"></div>
+          </div>
+        </div>
+
+        <!-- Upcoming Parade Night Readiness -->
+        <div class="card">
+          <div class="ctitle">Upcoming Parade Night Readiness</div>
+          <div id="dash-readiness" style="min-height:60px"></div>
         </div>
 
         <div class="card no-print">
@@ -702,6 +719,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="ph-title">Activities &amp; Events</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-act')">+ Add Activity</button>
+            <button class="btn btn-sky plan-write-el" style="display:none" onclick="openGenerateActivitiesModal()">Generate Activities</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddHolidayModal()">+ Add Holiday</button>
             <button class="btn btn-out admin-el" style="display:none" onclick="openCeaImport()">Import CEA</button>
           </div>
@@ -721,6 +739,44 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <thead><tr><th>Activity</th><th>Date</th><th>Importance</th><th>Audience</th><th>Prep Notes</th><th class="no-print">Actions</th></tr></thead>
             <tbody id="act-tbody"></tbody>
           </table>
+        </div>
+
+        <!-- ── Planning Year section (Annual Program functions) ── -->
+        <div class="card" style="margin-top:20px">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+            <div class="ctitle" style="margin:0">Planning Year</div>
+            <select id="py-select" onchange="loadYearMap(this.value)" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;flex:1;min-width:180px">
+              <option value="">— select a planning year —</option>
+            </select>
+            <span id="py-ctx-label-sqn" style="font-size:11px;color:var(--muted)"></span>
+            <button class="btn btn-dk plan-write-el" style="display:none" onclick="openNewYearModal()">+ New Year</button>
+          </div>
+          <div id="py-sqn-filter-row" style="display:none;margin-bottom:12px">
+            <label style="font-size:11px;font-weight:700;color:var(--muted);margin-right:8px">Squadron filter:</label>
+            <select id="py-sqn-filter" onchange="_loadPlanningYears()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px"></select>
+          </div>
+          <div id="py-map-body" style="min-height:40px"><p class="muted">Select a planning year to view the annual overview.</p></div>
+        </div>
+
+        <!-- Parade Dates card (shown when a year is selected) -->
+        <div class="card" id="py-dates-card" style="display:none;margin-top:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="ctitle" style="margin:0">Parade Dates</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-dk plan-write-el" style="display:none" onclick="openGenerateDatesModal()">Generate</button>
+              <button class="btn btn-out plan-write-el" style="display:none" onclick="openAddDateModal()">+ Add Date</button>
+            </div>
+          </div>
+          <div id="py-dates-body"></div>
+        </div>
+
+        <!-- Holidays card (shown when a year is selected) -->
+        <div class="card" id="py-holidays-card" style="display:none;margin-top:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="ctitle" style="margin:0">Holiday &amp; Stand-down Periods</div>
+            <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddHolidayModal()">+ Add Holiday</button>
+          </div>
+          <div id="py-holidays-body"></div>
         </div>
       </div>
 
@@ -1661,6 +1717,70 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-add-act')">Cancel</button>
       <button class="btn btn-dk" onclick="saveAct()">Add Activity</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generate Recurring Activities -->
+<div class="modal-bg" id="m-gen-acts">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-hdr"><div class="modal-title">Generate Recurring Activities</div><button class="modal-x" onclick="closeModal('m-gen-acts')">×</button></div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="ff" style="flex:2"><label>Activity Name *</label><input id="ga-name" placeholder="e.g. Drill Night"></div>
+        <div class="ff"><label>Type</label>
+          <select id="ga-type"><option value="Must Attend">Must Attend</option><option value="Key Event">Key Event</option><option value="Optional" selected>Optional</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="ff"><label>Start Date *</label><input type="date" id="ga-start"></div>
+        <div class="ff"><label>End Date *</label><input type="date" id="ga-end"></div>
+      </div>
+      <div class="form-row">
+        <div class="ff"><label>Start Time</label><input type="time" id="ga-time-start"></div>
+        <div class="ff"><label>Finish Time</label><input type="time" id="ga-time-end"></div>
+      </div>
+      <div class="form-row">
+        <div class="ff"><label>Recurrence *</label>
+          <select id="ga-recur" onchange="_gaRecurChange()">
+            <option value="daily">Daily</option>
+            <option value="weekly" selected>Weekly</option>
+            <option value="fortnightly">Fortnightly</option>
+            <option value="monthly">Monthly (same day of month)</option>
+            <option value="yearly">Yearly (same date)</option>
+          </select>
+        </div>
+        <div class="ff" id="ga-weekday-row"><label>Weekday</label>
+          <select id="ga-weekday">
+            <option value="0">Monday</option><option value="1">Tuesday</option>
+            <option value="2">Wednesday</option><option value="3">Thursday</option>
+            <option value="4">Friday</option><option value="5">Saturday</option>
+            <option value="6">Sunday</option>
+          </select>
+        </div>
+        <div class="ff"><label>Max occurrences</label><input type="number" id="ga-count" min="1" max="200" placeholder="(no limit)"></div>
+      </div>
+      <div class="ff"><label>Exclude dates (comma-separated YYYY-MM-DD)</label><input id="ga-excl" placeholder="e.g. 2026-04-10, 2026-12-25"></div>
+      <div class="ff"><label>Location</label><input id="ga-location" placeholder="e.g. SQN HQ"></div>
+      <div class="ff"><label>Notes</label><input id="ga-notes"></div>
+      <div id="ga-preview-area" style="display:none;margin-top:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="ctitle" style="margin:0" id="ga-preview-title">Preview</div>
+          <div style="font-size:11px;color:var(--muted)" id="ga-preview-summary"></div>
+        </div>
+        <div style="max-height:240px;overflow-y:auto">
+          <table class="data-table" id="ga-preview-table">
+            <thead><tr><th>Date</th><th>Start</th><th>Finish</th><th>Include/Skip</th><th>Reason</th></tr></thead>
+            <tbody id="ga-preview-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <p id="ga-msg" style="font-size:11.5px;color:var(--red);margin-top:8px;font-weight:700"></p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-out" onclick="closeModal('m-gen-acts')">Cancel</button>
+      <button class="btn btn-sky" onclick="previewGenerateActivities()">Preview</button>
+      <button class="btn btn-dk" id="ga-create-btn" style="display:none" onclick="commitGenerateActivities()">Create Activities</button>
     </div>
   </div>
 </div>
@@ -3029,6 +3149,7 @@ function nav(id){
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes("'"+id+"'"))n.classList.add('active');});
   if(id==='calendar')renderCal();
   if(id==='weekly-program'){populateWPDD();renderWP();}
+  if(id==='activities'){_loadActivitiesPage();}
   if(id==='dashboard')renderDash();
   if(id==='wing-overview')renderWing();
   if(id==='national')renderNational();
@@ -4055,7 +4176,6 @@ function drillFacDel(facKey){
 function renderDash(){
   const info=getCurrentUnitInfo();
   document.getElementById('dash-title').textContent=info.name+' — Training Dashboard';
-  document.getElementById('dash-sub').textContent=`${S.trainingYear||2026} Training Year`;
   const sess=allSess();
   const cnt=(st)=>sess.filter(s=>s.status===st).length;
   document.getElementById('s-pn').textContent=S.pns.length;
@@ -4169,6 +4289,77 @@ function renderDash(){
       <td style="color:var(--red);text-align:center">${f.cancelled}</td>
       <td style="font-weight:800;text-align:center">${f.total}</td>
     </tr>`).join('')||`<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:14px">No session data yet</td></tr>`;
+  }
+
+  // ── B. Session Outcomes chart ──
+  const outEl=document.getElementById('dash-outcomes');
+  if(outEl){
+    const total=sess.length;
+    if(!total){outEl.innerHTML='<div class="empty" style="padding:12px"><div class="es">No sessions recorded yet.</div></div>';}
+    else{
+      const outcomes=[
+        {label:'Delivered',count:cnt('delivered'),color:'var(--ok)',pattern:''},
+        {label:'Not Delivered',count:cnt('not_delivered'),color:'var(--steel)',pattern:''},
+        {label:'Cancelled',count:cnt('cancelled'),color:'var(--red)',pattern:''},
+        {label:'Rescheduled',count:cnt('rescheduled'),color:'var(--warn)',pattern:''},
+        {label:'Planned',count:cnt('planned'),color:'var(--blue)',pattern:''},
+      ];
+      const maxW=Math.max(...outcomes.map(o=>o.count),1);
+      outEl.innerHTML=outcomes.map(o=>{
+        const pct=Math.round(o.count/total*100);
+        const w=Math.round(o.count/maxW*100);
+        return `<div class="ph-row" style="margin-bottom:5px" role="img" aria-label="${o.label}: ${o.count} (${pct}%)">
+          <div class="ph-name" style="min-width:90px;font-size:11px">${o.label}</div>
+          <div class="ph-bar" style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${o.color};border-radius:3px;transition:width .3s" title="${o.count} session${o.count!==1?'s':''}"></div></div></div>
+          <div class="ph-cnt" style="min-width:48px;text-align:right;font-size:11px;color:var(--muted)">${o.count} <span style="font-size:9px">(${pct}%)</span></div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // ── D. Facilitator Workload chart ──
+  const wkEl=document.getElementById('dash-workload');
+  if(wkEl){
+    const wkMap={};
+    sess.forEach(s=>{ if(!s.facId&&!s.facName)return; const k=s.facId||s.facName; const n=s.facName||k; if(!wkMap[k])wkMap[k]={name:n,id:s.facId,count:0}; wkMap[k].count++; });
+    const wkList=Object.values(wkMap).sort((a,b)=>b.count-a.count).slice(0,10);
+    if(!wkList.length){wkEl.innerHTML='<div class="empty" style="padding:12px"><div class="es">No facilitator assignments.</div></div>';}
+    else{
+      const maxC=Math.max(...wkList.map(w=>w.count),1);
+      wkEl.innerHTML=wkList.map(w=>{
+        const pct=Math.round(w.count/maxC*100);
+        const name=w.name.length>20?w.name.substring(0,18)+'…':w.name;
+        return `<div class="ph-row" style="margin-bottom:4px" role="img" aria-label="${w.name}: ${w.count} sessions">
+          <div class="ph-name" style="min-width:90px;font-size:10.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(w.name)}">${esc(name)}</div>
+          <div class="ph-bar" style="flex:1"><div class="pbar"><div style="height:100%;width:${pct}%;background:var(--royal);border-radius:3px" title="${w.count} sessions"></div></div></div>
+          <div class="ph-cnt" style="min-width:32px;text-align:right;font-size:11px;color:var(--muted)">${w.count}</div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // ── C. Upcoming Parade Night Readiness ──
+  const rdEl=document.getElementById('dash-readiness');
+  if(rdEl){
+    const upcoming=S.pns.filter(p=>new Date(p.date+'T00:00:00')>=td).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,8);
+    if(!upcoming.length){rdEl.innerHTML='<div class="empty" style="padding:12px"><div class="es">No upcoming parade nights.</div></div>';}
+    else{
+      rdEl.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;padding:4px 0">` +
+        upcoming.map(pn=>{
+          const sessions=pn.sessions||[];
+          const unstaffed=sessions.filter(s=>!s.facId).length;
+          const readinessPct=pn.readiness!=null?Math.round(pn.readiness*100):(sessions.length&&sessions.every(s=>s.status==='delivered')?100:sessions.length?Math.round(sessions.filter(s=>s.status==='delivered').length/sessions.length*100):0);
+          const rdCls=readinessPct>=80?'var(--ok)':readinessPct>=40?'var(--warn)':'var(--red)';
+          return `<div style="border:1.5px solid var(--border);border-radius:8px;padding:10px;position:relative" role="img" aria-label="${pn.date}: ${readinessPct}% ready">
+            <div style="font-size:10.5px;font-weight:800;color:var(--dark)">${fmtD(pn.date,{weekday:'short',day:'numeric',month:'short'})}</div>
+            <div style="font-size:9.5px;color:var(--muted);margin-bottom:6px">${pn.term}</div>
+            <div class="pbar" style="margin-bottom:5px"><div style="height:100%;width:${readinessPct}%;background:${rdCls};border-radius:3px" title="${readinessPct}% ready"></div></div>
+            <div style="font-size:10px;color:${rdCls};font-weight:700">${readinessPct}% ready</div>
+            ${unstaffed?`<div style="font-size:10px;color:var(--warn);font-weight:700" aria-label="${unstaffed} unstaffed">⚠ ${unstaffed} unstaffed</div>`:''}
+            ${sessions.length?`<div style="font-size:9.5px;color:var(--muted)">${sessions.length} session${sessions.length!==1?'s':''}</div>`:'<div style="font-size:9.5px;color:var(--muted)">No sessions</div>'}
+          </div>`;
+        }).join('')+`</div>`;
+    }
   }
 }
 
@@ -4759,6 +4950,14 @@ async function deleteCurrItem(id){
 // ═══════════════════════════════════════════════════════════
 //  ACTIVITIES
 // ═══════════════════════════════════════════════════════════
+let _activitiesPageLoaded=false;
+async function _loadActivitiesPage(){
+  renderActs();
+  if(_activitiesPageLoaded)return;
+  _activitiesPageLoaded=true;
+  await _loadPlanningYears();
+  if(P.currentYearId)loadYearMap(P.currentYearId);
+}
 function renderActs(){
   const td=today();
   const typeFilter=(document.getElementById('act-f-type')||{}).value||'all';
@@ -4779,6 +4978,98 @@ function renderActs(){
     </tr>`;
   }).join(''):`<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:14px">No activities${typeFilter!=='all'?' of this type':''}${search?' matching "'+esc(search)+'"':''}.</td></tr>`;
 }
+// ── Activity Auto-Generation ──────────────────────────────────────────────
+function openGenerateActivitiesModal(){
+  ['ga-name','ga-location','ga-notes','ga-excl'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  document.getElementById('ga-start').value='';
+  document.getElementById('ga-end').value='';
+  document.getElementById('ga-time-start').value='';
+  document.getElementById('ga-time-end').value='';
+  document.getElementById('ga-recur').value='weekly';
+  document.getElementById('ga-weekday').value='1';
+  document.getElementById('ga-count').value='';
+  document.getElementById('ga-type').value='Optional';
+  document.getElementById('ga-preview-area').style.display='none';
+  document.getElementById('ga-create-btn').style.display='none';
+  document.getElementById('ga-msg').textContent='';
+  _gaRecurChange();
+  openModal('m-gen-acts');
+}
+function _gaRecurChange(){
+  const r=document.getElementById('ga-recur').value;
+  const wd=document.getElementById('ga-weekday-row');
+  if(wd)wd.style.display=['weekly','fortnightly'].includes(r)?'':'none';
+}
+function _gaBody(previewOnly){
+  const excl=(document.getElementById('ga-excl').value||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const count=parseInt(document.getElementById('ga-count').value)||null;
+  const wd=document.getElementById('ga-weekday').value;
+  const recur=document.getElementById('ga-recur').value;
+  return {
+    activity_name:document.getElementById('ga-name').value.trim(),
+    activity_type:document.getElementById('ga-type').value,
+    start_date:document.getElementById('ga-start').value,
+    end_date:document.getElementById('ga-end').value,
+    time_start:document.getElementById('ga-time-start').value||null,
+    time_end:document.getElementById('ga-time-end').value||null,
+    recurrence:recur,
+    weekday:['weekly','fortnightly'].includes(recur)?parseInt(wd):null,
+    excluded_dates:excl,
+    repeat_count:count,
+    location:document.getElementById('ga-location').value||null,
+    notes:document.getElementById('ga-notes').value||null,
+    planning_year_id:P&&P.currentYearId?P.currentYearId:null,
+    preview_only:previewOnly,
+  };
+}
+async function previewGenerateActivities(){
+  const msg=document.getElementById('ga-msg');
+  const body=_gaBody(true);
+  if(!body.activity_name){msg.textContent='Activity name is required.';return;}
+  if(!body.start_date||!body.end_date){msg.textContent='Start and end dates are required.';return;}
+  if(body.start_date>body.end_date){msg.textContent='End date must be on or after start date.';return;}
+  msg.textContent='Generating preview…';
+  try{
+    const r=await api('/api/activities/generate',{method:'POST',body});
+    const pa=document.getElementById('ga-preview-area');
+    const pb=document.getElementById('ga-preview-body');
+    const ps=document.getElementById('ga-preview-summary');
+    const cb=document.getElementById('ga-create-btn');
+    ps.textContent=`${r.would_create} to create, ${r.would_skip} to skip`;
+    pb.innerHTML=r.preview.map(row=>{
+      const statusCls=row.status==='include'?'b-ok':'b-grey';
+      const reasonTxt=row.reason==='duplicate'?`⚠ Duplicate (${row.existing_activity_id?'ID:'+row.existing_activity_id.slice(0,8):'exists'})`
+                      :row.reason==='holiday'?`⚠ Holiday: ${esc(row.holiday_name||'')}`
+                      :row.reason==='excluded'?'Excluded date':'';
+      return `<tr style="${row.status==='skip'?'opacity:0.55':''}">
+        <td>${esc(row.date)}</td>
+        <td>${esc(row.start_time||'—')}</td>
+        <td>${esc(row.finish_time||'—')}</td>
+        <td><span class="badge ${statusCls}">${row.status==='include'?'Include':'Skip'}</span></td>
+        <td style="font-size:10.5px;color:var(--muted)">${reasonTxt}</td>
+      </tr>`;
+    }).join('');
+    pa.style.display='';
+    cb.style.display=r.would_create>0?'inline-flex':'none';
+    msg.textContent='';
+  }catch(e){msg.textContent='Preview failed: '+apiErr(e);}
+}
+async function commitGenerateActivities(){
+  const msg=document.getElementById('ga-msg');
+  const body=_gaBody(false);
+  msg.textContent='Creating activities…';
+  document.getElementById('ga-create-btn').disabled=true;
+  try{
+    const r=await api('/api/activities/generate',{method:'POST',body});
+    closeModal('m-gen-acts');
+    await reloadAndRender();
+    alert(`Done. ${r.created_count} activities created, ${r.skipped_count} skipped.`);
+  }catch(e){
+    msg.textContent='Creation failed: '+apiErr(e);
+    document.getElementById('ga-create-btn').disabled=false;
+  }
+}
+
 let _editActId=null;
 async function saveAct(){
   const name=document.getElementById('act-name').value.trim();
