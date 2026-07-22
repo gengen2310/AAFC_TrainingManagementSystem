@@ -1,29 +1,36 @@
 #!/usr/bin/env bash
-# deploy-staging.sh — Hardened staging deployment guard for AAFC TMS (v4).
+# deploy-staging.sh — Hardened staging deployment guard for AAFC TMS (v5).
+#
+# Authentication:
+#   Two-step cookie login — POST /api/auth/lookup → POST /api/auth/login.
+#   Credential via hidden interactive prompt (read -rs) or CI env var.
+#   Cookie jar: mktemp (chmod 600); deleted in cleanup trap.
+#   No bearer token. No STAGING_AUTH_TOKEN. No credential in process args.
+#
+# Login flow:
+#   POST /api/auth/lookup  {"unit_type":"national","role":"system_admin"}
+#     → 200 {"user_id":"<uuid>","display_name":"..."}
+#   POST /api/auth/login   body read from 600-mode temp file, never in args
+#     → 200 Set-Cookie: aafc_session=<jwt>; HttpOnly; SameSite=lax
+#   All subsequent calls use --cookie "$COOKIE_JAR"
+#   POST /api/auth/logout  called in cleanup trap
 #
 # Gate order:
-#   PRE-DEPLOY  : token presence + /api/auth/me role check (stable, v39-safe endpoint)
-#   PREFLIGHT   : Railway IDs, UUID proof, git, tests, Alembic code head
-#   POST-AUTH   : capture PRE_LATEST and PRE_ACTIVE deployment IDs for all services
-#   BACKEND GATE: health, new-deployment ID confirmed, DB revision, subject-area-tags CRUD
-#   FRONTEND GATE: HTTP 200, new-deployment ID confirmed, build fingerprint, Playwright
-#   PW GATE     : HTTP 200/healthz, new-deployment ID confirmed, fingerprint, Playwright
-#
-# Deployment tracking (fixes the LATEST vs ACTIVE distinction):
-#   PRE_LATEST_DEPLOY_ID  = --limit 1 result before railway up (may be FAILED)
-#   PRE_ACTIVE_DEPLOY_ID  = first SUCCESS in --limit 20 list (what's serving traffic)
-#   After railway up: wait until --limit 1 returns an ID != PRE_LATEST to discover NEW_DEPLOY_ID
-#   Then poll NEW_DEPLOY_ID specifically. Abort on concurrent deployment (another ID appears).
-#
-# Subject-area-tags CRUD runs only after backend v40 is confirmed active.
-# /api/auth/me is used for pre-deploy token validation (not subject-area-tags).
-#
-# REQUIRED: STAGING_AUTH_TOKEN  (system_admin bearer token; never printed)
-# OPTIONAL: DRY_RUN=1           (validate token + preflight + show commands; no writes; exit 0)
+#   CREDENTIAL  : hidden prompt or CI env var
+#   PREFLIGHT   : Railway IDs, UUIDs, git, security greps, backend tests, Alembic head
+#   AUTH        : login + /api/auth/me role=system_admin is_national=True
+#   PRE-DEPLOY  : capture PRE_LATEST and PRE_ACTIVE for all three services
+#   AUTHZ       : deployment phrase prompt
+#   BACKEND     : railway up → health → new-deploy ID → DB revision b2c3d4e5f6a7 →
+#                 [reauth if session expired] → subject-area-tags CRUD
+#   FRONTEND    : railway up → HTTP 200 → new-deploy ID → build fingerprint → Playwright
+#   PW          : railway up → HTTP 200/healthz → new-deploy ID → fingerprint → Playwright
+#   CLEANUP     : logout, delete cookie jar, delete payload file, unset credential
 #
 # USAGE:
-#   STAGING_AUTH_TOKEN=<token> bash scripts/deploy-staging.sh
-#   STAGING_AUTH_TOKEN=<token> DRY_RUN=1 bash scripts/deploy-staging.sh
+#   bash scripts/deploy-staging.sh                              # interactive
+#   STAGING_SYSTEM_ADMIN_CODE=xxx DRY_RUN=1 \
+#     bash scripts/deploy-staging.sh                           # CI dry run
 #
 # TESTING (source functions without running main):
 #   DEPLOY_FUNCTIONS_ONLY=1 source scripts/deploy-staging.sh
@@ -65,13 +72,34 @@ fail() { echo -e "  ${RED}[FAIL]${NC} $1"; FAIL_COUNT=$((FAIL_COUNT+1)); }
 info() { echo -e "  ${BLU}[INFO]${NC} $1"; }
 die()  { echo -e "\n  ${RED}══ ABORT ══${NC} $1\n"; exit 1; }
 
+# ── Temp-file globals (set in main, not at source time) ───────────────────────
+COOKIE_JAR=""
+LOGIN_PAYLOAD_FILE=""
+STAGING_API_CODE="000"
+STAGING_API_BODY=""
+VERIFIED_NEW_DEPLOY_ID="unknown"
+
+# ── Cleanup ────────────────────────────────────────────────────────────────────
+# Registered as trap in main. Attempts logout then deletes all temp files.
+cleanup() {
+  if [ -n "${COOKIE_JAR:-}" ] && [ -f "${COOKIE_JAR:-}" ] && [ -s "${COOKIE_JAR:-}" ]; then
+    curl -s -X POST \
+      --connect-timeout 5 --max-time 10 \
+      --cookie "$COOKIE_JAR" \
+      "https://$EXPECTED_STAGING_BACKEND_DOMAIN/api/auth/logout" \
+      >/dev/null 2>&1 || true
+    info "Staging logout called."
+  fi
+  [ -n "${LOGIN_PAYLOAD_FILE:-}" ] && : > "${LOGIN_PAYLOAD_FILE:-}" 2>/dev/null || true
+  rm -f "${COOKIE_JAR:-}" "${LOGIN_PAYLOAD_FILE:-}" 2>/dev/null || true
+  unset STAGING_SYSTEM_ADMIN_CODE 2>/dev/null || true
+  info "Temporary files deleted; credential unset."
+}
+
 # ── Testable Railway deployment list wrapper ───────────────────────────────────
 # In test mode (DEPLOY_TEST_MODE=1) returns entries from MOCK_DEPLOY_CALLS[].
-# The call index is persisted to DEPLOY_TEST_COUNTER_FILE (a temp file) so that
-# the index survives across $() subshells, which would otherwise lose in-memory
-# variable changes.  The test script must set DEPLOY_TEST_COUNTER_FILE and
-# initialise it to "0" before each test.
-
+# Call index is persisted to DEPLOY_TEST_COUNTER_FILE (a temp file) so the
+# index survives across $() subshells.
 _railway_deploy_list() {
   local svc_id="$1" env_id="$2" limit="${3:-5}"
   if [ "${DEPLOY_TEST_MODE:-0}" = "1" ]; then
@@ -91,8 +119,6 @@ _railway_deploy_list() {
 
 # ── Pre-deployment state capture ───────────────────────────────────────────────
 # Outputs: "LATEST_ID|LATEST_STATUS|ACTIVE_ID|ACTIVE_CREATED"
-# LATEST  = first row from --limit 20 (newest regardless of status)
-# ACTIVE  = first SUCCESS row from --limit 20 (currently serving traffic)
 _capture_state() {
   local svc_id="$1"
   local json
@@ -114,14 +140,11 @@ print(f"{latest_id}|{latest_status}|{active_id}|{active_created}")
 }
 
 # ── New deployment tracking ────────────────────────────────────────────────────
-# Usage: wait_for_new_deploy <svc_id> <pre_latest_id> <pre_active_id> <timeout_s> <label>
-# Sets VERIFIED_NEW_DEPLOY_ID on success.
-# Phase 1: wait until --limit 1 returns ID != pre_latest_id  → that is NEW_DEPLOY_ID
+# Phase 1: wait until --limit 1 returns ID != pre_latest_id  → NEW_DEPLOY_ID
 # Phase 2: poll until NEW_DEPLOY_ID reaches SUCCESS
-#   - Abort on FAILED/CRASHED/REMOVED
-#   - Abort if yet another deployment appears (concurrent activity)
+#   - Abort on concurrent deployment (another ID appears after ours)
+#   - Abort on FAILED/CRASHED/REMOVED; run rollback check
 #   - Abort on timeout
-# On failure: runs check_rollback against pre_active_id
 VERIFIED_NEW_DEPLOY_ID="unknown"
 
 wait_for_new_deploy() {
@@ -142,7 +165,6 @@ import json,sys; d=json.load(sys.stdin); print(d[0]['id'] if d else 'none')" 2>/
 import json,sys; d=json.load(sys.stdin); print(d[0]['status'] if d else 'none')" 2>/dev/null || echo "none")
 
     if [ "$new_deploy_id" = "discovering" ]; then
-      # Phase 1: wait for the list to change
       if [ "$latest_id" = "$pre_latest_id" ]; then
         echo "    [${elapsed}s] Latest is still pre-deploy ($pre_latest_id) — upload in progress"
       elif [ "$latest_id" = "none" ]; then
@@ -152,11 +174,10 @@ import json,sys; d=json.load(sys.stdin); print(d[0]['status'] if d else 'none')"
         info "$label: new deployment discovered: $new_deploy_id (status: $latest_status)"
       fi
     else
-      # Phase 2: poll specific deployment; detect concurrent activity
+      # Phase 2: concurrent-deployment check
       if [ "$latest_id" != "$new_deploy_id" ] && [ "$latest_id" != "none" ]; then
         die "$label: concurrent deployment detected — $latest_id appeared after our deployment $new_deploy_id. Investigate before retrying."
       fi
-      # Get specific status from wider query
       local json5
       json5=$(_railway_deploy_list "$svc_id" "${ACTUAL_STAGING_ENV_ID:-}" 5)
       local our_status
@@ -174,8 +195,7 @@ else: print('not_found')" 2>/dev/null || echo "not_found")
           return 0
           ;;
         FAILED|CRASHED|REMOVED)
-          echo
-          echo -e "  ${RED}$label deployment $new_deploy_id reached $our_status${NC}"
+          echo -e "\n  ${RED}$label deployment $new_deploy_id reached $our_status${NC}"
           _check_rollback "$svc_id" "$pre_active_id" "$new_deploy_id" "$label"
           die "$label deployment $new_deploy_id → $our_status — HARD FAIL."
           ;;
@@ -200,14 +220,12 @@ else: print('not_found')" 2>/dev/null || echo "not_found")
 }
 
 # ── Rollback verification ──────────────────────────────────────────────────────
-# Usage: _check_rollback <svc_id> <pre_active_id> <failed_new_id> <label>
 _check_rollback() {
   local svc_id="$1" pre_active_id="$2" failed_new_id="$3" label="$4"
   local state
   state=$(_capture_state "$svc_id")
   local current_latest current_active
   current_latest="${state%%|*}"
-  # active_id is the third field
   current_active=$(echo "$state" | cut -d'|' -f3)
 
   info "$label rollback check:"
@@ -223,12 +241,11 @@ _check_rollback() {
   elif [ "$current_active" = "none" ]; then
     echo -e "  ${YLW}[WARN]${NC} $label has no active SUCCESS deployment — service may be down"
   else
-    echo -e "  ${YLW}[WARN]${NC} $label active deployment $current_active is neither pre-deploy nor failed — concurrent deployment activity suspected"
+    echo -e "  ${YLW}[WARN]${NC} $label active deployment $current_active is neither pre-deploy nor failed"
   fi
 }
 
 # ── HTTP health gate ───────────────────────────────────────────────────────────
-# Usage: poll_health <url> <timeout_s> <description>
 poll_health() {
   local url="$1" timeout="$2" desc="$3"
   local elapsed=0
@@ -248,10 +265,137 @@ poll_health() {
   die "$desc did not return HTTP 200 within ${timeout}s — HARD FAIL."
 }
 
+# ── Credential acquisition ─────────────────────────────────────────────────────
+# Interactive (default) or CI (STAGING_SYSTEM_ADMIN_CODE env var).
+# Credential is never echoed, never in process args, never written to repo files.
+staging_acquire_credential() {
+  if [ -n "${STAGING_SYSTEM_ADMIN_CODE:-}" ]; then
+    if [ "${#STAGING_SYSTEM_ADMIN_CODE}" -lt 6 ]; then
+      die "STAGING_SYSTEM_ADMIN_CODE is too short — appears to be a placeholder."
+    fi
+    info "Credential loaded from STAGING_SYSTEM_ADMIN_CODE (CI mode; value not printed)"
+    return 0
+  fi
+  # Interactive hidden entry
+  read -r -s -p "  Staging System Admin access code: " STAGING_SYSTEM_ADMIN_CODE
+  printf "\n"
+  if [ -z "${STAGING_SYSTEM_ADMIN_CODE:-}" ]; then
+    die "No access code entered — authentication blocked."
+  fi
+}
+
+# ── Staging login ──────────────────────────────────────────────────────────────
+# Step 1: POST /api/auth/lookup {"unit_type":"national","role":"system_admin"}
+#         → resolves user_id for the system_admin account
+# Step 2: write {"user_id":"...","code":"..."} to chmod-600 temp file
+#         POST /api/auth/login -d @file  → sets aafc_session cookie in COOKIE_JAR
+# The access code never appears in curl command-line args or process listings.
+staging_login() {
+  # Step 1: lookup user_id
+  local lookup_raw lookup_code lookup_body user_id
+  lookup_raw=$(curl -s -w "\n__STATUS__%{http_code}" \
+    --connect-timeout 10 --max-time 20 \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"unit_type":"national","role":"system_admin"}' \
+    "https://$EXPECTED_STAGING_BACKEND_DOMAIN/api/auth/lookup" 2>/dev/null)
+  lookup_code=$(echo "$lookup_raw" | grep -o '__STATUS__[0-9]*' | grep -o '[0-9]*' || echo "000")
+  lookup_body=$(echo "$lookup_raw" | sed 's/__STATUS__[0-9]*$//')
+
+  case "$lookup_code" in
+    200) ;;
+    404) die "Staging auth lookup: no system_admin account found — run bootstrap first." ;;
+    *)   die "Staging auth lookup failed (HTTP $lookup_code)." ;;
+  esac
+
+  user_id=$(echo "$lookup_body" | python3 -c "
+import json,sys; print(json.load(sys.stdin).get('user_id','MISSING'))" 2>/dev/null || echo "MISSING")
+  [ "$user_id" = "MISSING" ] || [ -z "$user_id" ] \
+    && die "Staging auth lookup: response missing user_id."
+
+  # Step 2: write login payload to protected temp file; never pass code as arg
+  # printf is a bash builtin — does not create a visible process
+  printf '{"user_id":"%s","code":"%s"}' "$user_id" "$STAGING_SYSTEM_ADMIN_CODE" \
+    > "$LOGIN_PAYLOAD_FILE"
+
+  local login_raw login_code
+  login_raw=$(curl -s -w "\n__STATUS__%{http_code}" \
+    --connect-timeout 10 --max-time 20 \
+    -X POST \
+    -H "Content-Type: application/json" \
+    --cookie-jar "$COOKIE_JAR" \
+    -d @"$LOGIN_PAYLOAD_FILE" \
+    "https://$EXPECTED_STAGING_BACKEND_DOMAIN/api/auth/login" 2>/dev/null)
+
+  # Zero payload immediately after curl returns (before any die())
+  : > "$LOGIN_PAYLOAD_FILE"
+
+  login_code=$(echo "$login_raw" | grep -o '__STATUS__[0-9]*' | grep -o '[0-9]*' || echo "000")
+
+  case "$login_code" in
+    200) ok "Staging login: HTTP 200, session cookie stored" ;;
+    401) die "Staging login: invalid access code (HTTP 401)." ;;
+    429) die "Staging login: locked out (HTTP 429) — too many failed attempts." ;;
+    *)   die "Staging login: unexpected HTTP $login_code." ;;
+  esac
+}
+
+# ── Session verification via /api/auth/me ─────────────────────────────────────
+# Returns 0 — valid system_admin session.
+# Returns 1 — HTTP 401 (expired/invalid; caller handles reauth).
+# Calls die() — any other error.
+# Cookie contents are never printed.
+staging_verify_session() {
+  local label="${1:-Auth}"
+  local resp code body role is_national
+  resp=$(curl -s -w "\n__STATUS__%{http_code}" \
+    --connect-timeout 10 --max-time 20 \
+    --cookie "$COOKIE_JAR" \
+    "https://$EXPECTED_STAGING_BACKEND_DOMAIN/api/auth/me" 2>/dev/null)
+  code=$(echo "$resp" | grep -o '__STATUS__[0-9]*' | grep -o '[0-9]*' || echo "000")
+  body=$(echo "$resp" | sed 's/__STATUS__[0-9]*$//')
+
+  case "$code" in
+    200)
+      role=$(echo "$body" | python3 -c "
+import json,sys; print(json.load(sys.stdin).get('session',{}).get('role','unknown'))" 2>/dev/null || echo "unknown")
+      is_national=$(echo "$body" | python3 -c "
+import json,sys; print(json.load(sys.stdin).get('session',{}).get('is_national',False))" 2>/dev/null || echo "False")
+      if [ "$role" = "system_admin" ] && [ "$is_national" = "True" ]; then
+        ok "$label /api/auth/me → role=system_admin is_national=True"
+        return 0
+      elif [ "$role" = "system_admin" ]; then
+        die "$label /api/auth/me: role=system_admin but is_national=False — unexpected org context."
+      else
+        die "$label /api/auth/me: role='$role' — not system_admin. Authorisation denied."
+      fi
+      ;;
+    401)
+      return 1
+      ;;
+    *)
+      die "$label /api/auth/me returned HTTP $code — staging backend may be unreachable."
+      ;;
+  esac
+}
+
+# ── Post-deploy reauthentication ──────────────────────────────────────────────
+# Checks session silently; if expired (401), logs in again and verifies role.
+staging_reauth_if_needed() {
+  local label="${1:-Post-deploy}"
+  if staging_verify_session "$label (session check)"; then
+    return 0
+  fi
+  # staging_verify_session returned 1 — session expired
+  info "$label: 30-min session expired during backend deployment — reauthenticating..."
+  : > "$COOKIE_JAR"
+  staging_login
+  staging_verify_session "$label (reauth)"
+}
+
 # ── Authenticated staging API call ────────────────────────────────────────────
-# Sets STAGING_API_CODE and STAGING_API_BODY. Token is never echoed.
-STAGING_API_CODE="000"
-STAGING_API_BODY=""
+# Uses session cookie. Refreshes cookie on sliding-window tokens.
+# Never prints COOKIE_JAR contents or Authorization header.
 staging_api_call() {
   local method="$1" path="$2" body="${3:-}"
   local url="https://$EXPECTED_STAGING_BACKEND_DOMAIN$path"
@@ -260,14 +404,16 @@ staging_api_call() {
     raw=$(curl -s -w "\n__STATUS__%{http_code}" \
       --connect-timeout 10 --max-time 20 \
       -X "$method" \
-      -H "Authorization: Bearer $STAGING_AUTH_TOKEN" \
       -H "Content-Type: application/json" \
+      --cookie "$COOKIE_JAR" \
+      --cookie-jar "$COOKIE_JAR" \
       -d "$body" "$url" 2>/dev/null)
   else
     raw=$(curl -s -w "\n__STATUS__%{http_code}" \
       --connect-timeout 10 --max-time 20 \
       -X "$method" \
-      -H "Authorization: Bearer $STAGING_AUTH_TOKEN" \
+      --cookie "$COOKIE_JAR" \
+      --cookie-jar "$COOKIE_JAR" \
       "$url" 2>/dev/null)
   fi
   STAGING_API_CODE=$(echo "$raw" | grep -o '__STATUS__[0-9]*' | grep -o '[0-9]*' || echo "000")
@@ -275,7 +421,6 @@ staging_api_call() {
 }
 
 # ── Playwright smoke (hard gate) ──────────────────────────────────────────────
-# Usage: require_playwright_smoke <grep_pattern> <description>
 require_playwright_smoke() {
   local pattern="$1" desc="$2"
   local spec="tools/playwright-staging/tests/staging-verification.spec.ts"
@@ -294,7 +439,7 @@ require_playwright_smoke() {
 }
 
 # ── Subject-area-tags CRUD workflow ───────────────────────────────────────────
-# Runs only after backend v40 is confirmed active. Never prints the token.
+# Runs only after backend v40 is confirmed active and session is valid.
 run_subject_area_tags_crud() {
   echo
   echo "  ── Subject-area-tags CRUD workflow ──────────────────────────────────"
@@ -330,7 +475,7 @@ import json,sys; print('yes' if any(t.get('id')=='$tag_id' for t in json.load(sy
 
   staging_api_call DELETE "/api/subject-area-tags/$tag_id"
   [ "$STAGING_API_CODE" = "200" ] \
-    || die "DELETE /api/subject-area-tags/$tag_id → $STAGING_API_CODE (expected 200) — HARD FAIL."
+    || die "DELETE /api/subject-area-tags/$tag_id → $STAGING_API_CODE — HARD FAIL."
   ok "DELETE /api/subject-area-tags/$tag_id → 200"
 
   staging_api_call GET "/api/subject-area-tags"
@@ -353,27 +498,24 @@ import json,sys; print('yes' if any(t.get('id')=='$tag_id' for t in json.load(sy
 
 echo
 echo "════════════════════════════════════════════════════════════════════"
-echo "  AAFC TMS — Hardened Staging Deployment Guard (v4)"
-echo "  All gates: HARD FAIL. UUIDs enforced. CRUD after backend only."
+echo "  AAFC TMS — Hardened Staging Deployment Guard (v5)"
+echo "  Cookie auth · All gates: HARD FAIL · UUIDs enforced"
 echo "════════════════════════════════════════════════════════════════════"
 echo
 
-# ══ PRE-0: Token presence and non-placeholder check ══════════════════════════
-echo "  [PRE-0] Staging auth token presence…"
-if [ -z "${STAGING_AUTH_TOKEN:-}" ]; then
-  die "STAGING_AUTH_TOKEN is not set.
-  Export a valid system_admin bearer token for staging:
-    export STAGING_AUTH_TOKEN=<token>
-  Deployment is blocked without it."
-fi
-# Minimum plausible length for a JWT (header.payload.signature)
-if [ "${#STAGING_AUTH_TOKEN}" -lt 100 ]; then
-  die "STAGING_AUTH_TOKEN is too short (${#STAGING_AUTH_TOKEN} chars; JWT expected >100). Appears to be a placeholder."
-fi
-ok "STAGING_AUTH_TOKEN present and non-trivial length (not printed)"
+# ── Init temp files and cleanup trap ─────────────────────────────────────────
+COOKIE_JAR=$(mktemp)
+chmod 600 "$COOKIE_JAR"
+LOGIN_PAYLOAD_FILE=$(mktemp)
+chmod 600 "$LOGIN_PAYLOAD_FILE"
+trap cleanup EXIT INT TERM
+
+# ══ CREDENTIAL: Acquire staging access code ═══════════════════════════════════
+echo "  [CRED] Staging System Admin credential…"
+staging_acquire_credential
+echo
 
 # ══ STEP 1: Fetch Railway project state ═══════════════════════════════════════
-echo
 echo "  [1/12] Fetching Railway project state…"
 RAILWAY_JSON=$(railway status --json 2>&1)
 echo "$RAILWAY_JSON" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null \
@@ -535,28 +677,11 @@ echo "  [11/12] Railway CLI…"
 command -v railway &>/dev/null || die "railway CLI not found."
 ok "railway CLI: $(railway --version 2>/dev/null)"
 
-# ══ STEP 12: Token validation via /api/auth/me ═══════════════════════════════
-# /api/auth/me is stable against v39 DB (reads JWT + users table only).
-# Does NOT depend on subject_area_tags or the v40 migration.
+# ══ STEP 12: Login + session verification ════════════════════════════════════
 echo
-echo "  [12/12] Validating STAGING_AUTH_TOKEN via /api/auth/me…"
-staging_api_call GET "/api/auth/me"
-if [ "$STAGING_API_CODE" = "200" ]; then
-  TOKEN_ROLE=$(echo "$STAGING_API_BODY" | python3 -c "
-import json,sys; d=json.load(sys.stdin); print(d.get('session',{}).get('role','unknown'))" 2>/dev/null || echo "unknown")
-  TOKEN_IS_NATIONAL=$(echo "$STAGING_API_BODY" | python3 -c "
-import json,sys; d=json.load(sys.stdin); print(d.get('session',{}).get('is_national',False))" 2>/dev/null || echo "False")
-  info "Token role: $TOKEN_ROLE  is_national: $TOKEN_IS_NATIONAL"
-  if [ "$TOKEN_ROLE" = "system_admin" ]; then
-    ok "STAGING_AUTH_TOKEN is valid — role: system_admin"
-  else
-    die "Token valid but role='$TOKEN_ROLE', not system_admin — HARD FAIL."
-  fi
-elif [ "$STAGING_API_CODE" = "401" ]; then
-  die "STAGING_AUTH_TOKEN is invalid or expired (HTTP 401) — obtain a fresh system_admin token."
-else
-  die "/api/auth/me returned $STAGING_API_CODE — staging backend may be unreachable or token is corrupt."
-fi
+echo "  [12/12] Authenticating to staging (POST /api/auth/lookup → /api/auth/login)…"
+staging_login
+staging_verify_session "Step 12"
 
 # ══ Preflight summary ═════════════════════════════════════════════════════════
 echo
@@ -567,8 +692,6 @@ echo "════════════════════════�
 echo
 
 # ══ Pre-deployment state capture ══════════════════════════════════════════════
-# Captures BOTH latest deployment ID (regardless of status) and active SUCCESS ID.
-# The new-deployment tracker waits for latest to CHANGE from PRE_*_LATEST.
 echo "  PRE-DEPLOYMENT STATE (both LATEST and ACTIVE captured per service)"
 echo
 
@@ -583,7 +706,7 @@ _capture_and_report() {
   local active="${rest%%|*}"
   local active_created="${rest#*|}"
   printf "  %-12s LATEST=%-44s (%s)\n" "$label" "$latest" "$lat_status"
-  printf "  %-12s ACTIVE=%-44s (%s)\n" ""          "$active"  "$active_created"
+  printf "  %-12s ACTIVE=%-44s (%s)\n" ""        "$active"  "$active_created"
   echo "${latest}|${active}"
 }
 
@@ -604,16 +727,16 @@ echo
 # ══ Resolved targets display ══════════════════════════════════════════════════
 echo "  RESOLVED TARGETS (verified against immutable allowlist)"
 echo
-printf "  %-30s %s\n" "Project ID:"         "$ACTUAL_PROJECT_ID"
-printf "  %-30s %s\n" "Staging env ID:"      "$ACTUAL_STAGING_ENV_ID"
-printf "  %-30s %s\n" "Production env ID:"   "$PRODUCTION_ENV_ID  (NOT targeted)"
+printf "  %-30s %s\n" "Project ID:"        "$ACTUAL_PROJECT_ID"
+printf "  %-30s %s\n" "Staging env ID:"    "$ACTUAL_STAGING_ENV_ID"
+printf "  %-30s %s\n" "Production env ID:" "$PRODUCTION_ENV_ID  (NOT targeted)"
 echo
 printf "  %-30s %s / UUID: %s\n" "Service 1:" "$EXPECTED_BACKEND_SVC_NAME"  "$ACTUAL_BACKEND_SVC_ID"
 printf "  %-30s %s / UUID: %s\n" "Service 2:" "$EXPECTED_FRONTEND_SVC_NAME" "$ACTUAL_FRONTEND_SVC_ID"
 printf "  %-30s %s / UUID: %s\n" "Service 3:" "$EXPECTED_PW_SVC_NAME"       "$ACTUAL_PW_SVC_ID"
 echo
-printf "  %-30s %s\n" "Branch:"  "$CURRENT_BRANCH"
-printf "  %-30s %s\n" "HEAD:"    "$CURRENT_HEAD — $(git log -1 --format='%s')"
+printf "  %-30s %s\n" "Branch:" "$CURRENT_BRANCH"
+printf "  %-30s %s\n" "HEAD:"   "$CURRENT_HEAD — $(git log -1 --format='%s')"
 echo
 
 # ══ Authorization gate ════════════════════════════════════════════════════════
@@ -634,7 +757,13 @@ echo
 
 # ══ DRY RUN ══════════════════════════════════════════════════════════════════
 if [ "${DRY_RUN:-0}" = "1" ]; then
-  echo -e "  ${YLW}DRY RUN — commands that would execute (no writes made):${NC}"
+  echo -e "  ${YLW}DRY RUN — no deployments, no migrations, no staging writes:${NC}"
+  echo
+  echo "  Authentication result (redacted):"
+  echo "    Staging login:        successful"
+  echo "    Role confirmed:       system_admin"
+  echo "    National context:     true"
+  echo "    Session:              established (cookie, not printed)"
   echo
   echo "  [1/3] Backend  (UUID: $ACTUAL_BACKEND_SVC_ID)"
   echo "    railway up --project $EXPECTED_PROJECT_ID \\"
@@ -643,8 +772,8 @@ if [ "${DRY_RUN:-0}" = "1" ]; then
   echo "    Gate 1: poll /api/health/ready HTTP 200 (${BACKEND_GATE_TIMEOUT}s)"
   echo "    Gate 2: wait for NEW deployment (newer than PRE_BACKEND_LATEST=$PRE_BACKEND_LATEST)"
   echo "    Gate 3: /api/system/migrations revision == $REQUIRED_ALEMBIC_HEAD"
-  echo "    Gate 4: subject-area-tags CRUD (POST→GET→DELETE→GET)"
-  echo "    [DRY RUN: gates 3-4 not executed; staging DB unchanged]"
+  echo "    Gate 4: [reauth if session expired] → subject-area-tags CRUD (POST→GET→DELETE→GET)"
+  echo "    [DRY RUN: gates 3-4 skipped; staging DB unchanged]"
   echo
   echo "  [2/3] Frontend (UUID: $ACTUAL_FRONTEND_SVC_ID)"
   echo "    railway up --project $EXPECTED_PROJECT_ID \\"
@@ -664,10 +793,8 @@ if [ "${DRY_RUN:-0}" = "1" ]; then
   echo "    Gate 3: root HTML contains React markers + SHA $CURRENT_HEAD"
   echo "    Gate 4: Playwright — [Mission Backlog / PW], [PW]"
   echo
-  echo "  Token validated via /api/auth/me (read-only, no staging data changed)."
-  echo "  Subject-area-tags CRUD: runs only post-backend in live mode."
-  echo
-  echo "  DRY RUN complete. Exit 0. No deployments. No staging writes."
+  echo "  Cleanup: logout called; cookie jar deleted; credential unset."
+  echo "  DRY RUN complete. Exit 0. No deployment. No staging writes."
   exit 0
 fi
 
@@ -676,11 +803,9 @@ fi
 # ══════════════════════════════════════════════════════════════════════════════
 echo "────────────────────────────────────────────────────────────────────"
 echo "  [Deploy 1/3] $EXPECTED_BACKEND_SVC_NAME"
-info "  Service UUID:      $ACTUAL_BACKEND_SVC_ID"
-info "  Env UUID:          $ACTUAL_STAGING_ENV_ID"
-info "  PRE_LATEST:        $PRE_BACKEND_LATEST"
-info "  PRE_ACTIVE:        $PRE_BACKEND_ACTIVE"
-info "  Migration:         a1b2c3d4e5f6 → $REQUIRED_ALEMBIC_HEAD"
+info "  Service UUID: $ACTUAL_BACKEND_SVC_ID"
+info "  PRE_LATEST:   $PRE_BACKEND_LATEST"
+info "  PRE_ACTIVE:   $PRE_BACKEND_ACTIVE"
 echo
 
 railway up \
@@ -705,19 +830,16 @@ import json,sys; d=json.load(sys.stdin); assert d.get('status')=='ready'" 2>/dev
 echo
 echo "  ── Backend gate 2/4: new deployment ID ──────────────────────────────"
 wait_for_new_deploy \
-  "$ACTUAL_BACKEND_SVC_ID" \
-  "$PRE_BACKEND_LATEST" \
-  "$PRE_BACKEND_ACTIVE" \
-  "$BACKEND_GATE_TIMEOUT" \
-  "Backend"
+  "$ACTUAL_BACKEND_SVC_ID" "$PRE_BACKEND_LATEST" "$PRE_BACKEND_ACTIVE" \
+  "$BACKEND_GATE_TIMEOUT" "Backend"
 BACKEND_NEW_DEPLOY_ID="$VERIFIED_NEW_DEPLOY_ID"
-info "Backend: new=$BACKEND_NEW_DEPLOY_ID  pre_latest=$PRE_BACKEND_LATEST  pre_active=$PRE_BACKEND_ACTIVE"
+info "Backend: new=$BACKEND_NEW_DEPLOY_ID"
 
 echo
 echo "  ── Backend gate 3/4: database revision ──────────────────────────────"
 staging_api_call GET "/api/system/migrations"
 [ "$STAGING_API_CODE" = "200" ] \
-  || die "/api/system/migrations → $STAGING_API_CODE (expected 200) — HARD FAIL."
+  || die "/api/system/migrations → $STAGING_API_CODE — HARD FAIL."
 DB_REVISION=$(echo "$STAGING_API_BODY" | python3 -c "
 import json,sys; print(json.load(sys.stdin).get('revision','MISSING'))" 2>/dev/null || echo "ERROR")
 IS_SINGLE=$(echo "$STAGING_API_BODY" | python3 -c "
@@ -725,14 +847,15 @@ import json,sys; print(json.load(sys.stdin).get('is_single_head',False))" 2>/dev
 info "is_single_head: $IS_SINGLE  revision: $DB_REVISION"
 [ "$IS_SINGLE" = "True" ] || die "Multiple Alembic heads — HARD FAIL."
 [ "$DB_REVISION" = "$REQUIRED_ALEMBIC_HEAD" ] \
-  && ok "DB revision: $DB_REVISION — exact match (v40 applied)" \
+  && ok "DB revision: $DB_REVISION — exact match (v40)" \
   || die "DB revision '$DB_REVISION' ≠ '$REQUIRED_ALEMBIC_HEAD' — HARD FAIL."
 
+echo
+echo "  ── Backend gate 4/4: session check + CRUD ───────────────────────────"
+staging_reauth_if_needed "Backend gate 4"
 run_subject_area_tags_crud
-
 ok "Backend gate PASSED."
 
-# Re-verify backend service ID
 _recheck=$(_svc_id "$EXPECTED_BACKEND_SVC_NAME")
 [ "$_recheck" = "$EXPECTED_BACKEND_SVC_ID" ] || die "Backend service ID changed!"
 
@@ -742,9 +865,8 @@ _recheck=$(_svc_id "$EXPECTED_BACKEND_SVC_NAME")
 echo
 echo "────────────────────────────────────────────────────────────────────"
 echo "  [Deploy 2/3] $EXPECTED_FRONTEND_SVC_NAME"
-info "  Service UUID:      $ACTUAL_FRONTEND_SVC_ID"
-info "  PRE_LATEST:        $PRE_FRONTEND_LATEST"
-info "  PRE_ACTIVE:        $PRE_FRONTEND_ACTIVE"
+info "  Service UUID: $ACTUAL_FRONTEND_SVC_ID"
+info "  PRE_LATEST:   $PRE_FRONTEND_LATEST"
 echo
 
 railway up \
@@ -760,13 +882,10 @@ poll_health "https://$EXPECTED_STAGING_FRONTEND_DOMAIN/" "$FRONTEND_GATE_TIMEOUT
 echo
 echo "  ── Frontend gate 2/4: new deployment ID ─────────────────────────────"
 wait_for_new_deploy \
-  "$ACTUAL_FRONTEND_SVC_ID" \
-  "$PRE_FRONTEND_LATEST" \
-  "$PRE_FRONTEND_ACTIVE" \
-  "$FRONTEND_GATE_TIMEOUT" \
-  "Frontend"
+  "$ACTUAL_FRONTEND_SVC_ID" "$PRE_FRONTEND_LATEST" "$PRE_FRONTEND_ACTIVE" \
+  "$FRONTEND_GATE_TIMEOUT" "Frontend"
 FRONTEND_NEW_DEPLOY_ID="$VERIFIED_NEW_DEPLOY_ID"
-info "Frontend: new=$FRONTEND_NEW_DEPLOY_ID  pre_latest=$PRE_FRONTEND_LATEST"
+info "Frontend: new=$FRONTEND_NEW_DEPLOY_ID"
 
 echo
 echo "  ── Frontend gate 3/4: build fingerprint ─────────────────────────────"
@@ -781,10 +900,7 @@ ok "Root HTML contains SHA: $CURRENT_HEAD"
 
 echo
 echo "  ── Frontend gate 4/4: Playwright smoke ──────────────────────────────"
-require_playwright_smoke \
-  '\[Dashboard\]|\[Nav\] Mobile|\[Network\]' \
-  "Dashboard + Mobile nav + Network"
-
+require_playwright_smoke '\[Dashboard\]|\[Nav\] Mobile|\[Network\]' "Dashboard + Mobile nav + Network"
 ok "Frontend gate PASSED."
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -793,9 +909,8 @@ ok "Frontend gate PASSED."
 echo
 echo "────────────────────────────────────────────────────────────────────"
 echo "  [Deploy 3/3] $EXPECTED_PW_SVC_NAME"
-info "  Service UUID:      $ACTUAL_PW_SVC_ID"
-info "  PRE_LATEST:        $PRE_PW_LATEST"
-info "  PRE_ACTIVE:        $PRE_PW_ACTIVE"
+info "  Service UUID: $ACTUAL_PW_SVC_ID"
+info "  PRE_LATEST:   $PRE_PW_LATEST"
 echo
 
 railway up \
@@ -811,13 +926,10 @@ poll_health "https://$EXPECTED_STAGING_PW_DOMAIN/healthz" "$PW_GATE_TIMEOUT" "PW
 echo
 echo "  ── PW gate 2/4: new deployment ID ───────────────────────────────────"
 wait_for_new_deploy \
-  "$ACTUAL_PW_SVC_ID" \
-  "$PRE_PW_LATEST" \
-  "$PRE_PW_ACTIVE" \
-  "$PW_GATE_TIMEOUT" \
-  "PW"
+  "$ACTUAL_PW_SVC_ID" "$PRE_PW_LATEST" "$PRE_PW_ACTIVE" \
+  "$PW_GATE_TIMEOUT" "PW"
 PW_NEW_DEPLOY_ID="$VERIFIED_NEW_DEPLOY_ID"
-info "PW: new=$PW_NEW_DEPLOY_ID  pre_latest=$PRE_PW_LATEST"
+info "PW: new=$PW_NEW_DEPLOY_ID"
 
 echo
 echo "  ── PW gate 3/4: build fingerprint ───────────────────────────────────"
@@ -832,13 +944,10 @@ ok "PW root HTML contains SHA: $CURRENT_HEAD"
 
 echo
 echo "  ── PW gate 4/4: Playwright smoke ────────────────────────────────────"
-require_playwright_smoke \
-  '\[Mission Backlog / PW\]|\[PW\]' \
-  "Planning Workspace smoke"
-
+require_playwright_smoke '\[Mission Backlog / PW\]|\[PW\]' "Planning Workspace smoke"
 ok "PW gate PASSED."
 
-# ══ Final audit: active deployment IDs ══════════════════════════════════════
+# ══ Final audit ══════════════════════════════════════════════════════════════
 echo
 echo "  POST-DEPLOYMENT ACTIVE DEPLOYMENT VERIFICATION"
 echo
@@ -849,9 +958,9 @@ _final_check() {
   if [ "$current_active" = "$expected_new" ]; then
     ok "$label active deployment: $current_active (new deployment confirmed active)"
   elif [ "$current_active" = "$pre_active" ]; then
-    die "$label active deployment is still pre-deploy ID — new deployment may not be serving."
+    die "$label active deployment is still pre-deploy ID — new may not be serving."
   else
-    info "$label active deployment: $current_active (different from both pre-deploy and expected new)"
+    info "$label active deployment: $current_active"
   fi
 }
 _final_check "$ACTUAL_BACKEND_SVC_ID"  "$PRE_BACKEND_ACTIVE"  "$BACKEND_NEW_DEPLOY_ID"  "Backend:"
@@ -868,7 +977,4 @@ printf "  %-12s pre_latest=%-44s  new=%s\n" "Frontend:" "$PRE_FRONTEND_LATEST" "
 printf "  %-12s pre_latest=%-44s  new=%s\n" "PW:"       "$PRE_PW_LATEST"       "$PW_NEW_DEPLOY_ID"
 echo
 echo "  Next: run the full Playwright suite."
-echo "    npx playwright test tools/playwright-staging/tests/staging-verification.spec.ts"
-echo "    Screenshots: artifacts/staging-ui-verification/$CURRENT_HEAD/"
 echo "════════════════════════════════════════════════════════════════════"
-echo
