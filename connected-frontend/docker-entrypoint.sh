@@ -35,7 +35,7 @@ sed -i "s|__CSP_CONNECT_SRC__|${CSP_CONNECT}|g" /etc/nginx/conf.d/default.conf
 BUILD_SHA="${RAILWAY_GIT_COMMIT_SHA:-local}"
 BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 sed -i \
-  "s|<meta name=\"app-build\" content=\"__APP_BUILD__\">|<meta name=\"app-build\" content=\"${BUILD_SHA}|${BUILD_TIME}\">|" \
+  "s#<meta name=\"app-build\" content=\"__APP_BUILD__\">#<meta name=\"app-build\" content=\"${BUILD_SHA}|${BUILD_TIME}\">#" \
   /usr/share/nginx/html/index.html
 
 # Create /version.json for programmatic fingerprint verification
