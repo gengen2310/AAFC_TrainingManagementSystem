@@ -223,17 +223,32 @@ fi
 echo
 if [ "${DRY_RUN:-0}" = "1" ]; then
   echo -e "  ${YLW}DRY RUN${NC} — would run:"
-  echo "    railway up --service aafc-tms-frontend --environment staging"
-  echo "    railway up --service aafc-tms-planning-workspace-preview --environment staging"
+  echo "    railway up --service aafc-tms-backend --environment staging --detach"
+  echo "    [wait for backend migration to complete]"
+  echo "    railway up --service aafc-tms-frontend --environment staging --detach"
+  echo "    railway up --service aafc-tms-planning-workspace-preview --environment staging --detach"
   echo "  Skipping actual deploy (DRY_RUN=1)."
 else
-  echo "  Deploying Main TMS (connected-frontend) to staging…"
-  railway up --service aafc-tms-frontend --environment staging
+  # Step 1: backend first — must run before frontends so alembic upgrade head completes
+  echo "  [1/3] Deploying backend (aafc-tms-backend) to staging — migrations will run on start…"
+  railway up --service aafc-tms-backend --environment staging --detach
   echo
-  echo "  Deploying Planning Workspace (frontend) to staging…"
-  railway up --service aafc-tms-planning-workspace-preview --environment staging
+  echo -e "  ${YLW}WAIT:${NC} Monitor Railway dashboard for backend deployment to reach ACTIVE status."
+  echo "  The v40 migration (adding updated_by to subject_area_tags) runs during startup."
+  echo "  Do NOT proceed until the backend is healthy."
   echo
-  echo -e "  ${GRN}Both staging deployments initiated.${NC}"
+  echo "  Press Enter once the backend deployment is ACTIVE and healthy, then frontends will deploy."
+  read -r _WAIT_CONFIRM
+  echo
+
+  # Step 2: frontends
+  echo "  [2/3] Deploying Main TMS (aafc-tms-frontend) to staging…"
+  railway up --service aafc-tms-frontend --environment staging --detach
+  echo
+  echo "  [3/3] Deploying Planning Workspace (aafc-tms-planning-workspace-preview) to staging…"
+  railway up --service aafc-tms-planning-workspace-preview --environment staging --detach
+  echo
+  echo -e "  ${GRN}All three staging deployments initiated.${NC}"
   echo "  Monitor at: https://railway.app (exemplary-emotion project, staging environment)"
 fi
 echo
