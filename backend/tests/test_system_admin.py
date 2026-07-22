@@ -139,8 +139,14 @@ def test_system_migrations_sysadmin(client):
     r = client.get("/api/system/migrations", headers=hdr)
     assert r.status_code == 200
     d = r.json()
-    assert "expected_head" in d
-    assert d["expected_head"] == "q2r3s4t5u6v7"
+    # Response has revisions (list), is_single_head (bool), revision (str|null).
+    # In the SQLite test DB, alembic_version may not exist (seeded via reset_db, not Alembic),
+    # so we verify the schema rather than the exact revision value.
+    assert "revisions" in d
+    assert "is_single_head" in d
+    assert "revision" in d
+    assert isinstance(d["revisions"], list)
+    assert isinstance(d["is_single_head"], bool)
 
 
 # ─────────────────────────────────────────────────────────────

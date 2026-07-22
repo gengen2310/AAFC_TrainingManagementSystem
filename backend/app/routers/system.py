@@ -134,11 +134,31 @@ def system_version(p: Principal = Depends(get_principal)):
 # ── GET /api/system/migrations ───────────────────────────────────────────────
 
 @router.get("/migrations")
-def system_migrations(p: Principal = Depends(get_principal)):
+def system_migrations(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Return the live Alembic revision(s) from the alembic_version table.
+
+    Used by the staging deployment gate to verify migration b2c3d4e5f6a7 applied.
+    Requires system_admin. Returns:
+      revisions       — list of version_num rows (empty list = no migration ever ran)
+      is_single_head  — true when exactly one revision present (expected state)
+      revision        — the single revision string, or null if 0 or >1 rows
+    """
     require_system_admin(p)
+    try:
+        rows = db.execute(text("SELECT version_num FROM alembic_version")).fetchall()
+        revisions = [r[0] for r in rows]
+    except Exception as exc:
+        return {
+            "revisions": [],
+            "is_single_head": False,
+            "revision": None,
+            "error": str(exc),
+        }
+    single = len(revisions) == 1
     return {
-        "expected_head": "q2r3s4t5u6v7",
-        "current": _migration_head(),
+        "revisions": revisions,
+        "is_single_head": single,
+        "revision": revisions[0] if single else None,
     }
 
 
