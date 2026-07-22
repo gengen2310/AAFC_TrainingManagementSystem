@@ -199,18 +199,22 @@ echo -e "  ${YLW}IMPORTANT:${NC} You are about to deploy to STAGING."
 echo "  This will update the staging environment with your current branch."
 echo "  Production is NOT affected."
 echo
+DEPLOY_SHA=$(git rev-parse --short HEAD)
+REQUIRED_PHRASE="DEPLOY TO STAGING ${DEPLOY_SHA}"
+
 echo "  Branch : $CURRENT_BRANCH"
-echo "  HEAD   : $(git rev-parse --short HEAD) — $(git log -1 --format='%s')"
+echo "  HEAD   : $DEPLOY_SHA — $(git log -1 --format='%s')"
 echo
 echo -e "  To confirm staging deployment, type exactly:"
-echo -e "  ${BLU}DEPLOY TO STAGING${NC}"
+echo -e "  ${BLU}${REQUIRED_PHRASE}${NC}"
 echo
 read -r CONFIRM
 
-if [ "$CONFIRM" != "DEPLOY TO STAGING" ]; then
+if [ "$CONFIRM" != "$REQUIRED_PHRASE" ]; then
   echo
   echo "  Confirmation phrase did not match. Deployment aborted."
   echo "  (You typed: '$CONFIRM')"
+  echo "  (Expected: '$REQUIRED_PHRASE')"
   echo
   exit 1
 fi
@@ -218,13 +222,18 @@ fi
 # ── Run deployment ─────────────────────────────────────────────────────────
 echo
 if [ "${DRY_RUN:-0}" = "1" ]; then
-  echo -e "  ${YLW}DRY RUN${NC} — would run: railway up --environment staging"
+  echo -e "  ${YLW}DRY RUN${NC} — would run:"
+  echo "    railway up --service aafc-tms-frontend --environment staging"
+  echo "    railway up --service aafc-tms-planning-workspace-preview --environment staging"
   echo "  Skipping actual deploy (DRY_RUN=1)."
 else
-  echo "  Deploying to staging…"
-  railway up --environment staging
+  echo "  Deploying Main TMS (connected-frontend) to staging…"
+  railway up --service aafc-tms-frontend --environment staging
   echo
-  echo -e "  ${GRN}Staging deployment initiated.${NC}"
+  echo "  Deploying Planning Workspace (frontend) to staging…"
+  railway up --service aafc-tms-planning-workspace-preview --environment staging
+  echo
+  echo -e "  ${GRN}Both staging deployments initiated.${NC}"
   echo "  Monitor at: https://railway.app (exemplary-emotion project, staging environment)"
 fi
 echo
