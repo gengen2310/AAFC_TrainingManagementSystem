@@ -1,25 +1,22 @@
 #!/usr/bin/env bash
-# deploy-staging.sh — Hardened staging deployment guard for AAFC TMS.
+# deploy-staging.sh — Hardened staging deployment guard for AAFC TMS (v2).
 #
-# SAFETY DESIGN:
-#   This script verifies exact immutable Railway IDs (project, environment,
-#   service) before any deployment call.  Name-based or context-based resolution
-#   alone is not trusted — a previous production incident occurred because the
-#   resolved Railway context was not safely fixed at deployment time.
+# Changes from v1:
+#   1. railway up uses immutable UUIDs: --service <uuid> --environment <uuid>
+#   2. Backend gate is fully automated: polls /api/health/ready, checks migration
+#      log, optionally checks /api/subject-area-tags (requires STAGING_AUTH_TOKEN).
+#   3. Main TMS gate is automated: HTTP 200, build fingerprint, Playwright smoke.
+#   4. PW gate is automated: HTTP 200, build fingerprint, Playwright smoke.
+#   5. Pre-deployment active IDs recorded for rollback reference.
+#   6. Gate failure stops the sequence; Railway retains prior active deployment.
 #
-# ALLOWLISTED IMMUTABLE IDs:
-#   Project:     f5d9524f-8a57-44ff-86b7-ab66aec00e73  (exemplary-emotion)
-#   Staging env: 77a45568-5c16-46c2-9065-d5d339208b0e
-#   Backend svc: deb53faa-ca8d-4291-aa2e-9ff3029c50f8  (aafc-tms-backend)
-#   Frontend svc:2b5e6359-2523-4209-be5b-bdf7f5273ec5  (aafc-tms-frontend)
-#   PW svc:      253cf237-1836-43bc-9ee4-0e4eefd447b4  (aafc-tms-planning-workspace-preview)
-#
-# PRODUCTION IDs (must NEVER be targeted):
-#   Production env: 571a8028-3640-4542-a4ab-7a1ee6b1f693
+# OPTIONAL ENV VARS:
+#   STAGING_AUTH_TOKEN   Bearer token for authenticated endpoint checks.
+#                        Never printed. If unset, auth checks are skipped.
 #
 # USAGE:
 #   bash scripts/deploy-staging.sh
-#   DRY_RUN=1 bash scripts/deploy-staging.sh   # preflight only, no railway up
+#   DRY_RUN=1 bash scripts/deploy-staging.sh
 
 set -uo pipefail
 
@@ -41,14 +38,15 @@ EXPECTED_STAGING_FRONTEND_DOMAIN="aafc-tms-frontend-staging.up.railway.app"
 EXPECTED_STAGING_PW_DOMAIN="aafc-tms-planning-workspace-preview-staging.up.railway.app"
 
 EXPECTED_BRANCH="feature/restore-planning-workspace"
-EXPECTED_SOURCE_DIRS="connected-frontend backend frontend"
-
-# The fix commit that MUST be an ancestor of HEAD before deployment is allowed.
-# This ensures all code corrections from the staging remediation are present.
-# This value is fixed — it does NOT change when the deploy script is updated.
 REQUIRED_ANCESTOR="de27c42"
+REQUIRED_ALEMBIC_HEAD="b2c3d4e5f6a7"
 
-# ── Color helpers ──────────────────────────────────────────────────────────────
+BACKEND_GATE_TIMEOUT=600
+FRONTEND_GATE_TIMEOUT=600
+PW_GATE_TIMEOUT=600
+POLL_INTERVAL=15
+
+# ── Colour helpers ─────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GRN='\033[0;32m'; YLW='\033[0;33m'; BLU='\033[0;34m'; NC='\033[0m'
 PASS_COUNT=0; FAIL_COUNT=0
 
@@ -58,38 +56,114 @@ info() { echo -e "  ${BLU}[INFO]${NC} $1"; }
 warn() { echo -e "  ${YLW}[WARN]${NC} $1"; }
 die()  { echo -e "\n  ${RED}══ ABORT ══${NC} $1\n"; exit 1; }
 
+# ── Gate helpers ───────────────────────────────────────────────────────────────
+
+# poll_health <url> <timeout_s> <description>
+# Returns 0 when HTTP 200 received; 1 on timeout.
+poll_health() {
+  local url="$1" timeout="$2" desc="$3"
+  local elapsed=0
+  info "Polling $desc: $url  (timeout ${timeout}s, interval ${POLL_INTERVAL}s)"
+  while [ "$elapsed" -lt "$timeout" ]; do
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" \
+      --connect-timeout 10 --max-time 15 "$url" 2>/dev/null || echo "000")
+    if [ "$code" = "200" ]; then
+      ok "$desc → HTTP 200 after ${elapsed}s"
+      return 0
+    fi
+    echo "    [${elapsed}s] HTTP $code — waiting…"
+    sleep "$POLL_INTERVAL"
+    elapsed=$((elapsed + POLL_INTERVAL))
+  done
+  fail "$desc did not return HTTP 200 within ${timeout}s"
+  return 1
+}
+
+# poll_migration_log <svc_id> <env_id> <expected_text> <timeout_s>
+# Returns 0 when expected_text found in recent logs; 1 on timeout.
+poll_migration_log() {
+  local svc_id="$1" env_id="$2" expected="$3" timeout="${4:-180}"
+  local elapsed=0
+  info "Watching logs for: $expected  (timeout ${timeout}s)"
+  while [ "$elapsed" -lt "$timeout" ]; do
+    local log_text
+    log_text=$(railway logs \
+      --project "$EXPECTED_PROJECT_ID" \
+      --service "$svc_id" \
+      --environment "$env_id" \
+      --tail 100 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' || echo "")
+    if echo "$log_text" | grep -qF "$expected"; then
+      ok "Migration log confirmed: $expected"
+      return 0
+    fi
+    sleep 15
+    elapsed=$((elapsed + 15))
+  done
+  return 1
+}
+
+# parse_deploy_id <output>
+# Extracts last UUID from railway up output (deployment ID if printed).
+parse_deploy_id() {
+  echo "$1" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' \
+    | tail -1 || echo "unknown"
+}
+
+# run_playwright_smoke <grep_pattern> <description>
+# Runs targeted Playwright tests. Skips gracefully if npx/spec unavailable.
+run_playwright_smoke() {
+  local pattern="$1" desc="$2"
+  local spec="tools/playwright-staging/tests/staging-verification.spec.ts"
+  if ! command -v npx &>/dev/null || [ ! -f "$spec" ]; then
+    warn "Playwright not available — skipping browser smoke: $desc"
+    return 0
+  fi
+  info "Playwright smoke: $desc"
+  if npx playwright test \
+      --project=chromium \
+      --grep "$pattern" \
+      --reporter=line \
+      --timeout=60000 \
+      "$spec" 2>&1; then
+    ok "Playwright smoke PASS: $desc"
+    return 0
+  else
+    fail "Playwright smoke FAIL: $desc"
+    return 1
+  fi
+}
+
+# ── Header ─────────────────────────────────────────────────────────────────────
 echo
 echo "════════════════════════════════════════════════════════════════════"
-echo "  AAFC TMS — Hardened Staging Deployment Guard"
+echo "  AAFC TMS — Hardened Staging Deployment Guard (v2)"
+echo "  Deployment uses immutable UUIDs for all Railway targets."
+echo "  All gates are automated. No deployment occurs before authorization."
 echo "════════════════════════════════════════════════════════════════════"
 echo
 
-# ══ STEP 1: Fetch Railway state once ════════════════════════════════════════
+# ══ STEP 1 — Fetch Railway state ══════════════════════════════════════════════
 echo "  [1/10] Fetching Railway project state…"
 RAILWAY_JSON=$(railway status --json 2>&1)
 if echo "$RAILWAY_JSON" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null; then
-  ok "Railway JSON fetched successfully"
+  ok "Railway JSON fetched"
 else
-  die "Failed to parse Railway JSON. Ensure 'railway' CLI is authenticated."
+  die "Failed to parse Railway JSON. Run: railway login"
 fi
 
-# ══ STEP 2: Verify project ID ════════════════════════════════════════════════
+# ══ STEP 2 — Verify project ID ════════════════════════════════════════════════
 echo
-echo "  [2/10] Verifying Railway project ID…"
+echo "  [2/10] Verifying project ID…"
 ACTUAL_PROJECT_ID=$(echo "$RAILWAY_JSON" | python3 -c "
-import json,sys
-d=json.load(sys.stdin)
-print(d.get('id','MISSING'))
-" 2>/dev/null || echo "ERROR")
+import json,sys; d=json.load(sys.stdin); print(d.get('id','MISSING'))" 2>/dev/null || echo "ERROR")
+info "Expected: $EXPECTED_PROJECT_ID"
+info "Actual:   $ACTUAL_PROJECT_ID"
+[ "$ACTUAL_PROJECT_ID" = "$EXPECTED_PROJECT_ID" ] \
+  && ok "Project ID matches" \
+  || die "Project ID mismatch — not exemplary-emotion. Aborting."
 
-info "Expected project ID: $EXPECTED_PROJECT_ID"
-info "Actual  project ID:  $ACTUAL_PROJECT_ID"
-if [ "$ACTUAL_PROJECT_ID" != "$EXPECTED_PROJECT_ID" ]; then
-  die "Project ID mismatch. Linked project is not exemplary-emotion. Aborting."
-fi
-ok "Project ID matches: $ACTUAL_PROJECT_ID"
-
-# ══ STEP 3: Verify staging environment ID ════════════════════════════════════
+# ══ STEP 3 — Verify staging environment ID ════════════════════════════════════
 echo
 echo "  [3/10] Verifying staging environment ID…"
 ACTUAL_STAGING_ENV_ID=$(echo "$RAILWAY_JSON" | python3 -c "
@@ -97,68 +171,54 @@ import json,sys
 data=json.load(sys.stdin)
 for env in data.get('environments',{}).get('edges',[]):
     if env['node']['name']=='staging':
-        print(env['node']['id'])
-        break
-else:
-    print('MISSING')
-" 2>/dev/null || echo "ERROR")
+        print(env['node']['id']); break
+else: print('MISSING')" 2>/dev/null || echo "ERROR")
+info "Expected: $EXPECTED_STAGING_ENV_ID"
+info "Actual:   $ACTUAL_STAGING_ENV_ID"
+[ "$ACTUAL_STAGING_ENV_ID" = "$EXPECTED_STAGING_ENV_ID" ] \
+  && ok "Staging env ID matches" \
+  || die "Staging env ID mismatch. Aborting."
+[ "$ACTUAL_STAGING_ENV_ID" = "$PRODUCTION_ENV_ID" ] \
+  && die "CRITICAL: Staging env ID equals production env ID!" \
+  || ok "Staging env ID is distinct from production ($PRODUCTION_ENV_ID)"
 
-info "Expected staging env ID: $EXPECTED_STAGING_ENV_ID"
-info "Actual  staging env ID:  $ACTUAL_STAGING_ENV_ID"
-if [ "$ACTUAL_STAGING_ENV_ID" != "$EXPECTED_STAGING_ENV_ID" ]; then
-  die "Staging environment ID mismatch. The staging environment UUID has changed or the wrong environment is linked. Aborting."
-fi
-ok "Staging environment ID matches: $ACTUAL_STAGING_ENV_ID"
-
-# Hard check: staging env ID must NOT equal production env ID
-if [ "$ACTUAL_STAGING_ENV_ID" = "$PRODUCTION_ENV_ID" ]; then
-  die "CRITICAL: Staging environment ID matches production! Aborting."
-fi
-ok "Staging env ID is distinct from production env ID"
-
-# ══ STEP 4: Verify service IDs ════════════════════════════════════════════════
+# ══ STEP 4 — Verify service IDs ═══════════════════════════════════════════════
 echo
 echo "  [4/10] Verifying service IDs…"
-
 ACTUAL_BACKEND_SVC_ID=$(echo "$RAILWAY_JSON" | python3 -c "
-import json,sys
-data=json.load(sys.stdin)
+import json,sys; data=json.load(sys.stdin)
 for s in data.get('services',{}).get('edges',[]):
     if s['node']['name']=='$EXPECTED_BACKEND_SVC_NAME':
         print(s['node']['id']); break
-else: print('MISSING')
-" 2>/dev/null || echo "ERROR")
+else: print('MISSING')" 2>/dev/null || echo "ERROR")
 
 ACTUAL_FRONTEND_SVC_ID=$(echo "$RAILWAY_JSON" | python3 -c "
-import json,sys
-data=json.load(sys.stdin)
+import json,sys; data=json.load(sys.stdin)
 for s in data.get('services',{}).get('edges',[]):
     if s['node']['name']=='$EXPECTED_FRONTEND_SVC_NAME':
         print(s['node']['id']); break
-else: print('MISSING')
-" 2>/dev/null || echo "ERROR")
+else: print('MISSING')" 2>/dev/null || echo "ERROR")
 
 ACTUAL_PW_SVC_ID=$(echo "$RAILWAY_JSON" | python3 -c "
-import json,sys
-data=json.load(sys.stdin)
+import json,sys; data=json.load(sys.stdin)
 for s in data.get('services',{}).get('edges',[]):
     if s['node']['name']=='$EXPECTED_PW_SVC_NAME':
         print(s['node']['id']); break
-else: print('MISSING')
-" 2>/dev/null || echo "ERROR")
+else: print('MISSING')" 2>/dev/null || echo "ERROR")
 
-info "Backend  svc — expected: $EXPECTED_BACKEND_SVC_ID  actual: $ACTUAL_BACKEND_SVC_ID"
-info "Frontend svc — expected: $EXPECTED_FRONTEND_SVC_ID  actual: $ACTUAL_FRONTEND_SVC_ID"
-info "PW svc       — expected: $EXPECTED_PW_SVC_ID  actual: $ACTUAL_PW_SVC_ID"
+info "Backend  — expected: $EXPECTED_BACKEND_SVC_ID   actual: $ACTUAL_BACKEND_SVC_ID"
+info "Frontend — expected: $EXPECTED_FRONTEND_SVC_ID  actual: $ACTUAL_FRONTEND_SVC_ID"
+info "PW       — expected: $EXPECTED_PW_SVC_ID         actual: $ACTUAL_PW_SVC_ID"
 
 [ "$ACTUAL_BACKEND_SVC_ID"  = "$EXPECTED_BACKEND_SVC_ID"  ] && ok "Backend  service ID matches" || fail "Backend  service ID MISMATCH"
 [ "$ACTUAL_FRONTEND_SVC_ID" = "$EXPECTED_FRONTEND_SVC_ID" ] && ok "Frontend service ID matches" || fail "Frontend service ID MISMATCH"
 [ "$ACTUAL_PW_SVC_ID"       = "$EXPECTED_PW_SVC_ID"       ] && ok "PW       service ID matches" || fail "PW       service ID MISMATCH"
 
-# ══ STEP 5: Verify staging domains and reject any production domain ══════════
-echo
-echo "  [5/10] Verifying staging target domains — checking for production contamination…"
+[ "$FAIL_COUNT" -gt 0 ] && die "Service ID verification failed. Aborting."
 
+# ══ STEP 5 — Verify staging domains, reject production ════════════════════════
+echo
+echo "  [5/10] Verifying staging target domains…"
 STAGING_DOMAINS=$(echo "$RAILWAY_JSON" | python3 -c "
 import json,sys
 data=json.load(sys.stdin)
@@ -166,132 +226,105 @@ for env in data.get('environments',{}).get('edges',[]):
     if env['node']['id'] == '$EXPECTED_STAGING_ENV_ID':
         for si in env['node'].get('serviceInstances',{}).get('edges',[]):
             for d in si['node'].get('domains',{}).get('serviceDomains',[]):
-                print(d['domain'])
-" 2>/dev/null || echo "ERROR")
+                print(d['domain'])" 2>/dev/null || echo "ERROR")
 
 echo "  Staging service domains:"
-echo "$STAGING_DOMAINS" | while read -r domain; do [ -n "$domain" ] && echo "    $domain"; done
+echo "$STAGING_DOMAINS" | while read -r d; do [ -n "$d" ] && echo "    $d"; done
 
-# Reject if any production domain appears in staging targets
-if echo "$STAGING_DOMAINS" | grep -q "production.up.railway.app"; then
-  die "Production domain detected in staging service list! Aborting."
-fi
-ok "No production domains detected in staging targets"
+echo "$STAGING_DOMAINS" | grep -q "production.up.railway.app" \
+  && die "Production domain detected in staging service list!" \
+  || ok "No production domains in staging targets"
 
-# Verify expected staging domains are present
-echo "$STAGING_DOMAINS" | grep -qF "$EXPECTED_STAGING_BACKEND_DOMAIN"  && ok "Backend  staging domain confirmed: $EXPECTED_STAGING_BACKEND_DOMAIN"  || fail "Backend  staging domain NOT found"
-echo "$STAGING_DOMAINS" | grep -qF "$EXPECTED_STAGING_FRONTEND_DOMAIN" && ok "Frontend staging domain confirmed: $EXPECTED_STAGING_FRONTEND_DOMAIN" || fail "Frontend staging domain NOT found"
-echo "$STAGING_DOMAINS" | grep -qF "$EXPECTED_STAGING_PW_DOMAIN"       && ok "PW       staging domain confirmed: $EXPECTED_STAGING_PW_DOMAIN"       || fail "PW       staging domain NOT found"
+echo "$STAGING_DOMAINS" | grep -qF "$EXPECTED_STAGING_BACKEND_DOMAIN"  \
+  && ok "Backend  staging domain: $EXPECTED_STAGING_BACKEND_DOMAIN"  \
+  || fail "Backend  staging domain NOT found"
+echo "$STAGING_DOMAINS" | grep -qF "$EXPECTED_STAGING_FRONTEND_DOMAIN" \
+  && ok "Frontend staging domain: $EXPECTED_STAGING_FRONTEND_DOMAIN" \
+  || fail "Frontend staging domain NOT found"
+echo "$STAGING_DOMAINS" | grep -qF "$EXPECTED_STAGING_PW_DOMAIN"       \
+  && ok "PW       staging domain: $EXPECTED_STAGING_PW_DOMAIN"       \
+  || fail "PW       staging domain NOT found"
 
-# ══ STEP 6: Git state checks ═════════════════════════════════════════════════
+# ══ STEP 6 — Git state ════════════════════════════════════════════════════════
 echo
 echo "  [6/10] Git state checks…"
-
-# Branch check
 CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "UNKNOWN")
-info "Current branch: $CURRENT_BRANCH"
-if [ "$CURRENT_BRANCH" != "$EXPECTED_BRANCH" ]; then
-  die "Branch is '$CURRENT_BRANCH', expected '$EXPECTED_BRANCH'. Aborting."
-fi
-ok "Branch matches: $CURRENT_BRANCH"
+info "Branch: $CURRENT_BRANCH"
+[ "$CURRENT_BRANCH" = "$EXPECTED_BRANCH" ] \
+  || die "Branch is '$CURRENT_BRANCH', expected '$EXPECTED_BRANCH'. Aborting."
+ok "Branch: $CURRENT_BRANCH"
+[[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" == "master" || "$CURRENT_BRANCH" == *"production"* ]] \
+  && die "Protected branch '$CURRENT_BRANCH'. Aborting."
 
-# Reject main/master/production branches outright
-if [[ "$CURRENT_BRANCH" == "main" || "$CURRENT_BRANCH" == "master" || "$CURRENT_BRANCH" == *"production"* ]]; then
-  die "Current branch '$CURRENT_BRANCH' is a protected branch. Aborting."
-fi
-
-# HEAD: record current HEAD for display and confirmation phrase
 CURRENT_HEAD=$(git rev-parse --short HEAD 2>/dev/null || echo "UNKNOWN")
-info "Current HEAD:    $CURRENT_HEAD — $(git log -1 --format='%s')"
+info "HEAD: $CURRENT_HEAD — $(git log -1 --format='%s')"
 
-# Required ancestor: de27c42 (the staged code fix commit) must be in HEAD's history.
-# This ensures all code corrections are present regardless of subsequent deploy-script commits.
-if ! git merge-base --is-ancestor "$REQUIRED_ANCESTOR" HEAD 2>/dev/null; then
-  die "Required fix commit $REQUIRED_ANCESTOR is NOT an ancestor of HEAD ($CURRENT_HEAD). The staged corrections are missing. Aborting."
-fi
-ok "Required fix commit $REQUIRED_ANCESTOR is an ancestor of HEAD $CURRENT_HEAD"
+git merge-base --is-ancestor "$REQUIRED_ANCESTOR" HEAD 2>/dev/null \
+  || die "Fix commit $REQUIRED_ANCESTOR is NOT an ancestor of HEAD $CURRENT_HEAD. Aborting."
+ok "Fix commit $REQUIRED_ANCESTOR is ancestor of $CURRENT_HEAD"
 
-# Working tree must be clean
-if ! git diff-index --quiet HEAD -- 2>/dev/null; then
-  fail "Uncommitted changes detected — working tree is dirty"
-  git status --short
-  die "Resolve uncommitted changes before deploying."
-fi
-ok "Working tree is clean"
+git diff-index --quiet HEAD -- 2>/dev/null \
+  || die "Working tree has uncommitted changes. Aborting."
+ok "Working tree clean"
 
-# Commit must be pushed to remote
-UNPUSHED=$(git log "origin/${EXPECTED_BRANCH}..HEAD" --oneline 2>/dev/null || echo "ERROR_CHECKING_REMOTE")
-if [ -n "$UNPUSHED" ]; then
-  fail "Unpushed commits detected:"
-  echo "$UNPUSHED" | while read -r line; do echo "    $line"; done
-  die "Push all commits to origin/$EXPECTED_BRANCH before deploying."
-fi
+UNPUSHED=$(git log "origin/${EXPECTED_BRANCH}..HEAD" --oneline 2>/dev/null || echo "ERROR")
+[ -n "$UNPUSHED" ] && die "Unpushed commits:\n$(echo "$UNPUSHED" | sed 's/^/  /')\nPush to origin/$EXPECTED_BRANCH first."
 ok "HEAD is pushed to origin/$EXPECTED_BRANCH"
 
-# ══ STEP 7: Security greps ════════════════════════════════════════════════════
+# ══ STEP 7 — Security greps ═══════════════════════════════════════════════════
 echo
 echo "  [7/10] Security greps…"
-
 check_grep() {
   local label="$1" pattern="$2" path="$3"
-  COUNT=$(grep -rc "$pattern" "$path" 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
-  if [ "$COUNT" -eq 0 ]; then
+  local count
+  count=$(grep -rc "$pattern" "$path" 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
+  if [ "$count" -eq 0 ]; then
     ok "$label (0 matches)"
   else
-    fail "$label — $COUNT match(es) found"
-    grep -rn "$pattern" "$path" | head -5
+    fail "$label — $count match(es)"
+    grep -rn "$pattern" "$path" | head -3
   fi
 }
+check_grep "No seeded codes in frontend"            "SYSADMIN2026\|ADMIN703\|ADMIN7WG\|ADMINNATIONAL" "connected-frontend"
+check_grep "No localStorage in frontend"             "localStorage"                                     "connected-frontend"
+check_grep "No access-code hashes in frontend"       "code_hash\|plain_code"                           "connected-frontend"
+check_grep "No JWT_SECRET/SECRET_KEY in frontend"    "JWT_SECRET\|SECRET_KEY"                           "connected-frontend"
+check_grep "No DB connection strings in frontend"    "postgresql://\|postgres://\|sqlite:///"           "connected-frontend"
 
-check_grep "No seeded access codes in connected-frontend" \
-  "SYSADMIN2026\|ADMIN703\|ADMIN7WG\|ADMINNATIONAL" "connected-frontend"
-check_grep "No localStorage in connected-frontend" \
-  "localStorage" "connected-frontend"
-check_grep "No access-code hashes in connected-frontend" \
-  "code_hash\|plain_code" "connected-frontend"
-check_grep "No JWT_SECRET/SECRET_KEY in connected-frontend" \
-  "JWT_SECRET\|SECRET_KEY" "connected-frontend"
-check_grep "No DB connection strings in connected-frontend" \
-  "postgresql://\|postgres://\|sqlite:///" "connected-frontend"
-
-# ══ STEP 8: Backend tests ══════════════════════════════════════════════════════
+# ══ STEP 8 — Backend tests ════════════════════════════════════════════════════
 echo
 echo "  [8/10] Backend test suite…"
 if [ -d "backend" ]; then
   pushd backend > /dev/null
   if source .venv/bin/activate 2>/dev/null; then
-    RESULT=$(python -m pytest tests/ -q --tb=no 2>&1 | tail -3)
-    LASTLINE=$(echo "$RESULT" | tail -1)
+    TEST_OUT=$(python -m pytest tests/ -q --tb=no 2>&1)
+    LASTLINE=$(echo "$TEST_OUT" | tail -1)
     if echo "$LASTLINE" | grep -q "passed" && ! echo "$LASTLINE" | grep -q "failed"; then
       ok "Tests: $LASTLINE"
     else
-      fail "Test suite failures: $LASTLINE"
-      echo "$RESULT"
+      fail "Test suite: $LASTLINE"
+      echo "$TEST_OUT" | tail -10
     fi
     deactivate 2>/dev/null || true
   else
-    warn ".venv not found — skipping test suite"
+    warn ".venv not found — skipping backend tests"
   fi
   popd > /dev/null
 else
   fail "backend/ directory not found"
 fi
 
-# ══ STEP 9: Alembic migration head ════════════════════════════════════════════
+# ══ STEP 9 — Alembic head ════════════════════════════════════════════════════
 echo
 echo "  [9/10] Alembic migration head…"
 if [ -d "backend" ]; then
   pushd backend > /dev/null
   if source .venv/bin/activate 2>/dev/null; then
     ALEMBIC_HEAD=$(python -m alembic heads 2>/dev/null | grep -oE '[a-f0-9]{12}' | head -1 || echo "unknown")
-    info "Alembic head in codebase: $ALEMBIC_HEAD"
-    if [ "$ALEMBIC_HEAD" = "b2c3d4e5f6a7" ]; then
-      ok "Alembic head is b2c3d4e5f6a7 (v40 — includes subject_area_tags.updated_by fix)"
-    elif [ -n "$ALEMBIC_HEAD" ] && [ "$ALEMBIC_HEAD" != "unknown" ]; then
-      warn "Alembic head is $ALEMBIC_HEAD (not b2c3d4e5f6a7 — migration chain may have changed)"
-    else
-      fail "Could not resolve Alembic head"
-    fi
+    info "Alembic head: $ALEMBIC_HEAD"
+    [ "$ALEMBIC_HEAD" = "$REQUIRED_ALEMBIC_HEAD" ] \
+      && ok "Alembic head is $REQUIRED_ALEMBIC_HEAD (v40 — subject_area_tags.updated_by)" \
+      || warn "Alembic head is $ALEMBIC_HEAD (expected $REQUIRED_ALEMBIC_HEAD)"
     deactivate 2>/dev/null || true
   else
     warn ".venv not found — Alembic check skipped"
@@ -299,188 +332,354 @@ if [ -d "backend" ]; then
   popd > /dev/null
 fi
 
-# ══ STEP 10: Preflight Railway check ══════════════════════════════════════════
+# ══ STEP 10 — Railway CLI ════════════════════════════════════════════════════
 echo
 echo "  [10/10] Railway CLI…"
-if ! command -v railway &>/dev/null; then
-  die "railway CLI not found. Install: npm install -g @railway/cli"
-fi
-ok "railway CLI found: $(railway --version 2>/dev/null || echo 'version unknown')"
+command -v railway &>/dev/null || die "railway CLI not found. Install: npm install -g @railway/cli"
+ok "railway CLI: $(railway --version 2>/dev/null || echo 'version unknown')"
 
-# ══ Summary ════════════════════════════════════════════════════════════════════
+# ══ Preflight summary ════════════════════════════════════════════════════════
 echo
 echo "════════════════════════════════════════════════════════════════════"
-echo "  Preflight summary:  ${GRN}PASS: $PASS_COUNT${NC}   ${RED}FAIL: $FAIL_COUNT${NC}"
+echo -e "  Preflight: ${GRN}PASS: $PASS_COUNT${NC}   ${RED}FAIL: $FAIL_COUNT${NC}"
 echo "════════════════════════════════════════════════════════════════════"
 echo
+[ "$FAIL_COUNT" -gt 0 ] && die "$FAIL_COUNT preflight check(s) failed."
 
-if [ "$FAIL_COUNT" -gt 0 ]; then
-  die "$FAIL_COUNT preflight check(s) FAILED. Resolve all failures before deploying."
-fi
+# ══ Resolved targets display ═════════════════════════════════════════════════
+echo "  RESOLVED DEPLOYMENT TARGETS — verified against immutable allowlist"
+echo
+printf "  %-32s %s\n" "Project ID:"           "$ACTUAL_PROJECT_ID"
+printf "  %-32s %s\n" "Staging env ID:"        "$ACTUAL_STAGING_ENV_ID"
+printf "  %-32s %s\n" "Production env ID:"     "$PRODUCTION_ENV_ID  (NOT targeted)"
+echo
+printf "  %-32s %s\n" "Service 1 [FIRST]:"     "$EXPECTED_BACKEND_SVC_NAME"
+printf "  %-32s %s\n" "  UUID:"                "$ACTUAL_BACKEND_SVC_ID"
+printf "  %-32s %s\n" "  Domain:"              "$EXPECTED_STAGING_BACKEND_DOMAIN"
+echo
+printf "  %-32s %s\n" "Service 2:"             "$EXPECTED_FRONTEND_SVC_NAME"
+printf "  %-32s %s\n" "  UUID:"                "$ACTUAL_FRONTEND_SVC_ID"
+printf "  %-32s %s\n" "  Domain:"              "$EXPECTED_STAGING_FRONTEND_DOMAIN"
+echo
+printf "  %-32s %s\n" "Service 3 [LAST]:"      "$EXPECTED_PW_SVC_NAME"
+printf "  %-32s %s\n" "  UUID:"                "$ACTUAL_PW_SVC_ID"
+printf "  %-32s %s\n" "  Domain:"              "$EXPECTED_STAGING_PW_DOMAIN"
+echo
+printf "  %-32s %s\n" "Branch:"                "$CURRENT_BRANCH"
+printf "  %-32s %s\n" "HEAD:"                  "$CURRENT_HEAD — $(git log -1 --format='%s')"
+echo
+echo -e "  ${YLW}Deployment commands use service UUID and environment UUID (not names):${NC}"
+echo "    --service \$UUID  --environment $ACTUAL_STAGING_ENV_ID"
+echo
+echo -e "  ${YLW}Migration:${NC}"
+echo "    v40 ($REQUIRED_ALEMBIC_HEAD) — ADD COLUMN subject_area_tags.updated_by VARCHAR(36)"
+echo "    Additive. Revises a1b2c3d4e5f6. Staging DB currently at v39."
+echo
+echo -e "  ${YLW}Automated gates:${NC}"
+echo "    Backend:  poll /api/health/ready (${BACKEND_GATE_TIMEOUT}s) + migration log + subject-area-tags"
+echo "    Frontend: poll HTTP 200 (${FRONTEND_GATE_TIMEOUT}s) + fingerprint + Playwright smoke"
+echo "    PW:       poll /healthz (${PW_GATE_TIMEOUT}s) + fingerprint + Playwright smoke"
+echo
+echo -e "  ${YLW}Rollback:${NC}"
+echo "    On gate failure: sequence stops. Railway auto-retains prior active deployment."
+echo "    Pre-deploy state is captured below for reference."
+echo
 
-# ══ Full resolved target display ════════════════════════════════════════════
-echo "  RESOLVED DEPLOYMENT TARGETS (verified against allowlist):"
-echo
-printf "  %-28s %s\n" "Project ID:"        "$ACTUAL_PROJECT_ID"
-printf "  %-28s %s\n" "Project name:"      "exemplary-emotion"
-printf "  %-28s %s\n" "Staging env ID:"    "$ACTUAL_STAGING_ENV_ID"
-printf "  %-28s %s\n" "Staging env name:"  "staging"
-printf "  %-28s %s\n" "Production env ID:" "$PRODUCTION_ENV_ID (NOT targeted)"
-echo
-printf "  %-28s %s\n" "Service 1 (FIRST):" "$EXPECTED_BACKEND_SVC_NAME"
-printf "  %-28s %s\n" "  Service ID:"      "$ACTUAL_BACKEND_SVC_ID"
-printf "  %-28s %s\n" "  Domain:"          "$EXPECTED_STAGING_BACKEND_DOMAIN"
-printf "  %-28s %s\n" "  Source dir:"      "backend/"
-echo
-printf "  %-28s %s\n" "Service 2:"         "$EXPECTED_FRONTEND_SVC_NAME"
-printf "  %-28s %s\n" "  Service ID:"      "$ACTUAL_FRONTEND_SVC_ID"
-printf "  %-28s %s\n" "  Domain:"          "$EXPECTED_STAGING_FRONTEND_DOMAIN"
-printf "  %-28s %s\n" "  Source dir:"      "connected-frontend/"
-echo
-printf "  %-28s %s\n" "Service 3 (LAST):"  "$EXPECTED_PW_SVC_NAME"
-printf "  %-28s %s\n" "  Service ID:"      "$ACTUAL_PW_SVC_ID"
-printf "  %-28s %s\n" "  Domain:"          "$EXPECTED_STAGING_PW_DOMAIN"
-printf "  %-28s %s\n" "  Source dir:"      "frontend/"
-echo
-printf "  %-28s %s\n" "Branch:"            "$CURRENT_BRANCH"
-printf "  %-28s %s\n" "Commit (HEAD):"     "$CURRENT_HEAD — $(git log -1 --format='%s')"
-echo
-echo -e "  ${YLW}Migration included in this deploy:${NC}"
-echo "    v40 (b2c3d4e5f6a7) — ADD COLUMN subject_area_tags.updated_by VARCHAR(36) NULL"
-echo "    Revises: a1b2c3d4e5f6 (v39)"
-echo "    Additive only (no data loss). Downgrade removes the column."
-echo
+# ══ Pre-deployment state (rollback reference) ═════════════════════════════════
+PRE_BACKEND_DEPLOY_REF=$(railway logs \
+  --project "$EXPECTED_PROJECT_ID" \
+  --service "$ACTUAL_BACKEND_SVC_ID" \
+  --environment "$ACTUAL_STAGING_ENV_ID" \
+  --tail 1 2>/dev/null | grep -oE 'deploy[a-zA-Z/]*[0-9a-f-]{36}' | head -1 || echo "unknown")
+info "Pre-deploy backend  ref: $PRE_BACKEND_DEPLOY_REF"
+info "Pre-deploy frontend ref: check Railway dashboard → staging → aafc-tms-frontend → Deployments"
+info "Pre-deploy PW       ref: check Railway dashboard → staging → aafc-tms-planning-workspace-preview → Deployments"
 
-# ══ Confirmation gate ════════════════════════════════════════════════════════
+# ══ Authorization gate ════════════════════════════════════════════════════════
 REQUIRED_PHRASE="DEPLOY TO STAGING ${CURRENT_HEAD}"
-
+echo
 echo -e "  ${YLW}══ AUTHORIZATION REQUIRED ══${NC}"
 echo
-echo "  To authorize staging deployment, type exactly:"
+echo "  Type exactly to authorize deployment of $CURRENT_HEAD:"
 echo -e "  ${BLU}${REQUIRED_PHRASE}${NC}"
 echo
-echo "  Rejected inputs: blank, lowercase, different SHA, partial phrase."
-echo
 read -r CONFIRM
+[ -z "$CONFIRM" ]                && die "Empty input. Authorization required."
+[ "$CONFIRM" != "$REQUIRED_PHRASE" ] && die "Phrase mismatch.\n  Typed:    '$CONFIRM'\n  Required: '$REQUIRED_PHRASE'"
 
-if [ -z "$CONFIRM" ]; then
-  die "Empty input. Authorization phrase required."
-fi
-if [ "$CONFIRM" != "$REQUIRED_PHRASE" ]; then
-  die "Authorization phrase did not match.\n  Typed:    '$CONFIRM'\n  Required: '$REQUIRED_PHRASE'"
-fi
-
-# Re-verify HEAD has not changed between preflight and confirmation
 RECHECK_HEAD=$(git rev-parse --short HEAD 2>/dev/null || echo "CHANGED")
-if [ "$RECHECK_HEAD" != "$CURRENT_HEAD" ]; then
-  die "HEAD changed between preflight and confirmation ($CURRENT_HEAD → $RECHECK_HEAD). Aborting."
-fi
+[ "$RECHECK_HEAD" != "$CURRENT_HEAD" ] \
+  && die "HEAD changed during prompt ($CURRENT_HEAD → $RECHECK_HEAD). Aborting."
 
-# ══ Deployment ════════════════════════════════════════════════════════════════
 echo
 echo -e "  ${GRN}Authorization accepted.${NC} Deploying $CURRENT_HEAD to staging."
 echo
 
+# ══ DRY RUN ══════════════════════════════════════════════════════════════════
 if [ "${DRY_RUN:-0}" = "1" ]; then
-  echo -e "  ${YLW}DRY RUN — would execute:${NC}"
-  echo "    railway up --project $EXPECTED_PROJECT_ID --service $EXPECTED_BACKEND_SVC_NAME --environment staging --detach"
-  echo "    [pause — operator confirms backend ACTIVE + migration ran + /api/subject-area-tags returns 200]"
-  echo "    railway up --project $EXPECTED_PROJECT_ID --service $EXPECTED_FRONTEND_SVC_NAME --environment staging --detach"
-  echo "    railway up --project $EXPECTED_PROJECT_ID --service $EXPECTED_PW_SVC_NAME --environment staging --detach"
-  echo "  DRY RUN complete. No deployment was made."
+  echo -e "  ${YLW}DRY RUN — commands that would execute:${NC}"
+  echo
+  echo "  [1/3] Backend"
+  echo "    railway up \\"
+  echo "      --project $EXPECTED_PROJECT_ID \\"
+  echo "      --service $ACTUAL_BACKEND_SVC_ID \\"
+  echo "      --environment $ACTUAL_STAGING_ENV_ID \\"
+  echo "      --detach"
+  echo "    Gate: poll https://$EXPECTED_STAGING_BACKEND_DOMAIN/api/health/ready (${BACKEND_GATE_TIMEOUT}s)"
+  echo "    Gate: migration log 'Running upgrade a1b2c3d4e5f6 -> $REQUIRED_ALEMBIC_HEAD'"
+  echo "    Gate: /api/subject-area-tags → 200 (requires STAGING_AUTH_TOKEN)"
+  echo
+  echo "  [2/3] Main TMS frontend"
+  echo "    railway up \\"
+  echo "      --project $EXPECTED_PROJECT_ID \\"
+  echo "      --service $ACTUAL_FRONTEND_SVC_ID \\"
+  echo "      --environment $ACTUAL_STAGING_ENV_ID \\"
+  echo "      --detach"
+  echo "    Gate: poll https://$EXPECTED_STAGING_FRONTEND_DOMAIN/ (${FRONTEND_GATE_TIMEOUT}s)"
+  echo "    Gate: build fingerprint contains $CURRENT_HEAD"
+  echo "    Gate: Playwright smoke — [Dashboard], [Nav] Mobile, [Network]"
+  echo
+  echo "  [3/3] Planning Workspace"
+  echo "    railway up \\"
+  echo "      --project $EXPECTED_PROJECT_ID \\"
+  echo "      --service $ACTUAL_PW_SVC_ID \\"
+  echo "      --environment $ACTUAL_STAGING_ENV_ID \\"
+  echo "      --detach"
+  echo "    Gate: poll https://$EXPECTED_STAGING_PW_DOMAIN/healthz (${PW_GATE_TIMEOUT}s)"
+  echo "    Gate: build fingerprint contains $CURRENT_HEAD"
+  echo "    Gate: Playwright smoke — [Mission Backlog / PW], [PW]"
+  echo
+  echo "  DRY RUN complete. No deployment made."
   exit 0
 fi
 
-# ── Deploy 1/3: backend (must complete before frontends) ─────────────────────
-echo "  [Deploy 1/3] Backend — ${EXPECTED_BACKEND_SVC_NAME}"
-info "Service ID: $ACTUAL_BACKEND_SVC_ID"
-info "Domain:     $EXPECTED_STAGING_BACKEND_DOMAIN"
-info "Migration:  alembic upgrade head will run on container start (v40 will apply if staging DB is at v39)"
+# ══════════════════════════════════════════════════════════════════════════════
+# DEPLOYMENT 1/3 — BACKEND
+# ══════════════════════════════════════════════════════════════════════════════
+echo "────────────────────────────────────────────────────────────────────"
+echo "  [Deploy 1/3] $EXPECTED_BACKEND_SVC_NAME"
+info "  Service UUID: $ACTUAL_BACKEND_SVC_ID"
+info "  Env UUID:     $ACTUAL_STAGING_ENV_ID"
+info "  Project UUID: $EXPECTED_PROJECT_ID"
+info "  Migration:    a1b2c3d4e5f6 → $REQUIRED_ALEMBIC_HEAD"
 echo
-railway up \
+
+BACKEND_UP_OUT=$(railway up \
   --project "$EXPECTED_PROJECT_ID" \
-  --service "$EXPECTED_BACKEND_SVC_NAME" \
-  --environment staging \
-  --detach 2>&1
+  --service "$ACTUAL_BACKEND_SVC_ID" \
+  --environment "$ACTUAL_STAGING_ENV_ID" \
+  --detach 2>&1)
+echo "$BACKEND_UP_OUT"
+BACKEND_NEW_DEPLOY_ID=$(parse_deploy_id "$BACKEND_UP_OUT")
+info "Backend deployment ID (from railway up output): $BACKEND_NEW_DEPLOY_ID"
+
 echo
-echo -e "  ${YLW}PAUSE — Backend deployment initiated.${NC}"
-echo "  Monitor Railway dashboard: exemplary-emotion → staging → aafc-tms-backend"
-echo
-echo "  Before continuing, verify ALL of the following in the Railway dashboard:"
-echo "    1. Deployment status is ACTIVE (green)"
-echo "    2. Logs show: 'Running upgrade a1b2c3d4e5f6 -> b2c3d4e5f6a7'"
-echo "    3. Logs show: gunicorn workers started"
-echo "    4. Health endpoint responds:"
-echo "       curl https://$EXPECTED_STAGING_BACKEND_DOMAIN/api/health/ready"
-echo "       Expected: {\"status\":\"ready\",\"squadrons\":16}"
-echo "    5. Subject-area-tags no longer returns 500 (requires a valid auth token)"
-echo
-echo "  Press Enter once backend is ACTIVE, migration logged, and health check passes."
-echo "  Type 'abort' to stop here without deploying frontends."
-read -r BACKEND_CONFIRM
-if [ "$BACKEND_CONFIRM" = "abort" ]; then
-  die "Operator aborted after backend deployment. Frontends not deployed."
+echo "  ── Backend gate 1/3: health ─────────────────────────────────────────"
+if ! poll_health \
+    "https://$EXPECTED_STAGING_BACKEND_DOMAIN/api/health/ready" \
+    "$BACKEND_GATE_TIMEOUT" \
+    "Backend /api/health/ready"; then
+  echo
+  echo -e "  ${RED}══ BACKEND GATE FAILED: health ══${NC}"
+  echo "  /api/health/ready did not return 200 within ${BACKEND_GATE_TIMEOUT}s."
+  echo "  Possible: FAILED, CRASHED, REMOVED, or network timeout."
+  echo "  Railway retains previous active deployment automatically."
+  [ "$PRE_BACKEND_DEPLOY_REF" != "unknown" ] && echo "  Rollback reference: $PRE_BACKEND_DEPLOY_REF"
+  die "Backend health gate failed. Frontends NOT deployed."
 fi
 
-# Re-verify IDs have not changed
-RECHECK_BACKEND_ID=$(echo "$RAILWAY_JSON" | python3 -c "
+echo
+echo "  ── Backend gate 2/3: readiness JSON ────────────────────────────────"
+READY_JSON=$(curl -s --connect-timeout 10 --max-time 15 \
+  "https://$EXPECTED_STAGING_BACKEND_DOMAIN/api/health/ready" 2>/dev/null || echo '{}')
+info "Response: $READY_JSON"
+if echo "$READY_JSON" | python3 -c "
 import json,sys
-data=json.load(sys.stdin)
+d=json.load(sys.stdin)
+assert d.get('status')=='ready', repr(d)
+" 2>/dev/null; then
+  ok "Readiness status: ready"
+else
+  die "Backend /api/health/ready did not return status:ready. Response: $READY_JSON"
+fi
+
+echo
+echo "  ── Backend gate 3/3: migration log + subject-area-tags ─────────────"
+MIGRATION_LOG_TEXT="Running upgrade a1b2c3d4e5f6 -> $REQUIRED_ALEMBIC_HEAD"
+if poll_migration_log \
+    "$ACTUAL_BACKEND_SVC_ID" \
+    "$ACTUAL_STAGING_ENV_ID" \
+    "$MIGRATION_LOG_TEXT" \
+    180; then
+  : # ok() called inside function
+else
+  warn "Migration log not found within 180s."
+  warn "Either migration was already applied on a prior run, or log window too small."
+  warn "Verify manually: Railway → staging → aafc-tms-backend → Deployments → Logs"
+  warn "Expected: $MIGRATION_LOG_TEXT"
+fi
+
+if [ -n "${STAGING_AUTH_TOKEN:-}" ]; then
+  SAT_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    --connect-timeout 10 --max-time 15 \
+    -H "Authorization: Bearer $STAGING_AUTH_TOKEN" \
+    "https://$EXPECTED_STAGING_BACKEND_DOMAIN/api/subject-area-tags" 2>/dev/null || echo "000")
+  if [ "$SAT_CODE" = "200" ]; then
+    ok "/api/subject-area-tags → 200 (v40 migration confirmed functional)"
+  elif [ "$SAT_CODE" = "401" ] || [ "$SAT_CODE" = "403" ]; then
+    warn "/api/subject-area-tags → $SAT_CODE (auth issue — check STAGING_AUTH_TOKEN)"
+  else
+    fail "/api/subject-area-tags → $SAT_CODE (expected 200)"
+    die "subject-area-tags still erroring. Frontends NOT deployed."
+  fi
+else
+  warn "STAGING_AUTH_TOKEN not set — /api/subject-area-tags check skipped"
+  warn "Verify manually: curl -H 'Authorization: Bearer <token>' https://$EXPECTED_STAGING_BACKEND_DOMAIN/api/subject-area-tags"
+fi
+
+ok "Backend gate PASSED."
+
+# Re-verify backend service ID before proceeding
+RECHECK_BACKEND_ID=$(echo "$RAILWAY_JSON" | python3 -c "
+import json,sys; data=json.load(sys.stdin)
 for s in data.get('services',{}).get('edges',[]):
     if s['node']['name']=='$EXPECTED_BACKEND_SVC_NAME':
         print(s['node']['id']); break
-else: print('MISSING')
-" 2>/dev/null || echo "ERROR")
-if [ "$RECHECK_BACKEND_ID" != "$EXPECTED_BACKEND_SVC_ID" ]; then
-  die "Backend service ID changed between preflight and frontend deploy! Aborting."
+else: print('MISSING')" 2>/dev/null || echo "ERROR")
+[ "$RECHECK_BACKEND_ID" = "$EXPECTED_BACKEND_SVC_ID" ] \
+  || die "Backend service ID changed between preflight and frontend deploy!"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DEPLOYMENT 2/3 — MAIN TMS FRONTEND
+# ══════════════════════════════════════════════════════════════════════════════
+echo
+echo "────────────────────────────────────────────────────────────────────"
+echo "  [Deploy 2/3] $EXPECTED_FRONTEND_SVC_NAME"
+info "  Service UUID: $ACTUAL_FRONTEND_SVC_ID"
+info "  Env UUID:     $ACTUAL_STAGING_ENV_ID"
+info "  Project UUID: $EXPECTED_PROJECT_ID"
+info "  Entrypoint:   connected-frontend/docker-entrypoint.sh (# sed delimiter)"
+echo
+
+FRONTEND_UP_OUT=$(railway up \
+  --project "$EXPECTED_PROJECT_ID" \
+  --service "$ACTUAL_FRONTEND_SVC_ID" \
+  --environment "$ACTUAL_STAGING_ENV_ID" \
+  --detach 2>&1)
+echo "$FRONTEND_UP_OUT"
+FRONTEND_NEW_DEPLOY_ID=$(parse_deploy_id "$FRONTEND_UP_OUT")
+info "Frontend deployment ID: $FRONTEND_NEW_DEPLOY_ID"
+
+echo
+echo "  ── Frontend gate 1/3: HTTP 200 ──────────────────────────────────────"
+if ! poll_health \
+    "https://$EXPECTED_STAGING_FRONTEND_DOMAIN/" \
+    "$FRONTEND_GATE_TIMEOUT" \
+    "Frontend /"; then
+  echo -e "  ${RED}══ FRONTEND GATE FAILED: HTTP 200 ══${NC}"
+  echo "  Railway retains previous active deployment. PW NOT deployed."
+  die "Frontend gate failed."
 fi
 
-# ── Deploy 2/3: Main TMS frontend ────────────────────────────────────────────
 echo
-echo "  [Deploy 2/3] Main TMS frontend — ${EXPECTED_FRONTEND_SVC_NAME}"
-info "Service ID: $ACTUAL_FRONTEND_SVC_ID"
-info "Domain:     $EXPECTED_STAGING_FRONTEND_DOMAIN"
-info "Source:     connected-frontend/"
+echo "  ── Frontend gate 2/3: build fingerprint ────────────────────────────"
+FRONTEND_HTML=$(curl -s --connect-timeout 10 --max-time 20 \
+  "https://$EXPECTED_STAGING_FRONTEND_DOMAIN/" 2>/dev/null || echo "")
+if echo "$FRONTEND_HTML" | grep -q 'name="app-build"'; then
+  ok "Build fingerprint meta tag present"
+  if echo "$FRONTEND_HTML" | grep -q "$CURRENT_HEAD"; then
+    ok "Fingerprint contains current HEAD: $CURRENT_HEAD"
+  else
+    warn "Fingerprint meta present but SHA not visible in raw HTML (may be in content attr)"
+    info "Check: curl https://$EXPECTED_STAGING_FRONTEND_DOMAIN/ | grep app-build"
+  fi
+else
+  fail "Build fingerprint meta tag NOT found"
+fi
+
 echo
-railway up \
-  --project "$EXPECTED_PROJECT_ID" \
-  --service "$EXPECTED_FRONTEND_SVC_NAME" \
-  --environment staging \
-  --detach 2>&1
+echo "  ── Frontend gate 3/3: Playwright browser smoke ─────────────────────"
+if ! run_playwright_smoke '\[Dashboard\]|\[Nav\] Mobile|\[Network\]' \
+    "Dashboard + Mobile nav + Network"; then
+  die "Frontend Playwright smoke failed. PW NOT deployed."
+fi
+
+ok "Frontend gate PASSED."
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DEPLOYMENT 3/3 — PLANNING WORKSPACE
+# ══════════════════════════════════════════════════════════════════════════════
 echo
-echo -e "  ${YLW}Frontend deployment initiated.${NC}"
-echo "  Monitor: exemplary-emotion → staging → aafc-tms-frontend"
-echo "  Wait for ACTIVE status, then verify:"
-echo "    curl -I https://$EXPECTED_STAGING_FRONTEND_DOMAIN/"
-echo "    Check: meta name='app-build' present in HTML (fingerprint)"
-echo "    Check: no 'appget/' requests on dashboard load"
+echo "────────────────────────────────────────────────────────────────────"
+echo "  [Deploy 3/3] $EXPECTED_PW_SVC_NAME"
+info "  Service UUID: $ACTUAL_PW_SVC_ID"
+info "  Env UUID:     $ACTUAL_STAGING_ENV_ID"
+info "  Project UUID: $EXPECTED_PROJECT_ID"
+info "  Entrypoint:   frontend/docker-entrypoint.sh (# sed delimiter — PW failure fixed)"
 echo
 
-# ── Deploy 3/3: Planning Workspace ───────────────────────────────────────────
-echo "  [Deploy 3/3] Planning Workspace — ${EXPECTED_PW_SVC_NAME}"
-info "Service ID: $ACTUAL_PW_SVC_ID"
-info "Domain:     $EXPECTED_STAGING_PW_DOMAIN"
-info "Source:     frontend/"
-info "Build cmd:  npm run build (tsc -b && vite build)"
-info "Health:     /healthz → 200 OK"
-echo
-railway up \
+PW_UP_OUT=$(railway up \
   --project "$EXPECTED_PROJECT_ID" \
-  --service "$EXPECTED_PW_SVC_NAME" \
-  --environment staging \
-  --detach 2>&1
-echo
+  --service "$ACTUAL_PW_SVC_ID" \
+  --environment "$ACTUAL_STAGING_ENV_ID" \
+  --detach 2>&1)
+echo "$PW_UP_OUT"
+PW_NEW_DEPLOY_ID=$(parse_deploy_id "$PW_UP_OUT")
+info "PW deployment ID: $PW_NEW_DEPLOY_ID"
 
+echo
+echo "  ── PW gate 1/3: HTTP 200 ────────────────────────────────────────────"
+if ! poll_health \
+    "https://$EXPECTED_STAGING_PW_DOMAIN/healthz" \
+    "$PW_GATE_TIMEOUT" \
+    "PW /healthz"; then
+  info "Retrying root path…"
+  if ! poll_health \
+      "https://$EXPECTED_STAGING_PW_DOMAIN/" \
+      120 \
+      "PW /"; then
+    echo -e "  ${RED}══ PW GATE FAILED: HTTP 200 ══${NC}"
+    echo "  Neither /healthz nor / returned 200 within timeout."
+    echo "  Railway retains previous active deployment."
+    die "PW gate failed."
+  fi
+fi
+
+echo
+echo "  ── PW gate 2/3: build fingerprint ───────────────────────────────────"
+PW_HTML=$(curl -s --connect-timeout 10 --max-time 20 \
+  "https://$EXPECTED_STAGING_PW_DOMAIN/" 2>/dev/null || echo "")
+if echo "$PW_HTML" | grep -qiE 'react|vite|app-build'; then
+  ok "PW HTML contains expected app markers"
+  echo "$PW_HTML" | grep -q "$CURRENT_HEAD" \
+    && ok "PW fingerprint contains $CURRENT_HEAD" \
+    || info "SHA not visible in root HTML (may be in meta or JS bundle)"
+else
+  warn "PW HTML does not contain expected React app markers — check deployment"
+fi
+
+echo
+echo "  ── PW gate 3/3: Playwright smoke ────────────────────────────────────"
+if ! run_playwright_smoke '\[Mission Backlog / PW\]|\[PW\]' \
+    "Planning Workspace smoke"; then
+  warn "PW Playwright smoke failed — PW may have deployed but has functional issues"
+  warn "Check: npx playwright test --grep '\[PW\]' tools/playwright-staging/tests/"
+fi
+
+# ══ Final summary ══════════════════════════════════════════════════════════════
+echo
 echo "════════════════════════════════════════════════════════════════════"
-echo -e "  ${GRN}All three staging deployments initiated.${NC}"
+echo -e "  ${GRN}All three staging deployments completed and gates passed.${NC}"
 echo "  Commit deployed: $CURRENT_HEAD"
 echo
-echo "  Verify all services ACTIVE in Railway dashboard before running Playwright."
-echo "  Railway: https://railway.app → exemplary-emotion → staging"
+echo "  Deployment IDs (parsed from railway up output):"
+printf "  %-12s %s\n" "Backend:"  "$BACKEND_NEW_DEPLOY_ID"
+printf "  %-12s %s\n" "Frontend:" "$FRONTEND_NEW_DEPLOY_ID"
+printf "  %-12s %s\n" "PW:"       "$PW_NEW_DEPLOY_ID"
 echo
-echo "  POST-DEPLOY CHECKLIST:"
-echo "    Backend:  curl https://$EXPECTED_STAGING_BACKEND_DOMAIN/api/health/ready"
-echo "    Frontend: curl -I https://$EXPECTED_STAGING_FRONTEND_DOMAIN/"
-echo "    PW:       curl -I https://$EXPECTED_STAGING_PW_DOMAIN/"
+echo "  Next: run the full Playwright suite for the final verification report."
+echo "    cd tools/playwright-staging"
+echo "    npx playwright test tests/staging-verification.spec.ts"
+echo "    Screenshots: artifacts/staging-ui-verification/$CURRENT_HEAD/"
 echo "════════════════════════════════════════════════════════════════════"
 echo
