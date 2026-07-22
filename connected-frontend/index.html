@@ -405,10 +405,19 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
 /* ── RESPONSIVE ── */
 @media(max-width:768px){
-  .sidenav{display:none;}
+  .sidenav{display:none;position:fixed;top:52px;left:0;bottom:0;z-index:300;box-shadow:2px 0 12px rgba(0,47,101,.18);overflow-y:auto;}
+  .sidenav.nav-open{display:block;}
+  .nav-overlay{display:none;position:fixed;inset:0;top:52px;background:rgba(0,0,0,.35);z-index:299;}
+  .nav-overlay.nav-open{display:block;}
+  .btn-hamburger{display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:6px 8px;margin-right:4px;color:white;}
+  .btn-hamburger span{display:block;width:20px;height:2px;background:white;margin:4px 0;border-radius:1px;}
   .main{padding:14px;}
   .stats-grid{grid-template-columns:repeat(2,1fr);}
   .form-row{grid-template-columns:1fr;}
+}
+@media(min-width:769px){
+  .btn-hamburger{display:none;}
+  .nav-overlay{display:none!important;}
 }
 /* ── System Console ─────────────────────────────────── */
 .sc-card{margin-bottom:16px;}
@@ -497,6 +506,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <div id="app">
   <div class="topbar">
     <div class="tb-brand">
+      <button class="btn-hamburger no-print" id="btn-hamburger" aria-label="Open navigation menu" aria-expanded="false" onclick="toggleMobileNav()"><span></span><span></span><span></span></button>
       <div class="tb-wm">AAFC <span class="r">·</span> Training Management</div>
       <div class="tb-sep">/</div>
       <div class="tb-unit" id="tb-unit">Training System</div>
@@ -507,6 +517,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <button class="tb-btn no-print" onclick="doLogout()">Sign Out</button>
     </div>
   </div>
+  <div class="nav-overlay no-print" id="nav-overlay" onclick="closeMobileNav()"></div>
   <div class="wing-banner" id="wing-banner" style="display:none"></div>
   <div class="scope-banner" id="scope-banner" style="display:none"><span class="sb-tag" id="sb-tag">SQN</span><span id="sb-text"></span></div>
   <div class="mode-banner" id="mode-banner"><span id="mode-text"></span><button onclick="exitMode()">Exit mode</button></div>
@@ -3237,6 +3248,7 @@ function renderAll(){
 //  NAVIGATION
 // ═══════════════════════════════════════════════════════════
 function nav(id){
+  closeMobileNav();
   if(id==='planning-year'||id==='planning-anchors'||id==='planning-term'||id==='planning-missions')id='activities';
   if(id==='planning-builder'||id==='planning-rooms')id='parade-nights';
   if(id==='planning-guide'||id==='planning-longrange'||id==='planning-checks')id='dashboard';
@@ -6685,6 +6697,8 @@ async function loadYearMap(yearId){
     P.annualProgramLoaded = true;
     datesCard.style.display=''; holCard.style.display='';
     await Promise.all([_renderParadeDates(yearId), _renderHolidays(yearId)]);
+    const wid=yr.wing_id||(S.session&&S.session.wing_id)||'';
+    if(wid){const wingYear=yr.year||new Date().getFullYear();await _loadAndRenderWingEventsOverlay(wid,wingYear);}
   } catch(e){ body.innerHTML = `<p class="muted">Error loading year: ${esc(apiErr(e))}</p>`; }
 }
 
@@ -8195,22 +8209,30 @@ function _apShowDateDetail(ds){
   body.innerHTML+=h;
 }
 
-// ─── Patch loadYearMap to also load Wing HQ events ───────────────────────────
-const _origLoadYearMap=loadYearMap;
-async function loadYearMap(yearId){
-  await _origLoadYearMap(yearId);
-  if(!yearId) return;
-  // Load wing events overlay after year map loads
-  const yr=P.years?.find(y=>y.planning_year_id===yearId)||{};
-  const wid=yr.wing_id||(S.session&&S.session.wing_id)||'';
-  if(wid){
-    const year=yr.year||new Date().getFullYear();
-    await _loadAndRenderWingEventsOverlay(wid, year);
-  }
-}
-
 // ─── nav() integration ────────────────────────────────────────────────────────
 // loadWingCalendar() is called when nav('wing-calendar') fires via nav() switch
+
+// ─── Mobile navigation drawer ─────────────────────────────────────────────────
+function toggleMobileNav(){
+  const nav=document.querySelector('.sidenav');
+  const overlay=document.getElementById('nav-overlay');
+  const btn=document.getElementById('btn-hamburger');
+  const isOpen=nav&&nav.classList.contains('nav-open');
+  if(isOpen){ closeMobileNav(); }
+  else {
+    if(nav)nav.classList.add('nav-open');
+    if(overlay)overlay.classList.add('nav-open');
+    if(btn)btn.setAttribute('aria-expanded','true');
+  }
+}
+function closeMobileNav(){
+  const nav=document.querySelector('.sidenav');
+  const overlay=document.getElementById('nav-overlay');
+  const btn=document.getElementById('btn-hamburger');
+  if(nav)nav.classList.remove('nav-open');
+  if(overlay)overlay.classList.remove('nav-open');
+  if(btn)btn.setAttribute('aria-expanded','false');
+}
 </script>
 </body>
 </html>
