@@ -6,6 +6,7 @@
 <title>AAFC Training System</title>
 <meta name="aafc-api-base" content="https://aafc-tms-backend-production.up.railway.app">
 <meta name="aafc-pw-base" content="">
+<meta name="app-build" content="__APP_BUILD__">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
@@ -1167,6 +1168,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="page-actions">
             <button class="btn btn-secondary" onclick="loadSystemConsole()">Refresh</button>
           </div>
+        </div>
+        <div id="sc-build-info" style="background:#f4f8fc;border:1px solid #d1dce8;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#455560">
+          <strong>Build Information</strong><br>
+          Main TMS &bull; Commit: <span id="sc-build-commit">—</span> &bull; Source: connected-frontend &bull; Built: <span id="sc-build-time">—</span>
+        </div>
         </div>
 
         <!-- System Overview card -->
@@ -3260,6 +3266,13 @@ function nav(id){
 
 function loadSystemConsole(){
   if(S.role!=='system_admin') return;
+  // Populate build fingerprint from meta tag injected by docker-entrypoint.sh
+  const buildMeta=(document.querySelector('meta[name="app-build"]')||{}).content||'';
+  const [sha,built]=(buildMeta||'|').split('|');
+  const commitEl=document.getElementById('sc-build-commit');
+  const builtEl=document.getElementById('sc-build-time');
+  if(commitEl) commitEl.textContent=sha||'(local build)';
+  if(builtEl) builtEl.textContent=built||'unknown';
   scLoadOverview();
   scLoadHealth();
   scLoadScopeMap();
@@ -4494,7 +4507,7 @@ async function loadDashCharts(){
   ['chart-weekly-outcomes','chart-delivery-trend','chart-session-outcomes','chart-cancellation-reasons','chart-curriculum-progress','chart-curriculum-backlog','chart-facilitator-workload'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="chart-skeleton"></div>';});
 
   let data;
-  try{data=await api('GET','/api/dashboard/charts?'+params);}
+  try{data=await api('/api/dashboard/charts?'+params);}
   catch(e){
     ['chart-weekly-outcomes','chart-curriculum-progress'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=_dEmptyChart('Could not load chart data. Try refreshing.');});
     return;
@@ -4556,7 +4569,7 @@ async function _loadDashStrategic(){
   if(btn){btn.textContent='Loading…';btn.disabled=true;}
   const win=document.getElementById('dash-window')?.value||'term';
   let data;
-  try{data=await api('GET','/api/dashboard/charts/strategic?window='+win);}
+  try{data=await api('/api/dashboard/charts/strategic?window='+win);}
   catch(e){if(btn){btn.textContent='Load Resilience Charts ↓';btn.disabled=false;}return;}
   const charts=data.charts||{};
   const sec=document.getElementById('dash-strategic-section');if(sec)sec.style.display='';

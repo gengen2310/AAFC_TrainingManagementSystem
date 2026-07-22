@@ -13,6 +13,8 @@
     <!-- URL of the connected-frontend TMS (set AAFC_TMS_BASE in env vars).
          Used for "Return to TMS" links. Leave empty to use the built-in fallback. -->
     <meta name="aafc-tms-base" content="">
+    <!-- Build fingerprint injected by docker-entrypoint.sh: "commitSHA|timestamp" -->
+    <meta name="app-build" content="__APP_BUILD__">
   </head>
   <body>
     <a href="#main" class="skip-link">Skip to main content</a>

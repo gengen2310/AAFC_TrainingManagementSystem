@@ -34,4 +34,17 @@ fi
 # Inject runtime port into nginx config
 sed -i "s/__PORT__/${PORT}/g" /etc/nginx/conf.d/default.conf
 
+# Inject build fingerprint (commit SHA | build timestamp).
+# RAILWAY_GIT_COMMIT_SHA is provided by Railway at runtime; falls back to "local" in dev.
+BUILD_SHA="${RAILWAY_GIT_COMMIT_SHA:-local}"
+BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+sed -i \
+  "s|<meta name=\"app-build\" content=\"__APP_BUILD__\">|<meta name=\"app-build\" content=\"${BUILD_SHA}|${BUILD_TIME}\">|" \
+  /usr/share/nginx/html/index.html
+
+# Create /version.json for programmatic fingerprint verification
+cat > /usr/share/nginx/html/version.json <<EOF
+{"commit":"${BUILD_SHA}","source":"frontend","built":"${BUILD_TIME}"}
+EOF
+
 exec nginx -g "daemon off;"
