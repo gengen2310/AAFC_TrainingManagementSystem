@@ -11,6 +11,7 @@ import type {
   WingHQEvent, CommandCentreData, PlanningConflict, HolidayPeriod,
   NightSummariesResponse, PlanningFacilitatorLeave, FacilitatorLeaveResult,
   FacilitatorWorkload, EquipmentItem, AnchorEvent, PlanningSession,
+  DashboardChartsResponse,
 } from "./types";
 
 /** Handles both legacy array shape `[...]` and current `{"conflicts":[...]}` shape. */
@@ -130,6 +131,15 @@ export const accountApi = {
 export const healthApi = {
   health: () => api.get<{ status: string }>("/api/health"),
   ready: () => api.get<{ status: string }>("/api/health/ready"),
+};
+
+export const dashboardApi = {
+  charts: (window: "week" | "term" | "year" = "term", squadron_id?: string) =>
+    api.get<DashboardChartsResponse>(
+      `/api/dashboard/charts?window=${window}${squadron_id ? `&squadron_id=${squadron_id}` : ""}`
+    ),
+  strategic: (window: "term" | "year" = "year") =>
+    api.get<DashboardChartsResponse>(`/api/dashboard/charts/strategic?window=${window}`),
 };
 
 // ─── Planning Workspace API ─────────────────────────────────────────────────

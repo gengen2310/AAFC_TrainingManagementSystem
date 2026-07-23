@@ -430,3 +430,37 @@ export interface CeaImportResult {
     existing_id: string | null;
   }>;
 }
+
+// ─── Dashboard charts (GET /api/dashboard/charts, /api/dashboard/charts/strategic) ──
+// Shared schema every chart_id follows — see backend/app/routers/dashboard.py.
+export type ChartType =
+  | "bar_horizontal" | "donut" | "line" | "stacked_bar" | "stacked_bar_horizontal"
+  | "grouped_bar" | "heatmap" | "readiness_card" | "readiness_grid";
+
+export interface ChartSeriesSpec { key: string; label: string; color?: string; }
+export interface ChartThresholds { green?: number; amber?: number; red?: number; }
+
+export interface DashboardChart {
+  chart_id: string;
+  title?: string;
+  explanation?: string;
+  question?: string;
+  chart_type: ChartType;
+  data: unknown;
+  insight?: string | null;
+  empty_state?: string;
+  drill_down?: { route?: string; filters?: Record<string, unknown> } | null;
+  permission_scope?: string;
+  x_axis?: string;
+  y_axis?: string;
+  series?: ChartSeriesSpec[];
+  thresholds?: ChartThresholds;
+  columns?: string[];
+}
+
+export interface DashboardChartsResponse {
+  scope: "squadron" | "wing" | "national";
+  window: string;
+  charts: Record<string, DashboardChart>;
+  error?: string;
+}
