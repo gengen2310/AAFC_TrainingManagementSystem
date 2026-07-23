@@ -842,6 +842,16 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <input id="curr-search" placeholder="Search curriculum…" oninput="renderCurr()" style="min-width:180px;">
         </div>
         <div id="curr-list"></div>
+        <div id="curr-drill" class="drill-panel">
+          <div class="drill-hdr">
+            <div class="drill-title" id="curr-drill-title">Sessions</div>
+            <button class="btn btn-xs btn-out no-print" onclick="hideDrill('curr-drill')">Close ×</button>
+          </div>
+          <div class="tw"><table>
+            <thead><tr><th>Date</th><th>Sess</th><th>Phase</th><th>Curriculum Item</th><th>Facilitator</th><th>Room</th><th>Status</th><th class="no-print">Action</th></tr></thead>
+            <tbody id="curr-drill-body"></tbody>
+          </table></div>
+        </div>
       </div>
 
       <!-- ACTIVITIES -->
@@ -976,48 +986,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <tbody id="equip-tbody"></tbody>
             </table></div>
           </div>
-        </div>
-      </div>
-
-      <!-- REPORTS -->
-      <div id="page-reports" class="page">
-        <div class="ph">
-          <div class="ph-title print-only">Training Summary Report</div>
-          <div class="ph-title no-print">Training Summary</div>
-          <div class="ph-actions no-print">
-            <button class="btn btn-out" onclick="printReport()">Print This Report</button>
-          </div>
-        </div>
-        <div class="stats-grid">
-          <div class="stat s-ok clk" onclick="repDrill('delivered')"><div class="slbl">Delivered</div><div class="sval lnk" id="r-del">0</div></div>
-          <div class="stat clk" onclick="repDrill('planned')"><div class="slbl">Planned</div><div class="sval lnk" id="r-pln">0</div></div>
-          <div class="stat s-warn clk" onclick="repDrill('not_delivered')"><div class="slbl">Not Delivered</div><div class="sval lnk" id="r-nd">0</div></div>
-          <div class="stat s-red clk" onclick="repDrill('cancelled')"><div class="slbl">Cancelled</div><div class="sval lnk" id="r-can">0</div></div>
-          <div class="stat s-purple clk" onclick="repDrill('rescheduled')"><div class="slbl">Rescheduled</div><div class="sval lnk" id="r-res">0</div></div>
-        </div>
-
-        <div id="rep-drill" class="drill-panel">
-          <div class="drill-hdr">
-            <div class="drill-title" id="rep-drill-title">Sessions</div>
-            <button class="btn btn-xs btn-out no-print" onclick="hideDrill('rep-drill')">Close ×</button>
-          </div>
-          <div class="tw"><table>
-            <thead><tr><th>Date</th><th>Sess</th><th>Phase</th><th>Curriculum Item</th><th>Facilitator</th><th>Room</th><th>Status</th><th class="no-print">Action</th></tr></thead>
-            <tbody id="rep-drill-body"></tbody>
-          </table></div>
-        </div>
-
-        <div class="card">
-          <div class="ctitle">Progress by Phase — click a count</div>
-          <div id="rep-phase"></div>
-        </div>
-
-        <div class="card">
-          <div class="ctitle">Facilitator Summary</div>
-          <div class="tw"><table>
-            <thead><tr><th>Facilitator</th><th>Del</th><th>Planned</th><th>Not Del</th><th>Cancelled</th><th>Rescheduled</th><th>Total</th><th class="no-print"></th></tr></thead>
-            <tbody id="rep-fac"></tbody>
-          </table></div>
         </div>
       </div>
 
@@ -3288,7 +3256,6 @@ function nav(id){
   if(id==='planning-year'||id==='planning-anchors'||id==='planning-term'||id==='planning-missions')id='activities';
   if(id==='planning-builder'||id==='planning-rooms')id='parade-nights';
   if(id==='planning-guide'||id==='planning-longrange'||id==='planning-checks')id='dashboard';
-  if(id==='reports'){const land=SCOPE_LANDING[effectiveScope()];id=land&&land!=='reports'?land:'dashboard';}
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');
@@ -4291,11 +4258,6 @@ function drillStatus(st){
   const stLbls={delivered:'Delivered',planned:'Planned',not_delivered:'Not Delivered',cancelled:'Cancelled',rescheduled:'↺ Rescheduled'};
   showDrill('dash-drill','dash-drill-title','dash-drill-body',stLbls[st]||st,sess);
 }
-function repDrill(st){
-  const sess=allSess().filter(s=>s.status===st);
-  const stLbls={delivered:'Delivered',planned:'Planned',not_delivered:'Not Delivered',cancelled:'Cancelled',rescheduled:'↺ Rescheduled'};
-  showDrill('rep-drill','rep-drill-title','rep-drill-body',stLbls[st]||st,sess);
-}
 function showDrill(panelId,titleId,bodyId,title,sess){
   document.getElementById(titleId).textContent=title+' ('+sess.length+')';
   document.getElementById(bodyId).innerHTML=sess.length?sess.map(s=>`<tr>
@@ -4311,17 +4273,9 @@ function showDrill(panelId,titleId,bodyId,title,sess){
   const p=document.getElementById(panelId);p.classList.add('show');p.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 function hideDrill(id){document.getElementById(id).classList.remove('show');}
-function drillPhase(ph){
-  const sess=allSess().filter(s=>s.phase===ph);
-  showDrill('rep-drill','rep-drill-title','rep-drill-body',(PH_S[ph]||ph)+' — Sessions',sess);
-}
 function drillPhaseDash(ph){
   const sess=allSess().filter(s=>s.phase===ph);
   showDrill('dash-drill','dash-drill-title','dash-drill-body',(PH_S[ph]||ph)+' — Sessions',sess);
-}
-function drillFacDel(facKey){
-  const sess=allSess().filter(s=>(s.facId===facKey||s.facName===facKey)&&s.status==='delivered');
-  showDrill('dash-drill','dash-drill-title','dash-drill-body','Delivered by '+facKey,sess);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5103,13 +5057,7 @@ function showCurrDetail(code){
 function drillCurr(code){
   const e=allCurr().find(x=>x.code===code);
   const sess=allSess().filter(s=>s.code===code);
-  if(effectiveScope()==='squadron'){
-    nav('dashboard');
-    setTimeout(()=>showDrill('dash-drill','dash-drill-title','dash-drill-body',(e?e.title:code)+' — Sessions',sess),50);
-  } else {
-    nav('reports');
-    setTimeout(()=>showDrill('rep-drill','rep-drill-title','rep-drill-body',(e?e.title:code)+' — Sessions',sess),50);
-  }
+  showDrill('curr-drill','curr-drill-title','curr-drill-body',(e?e.title:code)+' — Sessions',sess);
 }
 let _currSaveEndpoint='/api/curriculum';
 function _hideCurrWingRow(){document.getElementById('c-wing-row').style.display='none';}
@@ -5655,58 +5603,6 @@ async function delEquip(id){
   if(!confirm('Archive this equipment item?'))return;
   try{ await api('/api/equipment/'+id,{method:'DELETE'}); await reloadAndRender(); }
   catch(e){ alert(apiErr(e)); }
-}
-
-// ═══════════════════════════════════════════════════════════
-//  REPORTS
-// ═══════════════════════════════════════════════════════════
-function renderReports(){
-  const sess=allSess();
-  const cnt=(st)=>sess.filter(s=>s.status===st).length;
-  ['del','pln','nd','can','res'].forEach((id,i)=>{
-    const key=['delivered','planned','not_delivered','cancelled','rescheduled'][i];
-    const el=document.getElementById('r-'+id);if(el)el.textContent=cnt(key);
-    const ds=document.getElementById('s-'+id);
-    if(ds)ds.textContent=cnt(key); // sync dashboard
-  });
-  document.getElementById('s-del').textContent=cnt('delivered');
-  document.getElementById('s-pln').textContent=cnt('planned');
-  document.getElementById('s-nd').textContent=cnt('not_delivered');
-  document.getElementById('s-can').textContent=cnt('cancelled');
-
-  const phO=['A. Orientation','B. Initial','C. Junior','D. Intermediate','E. Senior','I. Bronze','J. Silver','K. Gold'];
-  const phC={};phO.forEach(p=>phC[p]={t:0,d:0,nd:0});
-  sess.forEach(s=>{if(phC[s.phase]){phC[s.phase].t++;if(s.status==='delivered')phC[s.phase].d++;if(s.status==='not_delivered')phC[s.phase].nd++;}});
-  document.getElementById('rep-phase').innerHTML=phO.map(ph=>{
-    const c=phC[ph];if(!c.t)return '';
-    const pct=Math.round(c.d/c.t*100);
-    const fc=pct>=80?'ok':pct>=40?'amber':'';
-    return `<div class="ph-row">
-      <div class="ph-name">${PH_S[ph]||ph}</div>
-      <div class="ph-bar"><div class="pbar"><div class="pfill ${fc}" style="width:${pct}%"></div></div></div>
-      <div class="ph-cnt">
-        <button class="btn-lnk" onclick="drillPhase('${ph}')" style="font-size:10px">${c.d}/${c.t}</button>
-        ${c.nd>0?`<span style="font-size:9.5px;color:var(--muted);margin-left:3px">(${c.nd} ND)</span>`:''}
-      </div>
-    </div>`;
-  }).join('');
-
-  const facMap={};
-  sess.forEach(s=>{
-    const k=s.facId||s.facName||'Unknown';
-    if(!facMap[k])facMap[k]={name:s.facName||'Unknown',facId:s.facId,delivered:0,planned:0,not_delivered:0,cancelled:0,rescheduled:0,total:0};
-    facMap[k][s.status]=(facMap[k][s.status]||0)+1;facMap[k].total++;
-  });
-  document.getElementById('rep-fac').innerHTML=Object.entries(facMap).sort((a,b)=>b[1].total-a[1].total).map(([k,f])=>`<tr>
-    <td style="font-weight:700">${f.facId?`<button class="btn-lnk" onclick="showFacProfile('${f.facId}')">${f.name}</button>`:f.name}</td>
-    <td style="color:var(--ok);font-weight:800;text-align:center"><button class="btn-lnk" onclick="drillFacDel('${k}')">${f.delivered||0}</button></td>
-    <td style="text-align:center">${f.planned||0}</td>
-    <td style="color:var(--steel);text-align:center">${f.not_delivered||0}</td>
-    <td style="color:var(--red);text-align:center">${f.cancelled||0}</td>
-    <td style="color:var(--warn);text-align:center">${f.rescheduled||0}</td>
-    <td style="font-weight:800;text-align:center">${f.total}</td>
-    <td class="no-print">${f.facId?`<button class="btn btn-xs btn-sky" onclick="showFacProfile('${f.facId}')">Profile →</button>`:'—'}</td>
-  </tr>`).join('')||`<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:14px">No session data yet</td></tr>`;
 }
 
 // ═══════════════════════════════════════════════════════════
