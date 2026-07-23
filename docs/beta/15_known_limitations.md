@@ -8,19 +8,19 @@ Created: 2026-07-14.
 
 ## Data Model Limitations
 
-### DL-01: Physical Spaces Not Unified
+### DL-01: Physical Spaces Not Unified — RESOLVED 2026-07-24
 
-- **Description**: Rooms and training areas are stored in two separate tables — `training_areas` (serving the connected-frontend Resources page) and `planning_locations` (serving the Planning Workspace Rooms tab). A squadron that adds a room via Resources will not see it in the Planning Workspace's Rooms tab, and vice versa. Users must duplicate entries.
-- **Impact**: Medium. Squadrons using both apps may maintain two separate room lists.
-- **Workaround**: Configure rooms in both places using the same names.
-- **Resolution**: Post-beta. Merge path documented in `28_authoritative_data_model.md` (Task #10).
+- **Description (historical)**: Rooms and training areas were stored in two separate tables — `training_areas` (serving the connected-frontend Resources page) and `planning_locations` (serving the Planning Workspace Rooms tab). A squadron that added a room via Resources would not see it in the Planning Workspace's Rooms tab, and vice versa.
+- **Resolution**: Fixed as Phase 1 of the master transformation plan. `/api/planning/locations` (list/create/update) now reads and writes `training_areas` directly instead of the separate `planning_locations` table — the same "shared table via a different router" pattern already used correctly for facilitators. Response JSON shape unchanged; no frontend changes required. Verified live: a room created in either app now appears immediately in the other.
+- **Bonus finding**: this merge also fixed a real, silent bug — `create_session`/`update_session`'s room-resolution logic only ever looked up `TrainingArea` rows, so a room picked from Planning Workspace's Rooms tab (previously backed by `planning_locations`) silently failed to attach to a session (no error, just an unassigned room). This is now fixed as a side effect of the merge.
+- **Also found and fixed while auditing this area**: `GET /years/{id}/facilitators/{id}/workload` (backs Planning Workspace's Facilitator Leave workload stats) queried `ScheduledSession`, a model with no live create/update path anywhere in the codebase — it always silently returned zero workload. Rewritten to use the same `TrainingSession`-based join `list_missions` already uses.
+- **Not touched**: the `planning_locations` table and `ScheduledSession` model themselves are left in place (no migration, no drop) — nothing in any live, reachable code path depends on them, so leaving them avoids any data-loss or FK-constraint risk. They can be dropped in a later, purely cosmetic cleanup pass.
 
-### DL-02: Facilitators Not Unified
+### DL-02: Facilitators Not Unified — CORRECTED, NOT A REAL DUPLICATION
 
-- **Description**: `facilitators` (training module) and `planning_facilitators` (Planning Workspace) are separate tables. A facilitator must be added in both places for full functionality across both apps.
-- **Impact**: Medium. Operational setup is duplicated.
-- **Workaround**: Add facilitators in both the connected-frontend Facilitators page and the Planning Workspace Facilitators tab.
-- **Resolution**: Post-beta. Merge requires migration + router updates.
+- **Original description (incorrect)**: This entry previously claimed `facilitators` (training module) and `planning_facilitators` (Planning Workspace) were separate tables requiring double data entry.
+- **Correction (2026-07-24 master transformation plan review)**: There is only one `Facilitator` model/table (`facilitators`). Planning Workspace's `/api/planning/facilitators` endpoint (`list_planning_facilitators`) reads that *same* table via a different router function — confirmed by direct model/migration inspection: no `planning_facilitators` table or `PlanningFacilitator` model class exists anywhere in `backend/app/models/` or any Alembic migration. The original claim (and the equivalent claim in `docs/beta/28_authoritative_data_model.md`) was never correct. **No merge is needed — there is nothing to merge.**
+- **Action**: this entry is kept (rather than deleted) specifically as a record that the claim was investigated and found false, so it doesn't get re-reported as a live gap in a future pass without re-checking.
 
 ### DL-03: Parade Dates and Parade Nights Are Separate
 
@@ -28,6 +28,19 @@ Created: 2026-07-14.
 - **Impact**: Low. This is intentional architecture (plan without committing sessions). Documented in user flows.
 - **Workaround**: Use the Parade Night Generator in the connected-frontend.
 - **Resolution**: Not planned — intentional design.
+
+### DL-04: CEA Import Exists as Two Separate, Differently-Permissioned Pipelines
+
+- **Description**: connected-frontend's "Import CEA" (Activities page) and Planning Workspace's "Import CEA" (Activities tab) are genuinely separate pipelines, writing to different models, discovered during the 2026-07-24 master transformation plan review (not previously documented anywhere):
+  - **Legacy pipeline** (`POST /api/activities/import-cea`, `training.py`): writes to the `Activity` model, squadron-scoped, dedups only by `cea_seq_nr`, **no review/classification workflow at all** — a row is either created or silently skipped as a duplicate. Permission: `sqn_admin` or higher (blocks only `sqn_general`/`wing_viewer`/`national_viewer`/`auditor`).
+  - **Reviewed pipeline** (`POST /api/planning/years/{year_id}/cea/import`, `planning.py`): writes to the `CeaActivity` model, wing-scoped via `CeaImportBatch`, has a full needs-review/classify workflow and smarter name+date-key dedup fallback. **Permission: `wing_admin`, `national_admin`, or `system_admin` only — `sqn_admin` is explicitly excluded.**
+- **Why this was not simply merged in the same pass as DL-01**: the two pipelines have a genuine role-permission mismatch, not just a data-model difference. Redirecting connected-frontend's "Import CEA" button to call the reviewed pipeline would **remove CEA import capability from every `sqn_admin` user** — a real regression, not a safe consolidation. Loosening the reviewed pipeline's role gate to include `sqn_admin` is also not a decision to make unilaterally: it may be deliberately wing-admin+-gated because CEA data is inherently wing-level (a single wing-level import feeding all its squadrons), in which case relaxing it would let a squadron admin import wing-scoped data — a different kind of regression.
+- **Impact**: Medium. A squadron using the legacy pipeline gets no review/classification step and a weaker dedup than the same data would get via the reviewed pipeline; the two pipelines' resulting rows are never reconciled with each other.
+- **Resolution — blocked on a product decision, not a technical one**: someone with product/organisational authority needs to decide one of:
+  1. CEA import becomes exclusively a `wing_admin`+ responsibility (retire the legacy squadron-level pipeline; requires user communication since it removes a capability `sqn_admin` users have today), or
+  2. The reviewed pipeline's role gate is deliberately widened to include `sqn_admin` for squadron-scoped imports (needs confirmation this doesn't violate the wing-scoping the `CeaImportBatch`/`CeaActivity` model design assumes), or
+  3. Both pipelines are kept, but the legacy one is upgraded in place to use the same review/classification model and stronger dedup logic as the reviewed pipeline, without touching either one's role gate (more engineering work, but zero capability or permission change).
+- **Not done**: no code change was made for this item. Flagging it accurately, with the actual blocker named, was judged more valuable than forcing a guess at a decision that affects who can do a real, currently-working task.
 
 ---
 

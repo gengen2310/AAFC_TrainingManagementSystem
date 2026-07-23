@@ -3,6 +3,14 @@
 Phase 8 output. Every shared concept mapped to its authoritative source.
 Created: 2026-07-14.
 
+**⚠️ Corrected 2026-07-24** (master transformation plan review): several claims below
+were checked directly against `backend/app/models/*.py` and found wrong — a
+facilitator-duplication claim that doesn't exist, and several table/class names that
+don't match the current schema. Corrections are inline, marked with **[CORRECTED]**.
+Treat this whole document as a hypothesis to re-verify against the actual model files
+before trusting it, not as ground truth — that is exactly the mistake this correction
+pass is fixing.
+
 ---
 
 ## Model Inventory and Authority Map
@@ -24,52 +32,86 @@ Created: 2026-07-14.
 |---|---|---|---|---|
 | Curriculum item | `curriculum_items` | `CurriculumItem` | `owning_level` (national/wing/squadron) | National items visible to all; wing items visible to wing+sqn; sqn items local only |
 | Program type | `core_status` field on `CurriculumItem` | — | Set at creation | Values: `foundation`, `extension`, `optional` (migrated from `core`/`additional`) |
-| Training session | `training_sessions` | `Session` | via `parade_night_id` → `squadron_id` | — |
+| Training session | `sessions` **[CORRECTED — was `training_sessions`]** | `Session` (imported as `TrainingSession` in `planning.py`) | via `parade_night_id` → `squadron_id` | — |
+
+**[NEW, 2026-07-24]** A second, parallel curriculum/publishing model exists —
+`ProgramPackage`/`ProgramItem` (`backend/app/models/program.py`), a National→Wing→Squadron
+publishing workflow (draft→review→approved→published→retired→archived) served by its own
+router (`routers/program.py`). No FK or code-level join was found between `ProgramItem` and
+`CurriculumItem` — they appear to be entirely independent data models for an overlapping
+concern. **Open question, not resolved by this pass**: is `ProgramItem` a governance/publishing
+layer intended to feed or replace `CurriculumItem`, or a genuinely separate concept? Do not
+assume either direction before this is confirmed directly.
 
 ### Activities and CEA
 
 | Concept | Authoritative table | Model class | Owning level | Dedup |
 |---|---|---|---|---|
-| Activity (general) | `activities` | `Activity` | `owning_level`: national/wing/squadron | `national_id` links to national source |
-| CEA activity (import) | `cea_activities` | `CeaActivity` | via `planning_year_id` | `external_id` is the CEA reference; duplicate detection by `external_id` per year |
+| Activity (general) | `activities` | `Activity` | `owning_level`: national/wing/squadron | `cea_seq_nr` links to a legacy-pipeline CEA import (see DL-04 below) |
+| CEA activity (import) | `cea_activities` | `CeaActivity` | via `planning_year_id` | `cea_activity_id` **[CORRECTED — was `external_id`]** is the CEA reference; duplicate detection by `cea_activity_id` per year, with a name+date-key fallback |
 | CEA import batch | `cea_import_batches` | `CeaImportBatch` | via `planning_year_id` | — |
-| Local hide (sqn overlay) | `cea_local_hides` | `CeaLocalHide` | `squadron_id` | Hides an inherited activity for one sqn; does not delete the source record |
+| Local hide (sqn overlay) | `activity_local_hides` **[CORRECTED — was `cea_local_hides`]** | `ActivityLocalHide` **[CORRECTED — was `CeaLocalHide`]** | `squadron_id` | Hides an inherited activity for one sqn; does not delete the source record |
+
+**[NEW, 2026-07-24] — see `docs/beta/15_known_limitations.md` DL-04 for full detail**: CEA
+import is actually **two separate pipelines**, not one. The `Activity`/`cea_seq_nr` row above
+describes the older, `sqn_admin`-permissioned pipeline (`POST /api/activities/import-cea`,
+`training.py`) with no review workflow. The `CeaActivity`/`CeaImportBatch` rows describe the
+newer, `wing_admin`+-only pipeline (`POST /api/planning/years/{id}/cea/import`, `planning.py`)
+with a full review/classification workflow. They were not previously documented as two
+separate systems in this table.
 
 ### Facilitators and Leave
 
 | Concept | Authoritative table | Model class | Owning org | Archive |
 |---|---|---|---|---|
-| Facilitator (planning) | `planning_facilitators` | `Facilitator` (planning) | `squadron_id` | `is_archived` |
-| Facilitator (training) | `facilitators` | `Facilitator` (training) | `squadron_id` | — |
-| Facilitator leave | `facilitator_leave` | `FacilitatorLeave` | via `facilitator_id` → `squadron_id` | — |
-| Scheduled session assignment | `scheduled_sessions.facilitator_id` | — | via `scheduled_session_id` | — |
+| Facilitator | `facilitators` | `Facilitator` | `squadron_id` | `is_archived` (`SoftDeleteMixin`) |
+| Facilitator leave | `planning_facilitator_leave` **[CORRECTED — was `facilitator_leave`]** | `PlanningFacilitatorLeave` **[CORRECTED — was `FacilitatorLeave`]** | via `facilitator_id` → `squadron_id` | — |
+| Scheduled session assignment (dead code — see note) | `scheduled_sessions.facilitator_id` | — | via `scheduled_session_id` | — |
 
-**Duplication flag**: `planning_facilitators` (planning module) and `facilitators` (training module) are separate tables with separate records. A user must add a facilitator in both places for full functionality. This is the primary outstanding duplication in the data model. Merging requires: (1) deciding which FK the planning module uses, (2) migrating `planning_facilitators` records to reference `facilitators`, (3) updating all planning callers. Deferred to post-beta.
+**[CORRECTED, 2026-07-24] — no facilitator duplication exists.** This section previously
+claimed a separate `planning_facilitators` table/`Facilitator` (planning) model requiring
+double data entry. **That claim is false**, confirmed by direct inspection: only one
+`Facilitator` model/table exists anywhere in `backend/app/models/` or any Alembic migration.
+Planning Workspace's `/api/planning/facilitators` endpoint (`list_planning_facilitators`)
+reads the *same* `facilitators` table via a different router function — a read-only overlay,
+not a second data source. **Do not plan or attempt a facilitator merger migration; there is
+nothing to merge.** (Corresponding correction also made in
+`docs/beta/15_known_limitations.md` DL-02.)
 
-### Physical Spaces — KNOWN DUPLICATION
+**Separately — real, dead code found in this same area (2026-07-24)**: `scheduled_sessions`
+(model `ScheduledSession`) has no live create/update path anywhere in the codebase — confirmed
+zero `ScheduledSession(...)` instantiations exist. The one endpoint that queried it for
+facilitator workload stats (`GET /years/{id}/facilitators/{id}/workload`) always silently
+returned zero regardless of real workload; this has been fixed to query `TrainingSession`
+instead (see `docs/beta/15_known_limitations.md` DL-01). The `scheduled_sessions` table and
+`ScheduledSession` model are left in place, unused, rather than dropped in that fix — a later,
+purely cosmetic cleanup could remove them, but nothing depends on them today.
+
+### Physical Spaces — RESOLVED 2026-07-24
 
 | Concept | Authoritative table | Model class | Used by |
 |---|---|---|---|
-| Training area / room | `training_areas` | `TrainingArea` | connected-frontend Resources page; `training.py` router |
-| Planning location | `planning_locations` | `PlanningLocation` | Planning Workspace Rooms tab; `planning.py` router |
+| Training area / room | `training_areas` | `TrainingArea` | connected-frontend Resources page (`training.py` router) **and** Planning Workspace Rooms tab (`planning.py` router — now reads/writes the same table) |
 
-**Both represent physical spaces** (rooms, outdoor areas, training facilities) owned by a squadron. They are separate tables with overlapping fields:
+**[CORRECTED, 2026-07-24]** This section previously described `planning_locations`/
+`PlanningLocation` as a separate, actively-used table requiring a future migration. That
+migration has been done: `/api/planning/locations` (`planning.py`) now reads and writes
+`training_areas` directly instead of the separate `planning_locations` table, following the
+same pattern already used correctly for facilitators. Response JSON shape is unchanged
+(`location_id`/`unit_id`/`name`/`location_type`/`capacity`/`notes`/`active_status`), so no
+frontend changes were needed. Verified live: a room created in either app now appears
+immediately in the other.
 
-| Field | `training_areas` | `planning_locations` |
-|---|---|---|
-| Squadron FK | `squadron_id` | `unit_id` |
-| Name | `name` | `name` |
-| Type | `type` + `indoor_outdoor` | `location_type` |
-| Capacity | `capacity` | `capacity` |
-| Notes | `notes` | `notes` |
-| Active | `active_status` | `active_status` |
-| Soft delete | `is_archived` (SoftDeleteMixin) | None |
+**Bonus finding from this fix**: `create_session`/`update_session`'s room-resolution logic
+(`db.get(TrainingArea, body.location_id)`) only ever looked up `TrainingArea` rows — a
+`location_id` from the old `PlanningLocation`-backed endpoint silently failed to resolve, so a
+room picked in Planning Workspace would not actually attach to the session (no error, just an
+unassigned room). This is now fixed as a direct side effect of the merge.
 
-**Decision**: `training_areas` is the **canonical** source (older, more complete, has soft-delete, serves the primary connected-frontend). `planning_locations` is a secondary overlay used only by Planning Workspace's session scheduling UI.
-
-**Planned merger (post-beta)**: Migration to add `training_area_id FK` on `planning_locations` and deprecate redundant fields. Callers in `planning.py` router updated to join through `training_areas`. UI in Planning Workspace updated to read from unified `training_areas` endpoint. Risk: medium (two routers, two frontends, existing session assignment references).
-
-**For this release**: Both tables remain operational independently. A squadron that creates rooms via the connected-frontend Resources page will NOT automatically see them in the Planning Workspace Rooms tab (and vice versa). This is a documented limitation.
+**Not touched**: the `planning_locations` table and `PlanningLocation` model are left in place
+(no migration, no drop) — nothing in any live, reachable code path depends on them, so this
+avoids any data-loss or FK-constraint risk. A later, purely cosmetic cleanup pass could drop
+the now-orphaned table.
 
 ### Notices and Announcements
 
@@ -90,7 +132,7 @@ Created: 2026-07-14.
 
 | Concept | Table | Model | Notes |
 |---|---|---|---|
-| Scheduled session | `scheduled_sessions` | `ScheduledSession` | Curriculum assigned to a parade date slot |
+| Scheduled session **[CORRECTED — dead code]** | `scheduled_sessions` | `ScheduledSession` | **Not live.** No `ScheduledSession(...)` is instantiated anywhere in the codebase — the real, live create/update path for a curriculum item assigned to a parade date slot is `TrainingSession` (`sessions` table, see Curriculum section above), created via `assign_mission`/`create_session`/`update_session`. `ScheduledSession` and this table are unused; left in place rather than dropped since removing them carries no functional benefit and a table drop is unnecessary risk for a purely cosmetic cleanup. |
 | Planning conflict | `planning_conflicts` | `PlanningConflict` | Detected during run-checks; can be overridden |
 | Prep rule | `prep_rules` | (query only) | Configures lead-time requirements |
 
@@ -111,7 +153,8 @@ No model or endpoint bypasses the audit service for privileged write operations.
 
 | Import type | Dedup key | Scope |
 |---|---|---|
-| CEA activities | `external_id` (from CEA system) | Per `planning_year_id` |
+| CEA activities (reviewed pipeline, `planning.py`) | `cea_activity_id` **[CORRECTED — was `external_id`]**, with a name+date-key fallback | Per `planning_year_id` |
+| CEA activities (legacy pipeline, `training.py`) | `cea_seq_nr` only, no fallback, no review step — see `docs/beta/15_known_limitations.md` DL-04 | Per squadron |
 | Curriculum CSV import | `code` (LEAFlet code) | Per `owning_level` + `squadron_id` |
 | Wing HQ calendar | `event_id` from Wing HQ | Per wing |
 
@@ -137,9 +180,12 @@ No cross-squadron data sharing via cache. All query keys are derived from the au
 
 ## Outstanding Consolidations (Post-Beta)
 
-| Priority | Duplication | Effort | Risk |
-|---|---|---|---|
-| HIGH | Facilitator split (`facilitators` vs `planning_facilitators`) | Medium | Migration + 2 router callers |
-| MEDIUM | Physical spaces (`training_areas` vs `planning_locations`) | Medium | Migration + 2 routers + 2 frontend UIs |
-| LOW | `core_status` value rename (`core`→`foundation`, `additional`→`extension`) | Low | Already in stash; needs migration ID fix |
-| LOW | `TrainingArea.squadron_id` vs `PlanningLocation.unit_id` naming inconsistency | Trivial | Can be addressed in merger |
+**[CORRECTED, 2026-07-24]**: two of the four items below were already resolved or never real;
+see `docs/beta/15_known_limitations.md` for the up-to-date DL-01 through DL-04 entries.
+
+| Priority | Duplication | Status |
+|---|---|---|
+| ~~HIGH~~ | ~~Facilitator split~~ | **Not real — corrected 2026-07-24.** No `planning_facilitators` table ever existed. |
+| ~~MEDIUM~~ | ~~Physical spaces~~ | **Resolved 2026-07-24.** `/api/planning/locations` now reads/writes `training_areas` directly. |
+| MEDIUM | CEA import — two pipelines, different role gates (`sqn_admin` vs `wing_admin`+) | **Open, blocked on a product decision** — see DL-04. Not a technical-only fix; redirecting one to the other removes a real capability or loosens a real permission gate without confirmation either is intended. |
+| LOW | `core_status` value rename (`core`→`foundation`, `additional`→`extension`) | Not independently re-verified in the 2026-07-24 pass — check current migration state before assuming this is still pending. |
