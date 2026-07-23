@@ -64,7 +64,15 @@ Created: 2026-07-14.
 - **Description**: The Planning Workspace (React, `aafc-tms-planning-workspace-preview`) has a stale build in production. The Dockerfile was broken (DEFECT-005); a fix is on the branch but not deployed.
 - **Impact**: HIGH. Users accessing `/planning` in production may see outdated UI or errors.
 - **Status**: Fix on branch. Production deployment requires explicit approval.
+- **Update (2026-07-23)**: root-caused and fixed for **staging** — see `docs/ui/final_ui_root_cause.md`. Staging was also stale (backend/frontend deployed 2026-07-21, Planning Workspace 2026-07-14) purely because nobody redeployed after later commits landed, plus `PLANNING_WORKSPACE_URL` was never set on the staging backend (a separate cause, unrelated to the Dockerfile defect). Both fixed and verified live on staging via Playwright (`frontend/e2e-connected/`) and screenshots (`artifacts/final-beta-consolidation/d999623/`). **Production is still on the stale build and still requires the explicit approval this limitation already flagged.**
 - **Defect**: DEFECT-005.
+
+### FL-06: Mission Backlog does not surface Cancelled / Not-delivered lessons distinctly
+
+- **Description**: The Planning Workspace's Mission Backlog (`BacklogContent` in `PlanningBottomDrawer.tsx`) filters curriculum items by `Unscheduled`/`Scheduled` only, driven by whether a session exists — not by session status. A session that was scheduled and later cancelled or not delivered shows as "Scheduled" in this view, with no distinct status tag and no direct reschedule action from Mission Backlog itself.
+- **Impact**: Medium. Cancelled/not-delivered sessions are still visible and manageable from the Parade Nights page (each session shows its real status there), so nothing is silently lost — but staff working from Mission Backlog specifically won't see a ranked "needs rescheduling" view for these.
+- **Status**: Not implemented. Identified during the 2026-07-23 UI consolidation pass; out of scope for that pass given its size (new status filter option, distinct tag styling, a reschedule action, retaining the original date/reason) relative to the rest of that pass's scope.
+- **Resolution**: Post-beta, or a dedicated follow-up pass.
 
 ### FL-02: No Playwright End-to-End Coverage
 
