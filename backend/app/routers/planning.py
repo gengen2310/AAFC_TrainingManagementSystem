@@ -328,10 +328,20 @@ def _session_out(s: ScheduledSession, db: DBSession) -> dict:
     }
 
 
-def _location_out(loc: PlanningLocation) -> dict:
+def _location_out(loc: TrainingArea) -> dict:
+    # Rooms merger (master transformation plan, Phase 1): Planning Workspace's
+    # Rooms tab now reads/writes the same `training_areas` table connected-
+    # frontend's Resources page uses, instead of the separate `planning_locations`
+    # table. This also fixes a real, live bug: create_session/update_session's
+    # room-resolution (`db.get(TrainingArea, body.location_id)`) only ever looked
+    # up TrainingArea rows — a location_id from the old PlanningLocation-backed
+    # endpoint silently failed to resolve, so a room picked in Planning Workspace
+    # would not actually attach to the session. The response shape below is kept
+    # identical to the old PlanningLocation-backed JSON so no frontend changes
+    # are required.
     return {
-        "location_id": loc.id, "unit_id": loc.unit_id, "name": loc.name,
-        "location_type": loc.location_type, "capacity": loc.capacity,
+        "location_id": loc.id, "unit_id": loc.squadron_id, "name": loc.name,
+        "location_type": loc.type, "capacity": loc.capacity,
         "notes": loc.notes, "active_status": loc.active_status,
     }
 
@@ -1541,17 +1551,20 @@ def list_locations(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    q = db.query(PlanningLocation).filter(PlanningLocation.active_status == True)  # noqa: E712
+    q = db.query(TrainingArea).filter(
+        TrainingArea.active_status == True,  # noqa: E712
+        TrainingArea.is_archived == False,  # noqa: E712
+    )
     if p.role == "sqn_admin":
-        q = q.filter(PlanningLocation.unit_id == p.squadron_id)
+        q = q.filter(TrainingArea.squadron_id == p.squadron_id)
     elif p.role in ("wing_admin", "wing_viewer"):
         sqn_ids = [s.id for s in db.query(Squadron).filter(
             Squadron.wing_id == p.wing_id, Squadron.is_archived == False  # noqa: E712
         ).all()]
-        q = q.filter(PlanningLocation.unit_id.in_(sqn_ids))
+        q = q.filter(TrainingArea.squadron_id.in_(sqn_ids))
     if unit_id:
-        q = q.filter(PlanningLocation.unit_id == unit_id)
-    return [_location_out(loc) for loc in q.order_by(PlanningLocation.name).all()]
+        q = q.filter(TrainingArea.squadron_id == unit_id)
+    return [_location_out(loc) for loc in q.order_by(TrainingArea.name).all()]
 
 
 @router.post("/locations")
@@ -1564,14 +1577,14 @@ def create_location(
     unit_id = body.unit_id or p.squadron_id
     if p.role == "sqn_admin":
         unit_id = p.squadron_id
-    loc = PlanningLocation(
-        id=str(uuid.uuid4()), unit_id=unit_id, name=body.name,
-        location_type=body.location_type, capacity=body.capacity,
+    loc = TrainingArea(
+        id=str(uuid.uuid4()), squadron_id=unit_id, name=body.name,
+        type=body.location_type, capacity=body.capacity,
         notes=body.notes, active_status=True,
-        created_by=p.user_id, created_at=utcnow(), updated_at=utcnow(),
+        created_at=utcnow(), updated_at=utcnow(),
     )
     db.add(loc); db.commit()
-    audit(db, p, object_type="planning_location", object_id=loc.id, action="create",
+    audit(db, p, object_type="training_area", object_id=loc.id, action="create",
           new={"name": body.name})
     return _location_out(loc)
 
@@ -1583,19 +1596,25 @@ def update_location(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    loc = db.get(PlanningLocation, location_id)
-    if not loc:
+    loc = db.get(TrainingArea, location_id)
+    if not loc or loc.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     _require_plan_write(p)
-    if p.role == "sqn_admin" and loc.unit_id != p.squadron_id:
+    if p.role == "sqn_admin" and loc.squadron_id != p.squadron_id:
         raise HTTPException(403, detail={"error": "out_of_scope"})
-    for field in ("name", "location_type", "capacity", "notes", "active_status"):
-        val = getattr(body, field)
-        if val is not None:
-            setattr(loc, field, val)
+    if body.name is not None:
+        loc.name = body.name
+    if body.location_type is not None:
+        loc.type = body.location_type
+    if body.capacity is not None:
+        loc.capacity = body.capacity
+    if body.notes is not None:
+        loc.notes = body.notes
+    if body.active_status is not None:
+        loc.active_status = body.active_status
     loc.updated_at = utcnow()
     db.commit()
-    audit(db, p, object_type="planning_location", object_id=loc.id, action="update")
+    audit(db, p, object_type="training_area", object_id=loc.id, action="update")
     return _location_out(loc)
 
 
@@ -3353,31 +3372,36 @@ def facilitator_workload(
     if not fac:
         raise HTTPException(404, detail={"error": "facilitator_not_found"})
 
-    # Get all parade date IDs in this year
-    year_date_ids = {
-        pd.id: pd.parade_date
-        for pd in db.query(ParadeDate).filter(
-            ParadeDate.planning_year_id == year_id,
-            ParadeDate.is_active == True,  # noqa: E712
-        ).all()
+    # Get all parade dates in this year, and their linked parade nights.
+    # NOTE: this endpoint originally queried `ScheduledSession` (parade_date_id
+    # FK), a model that is never populated by any live create/update path in
+    # this codebase (confirmed: no `ScheduledSession(...)` instantiation exists
+    # anywhere) — so it always silently returned zero workload. Rewritten to
+    # use the same ParadeDate -> ParadeNight -> TrainingSession join `list_missions`
+    # already uses for the real, live session data.
+    pd_rows = db.query(ParadeDate).filter(
+        ParadeDate.planning_year_id == year_id,
+        ParadeDate.is_active == True,  # noqa: E712
+    ).all()
+    pn_to_pd: dict[str, ParadeDate] = {
+        pd_obj.parade_night_id: pd_obj for pd_obj in pd_rows if pd_obj.parade_night_id
     }
 
-    # Find all scheduled sessions for this facilitator in this year
-    sessions = (
-        db.query(ScheduledSession)
-        .filter(
-            ScheduledSession.facilitator_id == fac_id,
-            ScheduledSession.parade_date_id.in_(list(year_date_ids.keys())),
-            ScheduledSession.is_archived == False,  # noqa: E712
-        )
-        .all()
-    )
+    sessions: list[TrainingSession] = []
+    if pn_to_pd:
+        sessions = db.query(TrainingSession).filter(
+            TrainingSession.facilitator_id == fac_id,
+            TrainingSession.parade_night_id.in_(list(pn_to_pd.keys())),
+            TrainingSession.is_archived == False,  # noqa: E712
+        ).all()
 
     total_scheduled = len(sessions)
-    # Group by parade_date_id
+    # Group by parade date (each parade night maps to exactly one parade date here)
     by_night: dict[str, list] = {}
     for s in sessions:
-        by_night.setdefault(s.parade_date_id, []).append(s)
+        pd_obj = pn_to_pd.get(s.parade_night_id)
+        if pd_obj:
+            by_night.setdefault(pd_obj.id, []).append(s)
 
     nights_with_sessions = len(by_night)
     counts_per_night = [len(v) for v in by_night.values()]
@@ -3388,27 +3412,19 @@ def facilitator_workload(
     today = date.today().isoformat()
     upcoming: list[dict] = []
     for s in sessions:
-        pd_date = year_date_ids.get(s.parade_date_id, "")
+        pd_obj = pn_to_pd.get(s.parade_night_id)
+        pd_date = pd_obj.parade_date if pd_obj else ""
         if pd_date >= today:
-            title = s.activity_title
-            if not title and s.curriculum_id:
-                ci = db.get(CurriculumItem, s.curriculum_id)
-                if ci:
-                    title = ci.title
-            loc_name = None
-            if s.location_id:
-                loc = db.get(PlanningLocation, s.location_id)
-                if loc:
-                    loc_name = loc.name
+            title = s.curriculum_title_at_time or s.custom_title
             upcoming.append({
                 "session_id": s.id,
                 "parade_date": pd_date,
-                "session_number": s.session_number,
+                "session_number": s.period_number,
                 "cadet_group": s.cadet_group,
                 "title": title,
-                "location_name": loc_name,
+                "location_name": s.training_area_name_at_time,
             })
-    upcoming.sort(key=lambda x: (x["parade_date"], x["session_number"]))
+    upcoming.sort(key=lambda x: (x["parade_date"], x["session_number"] or 0))
 
     return {
         "total_scheduled": total_scheduled,

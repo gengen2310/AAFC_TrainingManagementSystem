@@ -449,6 +449,67 @@ def test_location_update(client):
 
 
 # ─────────────────────────────────────────────────────────────
+# Rooms merger (master transformation plan, Phase 1): /api/planning/locations
+# and /api/training-areas must now be two views over the same canonical
+# training_areas table, not two separate tables (the old DL-01 duplication).
+# ─────────────────────────────────────────────────────────────
+
+def test_room_created_via_connected_frontend_visible_in_planning_workspace(client):
+    """A room added via /api/training-areas (connected-frontend's Resources
+    page) must be immediately visible via /api/planning/locations (Planning
+    Workspace's Rooms tab) — same table, not a separate copy."""
+    hdr = _sqn_admin_hdr(client)
+    rt = client.post("/api/training-areas",
+                      json={"name": "Cross-App Test Room", "type": "Classroom", "capacity": 25},
+                      headers=hdr)
+    assert rt.status_code == 200
+    r = client.get("/api/planning/locations", headers=hdr)
+    assert r.status_code == 200
+    names = [l["name"] for l in r.json()]
+    assert "Cross-App Test Room" in names
+
+
+def test_room_created_via_planning_workspace_visible_in_connected_frontend(client):
+    """The reverse direction: a room added via /api/planning/locations must
+    be immediately visible via /api/training-areas."""
+    hdr = _sqn_admin_hdr(client)
+    rl = client.post("/api/planning/locations",
+                      json={"name": "Reverse Cross-App Room", "location_type": "Outdoor", "capacity": 40},
+                      headers=hdr)
+    assert rl.status_code == 200
+    r = client.get("/api/training-areas", headers=hdr)
+    assert r.status_code == 200
+    names = [ta["name"] for ta in r.json()]
+    assert "Reverse Cross-App Room" in names
+
+
+def test_room_created_via_planning_workspace_attaches_to_a_session(client):
+    """Regression for a real, live bug: create_session/update_session's room
+    resolution only ever looked up TrainingArea rows (`db.get(TrainingArea,
+    body.location_id)`), so a room picked from Planning Workspace's Rooms tab
+    (previously backed by the separate planning_locations table) silently
+    failed to attach — the session was created with no room, no error. Now
+    that /api/planning/locations reads/writes training_areas directly, a room
+    id from that endpoint must resolve correctly."""
+    hdr = _sqn_admin_hdr(client)
+    rl = client.post("/api/planning/locations",
+                      json={"name": "Attach Test Room", "location_type": "indoor"}, headers=hdr)
+    loc_id = rl.json()["location_id"]
+
+    yr_id, pd_id = _setup_year_with_date(client, hdr)
+    r = client.post(
+        f"/api/planning/parade-dates/{pd_id}/sessions",
+        json={"cadet_group": "junior", "session_number": 1,
+              "activity_title": "Room Attach Test", "location_id": loc_id},
+        headers=hdr,
+    )
+    assert r.status_code == 200
+    d = r.json()
+    assert d["location_id"] == loc_id
+    assert d["location_name"] == "Attach Test Room"
+
+
+# ─────────────────────────────────────────────────────────────
 # Parade Night Builder / Scheduled Sessions
 # ─────────────────────────────────────────────────────────────
 
@@ -1387,6 +1448,35 @@ def test_facilitator_workload_returns_stats(client):
     assert "total_scheduled" in d
     assert "nights_with_sessions" in d
     assert "avg_per_night" in d
+
+
+def test_facilitator_workload_reflects_real_assigned_sessions(client):
+    """Regression for a real, live bug: this endpoint queried `ScheduledSession`,
+    a model with no live create/update path anywhere in the codebase — it
+    always silently returned zero workload regardless of how many real
+    sessions (TrainingSession) a facilitator actually had. Uses the seeded
+    2026 planning year (which has real assign-mission sessions with real
+    facilitators) rather than a freshly-created empty year, so a regression
+    back to querying the dead table would show total_scheduled == 0 here."""
+    hdr = _sqn_admin_hdr(client)
+    years_r = client.get("/api/planning/years", headers=hdr)
+    year_2026 = next(y for y in years_r.json() if y["year"] == 2026)
+    yr_id = year_2026["planning_year_id"]
+
+    facs = client.get("/api/planning/facilitators", headers=hdr).json()
+    assert facs, "Seeded 703 squadron should have facilitators"
+
+    # At least one seeded facilitator must show real, non-zero workload —
+    # mirrors the real seeded data (e.g. multiple facilitators with 2-16
+    # sessions each) confirmed live via the Facilitators page.
+    found_nonzero = False
+    for fac in facs:
+        r = client.get(f"/api/planning/years/{yr_id}/facilitators/{fac['facilitator_id']}/workload", headers=hdr)
+        assert r.status_code == 200
+        if r.json()["total_scheduled"] > 0:
+            found_nonzero = True
+            break
+    assert found_nonzero, "Expected at least one seeded facilitator to show non-zero workload"
 
 
 def test_facilitator_workload_requires_auth(client):
