@@ -1,14 +1,22 @@
 import { test, expect, Page } from "@playwright/test";
 
 // ── Connected-frontend (Main TMS) verification ──────────────────────────────
-// Targets the static single-file SPA at localhost:8080. Backend must already be
-// running and seeded on localhost:8000. API base is overridden via addInitScript
-// so connected-frontend/index.html's own <meta name="aafc-api-base"> is never edited.
+// Local run (playwright.connected.config.ts): targets localhost:8080, backend on
+// localhost:8000. API base is overridden via addInitScript so the page's own
+// <meta name="aafc-api-base"> (which points at production by default in source)
+// is never edited on disk.
+// Staging run (playwright.connected.staging.config.ts): targets the deployed
+// staging URL directly; no override needed — docker-entrypoint.sh already
+// rewrote the meta tag to the staging backend at container start.
+
+const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 
 async function loginSquadron(page: Page, code: string, role: "sqn_admin" | "sqn_general" = "sqn_admin") {
-  await page.addInitScript(() => {
-    (window as any).AAFC_API_BASE = "http://localhost:8000";
-  });
+  if (LOCAL_API_BASE) {
+    await page.addInitScript((base) => {
+      (window as any).AAFC_API_BASE = base;
+    }, LOCAL_API_BASE);
+  }
   await page.goto("/");
   await page.locator("#auth-type").selectOption("squadron");
   await page.locator("#auth-wing-select").selectOption("7WG");
