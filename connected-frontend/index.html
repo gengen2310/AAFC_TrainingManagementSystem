@@ -666,6 +666,16 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <div id="chart-subject-area-resilience"><div class="chart-skeleton"></div></div>
               <div id="insight-subject-area-resilience" class="chart-insight" style="display:none"></div>
             </div>
+            <div class="card">
+              <div class="ctitle">Facilitator status</div>
+              <div id="chart-facilitator-status"><div class="chart-skeleton"></div></div>
+              <div id="insight-facilitator-status" class="chart-insight" style="display:none"></div>
+            </div>
+            <div class="card">
+              <div class="ctitle">Repeated facilitator gaps — last 8 weeks</div>
+              <div id="chart-facilitator-gaps"><div class="chart-skeleton"></div></div>
+              <div id="insight-facilitator-gaps" class="chart-insight" style="display:none"></div>
+            </div>
           </div>
           <div class="card">
             <div class="ctitle">Long-term delivery trend by term</div>
@@ -910,6 +920,28 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <option value="">All subject areas</option>
             </select>
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-fac')">+ Add Facilitator</button>
+          </div>
+        </div>
+        <div class="dash-grid" style="margin-bottom:16px">
+          <div class="card">
+            <div class="ctitle">Facilitator status</div>
+            <div id="fac-chart-status"><div class="chart-skeleton"></div></div>
+            <div id="fac-insight-status" class="chart-insight" style="display:none"></div>
+          </div>
+          <div class="card">
+            <div class="ctitle">Workload distribution — sessions per facilitator</div>
+            <div id="fac-chart-workload"><div class="chart-skeleton"></div></div>
+            <div id="fac-insight-workload" class="chart-insight" style="display:none"></div>
+          </div>
+          <div class="card">
+            <div class="ctitle">Subject area coverage — qualified facilitators per area</div>
+            <div id="fac-chart-spof"><div class="chart-skeleton"></div></div>
+            <div id="fac-insight-spof" class="chart-insight" style="display:none"></div>
+          </div>
+          <div class="card">
+            <div class="ctitle">Repeated gaps — unfilled sessions by subject area (last 8 weeks)</div>
+            <div id="fac-chart-gaps"><div class="chart-skeleton"></div></div>
+            <div id="fac-insight-gaps" class="chart-insight" style="display:none"></div>
           </div>
         </div>
         <div class="tw">
@@ -1184,7 +1216,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <strong>Build Information</strong><br>
           Main TMS &bull; Commit: <span id="sc-build-commit">—</span> &bull; Source: connected-frontend &bull; Built: <span id="sc-build-time">—</span>
         </div>
-        </div>
 
         <!-- System Overview card -->
         <div class="card sc-card" id="sc-overview">
@@ -1421,15 +1452,16 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-hdr"><div class="modal-title">Bulk Generate Parade Dates</div><button class="modal-x" onclick="closeModal('m-gen-dates')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="form-group"><label>Frequency</label>
+        <div class="form-group"><label>Repeat every</label>
           <select id="gen-freq">
             <option value="weekly">Weekly</option>
             <option value="fortnightly">Fortnightly</option>
             <option value="monthly">Monthly (first weekday)</option>
+            <option value="yearly">Yearly</option>
             <option value="daily">Daily</option>
           </select>
         </div>
-        <div class="form-group"><label>Day of Week</label>
+        <div class="form-group"><label>Parade day</label>
           <select id="gen-weekday">
             <option value="0">Monday</option>
             <option value="1">Tuesday</option>
@@ -1442,19 +1474,23 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Start Date *</label><input type="date" id="gen-start"></div>
-        <div class="form-group"><label>End Date</label><input type="date" id="gen-end"></div>
+        <div class="form-group"><label>Program start date *</label><input type="date" id="gen-start"></div>
+        <div class="form-group"><label>Program end date</label><input type="date" id="gen-end"></div>
       </div>
-      <div class="form-group"><label>Max Repeats (alternative to End Date)</label><input type="number" id="gen-max-repeats" min="1" max="200" placeholder="e.g. 30"></div>
-      <div class="form-group"><label>Excluded Dates (YYYY-MM-DD, comma or space separated)</label><input type="text" id="gen-excl-dates" placeholder="e.g. 2026-04-10, 2026-04-17"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Parade start time</label><input type="time" id="gen-start-time" placeholder="Squadron default"></div>
+        <div class="form-group"><label>Parade finish time</label><input type="time" id="gen-end-time" placeholder="Squadron default"></div>
+      </div>
+      <div class="form-group"><label>Max Repeats (alternative to Program end date)</label><input type="number" id="gen-max-repeats" min="1" max="200" placeholder="e.g. 30"></div>
+      <div class="form-group"><label>Excluded dates (YYYY-MM-DD, comma or space separated)</label><input type="text" id="gen-excl-dates" placeholder="e.g. 2026-04-10, 2026-04-17"></div>
       <div class="form-group"><label><input type="checkbox" id="gen-excl-hols" checked> Skip existing holiday periods</label></div>
       <p id="gen-msg" style="color:var(--error)"></p>
       <div id="gen-preview-area" style="display:none;margin-top:8px;max-height:180px;overflow-y:auto"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-gen-dates')">Cancel</button>
-      <button class="btn btn-out" onclick="previewGenerateDates()">Preview</button>
-      <button class="btn btn-dk" onclick="doGenerateDates()">Generate</button>
+      <button class="btn btn-out" onclick="previewGenerateDates()">Preview Parade Nights</button>
+      <button class="btn btn-dk" onclick="doGenerateDates()">Create Parade Nights</button>
     </div>
   </div>
 </div>
@@ -3260,6 +3296,7 @@ function nav(id){
   if(id==='calendar')renderCal();
   if(id==='weekly-program'){populateWPDD();renderWP();}
   if(id==='activities'){_loadActivitiesPage();}
+  if(id==='facilitators')loadFacilitatorStats();
   if(id==='dashboard')renderDash();
   if(id==='wing-overview')renderWing();
   if(id==='national')renderNational();
@@ -4576,6 +4613,21 @@ async function loadDashCharts(){
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+//  FACILITATORS — VISUAL STATISTICS
+// ═══════════════════════════════════════════════════════════
+async function loadFacilitatorStats(){
+  ['fac-chart-status','fac-chart-workload','fac-chart-spof','fac-chart-gaps'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="chart-skeleton"></div>';});
+  let data;
+  try{data=await api('/api/dashboard/charts?window=term');}
+  catch(e){return;}
+  const charts=data.charts||{};
+  _dRenderChart('fac-chart-status',charts.facilitator_status_distribution,_chartDonut,'fac-insight-status');
+  _dRenderChart('fac-chart-workload',charts.facilitator_workload,_chartHBar,'fac-insight-workload');
+  _dRenderChart('fac-chart-spof',charts.subject_area_resilience,_chartHBar,'fac-insight-spof');
+  _dRenderChart('fac-chart-gaps',charts.facilitator_repeated_gaps,_chartHBar,'fac-insight-gaps');
+}
+
 async function _loadDashStrategic(){
   const btn=document.getElementById('btn-load-strategic');
   if(btn){btn.textContent='Loading…';btn.disabled=true;}
@@ -4587,6 +4639,8 @@ async function _loadDashStrategic(){
   const sec=document.getElementById('dash-strategic-section');if(sec)sec.style.display='';
   _dRenderChart('chart-capability-dependency',charts.capability_dependency,_chartHBar,'insight-capability-dependency');
   _dRenderChart('chart-subject-area-resilience',charts.subject_area_resilience,_chartHBar,'insight-subject-area-resilience');
+  _dRenderChart('chart-facilitator-status',charts.facilitator_status_distribution,_chartDonut,'insight-facilitator-status');
+  _dRenderChart('chart-facilitator-gaps',charts.facilitator_repeated_gaps,_chartHBar,'insight-facilitator-gaps');
   _dRenderChart('chart-long-term-trend',charts.long_term_delivery_trend,_chartLine);
   if(btn)btn.style.display='none';
 }
@@ -6910,7 +6964,10 @@ function _buildGenBody(){
   const exclRaw=(document.getElementById('gen-excl-dates')&&document.getElementById('gen-excl-dates').value)||'';
   const excluded_dates=exclRaw.split(/[\s,]+/).map(s=>s.trim()).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s));
   const excHols=document.getElementById('gen-excl-hols').checked;
-  return{weekday,start_date:start,end_date:end,frequency:freq,exclude_holidays:excHols,excluded_dates,max_repeats:maxR};
+  const startTime=(document.getElementById('gen-start-time')&&document.getElementById('gen-start-time').value)||null;
+  const endTime=(document.getElementById('gen-end-time')&&document.getElementById('gen-end-time').value)||null;
+  return{weekday,start_date:start,end_date:end,frequency:freq,exclude_holidays:excHols,excluded_dates,max_repeats:maxR,
+    parade_start_time:startTime,parade_end_time:endTime};
 }
 async function previewGenerateDates(){
   const msg=document.getElementById('gen-msg');

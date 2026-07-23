@@ -26,7 +26,7 @@ from ..database import get_db
 from ..dependencies import get_principal
 from ..models import (
     ParadeNight, Session, Facilitator, Squadron, Wing,
-    CurriculumItem, Equipment, TrainingArea,
+    CurriculumItem, Equipment, TrainingArea, PlanningFacilitatorLeave,
 )
 from ..permissions import Principal, require_role
 
@@ -393,6 +393,93 @@ def _facilitator_workload(sessions: list) -> dict:
         "insight": insight,
         "empty_state": "No facilitator assignments recorded for this period.",
         "drill_down": {"route": "parade-nights"},
+        "permission_scope": "squadron",
+    }
+
+
+def _facilitator_status_distribution(facs: list, leave_rows: list) -> dict:
+    """Donut: facilitators by current availability status.
+
+    Derived from the data actually available on the Facilitator/PlanningFacilitatorLeave
+    models — active_status plus any leave period covering today. There is no separate
+    "assigned"/"backup" flag on the model, so this reports the three statuses the data
+    can support: on leave, available, unavailable (inactive).
+    """
+    today_str = date.today().isoformat()
+    on_leave_ids = {
+        lv.facilitator_id for lv in leave_rows
+        if lv.start_date <= today_str <= lv.end_date
+    }
+    counts = {"on_leave": 0, "available": 0, "unavailable": 0}
+    for f in facs:
+        if not f.active_status:
+            counts["unavailable"] += 1
+        elif f.id in on_leave_ids:
+            counts["on_leave"] += 1
+        else:
+            counts["available"] += 1
+
+    data = [
+        {"status": "available", "label": "Available", "count": counts["available"], "color": "#2e7d32"},
+        {"status": "on_leave", "label": "On leave", "count": counts["on_leave"], "color": "#f57f17"},
+        {"status": "unavailable", "label": "Unavailable", "count": counts["unavailable"], "color": "#78909c"},
+    ]
+    insight = None
+    total = sum(counts.values())
+    if total and counts["on_leave"] / total > 0.25:
+        insight = f"{counts['on_leave']} of {total} facilitators are currently on leave."
+
+    return {
+        "chart_id": "facilitator_status_distribution",
+        "title": "Facilitator status",
+        "explanation": "Current availability of all facilitators on the roster.",
+        "question": "How many facilitators are actually available right now?",
+        "chart_type": "donut",
+        "data": data,
+        "insight": insight,
+        "empty_state": "No facilitators on the roster.",
+        "drill_down": {"route": "facilitators"},
+        "permission_scope": "squadron",
+    }
+
+
+def _facilitator_repeated_gaps(sessions: list, pn_date_by_id: dict, weeks: int = 8) -> dict:
+    """Ranked bar: subject areas/elements with unfilled (unstaffed) sessions in recent weeks."""
+    cutoff = (date.today() - timedelta(weeks=weeks)).isoformat()
+    gap_counts: dict[str, int] = defaultdict(int)
+    for s in sessions:
+        if s.facilitator_id:
+            continue
+        if getattr(s, "status", None) not in ("planned", "not_delivered"):
+            continue
+        parade_date = pn_date_by_id.get(s.parade_night_id)
+        if parade_date and parade_date < cutoff:
+            continue
+        label = s.element_at_time or s.curriculum_title_at_time or "Unclassified"
+        gap_counts[label] += 1
+
+    data = sorted(
+        [{"label": k, "count": v} for k, v in gap_counts.items()],
+        key=lambda x: -x["count"],
+    )[:10]
+
+    insight = None
+    if data:
+        top = data[0]
+        insight = f"{top['label']} has the most unfilled sessions ({top['count']}) in the last {weeks} weeks."
+
+    return {
+        "chart_id": "facilitator_repeated_gaps",
+        "title": "Repeated facilitator gaps",
+        "explanation": f"Subject areas with the most unstaffed sessions in the last {weeks} weeks.",
+        "question": "Where do we repeatedly fail to find a facilitator?",
+        "chart_type": "bar_horizontal",
+        "x_axis": "Unfilled sessions",
+        "y_axis": "Subject area",
+        "data": data,
+        "insight": insight,
+        "empty_state": f"No unstaffed sessions in the last {weeks} weeks.",
+        "drill_down": {"route": "parade-nights", "filters": {"status": "unstaffed"}},
         "permission_scope": "squadron",
     }
 
@@ -991,6 +1078,15 @@ def get_dashboard_charts(
         charts["curriculum_backlog"] = _curriculum_backlog(all_sessions, all_pns)
         charts["cancellation_reasons"] = _cancellation_reasons(sessions, pns)
         charts["facilitator_workload"] = _facilitator_workload(sessions)
+        charts["capability_dependency"] = _facilitator_capability_dependency(all_sessions)
+        charts["subject_area_resilience"] = _subject_area_resilience(facs)
+        fac_leave = db.query(PlanningFacilitatorLeave).filter(
+            PlanningFacilitatorLeave.facilitator_id.in_([f.id for f in facs]),
+            PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
+        ).all() if facs else []
+        charts["facilitator_status_distribution"] = _facilitator_status_distribution(facs, fac_leave)
+        all_pn_date_by_id = {pn.id: pn.date for pn in all_pns}
+        charts["facilitator_repeated_gaps"] = _facilitator_repeated_gaps(all_sessions, all_pn_date_by_id)
 
     elif scope == "wing":
         wing_id = p.acting_wing_id or p.wing_id
@@ -1118,6 +1214,13 @@ def get_strategic_charts(
         charts["capability_dependency"] = _facilitator_capability_dependency(all_sessions)
         charts["subject_area_resilience"] = _subject_area_resilience(facs)
         charts["long_term_delivery_trend"] = _long_term_delivery_trend(all_sessions, all_pns)
+        fac_leave = db.query(PlanningFacilitatorLeave).filter(
+            PlanningFacilitatorLeave.facilitator_id.in_([f.id for f in facs]),
+            PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
+        ).all() if facs else []
+        charts["facilitator_status_distribution"] = _facilitator_status_distribution(facs, fac_leave)
+        all_pn_date_by_id = {pn.id: pn.date for pn in all_pns}
+        charts["facilitator_repeated_gaps"] = _facilitator_repeated_gaps(all_sessions, all_pn_date_by_id)
 
     elif scope == "wing":
         wing_id = p.acting_wing_id or p.wing_id

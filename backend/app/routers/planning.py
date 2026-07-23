@@ -184,7 +184,10 @@ def _get_year_or_404(year_id: str, db: DBSession) -> PlanningYear:
     return py
 
 
-def _find_or_create_parade_night(db: DBSession, unit_id: str, date_str: str, p: Principal) -> ParadeNight | None:
+def _find_or_create_parade_night(
+    db: DBSession, unit_id: str, date_str: str, p: Principal,
+    start_time: str | None = None, end_time: str | None = None,
+) -> ParadeNight | None:
     """Find an existing ParadeNight for unit+date, or create one using the effective timing template."""
     if not unit_id:
         return None
@@ -207,7 +210,8 @@ def _find_or_create_parade_night(db: DBSession, unit_id: str, date_str: str, p: 
         session_count = sq.default_session_count or 3
     pn = ParadeNight(
         squadron_id=unit_id, wing_id=sq.wing_id, date=date_str, term=None,
-        start_time=sq.default_start_time, end_time=sq.default_end_time,
+        start_time=start_time or sq.default_start_time,
+        end_time=end_time or sq.default_end_time,
         session_count=session_count, parade_type="normal",
         timing_template_id=tmpl.id if tmpl else None,
         created_by=p.user_id,
@@ -526,9 +530,11 @@ class GenerateParadeDatesIn(BaseModel):
     end_date: str | None = None   # ISO YYYY-MM-DD; omit if max_repeats given
     parade_type: str = "standard"
     exclude_holidays: bool = True
-    frequency: str = "weekly"          # weekly | fortnightly | monthly | daily
+    frequency: str = "weekly"          # weekly | fortnightly | monthly | yearly | daily
     excluded_dates: list[str] = []     # specific ISO dates to skip
     max_repeats: int | None = None     # alternative to end_date
+    parade_start_time: str | None = None   # HH:MM override; falls back to squadron default
+    parade_end_time: str | None = None     # HH:MM override; falls back to squadron default
 
 
 @router.get("/years/{year_id}/parade-dates")
@@ -640,6 +646,10 @@ def _compute_candidate_dates(body: GenerateParadeDatesIn, holidays: list) -> lis
                 # Is this the first occurrence of this weekday in the month?
                 if d.day <= 7:
                     include = True
+        elif freq == "yearly":
+            # Same calendar month/day as the start date, each year.
+            if d.month == start.month and d.day == start.day:
+                include = True
         else:
             # Unknown frequency falls back to weekly
             if d.weekday() == body.weekday:
@@ -706,7 +716,10 @@ def generate_parade_dates(
     linked = []
     for ds in candidates:
         if ds not in existing:
-            pn = _find_or_create_parade_night(db, py.unit_id, ds, p)
+            pn = _find_or_create_parade_night(
+                db, py.unit_id, ds, p,
+                start_time=body.parade_start_time, end_time=body.parade_end_time,
+            )
             pd = ParadeDate(
                 id=str(uuid.uuid4()), planning_year_id=year_id,
                 unit_id=py.unit_id, parade_date=ds,
@@ -719,7 +732,10 @@ def generate_parade_dates(
             created.append(ds)
         elif py.unit_id and ds in unlinked_by_date:
             # Backfill the parade night link for an existing unlinked date
-            pn = _find_or_create_parade_night(db, py.unit_id, ds, p)
+            pn = _find_or_create_parade_night(
+                db, py.unit_id, ds, p,
+                start_time=body.parade_start_time, end_time=body.parade_end_time,
+            )
             if pn:
                 unlinked_by_date[ds].parade_night_id = pn.id
                 linked.append(ds)

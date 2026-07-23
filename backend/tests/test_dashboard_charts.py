@@ -147,6 +147,66 @@ def test_squadron_returns_facilitator_workload(client):
         assert "delivered" in row
         assert "total" in row
 
+def test_squadron_returns_facilitator_status_distribution(client):
+    hdrs = _sqn_admin(client)
+    r = client.get(CHARTS_URL + "?window=year", headers=hdrs)
+    charts = _charts(r)
+    assert "facilitator_status_distribution" in charts
+    fsd = charts["facilitator_status_distribution"]
+    assert fsd["chart_type"] == "donut"
+    statuses = {row["status"] for row in fsd["data"]}
+    assert statuses == {"available", "on_leave", "unavailable"}
+    # 703 squadron demo data seeds 5 active facilitators, none on leave.
+    counts = {row["status"]: row["count"] for row in fsd["data"]}
+    assert sum(counts.values()) == 5
+    assert counts["on_leave"] == 0
+
+def test_squadron_returns_subject_area_resilience(client):
+    hdrs = _sqn_admin(client)
+    r = client.get(CHARTS_URL + "?window=year", headers=hdrs)
+    charts = _charts(r)
+    assert "subject_area_resilience" in charts
+    sar = charts["subject_area_resilience"]
+    assert sar["chart_type"] == "bar_horizontal" or "data" in sar
+    for row in sar.get("data", []):
+        assert row["risk"] in ("critical", "warn", "ok")
+
+def test_squadron_returns_facilitator_repeated_gaps(client):
+    hdrs = _sqn_admin(client)
+    r = client.get(CHARTS_URL + "?window=year", headers=hdrs)
+    charts = _charts(r)
+    assert "facilitator_repeated_gaps" in charts
+    gaps = charts["facilitator_repeated_gaps"]
+    assert gaps["chart_type"] == "bar_horizontal"
+    for row in gaps.get("data", []):
+        assert "label" in row
+        assert "count" in row
+        assert row["count"] >= 1
+
+def test_squadron_returns_capability_dependency(client):
+    hdrs = _sqn_admin(client)
+    r = client.get(CHARTS_URL + "?window=year", headers=hdrs)
+    charts = _charts(r)
+    assert "capability_dependency" in charts
+    assert charts["capability_dependency"]["chart_type"] == "bar_horizontal"
+
+def test_facilitator_charts_zero_data_for_new_squadron(client):
+    # 704 squadron has no facilitators/sessions seeded — verifies empty-state safety.
+    hdrs = login(client, "ADMIN704")
+    r = client.get(CHARTS_URL + "?window=year", headers=hdrs)
+    assert r.status_code == 200
+    charts = _charts(r)
+    fsd = charts["facilitator_status_distribution"]
+    assert sum(row["count"] for row in fsd["data"]) == 0
+    assert charts["facilitator_repeated_gaps"]["data"] == []
+
+def test_squadron_general_can_view_facilitator_charts(client):
+    hdrs = _sqn_general(client)
+    r = client.get(CHARTS_URL + "?window=year", headers=hdrs)
+    charts = _charts(r)
+    assert "facilitator_status_distribution" in charts
+    assert "facilitator_repeated_gaps" in charts
+
 def test_squadron_returns_cancellation_reasons(client):
     hdrs = _sqn_admin(client)
     r = client.get(CHARTS_URL + "?window=year", headers=hdrs)
@@ -219,6 +279,20 @@ def test_strategic_returns_subject_area_resilience(client):
     for row in sar.get("data", []):
         assert "risk" in row
         assert row["risk"] in ("ok", "warn", "critical")
+
+def test_strategic_returns_facilitator_status_distribution(client):
+    hdrs = _sqn_admin(client)
+    r = client.get(STRATEGIC_URL, headers=hdrs)
+    charts = _charts(r)
+    assert "facilitator_status_distribution" in charts
+    assert charts["facilitator_status_distribution"]["chart_type"] == "donut"
+
+def test_strategic_returns_facilitator_repeated_gaps(client):
+    hdrs = _sqn_admin(client)
+    r = client.get(STRATEGIC_URL, headers=hdrs)
+    charts = _charts(r)
+    assert "facilitator_repeated_gaps" in charts
+    assert charts["facilitator_repeated_gaps"]["chart_type"] == "bar_horizontal"
 
 def test_strategic_returns_long_term_trend(client):
     hdrs = _sqn_admin(client)

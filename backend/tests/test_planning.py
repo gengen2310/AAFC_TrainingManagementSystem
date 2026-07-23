@@ -166,6 +166,45 @@ def test_generate_parade_dates_invalid_format(client):
     assert r.status_code == 400
 
 
+def test_generate_parade_dates_applies_time_override(client):
+    # 704 squadron has no pre-seeded parade nights, so the generated date is genuinely new.
+    hdr = login(client, "ADMIN704")
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.post(
+        f"/api/planning/years/{yr_id}/generate-parade-dates",
+        json={
+            "weekday": 4, "start_date": "2026-08-07", "end_date": "2026-08-07",
+            "exclude_holidays": False,
+            "parade_start_time": "18:15", "parade_end_time": "20:45",
+        },
+        headers=hdr,
+    )
+    assert r.status_code == 200
+    assert r.json()["created"] == 1
+    pn_list = client.get("/api/parade-nights", headers=hdr).json()
+    pn = next(p for p in pn_list if p["date"] == "2026-08-07")
+    assert pn["start_time"] == "18:15"
+    assert pn["end_time"] == "20:45"
+
+
+def test_generate_parade_dates_yearly_frequency(client):
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.post(
+        f"/api/planning/years/{yr_id}/generate-parade-dates",
+        json={
+            "weekday": 4, "start_date": "2026-04-25", "end_date": "2028-04-25",
+            "exclude_holidays": False, "frequency": "yearly",
+        },
+        headers=hdr,
+    )
+    assert r.status_code == 200
+    d = r.json()
+    assert d["dates"] == ["2026-04-25", "2027-04-25", "2028-04-25"]
+
+
 def test_general_cannot_delete_parade_date(client):
     sqn_hdr = _sqn_admin_hdr(client)
     year = _make_year(client, sqn_hdr)
