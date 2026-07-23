@@ -2139,7 +2139,7 @@ def list_missions(
     phase: Optional[str] = None,
     element: Optional[str] = None,
     term: Optional[str] = None,
-    status: Optional[str] = None,   # "scheduled" | "unscheduled"
+    status: Optional[str] = None,   # "scheduled" | "unscheduled" | "cancelled" | "not_delivered"
     search: Optional[str] = None,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
@@ -2212,12 +2212,18 @@ def list_missions(
             "location_id": s.training_area_id,
             "location_name": room_name,
             "status": s.status,
+            "cancelled_reason": s.cancelled_reason,
+            "not_delivered_reason": s.not_delivered_reason,
+            "rescheduled_to_date": s.rescheduled_to_date,
         }
 
     result = []
     for ci in items:
         scheduled = sessions_by_ci.get(ci.id, [])
         is_scheduled = len(scheduled) > 0
+        has_cancelled = any(s.status in ("cancelled", "cancelled_late") for s in scheduled)
+        has_not_delivered = any(s.status == "not_delivered" for s in scheduled)
+        needs_reschedule = has_cancelled or has_not_delivered
 
         # Filter by term if requested
         if term:
@@ -2232,6 +2238,10 @@ def list_missions(
             continue
         if status == "unscheduled" and is_scheduled:
             continue
+        if status == "cancelled" and not has_cancelled:
+            continue
+        if status == "not_delivered" and not has_not_delivered:
+            continue
 
         result.append({
             "curriculum_id": ci.id,
@@ -2245,6 +2255,9 @@ def list_missions(
             "duration_minutes": ci.duration_minutes,
             "core_status": ci.core_status,
             "is_scheduled": is_scheduled,
+            "has_cancelled": has_cancelled,
+            "has_not_delivered": has_not_delivered,
+            "needs_reschedule": needs_reschedule,
             "scheduled_sessions": [_sess_summary(s) for s in scheduled],
             "scheduled_count": len(scheduled),
         })

@@ -195,12 +195,15 @@ export interface MissionItem {
   phase: string; element: string | null; recommended_term: string | null;
   part_count: number | null; duration_minutes: number;
   core_status: string; is_scheduled: boolean;
+  has_cancelled: boolean; has_not_delivered: boolean; needs_reschedule: boolean;
   scheduled_count: number; instructor_suitability: string | null;
   scheduled_sessions: {
     session_id: string; parade_date: string | null; parade_date_id: string | null; term: string | null;
     session_number: number; part_number: number | null; cadet_group: string | null;
     facilitator_id: string | null; facilitator_name: string | null;
     location_id: string | null; location_name: string | null; status: string;
+    cancelled_reason: string | null; not_delivered_reason: string | null;
+    rescheduled_to_date: string | null;
   }[];
 }
 export interface PlanningLocation {

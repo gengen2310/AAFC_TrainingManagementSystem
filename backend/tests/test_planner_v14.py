@@ -410,6 +410,89 @@ def test_assign_mission_reflected_in_missions_list(client):
     assert ci_id in scheduled_ids
 
 
+def test_missions_list_surfaces_cancelled_status_and_reason(client):
+    """A cancelled session must show up under status=cancelled with its reason retained."""
+    hdr = _sqn_admin(client)
+    years_r = client.get("/api/planning/years", headers=hdr)
+    year_2026 = [y for y in years_r.json() if y["year"] == 2026]
+    year_id = year_2026[0]["planning_year_id"]
+
+    dates_r = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=hdr)
+    active_dates = [d for d in dates_r.json() if d["is_active"]]
+    date_id = active_dates[2]["parade_date_id"]  # avoid conflicting with earlier tests' dates
+
+    missions_r = client.get(f"/api/planning/years/{year_id}/missions?status=unscheduled", headers=hdr)
+    unscheduled = missions_r.json()["missions"]
+    if not unscheduled:
+        pytest.skip("No unscheduled missions to assign")
+    ci_id = unscheduled[0]["curriculum_id"]
+
+    assign_r = client.post(f"/api/planning/years/{year_id}/assign-mission", json={
+        "curriculum_id": ci_id, "parade_date_id": date_id,
+        "session_number": 3, "cadet_group": "junior",
+    }, headers=hdr)
+    assert assign_r.status_code == 200
+    session_id = assign_r.json()["session_id"]
+
+    status_r = client.post(f"/api/sessions/{session_id}/status", json={
+        "status": "cancelled", "reason": "Facilitator unavailable — squadron-wide illness",
+    }, headers=hdr)
+    assert status_r.status_code == 200
+
+    # Default (unscheduled) filter must not show it; is_scheduled is still true.
+    r_default = client.get(f"/api/planning/years/{year_id}/missions", headers=hdr)
+    row = next(m for m in r_default.json()["missions"] if m["curriculum_id"] == ci_id)
+    assert row["is_scheduled"] is True
+    assert row["has_cancelled"] is True
+    assert row["has_not_delivered"] is False
+    assert row["needs_reschedule"] is True
+
+    # status=cancelled filter must surface it.
+    r_cancelled = client.get(f"/api/planning/years/{year_id}/missions?status=cancelled", headers=hdr)
+    cancelled_ids = [m["curriculum_id"] for m in r_cancelled.json()["missions"]]
+    assert ci_id in cancelled_ids
+
+    # Original date and cancellation reason must be retained on the session summary.
+    sess = row["scheduled_sessions"][0]
+    assert sess["parade_date"] is not None
+    assert sess["cancelled_reason"] == "Facilitator unavailable — squadron-wide illness"
+
+
+def test_missions_list_surfaces_not_delivered_status(client):
+    """A not-delivered session must show up under status=not_delivered with its reason."""
+    hdr = _sqn_admin(client)
+    years_r = client.get("/api/planning/years", headers=hdr)
+    year_2026 = [y for y in years_r.json() if y["year"] == 2026]
+    year_id = year_2026[0]["planning_year_id"]
+
+    dates_r = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=hdr)
+    active_dates = [d for d in dates_r.json() if d["is_active"]]
+    date_id = active_dates[3]["parade_date_id"]
+
+    missions_r = client.get(f"/api/planning/years/{year_id}/missions?status=unscheduled", headers=hdr)
+    unscheduled = missions_r.json()["missions"]
+    if not unscheduled:
+        pytest.skip("No unscheduled missions to assign")
+    ci_id = unscheduled[0]["curriculum_id"]
+
+    assign_r = client.post(f"/api/planning/years/{year_id}/assign-mission", json={
+        "curriculum_id": ci_id, "parade_date_id": date_id,
+        "session_number": 4, "cadet_group": "junior",
+    }, headers=hdr)
+    session_id = assign_r.json()["session_id"]
+
+    status_r = client.post(f"/api/sessions/{session_id}/status", json={
+        "status": "not_delivered", "reason": "Venue flooded",
+    }, headers=hdr)
+    assert status_r.status_code == 200
+
+    r = client.get(f"/api/planning/years/{year_id}/missions?status=not_delivered", headers=hdr)
+    row = next(m for m in r.json()["missions"] if m["curriculum_id"] == ci_id)
+    assert row["has_not_delivered"] is True
+    assert row["needs_reschedule"] is True
+    assert row["scheduled_sessions"][0]["not_delivered_reason"] == "Venue flooded"
+
+
 # ─────────────────────────────────────────────────────────────
 # GET /api/planning/years/{id}/annual-program
 # ─────────────────────────────────────────────────────────────

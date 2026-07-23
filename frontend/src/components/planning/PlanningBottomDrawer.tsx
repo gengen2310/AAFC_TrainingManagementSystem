@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import type { CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { planningApi } from "../../api";
+import { planningApi, trainingApi } from "../../api";
 import type {
   PlanningFacilitator, PlanningLocation,
   PlanningFacilitatorLeave, FacilitatorWorkload, EquipmentItem,
@@ -78,6 +78,8 @@ function fmtDate(iso: string | null): string {
 }
 
 function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: (item: DrawerItem) => void }) {
+  const queryClient = useQueryClient();
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState("phase");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -114,6 +116,8 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
       if (fTerm && m.recommended_term !== fTerm) return false;
       if (fStatus === "scheduled" && !m.is_scheduled) return false;
       if (fStatus === "unscheduled" && m.is_scheduled) return false;
+      if (fStatus === "cancelled" && !m.has_cancelled) return false;
+      if (fStatus === "not_delivered" && !m.has_not_delivered) return false;
       if (q && !m.code.toLowerCase().includes(q) && !m.title.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -184,6 +188,8 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
           <option value="">All statuses</option>
           <option value="unscheduled">Unscheduled</option>
           <option value="scheduled">Scheduled</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="not_delivered">Not delivered</option>
         </select>
         <select value={fPhase} onChange={e => setFPhase(e.target.value)} style={{ ...inputSx, width: 150 }}>
           <option value="">All phases</option>
@@ -287,7 +293,15 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                     </td>
                     {/* Status */}
                     <td>
-                      {!m.is_scheduled ? (
+                      {m.has_not_delivered ? (
+                        <span title={s0?.not_delivered_reason ?? ""} style={{ color: "#fff", background: "#78909c", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                          NOT DELIVERED
+                        </span>
+                      ) : m.has_cancelled ? (
+                        <span title={s0?.cancelled_reason ?? ""} style={{ color: "#fff", background: "var(--aafc-red)", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                          CANCELLED
+                        </span>
+                      ) : !m.is_scheduled ? (
                         <span style={{ color: "var(--muted-text)", fontWeight: 600 }}>Unscheduled</span>
                       ) : isPartial ? (
                         <span style={{ color: "var(--warning, #d97706)", fontWeight: 600 }}>Partial {m.scheduled_count}/{partCount}</span>
@@ -327,7 +341,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                       {warnNoRoom && !warnCoreUnsched && <span title="No room assigned" style={{ color: "var(--muted-text)", fontSize: 11 }}>⚠ Room</span>}
                     </td>
                     {/* Actions */}
-                    <td>
+                    <td style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                       {s0 ? (
                         <button
                           className="btn sm out"
@@ -355,6 +369,35 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                           }})}
                         >
                           Schedule
+                        </button>
+                      )}
+                      {m.needs_reschedule && s0 && (
+                        <button
+                          className="btn sm out"
+                          disabled={reschedulingId === s0.session_id}
+                          style={{ fontSize: 10, padding: "2px 7px", borderColor: "var(--aafc-red)", color: "var(--aafc-red)" }}
+                          title={s0.cancelled_reason ?? s0.not_delivered_reason ?? ""}
+                          onClick={async () => {
+                            if (!window.confirm(
+                              `This session was ${m.has_not_delivered ? "not delivered" : "cancelled"} on ${fmtDate(s0.parade_date)}. ` +
+                              "Mark it as rescheduled and choose a new date now?"
+                            )) return;
+                            setReschedulingId(s0.session_id);
+                            try {
+                              await trainingApi.setStatus(s0.session_id, { status: "rescheduled" });
+                              await queryClient.invalidateQueries({ queryKey: ["planning-missions", yearId] });
+                              onItemClick({ type: "curriculum", curriculum: {
+                                curriculum_id: m.curriculum_id,
+                                code: m.code,
+                                title: m.title,
+                                phase: m.phase,
+                              }});
+                            } finally {
+                              setReschedulingId(null);
+                            }
+                          }}
+                        >
+                          Reschedule
                         </button>
                       )}
                     </td>
