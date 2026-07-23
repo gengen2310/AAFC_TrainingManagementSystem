@@ -50,11 +50,12 @@ interface Props {
   onPriorityToggle: (p: string) => void;
   cc: CommandCentreData | null;
   onBacklogItemClick: (type: string, id: string) => void;
+  className?: string;
 }
 
 export function PlanningLeftPanel({
   layers, onLayerToggle, audience, onAudienceToggle, priority, onPriorityToggle,
-  cc, onBacklogItemClick,
+  cc, onBacklogItemClick, className,
 }: Props) {
   const [legendOpen, setLegendOpen] = useState(true);
 
@@ -65,7 +66,7 @@ export function PlanningLeftPanel({
   const totalBacklog    = prepGaps.length + unscheduled.length + activeConflicts.length + unreviewed.length;
 
   return (
-    <div className="pw-left" aria-label="Planning filters and backlog">
+    <div className={`pw-left${className ? ` ${className}` : ""}`} aria-label="Planning filters and backlog">
 
       {/* ── Filters (renamed from "Layers") ───────────────── */}
       <div className="pw-section">

@@ -34,6 +34,14 @@ fi
 # Inject runtime port into nginx config
 sed -i "s/__PORT__/${PORT}/g" /etc/nginx/conf.d/default.conf
 
+# Inject the CSP connect-src origin — the backend this app actually calls. Falls back to
+# https: (any HTTPS origin) if neither VITE_API_BASE_URL nor AAFC_API_BASE is set, mirroring
+# connected-frontend's nginx.conf fallback behaviour for the same placeholder.
+CSP_CONNECT_SRC="${API_BASE:-https:}"
+sed -i \
+    "s#__CSP_CONNECT_SRC__#${CSP_CONNECT_SRC}#" \
+    /etc/nginx/conf.d/default.conf
+
 # Inject build fingerprint (commit SHA | build timestamp).
 # RAILWAY_GIT_COMMIT_SHA is provided by Railway at runtime; falls back to "local" in dev.
 BUILD_SHA="${RAILWAY_GIT_COMMIT_SHA:-local}"

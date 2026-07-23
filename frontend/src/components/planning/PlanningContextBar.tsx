@@ -18,6 +18,7 @@ interface Props {
   onDisplayModeChange: (m: DisplayMode) => void;
   onCustomStartChange: (v: string) => void;
   onCustomEndChange: (v: string) => void;
+  onToggleLeftPanel?: () => void;
 }
 
 const RANGES: { key: ViewRange; label: string }[] = [
@@ -33,6 +34,7 @@ export function PlanningContextBar({
   session, year,
   viewRange, displayMode, customStart, customEnd,
   onRangeChange, onDisplayModeChange, onCustomStartChange, onCustomEndChange,
+  onToggleLeftPanel,
 }: Props) {
   const scopeLabel = session?.is_national
     ? "NATHQ"
@@ -45,6 +47,16 @@ export function PlanningContextBar({
 
   return (
     <div className="pw-ctx" role="banner" aria-label="Planning workspace context">
+      {/* Mobile-only toggle for the left filter/backlog panel */}
+      {onToggleLeftPanel && (
+        <button
+          className="pw-btn-hamburger"
+          aria-label="Open filters and backlog panel"
+          onClick={onToggleLeftPanel}
+        >
+          <span></span><span></span><span></span>
+        </button>
+      )}
       {/* Identity */}
       <span className="pw-ctx-scope">{year ? year.name : "Training Planning"}</span>
       <span className="pw-ctx-sep">·</span>

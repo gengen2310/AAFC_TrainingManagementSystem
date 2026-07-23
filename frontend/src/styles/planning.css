@@ -898,4 +898,73 @@ body.pw-active .main {
   align-items: center;
   justify-content: space-between;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE — off-canvas left panel + full-screen right drawer
+   Mirrors connected-frontend's .sidenav/.btn-hamburger/.nav-overlay
+   pattern (same 768px breakpoint), adapted to this workspace's
+   actual structure: there's no page-router nav here, so the
+   hamburger opens the filters/backlog panel instead of a page menu.
+   ════════════════════════════════════════════════════════════ */
+.pw-btn-hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  margin-right: 2px;
+  color: #fff;
+}
+.pw-btn-hamburger span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: #fff;
+  margin: 3px 0;
+  border-radius: 1px;
+}
+
+@media (max-width: 768px) {
+  .pw-btn-hamburger { display: flex; }
+
+  .pw-body {
+    grid-template-columns: 1fr;
+    position: relative;
+  }
+  .pw-body.right-open {
+    grid-template-columns: 1fr;
+  }
+
+  .pw-left {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 260px;
+    max-width: 82vw;
+    z-index: 300;
+    transform: translateX(-100%);
+    transition: transform .18s ease;
+    box-shadow: 2px 0 12px rgba(0,47,101,.18);
+  }
+  .pw-left.pw-left-open {
+    transform: translateX(0);
+  }
+
+  .pw-left-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.35);
+    z-index: 299;
+  }
+
+  .pw-right {
+    position: fixed;
+    inset: 0;
+    z-index: 310;
+    width: auto;
+  }
+}
 .pw-section-toggle-icon { font-size: 9px; opacity: .6; }

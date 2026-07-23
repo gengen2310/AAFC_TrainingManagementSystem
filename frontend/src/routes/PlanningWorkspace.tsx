@@ -49,6 +49,9 @@ export function PlanningWorkspace() {
   const [layers, setLayers] = useState<LayerState>(defaultLayers);
   const [audience, setAudience] = useState<Set<string>>(new Set());
   const [priority, setPriority] = useState<Set<string>>(new Set());
+  // Mobile-only: left filter/backlog panel is off-canvas below 768px, toggled via the
+  // hamburger button in the context bar. Ignored (has no visual effect) above that width.
+  const [leftPanelOpen, setLeftPanelOpen] = useState(false);
 
   // ── Data queries ──────────────────────────────────────────────────────────────
   const { data: years, isLoading: yearsLoading } = useQuery({
@@ -112,6 +115,7 @@ export function PlanningWorkspace() {
   function handleDateClick(dateId: string, _date: string) {
     setSelectedDateId(dateId);
     setViewRange("parade-night");
+    setLeftPanelOpen(false);
   }
 
   function handleSessionClick(s: PlanningSession, dateId: string, date: string) {
@@ -146,6 +150,7 @@ export function PlanningWorkspace() {
         // silently ignore — event may not be accessible
       }
     }
+    setLeftPanelOpen(false);
   }
 
   function handleViewRangeChange(mode: ViewMode) {
@@ -311,6 +316,7 @@ export function PlanningWorkspace() {
         onDisplayModeChange={setDisplayMode}
         onCustomStartChange={setCustomStart}
         onCustomEndChange={setCustomEnd}
+        onToggleLeftPanel={() => setLeftPanelOpen(o => !o)}
       />
 
       {/* Year selector + quick actions */}
@@ -343,8 +349,14 @@ export function PlanningWorkspace() {
 
       {/* Main body: left + canvas + right */}
       <div className={`pw-body${drawerItem ? " right-open" : ""}`}>
+        {/* Mobile-only backdrop for the off-canvas left panel */}
+        {leftPanelOpen && (
+          <div className="pw-left-overlay" onClick={() => setLeftPanelOpen(false)} />
+        )}
+
         {/* Left panel */}
         <PlanningLeftPanel
+          className={leftPanelOpen ? "pw-left-open" : ""}
           layers={layers}
           onLayerToggle={handleLayerToggle}
           audience={audience}

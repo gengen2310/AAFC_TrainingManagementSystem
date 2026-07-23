@@ -10,19 +10,44 @@
 ## Design tokens (AAFC VIG palette)
 
 ```css
---blue:   #51b0e3   /* AAFC blue */
---dark:   #002f65   /* AAFC dark blue */
---royal:  #004b8d
---steel:  #455560
---lgrey:  #b0b7bb
---red:    #e51937
---bg:     #f4f8fc
---border: #d1dce8
---text:   #1e2d3d
+--blue:   #51b0e3   /* AAFC blue — accent, active states, highlights */
+--dark:   #002f65   /* AAFC dark blue — header, nav structure */
+--royal:  #004b8d   /* Royal blue — secondary active states */
+--steel:  #455560   /* Gunmetal grey — body text, secondary surfaces */
+--lgrey:  #b0b7bb   /* Light grey — borders, table headers, quiet backgrounds */
+--pale:   #7db2ce   /* Pale blue — subtle information backgrounds */
+--red:    #e51937   /* Red — danger, errors, must-attend only */
+
+--bg:           #f4f8fc  /* slight AAFC-blue tint on page background */
+--surface:      #ffffff
+--surface-2:    #f0f5fa
+--border:       #d1dce8
+--border-light: #e4edf5
+
+--text:   #1e2d3d  /* deep navy-dark for primary text */
+--text-2: #3a4a55
 --muted:  #6b7a87
+
+--ok:      #1a7f4b  --ok-bg:   #d4f0e3  --ok-text: #145f38
+--warn:    #c97a00  --warn-bg: #fff3cd
+
+--accent:       var(--blue)
+--accent-light: #e0f0fa
+
+--sh:  0 1px 4px rgba(0,47,101,.10)
+--sh2: 0 4px 16px rgba(0,47,101,.14)
 ```
 
 Font: `'Montserrat', Arial, sans-serif`
+
+**Planning Workspace (`frontend/`) uses a different token naming convention**
+(`--aafc-blue`, `--aafc-dark-blue`, `--surface`, `--muted-text`, plus dark/high-contrast
+theme variants — see `frontend/src/styles/tokens.css`) built on the same underlying brand
+hex values. This is a naming divergence, not a design-authority conflict — both trace back
+to the same AAFC VIG palette. Per `.claude/rules/architecture.md`, do not silently merge the
+two into one shared token source or rename either side's variables as a side effect of an
+unrelated change; that is an explicit architectural decision to surface to the user, not a
+default action.
 
 ## XSS prevention
 
