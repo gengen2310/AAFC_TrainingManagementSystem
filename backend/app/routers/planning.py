@@ -2159,6 +2159,7 @@ def list_missions(
     element: Optional[str] = None,
     term: Optional[str] = None,
     status: Optional[str] = None,   # "scheduled" | "unscheduled" | "cancelled" | "not_delivered"
+                                     # | "rescheduled" | "resolved" | "planned"
     search: Optional[str] = None,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
@@ -2234,6 +2235,7 @@ def list_missions(
             "cancelled_reason": s.cancelled_reason,
             "not_delivered_reason": s.not_delivered_reason,
             "rescheduled_to_date": s.rescheduled_to_date,
+            "outcome_note": s.delivery_notes or s.issue_notes,
         }
 
     result = []
@@ -2242,7 +2244,31 @@ def list_missions(
         is_scheduled = len(scheduled) > 0
         has_cancelled = any(s.status in ("cancelled", "cancelled_late") for s in scheduled)
         has_not_delivered = any(s.status == "not_delivered" for s in scheduled)
+        has_rescheduled = any(s.status == "rescheduled" for s in scheduled)
+        has_delivered = any(s.status in ("delivered", "delivered_with_issue") for s in scheduled)
         needs_reschedule = has_cancelled or has_not_delivered
+
+        # Six-state Mission Backlog model (master transformation plan Block 6):
+        # unscheduled / planned / cancelled_awaiting_reschedule /
+        # not_delivered_awaiting_reschedule / rescheduled / resolved.
+        # No explicit link exists in the schema between a cancelled/not-delivered
+        # session and whatever session eventually replaces it (rescheduled_to_date
+        # is a plain date string, not an FK) — "resolved" is therefore an honest
+        # approximation: a mission that has a cancelled/not-delivered session AND
+        # has also since been delivered via some session is treated as resolved,
+        # rather than left permanently flagged as needing a reschedule action.
+        if not is_scheduled:
+            backlog_status = "unscheduled"
+        elif needs_reschedule and has_delivered:
+            backlog_status = "resolved"
+        elif needs_reschedule and has_cancelled:
+            backlog_status = "cancelled_awaiting_reschedule"
+        elif needs_reschedule:
+            backlog_status = "not_delivered_awaiting_reschedule"
+        elif has_rescheduled:
+            backlog_status = "rescheduled"
+        else:
+            backlog_status = "planned"
 
         # Filter by term if requested
         if term:
@@ -2261,6 +2287,12 @@ def list_missions(
             continue
         if status == "not_delivered" and not has_not_delivered:
             continue
+        if status == "rescheduled" and backlog_status != "rescheduled":
+            continue
+        if status == "resolved" and backlog_status != "resolved":
+            continue
+        if status == "planned" and backlog_status != "planned":
+            continue
 
         result.append({
             "curriculum_id": ci.id,
@@ -2276,7 +2308,9 @@ def list_missions(
             "is_scheduled": is_scheduled,
             "has_cancelled": has_cancelled,
             "has_not_delivered": has_not_delivered,
+            "has_rescheduled": has_rescheduled,
             "needs_reschedule": needs_reschedule,
+            "backlog_status": backlog_status,
             "scheduled_sessions": [_sess_summary(s) for s in scheduled],
             "scheduled_count": len(scheduled),
         })

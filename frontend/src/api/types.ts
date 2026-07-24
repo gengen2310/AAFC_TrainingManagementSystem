@@ -195,7 +195,10 @@ export interface MissionItem {
   phase: string; element: string | null; recommended_term: string | null;
   part_count: number | null; duration_minutes: number;
   core_status: string; is_scheduled: boolean;
-  has_cancelled: boolean; has_not_delivered: boolean; needs_reschedule: boolean;
+  has_cancelled: boolean; has_not_delivered: boolean; has_rescheduled: boolean; needs_reschedule: boolean;
+  // Six-state model: unscheduled | planned | cancelled_awaiting_reschedule |
+  // not_delivered_awaiting_reschedule | rescheduled | resolved.
+  backlog_status: string;
   scheduled_count: number; instructor_suitability: string | null;
   scheduled_sessions: {
     session_id: string; parade_date: string | null; parade_date_id: string | null; term: string | null;
@@ -203,7 +206,7 @@ export interface MissionItem {
     facilitator_id: string | null; facilitator_name: string | null;
     location_id: string | null; location_name: string | null; status: string;
     cancelled_reason: string | null; not_delivered_reason: string | null;
-    rescheduled_to_date: string | null;
+    rescheduled_to_date: string | null; outcome_note: string | null;
   }[];
 }
 export interface PlanningLocation {

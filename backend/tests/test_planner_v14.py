@@ -494,6 +494,148 @@ def test_missions_list_surfaces_not_delivered_status(client):
 
 
 # ─────────────────────────────────────────────────────────────
+# Mission Backlog six-state model (master transformation plan Block 6):
+# unscheduled / planned / cancelled_awaiting_reschedule /
+# not_delivered_awaiting_reschedule / rescheduled / resolved
+# ─────────────────────────────────────────────────────────────
+
+def _assign_and_status(client, hdr, year_id, date_idx, session_number, status=None, reason=None):
+    dates_r = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=hdr)
+    active_dates = [d for d in dates_r.json() if d["is_active"]]
+    date_id = active_dates[date_idx]["parade_date_id"]
+
+    missions_r = client.get(f"/api/planning/years/{year_id}/missions?status=unscheduled", headers=hdr)
+    unscheduled = missions_r.json()["missions"]
+    if not unscheduled:
+        pytest.skip("No unscheduled missions to assign")
+    ci_id = unscheduled[0]["curriculum_id"]
+
+    assign_r = client.post(f"/api/planning/years/{year_id}/assign-mission", json={
+        "curriculum_id": ci_id, "parade_date_id": date_id,
+        "session_number": session_number, "cadet_group": "junior",
+    }, headers=hdr)
+    assert assign_r.status_code == 200, assign_r.text
+    session_id = assign_r.json()["session_id"]
+
+    if status:
+        status_r = client.post(f"/api/sessions/{session_id}/status",
+                               json={"status": status, "reason": reason}, headers=hdr)
+        assert status_r.status_code == 200, status_r.text
+    return ci_id, session_id, date_id
+
+
+def test_backlog_status_unscheduled(client):
+    hdr = _sqn_admin(client)
+    year_id = _get_year_id(client, hdr)
+    r = client.get(f"/api/planning/years/{year_id}/missions?status=unscheduled", headers=hdr)
+    missions = r.json()["missions"]
+    if not missions:
+        pytest.skip("No unscheduled missions available")
+    assert all(m["backlog_status"] == "unscheduled" for m in missions)
+
+
+def test_backlog_status_planned_for_a_normally_scheduled_session(client):
+    hdr = _sqn_admin(client)
+    year_id = _get_year_id(client, hdr)
+    ci_id, _, _ = _assign_and_status(client, hdr, year_id, date_idx=4, session_number=5)
+    r = client.get(f"/api/planning/years/{year_id}/missions?status=planned", headers=hdr)
+    ids = [m["curriculum_id"] for m in r.json()["missions"]]
+    assert ci_id in ids
+    row = next(m for m in r.json()["missions"] if m["curriculum_id"] == ci_id)
+    assert row["backlog_status"] == "planned"
+
+
+def test_backlog_status_cancelled_awaiting_reschedule(client):
+    hdr = _sqn_admin(client)
+    year_id = _get_year_id(client, hdr)
+    ci_id, _, _ = _assign_and_status(client, hdr, year_id, date_idx=5, session_number=6,
+                                     status="cancelled", reason="Weather")
+    r = client.get(f"/api/planning/years/{year_id}/missions", headers=hdr)
+    row = next(m for m in r.json()["missions"] if m["curriculum_id"] == ci_id)
+    assert row["backlog_status"] == "cancelled_awaiting_reschedule"
+
+
+def test_backlog_status_not_delivered_awaiting_reschedule(client):
+    hdr = _sqn_admin(client)
+    year_id = _get_year_id(client, hdr)
+    ci_id, _, _ = _assign_and_status(client, hdr, year_id, date_idx=6, session_number=7,
+                                     status="not_delivered", reason="Instructor sick")
+    r = client.get(f"/api/planning/years/{year_id}/missions", headers=hdr)
+    row = next(m for m in r.json()["missions"] if m["curriculum_id"] == ci_id)
+    assert row["backlog_status"] == "not_delivered_awaiting_reschedule"
+
+
+def test_backlog_status_rescheduled(client):
+    hdr = _sqn_admin(client)
+    year_id = _get_year_id(client, hdr)
+    ci_id, _, _ = _assign_and_status(client, hdr, year_id, date_idx=7, session_number=8,
+                                     status="rescheduled")
+    r = client.get(f"/api/planning/years/{year_id}/missions?status=rescheduled", headers=hdr)
+    ids = [m["curriculum_id"] for m in r.json()["missions"]]
+    assert ci_id in ids
+    row = next(m for m in r.json()["missions"] if m["curriculum_id"] == ci_id)
+    assert row["backlog_status"] == "rescheduled"
+    assert row["has_rescheduled"] is True
+
+
+def test_backlog_status_resolved_when_cancelled_session_later_delivered(client):
+    """A mission that was cancelled but has since ALSO been delivered (via another
+    session for the same curriculum item) is 'resolved', not stuck permanently
+    flagged as needing a reschedule action."""
+    hdr = _sqn_admin(client)
+    year_id = _get_year_id(client, hdr)
+
+    dates_r = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=hdr)
+    active_dates = [d for d in dates_r.json() if d["is_active"]]
+
+    missions_r = client.get(f"/api/planning/years/{year_id}/missions?status=unscheduled", headers=hdr)
+    unscheduled = missions_r.json()["missions"]
+    if not unscheduled:
+        pytest.skip("No unscheduled missions available")
+    ci_id = unscheduled[0]["curriculum_id"]
+
+    # First session: cancelled.
+    assign1 = client.post(f"/api/planning/years/{year_id}/assign-mission", json={
+        "curriculum_id": ci_id, "parade_date_id": active_dates[8]["parade_date_id"],
+        "session_number": 1, "cadet_group": "senior",
+    }, headers=hdr)
+    assert assign1.status_code == 200, assign1.text
+    client.post(f"/api/sessions/{assign1.json()['session_id']}/status",
+               json={"status": "cancelled", "reason": "Venue double-booked"}, headers=hdr)
+
+    # Second session for the SAME curriculum item, on a different date: delivered.
+    assign2 = client.post(f"/api/planning/years/{year_id}/assign-mission", json={
+        "curriculum_id": ci_id, "parade_date_id": active_dates[9]["parade_date_id"],
+        "session_number": 1, "cadet_group": "senior",
+    }, headers=hdr)
+    assert assign2.status_code == 200, assign2.text
+    client.post(f"/api/sessions/{assign2.json()['session_id']}/status",
+               json={"status": "delivered"}, headers=hdr)
+
+    r = client.get(f"/api/planning/years/{year_id}/missions?status=resolved", headers=hdr)
+    ids = [m["curriculum_id"] for m in r.json()["missions"]]
+    assert ci_id in ids
+    row = next(m for m in r.json()["missions"] if m["curriculum_id"] == ci_id)
+    assert row["backlog_status"] == "resolved"
+
+
+def test_outcome_note_retained_on_scheduled_session(client):
+    hdr = _sqn_admin(client)
+    year_id = _get_year_id(client, hdr)
+    ci_id, session_id, _ = _assign_and_status(client, hdr, year_id, date_idx=10, session_number=1,
+                                              status="delivered_with_issue", reason="Projector broke mid-session")
+    r = client.get(f"/api/planning/years/{year_id}/missions", headers=hdr)
+    row = next(m for m in r.json()["missions"] if m["curriculum_id"] == ci_id)
+    assert row["scheduled_sessions"][0]["outcome_note"] == "Projector broke mid-session"
+
+
+def _get_year_id(client, hdr):
+    years_r = client.get("/api/planning/years", headers=hdr)
+    year_2026 = [y for y in years_r.json() if y["year"] == 2026]
+    return year_2026[0]["planning_year_id"]
+
+
+# ─────────────────────────────────────────────────────────────
 # GET /api/planning/years/{id}/annual-program
 # ─────────────────────────────────────────────────────────────
 

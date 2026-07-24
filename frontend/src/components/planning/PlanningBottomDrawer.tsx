@@ -116,8 +116,16 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
       if (fTerm && m.recommended_term !== fTerm) return false;
       if (fStatus === "scheduled" && !m.is_scheduled) return false;
       if (fStatus === "unscheduled" && m.is_scheduled) return false;
-      if (fStatus === "cancelled" && !m.has_cancelled) return false;
-      if (fStatus === "not_delivered" && !m.has_not_delivered) return false;
+      // "Cancelled"/"Not delivered" mean "currently awaiting reschedule", not "has
+      // ever had this status" — has_cancelled/has_not_delivered stay true forever
+      // even once a mission is resolved, which previously made a resolved mission
+      // still match these two filters alongside "Resolved", confusingly implying
+      // it still needed action. Match backlog_status like the other four filters.
+      if (fStatus === "cancelled" && m.backlog_status !== "cancelled_awaiting_reschedule") return false;
+      if (fStatus === "not_delivered" && m.backlog_status !== "not_delivered_awaiting_reschedule") return false;
+      if (fStatus === "rescheduled" && m.backlog_status !== "rescheduled") return false;
+      if (fStatus === "resolved" && m.backlog_status !== "resolved") return false;
+      if (fStatus === "planned" && m.backlog_status !== "planned") return false;
       if (q && !m.code.toLowerCase().includes(q) && !m.title.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -188,8 +196,11 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
           <option value="">All statuses</option>
           <option value="unscheduled">Unscheduled</option>
           <option value="scheduled">Scheduled</option>
+          <option value="planned">Planned</option>
           <option value="cancelled">Cancelled</option>
           <option value="not_delivered">Not delivered</option>
+          <option value="rescheduled">Rescheduled</option>
+          <option value="resolved">Resolved</option>
         </select>
         <select value={fPhase} onChange={e => setFPhase(e.target.value)} style={{ ...inputSx, width: 150 }}>
           <option value="">All phases</option>
@@ -291,15 +302,23 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                         {progType.toUpperCase()}
                       </span>
                     </td>
-                    {/* Status */}
+                    {/* Status — see backlog_status's six-state model (backend/app/routers/planning.py) */}
                     <td>
-                      {m.has_not_delivered ? (
-                        <span title={s0?.not_delivered_reason ?? ""} style={{ color: "#fff", background: "#78909c", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                      {m.backlog_status === "resolved" ? (
+                        <span title={`Previously ${m.has_cancelled ? "cancelled" : "not delivered"}, now delivered.${s0?.outcome_note ? " " + s0.outcome_note : ""}`} style={{ color: "#fff", background: "var(--success, #1A7F4B)", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                          RESOLVED
+                        </span>
+                      ) : m.has_not_delivered ? (
+                        <span title={[s0?.not_delivered_reason, s0?.outcome_note].filter(Boolean).join(" — ") || "No reason recorded"} style={{ color: "#fff", background: "#78909c", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
                           NOT DELIVERED
                         </span>
                       ) : m.has_cancelled ? (
-                        <span title={s0?.cancelled_reason ?? ""} style={{ color: "#fff", background: "var(--aafc-red)", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                        <span title={[s0?.cancelled_reason, s0?.outcome_note].filter(Boolean).join(" — ") || "No reason recorded"} style={{ color: "#fff", background: "var(--aafc-red)", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
                           CANCELLED
+                        </span>
+                      ) : m.backlog_status === "rescheduled" ? (
+                        <span title={s0?.rescheduled_to_date ? `Rescheduled to ${fmtDate(s0.rescheduled_to_date)}` : "Rescheduled"} style={{ color: "#fff", background: "var(--rescheduled, #7C3AED)", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                          RESCHEDULED
                         </span>
                       ) : !m.is_scheduled ? (
                         <span style={{ color: "var(--muted-text)", fontWeight: 600 }}>Unscheduled</span>
@@ -371,7 +390,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                           Schedule
                         </button>
                       )}
-                      {m.needs_reschedule && s0 && (
+                      {m.needs_reschedule && m.backlog_status !== "resolved" && s0 && (
                         <button
                           className="btn sm out"
                           disabled={reschedulingId === s0.session_id}
