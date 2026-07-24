@@ -258,6 +258,7 @@ export function HeatmapChart({ chart }: { chart: DashboardChart }) {
 
 interface TonightData {
   date: string; term: string | null; overall_pct: number;
+  planning_status?: string; data_quality?: string;
   sessions_total: number; sessions_ready: number;
   fac_filled: number; fac_total: number; room_filled: number; room_total: number;
   sessions: Array<{ id: string; period: number | null; phase: string | null; title: string | null; facilitator: string | null; room: string | null; status: string; ready: boolean }>;
@@ -268,6 +269,19 @@ interface TonightData {
 export function ReadinessCard({ chart }: { chart: DashboardChart }) {
   const d = chart.data as TonightData | null;
   if (!d) return <EmptyState chart={chart} />;
+  // A parade night that exists but has zero sessions must read "Not planned" —
+  // never a misleading 100%/"ready" donut derived from the legacy overall_pct
+  // field (which is 100 for zero sessions, kept only for older report consumers).
+  if (d.planning_status === "not_planned" || d.sessions_total === 0) {
+    const dateLabel = new Date(d.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+    return (
+      <div>
+        <div style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8 }}>{dateLabel}{d.term ? ` · Term ${d.term}` : ""}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted-text)" }}>Not planned</div>
+        <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 4 }}>No sessions are scheduled for this parade night yet.</div>
+      </div>
+    );
+  }
   const pct = d.overall_pct;
   const col = pct >= 80 ? "var(--success, #1A7F4B)" : pct >= 60 ? "var(--warning, #C97A00)" : "var(--aafc-red, #E51937)";
   const dateLabel = new Date(d.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
@@ -308,21 +322,37 @@ export function ReadinessCard({ chart }: { chart: DashboardChart }) {
   );
 }
 
-interface UpcomingRow { date: string; term: string | null; sessions_total: number; sessions_ready: number; unstaffed: number; readiness_pct: number; published: boolean; }
+interface UpcomingRow {
+  date: string; term: string | null; sessions_total: number; sessions_ready: number;
+  unstaffed: number; readiness_pct: number; published: boolean;
+  planning_status?: string; data_quality?: string;
+}
 
-/** Grid of upcoming parade-night readiness cards — chart_type "readiness_grid". */
+/** Grid of upcoming parade-night readiness cards — chart_type "readiness_grid".
+ * A night with zero sessions is "not_planned" and must never show a percentage
+ * bar/badge — legacy readiness_pct is 100 for a zero-session night (kept only for
+ * older report consumers), which would otherwise read as "100% ready". */
 export function ReadinessGrid({ chart }: { chart: DashboardChart }) {
   const rows = (chart.data as UpcomingRow[] | undefined) ?? [];
   if (!rows.length) return <EmptyState chart={chart} />;
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 8 }}>
       {rows.map((r, i) => {
+        const notPlanned = r.planning_status === "not_planned" || r.sessions_total === 0;
+        const dateLabel = new Date(r.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+        if (notPlanned) {
+          return (
+            <div key={i} style={{ border: "1.5px solid var(--border)", borderRadius: 8, padding: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 800 }}>{dateLabel}</div>
+              <div style={{ fontSize: 10, color: "var(--muted-text)", fontWeight: 700, marginTop: 5 }}>Not planned</div>
+              <div style={{ fontSize: 9, color: "var(--muted-text)" }}>No sessions scheduled</div>
+            </div>
+          );
+        }
         const col = r.readiness_pct >= 80 ? "var(--success, #1A7F4B)" : r.readiness_pct >= 60 ? "var(--warning, #C97A00)" : "var(--aafc-red, #E51937)";
         return (
           <div key={i} style={{ border: "1.5px solid var(--border)", borderRadius: 8, padding: 8 }}>
-            <div style={{ fontSize: 10, fontWeight: 800 }}>
-              {new Date(r.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
-            </div>
+            <div style={{ fontSize: 10, fontWeight: 800 }}>{dateLabel}</div>
             <div style={{ height: 4, background: "var(--background)", borderRadius: 2, margin: "5px 0" }}>
               <div style={{ width: `${r.readiness_pct}%`, height: "100%", background: col, borderRadius: 2 }} />
             </div>

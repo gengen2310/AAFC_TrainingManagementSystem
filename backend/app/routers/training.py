@@ -16,6 +16,7 @@ from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
 from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron)
 from ..services import (audit, score_parade, publish_blockers, close_blockers)
+from ..services_readiness import parade_night_readiness
 
 router = APIRouter(prefix="/api", tags=["training"])
 
@@ -227,8 +228,14 @@ def get_parade(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depend
     require_can_view_squadron(p, pn.squadron_id, pn.wing_id)
     sess = [_sess_dict(x) for x in db.query(Session).filter(Session.parade_night_id == pn.id,
                                                             Session.is_archived == False).all()]  # noqa: E712
-    r = score_parade(sess)
-    return {**_pn_dict(pn), "sessions": sess, "readiness": r, "publish_blockers": publish_blockers(sess)}
+    # Computed live from the authoritative services_readiness module (not the stored
+    # ParadeNight.readiness_score/planning_status columns) so this response can never
+    # drift from the list endpoint or the Dashboard even if _recompute() wasn't
+    # triggered by some earlier edit path — same source of truth, always fresh.
+    readiness = parade_night_readiness(sess)
+    r = score_parade(sess)  # legacy shape (score/band/deductions) kept for existing callers of this field
+    return {**_pn_dict(pn), "sessions": sess, "readiness": r, "readiness_v2": readiness,
+            "publish_blockers": publish_blockers(sess)}
 
 
 @router.post("/parade-nights")
@@ -342,9 +349,17 @@ def _apply_status_transition(s: Session, new_status: str, reason: str | None,
 
 
 def _recompute(db: DBSession, pn: ParadeNight):
+    """The one place ParadeNight's readiness fields are written. Every session
+    create/edit/status-change calls this, so it's the natural point to keep
+    planning_status/data_quality (the authoritative fields) and readiness_score
+    (the legacy numeric projection, derived from the same computation — never
+    computed independently) in sync with each other."""
     sess = [_sess_dict(x) for x in db.query(Session).filter(Session.parade_night_id == pn.id,
                                                             Session.is_archived == False).all()]  # noqa: E712
-    pn.readiness_score = score_parade(sess)["score"]
+    result = parade_night_readiness(sess)
+    pn.planning_status = result["planning_status"]
+    pn.data_quality = result["data_quality"]
+    pn.readiness_score = result["legacy_score"]
     db.commit()
 
 

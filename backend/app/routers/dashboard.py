@@ -29,6 +29,7 @@ from ..models import (
     CurriculumItem, Equipment, TrainingArea, PlanningFacilitatorLeave,
 )
 from ..permissions import Principal, require_role
+from ..services_readiness import parade_night_readiness
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -484,8 +485,28 @@ def _facilitator_repeated_gaps(sessions: list, pn_date_by_id: dict, weeks: int =
     }
 
 
+def _session_to_readiness_dict(s) -> dict:
+    """Adapt a Session ORM row to the plain dict services_readiness.
+    parade_night_readiness() expects."""
+    return {
+        "id": s.id, "period_number": s.period_number,
+        "curriculum_item_id": s.curriculum_item_id, "custom_title": s.custom_title,
+        "session_title": s.session_title,
+        "facilitator_id": s.facilitator_id, "facilitator_display_name_at_time": s.facilitator_display_name_at_time,
+        "training_area_id": s.training_area_id, "training_area_name_at_time": s.training_area_name_at_time,
+        "status": s.status, "not_delivered_reason": s.not_delivered_reason, "cancelled_reason": s.cancelled_reason,
+    }
+
+
 def _tonight_readiness(pns: list, sessions: list, facs: list, rooms: list) -> dict:
-    """Tonight's / next parade night readiness card."""
+    """Tonight's / next parade night readiness card — sourced entirely from
+    services_readiness.parade_night_readiness(), the single authoritative
+    computation also used by _upcoming_readiness, training.py's _recompute/
+    get_parade, and ops.py's reports/wing-overview. A zero-session night is
+    "not_planned" here structurally (parade_night_readiness's own hard rule),
+    never "ready to run" — this closes the exact contradiction this pass found:
+    the old inline math could show 0% next to "Tonight's program is ready to run."
+    because `issues` was empty (no unfilled slots to report) on an empty night."""
     today_str = date.today().isoformat()
     upcoming_pns = sorted([pn for pn in pns if pn.date >= today_str], key=lambda p: p.date)
     if not upcoming_pns:
@@ -499,18 +520,8 @@ def _tonight_readiness(pns: list, sessions: list, facs: list, rooms: list) -> di
 
     next_pn = upcoming_pns[0]
     pn_sessions = [s for s in sessions if s.parade_night_id == next_pn.id]
-    fac_ids = {f.id for f in facs}
-    room_ids = {r.id for r in rooms}
+    readiness = parade_night_readiness([_session_to_readiness_dict(s) for s in pn_sessions])
 
-    # Compute readiness measures
-    total_sess = len(pn_sessions)
-    sessions_ready = sum(1 for s in pn_sessions if s.facilitator_id and (not s.training_area_id or s.training_area_id in room_ids))
-    fac_filled = sum(1 for s in pn_sessions if s.facilitator_id)
-    fac_total = total_sess
-    room_filled = sum(1 for s in pn_sessions if s.training_area_id)
-    room_total = total_sess
-
-    # Issues
     issues = []
     unfilled_fac = [s for s in pn_sessions if not s.facilitator_id]
     if unfilled_fac:
@@ -531,13 +542,18 @@ def _tonight_readiness(pns: list, sessions: list, facs: list, rooms: list) -> di
             "action": "Assign training areas in Parade Nights.",
         })
 
-    overall_pct = round(sessions_ready / total_sess * 100) if total_sess else 0
+    fac_filled = sum(1 for s in pn_sessions if s.facilitator_id)
+    room_filled = sum(1 for s in pn_sessions if s.training_area_id)
+    total_sess = readiness["sessions_total"]
 
-    plain = (
-        "Tonight's program is ready to run."
-        if not issues else
-        f"Tonight's program can run, but {len(issues)} item(s) need attention."
-    )
+    if readiness["planning_status"] == "not_planned":
+        plain = "No sessions are scheduled for the next parade night."
+    elif readiness["planning_status"] == "planned":
+        plain = "Tonight's program is ready to run."
+    elif readiness["planning_status"] == "blocked":
+        plain = f"Tonight's program has an unresolved conflict — {readiness['requirements_summary']}."
+    else:
+        plain = f"Tonight's program can run, but {readiness['requirements_summary']} — {len(issues)} item(s) need attention."
 
     return {
         "chart_id": "tonight",
@@ -548,13 +564,15 @@ def _tonight_readiness(pns: list, sessions: list, facs: list, rooms: list) -> di
         "data": {
             "date": next_pn.date,
             "term": next_pn.term,
-            "overall_pct": overall_pct,
+            "planning_status": readiness["planning_status"],
+            "data_quality": readiness["data_quality"],
+            "overall_pct": readiness["legacy_score"],
             "sessions_total": total_sess,
-            "sessions_ready": sessions_ready,
+            "sessions_ready": readiness["sessions_ready"],
             "fac_filled": fac_filled,
-            "fac_total": fac_total,
+            "fac_total": total_sess,
             "room_filled": room_filled,
-            "room_total": room_total,
+            "room_total": total_sess,
             "sessions": [
                 {
                     "id": s.id,
@@ -623,7 +641,12 @@ def _session_outcomes_distribution(sessions: list) -> dict:
 
 
 def _upcoming_readiness(pns: list, sessions: list) -> dict:
-    """Card grid: next 8 parade nights with readiness score."""
+    """Card grid: next 8 parade nights, using the same authoritative
+    parade_night_readiness() as _tonight_readiness. Previously this computed its
+    own staffing-only ratio and could report "All upcoming parade nights are fully
+    staffed" even when some nights had zero sessions (an empty night contributed
+    unstaffed=0, which read as "staffed") — a zero-session night is now
+    "not_planned" and is excluded from the fully-staffed claim below."""
     today_str = date.today().isoformat()
     upcoming = sorted([pn for pn in pns if pn.date >= today_str], key=lambda p: p.date)[:8]
     pn_sessions: dict[str, list] = defaultdict(list)
@@ -633,19 +656,35 @@ def _upcoming_readiness(pns: list, sessions: list) -> dict:
     data = []
     for pn in upcoming:
         sess = pn_sessions.get(pn.id, [])
-        total = len(sess)
+        readiness = parade_night_readiness([_session_to_readiness_dict(s) for s in sess])
         unstaffed = sum(1 for s in sess if not s.facilitator_id)
-        ready = sum(1 for s in sess if s.facilitator_id)
-        pct = round(ready / total * 100) if total else 0
         data.append({
             "date": pn.date,
             "term": pn.term,
-            "sessions_total": total,
-            "sessions_ready": ready,
+            "planning_status": readiness["planning_status"],
+            "data_quality": readiness["data_quality"],
+            "sessions_total": readiness["sessions_total"],
+            "sessions_ready": readiness["sessions_ready"],
             "unstaffed": unstaffed,
-            "readiness_pct": pct,
+            "readiness_pct": readiness["legacy_score"],
             "published": pn.published_status,
         })
+
+    # "Fully staffed" can only be claimed about nights that actually have sessions —
+    # a not_planned (zero-session) night is neither staffed nor unstaffed, it's simply
+    # not yet planned, and must never count toward a "fully staffed" claim either way.
+    planned_nights = [d for d in data if d["planning_status"] != "not_planned"]
+    unplanned_count = sum(1 for d in data if d["planning_status"] == "not_planned")
+    if not data:
+        insight = None
+    elif any(d["unstaffed"] > 0 for d in planned_nights):
+        insight = f"{sum(1 for d in planned_nights if d['unstaffed'] > 0)} upcoming nights have unstaffed sessions."
+    elif unplanned_count:
+        insight = f"All planned nights are fully staffed, but {unplanned_count} upcoming night(s) have no sessions scheduled yet."
+    elif planned_nights:
+        insight = "All upcoming parade nights are fully staffed."
+    else:
+        insight = "No upcoming parade nights are planned yet."
 
     return {
         "chart_id": "upcoming_readiness",
@@ -654,9 +693,7 @@ def _upcoming_readiness(pns: list, sessions: list) -> dict:
         "question": "Are upcoming parade nights fully staffed?",
         "chart_type": "readiness_grid",
         "data": data,
-        "insight": (f"{sum(1 for d in data if d['unstaffed'] > 0)} upcoming nights have unstaffed sessions."
-                    if any(d["unstaffed"] > 0 for d in data) else
-                    "All upcoming parade nights are fully staffed." if data else None),
+        "insight": insight,
         "empty_state": "No upcoming parade nights scheduled.",
         "drill_down": {"route": "parade-nights"},
         "permission_scope": "squadron",

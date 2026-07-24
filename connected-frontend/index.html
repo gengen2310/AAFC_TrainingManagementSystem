@@ -4513,12 +4513,23 @@ function _chartDonut(chart){
 function _renderTonightReadiness(chart){
   const d=chart.data||{};
   if(!d.date)return `<div class="card">${_dEmptyChart(chart.empty_state||'No parade night scheduled tonight or this week')}</div>`;
-  const pct=d.readiness_pct||0;const rdC=pct>=80?'var(--ok)':pct>=60?'var(--warn)':'var(--red)';
+  // A parade night that exists but has zero sessions is "not_planned" — never a
+  // misleading 100%/"ready" donut derived from overall_pct (a legacy projection
+  // that reads 100 for zero sessions, kept only for older report consumers).
+  if(d.planning_status==='not_planned'||!d.sessions_total){
+    return `<div class="card">
+      <div class="ctitle">Tonight — <span style="font-weight:400">${fmtD(d.date,{weekday:'long',day:'numeric',month:'long'})}</span></div>
+      <div style="font-size:13px;font-weight:700;color:var(--muted)">Not planned</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">No sessions are scheduled for this parade night yet.</div>
+    </div>`;
+  }
+  const pct=d.overall_pct||0;const rdC=pct>=80?'var(--ok)':pct>=60?'var(--warn)':'var(--red)';
   const conic=`conic-gradient(${rdC} ${pct}%, var(--border) 0)`;
+  const unstaffedCount=(d.sessions||[]).filter(s=>!s.facilitator).length;
   const sessHtml=(d.sessions||[]).map((s,i)=>`<div class="sched-lane">
     <span style="font-size:10px;color:var(--muted);min-width:48px">Sess ${i+1}</span>
-    <span style="font-size:11.5px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.curriculum_item||s.exp||'Unassigned')}</span>
-    <span style="font-size:10.5px;color:${s.facilitator?'var(--muted)':'var(--red)'}">${esc(s.facilitator||'Unstaffed')}</span>
+    <span style="font-size:11.5px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title||'No curriculum item')}</span>
+    <span style="font-size:10.5px;color:${s.facilitator?'var(--muted)':'var(--red)'}">${esc(s.facilitator||'No facilitator assigned')}</span>
   </div>`).join('');
   return `<div class="card">
     <div class="ctitle">Tonight — <span style="font-weight:400">${fmtD(d.date,{weekday:'long',day:'numeric',month:'long'})}</span></div>
@@ -4527,7 +4538,7 @@ function _renderTonightReadiness(chart){
         <div class="rdp-ring" style="background:${conic};width:72px;height:72px">
           <div class="rdp-inner" style="width:52px;height:52px;font-size:15px;color:${rdC}">${pct}%</div>
         </div>
-        ${d.unstaffed>0?`<div style="font-size:10.5px;color:var(--red);font-weight:700;margin-top:4px;text-align:center">⚠ ${d.unstaffed} unstaffed</div>`:''}
+        ${unstaffedCount>0?`<div style="font-size:10.5px;color:var(--red);font-weight:700;margin-top:4px;text-align:center">⚠ ${unstaffedCount} unstaffed</div>`:''}
       </div>
       <div style="flex:1">
         <div style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Session Plan</div>
@@ -4539,12 +4550,23 @@ function _renderTonightReadiness(chart){
 }
 
 // Upcoming readiness grid — chart_type=readiness_grid
+// A zero-session night is "not_planned" — never shown with a percentage bar
+// (legacy readiness_pct is 100 for zero sessions, kept for older report consumers).
 function _renderUpcomingReadiness(chart){
   const rows=(chart.data||[]).slice(0,8);if(!rows.length)return '';
   return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px;margin-top:12px">`+
-    rows.map(r=>{const pct=r.readiness_pct||0;const col=pct>=80?'var(--ok)':pct>=60?'var(--warn)':'var(--red)';
+    rows.map(r=>{
+      const dateLabel=fmtD(r.date,{weekday:'short',day:'numeric',month:'short'});
+      if(r.planning_status==='not_planned'||!r.sessions_total){
+        return `<div style="border:1.5px solid var(--border);border-radius:8px;padding:10px" role="img" aria-label="${r.date}: not planned, no sessions scheduled">
+          <div style="font-size:10.5px;font-weight:800;color:var(--dark)">${dateLabel}</div>
+          <div style="font-size:10.5px;color:var(--muted);font-weight:700;margin-top:5px">Not planned</div>
+          <div style="font-size:9.5px;color:var(--muted)">No sessions scheduled</div>
+        </div>`;
+      }
+      const pct=r.readiness_pct||0;const col=pct>=80?'var(--ok)':pct>=60?'var(--warn)':'var(--red)';
       return `<div style="border:1.5px solid var(--border);border-radius:8px;padding:10px" role="img" aria-label="${r.date}: ${pct}% ready">
-        <div style="font-size:10.5px;font-weight:800;color:var(--dark)">${fmtD(r.date,{weekday:'short',day:'numeric',month:'short'})}</div>
+        <div style="font-size:10.5px;font-weight:800;color:var(--dark)">${dateLabel}</div>
         <div class="pbar" style="margin:5px 0"><div style="height:100%;width:${pct}%;background:${col};border-radius:3px"></div></div>
         <div style="font-size:10.5px;color:${col};font-weight:700">${pct}% ready</div>
         ${r.unstaffed?`<div style="font-size:10px;color:var(--warn);font-weight:700">⚠ ${r.unstaffed} unstaffed</div>`:''}

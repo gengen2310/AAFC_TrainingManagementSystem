@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from .models import AuditLog
 from .permissions import Principal
+from .services_readiness import parade_night_readiness
 
 
 def audit(db: DBSession, principal: Principal | None, *, object_type: str, object_id: str | None,
@@ -56,29 +57,39 @@ def band(score: int) -> str:
 
 
 def score_parade(sessions: list[dict]) -> dict:
-    score = 100
+    """Legacy shape ({score, band, deductions}) kept for existing callers during
+    migration. `score`/`band` are now DERIVED from services_readiness.
+    parade_night_readiness() — the one authoritative computation — rather than
+    computed independently, so this can no longer disagree with the Dashboard or
+    any other consumer of that module (previously: this function returned "Ready"/
+    100 for a parade night with zero sessions, since its deduction loop never ran
+    on an empty list; that contradiction is now structurally impossible because
+    parade_night_readiness() has a hard "zero sessions -> not_planned" rule checked
+    before any score math). `deductions` remains itemized diagnostic detail — not
+    currently rendered by either frontend (confirmed unused in both codebases) —
+    computed the same way as before, since nothing scored/banded here depends on it."""
     deductions = []
     seen_fac, seen_room = {}, {}
     for s in sessions:
         label = f"P{s.get('period_number')}/{s.get('phase_at_time') or '?'}"
         if not s.get("facilitator_id") and not s.get("facilitator_display_name_at_time"):
-            score += HARD["missing_facilitator"]; deductions.append({"pts": HARD["missing_facilitator"], "reason": f"{label}: no facilitator", "session_id": s.get("id")})
+            deductions.append({"pts": HARD["missing_facilitator"], "reason": f"{label}: no facilitator", "session_id": s.get("id")})
         if not s.get("training_area_id") and not s.get("training_area_name_at_time"):
-            score += HARD["missing_room"]; deductions.append({"pts": HARD["missing_room"], "reason": f"{label}: no room", "session_id": s.get("id")})
+            deductions.append({"pts": HARD["missing_room"], "reason": f"{label}: no room", "session_id": s.get("id")})
         if not s.get("expected_attendance"):
-            score += HARD["no_expected_attendance"]; deductions.append({"pts": HARD["no_expected_attendance"], "reason": f"{label}: no expected attendance", "session_id": s.get("id")})
+            deductions.append({"pts": HARD["no_expected_attendance"], "reason": f"{label}: no expected attendance", "session_id": s.get("id")})
         fid = s.get("facilitator_id")
         if fid:
             if fid in seen_fac:
-                score += HARD["facilitator_clash"]; deductions.append({"pts": HARD["facilitator_clash"], "reason": f"{label}: facilitator double-booked", "session_id": s.get("id")})
+                deductions.append({"pts": HARD["facilitator_clash"], "reason": f"{label}: facilitator double-booked", "session_id": s.get("id")})
             seen_fac[fid] = True
         rid = s.get("training_area_id")
         if rid:
             if rid in seen_room:
-                score += HARD["room_clash"]; deductions.append({"pts": HARD["room_clash"], "reason": f"{label}: room double-booked", "session_id": s.get("id")})
+                deductions.append({"pts": HARD["room_clash"], "reason": f"{label}: room double-booked", "session_id": s.get("id")})
             seen_room[rid] = True
-    score = max(0, min(100, score))
-    return {"score": score, "band": band(score), "deductions": deductions}
+    result = parade_night_readiness(sessions)
+    return {"score": result["legacy_score"], "band": result["legacy_band"], "deductions": deductions}
 
 
 def publish_blockers(sessions: list[dict]) -> list[dict]:

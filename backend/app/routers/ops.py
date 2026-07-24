@@ -10,6 +10,7 @@ from ..models import (Session, ParadeNight, CurriculumItem, ActionItem, Exceptio
 from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_view_squadron
 from ..services import audit, score_parade
+from ..services_readiness import parade_night_readiness
 
 router = APIRouter(prefix="/api", tags=["ops"])
 
@@ -70,8 +71,13 @@ def rep_readiness(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
     for pn in pns[:8]:
         sess = [{c.name: getattr(s, c.name) for c in s.__table__.columns}
                 for s in db.query(Session).filter(Session.parade_night_id == pn.id).all()]
-        r = score_parade(sess)
-        out.append({"parade_night_id": pn.id, "date": pn.date, "score": r["score"], "band": r["band"], "deductions": r["deductions"]})
+        # Same authoritative computation as the Dashboard/training.py — a zero-session
+        # night reports planning_status "not_planned" (never a 100/"Ready" legacy_score).
+        readiness = parade_night_readiness(sess)
+        r = score_parade(sess)  # legacy shape (score/band/deductions), derived from the same computation
+        out.append({"parade_night_id": pn.id, "date": pn.date, "score": r["score"], "band": r["band"],
+                    "deductions": r["deductions"], "planning_status": readiness["planning_status"],
+                    "data_quality": readiness["data_quality"]})
     worst = min((o["score"] for o in out), default=100)
     decision = "no_action" if worst >= 85 else "action_required" if worst >= 50 else "command_decision_required"
     return {"title": "Next parade readiness", "parade_nights": out, "decision": decision}
@@ -141,16 +147,24 @@ def wing_overview(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
         published = sum(1 for x in pns if x.published_status)
         future = [x for x in pns if x.date >= today]
         score = None
+        planning_status = None
         if future:
             nxt = sorted(future, key=lambda x: x.date)[0]
             ns = [{c.name: getattr(z, c.name) for c in z.__table__.columns}
                   for z in db.query(Session).filter(Session.parade_night_id == nxt.id).all()]
-            score = score_parade(ns)["score"]
+            # Same authoritative computation as the Dashboard and /reports/readiness —
+            # a squadron whose next parade night has zero sessions reports
+            # planning_status "not_planned", never a numeric "readiness" that reads
+            # as fully staffed/ready.
+            readiness = parade_night_readiness(ns)
+            score = readiness["legacy_score"]
+            planning_status = readiness["planning_status"]
         cov = _coverage_for(db, s.id)
         out.append({"squadron_id": s.id, "code": s.code, "short_name": s.short_name,
                     "parade_day": s.default_parade_day, "nights": len(pns), "published": published,
                     "sessions": len(sess), "delivered": delivered,
                     "pct": round(delivered / len(sess) * 100) if sess else 0, "readiness": score,
+                    "planning_status": planning_status,
                     "coverage_pct": cov["coverage_pct"], "not_delivered": cov["not_delivered"],
                     "no_future_plan": len(future) == 0, "no_published_plan": published == 0})
     return {"squadrons": out}

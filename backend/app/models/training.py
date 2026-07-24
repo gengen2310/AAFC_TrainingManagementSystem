@@ -60,7 +60,14 @@ class ParadeNight(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     parade_type: Mapped[str] = mapped_column(String(20), default="normal")  # normal|activity|ceremonial|admin|stand_down|cancelled
     notes: Mapped[str | None] = mapped_column(Text)
     published_status: Mapped[bool] = mapped_column(Boolean, default=False)
+    # readiness_score is a legacy 0-100 projection, DERIVED from planning_status by
+    # services_readiness.parade_night_readiness() — not independently authoritative.
+    # planning_status/data_quality (services_readiness.PLANNING_STATUSES /
+    # DATA_QUALITY_STATES) are the real source of truth; nullable because existing
+    # rows are backfilled by a migration, not because either is optional going forward.
     readiness_score: Mapped[int] = mapped_column(Integer, default=0)
+    planning_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    data_quality: Mapped[str | None] = mapped_column(String(30), nullable=True)
     closeout_status: Mapped[str] = mapped_column(String(20), default="open")  # open|closed
     published_by: Mapped[str | None] = mapped_column(String(36))
     closed_by: Mapped[str | None] = mapped_column(String(36))
