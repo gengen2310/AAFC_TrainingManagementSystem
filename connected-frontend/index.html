@@ -4362,7 +4362,7 @@ function showDrill(panelId,titleId,bodyId,title,sess){
     <td style="font-size:11.5px">${s.facName||'—'}</td>
     <td style="font-size:11.5px">${s.room||'—'}</td>
     <td>${stBadge(s.status)}</td>
-    <td class="no-print">${S.isAdmin?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${s.date}',${s.si})">Edit</button>`:''}</td>
+    <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${s.date}',${s.si})">Edit</button>`:''}</td>
   </tr>`).join(''):`<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:16px">No sessions</td></tr>`;
   const p=document.getElementById(panelId);p.classList.add('show');p.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
@@ -4754,7 +4754,7 @@ function renderCal(){
     let chips='';
     if(pn)(pn.sessions||[]).slice(0,3).forEach(s=>{chips+=`<span class="cal-chip ${stCls(s.status)}">${PH_S[s.phase]||s.phase}</span>`;});
     acts.slice(0,1).forEach(a=>chips+=`<span class="cal-chip act">${a.name.substring(0,16)}</span>`);
-    const oc=pn?`onclick="showPNDetail('${ds}')"`:S.isAdmin?`onclick="openWithDate('${ds}')"`:'';
+    const oc=pn?`onclick="showPNDetail('${ds}')"`:canWriteSquadron()?`onclick="openWithDate('${ds}')"`:'';
     cells+=`<div class="${cls}" ${oc}><div class="cal-dt">${d}</div>${chips}</div>`;
   }
   let tail=(7-(first.getDay()+last.getDate())%7)%7;
@@ -4779,7 +4779,7 @@ function renderPN(){
     return true;
   });
   const el=document.getElementById('pn-list');
-  if(!filtered.length){el.innerHTML=`<div class="empty"><div class="et">No parade nights</div><div class="es">${S.isAdmin?'Select "+ Add Parade Night" above to create one.':'No parade nights have been scheduled.'}</div></div>`;return;}
+  if(!filtered.length){el.innerHTML=`<div class="empty"><div class="et">No parade nights</div><div class="es">${canWriteSquadron()?'Select "+ Add Parade Night" above to create one.':'No parade nights have been scheduled.'}</div></div>`;return;}
   el.innerHTML=filtered.map(pn=>buildPNCard(pn)).join('');
 }
 function buildPNCard(pn){
@@ -4789,7 +4789,7 @@ function buildPNCard(pn){
       <div class="sess-hdr"><span class="sess-num">Sess ${i+1}</span>${stBadge(s.status||'planned')}</div>
       <div class="sess-title">${s.exp||'<em style="color:var(--muted)">Unassigned</em>'}</div>
       <div class="sess-info">${s.phase?phBadge(s.phase)+' ':''} ${s.facName?''+s.facName:''} ${s.room?'· '+s.room:''}</div>
-      ${S.isAdmin?`<div class="sess-acts no-print" onclick="event.stopPropagation()">
+      ${canWriteSquadron()?`<div class="sess-acts no-print" onclick="event.stopPropagation()">
         <button class="btn btn-xs btn-ok" onclick="qkSt('${pn.date}',${i},'delivered')" aria-label="Mark Session ${i+1} delivered">✓</button>
         <button class="btn btn-xs" style="background:#eef0f2;color:var(--steel)" onclick="qkSt('${pn.date}',${i},'not_delivered')" aria-label="Mark Session ${i+1} not delivered"></button>
         <button class="btn btn-xs btn-red" onclick="qkSt('${pn.date}',${i},'cancelled')" aria-label="Cancel Session ${i+1}">✗</button>
@@ -4802,7 +4802,7 @@ function buildPNCard(pn){
       <div style="display:flex;gap:6px;align-items:center" class="no-print">
         ${allDel?stBadge('delivered'):stBadge('planned')}
         <button class="btn btn-xs btn-sky" onclick="showPNDetail('${pn.date}')">Detail</button>
-        ${S.isAdmin?`<button class="btn btn-xs btn-red" onclick="delPN('${pn.date}')">×</button>`:''}
+        ${canWriteSquadron()?`<button class="btn btn-xs btn-red" onclick="delPN('${pn.date}')">×</button>`:''}
       </div>
     </div>
     <div class="pn-body"><div class="sess-grid">${sessCards}</div></div>
@@ -4912,26 +4912,26 @@ function showPNDetail(ds){
   let html=`<div class="alert a-info"><b>${pn.term}</b> · ${pn.notes||'No notes'}</div>`;
   (pn.sessions||[]).forEach((s,i)=>{
     const stOpts=['planned','delivered','cancelled','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${s.status===v?'selected':''}>${{planned:'Planned',delivered:'Delivered',cancelled:'Cancelled',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
-    html+=`<div style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;${!S.isAdmin?'pointer-events:none;opacity:.85':''}">
+    html+=`<div style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;${!canWriteSquadron()?'pointer-events:none;opacity:.85':''}">
       <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Session ${i+1}</div>
       <div class="form-row">
-        <div class="ff"><label>Phase</label><select id="d-ph-${i}" ${!S.isAdmin?'disabled':''}>${phOpts}</select></div>
-        <div class="ff"><label>Status</label><select id="d-st-${i}" ${!S.isAdmin?'disabled':''}>${stOpts}</select></div>
+        <div class="ff"><label>Phase</label><select id="d-ph-${i}" ${!canWriteSquadron()?'disabled':''}>${phOpts}</select></div>
+        <div class="ff"><label>Status</label><select id="d-st-${i}" ${!canWriteSquadron()?'disabled':''}>${stOpts}</select></div>
       </div>
       <div class="ff"><label>Curriculum Item</label>
-        <select id="d-ex-${i}" ${!S.isAdmin?'disabled':''}><option value="">— Unassigned —</option>${currOpts}</select>
+        <select id="d-ex-${i}" ${!canWriteSquadron()?'disabled':''}><option value="">— Unassigned —</option>${currOpts}</select>
       </div>
       <div class="form-row">
         <div class="ff"><label>Facilitator</label>
-          <select id="d-fa-${i}" ${!S.isAdmin?'disabled':''}><option value="">— None —</option>${facOpts}</select>
+          <select id="d-fa-${i}" ${!canWriteSquadron()?'disabled':''}><option value="">— None —</option>${facOpts}</select>
         </div>
         <div class="ff"><label>Room</label>
-          <select id="d-rm-${i}" ${!S.isAdmin?'disabled':''}><option value="">— None —</option>${roomOpts}</select>
+          <select id="d-rm-${i}" ${!canWriteSquadron()?'disabled':''}><option value="">— None —</option>${roomOpts}</select>
         </div>
       </div>
     </div>`;
   });
-  if(S.isAdmin)html+=`<button class="btn btn-dk" onclick="savePNDetail('${ds}',${(pn.sessions||[]).length})">Save Changes</button>`;
+  if(canWriteSquadron())html+=`<button class="btn btn-dk" onclick="savePNDetail('${ds}',${(pn.sessions||[]).length})">Save Changes</button>`;
   document.getElementById('pn-det-body').innerHTML=html;
   setTimeout(()=>{
     (pn.sessions||[]).forEach((s,i)=>{
@@ -5126,7 +5126,7 @@ function canEditCurr(e){
   const role=S.role||'';
   if(e.owningLevel==='national')return ['national_admin','system_admin'].includes(role);
   if(e.owningLevel==='wing')return ['national_admin','system_admin','wing_admin'].includes(role);
-  return S.isAdmin&&e.owned;
+  return canWriteSquadron()&&e.owned;
 }
 function renderCurr(){
   const elF=document.getElementById('curr-f-el').value;
@@ -5194,7 +5194,7 @@ function showCurrDetail(code){
         <td style="font-size:11px">${s.facName||'—'}</td>
         <td style="font-size:11px">${s.room||'—'}</td>
         <td>${stBadge(s.status)}</td>
-        <td class="no-print">${S.isAdmin?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${s.date}',${s.si});closeModal('m-curr-detail')">Edit</button>`:'—'}</td>
+        <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${s.date}',${s.si});closeModal('m-curr-detail')">Edit</button>`:'—'}</td>
       </tr>`).join('')}</tbody></table></div>`
     :`<div class="alert a-warn">Not yet assigned to any parade night. <button class="btn btn-xs btn-sky no-print" onclick="closeModal('m-curr-detail');openModal('m-add-pn')">Schedule →</button></div>`}`;
   openModal('m-curr-detail');
@@ -5365,7 +5365,7 @@ function renderActs(){
       <td>${tb}</td>
       <td style="font-size:11.5px">${esc((act.audience||[]).join(', '))}</td>
       <td style="font-size:11.5px;color:var(--muted)">${esc(act.notes||'')}</td>
-      <td class="no-print">${S.isAdmin?`<button class="btn btn-xs btn-sky" onclick="editAct('${act.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delAct('${act.id}')">×</button>`:'—'}</td>
+      <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editAct('${act.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delAct('${act.id}')">×</button>`:'—'}</td>
     </tr>`;
   }).join(''):`<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:14px">No activities${typeFilter!=='all'?' of this type':''}${search?' matching "'+esc(search)+'"':''}.</td></tr>`;
 }
@@ -5536,7 +5536,7 @@ function renderFacs(){
       <td>${(f.areas||[]).map(a=>elBadge(a)).join(' ')||'<span style="color:var(--muted);font-size:11px">untagged</span>'}</td>
       <td style="text-align:center"><button class="btn-lnk" onclick="event.stopPropagation();showFacProfile('${f.id}')">${tot}</button></td>
       <td class="no-print" onclick="event.stopPropagation()">
-        ${S.isAdmin?`<button class="btn btn-xs btn-sky" onclick="tagFac('${f.id}')">Tags</button> <button class="btn btn-xs btn-sky" onclick="editFac('${f.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delFac('${f.id}')">×</button>`:''}
+        ${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="tagFac('${f.id}')">Tags</button> <button class="btn btn-xs btn-sky" onclick="editFac('${f.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delFac('${f.id}')">×</button>`:''}
       </td>
     </tr>`;
   }).join(''):`<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px">No facilitators${flt?' tagged in this subject area':''}.</td></tr>`;
@@ -5569,8 +5569,8 @@ function tagFac(id){
   // Show tag creation section for sqn_admin
   const createSection=document.getElementById('m-tag-create-section');
   const createBtn=document.getElementById('m-tag-create-btn');
-  if(createSection)createSection.style.display=S.isAdmin?'block':'none';
-  if(createBtn)createBtn.style.display=S.isAdmin?'inline-flex':'none';
+  if(createSection)createSection.style.display=canWriteSquadron()?'block':'none';
+  if(createBtn)createBtn.style.display=canWriteSquadron()?'inline-flex':'none';
   openModal('m-tag-fac');
 }
 async function createAndAddTag(){
@@ -5645,7 +5645,7 @@ function showFacProfile(id){
         <td style="font-weight:700;font-size:12px">${s.exp||'—'}</td>
         <td style="font-size:11px">${s.room||'—'}</td>
         <td>${stBadge(s.status)}</td>
-        <td class="no-print">${S.isAdmin?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${s.date}',${s.si});closeModal('m-fac-profile')">Edit</button>`:'—'}</td>
+        <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${s.date}',${s.si});closeModal('m-fac-profile')">Edit</button>`:'—'}</td>
       </tr>`).join('')}</tbody></table></div>`
     :'<div class="alert a-info">No sessions assigned yet.</div>'}`;
   openModal('m-fac-profile');
@@ -5695,13 +5695,13 @@ function renderRooms(){
     <td style="font-weight:700">${r.name}</td>
     <td style="text-align:center">${r.capacity}</td>
     <td><span class="badge b-blue" style="font-size:8.5px">${r.type}</span></td>
-    <td class="no-print">${S.isAdmin?`<button class="btn btn-xs btn-sky" onclick="editRoom('${r.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delRoom('${r.id}')">×</button>`:'—'}</td>
+    <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editRoom('${r.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delRoom('${r.id}')">×</button>`:'—'}</td>
   </tr>`).join('');
   document.getElementById('equip-tbody').innerHTML=S.equip.map((eq,i)=>`<tr>
     <td style="font-weight:700">${eq.name}</td>
     <td style="text-align:center">${eq.qty}</td>
     <td style="font-size:11.5px;color:var(--muted)">${eq.notes||''}</td>
-    <td class="no-print">${S.isAdmin?`<button class="btn btn-xs btn-sky" onclick="editEquip('${eq.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delEquip('${eq.id}')">×</button>`:'—'}</td>
+    <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editEquip('${eq.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delEquip('${eq.id}')">×</button>`:'—'}</td>
   </tr>`).join('');
 }
 async function saveRoom(){
@@ -5771,7 +5771,7 @@ function renderActions(){
     <td><span class="badge b-amber">${it.issue}</span></td>
     <td class="no-print">
       ${it.type==='curr'?`<button class="btn btn-xs btn-sky" onclick="showCurrDetail('${it.code}')">View →</button>`:''}
-      ${it.type==='sess'&&S.isAdmin?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${it.date}',${it.si})">Assign →</button>`:''}
+      ${it.type==='sess'&&canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${it.date}',${it.si})">Assign →</button>`:''}
     </td>
   </tr>`).join(''):`<tr><td colspan="7"><div class="empty" style="padding:18px"><div class="et">No items require attention.</div><div class="es">All curriculum items are scheduled.</div></div></td></tr>`;
 }
