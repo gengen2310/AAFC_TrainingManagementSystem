@@ -294,6 +294,14 @@ class SessionIn(BaseModel):
     training_area_id: str | None = None
     expected_attendance: int | None = None
     version: int | None = None
+    # Optional outcome/status transition, applied atomically with the field edits
+    # above in one transaction (see edit_session) — a client never ends up with the
+    # fields saved but the status change lost (or vice versa) from a network blip or
+    # validation failure between two separate calls.
+    status: str | None = None
+    reason: str | None = None
+    rescheduled_to_date: str | None = None
+    actual_attendance: int | None = None
 
 
 class StatusIn(BaseModel):
@@ -301,6 +309,36 @@ class StatusIn(BaseModel):
     reason: str | None = None
     rescheduled_to_date: str | None = None
     actual_attendance: int | None = None
+
+
+# Statuses where a bare state change with no explanation would leave an untrustworthy
+# record — matches Session.{not_delivered_reason,cancelled_reason,issue_notes}, the
+# only three status-specific free-text reason fields the model already has.
+REASON_REQUIRED_STATUSES = {"not_delivered", "cancelled", "cancelled_late", "delivered_with_issue"}
+
+
+def _apply_status_transition(s: Session, new_status: str, reason: str | None,
+                              rescheduled_to_date: str | None, actual_attendance: int | None) -> str:
+    """Validate and apply a status transition to `s` in memory (no commit). Returns the
+    old status. Raises HTTPException on invalid input — call this before any other
+    mutation/commit so a rejected transition never partially applies."""
+    if new_status not in VALID_STATUS:
+        raise HTTPException(400, detail={"error": "invalid_status"})
+    if new_status in REASON_REQUIRED_STATUSES and not (reason or "").strip():
+        raise HTTPException(400, detail={"error": f"reason_required_{new_status}"})
+    old_status = s.status
+    s.status = new_status
+    if new_status == "not_delivered":
+        s.not_delivered_reason = reason
+    if new_status in ("cancelled", "cancelled_late"):
+        s.cancelled_reason = reason
+    if new_status == "delivered_with_issue":
+        s.issue_notes = reason
+    if new_status == "rescheduled":
+        s.rescheduled_to_date = rescheduled_to_date
+    if actual_attendance is not None:
+        s.actual_attendance = actual_attendance
+    return old_status
 
 
 def _recompute(db: DBSession, pn: ParadeNight):
@@ -328,12 +366,32 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
 
 @router.put("/sessions/{sid}")
 def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Edit session fields, optionally with an atomic status transition in the same
+    request (body.status). All validation happens before any mutation, and the field
+    edit + status transition + status-history row + audit record share ONE commit —
+    if any check fails, nothing is written; if the commit itself fails, nothing is
+    written either, since no earlier partial commit exists to leave stale."""
     s = db.get(Session, sid)
     if not s or s.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     pn = db.get(ParadeNight, s.parade_night_id)
     require_can_write_squadron(p, s.squadron_id, pn.wing_id if pn else None)
     _check_version(s, body.version)
+
+    # ── Validate everything first — no mutation happens above this line ──
+    if body.curriculum_item_id and not db.get(CurriculumItem, body.curriculum_item_id):
+        raise HTTPException(400, detail={"error": "invalid_curriculum_item"})
+    if body.facilitator_id and not db.get(Facilitator, body.facilitator_id):
+        raise HTTPException(400, detail={"error": "invalid_facilitator"})
+    if body.training_area_id and not db.get(TrainingArea, body.training_area_id):
+        raise HTTPException(400, detail={"error": "invalid_training_area"})
+    status_changing = body.status is not None and body.status != s.status
+    if status_changing and body.status not in VALID_STATUS:
+        raise HTTPException(400, detail={"error": "invalid_status"})
+    if status_changing and body.status in REASON_REQUIRED_STATUSES and not (body.reason or "").strip():
+        raise HTTPException(400, detail={"error": f"reason_required_{body.status}"})
+
+    # ── All validation passed — apply every change, then a single commit ──
     old = {"facilitator_id": s.facilitator_id, "training_area_id": s.training_area_id}
     s.period_number = body.period_number
     s.cadet_group = body.cadet_group
@@ -342,43 +400,49 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
     s.expected_attendance = body.expected_attendance
     _denormalise(db, s, body.curriculum_item_id, body.facilitator_id, body.training_area_id)
     s.version += 1
-    db.commit()
+
+    old_status = s.status
+    if status_changing:
+        old_status = _apply_status_transition(s, body.status, body.reason,
+                                               body.rescheduled_to_date, body.actual_attendance)
+        db.add(SessionStatusHistory(session_id=s.id, old_status=old_status, new_status=body.status,
+                                    changed_by=p.user_id, reason=body.reason))
+
+    audit(db, p, object_type="session", object_id=s.id, action="edit", old=old,
+          new={"facilitator_id": s.facilitator_id, "training_area_id": s.training_area_id}, commit=False)
+    if status_changing:
+        audit(db, p, object_type="session", object_id=s.id, action="status_change",
+              old={"status": old_status}, new={"status": body.status}, reason=body.reason, commit=False)
+
+    db.commit()  # single commit: field edits + status transition + history + audit rows
+
     if pn:
         _recompute(db, pn)
-    # Edits after publication require a reason (recorded in audit).
-    audit(db, p, object_type="session", object_id=s.id, action="edit", old=old,
-          new={"facilitator_id": s.facilitator_id, "training_area_id": s.training_area_id})
-    return {"ok": True}
+    return {"ok": True, "version": s.version}
 
 
 @router.post("/sessions/{sid}/status")
 def set_status(sid: str, body: StatusIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Status-only transition (no field edits). Kept for callers that only ever
+    change status (e.g. the React app's status-only form) — internally atomic in the
+    same way edit_session is: validate first, one commit covering the status change,
+    history row, and audit record together."""
     s = db.get(Session, sid)
     if not s or s.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     pn = db.get(ParadeNight, s.parade_night_id)
     require_can_write_squadron(p, s.squadron_id, pn.wing_id if pn else None)
-    if body.status not in VALID_STATUS:
-        raise HTTPException(400, detail={"error": "invalid_status"})
-    if body.status == "not_delivered" and not (body.reason or "").strip():
-        raise HTTPException(400, detail={"error": "reason_required_not_delivered"})
-    old = s.status
-    s.status = body.status
-    if body.status == "not_delivered":
-        s.not_delivered_reason = body.reason
-    if body.status in ("cancelled", "cancelled_late"):
-        s.cancelled_reason = body.reason
-    if body.status == "rescheduled":
-        s.rescheduled_to_date = body.rescheduled_to_date
-    if body.actual_attendance is not None:
-        s.actual_attendance = body.actual_attendance
+
+    old = _apply_status_transition(s, body.status, body.reason, body.rescheduled_to_date, body.actual_attendance)
+
     db.add(SessionStatusHistory(session_id=s.id, old_status=old, new_status=body.status,
                                 changed_by=p.user_id, reason=body.reason))
-    db.commit()
+    audit(db, p, object_type="session", object_id=s.id, action="status_change",
+          old={"status": old}, new={"status": body.status}, reason=body.reason, commit=False)
+    db.commit()  # single commit: status transition + history + audit row
+
     if pn:
         _recompute(db, pn)
-    audit(db, p, object_type="session", object_id=s.id, action="status_change",
-          old={"status": old}, new={"status": body.status}, reason=body.reason)
     return {"ok": True}
 
 

@@ -334,6 +334,12 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .modal-body{padding:20px;}
 .modal-foot{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
 
+/* ── TOAST (non-blocking, accessible replacement for alert()) ── */
+.toast-region{position:fixed;top:16px;right:16px;z-index:900;display:flex;flex-direction:column;gap:8px;max-width:340px;}
+.toast{background:white;border:1.5px solid var(--border);border-left:4px solid var(--steel);border-radius:8px;padding:10px 14px;font-size:12.5px;font-weight:600;box-shadow:var(--sh2);color:var(--text);}
+.toast.err{border-left-color:var(--red);color:#8b1a1a;}
+.toast.ok{border-left-color:var(--ok);color:#145f38;}
+
 /* ── WEEKLY PROGRAM ── */
 .wp-tbl{width:100%;border-collapse:collapse;font-size:12px;}
 .wp-tbl th{background:var(--surface-2);color:var(--steel);padding:8px 12px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;border-bottom:1px solid var(--border);text-align:left;}
@@ -442,6 +448,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 </style>
 </head>
 <body>
+
+<div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
 
 <!-- ═══ AUTH ═══ -->
 <div id="auth-screen">
@@ -1731,6 +1739,41 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <span id="sess-edit-err" style="font-size:11.5px;margin-right:auto;font-weight:700"></span>
       <button class="btn btn-out" onclick="closeModal('m-sess-edit')">Cancel</button>
       <button class="btn btn-dk" onclick="saveSessEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Outcome reason collector — accessible replacement for prompt() when recording
+     Delivered with issue / Cancelled / Not delivered. Mouse, keyboard (Tab/Escape/Enter),
+     touch, and screen-reader accessible (role=dialog, aria-modal, labelled heading). -->
+<div class="modal-bg" id="m-outcome-reason" role="dialog" aria-modal="true" aria-labelledby="or-title">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr"><div class="modal-title" id="or-title">Reason required</div><button class="modal-x" type="button" onclick="_orCancel()" aria-label="Cancel">×</button></div>
+    <div class="modal-body">
+      <p id="or-context" class="muted" style="font-size:12.5px;margin:0 0 12px"></p>
+      <div class="ff">
+        <label for="or-reason">Reason</label>
+        <select id="or-reason" aria-required="true">
+          <option value="">— Select a reason —</option>
+          <option value="Facilitator unavailable">Facilitator unavailable</option>
+          <option value="Venue unavailable">Venue unavailable</option>
+          <option value="Equipment unavailable">Equipment unavailable</option>
+          <option value="Weather">Weather</option>
+          <option value="Higher-priority activity">Higher-priority activity</option>
+          <option value="Program changed">Program changed</option>
+          <option value="Insufficient time">Insufficient time</option>
+          <option value="Safety concern">Safety concern</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div class="ff"><label for="or-note">Additional notes (optional)</label>
+        <textarea id="or-note" rows="2" placeholder="Any further detail…"></textarea>
+      </div>
+      <div id="or-err" role="alert" style="font-size:11.5px;font-weight:700;color:var(--red);min-height:14px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-out" type="button" onclick="_orCancel()">Cancel</button>
+      <button class="btn btn-dk" type="button" onclick="_orSave()">Save reason</button>
     </div>
   </div>
 </div>
@@ -3066,8 +3109,59 @@ async function reloadAndRender(){ try{ await loadData(); renderAll(); }catch(e){
 
 // Backend write helpers (used by the wired handlers).
 async function apiSetSessionStatus(sessionId, status, reason){
-  return api('/api/sessions/'+sessionId+'/status',{method:'POST',body:JSON.stringify({status, not_delivered_reason:reason||null})});
+  // Field name must be "reason" — StatusIn (backend/app/routers/training.py) has no
+  // "not_delivered_reason" key, so sending that silently dropped the reason and made
+  // every not_delivered quick-action 400 with reason_required_not_delivered.
+  return api('/api/sessions/'+sessionId+'/status',{method:'POST',body:JSON.stringify({status, reason:reason||null})});
 }
+
+// ── Toast: non-blocking, accessible replacement for alert() in the outcome workflow ──
+function showToast(msg, isErr){
+  const region=document.getElementById('toast-region');
+  const t=document.createElement('div');
+  t.className='toast '+(isErr?'err':'ok');
+  t.setAttribute('role',isErr?'alert':'status');
+  t.textContent=msg;
+  region.appendChild(t);
+  setTimeout(()=>t.remove(),isErr?7000:4000);
+}
+
+// ── Statuses that require a reason before saving, and their user-facing context text ──
+const OUTCOME_REASON_REQUIRED={
+  not_delivered:'This session was not delivered.',
+  cancelled:'This session is being cancelled.',
+  cancelled_late:'This session is being cancelled.',
+  delivered_with_issue:'This session was delivered, but with an issue to record.'
+};
+let _orResolve=null;
+function collectOutcomeReason(status){
+  return new Promise(resolve=>{
+    _orResolve=resolve;
+    document.getElementById('or-context').textContent=OUTCOME_REASON_REQUIRED[status]||'Please provide a reason.';
+    document.getElementById('or-reason').value='';
+    document.getElementById('or-note').value='';
+    document.getElementById('or-err').textContent='';
+    openModal('m-outcome-reason');
+    setTimeout(()=>document.getElementById('or-reason').focus(),30);
+  });
+}
+function _orSave(){
+  const reason=document.getElementById('or-reason').value;
+  const note=document.getElementById('or-note').value.trim();
+  if(!reason){ document.getElementById('or-err').textContent='Select a reason to continue.'; return; }
+  closeModal('m-outcome-reason');
+  const full=note?reason+' — '+note:reason;
+  if(_orResolve)_orResolve(full);
+  _orResolve=null;
+}
+function _orCancel(){
+  closeModal('m-outcome-reason');
+  if(_orResolve)_orResolve(null);
+  _orResolve=null;
+}
+document.getElementById('m-outcome-reason').addEventListener('keydown',function(e){
+  if(e.key==='Escape')_orCancel();
+});
 async function apiPublishPN(pnId){ return api('/api/parade-nights/'+pnId+'/publish',{method:'POST'}); }
 async function apiClosePN(pnId){ return api('/api/parade-nights/'+pnId+'/close',{method:'POST'}); }
 async function apiAddActionItem(payload){ return api('/api/action-items',{method:'POST',body:JSON.stringify(payload)}); }
@@ -4670,10 +4764,10 @@ function buildPNCard(pn){
       <div class="sess-title">${s.exp||'<em style="color:var(--muted)">Unassigned</em>'}</div>
       <div class="sess-info">${s.phase?phBadge(s.phase)+' ':''} ${s.facName?''+s.facName:''} ${s.room?'· '+s.room:''}</div>
       ${S.isAdmin?`<div class="sess-acts no-print" onclick="event.stopPropagation()">
-        <button class="btn btn-xs btn-ok" onclick="qkSt('${pn.date}',${i},'delivered')">✓</button>
-        <button class="btn btn-xs" style="background:#eef0f2;color:var(--steel)" onclick="qkSt('${pn.date}',${i},'not_delivered')"></button>
-        <button class="btn btn-xs btn-red" onclick="qkSt('${pn.date}',${i},'cancelled')">✗</button>
-        <button class="btn btn-xs btn-sky" onclick="quickEdit('${pn.date}',${i})">✏</button>
+        <button class="btn btn-xs btn-ok" onclick="qkSt('${pn.date}',${i},'delivered')" aria-label="Mark Session ${i+1} delivered">✓</button>
+        <button class="btn btn-xs" style="background:#eef0f2;color:var(--steel)" onclick="qkSt('${pn.date}',${i},'not_delivered')" aria-label="Mark Session ${i+1} not delivered"></button>
+        <button class="btn btn-xs btn-red" onclick="qkSt('${pn.date}',${i},'cancelled')" aria-label="Cancel Session ${i+1}">✗</button>
+        <button class="btn btn-xs btn-sky" onclick="quickEdit('${pn.date}',${i})" aria-label="Edit Session ${i+1}">✏</button>
       </div>`:''}
     </div>`).join('');
   return `<div class="pn-card">
@@ -4691,11 +4785,14 @@ function buildPNCard(pn){
 async function qkSt(date,i,st){
   const pn=S.pns.find(p=>p.date===date);
   const sess=pn&&pn.sessions[i];
-  if(!sess||!sess.id){alert('Session not found.');return;}
+  if(!sess||!sess.id){showToast('Session not found.',true);return;}
   let reason=null;
-  if(st==='not_delivered'){ reason=prompt('Reason this session was not delivered (required):'); if(!reason)return; }
+  if(OUTCOME_REASON_REQUIRED[st]){
+    reason=await collectOutcomeReason(st);
+    if(reason===null)return; // cancelled the reason panel
+  }
   try{ await apiSetSessionStatus(sess.id, st, reason); await reloadAndRender(); }
-  catch(e){ alert(apiErr(e)); }
+  catch(e){ showToast(apiErr(e),true); }
 }
 async function delPN(date){
   const pn=S.pns.find(p=>p.date===date);
@@ -4823,33 +4920,42 @@ function showPNDetail(ds){
 async function savePNDetail(ds,cnt){
   const pn=S.pns.find(p=>p.date===ds);if(!pn)return;
   const errEl=document.getElementById('pn-det-err');
+  // Collect any required reasons up front, before writing anything — so a
+  // cancelled reason panel never leaves an earlier session half-saved.
+  const edits=[];
+  for(let i=0;i<cnt;i++){
+    const s=pn.sessions[i]; if(!s||!s.id)continue;
+    const newSt=document.getElementById('d-st-'+i)?.value;
+    let reason=null;
+    if(newSt&&newSt!==s.status&&OUTCOME_REASON_REQUIRED[newSt]){
+      reason=await collectOutcomeReason(newSt);
+      if(reason===null){ if(errEl)errEl.textContent=''; return; } // user cancelled — nothing saved yet
+    }
+    edits.push({i,s,newSt,reason});
+  }
   if(errEl){errEl.textContent='Saving…';errEl.style.color='var(--muted)';}
   try{
-    for(let i=0;i<cnt;i++){
-      const s=pn.sessions[i]; if(!s||!s.id)continue;
+    for(const {i,s,newSt,reason} of edits){
       const expTitle=document.getElementById('d-ex-'+i)?.value||'';
       const facId=document.getElementById('d-fa-'+i)?.value||null;
       const roomName=document.getElementById('d-rm-'+i)?.value||'';
       const phase=document.getElementById('d-ph-'+i)?.value||s.phase||'B. Initial';
-      const newSt=document.getElementById('d-st-'+i)?.value;
       const ci=S.curr.find(c=>c.title===expTitle);
       const room=S.rooms.find(r=>r.name===roomName);
-      await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify({
+      const body={
         parade_night_id:pn.id, period_number:s.period_number||i+1,
         phase_at_time:phase, curriculum_item_id:ci?ci.id:null,
         facilitator_id:facId||null, training_area_id:room?room.id:null,
         custom_title:expTitle&&!ci?expTitle:null
-      })});
-      if(newSt&&newSt!==s.status){
-        let reason=null;
-        if(newSt==='not_delivered'){reason=prompt('Reason this session was not delivered (required):');if(!reason)continue;}
-        if(newSt==='cancelled'||newSt==='cancelled_late'){reason=prompt('Cancellation reason (optional):');}
-        await api('/api/sessions/'+s.id+'/status',{method:'POST',body:JSON.stringify({status:newSt,reason:reason||null})});
-      }
+      };
+      if(newSt&&newSt!==s.status){ body.status=newSt; body.reason=reason||null; }
+      // Single atomic PUT: fields + status transition committed together server-side —
+      // no partial-update window between a field save and a separate status save.
+      await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify(body)});
     }
     if(errEl)errEl.textContent='';
     await reloadAndRender(); closeModal('m-pn-detail');
-  }catch(e){ if(errEl){errEl.textContent=apiErr(e);errEl.style.color='var(--red)';}else alert(apiErr(e)); }
+  }catch(e){ if(errEl){errEl.textContent=apiErr(e);errEl.style.color='var(--red)';}else showToast(apiErr(e),true); }
 }
 
 // QUICK EDIT
@@ -4872,7 +4978,7 @@ async function saveSessEdit(){
   if(!editSessRef)return;
   const pn=S.pns.find(p=>p.date===editSessRef.date);if(!pn)return;
   const s=pn.sessions[editSessRef.idx];
-  if(!s||!s.id){alert('Session ID missing — cannot save.');return;}
+  if(!s||!s.id){showToast('Session ID missing — cannot save.',true);return;}
   const newSt=document.getElementById('qe-st').value;
   const expTitle=document.getElementById('qe-ex').value;
   const facId=document.getElementById('qe-fa').value||null;
@@ -4880,24 +4986,30 @@ async function saveSessEdit(){
   const ci=S.curr.find(c=>c.title===expTitle);
   const room=S.rooms.find(r=>r.name===roomName);
   const sessErrEl=document.getElementById('sess-edit-err');
+  // Collect the reason (if this transition needs one) BEFORE saving anything, so
+  // cancelling the reason panel leaves the session completely untouched rather than
+  // saving the field edits while silently dropping the status change.
+  let reason=null;
+  if(newSt!==s.status&&OUTCOME_REASON_REQUIRED[newSt]){
+    reason=await collectOutcomeReason(newSt);
+    if(reason===null)return;
+  }
   if(sessErrEl){sessErrEl.textContent='Saving…';sessErrEl.style.color='var(--muted)';}
   try{
-    await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify({
+    const body={
       parade_night_id:pn.id, period_number:s.period_number||editSessRef.idx+1,
       phase_at_time:s.phase||'B. Initial', curriculum_item_id:ci?ci.id:null,
       facilitator_id:facId||null, training_area_id:room?room.id:null,
       custom_title:expTitle&&!ci?expTitle:null
-    })});
-    if(newSt!==s.status){
-      let reason=null;
-      if(newSt==='not_delivered'){reason=prompt('Reason this session was not delivered (required):');if(!reason)return;}
-      if(newSt==='cancelled'||newSt==='cancelled_late'){reason=prompt('Cancellation reason (optional):');}
-      await api('/api/sessions/'+s.id+'/status',{method:'POST',body:JSON.stringify({status:newSt,reason:reason||null})});
-    }
+    };
+    if(newSt!==s.status){ body.status=newSt; body.reason=reason||null; }
+    // Single atomic PUT — see savePNDetail()'s comment for why this replaced the
+    // previous separate PUT-then-POST(/status) two-call sequence.
+    await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify(body)});
     if(sessErrEl)sessErrEl.textContent='';
     await reloadAndRender(); closeModal('m-sess-edit'); editSessRef=null;
   }catch(e){
-    if(sessErrEl){sessErrEl.textContent=apiErr(e);sessErrEl.style.color='var(--red)';}else alert(apiErr(e));
+    if(sessErrEl){sessErrEl.textContent=apiErr(e);sessErrEl.style.color='var(--red)';}else showToast(apiErr(e),true);
   }
 }
 

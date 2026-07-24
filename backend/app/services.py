@@ -8,7 +8,11 @@ from .permissions import Principal
 
 def audit(db: DBSession, principal: Principal | None, *, object_type: str, object_id: str | None,
           action: str, old=None, new=None, reason: str | None = None,
-          ip: str | None = None, ua: str | None = None) -> None:
+          ip: str | None = None, ua: str | None = None, commit: bool = True) -> None:
+    """Write an audit row. `commit=False` lets a caller fold the audit write into its
+    own transaction (e.g. one atomic session edit + status change + audit record that
+    must all succeed or all roll back together) instead of this always being a second,
+    independent commit after the caller's own change is already durable."""
     entry = AuditLog(
         user_id=principal.user_id if principal else None,
         role=principal.role if principal else None,
@@ -23,7 +27,8 @@ def audit(db: DBSession, principal: Principal | None, *, object_type: str, objec
         reason=reason, ip_address=ip, user_agent=(ua or "")[:300] or None,
     )
     db.add(entry)
-    db.commit()
+    if commit:
+        db.commit()
 
 
 # ── Readiness engine ──
