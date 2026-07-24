@@ -260,8 +260,16 @@ def _curriculum_progress(sessions: list, curr_items: list) -> dict:
     }
 
 
+_UNKNOWN_PHASE_LABEL = "Missing phase (needs information)"
+
+
 def _curriculum_backlog(sessions: list, pns: list) -> dict:
-    """Ranked bar: phases with most undelivered sessions relative to historical parade nights."""
+    """Ranked bar: phases with most undelivered sessions relative to historical parade nights.
+
+    A session with no phase_at_time recorded is a data-quality gap, not an
+    operational finding — it is shown in the chart (so the missed-session count
+    isn't silently hidden) but is never allowed to be the chart's headline insight,
+    and is labelled/coloured distinctly from a real phase name."""
     today_str = date.today().isoformat()
     pn_map = {pn.id: pn.date for pn in pns}
     # Past parade nights only
@@ -273,13 +281,26 @@ def _curriculum_backlog(sessions: list, pns: list) -> dict:
             continue
         if s.status not in ("not_delivered", "cancelled", "rescheduled"):
             continue
-        ph = s.phase_at_time or "Unknown"
+        ph = s.phase_at_time or _UNKNOWN_PHASE_LABEL
         phase_cnt[ph] += 1
 
     data = sorted(
-        [{"label": ph, "count": cnt, "color": "#e51937"} for ph, cnt in phase_cnt.items()],
+        [{"label": ph, "count": cnt,
+          "color": "#8a93a6" if ph == _UNKNOWN_PHASE_LABEL else "#e51937",
+          "data_quality_gap": ph == _UNKNOWN_PHASE_LABEL}
+         for ph, cnt in phase_cnt.items()],
         key=lambda x: -x["count"],
     )
+
+    real_data = [d for d in data if not d["data_quality_gap"]]
+    missing_count = next((d["count"] for d in data if d["data_quality_gap"]), 0)
+    insight = None
+    if real_data:
+        insight = f"The largest backlog is in {real_data[0]['label']} ({real_data[0]['count']} sessions)."
+    elif missing_count:
+        insight = f"{missing_count} missed session(s) have no phase recorded — cannot rank by phase yet."
+    if missing_count and real_data:
+        insight += f" ({missing_count} additional session(s) are missing a phase and need information.)"
 
     return {
         "chart_id": "curriculum_backlog",
@@ -290,16 +311,23 @@ def _curriculum_backlog(sessions: list, pns: list) -> dict:
         "x_axis": "Missed sessions",
         "y_axis": "Phase",
         "data": data,
-        "insight": (f"The largest backlog is in {data[0]['label']} ({data[0]['count']} sessions)."
-                    if data else None),
+        "insight": insight,
         "empty_state": "No backlog — all past sessions were delivered.",
         "drill_down": {"route": "parade-nights", "filters": {"status": "not_delivered"}},
         "permission_scope": "squadron",
     }
 
 
+_REASON_NOT_RECORDED_LABEL = "Reason not recorded (needs information)"
+
+
 def _cancellation_reasons(sessions: list, pns: list) -> dict:
-    """Ranked bar: most common cancellation / not-delivered reasons."""
+    """Ranked bar: most common cancellation / not-delivered reasons.
+
+    A session with no reason recorded is a data-quality gap, not itself an
+    operational cause of disruption — it is shown (so the count isn't hidden) but
+    is never allowed to be the chart's "most common cause" headline, and is
+    labelled/coloured distinctly from a real, named reason."""
     today_str = date.today().isoformat()
     pn_map = {pn.id: pn.date for pn in pns}
     reason_cnt: dict[str, int] = defaultdict(int)
@@ -310,23 +338,31 @@ def _cancellation_reasons(sessions: list, pns: list) -> dict:
             continue
         reason = None
         if s.status == "cancelled":
-            reason = (s.cancelled_reason or "").strip() or "Reason not recorded"
+            reason = (s.cancelled_reason or "").strip() or _REASON_NOT_RECORDED_LABEL
         elif s.status == "not_delivered":
-            reason = (s.not_delivered_reason or "").strip() or "Reason not recorded"
+            reason = (s.not_delivered_reason or "").strip() or _REASON_NOT_RECORDED_LABEL
         if reason:
             # Truncate long free-text to first sentence / 60 chars
-            reason = reason[:60] + ("…" if len(reason) > 60 else "")
+            if reason != _REASON_NOT_RECORDED_LABEL:
+                reason = reason[:60] + ("…" if len(reason) > 60 else "")
             reason_cnt[reason] += 1
 
     data = sorted(
-        [{"label": r, "count": c} for r, c in reason_cnt.items()],
+        [{"label": r, "count": c, "data_quality_gap": r == _REASON_NOT_RECORDED_LABEL}
+         for r, c in reason_cnt.items()],
         key=lambda x: -x["count"],
     )[:12]  # top 12
 
+    real_data = [d for d in data if not d["data_quality_gap"]]
+    missing_count = next((d["count"] for d in data if d["data_quality_gap"]), 0)
     insight = None
-    if data:
-        top = data[0]
+    if real_data:
+        top = real_data[0]
         insight = f"Most common cause: \"{top['label']}\" ({top['count']} sessions)."
+        if missing_count:
+            insight += f" ({missing_count} additional session(s) have no reason recorded.)"
+    elif missing_count:
+        insight = f"{missing_count} cancelled/not-delivered session(s) have no reason recorded yet."
 
     return {
         "chart_id": "cancellation_reasons",
@@ -1111,7 +1147,14 @@ def get_dashboard_charts(
         charts["session_outcomes"] = _session_outcomes_distribution(sessions)
         charts["weekly_outcomes"] = _weekly_outcomes(sessions, pns)
         charts["delivery_trend"] = _delivery_trend(all_sessions, all_pns)
-        charts["curriculum_progress"] = _curriculum_progress(sessions, curr_items)
+        # all_sessions (not the window-filtered `sessions`) — curriculum phase
+        # progress is a cumulative measure like its sibling curriculum_backlog
+        # (already all_sessions below), not a windowed one. Using the window-
+        # filtered set here silently produced an all-zero chart whenever a
+        # squadron's delivered history predates the window (e.g. "term" only
+        # looks back 90 days), with no visible error — exactly the kind of
+        # empty-looks-like-broken chart-trust problem this pass targets.
+        charts["curriculum_progress"] = _curriculum_progress(all_sessions, curr_items)
         charts["curriculum_backlog"] = _curriculum_backlog(all_sessions, all_pns)
         charts["cancellation_reasons"] = _cancellation_reasons(sessions, pns)
         charts["facilitator_workload"] = _facilitator_workload(sessions)
@@ -1166,7 +1209,12 @@ def get_dashboard_charts(
                 charts["session_outcomes"] = _session_outcomes_distribution(sessions)
                 charts["weekly_outcomes"] = _weekly_outcomes(sessions, pns)
                 charts["facilitator_workload"] = _facilitator_workload(sessions)
-                charts["curriculum_progress"] = _curriculum_progress(sessions, [])
+                wing_curr_items = db.query(CurriculumItem).filter(
+                    CurriculumItem.is_archived == False,  # noqa: E712
+                ).all()
+                # all_sessions, not the window-filtered `sessions` — see the matching
+                # comment on the squadron-scope branch above for why.
+                charts["curriculum_progress"] = _curriculum_progress(all_sessions, wing_curr_items)
 
         # Wing-level comparison charts
         charts["squadron_readiness"] = _squadron_readiness(db, wing_id, w_start, w_end)

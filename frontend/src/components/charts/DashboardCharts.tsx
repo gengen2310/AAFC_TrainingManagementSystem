@@ -59,7 +59,11 @@ function colorFor(row: Record<string, unknown>): string {
   return "var(--aafc-royal-blue, #004B8D)";
 }
 
-/** Horizontal ranked bar list — chart_type "bar_horizontal". */
+/** Horizontal ranked bar list — chart_type "bar_horizontal". Rows flagged
+ * data_quality_gap (a missing phase/reason, not a real ranked category — see
+ * backend/app/routers/dashboard.py's _curriculum_backlog/_cancellation_reasons)
+ * render distinctly: a muted dashed bar and an "ⓘ" prefix, so a data-quality
+ * gap is never visually mistaken for a real, named cause. */
 export function HBarChart({ chart }: { chart: DashboardChart }) {
   const rows = rowsOf(chart);
   if (!rows.length) return <EmptyState chart={chart} />;
@@ -70,16 +74,17 @@ export function HBarChart({ chart }: { chart: DashboardChart }) {
         const key = valueKeyFor(r);
         const v = numOf(r, key);
         const w = Math.round((v / maxV) * 100);
+        const isGap = r.data_quality_gap === true;
         const display = key === "readiness_pct" ? `${v}%`
           : (typeof r.delivered === "number" && typeof r.total === "number") ? `${r.delivered} / ${r.total}`
           : String(v);
         return (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <div style={{ minWidth: 110, maxWidth: 140, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={labelOf(r)}>
-              {labelOf(r)}
+            <div style={{ minWidth: 110, maxWidth: 140, fontSize: 11, fontStyle: isGap ? "italic" : undefined, color: isGap ? "var(--muted-text)" : undefined, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={labelOf(r)}>
+              {isGap && "ⓘ "}{labelOf(r)}
             </div>
-            <div style={{ flex: 1, background: "var(--background, #f1f5f9)", borderRadius: 3, height: 10 }}>
-              <div style={{ width: `${w}%`, height: "100%", background: colorFor(r), borderRadius: 3, transition: "width .3s" }} />
+            <div style={{ flex: 1, background: "var(--background, #f1f5f9)", borderRadius: 3, height: 10, border: isGap ? "1px dashed var(--muted-text)" : undefined }}>
+              <div style={{ width: `${w}%`, height: "100%", background: isGap ? "var(--muted-text, #8a93a6)" : colorFor(r), borderRadius: 3, transition: "width .3s" }} />
             </div>
             <div style={{ minWidth: 52, textAlign: "right", fontSize: 11, color: "var(--muted-text)" }}>{display}</div>
           </div>

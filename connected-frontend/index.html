@@ -4402,9 +4402,13 @@ function _chartHBar(chart){
   return rows.map(r=>{
     const v=+(r[valKey])||0;const w=Math.round(v/maxV*100);const lbl=String(r.label||r.name||'—').substring(0,32);
     const drill=chart.drill_down&&r.drill_id?`onclick="drillDashChart('${esc(chart.chart_id)}','${esc(r.drill_id)}')" style="cursor:pointer"`:'';
+    // A data-quality gap (missing phase/reason — see _curriculum_backlog/
+    // _cancellation_reasons) is never a real ranked category: shown distinctly
+    // (muted dashed bar, "ⓘ" prefix), not styled like a genuine cause.
+    const isGap=!!r.data_quality_gap;
     return `<div class="ph-row" style="margin-bottom:5px" role="img" aria-label="${esc(lbl)}: ${lblFor(r)}" ${drill}>
-      <div class="ph-name" style="min-width:110px;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.label||r.name||'')}">${esc(lbl)}</div>
-      <div class="ph-bar" style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${colorFor(r)};border-radius:3px;transition:width .3s" title="${lblFor(r)}"></div></div></div>
+      <div class="ph-name" style="min-width:110px;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isGap?'font-style:italic;color:var(--muted)':''}" title="${esc(r.label||r.name||'')}">${isGap?'ⓘ ':''}${esc(lbl)}</div>
+      <div class="ph-bar" style="flex:1"><div class="pbar" style="${isGap?'border:1px dashed var(--muted)':''}"><div style="height:100%;width:${w}%;background:${isGap?'var(--muted)':colorFor(r)};border-radius:3px;transition:width .3s" title="${lblFor(r)}"></div></div></div>
       <div class="ph-cnt" style="min-width:52px;text-align:right;font-size:11px;color:var(--muted)">${lblFor(r)}</div>
     </div>`;
   }).join('');
