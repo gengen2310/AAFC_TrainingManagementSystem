@@ -4831,6 +4831,7 @@ async function savePNDetail(ds,cnt){
       const facId=document.getElementById('d-fa-'+i)?.value||null;
       const roomName=document.getElementById('d-rm-'+i)?.value||'';
       const phase=document.getElementById('d-ph-'+i)?.value||s.phase||'B. Initial';
+      const newSt=document.getElementById('d-st-'+i)?.value;
       const ci=S.curr.find(c=>c.title===expTitle);
       const room=S.rooms.find(r=>r.name===roomName);
       await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify({
@@ -4839,6 +4840,12 @@ async function savePNDetail(ds,cnt){
         facilitator_id:facId||null, training_area_id:room?room.id:null,
         custom_title:expTitle&&!ci?expTitle:null
       })});
+      if(newSt&&newSt!==s.status){
+        let reason=null;
+        if(newSt==='not_delivered'){reason=prompt('Reason this session was not delivered (required):');if(!reason)continue;}
+        if(newSt==='cancelled'||newSt==='cancelled_late'){reason=prompt('Cancellation reason (optional):');}
+        await api('/api/sessions/'+s.id+'/status',{method:'POST',body:JSON.stringify({status:newSt,reason:reason||null})});
+      }
     }
     if(errEl)errEl.textContent='';
     await reloadAndRender(); closeModal('m-pn-detail');

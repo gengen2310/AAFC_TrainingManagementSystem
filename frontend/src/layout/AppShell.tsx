@@ -85,8 +85,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <ProxyControls kind="proxy" />
           </>}
 
-          {/* NATIONAL — cross-wing assurance; squadron editing only via Intervention */}
-          {national && <>
+          {/* NATIONAL — cross-wing assurance; squadron editing only via Intervention.
+              isNational() also returns true for the auditor role (matching the backend's
+              NATIONAL_LEVEL grouping in permissions.py, which is correct for view-scope
+              purposes elsewhere in the app) — excluded here so auditor sessions render only
+              their own dedicated nav block below, not both. */}
+          {national && !auditor && <>
             <div className="nav-group">National Assurance</div>
             <NavItem to="/national-overview" label="National Dashboard" />
             <NavItem to="/wing-overview" label="Wing Drill-down" />
