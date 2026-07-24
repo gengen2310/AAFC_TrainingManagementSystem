@@ -272,7 +272,7 @@ export function Accounts() {
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Create account">
           <div className="modal-box">
             <h2 style={{ marginTop: 0 }}>Add Account</h2>
-            <label>Display Name<input value={createName} onChange={e => setCreateName(e.target.value)} autoFocus /></label>
+            <label>Display Name<input value={createName} onChange={e => setCreateName(e.target.value)} /></label>
             <label>Role
               <select value={createRole} onChange={e => { setCreateRole(e.target.value); setCreateFlight(""); }}>
                 <option value="">— select role —</option>
@@ -387,7 +387,7 @@ export function Accounts() {
           <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Edit account">
             <div className="modal-box" style={{ maxWidth: 380 }}>
               <h2 style={{ marginTop: 0 }}>Edit Account</h2>
-              <label>Display Name<input value={editName} onChange={e => setEditName(e.target.value)} autoFocus /></label>
+              <label>Display Name<input value={editName} onChange={e => setEditName(e.target.value)} /></label>
               {acct?.scope_type === "squadron" && sqnFlights.length > 0 && (
                 <label>Flight (optional)
                   <select value={editFlight} onChange={e => setEditFlight(e.target.value)}>
@@ -417,7 +417,7 @@ export function Accounts() {
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Rename flight">
           <div className="modal-box" style={{ maxWidth: 360 }}>
             <h2 style={{ marginTop: 0 }}>Rename Flight</h2>
-            <label>Flight Name<input value={renameName} onChange={e => setRenameName(e.target.value)} autoFocus /></label>
+            <label>Flight Name<input value={renameName} onChange={e => setRenameName(e.target.value)} /></label>
             <div className="modal-foot">
               <button className="btn out" onClick={() => setRenameFid(null)}>Cancel</button>
               <button className="btn primary" disabled={renameFlightMut.isPending} onClick={() =>
@@ -435,7 +435,7 @@ export function Accounts() {
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Create flight">
           <div className="modal-box" style={{ maxWidth: 380 }}>
             <h2 style={{ marginTop: 0 }}>Add Flight</h2>
-            <label>Flight Name<input value={flightName} onChange={e => setFlightName(e.target.value)} autoFocus /></label>
+            <label>Flight Name<input value={flightName} onChange={e => setFlightName(e.target.value)} /></label>
             <label>Squadron
               <select value={flightSqn} onChange={e => setFlightSqn(e.target.value)}
                 disabled={!!session?.squadron_id}>

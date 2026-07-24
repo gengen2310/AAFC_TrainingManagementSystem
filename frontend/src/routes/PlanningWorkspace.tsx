@@ -53,6 +53,13 @@ export function PlanningWorkspace() {
   // hamburger button in the context bar. Ignored (has no visual effect) above that width.
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
 
+  useEffect(() => {
+    if (!leftPanelOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLeftPanelOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [leftPanelOpen]);
+
   // ── Data queries ──────────────────────────────────────────────────────────────
   const { data: years, isLoading: yearsLoading } = useQuery({
     queryKey: ["planning-years"],
@@ -349,8 +356,11 @@ export function PlanningWorkspace() {
 
       {/* Main body: left + canvas + right */}
       <div className={`pw-body${drawerItem ? " right-open" : ""}`}>
-        {/* Mobile-only backdrop for the off-canvas left panel */}
+        {/* Mobile-only backdrop for the off-canvas left panel. Tap-to-close is a mouse-only
+            convenience; Escape (above) and re-tapping the hamburger button are the full
+            keyboard-equivalent close paths. */}
         {leftPanelOpen && (
+          // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
           <div className="pw-left-overlay" onClick={() => setLeftPanelOpen(false)} />
         )}
 

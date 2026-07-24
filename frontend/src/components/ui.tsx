@@ -14,8 +14,19 @@ export function Stat({ label, value, hint }: { label: string; value: ReactNode; 
 }
 export function Empty({ msg }: { msg: string }) { return <div className="empty" role="status">{msg}</div>; }
 export function Loading() { return <div className="empty" role="status" aria-live="polite">Loading…</div>; }
-export function Bar({ pct }: { pct: number }) {
-  return <div className="bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} /></div>;
+export function Bar({ pct, label }: { pct: number; label?: string }) {
+  return (
+    <div
+      className="bar"
+      role="progressbar"
+      aria-valuenow={pct}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={label ?? `${pct}% complete`}
+    >
+      <span style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+    </div>
+  );
 }
 export function ErrorNote({ error }: { error: unknown }) {
   const msg = error instanceof ApiError ? error.friendly : "Something went wrong.";

@@ -182,13 +182,14 @@ function AddNoticeForm({ dateId, onDone }: { dateId: string; onDone: () => void 
   }
 
   return (
+    // Only stops this form's own clicks from bubbling to the parent block's click handler.
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div className="pw-block-notice-form" onClick={e => e.stopPropagation()}>
       <textarea
         className="pw-block-notice-input"
         placeholder="Notice text…"
         value={text}
         onChange={e => setText(e.target.value)}
-        autoFocus
         rows={2}
       />
       <div className="pw-block-notice-form-row">
@@ -337,12 +338,14 @@ export function ParadeNightBlock({
             const cells = BLOCK_PERIODS.map(p => getCell(sessions, g.cadetGroups, p));
             const allEmpty = cells.every(c => c === null);
             return (
+              // Mouse-only shortcut for the same action as the block header above
+              // (which already has a real, focusable, keyboard-operable role="button")
+              // — intentionally not a second tab stop for the identical action.
+              // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
               <div
                 key={g.key}
                 className={`pw-block-cg-row${allEmpty ? " all-empty" : ""}`}
                 onClick={onHeaderClick}
-                role="button"
-                tabIndex={-1}
               >
                 <span className="pw-block-cg-lbl">{g.label}</span>
                 <span className="pw-block-cg-periods">

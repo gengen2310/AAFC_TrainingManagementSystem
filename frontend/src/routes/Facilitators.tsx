@@ -119,6 +119,10 @@ function TagInput({ tags, onChange, id, placeholder = "Type and press Enter or ,
   const atMax = tags.length >= MAX_TAGS;
 
   return (
+    // The onClick here only redirects focus to the real <input> already rendered below,
+    // which is independently keyboard-reachable via Tab — adding a second, duplicate
+    // keyboard-operable target on this wrapper would just confuse tab order.
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
     <div className="tag-input" role="group" aria-label="Subject area tags" onClick={() => ref.current?.focus()}>
       {tags.map((tag, i) => (
         <span key={tag} className="tag-chip">
@@ -151,8 +155,8 @@ function AddFacModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
         <label htmlFor="f-first">First name</label><input id="f-first" value={first} onChange={(e) => setFirst(e.target.value)} />
         <label htmlFor="f-last">Last name</label><input id="f-last" value={last} onChange={(e) => setLast(e.target.value)} />
         <label htmlFor="f-rank">Current rank</label><input id="f-rank" value={rank} onChange={(e) => setRank(e.target.value)} />
-        <label>Subject areas</label>
-        <TagInput tags={subjects} onChange={setSubjects} />
+        <label htmlFor="add-fac-subjects">Subject areas</label>
+        <TagInput id="add-fac-subjects" tags={subjects} onChange={setSubjects} />
         <p className="muted" style={{ fontSize: 11, margin: "0 0 4px" }}>
           Press Enter or comma to add each tag · max {MAX_TAGS} tags · {MAX_LEN} chars each
         </p>
@@ -176,8 +180,8 @@ function TagsModal({ fac, onClose, onDone }: { fac: Facilitator; onClose: () => 
   return (
     <Modal title={`Subject areas — ${name}`} onClose={onClose}>
       <div className="form">
-        <label>Subject areas</label>
-        <TagInput tags={subjects} onChange={(t) => { setSubjects(t); setErr(""); }} />
+        <label htmlFor="edit-fac-subjects">Subject areas</label>
+        <TagInput id="edit-fac-subjects" tags={subjects} onChange={(t) => { setSubjects(t); setErr(""); }} />
         <p className="muted" style={{ fontSize: 11, margin: "0 0 4px" }}>
           Press Enter or comma to add · Backspace removes last tag · max {MAX_TAGS} tags
         </p>

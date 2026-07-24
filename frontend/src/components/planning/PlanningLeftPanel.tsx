@@ -165,7 +165,10 @@ export function PlanningLeftPanel({
               <div
                 key={e.wing_event_id}
                 className="pw-backlog-item"
+                role="button"
+                tabIndex={0}
                 onClick={() => onBacklogItemClick("wing-event", e.wing_event_id)}
+                onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onBacklogItemClick("wing-event", e.wing_event_id); } }}
               >
                 <span className="pw-backlog-dot" style={{ background: "#004B8D" }} />
                 <div>
@@ -186,7 +189,10 @@ export function PlanningLeftPanel({
               <div
                 key={g.anchor_event_id}
                 className="pw-backlog-item"
+                role="button"
+                tabIndex={0}
                 onClick={() => onBacklogItemClick("anchor", g.anchor_event_id)}
+                onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onBacklogItemClick("anchor", g.anchor_event_id); } }}
               >
                 <span className="pw-backlog-dot" style={{ background: "var(--warning)" }} />
                 <div>
@@ -207,7 +213,10 @@ export function PlanningLeftPanel({
               <div
                 key={u.curriculum_id}
                 className="pw-backlog-item"
+                role="button"
+                tabIndex={0}
                 onClick={() => onBacklogItemClick("curriculum", u.curriculum_id)}
+                onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onBacklogItemClick("curriculum", u.curriculum_id); } }}
               >
                 <span className="pw-backlog-dot" style={{ background: "var(--aafc-gunmetal)" }} />
                 <div>

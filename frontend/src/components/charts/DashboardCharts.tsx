@@ -357,6 +357,7 @@ export function ChartCard({ chart, onDrillDown }: { chart: DashboardChart; onDri
     <div
       style={{ ...cardSx, cursor: clickable ? "pointer" : undefined }}
       onClick={clickable ? () => onDrillDown(chart) : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onDrillDown(chart); } } : undefined}
       role={clickable ? "button" : undefined}
       tabIndex={clickable ? 0 : undefined}
     >

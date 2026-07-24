@@ -23,7 +23,7 @@ export function LoginPage() {
         </h1>
         <div className="login-rule" />
         <label htmlFor="code">Access code</label>
-        <input id="code" type="password" value={code} autoComplete="off" autoFocus
+        <input id="code" type="password" value={code} autoComplete="off"
           onChange={(e) => setCode(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
           aria-describedby={err ? "login-err" : undefined} aria-invalid={!!err} />

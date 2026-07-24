@@ -10,7 +10,10 @@
 .btn.sm{padding:5px 10px;font-size:12px;}
 .badge{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:6px;padding:2px 7px;font-size:10.5px;font-weight:700;}
 .badge.ok{border-color:var(--success);color:var(--success);}
-.badge.warn{border-color:var(--warning);color:var(--warning);}
+/* text uses a darkened shade of --warning (#c97a00 is only 3.35:1 on white at this
+   weight/size, below WCAG AA's 4.5:1 for normal text); border keeps the token as-is
+   since non-text UI contrast only needs 3:1, which it already meets. */
+.badge.warn{border-color:var(--warning);color:#a86600;}
 .badge.red{border-color:var(--aafc-red);color:var(--aafc-red);}
 .badge.blue{border-color:var(--aafc-royal-blue);color:var(--aafc-royal-blue);}
 .lh{color:var(--aafc-royal-blue);font-weight:700;text-decoration:none;}

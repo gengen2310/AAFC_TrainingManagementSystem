@@ -103,16 +103,18 @@ export function PlanningContextBar({
         {/* Custom date range inputs */}
         {viewRange === "custom" && (
           <div className="pw-ctx-custom">
-            <label className="pw-ctx-custom-lbl">From</label>
+            <label className="pw-ctx-custom-lbl" htmlFor="pw-ctx-custom-start">From</label>
             <input
+              id="pw-ctx-custom-start"
               type="date"
               className="pw-ctx-date-input"
               value={customStart}
               onChange={e => onCustomStartChange(e.target.value)}
               aria-label="Custom range start date"
             />
-            <label className="pw-ctx-custom-lbl">To</label>
+            <label className="pw-ctx-custom-lbl" htmlFor="pw-ctx-custom-end">To</label>
             <input
+              id="pw-ctx-custom-end"
               type="date"
               className="pw-ctx-date-input"
               value={customEnd}

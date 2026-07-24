@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { planningApi, trainingApi } from "../../api";
@@ -646,7 +646,7 @@ function FacilitatorsContent({
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
             <label style={labelSx}>
               First name *
-              <input value={firstName} onChange={e => setFirstName(e.target.value)} style={inputSx} autoFocus />
+              <input value={firstName} onChange={e => setFirstName(e.target.value)} style={inputSx} />
             </label>
             <label style={labelSx}>
               Last name *
@@ -833,7 +833,7 @@ function EquipmentContent() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
             <label style={{ ...labelSx, gridColumn: "1 / 3" }}>
               Name *
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Projector" autoFocus style={inputSx} />
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Projector" style={inputSx} />
             </label>
             <label style={labelSx}>
               Type
@@ -985,7 +985,6 @@ function HolidaysContent({ yearId }: { yearId: string }) {
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="e.g. Spring Break"
-                autoFocus
                 style={{ fontWeight: 400, padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12 }}
               />
             </label>
@@ -1173,6 +1172,12 @@ function ClassifyModal({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   async function handleSave() {
     setSaving(true); setErr(null);
     try {
@@ -1194,13 +1199,19 @@ function ClassifyModal({
   }
 
   return (
+    // Backdrop click is a mouse-only convenience; Escape (above) and the Cancel button
+    // below are the full keyboard-equivalent dismiss paths.
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 900, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      {/* Only stops the backdrop's click-to-close from firing for clicks inside the dialog. */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div style={{ background: "#fff", borderRadius: 10, padding: 24, width: 420, maxWidth: "95vw" }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Classify Activity</div>
         <div style={{ fontSize: 12, color: "var(--muted-text)", marginBottom: 16 }}>{activity.activity_name}</div>
 
-        <label style={{ fontSize: 12, fontWeight: 700, display: "block", marginBottom: 4 }}>Importance</label>
+        <label htmlFor="classify-importance" style={{ fontSize: 12, fontWeight: 700, display: "block", marginBottom: 4 }}>Importance</label>
         <select
+          id="classify-importance"
           value={importance}
           onChange={e => setImportance(e.target.value)}
           style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12, marginBottom: 14 }}
@@ -1502,7 +1513,7 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         <div style={{ padding: "10px 14px", background: "#f0f5ff", borderBottom: "1px solid var(--border)", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
           <label style={{ gridColumn: "1 / 3", ...labelSx }}>
             Activity name *
-            <input value={newName} onChange={e => setNewName(e.target.value)} autoFocus style={{ ...inputSx, fontWeight: 400 }} />
+            <input value={newName} onChange={e => setNewName(e.target.value)} style={{ ...inputSx, fontWeight: 400 }} />
           </label>
           <label style={labelSx}>
             Start date

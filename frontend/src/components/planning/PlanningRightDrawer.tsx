@@ -243,6 +243,11 @@ function SessionForm({
               {pickerOpen && searchResults.length > 0 && (
                 <div className="pw-curric-dropdown">
                   {searchResults.map(m => (
+                    // TODO(a11y follow-up): this search dropdown has no real keyboard
+                    // navigation (arrow keys / Enter) yet — see docs/beta/15_known_limitations.md.
+                    // onMouseDown (not onClick) is deliberate: it fires before the input's
+                    // onBlur closes the dropdown.
+                    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
                     <div
                       key={m.curriculum_id}
                       className="pw-curric-item"
@@ -454,7 +459,7 @@ function CreateAnchorForm({ yearId, onClose }: { yearId: string; onClose: () => 
 
   return (
     <div className="pw-drawer-form">
-      <label>Event name *<input value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Annual Inspection" autoFocus /></label>
+      <label>Event name *<input value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Annual Inspection" /></label>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <label>Type
           <select value={eventType} onChange={e => setEventType(e.target.value)}>
@@ -534,7 +539,7 @@ function LocationForm({ location, onClose }: {
 
   return (
     <div className="pw-drawer-form">
-      <label>Name *<input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Main Classroom" autoFocus /></label>
+      <label>Name *<input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Main Classroom" /></label>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <label>Type
           <select value={locType} onChange={e => setLocType(e.target.value)}>

@@ -19,7 +19,7 @@ export function Reports() {
       <Card title="Curriculum coverage" action={coverage.data && <DecisionBadge decision={coverage.data.decision} />}>
         {coverage.isLoading ? <Loading /> : coverage.error ? <ErrorNote error={coverage.error} /> : (
           <div>
-            <Bar pct={coverage.data!.coverage_pct} />
+            <Bar pct={coverage.data!.coverage_pct} label="Curriculum coverage" />
             <p className="muted">{coverage.data!.scheduled}/{coverage.data!.total} scheduled · {coverage.data!.delivered} delivered.</p>
             {coverage.data!.unscheduled.length > 0 && (
               <details><summary>{coverage.data!.unscheduled.length} unscheduled items</summary>

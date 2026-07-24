@@ -44,6 +44,24 @@ Created: 2026-07-14.
 
 ---
 
+## Accessibility Limitations
+
+### AL-01: Curriculum-Link Search Dropdown Has No Real Keyboard Navigation
+
+- **Description**: Planning Workspace's curriculum-link search dropdown (`PlanningRightDrawer.tsx`, the "Curriculum link" search box on session/anchor detail) has no arrow-key/Enter selection — the dropdown items only respond to a mouse. Found during the 2026-07-24 accessibility widening pass (Phase 7) via `eslint-plugin-jsx-a11y`, which flagged the item's `onMouseDown` handler with no keyboard equivalent.
+- **Why not fixed in the same pass**: the items deliberately use `onMouseDown` rather than `onClick` so selection fires before the search input's `onBlur` closes the dropdown — a timing-sensitive pattern. Properly fixing this means implementing a real combobox interaction model (ArrowUp/ArrowDown to move a highlighted option, Enter to select, Escape to close) without breaking that blur/mousedown timing, which needs live verification of a working feature rather than a mechanical lint fix.
+- **Impact**: Low-medium. A keyboard-only user can still link curriculum via the same underlying data (no data is unreachable), but must currently do so through some other path; the search box itself isn't operable without a mouse.
+- **Resolution**: Not done this pass. `eslint-disable` with a `TODO(a11y follow-up)` comment left in place at the call site so the gap stays visible in code, not just here.
+
+### AL-02: Pre-existing Test Bugs Found (Not Introduced This Pass, Not Fixed)
+
+Found while widening `frontend/e2e/accessibility.spec.ts` coverage (Phase 7) and reproduced against a clean pre-Phase-7 checkout to confirm they predate this work:
+- `e2e/facilitators.spec.ts` › "facilitator leave can be recorded via API" asserts `body.facilitator_id` but the real response shape is `body.leave.facilitator_id` — a test bug, not a backend defect (the API is already returning the more informative nested shape).
+- `e2e/reports.spec.ts` › "facilitator load card renders without error" and "not delivered card renders without error" use an immediate `.isVisible().catch(() => false)` check with no wait/retry, so they can read the DOM before the async report data has rendered — a flaky-by-design pattern, not a rendering bug (manually confirmed the tables render correctly with real data).
+- Neither was fixed in this pass — out of scope for an accessibility-coverage widening — but recorded here since they were newly discovered, not previously tracked.
+
+---
+
 ## Security Limitations
 
 ### SL-01: Production ENVIRONMENT Variable Mismatch
