@@ -204,8 +204,8 @@ Decision: **RETAIN** — wing/national oversight layer
 | Facilitator list | `connected-frontend` (facilitators page) + `frontend/src/routes/Facilitators.tsx` | Same data | **RETAIN BOTH** — same reason; Planning Workspace adds stats |
 | Activity/CEA review | `connected-frontend` (activities page) + Planning Workspace (Activities tab) | Overlap — both show CEA and local activities | **RETAIN BOTH** — connected-frontend shows historical view; Planning Workspace adds classification workflow |
 | Parade night view | `connected-frontend` (calendar, parade-nights) + Planning Workspace (parade night tab) | Overlap | **RETAIN BOTH** — different granularity and purpose |
-| Reports | `connected-frontend` (reports page) + `frontend/src/routes/Reports.tsx` | Same data | **RETAIN BOTH** — currently deployed in different apps |
-| Resource model | `TrainingArea`/`PlanningLocation` in backend | Two overlapping concepts for physical spaces | **MERGE** — see Task #10 / Phase 8 |
+| Reports (`page-reports` / "Training Summary") | `connected-frontend` | **[UPDATED 2026-07-24]** Not actually a live duplicate — `nav('reports')` always redirected away before this page could render, and its stats were never populated by any reachable code. **REMOVED** (master transformation plan Phase 6), not retained; `frontend/src/routes/Reports.tsx` (React full-app route table) is the only live "Reports" page now. That investigation also found and fixed a real bug: the Curriculum page's "N sess." drill-down silently failed for wing/national/auditor scope because it routed through this same dead page — see `docs/beta/15_known_limitations.md`. |
+| Resource model | `TrainingArea`/`PlanningLocation` in backend | Two overlapping concepts for physical spaces | **[RESOLVED 2026-07-24]** — master transformation plan Phase 1; `/api/planning/locations` now reads/writes `training_areas` directly. See `docs/beta/15_known_limitations.md` DL-01. |
 | `_all_sessions` in `ops.py` | Called twice in same function (double query) | N+1 | **FIX** (in stash — apply separately) |
 
 ---
@@ -228,10 +228,11 @@ Decision: **RETAIN** — wing/national oversight layer
 | Decision | Count | Items |
 |---|---|---|
 | RETAIN | 39 | Most production pages |
-| RETAIN AND IMPROVE | 3 | Dashboard (both apps), Activities (connected-frontend) |
+| RETAIN AND IMPROVE | 3 | Dashboard (both apps — Planning Workspace's rebuilt onto chart endpoints 2026-07-24), Activities (connected-frontend) |
 | RETIRED | 4 | planning-year, planning-missions, planning-builder, planning-guide |
 | REMOVE FROM NAVIGATION | 5 | planning-anchors, planning-term, planning-longrange, planning-rooms, planning-checks |
-| MERGE (pending) | 1 | TrainingArea + PlanningLocation resource model |
+| REMOVED (dead code deleted) | 1 | `page-reports` / "Training Summary" (connected-frontend) — 2026-07-24 |
+| MERGE — RESOLVED 2026-07-24 | 1 | TrainingArea + PlanningLocation resource model |
 | No action needed | 9 | Hidden HTML divs for retired planning pages |
 
 **Total pages classified**: 52 (30 connected-frontend + 22 React routes)

@@ -163,12 +163,11 @@ Created: 2026-07-14.
 - Are the IDs the same or different?
 - When was each record created?
 
-**Note on known limitation**: Rooms and facilitators can exist in both TMS and Planning Workspace as separate records with the same name. This is expected — it is the rooms/facilitators duplication limitation.
+**[UPDATED 2026-07-24]**: Neither of these is actually a live duplication limitation any more, per `docs/beta/15_known_limitations.md` DL-01/DL-02 — facilitators were never a separate table to begin with (a docs error, corrected), and rooms/training-areas have been unified: `/api/planning/locations` now reads/writes the same `training_areas` table connected-frontend's Resources page uses. A room or facilitator that appears to exist twice with the same name today is a genuine duplicate, not this old known-limitation pattern.
 
 **Resolution steps**:
 1. Check audit log to determine how many records exist and when they were created
-2. If genuine duplicates (same operational entity created twice): escalate — do not delete without instruction
-3. If known limitation (TMS + Planning Workspace separate records): explain to user, no action needed
+2. Treat any apparent duplicate as genuine — escalate, do not delete without instruction (the "known limitation, no action needed" branch below no longer applies)
 
 ---
 

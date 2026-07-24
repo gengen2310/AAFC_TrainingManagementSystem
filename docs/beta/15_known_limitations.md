@@ -62,6 +62,16 @@ Found while widening `frontend/e2e/accessibility.spec.ts` coverage (Phase 7) and
 
 ---
 
+## Observability
+
+### OB-01: No APM / Error-Tracking Tool Configured
+
+- **Description**: Neither backend nor either frontend has an APM or error-tracking SDK (e.g. Sentry) wired in. Structured JSON access logs plus request-ID/response-time headers exist server-side; log aggregation is assumed to be handled externally by the deploy platform. There is no proactive error surfacing — diagnosing an issue today means reading logs after the fact, not getting paged/notified when it happens.
+- **Why not implemented in this pass**: adding a real APM tool requires a third-party account and a secret (e.g. a Sentry DSN) that only the project owner can create — not something to add unilaterally without that account/credential existing first.
+- **Status (2026-07-24)**: deliberately deferred, by explicit choice — asked and confirmed "skip for now, document only" rather than stub unused SDK plumbing or guess at a provider. Revisit once a provider/account is chosen; at that point the DSN is the only piece needed (env-var-gated init on both frontends + backend), not a design decision.
+
+---
+
 ## Security Limitations
 
 ### SL-01: Production ENVIRONMENT Variable Mismatch
