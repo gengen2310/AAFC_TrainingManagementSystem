@@ -870,7 +870,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-act')">+ Add Activity</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openGenerateActivitiesModal()">Generate Activities</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddHolidayModal()">+ Add Holiday</button>
-            <button class="btn btn-out admin-el" style="display:none" onclick="openCeaImport()">Import CEA</button>
           </div>
         </div>
         <div class="fbar no-print">
@@ -1944,24 +1943,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <button class="btn btn-out" onclick="closeModal('m-gen-acts')">Cancel</button>
       <button class="btn btn-sky" onclick="previewGenerateActivities()">Preview</button>
       <button class="btn btn-dk" id="ga-create-btn" style="display:none" onclick="commitGenerateActivities()">Create Activities</button>
-    </div>
-  </div>
-</div>
-
-<!-- CEA Activity Import -->
-<div class="modal-bg" id="m-cea-import">
-  <div class="modal" style="max-width:700px">
-    <div class="modal-hdr"><div class="modal-title">Import Activities from CEA</div><button class="modal-x" onclick="closeModal('m-cea-import')">×</button></div>
-    <div class="modal-body">
-      <div class="alert a-info">Upload a CEA export CSV. Columns: SeqNr, Name, Start date, Start time, End date, End time, Unit, Location, Activity Notes. Duplicate SeqNr records are skipped.</div>
-      <div class="form-group"><label>CSV File *</label><input type="file" id="cea-file" accept=".csv,text/csv"></div>
-      <p id="cea-msg" style="color:var(--error)"></p>
-      <div id="cea-preview-area" style="display:none;max-height:240px;overflow-y:auto;margin-top:8px"></div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-out" onclick="closeModal('m-cea-import')">Cancel</button>
-      <button class="btn btn-out" onclick="previewCeaImport()">Preview</button>
-      <button class="btn btn-dk" id="cea-import-btn" style="display:none" onclick="commitCeaImport()">Import</button>
     </div>
   </div>
 </div>
@@ -7849,76 +7830,6 @@ async function promptOverrideConflict(cId, yearId){
     await api(`/api/planning/conflicts/${cId}/override`,{method:'POST',body:{override_reason:reason.trim()}});
     await loadPlanningChecks(yearId);
   } catch(e){ alert(apiErr(e)); }
-}
-
-// ═══════════════════════
-//  CEA ACTIVITY IMPORT
-// ═══════════════════════
-
-let _ceaPreviewRows=null;
-function openCeaImport(){
-  _ceaPreviewRows=null;
-  document.getElementById('cea-file').value='';
-  document.getElementById('cea-msg').textContent='';
-  document.getElementById('cea-preview-area').style.display='none';
-  document.getElementById('cea-preview-area').innerHTML='';
-  document.getElementById('cea-import-btn').style.display='none';
-  openModal('m-cea-import');
-}
-async function previewCeaImport(){
-  const msg=document.getElementById('cea-msg');
-  const area=document.getElementById('cea-preview-area');
-  const fileEl=document.getElementById('cea-file');
-  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select a CSV file first.'; return; }
-  msg.textContent='Loading preview…';
-  area.style.display='none';
-  const form=new FormData();
-  form.append('file',fileEl.files[0]);
-  try{
-    const res=await fetch(API_BASE+'/api/activities/import-cea?preview=true',{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+tokenGet()},
-      body:form,
-    });
-    const d=await res.json();
-    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||'Error'; return; }
-    _ceaPreviewRows=d.rows||[];
-    const newRows=_ceaPreviewRows.filter(r=>r.status!=='duplicate');
-    const dupRows=_ceaPreviewRows.filter(r=>r.status==='duplicate');
-    msg.textContent=`${newRows.length} new, ${dupRows.length} duplicate (will be skipped).`+(d.parse_errors&&d.parse_errors.length?' '+d.parse_errors.length+' parse error(s).':'');
-    area.innerHTML='<table class="data-table" style="font-size:11px"><thead><tr><th>SeqNr</th><th>Name</th><th>Date</th><th>Time</th><th>Location</th><th>Status</th></tr></thead><tbody>'+
-      _ceaPreviewRows.map(r=>`<tr>
-        <td>${esc(r.cea_seq_nr||'—')}</td>
-        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(r.activity_name)}</td>
-        <td>${esc(r.date_start||'—')}</td>
-        <td>${esc((r.time_start||'')+(r.time_end?' – '+r.time_end:''))}</td>
-        <td>${esc(r.location||'—')}</td>
-        <td><span class="badge ${r.status==='duplicate'?'b-grey':'b-ok'}">${r.status==='duplicate'?'Skip':'New'}</span></td>
-      </tr>`).join('')+'</tbody></table>';
-    area.style.display='block';
-    if(newRows.length>0) document.getElementById('cea-import-btn').style.display='';
-  }catch(e){ msg.textContent=apiErr(e); }
-}
-async function commitCeaImport(){
-  const msg=document.getElementById('cea-msg');
-  const fileEl=document.getElementById('cea-file');
-  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select a CSV file first.'; return; }
-  msg.textContent='Importing…';
-  document.getElementById('cea-import-btn').disabled=true;
-  const form=new FormData();
-  form.append('file',fileEl.files[0]);
-  try{
-    const res=await fetch(API_BASE+'/api/activities/import-cea?preview=false',{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+tokenGet()},
-      body:form,
-    });
-    const d=await res.json();
-    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||'Error'; document.getElementById('cea-import-btn').disabled=false; return; }
-    closeModal('m-cea-import');
-    await reloadAndRender();
-    alert(`Imported ${d.created} activit${d.created!==1?'ies':'y'}. ${d.skipped} duplicate${d.skipped!==1?'s':''} skipped.`);
-  }catch(e){ msg.textContent=apiErr(e); document.getElementById('cea-import-btn').disabled=false; }
 }
 
 // ════════════════════════════

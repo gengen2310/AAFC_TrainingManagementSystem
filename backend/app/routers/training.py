@@ -2339,173 +2339,34 @@ async def import_curriculum_csv(
     return result
 
 
-# ── CEA ACTIVITY IMPORT ───────────────────────────────────────────────────────
-
-_CEA_DATE_FMTS = ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y", "%d %b %Y"]
-
-
-def _parse_cea_date(raw: str) -> str | None:
-    """Parse a CEA export date to ISO YYYY-MM-DD."""
-    if not raw:
-        return None
-    from datetime import datetime
-    for fmt in _CEA_DATE_FMTS:
-        try:
-            return datetime.strptime(raw.strip(), fmt).strftime("%Y-%m-%d")
-        except ValueError:
-            pass
-    return raw.strip()[:10] or None
-
-
-def _parse_cea_time(raw: str) -> str | None:
-    """Normalise a time string to HH:MM:SS (8 chars max)."""
-    if not raw:
-        return None
-    raw = raw.strip()
-    # Accept HH:MM, HH:MM:SS, H:MM
-    parts = raw.split(":")
-    if len(parts) >= 2:
-        try:
-            hh = int(parts[0])
-            mm = int(parts[1])
-            return f"{hh:02d}:{mm:02d}"
-        except ValueError:
-            pass
-    return raw[:8] or None
-
+# ── CEA ACTIVITY IMPORT (retired -- see docstring below) ─────────────────────
 
 @router.post("/activities/import-cea")
 async def import_activities_cea(
-    file: UploadFile = File(...),
     preview: bool = False,
-    db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    """Import activities from a CEA export CSV.
+    """RETIRED (DEFECT-005, general-release qualification).
 
-    Expected columns (case-insensitive):
-    SeqNr, Name, Start date, Start time, End date, End time,
-    Unit, Location, Activity Notes
+    Connected-frontend's legacy CEA import wrote squadron-scoped Activity
+    rows with no persisted review/classification step and per-squadron-only
+    dedup (by cea_seq_nr). Planning Workspace's CEA import
+    (POST /api/planning/years/{year_id}/cea/import) has since become the
+    single sanctioned pipeline: wing_admin+ only, full needs-review/classify
+    workflow, import-batch history, and a squadron-local hide/note overlay
+    (POST /api/planning/cea/{id}/local-hide) instead of writing squadron
+    data directly. Consolidating onto one reviewed pipeline, as required.
 
-    Deduplication: if a row's SeqNr already exists in the squadron's
-    activities, that row is skipped (not duplicated).
-
-    If preview=true, returns parsed rows without writing to the database.
-    Permissions: squadron_admin or higher (writes to the active squadron).
+    Still requires authentication (not publicly reachable) so this responds
+    with a clear, actionable 410 rather than a bare 404 for any caller that
+    still has this URL bookmarked or scripted -- see
+    docs/beta/15_known_limitations.md.
     """
-    import csv, io
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
-
-    sq_id = _active_squadron(p)
-    if not sq_id:
-        raise HTTPException(400, detail={"error": "no_squadron_scope"})
-    s = db.get(Squadron, sq_id)
-    if not s:
-        raise HTTPException(400, detail={"error": "no_squadron_scope"})
-    if not preview:
-        require_can_write_squadron(p, s.id, s.wing_id)
-
-    content = await file.read()
-    try:
-        text = content.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        text = content.decode("latin-1")
-
-    reader = csv.DictReader(io.StringIO(text))
-    parse_errors: list[str] = []
-    preview_rows: list[dict] = []
-    created = skipped = failed = 0
-
-    # Load existing seq numbers for deduplication
-    existing_seq = {
-        a.cea_seq_nr for a in
-        db.query(Activity.cea_seq_nr).filter(
-            Activity.squadron_id == sq_id,
-            Activity.cea_seq_nr.isnot(None),
-            Activity.is_archived == False,  # noqa: E712
-        ).all()
-        if a.cea_seq_nr
-    }
-
-    for i, row in enumerate(reader, start=2):
-        norm = {k.strip().lower(): (v or "").strip() for k, v in row.items()}
-
-        seq_nr = norm.get("seqnr") or norm.get("seq nr") or norm.get("seq_nr") or norm.get("seq") or ""
-        name = norm.get("name") or norm.get("activity name") or norm.get("activity") or ""
-        date_start_raw = norm.get("start date") or norm.get("startdate") or norm.get("start_date") or ""
-        time_start_raw = norm.get("start time") or norm.get("starttime") or norm.get("start_time") or ""
-        date_end_raw = norm.get("end date") or norm.get("enddate") or norm.get("end_date") or ""
-        time_end_raw = norm.get("end time") or norm.get("endtime") or norm.get("end_time") or ""
-        unit = norm.get("unit") or ""
-        location = norm.get("location") or ""
-        notes = norm.get("activity notes") or norm.get("notes") or norm.get("activity_notes") or ""
-
-        if not name or not date_start_raw:
-            parse_errors.append(f"Row {i}: missing Name or Start date — skipped.")
-            continue
-
-        date_start = _parse_cea_date(date_start_raw)
-        date_end = _parse_cea_date(date_end_raw) if date_end_raw else None
-        time_start = _parse_cea_time(time_start_raw) if time_start_raw else None
-        time_end = _parse_cea_time(time_end_raw) if time_end_raw else None
-
-        if not date_start:
-            parse_errors.append(f"Row {i}: unrecognised date format '{date_start_raw}' — skipped.")
-            continue
-
-        row_data = {
-            "cea_seq_nr": seq_nr or None,
-            "activity_name": name,
-            "date_start": date_start,
-            "date_end": date_end,
-            "time_start": time_start,
-            "time_end": time_end,
-            "location": location or None,
-            "notes": (notes + (f"\nUnit: {unit}" if unit else "")).strip() or None,
-            "activity_type": "CEA",
-            "status": "duplicate" if seq_nr and seq_nr in existing_seq else "new",
-        }
-
-        if preview:
-            preview_rows.append(row_data)
-            continue
-
-        if seq_nr and seq_nr in existing_seq:
-            skipped += 1
-            continue
-
-        try:
-            a = Activity(
-                squadron_id=s.id, wing_id=s.wing_id,
-                activity_name=name, activity_type="CEA",
-                date_start=date_start, date_end=date_end,
-                time_start=time_start, time_end=time_end,
-                location=location or None,
-                notes=(notes + (f"\nUnit: {unit}" if unit else "")).strip() or None,
-                cea_seq_nr=seq_nr or None,
-            )
-            db.add(a)
-            if seq_nr:
-                existing_seq.add(seq_nr)
-            created += 1
-        except Exception as exc:
-            failed += 1
-            parse_errors.append(f"Row {i}: save failed — {exc}")
-
-    if preview:
-        return {"ok": True, "preview": True, "rows": preview_rows, "parse_errors": parse_errors}
-
-    db.commit()
-    audit(db, p, object_type="activity", object_id="cea_import", action="bulk_import",
-          new={"created": created, "skipped": skipped, "failed": failed})
-
-    return {
-        "ok": True, "preview": False,
-        "created": created, "skipped": skipped, "failed": failed,
-        "total": created + skipped + failed,
-        "parse_errors": parse_errors,
-    }
+    raise HTTPException(410, detail={
+        "error": "retired",
+        "message": ("CEA import has moved to the Planning Workspace (Import CEA, "
+                    "wing_admin or higher). This endpoint no longer accepts imports."),
+    })
 
 
 # ═══════════════════════════════════════════════════

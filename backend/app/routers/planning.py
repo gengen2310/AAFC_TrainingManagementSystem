@@ -4020,6 +4020,20 @@ def classify_cea_activity(
     if not act or act.is_archived:
         raise HTTPException(404, detail={"error": "activity_not_found"})
     _require_year_access(p, _get_year_or_404(act.planning_year_id, db), write=True)
+    # DEFECT-005: classify mutates the shared CeaActivity row directly
+    # (importance/audience/classification_status), unlike local-hide below
+    # which only ever writes a squadron-local overlay row. unit_id is set
+    # only for manually-created, squadron-owned activities (see
+    # create_manual_activity) -- never by the CSV import path, which leaves
+    # it null for a wing-wide/shared activity. A sqn_admin may classify
+    # their own squadron's manual activity, but must never be able to
+    # overwrite a wing-wide CEA activity's classification for every
+    # squadron in the wing at once.
+    if act.unit_id != p.squadron_id and p.role == "sqn_admin":
+        raise HTTPException(403, detail={
+            "error": "wing_wide_activity",
+            "message": "Only a Wing Admin or higher can classify a wing-wide CEA activity.",
+        })
     act.importance = body.importance
     act.audience_staff_only = body.audience_staff_only
     act.audience_seniors = body.audience_seniors
