@@ -83,3 +83,36 @@ def test_rate_limit_different_ips_are_independent(client):
     check_api_rate(ip_a)  # pushes ip_a over limit
     # ip_b has no hits yet
     assert check_api_rate(ip_b) is False
+
+
+def test_rate_limit_does_not_count_options_preflight(client):
+    """DEFECT-004: CORS preflight (OPTIONS) requests must not consume the
+    general rate-limit budget -- they carry no credentials of consequence and
+    reach no route/business logic. Counting them was silently halving the
+    effective budget for any cross-origin caller (confirmed live: a
+    connected-frontend e2e spec made ~220 OPTIONS requests alongside ~250
+    real GET/POST requests in under a minute, tripping the limit well below
+    its configured real-operation threshold). Regression guard: prefill the
+    limiter exactly to the threshold, then confirm an OPTIONS request still
+    succeeds (204, no rate_limited body) while a real GET is still blocked.
+    """
+    ip = "testclient"
+    _prefill_hits(ip, settings.API_RATE_LIMIT)
+    r = client.options("/api/auth/me")
+    assert r.status_code != 429
+    # The real GET immediately after is still correctly blocked -- this test
+    # is verifying OPTIONS isn't counted, not that the limiter is disabled.
+    hdr = login(client, "ADMIN703")
+    r = client.get("/api/auth/me", headers=hdr)
+    assert r.status_code == 429
+
+
+def test_rate_limit_options_does_not_advance_the_counter(client):
+    """A burst of OPTIONS requests alone must never trip the limiter for the
+    real requests that follow."""
+    ip = "testclient"
+    for _ in range(settings.API_RATE_LIMIT + 50):
+        client.options("/api/auth/me")
+    hdr = login(client, "ADMIN703")
+    r = client.get("/api/auth/me", headers=hdr)
+    assert r.status_code == 200

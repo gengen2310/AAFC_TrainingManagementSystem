@@ -452,3 +452,134 @@ def test_bootstrap_staging_unknown_wing_returns_422(client):
                     headers=hdr)
     assert r.status_code == 422
     assert "wing_not_found" in r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# Reset Rate Limits (DEFECT-004: deterministic test/CI isolation from the
+# general API rate limiter, DB-backed IP login limiter, and per-account
+# lockout, without weakening any of the three in production).
+# ─────────────────────────────────────────────────────────────
+
+def test_reset_rate_limits_requires_sysadmin(client):
+    hdr = _nat_admin(client)
+    r = client.post("/api/system/reset-rate-limits", headers=hdr)
+    assert r.status_code == 403
+
+
+def test_reset_rate_limits_unauthenticated(client):
+    r = client.post("/api/system/reset-rate-limits")
+    assert r.status_code == 401
+
+
+def test_reset_rate_limits_rejected_when_is_prod(client):
+    """Same production guard as bootstrap-staging -- must never be reachable in prod."""
+    from unittest.mock import patch, PropertyMock
+    from app.config import Settings
+
+    hdr = _sysadmin(client)
+    with patch.object(Settings, "is_prod", new_callable=PropertyMock) as mock_is_prod:
+        mock_is_prod.return_value = True
+        r = client.post("/api/system/reset-rate-limits", headers=hdr)
+    assert r.status_code == 403
+    assert r.json()["detail"]["error"] == "not_allowed_in_production"
+
+
+def test_reset_rate_limits_clears_ip_login_lockout(client):
+    """Trip the DB-backed per-IP login lockout, confirm the endpoint clears it.
+
+    Authenticate BEFORE tripping the lockout: login_blocked_db() is checked
+    before code verification (see auth.py's login()), so a locked-out IP
+    cannot log in even with a correct code -- the reset call must be made
+    with a token obtained beforehand, exactly as an external test runner
+    would do (authenticate once in setup, then call reset between test
+    files/runs without needing to log in again).
+    """
+    hdr = _sysadmin(client)
+
+    for _ in range(5):
+        r = client.post("/api/auth/login", json={"code": "WRONGCODE-DEFECT004"})
+        assert r.status_code == 401
+    r = client.post("/api/auth/login", json={"code": "WRONGCODE-DEFECT004"})
+    assert r.status_code == 429
+    assert r.json()["detail"]["error"] == "locked_out"
+
+    r = client.post("/api/system/reset-rate-limits", headers=hdr)
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+
+    # IP no longer locked -- a wrong code now returns 401 (invalid), not 429 (locked)
+    r = client.post("/api/auth/login", json={"code": "WRONGCODE-DEFECT004"})
+    assert r.status_code == 401
+
+
+def test_reset_rate_limits_clears_account_lockout(client):
+    """Trip the per-account 24h lockout, confirm the endpoint clears it."""
+    from app.database import SessionLocal, engine
+    from app.models import AccessCode
+    from app.security import verify_code
+    from sqlalchemy import text
+    from datetime import datetime, timedelta, timezone
+
+    hdr = _sysadmin(client)
+
+    db = SessionLocal()
+    try:
+        ac_id = next(ac.id for ac in db.query(AccessCode)
+                     .filter(AccessCode.active_status == True).all()  # noqa: E712
+                     if verify_code("703SQN2026", ac.code_hash))
+    finally:
+        db.close()
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE access_codes SET locked_until=:lu, failed_attempts=5 WHERE id=:id"),
+            {"lu": datetime.now(timezone.utc) + timedelta(minutes=30), "id": ac_id},
+        )
+    engine.dispose()
+
+    r = client.post("/api/auth/login", json={"code": "703SQN2026"})
+    assert r.status_code == 429
+    assert r.json()["detail"]["error"] == "locked_out"
+
+    r = client.post("/api/system/reset-rate-limits", headers=hdr)
+    assert r.status_code == 200
+
+    r = client.post("/api/auth/login", json={"code": "703SQN2026"})
+    assert r.status_code == 200
+
+
+def test_reset_rate_limits_clears_general_api_limiter(client):
+    """Trip the general per-IP API rate limiter, confirm the endpoint clears it.
+
+    Also proves the endpoint stays reachable while the limiter it resets is
+    itself currently tripped (see _RATE_LIMIT_EXEMPT in main.py) -- without
+    that exemption this would be a chicken-and-egg deadlock: the one
+    endpoint meant to recover a stuck client would be the thing blocking it.
+    """
+    from unittest.mock import patch
+    from app.config import settings as app_settings
+
+    hdr = _sysadmin(client)
+    with patch.object(app_settings, "API_RATE_LIMIT", 2):
+        for _ in range(2):
+            r = client.get("/api/system/overview", headers=hdr)
+            assert r.status_code == 200
+        r = client.get("/api/system/overview", headers=hdr)
+        assert r.status_code == 429
+        assert r.json()["error"] == "rate_limited"
+
+        r = client.post("/api/system/reset-rate-limits", headers=hdr)
+        assert r.status_code == 200
+
+        r = client.get("/api/system/overview", headers=hdr)
+        assert r.status_code == 200
+
+
+def test_reset_rate_limits_audit_entry(client):
+    """State-changing system_admin action must be audited."""
+    hdr = _sysadmin(client)
+    client.post("/api/system/reset-rate-limits", headers=hdr)
+    r = client.get("/api/system/audit-summary?action=reset_rate_limits&limit=10", headers=hdr)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["count"] >= 1
+    assert d["logs"][0]["object_type"] == "system"

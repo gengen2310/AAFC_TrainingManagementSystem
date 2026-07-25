@@ -1,4 +1,16 @@
 import { test, expect } from "@playwright/test";
+import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+
+// DEFECT-004: playwright-global-setup.ts resets rate limits once per full
+// suite invocation, which is not always enough for a large suite -- a
+// spec file's own request volume, especially with other files having run
+// immediately before it, can still cross the general API limiter's
+// 300 req/60s budget partway through (observed live running this suite).
+// A per-file reset gives this file its own fresh budget. Best-effort; see
+// e2e-rate-limit-reset.ts for what this does and its known limitations.
+test.beforeAll(async () => {
+  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000");
+});
 
 // ── Parade nights CRUD and scheduling (Phase 12, Gap #12) ────────────────────
 // Tests the full parade-night lifecycle in the React TMS app:

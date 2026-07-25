@@ -156,6 +156,12 @@ _RATE_LIMIT_EXEMPT = frozenset({
     "/api/health/db",
     "/api/health/ready",
     "/",
+    # DEFECT-004: must stay reachable even once this exact limiter has been
+    # tripped, or it can never recover a stuck test/CI client -- still fully
+    # gated by require_system_admin + settings.is_prod inside the handler,
+    # so exemption here only skips the per-IP counter, not auth or the
+    # production guard.
+    "/api/system/reset-rate-limits",
 })
 
 
@@ -165,8 +171,20 @@ async def api_rate_limit(request: Request, call_next):
 
     Login has its own DB-backed limiter; health probes must never be blocked.
     All other /api/ routes share this limit to prevent automated bulk enumeration.
+
+    DEFECT-004: CORS preflight (OPTIONS) requests are excluded from the count.
+    They carry no credentials of consequence and touch no route/business logic
+    -- counting them was silently halving the effective budget for any
+    cross-origin caller (confirmed live: a single connected-frontend e2e spec
+    file made 220 OPTIONS requests alongside 253 real GET/POST requests in
+    45s, tripping the 300/60s limit on request volume that was, by real
+    operation count, still well under it). This affects real cross-origin
+    production traffic identically to test traffic, not just tests -- fixing
+    the count is a correctness fix, not a threshold change; API_RATE_LIMIT
+    and API_RATE_WINDOW_SEC are unchanged.
     """
-    if request.url.path not in _RATE_LIMIT_EXEMPT and request.url.path.startswith("/api/"):
+    if (request.method != "OPTIONS" and request.url.path not in _RATE_LIMIT_EXEMPT
+            and request.url.path.startswith("/api/")):
         from .security import check_api_rate
         ip = request.client.host if request.client else "anon"
         if check_api_rate(ip):

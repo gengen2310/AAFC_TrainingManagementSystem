@@ -9,6 +9,7 @@ process.env.CONNECTED_LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE || "
 export default defineConfig({
   testDir: "./e2e-connected",
   timeout: 30000,
+  globalSetup: "./playwright-global-setup.ts",
   use: { baseURL: "http://localhost:8080", trace: "on-first-retry" },
   webServer: {
     command: "python3 -m http.server 8080 --directory ../connected-frontend",

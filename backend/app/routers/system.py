@@ -21,11 +21,11 @@ from ..database import get_db
 from ..dependencies import get_principal
 from ..database import utcnow
 from ..models import (
-    User, Wing, Squadron, AuditLog, SystemSetting, AccessCode,
+    User, Wing, Squadron, AuditLog, SystemSetting, AccessCode, IpLoginAttempt,
     PlanningYear, ParadeDate, Session, CurriculumItem, NationalEntity,
 )
 from ..permissions import Principal, require_system_admin, require_audit_access
-from ..security import generate_code, hash_code
+from ..security import generate_code, hash_code, reset_rate_limiter, reset_api_rate_limiter
 from ..services import audit
 
 router = APIRouter(prefix="/api/system", tags=["system"])
@@ -537,3 +537,49 @@ def bootstrap_staging(body: BootstrapIn | None = None,
         "accounts_created": created_accounts,
         "notice": "Codes shown here will NOT be retrievable again. Record each code now.",
     }
+
+
+@router.post("/reset-rate-limits")
+def reset_rate_limits(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Test/staging-only: clear all rate-limit and login-lockout state.
+
+    DEFECT-004 (general-release qualification): repeated/rapid automated test
+    runs (Playwright e2e, load/staging validation) against a long-lived backend
+    process were tripping the general API rate limiter, the DB-backed per-IP
+    login limiter, and the per-account lockout -- producing flaky 429s/423s
+    unrelated to the feature under test, with "restart the backend" as the
+    only prior workaround. backend/tests/conftest.py already resets all three
+    in-process before every pytest test; this is the same reset exposed over
+    HTTP so an external test runner (a separate process) can call it between
+    test files/runs without weakening any limiter's real thresholds. Rejected
+    in production, same guard as bootstrap-staging above.
+
+    Requires a normal system_admin bearer token -- no alternate auth path.
+    Known limitation: if the IP this endpoint would clear is *already* fully
+    locked out before it's called, the caller cannot log in to obtain that
+    token either (login_blocked_db is checked before code verification for
+    every login attempt, including a correct system_admin code), so this
+    specific endpoint cannot self-heal that one edge case. That is an
+    accepted gap, not silently worked around: an authentication bypass for
+    this endpoint was considered and deliberately rejected, since it would
+    weaken the same login-lockout protection this endpoint exists to reset --
+    see docs/beta/15_known_limitations.md. In practice this only occurs if a
+    *previous* run left the IP locked out and this reset was never called at
+    its own start; the existing 900s lockout window (or, if urgent, a manual
+    backend restart) remains the fallback for that specific case.
+    """
+    require_system_admin(p)
+    if settings.is_prod:
+        raise HTTPException(403, detail={
+            "error": "not_allowed_in_production",
+            "message": "Rate-limit reset is not available in the production environment.",
+        })
+    reset_rate_limiter()
+    reset_api_rate_limiter()
+    db.query(IpLoginAttempt).delete()
+    for ac in db.query(AccessCode).all():
+        ac.failed_attempts = 0
+        ac.locked_until = None
+    db.commit()
+    audit(db, p, object_type="system", object_id="rate_limits", action="reset_rate_limits")
+    return {"ok": True}

@@ -1,4 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
+import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // ── Connected-frontend (Main TMS) verification ──────────────────────────────
 // Local run (playwright.connected.config.ts): targets localhost:8080, backend on
@@ -10,6 +11,18 @@ import { test, expect, Page } from "@playwright/test";
 // rewrote the meta tag to the staging backend at container start.
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
+
+// DEFECT-004 follow-up: playwright-global-setup.ts resets rate limits once
+// per full suite invocation, which isn't always enough -- verified live that
+// this file's own request volume, especially with other spec files having
+// run immediately before it, can still cross the general API limiter's
+// 300 req/60s budget partway through (observed as #auth-wing-select never
+// getting populated -- a rate-limited /api/wings fetch, not a real login
+// bug). A per-file reset gives this file its own fresh budget. Best-effort;
+// see e2e-rate-limit-reset.ts for what this does and its known limitations.
+test.beforeAll(async () => {
+  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+});
 
 async function loginSquadron(page: Page, code: string, role: "sqn_admin" | "sqn_general" = "sqn_admin") {
   if (LOCAL_API_BASE) {
