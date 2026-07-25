@@ -225,6 +225,16 @@ export const planningApi = {
   }) => api.post<{ ok: boolean; created: number; linked: number; dates: string[] }>(
     `/api/planning/years/${year_id}/generate-parade-dates`, body,
   ),
+  updateFutureParadeDay: (year_id: string, body: {
+    new_weekday: number; from_date?: string; exclude_ids?: string[];
+    reason?: string; preview?: boolean;
+  }) => api.post<{
+    ok: boolean; preview: boolean;
+    changes?: { parade_date_id: string; old_date: string; new_date: string; term: string | null;
+      week_number: number | null; has_sessions: boolean; conflicts: string[]; blocked: boolean }[];
+    to_update?: number; blocked?: number;
+    updated?: number; skipped?: number; exceptions_preserved: number;
+  }>(`/api/planning/years/${year_id}/update-future-parade-day`, body),
   listAnchors: (year_id: string) =>
     api.get<AnchorEvent[]>(`/api/planning/years/${year_id}/anchors`),
   createAnchor: (year_id: string, body: {

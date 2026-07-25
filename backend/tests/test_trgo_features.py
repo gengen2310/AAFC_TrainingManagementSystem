@@ -1,0 +1,235 @@
+"""TRGO-01/02/03/05/08: deferred TRGO feature implementations (general-release
+qualification continuation). See docs/release/qualification_gap_register.md.
+"""
+import io
+from datetime import date, timedelta
+
+import pytest
+from tests.conftest import login
+
+
+def _sqn_admin_hdr(client):
+    return login(client, "ADMIN703")
+
+
+def _wing_admin_hdr(client):
+    return login(client, "ADMIN7WG")
+
+
+def _general_hdr(client):
+    return login(client, "703SQN2026")
+
+
+def _make_year(client, hdr, year=2099, name="TRGO Feature Test Year"):
+    r = client.post("/api/planning/years", json={"year": year, "name": name}, headers=hdr)
+    assert r.status_code == 200, r.text
+    return r.json()["planning_year_id"]
+
+
+def _future_monday():
+    """A Monday at least 14 days out, so week-shift math never crosses into the past."""
+    d = date.today() + timedelta(days=14)
+    return d - timedelta(days=d.weekday())
+
+
+# ─────────────────────────────────────────────────────────────
+# TRGO-01: Update Future Parade Nights
+# ─────────────────────────────────────────────────────────────
+
+def _seed_parade_dates(client, hdr, year_id, dates):
+    ids = []
+    for d in dates:
+        r = client.post(f"/api/planning/years/{year_id}/parade-dates",
+                        json={"parade_date": d, "parade_type": "standard"},
+                        headers=hdr)
+        assert r.status_code == 200, r.text
+        ids.append(r.json()["parade_date_id"])
+    return ids
+
+
+def test_update_future_parade_day_preview_does_not_write(client):
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2091)
+    monday = _future_monday()
+    tuesday_date = (monday + timedelta(days=1)).isoformat()
+    _seed_parade_dates(client, hdr, year_id, [tuesday_date])
+
+    r = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                    json={"new_weekday": 4, "preview": True},  # move Tue -> Fri
+                    headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["preview"] is True
+    assert d["to_update"] == 1
+    friday_date = (monday + timedelta(days=4)).isoformat()
+    assert d["changes"][0]["new_date"] == friday_date
+    assert d["changes"][0]["old_date"] == tuesday_date
+
+    # Confirm nothing was actually written
+    r2 = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=hdr)
+    dates = [row["parade_date"] for row in r2.json()]
+    assert tuesday_date in dates
+    assert friday_date not in dates
+
+
+def test_update_future_parade_day_commit_requires_reason(client):
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2092)
+    monday = _future_monday()
+    _seed_parade_dates(client, hdr, year_id, [(monday + timedelta(days=1)).isoformat()])
+
+    r = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                    json={"new_weekday": 4, "preview": False},
+                    headers=hdr)
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "reason_required"
+
+
+def test_update_future_parade_day_commit_moves_date_and_preserves_night(client):
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2093)
+    monday = _future_monday()
+    tuesday_date = (monday + timedelta(days=1)).isoformat()
+    ids = _seed_parade_dates(client, hdr, year_id, [tuesday_date])
+
+    # Get the linked parade_night_id before the change
+    before = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=hdr).json()
+    row = next(r for r in before if r["parade_date_id"] == ids[0])
+    pn_id_before = row.get("parade_night_id")
+
+    r = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                    json={"new_weekday": 4, "preview": False, "reason": "Squadron changed parade night to Friday"},
+                    headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["updated"] == 1
+    assert d["skipped"] == 0
+
+    after = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=hdr).json()
+    row_after = next(r for r in after if r["parade_date_id"] == ids[0])
+    friday_date = (monday + timedelta(days=4)).isoformat()
+    assert row_after["parade_date"] == friday_date
+    # Same parade_night_id preserved -- sessions/facilitators/rooms untouched
+    assert row_after.get("parade_night_id") == pn_id_before
+
+
+def test_update_future_parade_day_historical_records_unchanged(client):
+    """Records before from_date must never be touched."""
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2094)
+    monday = _future_monday()
+    future_tuesday = (monday + timedelta(days=1)).isoformat()
+    past_tuesday = "2020-01-07"  # a real past Tuesday, well before "today"
+    _seed_parade_dates(client, hdr, year_id, [past_tuesday, future_tuesday])
+
+    r = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                    json={"new_weekday": 4, "preview": True},
+                    headers=hdr)
+    changed_old_dates = {c["old_date"] for c in r.json()["changes"]}
+    assert past_tuesday not in changed_old_dates
+    assert future_tuesday in changed_old_dates
+
+
+def test_update_future_parade_day_exceptions_preserved_by_default(client):
+    """A non-standard parade_type (e.g. a one-off special night) must not move."""
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2095)
+    monday = _future_monday()
+    special_date = (monday + timedelta(days=1)).isoformat()
+    r = client.post(f"/api/planning/years/{year_id}/parade-dates",
+                    json={"parade_date": special_date, "parade_type": "special"},
+                    headers=hdr)
+    assert r.status_code == 200, r.text
+
+    r2 = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                     json={"new_weekday": 4, "preview": True},
+                     headers=hdr)
+    assert r2.json()["to_update"] == 0
+    assert r2.json()["exceptions_preserved"] == 1
+
+
+def test_update_future_parade_day_holiday_conflict_blocks(client):
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2096)
+    monday = _future_monday()
+    tuesday_date = (monday + timedelta(days=1)).isoformat()
+    friday_date = (monday + timedelta(days=4)).isoformat()
+    _seed_parade_dates(client, hdr, year_id, [tuesday_date])
+    r = client.post(f"/api/planning/years/{year_id}/holidays",
+                    json={"name": "Test Holiday", "start_date": friday_date, "end_date": friday_date,
+                          "affects_parade": True},
+                    headers=hdr)
+    assert r.status_code == 200, r.text
+
+    r2 = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                     json={"new_weekday": 4, "preview": True},
+                     headers=hdr)
+    d = r2.json()
+    assert d["blocked"] == 1
+    assert "holiday" in d["changes"][0]["conflicts"]
+
+
+def test_update_future_parade_day_duplicate_date_blocks(client):
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2097)
+    monday = _future_monday()
+    tuesday_date = (monday + timedelta(days=1)).isoformat()
+    friday_date = (monday + timedelta(days=4)).isoformat()
+    # A parade night already exists on the target Friday
+    _seed_parade_dates(client, hdr, year_id, [tuesday_date, friday_date])
+
+    r = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                    json={"new_weekday": 4, "preview": True},
+                    headers=hdr)
+    d = r.json()
+    tue_change = next(c for c in d["changes"] if c["old_date"] == tuesday_date)
+    assert "duplicate_date" in tue_change["conflicts"]
+    assert tue_change["blocked"] is True
+
+
+def test_update_future_parade_day_writes_audit(client):
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2098)
+    monday = _future_monday()
+    _seed_parade_dates(client, hdr, year_id, [(monday + timedelta(days=1)).isoformat()])
+
+    client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+               json={"new_weekday": 4, "preview": False, "reason": "Move to Friday nights"},
+               headers=hdr)
+    auditor_hdr = login(client, "AUDITOR2026")
+    r = client.get("/api/system/audit-summary?action=update_future_parade_day_bulk&limit=10", headers=auditor_hdr)
+    assert r.status_code == 200
+    assert r.json()["count"] >= 1
+
+
+def test_update_future_parade_day_sqn_general_cannot_commit(client):
+    hdr_admin = _sqn_admin_hdr(client)
+    hdr_general = _general_hdr(client)
+    year_id = _make_year(client, hdr_admin, year=2081)
+    monday = _future_monday()
+    _seed_parade_dates(client, hdr_admin, year_id, [(monday + timedelta(days=1)).isoformat()])
+
+    r = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                    json={"new_weekday": 4, "preview": False, "reason": "test"},
+                    headers=hdr_general)
+    assert r.status_code == 403
+
+
+def test_update_future_parade_day_rollback_on_conflict_does_not_partially_apply(client):
+    """A blocked row must be reported as skipped, never partially written."""
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2082)
+    monday = _future_monday()
+    tuesday_date = (monday + timedelta(days=1)).isoformat()
+    friday_date = (monday + timedelta(days=4)).isoformat()
+    ids = _seed_parade_dates(client, hdr, year_id, [tuesday_date, friday_date])
+
+    r = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                    json={"new_weekday": 4, "preview": False, "reason": "test"},
+                    headers=hdr)
+    d = r.json()
+    assert d["skipped"] == 1
+    # The blocked row's date must be unchanged
+    after = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=hdr).json()
+    row = next(x for x in after if x["parade_date_id"] == ids[0])
+    assert row["parade_date"] == tuesday_date

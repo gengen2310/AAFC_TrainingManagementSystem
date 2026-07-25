@@ -15,6 +15,8 @@ import { EightWeekView } from "../components/planning/views/EightWeekView";
 import { TwoWeekView } from "../components/planning/views/TwoWeekView";
 import { ParadeNightGridView } from "../components/planning/views/ParadeNightGridView";
 import { SetupPanel } from "../components/planning/SetupPanel";
+import { UpdateFutureParadeDayModal } from "../components/planning/UpdateFutureParadeDayModal";
+import { canWriteSquadron } from "../auth/permissions";
 import type { PlanningSession, AnchorEvent } from "../api/types";
 
 
@@ -44,6 +46,7 @@ export function PlanningWorkspace() {
     setSelectedYearId(id);
   }, []);
   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
+  const [updatingParadeDay, setUpdatingParadeDay] = useState(false);
   const [bottomOpen, setBottomOpen] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab>("activities");
   const [layers, setLayers] = useState<LayerState>(defaultLayers);
@@ -351,7 +354,23 @@ export function PlanningWorkspace() {
           >
             + Anchor event
           </button>
+          {canWriteSquadron(session) && (
+            <button
+              className="btn sm out"
+              style={{ fontSize: 11, padding: "3px 10px" }}
+              onClick={() => setUpdatingParadeDay(true)}
+            >
+              Update future parade nights…
+            </button>
+          )}
         </div>
+      )}
+      {updatingParadeDay && selectedYearId && (
+        <UpdateFutureParadeDayModal
+          yearId={selectedYearId}
+          onClose={() => setUpdatingParadeDay(false)}
+          onDone={() => qc.invalidateQueries({ queryKey: ["planning-cc"] })}
+        />
       )}
 
       {/* Main body: left + canvas + right */}

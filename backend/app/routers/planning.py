@@ -755,6 +755,150 @@ def generate_parade_dates(
     return {"ok": True, "created": len(created), "linked": len(linked), "dates": created}
 
 
+class UpdateFutureParadeDayIn(BaseModel):
+    new_weekday: int                      # 0=Mon … 6=Sun, same convention as GenerateParadeDatesIn
+    from_date: str | None = None          # ISO date; defaults to today
+    exclude_ids: list[str] = []           # ParadeDate IDs to leave untouched (kept as one-night exceptions)
+    reason: str | None = None             # required when preview=false
+    preview: bool = True
+
+
+@router.post("/years/{year_id}/update-future-parade-day")
+def update_future_parade_day(
+    year_id: str,
+    body: UpdateFutureParadeDayIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """TRGO-01: move future Parade Nights to a new day of the week.
+
+    Changing Squadron.default_parade_day only affects newly-generated dates --
+    it was never meant to (and does not) retroactively touch existing ParadeDate/
+    ParadeNight rows, since both store a concrete ISO date, not a derived one.
+    This endpoint is the explicit, auditable action for a squadron that actually
+    wants its upcoming nights moved to a new day, previously missing entirely.
+
+    Only ParadeDate rows with parade_date >= from_date and parade_type=="standard"
+    are considered -- one-night exceptions (parade_type != "standard", e.g. a
+    special/cancelled night) are preserved automatically, not just via exclude_ids.
+    Each candidate is shifted to the same day *within its existing ISO week*
+    (Mon-Sun), preserving term/week_number and the linked ParadeNight (so
+    sessions, facilitators and rooms already assigned are never disturbed --
+    only the date changes, in place).
+    """
+    from sqlalchemy import or_
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py, write=not body.preview)
+    if not body.preview and not (body.reason or "").strip():
+        raise HTTPException(400, detail={"error": "reason_required",
+                                          "message": "A reason is required to update future parade nights."})
+    if body.new_weekday < 0 or body.new_weekday > 6:
+        raise HTTPException(400, detail={"error": "invalid_weekday"})
+
+    from_date = body.from_date or date.today().isoformat()
+    rows = db.query(ParadeDate).filter(
+        ParadeDate.planning_year_id == year_id,
+        ParadeDate.is_active == True,  # noqa: E712
+        ParadeDate.parade_date >= from_date,
+        ParadeDate.parade_type == "standard",
+    ).order_by(ParadeDate.parade_date).all()
+
+    holidays = db.query(HolidayPeriod).filter(
+        HolidayPeriod.planning_year_id == year_id,
+        HolidayPeriod.affects_parade == True,  # noqa: E712
+    ).all()
+
+    def in_holiday(d: str) -> bool:
+        return any(h.start_date <= d <= h.end_date for h in holidays)
+
+    # All active dates for this year, to detect a shift landing on an existing date.
+    existing_dates = {r.parade_date for r in
+                      db.query(ParadeDate.parade_date).filter(
+                          ParadeDate.planning_year_id == year_id,
+                          ParadeDate.is_active == True,  # noqa: E712
+                      ).all()}
+
+    plan: list[dict] = []
+    for pd_row in rows:
+        if pd_row.id in body.exclude_ids:
+            continue
+        old_d = date.fromisoformat(pd_row.parade_date)
+        if old_d.weekday() == body.new_weekday:
+            continue  # already on the target day -- nothing to do
+        new_d = old_d - timedelta(days=old_d.weekday()) + timedelta(days=body.new_weekday)
+        new_ds = new_d.isoformat()
+
+        conflicts = []
+        if new_ds in existing_dates and new_ds != pd_row.parade_date:
+            conflicts.append("duplicate_date")
+        if in_holiday(new_ds):
+            conflicts.append("holiday")
+
+        has_sessions = False
+        if pd_row.parade_night_id:
+            has_sessions = db.query(TrainingSession).filter(
+                TrainingSession.parade_night_id == pd_row.parade_night_id,
+                TrainingSession.is_archived == False,  # noqa: E712
+            ).count() > 0
+
+        plan.append({
+            "parade_date_id": pd_row.id,
+            "old_date": pd_row.parade_date,
+            "new_date": new_ds,
+            "term": pd_row.term,
+            "week_number": pd_row.week_number,
+            "parade_night_id": pd_row.parade_night_id,
+            "has_sessions": has_sessions,
+            "conflicts": conflicts,
+            "blocked": len(conflicts) > 0,
+        })
+
+    exceptions = db.query(ParadeDate).filter(
+        ParadeDate.planning_year_id == year_id,
+        ParadeDate.is_active == True,  # noqa: E712
+        ParadeDate.parade_date >= from_date,
+        ParadeDate.parade_type != "standard",
+    ).count()
+
+    if body.preview:
+        return {
+            "ok": True, "preview": True,
+            "changes": plan,
+            "to_update": sum(1 for r in plan if not r["blocked"]),
+            "blocked": sum(1 for r in plan if r["blocked"]),
+            "exceptions_preserved": exceptions,
+        }
+
+    updated = []
+    skipped = []
+    for r in plan:
+        if r["blocked"]:
+            skipped.append(r)
+            continue
+        pd_row = db.get(ParadeDate, r["parade_date_id"])
+        old_date = pd_row.parade_date
+        pd_row.parade_date = r["new_date"]
+        pd_row.updated_at = utcnow()
+        if r["parade_night_id"]:
+            pn = db.get(ParadeNight, r["parade_night_id"])
+            if pn:
+                pn.date = r["new_date"]
+                pn.updated_at = utcnow()
+        audit(db, p, object_type="parade_date", object_id=r["parade_date_id"],
+              action="update_future_parade_day",
+              old={"date": old_date}, new={"date": r["new_date"]}, reason=body.reason)
+        updated.append(r)
+    db.commit()
+    audit(db, p, object_type="planning_year", object_id=year_id, action="update_future_parade_day_bulk",
+          new={"updated": len(updated), "skipped": len(skipped), "new_weekday": body.new_weekday}, reason=body.reason)
+    return {
+        "ok": True, "preview": False,
+        "updated": len(updated), "skipped": len(skipped),
+        "updated_dates": updated, "skipped_conflicts": skipped,
+        "exceptions_preserved": exceptions,
+    }
+
+
 @router.delete("/parade-dates/{date_id}")
 def delete_parade_date(
     date_id: str,
