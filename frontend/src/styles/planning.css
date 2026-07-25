@@ -383,7 +383,7 @@ body.pw-active .main {
   border-bottom: 1px solid var(--border);
 }
 .pw-curric-item:last-child { border-bottom: none; }
-.pw-curric-item:hover { background: rgba(81,176,227,.1); }
+.pw-curric-item:hover, .pw-curric-item.highlighted { background: rgba(81,176,227,.1); }
 
 /* ── Setup panel ─────────────────────────────────────────── */
 .pw-setup-panel {

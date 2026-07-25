@@ -46,12 +46,12 @@ Created: 2026-07-14.
 
 ## Accessibility Limitations
 
-### AL-01: Curriculum-Link Search Dropdown Has No Real Keyboard Navigation
+### AL-01: Curriculum-Link Search Dropdown Has No Real Keyboard Navigation — RESOLVED
 
-- **Description**: Planning Workspace's curriculum-link search dropdown (`PlanningRightDrawer.tsx`, the "Curriculum link" search box on session/anchor detail) has no arrow-key/Enter selection — the dropdown items only respond to a mouse. Found during the 2026-07-24 accessibility widening pass (Phase 7) via `eslint-plugin-jsx-a11y`, which flagged the item's `onMouseDown` handler with no keyboard equivalent.
-- **Why not fixed in the same pass**: the items deliberately use `onMouseDown` rather than `onClick` so selection fires before the search input's `onBlur` closes the dropdown — a timing-sensitive pattern. Properly fixing this means implementing a real combobox interaction model (ArrowUp/ArrowDown to move a highlighted option, Enter to select, Escape to close) without breaking that blur/mousedown timing, which needs live verification of a working feature rather than a mechanical lint fix.
-- **Impact**: Low-medium. A keyboard-only user can still link curriculum via the same underlying data (no data is unreachable), but must currently do so through some other path; the search box itself isn't operable without a mouse.
-- **Resolution**: Not done this pass. `eslint-disable` with a `TODO(a11y follow-up)` comment left in place at the call site so the gap stays visible in code, not just here.
+- **Description**: Planning Workspace's curriculum-link search dropdown (`PlanningRightDrawer.tsx`, the "Curriculum link" search box on session/anchor detail) had no arrow-key/Enter selection — the dropdown items only responded to a mouse. Found during the 2026-07-24 accessibility widening pass (Phase 7) via `eslint-plugin-jsx-a11y`, which flagged the item's `onMouseDown` handler with no keyboard equivalent.
+- **Resolution (master transformation plan Block 12)**: implemented the real ARIA 1.2 combobox-list pattern — the input carries `role="combobox"`/`aria-expanded`/`aria-controls`/`aria-activedescendant`, the dropdown is `role="listbox"`, each item is `role="option"`. ArrowUp/ArrowDown move a highlighted option (`aria-selected`, matching visual highlight), Enter selects it, Escape closes without selecting — all via a `handleSearchKeyDown` handler on the input, which owns focus throughout (the ARIA-correct model: listbox options are never separately focusable). The pre-existing `onMouseDown`-before-`onBlur` timing trick is unchanged; mouse selection still works exactly as before, `onMouseEnter` now also syncs the keyboard highlight so mouse and keyboard stay consistent.
+- **Impact**: None remaining — a keyboard-only user can now search, navigate, and select without a mouse.
+- The `eslint-disable` at the option `<div>` remains, now accurately justified (a comment explains why): the option itself intentionally has no independent keyboard handler because the combobox pattern puts all keyboard interaction on the input, not the option.
 
 ### AL-02: Pre-existing Test Bugs Found (Not Introduced This Pass, Not Fixed)
 

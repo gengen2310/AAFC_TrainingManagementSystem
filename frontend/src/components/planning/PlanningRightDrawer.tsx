@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId, type KeyboardEvent } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../api";
 import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent } from "../../api/types";
@@ -43,7 +43,9 @@ function SessionForm({
   const [curriculumId, setCurriculumId] = useState<string | null>(existing?.curriculum_id ?? null);
   const [currSearch, setCurrSearch] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
   const [cadetGroup, setCadetGroup] = useState(
     existing?.cadet_group ?? (item.type === "new-session" ? item.cadetGroup : "junior"),
   );
@@ -88,11 +90,35 @@ function SessionForm({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  // Keep the highlighted option in range as the result set changes while typing.
+  useEffect(() => { setHighlightedIndex(0); }, [currSearch]);
+
   function selectCurriculum(m: MissionItem) {
     setCurriculumId(m.curriculum_id);
     setTitle(m.title);
     setCurrSearch("");
     setPickerOpen(false);
+  }
+
+  // Real ARIA combobox keyboard interaction (was previously mouse-only — see
+  // docs/beta/15_known_limitations.md AL-01). ArrowUp/Down move the highlighted
+  // option, Enter selects it, Escape closes without selecting.
+  function handleSearchKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (!pickerOpen || searchResults.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex(i => Math.min(i + 1, searchResults.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex(i => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const m = searchResults[highlightedIndex];
+      if (m) selectCurriculum(m);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setPickerOpen(false);
+    }
   }
 
   function clearCurriculum() {
@@ -234,24 +260,45 @@ function SessionForm({
           ) : (
             <>
               <input
+                role="combobox"
+                aria-expanded={pickerOpen && searchResults.length > 0}
+                aria-haspopup="listbox"
+                aria-autocomplete="list"
+                aria-controls={`${listboxId}-listbox`}
+                aria-activedescendant={
+                  pickerOpen && searchResults[highlightedIndex]
+                    ? `${listboxId}-opt-${searchResults[highlightedIndex].curriculum_id}`
+                    : undefined
+                }
                 placeholder="Search by code or title…"
                 value={currSearch}
                 onChange={e => { setCurrSearch(e.target.value); setPickerOpen(true); }}
                 onFocus={() => setPickerOpen(true)}
+                onKeyDown={handleSearchKeyDown}
                 style={{ width: "100%", fontSize: 12, padding: "6px 9px", borderRadius: 6, border: "1.5px solid var(--border)" }}
               />
               {pickerOpen && searchResults.length > 0 && (
-                <div className="pw-curric-dropdown">
-                  {searchResults.map(m => (
-                    // TODO(a11y follow-up): this search dropdown has no real keyboard
-                    // navigation (arrow keys / Enter) yet — see docs/beta/15_known_limitations.md.
+                <div className="pw-curric-dropdown" role="listbox" id={`${listboxId}-listbox`} aria-label="Curriculum search results">
+                  {searchResults.map((m, i) => (
                     // onMouseDown (not onClick) is deliberate: it fires before the input's
-                    // onBlur closes the dropdown.
-                    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+                    // onBlur closes the dropdown. Real keyboard operability (Arrow keys,
+                    // Enter, Escape) is handled by handleSearchKeyDown on the input above,
+                    // via role="combobox"/aria-activedescendant — per the W3C ARIA APG
+                    // combobox-list pattern, listbox options are deliberately NOT focusable
+                    // (no tabIndex); the input owns focus throughout and the "virtually
+                    // focused" option is only ever referenced, never actually focused. This
+                    // is why interactive-supports-focus is also suppressed here, not just
+                    // the click/keyboard-parity rules (see docs/beta/15_known_limitations.md
+                    // AL-01, resolved).
+                    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/interactive-supports-focus
                     <div
                       key={m.curriculum_id}
-                      className="pw-curric-item"
+                      id={`${listboxId}-opt-${m.curriculum_id}`}
+                      role="option"
+                      aria-selected={i === highlightedIndex}
+                      className={`pw-curric-item${i === highlightedIndex ? " highlighted" : ""}`}
                       onMouseDown={() => selectCurriculum(m)}
+                      onMouseEnter={() => setHighlightedIndex(i)}
                     >
                       <span className="pw-curric-code">{m.code}</span>
                       <span style={{ flex: 1 }}>{m.title}</span>
