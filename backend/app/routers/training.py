@@ -8,10 +8,10 @@ from typing import List, Optional
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
-from ..models import (CurriculumItem, CurriculumElement, ParadeNight, Session, SessionStatusHistory,
+from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
                       Facilitator, FacilitatorRankHistory, SubjectAreaTag, TrainingArea, Equipment,
                       Activity, Cadet, Squadron, TimingTemplate, TimingBlock)
-from ..models.training import ELEMENT_SCOPE_LEVELS
+from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
 from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron)
@@ -1484,6 +1484,152 @@ def _upsert_element(db: DBSession, name: str, scope: str = "national",
     db.add(el)
     db.flush()  # get id without full commit
     return el.id
+
+
+# ── CURRICULUM PHASES ─────────────────────────────────────────────────────────
+# Master transformation plan Block 10 / addendum section II.2: a governed
+# training-phase catalogue, deliberately built as CurriculumElement's sibling
+# (same scope model, same idempotent-create/archive shape) rather than a
+# discriminator on curriculum_elements itself — elements are subject-matter
+# categories, phases are program-progression stages, and a discriminator
+# risked confusing list_elements' existing callers. CustomPhase (the
+# pre-existing, fully-unwired dead table) is deliberately left alone, not
+# built on — it lacks the scope columns this table needs, so extending it
+# would have needed the same work as starting fresh here.
+
+class PhaseIn(BaseModel):
+    name: str            # e.g. "A. Orientation" — matches CurriculumItem.phase/Session.phase_at_time
+    display_name: str
+    scope_level: str = "national"
+    wing_id: str | None = None
+    squadron_id: str | None = None
+    sort_order: int = 0
+
+
+def _can_create_phase(p: Principal, scope_level: str,
+                      wing_id: str | None = None, squadron_id: str | None = None) -> None:
+    """Raise 403 if the actor cannot create a phase at the requested scope.
+    Identical rule set to _can_create_element — phases and elements are
+    governed by the same scope doctrine."""
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden",
+                                          "message": "Viewers and auditors cannot create phases."})
+    if scope_level not in PHASE_SCOPE_LEVELS:
+        raise HTTPException(400, detail={"error": "invalid_scope",
+                                          "message": f"scope_level must be one of: {sorted(PHASE_SCOPE_LEVELS)}"})
+    if scope_level == "system":
+        if p.role != "system_admin":
+            raise HTTPException(403, detail={"error": "forbidden",
+                                              "message": "Only system_admin can create system-scope phases."})
+    elif scope_level == "national":
+        if p.role not in _NAT_ADMIN_ROLES:
+            raise HTTPException(403, detail={"error": "forbidden",
+                                              "message": "Only national_admin or system_admin can create national phases."})
+    elif scope_level == "wing":
+        if p.role not in _WING_WRITE_ROLES:
+            raise HTTPException(403, detail={"error": "forbidden",
+                                              "message": "Only wing_admin or above can create wing phases."})
+        effective_wing = wing_id or p.wing_id
+        if p.role == "wing_admin" and effective_wing != p.wing_id:
+            raise HTTPException(403, detail={"error": "out_of_scope",
+                                              "message": "Wing admin can only create phases for their own wing."})
+    elif scope_level == "squadron":
+        if p.role not in {*_WING_WRITE_ROLES, "sqn_admin"}:
+            raise HTTPException(403, detail={"error": "forbidden"})
+        if p.role == "sqn_admin" and squadron_id and squadron_id != p.squadron_id:
+            raise HTTPException(403, detail={"error": "out_of_scope",
+                                              "message": "Squadron admin can only create phases for their own squadron."})
+
+
+def _visible_phases(db: DBSession, p: Principal) -> list[CurriculumPhase]:
+    """Return phases visible to this principal (scoped by role) — identical
+    visibility rule to _visible_elements. This is the "phase is available to
+    this unit" concept from addendum section II.3, distinct from "phase
+    exists in catalogue" (any row) and "phase is scheduled tonight" (a
+    Session's phase_at_time)."""
+    from sqlalchemy import or_
+    conditions = [
+        CurriculumPhase.scope_level == "national",
+        CurriculumPhase.scope_level == "system",
+    ]
+    wing_id = p.acting_wing_id or p.wing_id
+    sq_id = p.acting_squadron_id or p.squadron_id
+    if wing_id:
+        conditions.append(
+            (CurriculumPhase.scope_level == "wing") & (CurriculumPhase.wing_id == wing_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(CurriculumPhase.scope_level == "wing")
+    if sq_id:
+        conditions.append(
+            (CurriculumPhase.scope_level == "squadron") & (CurriculumPhase.squadron_id == sq_id))
+    elif p.role == "wing_admin":
+        pass  # wing admin: no sqn-scope phases unless proxied
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(CurriculumPhase.scope_level == "squadron")
+    return db.query(CurriculumPhase).filter(
+        CurriculumPhase.is_archived == False,  # noqa: E712
+        CurriculumPhase.active_status == True,  # noqa: E712
+        or_(*conditions),
+    ).order_by(CurriculumPhase.sort_order, CurriculumPhase.scope_level, CurriculumPhase.display_name).all()
+
+
+@router.get("/curriculum/phases")
+def list_phases(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Return all training phases visible to the caller's scope, in
+    training-progression order — the phase picker's data source."""
+    return [{"phase_id": ph.id, "name": ph.name, "display_name": ph.display_name,
+             "scope_level": ph.scope_level, "wing_id": ph.wing_id, "squadron_id": ph.squadron_id,
+             "sort_order": ph.sort_order}
+            for ph in _visible_phases(db, p)]
+
+
+@router.post("/curriculum/phases")
+def create_phase(body: PhaseIn, db: DBSession = Depends(get_db),
+                 p: Principal = Depends(get_principal)):
+    """Create a training phase at the requested scope."""
+    scope = body.scope_level
+    _can_create_phase(p, scope, body.wing_id, body.squadron_id)
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(400, detail={"error": "name_required"})
+    wing_id = body.wing_id or (p.wing_id if scope in ("wing", "squadron") else None)
+    sq_id = body.squadron_id or (p.squadron_id if scope == "squadron" else None)
+    # Idempotent: return existing phase if same name + scope
+    existing = db.query(CurriculumPhase).filter(
+        CurriculumPhase.name == name,
+        CurriculumPhase.scope_level == scope,
+        CurriculumPhase.wing_id == wing_id,
+        CurriculumPhase.squadron_id == sq_id,
+        CurriculumPhase.is_archived == False,  # noqa: E712
+    ).first()
+    if existing:
+        return {"ok": True, "phase_id": existing.id, "name": existing.name,
+                "display_name": existing.display_name, "scope_level": existing.scope_level, "existed": True}
+    ph = CurriculumPhase(
+        name=name, display_name=body.display_name or name,
+        scope_level=scope, wing_id=wing_id, squadron_id=sq_id, sort_order=body.sort_order,
+        active_status=True, created_by=p.user_id)
+    db.add(ph)
+    db.commit()
+    audit(db, p, object_type="curriculum_phase", object_id=ph.id, action="create",
+          new={"name": name, "scope": scope})
+    return {"ok": True, "phase_id": ph.id, "name": ph.name,
+            "display_name": ph.display_name, "scope_level": ph.scope_level, "existed": False}
+
+
+@router.post("/curriculum/phases/{phid}/archive")
+def archive_phase(phid: str, db: DBSession = Depends(get_db),
+                  p: Principal = Depends(get_principal)):
+    ph = db.get(CurriculumPhase, phid)
+    if not ph:
+        raise HTTPException(404, detail={"error": "not_found"})
+    # Only the owning scope or above can archive
+    _can_create_phase(p, ph.scope_level, ph.wing_id, ph.squadron_id)
+    ph.is_archived = True
+    ph.archived_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="curriculum_phase", object_id=ph.id, action="archive")
+    return {"ok": True}
 
 
 # ── CURRICULUM WRITE (SQN-owned items only) ──────────────────────────────────

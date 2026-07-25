@@ -10,7 +10,7 @@ from .organisations import (
     NationalEntity, Wing, Squadron, Flight, User, AccessCode, ProxySession, IpLoginAttempt,
 )
 from .training import (
-    CurriculumItem, CurriculumElement, CustomPhase, ParadeNight, Session, SessionStatusHistory,
+    CurriculumItem, CurriculumElement, CurriculumPhase, CustomPhase, ParadeNight, Session, SessionStatusHistory,
     Facilitator, FacilitatorRankHistory, SubjectAreaTag, TrainingArea, Equipment, Activity, Cadet,
     TimingTemplate, TimingBlock, ParadeNightTimingOverride,
 )
@@ -24,7 +24,7 @@ from .program import (
 
 __all__ = [
     "NationalEntity", "Wing", "Squadron", "Flight", "User", "AccessCode", "ProxySession", "IpLoginAttempt",
-    "CurriculumItem", "CurriculumElement", "CustomPhase", "ParadeNight", "Session", "SessionStatusHistory",
+    "CurriculumItem", "CurriculumElement", "CurriculumPhase", "CustomPhase", "ParadeNight", "Session", "SessionStatusHistory",
     "Facilitator", "FacilitatorRankHistory", "SubjectAreaTag", "TrainingArea", "Equipment", "Activity", "Cadet",
     "TimingTemplate", "TimingBlock", "ParadeNightTimingOverride",
     "ActionItem", "Exception", "AuditLog", "ImportLog", "ExportLog", "SystemSetting",

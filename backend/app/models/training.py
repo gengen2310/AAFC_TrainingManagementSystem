@@ -315,3 +315,30 @@ class CurriculumElement(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     squadron_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+
+# Scope constants for the phase catalogue — same shape as ELEMENT_SCOPE_LEVELS
+PHASE_SCOPE_LEVELS = frozenset({"national", "wing", "squadron", "system"})
+
+
+class CurriculumPhase(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
+    """Managed training-phase catalogue (master transformation plan Block 10).
+
+    Mirrors CurriculumElement's proven scope/visibility pattern exactly:
+    system > national > wing > squadron, squadron users see national + their
+    wing's + their own squadron's phases, higher-scope phases are read-only
+    to lower-scope admins. CurriculumItem.phase / Session.phase_at_time stay
+    plain strings matched by name — same relationship CurriculumElement has
+    to CurriculumItem.element today, not a schema-level FK, so this table
+    governs the catalogue and visibility of phase names without touching
+    existing historical free-text data.
+    """
+    __tablename__ = "curriculum_phases"
+    name: Mapped[str] = mapped_column(String(60), index=True)
+    display_name: Mapped[str] = mapped_column(String(120))
+    scope_level: Mapped[str] = mapped_column(String(20), index=True)  # system|national|wing|squadron
+    wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    squadron_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    active_status: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)

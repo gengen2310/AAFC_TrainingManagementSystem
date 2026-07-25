@@ -1792,13 +1792,20 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ff"><label>Part Number</label><input type="number" id="c-part" value="1" min="1" step="1" style="max-width:100px"></div>
       </div>
       <div class="form-row">
-        <div class="ff"><label>Phase</label>
-          <select id="c-phase">
-            <option value="A. Orientation">Orientation</option><option value="B. Initial">Initial</option>
-            <option value="C. Junior">Junior</option><option value="D. Intermediate">Intermediate</option>
-            <option value="E. Senior">Senior</option><option value="I. Bronze">Bronze CLP</option>
-            <option value="J. Silver">Silver CLP</option><option value="K. Gold">Gold CLP</option>
-          </select>
+        <div class="ff">
+          <label>Phase</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="c-phase" style="flex:1"></select>
+            <button type="button" class="btn" style="white-space:nowrap;font-size:11px;padding:4px 8px" onclick="openCreatePhaseInline()">+ New</button>
+          </div>
+          <div id="c-phase-new" style="display:none;margin-top:6px">
+            <div style="display:flex;gap:6px;align-items:center">
+              <input id="c-phase-new-name" placeholder="Phase name (e.g. F. Advanced)" style="flex:1">
+              <button type="button" class="btn btn-dk" style="font-size:11px;padding:4px 8px" onclick="doCreatePhaseInline()">Create</button>
+              <button type="button" class="btn btn-out" style="font-size:11px;padding:4px 8px" onclick="document.getElementById('c-phase-new').style.display='none'">×</button>
+            </div>
+            <div id="c-phase-new-msg" style="font-size:11px;margin-top:3px;color:var(--red)"></div>
+          </div>
         </div>
         <div class="ff">
           <label>Element</label>
@@ -3019,6 +3026,7 @@ async function loadData(){
   const p_pns=api('/api/parade-nights').catch(e=>{S.loadErr=apiErr(e);return null;});
   const p_facs=api('/api/facilitators').catch(()=>null);
   const p_cur=api('/api/curriculum').catch(()=>null);
+  const p_phases=api('/api/curriculum/phases').catch(()=>null);
   const p_ta=api('/api/training-areas').catch(()=>null);
   const p_eq=api('/api/equipment').catch(()=>null);
   const p_ai=api('/api/action-items').catch(()=>null);
@@ -3044,14 +3052,14 @@ async function loadData(){
 
   const[
     uicfg,tags,
-    pns,facs,cur,ta,eq,ai,acts,proxy,
+    pns,facs,cur,phases,ta,eq,ai,acts,proxy,
     repSum,repRead,repCov,repFload,repNdel,
     sqnData,timing,auditData,
     wov,wph,wcap,wsqns,
     nat,natov,natcap,wings,nsqns,
   ]=await Promise.all([
     p_uicfg,p_tags,
-    p_pns,p_facs,p_cur,p_ta,p_eq,p_ai,p_acts,p_proxy,
+    p_pns,p_facs,p_cur,p_phases,p_ta,p_eq,p_ai,p_acts,p_proxy,
     p_sum,p_read,p_cov,p_fload,p_ndel,
     p_sqnData,p_timing,p_audit,
     p_wov,p_wph,p_wcap,p_wsqns,
@@ -3072,6 +3080,11 @@ async function loadData(){
   const _parseAreas=a=>{if(!a)return[];if(Array.isArray(a))return a;if(typeof a==='string'){try{const r=JSON.parse(a);return Array.isArray(r)?r:[];}catch(_){return[];}}return[];};
   S.facs=(facs||[]).map(f=>({id:f.facilitator_id,rank:f.current_rank||'',first:f.first_name||'',last:f.last_name||'',type:f.type||'',areas:_parseAreas(f.subject_areas)}));
   S.curr=((cur&&cur.items)||[]).map(i=>({id:i.curriculum_id,code:i.code,identifier:i.identifier,partNumber:i.part_number,title:i.title,phase:i.phase,el:i.element,term:i.recommended_term,hours:Math.round((i.duration_minutes||0)/60),type:i.core_status,lh:i.learning_hub_url,progress:i.progress,sessions:i.session_count,owningLevel:i.owning_level,wingId:i.wing_id,owned:i.owning_level==='squadron'}));
+  // Governed phase catalogue (master transformation plan Block 10) — falls
+  // back to the 8 built-in names if the endpoint is unreachable, same
+  // fallback _populateCurrPhases() uses for the curriculum-item form.
+  S.phases=(Array.isArray(phases)&&phases.length)?phases.map(p=>({name:p.name,displayName:p.display_name})):
+    ['A. Orientation','B. Initial','C. Junior','D. Intermediate','E. Senior','I. Bronze','J. Silver','K. Gold'].map(n=>({name:n,displayName:n}));
   S.rooms=(ta||[]).map(r=>({id:r.training_area_id||r.id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||''}));
   S.equip=(eq||[]).map(x=>({id:x.equipment_id||x.id,name:x.name,qty:x.quantity||x.qty,notes:x.notes||''}));
   S.actionItems=(ai||[]).map(a=>({id:a.action_id,title:a.title,description:a.description,owner:a.owner,due:a.due_date,status:a.status,severity:a.severity,source:a.source}));
@@ -4834,18 +4847,16 @@ function buildSlots(){
   const currOpts=allCurr().map(e=>`<option value="${e.title}">${e.code} — ${e.title}</option>`).join('');
   const facOpts=S.facs.map(f=>`<option value="${f.id}">${facDisplay(f)}</option>`).join('');
   const roomOpts=S.rooms.map(r=>`<option value="${r.name}">${r.name}</option>`).join('');
+  // Governed phase catalogue (master transformation plan Block 10) — S.phases
+  // is loaded at app-load time and already scope-filtered server-side.
+  const phaseOpts=(S.phases||[]).map(p=>`<option value="${esc(p.name)}">${esc(p.displayName)}</option>`).join('');
   let html='';
   for(let i=0;i<n;i++){
     html+=`<div style="border:1px solid var(--border);border-radius:7px;padding:10px;margin-bottom:8px;">
       <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Session ${i+1}</div>
       <div class="form-row">
         <div class="ff"><label>Phase</label>
-          <select id="np-ph-${i}">
-            <option value="A. Orientation">Orientation</option><option value="B. Initial">Initial</option>
-            <option value="C. Junior">Junior</option><option value="D. Intermediate">Intermediate</option>
-            <option value="E. Senior">Senior</option><option value="I. Bronze">Bronze CLP</option>
-            <option value="J. Silver">Silver CLP</option><option value="K. Gold">Gold CLP</option>
-          </select>
+          <select id="np-ph-${i}">${phaseOpts}</select>
         </div>
         <div class="ff"><label>Curriculum Item</label>
           <select id="np-ex-${i}"><option value="">— Unassigned —</option>${currOpts}</select>
@@ -4908,7 +4919,10 @@ function showPNDetail(ds){
   const currOpts=allCurr().map(e=>`<option value="${e.title}">${e.code} — ${e.title}</option>`).join('');
   const facOpts=S.facs.map(f=>`<option value="${f.id}">${facDisplay(f)}</option>`).join('');
   const roomOpts=S.rooms.map(r=>`<option value="${r.name}">${r.name}</option>`).join('');
-  const phOpts=['A. Orientation','B. Initial','C. Junior','D. Intermediate','E. Senior','I. Bronze','J. Silver','K. Gold'].map(p=>`<option value="${p}">${PH_S[p]}</option>`).join('');
+  // Governed phase catalogue (master transformation plan Block 10) — falls
+  // back to PH_S's short label for the 8 built-in names, else uses the
+  // phase's own display_name (a custom wing/squadron phase).
+  const phOpts=(S.phases||[]).map(p=>`<option value="${esc(p.name)}">${esc(PH_S[p.name]||p.displayName)}</option>`).join('');
   let html=`<div class="alert a-info"><b>${pn.term}</b> · ${pn.notes||'No notes'}</div>`;
   (pn.sessions||[]).forEach((s,i)=>{
     const stOpts=['planned','delivered','cancelled','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${s.status===v?'selected':''}>${{planned:'Planned',delivered:'Delivered',cancelled:'Cancelled',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
@@ -4935,7 +4949,16 @@ function showPNDetail(ds){
   document.getElementById('pn-det-body').innerHTML=html;
   setTimeout(()=>{
     (pn.sessions||[]).forEach((s,i)=>{
-      const ph=document.getElementById('d-ph-'+i);if(ph)ph.value=s.phase||'B. Initial';
+      const ph=document.getElementById('d-ph-'+i);
+      if(ph){
+        // A session's recorded phase may predate the governed catalogue —
+        // add it as a one-off option rather than silently switching it to
+        // whatever option happens to be first when Save is clicked.
+        if(s.phase && ![...ph.options].some(o=>o.value===s.phase)){
+          ph.appendChild(new Option(s.phase+' (not in catalogue)', s.phase));
+        }
+        ph.value=s.phase||'B. Initial';
+      }
       const ex=document.getElementById('d-ex-'+i);if(ex)ex.value=s.exp||'';
       const fa=document.getElementById('d-fa-'+i);if(fa)fa.value=s.facId||'';
       const rm=document.getElementById('d-rm-'+i);if(rm)rm.value=s.room||'';
@@ -5262,24 +5285,68 @@ async function doCreateElementInline(){
     nameInput.value='';
   }catch(e){msgEl.textContent=apiErr(e);}
 }
+// Master transformation plan Block 10: Phase was previously a hardcoded
+// <select> baked into this file's HTML — no wing/squadron could ever add a
+// custom phase, and national admins had no way to extend the list without a
+// code change. This mirrors _populateCurrElements()'s governed-catalogue
+// pattern exactly, including the same offline fallback to the 8 built-in
+// names so the form still works if /api/curriculum/phases is unreachable.
+async function _populateCurrPhases(){
+  const sel=document.getElementById('c-phase');if(!sel)return;
+  const prev=sel.value;
+  try{
+    const phases=await api('/api/curriculum/phases');
+    sel.innerHTML='';
+    (phases||[]).forEach(p=>{const o=new Option(p.display_name||p.name,p.name);sel.appendChild(o);});
+  }catch(_){
+    // fallback to built-in list if API unavailable
+    sel.innerHTML=`<option value="A. Orientation">A. Orientation</option><option value="B. Initial">B. Initial</option>
+      <option value="C. Junior">C. Junior</option><option value="D. Intermediate">D. Intermediate</option>
+      <option value="E. Senior">E. Senior</option><option value="I. Bronze">I. Bronze</option>
+      <option value="J. Silver">J. Silver</option><option value="K. Gold">K. Gold</option>`;
+  }
+  if(prev && [...sel.options].some(o=>o.value===prev)) sel.value=prev;
+}
+function openCreatePhaseInline(){
+  const el=document.getElementById('c-phase-new');
+  if(el){el.style.display='block';document.getElementById('c-phase-new-name').focus();}
+}
+async function doCreatePhaseInline(){
+  const nameInput=document.getElementById('c-phase-new-name');
+  const msgEl=document.getElementById('c-phase-new-msg');
+  const name=(nameInput.value||'').trim();
+  if(!name){msgEl.textContent='Phase name is required.';return;}
+  msgEl.textContent='';
+  try{
+    const r=await api('/api/curriculum/phases',{method:'POST',body:{
+      name,display_name:name,scope_level:'national'
+    }});
+    // Reload phase list and select the new one
+    await _populateCurrPhases();
+    const sel=document.getElementById('c-phase');
+    if(sel)sel.value=r.name||name;
+    document.getElementById('c-phase-new').style.display='none';
+    nameInput.value='';
+  }catch(e){msgEl.textContent=apiErr(e);}
+}
 function openAddCurr(){
   editCurrCode=null;_currSaveEndpoint='/api/curriculum';_hideCurrWingRow();
   document.getElementById('curr-modal-title').textContent='+ Add Squadron Curriculum';
-  _resetCurrModal();_setCurrTermOptional(false);_populateCurrElements();openModal('m-add-curr');
+  _resetCurrModal();_setCurrTermOptional(false);_populateCurrElements();_populateCurrPhases();openModal('m-add-curr');
 }
 function openAddCurrWing(){
   editCurrCode=null;_currSaveEndpoint='/api/curriculum/wing';
   document.getElementById('curr-modal-title').textContent='+ Add Wing Curriculum';
-  _resetCurrModal();_setCurrTermOptional(true);_populateCurrElements();
+  _resetCurrModal();_setCurrTermOptional(true);_populateCurrElements();_populateCurrPhases();
   if(S.isNational) _showCurrWingRow(); else _hideCurrWingRow();
   openModal('m-add-curr');
 }
 function openAddCurrNat(){
   editCurrCode=null;_currSaveEndpoint='/api/curriculum/national';_hideCurrWingRow();
   document.getElementById('curr-modal-title').textContent='+ Add National Curriculum';
-  _resetCurrModal();_setCurrTermOptional(true);_populateCurrElements();openModal('m-add-curr');
+  _resetCurrModal();_setCurrTermOptional(true);_populateCurrElements();_populateCurrPhases();openModal('m-add-curr');
 }
-function editCurr(code){
+async function editCurr(code){
   const e=S.curr.find(x=>x.code===code&&canEditCurr(x));if(!e){alert('You do not have permission to edit this curriculum item.');return;}
   editCurrCode=code;
   // Set the correct save endpoint for the owning level
@@ -5288,7 +5355,21 @@ function editCurr(code){
   else _currSaveEndpoint='/api/curriculum';
   document.getElementById('curr-modal-title').textContent='Edit Curriculum Item';
   document.getElementById('c-code').value=e.code;document.getElementById('c-title').value=e.title;
-  document.getElementById('c-phase').value=e.phase;document.getElementById('c-el').value=e.el||'';
+  // Await both governed-catalogue populates before setting values — the
+  // select must contain e.phase's/e.el's option before .value can select it
+  // (previously phase was a hardcoded <select> that always had every option
+  // present; now it's populated from /api/curriculum/phases, so this must
+  // finish first, same as the existing element select already requires).
+  await Promise.all([_populateCurrPhases(), _populateCurrElements()]);
+  const phaseSel=document.getElementById('c-phase');
+  // A historical item's phase may predate the governed catalogue (free-text
+  // data is never retroactively rejected, per the catalogue's own design) —
+  // add it as a one-off option rather than silently switching the item to
+  // whatever option happens to be first when Save is clicked.
+  if(e.phase && ![...phaseSel.options].some(o=>o.value===e.phase)){
+    phaseSel.appendChild(new Option(e.phase+' (not in catalogue)', e.phase));
+  }
+  phaseSel.value=e.phase;document.getElementById('c-el').value=e.el||'';
   document.getElementById('c-term').value=e.term||'';document.getElementById('c-lh').value=e.lh||'';
   document.getElementById('c-hours').value=e.hours||1;
   const instrEl=document.getElementById('c-instr');if(instrEl)instrEl.value=e.instr||'Staff';

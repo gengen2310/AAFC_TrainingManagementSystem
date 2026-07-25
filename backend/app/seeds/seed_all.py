@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from ..database import SessionLocal, init_db, reset_db
 from ..security import hash_code
 from ..models import (NationalEntity, Wing, Squadron, Flight, User, AccessCode,
-                      CurriculumItem, CurriculumElement, Facilitator, FacilitatorRankHistory,
+                      CurriculumItem, CurriculumElement, CurriculumPhase, Facilitator, FacilitatorRankHistory,
                       TrainingArea, Equipment, ParadeNight, Session, Cadet,
                       TimingTemplate, TimingBlock)
 
@@ -18,6 +18,19 @@ _DEFAULT_ELEMENTS = [
     ("Service_Community", "Service & Community",        "national"),
     ("SQN_Affairs",       "Squadron Affairs",           "national"),
     ("CDT_Skills",        "Cadet Skills",               "national"),
+]
+
+# Master transformation plan Block 10 — same names as dashboard.py's _PHASES
+# constant, the phase strings already in live use across charts/curriculum.
+_DEFAULT_PHASES = [
+    ("A. Orientation",  "A. Orientation",  "national", 10),
+    ("B. Initial",      "B. Initial",      "national", 20),
+    ("C. Junior",       "C. Junior",       "national", 30),
+    ("D. Intermediate", "D. Intermediate", "national", 40),
+    ("E. Senior",       "E. Senior",       "national", 50),
+    ("I. Bronze",       "I. Bronze",       "national", 60),
+    ("J. Silver",       "J. Silver",       "national", 70),
+    ("K. Gold",         "K. Gold",         "national", 80),
 ]
 
 UNITS = [
@@ -279,6 +292,16 @@ def seed_all():
         ).first():
             db.add(CurriculumElement(name=name, display_name=display_name,
                                      scope_level=scope, active_status=True))
+    # Seed default curriculum phases (idempotent) — mirrors the elements seed
+    # above; reset_db() bypasses Alembic, so the migration's own seed insert
+    # never runs against this metadata-created dev/test DB.
+    for name, display_name, scope, sort_order in _DEFAULT_PHASES:
+        if not db.query(CurriculumPhase).filter(
+            CurriculumPhase.name == name,
+            CurriculumPhase.scope_level == scope,
+        ).first():
+            db.add(CurriculumPhase(name=name, display_name=display_name,
+                                   scope_level=scope, sort_order=sort_order, active_status=True))
     db.commit()
     db.close()
     print("Seeded: National HQ, 7 Wing, 16 squadrons, users/access codes, 13 core curriculum items, 703 demo data (incl. Alpha/Bravo flights, planning year, WA holidays).")
