@@ -53,13 +53,19 @@ Created: 2026-07-14.
 - **Impact**: None remaining — a keyboard-only user can now search, navigate, and select without a mouse.
 - The `eslint-disable` at the option `<div>` remains, now accurately justified (a comment explains why): the option itself intentionally has no independent keyboard handler because the combobox pattern puts all keyboard interaction on the input, not the option.
 
-### AL-02: Pre-existing Test Bugs Found (Not Introduced This Pass, Not Fixed)
+### AL-02: Pre-existing Test Bugs Found (Not Introduced This Pass)
 
 Found while widening `frontend/e2e/accessibility.spec.ts` coverage (Phase 7) and reproduced against a clean pre-Phase-7 checkout to confirm they predate this work:
-- `e2e/facilitators.spec.ts` › "facilitator leave can be recorded via API" asserts `body.facilitator_id` but the real response shape is `body.leave.facilitator_id` — a test bug, not a backend defect (the API is already returning the more informative nested shape).
-- `e2e/reports.spec.ts` › "facilitator load card renders without error" and "not delivered card renders without error" use an immediate `.isVisible().catch(() => false)` check with no wait/retry, so they can read the DOM before the async report data has rendered — a flaky-by-design pattern, not a rendering bug (manually confirmed the tables render correctly with real data).
-- Neither was fixed in this pass — out of scope for an accessibility-coverage widening — but recorded here since they were newly discovered, not previously tracked.
-- Independently re-confirmed during the master transformation's Blocks 13-15 verification gate (2026-07-25): `e2e/reports.spec.ts`'s two flaky assertions above still reproduce identically (page snapshot at failure time shows the correct table with real facilitator data already rendered — the assertion simply ran before it).
+- `e2e/facilitators.spec.ts` › "facilitator leave can be recorded via API" asserts `body.facilitator_id` but the real response shape is `body.leave.facilitator_id` — a test bug, not a backend defect (the API is already returning the more informative nested shape). **Not fixed this pass** — out of scope for DEFECT-003 (below), which is specifically the `reports.spec.ts` timing-race pair; still open.
+- `e2e/reports.spec.ts` › "facilitator load card renders without error" and "not delivered card renders without error" — **RESOLVED, see DEFECT-003 below.**
+
+### DEFECT-003 (2026-07-25): `reports.spec.ts` Timing-Race Tests — RESOLVED
+
+Two bugs, both in the test file, not the app:
+1. Both tests used an immediate `.isVisible().catch(() => false)` check with no wait/retry, so they could read the DOM before the async report query had resolved out of its Loading state (`<Loading />`, already a proper `role="status" aria-live="polite"` indicator — confirmed the UI does not need a clearer loading state; the gap was purely the test's lack of a wait). Fixed by replacing the one-shot check with `expect(table.or(empty)).toBeVisible({ timeout: 10000 })`, which uses Playwright's built-in polling.
+2. A second, previously-undiscovered bug found while fixing the first: the facilitator-load test used `page.locator("table").nth(0)`, assuming the facilitator table is always the first `<table>` on the page. It isn't — the Curriculum coverage card above it also renders a `<table>` (inside a closed `<details>`, for the unscheduled-items list) whenever `unscheduled.length > 0`, which is present in the DOM but hidden. `nth(0)` picked that hidden table, not the facilitator one. Same risk existed for the not-delivered test's `.last()`. Fixed by locating each table by its actual header content (`Facilitator.*Sessions.*Delivered.*Risk` / `Code.*Reason`), matching the pattern already used elsewhere in the same file ("facilitator load table has correct columns when data is present").
+
+Verified: both tests pass consistently across repeated runs against a freshly-restarted backend. Remaining intermittent failures observed only under rapid back-to-back full-suite reruns against the same never-restarted backend process are the general API rate limiter / login lockout (429s, login timeouts) — the pre-existing, separately-tracked DEFECT-004, not a regression from this fix.
 
 ### AL-03: `term` Number/String Contract Mismatch — RESOLVED (DEFECT-002, 2026-07-25)
 

@@ -78,12 +78,24 @@ test("facilitator load card renders without error", async ({ page }) => {
   await page.goto("/reports");
   await expect(page.getByRole("heading", { name: "Training Reports" })).toBeVisible({ timeout: 8000 });
 
-  // Card shows table or "No facilitator load yet." empty state
-  const hasTable = await page.locator("table").nth(0).isVisible().catch(() => false);
-  const hasEmpty = await page.getByText(/no facilitator load yet/i).isVisible().catch(() => false);
+  // DEFECT-003 (AL-02): two bugs fixed here.
+  // 1. The card shows a Loading state (role="status") while its query is in
+  //    flight, then settles into either a table or the "No facilitator load
+  //    yet." empty state. A one-shot isVisible().catch(() => false) was
+  //    flaky-by-design -- it could run during the Loading window, before
+  //    either exists. Now waits (with Playwright's built-in retry) for one
+  //    to actually appear.
+  // 2. table.nth(0) assumed the facilitator table is always the first
+  //    <table> on the page, but the Curriculum coverage card above it also
+  //    renders a <table> (inside a closed <details>, for unscheduled items)
+  //    whenever there's unscheduled curriculum -- which is hidden, but
+  //    still nth(0). Locate by header content instead of position.
+  const table = page.locator("table").filter({ hasText: /Facilitator.*Sessions.*Delivered.*Risk/i });
+  const empty = page.getByText(/no facilitator load yet/i);
+  await expect(table.or(empty)).toBeVisible({ timeout: 10000 });
+
   // Must be one or the other — no error note
   await expect(page.locator(".errnote, .errbox").first()).not.toBeVisible();
-  expect(hasTable || hasEmpty).toBe(true);
 });
 
 test("facilitator load API returns expected shape", async ({ page }) => {
@@ -128,10 +140,16 @@ test("not delivered card renders without error", async ({ page }) => {
   await page.goto("/reports");
   await expect(page.getByRole("heading", { name: "Training Reports" })).toBeVisible({ timeout: 8000 });
 
-  const hasTable = await page.locator("table").last().isVisible().catch(() => false);
-  const hasEmpty = await page.getByText(/no not-delivered sessions/i).isVisible().catch(() => false);
+  // DEFECT-003 (AL-02): same two fixes as the facilitator load card above --
+  // wait for the query to settle instead of a one-shot check, and locate by
+  // header content ("Code"/"Reason") instead of table.last(), which would
+  // silently resolve to a different table if this card's own table hasn't
+  // rendered yet (or isn't present at all, in the empty-state case).
+  const table = page.locator("table").filter({ hasText: /Code.*Reason/i });
+  const empty = page.getByText(/no not-delivered sessions/i);
+  await expect(table.or(empty)).toBeVisible({ timeout: 10000 });
+
   await expect(page.locator(".errnote, .errbox").first()).not.toBeVisible();
-  expect(hasTable || hasEmpty).toBe(true);
 });
 
 test("not delivered API returns expected shape", async ({ page }) => {
