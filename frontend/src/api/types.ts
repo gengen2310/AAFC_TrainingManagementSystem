@@ -467,3 +467,39 @@ export interface DashboardChartsResponse {
   charts: Record<string, DashboardChart>;
   error?: string;
 }
+
+// ─── Facilitator Schedule Explorer (master transformation plan Block 9) ────
+export interface FacilitatorScheduleFacilitator {
+  facilitator_id: string;
+  name: string;
+  type: string;
+  subject_areas: string[];
+  on_leave_now: boolean;
+}
+export interface FacilitatorScheduleSessionItem {
+  id: string;
+  facilitator_id: string;
+  kind: "session";
+  date: string;
+  label: string;
+  status: string;
+  parade_night_id: string;
+  session_id: string;
+}
+export interface FacilitatorScheduleLeaveItem {
+  id: string;
+  facilitator_id: string;
+  kind: "leave";
+  start_date: string;
+  end_date: string;
+  label: string;
+}
+export type FacilitatorScheduleItem = FacilitatorScheduleSessionItem | FacilitatorScheduleLeaveItem;
+export interface FacilitatorScheduleResponse {
+  squadron_id: string | null;
+  window: string;
+  window_start: string;
+  window_end: string;
+  facilitators: FacilitatorScheduleFacilitator[];
+  items: FacilitatorScheduleItem[];
+}

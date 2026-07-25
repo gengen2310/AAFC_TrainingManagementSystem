@@ -59,6 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavItem to="/curriculum" label="Curriculum" />
             <div className="nav-group">Capability</div>
             <NavItem to="/facilitators" label="Facilitators" />
+            <NavItem to="/facilitator-schedule" label="Facilitator Schedule" />
             <NavItem to="/resources" label="Resources" />
             {r.cadets && <NavItem to="/cadets" label="Cadets" />}
             <div className="nav-group">Assurance</div>
@@ -94,6 +95,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavItem to="/weekly-program" label="Weekly Program" />
             <NavItem to="/curriculum" label="Curriculum" />
             <NavItem to="/facilitators" label="Facilitators" />
+            <NavItem to="/facilitator-schedule" label="Facilitator Schedule" />
             <NavItem to="/resources" label="Resources" />
             <NavItem to="/planning" label="Planning Workspace" />
             <div className="nav-group">Proxy Mode (required to edit a squadron)</div>
@@ -122,6 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavItem to="/weekly-program" label="Weekly Program" />
             <NavItem to="/curriculum" label="Curriculum" />
             <NavItem to="/facilitators" label="Facilitators" />
+            <NavItem to="/facilitator-schedule" label="Facilitator Schedule" />
             <NavItem to="/resources" label="Resources" />
             <NavItem to="/planning" label="Planning Workspace" />
             {(session?.role === "national_admin" || isSystemAdmin(session)) &&

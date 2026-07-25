@@ -12,6 +12,7 @@ import { ParadeNights } from "./routes/ParadeNights";
 import { WeeklyProgram } from "./routes/WeeklyProgram";
 import { Curriculum } from "./routes/Curriculum";
 import { Facilitators } from "./routes/Facilitators";
+import { FacilitatorSchedule } from "./routes/FacilitatorSchedule";
 import { Resources } from "./routes/Resources";
 import { Cadets } from "./routes/Cadets";
 import { Reports } from "./routes/Reports";
@@ -161,6 +162,7 @@ export default function App() {
                 <Route path="/weekly-program" element={<WeeklyProgram />} />
                 <Route path="/curriculum" element={<Curriculum />} />
                 <Route path="/facilitators" element={<Facilitators />} />
+                <Route path="/facilitator-schedule" element={<FacilitatorSchedule />} />
                 <Route path="/resources" element={<Resources />} />
                 <Route path="/cadets" element={<Cadets />} />
                 <Route path="/reports" element={<Reports />} />

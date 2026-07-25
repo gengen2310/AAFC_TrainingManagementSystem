@@ -26,7 +26,7 @@ const SQUADRON_CHART_ORDER = [
 const WING_CHART_ORDER = ["squadron_readiness", "squadron_delivery_comparison", "wing_subject_area_gaps"];
 const NATIONAL_CHART_ORDER = ["wing_readiness", "wing_delivery_comparison"];
 const STRATEGIC_CHART_ORDER = [
-  "capability_dependency", "subject_area_resilience",
+  "capability_dependency", "subject_area_resilience", "facilitator_leave_impact",
   "facilitator_status_distribution", "facilitator_repeated_gaps", "long_term_delivery_trend",
 ];
 

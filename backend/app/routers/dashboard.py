@@ -30,6 +30,7 @@ from ..models import (
 )
 from ..permissions import Principal, require_role, require_can_view_squadron
 from ..services_readiness import parade_night_readiness
+from .training import _view_squadron_id
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -517,6 +518,57 @@ def _facilitator_repeated_gaps(sessions: list, pn_date_by_id: dict, weeks: int =
         "insight": insight,
         "empty_state": f"No unstaffed sessions in the last {weeks} weeks.",
         "drill_down": {"route": "parade-nights", "filters": {"status": "unstaffed"}},
+        "permission_scope": "squadron",
+    }
+
+
+def _facilitator_leave_impact(facs: list, leave_rows: list, all_pns: list, all_sessions: list) -> dict:
+    """Ranked bar: upcoming sessions assigned to a facilitator that fall inside
+    their own recorded leave — the "who needs a substitute" chart (master
+    transformation plan Block 9 / addendum section DD). Confirmed as a genuine
+    gap: nothing else cross-references PlanningFacilitatorLeave against a
+    facilitator's own upcoming session assignments."""
+    today_str = date.today().isoformat()
+    pn_date_by_id = {pn.id: pn.date for pn in all_pns}
+    fac_name = {
+        f.id: f"{(f.current_rank + ' ') if f.current_rank else ''}{f.first_name} {f.last_name}"
+        for f in facs
+    }
+    upcoming_leave = [lv for lv in leave_rows if lv.end_date >= today_str]
+    impact_counts: dict[str, int] = defaultdict(int)
+    for lv in upcoming_leave:
+        name = fac_name.get(lv.facilitator_id)
+        if not name:
+            continue
+        for s in all_sessions:
+            if s.facilitator_id != lv.facilitator_id or s.status != "planned":
+                continue
+            pd = pn_date_by_id.get(s.parade_night_id)
+            if pd and lv.start_date <= pd <= lv.end_date:
+                impact_counts[name] += 1
+
+    data = sorted(
+        [{"label": k, "count": v} for k, v in impact_counts.items() if v > 0],
+        key=lambda x: -x["count"],
+    )[:15]
+
+    insight = None
+    if data:
+        top = data[0]
+        insight = f"{top['label']} has {top['count']} upcoming session(s) scheduled during recorded leave — arrange a substitute."
+
+    return {
+        "chart_id": "facilitator_leave_impact",
+        "title": "Sessions needing a substitute",
+        "explanation": "Upcoming sessions assigned to a facilitator during their own recorded leave.",
+        "question": "Which upcoming sessions need a substitute facilitator arranged?",
+        "chart_type": "bar_horizontal",
+        "x_axis": "Sessions affected",
+        "y_axis": "Facilitator",
+        "data": data,
+        "insight": insight,
+        "empty_state": "No upcoming sessions clash with recorded facilitator leave.",
+        "drill_down": {"route": "facilitator-schedule"},
         "permission_scope": "squadron",
     }
 
@@ -1270,13 +1322,52 @@ def get_dashboard_charts(
     }
 
 
+def _full_squadron_strategic_charts(db: DBSession, sq_id: str) -> dict:
+    all_pns = db.query(ParadeNight).filter(
+        ParadeNight.squadron_id == sq_id,
+        ParadeNight.is_archived == False,  # noqa: E712
+    ).all()
+    all_sessions = db.query(Session).filter(
+        Session.parade_night_id.in_([pn.id for pn in all_pns]),
+        Session.is_archived == False,  # noqa: E712
+    ).all() if all_pns else []
+    facs = db.query(Facilitator).filter(
+        Facilitator.squadron_id == sq_id,
+        Facilitator.is_archived == False,  # noqa: E712
+    ).all()
+    charts: dict = {}
+    charts["capability_dependency"] = _facilitator_capability_dependency(all_sessions)
+    charts["subject_area_resilience"] = _subject_area_resilience(facs)
+    charts["long_term_delivery_trend"] = _long_term_delivery_trend(all_sessions, all_pns)
+    fac_leave = db.query(PlanningFacilitatorLeave).filter(
+        PlanningFacilitatorLeave.facilitator_id.in_([f.id for f in facs]),
+        PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
+    ).all() if facs else []
+    charts["facilitator_status_distribution"] = _facilitator_status_distribution(facs, fac_leave)
+    all_pn_date_by_id = {pn.id: pn.date for pn in all_pns}
+    charts["facilitator_repeated_gaps"] = _facilitator_repeated_gaps(all_sessions, all_pn_date_by_id)
+    charts["facilitator_leave_impact"] = _facilitator_leave_impact(facs, fac_leave, all_pns, all_sessions)
+    return charts
+
+
 @router.get("/charts/strategic")
 def get_strategic_charts(
     window: str = Query("year", pattern="^(term|year)$"),
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    """Strategic / long-range charts — deferred load (lower priority than tactical)."""
+    """Strategic / long-range charts — deferred load (lower priority than tactical).
+
+    Deliberately does NOT accept squadron_id like the tactical /charts endpoint
+    does (master transformation plan Block 8): several strategic chart_ids
+    (subject_area_resilience, long_term_delivery_trend) are computed at BOTH
+    squadron and wing scope under the same chart_id key, so naively merging a
+    squadron_id-selected squadron's version into a wing viewer's response would
+    silently overwrite the wing rollup — a real key collision, not a cosmetic
+    one. The Facilitator Schedule Explorer's own endpoint
+    (/api/dashboard/facilitator-schedule) is the squadron_id-aware path for
+    facilitator_leave_impact instead.
+    """
     scope = _scope(p)
     w_start, w_end = _date_window(window)
     charts: dict = {}
@@ -1285,28 +1376,7 @@ def get_strategic_charts(
         sq_id = p.acting_squadron_id or p.squadron_id
         if not sq_id:
             return {"scope": scope, "window": window, "charts": {}}
-        all_pns = db.query(ParadeNight).filter(
-            ParadeNight.squadron_id == sq_id,
-            ParadeNight.is_archived == False,  # noqa: E712
-        ).all()
-        all_sessions = db.query(Session).filter(
-            Session.parade_night_id.in_([pn.id for pn in all_pns]),
-            Session.is_archived == False,  # noqa: E712
-        ).all() if all_pns else []
-        facs = db.query(Facilitator).filter(
-            Facilitator.squadron_id == sq_id,
-            Facilitator.is_archived == False,  # noqa: E712
-        ).all()
-        charts["capability_dependency"] = _facilitator_capability_dependency(all_sessions)
-        charts["subject_area_resilience"] = _subject_area_resilience(facs)
-        charts["long_term_delivery_trend"] = _long_term_delivery_trend(all_sessions, all_pns)
-        fac_leave = db.query(PlanningFacilitatorLeave).filter(
-            PlanningFacilitatorLeave.facilitator_id.in_([f.id for f in facs]),
-            PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
-        ).all() if facs else []
-        charts["facilitator_status_distribution"] = _facilitator_status_distribution(facs, fac_leave)
-        all_pn_date_by_id = {pn.id: pn.date for pn in all_pns}
-        charts["facilitator_repeated_gaps"] = _facilitator_repeated_gaps(all_sessions, all_pn_date_by_id)
+        charts.update(_full_squadron_strategic_charts(db, sq_id))
 
     elif scope == "wing":
         wing_id = p.acting_wing_id or p.wing_id
@@ -1329,3 +1399,107 @@ def get_strategic_charts(
             charts["long_term_delivery_trend"] = _long_term_delivery_trend(sessions, pns)
 
     return {"scope": scope, "window": window, "charts": charts}
+
+
+@router.get("/facilitator-schedule")
+def get_facilitator_schedule(
+    window: str = Query("year", pattern="^(week|term|year)$"),
+    squadron_id: str | None = Query(None, description="Wing/National: view a specific squadron's facilitator schedule"),
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Facilitator Schedule Explorer data (master transformation plan Block 9):
+    one row per facilitator, items = their assigned sessions (dated via the
+    parent ParadeNight — Session itself has no date column) plus recorded
+    leave ranges, for a grouped timeline and its mandatory accessible list
+    fallback.
+
+    Squadron-scoped only, same as every other squadron page under Block 8: a
+    Wing/National viewer must select a squadron via squadron_id (view access
+    only, no proxy needed); nobody sees another squadron's facilitator
+    schedule by default. Returns an empty result (not an error) when no
+    squadron is resolved, matching the "select a squadron" empty-state
+    convention already used across Calendar/Curriculum/Facilitators/Resources.
+    """
+    sq_id = _view_squadron_id(p, squadron_id, db)
+    w_start, w_end = _date_window(window)
+    if not sq_id:
+        return {
+            "squadron_id": None, "window": window, "window_start": w_start, "window_end": w_end,
+            "facilitators": [], "items": [],
+        }
+
+    facs = db.query(Facilitator).filter(
+        Facilitator.squadron_id == sq_id,
+        Facilitator.is_archived == False,  # noqa: E712
+    ).all()
+    fac_ids = [f.id for f in facs]
+
+    pns = db.query(ParadeNight).filter(
+        ParadeNight.squadron_id == sq_id,
+        ParadeNight.date >= w_start,
+        ParadeNight.date <= w_end,
+        ParadeNight.is_archived == False,  # noqa: E712
+    ).all()
+    pn_date_by_id = {pn.id: pn.date for pn in pns}
+    sessions = db.query(Session).filter(
+        Session.parade_night_id.in_(list(pn_date_by_id.keys())),
+        Session.facilitator_id.isnot(None),
+        Session.is_archived == False,  # noqa: E712
+    ).all() if pn_date_by_id else []
+
+    leave_rows = db.query(PlanningFacilitatorLeave).filter(
+        PlanningFacilitatorLeave.facilitator_id.in_(fac_ids),
+        PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
+        PlanningFacilitatorLeave.start_date <= w_end,
+        PlanningFacilitatorLeave.end_date >= w_start,
+    ).all() if fac_ids else []
+
+    today_str = date.today().isoformat()
+    on_leave_now = {lv.facilitator_id for lv in leave_rows if lv.start_date <= today_str <= lv.end_date}
+
+    facilitators = [
+        {
+            "facilitator_id": f.id,
+            "name": f"{(f.current_rank + ' ') if f.current_rank else ''}{f.first_name} {f.last_name}",
+            "type": f.type,
+            "subject_areas": f.subject_areas or [],
+            "on_leave_now": f.id in on_leave_now,
+        }
+        for f in facs
+    ]
+
+    items = []
+    for s in sessions:
+        pd = pn_date_by_id.get(s.parade_night_id)
+        if not pd:
+            continue
+        title = s.curriculum_title_at_time or s.custom_title or s.session_title or "Session"
+        items.append({
+            "id": f"session-{s.id}",
+            "facilitator_id": s.facilitator_id,
+            "kind": "session",
+            "date": pd,
+            "label": title,
+            "status": s.status,
+            "parade_night_id": s.parade_night_id,
+            "session_id": s.id,
+        })
+    for lv in leave_rows:
+        items.append({
+            "id": f"leave-{lv.id}",
+            "facilitator_id": lv.facilitator_id,
+            "kind": "leave",
+            "start_date": lv.start_date,
+            "end_date": lv.end_date,
+            "label": lv.reason or "Leave",
+        })
+
+    return {
+        "squadron_id": sq_id,
+        "window": window,
+        "window_start": w_start,
+        "window_end": w_end,
+        "facilitators": facilitators,
+        "items": items,
+    }

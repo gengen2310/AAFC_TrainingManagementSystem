@@ -130,3 +130,18 @@ table.heatmap .hm-corner { background: var(--surface-2, #eef2f7); }
 .tag-chip{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--primary);color:var(--primary);border-radius:5px;padding:2px 2px 2px 8px;font-size:11.5px;font-weight:700;line-height:1.5;white-space:nowrap;}
 .tag-remove{border:none;background:none;cursor:pointer;color:inherit;font-size:15px;line-height:1;padding:0 4px;opacity:.65;border-radius:3px;}
 .tag-remove:hover{opacity:1;}
+
+/* ── Facilitator Schedule Explorer (Block 9) — vis-timeline item styling.
+   Colour is never the only signal: every item's text already carries a
+   status icon (see FacilitatorTimeline.tsx's STATUS_ICON), these classes
+   only reinforce it. */
+.fts-item.fts-session{border-radius:10px;font-size:11px;font-weight:700;padding:2px 6px;}
+.fts-item.fts-ok{background:color-mix(in srgb, var(--success) 18%, var(--surface));border-color:var(--success);color:var(--success);}
+.fts-item.fts-warn{background:color-mix(in srgb, var(--warning) 18%, var(--surface));border-color:var(--warning);color:#a86600;}
+.fts-item.fts-red{background:color-mix(in srgb, var(--aafc-red) 15%, var(--surface));border-color:var(--aafc-red);color:var(--aafc-red);}
+.fts-item.fts-blue{background:color-mix(in srgb, var(--aafc-royal-blue) 15%, var(--surface));border-color:var(--aafc-royal-blue);color:var(--aafc-royal-blue);}
+.fts-item.fts-purple{background:color-mix(in srgb, var(--rescheduled) 15%, var(--surface));border-color:var(--rescheduled);color:var(--rescheduled);}
+.fts-item.fts-leave{background:repeating-linear-gradient(45deg, color-mix(in srgb, var(--warning) 22%, var(--surface)), color-mix(in srgb, var(--warning) 22%, var(--surface)) 6px, var(--surface) 6px, var(--surface) 12px);border:1px solid var(--warning);color:#a86600;font-size:11px;font-weight:700;}
+.fts-leave-now-tag{font-size:9.5px;font-weight:700;color:#a86600;background:color-mix(in srgb, var(--warning) 20%, var(--surface));border:1px solid var(--warning);border-radius:5px;padding:1px 5px;margin-left:4px;}
+.fts-list-fac{margin-bottom:20px;}
+.fts-list-fac h3{font-size:13px;font-weight:800;margin-bottom:8px;}

@@ -143,6 +143,10 @@ export const dashboardApi = {
     ),
   strategic: (window: "term" | "year" = "year") =>
     api.get<DashboardChartsResponse>(`/api/dashboard/charts/strategic?window=${window}`),
+  facilitatorSchedule: (window: "week" | "term" | "year" = "year", squadron_id?: string) =>
+    api.get<import("./types").FacilitatorScheduleResponse>(
+      `/api/dashboard/facilitator-schedule?window=${window}${squadron_id ? `&squadron_id=${squadron_id}` : ""}`
+    ),
 };
 
 // ─── Planning Workspace API ─────────────────────────────────────────────────
