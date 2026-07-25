@@ -8,17 +8,20 @@ import { DecisionBadge } from "../components/status/StatusBadge";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { canWriteSquadron } from "../auth/permissions";
+import { useScopedSquadron } from "../layout/SquadronViewContext";
 import type { Facilitator } from "../api/types";
 
 export function Facilitators() {
   const { session } = useAuth();
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["facilitators"], queryFn: trainingApi.facilitators });
-  const load = useQuery({ queryKey: ["fac-load"], queryFn: reportApi.facLoad });
+  const { needsSelection, squadronId, scoped } = useScopedSquadron();
+  const q = useQuery({ queryKey: ["facilitators", squadronId], queryFn: () => trainingApi.facilitators(squadronId), enabled: scoped });
+  const load = useQuery({ queryKey: ["fac-load", squadronId], queryFn: () => reportApi.facLoad(squadronId), enabled: scoped });
   const [adding, setAdding] = useState(false);
   const [tagsFor, setTagsFor] = useState<Facilitator | null>(null);
   const [statsId, setStatsId] = useState<string | null>(null);
   const canWrite = canWriteSquadron(session);
+  if (needsSelection && !squadronId) return <Empty msg="Select a squadron above to view its facilitators." />;
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
   return (

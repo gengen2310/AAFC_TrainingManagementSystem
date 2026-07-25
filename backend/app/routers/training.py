@@ -57,6 +57,34 @@ def _active_squadron(p: Principal) -> str:
     return p.squadron_id
 
 
+def _view_squadron_id(p: Principal, squadron_id: str | None, db: DBSession) -> str | None:
+    """Resolve which squadron's data a READ should return. An explicit squadron_id
+    (validated via require_can_view_squadron, the same check dashboard charts and
+    /api/parade-nights already use) lets a wing/national viewer see a specific
+    squadron's operational pages WITHOUT needing to enter Proxy/Delegated
+    Intervention Mode — viewing is broad by design (permissions.py's
+    Principal.can_view_squadron), only writing is proxy-gated (see
+    require_can_write_squadron / Block 7's canWriteSquadron fix). Falls back to
+    _active_squadron() when no squadron_id is given, so existing squadron-scoped
+    callers are unaffected.
+
+    Master transformation plan Block 8: this closes the inconsistency where
+    /api/parade-nights and /api/dashboard/charts already supported this pattern
+    but /api/facilitators, /api/training-areas, /api/equipment, and /api/activities
+    did not — a wing/national viewer's squadron selector must behave the same way
+    on every squadron page, not degrade differently depending which one they're on."""
+    if squadron_id:
+        s = db.get(Squadron, squadron_id)
+        if not s:
+            # A bogus squadron_id must 404, never silently fall back to the
+            # caller's own scope — that would mask a broken link/typo as "no
+            # results" instead of a clear error.
+            raise HTTPException(404, detail={"error": "squadron_not_found"})
+        require_can_view_squadron(p, s.id, s.wing_id)
+        return s.id
+    return _active_squadron(p)
+
+
 def _sess_dict(s: Session) -> dict:
     d = {c.name: getattr(s, c.name) for c in s.__table__.columns}
     d["session_id"] = s.id  # alias for Night Builder compatibility
@@ -65,8 +93,8 @@ def _sess_dict(s: Session) -> dict:
 
 # ── CURRICULUM ──
 @router.get("/curriculum")
-def list_curriculum(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _active_squadron(p)
+def list_curriculum(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _view_squadron_id(p, squadron_id, db)
     # Resolve the wing for the acting scope
     wing_id: str | None = p.acting_wing_id or p.wing_id
     if sq_id:
@@ -557,10 +585,10 @@ class FacIn(BaseModel):
 
 
 @router.get("/facilitators")
-def list_facs(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def list_facs(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     from datetime import date, timedelta
     from ..models.planning import PlanningFacilitatorLeave
-    sq_id = _active_squadron(p)
+    sq_id = _view_squadron_id(p, squadron_id, db)
     facs = db.query(Facilitator).filter(Facilitator.squadron_id == sq_id,
                                         Facilitator.is_archived == False).all()  # noqa: E712
     today = date.today().isoformat()
@@ -652,8 +680,8 @@ def fac_stats(fid: str, db: DBSession = Depends(get_db), p: Principal = Depends(
 
 # ── RESOURCES ──
 @router.get("/training-areas")
-def list_rooms(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _active_squadron(p)
+def list_rooms(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _view_squadron_id(p, squadron_id, db)
     rows = db.query(TrainingArea).filter(TrainingArea.squadron_id == sq_id,
                                          TrainingArea.is_archived == False).all()  # noqa: E712
     return [{"training_area_id": r.id, "name": r.name, "type": r.type, "capacity": r.capacity,
@@ -661,8 +689,8 @@ def list_rooms(db: DBSession = Depends(get_db), p: Principal = Depends(get_princ
 
 
 @router.get("/equipment")
-def list_equipment(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _active_squadron(p)
+def list_equipment(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _view_squadron_id(p, squadron_id, db)
     rows = db.query(Equipment).filter(Equipment.squadron_id == sq_id,
                                       Equipment.is_archived == False).all()  # noqa: E712
     return [{"equipment_id": e.id, "name": e.name, "type": e.type, "quantity": e.quantity,
@@ -1003,8 +1031,8 @@ def _activity_out(a: Activity) -> dict:
 
 
 @router.get("/activities")
-def list_activities(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _active_squadron(p)
+def list_activities(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _view_squadron_id(p, squadron_id, db)
     rows = db.query(Activity).filter(Activity.squadron_id == sq_id,
                                      Activity.is_archived == False).order_by(Activity.date_start).all()  # noqa: E712
     return [_activity_out(a) for a in rows]

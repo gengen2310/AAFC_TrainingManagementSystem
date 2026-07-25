@@ -19,7 +19,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db
@@ -28,7 +28,7 @@ from ..models import (
     ParadeNight, Session, Facilitator, Squadron, Wing,
     CurriculumItem, Equipment, TrainingArea, PlanningFacilitatorLeave,
 )
-from ..permissions import Principal, require_role
+from ..permissions import Principal, require_role, require_can_view_squadron
 from ..services_readiness import parade_night_readiness
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -1083,6 +1083,93 @@ def _long_term_delivery_trend(sessions: list, pns: list, terms: int = 4) -> dict
     }
 
 
+# ── squadron chart bundle (shared by scope=squadron and any wing/national
+#    viewer who has selected a squadron via squadron_id — master transformation
+#    plan Block 8: "a wing_admin's Dashboard should look like a squadron
+#    Dashboard ... layered on", not a reduced subset) ──────────────────────────
+
+def _full_squadron_charts(db: DBSession, sq_id: str, w_start: str, w_end: str) -> dict:
+    pns = db.query(ParadeNight).filter(
+        ParadeNight.squadron_id == sq_id,
+        ParadeNight.date >= w_start,
+        ParadeNight.date <= w_end,
+        ParadeNight.is_archived == False,  # noqa: E712
+    ).all()
+    pn_ids = [pn.id for pn in pns]
+    sessions = db.query(Session).filter(
+        Session.parade_night_id.in_(pn_ids),
+        Session.is_archived == False,  # noqa: E712
+    ).all() if pn_ids else []
+    facs = db.query(Facilitator).filter(
+        Facilitator.squadron_id == sq_id,
+        Facilitator.is_archived == False,  # noqa: E712
+    ).all()
+    rooms = db.query(TrainingArea).filter(
+        TrainingArea.squadron_id == sq_id,
+        TrainingArea.is_archived == False,  # noqa: E712
+    ).all()
+    curr_items = db.query(CurriculumItem).filter(
+        CurriculumItem.is_archived == False,  # noqa: E712
+    ).all()
+
+    # Tactical: tonight + all PNs (not just window)
+    all_pns = db.query(ParadeNight).filter(
+        ParadeNight.squadron_id == sq_id,
+        ParadeNight.is_archived == False,  # noqa: E712
+    ).all()
+    all_pn_ids = [pn.id for pn in all_pns]
+    all_sessions = db.query(Session).filter(
+        Session.parade_night_id.in_(all_pn_ids),
+        Session.is_archived == False,  # noqa: E712
+    ).all() if all_pn_ids else []
+
+    charts: dict = {}
+    charts["tonight"] = _tonight_readiness(all_pns, all_sessions, facs, rooms)
+    charts["upcoming_readiness"] = _upcoming_readiness(all_pns, all_sessions)
+    charts["session_outcomes"] = _session_outcomes_distribution(sessions)
+    charts["weekly_outcomes"] = _weekly_outcomes(sessions, pns)
+    charts["delivery_trend"] = _delivery_trend(all_sessions, all_pns)
+    # all_sessions (not the window-filtered `sessions`) — curriculum phase
+    # progress is a cumulative measure like its sibling curriculum_backlog
+    # (already all_sessions below), not a windowed one. Using the window-
+    # filtered set here silently produced an all-zero chart whenever a
+    # squadron's delivered history predates the window (e.g. "term" only
+    # looks back 90 days), with no visible error — exactly the kind of
+    # empty-looks-like-broken chart-trust problem this pass targets.
+    charts["curriculum_progress"] = _curriculum_progress(all_sessions, curr_items)
+    charts["curriculum_backlog"] = _curriculum_backlog(all_sessions, all_pns)
+    charts["cancellation_reasons"] = _cancellation_reasons(sessions, pns)
+    charts["facilitator_workload"] = _facilitator_workload(sessions)
+    charts["capability_dependency"] = _facilitator_capability_dependency(all_sessions)
+    charts["subject_area_resilience"] = _subject_area_resilience(facs)
+    fac_leave = db.query(PlanningFacilitatorLeave).filter(
+        PlanningFacilitatorLeave.facilitator_id.in_([f.id for f in facs]),
+        PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
+    ).all() if facs else []
+    charts["facilitator_status_distribution"] = _facilitator_status_distribution(facs, fac_leave)
+    all_pn_date_by_id = {pn.id: pn.date for pn in all_pns}
+    charts["facilitator_repeated_gaps"] = _facilitator_repeated_gaps(all_sessions, all_pn_date_by_id)
+    return charts
+
+
+def _view_squadron_id_for_dashboard(p: Principal, squadron_id: str, db: DBSession) -> str | None:
+    """Validate a wing/national viewer's requested squadron_id the same way
+    /api/facilitators, /api/curriculum etc. already do (_view_squadron_id in
+    training.py) — view access only, no proxy/intervention required. Returns
+    None (never raises) for a squadron outside the caller's view scope, so an
+    unrelated bad id degrades to "no squadron charts" rather than a hard error
+    on a read-heavy dashboard endpoint; a squadron that simply doesn't exist
+    still 404s, matching training.py's behaviour for a broken link/typo."""
+    sq = db.get(Squadron, squadron_id)
+    if not sq:
+        raise HTTPException(404, detail={"error": "squadron_not_found"})
+    try:
+        require_can_view_squadron(p, sq.id, sq.wing_id)
+    except HTTPException:
+        return None
+    return sq.id
+
+
 # ── main endpoints ────────────────────────────────────────────────────────────
 
 @router.get("/charts")
@@ -1107,114 +1194,23 @@ def get_dashboard_charts(
         sq_id = p.acting_squadron_id or p.squadron_id
         if not sq_id:
             return {"scope": scope, "window": window, "charts": {}, "error": "no_squadron_scope"}
-
-        pns = db.query(ParadeNight).filter(
-            ParadeNight.squadron_id == sq_id,
-            ParadeNight.date >= w_start,
-            ParadeNight.date <= w_end,
-            ParadeNight.is_archived == False,  # noqa: E712
-        ).all()
-        pn_ids = [pn.id for pn in pns]
-        sessions = db.query(Session).filter(
-            Session.parade_night_id.in_(pn_ids),
-            Session.is_archived == False,  # noqa: E712
-        ).all() if pn_ids else []
-        facs = db.query(Facilitator).filter(
-            Facilitator.squadron_id == sq_id,
-            Facilitator.is_archived == False,  # noqa: E712
-        ).all()
-        rooms = db.query(TrainingArea).filter(
-            TrainingArea.squadron_id == sq_id,
-            TrainingArea.is_archived == False,  # noqa: E712
-        ).all()
-        curr_items = db.query(CurriculumItem).filter(
-            CurriculumItem.is_archived == False,  # noqa: E712
-        ).all()
-
-        # Tactical: tonight + all PNs (not just window)
-        all_pns = db.query(ParadeNight).filter(
-            ParadeNight.squadron_id == sq_id,
-            ParadeNight.is_archived == False,  # noqa: E712
-        ).all()
-        all_pn_ids = [pn.id for pn in all_pns]
-        all_sessions = db.query(Session).filter(
-            Session.parade_night_id.in_(all_pn_ids),
-            Session.is_archived == False,  # noqa: E712
-        ).all() if all_pn_ids else []
-
-        charts["tonight"] = _tonight_readiness(all_pns, all_sessions, facs, rooms)
-        charts["upcoming_readiness"] = _upcoming_readiness(all_pns, all_sessions)
-        charts["session_outcomes"] = _session_outcomes_distribution(sessions)
-        charts["weekly_outcomes"] = _weekly_outcomes(sessions, pns)
-        charts["delivery_trend"] = _delivery_trend(all_sessions, all_pns)
-        # all_sessions (not the window-filtered `sessions`) — curriculum phase
-        # progress is a cumulative measure like its sibling curriculum_backlog
-        # (already all_sessions below), not a windowed one. Using the window-
-        # filtered set here silently produced an all-zero chart whenever a
-        # squadron's delivered history predates the window (e.g. "term" only
-        # looks back 90 days), with no visible error — exactly the kind of
-        # empty-looks-like-broken chart-trust problem this pass targets.
-        charts["curriculum_progress"] = _curriculum_progress(all_sessions, curr_items)
-        charts["curriculum_backlog"] = _curriculum_backlog(all_sessions, all_pns)
-        charts["cancellation_reasons"] = _cancellation_reasons(sessions, pns)
-        charts["facilitator_workload"] = _facilitator_workload(sessions)
-        charts["capability_dependency"] = _facilitator_capability_dependency(all_sessions)
-        charts["subject_area_resilience"] = _subject_area_resilience(facs)
-        fac_leave = db.query(PlanningFacilitatorLeave).filter(
-            PlanningFacilitatorLeave.facilitator_id.in_([f.id for f in facs]),
-            PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
-        ).all() if facs else []
-        charts["facilitator_status_distribution"] = _facilitator_status_distribution(facs, fac_leave)
-        all_pn_date_by_id = {pn.id: pn.date for pn in all_pns}
-        charts["facilitator_repeated_gaps"] = _facilitator_repeated_gaps(all_sessions, all_pn_date_by_id)
+        charts.update(_full_squadron_charts(db, sq_id, w_start, w_end))
 
     elif scope == "wing":
         wing_id = p.acting_wing_id or p.wing_id
         if not wing_id:
             return {"scope": scope, "window": window, "charts": {}, "error": "no_wing_scope"}
 
-        # If a specific squadron is requested (proxy mode)
+        # If a specific squadron is requested, viewing it needs no Proxy Mode
+        # (view is broad by design) — same _view_squadron_id-style validation
+        # used by /api/facilitators, /api/curriculum etc. (Block 8), and the
+        # FULL squadron chart set (not a 4-chart subset) so a Wing/National
+        # viewer's Dashboard genuinely looks like that squadron's own Dashboard
+        # with comparison charts layered on, not a reduced page.
         if squadron_id:
-            sq = db.get(Squadron, squadron_id)
-            if sq and sq.wing_id == wing_id:
-                pns = db.query(ParadeNight).filter(
-                    ParadeNight.squadron_id == squadron_id,
-                    ParadeNight.date >= w_start,
-                    ParadeNight.date <= w_end,
-                    ParadeNight.is_archived == False,  # noqa: E712
-                ).all()
-                pn_ids = [pn.id for pn in pns]
-                sessions = db.query(Session).filter(
-                    Session.parade_night_id.in_(pn_ids),
-                    Session.is_archived == False,  # noqa: E712
-                ).all() if pn_ids else []
-                facs = db.query(Facilitator).filter(
-                    Facilitator.squadron_id == squadron_id,
-                    Facilitator.is_archived == False,  # noqa: E712
-                ).all()
-                rooms = db.query(TrainingArea).filter(
-                    TrainingArea.squadron_id == squadron_id,
-                    TrainingArea.is_archived == False,  # noqa: E712
-                ).all()
-                all_pns = db.query(ParadeNight).filter(
-                    ParadeNight.squadron_id == squadron_id,
-                    ParadeNight.is_archived == False,  # noqa: E712
-                ).all()
-                all_pn_ids = [pn.id for pn in all_pns]
-                all_sessions = db.query(Session).filter(
-                    Session.parade_night_id.in_(all_pn_ids),
-                    Session.is_archived == False,  # noqa: E712
-                ).all() if all_pn_ids else []
-                charts["tonight"] = _tonight_readiness(all_pns, all_sessions, facs, rooms)
-                charts["session_outcomes"] = _session_outcomes_distribution(sessions)
-                charts["weekly_outcomes"] = _weekly_outcomes(sessions, pns)
-                charts["facilitator_workload"] = _facilitator_workload(sessions)
-                wing_curr_items = db.query(CurriculumItem).filter(
-                    CurriculumItem.is_archived == False,  # noqa: E712
-                ).all()
-                # all_sessions, not the window-filtered `sessions` — see the matching
-                # comment on the squadron-scope branch above for why.
-                charts["curriculum_progress"] = _curriculum_progress(all_sessions, wing_curr_items)
+            viewed_sq_id = _view_squadron_id_for_dashboard(p, squadron_id, db)
+            if viewed_sq_id:
+                charts.update(_full_squadron_charts(db, viewed_sq_id, w_start, w_end))
 
         # Wing-level comparison charts
         charts["squadron_readiness"] = _squadron_readiness(db, wing_id, w_start, w_end)
@@ -1222,6 +1218,11 @@ def get_dashboard_charts(
         charts["wing_subject_area_gaps"] = _wing_subject_area_gaps(db, wing_id)
 
     else:  # national
+        if squadron_id:
+            viewed_sq_id = _view_squadron_id_for_dashboard(p, squadron_id, db)
+            if viewed_sq_id:
+                charts.update(_full_squadron_charts(db, viewed_sq_id, w_start, w_end))
+
         charts["wing_readiness"] = _wing_readiness_comparison(db, w_start, w_end)
         # Wing delivery comparison (re-use squadron_delivery_comparison per-wing)
         wings_data = _wing_ids_for_national(db)

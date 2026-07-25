@@ -9,8 +9,8 @@ import { isWing, isNational } from "../auth/permissions";
 export function Reports() {
   const { session } = useAuth();
   const coverage = useQuery({ queryKey: ["coverage"], queryFn: reportApi.coverage });
-  const load = useQuery({ queryKey: ["fac-load"], queryFn: reportApi.facLoad });
-  const nd = useQuery({ queryKey: ["nd"], queryFn: reportApi.notDelivered });
+  const load = useQuery({ queryKey: ["fac-load"], queryFn: () => reportApi.facLoad() });
+  const nd = useQuery({ queryKey: ["nd"], queryFn: () => reportApi.notDelivered() });
 
   return (
     <div>

@@ -4,10 +4,12 @@ import { trainingApi } from "../api";
 import { Card, Empty, Loading, ErrorNote } from "../components/ui";
 import { StatusBadge } from "../components/status/StatusBadge";
 import { DrilldownPanel } from "../components/DrilldownPanel";
+import { useScopedSquadron } from "../layout/SquadronViewContext";
 import type { CurriculumItem } from "../api/types";
 
 export function Curriculum() {
-  const q = useQuery({ queryKey: ["curriculum"], queryFn: trainingApi.curriculum });
+  const { needsSelection, squadronId, scoped } = useScopedSquadron();
+  const q = useQuery({ queryKey: ["curriculum", squadronId], queryFn: () => trainingApi.curriculum(squadronId), enabled: scoped });
   const [phase, setPhase] = useState(""); const [element, setElement] = useState("");
   const [progress, setProgress] = useState(""); const [search, setSearch] = useState("");
   const [drill, setDrill] = useState<CurriculumItem | null>(null);
@@ -20,6 +22,7 @@ export function Curriculum() {
     (!progress || i.progress === progress) &&
     (!search || `${i.code} ${i.title}`.toLowerCase().includes(search.toLowerCase())));
 
+  if (needsSelection && !squadronId) return <div><h1>Curriculum</h1><Empty msg="Select a squadron above to view its curriculum." /></div>;
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
 

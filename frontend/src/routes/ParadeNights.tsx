@@ -8,15 +8,18 @@ import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { canWriteSquadron } from "../auth/permissions";
 import { ParadeNightDetailView } from "./ParadeNightDetail";
+import { useScopedSquadron } from "../layout/SquadronViewContext";
 
 export function ParadeNights() {
   const { session } = useAuth();
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["parade-nights"], queryFn: () => trainingApi.paradeNights() });
+  const { needsSelection, squadronId, scoped } = useScopedSquadron();
+  const q = useQuery({ queryKey: ["parade-nights", squadronId], queryFn: () => trainingApi.paradeNights(squadronId), enabled: scoped });
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const canWrite = canWriteSquadron(session);
 
+  if (needsSelection && !squadronId) return <div><h1>Parade Nights</h1><Empty msg="Select a squadron above to view its parade nights." /></div>;
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
 

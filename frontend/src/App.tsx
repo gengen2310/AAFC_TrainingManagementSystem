@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { RequireAuth } from "./auth/RequireAuth";
 import { AppShell } from "./layout/AppShell";
+import { SquadronViewProvider } from "./layout/SquadronViewContext";
 import { isNational, isWing, isAuditor } from "./auth/permissions";
 import { Dashboard } from "./routes/Dashboard";
 import { Calendar } from "./routes/Calendar";
@@ -149,6 +150,7 @@ export default function App() {
       <AuthProvider>
         <Router basename={BASENAME}>
           <RequireAuth>
+            <SquadronViewProvider>
             <AppShell>
               <ErrorBoundary>
               <Routes>
@@ -176,6 +178,7 @@ export default function App() {
               </Routes>
               </ErrorBoundary>
             </AppShell>
+            </SquadronViewProvider>
           </RequireAuth>
         </Router>
       </AuthProvider>

@@ -62,8 +62,8 @@ export function ParadeNightDetailView({ id, canWrite }: { id: string; canWrite: 
 }
 
 function AddSessionForm({ pnid, onClose, onDone }: { pnid: string; onClose: () => void; onDone: () => void }) {
-  const cur = useQuery({ queryKey: ["curriculum"], queryFn: trainingApi.curriculum });
-  const facs = useQuery({ queryKey: ["facilitators"], queryFn: trainingApi.facilitators });
+  const cur = useQuery({ queryKey: ["curriculum"], queryFn: () => trainingApi.curriculum() });
+  const facs = useQuery({ queryKey: ["facilitators"], queryFn: () => trainingApi.facilitators() });
   const [period, setPeriod] = useState("1");
   const [item, setItem] = useState("");
   const [fac, setFac] = useState("");

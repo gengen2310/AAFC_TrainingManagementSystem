@@ -8,6 +8,7 @@ import { ChartCard } from "../components/charts/DashboardCharts";
 import type { DashboardChart } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { canViewCadets } from "../auth/permissions";
+import { useScopedSquadron } from "../layout/SquadronViewContext";
 
 // Chart-led Dashboard consuming the same backend chart endpoints
 // (/api/dashboard/charts, /api/dashboard/charts/strategic) already used by
@@ -34,10 +35,14 @@ export function Dashboard() {
   const [win, setWin] = useState<Window>("term");
   const [drill, setDrill] = useState<string | null>(null);
   const [showStrategic, setShowStrategic] = useState(false);
+  // Wing/National viewers get their comparison dashboard regardless of selection;
+  // selecting a squadron (master transformation plan Block 8) layers that
+  // squadron's own tactical/operational charts on top — it never blocks the page.
+  const { squadronId } = useScopedSquadron();
 
   const chartsQ = useQuery({
-    queryKey: ["dashboard-charts", win],
-    queryFn: () => dashboardApi.charts(win),
+    queryKey: ["dashboard-charts", win, squadronId],
+    queryFn: () => dashboardApi.charts(win, squadronId),
     staleTime: 2 * 60 * 1000,
   });
   const strategicQ = useQuery({
@@ -50,8 +55,8 @@ export function Dashboard() {
   // Exact-value quick stats + named/dated records — retained alongside the charts above,
   // since a chart encodes a shape but these give the precise figures and identifiable
   // records the doctrine requires ("keep named people, exact sessions ... in drill-downs").
-  const summary = useQuery({ queryKey: ["summary"], queryFn: reportApi.summary });
-  const parades = useQuery({ queryKey: ["parade-nights"], queryFn: () => trainingApi.paradeNights() });
+  const summary = useQuery({ queryKey: ["summary", squadronId], queryFn: () => reportApi.summary(squadronId) });
+  const parades = useQuery({ queryKey: ["parade-nights", squadronId], queryFn: () => trainingApi.paradeNights(squadronId) });
 
   if (chartsQ.isLoading) return <Loading />;
   if (chartsQ.error) return <ErrorNote error={chartsQ.error} />;
@@ -60,9 +65,13 @@ export function Dashboard() {
   const scope = chartsQ.data.scope;
   const charts = chartsQ.data.charts;
   const strategicCharts = strategicQ.data?.charts ?? {};
+  const chartRow = (id: string): DashboardChart | undefined => charts[id];
+  // A squadron's tactical charts are present either because the caller IS
+  // squadron-scoped, or because a Wing/National viewer selected one via the
+  // squadron selector — "tonight" only ever appears in the squadron chart bundle.
+  const viewingSquadron = scope === "squadron" || !!chartRow("tonight");
 
   const orderFor = scope === "wing" ? WING_CHART_ORDER : scope === "national" ? NATIONAL_CHART_ORDER : SQUADRON_CHART_ORDER;
-  const chartRow = (id: string): DashboardChart | undefined => charts[id];
 
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = (parades.data ?? [])
@@ -84,7 +93,17 @@ export function Dashboard() {
         </label>
       </div>
 
-      {scope === "squadron" && summary.data && (
+      {scope !== "squadron" && (
+        <div style={{ margin: "0 0 12px" }}>
+          <p className="muted" style={{ fontSize: 12 }}>
+            {viewingSquadron
+              ? "Showing the selected squadron's own Dashboard, plus your comparison charts below."
+              : "Select a squadron from the nav to see its own tactical Dashboard here."}
+          </p>
+        </div>
+      )}
+
+      {viewingSquadron && summary.data && (
         <>
           <div className="sg">
             <Stat label="Parade nights" value={(parades.data ?? []).length} />
@@ -101,15 +120,27 @@ export function Dashboard() {
         </>
       )}
 
-      {/* A — Tonight & upcoming readiness (squadron only, tactical) */}
-      {scope === "squadron" && chartRow("tonight") && (
+      {/* A — Tonight & upcoming readiness (tactical; squadron scope, or Wing/National with a squadron selected) */}
+      {viewingSquadron && chartRow("tonight") && (
         <Card title="A — Tonight & this week">
           <ChartCard chart={chartRow("tonight")!} />
         </Card>
       )}
-      {scope === "squadron" && chartRow("upcoming_readiness") && (
+      {viewingSquadron && chartRow("upcoming_readiness") && (
         <Card title="Next 8 parade nights">
           <ChartCard chart={chartRow("upcoming_readiness")!} />
+        </Card>
+      )}
+
+      {/* B1 — the selected squadron's own term charts, layered above the Wing/National
+          comparison charts (master transformation plan Block 8: inherit, don't diverge) */}
+      {viewingSquadron && scope !== "squadron" && (
+        <Card title="Selected squadron — this term">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 4 }}>
+            {SQUADRON_CHART_ORDER.map(id => chartRow(id) && (
+              <ChartCard key={`sq-${id}`} chart={chartRow(id)!} />
+            ))}
+          </div>
         </Card>
       )}
 
@@ -143,7 +174,7 @@ export function Dashboard() {
         </Card>
       )}
 
-      {scope === "squadron" && (
+      {viewingSquadron && (
         <Card title="Upcoming parade nights">
           {upcoming.length === 0 ? <Empty msg="No parade nights yet. Create one from the Parade Nights page." /> : (
             <table>
@@ -166,13 +197,13 @@ export function Dashboard() {
         </Card>
       )}
 
-      {drill === "not_delivered" && <NotDeliveredDrill onClose={() => setDrill(null)} />}
+      {drill === "not_delivered" && <NotDeliveredDrill squadronId={squadronId} onClose={() => setDrill(null)} />}
     </div>
   );
 }
 
-function NotDeliveredDrill({ onClose }: { onClose: () => void }) {
-  const q = useQuery({ queryKey: ["nd"], queryFn: reportApi.notDelivered });
+function NotDeliveredDrill({ squadronId, onClose }: { squadronId?: string; onClose: () => void }) {
+  const q = useQuery({ queryKey: ["nd", squadronId], queryFn: () => reportApi.notDelivered(squadronId) });
   return <DrilldownPanel title="Not delivered — records" onClose={onClose}>
     {q.isLoading ? <Loading /> : (q.data?.sessions.length ? (
       <table><thead><tr><th>Code</th><th>Reason</th></tr></thead>

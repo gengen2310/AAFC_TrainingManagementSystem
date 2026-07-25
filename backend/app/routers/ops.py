@@ -11,6 +11,7 @@ from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_view_squadron
 from ..services import audit, score_parade
 from ..services_readiness import parade_night_readiness
+from .training import _view_squadron_id
 
 router = APIRouter(prefix="/api", tags=["ops"])
 
@@ -52,8 +53,8 @@ def _coverage_for(db, sq_id):
 
 # ── REPORTS ──
 @router.get("/reports/summary")
-def rep_summary(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _active_squadron(p)
+def rep_summary(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq = _view_squadron_id(p, squadron_id, db)
     sess = _all_sessions(db, sq)
     counts = {}
     for s in sess:
@@ -104,8 +105,8 @@ def rep_coverage(db: DBSession = Depends(get_db), p: Principal = Depends(get_pri
 
 
 @router.get("/reports/facilitator-load")
-def rep_load(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _active_squadron(p)
+def rep_load(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq = _view_squadron_id(p, squadron_id, db)
     load = {}
     for s in _all_sessions(db, sq):
         name = s.facilitator_display_name_at_time
@@ -123,8 +124,8 @@ def rep_load(db: DBSession = Depends(get_db), p: Principal = Depends(get_princip
 
 
 @router.get("/reports/not-delivered")
-def rep_nd(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _active_squadron(p)
+def rep_nd(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq = _view_squadron_id(p, squadron_id, db)
     rows = [s for s in _all_sessions(db, sq) if s.status == "not_delivered"]
     return {"title": "Not delivered", "sessions": [{"id": s.id, "curriculum_code_at_time": s.curriculum_code_at_time,
             "not_delivered_reason": s.not_delivered_reason, "status": s.status} for s in rows],

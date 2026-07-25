@@ -51,7 +51,10 @@ export const orgApi = {
 };
 
 export const trainingApi = {
-  curriculum: () => api.get<{ items: CurriculumItem[] }>("/api/curriculum"),
+  // squadron_id (optional): lets a wing/national viewer see a specific squadron's
+  // data without needing Proxy/Delegated Intervention Mode — see backend/app/
+  // routers/training.py's _view_squadron_id (master transformation plan Block 8).
+  curriculum: (squadron_id?: string) => api.get<{ items: CurriculumItem[] }>(`/api/curriculum${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   curriculumSessions: (cid: string) => api.get<SessionRow[]>(`/api/curriculum/${cid}/sessions`),
   paradeNights: (squadron_id?: string) => api.get<ParadeNightWithSessions[]>(`/api/parade-nights${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   paradeNight: (id: string) => api.get<ParadeNightDetail>(`/api/parade-nights/${id}`),
@@ -63,25 +66,25 @@ export const trainingApi = {
   editSession: (id: string, b: Record<string, unknown>) => api.put<{ ok: boolean }>(`/api/sessions/${id}`, b),
   setStatus: (id: string, b: { status: string; reason?: string; rescheduled_to_date?: string; actual_attendance?: number }) =>
     api.post<{ ok: boolean }>(`/api/sessions/${id}/status`, b),
-  facilitators: () => api.get<Facilitator[]>("/api/facilitators"),
+  facilitators: (squadron_id?: string) => api.get<Facilitator[]>(`/api/facilitators${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   addFacilitator: (b: { first_name: string; last_name: string; current_rank?: string; type?: string; subject_areas?: string[] }) =>
     api.post<{ ok: boolean; facilitator_id: string }>("/api/facilitators", b),
   updateFacilitator: (id: string, b: { subject_areas?: string[]; type?: string; current_rank?: string }) =>
     api.patch<{ ok: boolean; facilitator_id: string; subject_areas: string[] }>(`/api/facilitators/${id}`, b),
   facilitatorStats: (id: string) => api.get<FacilitatorStats>(`/api/facilitators/${id}/stats`),
-  trainingAreas: () => api.get<TrainingArea[]>("/api/training-areas"),
-  equipment: () => api.get<Equipment[]>("/api/equipment"),
+  trainingAreas: (squadron_id?: string) => api.get<TrainingArea[]>(`/api/training-areas${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
+  equipment: (squadron_id?: string) => api.get<Equipment[]>(`/api/equipment${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   clashes: (date: string) => api.get<ClashResult>(`/api/resources/clashes?date=${date}`),
   cadets: () => api.get<Cadet[]>("/api/cadets"),
   cadetRisk: () => api.get<CadetRiskFlag[]>("/api/cadets/risk"),
 };
 
 export const reportApi = {
-  summary: () => api.get<SummaryReport>("/api/reports/summary"),
+  summary: (squadron_id?: string) => api.get<SummaryReport>(`/api/reports/summary${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   readiness: () => api.get<ReadinessReport>("/api/reports/readiness"),
   coverage: () => api.get<CoverageReport>("/api/reports/curriculum-coverage"),
-  facLoad: () => api.get<FacLoadReport>("/api/reports/facilitator-load"),
-  notDelivered: () => api.get<NotDeliveredReport>("/api/reports/not-delivered"),
+  facLoad: (squadron_id?: string) => api.get<FacLoadReport>(`/api/reports/facilitator-load${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
+  notDelivered: (squadron_id?: string) => api.get<NotDeliveredReport>(`/api/reports/not-delivered${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   wingOverview: () => api.get<WingOverview>("/api/reports/wing-overview"),
   nationalOverview: () => api.get<NationalOverview>("/api/reports/national-overview"),
   nationalCapability: () => api.get<NationalCapability>("/api/reports/national-capability"),
