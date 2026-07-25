@@ -5317,9 +5317,19 @@ async function doCreatePhaseInline(){
   const name=(nameInput.value||'').trim();
   if(!name){msgEl.textContent='Phase name is required.';return;}
   msgEl.textContent='';
+  // DEFECT-001 (general-release qualification): this used to always send
+  // scope_level:'national', so a Squadron Admin's own "+ New" click always
+  // hit the national-only check and returned "Access not permitted" — the
+  // backend was correct (sqn_admin was never authorised to create a
+  // NATIONAL phase), the bug was sending the wrong scope for the caller.
+  // effectiveScope() already resolves 'squadron' for a wing/national admin
+  // with an active Proxy/Delegated Intervention session, so this also
+  // creates the phase in the correct acting squadron automatically.
+  const es=effectiveScope();
+  const scopeLevel = es==='squadron' ? 'squadron' : es==='wing' ? 'wing' : 'national';
   try{
     const r=await api('/api/curriculum/phases',{method:'POST',body:{
-      name,display_name:name,scope_level:'national'
+      name,display_name:name,scope_level:scopeLevel
     }});
     // Reload phase list and select the new one
     await _populateCurrPhases();

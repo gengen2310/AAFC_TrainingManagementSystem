@@ -1509,8 +1509,17 @@ class PhaseIn(BaseModel):
 def _can_create_phase(p: Principal, scope_level: str,
                       wing_id: str | None = None, squadron_id: str | None = None) -> None:
     """Raise 403 if the actor cannot create a phase at the requested scope.
-    Identical rule set to _can_create_element — phases and elements are
-    governed by the same scope doctrine."""
+
+    DEFECT-001 (general-release qualification): the squadron-scope branch
+    used to allow wing_admin/national_admin/system_admin to create a
+    squadron-scope phase for ANY squadron with no Proxy/Delegated
+    Intervention check at all — inconsistent with require_can_write_squadron,
+    the sanctioned mechanism used everywhere else in this app for a higher
+    role writing into a lower organisational scope. Now enforced the same
+    way: sqn_admin writes their own squadron directly; wing_admin needs an
+    active Proxy session targeting that squadron; national_admin/system_admin
+    need active Delegated Intervention targeting that squadron.
+    """
     if p.role in _WRITE_BLOCKED:
         raise HTTPException(403, detail={"error": "forbidden",
                                           "message": "Viewers and auditors cannot create phases."})
@@ -1534,11 +1543,26 @@ def _can_create_phase(p: Principal, scope_level: str,
             raise HTTPException(403, detail={"error": "out_of_scope",
                                               "message": "Wing admin can only create phases for their own wing."})
     elif scope_level == "squadron":
-        if p.role not in {*_WING_WRITE_ROLES, "sqn_admin"}:
+        if p.role == "sqn_admin":
+            if squadron_id and squadron_id != p.squadron_id:
+                raise HTTPException(403, detail={"error": "out_of_scope",
+                                                  "message": "Squadron admin can only create phases for their own squadron."})
+        elif p.role == "wing_admin":
+            if not p.acting_squadron_id:
+                raise HTTPException(403, detail={"error": "proxy_required",
+                                                  "message": "Wing Admin must enter Proxy Mode to create a squadron-scope phase."})
+            if squadron_id and squadron_id != p.acting_squadron_id:
+                raise HTTPException(403, detail={"error": "out_of_scope",
+                                                  "message": "Can only create a squadron-scope phase for the squadron currently in Proxy Mode."})
+        elif p.role in ("national_admin", "system_admin"):
+            if not p.acting_squadron_id:
+                raise HTTPException(403, detail={"error": "intervention_required",
+                                                  "message": "National Admin must enter Delegated Intervention Mode to create a squadron-scope phase."})
+            if squadron_id and squadron_id != p.acting_squadron_id:
+                raise HTTPException(403, detail={"error": "out_of_scope",
+                                                  "message": "Can only create a squadron-scope phase for the squadron currently in Delegated Intervention Mode."})
+        else:
             raise HTTPException(403, detail={"error": "forbidden"})
-        if p.role == "sqn_admin" and squadron_id and squadron_id != p.squadron_id:
-            raise HTTPException(403, detail={"error": "out_of_scope",
-                                              "message": "Squadron admin can only create phases for their own squadron."})
 
 
 def _visible_phases(db: DBSession, p: Principal) -> list[CurriculumPhase]:
@@ -1592,8 +1616,13 @@ def create_phase(body: PhaseIn, db: DBSession = Depends(get_db),
     name = (body.name or "").strip()
     if not name:
         raise HTTPException(400, detail={"error": "name_required"})
-    wing_id = body.wing_id or (p.wing_id if scope in ("wing", "squadron") else None)
-    sq_id = body.squadron_id or (p.squadron_id if scope == "squadron" else None)
+    # DEFECT-001: fall back to the caller's ACTING wing/squadron (set while a
+    # Proxy/Delegated Intervention session is active), not just their own —
+    # otherwise a wing_admin/national_admin who omits squadron_id here would
+    # have it resolve to their own (nonexistent) squadron_id and silently
+    # create an orphaned scope_level="squadron", squadron_id=None row.
+    wing_id = body.wing_id or ((p.acting_wing_id or p.wing_id) if scope in ("wing", "squadron") else None)
+    sq_id = body.squadron_id or ((p.acting_squadron_id or p.squadron_id) if scope == "squadron" else None)
     # Idempotent: return existing phase if same name + scope
     existing = db.query(CurriculumPhase).filter(
         CurriculumPhase.name == name,

@@ -26,6 +26,114 @@ def _auditor(client):
     return login(client, "AUDITOR2026")
 
 
+def _own_squadron_id(client, hdr):
+    return client.get("/api/auth/me", headers=hdr).json()["session"]["squadron_id"]
+
+
+# ── DEFECT-001 (general-release qualification) ───────────────────────────
+# Root cause: _can_create_phase's squadron-scope branch let wing_admin/
+# national_admin/system_admin create a squadron-scope phase for ANY squadron
+# with no Proxy/Delegated Intervention check at all — a real tenancy gap,
+# inconsistent with require_can_write_squadron's doctrine used everywhere
+# else in this app. Omitting squadron_id entirely also silently created an
+# orphaned phase row (scope_level="squadron", squadron_id=None) since the
+# caller has no own squadron_id to fall back to. Separately, connected-
+# frontend's inline "+ New" phase creator always sent scope_level:"national"
+# regardless of who clicked it, so a sqn_admin's own click always hit the
+# national-only check and got "Access not permitted" — the literal reported
+# symptom, but a frontend bug, not a backend one (the backend already
+# correctly allows sqn_admin to create squadron-scope phases).
+
+def test_wing_admin_without_proxy_cannot_create_squadron_scope_phase_for_specific_squadron(client):
+    """A wing_admin who has NOT entered Proxy Mode must not be able to create
+    a squadron-scope phase for an explicit squadron_id — writing into a lower
+    scope always requires Proxy/Delegated Intervention in this app."""
+    hdr_sqn = _sqn_admin(client)
+    sqn_id = _own_squadron_id(client, hdr_sqn)
+
+    hdr_wing = _wing_admin(client)
+    r = client.post("/api/curriculum/phases", json={
+        "name": "NO_PROXY_SQN_PHASE", "display_name": "No Proxy Squadron Phase",
+        "scope_level": "squadron", "squadron_id": sqn_id,
+    }, headers=hdr_wing)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "proxy_required"
+
+
+def test_wing_admin_without_proxy_and_no_squadron_id_does_not_orphan_a_phase(client):
+    """Omitting squadron_id entirely must not silently create an orphaned
+    scope_level="squadron", squadron_id=None row."""
+    hdr_wing = _wing_admin(client)
+    r = client.post("/api/curriculum/phases", json={
+        "name": "NO_PROXY_NO_SQNID_PHASE", "display_name": "No Proxy No Squadron Id",
+        "scope_level": "squadron",
+    }, headers=hdr_wing)
+    assert r.status_code == 403, r.text
+
+
+def test_wing_admin_with_active_proxy_can_create_squadron_scope_phase(client):
+    """Once a wing_admin has entered Proxy Mode for a specific squadron, they
+    may create a squadron-scope phase for THAT squadron — the sanctioned
+    write-into-a-lower-scope mechanism, matching require_can_write_squadron."""
+    hdr_sqn = _sqn_admin(client)
+    sqn_id = _own_squadron_id(client, hdr_sqn)
+
+    hdr_wing = _wing_admin(client)
+    enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "Assist with phase setup"}, headers=hdr_wing)
+    assert enter.status_code == 200, enter.text
+    try:
+        r = client.post("/api/curriculum/phases", json={
+            "name": "PROXY_SQN_PHASE", "display_name": "Proxy Squadron Phase",
+            "scope_level": "squadron",
+        }, headers=hdr_wing)
+        assert r.status_code == 200, r.text
+        assert r.json()["scope_level"] == "squadron"
+        phases = client.get("/api/curriculum/phases", headers=hdr_sqn).json()
+        assert any(p["name"] == "PROXY_SQN_PHASE" for p in phases)
+    finally:
+        client.post("/api/proxy/exit", headers=hdr_wing)
+
+
+def test_wing_admin_proxy_cannot_create_squadron_phase_for_a_different_squadron(client):
+    """Proxy into squadron A must not authorise creating a squadron-scope
+    phase explicitly targeting squadron B."""
+    hdr_sqn = _sqn_admin(client)
+    sqn_a = _own_squadron_id(client, hdr_sqn)
+
+    hdr_nat = _nat_admin(client)
+    wings = client.get("/api/wings", headers=hdr_nat).json()
+    squadrons = client.get("/api/squadrons", headers=hdr_nat).json()
+    sqn_b = next((s["squadron_id"] for s in squadrons if s["squadron_id"] != sqn_a), None)
+    if not sqn_b:
+        return  # only one squadron seeded in this environment — nothing to assert
+
+    hdr_wing = _wing_admin(client)
+    enter = client.post(f"/api/proxy/enter/{sqn_a}", json={"reason": "Assist squadron A"}, headers=hdr_wing)
+    if enter.status_code != 200:
+        return  # sqn_b may not be in this wing_admin's wing — not a useful case here
+    try:
+        r = client.post("/api/curriculum/phases", json={
+            "name": "CROSS_SQN_PHASE", "display_name": "Cross Squadron Phase",
+            "scope_level": "squadron", "squadron_id": sqn_b,
+        }, headers=hdr_wing)
+        assert r.status_code == 403, r.text
+    finally:
+        client.post("/api/proxy/exit", headers=hdr_wing)
+
+
+def test_national_admin_without_intervention_cannot_create_squadron_scope_phase(client):
+    hdr_sqn = _sqn_admin(client)
+    sqn_id = _own_squadron_id(client, hdr_sqn)
+
+    hdr_nat = _nat_admin(client)
+    r = client.post("/api/curriculum/phases", json={
+        "name": "NO_INTERVENTION_SQN_PHASE", "display_name": "No Intervention Squadron Phase",
+        "scope_level": "squadron", "squadron_id": sqn_id,
+    }, headers=hdr_nat)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "intervention_required"
+
+
 # ── Phase list ────────────────────────────────────────────────────────────
 
 def test_phases_list_returns_seeded_defaults_in_order(client):
@@ -110,14 +218,41 @@ def test_nat_admin_can_create_national_phase(client):
     assert r.json()["scope_level"] == "national"
 
 
-def test_sysadmin_can_create_any_scope_phase(client):
+def test_sysadmin_can_create_national_and_wing_scope_phase_directly(client):
     hdr = _sysadmin(client)
-    for scope in ("national", "wing", "squadron"):
+    for scope in ("national", "wing"):
         r = client.post("/api/curriculum/phases", json={
             "name": f"SYSADM_PHASE_{scope.upper()[:3]}", "display_name": f"SysAdmin {scope} phase",
             "scope_level": scope,
         }, headers=hdr)
         assert r.status_code == 200, f"scope={scope} failed: {r.text}"
+
+
+def test_sysadmin_needs_intervention_to_create_squadron_scope_phase(client):
+    """DEFECT-001: system_admin is grouped with national_admin for squadron-
+    scope writes — Delegated Intervention required, same as every other
+    squadron-scope write in this app (Principal.can_write_squadron)."""
+    hdr_sqn = _sqn_admin(client)
+    sqn_id = _own_squadron_id(client, hdr_sqn)
+
+    hdr = _sysadmin(client)
+    denied = client.post("/api/curriculum/phases", json={
+        "name": "SYSADM_PHASE_SQN", "display_name": "SysAdmin squadron phase",
+        "scope_level": "squadron", "squadron_id": sqn_id,
+    }, headers=hdr)
+    assert denied.status_code == 403, denied.text
+    assert denied.json()["detail"]["error"] == "intervention_required"
+
+    enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "System admin phase setup"}, headers=hdr)
+    assert enter.status_code == 200, enter.text
+    try:
+        r = client.post("/api/curriculum/phases", json={
+            "name": "SYSADM_PHASE_SQN", "display_name": "SysAdmin squadron phase",
+            "scope_level": "squadron",
+        }, headers=hdr)
+        assert r.status_code == 200, r.text
+    finally:
+        client.post("/api/proxy/exit", headers=hdr)
 
 
 def test_auditor_cannot_create_phase(client):
