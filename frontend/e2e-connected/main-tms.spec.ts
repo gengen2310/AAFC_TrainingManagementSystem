@@ -76,13 +76,16 @@ test.describe("Planning Workspace restoration", () => {
 });
 
 test.describe("Activities page", () => {
-  test("has Add Holiday and Import CEA, no separate Import Review tab", async ({ page }) => {
+  test("has Add Holiday, no Import CEA (retired, DEFECT-005), no separate Import Review tab", async ({ page }) => {
     await loginSquadron(page, "ADMIN703");
     await page.evaluate(() => (window as any).nav("activities"));
     await expect(page.locator("#page-activities .ph-title")).toHaveText("Activities");
     await expect(page.locator("#page-activities")).not.toContainText("Events and activities");
     await expect(page.getByRole("button", { name: "+ Add Holiday" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Import CEA" })).toBeVisible();
+    // DEFECT-005: connected-frontend's legacy CEA import was retired in favour
+    // of Planning Workspace's single reviewed pipeline -- the button, modal,
+    // and backing endpoint (now 410 Gone) were removed together.
+    await expect(page.getByRole("button", { name: "Import CEA" })).toHaveCount(0);
     await expect(page.getByText("Import Review", { exact: false })).toHaveCount(0);
   });
 
