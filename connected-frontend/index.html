@@ -848,6 +848,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <option value="unscheduled">Unscheduled</option>
           </select>
           <input id="curr-search" placeholder="Search curriculum…" oninput="renderCurr()" style="min-width:180px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--steel);white-space:nowrap">
+            <input type="checkbox" id="curr-f-nolh" onchange="renderCurr()"> Missing Learning Hub link
+          </label>
         </div>
         <div id="curr-list"></div>
         <div id="curr-drill" class="drill-panel">
@@ -1839,7 +1842,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-add-curr')">Cancel</button>
-      <button class="btn btn-dk" onclick="saveCurr()">Save</button>
+      <button class="btn btn-dk" id="c-save-btn" onclick="saveCurr()">Save</button>
     </div>
   </div>
 </div>
@@ -5136,11 +5139,15 @@ function renderCurr(){
   const elF=document.getElementById('curr-f-el').value;
   const pgF=document.getElementById('curr-f-prog').value;
   const q=(document.getElementById('curr-search').value||'').toLowerCase();
+  // TRGO-04: let an admin audit which curriculum items have no Learning
+  // Hub link, instead of finding out one at a time while browsing.
+  const noLhF=(document.getElementById('curr-f-nolh')||{}).checked;
   const filtered=allCurr().filter(e=>{
     if(currTabFilter!=='all'&&e.phase!==currTabFilter)return false;
     if(elF!=='all'&&e.el!==elF)return false;
     const dp=deriveProgress(e.code);
     if(pgF!=='all'&&dp!==pgF)return false;
+    if(noLhF&&e.lh)return false;
     if(q&&!e.title.toLowerCase().includes(q)&&!e.code.toLowerCase().includes(q))return false;
     return true;
   });
@@ -5380,6 +5387,12 @@ async function saveCurr(){
     learning_hub_url:document.getElementById('c-lh').value||null,
     duration_minutes:(+document.getElementById('c-hours').value||1)*60,
     identifier,part_number:partNumber};
+  // TRGO-06: give visible saving feedback -- this save previously went
+  // silent for the whole network round-trip with no indication anything
+  // was happening, unlike the session-edit and planning-drawer save flows.
+  const btn=document.getElementById('c-save-btn');
+  const btnLabel=btn?btn.textContent:'Save';
+  if(btn){btn.disabled=true;btn.textContent='Saving…';}
   try{
     if(editCurrCode){
       const existing=S.curr.find(e=>e.code===editCurrCode&&canEditCurr(e));
@@ -5402,6 +5415,8 @@ async function saveCurr(){
   }catch(e){
     // Show human-readable error; 409 now includes a message field
     alert(apiErr(e));
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=btnLabel;}
   }
 }
 async function deleteCurrItem(id){

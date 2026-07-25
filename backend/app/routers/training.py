@@ -582,6 +582,7 @@ class FacIn(BaseModel):
     current_rank: str | None = None
     type: str | None = "Staff"
     subject_areas: list[str] | None = None
+    confirm_duplicate: bool = False
 
 
 @router.get("/facilitators")
@@ -611,6 +612,7 @@ def list_facs(squadron_id: str | None = None, db: DBSession = Depends(get_db), p
 
 @router.post("/facilitators")
 def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    from sqlalchemy import func
     if p.role in _WRITE_BLOCKED:
         raise HTTPException(403, detail={"error": "forbidden"})
     sq_id = _active_squadron(p)
@@ -620,6 +622,25 @@ def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends
     if not s:
         raise HTTPException(400, detail={"error": "no_squadron_scope"})
     require_can_write_squadron(p, s.id, s.wing_id)
+    # TRGO-07: warn (don't silently allow) when a facilitator with the same
+    # name already exists in this squadron -- the same person re-added by
+    # accident is common; a same-name-different-person case is legitimate
+    # and rare, so this blocks once and lets the caller explicitly confirm
+    # rather than either always blocking or never warning at all.
+    if not body.confirm_duplicate:
+        existing = db.query(Facilitator).filter(
+            Facilitator.squadron_id == s.id,
+            Facilitator.is_archived == False,  # noqa: E712
+            func.lower(Facilitator.last_name) == body.last_name.strip().lower(),
+            func.lower(func.coalesce(Facilitator.first_name, "")) == (body.first_name or "").strip().lower(),
+        ).first()
+        if existing:
+            raise HTTPException(409, detail={
+                "error": "possible_duplicate",
+                "message": (f"A facilitator named {(body.first_name or '').strip()} "
+                            f"{body.last_name.strip()} already exists in this squadron.").strip(),
+                "existing_facilitator_id": existing.id,
+            })
     f = Facilitator(squadron_id=s.id, wing_id=s.wing_id, first_name=body.first_name,
                     last_name=body.last_name, current_rank=body.current_rank, type=body.type or "Staff",
                     subject_areas=_validate_subject_areas(body.subject_areas))
