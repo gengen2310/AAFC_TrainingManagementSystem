@@ -9,8 +9,11 @@ test("wing admin can enter and exit proxy mode", async ({ page }) => {
   await page.getByRole("button", { name: "Log in" }).click();
   // WingOverview renders <h1>Wing Assurance</h1>
   await expect(page.getByRole("heading", { name: /wing assurance/i })).toBeVisible({ timeout: 10000 });
-  // Select a squadron and enter proxy
-  await page.getByLabel(/squadron/i).selectOption({ index: 1 });
+  // Select a squadron and enter proxy. Exact match: Block 8 added a second,
+  // legitimate "Viewing squadron" selector (SquadronSelector) to the same nav
+  // for read-only squadron browsing without proxy — /squadron/i now matches
+  // both, so this must target the proxy-mode select specifically.
+  await page.getByLabel("Squadron", { exact: true }).selectOption({ index: 1 });
   await page.getByPlaceholder(/reason/i).fill("Assisting squadron with planning");
   await page.getByRole("button", { name: /enter proxy/i }).click();
   await expect(page.getByText(/proxy mode active/i)).toBeVisible({ timeout: 5000 });

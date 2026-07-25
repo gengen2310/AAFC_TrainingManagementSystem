@@ -59,6 +59,14 @@ Found while widening `frontend/e2e/accessibility.spec.ts` coverage (Phase 7) and
 - `e2e/facilitators.spec.ts` › "facilitator leave can be recorded via API" asserts `body.facilitator_id` but the real response shape is `body.leave.facilitator_id` — a test bug, not a backend defect (the API is already returning the more informative nested shape).
 - `e2e/reports.spec.ts` › "facilitator load card renders without error" and "not delivered card renders without error" use an immediate `.isVisible().catch(() => false)` check with no wait/retry, so they can read the DOM before the async report data has rendered — a flaky-by-design pattern, not a rendering bug (manually confirmed the tables render correctly with real data).
 - Neither was fixed in this pass — out of scope for an accessibility-coverage widening — but recorded here since they were newly discovered, not previously tracked.
+- Independently re-confirmed during the master transformation's Blocks 13-15 verification gate (2026-07-25): `e2e/reports.spec.ts`'s two flaky assertions above still reproduce identically (page snapshot at failure time shows the correct table with real facilitator data already rendered — the assertion simply ran before it).
+
+### AL-03: `parade-nights.spec.ts` Sends `term` as a Number, API Requires a String
+
+- **Description**: Four tests in `e2e/parade-nights.spec.ts` (lines 68, 89, 114, 144) create a parade night via direct API call with `term: 4` (a JS number) in the request body. `ParadeIn.term` (`backend/app/routers/training.py`) has always been typed `str | None` (confirmed via `git blame` — the field predates the 2026-07 master transformation session entirely), so Pydantic rejects the request with a 422 (`"Input should be a valid string"`). The one test in the same file that creates a parade night through the actual UI form (line 44) passes, because an HTML `<input>`'s value is always a string regardless of what the field conceptually represents.
+- **Found**: 2026-07-25, while running the full `frontend/e2e` suite as part of the master transformation plan's Blocks 13-15 verification gate. Confirmed via `git blame` that neither the test file nor the `term` field type were touched by any commit in this session — pre-existing, not a regression.
+- **Impact**: Test-only. The real create-parade-night flow (both frontends, both the UI form and any correctly-typed API caller) is unaffected — confirmed via the backend's own test suite (`test_planner_v14.py` et al., all passing) and live browser verification during this session's own Block 8-9 work.
+- **Resolution**: Not fixed this pass — out of scope for the master transformation blocks, which touched `training.py` for unrelated capability-inheritance (Block 8) and phase-catalogue (Block 10) endpoints, not parade-night creation. Fix is mechanical (`term: 4` → `term: "T4"` at each of the four call sites) whenever this file is next touched.
 
 ---
 

@@ -50,7 +50,10 @@ test.describe("Year rollover", () => {
       headers: hdr,
     });
     expect(gen.status()).toBe(200);
-    const sourceDates = (await gen.json()).parade_dates as { parade_date: string }[];
+    // Pre-existing test bug (predates this session — the endpoint has never
+    // returned a `parade_dates` field, only `dates` as a plain string array;
+    // see backend/app/routers/planning.py's generate_parade_dates).
+    const sourceDates = (await gen.json()).dates as string[];
     expect(sourceDates.length).toBeGreaterThan(0);
 
     // Add a holiday to copy
@@ -87,7 +90,7 @@ test.describe("Year rollover", () => {
     const newDateStrings = newDateList.map((d) => d.parade_date);
     // Each source date must appear advanced by one year
     for (const sd of sourceDates.slice(0, 3)) {
-      const expected = sd.parade_date.replace("2170", "2171");
+      const expected = sd.replace("2170", "2171");
       expect(newDateStrings).toContain(expected);
     }
 
