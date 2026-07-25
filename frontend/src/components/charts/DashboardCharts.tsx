@@ -150,8 +150,16 @@ export function LineChart({ chart }: { chart: DashboardChart }) {
   return (
     <div style={{ overflowX: "auto" }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: W, height: H }} role="img" aria-label={chart.title ?? "Trend"}>
-        {th?.green != null && <line x1={PAD} x2={W - PAD} y1={yFor(th.green)} y2={yFor(th.green)} stroke="var(--success, #1A7F4B)" strokeDasharray="3,3" strokeWidth={1} />}
-        {th?.amber != null && <line x1={PAD} x2={W - PAD} y1={yFor(th.amber)} y2={yFor(th.amber)} stroke="var(--warning, #C97A00)" strokeDasharray="3,3" strokeWidth={1} />}
+        {/* Threshold lines carry their own visible value label — a dashed
+            line's colour alone doesn't tell a reader what "80" or "60" means. */}
+        {th?.green != null && <>
+          <line x1={PAD} x2={W - PAD} y1={yFor(th.green)} y2={yFor(th.green)} stroke="var(--success, #1A7F4B)" strokeDasharray="3,3" strokeWidth={1} />
+          <text x={W - PAD} y={yFor(th.green) - 3} textAnchor="end" fontSize={8} fill="var(--success, #1A7F4B)">Target {th.green}%</text>
+        </>}
+        {th?.amber != null && <>
+          <line x1={PAD} x2={W - PAD} y1={yFor(th.amber)} y2={yFor(th.amber)} stroke="var(--warning, #C97A00)" strokeDasharray="3,3" strokeWidth={1} />
+          <text x={W - PAD} y={yFor(th.amber) - 3} textAnchor="end" fontSize={8} fill="var(--warning, #C97A00)">Warning {th.amber}%</text>
+        </>}
         <polyline points={points} fill="none" stroke="var(--aafc-royal-blue, #004B8D)" strokeWidth={2} />
         {values.map((v, i) => <circle key={i} cx={PAD + i * stepX} cy={yFor(v)} r={2.5} fill="var(--aafc-royal-blue, #004B8D)" />)}
       </svg>
@@ -241,7 +249,7 @@ export function HeatmapChart({ chart }: { chart: DashboardChart }) {
         <thead>
           <tr>
             <th></th>
-            {cols.map(c => <th key={c} style={{ fontSize: 9, color: "var(--muted-text)", padding: "2px 4px", whiteSpace: "nowrap" }}>{c}</th>)}
+            {cols.map((c, i) => <th key={i} style={{ fontSize: 9, color: "var(--muted-text)", padding: "2px 4px", whiteSpace: "nowrap" }}>{c}</th>)}
           </tr>
         </thead>
         <tbody>

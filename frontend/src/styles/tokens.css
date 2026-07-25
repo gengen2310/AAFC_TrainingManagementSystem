@@ -5,13 +5,25 @@
   --success:#1A7F4B; --warning:#C97A00; --rescheduled:#7C3AED; --border:#D8DEE4;
   --space-1:8px; --space-2:16px; --space-3:24px; --space-4:32px; --radius:10px;
   --primary:var(--aafc-dark-blue); --accent:var(--aafc-blue);
+  /* Previously used as var(--name, #hardcoded-fallback) at each call site with
+     no definition here — every fallback silently won, drifted independently
+     (surface-2 alone had 4 slightly different hardcoded greys across call
+     sites), and never adapted to dark/hc theme. Defining them for real once,
+     here, is the fix — not a new design decision. */
+  --surface-2:#EEF2F7; --line:var(--border); --ink-2:#44506A;
+  --navy:var(--aafc-dark-blue); --ok:var(--success); --warn:var(--warning);
+  --danger:var(--aafc-red);
 }
 html[data-theme="dark"]{
   --surface:#0F1C30; --background:#081426; --text:#E7EEF6; --muted-text:#9FB2C6;
   --border:#1E3251; --primary:#51B0E3; --accent:#51B0E3; --red:#FF6B6B;
+  --surface-2:#16233A; --line:var(--border); --ink-2:#C7D4E3;
+  --navy:#51B0E3; --ok:var(--success); --warn:var(--warning); --danger:var(--red);
 }
 html[data-theme="hc"]{
   --surface:#FFFFFF; --background:#FFFFFF; --text:#000000; --muted-text:#000000;
   --border:#000000; --primary:#000000; --accent:#000000;
+  --surface-2:#FFFFFF; --line:#000000; --ink-2:#000000;
+  --navy:#000000; --ok:#000000; --warn:#000000; --danger:#000000;
 }
 @media (prefers-reduced-motion: reduce){ *{animation:none!important; transition:none!important;} }
