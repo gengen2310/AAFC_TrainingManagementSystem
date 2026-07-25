@@ -49,12 +49,12 @@ export function ParadeNights() {
 
 function CreateParadeModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [date, setDate] = useState("");
-  const [term, setTerm] = useState("1");
+  const [term, setTerm] = useState("T1");
   const [count, setCount] = useState("3");
   const [err, setErr] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const m = useMutation({
-    mutationFn: () => trainingApi.createParadeNight({ date, term: Number(term), session_count: Number(count) }),
+    mutationFn: () => trainingApi.createParadeNight({ date, term, session_count: Number(count) }),
     onSuccess: onDone,
     onError: (e) => {
       if (e instanceof ApiError) {
@@ -72,7 +72,12 @@ function CreateParadeModal({ onClose, onDone }: { onClose: () => void; onDone: (
         <input id="pn-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-invalid={!!fields.date} />
         {fields.date && <div className="field-err" role="alert">{fields.date}</div>}
         <label htmlFor="pn-term">Term</label>
-        <input id="pn-term" type="number" min={1} max={4} value={term} onChange={(e) => setTerm(e.target.value)} aria-invalid={!!fields.term} />
+        <select id="pn-term" value={term} onChange={(e) => setTerm(e.target.value)} aria-invalid={!!fields.term}>
+          <option value="T1">Term 1</option>
+          <option value="T2">Term 2</option>
+          <option value="T3">Term 3</option>
+          <option value="T4">Term 4</option>
+        </select>
         {fields.term && <div className="field-err" role="alert">{fields.term}</div>}
         <label htmlFor="pn-count">Session count</label>
         <input id="pn-count" type="number" min={1} max={6} value={count} onChange={(e) => setCount(e.target.value)} aria-invalid={!!fields.session_count} />

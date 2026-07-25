@@ -51,6 +51,26 @@ test("Calendar page loads", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /calendar/i })).toBeVisible({ timeout: 8000 });
 });
 
+// DEFECT-002 (general-release qualification, AL-03): recommended_term is already
+// "T1".."T4" from the backend (see backend/app/models/training.py's CurriculumItem.
+// recommended_term, String(10)); the Planning Workspace's Mission Backlog table used
+// to re-prefix it with `T${m.recommended_term}`, rendering "TT1" instead of "T1".
+// Any populated Rec. Term cell must match ^T[1-4]$ exactly, never double-prefixed.
+test("Mission Backlog Rec. Term column is not double-prefixed", async ({ page }) => {
+  await page.goto("/planning");
+  await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
+
+  await page.getByText("Activities ▲").click();
+  await page.getByRole("button", { name: "Mission Backlog" }).click();
+  await expect(page.getByText("Rec. Term")).toBeVisible({ timeout: 8000 });
+
+  const cells = page.locator("table").locator("tr").locator("td").filter({ hasText: /^T\d$|^TT\d$/ });
+  const count = await cells.count();
+  for (let i = 0; i < count; i++) {
+    await expect(cells.nth(i)).toHaveText(/^T[1-4]$/);
+  }
+});
+
 test("read-only role (sqn_general) cannot see admin controls", async ({ page }) => {
   // Log out and back in as general user
   await page.getByRole("button", { name: /log out|sign out/i }).click();

@@ -34,7 +34,7 @@ export interface Flight {
 export interface CurriculumItem {
   curriculum_id: string; code: string; title: string; phase: string; element: string;
   duration_minutes: number; core_status: string; learning_hub_url: string | null;
-  recommended_term: number | null; session_count: number; progress: string;
+  recommended_term: string | null; session_count: number; progress: string;
 }
 export interface SessionRow {
   id: string; parade_night_id: string; squadron_id: string; period_number: number;
@@ -47,7 +47,7 @@ export interface SessionRow {
   [k: string]: unknown;
 }
 export interface ParadeNight {
-  parade_night_id: string; squadron_id: string; date: string; term: number | null;
+  parade_night_id: string; squadron_id: string; date: string; term: string | null;
   start_time: string | null; end_time: string | null; session_count: number;
   parade_type: string; published_status: boolean; readiness_score: number | null; closeout_status: string | null;
 }

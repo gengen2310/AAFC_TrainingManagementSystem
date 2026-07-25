@@ -58,7 +58,7 @@ export const trainingApi = {
   curriculumSessions: (cid: string) => api.get<SessionRow[]>(`/api/curriculum/${cid}/sessions`),
   paradeNights: (squadron_id?: string) => api.get<ParadeNightWithSessions[]>(`/api/parade-nights${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   paradeNight: (id: string) => api.get<ParadeNightDetail>(`/api/parade-nights/${id}`),
-  createParadeNight: (b: { date: string; term?: number; session_count?: number; parade_type?: string }) =>
+  createParadeNight: (b: { date: string; term?: string; session_count?: number; parade_type?: string }) =>
     api.post<{ ok: boolean; parade_night_id: string }>("/api/parade-nights", b),
   publish: (id: string) => api.post<{ ok: boolean }>(`/api/parade-nights/${id}/publish`),
   close: (id: string) => api.post<{ ok: boolean }>(`/api/parade-nights/${id}/close`),

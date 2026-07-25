@@ -50,7 +50,7 @@ test("sqn_admin can create a parade night", async ({ page }) => {
 
   // Fill in the form
   await page.locator("#pn-date").fill("2099-11-14");
-  await page.locator("#pn-term").fill("2");
+  await page.locator("#pn-term").selectOption("T2");
   await page.locator("#pn-count").fill("3");
 
   // Submit
@@ -69,10 +69,10 @@ test("created parade night has correct columns in list", async ({ page }) => {
   // Create via API to avoid date collision with other tests
   const hdr = await authHeader(page, ADMIN_CODE);
   const r = await page.request.post("/api/parade-nights", {
-    data: { date: "2099-12-05", term: 4, session_count: 2 },
+    data: { date: "2099-12-05", term: "T4", session_count: 2 },
     headers: hdr,
   });
-  expect(r.status()).toBe(201);
+  expect(r.status()).toBe(200); // POST /api/parade-nights returns 200, not 201 -- app-wide convention (83/84 POST routes)
 
   await page.goto("/parade-nights");
   await expect(page.getByRole("heading", { name: "Parade Nights" })).toBeVisible({ timeout: 8000 });
@@ -80,7 +80,7 @@ test("created parade night has correct columns in list", async ({ page }) => {
 
   // Row should show the date and a status
   const row = page.locator("tr").filter({ hasText: "2099-12-05" });
-  await expect(row.getByText("4")).toBeVisible(); // term column
+  await expect(row.getByText("T4")).toBeVisible(); // term column
   await expect(row.getByText("normal")).toBeVisible(); // parade_type default
 });
 
@@ -90,10 +90,10 @@ test("clicking Open shows parade night detail modal", async ({ page }) => {
   // Ensure we have a parade night to open (use API)
   const hdr = await authHeader(page, ADMIN_CODE);
   const r = await page.request.post("/api/parade-nights", {
-    data: { date: "2099-12-12", term: 4, session_count: 3 },
+    data: { date: "2099-12-12", term: "T4", session_count: 3 },
     headers: hdr,
   });
-  expect(r.status()).toBe(201);
+  expect(r.status()).toBe(200); // POST /api/parade-nights returns 200, not 201 -- app-wide convention (83/84 POST routes)
 
   await page.goto("/parade-nights");
   await expect(page.getByRole("heading", { name: "Parade Nights" })).toBeVisible({ timeout: 8000 });
@@ -114,10 +114,10 @@ test("clicking Open shows parade night detail modal", async ({ page }) => {
 test("sqn_admin can add a session to a parade night", async ({ page }) => {
   const hdr = await authHeader(page, ADMIN_CODE);
   const r = await page.request.post("/api/parade-nights", {
-    data: { date: "2099-12-19", term: 4, session_count: 1 },
+    data: { date: "2099-12-19", term: "T4", session_count: 1 },
     headers: hdr,
   });
-  expect(r.status()).toBe(201);
+  expect(r.status()).toBe(200); // POST /api/parade-nights returns 200, not 201 -- app-wide convention (83/84 POST routes)
 
   await page.goto("/parade-nights");
   await expect(page.getByRole("heading", { name: "Parade Nights" })).toBeVisible({ timeout: 8000 });
@@ -129,11 +129,11 @@ test("sqn_admin can add a session to a parade night", async ({ page }) => {
   await expect(dialog).toBeVisible({ timeout: 8000 });
 
   await dialog.getByRole("button", { name: "Add session" }).click();
-  await expect(page.getByText("Add session")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByRole("heading", { name: "Add session" })).toBeVisible({ timeout: 5000 });
 
   // Fill in period number (minimum required field)
   await page.locator("#s-period").fill("1");
-  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Add", exact: true }).click();
 
   // Session should appear in the table
   await expect(dialog.locator("tbody tr").first()).toBeVisible({ timeout: 8000 });
@@ -144,15 +144,22 @@ test("sqn_admin can add a session to a parade night", async ({ page }) => {
 test("parade night status changes to published after Publish", async ({ page }) => {
   const hdr = await authHeader(page, ADMIN_CODE);
   const r = await page.request.post("/api/parade-nights", {
-    data: { date: "2099-12-26", term: 4, session_count: 1 },
+    data: { date: "2099-12-26", term: "T4", session_count: 1 },
     headers: hdr,
   });
-  expect(r.status()).toBe(201);
+  expect(r.status()).toBe(200); // POST /api/parade-nights returns 200, not 201 -- app-wide convention (83/84 POST routes)
   const pnId = (await r.json()).parade_night_id as string;
 
-  // Add a session so we can publish
+  // Publishing requires every session to have a title, a facilitator, and a
+  // room (see publish_blockers() in backend/app/services.py) -- fetch real
+  // seeded 703 records so the session actually satisfies those blockers.
+  const facs = await (await page.request.get("/api/facilitators", { headers: hdr })).json();
+  const rooms = await (await page.request.get("/api/training-areas", { headers: hdr })).json();
   await page.request.post("/api/sessions", {
-    data: { parade_night_id: pnId, period_number: 1 },
+    data: {
+      parade_night_id: pnId, period_number: 1, custom_title: "Test session",
+      facilitator_id: facs[0].facilitator_id, training_area_id: rooms[0].training_area_id,
+    },
     headers: hdr,
   });
 

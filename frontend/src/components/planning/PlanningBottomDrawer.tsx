@@ -295,7 +295,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                     {/* Duration */}
                     <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{m.duration_minutes}m</td>
                     {/* Rec. Term */}
-                    <td style={{ textAlign: "center" }}>{m.recommended_term ? `T${m.recommended_term}` : "—"}</td>
+                    <td style={{ textAlign: "center" }}>{m.recommended_term ?? "—"}</td>
                     {/* Type */}
                     <td style={{ textAlign: "center" }}>
                       <span style={PROG_TYPE_STYLE[progType]}>
