@@ -52,9 +52,19 @@ assume either direction before this is confirmed directly.
 | CEA import batch | `cea_import_batches` | `CeaImportBatch` | via `planning_year_id` | — |
 | Local hide (sqn overlay) | `activity_local_hides` **[CORRECTED — was `cea_local_hides`]** | `ActivityLocalHide` **[CORRECTED — was `CeaLocalHide`]** | `squadron_id` | Hides an inherited activity for one sqn; does not delete the source record |
 
-**[NEW, 2026-07-24] — see `docs/beta/15_known_limitations.md` DL-04 for full detail**: CEA
-import is actually **two separate pipelines**, not one. The `Activity`/`cea_seq_nr` row above
-describes the older, `sqn_admin`-permissioned pipeline (`POST /api/activities/import-cea`,
+**[UPDATED, 2026-07-26 — DEFECT-005]**: the two-pipeline situation described below (originally
+found 2026-07-24) is resolved. `POST /api/activities/import-cea` (the older, `sqn_admin`-
+permissioned pipeline with no review workflow) is now **retired** — it responds `410 Gone`
+and connected-frontend's "Import CEA" button/modal were removed. `POST
+/api/planning/years/{id}/cea/import` (Planning Workspace, `wing_admin`+-only, full review/
+classification workflow) is now the single CEA import pipeline. The `Activity.cea_seq_nr`
+column still exists (it's also reused by the unrelated batch-generate-activities feature) but
+no longer receives CEA-imported rows going forward; historical rows created by the old
+pipeline before retirement are unaffected and remain readable.
+
+**[HISTORICAL, 2026-07-24] — see `docs/beta/15_known_limitations.md` DL-04 for full detail**: CEA
+import was actually **two separate pipelines**, not one. The `Activity`/`cea_seq_nr` row above
+described the older, `sqn_admin`-permissioned pipeline (`POST /api/activities/import-cea`,
 `training.py`) with no review workflow. The `CeaActivity`/`CeaImportBatch` rows describe the
 newer, `wing_admin`+-only pipeline (`POST /api/planning/years/{id}/cea/import`, `planning.py`)
 with a full review/classification workflow. They were not previously documented as two

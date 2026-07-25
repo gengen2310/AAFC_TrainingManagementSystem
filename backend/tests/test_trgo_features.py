@@ -233,3 +233,55 @@ def test_update_future_parade_day_rollback_on_conflict_does_not_partially_apply(
     after = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=hdr).json()
     row = next(x for x in after if x["parade_date_id"] == ids[0])
     assert row["parade_date"] == tuesday_date
+
+
+# ─────────────────────────────────────────────────────────────
+# TRGO-02: unified Activities view -- local-hide state surfaced on read
+# ─────────────────────────────────────────────────────────────
+
+def test_cea_activities_list_includes_hide_state_defaults(client):
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2083)
+    r = client.post(f"/api/planning/years/{year_id}/cea/activities",
+                    json={"activity_name": "Unhidden activity"}, headers=hdr)
+    assert r.status_code == 200, r.text
+
+    r2 = client.get(f"/api/planning/years/{year_id}/cea/activities", headers=hdr)
+    assert r2.status_code == 200
+    act = r2.json()["activities"][0]
+    assert act["is_hidden_for_me"] is False
+    assert act["local_note"] is None
+
+
+def test_cea_activities_list_reflects_local_hide(client):
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2084)
+    r = client.post(f"/api/planning/years/{year_id}/cea/activities",
+                    json={"activity_name": "To be hidden"}, headers=hdr)
+    activity_id = r.json()["id"]
+
+    r2 = client.post(f"/api/planning/cea/{activity_id}/local-hide",
+                     json={"is_hidden": True, "local_note": "Not relevant to us"}, headers=hdr)
+    assert r2.status_code == 200, r2.text
+
+    r3 = client.get(f"/api/planning/years/{year_id}/cea/activities", headers=hdr)
+    act = next(a for a in r3.json()["activities"] if a["id"] == activity_id)
+    assert act["is_hidden_for_me"] is True
+    assert act["local_note"] == "Not relevant to us"
+
+
+def test_cea_local_hide_does_not_affect_other_squadron(client):
+    """Local hide must be a per-squadron overlay, never visible to a sibling squadron."""
+    hdr703 = _sqn_admin_hdr(client)
+    hdr704 = login(client, "ADMIN704")
+    year_id = _make_year(client, hdr703, year=2085)
+    r = client.post(f"/api/planning/years/{year_id}/cea/activities",
+                    json={"activity_name": "703-scoped activity"}, headers=hdr703)
+    activity_id = r.json()["id"]
+    client.post(f"/api/planning/cea/{activity_id}/local-hide",
+               json={"is_hidden": True}, headers=hdr703)
+
+    # 704 has no access to 703's year at all (different squadron), confirming
+    # scope isolation independently of the hide-state field itself.
+    r2 = client.get(f"/api/planning/years/{year_id}/cea/activities", headers=hdr704)
+    assert r2.status_code == 403

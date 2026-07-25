@@ -3912,7 +3912,26 @@ def list_cea_activities(
     if status:
         stmt = stmt.where(CeaActivity.classification_status == status)
     rows = db.scalars(stmt.order_by(CeaActivity.activity_start_date)).all()
-    return {"activities": [_cea_activity_out(r) for r in rows]}
+    # TRGO-02: surface the caller's own squadron's local-hide/note state so the
+    # unified Activities view can show "hidden for you" and let a squadron
+    # toggle it, without touching the shared CeaActivity row (the point of
+    # local-hide being a per-squadron overlay, not a source-record edit).
+    hides_by_activity: dict[str, ActivityLocalHide] = {}
+    if p.squadron_id and rows:
+        activity_ids = [r.id for r in rows]
+        hide_rows = db.query(ActivityLocalHide).filter(
+            ActivityLocalHide.cea_activity_id.in_(activity_ids),
+            ActivityLocalHide.unit_id == p.squadron_id,
+        ).all()
+        hides_by_activity = {h.cea_activity_id: h for h in hide_rows}
+    out = []
+    for r in rows:
+        d = _cea_activity_out(r)
+        hide = hides_by_activity.get(r.id)
+        d["is_hidden_for_me"] = bool(hide and hide.is_hidden)
+        d["local_note"] = hide.local_note if hide else None
+        out.append(d)
+    return {"activities": out}
 
 
 @router.get("/years/{year_id}/cea/batches")

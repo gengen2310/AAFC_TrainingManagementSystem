@@ -1168,6 +1168,8 @@ type UnifiedActivity = {
   unit: string | null;
   extra: string | null;
   is_removed: boolean;
+  is_hidden: boolean;
+  local_note: string | null;
   raw_cea: import("../../api/types").CeaActivity | null;
   raw_anchor: import("../../api/types").AnchorEvent | null;
   raw_holiday: import("../../api/types").HolidayPeriod | null;
@@ -1288,6 +1290,9 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
   const [fSearch, setFSearch] = useState("");
   const [fStart, setFStart] = useState("");
   const [fEnd, setFEnd] = useState("");
+  const [fShowHidden, setFShowHidden] = useState(false);
+  const [hidingId, setHidingId] = useState<string | null>(null);
+  const [hideNote, setHideNote] = useState("");
   // Sort
   const [sortCol, setSortCol] = useState("start_date");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -1334,6 +1339,8 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         unit: a.host_unit ?? a.parent_unit,
         extra: a.cea_activity_id,
         is_removed: a.is_removed_from_cea,
+        is_hidden: a.is_hidden_for_me,
+        local_note: a.local_note,
         raw_cea: a,
         raw_anchor: null,
         raw_holiday: null,
@@ -1352,6 +1359,8 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         unit: a.unit_name,
         extra: a.event_type,
         is_removed: false,
+        is_hidden: false,
+        local_note: null,
         raw_cea: null,
         raw_anchor: a,
         raw_holiday: null,
@@ -1370,6 +1379,8 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         unit: null,
         extra: h.holiday_type.replace(/_/g, " "),
         is_removed: false,
+        is_hidden: false,
+        local_note: null,
         raw_cea: null,
         raw_anchor: null,
         raw_holiday: h,
@@ -1382,6 +1393,10 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
     const q = fSearch.toLowerCase();
     return [...unified]
       .filter(r => {
+        // TRGO-02: hidden items are excluded by default -- local hide is a
+        // "get this out of my way" action, not a delete, so it should not
+        // require a special mode to reach, just an explicit toggle to reveal.
+        if (r.is_hidden && !fShowHidden) return false;
         if (fSource !== "all" && r.source !== fSource) return false;
         if (fStatus === "needs_review" && r.classification_status !== "needs_review") return false;
         if (fStatus === "classified" && r.classification_status !== "classified") return false;
@@ -1400,7 +1415,7 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         const cmp = av < bv ? -1 : av > bv ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [unified, fSource, fStatus, fSearch, fStart, fEnd, sortCol, sortDir]);
+  }, [unified, fSource, fStatus, fSearch, fStart, fEnd, fShowHidden, sortCol, sortDir]);
 
   function handleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -1432,6 +1447,16 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
     } finally {
       setCreating(false);
     }
+  }
+
+  // TRGO-02: local hide/note -- a squadron-scoped overlay (ActivityLocalHide)
+  // that never touches the shared CeaActivity source row.
+  async function toggleHide(activity: import("../../api/types").CeaActivity, note?: string) {
+    await planningApi.ceaLocalHide(activity.id, {
+      is_hidden: !activity.is_hidden_for_me,
+      local_note: note !== undefined ? note : (activity.local_note ?? undefined),
+    });
+    await qc.invalidateQueries({ queryKey: ["cea-activities", yearId] });
   }
 
   async function handleFileImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1495,6 +1520,10 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         >
           Reset
         </button>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--muted-text)", cursor: "pointer", whiteSpace: "nowrap" }}>
+          <input type="checkbox" checked={fShowHidden} onChange={e => setFShowHidden(e.target.checked)} />
+          Show hidden
+        </label>
         <span style={{ fontSize: 11, color: "var(--muted-text)", marginLeft: "auto", whiteSpace: "nowrap" }}>
           {filtered.length} of {unified.length}
         </span>
@@ -1588,7 +1617,7 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
             </thead>
             <tbody>
               {filtered.map(r => (
-                <tr key={`${r.source}-${r.id}`} style={{ background: r.is_removed ? "#fff3cd" : undefined }}>
+                <tr key={`${r.source}-${r.id}`} style={{ background: r.is_removed ? "#fff3cd" : r.is_hidden ? "#f4f5f7" : undefined, opacity: r.is_hidden ? 0.7 : 1 }}>
                   <td>
                     <span style={{
                       fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 3,
@@ -1604,6 +1633,12 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
                     {r.name}
                     {r.is_removed && (
                       <span style={{ marginLeft: 4, fontSize: 9, color: "var(--warning)", fontWeight: 700 }}>[Not in latest import]</span>
+                    )}
+                    {r.is_hidden && (
+                      <span style={{ marginLeft: 4, fontSize: 9, color: "var(--muted-text)", fontWeight: 700 }}>[Hidden for your squadron]</span>
+                    )}
+                    {r.local_note && (
+                      <div style={{ fontSize: 9, color: "var(--muted-text)", fontWeight: 400, fontStyle: "italic" }}>{r.local_note}</div>
                     )}
                   </td>
                   <td style={{ whiteSpace: "nowrap" }}>{r.start_date ?? "—"}</td>
@@ -1625,7 +1660,7 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
                       <span style={{ fontSize: 10, color: "var(--muted-text)" }}>{r.classification_status ?? "—"}</span>
                     )}
                   </td>
-                  <td>
+                  <td style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                     {r.raw_cea && (
                       <button
                         className="btn sm out"
@@ -1633,6 +1668,18 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
                         onClick={() => setClassifying(r.raw_cea!)}
                       >
                         Classify
+                      </button>
+                    )}
+                    {r.raw_cea && (
+                      <button
+                        className="btn sm out"
+                        style={{ fontSize: 10, padding: "2px 6px" }}
+                        onClick={() => {
+                          if (r.is_hidden) { toggleHide(r.raw_cea!); }
+                          else { setHidingId(r.id); setHideNote(r.local_note ?? ""); }
+                        }}
+                      >
+                        {r.is_hidden ? "Unhide" : "Hide / note…"}
                       </button>
                     )}
                   </td>
@@ -1695,6 +1742,37 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
           onClose={() => setClassifying(null)}
         />
       )}
+
+      {hidingId && (() => {
+        const target = unified.find(r => r.id === hidingId)?.raw_cea;
+        if (!target) return null;
+        return (
+          <div className="pw-modal-overlay" role="dialog" aria-label="Hide activity for your squadron" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, width: 360, boxShadow: "0 8px 24px rgba(0,0,0,0.2)" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Hide "{target.activity_name}" for your squadron</div>
+              <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8 }}>
+                This only affects what your squadron sees -- the shared activity record is not changed, and other squadrons still see it normally.
+              </p>
+              <label style={labelSx}>
+                Note (optional)
+                <textarea value={hideNote} onChange={e => setHideNote(e.target.value)} rows={2} style={{ ...inputSx, resize: "vertical" }} />
+              </label>
+              <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
+                <button className="btn sm out" onClick={() => setHidingId(null)}>Cancel</button>
+                <button
+                  className="btn sm primary"
+                  onClick={async () => {
+                    await toggleHide(target, hideNote.trim() || undefined);
+                    setHidingId(null);
+                  }}
+                >
+                  Hide for my squadron
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -19,7 +19,7 @@
 1. Create new planning year via the Planning Workspace (Parade Nights → Planning Workspace → New Year)
 2. Generate parade dates (verify weekday and holiday exclusions)
 3. Add/update holiday periods for the new year
-4. Add anchor events from the CEA calendar via Activities → Import CEA
+4. Import CEA activities via Planning Workspace → Import CEA (wing_admin or higher — DEFECT-005 retired the old connected-frontend Activities → Import CEA path)
 5. Assign curriculum items to parade night sessions via Parade Nights
 6. Confirm timing template is correct for the unit
 

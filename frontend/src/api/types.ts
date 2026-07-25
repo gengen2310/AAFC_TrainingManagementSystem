@@ -397,6 +397,8 @@ export interface CeaActivity {
   is_removed_from_cea: boolean;
   is_archived: boolean;
   created_at: string | null;
+  is_hidden_for_me: boolean;
+  local_note: string | null;
 }
 
 export interface CeaImportBatch {
