@@ -18,10 +18,20 @@ connect_args = {"check_same_thread": False} if _is_sqlite else {}
 # Supabase Session Pooler caps connections at 15.  With 2 gunicorn workers
 # each pool must stay under 8 (7 + 1 pre-ping headroom = 14 total < 15).
 # Switch DATABASE_URL to port 6543 (Transaction Pooler) for higher concurrency.
+# Pool size is configurable per-environment (DB_POOL_SIZE / DB_POOL_MAX_OVERFLOW /
+# DB_POOL_TIMEOUT) — the 5/2/30 defaults below are what's safe for production's
+# Supabase constraint; an environment with a different Postgres (higher
+# max_connections, no external pooler cap) may set these env vars higher without
+# touching this file or affecting any other environment.
 _pool_kwargs = (
     {}
     if _is_sqlite
-    else {"pool_size": 5, "max_overflow": 2, "pool_timeout": 30, "pool_recycle": 1800}
+    else {
+        "pool_size": settings.DB_POOL_SIZE,
+        "max_overflow": settings.DB_POOL_MAX_OVERFLOW,
+        "pool_timeout": settings.DB_POOL_TIMEOUT,
+        "pool_recycle": 1800,
+    }
 )
 
 engine = create_engine(

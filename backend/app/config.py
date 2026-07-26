@@ -17,6 +17,16 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./aafc_tms.db"
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # SQLAlchemy connection pool sizing (Postgres only; ignored for SQLite).
+    # Defaults are sized for PRODUCTION's Supabase Session Pooler, which caps total
+    # connections at 15 -- with 2 gunicorn workers, each pool must stay under 8
+    # (7 + 1 pre-ping headroom = 14 total < 15). Do not raise these defaults without
+    # re-checking that constraint. Environments without that constraint (e.g. a
+    # staging database that isn't behind Supabase's pooler) may override via env var.
+    DB_POOL_SIZE: int = 5
+    DB_POOL_MAX_OVERFLOW: int = 2
+    DB_POOL_TIMEOUT: int = 30
+
     # Secrets — MUST be overridden in production via environment.
     # Dev defaults are ≥32 bytes to satisfy HS256 key-length requirements during local testing.
     # These values MUST be replaced with cryptographically random secrets in production.
