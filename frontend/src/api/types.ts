@@ -137,6 +137,12 @@ export interface TimingBlock {
   start_time: string | null; end_time: string | null;
   duration_minutes: number; is_instructional: boolean; period_number: number | null;
 }
+export interface TimingTemplateFull {
+  timing_template_id: string; squadron_id: string; name: string;
+  effective_from: string; effective_to: string | null;
+  is_default: boolean; active_status: boolean; notes: string | null;
+  instructional_period_count: number;
+}
 export interface PlanningConflict {
   conflict_id: string; planning_year_id: string | null; parade_date_id: string | null;
   scheduled_session_id: string | null; conflict_type: string; severity: string;

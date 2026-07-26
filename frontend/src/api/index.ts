@@ -238,6 +238,19 @@ export const planningApi = {
   }) => api.post<{ ok: boolean; created: number; linked: number; dates: string[] }>(
     `/api/planning/years/${year_id}/generate-parade-dates`, body,
   ),
+  rolloverYear: (year_id: string, body: {
+    target_year?: number; name?: string;
+    copy_holidays?: boolean; carry_incomplete_sessions?: boolean;
+  }) => api.post<{
+    ok: boolean; new_planning_year_id: string; year: number; name: string;
+    holidays_copied: number; parade_dates_copied: number; incomplete_sessions_noted: number;
+  }>(`/api/planning/years/${year_id}/rollover`, body),
+  listTimingTemplates: (squadron_id?: string) =>
+    api.get<import("./types").TimingTemplateFull[]>(`/api/timing-templates${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
+  applyTimingTemplateFromDate: (template_id: string, body: { effective_from: string; reason?: string }) =>
+    api.post<{ ok: boolean; effective_from: string; closed_previous_count: number }>(
+      `/api/timing-templates/${template_id}/apply-from-date`, body,
+    ),
   updateFutureParadeDay: (year_id: string, body: {
     new_weekday: number; from_date?: string; exclude_ids?: string[];
     reason?: string; preview?: boolean;

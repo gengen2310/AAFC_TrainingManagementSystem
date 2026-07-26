@@ -16,6 +16,7 @@ import { TwoWeekView } from "../components/planning/views/TwoWeekView";
 import { ParadeNightGridView } from "../components/planning/views/ParadeNightGridView";
 import { SetupPanel } from "../components/planning/SetupPanel";
 import { UpdateFutureParadeDayModal } from "../components/planning/UpdateFutureParadeDayModal";
+import { GuidedYearSetupModal } from "../components/planning/GuidedYearSetupModal";
 import { canWriteSquadron } from "../auth/permissions";
 import type { PlanningSession, AnchorEvent } from "../api/types";
 
@@ -47,6 +48,7 @@ export function PlanningWorkspace() {
   }, []);
   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
   const [updatingParadeDay, setUpdatingParadeDay] = useState(false);
+  const [guidedSetupOpen, setGuidedSetupOpen] = useState(false);
   const [bottomOpen, setBottomOpen] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab>("activities");
   const [layers, setLayers] = useState<LayerState>(defaultLayers);
@@ -363,6 +365,15 @@ export function PlanningWorkspace() {
               Update future parade nights…
             </button>
           )}
+          {canWriteSquadron(session) && (
+            <button
+              className="btn sm out"
+              style={{ fontSize: 11, padding: "3px 10px" }}
+              onClick={() => setGuidedSetupOpen(true)}
+            >
+              Guided year setup…
+            </button>
+          )}
         </div>
       )}
       {updatingParadeDay && selectedYearId && (
@@ -370,6 +381,17 @@ export function PlanningWorkspace() {
           yearId={selectedYearId}
           onClose={() => setUpdatingParadeDay(false)}
           onDone={() => qc.invalidateQueries({ queryKey: ["planning-cc"] })}
+        />
+      )}
+      {guidedSetupOpen && (
+        <GuidedYearSetupModal
+          years={years ?? []}
+          onClose={() => setGuidedSetupOpen(false)}
+          onDone={() => {
+            qc.invalidateQueries({ queryKey: ["planning-years"] });
+            qc.invalidateQueries({ queryKey: ["planning-cc"] });
+            qc.invalidateQueries({ queryKey: ["planning-night-summaries"] });
+          }}
         />
       )}
 
