@@ -72,6 +72,19 @@ export const trainingApi = {
   updateFacilitator: (id: string, b: { subject_areas?: string[]; type?: string; current_rank?: string }) =>
     api.patch<{ ok: boolean; facilitator_id: string; subject_areas: string[] }>(`/api/facilitators/${id}`, b),
   facilitatorStats: (id: string) => api.get<FacilitatorStats>(`/api/facilitators/${id}/stats`),
+  facilitatorImportTemplate: () => api.get<string>("/api/facilitators/import/template.csv"),
+  importFacilitatorsCsv: (file: File, opts: { preview: boolean; confirmDuplicateRows?: number[] }) => {
+    const form = new FormData();
+    form.append("file", file);
+    const params = new URLSearchParams({ preview: String(opts.preview) });
+    if (opts.confirmDuplicateRows?.length) params.set("confirm_duplicate_rows", opts.confirmDuplicateRows.join(","));
+    return api.postForm<{
+      ok: boolean; preview: boolean;
+      rows?: { row: number; action: string; message?: string; first_name: string | null; last_name: string }[];
+      to_create?: number; duplicates?: number; errors: number;
+      created?: number; skipped?: number; created_ids?: string[]; total?: number;
+    }>(`/api/facilitators/import?${params}`, form);
+  },
   trainingAreas: (squadron_id?: string) => api.get<TrainingArea[]>(`/api/training-areas${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   equipment: (squadron_id?: string) => api.get<Equipment[]>(`/api/equipment${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   clashes: (date: string) => api.get<ClashResult>(`/api/resources/clashes?date=${date}`),

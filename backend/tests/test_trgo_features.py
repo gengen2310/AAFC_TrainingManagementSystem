@@ -285,3 +285,150 @@ def test_cea_local_hide_does_not_affect_other_squadron(client):
     # scope isolation independently of the hide-state field itself.
     r2 = client.get(f"/api/planning/years/{year_id}/cea/activities", headers=hdr704)
     assert r2.status_code == 403
+
+
+# ─────────────────────────────────────────────────────────────
+# TRGO-05: Facilitator CSV import
+# ─────────────────────────────────────────────────────────────
+
+def _csv_file(content: bytes, name="facilitators.csv"):
+    return {"file": (name, io.BytesIO(content), "text/csv")}
+
+
+def test_facilitator_import_template_downloadable(client):
+    hdr = _sqn_admin_hdr(client)
+    r = client.get("/api/facilitators/import/template.csv", headers=hdr)
+    assert r.status_code == 200
+    assert b"first_name" in r.content
+    assert b"last_name" in r.content
+
+
+def test_facilitator_import_preview_does_not_write(client):
+    hdr = _sqn_admin_hdr(client)
+    csv_content = b"rank,first_name,last_name,type,subject_areas\nFLTLT,Trgo05,Preview,Staff,Drill;Air_Space\n"
+    r = client.post("/api/facilitators/import?preview=true", files=_csv_file(csv_content), headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["preview"] is True
+    assert d["to_create"] == 1
+    assert d["rows"][0]["action"] == "create"
+
+    # Not actually created
+    r2 = client.get("/api/facilitators", headers=hdr)
+    names = [(f["first_name"], f["last_name"]) for f in r2.json()]
+    assert ("Trgo05", "Preview") not in names
+
+
+def test_facilitator_import_commit_creates_rows(client):
+    hdr = _sqn_admin_hdr(client)
+    csv_content = b"rank,first_name,last_name,type,subject_areas\nFLTLT,Trgo05,Commit,Staff,Drill\n"
+    r = client.post("/api/facilitators/import?preview=false", files=_csv_file(csv_content), headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["created"] == 1
+    assert d["skipped"] == 0
+    assert len(d["created_ids"]) == 1
+
+    r2 = client.get("/api/facilitators", headers=hdr)
+    names = [(f["first_name"], f["last_name"]) for f in r2.json()]
+    assert ("Trgo05", "Commit") in names
+
+
+def test_facilitator_import_detects_duplicate_against_existing(client):
+    hdr = _sqn_admin_hdr(client)
+    client.post("/api/facilitators", json={"first_name": "Trgo05", "last_name": "Existing"}, headers=hdr)
+
+    csv_content = b"first_name,last_name\nTrgo05,Existing\n"
+    r = client.post("/api/facilitators/import?preview=true", files=_csv_file(csv_content), headers=hdr)
+    d = r.json()
+    assert d["rows"][0]["action"] == "duplicate"
+    assert d["duplicates"] == 1
+
+
+def test_facilitator_import_detects_duplicate_within_file(client):
+    hdr = _sqn_admin_hdr(client)
+    csv_content = b"first_name,last_name\nTrgo05,Dup\nTrgo05,Dup\n"
+    r = client.post("/api/facilitators/import?preview=true", files=_csv_file(csv_content), headers=hdr)
+    d = r.json()
+    assert d["rows"][0]["action"] == "create"
+    assert d["rows"][1]["action"] == "duplicate_in_file"
+
+
+def test_facilitator_import_skips_duplicates_by_default_on_commit(client):
+    hdr = _sqn_admin_hdr(client)
+    client.post("/api/facilitators", json={"first_name": "Trgo05", "last_name": "SkipMe"}, headers=hdr)
+
+    csv_content = b"first_name,last_name\nTrgo05,SkipMe\n"
+    r = client.post("/api/facilitators/import?preview=false", files=_csv_file(csv_content), headers=hdr)
+    d = r.json()
+    assert d["created"] == 0
+    assert d["skipped"] == 1
+
+
+def test_facilitator_import_confirm_duplicate_rows_forces_create(client):
+    hdr = _sqn_admin_hdr(client)
+    client.post("/api/facilitators", json={"first_name": "Trgo05", "last_name": "ForceCreate"}, headers=hdr)
+
+    csv_content = b"first_name,last_name\nTrgo05,ForceCreate\n"
+    r = client.post("/api/facilitators/import?preview=false&confirm_duplicate_rows=0",
+                    files=_csv_file(csv_content), headers=hdr)
+    d = r.json()
+    assert d["created"] == 1
+    assert d["skipped"] == 0
+
+
+def test_facilitator_import_malformed_row_reported_as_error(client):
+    hdr = _sqn_admin_hdr(client)
+    csv_content = b"first_name,last_name\nNoLastName,\n"
+    r = client.post("/api/facilitators/import?preview=true", files=_csv_file(csv_content), headers=hdr)
+    d = r.json()
+    assert d["rows"][0]["action"] == "error"
+    assert d["errors"] == 1
+
+
+def test_facilitator_import_partial_invalid_file_still_creates_valid_rows(client):
+    hdr = _sqn_admin_hdr(client)
+    csv_content = b"first_name,last_name\nGood,Trgo05Row\n,\n"
+    r = client.post("/api/facilitators/import?preview=false", files=_csv_file(csv_content), headers=hdr)
+    d = r.json()
+    assert d["created"] == 1
+    assert d["errors"] == 1
+
+
+def test_facilitator_import_neutralises_formula_injection(client):
+    hdr = _sqn_admin_hdr(client)
+    csv_content = b'first_name,last_name\n=HYPERLINK("evil"),Trgo05Formula\n'
+    r = client.post("/api/facilitators/import?preview=false", files=_csv_file(csv_content), headers=hdr)
+    d = r.json()
+    assert d["created"] == 1
+    r2 = client.get("/api/facilitators", headers=hdr)
+    fac = next(f for f in r2.json() if f["last_name"] == "Trgo05Formula")
+    assert not fac["first_name"].startswith("=")
+
+
+def test_facilitator_import_requires_write_permission(client):
+    hdr = _general_hdr(client)
+    csv_content = b"first_name,last_name\nX,Y\n"
+    r = client.post("/api/facilitators/import?preview=false", files=_csv_file(csv_content), headers=hdr)
+    assert r.status_code == 403
+
+
+def test_facilitator_import_writes_audit(client):
+    hdr = _sqn_admin_hdr(client)
+    csv_content = b"first_name,last_name\nTrgo05,AuditRow\n"
+    client.post("/api/facilitators/import?preview=false", files=_csv_file(csv_content), headers=hdr)
+    auditor_hdr = login(client, "AUDITOR2026")
+    r = client.get("/api/system/audit-summary?action=csv_import&limit=10", headers=auditor_hdr)
+    assert r.status_code == 200
+    assert r.json()["count"] >= 1
+
+
+def test_facilitator_import_handles_1000_row_file(client):
+    hdr = _sqn_admin_hdr(client)
+    lines = ["first_name,last_name"] + [f"Trgo05Bulk{i},Row{i}" for i in range(1000)]
+    csv_content = ("\n".join(lines) + "\n").encode()
+    r = client.post("/api/facilitators/import?preview=false", files=_csv_file(csv_content), headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["created"] == 1000
+    assert d["errors"] == 0

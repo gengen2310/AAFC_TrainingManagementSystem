@@ -651,6 +651,186 @@ def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends
     return {"ok": True, "facilitator_id": f.id}
 
 
+@router.get("/facilitators/import/template.csv")
+def facilitator_import_template(p: Principal = Depends(get_principal)):
+    """TRGO-05: downloadable CSV template matching the columns import_facilitators_csv accepts."""
+    import io
+    from fastapi.responses import StreamingResponse
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    bio = io.BytesIO(
+        b"rank,first_name,last_name,type,subject_areas,active_status\r\n"
+        b"FLTLT,Jordan,Smith,Staff,Drill;Air_Space,true\r\n"
+    )
+    return StreamingResponse(bio, media_type="text/csv",
+                             headers={"Content-Disposition": "attachment; filename=facilitator_import_template.csv"})
+
+
+_FAC_CSV_FIELDS = {
+    "rank": ("rank", "current_rank"),
+    "first_name": ("first_name", "first name", "firstname", "given name"),
+    "last_name": ("last_name", "last name", "lastname", "surname", "family name"),
+    "type": ("type", "facilitator type"),
+    "subject_areas": ("subject_areas", "subject areas", "subjects"),
+    "active_status": ("active_status", "active", "active status"),
+}
+
+
+def _neutralise_csv_cell(v: str) -> str:
+    """Strip a leading formula-trigger character (=, +, -, @, tab, CR) so a
+    re-exported/opened-in-Excel copy of this data can never execute a
+    formula injected via an uploaded CSV cell (CSV/Excel formula injection)."""
+    v = (v or "").strip()
+    while v and v[0] in "=+-@\t\r":
+        v = v[1:].strip()
+    return v
+
+
+def _fac_csv_get(row: dict, key: str) -> str:
+    norm = {k.strip().lower(): (v or "").strip() for k, v in row.items()}
+    for alias in _FAC_CSV_FIELDS[key]:
+        if alias in norm and norm[alias]:
+            return _neutralise_csv_cell(norm[alias])
+    return ""
+
+
+class FacilitatorImportIn(BaseModel):
+    preview: bool = True
+    # Row indices (0-based, matching the preview's row order) the caller has
+    # explicitly reviewed and wants created despite a name match -- the CSV
+    # equivalent of confirm_duplicate on the single-facilitator endpoint.
+    confirm_duplicate_rows: list[int] = []
+
+
+@router.post("/facilitators/import")
+async def import_facilitators_csv(
+    file: UploadFile = File(...),
+    preview: bool = True,
+    confirm_duplicate_rows: str = "",
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """TRGO-05: governed bulk facilitator import.
+
+    Reuses the CEA import pipeline's preview-then-commit shape and the
+    TRGO-07 duplicate-detection already shipped for single-facilitator
+    create (case-insensitive first+last name match within the squadron) --
+    the same "same person added twice by accident is common, but a genuine
+    same-name-different-person case must still be possible" reasoning
+    applies identically to a bulk import.
+
+    No stable per-row identifier exists on Facilitator today (no email/
+    service-number field), so matching is name-based, same as the single-
+    create endpoint -- this is a real, named limitation, not a silent gap:
+    a CSV with two genuinely different people who happen to share a name
+    needs `confirm_duplicate_rows` to include both.
+
+    CSV formula injection: any cell starting with =, +, -, @ (a formula
+    trigger in Excel/Sheets) is neutralised before it ever reaches storage
+    or a later export.
+    """
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    sq_id = _active_squadron(p)
+    if not sq_id:
+        require_can_write_squadron(p, "none", None)
+    s = db.get(Squadron, sq_id)
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    if not preview:
+        require_can_write_squadron(p, s.id, s.wing_id)
+
+    from ..config import settings as _settings
+    content = await file.read()
+    if len(content) > _settings.UPLOAD_MAX_MB * 1024 * 1024:
+        raise HTTPException(413, detail={"error": "file_too_large"})
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+
+    import csv, io
+    reader = csv.DictReader(io.StringIO(text))
+    if reader.fieldnames is None:
+        raise HTTPException(400, detail={"error": "invalid_header", "message": "CSV has no header row."})
+
+    existing = {
+        ((e.first_name or "").strip().lower(), e.last_name.strip().lower())
+        for e in db.query(Facilitator).filter(
+            Facilitator.squadron_id == s.id, Facilitator.is_archived == False,  # noqa: E712
+        ).all()
+    }
+    confirm_idx = set()
+    if confirm_duplicate_rows:
+        try:
+            confirm_idx = {int(x) for x in confirm_duplicate_rows.split(",") if x.strip()}
+        except ValueError:
+            raise HTTPException(400, detail={"error": "invalid_confirm_rows"})
+
+    rows_out = []
+    seen_in_file: set[tuple[str, str]] = set()
+    for i, row in enumerate(reader):
+        last_name = _fac_csv_get(row, "last_name")
+        first_name = _fac_csv_get(row, "first_name")
+        if not last_name:
+            rows_out.append({"row": i, "action": "error", "message": "Missing last name.", "last_name": last_name, "first_name": first_name})
+            continue
+        key = (first_name.lower(), last_name.lower())
+        action = "create"
+        if key in existing:
+            action = "duplicate"
+        elif key in seen_in_file:
+            action = "duplicate_in_file"
+        seen_in_file.add(key)
+
+        rec = {
+            "row": i, "action": action,
+            "first_name": first_name or None, "last_name": last_name,
+            "current_rank": _fac_csv_get(row, "rank") or None,
+            "type": _fac_csv_get(row, "type") or "Staff",
+            "subject_areas": [x.strip() for x in _fac_csv_get(row, "subject_areas").split(";") if x.strip()],
+            "active_status": _fac_csv_get(row, "active_status").lower() not in ("false", "0", "no", "inactive"),
+        }
+        rows_out.append(rec)
+
+    if preview:
+        return {
+            "ok": True, "preview": True, "rows": rows_out,
+            "to_create": sum(1 for r in rows_out if r["action"] == "create" or r["row"] in confirm_idx),
+            "duplicates": sum(1 for r in rows_out if r["action"] in ("duplicate", "duplicate_in_file")),
+            "errors": sum(1 for r in rows_out if r["action"] == "error"),
+        }
+
+    created = skipped = errors = 0
+    created_ids = []
+    for r in rows_out:
+        if r["action"] == "error":
+            errors += 1
+            continue
+        if r["action"] in ("duplicate", "duplicate_in_file") and r["row"] not in confirm_idx:
+            skipped += 1
+            continue
+        f = Facilitator(
+            squadron_id=s.id, wing_id=s.wing_id,
+            first_name=r["first_name"], last_name=r["last_name"],
+            current_rank=r["current_rank"], type=r["type"] or "Staff",
+            subject_areas=_validate_subject_areas(r["subject_areas"]),
+            active_status=r["active_status"],
+        )
+        db.add(f); db.flush()
+        db.add(FacilitatorRankHistory(facilitator_id=f.id, rank=r["current_rank"], effective_from=str(utcnow().date())))
+        created += 1
+        created_ids.append(f.id)
+    db.commit()
+    audit(db, p, object_type="facilitator", object_id=None, action="csv_import",
+          new={"created": created, "skipped": skipped, "errors": errors, "source_file_name": file.filename})
+    return {
+        "ok": True, "preview": False,
+        "created": created, "skipped": skipped, "errors": errors,
+        "created_ids": created_ids, "total": len(rows_out),
+    }
+
+
 class FacUpdateIn(BaseModel):
     subject_areas: list[str] | None = None
     type: str | None = None
