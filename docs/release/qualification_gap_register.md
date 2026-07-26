@@ -391,7 +391,69 @@ acceptance criteria, and is updated in place as each item closes.
     artifact set under `artifacts/general-release/<SHA>/staging/`, and staging
     failure/recovery testing + the 4-24 hour soak (both depend on the load test
     below).
-- **Load test / soak / production — not started**: the 1,000-concurrent-user load
-  test has its own flagged stop-condition (a financial-commitment check) that has
-  not yet happened; staging soak and production deployment both come after it in
-  the brief's own sequencing and have not been attempted.
+- **Load test — financial-commitment stop-condition raised and cleared**: flagged to
+  the user before running (real Railway compute/bandwidth cost); user confirmed
+  "Proceed at full 1,000-user scale" via explicit approval.
+- **Load test run 1 (1,000 users, 10 min, 90s ramp) — FAIL**: P95 latency 16.2s,
+  both 5xx and non-5xx failures. Root-caused via direct evidence rather than
+  guesswork:
+  - Railway `metrics --since` showed neither CPU nor memory saturated on the
+    backend service — ruled out simple compute/memory exhaustion.
+  - `railway logs` on the live deployment showed a real
+    `sqlalchemy.exc.TimeoutError: QueuePool limit ... reached` — the SQLAlchemy
+    connection pool (5 + 2 overflow = 7 per worker × 2 gunicorn workers = 14 total)
+    was sized for **production's** Supabase Session Pooler 15-connection cap, a
+    constraint that does not apply to staging's separate, Railway-native Postgres
+    (max_connections=100, only ~19 in use at the time).
+  - Fixed by making pool size configurable per-environment (`DB_POOL_SIZE` /
+    `DB_POOL_MAX_OVERFLOW` / `DB_POOL_TIMEOUT` in `app/config.py`, commit
+    `104702b`), defaulting to the unchanged production-safe values so production's
+    behaviour is untouched unless the env vars are explicitly set.
+- **Load test run 2 (same parameters, after the pool fix) — FAIL, nearly identical**:
+  P95 latency and failure counts barely moved (5xx count only dropped 8→3),
+  proving the pool was a real but non-dominant bottleneck. Continued
+  root-causing:
+  - Confirmed the general per-IP API rate limiter (300 req/60s, `app/main.py`)
+    would legitimately fire given all 1,000 virtual users share one test-machine
+    IP — a known single-source-IP load-testing methodology limitation, not a
+    defect. Per the brief's explicit instruction never to weaken rate limits to
+    make a test pass, this was **not** touched; it is called out here as an
+    honest caveat on this test's realism, not resolved.
+  - Found `login()` (`app/routers/auth.py`) is a **sync** function, so FastAPI runs
+    it via `run_in_threadpool`, bounded by anyio's default capacity limiter.
+    PBKDF2 password verification (`passlib`'s `pbkdf2_sha256`, deliberately
+    CPU-expensive — a genuine security property, not weakened) under high
+    concurrency queues inside that limiter; with only 2 gunicorn **worker
+    processes** and Python's GIL preventing one process from using more than one
+    core for CPU-bound work, only additional OS processes (not threads) can add
+    real throughput here. Confirmed via Railway's GraphQL service manifest that
+    staging and production share the exact same `docker-entrypoint-staging.sh`
+    entrypoint/Dockerfile despite the filename, so any fix had to be
+    environment-variable-gated rather than a blanket change.
+  - Fix: made worker count configurable (`GUNICORN_WORKERS`, defaulting to the
+    existing value 2 so production is unaffected unless explicitly overridden),
+    commit `764cafa`. Set staging-only overrides via
+    `railway variable set --skip-deploys`: `GUNICORN_WORKERS=6`,
+    `DB_POOL_SIZE=8`, `DB_POOL_MAX_OVERFLOW=4` (8+4=12 per worker × 6 workers =
+    72 total connections, safely under staging Postgres's 100 max_connections).
+    Redeployed staging backend (deployment `b0543bfb` → SUCCESS); confirmed via
+    live logs the entrypoint actually started gunicorn with 6 workers, and
+    `/api/health/ready` returned 200 post-deploy.
+  - Fail-closed environment verification re-confirmed before this deploy: project
+    `f5d9524f-8a57-44ff-86b7-ab66aec00e73`, environment
+    `77a45568-5c16-46c2-9065-d5d339208b0e`, service `deb53faa-ca8d-4291-aa2e-9ff3029c50f8`
+    (`aafc-tms-backend`) all matched the recorded values exactly.
+  - A pre-existing, unrelated test flake was found and fixed in passing (not part
+    of the load-test root cause, but blocked a clean regression-test gate before
+    this commit): `tests/test_facilitator_schedule.py`'s `+130`-day offset
+    collided with `seed_all()`'s every-Friday-through-2026-12-11 baseline data for
+    squadron 703 once the suite ran on a date whose weekday pushed the offset
+    onto a seeded Friday. Fixed with a `+144`-day offset that lands past the
+    seeded range regardless of weekday. Full suite confirmed clean afterwards:
+    853 passed, 4 skipped.
+- **Load test run 3 (after the worker-count fix) — result pending**: in progress
+  as of this entry; see the next gap-register update or
+  `docs/release/general_release_readiness.md` for the outcome.
+- **Staging soak and production deployment — not yet started**: both depend on
+  the load test above reaching an honest pass (or a documented, final explanation
+  of the per-IP rate-limiter methodology ceiling) per the brief's own sequencing.
