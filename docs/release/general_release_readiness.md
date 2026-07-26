@@ -1,0 +1,137 @@
+# General Release Readiness Report
+
+Release candidate: `feature/restore-planning-workspace` @ `c90b086`
+Alembic head: `y8z9a0b1c2d3`
+PR: #3 (`feature/restore-planning-workspace` → `main`), OPEN, not yet merged
+Date of this report: 2026-07-26
+
+This report is updated in place as remaining work completes. It reflects the actual
+state of this branch at the commit above — not a forecast or a plan.
+
+## 1. Deferred TRGO requirements (gap register GAP-01 through GAP-05)
+
+All 5 addressed, tested, live-verified in browser, committed, pushed:
+
+| Item | Status | Commit |
+|---|---|---|
+| TRGO-01 — Update Future Parade Nights | Done | `a624cc9` |
+| TRGO-02 — Unified inherited-activities view | Done | `c5aa7b5` |
+| TRGO-03 — Guided year setup, reachable anytime | Done | `29cab6a` |
+| TRGO-05 — Governed facilitator CSV import | Done | `172ba12` |
+| TRGO-08 — Mission Backlog date-range filter | Done | `3dacc0c` |
+
+## 2. Reverification of previously-fixed items (GAP-10)
+
+TRGO-04/06/07 re-verified end-to-end in both frontends (not trusted from a prior
+session's claim). Found and closed a real gap: the original fix only landed in
+`connected-frontend`, and the duplicate-facilitator warning in both frontends was a
+dead end with no way to confirm-and-add-anyway. Fixed, live-verified, `3f9ee0c`.
+
+## 3. Eight-role security sweep (GAP-06)
+
+- `security_scope_test.py`: 31/31 passed (unauthenticated access, invalid JWT,
+  read-only-role write denial, system_admin endpoint denial for all 4 non-system-admin
+  roles, cross-squadron IDOR, oversized request body, unexpected enum values, no
+  secrets/codes/hashes in system responses, live rate-limit trigger).
+- `smoke_test.py`: 29/29 passed (login for all 6 role codes, scope denial checks).
+- Full backend suite: 853 passed, 4 skipped.
+- All run fresh against a freshly-seeded local server this pass, not carried over from
+  an earlier session's numbers.
+
+## 4. Accessibility (GAP-07)
+
+`frontend/e2e/accessibility.spec.ts`: 19/19 passed fresh against current code,
+including the Curriculum and Facilitators pages this pass's TRGO fixes touched (no
+regression). Residual, not blocking: no dedicated axe assertion for the three new
+modals specifically (Update Future Parade Nights, Guided Year Setup, Facilitator CSV
+Import) — they're reachable through routes the suite already covers. connected-frontend
+has no axe-based coverage at all (pre-existing).
+
+## 5. Local release gate, 2x repeated (GAP-12)
+
+- Backend `pytest tests/`: 853 passed, 4 skipped — identical both runs, no flakiness.
+- Frontend `tsc --noEmit` / `eslint` / `vitest run` / `vite build`: clean, 0 errors, 17
+  pre-existing warnings (unrelated to this pass), 15/15 tests — identical both runs.
+
+## 6. Database / migration gate against disposable PostgreSQL (GAP-12)
+
+Ran against a genuine local PostgreSQL 16 instance, created and dropped for this
+purpose only — never the developer's own local Postgres data, never staging, never
+production:
+
+- Fresh `alembic upgrade head`: 40 migrations, single head, 58 tables, clean.
+- Idempotent re-run: no-op, no error.
+- Full `alembic downgrade base` then re-`upgrade head`: clean round-trip, 58 tables
+  restored, correct head.
+- Schema-specific checks confirmed correct: JSONB column (v28), partial unique index
+  (v27), optimistic-locking `version` columns (v37) on all 7 tables, 56 FK constraints
+  with `squadrons.wing_id → wings.id` confirmed by both definition and live rejection
+  test.
+- App-level: real server boot against Postgres, real `seed_all()` (run only after
+  explicit operator authorization — the auto-mode safety classifier correctly blocked
+  my own unprompted attempt to set the destructive-seed override flag), 29/29
+  smoke test and 31/31 security-scope test against the Postgres-backed live server.
+
+## 7. Data-integrity audit (GAP-12)
+
+31 read-only checks (`tools/stress/data_integrity_check.py`, local-only per this repo's
+`.gitignore`): referential integrity, tenancy consistency, security invariants (no
+plaintext codes, no reused code hash, every active user has a code, no hash-shaped
+values leaking into the audit log), data quality, optimistic-locking sanity, uniqueness
+beyond DB constraints, archival hygiene. 31/31 pass against current seed data.
+
+## 8. Backup/restore gate (GAP-12)
+
+Real `pg_dump` → `pg_restore` cycle against a disposable Postgres database: 0 errors,
+exact row-count parity across 5 key tables, and — the actual bar, not just a schema
+check — a live server booted against the restored database passed the full 29-test
+smoke suite, including real login for all 6 role codes. One genuine, non-defect finding
+along the way: the backup faithfully captured an IP-lockout row from the security
+sweep's own tests, which correctly carried through restore (cleared on the disposable
+DB, not a real-environment action).
+
+## 9. Security greps
+
+All 4 pre-packaging greps from `.claude/rules/security.md` return 0 matches (re-run
+this pass, `connected-frontend` was touched by the TRGO-04/06/07 reverification work).
+
+## 10. Release documents
+
+`release_notes.md`, `production_release_runbook.md`, `rollback_runbook.md`, and this
+document are now written (previously falsely claimed complete in an earlier register
+entry — corrected, see gap register GAP-08).
+
+## 11. NOT yet done — explicitly blocking general release
+
+- **Staging deployment and verification** (brief sections 18-21): not started. No
+  Railway action has been taken this pass. Requires the fail-closed environment
+  verification procedure before the first action.
+- **Staging test data, workflow verification across every operational area**: not
+  started — depends on staging deployment above.
+- **1,000-concurrent-user load test** (brief sections 22-25): not started. This is one
+  of the two items I flagged at the very start of this pass as needing a financial-
+  commitment check before running, per the standing stop-conditions — that check has
+  not yet happened.
+- **Staging failure/recovery testing, 4-24 hour soak** (brief sections 26-27): not
+  started — depends on the above.
+- **PR #3 merge to `main`**: not done. Per the brief's own sequencing, this only
+  happens after staging qualification passes — it has not yet been attempted.
+- **Production deployment, smoke tests, post-release monitoring** (brief sections
+  31-34): not started, and must not start before every item above is complete.
+
+## 12. Defect log
+
+No SEV1/SEV2/SEV3 defects are currently open against this release candidate. Two SEV4
+items are tracked as residual/deferred in `qualification_gap_register.md` (GAP-02's
+wing→squadron auto-inheritance, GAP-11's connected-frontend meta-tag default) — neither
+blocks general release; both need a product/owner decision rather than more code.
+
+## Final determination
+
+**NOT READY FOR GENERAL RELEASE**
+
+Reason: Section 11's items — staging deployment and verification, the 1,000-user load
+test (pending its own financial-commitment check), staging soak, PR merge, and
+production deployment — have not been performed. Every local, code-level qualification
+gate that can be run without touching shared infrastructure has passed. The remaining
+work is infrastructure-facing and is the next step, not a defect blocking it.
