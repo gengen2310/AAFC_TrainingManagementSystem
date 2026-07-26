@@ -1,6 +1,6 @@
 # General Release Readiness Report
 
-Release candidate: `feature/restore-planning-workspace` @ `c90b086`
+Release candidate: `feature/restore-planning-workspace` @ `46d6c61`
 Alembic head: `y8z9a0b1c2d3`
 PR: #3 (`feature/restore-planning-workspace` → `main`), OPEN, not yet merged
 Date of this report: 2026-07-26
@@ -101,17 +101,44 @@ this pass, `connected-frontend` was touched by the TRGO-04/06/07 reverification 
 document are now written (previously falsely claimed complete in an earlier register
 entry — corrected, see gap register GAP-08).
 
-## 11. NOT yet done — explicitly blocking general release
+## 11. Staging deployment and verification (GAP-09) — done, this pass
 
-- **Staging deployment and verification** (brief sections 18-21): not started. No
-  Railway action has been taken this pass. Requires the fail-closed environment
-  verification procedure before the first action.
-- **Staging test data, workflow verification across every operational area**: not
-  started — depends on staging deployment above.
-- **1,000-concurrent-user load test** (brief sections 22-25): not started. This is one
-  of the two items I flagged at the very start of this pass as needing a financial-
-  commitment check before running, per the standing stop-conditions — that check has
-  not yet happened.
+- Fail-closed environment verification passed exactly: project ID, staging
+  environment ID, all 3 service IDs, and all 3 domains matched the values recorded
+  at the start of this task before any Railway action was taken.
+- All 3 services (backend, Main TMS frontend, Planning Workspace frontend) deployed
+  to staging and confirmed `SUCCESS` by polling deployment status to a terminal
+  state, not just a queued build.
+- **Found and fixed a real, previously-undetected deployment-architecture defect**
+  (GAP-13): TRGO-05's CSV import UI, and this pass's TRGO-07 duplicate-warning fix
+  to the standalone `Facilitators.tsx` route, were unreachable on the actual
+  deployed Planning Workspace preview service, because that service always runs in
+  a module mode that skips the entire standalone page router. Root-caused by
+  reading `App.tsx`'s routing and confirming the live meta tag; fixed by moving the
+  UI to the drawer tab that's actually reachable; redeployed; reverified live.
+- `smoke_test.py` (29/29) and `security_scope_test.py` (31/31) both passed fresh
+  against the live staging backend.
+- Live browser verification against the real staging URLs on both frontends:
+  login, dashboard, Facilitators (including the TRGO-07 fix), Guided Year Setup
+  (TRGO-03), and the CSV import + duplicate-warning flows (GAP-13's fix) all
+  confirmed working with zero console errors.
+- Staging test data scaled to 1,246 users (target ≥1,200), 139 squadrons, 13 wings.
+  One newly-seeded synthetic account confirmed able to log in with correct
+  role/scope.
+- Broad workflow verification swept every major role × endpoint combination across
+  operational areas (facilitators, training areas, equipment, cadets, curriculum,
+  parade nights, reports, planning years, wing calendar, accounts, audit) for
+  sqn_admin, wing_admin, national_admin, and auditor — all returned the expected
+  status.
+- **Not yet done**: the formal staging screenshot evidence artifact set, and
+  staging failure/recovery testing + the 4-24 hour soak (both depend on the load
+  test below).
+
+## 12. NOT yet done — explicitly blocking general release
+
+- **1,000-concurrent-user load test** (brief sections 22-25): not started. This is
+  the financial-commitment check I flagged at the very start of this pass, per the
+  standing stop-conditions — that check has not yet happened.
 - **Staging failure/recovery testing, 4-24 hour soak** (brief sections 26-27): not
   started — depends on the above.
 - **PR #3 merge to `main`**: not done. Per the brief's own sequencing, this only
@@ -119,19 +146,22 @@ entry — corrected, see gap register GAP-08).
 - **Production deployment, smoke tests, post-release monitoring** (brief sections
   31-34): not started, and must not start before every item above is complete.
 
-## 12. Defect log
+## 13. Defect log
 
-No SEV1/SEV2/SEV3 defects are currently open against this release candidate. Two SEV4
-items are tracked as residual/deferred in `qualification_gap_register.md` (GAP-02's
-wing→squadron auto-inheritance, GAP-11's connected-frontend meta-tag default) — neither
-blocks general release; both need a product/owner decision rather than more code.
+No SEV1/SEV2 defects are currently open against this release candidate. GAP-13 (SEV2,
+TRGO-05's UI unreachable in the deployed config) was found and fixed this pass. Two
+SEV3/SEV4 items are tracked as residual/deferred in `qualification_gap_register.md`
+(GAP-02's wing→squadron auto-inheritance, GAP-11's connected-frontend meta-tag
+default) — neither blocks general release; both need a product/owner decision rather
+than more code.
 
 ## Final determination
 
 **NOT READY FOR GENERAL RELEASE**
 
-Reason: Section 11's items — staging deployment and verification, the 1,000-user load
-test (pending its own financial-commitment check), staging soak, PR merge, and
-production deployment — have not been performed. Every local, code-level qualification
-gate that can be run without touching shared infrastructure has passed. The remaining
-work is infrastructure-facing and is the next step, not a defect blocking it.
+Reason: Section 12's items — the 1,000-user load test (pending its own financial-
+commitment check), staging soak, PR merge, and production deployment — have not been
+performed. Every local, code-level qualification gate and the staging deployment/
+verification gate have both passed, with one real defect (GAP-13) found and fixed
+along the way — exactly what staging verification is for. The remaining work is the
+load test and everything sequenced after it, not a defect blocking it.

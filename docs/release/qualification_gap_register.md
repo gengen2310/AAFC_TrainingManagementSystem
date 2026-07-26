@@ -343,3 +343,55 @@ acceptance criteria, and is updated in place as each item closes.
   staging security/load/soak testing, and production deployment per the exact protocol in
   sections 18-34, with the fail-closed Railway environment guard in section 4 applied
   before every infrastructure action.
+- **Staging deployment — done, this pass**:
+  - Fail-closed environment verification before every action: project
+    `f5d9524f-8a57-44ff-86b7-ab66aec00e73` (exemplary-emotion), environment
+    `77a45568-5c16-46c2-9065-d5d339208b0e` (staging), all 3 service IDs and all 3
+    domains matched the values recorded at the start of this task exactly.
+  - All 3 services deployed via `railway up` (backend `c0740bd1`→SUCCESS, Main TMS
+    frontend `2946f137`→SUCCESS, Planning Workspace `3e786253`→SUCCESS, later
+    redeployed as `10c7d98a`→SUCCESS after GAP-13's fix).
+  - Found and fixed GAP-13 (TRGO-05's CSV import UI unreachable in the actually-
+    deployed module-mode config) — see that entry for detail. This is the kind of
+    defect only a real staging deployment surfaces.
+  - Role-based verification against the live staging backend: `smoke_test.py`
+    29/29 and `security_scope_test.py` 31/31, both fresh; direct curl checks
+    confirmed `SYSADMIN2026` correctly returns 401 (the staging credential reset
+    the brief noted as already complete is holding — not a defect); 5 of 6 role
+    codes (all but system_admin) log in and reach role-appropriate data.
+  - This session's new endpoints confirmed live: TRGO-01's
+    `update-future-parade-day` preview returns a real response; TRGO-05's
+    facilitator-import template downloads; TRGO-08's mission date-range filter
+    param is accepted.
+  - Browser-level verification against the live staging URLs (not curl): Main TMS
+    login flow, dashboard, Facilitators page, and the TRGO-07 duplicate-warning
+    "Add anyway" flow all confirmed working with zero console errors; Planning
+    Workspace's "Guided year setup…" modal (TRGO-03) renders and its steps work
+    against real staging data; the Facilitators drawer tab's CSV import and
+    duplicate-warning flows (GAP-13's fix) confirmed end-to-end.
+  - Staging test data scaled to 1,246 users (target ≥1,200), 139 squadrons, 13
+    wings, via a corrected `tools/stress/data_volume_seed.py` (this gitignored,
+    local-only script had gone stale relative to the current schema — fixed
+    missing `short_name` on Wing/Squadron, an invalid `unit_type` value, and a
+    heterogeneous-batch FK-ordering bug that caused `AccessCode` rows to be
+    inserted before their `User` row over the remote connection; also fixed a
+    ~1,700-round-trip-per-row performance problem by generating IDs client-side
+    instead of flushing after every row). One newly-seeded synthetic account
+    confirmed to log in successfully (200, correct role/scope in the session
+    payload).
+  - Broad workflow verification swept every major role × endpoint combination
+    (sqn_admin: facilitators/training-areas/equipment/cadets/curriculum/parade-
+    nights/reports x4/planning-years, all 200; wing_admin: dashboard charts and
+    wing-calendar squadron-overlay, both 200 once corrected to staging's actual
+    wing ID rather than a local-dev one; national_admin: wings/squadrons/
+    accounts, all 200; auditor: audit-summary 200, scope-map correctly 403
+    since that endpoint is `require_system_admin`-only, not general audit
+    access — confirmed by reading the endpoint, not assumed).
+  - Not yet done: the full staging screenshot evidence suite as a formal
+    artifact set under `artifacts/general-release/<SHA>/staging/`, and staging
+    failure/recovery testing + the 4-24 hour soak (both depend on the load test
+    below).
+- **Load test / soak / production — not started**: the 1,000-concurrent-user load
+  test has its own flagged stop-condition (a financial-commitment check) that has
+  not yet happened; staging soak and production deployment both come after it in
+  the brief's own sequencing and have not been attempted.
