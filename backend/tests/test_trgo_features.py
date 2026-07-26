@@ -432,3 +432,106 @@ def test_facilitator_import_handles_1000_row_file(client):
     d = r.json()
     assert d["created"] == 1000
     assert d["errors"] == 0
+
+
+# ─────────────────────────────────────────────────────────────
+# TRGO-08: Mission Backlog date-range filter
+# ─────────────────────────────────────────────────────────────
+
+def _assign_two_missions_on_dates(client, hdr, year_id, date_a, date_b):
+    """Seed two parade dates and assign two distinct unscheduled curriculum
+    items to them (one per date), returning (curriculum_id_a, curriculum_id_b)."""
+    date_ids = _seed_parade_dates(client, hdr, year_id, [date_a, date_b])
+    missions_r = client.get(f"/api/planning/years/{year_id}/missions?status=unscheduled", headers=hdr)
+    unscheduled = missions_r.json()["missions"]
+    assert len(unscheduled) >= 2, "seed data must provide at least 2 unscheduled curriculum items"
+    ci_a, ci_b = unscheduled[0]["curriculum_id"], unscheduled[1]["curriculum_id"]
+
+    r_a = client.post(f"/api/planning/years/{year_id}/assign-mission", json={
+        "curriculum_id": ci_a, "parade_date_id": date_ids[0],
+        "session_number": 1, "cadet_group": "junior",
+    }, headers=hdr)
+    assert r_a.status_code == 200, r_a.text
+    r_b = client.post(f"/api/planning/years/{year_id}/assign-mission", json={
+        "curriculum_id": ci_b, "parade_date_id": date_ids[1],
+        "session_number": 1, "cadet_group": "junior",
+    }, headers=hdr)
+    assert r_b.status_code == 200, r_b.text
+    return ci_a, ci_b
+
+
+def test_missions_date_range_filter_includes_session_in_range(client):
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2094)
+    monday = _future_monday()
+    date_a = monday.isoformat()
+    date_b = (monday + timedelta(days=28)).isoformat()
+    ci_a, ci_b = _assign_two_missions_on_dates(client, hdr, year_id, date_a, date_b)
+
+    r = client.get(
+        f"/api/planning/years/{year_id}/missions?start_date={date_a}&end_date={date_a}",
+        headers=hdr,
+    )
+    assert r.status_code == 200, r.text
+    ids = [m["curriculum_id"] for m in r.json()["missions"] if m["is_scheduled"]]
+    assert ci_a in ids
+    assert ci_b not in ids
+
+
+def test_missions_date_range_filter_excludes_out_of_range_scheduled(client):
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2095)
+    monday = _future_monday()
+    date_a = monday.isoformat()
+    date_b = (monday + timedelta(days=28)).isoformat()
+    ci_a, ci_b = _assign_two_missions_on_dates(client, hdr, year_id, date_a, date_b)
+
+    r = client.get(
+        f"/api/planning/years/{year_id}/missions"
+        f"?start_date={date_a}&end_date={(monday + timedelta(days=7)).isoformat()}",
+        headers=hdr,
+    )
+    assert r.status_code == 200, r.text
+    ids = [m["curriculum_id"] for m in r.json()["missions"] if m["is_scheduled"]]
+    assert ci_a in ids
+    assert ci_b not in ids
+
+
+def test_missions_date_range_filter_never_hides_unscheduled_items(client):
+    """Unscheduled missions have no date to match and must always remain visible,
+    regardless of the active date-range filter -- a backlog is about what still
+    needs attention, not only what falls in the currently visible window."""
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2096)
+    monday = _future_monday()
+
+    before_r = client.get(f"/api/planning/years/{year_id}/missions?status=unscheduled", headers=hdr)
+    unscheduled_before = {m["curriculum_id"] for m in before_r.json()["missions"]}
+    assert len(unscheduled_before) > 0
+
+    r = client.get(
+        f"/api/planning/years/{year_id}/missions"
+        f"?start_date={monday.isoformat()}&end_date={monday.isoformat()}",
+        headers=hdr,
+    )
+    assert r.status_code == 200, r.text
+    still_present = {m["curriculum_id"] for m in r.json()["missions"] if not m["is_scheduled"]}
+    assert unscheduled_before == still_present
+
+
+def test_missions_date_range_filter_open_ended_start_only(client):
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2097)
+    monday = _future_monday()
+    date_a = monday.isoformat()
+    date_b = (monday + timedelta(days=28)).isoformat()
+    ci_a, ci_b = _assign_two_missions_on_dates(client, hdr, year_id, date_a, date_b)
+
+    r = client.get(
+        f"/api/planning/years/{year_id}/missions?start_date={(monday + timedelta(days=14)).isoformat()}",
+        headers=hdr,
+    )
+    assert r.status_code == 200, r.text
+    ids = [m["curriculum_id"] for m in r.json()["missions"] if m["is_scheduled"]]
+    assert ci_b in ids
+    assert ci_a not in ids

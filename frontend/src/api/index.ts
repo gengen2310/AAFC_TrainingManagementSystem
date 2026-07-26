@@ -177,11 +177,15 @@ export const planningApi = {
   },
   weeklyProgram: (date_id: string) =>
     api.get<WeeklyProgramData>(`/api/planning/parade-dates/${date_id}/weekly-program`),
-  missions: (year_id: string, opts: { status?: string; phase?: string; search?: string } = {}) => {
+  missions: (year_id: string, opts: {
+    status?: string; phase?: string; search?: string; start_date?: string; end_date?: string;
+  } = {}) => {
     const p = new URLSearchParams();
     if (opts.status) p.set("status", opts.status);
     if (opts.phase) p.set("phase", opts.phase);
     if (opts.search) p.set("search", opts.search);
+    if (opts.start_date) p.set("start_date", opts.start_date);
+    if (opts.end_date) p.set("end_date", opts.end_date);
     const qs = p.toString();
     return api.get<{ planning_year_id: string; year: number; total: number; scheduled_count: number; missions: MissionItem[] }>(
       `/api/planning/years/${year_id}/missions${qs ? `?${qs}` : ""}`

@@ -2305,6 +2305,8 @@ def list_missions(
     status: Optional[str] = None,   # "scheduled" | "unscheduled" | "cancelled" | "not_delivered"
                                      # | "rescheduled" | "resolved" | "planned"
     search: Optional[str] = None,
+    start_date: Optional[str] = None,  # TRGO-08: ISO date, inclusive
+    end_date: Optional[str] = None,    # TRGO-08: ISO date, inclusive
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -2413,6 +2415,26 @@ def list_missions(
             backlog_status = "rescheduled"
         else:
             backlog_status = "planned"
+
+        # Filter by date range if requested. An unscheduled mission has no date to
+        # match against and still needs attention regardless of the visible window,
+        # so it is never excluded by this filter -- only scheduled missions are
+        # narrowed down to those with at least one session inside the range.
+        if (start_date or end_date) and is_scheduled:
+            in_range = False
+            for s in scheduled:
+                pd_obj = pn_to_pd.get(s.parade_night_id)
+                d = pd_obj.parade_date if pd_obj else None
+                if not d:
+                    continue
+                if start_date and d < start_date:
+                    continue
+                if end_date and d > end_date:
+                    continue
+                in_range = True
+                break
+            if not in_range:
+                continue
 
         # Filter by term if requested
         if term:

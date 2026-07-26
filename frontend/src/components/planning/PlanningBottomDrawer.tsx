@@ -89,6 +89,8 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
   const [fStatus, setFStatus] = useState("unscheduled");
   const [fCore, setFCore] = useState("");
   const [fTerm, setFTerm] = useState("");
+  const [fDateStart, setFDateStart] = useState("");
+  const [fDateEnd, setFDateEnd] = useState("");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["planning-missions", yearId, "backlog"],
@@ -127,6 +129,18 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
       if (fStatus === "resolved" && m.backlog_status !== "resolved") return false;
       if (fStatus === "planned" && m.backlog_status !== "planned") return false;
       if (q && !m.code.toLowerCase().includes(q) && !m.title.toLowerCase().includes(q)) return false;
+      // TRGO-08: date-range filter. An unscheduled mission has no date to match
+      // against and always needs attention, so it is never hidden by this filter
+      // -- only scheduled missions are narrowed to those with a session in range.
+      if ((fDateStart || fDateEnd) && m.is_scheduled) {
+        const inRange = m.scheduled_sessions.some(s => {
+          if (!s.parade_date) return false;
+          if (fDateStart && s.parade_date < fDateStart) return false;
+          if (fDateEnd && s.parade_date > fDateEnd) return false;
+          return true;
+        });
+        if (!inRange) return false;
+      }
       return true;
     });
 
@@ -149,7 +163,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
       return sortDir === "asc" ? cmp : -cmp;
     });
     return rows;
-  }, [data, search, fPhase, fElement, fSuitability, fCore, fTerm, fStatus, sortCol, sortDir]);
+  }, [data, search, fPhase, fElement, fSuitability, fCore, fTerm, fStatus, fDateStart, fDateEnd, sortCol, sortDir]);
 
   function handleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -226,10 +240,18 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
             {opts.terms.map(t => <option key={t} value={t}>Term {t}</option>)}
           </select>
         )}
+        <label style={{ fontSize: 11, color: "var(--muted-text)", display: "flex", alignItems: "center", gap: 4 }}>
+          From
+          <input type="date" value={fDateStart} onChange={e => setFDateStart(e.target.value)} style={{ ...inputSx, width: 130 }} aria-label="Scheduled from date" />
+        </label>
+        <label style={{ fontSize: 11, color: "var(--muted-text)", display: "flex", alignItems: "center", gap: 4 }}>
+          To
+          <input type="date" value={fDateEnd} onChange={e => setFDateEnd(e.target.value)} style={{ ...inputSx, width: 130 }} aria-label="Scheduled to date" />
+        </label>
         <button
           className="btn sm out"
           style={{ fontSize: 11, padding: "3px 8px", whiteSpace: "nowrap" }}
-          onClick={() => { setSearch(""); setFPhase(""); setFElement(""); setFSuitability(""); setFCore(""); setFTerm(""); setFStatus("unscheduled"); }}
+          onClick={() => { setSearch(""); setFPhase(""); setFElement(""); setFSuitability(""); setFCore(""); setFTerm(""); setFStatus("unscheduled"); setFDateStart(""); setFDateEnd(""); }}
         >
           Reset
         </button>
