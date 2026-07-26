@@ -100,7 +100,48 @@ acceptance criteria, and is updated in place as each item closes.
   batch history; audit; 1000-row file handling.
 - **Status**: addressed this pass — see implementation section. Committed `172ba12`,
   live-verified in browser (template download, in-file duplicate flagged in preview,
-  commit skipped it, formula-injection cell neutralised), pushed.
+  commit skipped it, formula-injection cell neutralised), pushed. **Superseded by
+  GAP-13**: the UI built here (standalone `Facilitators.tsx` route) turned out to be
+  unreachable on the actual deployed Planning Workspace preview service — see GAP-13
+  for the root cause and fix. The backend endpoints and duplicate-detection logic
+  described here are unaffected and correct; only the UI's *location* needed
+  correcting, done in `563968c`.
+
+## GAP-13: TRGO-05's UI (and the TRGO-07 fix) were unreachable on the actual deployed staging service (new finding)
+
+- **Source**: found during this pass's first-ever staging deployment of the Planning
+  Workspace preview service — not detectable from local dev testing alone.
+- **Finding**: the deployed `aafc-tms-planning-workspace-preview` service always runs
+  with `aafc-module-mode=true` (hardcoded by `frontend/docker-entrypoint.sh`). In that
+  mode, `App.tsx` replaces its entire standalone page router (`/facilitators`,
+  `/curriculum`, `/dashboard`, etc.) with a single `/planning`-only route plus a
+  catch-all redirect back to `/planning` (confirmed by reading `ModuleEntry` in
+  `App.tsx` and by curling the live staging HTML for the meta tag value). GAP-04's
+  CSV import UI, and GAP-10's duplicate-warning fix to the standalone
+  `Facilitators.tsx` route, both lived on a route that is never rendered on the
+  actually-deployed service — correctly implemented, correctly tested locally in
+  full-router dev mode, but unreachable by any real staging or production user of
+  this service.
+- **Compounding finding**: a *third*, separate "Add Facilitator" form exists inside
+  `PlanningBottomDrawer.tsx`'s Facilitators drawer tab (part of the single `/planning`
+  workspace, so it IS reachable in module mode) — it posts to the same
+  `POST /api/facilitators` endpoint and therefore hits the same 409
+  `possible_duplicate` check, but had never been given the confirm-and-resubmit fix
+  either, since it hadn't been identified as a third instance of the same UI pattern.
+- **Severity**: SEV2 — a whole deferred requirement (TRGO-05) was effectively
+  unshippable as originally built, only discoverable by deploying to staging and
+  clicking through it rather than trusting local dev-mode testing.
+- **Correction plan**: extract the CSV-import modal into a shared component; wire it
+  into the reachable Facilitators drawer tab; add the same duplicate-warning +
+  "Add anyway" flow to that tab's own add-facilitator form.
+- **Status**: addressed this pass. Committed `563968c`, redeployed to staging
+  (`aafc-tms-planning-workspace-preview`, deployment `10c7d98a`), and re-verified
+  directly against the live staging URL in a real browser: "Import CSV" button
+  present and functional (template download, preview, commit all confirmed), and the
+  duplicate-warning "Add anyway" flow confirmed working from the drawer tab's form.
+  Zero console errors. This is the discipline the staging-deployment step exists
+  for — flagging it explicitly rather than treating it as a quiet fix, since it's a
+  real example of "locally verified" not meaning "actually deployed and reachable."
 
 ## GAP-05: TRGO-08 — Date/module filtering
 
@@ -199,7 +240,19 @@ acceptance criteria, and is updated in place as each item closes.
   specific workflow through the UI).
 - **Status**: addressed this pass. Committed `3f9ee0c`, live-verified in both frontends
   (see GAP-01 through GAP-05 verification notes for the general TRGO reverification
-  discipline applied). See commit message for full detail.
+  discipline applied). See commit message for full detail. **Note (added after
+  GAP-13)**: this fix's React-app half (`Curriculum.tsx`, `Facilitators.tsx`) was
+  verified in local full-router dev mode, which is how it was reachable and testable
+  at the time — GAP-13 later found the *deployed* Planning Workspace service always
+  runs in module mode, where these same standalone routes are unreachable. Curriculum's
+  Learning Hub filter (TRGO-04) remains a real, correct fix for anyone using the
+  full-router build if one is ever deployed, but is not reachable on the actual
+  deployed staging/production Planning Workspace service today, same as GAP-13's
+  finding for the Facilitators page. Not re-fixed a second time in a reachable location
+  this pass (unlike GAP-13's CSV import and duplicate-warning fixes) since Curriculum's
+  Learning Hub filter is a lower-severity convenience filter, not a full missing
+  requirement — flagged here for completeness, not silently left inconsistent with
+  GAP-13's treatment.
 
 ## GAP-11: connected-frontend's committed meta tag defaults to production, not localhost (new finding)
 
