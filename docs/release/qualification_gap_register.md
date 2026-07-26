@@ -451,9 +451,71 @@ acceptance criteria, and is updated in place as each item closes.
     onto a seeded Friday. Fixed with a `+144`-day offset that lands past the
     seeded range regardless of weekday. Full suite confirmed clean afterwards:
     853 passed, 4 skipped.
-- **Load test run 3 (after the worker-count fix) — result pending**: in progress
-  as of this entry; see the next gap-register update or
-  `docs/release/general_release_readiness.md` for the outcome.
-- **Staging soak and production deployment — not yet started**: both depend on
-  the load test above reaching an honest pass (or a documented, final explanation
-  of the per-IP rate-limiter methodology ceiling) per the brief's own sequencing.
+- **Load test run 3 (after the worker-count fix) — FAIL, but zero 5xx for the first
+  time**: P95 17.5s, but the `5xx=9` (client-observed) vs. **1,427** (Railway
+  server-side `metrics`) discrepancy was itself a clue — most non-5xx failures
+  were client-side read-timeouts on `/api/auth/login` specifically (P95 ~20.4s
+  on that endpoint alone; every other endpoint's P95 was already healthy,
+  ≤2.2s). Root-caused further:
+  - `railway logs` still showed `QueuePool limit of size 8 overflow 4 reached`
+    even at the larger per-worker pool — ruled out "just raise the pool again"
+    as the fix, since the real question was why login alone was slow when a
+    bare local PBKDF2 verify benchmarked at ~2ms.
+  - Found the load-test tool itself (`tools/stress/load_test_staging.py`,
+    gitignored, local-only) re-logged in and out every ~10-20s for all 1,000
+    virtual users — nothing like real usage (a session lasts up to
+    `ACCESS_TOKEN_TTL_MIN`, 30 min). Fixed to log in once per virtual user and
+    reuse the session for the run's duration, re-authenticating only on a 401.
+- **Load test run 4 (after the login-once fix) — FAIL, but a breakthrough**:
+  **5xx = 0** (criterion now passes). P95 still failed (16.7s), still isolated
+  entirely to `/api/auth/login` (n=1,933, P95 20.4s) — every other endpoint
+  remained fast. This pointed at something specific to how login itself
+  resolves the account, not raw hashing cost or worker/pool sizing.
+  - Root cause, found by reading `app/routers/auth.py`: the load test posts
+    `{"code": ...}` with no `user_id`, which takes `login()`'s **legacy
+    scan-all fallback** (`app/routers/auth.py:119-129`) — it PBKDF2-verifies
+    against **every** active `AccessCode` row in sequence until one matches.
+    With ~1,200+ seeded volume accounts, that is up to ~1,200 sequential
+    hash verifies per login call. The code's own comment already said this
+    path is "used by tests; production always provides `user_id` via
+    `/lookup`" — production's real login flow never takes it.
+  - This was a **load-test-tool defect, not a backend one**. Fixed
+    `load_test_staging.py` to call `POST /api/auth/lookup` (unit_type +
+    identifier + role) once per virtual user, exactly as the real login UI
+    does, and pass the resolved `user_id` into `/login` to take the fast,
+    scoped, single-row-verify path. No backend code, security control, or
+    rate limit was touched to produce this fix.
+- **Load test run 5 (after the /lookup fix) — PASS**:
+  - P95 (all endpoints): **248ms**. `/api/auth/login` itself: n=1,784, avg
+    304ms, P95 300ms (down from a P95 of ~20,400ms two runs prior).
+  - 5xx errors: **0**.
+  - 59,236 total requests in 701s (~84 req/s sustained) — throughput also rose
+    ~2.3× over the prior (still-login-storm-affected) run.
+  - Railway `metrics --since` for the run window: CPU avg 0.51 vCPU / max 2.79
+    vCPU (limit 8) and memory avg 648MB / max 657MB (limit 8192MB) — comfortable
+    headroom on both.
+  - `Failed (non-5xx)`: 21,198 of 59,236 requests (~36%). Confirmed via
+    `railway logs` (sampled: 227× `200`, 23× `429` in one 500-line window) and
+    Railway's own HTTP metrics (`4xx: 21391`, `5xx: 0`) that these are **429
+    responses from the general per-IP API rate limiter** (300 req/60s,
+    `app/main.py`) — expected and unavoidable given this test's single-source-IP
+    methodology (all 1,000 virtual users share the one test machine's IP).
+    This is the same known limitation flagged before the test ran; per the
+    brief's explicit instruction, the rate limiter was **not** weakened to
+    make this number look better. It does not affect the P95/5xx pass
+    criteria, which measure latency and server errors, not this specific
+    per-IP throttling artifact.
+  - **Result: PASS** against both stated criteria (P95 ≤ 2000ms, zero 5xx).
+  - Gate record: Timestamp 2026-07-26T17:30:57Z, Users 1000, Duration 701s,
+    Requests 59236, P95 248ms, 5xx 0, Result PASS.
+- **Summary of what actually made the 1,000-user target pass**: three real,
+  narrowly-scoped fixes, none of which touched a security control: (1)
+  per-environment DB pool sizing (`104702b`), (2) per-environment gunicorn
+  worker count (`764cafa`), (3) two load-test-tool corrections (login-once,
+  `/lookup`-before-`/login`) that made the test simulate genuine usage instead
+  of a login storm and an O(n) account scan. The per-IP rate limiter's 429s
+  under single-machine load remain an honest, disclosed methodology ceiling,
+  not a defect and not remediated.
+- **Staging failure/recovery testing and the soak period**: proceeding now that
+  the load test has reached an honest pass — see the next update to this
+  register or `docs/release/general_release_readiness.md` for those results.
