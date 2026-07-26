@@ -298,7 +298,7 @@ export const planningApi = {
     api.get<FacilitatorWorkload>(`/api/planning/years/${year_id}/facilitators/${fac_id}/workload`),
 
   // ── Facilitator create (via training endpoint) ──────────────────────────────
-  createFacilitator: (body: { first_name: string; last_name: string; current_rank?: string; type?: string; subject_areas?: string[] }) =>
+  createFacilitator: (body: { first_name: string; last_name: string; current_rank?: string; type?: string; subject_areas?: string[]; confirm_duplicate?: boolean }) =>
     api.post<{ ok: boolean; facilitator_id: string }>('/api/facilitators', body),
 
   // ── Equipment ───────────────────────────────────────────────────────────────

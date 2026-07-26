@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from "react";
 import type { CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { planningApi, trainingApi } from "../../api";
+import { ApiError } from "../../api/client";
+import { ImportFacilitatorsModal } from "./ImportFacilitatorsModal";
 import type {
   PlanningFacilitator, PlanningLocation,
   PlanningFacilitatorLeave, FacilitatorWorkload, EquipmentItem,
@@ -646,6 +648,7 @@ function FacilitatorsContent({
   const qc = useQueryClient();
   const [selectedFacId, setSelectedFacId] = useState<string | null>(null);
   const [addingFac, setAddingFac] = useState(false);
+  const [importingFac, setImportingFac] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [rank, setRank] = useState("");
@@ -653,8 +656,16 @@ function FacilitatorsContent({
   const [subjectAreas, setSubjectAreas] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [dupWarning, setDupWarning] = useState<string | null>(null);
 
-  async function handleAddFac() {
+  // TRGO-07 (drawer-tab parity): this form posts to the same POST /api/facilitators
+  // endpoint as the standalone Add Facilitator modal, so it hits the same
+  // 409 possible_duplicate check -- but until this fix it had no way to resubmit
+  // with confirm_duplicate:true, so a genuine same-name-different-person case was
+  // a dead end here too. This tab is the one actually reachable when the app is
+  // deployed in module mode, so the fix belongs here, not only on the standalone
+  // route's own copy of this form.
+  async function handleAddFac(confirmDuplicate = false) {
     if (!firstName.trim() || !lastName.trim()) { setErr("First and last name are required."); return; }
     setSaving(true); setErr(null);
     try {
@@ -663,12 +674,17 @@ function FacilitatorsContent({
         current_rank: rank.trim() || undefined,
         type: facType || undefined,
         subject_areas: subjectAreas ? subjectAreas.split(",").map(s => s.trim()).filter(Boolean) : undefined,
+        confirm_duplicate: confirmDuplicate,
       });
       await qc.invalidateQueries({ queryKey: ["planning-facilitators"] });
       setFirstName(""); setLastName(""); setRank(""); setFacType("officer"); setSubjectAreas("");
-      setAddingFac(false);
+      setAddingFac(false); setDupWarning(null);
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Failed to create facilitator");
+      if (e instanceof ApiError && e.code === "possible_duplicate") {
+        setDupWarning(e.friendly);
+      } else {
+        setErr(e instanceof Error ? e.message : "Failed to create facilitator");
+      }
     } finally {
       setSaving(false);
     }
@@ -676,22 +692,31 @@ function FacilitatorsContent({
 
   return (
     <div>
-      <div style={{ padding: "8px 14px 0", display: "flex", justifyContent: "flex-end" }}>
+      <div style={{ padding: "8px 14px 0", display: "flex", justifyContent: "flex-end", gap: 6 }}>
         {!addingFac && (
-          <button className="btn sm primary" onClick={() => setAddingFac(true)}>+ Add Facilitator</button>
+          <>
+            <button className="btn sm out" onClick={() => setImportingFac(true)}>Import CSV</button>
+            <button className="btn sm primary" onClick={() => { setAddingFac(true); setDupWarning(null); setErr(null); }}>+ Add Facilitator</button>
+          </>
         )}
       </div>
+      {importingFac && (
+        <ImportFacilitatorsModal
+          onClose={() => setImportingFac(false)}
+          onDone={() => { setImportingFac(false); qc.invalidateQueries({ queryKey: ["planning-facilitators"] }); }}
+        />
+      )}
 
       {addingFac && (
         <div style={{ padding: "10px 14px", background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
             <label style={labelSx}>
               First name *
-              <input value={firstName} onChange={e => setFirstName(e.target.value)} style={inputSx} />
+              <input value={firstName} onChange={e => { setFirstName(e.target.value); setDupWarning(null); }} style={inputSx} />
             </label>
             <label style={labelSx}>
               Last name *
-              <input value={lastName} onChange={e => setLastName(e.target.value)} style={inputSx} />
+              <input value={lastName} onChange={e => { setLastName(e.target.value); setDupWarning(null); }} style={inputSx} />
             </label>
             <label style={labelSx}>
               Rank
@@ -712,9 +737,17 @@ function FacilitatorsContent({
             </label>
           </div>
           {err && <div style={{ color: "var(--aafc-red)", fontSize: 12, marginBottom: 6 }}>{err}</div>}
+          {dupWarning && (
+            <div style={{ color: "var(--aafc-red)", fontSize: 12, marginBottom: 6 }}>
+              {dupWarning} If this is a different person with the same name, you can add them anyway.
+            </div>
+          )}
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn sm primary" onClick={handleAddFac} disabled={saving}>{saving ? "Saving…" : "Add facilitator"}</button>
-            <button className="btn sm out" onClick={() => { setAddingFac(false); setErr(null); }}>Cancel</button>
+            <button className="btn sm primary" onClick={() => handleAddFac(false)} disabled={saving}>{saving ? "Saving…" : "Add facilitator"}</button>
+            {dupWarning && (
+              <button className="btn sm out" onClick={() => handleAddFac(true)} disabled={saving}>{saving ? "Saving…" : "Add anyway"}</button>
+            )}
+            <button className="btn sm out" onClick={() => { setAddingFac(false); setErr(null); setDupWarning(null); }}>Cancel</button>
           </div>
         </div>
       )}
