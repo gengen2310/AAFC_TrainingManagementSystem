@@ -130,7 +130,23 @@ acceptance criteria, and is updated in place as each item closes.
 - **Severity**: SEV2 (release-blocking per the brief's own classification) until re-run.
 - **Correction plan**: execute the full role × scope × action matrix in section 9 as its
   own gate.
-- **Status**: addressed this pass — see security gate section below.
+- **Status**: addressed this pass. Ran fresh against a freshly-seeded local server (16
+  squadrons, all 8 roles):
+  - `tools/stress/security_scope_test.py` — 31/31 passed (unauthenticated access to 8
+    endpoints, invalid JWT, read-only-role write attempts, system_admin endpoint denial
+    for sqn_admin/national_admin/auditor/sqn_general, cross-squadron IDOR, oversized
+    request body, unexpected enum values, no secrets/codes/hashes in system responses,
+    live 429 on repeated bad logins).
+  - `tools/stress/smoke_test.py` — 29/29 passed (login for all 6 role codes, system
+    console access + scope denial for sqn_admin/auditor, org/account/curriculum/
+    planning/audit reads).
+  - Full backend suite (role-matrix tests included) — 853 passed, 4 skipped.
+  - Note: running `security_scope_test.py` immediately before `smoke_test.py` against
+    the same unreset server produced spurious login failures in the second script,
+    because the first script's own rate-limit/lockout test had just tripped the login
+    limiter — expected interaction between two intentionally-adversarial scripts
+    sharing one server, not a defect. Each script passes 100% run independently against
+    a freshly-seeded server; re-run separately to reproduce cleanly.
 
 ## GAP-07: Accessibility audit not re-derived as a standalone gate
 
@@ -142,15 +158,73 @@ acceptance criteria, and is updated in place as each item closes.
 - **Correction plan**: run existing axe-core suite fresh against the release-candidate SHA;
   extend coverage to include the new UI added this pass (Update Future Parade Nights,
   unified Activities view, guided year wizard extensions, Facilitator CSV import).
-- **Status**: addressed this pass — see accessibility gate section below.
+- **Status**: addressed this pass at the "run fresh" level — `frontend/e2e/
+  accessibility.spec.ts`, 19/19 passed against current code (`npx playwright test
+  e2e/accessibility.spec.ts`), including the Curriculum and Facilitators pages touched
+  by this pass's TRGO-04/06/07 fixes (no regression). Extending the suite's own route
+  list to add dedicated specs for the new modals (Update Future Parade Nights, Guided
+  Year Setup, Facilitator CSV Import) was not done this pass — those pages are reachable
+  from routes the suite already covers (Planning Workspace, Facilitators) so a gross
+  accessibility break would likely surface, but a per-modal axe assertion does not exist
+  yet; flagged as residual, not silently dropped. connected-frontend still has no
+  axe-based coverage at all (pre-existing gap, also not addressed this pass).
 
 ## GAP-08: Production runbook / rollback runbook / release notes not written
 
 - **Source**: brief sections 16, 29-31.
 - **Correction plan**: write all four release documents before any production action.
-- **Status**: addressed this pass — see `docs/release/production_release_runbook.md`,
-  `docs/release/rollback_runbook.md`, `docs/release/release_notes.md`,
-  `docs/release/general_release_readiness.md`.
+- **Status**: NOT yet addressed — correcting an inaccurate earlier claim in this same
+  register that these existed. As of this update, `docs/release/` contains only
+  `qualification_gap_register.md`, `trgo_review_traceability.md`, and
+  `general_release_master_checklist.md`. `production_release_runbook.md`,
+  `rollback_runbook.md`, `release_notes.md`, and `general_release_readiness.md` do not
+  exist yet. Tracked to be written in this task's own step (release documents), before
+  any staging or production action.
+
+## GAP-10: TRGO-04/06/07 fixed only in connected-frontend, not the React app (new finding)
+
+- **Requirement**: the three TRGO items a prior session marked fixed should actually work
+  in both frontends, not just one — same standard applied throughout this register.
+- **Source**: found during this pass's Section 8 reverification of TRGO-04/06/07 (not
+  previously identified as a gap).
+- **Finding**: commit `00825cc` fixed the Learning Hub filter (TRGO-04) and save-button
+  feedback (TRGO-06) only in `connected-frontend/index.html`; the React Planning
+  Workspace's equivalent pages (`Curriculum.tsx`, `Facilitators.tsx`) had no matching UI.
+  Separately, TRGO-07's duplicate-facilitator fix was backend-only + surfaced in both
+  frontends as a dead end — the 409 warning displayed, but neither frontend could ever
+  send the `confirm_duplicate: true` resubmit needed to actually add a genuine
+  same-name-different-person, and connected-frontend used a blocking `alert()` for it.
+- **Severity**: SEV4 (missing UI convenience / accessibility parity — a system_admin or
+  wing_admin using the CSV template still didn't lose data, just couldn't complete this
+  specific workflow through the UI).
+- **Status**: addressed this pass. Committed `3f9ee0c`, live-verified in both frontends
+  (see GAP-01 through GAP-05 verification notes for the general TRGO reverification
+  discipline applied). See commit message for full detail.
+
+## GAP-11: connected-frontend's committed meta tag defaults to production, not localhost (new finding)
+
+- **Source**: found incidentally while safely testing GAP-10's connected-frontend fix —
+  not part of any TRGO item, a standalone infrastructure-safety finding.
+- **Finding**: `connected-frontend/index.html`'s checked-in `<meta name="aafc-api-base">`
+  points at `https://aafc-tms-backend-production.up.railway.app`, set deliberately in an
+  earlier commit (`a9589b7`, "point frontend to Railway backend"). This does not affect
+  the deployed Docker artifact (its `docker-entrypoint.sh` always rewrites this tag from
+  the `AAFC_API_BASE` env var at container start, regardless of what's checked in). It
+  does affect local dev: `RUN_TMS_CONNECTED_FRONTEND_MAC.sh`'s own comment says "The
+  client points at http://localhost:8000 via <meta name="aafc-api-base">", but running it
+  exactly as documented would silently send a "local" tester's requests to the live
+  production backend instead.
+- **Severity**: SEV3 (safety/correctness risk for local dev and testing workflows, not a
+  currently-exploitable production vulnerability — deployed behavior is unaffected).
+- **Status**: NOT fixed this pass — deliberately left as-is rather than unilaterally
+  reverting a decision a prior session made on purpose, since the reason for that change
+  isn't recorded and reverting it without knowing why could break whatever it was for
+  (e.g. a specific demo/handoff). This pass's own testing avoided the hazard by serving a
+  temporary local copy with the tag pointed at localhost, never editing or committing a
+  changed default. Flagged for an explicit owner decision: either restore the localhost
+  default (matching the documented dev workflow) or update
+  `RUN_TMS_CONNECTED_FRONTEND_MAC.sh`'s comment and add an explicit local-override step to
+  match the current committed default.
 
 ## GAP-09: Staging/load/production work not performed
 
