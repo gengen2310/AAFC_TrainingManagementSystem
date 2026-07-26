@@ -31,9 +31,14 @@ backward-compatible with the previous application code):
 
 1. Identify the previous known-good Git SHA and Railway deployment ID for each of the
    three services (backend, Main TMS frontend, Planning Workspace frontend).
-2. Redeploy each service from that prior deployment/SHA — Railway supports redeploying
-   a specific prior build directly; use that rather than reverting commits and pushing
-   a new one, since a direct redeploy is faster and doesn't touch git history.
+2. Redeploy each service from that prior deployment/SHA. **Verified this pass**: the
+   `railway` CLI's `redeploy`/`restart` commands only operate on a service's *latest*
+   deployment — there is no CLI subcommand that redeploys an arbitrary older deployment
+   ID directly. Railway's dashboard UI may still expose a per-deployment "redeploy" action
+   (not verified in this pass); if it doesn't, the reliable path is `railway up` from a
+   checkout of the prior known-good Git SHA (rebuilds via the Dockerfile, same as any other
+   deploy) — slower than an in-place redeploy would be, but confirmed to work, since it's
+   the same mechanism every deploy in this project already uses.
 3. Re-run `production_release_runbook.md` Section 3's smoke tests against the
    rolled-back build.
 4. Confirm the rollback resolved the triggering condition before standing down.
