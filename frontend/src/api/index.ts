@@ -67,7 +67,7 @@ export const trainingApi = {
   setStatus: (id: string, b: { status: string; reason?: string; rescheduled_to_date?: string; actual_attendance?: number }) =>
     api.post<{ ok: boolean }>(`/api/sessions/${id}/status`, b),
   facilitators: (squadron_id?: string) => api.get<Facilitator[]>(`/api/facilitators${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
-  addFacilitator: (b: { first_name: string; last_name: string; current_rank?: string; type?: string; subject_areas?: string[] }) =>
+  addFacilitator: (b: { first_name: string; last_name: string; current_rank?: string; type?: string; subject_areas?: string[]; confirm_duplicate?: boolean }) =>
     api.post<{ ok: boolean; facilitator_id: string }>("/api/facilitators", b),
   updateFacilitator: (id: string, b: { subject_areas?: string[]; type?: string; current_rank?: string }) =>
     api.patch<{ ok: boolean; facilitator_id: string; subject_areas: string[] }>(`/api/facilitators/${id}`, b),

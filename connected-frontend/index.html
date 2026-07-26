@@ -939,7 +939,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <select id="fac-filter" onchange="S.facFilter=this.value;renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px">
               <option value="">All subject areas</option>
             </select>
-            <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-fac')">+ Add Facilitator</button>
+            <button class="btn btn-dk admin-el" style="display:none" onclick="editFacId=null;document.getElementById('fac-rank').value='';document.getElementById('fac-first').value='';document.getElementById('fac-last').value='';document.getElementById('fac-modal-title').textContent='+ Add Facilitator';_clearFacDupWarning();openModal('m-add-fac')">+ Add Facilitator</button>
           </div>
         </div>
         <div class="dash-grid" style="margin-bottom:16px">
@@ -2019,6 +2019,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-hdr"><div class="modal-title" id="fac-modal-title">+ Add Facilitator</div><button class="modal-x" onclick="closeModal('m-add-fac')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info">Rank is stored separately so historical records stay accurate when rank changes.</div>
+      <div class="alert a-warn" id="fac-dup-warn" style="display:none"></div>
       <div class="form-row">
         <div class="ff"><label>Current Rank</label><input id="fac-rank" placeholder="e.g. FLTLT(AAFC), CUO, CPL(AAFC)"></div>
         <div class="ff"><label>Type</label>
@@ -2026,8 +2027,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
       </div>
       <div class="form-row">
-        <div class="ff"><label>First Name</label><input id="fac-first"></div>
-        <div class="ff"><label>Last Name</label><input id="fac-last"></div>
+        <div class="ff"><label>First Name</label><input id="fac-first" oninput="_clearFacDupWarning()"></div>
+        <div class="ff"><label>Last Name</label><input id="fac-last" oninput="_clearFacDupWarning()"></div>
       </div>
       <div class="ff"><label>Subject Areas</label>
         <div class="chk-grp">
@@ -2042,7 +2043,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-add-fac')">Cancel</button>
-      <button class="btn btn-dk" onclick="saveFac()">Save Profile</button>
+      <button class="btn btn-dk" id="fac-save-btn" onclick="saveFac()">Save Profile</button>
+      <button class="btn btn-out" id="fac-save-anyway-btn" style="display:none" onclick="saveFac(true)">Add anyway</button>
     </div>
   </div>
 </div>
@@ -5742,23 +5744,51 @@ function _readFacAreas(){
   ['drill','air','field','pd','sc','sqn'].forEach(k=>{if(document.getElementById('fa-'+k)&&document.getElementById('fa-'+k).checked)areas.push({drill:'Drill',air:'Air_Space',field:'Field',pd:'Personal_Dev',sc:'Service_Community',sqn:'SQN_Affairs'}[k]);});
   return areas;
 }
-function saveFac(){
+function _clearFacDupWarning(){
+  const w=document.getElementById('fac-dup-warn'); if(w){w.style.display='none';w.textContent='';}
+  const anyway=document.getElementById('fac-save-anyway-btn'); if(anyway)anyway.style.display='none';
+}
+// TRGO-07: the backend blocks a same-name-in-squadron create with 409
+// possible_duplicate once, then requires an explicit confirm_duplicate resubmit
+// (backend/app/routers/training.py add_fac). This surfaced only as a blocking
+// alert() with no way to actually add a genuine same-name-different-person --
+// a dead end. Now it shows an inline warning and an explicit "Add anyway" button
+// that resubmits with confirm_duplicate:true, matching the same pattern already
+// used in the React Planning Workspace's Facilitators page.
+function saveFac(confirmDuplicate){
   const rank=document.getElementById('fac-rank').value.trim();
   const first=document.getElementById('fac-first').value.trim();
   const last=document.getElementById('fac-last').value.trim();
   if(!last){alert('Last name required.');return;}
   const areas=_readFacAreas();
   const type=document.getElementById('fac-type').value;
+  const btn=document.getElementById('fac-save-btn');
+  const btnLabel=btn?btn.textContent:'Save Profile';
+  if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  const anywayBtn=document.getElementById('fac-save-anyway-btn');
+  if(anywayBtn)anywayBtn.disabled=true;
+  const done=()=>{ if(btn){btn.disabled=false;btn.textContent=btnLabel;} if(anywayBtn)anywayBtn.disabled=false; };
   if(editFacId){
     const fid=editFacId; editFacId=null;
     api('/api/facilitators/'+fid,{method:'PATCH',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type,subject_areas:areas})})
-      .then(async()=>{ await reloadAndRender(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; })
-      .catch(e=>alert(apiErr(e)));
+      .then(async()=>{ await reloadAndRender(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning(); })
+      .catch(e=>alert(apiErr(e)))
+      .finally(done);
     return;
   }
-  api('/api/facilitators',{method:'POST',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type,subject_areas:areas})})
-    .then(async()=>{ await reloadAndRender(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; })
-    .catch(e=>alert(apiErr(e)));
+  api('/api/facilitators',{method:'POST',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type,subject_areas:areas,confirm_duplicate:!!confirmDuplicate})})
+    .then(async()=>{ await reloadAndRender(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning(); })
+    .catch(e=>{
+      if(e&&e.code==='possible_duplicate'&&!confirmDuplicate){
+        const w=document.getElementById('fac-dup-warn');
+        w.textContent=apiErr(e)+' If this is a different person with the same name, you can add them anyway.';
+        w.style.display='';
+        if(anywayBtn)anywayBtn.style.display='';
+      }else{
+        alert(apiErr(e));
+      }
+    })
+    .finally(done);
 }
 function editFac(id){
   const f=facById(id);if(!f)return;editFacId=id;
@@ -5766,6 +5796,7 @@ function editFac(id){
   document.getElementById('fac-rank').value=f.rank||'';document.getElementById('fac-first').value=f.first||'';
   document.getElementById('fac-last').value=f.last||'';document.getElementById('fac-type').value=({Staff:'Officer',Civilian:'Civilian','Senior Cadet':'Senior Cadet',NCO:'NCO',Officer:'Officer'}[f.type]||f.type||'Officer');
   ['drill','air','field','pd','sc','sqn'].forEach(k=>{const a={drill:'Drill',air:'Air_Space',field:'Field',pd:'Personal_Dev',sc:'Service_Community',sqn:'SQN_Affairs'}[k];document.getElementById('fa-'+k).checked=(f.areas||[]).includes(a);});
+  _clearFacDupWarning();
   openModal('m-add-fac');
 }
 async function delFac(id){

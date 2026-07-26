@@ -12,6 +12,11 @@ export function Curriculum() {
   const q = useQuery({ queryKey: ["curriculum", squadronId], queryFn: () => trainingApi.curriculum(squadronId), enabled: scoped });
   const [phase, setPhase] = useState(""); const [element, setElement] = useState("");
   const [progress, setProgress] = useState(""); const [search, setSearch] = useState("");
+  // TRGO-04 (React-app parity): connected-frontend already has a "Missing Learning
+  // Hub link" filter (index.html curr-f-nolh checkbox) -- the React Curriculum page
+  // had no equivalent, even though the underlying learning_hub_url field is the
+  // same data on both frontends.
+  const [noLearningHub, setNoLearningHub] = useState(false);
   const [drill, setDrill] = useState<CurriculumItem | null>(null);
 
   const items = q.data?.items ?? [];
@@ -20,6 +25,7 @@ export function Curriculum() {
   const filtered = items.filter((i) =>
     (!phase || i.phase === phase) && (!element || i.element === element) &&
     (!progress || i.progress === progress) &&
+    (!noLearningHub || !i.learning_hub_url) &&
     (!search || `${i.code} ${i.title}`.toLowerCase().includes(search.toLowerCase())));
 
   if (needsSelection && !squadronId) return <div><h1>Curriculum</h1><Empty msg="Select a squadron above to view its curriculum." /></div>;
@@ -39,6 +45,10 @@ export function Curriculum() {
           <select value={element} onChange={(e) => setElement(e.target.value)} aria-label="Element"><option value="">All elements</option>{elements.map((e) => <option key={e}>{e}</option>)}</select>
           <select value={progress} onChange={(e) => setProgress(e.target.value)} aria-label="Progress"><option value="">Any progress</option>{["not_started", "in_progress", "complete"].map((p) => <option key={p} value={p}>{p.replace(/_/g, " ")}</option>)}</select>
           <input placeholder="Search code or title" value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search curriculum" />
+          <label style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 400 }}>
+            <input type="checkbox" checked={noLearningHub} onChange={(e) => setNoLearningHub(e.target.checked)} />
+            Missing Learning Hub link
+          </label>
         </div>
       </Card>
       {Object.keys(groups).length === 0 ? <Empty msg="No curriculum items match." /> : Object.entries(groups).map(([ph, list]) => (

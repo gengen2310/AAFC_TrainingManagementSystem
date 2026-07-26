@@ -151,19 +151,37 @@ function TagInput({ tags, onChange, id, placeholder = "Type and press Enter or ,
 }
 
 // ── Add facilitator modal ──────────────────────────────────────────────────────
+// TRGO-07 (React-app parity): the backend blocks a same-name-in-squadron create
+// with 409 possible_duplicate once, then requires an explicit confirm_duplicate
+// resubmit -- previously this frontend had no way to send that second request,
+// so a genuine same-name-different-person case was a dead end. TRGO-06 (React-
+// app parity): the Add button now shows "Adding…" while pending, matching the
+// save-in-progress feedback already present elsewhere (e.g. SessionForm).
 function AddFacModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [first, setFirst] = useState(""); const [last, setLast] = useState("");
   const [rank, setRank] = useState(""); const [subjects, setSubjects] = useState<string[]>([]);
   const [err, setErr] = useState("");
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const m = useMutation({
-    mutationFn: () => trainingApi.addFacilitator({ first_name: first, last_name: last, current_rank: rank, subject_areas: subjects }),
-    onSuccess: onDone, onError: (e) => setErr(e instanceof ApiError ? e.friendly : "Could not add."),
+    mutationFn: (confirmDuplicate: boolean) => trainingApi.addFacilitator({
+      first_name: first, last_name: last, current_rank: rank, subject_areas: subjects,
+      confirm_duplicate: confirmDuplicate,
+    }),
+    onSuccess: onDone,
+    onError: (e) => {
+      if (e instanceof ApiError && e.code === "possible_duplicate") {
+        setDuplicateWarning(e.friendly);
+        setErr("");
+      } else {
+        setErr(e instanceof ApiError ? e.friendly : "Could not add.");
+      }
+    },
   });
   return (
     <Modal title="Add facilitator" onClose={onClose}>
       <div className="form">
-        <label htmlFor="f-first">First name</label><input id="f-first" value={first} onChange={(e) => setFirst(e.target.value)} />
-        <label htmlFor="f-last">Last name</label><input id="f-last" value={last} onChange={(e) => setLast(e.target.value)} />
+        <label htmlFor="f-first">First name</label><input id="f-first" value={first} onChange={(e) => { setFirst(e.target.value); setDuplicateWarning(null); }} />
+        <label htmlFor="f-last">Last name</label><input id="f-last" value={last} onChange={(e) => { setLast(e.target.value); setDuplicateWarning(null); }} />
         <label htmlFor="f-rank">Current rank</label><input id="f-rank" value={rank} onChange={(e) => setRank(e.target.value)} />
         <label htmlFor="add-fac-subjects">Subject areas</label>
         <TagInput id="add-fac-subjects" tags={subjects} onChange={setSubjects} />
@@ -171,7 +189,21 @@ function AddFacModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           Press Enter or comma to add each tag · max {MAX_TAGS} tags · {MAX_LEN} chars each
         </p>
         {err && <div className="err" role="alert">{err}</div>}
-        <Button onClick={() => m.mutate()} disabled={!first || !last || m.isPending}>Add</Button>
+        {duplicateWarning && (
+          <div className="err" role="alert">
+            {duplicateWarning} If this is a different person with the same name, you can add them anyway.
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button onClick={() => m.mutate(false)} disabled={!first || !last || m.isPending}>
+            {m.isPending ? "Adding…" : "Add"}
+          </Button>
+          {duplicateWarning && (
+            <Button variant="out" onClick={() => m.mutate(true)} disabled={m.isPending}>
+              {m.isPending ? "Adding…" : "Add anyway"}
+            </Button>
+          )}
+        </div>
       </div>
     </Modal>
   );
