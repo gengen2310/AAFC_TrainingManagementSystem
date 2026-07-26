@@ -29,7 +29,8 @@ acceptance criteria, and is updated in place as each item closes.
   change via explicit user action with preview + confirmation + reason + audit; holiday/
   conflict/duplicate detection in the preview; Dashboard/Calendar/Planning Workspace
   reflect the change immediately.
-- **Status**: addressed this pass — see implementation section below.
+- **Status**: addressed this pass — see implementation section below. Committed
+  `a624cc9`, live-verified in browser and via direct API calls, pushed.
 
 ## GAP-02: TRGO-02 — Inherited activities/holidays visibility model
 
@@ -57,7 +58,8 @@ acceptance criteria, and is updated in place as each item closes.
   frontend caller, no doc pointing at it, no stranded data).
 - **Status**: addressed this pass (unified view + CEA-retirement confirmation) — full
   wing→squadron holiday/anchor-event data-model cascade remains out of scope, documented
-  below as a residual item, not silently dropped.
+  below as a residual item, not silently dropped. Committed `c5aa7b5`, live-verified in
+  browser, pushed.
 
 ## GAP-03: TRGO-03 — Guided training-year workflow
 
@@ -79,7 +81,9 @@ acceptance criteria, and is updated in place as each item closes.
 - **Status**: addressed this pass at a genuinely useful, bounded scope — see
   implementation notes; full parity with every listed placement method (copy-night/copy-
   week/copy-term/suggested-sequence/CSV-import-for-placement) is a larger UI investment
-  flagged as a residual item, not silently dropped.
+  flagged as a residual item, not silently dropped. Committed `29cab6a`, live-verified in
+  browser (create-new path, roll-over path, timing-template step, bulk placement of 4
+  sessions), pushed.
 
 ## GAP-04: TRGO-05 — Facilitator CSV import
 
@@ -94,7 +98,9 @@ acceptance criteria, and is updated in place as each item closes.
 - **Acceptance criteria**: CSV template download; upload+parse+validate+preview; exact/
   possible-duplicate handling (skip/update/keep-both/review); formula-injection guard;
   batch history; audit; 1000-row file handling.
-- **Status**: addressed this pass — see implementation section.
+- **Status**: addressed this pass — see implementation section. Committed `172ba12`,
+  live-verified in browser (template download, in-file duplicate flagged in preview,
+  commit skipped it, formula-injection cell neutralised), pushed.
 
 ## GAP-05: TRGO-08 — Date/module filtering
 
@@ -111,7 +117,9 @@ acceptance criteria, and is updated in place as each item closes.
   date presentation follows the unambiguous Australian form where changed.
 - **Status**: addressed this pass at the Mission Backlog level (the concretely-identified
   gap); a full sweep of every listed page's filter/date-format conventions is a larger
-  UI-consistency pass, flagged as residual, not silently dropped.
+  UI-consistency pass, flagged as residual, not silently dropped. Committed `3dacc0c`,
+  live-verified in browser (13→11 items on a real date range, unscheduled item stayed
+  visible, Reset clears both fields), pushed. Backend suite 853 passed / 4 skipped.
 
 ## GAP-06: Eight-role security sweep not re-derived
 
