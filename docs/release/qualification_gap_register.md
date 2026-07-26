@@ -226,6 +226,60 @@ acceptance criteria, and is updated in place as each item closes.
   `RUN_TMS_CONNECTED_FRONTEND_MAC.sh`'s comment and add an explicit local-override step to
   match the current committed default.
 
+## GAP-12: DB/migration gate, expanded data-integrity audit, backup/restore gate not run this pass (new tracking entry)
+
+- **Source**: brief sections 12-15 (exhaustive local release gate, migration gate against
+  disposable Postgres, expanded data-integrity audit, backup/restore gate).
+- **Status**: addressed this pass. Evidence:
+  - **Local release gate, 2x repeated**: backend `pytest tests/` — 853 passed, 4 skipped,
+    identical both runs. Frontend `tsc --noEmit` / `eslint` / `vitest run` — clean, 0
+    errors, 17 pre-existing warnings, 15/15 tests passed, identical both runs. No
+    flakiness observed.
+  - **DB/migration gate against disposable PostgreSQL** (local Homebrew postgresql@16,
+    not staging/production): fresh `alembic upgrade head` from empty — all 40 migrations
+    applied cleanly, single head confirmed (`y8z9a0b1c2d3`), 58 tables. Idempotent re-run
+    of `upgrade head` — no-op, no error. Full `alembic downgrade base` — all 40 migrations
+    reversed cleanly. Re-`upgrade head` round-trip — 58 tables restored, `alembic_version`
+    correct. Schema-specific checks: `facilitators.subject_areas` is genuinely `jsonb`
+    (v28); `uq_parade_night_sqn_date_active` partial unique index present (v27); `version`
+    column present on all 7 optimistic-locked tables (v37); 56 FK constraints defined,
+    `squadrons.wing_id → wings.id` confirmed by definition and by a live NOT-NULL/FK
+    rejection test. App-level: server boots and `/api/health/db` returns ok against real
+    Postgres; `seed_all()` (destructive reset — ran only after explicit user
+    authorization, since the auto-mode safety classifier correctly blocked my own
+    unprompted `ALLOW_DESTRUCTIVE_SEED=true`) writes real data; `smoke_test.py` 29/29 and
+    `security_scope_test.py` 31/31 both pass against the Postgres-backed live server —
+    genuine business-logic validation, not just schema checks. Note: the backend pytest
+    suite itself always runs against its own isolated SQLite temp DB
+    (`tests/conftest.py` hardcodes `DATABASE_URL`) regardless of any exported env var —
+    the 853-passed figure above is a SQLite result; Postgres-specific behaviour is
+    covered by the live-server checks in this bullet instead, not by pytest.
+  - **Expanded data-integrity audit**: new `tools/stress/data_integrity_check.py`
+    (gitignored, local-only, matching its sibling stress scripts) — 31 read-only SQL
+    checks: 8 referential-integrity (orphaned FK), 5 tenancy-consistency (denormalised
+    wing_id/squadron_id drift), 4 security-invariant (no plaintext codes, no reused hash
+    across users, every active user has a code, no hash-shaped values in audit log), 5
+    data-quality, 6 optimistic-locking version sanity, 2 uniqueness-beyond-DB-constraint,
+    1 archival-hygiene. All 31 pass against current seed data. First draft had a false
+    positive (assumed bcrypt-shaped hashes; the app actually uses passlib
+    `pbkdf2_sha256`) — corrected the check, and separately corrected
+    `.claude/rules/backend.md`'s matching stale "bcrypt" claim.
+  - **Backup/restore gate**: real `pg_dump --format=custom --no-owner --no-privileges`
+    against the disposable seeded Postgres DB (188KB dump, sha256 recorded), restored via
+    `pg_restore` into a second, separate disposable database — 0 errors. Row-count parity
+    confirmed exactly (squadrons/users/facilitators/curriculum_items/planning_years all
+    matched original). App-level verification (the actual bar, not just a schema check):
+    booted a live server against the restored DB and ran the full `smoke_test.py` —
+    29/29 passed, including real login for all 6 role codes and system-console access
+    checks. One genuine finding along the way: the first `smoke_test.py` run against the
+    restored DB got 429 `locked_out` on every login — not a restore defect, but the
+    backup faithfully capturing an IP-lockout row created by the security-sweep tests run
+    earlier against the same source DB, which correctly carried through pg_dump/restore;
+    cleared via `TRUNCATE ip_login_attempts` on this disposable DB (not attempted or
+    relevant to any real environment) and re-ran clean.
+  - All disposable Postgres databases and the temporary dump file were dropped/deleted
+    after use; nothing was left behind on the local Postgres server.
+
 ## GAP-09: Staging/load/production work not performed
 
 - **Source**: brief sections 18-27, 31-34.
