@@ -53,11 +53,19 @@ def test_squadron_admin_sees_own_facilitators_and_session_items(client):
     wing_id = client.get("/api/auth/me", headers=hdr).json()["session"]["wing_id"]
     fac_id = _seed_facilitator(client, hdr)
 
-    # Offset chosen to be both within the current calendar year (the "year"
-    # window is calendar-year-bounded, see _date_window) and far enough from
-    # small offsets other test files commonly use, to avoid a duplicate-date
-    # 409 against parade nights the shared session-scoped test DB already has.
-    future = (date.today() + timedelta(days=130)).isoformat()
+    # Offset must stay within the current calendar year (the "year" window is
+    # calendar-year-bounded, see _date_window) while landing on a date that
+    # collides with neither seed_all()'s baseline data nor another test's
+    # parade night. seed_all() seeds a real ParadeNight for squadron 703 on
+    # EVERY Friday from 2026-01-30 through 2026-12-11 -- any today+N offset
+    # that lands on a Friday inside that range hits a 409 duplicate_date (this
+    # is what broke a prior +130 offset once the suite ran on 2026-07-27,
+    # since today's weekday made +130 land on a seeded Friday). +144 lands on
+    # 2026-12-18, a Friday just past the seeded range's end (and inside the
+    # Term 4/Summer Holidays period, which seed_all() explicitly skips when
+    # seeding Fridays) -- safe regardless of which weekday "today" falls on
+    # this year, as long as today+144 stays in-year.
+    future = (date.today() + timedelta(days=144)).isoformat()
     _create_session_with_facilitator(client, hdr, sqn_id, wing_id, fac_id, future)
 
     r = client.get("/api/dashboard/facilitator-schedule", params={"window": "year"}, headers=hdr)
