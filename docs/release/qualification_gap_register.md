@@ -1378,3 +1378,80 @@ acceptance criteria, and is updated in place as each item closes.
   caught and corrected only because of the "verify every production action, don't
   assume" discipline; flagged honestly as a mistake made and then caught, not
   omitted from the record.
+
+## GAP-20: Production frontends served staging's backend URL — urgent post-release incident, fixed and verified
+
+- **Source**: user report immediately after release — `https://aafc-tms-frontend-production.up.railway.app`
+  showed "Cannot reach the backend at https://aafc-tms-backend-staging.up.railway.app".
+- **Root cause confirmed via the live rendered HTML, not just source code**: both
+  production frontend Railway services had `AAFC_API_BASE` set to the staging
+  backend URL. `AAFC_PW_BASE` (Main TMS → Planning Workspace link) and
+  `AAFC_TMS_BASE` (Planning Workspace → Main TMS link) were both unset (empty
+  meta tag content). Confirmed via `curl`'d production HTML showing
+  `<meta name="aafc-api-base" content="https://aafc-tms-backend-staging.up.railway.app">`
+  on both services, and via `railway variable list` on each service (non-secret
+  operational values, not credentials) showing the same. Both entrypoint scripts'
+  substitution mechanism itself was correct — this was a pure environment-variable
+  misconfiguration, not a code defect. `app-build` showed `local|<timestamp>` on
+  both (confirms `RAILWAY_GIT_COMMIT_SHA` is never auto-populated for
+  `railway up`-based local-directory deploys — a pre-existing, separate,
+  non-blocking gap in build-fingerprint traceability).
+- **Fix — configuration only, no code change needed for the root cause itself**:
+  set `AAFC_API_BASE=https://aafc-tms-backend-production.up.railway.app` and
+  `AAFC_PW_BASE=https://aafc-tms-planning-workspace-preview-production.up.railway.app/planning`
+  on `aafc-tms-frontend` (production); set
+  `AAFC_API_BASE=https://aafc-tms-backend-production.up.railway.app` and
+  `AAFC_TMS_BASE=https://aafc-tms-frontend-production.up.railway.app` on
+  `aafc-tms-planning-workspace-preview` (production). Fail-closed guard
+  (project/environment/service IDs) re-verified before each variable write.
+- **Deployment guard added** (commits `61ef81c`, then narrowed in `5667382` after a
+  self-caught false positive — see below): both entrypoint scripts now refuse to
+  start (`exit 1`) when `RAILWAY_ENVIRONMENT_NAME=production` and the *resolved*
+  `aafc-api-base`/`aafc-pw-base`/`aafc-tms-base` meta-tag lines contain
+  `backend-staging`, `frontend-staging`, `planning-workspace-preview-staging`, or
+  `localhost`. **First version checked the whole `index.html` file**, which
+  false-positived and crash-looped the Planning Workspace deployment
+  (`CRASHED` status, confirmed via `railway logs`) — both files legitimately
+  contain the literal string "localhost" outside any live config value
+  (`frontend/index.html`'s own operator-guidance comment; `connected-frontend`'s
+  dev-mode-detection JS). Caught immediately from the crash logs, fixed to check
+  only the actual injected meta-tag lines, verified locally against both a
+  correct-config case and a staging-leaked-into-prod case before redeploying.
+- **Redeployed both frontends** (genuine `railway up` rebuilds, not restarts —
+  a restart would not re-resolve the corrected variables, per the same lesson
+  already learned in GAP-19). `RAILWAY_GIT_COMMIT_SHA` set explicitly as a normal
+  variable before each deploy (Railway accepted the override) so `app-build`/
+  `version.json` reflect the real corrective SHA rather than `local|<timestamp>`.
+  Final deployments: Main TMS `34af240c-...`, Planning Workspace `c52a95be-...`,
+  both `SUCCESS`, both fingerprinted `5667382019090be910f9c02359ee12ec73a8c8d4`.
+- **Full verification, fresh curl + real browser (not just source review)**:
+  rendered HTML on both services now shows correct production URLs, no staging
+  references anywhere, `version.json` matches on both; live browser check (fresh
+  navigation, not cached) confirmed the Main TMS login page renders and its
+  organisation-lookup call (`GET /api/auth/organisations`) network-request-panel-
+  confirmed hitting `aafc-tms-backend-production`, not staging; Planning
+  Workspace's "Session not found" state (correct, expected — no cookie in a fresh
+  session) correctly links "Return to TMS" to the production Main TMS URL; zero
+  console errors on either page.
+- **Cross-environment impact — checked directly in staging's own logs, not
+  inferred**: found 4 real `OPTIONS` preflight requests in staging's access log
+  during the incident window, against exactly the paths a browser loading the
+  (misconfigured) production login page would call —
+  `/api/auth/me`, `/api/auth/organisations` (×2), `/api/auth/lookup` — **all
+  returned `400`**, rejected by staging's own `CORS_ALLOWED_ORIGINS` (confirmed:
+  staging's CORS list contains only staging's own two frontend URLs, not
+  production's). Because a CORS preflight failure stops a browser from ever
+  sending the actual request, **no login, no session, no read, no write, and no
+  data of any kind reached staging as a result of this misconfiguration** — the
+  user's own reported symptom ("Cannot reach the backend") is the direct,
+  expected consequence of this CORS rejection, not evidence of a successful
+  cross-environment data leak. Did not delete anything in staging as part of this
+  check, per instruction.
+- **Severity**: SEV1 while live (a genuinely unusable production frontend for any
+  real visitor) — now fixed and verified. The root cause (how `AAFC_API_BASE` came
+  to be set to staging's URL on production in the first place) was not
+  independently traced to a specific prior action — it may predate this session
+  entirely (same class of issue as `DEFECT-003`) or may be a further instance of
+  the same cross-environment variable-setting carelessness already caught once in
+  GAP-19; not resolved further here since the practical fix (correct the values,
+  add a guard, verify) is the same regardless of exactly when it happened.
