@@ -44,14 +44,18 @@ cat > /usr/share/nginx/html/version.json <<EOF
 EOF
 
 # Production deployment guard: refuse to start if this environment is production
-# but the resolved config still points at a staging/local target. Cheaper than
-# discovering it live in a user's browser -- see qualification_gap_register.md
-# GAP-20 for the incident this guard exists to prevent from recurring silently.
+# but the resolved config still points at a staging/local target. Only checks the
+# actual injected meta-tag lines, not the whole file -- index.html's own JS has
+# legitimate dev-mode-detection code referencing "localhost", which is not a live
+# config value and must not trip this guard. Cheaper than discovering it live in
+# a user's browser -- see qualification_gap_register.md GAP-20 for the incident
+# this guard exists to prevent from recurring silently.
 if [ "${RAILWAY_ENVIRONMENT_NAME:-}" = "production" ]; then
+  META_LINES="$(grep -E '<meta name="aafc-(api-base|pw-base)"' /usr/share/nginx/html/index.html)"
   for forbidden in "backend-staging" "frontend-staging" "planning-workspace-preview-staging" "localhost"; do
-    if grep -q "$forbidden" /usr/share/nginx/html/index.html; then
-      echo "[entrypoint] FATAL: production build contains forbidden reference '${forbidden}' in index.html — refusing to start." >&2
-      grep -n "aafc-api-base\|aafc-pw-base" /usr/share/nginx/html/index.html >&2
+    if echo "$META_LINES" | grep -q "$forbidden"; then
+      echo "[entrypoint] FATAL: production build's resolved config contains forbidden reference '${forbidden}' — refusing to start." >&2
+      echo "$META_LINES" >&2
       exit 1
     fi
   done
