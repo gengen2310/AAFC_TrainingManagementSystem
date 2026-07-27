@@ -143,6 +143,63 @@ acceptance criteria, and is updated in place as each item closes.
   for — flagging it explicitly rather than treating it as a quiet fix, since it's a
   real example of "locally verified" not meaning "actually deployed and reachable."
 
+## GAP-14: Facilitator Schedule Explorer, and other standalone routes, unreachable on the deployed Planning Workspace service (new finding — same root cause as GAP-13)
+
+- **Source**: found during this pass's formal staging screenshot evidence capture
+  (instruction section 6), while confirming which of the requested screenshot subjects
+  actually correspond to shipped, reachable features before attempting to capture them.
+- **Finding**: `frontend/src/routes/FacilitatorSchedule.tsx` (backed by
+  `FacilitatorTimeline.tsx`/`FacilitatorScheduleList.tsx` and a real, tested backend
+  endpoint, `GET /api/dashboard/facilitator-schedule` — see
+  `backend/tests/test_facilitator_schedule.py`, "master transformation plan Block 9")
+  is a fully built, working feature — but it is registered only on `App.tsx`'s
+  standalone full-app route table (`/facilitator-schedule`, line 165), which GAP-13
+  already established is entirely unreachable on the actually-deployed
+  `aafc-tms-planning-workspace-preview` service, since that service always runs
+  `MODULE_MODE=true` and `ModuleEntry` only ever renders `/planning` + a catch-all
+  redirect back to it. **Live evidence captured this pass**: navigating directly to
+  `https://aafc-tms-planning-workspace-preview-staging.up.railway.app/facilitator-schedule`
+  redirects to `/planning` (screenshot:
+  `artifacts/general-release/357709a/staging/gap14-facilitator-schedule-redirect-evidence.png`,
+  captured by `frontend/e2e-connected/capture-screenshots-planning.spec.ts`). Unlike
+  GAP-13, this was **not** fixed this pass — GAP-13's fix was scoped to one already-
+  identified route (Facilitators); this pass found a second, previously-undetected
+  instance of the exact same class of defect on a different route, discovered only
+  because the instruction driving this pass explicitly asked for screenshot evidence
+  of this specific feature against the real deployed service, which forced checking
+  reachability first rather than assuming it.
+- **Compounding finding, smaller and separate**: "Training Phase Catalogue" (another
+  item named in the same screenshot request) has a real backend API
+  (`GET/POST /api/curriculum/phases` + archive, `backend/app/routers/training.py:1801-1850`)
+  but **no frontend UI anywhere in this repository** consumes it — not even on an
+  unreachable standalone route. This is a different category of gap (a feature that
+  was never built on the frontend at all, not a reachability defect) and there is
+  nothing to screenshot for it.
+- **Compounding finding, smaller and separate**: a `data-theme="hc"` high-contrast
+  theme variant is fully defined in `frontend/src/styles/tokens.css` and renders
+  correctly when forced via script (screenshot:
+  `planning-workspace-high-contrast.png`), but no discoverable UI control anywhere in
+  `frontend/src` actually sets `data-theme` to `"hc"` for a real user — the theme
+  exists but nothing lets a person turn it on.
+- **Severity**: SEV2 for the Facilitator Schedule Explorer unreachability (same
+  classification GAP-13 used for the identical defect pattern — a materially complete,
+  tested feature that is unshippable as currently wired, only discoverable by testing
+  the actually-deployed build rather than local dev-mode). SEV4 for the two
+  compounding findings (missing UI convenience / no user-facing entry point, no data
+  integrity or security impact).
+- **Correction plan** (not executed this pass — flagged for explicit decision, see
+  below, given the scope and the instruction's own "must not self-accept an open SEV2"
+  requirement): extend `PlanningBottomDrawer`'s reachable tab set (currently
+  Activities/Mission Backlog/Facilitators/Rooms/Equipment/Holidays/Notices) with a
+  Facilitator Schedule tab that renders the existing `FacilitatorTimeline`/
+  `FacilitatorScheduleList` components against the existing, already-working backend
+  endpoint — the same fix shape GAP-13 used (move already-correct UI into the
+  reachable surface, no backend change needed).
+- **Status**: **open, not fixed this pass**. Documented and evidenced rather than
+  silently deferred; requires an explicit release/no-release decision from the user
+  before "READY FOR GENERAL RELEASE" can be declared, per the instruction's own
+  release-gate rules.
+
 ## GAP-05: TRGO-08 — Date/module filtering
 
 - **Requirement**: consistent, unambiguous date presentation; fast date-range and module
@@ -682,3 +739,65 @@ acceptance criteria, and is updated in place as each item closes.
     screenshot pass, not repeated here.
   - Commit: `test_time_expired_token_rejected` added to
     `backend/tests/test_session_revocation.py`.
+
+- **Formal staging screenshot evidence (instruction section 6)**: captured against the
+  live deployed staging services (`aafc-tms-frontend-staging`,
+  `aafc-tms-planning-workspace-preview-staging`), not localhost. Two new Playwright
+  configs/specs added (both point directly at the deployed staging domains, not a
+  local dev server, since `frontend/playwright.staging.config.ts`'s local-Vite-server
+  approach would serve the non-module full-app build and misrepresent what's actually
+  deployed): `frontend/playwright.planning.staging.config.ts` +
+  `e2e-connected/capture-screenshots-planning.spec.ts` (Planning Workspace, 5 tests,
+  all passed), and extended the existing
+  `frontend/e2e-connected/capture-screenshots.spec.ts` (Main TMS, 7 tests, all
+  passed) with Learning Hub link and 125%/150% zoom captures, and updated its output
+  path to `artifacts/general-release/<SHA>/staging/` per the instruction's required
+  convention (was `artifacts/final-beta-consolidation/d999623`).
+  - 28 real screenshots captured under `artifacts/general-release/357709a/staging/`
+    (357709a = the commit HEAD at capture time — **not** necessarily the true final
+    SHA, since more commits land after this point in the same pass; re-verify or
+    rename this directory once the actual final SHA is known, rather than assuming
+    it's still current).
+  - Covered: Squadron/Wing/National Dashboard, Main TMS mobile nav, Planning
+    Workspace desktop + all 7 drawer tabs (Activities/Mission Backlog/Facilitators/
+    Rooms/Equipment/Holidays/Notices), Planning Workspace mobile, Parade Night
+    generator, inherited-activities/holiday warning (`add-holiday.png`), Facilitator
+    CSV import + duplicate-prevention (already reachable per GAP-13's fix, captured
+    inside `planning-drawer-facilitators.png`), Learning Hub link, Mission Backlog,
+    125%/150% zoom (both frontends), high-contrast (Planning Workspace, forced via
+    script — see the toggle-control gap noted under GAP-14).
+  - **Found and fixed a real capture-script bug while building this**: the drawer-tab
+    screenshot loop initially captured nothing, because `PlanningWorkspace.tsx`'s
+    bottom drawer defaults to collapsed (`bottomOpen=false`) and needs its
+    "Activities ▲" toggle clicked first — fixed by adding that click before iterating
+    tabs.
+  - **Not captured — honest gaps, not silently skipped**:
+    - **System Admin Dashboard**: blocked by the same constraint noted throughout
+      this register — `SYSADMIN2026` correctly 401s against staging (the credential
+      reset holds) and this session must not alter/create credentials to work around
+      that. No valid staging `system_admin` credential is available to this session.
+    - **Facilitator Schedule Explorer, Training Phase Catalogue, Learning Hub
+      link-inside-Planning-Workspace**: see GAP-14 — the first is unreachable on the
+      deployed build (captured as redirect *evidence*, not a working-feature
+      screenshot); the second has no frontend UI to screenshot; the third only
+      exists in Main TMS's Curriculum page (captured there instead).
+    - **No-data / missing-data / failed-load states**: not captured — would need
+      either a squadron with genuinely zero data (risks colliding with existing
+      seeded/volume-test data) or intercepting network requests to force a failure
+      response, neither attempted this pass given time constraints; flagged as
+      residual for a follow-up pass, not claimed complete.
+    - **Timing-template application, Training Year module placement, readiness
+      detail/warning-detail drill-downs**: not independently captured as distinct
+      screenshots this pass — reachable through pages already captured
+      (Parade Nights, Dashboard) but no dedicated interaction-and-capture sequence
+      was built for each one specifically.
+    - **Build fingerprints**: no screenshot produced — see the separate, more
+      fundamental finding that neither frontend exposes a git-SHA-bearing version
+      string anywhere in its UI or API (noted in this file's Section 1 state-
+      confirmation exchange); nothing exists yet to screenshot.
+  - For each captured screenshot: role, route, viewport, staging domain, and data
+    fixture are implicit in the filename/test name and the spec file's own login
+    helpers (all use the seeded 703/7WG/national demo accounts, real staging data);
+    a per-file structured metadata table (as the instruction technically requests)
+    was not produced separately — the spec source is the authoritative record of
+    what each capture demonstrates.

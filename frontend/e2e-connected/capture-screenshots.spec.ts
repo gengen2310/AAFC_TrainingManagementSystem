@@ -2,7 +2,8 @@ import { test, Page } from "@playwright/test";
 
 // One-off evidence capture against live staging — not part of the regular verification
 // suite. Run with: npx playwright test --config=playwright.connected.staging.config.ts e2e-connected/capture-screenshots.spec.ts
-const OUT = "/Users/jennydv/Desktop/AAFC_TMS_National_Connected_Pilot_Package_v17_1_source/artifacts/final-beta-consolidation/d999623";
+const SHA = process.env.CAPTURE_SHA || "unknown-sha";
+const OUT = `/Users/jennydv/Desktop/AAFC_TMS_National_Connected_Pilot_Package_v17_1_source/artifacts/general-release/${SHA}/staging`;
 
 async function loginSquadron(page: Page, code: string, role: "sqn_admin" | "sqn_general" = "sqn_admin") {
   await page.goto("/");
@@ -111,4 +112,21 @@ test("capture wing dashboard", async ({ page }) => {
 test("capture national dashboard", async ({ page }) => {
   await loginNational(page, "ADMINNATIONAL");
   await page.screenshot({ path: `${OUT}/national-dashboard.png`, fullPage: true });
+});
+
+test("capture Curriculum page (Learning Hub link + missing-link filter)", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await page.evaluate(() => (window as any).nav("curriculum"));
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: `${OUT}/curriculum-learning-hub.png`, fullPage: true });
+});
+
+test("capture dashboard at 125% and 150% zoom", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  for (const scale of [1.25, 1.5]) {
+    await page.evaluate((s) => { (document.body.style as any).zoom = String(s); }, scale);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${OUT}/dashboard-zoom-${Math.round(scale * 100)}.png`, fullPage: true });
+    await page.evaluate(() => { (document.body.style as any).zoom = "1"; });
+  }
 });
