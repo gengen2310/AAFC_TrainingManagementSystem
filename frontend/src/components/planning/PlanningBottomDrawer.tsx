@@ -1,9 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
 import type { CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { planningApi, trainingApi } from "../../api";
+import { planningApi, trainingApi, dashboardApi } from "../../api";
 import { ApiError } from "../../api/client";
 import { ImportFacilitatorsModal } from "./ImportFacilitatorsModal";
+import { FacilitatorTimeline, type ZoomPreset } from "../charts/FacilitatorTimeline";
+import { FacilitatorScheduleList } from "../charts/FacilitatorScheduleList";
+import { Loading, ErrorNote } from "../ui";
 import type {
   PlanningFacilitator, PlanningLocation,
   PlanningFacilitatorLeave, FacilitatorWorkload, EquipmentItem,
@@ -13,6 +16,7 @@ import type { DrawerItem } from "./PlanningRightDrawer";
 export type BottomTab =
   | "backlog"
   | "facilitators"
+  | "schedule"
   | "rooms"
   | "equipment"
   | "holidays"
@@ -27,12 +31,14 @@ interface Props {
   facilitators: PlanningFacilitator[];
   locations: PlanningLocation[];
   onItemClick: (item: DrawerItem) => void;
+  squadronId?: string;
 }
 
 const TABS: { key: BottomTab; label: string }[] = [
   { key: "activities", label: "Activities" },
   { key: "backlog", label: "Mission Backlog" },
   { key: "facilitators", label: "Facilitators" },
+  { key: "schedule", label: "Schedule" },
   { key: "rooms", label: "Rooms" },
   { key: "equipment", label: "Equipment" },
   { key: "holidays", label: "Holidays" },
@@ -635,6 +641,57 @@ function FacilitatorLeaveSection({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── ScheduleContent ──────────────────────────────────────────────────────────
+// GAP-14 fix: the Facilitator Schedule Explorer (FacilitatorTimeline.tsx /
+// FacilitatorScheduleList.tsx, GET /api/dashboard/facilitator-schedule) was
+// fully built and tested but only registered on the standalone full-app route
+// table (/facilitator-schedule) -- unreachable on the actually-deployed
+// module-mode Planning Workspace service, the same root cause GAP-13 already
+// found for the Facilitators CSV import. This wires the same components into
+// the one surface that IS reachable in module mode: a Bottom Drawer tab.
+// Squadron-scoped directly via the caller's own squadronId (the session's
+// squadron for a squadron-role user) rather than useScopedSquadron's
+// Wing/National selector context, which isn't wired into module mode.
+function ScheduleContent({ squadronId }: { squadronId?: string }) {
+  const [zoom, setZoom] = useState<ZoomPreset>("term");
+  const [view, setView] = useState<"timeline" | "list">("timeline");
+
+  const q = useQuery({
+    queryKey: ["facilitator-schedule", zoom, squadronId],
+    queryFn: () => dashboardApi.facilitatorSchedule(zoom === "week" ? "week" : "year", squadronId),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+        <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+          Zoom
+          <select value={zoom} onChange={(e) => setZoom(e.target.value as ZoomPreset)} style={{ fontSize: 12, padding: "4px 6px" }}>
+            <option value="week">Week</option>
+            <option value="month">Month</option>
+            <option value="term">Term</option>
+            <option value="year">Year</option>
+          </select>
+        </label>
+        <div role="group" aria-label="View">
+          <button type="button" className={`btn sm ${view === "timeline" ? "" : "out"}`} aria-pressed={view === "timeline"} onClick={() => setView("timeline")}>Timeline</button>{" "}
+          <button type="button" className={`btn sm ${view === "list" ? "" : "out"}`} aria-pressed={view === "list"} onClick={() => setView("list")}>List (accessible)</button>
+        </div>
+      </div>
+      {q.isLoading ? (
+        <Loading />
+      ) : q.error ? (
+        <ErrorNote error={q.error} />
+      ) : view === "timeline" ? (
+        <FacilitatorTimeline facilitators={q.data?.facilitators ?? []} items={q.data?.items ?? []} zoomPreset={zoom} />
+      ) : (
+        <FacilitatorScheduleList facilitators={q.data?.facilitators ?? []} items={q.data?.items ?? []} />
+      )}
     </div>
   );
 }
@@ -1835,7 +1892,7 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
 
 // ─── PlanningBottomDrawer ─────────────────────────────────────────────────────
 
-export function PlanningBottomDrawer({ yearId, tab, onTabChange, onClose, facilitators, locations, onItemClick }: Props) {
+export function PlanningBottomDrawer({ yearId, tab, onTabChange, onClose, facilitators, locations, onItemClick, squadronId }: Props) {
   return (
     <div className="pw-bottom-bar" role="complementary" aria-label="Bottom planning drawer">
       <div className="pw-bottom-tabs">
@@ -1858,6 +1915,8 @@ export function PlanningBottomDrawer({ yearId, tab, onTabChange, onClose, facili
         {tab === "facilitators" && (
           <FacilitatorsContent yearId={yearId} facilitators={facilitators} />
         )}
+
+        {tab === "schedule" && <ScheduleContent squadronId={squadronId} />}
 
         {tab === "rooms" && (
           <RoomsContent

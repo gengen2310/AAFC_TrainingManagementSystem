@@ -460,6 +460,7 @@ export function PlanningWorkspace() {
           facilitators={facilitators}
           locations={locations}
           onItemClick={(item) => { setDrawerItem(item); setBottomOpen(false); }}
+          squadronId={session?.squadron_id ?? undefined}
         />
       )}
     </div>
