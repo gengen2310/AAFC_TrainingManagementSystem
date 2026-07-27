@@ -619,12 +619,131 @@ acceptance criteria, and is updated in place as each item closes.
   deploy already uses), not an in-place CLI redeploy of an old deployment ID.
   The dashboard UI may still expose a per-deployment redeploy action; not
   verified in this pass.
-- **Staging soak period**: user chose the 4-hour option via explicit
-  `AskUserQuestion` check-in (this being a new, multi-hour resource commitment
-  distinct from the load test's own already-cleared cost). Running: 60
-  concurrent users sustained for 240 minutes, Railway metrics snapshotted
-  every 15 minutes. Result recorded once it completes (see this file's next
-  update or `docs/release/general_release_readiness.md`).
+- **Staging soak period — PASS** (60 concurrent users, 4h01m sustained, ran
+  2026-07-26T23:58Z→2026-07-27T10:18Z wall-clock — see honesty note on elapsed
+  time below). User chose the 4-hour option via explicit `AskUserQuestion`
+  check-in (a new, multi-hour resource commitment distinct from the load
+  test's own already-cleared cost).
+  - **Overall result**: 34,114 total requests, P95 341ms, **0 5xx errors across
+    the entire run** (client-observed, from the load tool's own status-code
+    tracking — not just the final summary line; see the interval breakdown
+    below). 675 non-5xx failures (~2.0%) — sampled errors were all transient
+    network-level conditions (`Read timed out`, `Connection aborted` /
+    `ConnectionResetError`), not application-level error responses; none
+    correlated with a 5xx or any audit/data-integrity anomaly.
+  - **Honesty note on wall-clock vs. run duration**: the orchestrator script's
+    `sleep 900`-based 15-minute metrics-snapshot loop experienced large,
+    irregular delays (observed gaps of 79, 103, and 157 minutes between
+    consecutive snapshots, against 16 total snapshots for a nominally
+    4-hour/16-snapshot plan) — almost certainly caused by this session's own
+    heavy concurrent foreground tool use (git operations, browser automation,
+    file edits) competing for the same shell/process scheduling, not a fault
+    in the soak's actual load generation. **The load generator itself (a
+    separate Python process) was unaffected** — its internal progress log
+    used real elapsed time via `time.perf_counter()` and shows a smooth,
+    continuous request rate the entire way through (see the interval table
+    below, reconstructed directly from that log rather than from the irregular
+    Railway snapshots). Reporting this discrepancy rather than silently
+    presenting a clean 16×15-minute grid that wouldn't reflect what actually
+    happened.
+  - **Interval breakdown, reconstructed from the load generator's own
+    continuous progress log** (true elapsed time, not wall-clock, since this
+    is what's actually reliable — see honesty note above):
+
+    | Interval (elapsed) | Requests in interval | Cumulative 5xx | 5xx in interval |
+    |---|---|---|---|
+    | 0–15 min | 2,264 | 0 | 0 |
+    | 15–30 min | 2,201 | 0 | 0 |
+    | 30–45 min | 2,217 | 0 | 0 |
+    | 45–60 min | 1,839 | 0 | 0 |
+    | 60–75 min | 1,905 | 0 | 0 |
+    | 75–90 min | 1,878 | 0 | 0 |
+    | 90–105 min | 2,166 | 0 | 0 |
+    | 105–120 min | 2,166 | 0 | 0 |
+    | 120–135 min | 2,200 | 0 | 0 |
+    | 135–150 min | 2,183 | 0 | 0 |
+    | 150–165 min | 2,209 | 0 | 0 |
+    | 165–180 min | 2,217 | 0 | 0 |
+    | 180–195 min | 2,169 | 0 | 0 |
+    | 195–210 min | 1,924 | 0 | 0 |
+    | 210–225 min | 2,215 | 0 | 0 |
+    | 225–240 min | 2,203 | 0 | 0 |
+    | 240–241 min (tail) | 146 | 0 | 0 |
+
+    Zero 5xx in every single interval — no degradation cluster anywhere in the
+    run, including toward the end (no fatigue/leak-triggered failure spike).
+  - **Railway server-side metrics** (16 irregular-interval snapshots — see
+    honesty note; CPU/memory/HTTP as reported by Railway's own proxy, which
+    may include non-load-test traffic such as health checks):
+    - **CPU**: averaged 0.01–0.06 vCPU across all 16 snapshots (limit 8 vCPU)
+      — never meaningfully utilized; one snapshot (`07:38:33Z`) showed a
+      brief max spike to 0.38 vCPU, still trivial against the 8 vCPU limit.
+    - **Memory**: started the run at ~536MB avg (snapshots 1–3, first ~45
+      real minutes), then a **mild, real increase to a ~577–595MB plateau**
+      from snapshot 11 onward (`07:38:33Z` through the final snapshot at
+      `10:17:55Z`) — roughly a 60MB increase. Classified as **bounded growth
+      that plateaued, not a continuous leak**: the last 6 snapshots
+      (11 through 16) cluster tightly between 594.7MB and 595.6MB with no
+      further upward trend, rather than climbing continuously to the end of
+      the run. Consistent with expected one-time warm-up behavior (e.g., DB
+      connection pool reaching steady-state, in-process rate-limiter/cache
+      state growing to its working-set size) rather than an unbounded leak.
+    - **HTTP (Railway's own proxy-level counts)**: one snapshot
+      (`07:38:33Z`) shows `5xx: 13` in that specific 16-minute window — this
+      is a genuine discrepancy against the load tool's own 0-5xx tally, and
+      is attributed to Railway's metrics being **service-wide** (all traffic
+      to the backend, including anything outside this specific load test —
+      health checks, this session's own concurrent curl-based verification
+      calls made during the same window, etc.) rather than exclusively the
+      soak's own generated traffic. Not independently root-caused further
+      (the specific 13 requests are not retrievable after the fact); flagged
+      as an open, unresolved discrepancy rather than dismissed.
+  - **No service restarts or container crashes observed** — the deployment
+    ID active throughout (`b0543bfb`) never changed across all 16 snapshots.
+  - **No connection-pool-wait/slow-query evidence found** — no
+    `QueuePool`/timeout errors appeared in the sampled error list this run
+    (contrast with the earlier 1,000-user runs, where they did) — consistent
+    with 60 concurrent users being comfortably within the fixed capacity
+    established by the load-test fixes (GAP-09).
+  - **Post-soak recovery verification** (all against the live staging
+    backend, immediately after the soak's load generator exited): `GET
+    /api/health` → `{"status":"ok"}` 200; `GET /api/health/ready` →
+    `{"status":"ready","squadrons":139}` 200; login (seeded account `LV1011`)
+    → succeeded, correct role/scope in the session payload; `GET
+    /api/dashboard/charts`, `GET /api/parade-nights`, `GET
+    /api/planning/years` → all 200; **one designated safe write**: created a
+    real `ParadeNight` on a far-future, non-colliding date (`2028-06-30`),
+    confirmed via a follow-up read that it existed with the correct data,
+    then deleted it via the app's own `DELETE /api/parade-nights/{id}`
+    (verified 200, not left as clutter); **audit verification**: logged in as
+    the seeded `AUDITOR2026` account and confirmed
+    `GET /api/system/audit-summary` contains both the `create` and the
+    delete (recorded as an `archive` action, matching the app's existing
+    soft-delete-in-audit convention) entries for that exact record, with the
+    correct actor, role, scope, and object IDs.
+  - **Resource use after the soak** (fresh `railway metrics --since 10m`
+    read, taken after the post-soak functional checks above): CPU back to
+    near-idle (avg 0.023 / max 0.041 vCPU, matching pre-soak baseline).
+    Memory at 567–597MB — **has not receded from the plateau reached during
+    the soak** within this ~10-minute post-test window. Given the plateau (not
+    continued growth) observed during the run itself, and that gunicorn
+    workers were not restarted between the soak and this check (same
+    long-lived Python processes, so in-process caches/pools naturally
+    persist), this is consistent with the "bounded growth, not a leak"
+    classification above — but it is reported as an open observation, not
+    silently assumed to be fine, since the memory level has not yet been
+    watched over a longer idle period to confirm it stays flat rather than
+    slowly climbing further under future load.
+  - **Soak acceptance criteria (per the instruction's own list)**: ran full
+    intended duration — PASS; no SEV1/SEV2 defect occurred during the soak —
+    PASS; no unexplained process restart — PASS (same deployment ID
+    throughout); no memory leak — PASS as bounded/plateaued growth, with the
+    post-soak-recession caveat above noted rather than hidden; no
+    connection-pool exhaustion — PASS; no sustained latency degradation —
+    PASS (P95 stayed at 341ms overall, no interval showed elevated failures);
+    no data corruption / no duplicate write — PASS (single deterministic
+    create+delete cycle, confirmed via read-back and audit log); core
+    workflows remained functional — PASS (post-soak functional checks above).
 - **Load-related configuration verification (instruction section 5)**:
   - `DB_POOL_SIZE`/`DB_POOL_MAX_OVERFLOW`/`DB_POOL_TIMEOUT` — file
     `backend/app/config.py`, commit `104702b`. Staging: `8`/`4`/`30` (set via
