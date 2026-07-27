@@ -1192,3 +1192,10 @@ acceptance criteria, and is updated in place as each item closes.
   explicit user decision on how to proceed, per the same discipline as GAP-16, rather
   than either quietly accepting a FAIL as fully understood or unilaterally spending
   further Railway compute on another multi-hour re-run to chase it further.
+- **User decision (explicit `AskUserQuestion`)**: "Accept as documented and proceed" —
+  GAP-17 is treated as a real, disclosed, partially-inconclusive finding factored
+  honestly into the release decision, not swept aside and not chased further with
+  additional multi-hour/real-cost re-runs. The confidently-explained cluster and the
+  fixed test-tool bug are resolved; the genuinely unexplained cluster and the
+  connection-timeout ambiguity remain open, accepted residual uncertainty — named
+  explicitly as a known limitation of this qualification pass, not claimed resolved.
