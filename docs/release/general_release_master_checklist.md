@@ -1,13 +1,16 @@
 # General Release Master Checklist
 
-Release candidate: `feature/restore-planning-workspace` @ `a8ec56f`
+Release candidate: `feature/restore-planning-workspace` @ `297270c`
 Alembic head: `y8z9a0b1c2d3`
-Date of this pass: 2026-07-26
+Date of this pass: 2026-07-27
 
-This consolidates the local, code-level qualification work completed in this session.
-**Nothing in this document authorizes or claims staging deployment, load testing, or
-production deployment** — those remain pending explicit user confirmation, per the
-standing boundary agreed at the start of this qualification pass (see Section 8).
+This consolidates the **local, code-level** qualification work completed early in this
+session (Sections 1-9 below), as a historical record of that phase. **Superseded for
+staging/load/production status**: the standing boundary Section 8 refers to was later
+explicitly superseded by the user in chat, and staging deployment, load/soak testing,
+a rollback drill, and production backup/restore verification were all subsequently
+performed — see `general_release_readiness.md` for the authoritative, current status
+and final determination. Do not treat this document's Section 8/9 as current.
 
 ---
 
@@ -101,15 +104,19 @@ existing daily-backup/weekly-restore workflow, verified at the application level
 `docs/beta/15_known_limitations.md` and this repo's `.github/workflows/`) — this pass
 did not re-derive or re-verify those from scratch, and this document does not claim it did.
 
-## 8. Explicitly not done — pending user confirmation
+## 8. Superseded — see `general_release_readiness.md`
 
-Per the standing boundary set at the start of this qualification pass: staging
-deployment, staging load/concurrency testing, and production deployment are **not**
-performed by this document or any commit in this pass, regardless of any blanket
-pre-authorization in the originating brief. Each requires a separate, explicit go-ahead
-in chat before being attempted.
+The standing boundary this section originally described (staging deployment, load
+testing, and production deployment all pending separate explicit go-ahead) was
+explicitly superseded by the user later in this same qualification pass. All of those
+were subsequently performed, with full results, root-cause analysis, and explicit
+user acceptance of the real findings surfaced along the way, documented in
+`qualification_gap_register.md` and `general_release_readiness.md`. This section is
+kept as a historical record of this document's original, local-only scope — it is not
+a current statement of what remains undone.
 
-## 9. Working tree state
+## 9. Working tree state (as of this document's original local-gate pass)
 
-Clean. All changes from this pass are committed on `feature/restore-planning-workspace`;
-nothing pushed, nothing merged, no credentials touched, no deployment performed.
+Historical: clean at the time Sections 1-7 were completed. For current working-tree
+and push/PR state, see `general_release_readiness.md`'s header and
+`qualification_gap_register.md`'s Section 1 state-confirmation entries.
