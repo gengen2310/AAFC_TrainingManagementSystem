@@ -130,23 +130,56 @@ entry — corrected, see gap register GAP-08).
   parade nights, reports, planning years, wing calendar, accounts, audit) for
   sqn_admin, wing_admin, national_admin, and auditor — all returned the expected
   status.
-- **Not yet done**: the formal staging screenshot evidence artifact set, and
-  staging failure/recovery testing + the 4-24 hour soak (both depend on the load
-  test below).
+- **Not yet done**: the formal staging screenshot evidence artifact set.
 
-## 12. NOT yet done — explicitly blocking general release
+## 12. Load test, recovery test, and soak (brief sections 22-27) — done / in progress
 
-- **1,000-concurrent-user load test** (brief sections 22-25): not started. This is
-  the financial-commitment check I flagged at the very start of this pass, per the
-  standing stop-conditions — that check has not yet happened.
-- **Staging failure/recovery testing, 4-24 hour soak** (brief sections 26-27): not
-  started — depends on the above.
+- **1,000-concurrent-user load test — PASS (5th run, after fixing 2 backend capacity
+  issues and 2 load-test-tool defects)**. Financial-commitment stop-condition raised
+  and explicitly cleared by the user ("Proceed at full 1,000-user scale") before
+  running. Final result: P95 248ms (target ≤2000ms), 0 5xx errors (target 0), 59,236
+  requests over 701s, CPU avg 0.51/max 2.79 vCPU (limit 8), memory avg 648MB/max
+  657MB (limit 8192MB). Full root-cause chain (DB pool sizing, gunicorn worker count,
+  a login-storm test-tool defect, and a legacy-scan-all-account test-tool defect) is
+  in `qualification_gap_register.md` GAP-09 — none of the four fixes touched a
+  security control; the two backend fixes are environment-variable-gated so
+  production's defaults are unchanged unless explicitly overridden there too. The
+  general per-IP rate limiter's 429 responses under this test's necessarily
+  single-source-IP methodology are a disclosed, accepted methodology ceiling, not a
+  defect, and were not remediated (per the brief's explicit instruction not to
+  weaken rate limiting to make a test pass).
+- **Staging failure/recovery testing — PASS**. `railway restart` against the live
+  backend service: `railway logs` shows a ~6s internal restart window; 5-second-
+  interval external health polling throughout never observed anything but 200 (no
+  externally visible downtime). Post-restart functional check confirmed: health
+  ready, login succeeded, `/api/auth/me` returned correct session/role/scope — full
+  functional recovery, no data loss. Separately attempted to verify the rollback
+  runbook's claim that Railway supports redeploying an arbitrary prior deployment
+  directly: the `railway` CLI only redeploys a service's *latest* deployment (no
+  CLI path to an older deployment ID) — did not attempt to work around this via the
+  raw GraphQL API, since that would have required reading Railway's local
+  credential store directly, which the session's safety classifier correctly
+  declined. `rollback_runbook.md` corrected to document the verified path instead
+  (`railway up` from the prior known-good Git SHA).
+- **Staging soak (4-24h) — user chose the 4-hour option** given this is a new,
+  multi-hour resource commitment distinct from the load test's own already-cleared
+  cost (explicit `AskUserQuestion` check-in, consistent with how the load test's
+  financial-commitment stop-condition was handled). Running as of this entry: 60
+  concurrent virtual users sustained for 240 minutes against staging, with Railway
+  CPU/memory/HTTP metrics snapshotted every 15 minutes to check for slow leaks or
+  degradation over hours rather than minutes (not just a start/end pass-fail).
+  Result to be recorded here once it completes.
+
+## 13. NOT yet done — explicitly blocking general release
+
+- **Staging soak completion**: in progress (see Section 12) — the release decision
+  below waits on its result.
 - **PR #3 merge to `main`**: not done. Per the brief's own sequencing, this only
-  happens after staging qualification passes — it has not yet been attempted.
+  happens after staging qualification (including the soak) passes.
 - **Production deployment, smoke tests, post-release monitoring** (brief sections
   31-34): not started, and must not start before every item above is complete.
 
-## 13. Defect log
+## 14. Defect log
 
 No SEV1/SEV2 defects are currently open against this release candidate. GAP-13 (SEV2,
 TRGO-05's UI unreachable in the deployed config) was found and fixed this pass. Two
@@ -157,11 +190,11 @@ than more code.
 
 ## Final determination
 
-**NOT READY FOR GENERAL RELEASE**
+**NOT YET READY FOR GENERAL RELEASE — pending soak completion only**
 
-Reason: Section 12's items — the 1,000-user load test (pending its own financial-
-commitment check), staging soak, PR merge, and production deployment — have not been
-performed. Every local, code-level qualification gate and the staging deployment/
-verification gate have both passed, with one real defect (GAP-13) found and fixed
-along the way — exactly what staging verification is for. The remaining work is the
-load test and everything sequenced after it, not a defect blocking it.
+Reason: every gate through the 1,000-user load test and staging failure/recovery
+testing has now passed, with real defects found and fixed along the way (GAP-13 in
+staging deployment; the DB pool, worker-count, and two load-test-tool defects in the
+load test) — exactly what this qualification process is for. The one remaining item
+before the release decision (Section 13) is the staging soak's own result, followed
+by the PR merge and production deployment sequencing already documented above.
