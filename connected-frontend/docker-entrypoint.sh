@@ -43,4 +43,18 @@ cat > /usr/share/nginx/html/version.json <<EOF
 {"commit":"${BUILD_SHA}","source":"connected-frontend","built":"${BUILD_TIME}"}
 EOF
 
+# Production deployment guard: refuse to start if this environment is production
+# but the resolved config still points at a staging/local target. Cheaper than
+# discovering it live in a user's browser -- see qualification_gap_register.md
+# GAP-20 for the incident this guard exists to prevent from recurring silently.
+if [ "${RAILWAY_ENVIRONMENT_NAME:-}" = "production" ]; then
+  for forbidden in "backend-staging" "frontend-staging" "planning-workspace-preview-staging" "localhost"; do
+    if grep -q "$forbidden" /usr/share/nginx/html/index.html; then
+      echo "[entrypoint] FATAL: production build contains forbidden reference '${forbidden}' in index.html — refusing to start." >&2
+      grep -n "aafc-api-base\|aafc-pw-base" /usr/share/nginx/html/index.html >&2
+      exit 1
+    fi
+  done
+fi
+
 exec nginx -g "daemon off;"
