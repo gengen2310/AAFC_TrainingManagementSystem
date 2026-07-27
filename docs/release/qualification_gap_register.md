@@ -938,3 +938,79 @@ acceptance criteria, and is updated in place as each item closes.
     a per-file structured metadata table (as the instruction technically requests)
     was not produced separately — the spec source is the authoritative record of
     what each capture demonstrates.
+
+- **Staging rollback drill (instruction section 8) — PASS**. A restart is not a
+  rollback test, so this was performed as a genuinely separate exercise from the
+  earlier restart/recovery test.
+  - **Pre-drill checks**: confirmed via `git log 104702b..HEAD --
+    backend/alembic/versions` that **no new Alembic migration** exists between the
+    prior known-good commit (`104702b`) and the current release candidate — this
+    drill needed no destructive DB downgrade at all, only an application-code
+    rollback. Recorded the pre-drill active deployment ID (`b0543bfb`) before
+    touching anything.
+  - **First attempt hit a real tooling mistake, caught and corrected**: ran
+    `railway up` from an isolated git worktree (checked out at `104702b`, no
+    Railway project link) without an explicit `--project` flag — this silently
+    created a **brand-new, unrelated Railway project** (`dc2f5bb0...`) instead of
+    targeting the existing staging service, rather than erroring. Confirmed the
+    real staging backend was completely untouched (still on `b0543bfb`, still
+    healthy) before doing anything else. Asked the user for explicit permission
+    before deleting the accidental project (a destructive action) — user approved;
+    deleted via `railway delete --project dc2f5bb0... --yes`. Retried with
+    `--project`/`--service`/`--environment` all passed explicitly, which correctly
+    targeted the real staging service.
+  - **Rollback deploy**: `104702b` deployed to the staging backend service
+    (deployment `72f45ebf`, image digest `sha256:8b81c25d...` — confirmed
+    genuinely different from the release candidate's digest, not a no-op).
+    Verified: health `{"status":"ok"}` 200; readiness
+    `{"status":"ready","squadrons":139}` 200; login (seeded `LV1011`) succeeded;
+    smoke tests against 5 endpoints (`/api/auth/me`, `/api/dashboard/charts`,
+    `/api/parade-nights`, `/api/planning/years`, `/api/facilitators`) all 200.
+  - **Redeploy of the release candidate**: current HEAD (at drill time, `356287b`)
+    deployed back (deployment `de9b35d1`, a third distinct image digest). Verified:
+    health/readiness 200; smoke tests all 200 again; squadron count unchanged at
+    139 (**no data loss** across the rollback→forward cycle). Migration revision
+    was not independently re-queried via `/api/system/migrations` (that endpoint
+    is `system_admin`-only and no valid staging `system_admin` credential is
+    available to this session, the same constraint noted throughout this
+    register) — inferred instead from the entrypoint's own behavior: both deploys'
+    `docker-entrypoint-staging.sh` runs `alembic upgrade head` before starting
+    gunicorn, and the app came up serving correct 200s both times, which would not
+    happen if that step had failed.
+  - **Frontend also redeployed as part of this drill**: the Planning Workspace
+    frontend (`aafc-tms-planning-workspace-preview`) had real source changes since
+    its last staging deployment (GAP-14's fix, `f260b9c`) that hadn't been pushed
+    to staging yet — redeployed it as part of "deploy prior compatible frontend
+    versions where needed" (deployment `a4457081`, SUCCESS). **Live-verified in a
+    real browser against the actual deployed staging domain** (not local dev):
+    logged into Main TMS staging, navigated to the live
+    `aafc-tms-planning-workspace-preview-staging` URL, opened the bottom drawer,
+    clicked the new "Schedule" tab — confirmed present and rendering (empty grid
+    for this particular test squadron, which has no facilitators/sessions yet —
+    expected data state, not a defect). This is GAP-14's fix now confirmed live on
+    staging, not just locally.
+  - **Timings** (all UTC): decision to rollback `11:11:22`; rollback deploy
+    queued `11:20:12`Z (build/upload time before that point, not itself
+    "downtime"); service recovery (first successful health check on the
+    rolled-back build) `11:20:12`Z — effectively immediate once the deployment
+    reached `SUCCESS`; redeploy of the release candidate queued `11:21:21`Z; full
+    application recovery (health + smoke tests passing again on the release
+    candidate) `11:22:10`Z. Total rollback-and-forward-fix cycle: **under 11
+    minutes** end-to-end, dominated by two sequential container builds, not by
+    any manual recovery effort.
+  - **Real, self-inflicted side effect found and disclosed, not hidden**: the
+    500-user/2-hour sustained-concurrency soak (see the soak-concurrency gap
+    entry below) was already running when this drill's two deploys executed.
+    Both deploys' container swaps landed exactly inside that concurrent soak's
+    request stream — the soak's own 5xx counter jumped from 0 to 43 in a narrow
+    window (elapsed 776s–896s into the soak, i.e. 11:19:47Z–11:21:47Z), which
+    lines up almost exactly with this drill's two deploy timestamps
+    (11:20:12Z, 11:21:21Z–11:22:10Z), and **the count did not increase again for
+    the remainder of the soak** after the second deploy completed. This is
+    interpreted as the rollback drill's own container swaps causing brief
+    connection drops for in-flight requests from the concurrently-running soak —
+    a real methodology mistake (running a rollback drill and a sustained
+    concurrency soak against the same service at the same time), not a capacity
+    defect independently discovered by the soak. **Should have been sequenced
+    serially**; noted here so the 500-user soak's own results section doesn't
+    misattribute this to a genuine capacity problem.
