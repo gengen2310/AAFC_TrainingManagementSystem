@@ -1317,3 +1317,64 @@ acceptance criteria, and is updated in place as each item closes.
   predate and are independent of this session's actions), but is recorded here as a
   real, open, SEV1 finding requiring a follow-up fix before production holds real
   data it cannot afford to lose.
+
+## GAP-19: DEFECT-003 (production ENVIRONMENT=staging) fixed live during production smoke testing; a real cross-environment variable mistake found and corrected in the same pass
+
+- **DEFECT-003 fix applied**. Smoke testing (instruction section 14) found production's
+  own frontend getting `400 Disallowed CORS origin` calling its own backend. Root
+  cause was already documented by an earlier session as `DEFECT-003`
+  (`docs/beta/11_defect_register.md`): production's `ENVIRONMENT` variable read
+  `"staging"`, and — newly confirmed this pass — `CORS_ALLOWED_ORIGINS` was literally
+  set to staging's frontend URLs. `DEFECT-003`'s own fix was prepared but explicitly
+  left unapplied pending approval. Verified safe to apply before touching anything
+  (checked `SECRET_KEY`/`JWT_SECRET` length and dev-prefix, `COOKIE_SECURE`,
+  `DATABASE_URL`-not-sqlite — all without printing secret values — confirmed
+  `validate_for_production()` would pass cleanly). **User explicitly approved** both
+  variable changes. Applied: `ENVIRONMENT=production`,
+  `CORS_ALLOWED_ORIGINS=https://aafc-tms-frontend-production.up.railway.app,https://aafc-tms-planning-workspace-preview-production.up.railway.app`.
+  Verified post-fix: CORS now correctly allows production's own frontend (200,
+  correct `access-control-allow-origin`) and still correctly rejects an untrusted
+  origin (400); HSTS header now present (confirms `is_prod` is now `True`); `/docs`
+  still correctly hidden.
+- **Separately found and fixed: production had staging-only capacity overrides set
+  on it.** While verifying the above fix took effect, discovered `GUNICORN_WORKERS=6`,
+  `DB_POOL_SIZE=8`, `DB_POOL_MAX_OVERFLOW=4` — the load-test capacity overrides this
+  session set on **staging only** (GAP-09) — were also present on **production**.
+  Confirmed this was not a Railway "shared variable" (deleting them on production did
+  not remove them from staging, checked directly), meaning production had genuinely,
+  independently had these values set at some point this session without being
+  caught until this explicit post-deploy verification — the exact reason the "print
+  and verify the production environment guard before every production action"
+  discipline exists. Deleted all three from production, restoring the committed code
+  defaults (`GUNICORN_WORKERS` defaults to 2 via the entrypoint script;
+  `DB_POOL_SIZE`/`DB_POOL_MAX_OVERFLOW` default to 5/2 via `app/config.py`) — these
+  are the exact values the original GAP-09 connection-math analysis verified safe
+  for Supabase's 15-connection cap.
+- **A real operational lesson, also documented for future reference**: `railway
+  restart` does **not** re-resolve environment variables into the running
+  container — after deleting the three variables, a `restart` left the deployment
+  still booting with 6 workers (confirmed via a fresh log line reading
+  `Starting gunicorn (6 workers)...` after the restart completed). Only
+  `railway redeploy` (a genuine new deployment) actually picked up the corrected
+  variables (confirmed via the next boot's log line reading
+  `Starting gunicorn (2 workers)...`, plus a fresh `alembic upgrade head` run and
+  the staging-bootstrap-check log line, consistent with a real new deployment, not
+  a mere process restart).
+- **Reassessed connection-math risk in light of GAP-18**: GAP-09's original
+  production connection-math analysis (2 workers × 7 = 14 connections, safe under
+  Supabase's 15-connection cap) assumed production connects via Supabase — which
+  GAP-18 established is **not** actually true (production runs on Railway-native
+  Postgres at runtime). The 2-worker/5-pool/2-overflow defaults remain safe
+  regardless (a smaller number of connections is safe against any reasonable
+  `max_connections` value), so reverting to them here was the correct, conservative
+  choice independent of which specific constraint actually applies — but the
+  original "safe because of Supabase's 15-connection cap" reasoning should be
+  revisited once GAP-18 is resolved and production's actual database target is
+  confirmed.
+- **Severity**: DEFECT-003 was a real, live, application-breaking misconfiguration
+  (SEV1/SEV2 by the original defect register's own classification) — now fixed and
+  verified. The cross-environment variable mistake was a real process failure this
+  session (not previously disclosed because it was not previously discovered) —
+  caught and corrected only because of the "verify every production action, don't
+  assume" discipline; flagged honestly as a mistake made and then caught, not
+  omitted from the record.
