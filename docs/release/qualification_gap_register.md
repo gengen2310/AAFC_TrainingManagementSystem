@@ -544,11 +544,92 @@ acceptance criteria, and is updated in place as each item closes.
   deploy already uses), not an in-place CLI redeploy of an old deployment ID.
   The dashboard UI may still expose a per-deployment redeploy action; not
   verified in this pass.
-- **Staging soak period — not yet started**: this is a genuinely new,
-  multi-hour resource commitment (sustained Railway compute against staging
-  for the 4-24 hour window the brief specifies) distinct from the load test's
-  already-cleared financial-commitment check, and its exact duration (4h vs.
-  24h) is a real product-owner tradeoff, not something to default silently.
-  Flagging this to the user before committing to a specific duration and
-  approach, per the same discipline applied to the load test's own
-  stop-condition.
+- **Staging soak period**: user chose the 4-hour option via explicit
+  `AskUserQuestion` check-in (this being a new, multi-hour resource commitment
+  distinct from the load test's own already-cleared cost). Running: 60
+  concurrent users sustained for 240 minutes, Railway metrics snapshotted
+  every 15 minutes. Result recorded once it completes (see this file's next
+  update or `docs/release/general_release_readiness.md`).
+- **Load-related configuration verification (instruction section 5)**:
+  - `DB_POOL_SIZE`/`DB_POOL_MAX_OVERFLOW`/`DB_POOL_TIMEOUT` — file
+    `backend/app/config.py`, commit `104702b`. Staging: `8`/`4`/`30` (set via
+    `railway variable set --skip-deploys` on the staging backend service
+    only). Production: unchanged defaults `5`/`2`/`30` — confirmed by reading
+    the committed code default rather than reading production's live
+    variables (a live pull of production's full variable set was correctly
+    blocked by the safety classifier as unnecessary secret exposure for what
+    is really just a 2-number check; production's actual value is provably
+    the code default since no `railway variable set` was ever run against the
+    production environment/service this session — verified via
+    `git log --oneline -- backend/app/config.py backend/docker-entrypoint-staging.sh`
+    showing only this session's staging-only commits touched these files, and
+    this session's own Railway command history only ever targeted the
+    staging environment ID for variable writes). No security impact (not an
+    auth/authz control). Memory/connection impact: each pooled connection
+    holds a small fixed amount of Postgres backend memory; going from 7 to 12
+    per-worker sessions is a minor, bounded increase, not a leak vector.
+  - `GUNICORN_WORKERS` — file `backend/docker-entrypoint-staging.sh`, commit
+    `764cafa`. Staging: `6`. Production: unchanged default `2` (same
+    verification method as above). No security impact. Memory impact: each
+    additional gunicorn worker is a full separate Python process (~150-250MB
+    RSS observed for this app), so staging's memory footprint is
+    proportionally higher than production's per-replica cost — acceptable for
+    a preview/staging environment, would need explicit reassessment before
+    ever being copied to production.
+  - Load-test-tool login-once and `/lookup`-before-`/login` fixes — file
+    `tools/stress/load_test_staging.py` (gitignored, local-only, never
+    committed). No production impact whatsoever: this file is never deployed
+    or shipped; it only changed how the *test harness* behaves.
+  - **Maximum connection math**:
+    - Production: `2 workers × (5 + 2) = 14` total, under Supabase Session
+      Pooler's 15-connection hard cap — unchanged from before this session,
+      and now covered by a regression test
+      (`backend/tests/test_db_pool_config.py::test_production_defaults_stay_under_supabase_session_pooler_cap`,
+      commit `2dd82f0`) that fails if a future default change silently
+      violates this constraint.
+    - Staging: `6 workers × (8 + 4) = 72` total against a Postgres with
+      `max_connections=100` (established earlier this pass) and ~19
+      connections in baseline use by other services/monitoring — comfortably
+      under 100 at steady state (72 + 19 = 91).
+    - **Real finding, not yet fully resolved**: if Railway's single-instance
+      deploy swap briefly runs the outgoing and incoming container
+      simultaneously (true blue-green, both accepting traffic and both able
+      to open their own full connection pool) rather than a strict
+      stop-then-start, the worst-case connection demand during that overlap
+      window could be double the steady-state figure. For staging that would
+      be `72 × 2 + 19 = 163`, exceeding the 100-connection cap; for
+      production, `14 × 2 = 28`, exceeding the Supabase 15-connection cap —
+      a risk that would predate this session's changes entirely, since
+      production's worker/pool values were never touched. This session's own
+      restart test (GAP-09, restart/recovery entry) showed zero externally
+      observed downtime, consistent with either a true zero-downtime overlap
+      *or* a fast enough sequential swap (~6s) that no request was ever
+      caught mid-transition at the traffic level that test exercised (no
+      concurrent 1000-user load was running during that specific restart) —
+      the two explanations aren't distinguishable from the evidence gathered
+      so far. **Not resolved in this pass**: confirming Railway's exact
+      single-service deploy overlap behaviour (via their docs/support, or by
+      deploying under heavy concurrent load and watching for pool exhaustion
+      during the swap) before treating either environment's worst-case number
+      as fully safe. Recorded here rather than silently assumed safe.
+  - **Regression tests added/confirmed** (commit `2dd82f0` for the new ones;
+    `tests/test_rate_limiting.py` already had the rest before this pass):
+    OPTIONS preflight excluded from the rate-limit budget
+    (`test_rate_limit_does_not_count_options_preflight`,
+    `test_rate_limit_options_does_not_advance_the_counter` — pre-existing,
+    DEFECT-004); different IPs rate-limited independently
+    (`test_rate_limit_different_ips_are_independent` — pre-existing; this is
+    the closest existing analogue to "legitimate users not sharing an
+    incorrect bucket" — the limiter is deliberately per-IP by design, so
+    multiple genuine users sharing one IP sharing one bucket is expected
+    behaviour, not a bug, per the load test's own documented single-source-IP
+    caveat); DB pool sizing correctness and the production-safety ceiling
+    (new, `test_db_pool_config.py`, 3 tests). **Not added**: dedicated
+    unit/integration tests for worker startup and graceful shutdown — these
+    aren't practically unit-testable against the SQLite-based suite (pooling
+    is Postgres-only and workers are a process-management concern outside
+    the app layer); instead, real evidence already exists from this
+    session's actual staging restart (clean "Booting worker" × 6 and
+    "Shutting down" sequences in `railway logs`, captured during the
+    restart/recovery test above) rather than a synthetic re-test of the same
+    behaviour.
