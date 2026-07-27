@@ -195,10 +195,28 @@ acceptance criteria, and is updated in place as each item closes.
   `FacilitatorScheduleList` components against the existing, already-working backend
   endpoint — the same fix shape GAP-13 used (move already-correct UI into the
   reachable surface, no backend change needed).
-- **Status**: **open, not fixed this pass**. Documented and evidenced rather than
-  silently deferred; requires an explicit release/no-release decision from the user
-  before "READY FOR GENERAL RELEASE" can be declared, per the instruction's own
-  release-gate rules.
+- **Status**: **fixed this pass**. User was asked explicitly ("fix now" vs. "accept as
+  a documented, deferred limitation") and chose to fix it rather than accept the open
+  SEV2, consistent with the instruction's "must not self-accept an open SEV3" rule
+  applied here to a SEV2 too. Added a "Schedule" tab to `PlanningBottomDrawer` (commit
+  `f260b9c`) rendering the existing `FacilitatorTimeline`/`FacilitatorScheduleList`
+  components against the existing `GET /api/dashboard/facilitator-schedule` endpoint,
+  scoped via the caller's own `squadronId` — no backend change needed, same fix shape
+  as GAP-13. Verified: `tsc --noEmit` clean, `npm run build` and `npm run build:single`
+  both succeed, `eslint` shows zero new warnings (only 2 pre-existing, unrelated
+  ones), backend suite unaffected (857 passed, 4 skipped — this is a frontend-only
+  change). **Live-verified in a real browser** (local dev server against local
+  backend, not just a code read): logged in as `ADMIN703`, opened the Planning
+  Workspace bottom drawer, clicked the new "Schedule" tab — both the Timeline view
+  and the accessible List (accessible) fallback rendered real facilitator/session
+  data correctly, zero console errors (only two pre-existing React Router future-flag
+  warnings, unrelated to this change). **Not yet re-verified against the deployed
+  staging SHA** — this fix has not yet been deployed to staging as of this entry;
+  that redeploy + a fresh staging screenshot happens as part of finalizing the
+  release documents, before the final release decision. The two smaller compounding
+  findings (Training Phase Catalogue has no frontend UI at all; the high-contrast
+  theme has no discoverable toggle) remain open, accepted as SEV4 residual items —
+  not release-blocking, not silently dropped either.
 
 ## GAP-05: TRGO-08 — Date/module filtering
 
