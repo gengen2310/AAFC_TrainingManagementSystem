@@ -1254,3 +1254,66 @@ acceptance criteria, and is updated in place as each item closes.
   fixed test-tool bug are resolved; the genuinely unexplained cluster and the
   connection-timeout ambiguity remain open, accepted residual uncertainty — named
   explicitly as a known limitation of this qualification pass, not claimed resolved.
+
+## GAP-18: Production backup/restore workflows target a different database than production's actual runtime database (new finding, SEV1)
+
+- **Source**: found during production deployment (instruction section 13). After
+  deploying the release-candidate backend to production, `GET /api/health/ready`
+  returned `{"status":"ready","squadrons":0}` and `GET /api/auth/organisations`
+  returned `{"wings":[]}` — sharply contradicting GAP-16's backup/restore
+  verification earlier the same day, which showed real data (16 squadrons, 39
+  users, 8 wings, 496 audit logs) via two successful backups (11:51Z and 14:03Z,
+  both from `SUPABASE_DB_URL`).
+- **Investigated live, with the user, before taking any further production action**
+  (deployment of the two frontends was deliberately paused pending this): confirmed
+  none of the 4 migrations that had just run (v39-v42) touch the `squadrons`/`wings`
+  tables (read each migration file directly). Asked the user directly rather than
+  attempt to read any secret value to resolve the ambiguity — confirmed **production's
+  backend actually runs against Railway's own native Postgres service** (visible in
+  the project as `Postgres`, service ID `96f1e5b4-5bf4-4803-9481-bb812ecdc905`), **not**
+  the external Supabase-hosted Postgres that `SUPABASE_DB_URL` (used by both backup
+  workflows) targets. Also confirmed with the user that this Railway Postgres service
+  is an existing, long-running service — today's deployment timestamp on it
+  (`2026-07-27T12:11:46Z`) is a redeploy/restart, not fresh provisioning, so the
+  `squadrons: 0` state is genuine, pre-existing, and **not** something this session's
+  deployment caused.
+- **Finding**: the daily production backup workflow (`backup-postgresql.yml`) and
+  weekly restore-test (`test-restore-postgresql.yml`) — including GAP-16's own
+  "successful" runs earlier today — have been backing up and restore-verifying a
+  **different physical database** than the one `aafc-tms-backend`'s production
+  deployment actually reads and writes at runtime. This is a materially more serious
+  finding than GAP-16's original framing: fixing the `pg_dump` version mismatch
+  (GAP-16) restored the ability to successfully back up *something*, but that
+  something has apparently never been the live production data. **Production's real,
+  live database currently has no automated backup coverage from either workflow in
+  this repository.**
+- **Not yet determined this pass** (deliberately not guessed at): whether
+  `SUPABASE_DB_URL` points to a genuinely stale/decommissioned Supabase project left
+  over from an earlier architecture (per `CLAUDE.md`'s own note that the stack was
+  originally designed for "PostgreSQL (Supabase-hosted) in deployed environments"
+  before apparently moving to Railway-native Postgres for at least this environment),
+  or whether it's a different, still-relevant database for some other purpose. Also
+  not determined: whether Railway's own native Postgres service has any other backup
+  mechanism outside this repository's GitHub Actions workflows (e.g. a
+  platform-level snapshot feature) — this session did not find evidence of one in
+  the service's deployment manifest, but did not exhaustively check Railway's
+  dashboard-level backup features either.
+- **Severity: SEV1** — the same class of severity as GAP-16 (a real gap in disaster-
+  recovery coverage for production), and arguably more serious in one respect (GAP-16
+  was "backups have been failing for 13 days but the mechanism itself works once
+  fixed"; GAP-18 is "the mechanism has possibly never covered the actual live
+  database at all"). Less urgent in another respect: production's live database
+  currently holds no organisational data (`squadrons: 0`), so there is nothing of
+  operational consequence to lose *right now* — but this must be resolved before
+  production is populated with real squadron/user data, not after.
+- **Not fixed this pass** — this requires either updating `SUPABASE_DB_URL` (or
+  adding a new secret) to point at the Railway-native Postgres service's own
+  connection string, or confirming Railway provides an equivalent backup mechanism
+  natively and standardising on that instead. Either path is a deliberate
+  infrastructure/credentials decision for the user, not something to change
+  unilaterally mid-deployment.
+- **Disposition**: does not block continuing this deployment (the backend deployment
+  itself is healthy; the empty-database state and the backup-target mismatch both
+  predate and are independent of this session's actions), but is recorded here as a
+  real, open, SEV1 finding requiring a follow-up fix before production holds real
+  data it cannot afford to lose.
