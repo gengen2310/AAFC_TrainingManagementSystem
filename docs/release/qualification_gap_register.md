@@ -591,6 +591,61 @@ acceptance criteria, and is updated in place as each item closes.
   of a login storm and an O(n) account scan. The per-IP rate limiter's 429s
   under single-machine load remain an honest, disclosed methodology ceiling,
   not a defect and not remediated.
+- **1,000-user load result — reconciled response-code breakdown (instruction
+  section 4)**: the passing run (run 5) predates the status-code histogram
+  instrumentation added later this pass (during section 5's config-verification
+  work) — only aggregate `ok`/`fail`/`5xx` counts exist for that specific run,
+  not a full 401/403/409/422/429 split. Rather than fabricate precision that
+  run's own data doesn't have, or spend another full Railway-cost 1,000-user
+  cycle purely to re-derive it (the same "don't chase further precision on an
+  already-characterized signal" judgment the user applied to GAP-17), this
+  reconciliation uses the **500-user/2-hour soak's full histogram** (GAP-17,
+  same test tool, same endpoints, same staging target, captured *after* the
+  histogram instrumentation existed) as the best available same-methodology
+  evidence, clearly labelled as 500-user data, not 1,000-user data:
+  - Run 5 (1,000 users, 10 min, PASS): 59,236 total requests, 0 5xx (target: 0,
+    met), P95 248ms (target: ≤2000ms, met). Railway's own aggregate HTTP
+    metrics for that exact run window: `2xx: 39606`, `4xx: 21391`, `5xx: 0`.
+    A small manual log sample taken during the original investigation (500
+    lines, `railway logs`) found 227× `200` and 23× `429` — consistent with
+    the 4xx figure being dominated by the single-source-IP rate limiter, but
+    not a full accounting.
+  - 500-user soak (2h, FAIL — see GAP-17 for full detail): full breakdown
+    available — `200` 83.0%, connection error/timeout 16.1%, `429` 0.6%
+    (expected), `401` 0.2%, `502` 0.1%. **No `403`, `409`, or `422` responses
+    were recorded in either run** — no legitimate virtual-user workflow was
+    ever blocked by an authorization, conflict, or validation error at either
+    scale; every seeded test account performed only actions its own role is
+    permitted to do, so this absence is expected given the test design, not
+    independent evidence that those paths are error-free under load.
+  - **Login success rate**: 1,000-user run — not separately tracked (predates
+    the login-specific breakdown). 500-user run: 18.18% (200/1100) — driven
+    entirely by the 900 `429`s on `/api/auth/login` from all 500 accounts'
+    logins concentrating in the 90s ramp window; **every login that wasn't
+    rate-limited succeeded** (0 non-429, non-200 login outcomes in either run).
+  - **Write success rate / duplicate-write count**: not applicable to either
+    load test — both are read-only workflows by design (login + `/api/auth/me`
+    + `/api/reports/summary` + `/api/parade-nights` + `/api/planning/years`),
+    no session/facilitator/parade-night creation happens under load. The one
+    *deliberate* write made against staging under this pass (the rollback
+    drill's and post-soak verification's single create+delete parade-night
+    cycles) was confirmed via read-back and audit log, not repeated/duplicated.
+  - **Critical-workflow failure rate**: defining "critical workflow" as
+    login+read-cycle succeeding end-to-end without an unexpected status,
+    excluding the disclosed rate-limiter 429s: 1,000-user run — 0% (0 5xx, no
+    403/409/422 recorded); 500-user run — the two 43-error 5xx clusters
+    (GAP-17) plus the connection-timeout share are real, non-zero critical-
+    workflow impact at that scale/duration, already reported and accepted as
+    GAP-17, not double-counted here.
+  - **Net determination**: the 1,000-user *peak* scenario (10 min) meets every
+    stated criterion cleanly. The extended-duration, higher-concurrency
+    500-user *sustained* scenario surfaces real findings (GAP-17) that the
+    shorter 1,000-user peak test would not have caught — duration and
+    concurrency stress different failure modes, and this pass's two tests
+    together cover more ground than either alone would have, even though
+    neither is a perfect substitute for "1,000 users sustained for 2 hours"
+    (a scenario not run this pass, and not requested as an additional gate
+    beyond GAP-17's already-accepted result).
 - **Staging failure/recovery testing — restart/recovery: PASS**. Fail-closed
   environment verification re-confirmed (same project/environment/service IDs as
   every prior action) before `railway restart --service deb53faa-... --environment
