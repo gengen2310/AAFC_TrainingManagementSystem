@@ -633,3 +633,52 @@ acceptance criteria, and is updated in place as each item closes.
     "Shutting down" sequences in `railway logs`, captured during the
     restart/recovery test above) rather than a synthetic re-test of the same
     behaviour.
+
+- **Eight-role security/API matrix verification (instruction section 7)**:
+  - **Existing local test-suite coverage** (same code as the currently
+    deployed staging SHA, since no app-code changes have landed since
+    `764cafa`): 183 explicit `assert ... == 401`/`== 403` checks across 20+
+    test files; a dedicated IDOR test file (`test_planning_idor.py`, 10
+    assertions); 22 optimistic-lock/stale-version (`409`) assertions; 6
+    proxy/delegated-intervention tests including
+    `test_core.py::test_proxy_requires_reason`; 12 cross-wing/cross-squadron
+    tests; 8 tests verifying audit-log entries on privileged actions; 4
+    archived-record-access tests. Per `.claude/rules/testing.md`'s own
+    established convention ("every endpoint needs happy-path/403/401; for
+    system_admin endpoints also test national_admin/sqn_admin/auditor are
+    denied"), this is systematic, not incidental, coverage.
+  - **Found and closed one real gap**: no test exercised a JWT whose `exp`
+    claim had actually passed (only *version-based* revocation — code reset —
+    was tested, in `test_session_revocation.py`). Added
+    `test_time_expired_token_rejected` (same file, commit below): creates a
+    token with `ttl_min=-1` via the app's own `create_token()`, confirms 401.
+    Full suite: 857 passed, 4 skipped (was 856).
+  - **Live confirmatory sweep against the actual deployed staging SHA**
+    (curl, using seeded volume accounts): unauthenticated request → 401;
+    garbage/malformed bearer token → 401; `wing_viewer` attempting a write
+    (`POST /api/parade-nights`) → 403 `forbidden`; `auditor` attempting the
+    same write → 403 `forbidden`; guessed random UUID on a detail endpoint
+    (`GET /api/parade-nights/{random-uuid}`) → 404 `not_found`, no data
+    leak. **Modified-request-body cross-scope attempt**: logged in as one
+    seeded `sqn_admin` (squadron `04a0b35a...`) and POSTed
+    `/api/parade-nights` with a *different* real squadron's ID
+    (`eb0b9c8a...`, another seeded account's squadron) placed directly in the
+    request body — verified via a follow-up GET that the created record
+    belonged to the **caller's own** squadron (`04a0b35a...`), not the one
+    supplied in the body. Confirms `create_parade()` (`training.py:269`)
+    correctly derives the write target from `_active_squadron(p)` (the
+    authenticated principal's own session/proxy state) and silently ignores
+    a client-supplied `squadron_id` for scope-determination purposes — this
+    is the correct, secure pattern (a request body value can never be used
+    to widen write scope), not a vulnerability. Test parade-night record
+    deleted via the app's own `DELETE /api/parade-nights/{id}` immediately
+    after (not left as clutter).
+  - **Not independently re-verified live**: literal expired-session-over-HTTP
+    (relies on the local test above, since it's the same JWT-validation code
+    path — decode logic doesn't differ between environments) and stale
+    optimistic-lock version over HTTP (relies on the existing 22 local
+    tests). The **browser** half of this section's requirement (role-based UI
+    behaviour, not just API status codes) is covered by task #41's Playwright
+    screenshot pass, not repeated here.
+  - Commit: `test_time_expired_token_rejected` added to
+    `backend/tests/test_session_revocation.py`.

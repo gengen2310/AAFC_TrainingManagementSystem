@@ -4,6 +4,7 @@ When a user's access code is reset (via either change_code or accounts reset-cod
 any previously issued tokens must be rejected with 401 session_revoked.
 """
 from tests.conftest import login
+from app.security import create_token
 
 
 def _get_sqn_admin_id(client) -> str:
@@ -98,6 +99,20 @@ def test_new_token_valid_after_code_reset(client):
     client.post(f"/api/accounts/{gen_uid}/reset-code",
                 json={"new_code": "703SQN2026"},
                 headers=admin_hdr)
+
+
+def test_time_expired_token_rejected(client):
+    """A token whose exp claim has already passed must be rejected with 401,
+    independent of token_version revocation (covers section 7's 'expired
+    sessions' RBAC-matrix requirement, previously only covered for
+    version-based revocation, not literal time expiry)."""
+    hdr = login(client, "ADMIN703")
+    me = client.get("/api/auth/me", headers=hdr)
+    uid = me.json()["session"]["user_id"]
+
+    expired_token = create_token(uid, {"role": "sqn_admin"}, ttl_min=-1)
+    r = client.get("/api/auth/me", headers={"Authorization": f"Bearer {expired_token}"})
+    assert r.status_code == 401
 
 
 def test_unrelated_user_token_not_revoked(client):
