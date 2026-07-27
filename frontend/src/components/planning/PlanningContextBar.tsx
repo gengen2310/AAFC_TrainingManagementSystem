@@ -18,6 +18,7 @@ interface Props {
   onDisplayModeChange: (m: DisplayMode) => void;
   onCustomStartChange: (v: string) => void;
   onCustomEndChange: (v: string) => void;
+  onToggleLeftPanel?: () => void;
 }
 
 const RANGES: { key: ViewRange; label: string }[] = [
@@ -30,9 +31,10 @@ const RANGES: { key: ViewRange; label: string }[] = [
 ];
 
 export function PlanningContextBar({
-  session, year, cc,
+  session, year,
   viewRange, displayMode, customStart, customEnd,
   onRangeChange, onDisplayModeChange, onCustomStartChange, onCustomEndChange,
+  onToggleLeftPanel,
 }: Props) {
   const scopeLabel = session?.is_national
     ? "NATHQ"
@@ -43,46 +45,23 @@ export function PlanningContextBar({
     ? session.role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : "—";
 
-  const conflicts   = cc?.active_conflicts?.length  ?? 0;
-  const unscheduled = cc?.unscheduled_required?.length ?? 0;
-  const unreviewed  = cc?.unreviewed_wing?.length   ?? 0;
-  const prepGaps    = cc?.prep_gaps?.length         ?? 0;
-
-
   return (
     <div className="pw-ctx" role="banner" aria-label="Planning workspace context">
+      {/* Mobile-only toggle for the left filter/backlog panel */}
+      {onToggleLeftPanel && (
+        <button
+          className="pw-btn-hamburger"
+          aria-label="Open filters and backlog panel"
+          onClick={onToggleLeftPanel}
+        >
+          <span></span><span></span><span></span>
+        </button>
+      )}
       {/* Identity */}
       <span className="pw-ctx-scope">{year ? year.name : "Training Planning"}</span>
       <span className="pw-ctx-sep">·</span>
       <span className="pw-ctx-year">{year?.year ?? new Date().getFullYear()}</span>
       <span className="pw-ctx-role" title={roleLabel}>{roleLabel} · {scopeLabel}</span>
-
-      {/* Health chips */}
-      <div className="pw-ctx-health" aria-label="Planning health">
-        {conflicts > 0 && (
-          <span className="pw-health-chip err" title="Active conflicts">
-            {conflicts} conflict{conflicts !== 1 ? "s" : ""}
-          </span>
-        )}
-        {prepGaps > 0 && (
-          <span className="pw-health-chip warn" title="Prep gaps">
-            {prepGaps} prep gap{prepGaps !== 1 ? "s" : ""}
-          </span>
-        )}
-        {unscheduled > 0 && (
-          <span className="pw-health-chip warn" title="Required curriculum not yet scheduled">
-            {unscheduled} unscheduled
-          </span>
-        )}
-        {unreviewed > 0 && (
-          <span className="pw-health-chip warn" title="Wing events not yet reviewed">
-            {unreviewed} to review
-          </span>
-        )}
-        {conflicts === 0 && unscheduled === 0 && unreviewed === 0 && prepGaps === 0 && cc && (
-          <span className="pw-health-chip ok">Healthy</span>
-        )}
-      </div>
 
       {/* Range + display mode controls */}
       <div className="pw-ctx-range-wrap" role="toolbar" aria-label="Range and view mode">
@@ -124,16 +103,18 @@ export function PlanningContextBar({
         {/* Custom date range inputs */}
         {viewRange === "custom" && (
           <div className="pw-ctx-custom">
-            <label className="pw-ctx-custom-lbl">From</label>
+            <label className="pw-ctx-custom-lbl" htmlFor="pw-ctx-custom-start">From</label>
             <input
+              id="pw-ctx-custom-start"
               type="date"
               className="pw-ctx-date-input"
               value={customStart}
               onChange={e => onCustomStartChange(e.target.value)}
               aria-label="Custom range start date"
             />
-            <label className="pw-ctx-custom-lbl">To</label>
+            <label className="pw-ctx-custom-lbl" htmlFor="pw-ctx-custom-end">To</label>
             <input
+              id="pw-ctx-custom-end"
               type="date"
               className="pw-ctx-date-input"
               value={customEnd}

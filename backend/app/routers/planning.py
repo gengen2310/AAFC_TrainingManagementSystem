@@ -29,11 +29,20 @@ from ..models.planning import (
 from ..models.training import TimingTemplate, TimingBlock, Activity
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
-from ..permissions import Principal, require_role, require_can_write_squadron
+from ..permissions import Principal, require_role, require_can_write_squadron, require_can_view_squadron
 from ..services import audit
 from .timing import _effective_template
 
 router = APIRouter(prefix="/api/planning", tags=["planning"])
+
+
+def _check_version(obj, client_version: int | None) -> None:
+    """Raise 409 if the client's version is stale (optimistic locking)."""
+    if client_version is not None and obj.version != client_version:
+        raise HTTPException(409, detail={
+            "error": "version_conflict",
+            "current_version": obj.version,
+        })
 
 
 def _parse_json_list(val) -> list:
@@ -153,10 +162,10 @@ def _require_plan_write(p: Principal) -> None:
 
 
 def _require_year_access(p: Principal, py: PlanningYear, write: bool = False) -> None:
-    """Enforce scope: sqn_admin → own sqn; wing_admin → own wing; nat → all."""
+    """Enforce scope: sqn_admin/sqn_general → own sqn; wing_admin → own wing; nat → all."""
     if write and p.role in _WRITE_BLOCKED:
         raise HTTPException(403, detail={"error": "forbidden"})
-    if p.role == "sqn_admin":
+    if p.role in ("sqn_admin", "sqn_general"):
         if py.unit_id != p.squadron_id:
             raise HTTPException(403, detail={"error": "out_of_scope"})
     elif p.role == "wing_admin":
@@ -165,7 +174,7 @@ def _require_year_access(p: Principal, py: PlanningYear, write: bool = False) ->
     elif p.role in ("wing_viewer", "national_viewer", "auditor"):
         if p.role == "wing_viewer" and py.wing_id != p.wing_id:
             raise HTTPException(403, detail={"error": "out_of_scope"})
-    # nat/system: unrestricted
+    # national_admin, system_admin: unrestricted
 
 
 def _get_year_or_404(year_id: str, db: DBSession) -> PlanningYear:
@@ -175,7 +184,10 @@ def _get_year_or_404(year_id: str, db: DBSession) -> PlanningYear:
     return py
 
 
-def _find_or_create_parade_night(db: DBSession, unit_id: str, date_str: str, p: Principal) -> ParadeNight | None:
+def _find_or_create_parade_night(
+    db: DBSession, unit_id: str, date_str: str, p: Principal,
+    start_time: str | None = None, end_time: str | None = None,
+) -> ParadeNight | None:
     """Find an existing ParadeNight for unit+date, or create one using the effective timing template."""
     if not unit_id:
         return None
@@ -198,7 +210,8 @@ def _find_or_create_parade_night(db: DBSession, unit_id: str, date_str: str, p: 
         session_count = sq.default_session_count or 3
     pn = ParadeNight(
         squadron_id=unit_id, wing_id=sq.wing_id, date=date_str, term=None,
-        start_time=sq.default_start_time, end_time=sq.default_end_time,
+        start_time=start_time or sq.default_start_time,
+        end_time=end_time or sq.default_end_time,
         session_count=session_count, parade_type="normal",
         timing_template_id=tmpl.id if tmpl else None,
         created_by=p.user_id,
@@ -221,6 +234,7 @@ def _year_out(py: PlanningYear, unit_code: str | None = None,
         "created_by": py.created_by, "updated_by": py.updated_by,
         "created_at": py.created_at.isoformat() if py.created_at else None,
         "updated_at": py.updated_at.isoformat() if py.updated_at else None,
+        "version": py.version,
     }
 
 
@@ -279,6 +293,7 @@ def _anchor_out(a: AnchorEvent) -> dict:
         "notes": a.notes, "is_archived": a.is_archived,
         "created_by": a.created_by,
         "created_at": a.created_at.isoformat() if a.created_at else None,
+        "version": a.version,
     }
 
 
@@ -313,10 +328,20 @@ def _session_out(s: ScheduledSession, db: DBSession) -> dict:
     }
 
 
-def _location_out(loc: PlanningLocation) -> dict:
+def _location_out(loc: TrainingArea) -> dict:
+    # Rooms merger (master transformation plan, Phase 1): Planning Workspace's
+    # Rooms tab now reads/writes the same `training_areas` table connected-
+    # frontend's Resources page uses, instead of the separate `planning_locations`
+    # table. This also fixes a real, live bug: create_session/update_session's
+    # room-resolution (`db.get(TrainingArea, body.location_id)`) only ever looked
+    # up TrainingArea rows — a location_id from the old PlanningLocation-backed
+    # endpoint silently failed to resolve, so a room picked in Planning Workspace
+    # would not actually attach to the session. The response shape below is kept
+    # identical to the old PlanningLocation-backed JSON so no frontend changes
+    # are required.
     return {
-        "location_id": loc.id, "unit_id": loc.unit_id, "name": loc.name,
-        "location_type": loc.location_type, "capacity": loc.capacity,
+        "location_id": loc.id, "unit_id": loc.squadron_id, "name": loc.name,
+        "location_type": loc.type, "capacity": loc.capacity,
         "notes": loc.notes, "active_status": loc.active_status,
     }
 
@@ -355,6 +380,7 @@ def _real_session_out(s: TrainingSession, db: DBSession) -> dict:
         "is_combined": False,
         "override_conflict": False,
         "created_at": s.created_at.isoformat() if s.created_at else None,
+        "version": s.version,
     }
 
 
@@ -385,6 +411,7 @@ class PlanningYearIn(BaseModel):
 class PlanningYearUpdateIn(BaseModel):
     name: Optional[str] = None
     active_status: Optional[bool] = None
+    version: Optional[int] = None
 
 
 @router.get("/years")
@@ -395,7 +422,7 @@ def list_planning_years(
     p: Principal = Depends(get_principal),
 ):
     q = db.query(PlanningYear)
-    if p.role == "sqn_admin":
+    if p.role in ("sqn_admin", "sqn_general"):
         q = q.filter(PlanningYear.unit_id == p.squadron_id)
     elif p.role in ("wing_admin", "wing_viewer"):
         q = q.filter(PlanningYear.wing_id == p.wing_id)
@@ -480,11 +507,13 @@ def update_planning_year(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True)
+    _check_version(py, body.version)
     if body.name is not None:
         py.name = body.name
     if body.active_status is not None:
         py.active_status = body.active_status
     py.updated_by = p.user_id; py.updated_at = utcnow()
+    py.version += 1
     db.commit()
     audit(db, p, object_type="planning_year", object_id=py.id, action="update")
     sq = db.get(Squadron, py.unit_id) if py.unit_id else None
@@ -511,9 +540,11 @@ class GenerateParadeDatesIn(BaseModel):
     end_date: str | None = None   # ISO YYYY-MM-DD; omit if max_repeats given
     parade_type: str = "standard"
     exclude_holidays: bool = True
-    frequency: str = "weekly"          # weekly | fortnightly | monthly | daily
+    frequency: str = "weekly"          # weekly | fortnightly | monthly | yearly | daily
     excluded_dates: list[str] = []     # specific ISO dates to skip
     max_repeats: int | None = None     # alternative to end_date
+    parade_start_time: str | None = None   # HH:MM override; falls back to squadron default
+    parade_end_time: str | None = None     # HH:MM override; falls back to squadron default
 
 
 @router.get("/years/{year_id}/parade-dates")
@@ -625,6 +656,10 @@ def _compute_candidate_dates(body: GenerateParadeDatesIn, holidays: list) -> lis
                 # Is this the first occurrence of this weekday in the month?
                 if d.day <= 7:
                     include = True
+        elif freq == "yearly":
+            # Same calendar month/day as the start date, each year.
+            if d.month == start.month and d.day == start.day:
+                include = True
         else:
             # Unknown frequency falls back to weekly
             if d.weekday() == body.weekday:
@@ -691,7 +726,10 @@ def generate_parade_dates(
     linked = []
     for ds in candidates:
         if ds not in existing:
-            pn = _find_or_create_parade_night(db, py.unit_id, ds, p)
+            pn = _find_or_create_parade_night(
+                db, py.unit_id, ds, p,
+                start_time=body.parade_start_time, end_time=body.parade_end_time,
+            )
             pd = ParadeDate(
                 id=str(uuid.uuid4()), planning_year_id=year_id,
                 unit_id=py.unit_id, parade_date=ds,
@@ -704,7 +742,10 @@ def generate_parade_dates(
             created.append(ds)
         elif py.unit_id and ds in unlinked_by_date:
             # Backfill the parade night link for an existing unlinked date
-            pn = _find_or_create_parade_night(db, py.unit_id, ds, p)
+            pn = _find_or_create_parade_night(
+                db, py.unit_id, ds, p,
+                start_time=body.parade_start_time, end_time=body.parade_end_time,
+            )
             if pn:
                 unlinked_by_date[ds].parade_night_id = pn.id
                 linked.append(ds)
@@ -712,6 +753,150 @@ def generate_parade_dates(
     audit(db, p, object_type="planning_year", object_id=year_id, action="generate_parade_dates",
           new={"created": len(created), "linked": len(linked)})
     return {"ok": True, "created": len(created), "linked": len(linked), "dates": created}
+
+
+class UpdateFutureParadeDayIn(BaseModel):
+    new_weekday: int                      # 0=Mon … 6=Sun, same convention as GenerateParadeDatesIn
+    from_date: str | None = None          # ISO date; defaults to today
+    exclude_ids: list[str] = []           # ParadeDate IDs to leave untouched (kept as one-night exceptions)
+    reason: str | None = None             # required when preview=false
+    preview: bool = True
+
+
+@router.post("/years/{year_id}/update-future-parade-day")
+def update_future_parade_day(
+    year_id: str,
+    body: UpdateFutureParadeDayIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """TRGO-01: move future Parade Nights to a new day of the week.
+
+    Changing Squadron.default_parade_day only affects newly-generated dates --
+    it was never meant to (and does not) retroactively touch existing ParadeDate/
+    ParadeNight rows, since both store a concrete ISO date, not a derived one.
+    This endpoint is the explicit, auditable action for a squadron that actually
+    wants its upcoming nights moved to a new day, previously missing entirely.
+
+    Only ParadeDate rows with parade_date >= from_date and parade_type=="standard"
+    are considered -- one-night exceptions (parade_type != "standard", e.g. a
+    special/cancelled night) are preserved automatically, not just via exclude_ids.
+    Each candidate is shifted to the same day *within its existing ISO week*
+    (Mon-Sun), preserving term/week_number and the linked ParadeNight (so
+    sessions, facilitators and rooms already assigned are never disturbed --
+    only the date changes, in place).
+    """
+    from sqlalchemy import or_
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py, write=not body.preview)
+    if not body.preview and not (body.reason or "").strip():
+        raise HTTPException(400, detail={"error": "reason_required",
+                                          "message": "A reason is required to update future parade nights."})
+    if body.new_weekday < 0 or body.new_weekday > 6:
+        raise HTTPException(400, detail={"error": "invalid_weekday"})
+
+    from_date = body.from_date or date.today().isoformat()
+    rows = db.query(ParadeDate).filter(
+        ParadeDate.planning_year_id == year_id,
+        ParadeDate.is_active == True,  # noqa: E712
+        ParadeDate.parade_date >= from_date,
+        ParadeDate.parade_type == "standard",
+    ).order_by(ParadeDate.parade_date).all()
+
+    holidays = db.query(HolidayPeriod).filter(
+        HolidayPeriod.planning_year_id == year_id,
+        HolidayPeriod.affects_parade == True,  # noqa: E712
+    ).all()
+
+    def in_holiday(d: str) -> bool:
+        return any(h.start_date <= d <= h.end_date for h in holidays)
+
+    # All active dates for this year, to detect a shift landing on an existing date.
+    existing_dates = {r.parade_date for r in
+                      db.query(ParadeDate.parade_date).filter(
+                          ParadeDate.planning_year_id == year_id,
+                          ParadeDate.is_active == True,  # noqa: E712
+                      ).all()}
+
+    plan: list[dict] = []
+    for pd_row in rows:
+        if pd_row.id in body.exclude_ids:
+            continue
+        old_d = date.fromisoformat(pd_row.parade_date)
+        if old_d.weekday() == body.new_weekday:
+            continue  # already on the target day -- nothing to do
+        new_d = old_d - timedelta(days=old_d.weekday()) + timedelta(days=body.new_weekday)
+        new_ds = new_d.isoformat()
+
+        conflicts = []
+        if new_ds in existing_dates and new_ds != pd_row.parade_date:
+            conflicts.append("duplicate_date")
+        if in_holiday(new_ds):
+            conflicts.append("holiday")
+
+        has_sessions = False
+        if pd_row.parade_night_id:
+            has_sessions = db.query(TrainingSession).filter(
+                TrainingSession.parade_night_id == pd_row.parade_night_id,
+                TrainingSession.is_archived == False,  # noqa: E712
+            ).count() > 0
+
+        plan.append({
+            "parade_date_id": pd_row.id,
+            "old_date": pd_row.parade_date,
+            "new_date": new_ds,
+            "term": pd_row.term,
+            "week_number": pd_row.week_number,
+            "parade_night_id": pd_row.parade_night_id,
+            "has_sessions": has_sessions,
+            "conflicts": conflicts,
+            "blocked": len(conflicts) > 0,
+        })
+
+    exceptions = db.query(ParadeDate).filter(
+        ParadeDate.planning_year_id == year_id,
+        ParadeDate.is_active == True,  # noqa: E712
+        ParadeDate.parade_date >= from_date,
+        ParadeDate.parade_type != "standard",
+    ).count()
+
+    if body.preview:
+        return {
+            "ok": True, "preview": True,
+            "changes": plan,
+            "to_update": sum(1 for r in plan if not r["blocked"]),
+            "blocked": sum(1 for r in plan if r["blocked"]),
+            "exceptions_preserved": exceptions,
+        }
+
+    updated = []
+    skipped = []
+    for r in plan:
+        if r["blocked"]:
+            skipped.append(r)
+            continue
+        pd_row = db.get(ParadeDate, r["parade_date_id"])
+        old_date = pd_row.parade_date
+        pd_row.parade_date = r["new_date"]
+        pd_row.updated_at = utcnow()
+        if r["parade_night_id"]:
+            pn = db.get(ParadeNight, r["parade_night_id"])
+            if pn:
+                pn.date = r["new_date"]
+                pn.updated_at = utcnow()
+        audit(db, p, object_type="parade_date", object_id=r["parade_date_id"],
+              action="update_future_parade_day",
+              old={"date": old_date}, new={"date": r["new_date"]}, reason=body.reason)
+        updated.append(r)
+    db.commit()
+    audit(db, p, object_type="planning_year", object_id=year_id, action="update_future_parade_day_bulk",
+          new={"updated": len(updated), "skipped": len(skipped), "new_weekday": body.new_weekday}, reason=body.reason)
+    return {
+        "ok": True, "preview": False,
+        "updated": len(updated), "skipped": len(skipped),
+        "updated_dates": updated, "skipped_conflicts": skipped,
+        "exceptions_preserved": exceptions,
+    }
 
 
 @router.delete("/parade-dates/{date_id}")
@@ -843,6 +1028,7 @@ class AnchorEventUpdateIn(BaseModel):
     planning_impact: Optional[str] = None
     readiness_requirements: Optional[str] = None
     notes: Optional[str] = None
+    version: Optional[int] = None
 
 
 @router.get("/years/{year_id}/anchors")
@@ -913,12 +1099,14 @@ def update_anchor(
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(a.planning_year_id, db)
     _require_year_access(p, py, write=True)
+    _check_version(a, body.version)
     for field in ("event_name", "importance", "start_date", "end_date",
                   "planning_impact", "readiness_requirements", "notes"):
         val = getattr(body, field)
         if val is not None:
             setattr(a, field, val)
     a.updated_by = p.user_id; a.updated_at = utcnow()
+    a.version += 1
     db.commit()
     audit(db, p, object_type="anchor_event", object_id=a.id, action="update")
     return _anchor_out(a)
@@ -1167,6 +1355,7 @@ class ScheduledSessionUpdateIn(BaseModel):
     override_reason: Optional[str] = None
     status: Optional[str] = None
     notes: Optional[str] = None
+    version: Optional[int] = None
 
 
 @router.post("/parade-dates/{date_id}/sessions")
@@ -1270,6 +1459,7 @@ def update_session(
     pn = db.get(ParadeNight, s.parade_night_id) if s.parade_night_id else None
     if pn:
         require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    _check_version(s, body.version)
 
     if body.curriculum_id is not None:
         if body.curriculum_id:
@@ -1308,6 +1498,7 @@ def update_session(
         s.status = body.status
     if body.notes is not None:
         s.delivery_notes = body.notes
+    s.version += 1
     db.commit()
     audit(db, p, object_type="session", object_id=s.id, action="update")
     return _real_session_out(s, db)
@@ -1504,17 +1695,20 @@ def list_locations(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    q = db.query(PlanningLocation).filter(PlanningLocation.active_status == True)  # noqa: E712
+    q = db.query(TrainingArea).filter(
+        TrainingArea.active_status == True,  # noqa: E712
+        TrainingArea.is_archived == False,  # noqa: E712
+    )
     if p.role == "sqn_admin":
-        q = q.filter(PlanningLocation.unit_id == p.squadron_id)
+        q = q.filter(TrainingArea.squadron_id == p.squadron_id)
     elif p.role in ("wing_admin", "wing_viewer"):
         sqn_ids = [s.id for s in db.query(Squadron).filter(
             Squadron.wing_id == p.wing_id, Squadron.is_archived == False  # noqa: E712
         ).all()]
-        q = q.filter(PlanningLocation.unit_id.in_(sqn_ids))
+        q = q.filter(TrainingArea.squadron_id.in_(sqn_ids))
     if unit_id:
-        q = q.filter(PlanningLocation.unit_id == unit_id)
-    return [_location_out(loc) for loc in q.order_by(PlanningLocation.name).all()]
+        q = q.filter(TrainingArea.squadron_id == unit_id)
+    return [_location_out(loc) for loc in q.order_by(TrainingArea.name).all()]
 
 
 @router.post("/locations")
@@ -1527,14 +1721,14 @@ def create_location(
     unit_id = body.unit_id or p.squadron_id
     if p.role == "sqn_admin":
         unit_id = p.squadron_id
-    loc = PlanningLocation(
-        id=str(uuid.uuid4()), unit_id=unit_id, name=body.name,
-        location_type=body.location_type, capacity=body.capacity,
+    loc = TrainingArea(
+        id=str(uuid.uuid4()), squadron_id=unit_id, name=body.name,
+        type=body.location_type, capacity=body.capacity,
         notes=body.notes, active_status=True,
-        created_by=p.user_id, created_at=utcnow(), updated_at=utcnow(),
+        created_at=utcnow(), updated_at=utcnow(),
     )
     db.add(loc); db.commit()
-    audit(db, p, object_type="planning_location", object_id=loc.id, action="create",
+    audit(db, p, object_type="training_area", object_id=loc.id, action="create",
           new={"name": body.name})
     return _location_out(loc)
 
@@ -1546,19 +1740,25 @@ def update_location(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    loc = db.get(PlanningLocation, location_id)
-    if not loc:
+    loc = db.get(TrainingArea, location_id)
+    if not loc or loc.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     _require_plan_write(p)
-    if p.role == "sqn_admin" and loc.unit_id != p.squadron_id:
+    if p.role == "sqn_admin" and loc.squadron_id != p.squadron_id:
         raise HTTPException(403, detail={"error": "out_of_scope"})
-    for field in ("name", "location_type", "capacity", "notes", "active_status"):
-        val = getattr(body, field)
-        if val is not None:
-            setattr(loc, field, val)
+    if body.name is not None:
+        loc.name = body.name
+    if body.location_type is not None:
+        loc.type = body.location_type
+    if body.capacity is not None:
+        loc.capacity = body.capacity
+    if body.notes is not None:
+        loc.notes = body.notes
+    if body.active_status is not None:
+        loc.active_status = body.active_status
     loc.updated_at = utcnow()
     db.commit()
-    audit(db, p, object_type="planning_location", object_id=loc.id, action="update")
+    audit(db, p, object_type="training_area", object_id=loc.id, action="update")
     return _location_out(loc)
 
 
@@ -2102,8 +2302,11 @@ def list_missions(
     phase: Optional[str] = None,
     element: Optional[str] = None,
     term: Optional[str] = None,
-    status: Optional[str] = None,   # "scheduled" | "unscheduled"
+    status: Optional[str] = None,   # "scheduled" | "unscheduled" | "cancelled" | "not_delivered"
+                                     # | "rescheduled" | "resolved" | "planned"
     search: Optional[str] = None,
+    start_date: Optional[str] = None,  # TRGO-08: ISO date, inclusive
+    end_date: Optional[str] = None,    # TRGO-08: ISO date, inclusive
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -2175,12 +2378,63 @@ def list_missions(
             "location_id": s.training_area_id,
             "location_name": room_name,
             "status": s.status,
+            "cancelled_reason": s.cancelled_reason,
+            "not_delivered_reason": s.not_delivered_reason,
+            "rescheduled_to_date": s.rescheduled_to_date,
+            "outcome_note": s.delivery_notes or s.issue_notes,
         }
 
     result = []
     for ci in items:
         scheduled = sessions_by_ci.get(ci.id, [])
         is_scheduled = len(scheduled) > 0
+        has_cancelled = any(s.status in ("cancelled", "cancelled_late") for s in scheduled)
+        has_not_delivered = any(s.status == "not_delivered" for s in scheduled)
+        has_rescheduled = any(s.status == "rescheduled" for s in scheduled)
+        has_delivered = any(s.status in ("delivered", "delivered_with_issue") for s in scheduled)
+        needs_reschedule = has_cancelled or has_not_delivered
+
+        # Six-state Mission Backlog model (master transformation plan Block 6):
+        # unscheduled / planned / cancelled_awaiting_reschedule /
+        # not_delivered_awaiting_reschedule / rescheduled / resolved.
+        # No explicit link exists in the schema between a cancelled/not-delivered
+        # session and whatever session eventually replaces it (rescheduled_to_date
+        # is a plain date string, not an FK) — "resolved" is therefore an honest
+        # approximation: a mission that has a cancelled/not-delivered session AND
+        # has also since been delivered via some session is treated as resolved,
+        # rather than left permanently flagged as needing a reschedule action.
+        if not is_scheduled:
+            backlog_status = "unscheduled"
+        elif needs_reschedule and has_delivered:
+            backlog_status = "resolved"
+        elif needs_reschedule and has_cancelled:
+            backlog_status = "cancelled_awaiting_reschedule"
+        elif needs_reschedule:
+            backlog_status = "not_delivered_awaiting_reschedule"
+        elif has_rescheduled:
+            backlog_status = "rescheduled"
+        else:
+            backlog_status = "planned"
+
+        # Filter by date range if requested. An unscheduled mission has no date to
+        # match against and still needs attention regardless of the visible window,
+        # so it is never excluded by this filter -- only scheduled missions are
+        # narrowed down to those with at least one session inside the range.
+        if (start_date or end_date) and is_scheduled:
+            in_range = False
+            for s in scheduled:
+                pd_obj = pn_to_pd.get(s.parade_night_id)
+                d = pd_obj.parade_date if pd_obj else None
+                if not d:
+                    continue
+                if start_date and d < start_date:
+                    continue
+                if end_date and d > end_date:
+                    continue
+                in_range = True
+                break
+            if not in_range:
+                continue
 
         # Filter by term if requested
         if term:
@@ -2195,6 +2449,16 @@ def list_missions(
             continue
         if status == "unscheduled" and is_scheduled:
             continue
+        if status == "cancelled" and not has_cancelled:
+            continue
+        if status == "not_delivered" and not has_not_delivered:
+            continue
+        if status == "rescheduled" and backlog_status != "rescheduled":
+            continue
+        if status == "resolved" and backlog_status != "resolved":
+            continue
+        if status == "planned" and backlog_status != "planned":
+            continue
 
         result.append({
             "curriculum_id": ci.id,
@@ -2208,6 +2472,11 @@ def list_missions(
             "duration_minutes": ci.duration_minutes,
             "core_status": ci.core_status,
             "is_scheduled": is_scheduled,
+            "has_cancelled": has_cancelled,
+            "has_not_delivered": has_not_delivered,
+            "has_rescheduled": has_rescheduled,
+            "needs_reschedule": needs_reschedule,
+            "backlog_status": backlog_status,
             "scheduled_sessions": [_sess_summary(s) for s in scheduled],
             "scheduled_count": len(scheduled),
         })
@@ -3166,14 +3435,10 @@ def list_facilitator_leave(
     p: Principal = Depends(get_principal),
 ):
     """List all active leave periods for a facilitator."""
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     fac = db.get(Facilitator, fac_id)
     if not fac:
         raise HTTPException(404, detail={"error": "facilitator_not_found"})
-    if p.role == "sqn_admin" and fac.squadron_id != p.squadron_id:
-        raise HTTPException(403, detail={"error": "out_of_scope"})
-    if p.role in ("wing_admin", "wing_viewer") and fac.wing_id != p.wing_id:
-        raise HTTPException(403, detail={"error": "out_of_scope"})
+    require_can_view_squadron(p, fac.squadron_id, fac.wing_id)
     rows = (
         db.query(PlanningFacilitatorLeave)
         .filter(
@@ -3206,14 +3471,10 @@ def add_facilitator_leave(
     p: Principal = Depends(get_principal),
 ):
     """Add a leave period for a facilitator and return affected scheduled sessions."""
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     fac = db.get(Facilitator, fac_id)
     if not fac:
         raise HTTPException(404, detail={"error": "facilitator_not_found"})
-    if p.role == "sqn_admin" and fac.squadron_id != p.squadron_id:
-        raise HTTPException(403, detail={"error": "out_of_scope"})
-    if p.role in ("wing_admin", "wing_viewer") and fac.wing_id != p.wing_id:
-        raise HTTPException(403, detail={"error": "out_of_scope"})
+    require_can_write_squadron(p, fac.squadron_id, fac.wing_id)
     if body.start_date > body.end_date:
         raise HTTPException(400, detail={"error": "start_date_after_end_date"})
 
@@ -3282,10 +3543,13 @@ def delete_facilitator_leave(
     p: Principal = Depends(get_principal),
 ):
     """Soft-delete a facilitator leave record."""
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     leave = db.get(PlanningFacilitatorLeave, leave_id)
     if not leave or leave.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
+    fac = db.get(Facilitator, leave.facilitator_id)
+    if not fac:
+        raise HTTPException(404, detail={"error": "facilitator_not_found"})
+    require_can_write_squadron(p, fac.squadron_id, fac.wing_id)
     leave.is_archived = True
     db.commit()
     audit(db, p, object_type="facilitator_leave", object_id=leave_id, action="archive")
@@ -3308,31 +3572,36 @@ def facilitator_workload(
     if not fac:
         raise HTTPException(404, detail={"error": "facilitator_not_found"})
 
-    # Get all parade date IDs in this year
-    year_date_ids = {
-        pd.id: pd.parade_date
-        for pd in db.query(ParadeDate).filter(
-            ParadeDate.planning_year_id == year_id,
-            ParadeDate.is_active == True,  # noqa: E712
-        ).all()
+    # Get all parade dates in this year, and their linked parade nights.
+    # NOTE: this endpoint originally queried `ScheduledSession` (parade_date_id
+    # FK), a model that is never populated by any live create/update path in
+    # this codebase (confirmed: no `ScheduledSession(...)` instantiation exists
+    # anywhere) — so it always silently returned zero workload. Rewritten to
+    # use the same ParadeDate -> ParadeNight -> TrainingSession join `list_missions`
+    # already uses for the real, live session data.
+    pd_rows = db.query(ParadeDate).filter(
+        ParadeDate.planning_year_id == year_id,
+        ParadeDate.is_active == True,  # noqa: E712
+    ).all()
+    pn_to_pd: dict[str, ParadeDate] = {
+        pd_obj.parade_night_id: pd_obj for pd_obj in pd_rows if pd_obj.parade_night_id
     }
 
-    # Find all scheduled sessions for this facilitator in this year
-    sessions = (
-        db.query(ScheduledSession)
-        .filter(
-            ScheduledSession.facilitator_id == fac_id,
-            ScheduledSession.parade_date_id.in_(list(year_date_ids.keys())),
-            ScheduledSession.is_archived == False,  # noqa: E712
-        )
-        .all()
-    )
+    sessions: list[TrainingSession] = []
+    if pn_to_pd:
+        sessions = db.query(TrainingSession).filter(
+            TrainingSession.facilitator_id == fac_id,
+            TrainingSession.parade_night_id.in_(list(pn_to_pd.keys())),
+            TrainingSession.is_archived == False,  # noqa: E712
+        ).all()
 
     total_scheduled = len(sessions)
-    # Group by parade_date_id
+    # Group by parade date (each parade night maps to exactly one parade date here)
     by_night: dict[str, list] = {}
     for s in sessions:
-        by_night.setdefault(s.parade_date_id, []).append(s)
+        pd_obj = pn_to_pd.get(s.parade_night_id)
+        if pd_obj:
+            by_night.setdefault(pd_obj.id, []).append(s)
 
     nights_with_sessions = len(by_night)
     counts_per_night = [len(v) for v in by_night.values()]
@@ -3343,27 +3612,19 @@ def facilitator_workload(
     today = date.today().isoformat()
     upcoming: list[dict] = []
     for s in sessions:
-        pd_date = year_date_ids.get(s.parade_date_id, "")
+        pd_obj = pn_to_pd.get(s.parade_night_id)
+        pd_date = pd_obj.parade_date if pd_obj else ""
         if pd_date >= today:
-            title = s.activity_title
-            if not title and s.curriculum_id:
-                ci = db.get(CurriculumItem, s.curriculum_id)
-                if ci:
-                    title = ci.title
-            loc_name = None
-            if s.location_id:
-                loc = db.get(PlanningLocation, s.location_id)
-                if loc:
-                    loc_name = loc.name
+            title = s.curriculum_title_at_time or s.custom_title
             upcoming.append({
                 "session_id": s.id,
                 "parade_date": pd_date,
-                "session_number": s.session_number,
+                "session_number": s.period_number,
                 "cadet_group": s.cadet_group,
                 "title": title,
-                "location_name": loc_name,
+                "location_name": s.training_area_name_at_time,
             })
-    upcoming.sort(key=lambda x: (x["parade_date"], x["session_number"]))
+    upcoming.sort(key=lambda x: (x["parade_date"], x["session_number"] or 0))
 
     return {
         "total_scheduled": total_scheduled,
@@ -3526,8 +3787,7 @@ def list_notices(
     pd = db.get(ParadeDate, date_id)
     if not pd:
         raise HTTPException(404, detail={"error": "parade_date_not_found"})
-    py = _get_year_or_404(pd.planning_year_id, db)
-    _require_year_access(p, py)
+    _require_year_access(p, _get_year_or_404(pd.planning_year_id, db), write=False)
     notices = (
         db.query(PlanningNotice)
         .filter(
@@ -3547,12 +3807,10 @@ def create_notice(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     pd = db.get(ParadeDate, date_id)
     if not pd:
         raise HTTPException(404, detail={"error": "parade_date_not_found"})
-    py = _get_year_or_404(pd.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, _get_year_or_404(pd.planning_year_id, db), write=True)
     notice = PlanningNotice(
         planning_year_id=pd.planning_year_id,
         parade_date_id=date_id,
@@ -3572,6 +3830,7 @@ class NoticeUpdateIn(BaseModel):
     notice_text: str | None = None
     priority: str | None = None
     audience: str | None = None
+    version: int | None = None
 
 
 @router.patch("/notices/{notice_id}")
@@ -3581,18 +3840,21 @@ def update_notice(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     notice = db.get(PlanningNotice, notice_id)
     if not notice or notice.is_archived:
         raise HTTPException(404, detail={"error": "notice_not_found"})
-    py = _get_year_or_404(notice.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    pd = db.get(ParadeDate, notice.parade_date_id)
+    if not pd:
+        raise HTTPException(404, detail={"error": "parade_date_not_found"})
+    _require_year_access(p, _get_year_or_404(pd.planning_year_id, db), write=True)
+    _check_version(notice, body.version)
     if body.notice_text is not None:
         notice.notice_text = body.notice_text.strip()
     if body.priority is not None:
         notice.priority = body.priority
     if body.audience is not None:
         notice.audience = body.audience
+    notice.version += 1
     db.commit()
     return {"ok": True}
 
@@ -3603,12 +3865,13 @@ def archive_notice(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
     notice = db.get(PlanningNotice, notice_id)
     if not notice:
         raise HTTPException(404, detail={"error": "notice_not_found"})
-    py = _get_year_or_404(notice.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    pd = db.get(ParadeDate, notice.parade_date_id)
+    if not pd:
+        raise HTTPException(404, detail={"error": "parade_date_not_found"})
+    _require_year_access(p, _get_year_or_404(pd.planning_year_id, db), write=True)
     notice.is_archived = True
     db.commit()
     audit(db, p, object_type="PlanningNotice", object_id=notice_id, action="archive")
@@ -3662,8 +3925,7 @@ def list_cea_activities(
     p: Principal = Depends(get_principal),
 ):
     require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
-    py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py)
+    _require_year_access(p, _get_year_or_404(year_id, db), write=False)
     from sqlalchemy import select
     stmt = select(CeaActivity).where(
         CeaActivity.planning_year_id == year_id,
@@ -3672,7 +3934,26 @@ def list_cea_activities(
     if status:
         stmt = stmt.where(CeaActivity.classification_status == status)
     rows = db.scalars(stmt.order_by(CeaActivity.activity_start_date)).all()
-    return {"activities": [_cea_activity_out(r) for r in rows]}
+    # TRGO-02: surface the caller's own squadron's local-hide/note state so the
+    # unified Activities view can show "hidden for you" and let a squadron
+    # toggle it, without touching the shared CeaActivity row (the point of
+    # local-hide being a per-squadron overlay, not a source-record edit).
+    hides_by_activity: dict[str, ActivityLocalHide] = {}
+    if p.squadron_id and rows:
+        activity_ids = [r.id for r in rows]
+        hide_rows = db.query(ActivityLocalHide).filter(
+            ActivityLocalHide.cea_activity_id.in_(activity_ids),
+            ActivityLocalHide.unit_id == p.squadron_id,
+        ).all()
+        hides_by_activity = {h.cea_activity_id: h for h in hide_rows}
+    out = []
+    for r in rows:
+        d = _cea_activity_out(r)
+        hide = hides_by_activity.get(r.id)
+        d["is_hidden_for_me"] = bool(hide and hide.is_hidden)
+        d["local_note"] = hide.local_note if hide else None
+        out.append(d)
+    return {"activities": out}
 
 
 @router.get("/years/{year_id}/cea/batches")
@@ -3682,8 +3963,7 @@ def list_cea_batches(
     p: Principal = Depends(get_principal),
 ):
     require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
-    py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py)
+    _require_year_access(p, _get_year_or_404(year_id, db), write=False)
     from sqlalchemy import select
     rows = db.scalars(
         select(CeaImportBatch)
@@ -3924,8 +4204,21 @@ def classify_cea_activity(
     act = db.get(CeaActivity, activity_id)
     if not act or act.is_archived:
         raise HTTPException(404, detail={"error": "activity_not_found"})
-    py = _get_year_or_404(act.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, _get_year_or_404(act.planning_year_id, db), write=True)
+    # DEFECT-005: classify mutates the shared CeaActivity row directly
+    # (importance/audience/classification_status), unlike local-hide below
+    # which only ever writes a squadron-local overlay row. unit_id is set
+    # only for manually-created, squadron-owned activities (see
+    # create_manual_activity) -- never by the CSV import path, which leaves
+    # it null for a wing-wide/shared activity. A sqn_admin may classify
+    # their own squadron's manual activity, but must never be able to
+    # overwrite a wing-wide CEA activity's classification for every
+    # squadron in the wing at once.
+    if act.unit_id != p.squadron_id and p.role == "sqn_admin":
+        raise HTTPException(403, detail={
+            "error": "wing_wide_activity",
+            "message": "Only a Wing Admin or higher can classify a wing-wide CEA activity.",
+        })
     act.importance = body.importance
     act.audience_staff_only = body.audience_staff_only
     act.audience_seniors = body.audience_seniors
@@ -3933,8 +4226,8 @@ def classify_cea_activity(
     act.audience_first_years = body.audience_first_years
     act.classification_status = "classified" if body.importance else "needs_review"
     act.classified_by = p.user_id
-    from datetime import datetime as _dt
-    act.classified_at = _dt.utcnow().isoformat()
+    from datetime import datetime, timezone
+    act.classified_at = datetime.now(timezone.utc).isoformat()
     act.updated_at = utcnow()
     db.commit()
     audit(db, p, object_type="CeaActivity", object_id=activity_id, action="classify")
@@ -4010,8 +4303,7 @@ def create_manual_activity(
     p: Principal = Depends(get_principal),
 ):
     require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
-    py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, _get_year_or_404(year_id, db), write=True)
     act = CeaActivity(
         id=str(uuid.uuid4()),
         planning_year_id=year_id,

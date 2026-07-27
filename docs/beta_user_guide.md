@@ -142,18 +142,45 @@ Curriculum items are read-only for squadron users — content is managed at Wing
 
 Manage the list of staff and instructors who deliver sessions at your squadron. Each facilitator has a name, rank, and optional subject area tags. Facilitator records are used to populate session plans and track facilitator load in reports.
 
+**Subject area tags** are unit-specific labels (e.g. "Drill", "Aerospace", "First Aid") that help you filter facilitators by expertise. Squadron Admins can create new tags directly in the Assign Tags modal — type a name and click **Create & add tag**. Tags are saved and reusable for the life of the planning year.
+
 ### Training Areas
 
 Record the physical spaces available at your squadron (training rooms, ranges, outdoor areas). These are used in session planning and resource clash detection.
 
+### Activities & Events
+
+The **Activities** page records non-parade-night events (camps, biathlon, competitions, etc.) and provides access to the planning year overview.
+
+**Generate Activities** (Squadron Admin): Click **Generate Activities** in the page header to bulk-create a recurring series. Choose a name, date range, recurrence pattern (daily, weekly, fortnightly, monthly, yearly), weekday, and any dates to exclude. Click **Preview** to see exactly which dates will be created and which will be skipped (holidays, duplicates). Click **Create** to commit. Holidays from your active planning year are automatically detected.
+
+**Planning Year section**: Select your current planning year from the dropdown to view the annual overview map, parade dates, and holidays. Wing Admins see a squadron filter to switch between squadrons.
+
+### Dashboard
+
+The **Dashboard** provides a consolidated training overview:
+- **Training summary** — session counts by status (Delivered, Planned, Not Delivered, Cancelled, Rescheduled)
+- **Progress by phase** — delivery completion per curriculum phase with a visual indicator
+- **Session Outcomes** — horizontal bar chart showing the share of sessions in each outcome state
+- **Facilitator Workload** — bar chart of sessions delivered per facilitator (top 10)
+- **Upcoming Parade Night Readiness** — card grid of the next 8 parade nights showing readiness score and unstaffed session count
+- **Facilitator summary** — detailed table of who delivered what across the training year
+- **Upcoming parade nights** — combined list of next scheduled nights and activities
+
 ### Reports
 
-The **Reports** section provides:
-- **Training Summary** — overall delivery rate and readiness score for your squadron
+The **Training Reports** section provides detailed drilldowns:
 - **Not Delivered** — sessions that did not proceed, with reasons
 - **Curriculum Coverage** — which curriculum items have been delivered and how often
+- **Facilitator load** — session count and risk level per facilitator
 
 Wing Admins have access to Wing-wide overview reports across all 16 squadrons.
+
+### Planning Workspace
+
+If your Wing has the Planning Workspace enabled, a **Planning Workspace ↗** link appears in the navigation sidebar. Clicking it opens the dedicated planning view in a new tab — no second login is required, as your session carries across automatically.
+
+The Planning Workspace is available to squadron, wing, and national roles. System Admin and Auditor roles do not see the link. The link only appears when the feature is active for your environment — if you do not see it, the feature is not yet enabled for your unit.
 
 ---
 
@@ -205,9 +232,14 @@ TMS is in beta. Your feedback is essential.
 | Publish a parade night | Open the parade night → Publish |
 | Close a parade night | Open the parade night → Close |
 | Add a facilitator | Facilitators → Add Facilitator |
+| Assign tags to a facilitator | Facilitators → Assign Tags |
+| Create a new subject area tag | Facilitators → Assign Tags → Create & add tag |
+| Bulk-create recurring activities | Activities → Generate Activities |
+| View planning year overview | Activities → select year from Planning Year dropdown |
 | View training reports | Reports |
+| Open Planning Workspace | Navigation sidebar → Planning Workspace ↗ |
 | Log out | Top navigation → Log Out |
 
 ---
 
-*TMS v17.1 · 7 Wing Beta · 2026*
+*TMS v17.1 · 7 Wing Beta · 2026 · Updated with Planning Workspace, Generate Activities, and Dashboard graph features*

@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from ..database import SessionLocal, init_db, reset_db
 from ..security import hash_code
 from ..models import (NationalEntity, Wing, Squadron, Flight, User, AccessCode,
-                      CurriculumItem, CurriculumElement, Facilitator, FacilitatorRankHistory,
+                      CurriculumItem, CurriculumElement, CurriculumPhase, Facilitator, FacilitatorRankHistory,
                       TrainingArea, Equipment, ParadeNight, Session, Cadet,
                       TimingTemplate, TimingBlock)
 
@@ -18,6 +18,19 @@ _DEFAULT_ELEMENTS = [
     ("Service_Community", "Service & Community",        "national"),
     ("SQN_Affairs",       "Squadron Affairs",           "national"),
     ("CDT_Skills",        "Cadet Skills",               "national"),
+]
+
+# Master transformation plan Block 10 — same names as dashboard.py's _PHASES
+# constant, the phase strings already in live use across charts/curriculum.
+_DEFAULT_PHASES = [
+    ("A. Orientation",  "A. Orientation",  "national", 10),
+    ("B. Initial",      "B. Initial",      "national", 20),
+    ("C. Junior",       "C. Junior",       "national", 30),
+    ("D. Intermediate", "D. Intermediate", "national", 40),
+    ("E. Senior",       "E. Senior",       "national", 50),
+    ("I. Bronze",       "I. Bronze",       "national", 60),
+    ("J. Silver",       "J. Silver",       "national", 70),
+    ("K. Gold",         "K. Gold",         "national", 80),
 ]
 
 UNITS = [
@@ -174,31 +187,72 @@ def seed_all():
         ))
     db.commit()
 
+    # Tuples: (period, cadet_group, curriculum_code, room, facilitator_last_name, status)
     demo_pns = [
-        ("2026-02-06", "T1", [(1, "A. Orientation", "ORI-M01", "Bravo", "Daley", "delivered"),
-                              (2, "B. Initial", "INL-M00", "Bravo", "McGhie", "delivered"),
-                              (3, "D. Intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered")]),
-        ("2026-05-01", "T2", [(1, "B. Initial", "INL-M08", "Major Parade Ground", "Milligen", "delivered"),
-                              (2, "C. Junior", "JNR-M01", "Major Parade Ground", "Milligen", "not_delivered")]),
-        ("2026-07-24", "T3", [(1, "B. Initial", "INL-M02", "Bravo", "Daniels", "planned"),
-                              (2, "C. Junior", "JNR-M01", "Major Parade Ground", "Milligen", "planned"),
-                              (3, "D. Intermediate", "INT-M04", "Seniors Working Room", "Flanders", "planned")]),
+        ("2026-02-06", "T1", [
+            (1, "orientation", "ORI-M01", "Bravo", "Daley", "delivered"),
+            (1, "initial", "ORI-M01", "Bravo", "Daley", "delivered"),
+            (1, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "delivered"),
+            (1, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
+            (1, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
+            (2, "orientation", "ORI-M01", "Bravo", "McGhie", "delivered"),
+            (2, "initial", "INL-M00", "Bravo", "McGhie", "delivered"),
+            (2, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "delivered"),
+            (2, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
+            (2, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
+            (3, "orientation", "ORI-M01", "Bravo", "Daley", "delivered"),
+            (3, "initial", "INL-M00", "Bravo", "McGhie", "delivered"),
+            (3, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "delivered"),
+            (3, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
+            (3, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
+        ]),
+        ("2026-05-01", "T2", [
+            (1, "orientation", "ORI-M01", "Bravo", "Daley", "delivered"),
+            (1, "initial", "INL-M08", "Bravo", "Milligen", "delivered"),
+            (1, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "delivered"),
+            (1, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
+            (1, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
+            (2, "orientation", "ORI-M01", "Bravo", "Daley", "delivered"),
+            (2, "initial", "INL-M08", "Major Parade Ground", "Milligen", "not_delivered"),
+            (2, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "not_delivered"),
+            (2, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
+            (2, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
+        ]),
+        ("2026-07-24", "T3", [
+            (1, "orientation", "INL-M02", "Bravo", "Daniels", "planned"),
+            (1, "initial", "INL-M02", "Bravo", "Daniels", "planned"),
+            (1, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "planned"),
+            (1, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
+            (1, "senior", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
+            (2, "orientation", "ORI-M01", "Bravo", "Daniels", "planned"),
+            (2, "initial", "INL-M02", "Bravo", "Daniels", "planned"),
+            (2, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "planned"),
+            (2, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
+            (2, "senior", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
+            (3, "orientation", "ORI-M01", "Bravo", "Daniels", "planned"),
+            (3, "initial", "INL-M02", "Bravo", "Daniels", "planned"),
+            (3, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "planned"),
+            (3, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
+            (3, "senior", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
+        ]),
     ]
     for date, term, sessions in demo_pns:
         published = all(x[5] in ("delivered", "not_delivered") for x in sessions)
+        unique_periods = len({x[0] for x in sessions})
         pn = ParadeNight(squadron_id=s703.id, wing_id=wing.id, date=date, term=term,
                          start_time=s703.default_start_time, end_time=s703.default_end_time,
-                         session_count=len(sessions), published_status=published,
+                         session_count=unique_periods, published_status=published,
                          timing_template_id=tmpl_703.id)
         db.add(pn); db.commit()
-        for period, phase, code, room, faclast, status in sessions:
-            c = cur_by_code.get(code)
-            f = facs.get(faclast)
-            r = rooms.get(room)
+        for period, cadet_group, code, room, faclast, status in sessions:
+            c = cur_by_code.get(code) if code else None
+            f = facs.get(faclast) if faclast else None
+            r = rooms.get(room) if room else None
             db.add(Session(parade_night_id=pn.id, squadron_id=s703.id, period_number=period,
+                           cadet_group=cadet_group,
                            curriculum_item_id=c.id if c else None,
                            curriculum_code_at_time=code, curriculum_title_at_time=c.title if c else code,
-                           phase_at_time=phase, facilitator_id=f.id if f else None,
+                           facilitator_id=f.id if f else None,
                            facilitator_rank_at_time=f.current_rank if f else None,
                            facilitator_display_name_at_time=(f.current_rank + " " + f.last_name) if f else None,
                            training_area_id=r.id if r else None, training_area_name_at_time=room,
@@ -238,6 +292,16 @@ def seed_all():
         ).first():
             db.add(CurriculumElement(name=name, display_name=display_name,
                                      scope_level=scope, active_status=True))
+    # Seed default curriculum phases (idempotent) — mirrors the elements seed
+    # above; reset_db() bypasses Alembic, so the migration's own seed insert
+    # never runs against this metadata-created dev/test DB.
+    for name, display_name, scope, sort_order in _DEFAULT_PHASES:
+        if not db.query(CurriculumPhase).filter(
+            CurriculumPhase.name == name,
+            CurriculumPhase.scope_level == scope,
+        ).first():
+            db.add(CurriculumPhase(name=name, display_name=display_name,
+                                   scope_level=scope, sort_order=sort_order, active_status=True))
     db.commit()
     db.close()
     print("Seeded: National HQ, 7 Wing, 16 squadrons, users/access codes, 13 core curriculum items, 703 demo data (incl. Alpha/Bravo flights, planning year, WA holidays).")

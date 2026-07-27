@@ -62,8 +62,8 @@ export function ParadeNightDetailView({ id, canWrite }: { id: string; canWrite: 
 }
 
 function AddSessionForm({ pnid, onClose, onDone }: { pnid: string; onClose: () => void; onDone: () => void }) {
-  const cur = useQuery({ queryKey: ["curriculum"], queryFn: trainingApi.curriculum });
-  const facs = useQuery({ queryKey: ["facilitators"], queryFn: trainingApi.facilitators });
+  const cur = useQuery({ queryKey: ["curriculum"], queryFn: () => trainingApi.curriculum() });
+  const facs = useQuery({ queryKey: ["facilitators"], queryFn: () => trainingApi.facilitators() });
   const [period, setPeriod] = useState("1");
   const [item, setItem] = useState("");
   const [fac, setFac] = useState("");
@@ -94,15 +94,29 @@ function AddSessionForm({ pnid, onClose, onDone }: { pnid: string; onClose: () =
   );
 }
 
+// Matches backend/app/routers/training.py's REASON_REQUIRED_STATUSES — a status
+// change to any of these must carry a non-empty reason or the server rejects it.
+const REASON_REQUIRED_STATUSES = new Set(["not_delivered", "cancelled", "cancelled_late", "delivered_with_issue"]);
+
+// Structured reason choices, matching connected-frontend's equivalent outcome panel
+// (see connected-frontend/index.html's #m-outcome-reason) — kept identical across
+// both frontends so the same operational vocabulary is used everywhere.
+const OUTCOME_REASONS = [
+  "Facilitator unavailable", "Venue unavailable", "Equipment unavailable", "Weather",
+  "Higher-priority activity", "Program changed", "Insufficient time", "Safety concern", "Other",
+];
+
 function SetStatusForm({ session, onClose, onDone }: { session: SessionRow; onClose: () => void; onDone: () => void }) {
   const [status, setStatus] = useState("delivered");
   const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
   const [resched, setResched] = useState("");
   const [att, setAtt] = useState("");
   const [err, setErr] = useState("");
-  const needsReason = status === "not_delivered" || status === "cancelled" || status === "cancelled_late";
+  const needsReason = REASON_REQUIRED_STATUSES.has(status);
+  const fullReason = reason ? (note.trim() ? `${reason} — ${note.trim()}` : reason) : "";
   const m = useMutation({
-    mutationFn: () => trainingApi.setStatus(session.id, { status, reason: reason || undefined,
+    mutationFn: () => trainingApi.setStatus(session.id, { status, reason: fullReason || undefined,
       rescheduled_to_date: resched || undefined, actual_attendance: att ? Number(att) : undefined }),
     onSuccess: onDone, onError: (e) => setErr(e instanceof ApiError ? e.friendly : "Could not set status."),
   });
@@ -114,15 +128,22 @@ function SetStatusForm({ session, onClose, onDone }: { session: SessionRow; onCl
         {["delivered", "delivered_with_issue", "not_delivered", "cancelled", "cancelled_late", "rescheduled", "planned"].map((s) =>
           <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
       </select>
-      {needsReason && (<><label htmlFor="st-reason">Reason {status === "not_delivered" ? "(required)" : ""}</label>
-        <input id="st-reason" value={reason} onChange={(e) => setReason(e.target.value)} /></>)}
+      {needsReason && (<>
+        <label htmlFor="st-reason">Reason (required)</label>
+        <select id="st-reason" value={reason} onChange={(e) => setReason(e.target.value)} aria-required="true">
+          <option value="">— Select a reason —</option>
+          {OUTCOME_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <label htmlFor="st-note">Additional notes (optional)</label>
+        <input id="st-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Any further detail…" />
+      </>)}
       {status === "rescheduled" && (<><label htmlFor="st-res">Rescheduled to</label>
         <input id="st-res" type="date" value={resched} onChange={(e) => setResched(e.target.value)} /></>)}
       {(status === "delivered" || status === "delivered_with_issue") && (<><label htmlFor="st-att">Actual attendance</label>
         <input id="st-att" type="number" min={0} value={att} onChange={(e) => setAtt(e.target.value)} /></>)}
       {err && <div className="err" role="alert">{err}</div>}
       <div className="row-actions">
-        <Button onClick={() => m.mutate()} disabled={m.isPending || (status === "not_delivered" && !reason.trim())}>Save status</Button>
+        <Button onClick={() => m.mutate()} disabled={m.isPending || (needsReason && !reason)}>Save status</Button>
         <Button variant="out" onClick={onClose}>Cancel</Button>
       </div>
     </div>

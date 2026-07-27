@@ -10,7 +10,8 @@ import type {
   MissionItem, PlanningLocation, PlanningFacilitator, LocalLesson,
   WingHQEvent, CommandCentreData, PlanningConflict, HolidayPeriod,
   NightSummariesResponse, PlanningFacilitatorLeave, FacilitatorLeaveResult,
-  FacilitatorWorkload, EquipmentItem, AnchorEvent,
+  FacilitatorWorkload, EquipmentItem, AnchorEvent, PlanningSession,
+  DashboardChartsResponse,
 } from "./types";
 
 /** Handles both legacy array shape `[...]` and current `{"conflicts":[...]}` shape. */
@@ -50,11 +51,14 @@ export const orgApi = {
 };
 
 export const trainingApi = {
-  curriculum: () => api.get<{ items: CurriculumItem[] }>("/api/curriculum"),
+  // squadron_id (optional): lets a wing/national viewer see a specific squadron's
+  // data without needing Proxy/Delegated Intervention Mode — see backend/app/
+  // routers/training.py's _view_squadron_id (master transformation plan Block 8).
+  curriculum: (squadron_id?: string) => api.get<{ items: CurriculumItem[] }>(`/api/curriculum${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   curriculumSessions: (cid: string) => api.get<SessionRow[]>(`/api/curriculum/${cid}/sessions`),
   paradeNights: (squadron_id?: string) => api.get<ParadeNightWithSessions[]>(`/api/parade-nights${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   paradeNight: (id: string) => api.get<ParadeNightDetail>(`/api/parade-nights/${id}`),
-  createParadeNight: (b: { date: string; term?: number; session_count?: number; parade_type?: string }) =>
+  createParadeNight: (b: { date: string; term?: string; session_count?: number; parade_type?: string }) =>
     api.post<{ ok: boolean; parade_night_id: string }>("/api/parade-nights", b),
   publish: (id: string) => api.post<{ ok: boolean }>(`/api/parade-nights/${id}/publish`),
   close: (id: string) => api.post<{ ok: boolean }>(`/api/parade-nights/${id}/close`),
@@ -62,25 +66,38 @@ export const trainingApi = {
   editSession: (id: string, b: Record<string, unknown>) => api.put<{ ok: boolean }>(`/api/sessions/${id}`, b),
   setStatus: (id: string, b: { status: string; reason?: string; rescheduled_to_date?: string; actual_attendance?: number }) =>
     api.post<{ ok: boolean }>(`/api/sessions/${id}/status`, b),
-  facilitators: () => api.get<Facilitator[]>("/api/facilitators"),
-  addFacilitator: (b: { first_name: string; last_name: string; current_rank?: string; type?: string; subject_areas?: string[] }) =>
+  facilitators: (squadron_id?: string) => api.get<Facilitator[]>(`/api/facilitators${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
+  addFacilitator: (b: { first_name: string; last_name: string; current_rank?: string; type?: string; subject_areas?: string[]; confirm_duplicate?: boolean }) =>
     api.post<{ ok: boolean; facilitator_id: string }>("/api/facilitators", b),
   updateFacilitator: (id: string, b: { subject_areas?: string[]; type?: string; current_rank?: string }) =>
     api.patch<{ ok: boolean; facilitator_id: string; subject_areas: string[] }>(`/api/facilitators/${id}`, b),
   facilitatorStats: (id: string) => api.get<FacilitatorStats>(`/api/facilitators/${id}/stats`),
-  trainingAreas: () => api.get<TrainingArea[]>("/api/training-areas"),
-  equipment: () => api.get<Equipment[]>("/api/equipment"),
+  facilitatorImportTemplate: () => api.get<string>("/api/facilitators/import/template.csv"),
+  importFacilitatorsCsv: (file: File, opts: { preview: boolean; confirmDuplicateRows?: number[] }) => {
+    const form = new FormData();
+    form.append("file", file);
+    const params = new URLSearchParams({ preview: String(opts.preview) });
+    if (opts.confirmDuplicateRows?.length) params.set("confirm_duplicate_rows", opts.confirmDuplicateRows.join(","));
+    return api.postForm<{
+      ok: boolean; preview: boolean;
+      rows?: { row: number; action: string; message?: string; first_name: string | null; last_name: string }[];
+      to_create?: number; duplicates?: number; errors: number;
+      created?: number; skipped?: number; created_ids?: string[]; total?: number;
+    }>(`/api/facilitators/import?${params}`, form);
+  },
+  trainingAreas: (squadron_id?: string) => api.get<TrainingArea[]>(`/api/training-areas${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
+  equipment: (squadron_id?: string) => api.get<Equipment[]>(`/api/equipment${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   clashes: (date: string) => api.get<ClashResult>(`/api/resources/clashes?date=${date}`),
   cadets: () => api.get<Cadet[]>("/api/cadets"),
   cadetRisk: () => api.get<CadetRiskFlag[]>("/api/cadets/risk"),
 };
 
 export const reportApi = {
-  summary: () => api.get<SummaryReport>("/api/reports/summary"),
+  summary: (squadron_id?: string) => api.get<SummaryReport>(`/api/reports/summary${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   readiness: () => api.get<ReadinessReport>("/api/reports/readiness"),
   coverage: () => api.get<CoverageReport>("/api/reports/curriculum-coverage"),
-  facLoad: () => api.get<FacLoadReport>("/api/reports/facilitator-load"),
-  notDelivered: () => api.get<NotDeliveredReport>("/api/reports/not-delivered"),
+  facLoad: (squadron_id?: string) => api.get<FacLoadReport>(`/api/reports/facilitator-load${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
+  notDelivered: (squadron_id?: string) => api.get<NotDeliveredReport>(`/api/reports/not-delivered${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   wingOverview: () => api.get<WingOverview>("/api/reports/wing-overview"),
   nationalOverview: () => api.get<NationalOverview>("/api/reports/national-overview"),
   nationalCapability: () => api.get<NationalCapability>("/api/reports/national-capability"),
@@ -132,6 +149,19 @@ export const healthApi = {
   ready: () => api.get<{ status: string }>("/api/health/ready"),
 };
 
+export const dashboardApi = {
+  charts: (window: "week" | "term" | "year" = "term", squadron_id?: string) =>
+    api.get<DashboardChartsResponse>(
+      `/api/dashboard/charts?window=${window}${squadron_id ? `&squadron_id=${squadron_id}` : ""}`
+    ),
+  strategic: (window: "term" | "year" = "year") =>
+    api.get<DashboardChartsResponse>(`/api/dashboard/charts/strategic?window=${window}`),
+  facilitatorSchedule: (window: "week" | "term" | "year" = "year", squadron_id?: string) =>
+    api.get<import("./types").FacilitatorScheduleResponse>(
+      `/api/dashboard/facilitator-schedule?window=${window}${squadron_id ? `&squadron_id=${squadron_id}` : ""}`
+    ),
+};
+
 // ─── Planning Workspace API ─────────────────────────────────────────────────
 export const planningApi = {
   years: () => api.get<PlanningYear[]>("/api/planning/years"),
@@ -147,11 +177,15 @@ export const planningApi = {
   },
   weeklyProgram: (date_id: string) =>
     api.get<WeeklyProgramData>(`/api/planning/parade-dates/${date_id}/weekly-program`),
-  missions: (year_id: string, opts: { status?: string; phase?: string; search?: string } = {}) => {
+  missions: (year_id: string, opts: {
+    status?: string; phase?: string; search?: string; start_date?: string; end_date?: string;
+  } = {}) => {
     const p = new URLSearchParams();
     if (opts.status) p.set("status", opts.status);
     if (opts.phase) p.set("phase", opts.phase);
     if (opts.search) p.set("search", opts.search);
+    if (opts.start_date) p.set("start_date", opts.start_date);
+    if (opts.end_date) p.set("end_date", opts.end_date);
     const qs = p.toString();
     return api.get<{ planning_year_id: string; year: number; total: number; scheduled_count: number; missions: MissionItem[] }>(
       `/api/planning/years/${year_id}/missions${qs ? `?${qs}` : ""}`
@@ -178,6 +212,8 @@ export const planningApi = {
     activity_title?: string; facilitator_id?: string; location_id?: string;
     part_number?: number; notes?: string;
   }) => api.post<Record<string, unknown>>(`/api/planning/parade-dates/${date_id}/sessions`, body),
+  getSession: (session_id: string) =>
+    api.get<PlanningSession>(`/api/planning/sessions/${session_id}`),
   updateSession: (session_id: string, body: {
     curriculum_id?: string | null; activity_title?: string | null;
     facilitator_id?: string | null; assistant_facilitator_id?: string | null;
@@ -206,6 +242,29 @@ export const planningApi = {
   }) => api.post<{ ok: boolean; created: number; linked: number; dates: string[] }>(
     `/api/planning/years/${year_id}/generate-parade-dates`, body,
   ),
+  rolloverYear: (year_id: string, body: {
+    target_year?: number; name?: string;
+    copy_holidays?: boolean; carry_incomplete_sessions?: boolean;
+  }) => api.post<{
+    ok: boolean; new_planning_year_id: string; year: number; name: string;
+    holidays_copied: number; parade_dates_copied: number; incomplete_sessions_noted: number;
+  }>(`/api/planning/years/${year_id}/rollover`, body),
+  listTimingTemplates: (squadron_id?: string) =>
+    api.get<import("./types").TimingTemplateFull[]>(`/api/timing-templates${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
+  applyTimingTemplateFromDate: (template_id: string, body: { effective_from: string; reason?: string }) =>
+    api.post<{ ok: boolean; effective_from: string; closed_previous_count: number }>(
+      `/api/timing-templates/${template_id}/apply-from-date`, body,
+    ),
+  updateFutureParadeDay: (year_id: string, body: {
+    new_weekday: number; from_date?: string; exclude_ids?: string[];
+    reason?: string; preview?: boolean;
+  }) => api.post<{
+    ok: boolean; preview: boolean;
+    changes?: { parade_date_id: string; old_date: string; new_date: string; term: string | null;
+      week_number: number | null; has_sessions: boolean; conflicts: string[]; blocked: boolean }[];
+    to_update?: number; blocked?: number;
+    updated?: number; skipped?: number; exceptions_preserved: number;
+  }>(`/api/planning/years/${year_id}/update-future-parade-day`, body),
   listAnchors: (year_id: string) =>
     api.get<AnchorEvent[]>(`/api/planning/years/${year_id}/anchors`),
   createAnchor: (year_id: string, body: {
@@ -239,7 +298,7 @@ export const planningApi = {
     api.get<FacilitatorWorkload>(`/api/planning/years/${year_id}/facilitators/${fac_id}/workload`),
 
   // ── Facilitator create (via training endpoint) ──────────────────────────────
-  createFacilitator: (body: { first_name: string; last_name: string; current_rank?: string; type?: string; subject_areas?: string[] }) =>
+  createFacilitator: (body: { first_name: string; last_name: string; current_rank?: string; type?: string; subject_areas?: string[]; confirm_duplicate?: boolean }) =>
     api.post<{ ok: boolean; facilitator_id: string }>('/api/facilitators', body),
 
   // ── Equipment ───────────────────────────────────────────────────────────────

@@ -21,11 +21,11 @@ from ..database import get_db
 from ..dependencies import get_principal
 from ..database import utcnow
 from ..models import (
-    User, Wing, Squadron, AuditLog, SystemSetting, AccessCode,
+    User, Wing, Squadron, AuditLog, SystemSetting, AccessCode, IpLoginAttempt,
     PlanningYear, ParadeDate, Session, CurriculumItem, NationalEntity,
 )
 from ..permissions import Principal, require_system_admin, require_audit_access
-from ..security import generate_code, hash_code
+from ..security import generate_code, hash_code, reset_rate_limiter, reset_api_rate_limiter
 from ..services import audit
 
 router = APIRouter(prefix="/api/system", tags=["system"])
@@ -134,11 +134,31 @@ def system_version(p: Principal = Depends(get_principal)):
 # ── GET /api/system/migrations ───────────────────────────────────────────────
 
 @router.get("/migrations")
-def system_migrations(p: Principal = Depends(get_principal)):
+def system_migrations(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Return the live Alembic revision(s) from the alembic_version table.
+
+    Used by the staging deployment gate to verify migration b2c3d4e5f6a7 applied.
+    Requires system_admin. Returns:
+      revisions       — list of version_num rows (empty list = no migration ever ran)
+      is_single_head  — true when exactly one revision present (expected state)
+      revision        — the single revision string, or null if 0 or >1 rows
+    """
     require_system_admin(p)
+    try:
+        rows = db.execute(text("SELECT version_num FROM alembic_version")).fetchall()
+        revisions = [r[0] for r in rows]
+    except Exception as exc:
+        return {
+            "revisions": [],
+            "is_single_head": False,
+            "revision": None,
+            "error": str(exc),
+        }
+    single = len(revisions) == 1
     return {
-        "expected_head": "q2r3s4t5u6v7",
-        "current": _migration_head(),
+        "revisions": revisions,
+        "is_single_head": single,
+        "revision": revisions[0] if single else None,
     }
 
 
@@ -152,6 +172,8 @@ def get_maintenance(db: DBSession = Depends(get_db), p: Principal = Depends(get_
         "message": _get_setting(db, "maintenance_message"),
         "until": _get_setting(db, "maintenance_until"),
         "updated_at": _get_setting(db, "maintenance_updated_at"),
+        "block_reads": _get_setting(db, "maintenance_block_reads", "false") == "true",
+        "block_logins": _get_setting(db, "maintenance_block_logins", "false") == "true",
     }
 
 
@@ -159,6 +181,8 @@ class MaintenanceIn(BaseModel):
     message: str | None = None
     until: str | None = None
     confirm: str = ""
+    block_reads: bool = False
+    block_logins: bool = False
 
 
 @router.post("/maintenance/enable")
@@ -171,26 +195,32 @@ def enable_maintenance(body: MaintenanceIn, db: DBSession = Depends(get_db),
     _set_setting(db, "maintenance_mode", "on", p.user_id)
     _set_setting(db, "maintenance_message", body.message or "System under maintenance. Please try again later.", p.user_id)
     _set_setting(db, "maintenance_until", body.until, p.user_id)
+    _set_setting(db, "maintenance_block_reads", "true" if body.block_reads else "false", p.user_id)
+    _set_setting(db, "maintenance_block_logins", "true" if body.block_logins else "false", p.user_id)
     _set_setting(db, "maintenance_updated_at",
                  datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), p.user_id)
     audit(db, p, object_type="system", object_id="maintenance",
           action="maintenance_enabled",
-          new={"message": body.message, "until": body.until})
+          new={"message": body.message, "until": body.until,
+               "block_reads": body.block_reads, "block_logins": body.block_logins})
     from ..main import invalidate_maintenance_cache
     invalidate_maintenance_cache()
-    return {"enabled": True, "message": body.message, "until": body.until}
+    return {"enabled": True, "message": body.message, "until": body.until,
+            "block_reads": body.block_reads, "block_logins": body.block_logins}
 
 
 @router.post("/maintenance/disable")
 def disable_maintenance(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     require_system_admin(p)
     _set_setting(db, "maintenance_mode", "off", p.user_id)
+    _set_setting(db, "maintenance_block_reads", "false", p.user_id)
+    _set_setting(db, "maintenance_block_logins", "false", p.user_id)
     _set_setting(db, "maintenance_updated_at",
                  datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), p.user_id)
     audit(db, p, object_type="system", object_id="maintenance", action="maintenance_disabled")
     from ..main import invalidate_maintenance_cache
     invalidate_maintenance_cache()
-    return {"enabled": False}
+    return {"enabled": False, "block_reads": False, "block_logins": False}
 
 
 # ── GET /api/system/scope-map ─────────────────────────────────────────────────
@@ -382,25 +412,36 @@ def pg_dump_backup(db: DBSession = Depends(get_db), p: Principal = Depends(get_p
 
 # ── POST /api/system/bootstrap-staging ───────────────────────────────────────
 
+class BootstrapIn(BaseModel):
+    wing_code: str | None = None   # defaults to the first active Wing in the DB
+    sqn_code: str | None = None    # defaults to first active Squadron under that Wing
+    sqn_name: str | None = None    # name to use when creating the squadron (if absent)
+
+
 @router.post("/bootstrap-staging")
-def bootstrap_staging(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def bootstrap_staging(body: BootstrapIn | None = None,
+                      db: DBSession = Depends(get_db),
+                      p: Principal = Depends(get_principal)):
     """One-time setup helper for staging / development environments.
 
-    Creates 703SQN under 7WG (if missing) and one account each for
-    national_admin, wing_admin (7WG), and sqn_admin (703SQN) if no active
-    account of that role+scope already exists.
+    Creates the first available squadron under the requested (or first) wing,
+    plus one account each for national_admin, wing_admin, and sqn_admin if no
+    active account of that role+scope already exists.
+
+    Accepts optional JSON body: {"wing_code": "7WG", "sqn_code": "703", "sqn_name": "703 SQN AAFC"}
+    If omitted, uses the first active Wing and first active Squadron found.
 
     Returns newly created accounts with one-time access codes. Codes are never
     stored in plaintext — only the hash is persisted. Rejected in production.
     """
     require_system_admin(p)
-    env = settings.ENVIRONMENT or ""
-    if env.lower() == "production":
+    if settings.is_prod:
         raise HTTPException(403, detail={
             "error": "not_allowed_in_production",
             "message": "Bootstrap is not available in the production environment.",
         })
 
+    bdy = body or BootstrapIn()
     results = []
     created_accounts = []
 
@@ -411,34 +452,44 @@ def bootstrap_staging(db: DBSession = Depends(get_db), p: Principal = Depends(ge
             "message": "No NationalEntity found. Run migrations and initial seed first.",
         })
 
-    wing = db.query(Wing).filter(Wing.code == "7WG", Wing.is_archived == False).first()  # noqa: E712
+    # Resolve wing: use provided code, or fall back to first active Wing.
+    wing_q = db.query(Wing).filter(Wing.is_archived == False)  # noqa: E712
+    if bdy.wing_code:
+        wing_q = wing_q.filter(Wing.code == bdy.wing_code)
+    wing = wing_q.first()
     if not wing:
-        raise HTTPException(422, detail={
-            "error": "7WG_not_found",
-            "message": "7WG not found. Create it first via System Console → Scope Map → Create Wing.",
-        })
+        detail_msg = (
+            f"Wing '{bdy.wing_code}' not found." if bdy.wing_code
+            else "No active Wing found. Create one first via System Console → Scope Map."
+        )
+        raise HTTPException(422, detail={"error": "wing_not_found", "message": detail_msg})
 
-    # Create 703SQN if missing
-    sqn = db.query(Squadron).filter(Squadron.code == "703", Squadron.is_archived == False).first()  # noqa: E712
+    # Resolve squadron: use provided code under this wing, or fall back to first active.
+    sqn_q = db.query(Squadron).filter(Squadron.wing_id == wing.id, Squadron.is_archived == False)  # noqa: E712
+    if bdy.sqn_code:
+        sqn_q = sqn_q.filter(Squadron.code == bdy.sqn_code)
+    sqn = sqn_q.first()
     sqn_created = False
     if not sqn:
-        sqn = Squadron(wing_id=wing.id, code="703", name="703 Squadron AAFC",
-                       short_name="703 SQN", unit_type="standard_squadron",
+        sqn_code = bdy.sqn_code or "001"
+        sqn_name = bdy.sqn_name or f"{sqn_code} Squadron AAFC"
+        sqn = Squadron(wing_id=wing.id, code=sqn_code, name=sqn_name,
+                       short_name=f"{sqn_code} SQN", unit_type="standard_squadron",
                        active_status=True, created_by=p.user_id)
         db.add(sqn)
         db.flush()
         audit(db, p, object_type="squadron", object_id=sqn.id, action="create",
-              new={"code": "703", "name": "703 Squadron AAFC", "wing": "7WG",
+              new={"code": sqn_code, "name": sqn_name, "wing": wing.code,
                    "source": "staging_bootstrap"})
         sqn_created = True
-    results.append({"type": "squadron", "code": "703", "name": sqn.name, "created": sqn_created})
+    results.append({"type": "squadron", "code": sqn.code, "name": sqn.name, "created": sqn_created})
 
     account_specs = [
         {"role": "national_admin", "display_name": "National Admin",
          "national_id": nat.id, "wing_id": None, "squadron_id": None},
-        {"role": "wing_admin", "display_name": "7WG Wing Admin",
+        {"role": "wing_admin", "display_name": f"{wing.code} Wing Admin",
          "national_id": None, "wing_id": wing.id, "squadron_id": None},
-        {"role": "sqn_admin", "display_name": "703 SQN Admin",
+        {"role": "sqn_admin", "display_name": f"{sqn.code} SQN Admin",
          "national_id": None, "wing_id": wing.id, "squadron_id": sqn.id},
     ]
 
@@ -481,8 +532,54 @@ def bootstrap_staging(db: DBSession = Depends(get_db), p: Principal = Depends(ge
     db.commit()
 
     return {
-        "environment": env,
+        "environment": settings.ENVIRONMENT,
         "results": results,
         "accounts_created": created_accounts,
         "notice": "Codes shown here will NOT be retrievable again. Record each code now.",
     }
+
+
+@router.post("/reset-rate-limits")
+def reset_rate_limits(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Test/staging-only: clear all rate-limit and login-lockout state.
+
+    DEFECT-004 (general-release qualification): repeated/rapid automated test
+    runs (Playwright e2e, load/staging validation) against a long-lived backend
+    process were tripping the general API rate limiter, the DB-backed per-IP
+    login limiter, and the per-account lockout -- producing flaky 429s/423s
+    unrelated to the feature under test, with "restart the backend" as the
+    only prior workaround. backend/tests/conftest.py already resets all three
+    in-process before every pytest test; this is the same reset exposed over
+    HTTP so an external test runner (a separate process) can call it between
+    test files/runs without weakening any limiter's real thresholds. Rejected
+    in production, same guard as bootstrap-staging above.
+
+    Requires a normal system_admin bearer token -- no alternate auth path.
+    Known limitation: if the IP this endpoint would clear is *already* fully
+    locked out before it's called, the caller cannot log in to obtain that
+    token either (login_blocked_db is checked before code verification for
+    every login attempt, including a correct system_admin code), so this
+    specific endpoint cannot self-heal that one edge case. That is an
+    accepted gap, not silently worked around: an authentication bypass for
+    this endpoint was considered and deliberately rejected, since it would
+    weaken the same login-lockout protection this endpoint exists to reset --
+    see docs/beta/15_known_limitations.md. In practice this only occurs if a
+    *previous* run left the IP locked out and this reset was never called at
+    its own start; the existing 900s lockout window (or, if urgent, a manual
+    backend restart) remains the fallback for that specific case.
+    """
+    require_system_admin(p)
+    if settings.is_prod:
+        raise HTTPException(403, detail={
+            "error": "not_allowed_in_production",
+            "message": "Rate-limit reset is not available in the production environment.",
+        })
+    reset_rate_limiter()
+    reset_api_rate_limiter()
+    db.query(IpLoginAttempt).delete()
+    for ac in db.query(AccessCode).all():
+        ac.failed_attempts = 0
+        ac.locked_until = None
+    db.commit()
+    audit(db, p, object_type="system", object_id="rate_limits", action="reset_rate_limits")
+    return {"ok": True}

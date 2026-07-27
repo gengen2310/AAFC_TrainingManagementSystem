@@ -5,6 +5,11 @@ import { visibleRoutes } from "../auth/roleGuards";
 import { isWing, isNational, isAuditor, isAdmin, isSystemAdmin, canManageAccounts } from "../auth/permissions";
 import { ProxyControls } from "./ProxyControls";
 import { useProxyGuard } from "../auth/useProxyGuard";
+import { SquadronSelector } from "./SquadronSelector";
+
+const TMS_URL =
+  (document.querySelector('meta[name="aafc-tms-base"]') as HTMLMetaElement | null)
+    ?.content || "https://aafc-tms-frontend-production.up.railway.app";
 
 const THEMES = ["light", "dark", "hc"] as const;
 type Theme = typeof THEMES[number];
@@ -54,6 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavItem to="/curriculum" label="Curriculum" />
             <div className="nav-group">Capability</div>
             <NavItem to="/facilitators" label="Facilitators" />
+            <NavItem to="/facilitator-schedule" label="Facilitator Schedule" />
             <NavItem to="/resources" label="Resources" />
             {r.cadets && <NavItem to="/cadets" label="Cadets" />}
             <div className="nav-group">Assurance</div>
@@ -67,7 +73,12 @@ export function AppShell({ children }: { children: ReactNode }) {
               <NavItem to="/admin" label="Admin / Settings" /></>}
           </>}
 
-          {/* WING — assurance & comparison first; squadron editing only via Proxy Mode */}
+          {/* WING — retains the full Squadron function set (master transformation plan
+              Block 8: "Wing users must retain the relevant Squadron pages/functions,
+              then receive additional scope/analytics/governance capability" — not a
+              separate, reduced page set). Viewing any squadron's pages below uses the
+              Squadron selector and needs no Proxy Mode (viewing is broad by design);
+              writing to that squadron still requires entering Proxy Mode. */}
           {wing && <>
             <div className="nav-group">Wing Assurance</div>
             <NavItem to="/wing-overview" label="Wing Dashboard" />
@@ -76,13 +87,27 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavItem to="/action-items" label="Action Items" />
             <NavItem to="/audit" label="Audit" />
             <NavItem to="/accounts" label="Account Management" />
-            <div className="nav-group">Squadron support</div>
-            <NavItem to="/dashboard" label="Squadron Drill-down" />
+            <div className="nav-group">Squadron Functions</div>
+            <SquadronSelector />
+            <NavItem to="/dashboard" label="Dashboard" />
+            <NavItem to="/calendar" label="Calendar" />
+            <NavItem to="/parade-nights" label="Parade Nights" />
+            <NavItem to="/weekly-program" label="Weekly Program" />
+            <NavItem to="/curriculum" label="Curriculum" />
+            <NavItem to="/facilitators" label="Facilitators" />
+            <NavItem to="/facilitator-schedule" label="Facilitator Schedule" />
+            <NavItem to="/resources" label="Resources" />
+            <NavItem to="/planning" label="Planning Workspace" />
+            <div className="nav-group">Proxy Mode (required to edit a squadron)</div>
             <ProxyControls kind="proxy" />
           </>}
 
-          {/* NATIONAL — cross-wing assurance; squadron editing only via Intervention */}
-          {national && <>
+          {/* NATIONAL — cross-wing assurance; squadron editing only via Intervention.
+              isNational() also returns true for the auditor role (matching the backend's
+              NATIONAL_LEVEL grouping in permissions.py, which is correct for view-scope
+              purposes elsewhere in the app) — excluded here so auditor sessions render only
+              their own dedicated nav block below, not both. */}
+          {national && !auditor && <>
             <div className="nav-group">National Assurance</div>
             <NavItem to="/national-overview" label="National Dashboard" />
             <NavItem to="/wing-overview" label="Wing Drill-down" />
@@ -91,8 +116,19 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavItem to="/action-items" label="Action Items" />
             <NavItem to="/audit" label="Audit" />
             {canManageAccounts(session) && <NavItem to="/accounts" label="Account Management" />}
+            <div className="nav-group">Squadron Functions</div>
+            <SquadronSelector />
+            <NavItem to="/dashboard" label="Dashboard" />
+            <NavItem to="/calendar" label="Calendar" />
+            <NavItem to="/parade-nights" label="Parade Nights" />
+            <NavItem to="/weekly-program" label="Weekly Program" />
+            <NavItem to="/curriculum" label="Curriculum" />
+            <NavItem to="/facilitators" label="Facilitators" />
+            <NavItem to="/facilitator-schedule" label="Facilitator Schedule" />
+            <NavItem to="/resources" label="Resources" />
+            <NavItem to="/planning" label="Planning Workspace" />
             {(session?.role === "national_admin" || isSystemAdmin(session)) &&
-              <><div className="nav-group">Intervention</div><ProxyControls kind="intervention" /></>}
+              <><div className="nav-group">Intervention (required to edit a squadron)</div><ProxyControls kind="intervention" /></>}
             {isSystemAdmin(session) && <><div className="nav-group">System</div>
               <NavItem to="/admin" label="Admin / Settings" /></>}
           </>}
@@ -109,6 +145,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {/* Account — visible to every authenticated user */}
           <div className="nav-group">Account</div>
           <NavItem to="/settings" label="Access Codes" />
+          <a href={TMS_URL} className="nav-item nav-item-ext" rel="noopener noreferrer">&#8592; Main TMS</a>
         </nav>
         <main id="main" className="main" tabIndex={-1}>{children}</main>
       </div>

@@ -74,7 +74,7 @@ import os
 import re
 import sys
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 # ── Bootstrap: add backend to PYTHONPATH ────────────────────────────────────
@@ -472,7 +472,7 @@ def run_import(
                         changed = True
                 if changed:
                     existing.year = event_year
-                    existing.updated_at = datetime.utcnow()
+                    existing.updated_at = datetime.now(timezone.utc)
                     updated += 1
                 else:
                     skipped += 1
@@ -483,8 +483,8 @@ def run_import(
                     year=event_year,
                     source_system=source_system,
                     source_reference=source_ref,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
                     is_archived=False,
                     **row_data,
                 )

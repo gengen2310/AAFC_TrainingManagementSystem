@@ -1,5 +1,5 @@
 """Per-account and DB-backed IP lockout tests."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import text
@@ -28,7 +28,7 @@ def _set_account_locked(user_code: str, minutes: int = 30) -> None:
     Uses raw SQL to bypass the ORM identity map so subsequent requests see fresh state.
     """
     ac_id = _find_ac_id(user_code)
-    locked_dt = datetime.utcnow() + timedelta(minutes=minutes)
+    locked_dt = datetime.now(timezone.utc) + timedelta(minutes=minutes)
     with engine.begin() as conn:
         conn.execute(
             text("UPDATE access_codes SET locked_until=:lu, failed_attempts=5 WHERE id=:id"),
@@ -112,7 +112,7 @@ def test_account_lockout_does_not_affect_other_accounts(client):
 def test_successful_login_resets_account_lockout(client):
     # Directly set a past locked_until (already expired) so login still succeeds but resets counters
     ac_id = _find_ac_id("ADMIN703")
-    expired_dt = datetime.utcnow() - timedelta(minutes=1)
+    expired_dt = datetime.now(timezone.utc) - timedelta(minutes=1)
     with engine.begin() as conn:
         conn.execute(
             text("UPDATE access_codes SET locked_until=:lu, failed_attempts=3 WHERE id=:id"),
@@ -338,3 +338,17 @@ def test_lookup_user_id_scope_prevents_wrong_code(client):
     uid = r.json()["user_id"]
     r2 = client.post("/api/auth/login", json={"user_id": uid, "code": "703SQN2026"})
     assert r2.status_code == 401
+
+
+def test_lockout_message_is_generic_not_7wg_specific(client):
+    """Lockout message must not mention '7 Wing' — it must be Wing-agnostic."""
+    _set_account_locked("703SQN2026")
+    try:
+        r = client.post("/api/auth/login", json={"code": "703SQN2026"})
+        assert r.status_code == 429
+        detail = r.json().get("detail", {})
+        msg = detail.get("message", "")
+        assert "7 Wing" not in msg, f"Lockout message is Wing-specific: {msg!r}"
+        assert "Wing SOCAD" in msg or "SOCAD" in msg, f"Expected SOCAD contact hint in: {msg!r}"
+    finally:
+        _clear_account_lock("703SQN2026")

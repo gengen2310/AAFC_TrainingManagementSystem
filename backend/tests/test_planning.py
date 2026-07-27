@@ -166,6 +166,45 @@ def test_generate_parade_dates_invalid_format(client):
     assert r.status_code == 400
 
 
+def test_generate_parade_dates_applies_time_override(client):
+    # 704 squadron has no pre-seeded parade nights, so the generated date is genuinely new.
+    hdr = login(client, "ADMIN704")
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.post(
+        f"/api/planning/years/{yr_id}/generate-parade-dates",
+        json={
+            "weekday": 4, "start_date": "2026-08-07", "end_date": "2026-08-07",
+            "exclude_holidays": False,
+            "parade_start_time": "18:15", "parade_end_time": "20:45",
+        },
+        headers=hdr,
+    )
+    assert r.status_code == 200
+    assert r.json()["created"] == 1
+    pn_list = client.get("/api/parade-nights", headers=hdr).json()
+    pn = next(p for p in pn_list if p["date"] == "2026-08-07")
+    assert pn["start_time"] == "18:15"
+    assert pn["end_time"] == "20:45"
+
+
+def test_generate_parade_dates_yearly_frequency(client):
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.post(
+        f"/api/planning/years/{yr_id}/generate-parade-dates",
+        json={
+            "weekday": 4, "start_date": "2026-04-25", "end_date": "2028-04-25",
+            "exclude_holidays": False, "frequency": "yearly",
+        },
+        headers=hdr,
+    )
+    assert r.status_code == 200
+    d = r.json()
+    assert d["dates"] == ["2026-04-25", "2027-04-25", "2028-04-25"]
+
+
 def test_general_cannot_delete_parade_date(client):
     sqn_hdr = _sqn_admin_hdr(client)
     year = _make_year(client, sqn_hdr)
@@ -407,6 +446,67 @@ def test_location_update(client):
                      json={"capacity": 40}, headers=hdr)
     assert r.status_code == 200
     assert r.json()["capacity"] == 40
+
+
+# ─────────────────────────────────────────────────────────────
+# Rooms merger (master transformation plan, Phase 1): /api/planning/locations
+# and /api/training-areas must now be two views over the same canonical
+# training_areas table, not two separate tables (the old DL-01 duplication).
+# ─────────────────────────────────────────────────────────────
+
+def test_room_created_via_connected_frontend_visible_in_planning_workspace(client):
+    """A room added via /api/training-areas (connected-frontend's Resources
+    page) must be immediately visible via /api/planning/locations (Planning
+    Workspace's Rooms tab) — same table, not a separate copy."""
+    hdr = _sqn_admin_hdr(client)
+    rt = client.post("/api/training-areas",
+                      json={"name": "Cross-App Test Room", "type": "Classroom", "capacity": 25},
+                      headers=hdr)
+    assert rt.status_code == 200
+    r = client.get("/api/planning/locations", headers=hdr)
+    assert r.status_code == 200
+    names = [l["name"] for l in r.json()]
+    assert "Cross-App Test Room" in names
+
+
+def test_room_created_via_planning_workspace_visible_in_connected_frontend(client):
+    """The reverse direction: a room added via /api/planning/locations must
+    be immediately visible via /api/training-areas."""
+    hdr = _sqn_admin_hdr(client)
+    rl = client.post("/api/planning/locations",
+                      json={"name": "Reverse Cross-App Room", "location_type": "Outdoor", "capacity": 40},
+                      headers=hdr)
+    assert rl.status_code == 200
+    r = client.get("/api/training-areas", headers=hdr)
+    assert r.status_code == 200
+    names = [ta["name"] for ta in r.json()]
+    assert "Reverse Cross-App Room" in names
+
+
+def test_room_created_via_planning_workspace_attaches_to_a_session(client):
+    """Regression for a real, live bug: create_session/update_session's room
+    resolution only ever looked up TrainingArea rows (`db.get(TrainingArea,
+    body.location_id)`), so a room picked from Planning Workspace's Rooms tab
+    (previously backed by the separate planning_locations table) silently
+    failed to attach — the session was created with no room, no error. Now
+    that /api/planning/locations reads/writes training_areas directly, a room
+    id from that endpoint must resolve correctly."""
+    hdr = _sqn_admin_hdr(client)
+    rl = client.post("/api/planning/locations",
+                      json={"name": "Attach Test Room", "location_type": "indoor"}, headers=hdr)
+    loc_id = rl.json()["location_id"]
+
+    yr_id, pd_id = _setup_year_with_date(client, hdr)
+    r = client.post(
+        f"/api/planning/parade-dates/{pd_id}/sessions",
+        json={"cadet_group": "junior", "session_number": 1,
+              "activity_title": "Room Attach Test", "location_id": loc_id},
+        headers=hdr,
+    )
+    assert r.status_code == 200
+    d = r.json()
+    assert d["location_id"] == loc_id
+    assert d["location_name"] == "Attach Test Room"
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1013,3 +1113,457 @@ def test_sqn_admin_auth_me_returns_wing_code(client):
     session = r.json()["session"]
     assert session.get("wing_code") == "7WG", \
         f"wing_code must be '7WG' for ADMIN703 (under 7 Wing), got {session.get('wing_code')}"
+
+
+# ─────────────────────────────────────────────────────────────
+# IDOR / cross-squadron tenancy regression tests (2026-07-13)
+#
+# facilitator-leave, notices, and CEA endpoints checked only the caller's
+# ROLE (require_role) and never checked that the object being read/written
+# actually belonged to the caller's own squadron/wing. A same-role admin
+# from a different squadron (or, for CEA import, a wing_admin from a
+# different wing) could read or write another organisation's data.
+# Fixed by adding require_can_view_squadron/require_can_write_squadron
+# (facilitator-leave) and _require_year_access (notices, CEA) after
+# fetching the target object. These tests prove the cross-tenant paths
+# are now denied and same-tenant access still works.
+# ─────────────────────────────────────────────────────────────
+
+def _other_sqn_admin_hdr(client):
+    """Admin for squadron 701 — a different squadron from 703, same wing (7WG)."""
+    return login(client, "ADMIN701")
+
+
+def _seed_703_facilitator_id(client, hdr703):
+    r = client.get("/api/planning/facilitators", headers=hdr703)
+    assert r.status_code == 200
+    facilitators = r.json()
+    assert facilitators, "expected at least one seeded 703 facilitator"
+    return facilitators[0]["facilitator_id"]
+
+
+def test_facilitator_leave_cross_squadron_list_denied(client):
+    hdr703 = _sqn_admin_hdr(client)
+    fac_id = _seed_703_facilitator_id(client, hdr703)
+    other_hdr = _other_sqn_admin_hdr(client)
+    r = client.get(f"/api/planning/facilitators/{fac_id}/leave", headers=other_hdr)
+    assert r.status_code == 403, r.text
+
+
+def test_facilitator_leave_cross_squadron_create_denied(client):
+    hdr703 = _sqn_admin_hdr(client)
+    fac_id = _seed_703_facilitator_id(client, hdr703)
+    other_hdr = _other_sqn_admin_hdr(client)
+    r = client.post(
+        f"/api/planning/facilitators/{fac_id}/leave",
+        json={"start_date": "2026-08-01", "end_date": "2026-08-05", "reason": "cross-squadron test"},
+        headers=other_hdr,
+    )
+    assert r.status_code == 403, r.text
+
+
+def test_facilitator_leave_cross_squadron_delete_denied(client):
+    hdr703 = _sqn_admin_hdr(client)
+    fac_id = _seed_703_facilitator_id(client, hdr703)
+    r = client.post(
+        f"/api/planning/facilitators/{fac_id}/leave",
+        json={"start_date": "2026-08-01", "end_date": "2026-08-05", "reason": "owner create"},
+        headers=hdr703,
+    )
+    assert r.status_code == 200, r.text
+    leave_id = r.json()["leave"]["id"]
+
+    other_hdr = _other_sqn_admin_hdr(client)
+    r = client.delete(f"/api/planning/facilitator-leave/{leave_id}", headers=other_hdr)
+    assert r.status_code == 403, r.text
+
+
+def test_facilitator_leave_same_squadron_admin_allowed(client):
+    """Regression guard: the fix must not break legitimate same-squadron access."""
+    hdr703 = _sqn_admin_hdr(client)
+    fac_id = _seed_703_facilitator_id(client, hdr703)
+    r = client.post(
+        f"/api/planning/facilitators/{fac_id}/leave",
+        json={"start_date": "2026-09-01", "end_date": "2026-09-03", "reason": "own squadron"},
+        headers=hdr703,
+    )
+    assert r.status_code == 200, r.text
+    leave_id = r.json()["leave"]["id"]
+
+    r = client.get(f"/api/planning/facilitators/{fac_id}/leave", headers=hdr703)
+    assert r.status_code == 200
+    assert any(entry["id"] == leave_id for entry in r.json()["leave"])
+
+    r = client.delete(f"/api/planning/facilitator-leave/{leave_id}", headers=hdr703)
+    assert r.status_code == 200, r.text
+
+
+def _make_parade_date_and_notice(client, hdr, date_str):
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.post(f"/api/planning/years/{yr_id}/parade-dates",
+                     json={"parade_date": date_str}, headers=hdr)
+    assert r.status_code == 200, r.text
+    date_id = r.json()["parade_date_id"]
+    r = client.post(f"/api/planning/parade-dates/{date_id}/notices",
+                     json={"notice_text": "Bring wet-weather gear", "priority": "high"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    return date_id, r.json()["notice_id"]
+
+
+def test_notices_cross_squadron_list_denied(client):
+    hdr703 = _sqn_admin_hdr(client)
+    date_id, _ = _make_parade_date_and_notice(client, hdr703, "2026-08-07")
+    other_hdr = _other_sqn_admin_hdr(client)
+    r = client.get(f"/api/planning/parade-dates/{date_id}/notices", headers=other_hdr)
+    assert r.status_code == 403, r.text
+
+
+def test_notices_cross_squadron_create_denied(client):
+    hdr703 = _sqn_admin_hdr(client)
+    date_id, _ = _make_parade_date_and_notice(client, hdr703, "2026-08-14")
+    other_hdr = _other_sqn_admin_hdr(client)
+    r = client.post(f"/api/planning/parade-dates/{date_id}/notices",
+                     json={"notice_text": "cross-squadron write attempt"}, headers=other_hdr)
+    assert r.status_code == 403, r.text
+
+
+def test_notices_cross_squadron_update_and_archive_denied(client):
+    hdr703 = _sqn_admin_hdr(client)
+    _, notice_id = _make_parade_date_and_notice(client, hdr703, "2026-08-21")
+    other_hdr = _other_sqn_admin_hdr(client)
+
+    r = client.patch(f"/api/planning/notices/{notice_id}",
+                      json={"notice_text": "tampered"}, headers=other_hdr)
+    assert r.status_code == 403, r.text
+
+    r = client.post(f"/api/planning/notices/{notice_id}/archive", headers=other_hdr)
+    assert r.status_code == 403, r.text
+
+
+def test_notices_same_squadron_admin_allowed(client):
+    """Regression guard: same-squadron notice read/write/archive must still work."""
+    hdr703 = _sqn_admin_hdr(client)
+    date_id, notice_id = _make_parade_date_and_notice(client, hdr703, "2026-08-28")
+
+    r = client.get(f"/api/planning/parade-dates/{date_id}/notices", headers=hdr703)
+    assert r.status_code == 200
+    assert any(n["notice_id"] == notice_id for n in r.json())
+
+    r = client.patch(f"/api/planning/notices/{notice_id}",
+                      json={"priority": "normal"}, headers=hdr703)
+    assert r.status_code == 200, r.text
+
+    r = client.post(f"/api/planning/notices/{notice_id}/archive", headers=hdr703)
+    assert r.status_code == 200, r.text
+
+
+def test_cea_cross_squadron_list_activities_denied(client):
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    other_hdr = _other_sqn_admin_hdr(client)
+    r = client.get(f"/api/planning/years/{year['planning_year_id']}/cea/activities", headers=other_hdr)
+    assert r.status_code == 403, r.text
+
+
+def test_cea_cross_squadron_list_batches_denied(client):
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    other_hdr = _other_sqn_admin_hdr(client)
+    r = client.get(f"/api/planning/years/{year['planning_year_id']}/cea/batches", headers=other_hdr)
+    assert r.status_code == 403, r.text
+
+
+def test_cea_cross_squadron_create_manual_activity_denied(client):
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    other_hdr = _other_sqn_admin_hdr(client)
+    r = client.post(
+        f"/api/planning/years/{year['planning_year_id']}/cea/activities",
+        json={"activity_name": "cross-squadron manual activity"},
+        headers=other_hdr,
+    )
+    assert r.status_code == 403, r.text
+
+
+def test_cea_cross_squadron_classify_denied(client):
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    r = client.post(
+        f"/api/planning/years/{year['planning_year_id']}/cea/activities",
+        json={"activity_name": "703-owned activity"},
+        headers=hdr703,
+    )
+    assert r.status_code == 200, r.text
+    activity_id = r.json()["id"]
+
+    other_hdr = _other_sqn_admin_hdr(client)
+    r = client.patch(
+        f"/api/planning/cea/{activity_id}/classify",
+        json={"importance": "high"},
+        headers=other_hdr,
+    )
+    assert r.status_code == 403, r.text
+
+
+def test_cea_same_squadron_admin_allowed(client):
+    """Regression guard: same-squadron CEA list/create/classify must still work."""
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+
+    r = client.get(f"/api/planning/years/{yr_id}/cea/activities", headers=hdr703)
+    assert r.status_code == 200
+
+    r = client.post(f"/api/planning/years/{yr_id}/cea/activities",
+                     json={"activity_name": "703 own activity"}, headers=hdr703)
+    assert r.status_code == 200, r.text
+    activity_id = r.json()["id"]
+
+    r = client.patch(f"/api/planning/cea/{activity_id}/classify",
+                      json={"importance": "high"}, headers=hdr703)
+    assert r.status_code == 200, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# sqn_general scope restriction in _require_year_access
+#
+# sqn_general (read-only squadron user) was falling through
+# _require_year_access without any squadron-scope check, meaning
+# a 701 SQN general user could read 703 SQN planning data.
+# Fixed by adding "sqn_general" to the sqn_admin branch.
+# ─────────────────────────────────────────────────────────────
+
+def _other_sqn_general_hdr(client):
+    """sqn_general user for squadron 701 — different from 703."""
+    return login(client, "701SQN2026")
+
+
+def test_sqn_general_cannot_read_other_sqn_planning_year(client):
+    """sqn_general from 701 must not read a 703 planning year."""
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+
+    other_general = _other_sqn_general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/annual-program", headers=other_general)
+    assert r.status_code == 403, r.text
+
+
+def test_sqn_general_cannot_read_other_sqn_missions(client):
+    """sqn_general from 701 must not read 703 mission backlog."""
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+
+    other_general = _other_sqn_general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/missions", headers=other_general)
+    assert r.status_code == 403, r.text
+
+
+def test_sqn_general_cannot_read_other_sqn_cea(client):
+    """sqn_general from 701 must not read 703 CEA activities."""
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+
+    other_general = _other_sqn_general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/cea/activities", headers=other_general)
+    assert r.status_code == 403, r.text
+
+
+def test_sqn_general_can_read_own_sqn_planning_year(client):
+    """Regression guard: sqn_general must still read their own squadron's data."""
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+
+    own_general = _general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/annual-program", headers=own_general)
+    assert r.status_code == 200, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# Night summaries endpoint
+# ─────────────────────────────────────────────────────────────
+
+def test_night_summaries_returns_list(client):
+    """night-summaries returns a list keyed on all parade-date IDs in the year."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.get(f"/api/planning/years/{yr_id}/night-summaries", headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert "summaries" in d
+    assert isinstance(d["summaries"], list)
+
+
+def test_night_summaries_requires_auth(client):
+    # Fresh client with no prior login — use a dummy UUID so we don't need a real year.
+    import uuid
+    r = client.get(f"/api/planning/years/{uuid.uuid4()}/night-summaries")
+    assert r.status_code == 401
+
+
+def test_night_summaries_sqn_general_allowed(client):
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+    gen_hdr = _general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/night-summaries", headers=gen_hdr)
+    assert r.status_code == 200, r.text
+
+
+def test_night_summaries_sqn_general_cross_sqn_denied(client):
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+    other_gen = _other_sqn_general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/night-summaries", headers=other_gen)
+    assert r.status_code == 403, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# Facilitator workload endpoint
+# ─────────────────────────────────────────────────────────────
+
+def test_facilitator_workload_returns_stats(client):
+    """Facilitator workload returns a valid structure for a seeded facilitator."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+
+    facs_r = client.get("/api/planning/facilitators", headers=hdr)
+    assert facs_r.status_code == 200
+    facs = facs_r.json()
+    if not facs:
+        import pytest
+        pytest.skip("No facilitators seeded for 703")
+    fac_id = facs[0]["facilitator_id"]
+
+    r = client.get(f"/api/planning/years/{yr_id}/facilitators/{fac_id}/workload", headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert "total_scheduled" in d
+    assert "nights_with_sessions" in d
+    assert "avg_per_night" in d
+
+
+def test_facilitator_workload_reflects_real_assigned_sessions(client):
+    """Regression for a real, live bug: this endpoint queried `ScheduledSession`,
+    a model with no live create/update path anywhere in the codebase — it
+    always silently returned zero workload regardless of how many real
+    sessions (TrainingSession) a facilitator actually had. Uses the seeded
+    2026 planning year (which has real assign-mission sessions with real
+    facilitators) rather than a freshly-created empty year, so a regression
+    back to querying the dead table would show total_scheduled == 0 here."""
+    hdr = _sqn_admin_hdr(client)
+    years_r = client.get("/api/planning/years", headers=hdr)
+    year_2026 = next(y for y in years_r.json() if y["year"] == 2026)
+    yr_id = year_2026["planning_year_id"]
+
+    facs = client.get("/api/planning/facilitators", headers=hdr).json()
+    assert facs, "Seeded 703 squadron should have facilitators"
+
+    # At least one seeded facilitator must show real, non-zero workload —
+    # mirrors the real seeded data (e.g. multiple facilitators with 2-16
+    # sessions each) confirmed live via the Facilitators page.
+    found_nonzero = False
+    for fac in facs:
+        r = client.get(f"/api/planning/years/{yr_id}/facilitators/{fac['facilitator_id']}/workload", headers=hdr)
+        assert r.status_code == 200
+        if r.json()["total_scheduled"] > 0:
+            found_nonzero = True
+            break
+    assert found_nonzero, "Expected at least one seeded facilitator to show non-zero workload"
+
+
+def test_facilitator_workload_requires_auth(client):
+    # Fresh client with no prior login
+    import uuid
+    from fastapi.testclient import TestClient
+    from app.main import app as _app
+    fresh = TestClient(_app)
+    r = fresh.get(f"/api/planning/years/{uuid.uuid4()}/facilitators/{uuid.uuid4()}/workload")
+    assert r.status_code == 401
+
+
+def test_facilitator_workload_sqn_general_blocked(client):
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    facs_r = client.get("/api/planning/facilitators", headers=hdr)
+    facs = facs_r.json()
+    if not facs:
+        import pytest
+        pytest.skip("No facilitators seeded")
+    fac_id = facs[0]["facilitator_id"]
+    gen_hdr = _general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/facilitators/{fac_id}/workload", headers=gen_hdr)
+    assert r.status_code == 403, r.text
+
+
+def test_facilitator_workload_nonexistent_facilitator(client):
+    import uuid
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.get(f"/api/planning/years/{yr_id}/facilitators/{uuid.uuid4()}/workload", headers=hdr)
+    assert r.status_code == 404, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# Planning year Excel export
+# ─────────────────────────────────────────────────────────────
+
+def test_planning_year_excel_export_returns_xlsx(client):
+    """Planning year export produces a valid xlsx response."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.get(f"/api/planning/years/{yr_id}/export.xlsx", headers=hdr)
+    assert r.status_code == 200, r.text
+    ct = r.headers.get("content-type", "")
+    assert "spreadsheetml" in ct or "octet-stream" in ct or "excel" in ct, f"unexpected content-type: {ct}"
+
+
+def test_planning_year_excel_export_requires_auth(client):
+    # Fresh client with no prior login
+    import uuid
+    from fastapi.testclient import TestClient
+    from app.main import app as _app
+    fresh = TestClient(_app)
+    r = fresh.get(f"/api/planning/years/{uuid.uuid4()}/export.xlsx")
+    assert r.status_code == 401
+
+
+def test_schedule_export_returns_xlsx(client):
+    """Schedule export endpoint produces a valid xlsx response."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.get(f"/api/planning/years/{yr_id}/schedule/export.xlsx", headers=hdr)
+    assert r.status_code == 200, r.text
+    ct = r.headers.get("content-type", "")
+    assert "spreadsheetml" in ct or "octet-stream" in ct or "excel" in ct, f"unexpected content-type: {ct}"
+
+
+def test_schedule_export_sqn_general_allowed(client):
+    """sqn_general can download the schedule export for their own squadron."""
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+    gen_hdr = _general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/schedule/export.xlsx", headers=gen_hdr)
+    assert r.status_code == 200, r.text
+
+
+def test_schedule_export_cross_sqn_denied(client):
+    """sqn_general from another squadron cannot download the schedule export."""
+    hdr703 = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr703)
+    yr_id = year["planning_year_id"]
+    other_gen = _other_sqn_general_hdr(client)
+    r = client.get(f"/api/planning/years/{yr_id}/schedule/export.xlsx", headers=other_gen)
+    assert r.status_code == 403, r.text

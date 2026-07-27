@@ -7,12 +7,15 @@ import { Modal } from "../components/Modal";
 import { ParadeNightDetailView } from "./ParadeNightDetail";
 import { useAuth } from "../auth/AuthProvider";
 import { canWriteSquadron } from "../auth/permissions";
+import { useScopedSquadron } from "../layout/SquadronViewContext";
 
 // Calendar = parade nights grouped by month, with session-status chips. Click to open detail.
 export function Calendar() {
   const { session } = useAuth();
-  const q = useQuery({ queryKey: ["parade-nights"], queryFn: () => trainingApi.paradeNights() });
+  const { needsSelection, squadronId, scoped } = useScopedSquadron();
+  const q = useQuery({ queryKey: ["parade-nights", squadronId], queryFn: () => trainingApi.paradeNights(squadronId), enabled: scoped });
   const [openId, setOpenId] = useState<string | null>(null);
+  if (needsSelection && !squadronId) return <div><h1>Calendar</h1><Empty msg="Select a squadron above to view its calendar." /></div>;
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
 

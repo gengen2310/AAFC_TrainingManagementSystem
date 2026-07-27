@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { RequireAuth } from "./auth/RequireAuth";
 import { AppShell } from "./layout/AppShell";
+import { SquadronViewProvider } from "./layout/SquadronViewContext";
 import { isNational, isWing, isAuditor } from "./auth/permissions";
 import { Dashboard } from "./routes/Dashboard";
 import { Calendar } from "./routes/Calendar";
@@ -11,6 +12,7 @@ import { ParadeNights } from "./routes/ParadeNights";
 import { WeeklyProgram } from "./routes/WeeklyProgram";
 import { Curriculum } from "./routes/Curriculum";
 import { Facilitators } from "./routes/Facilitators";
+import { FacilitatorSchedule } from "./routes/FacilitatorSchedule";
 import { Resources } from "./routes/Resources";
 import { Cadets } from "./routes/Cadets";
 import { Reports } from "./routes/Reports";
@@ -30,7 +32,9 @@ const qc = new QueryClient({ defaultOptions: { queries: { retry: false, refetchO
 const USE_HASH = import.meta.env.VITE_HASH_ROUTER === "true";
 const BASENAME = USE_HASH ? "/" : (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "/";
 
-const TMS_URL = "https://aafc-tms-frontend-production.up.railway.app";
+const TMS_URL =
+  (document.querySelector('meta[name="aafc-tms-base"]') as HTMLMetaElement | null)
+    ?.content || "https://aafc-tms-frontend-production.up.railway.app";
 const MODULE_MODE =
   (document.querySelector('meta[name="aafc-module-mode"]') as HTMLMetaElement | null)
     ?.content === "true";
@@ -147,6 +151,7 @@ export default function App() {
       <AuthProvider>
         <Router basename={BASENAME}>
           <RequireAuth>
+            <SquadronViewProvider>
             <AppShell>
               <ErrorBoundary>
               <Routes>
@@ -157,6 +162,7 @@ export default function App() {
                 <Route path="/weekly-program" element={<WeeklyProgram />} />
                 <Route path="/curriculum" element={<Curriculum />} />
                 <Route path="/facilitators" element={<Facilitators />} />
+                <Route path="/facilitator-schedule" element={<FacilitatorSchedule />} />
                 <Route path="/resources" element={<Resources />} />
                 <Route path="/cadets" element={<Cadets />} />
                 <Route path="/reports" element={<Reports />} />
@@ -174,6 +180,7 @@ export default function App() {
               </Routes>
               </ErrorBoundary>
             </AppShell>
+            </SquadronViewProvider>
           </RequireAuth>
         </Router>
       </AuthProvider>

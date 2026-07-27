@@ -50,11 +50,12 @@ interface Props {
   onPriorityToggle: (p: string) => void;
   cc: CommandCentreData | null;
   onBacklogItemClick: (type: string, id: string) => void;
+  className?: string;
 }
 
 export function PlanningLeftPanel({
   layers, onLayerToggle, audience, onAudienceToggle, priority, onPriorityToggle,
-  cc, onBacklogItemClick,
+  cc, onBacklogItemClick, className,
 }: Props) {
   const [legendOpen, setLegendOpen] = useState(true);
 
@@ -65,7 +66,7 @@ export function PlanningLeftPanel({
   const totalBacklog    = prepGaps.length + unscheduled.length + activeConflicts.length + unreviewed.length;
 
   return (
-    <div className="pw-left" aria-label="Planning filters and backlog">
+    <div className={`pw-left${className ? ` ${className}` : ""}`} aria-label="Planning filters and backlog">
 
       {/* ── Filters (renamed from "Layers") ───────────────── */}
       <div className="pw-section">
@@ -164,7 +165,10 @@ export function PlanningLeftPanel({
               <div
                 key={e.wing_event_id}
                 className="pw-backlog-item"
+                role="button"
+                tabIndex={0}
                 onClick={() => onBacklogItemClick("wing-event", e.wing_event_id)}
+                onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onBacklogItemClick("wing-event", e.wing_event_id); } }}
               >
                 <span className="pw-backlog-dot" style={{ background: "#004B8D" }} />
                 <div>
@@ -185,7 +189,10 @@ export function PlanningLeftPanel({
               <div
                 key={g.anchor_event_id}
                 className="pw-backlog-item"
+                role="button"
+                tabIndex={0}
                 onClick={() => onBacklogItemClick("anchor", g.anchor_event_id)}
+                onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onBacklogItemClick("anchor", g.anchor_event_id); } }}
               >
                 <span className="pw-backlog-dot" style={{ background: "var(--warning)" }} />
                 <div>
@@ -206,7 +213,10 @@ export function PlanningLeftPanel({
               <div
                 key={u.curriculum_id}
                 className="pw-backlog-item"
+                role="button"
+                tabIndex={0}
                 onClick={() => onBacklogItemClick("curriculum", u.curriculum_id)}
+                onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onBacklogItemClick("curriculum", u.curriculum_id); } }}
               >
                 <span className="pw-backlog-dot" style={{ background: "var(--aafc-gunmetal)" }} />
                 <div>

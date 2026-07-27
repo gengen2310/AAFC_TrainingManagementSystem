@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useId, type KeyboardEvent } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../api";
 import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent } from "../../api/types";
@@ -7,6 +7,7 @@ import { ActivityFullDetail, anchorToDisplay } from "./ActivityDetailBlock";
 // ─── Drawer item discriminated union ──────────────────────────────────────────
 export type DrawerItem =
   | { type: "session"; session: PlanningSession; dateId: string; date: string; conflicts: PlanningConflict[] }
+  | { type: "session-by-id"; sessionId: string; dateId: string; date: string }
   | { type: "new-session"; cadetGroup: string; periodNumber: number; dateId: string }
   | { type: "wing-event"; event: WingHQEvent }
   | { type: "curriculum"; curriculum: { curriculum_id: string; code: string; title: string; phase: string } }
@@ -42,7 +43,9 @@ function SessionForm({
   const [curriculumId, setCurriculumId] = useState<string | null>(existing?.curriculum_id ?? null);
   const [currSearch, setCurrSearch] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const listboxId = useId();
   const [cadetGroup, setCadetGroup] = useState(
     existing?.cadet_group ?? (item.type === "new-session" ? item.cadetGroup : "junior"),
   );
@@ -87,11 +90,35 @@ function SessionForm({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  // Keep the highlighted option in range as the result set changes while typing.
+  useEffect(() => { setHighlightedIndex(0); }, [currSearch]);
+
   function selectCurriculum(m: MissionItem) {
     setCurriculumId(m.curriculum_id);
     setTitle(m.title);
     setCurrSearch("");
     setPickerOpen(false);
+  }
+
+  // Real ARIA combobox keyboard interaction (was previously mouse-only — see
+  // docs/beta/15_known_limitations.md AL-01). ArrowUp/Down move the highlighted
+  // option, Enter selects it, Escape closes without selecting.
+  function handleSearchKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (!pickerOpen || searchResults.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex(i => Math.min(i + 1, searchResults.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex(i => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const m = searchResults[highlightedIndex];
+      if (m) selectCurriculum(m);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      setPickerOpen(false);
+    }
   }
 
   function clearCurriculum() {
@@ -233,19 +260,45 @@ function SessionForm({
           ) : (
             <>
               <input
+                role="combobox"
+                aria-expanded={pickerOpen && searchResults.length > 0}
+                aria-haspopup="listbox"
+                aria-autocomplete="list"
+                aria-controls={`${listboxId}-listbox`}
+                aria-activedescendant={
+                  pickerOpen && searchResults[highlightedIndex]
+                    ? `${listboxId}-opt-${searchResults[highlightedIndex].curriculum_id}`
+                    : undefined
+                }
                 placeholder="Search by code or title…"
                 value={currSearch}
                 onChange={e => { setCurrSearch(e.target.value); setPickerOpen(true); }}
                 onFocus={() => setPickerOpen(true)}
+                onKeyDown={handleSearchKeyDown}
                 style={{ width: "100%", fontSize: 12, padding: "6px 9px", borderRadius: 6, border: "1.5px solid var(--border)" }}
               />
               {pickerOpen && searchResults.length > 0 && (
-                <div className="pw-curric-dropdown">
-                  {searchResults.map(m => (
+                <div className="pw-curric-dropdown" role="listbox" id={`${listboxId}-listbox`} aria-label="Curriculum search results">
+                  {searchResults.map((m, i) => (
+                    // onMouseDown (not onClick) is deliberate: it fires before the input's
+                    // onBlur closes the dropdown. Real keyboard operability (Arrow keys,
+                    // Enter, Escape) is handled by handleSearchKeyDown on the input above,
+                    // via role="combobox"/aria-activedescendant — per the W3C ARIA APG
+                    // combobox-list pattern, listbox options are deliberately NOT focusable
+                    // (no tabIndex); the input owns focus throughout and the "virtually
+                    // focused" option is only ever referenced, never actually focused. This
+                    // is why interactive-supports-focus is also suppressed here, not just
+                    // the click/keyboard-parity rules (see docs/beta/15_known_limitations.md
+                    // AL-01, resolved).
+                    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/interactive-supports-focus
                     <div
                       key={m.curriculum_id}
-                      className="pw-curric-item"
+                      id={`${listboxId}-opt-${m.curriculum_id}`}
+                      role="option"
+                      aria-selected={i === highlightedIndex}
+                      className={`pw-curric-item${i === highlightedIndex ? " highlighted" : ""}`}
                       onMouseDown={() => selectCurriculum(m)}
+                      onMouseEnter={() => setHighlightedIndex(i)}
                     >
                       <span className="pw-curric-code">{m.code}</span>
                       <span style={{ flex: 1 }}>{m.title}</span>
@@ -453,7 +506,7 @@ function CreateAnchorForm({ yearId, onClose }: { yearId: string; onClose: () => 
 
   return (
     <div className="pw-drawer-form">
-      <label>Event name *<input value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Annual Inspection" autoFocus /></label>
+      <label>Event name *<input value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Annual Inspection" /></label>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <label>Type
           <select value={eventType} onChange={e => setEventType(e.target.value)}>
@@ -533,7 +586,7 @@ function LocationForm({ location, onClose }: {
 
   return (
     <div className="pw-drawer-form">
-      <label>Name *<input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Main Classroom" autoFocus /></label>
+      <label>Name *<input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Main Classroom" /></label>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
         <label>Type
           <select value={locType} onChange={e => setLocType(e.target.value)}>
@@ -666,8 +719,12 @@ function ScheduleFromBacklogPanel({
             <div className="pw-drawer-value">{mission.duration_minutes} min</div>
           </div>
           <div className="pw-drawer-section">
-            <div className="pw-drawer-label">Core status</div>
-            <div className="pw-drawer-value" style={{ textTransform: "capitalize" }}>{mission.core_status}</div>
+            <div className="pw-drawer-label">Program type</div>
+            <div className="pw-drawer-value" style={{ textTransform: "capitalize" }}>
+              {mission.core_status === "foundation" || mission.core_status === "core" ? "Foundation"
+                : mission.core_status === "optional" ? "Optional"
+                : "Extension"}
+            </div>
           </div>
           {mission.instructor_suitability && (
             <div className="pw-drawer-section">
@@ -779,6 +836,7 @@ export function PlanningRightDrawer({ item, facilitators, locations, yearId, onC
 
   const title =
     item.type === "session" ? (item.session.activity_title ?? "Session")
+    : item.type === "session-by-id" ? "Session"
     : item.type === "new-session" ? "Add Session"
     : item.type === "wing-event" ? item.event.title
     : item.type === "new-anchor" ? "New Anchor Event"
@@ -795,6 +853,10 @@ export function PlanningRightDrawer({ item, facilitators, locations, yearId, onC
       <div className="pw-drawer-body" key={key}>
         {(item.type === "session" || item.type === "new-session") && (
           <SessionForm item={item} facilitators={facilitators} locations={locations} yearId={yearId} onClose={onClose} />
+        )}
+        {item.type === "session-by-id" && (
+          <SessionByIdLoader sessionId={item.sessionId} dateId={item.dateId} date={item.date}
+            facilitators={facilitators} locations={locations} yearId={yearId} onClose={onClose} />
         )}
         {item.type === "wing-event" && (
           <WingEventPanel event={item.event} onClose={onClose} />
@@ -820,4 +882,19 @@ export function PlanningRightDrawer({ item, facilitators, locations, yearId, onC
       </div>
     </div>
   );
+}
+
+function SessionByIdLoader({ sessionId, dateId, date, facilitators, locations, yearId, onClose }: {
+  sessionId: string; dateId: string; date: string;
+  facilitators: PlanningFacilitator[]; locations: PlanningLocation[];
+  yearId: string | null; onClose: () => void;
+}) {
+  const q = useQuery({
+    queryKey: ["planning-session", sessionId],
+    queryFn: () => planningApi.getSession(sessionId),
+  });
+  if (q.isLoading) return <p className="muted">Loading session…</p>;
+  if (!q.data) return <p className="muted">Session not found.</p>;
+  const item: DrawerItem = { type: "session", session: q.data, dateId, date, conflicts: [] };
+  return <SessionForm item={item} facilitators={facilitators} locations={locations} yearId={yearId} onClose={onClose} />;
 }

@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { authApi, orgApi } from "../api";
 import { tokenStore } from "../api/client";
 import type { SessionInfo } from "../api/types";
@@ -16,6 +17,14 @@ const Ctx = createContext<AuthCtx | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  // React Query's cache is keyed by query name only, with no per-user/session
+  // dimension (e.g. ["dashboard-charts", win]) — without an explicit clear here,
+  // switching accounts in the same tab (login → logout → different login) leaves
+  // the previous user's cached data visible until each query's own staleTime
+  // expires, which for a role-branching page like Dashboard can show one role's
+  // tactical data inside another role's shell. Clearing on every login/logout
+  // transition closes that gap regardless of any single query's staleTime.
+  const queryClient = useQueryClient();
 
   const refresh = useCallback(async () => {
     try { const r = await authApi.me(); setSession(r.session); }
@@ -27,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => { (async () => { await refresh(); setLoading(false); })(); }, [refresh]);
 
   const login = async (code: string) => {
+    queryClient.clear();
     const r = await authApi.login(code);
     tokenStore.set(r.token);
     setSession(r.session);
@@ -36,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { await authApi.logout(); } catch { /* ignore */ }
     tokenStore.clear();
     setSession(null);
+    queryClient.clear();
   };
 
   // Exits proxy / delegated-intervention on the backend then refreshes the session.

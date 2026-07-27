@@ -478,3 +478,38 @@ class TestLegitimateWorkflowsUnblocked:
 
         r = client.post(f"/api/planning/notices/{notice_id}/archive", headers=hdr)
         assert r.status_code == 200
+
+
+# ─── DEFECT-007: sqn_general planning-year scope ──────────────────────────────
+
+class TestSqnGeneralYearScope:
+    """sqn_general must only see their own squadron's planning years (DEFECT-007)."""
+
+    def test_sqn_general_sees_own_year(self, client):
+        """sqn_general can read planning years that belong to their squadron."""
+        hdr_admin = _hdr(client, "ADMIN703")
+        hdr_gen = _hdr(client, "703SQN2026")
+        _make_year(client, hdr_admin, year=2088, name="Gen Scope Year")
+
+        r = client.get("/api/planning/years", headers=hdr_gen)
+        assert r.status_code == 200
+        years = r.json()
+        y2088 = [y for y in years if y["year"] == 2088]
+        assert y2088, "sqn_general should see their own squadron's planning year"
+
+    def test_sqn_general_cannot_see_other_squadron_year(self, client):
+        """sqn_general from squadron 703 must not see planning years from squadron 701."""
+        hdr_701 = _hdr(client, "ADMIN701")
+        hdr_703_gen = _hdr(client, "703SQN2026")
+        yr = _make_year(client, hdr_701, year=2087, name="701 Year — Gen Must Not See")
+        yr_unit_id = client.get(
+            f"/api/planning/years/{yr}", headers=hdr_701
+        ).json().get("unit_id")
+
+        r = client.get("/api/planning/years", headers=hdr_703_gen)
+        assert r.status_code == 200
+        years = r.json()
+        leaked = [y for y in years if y.get("unit_id") == yr_unit_id and y["year"] == 2087]
+        assert not leaked, (
+            f"IDOR: sqn_general 703 can see planning year 2087 belonging to unit {yr_unit_id}"
+        )

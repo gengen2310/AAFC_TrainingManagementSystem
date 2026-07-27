@@ -4,7 +4,7 @@
 
 - FastAPI 0.110+, SQLAlchemy 2.0, Python 3.13, Alembic, Pydantic v2
 - SQLite for local demo; PostgreSQL for production
-- JWT HS256 via python-jose, bcrypt for access-code hashing
+- JWT HS256 via python-jose, passlib pbkdf2_sha256 for access-code hashing (`app/security.py`)
 
 ## Permission model
 

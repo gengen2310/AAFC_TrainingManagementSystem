@@ -17,6 +17,16 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./aafc_tms.db"
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # SQLAlchemy connection pool sizing (Postgres only; ignored for SQLite).
+    # Defaults are sized for PRODUCTION's Supabase Session Pooler, which caps total
+    # connections at 15 -- with 2 gunicorn workers, each pool must stay under 8
+    # (7 + 1 pre-ping headroom = 14 total < 15). Do not raise these defaults without
+    # re-checking that constraint. Environments without that constraint (e.g. a
+    # staging database that isn't behind Supabase's pooler) may override via env var.
+    DB_POOL_SIZE: int = 5
+    DB_POOL_MAX_OVERFLOW: int = 2
+    DB_POOL_TIMEOUT: int = 30
+
     # Secrets — MUST be overridden in production via environment.
     # Dev defaults are ≥32 bytes to satisfy HS256 key-length requirements during local testing.
     # These values MUST be replaced with cryptographically random secrets in production.
@@ -38,12 +48,35 @@ class Settings(BaseSettings):
     LOGIN_WINDOW_SEC: int = 300
     LOGIN_LOCKOUT_SEC: int = 900
 
+    # General API rate limiting (non-login endpoints, per-IP, in-memory sliding window)
+    API_RATE_LIMIT: int = 300       # requests allowed per window
+    API_RATE_WINDOW_SEC: int = 60   # window length in seconds
+
     # Uploads / exports
     UPLOAD_MAX_MB: int = 5
     EXPORT_DIR: str = "./exports"
     BACKUP_DIR: str = "./backups"
 
     TRAINING_YEAR: int = 2026
+
+    # URL for the Planning Workspace frontend (served separately).
+    # Set this env var in each Railway environment. Empty string = no link shown.
+    PLANNING_WORKSPACE_URL: str = ""
+
+    # Defense in depth for reset_db()/seed_all(): SHA-256 fingerprints (of the
+    # DATABASE_URL hostname only — never the credentials) of databases that
+    # must never be destructively reset, regardless of what ENVIRONMENT says.
+    # This exists because production's ENVIRONMENT was found set to "staging"
+    # in practice — see docs/beta/11_defect_register.md — so ENVIRONMENT alone
+    # is not a sufficient guard. Comma-separated; extend via env var without
+    # a code change if another protected database is added.
+    PROTECTED_DB_HOST_FINGERPRINTS: str = (
+        "48de339b89ad325c27447d39c07b2ee3d56ebc155d46e517bc820b520a70c943"
+    )
+
+    @property
+    def protected_db_host_fingerprints(self) -> set[str]:
+        return {f.strip() for f in self.PROTECTED_DB_HOST_FINGERPRINTS.split(",") if f.strip()}
 
     @property
     def cors_origins(self) -> list[str]:

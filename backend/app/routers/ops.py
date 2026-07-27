@@ -10,6 +10,8 @@ from ..models import (Session, ParadeNight, CurriculumItem, ActionItem, Exceptio
 from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_view_squadron
 from ..services import audit, score_parade
+from ..services_readiness import parade_night_readiness
+from .training import _view_squadron_id
 
 router = APIRouter(prefix="/api", tags=["ops"])
 
@@ -51,8 +53,8 @@ def _coverage_for(db, sq_id):
 
 # ── REPORTS ──
 @router.get("/reports/summary")
-def rep_summary(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _active_squadron(p)
+def rep_summary(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq = _view_squadron_id(p, squadron_id, db)
     sess = _all_sessions(db, sq)
     counts = {}
     for s in sess:
@@ -70,8 +72,13 @@ def rep_readiness(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
     for pn in pns[:8]:
         sess = [{c.name: getattr(s, c.name) for c in s.__table__.columns}
                 for s in db.query(Session).filter(Session.parade_night_id == pn.id).all()]
-        r = score_parade(sess)
-        out.append({"parade_night_id": pn.id, "date": pn.date, "score": r["score"], "band": r["band"], "deductions": r["deductions"]})
+        # Same authoritative computation as the Dashboard/training.py — a zero-session
+        # night reports planning_status "not_planned" (never a 100/"Ready" legacy_score).
+        readiness = parade_night_readiness(sess)
+        r = score_parade(sess)  # legacy shape (score/band/deductions), derived from the same computation
+        out.append({"parade_night_id": pn.id, "date": pn.date, "score": r["score"], "band": r["band"],
+                    "deductions": r["deductions"], "planning_status": readiness["planning_status"],
+                    "data_quality": readiness["data_quality"]})
     worst = min((o["score"] for o in out), default=100)
     decision = "no_action" if worst >= 85 else "action_required" if worst >= 50 else "command_decision_required"
     return {"title": "Next parade readiness", "parade_nights": out, "decision": decision}
@@ -83,8 +90,9 @@ def rep_coverage(db: DBSession = Depends(get_db), p: Principal = Depends(get_pri
     items = db.query(CurriculumItem).filter(
         (CurriculumItem.owning_level == "national") | (CurriculumItem.squadron_id == sq),
         CurriculumItem.is_archived == False).all()  # noqa: E712
-    scheduled = {s.curriculum_item_id for s in _all_sessions(db, sq) if s.curriculum_item_id}
-    delivered = {s.curriculum_item_id for s in _all_sessions(db, sq)
+    all_sess = _all_sessions(db, sq)
+    scheduled = {s.curriculum_item_id for s in all_sess if s.curriculum_item_id}
+    delivered = {s.curriculum_item_id for s in all_sess
                  if s.curriculum_item_id and s.status in ("delivered", "delivered_with_issue")}
     total = len(items)
     sched = len([i for i in items if i.id in scheduled])
@@ -97,8 +105,8 @@ def rep_coverage(db: DBSession = Depends(get_db), p: Principal = Depends(get_pri
 
 
 @router.get("/reports/facilitator-load")
-def rep_load(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _active_squadron(p)
+def rep_load(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq = _view_squadron_id(p, squadron_id, db)
     load = {}
     for s in _all_sessions(db, sq):
         name = s.facilitator_display_name_at_time
@@ -116,8 +124,8 @@ def rep_load(db: DBSession = Depends(get_db), p: Principal = Depends(get_princip
 
 
 @router.get("/reports/not-delivered")
-def rep_nd(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _active_squadron(p)
+def rep_nd(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq = _view_squadron_id(p, squadron_id, db)
     rows = [s for s in _all_sessions(db, sq) if s.status == "not_delivered"]
     return {"title": "Not delivered", "sessions": [{"id": s.id, "curriculum_code_at_time": s.curriculum_code_at_time,
             "not_delivered_reason": s.not_delivered_reason, "status": s.status} for s in rows],
@@ -140,19 +148,89 @@ def wing_overview(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
         published = sum(1 for x in pns if x.published_status)
         future = [x for x in pns if x.date >= today]
         score = None
+        planning_status = None
         if future:
             nxt = sorted(future, key=lambda x: x.date)[0]
             ns = [{c.name: getattr(z, c.name) for c in z.__table__.columns}
                   for z in db.query(Session).filter(Session.parade_night_id == nxt.id).all()]
-            score = score_parade(ns)["score"]
+            # Same authoritative computation as the Dashboard and /reports/readiness —
+            # a squadron whose next parade night has zero sessions reports
+            # planning_status "not_planned", never a numeric "readiness" that reads
+            # as fully staffed/ready.
+            readiness = parade_night_readiness(ns)
+            score = readiness["legacy_score"]
+            planning_status = readiness["planning_status"]
         cov = _coverage_for(db, s.id)
         out.append({"squadron_id": s.id, "code": s.code, "short_name": s.short_name,
                     "parade_day": s.default_parade_day, "nights": len(pns), "published": published,
                     "sessions": len(sess), "delivered": delivered,
                     "pct": round(delivered / len(sess) * 100) if sess else 0, "readiness": score,
+                    "planning_status": planning_status,
                     "coverage_pct": cov["coverage_pct"], "not_delivered": cov["not_delivered"],
                     "no_future_plan": len(future) == 0, "no_published_plan": published == 0})
     return {"squadrons": out}
+
+
+@router.get("/reports/wing-cancellation-trend")
+def wing_cancellation_trend(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Per-squadron cancelled session and parade-night counts for Wing command review.
+
+    Cancelled sessions are those with Session.status == 'cancelled'.
+    Cancelled nights are ParadeNights with parade_type == 'cancelled' (stand-down / wash-out).
+    Reasons are aggregated from Session.cancelled_reason (free text, grouped by value).
+    """
+    require_role(p, "wing_viewer", "wing_admin", "national_viewer", "national_admin", "system_admin", "auditor")
+    wing_id = p.wing_id if p.is_wing else None
+    q = db.query(Squadron).filter(Squadron.is_archived == False)  # noqa: E712
+    if wing_id:
+        q = q.filter(Squadron.wing_id == wing_id)
+    out = []
+    for s in q.all():
+        cancelled_sess = [x for x in _all_sessions(db, s.id) if x.status == "cancelled"]
+        cancelled_nights = db.query(ParadeNight).filter(
+            ParadeNight.squadron_id == s.id,
+            ParadeNight.parade_type == "cancelled").count()
+        reason_counts: dict[str, int] = {}
+        for x in cancelled_sess:
+            key = (x.cancelled_reason or "unspecified").strip()[:80]
+            reason_counts[key] = reason_counts.get(key, 0) + 1
+        out.append({
+            "squadron_id": s.id, "code": s.code, "short_name": s.short_name,
+            "cancelled_sessions": len(cancelled_sess),
+            "cancelled_nights": cancelled_nights,
+            "reasons": sorted([{"reason": k, "count": v} for k, v in reason_counts.items()],
+                               key=lambda x: -x["count"]),
+        })
+    out.sort(key=lambda x: -(x["cancelled_sessions"] + x["cancelled_nights"]))
+    total_sess = sum(x["cancelled_sessions"] for x in out)
+    total_nights = sum(x["cancelled_nights"] for x in out)
+    return {"title": "Cancelled / rescheduled trend", "squadrons": out,
+            "total_cancelled_sessions": total_sess, "total_cancelled_nights": total_nights,
+            "decision": "action_required" if total_sess + total_nights > 0 else "no_action"}
+
+
+@router.get("/reports/wing-not-delivered")
+def wing_not_delivered(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Wing-wide aggregation of not-delivered sessions, ranked by squadron count."""
+    require_role(p, "wing_viewer", "wing_admin", "national_viewer", "national_admin", "system_admin", "auditor")
+    wing_id = p.wing_id if p.is_wing else None
+    q = db.query(Squadron).filter(Squadron.is_archived == False)  # noqa: E712
+    if wing_id:
+        q = q.filter(Squadron.wing_id == wing_id)
+    out = []
+    for s in q.all():
+        rows = [x for x in _all_sessions(db, s.id) if x.status == "not_delivered"]
+        if rows:
+            out.append({
+                "squadron_id": s.id, "code": s.code, "short_name": s.short_name,
+                "not_delivered_count": len(rows),
+                "sessions": [{"id": x.id, "curriculum_code_at_time": x.curriculum_code_at_time,
+                              "not_delivered_reason": x.not_delivered_reason} for x in rows],
+            })
+    out.sort(key=lambda x: -x["not_delivered_count"])
+    return {"title": "Cross-squadron not-delivered", "squadrons": out,
+            "total_not_delivered": sum(x["not_delivered_count"] for x in out),
+            "decision": "action_required" if out else "no_action"}
 
 
 @router.get("/reports/wing-phase-coverage")

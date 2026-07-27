@@ -2,6 +2,27 @@ import { useState } from "react";
 import { planningApi } from "../../api";
 import type { SessionInfo } from "../../api/types";
 
+const JS_DOW = [1, 2, 3, 4, 5, 6, 0]; // Mon=0→JS1, ..., Sun=6→JS0
+
+function previewDates(weekday: number, startDate: string, endDate: string, frequency: string): string[] {
+  if (!startDate || !endDate) return [];
+  const targetDay = JS_DOW[weekday];
+  const end = new Date(endDate + "T00:00:00");
+  const cur = new Date(startDate + "T00:00:00");
+  while (cur.getDay() !== targetDay) cur.setDate(cur.getDate() + 1);
+  const step = frequency === "weekly" ? 7 : frequency === "fortnightly" ? 14 : 28;
+  const dates: string[] = [];
+  while (cur <= end && dates.length < 60) {
+    dates.push(cur.toISOString().slice(0, 10));
+    cur.setDate(cur.getDate() + step);
+  }
+  return dates;
+}
+
+function fmtDate(iso: string): string {
+  return new Date(iso + "T00:00:00").toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" });
+}
+
 const WEEKDAYS = [
   { value: 0, label: "Monday" },
   { value: 1, label: "Tuesday" },
@@ -141,45 +162,72 @@ export function SetupPanel({ onYearCreated }: Props) {
           <div className="pw-setup-step-num">{datesResult ? "✓" : "2"}</div>
           <div className="pw-setup-step-body">
             <div className="pw-setup-step-title">Generate Parade Dates</div>
-            {step === "dates" && !datesResult && (
-              <div className="pw-drawer-form" style={{ maxWidth: 480 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  <label>
-                    Parade weekday
-                    <select value={weekday} onChange={e => setWeekday(Number(e.target.value))}>
-                      {WEEKDAYS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-                    </select>
+            {step === "dates" && !datesResult && (() => {
+              const preview = previewDates(weekday, startDate, endDate, frequency);
+              return (
+                <div className="pw-drawer-form" style={{ maxWidth: 520 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <label>
+                      Parade weekday
+                      <select value={weekday} onChange={e => setWeekday(Number(e.target.value))}>
+                        {WEEKDAYS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      Frequency
+                      <select value={frequency} onChange={e => setFrequency(e.target.value)}>
+                        {FREQUENCIES.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      Start date
+                      <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    </label>
+                    <label>
+                      End date
+                      <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    </label>
+                  </div>
+                  <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400, marginTop: 6 }}>
+                    <input type="checkbox" checked={excludeHolidays} onChange={e => setExcludeHolidays(e.target.checked)} />
+                    Exclude public holiday periods (deducted when holidays are configured)
                   </label>
-                  <label>
-                    Frequency
-                    <select value={frequency} onChange={e => setFrequency(e.target.value)}>
-                      {FREQUENCIES.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
-                    </select>
-                  </label>
-                  <label>
-                    Start date
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                  </label>
-                  <label>
-                    End date
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
-                  </label>
+
+                  {preview.length > 0 && (
+                    <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8 }}>
+                      <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6 }}>
+                        Preview — {preview.length} date{preview.length !== 1 ? "s" : ""}
+                        {excludeHolidays && <span style={{ fontWeight: 400, color: "var(--muted-text)", marginLeft: 6 }}>(holidays excluded on save)</span>}
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 10px" }}>
+                        {preview.map(d => (
+                          <span key={d} style={{ fontSize: 11, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{fmtDate(d)}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {datesErr && <div className="pw-err" style={{ marginTop: 6 }}>{datesErr}</div>}
+                  <div style={{ marginTop: 12 }}>
+                    <button className="btn primary" onClick={handleGenerateDates} disabled={savingDates || preview.length === 0}>
+                      {savingDates ? "Generating…" : `Generate ${preview.length > 0 ? preview.length : ""} parade date${preview.length !== 1 ? "s" : ""} →`}
+                    </button>
+                  </div>
                 </div>
-                <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400, marginTop: 6 }}>
-                  <input type="checkbox" checked={excludeHolidays} onChange={e => setExcludeHolidays(e.target.checked)} />
-                  Exclude holiday periods
-                </label>
-                {datesErr && <div className="pw-err" style={{ marginTop: 6 }}>{datesErr}</div>}
-                <div style={{ marginTop: 12 }}>
-                  <button className="btn primary" onClick={handleGenerateDates} disabled={savingDates}>
-                    {savingDates ? "Generating…" : "Generate parade dates →"}
-                  </button>
-                </div>
-              </div>
-            )}
+              );
+            })()}
             {datesResult && (
-              <div style={{ fontSize: 13, color: "var(--success)", fontWeight: 700 }}>
-                ✓ {datesResult.created} parade date{datesResult.created !== 1 ? "s" : ""} generated
+              <div>
+                <div style={{ fontSize: 13, color: "var(--success)", fontWeight: 700 }}>
+                  ✓ {datesResult.created} parade date{datesResult.created !== 1 ? "s" : ""} generated
+                </div>
+                {datesResult.dates.length > 0 && (
+                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: "3px 10px" }}>
+                    {datesResult.dates.map(d => (
+                      <span key={d} style={{ fontSize: 11, color: "var(--muted-text)", fontVariantNumeric: "tabular-nums" }}>{fmtDate(d)}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

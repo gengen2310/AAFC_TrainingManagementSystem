@@ -132,7 +132,6 @@ function AddNoticeForm({ dateId, onDone }: { dateId: string; onDone: () => void 
         placeholder="Notice text…"
         value={text}
         onChange={e => setText(e.target.value)}
-        autoFocus
         rows={2}
       />
       <div className="pw-block-notice-form-row">

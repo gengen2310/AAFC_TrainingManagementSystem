@@ -8,15 +8,18 @@ import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { canWriteSquadron } from "../auth/permissions";
 import { ParadeNightDetailView } from "./ParadeNightDetail";
+import { useScopedSquadron } from "../layout/SquadronViewContext";
 
 export function ParadeNights() {
   const { session } = useAuth();
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["parade-nights"], queryFn: () => trainingApi.paradeNights() });
+  const { needsSelection, squadronId, scoped } = useScopedSquadron();
+  const q = useQuery({ queryKey: ["parade-nights", squadronId], queryFn: () => trainingApi.paradeNights(squadronId), enabled: scoped });
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const canWrite = canWriteSquadron(session);
 
+  if (needsSelection && !squadronId) return <div><h1>Parade Nights</h1><Empty msg="Select a squadron above to view its parade nights." /></div>;
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
 
@@ -46,12 +49,12 @@ export function ParadeNights() {
 
 function CreateParadeModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [date, setDate] = useState("");
-  const [term, setTerm] = useState("1");
+  const [term, setTerm] = useState("T1");
   const [count, setCount] = useState("3");
   const [err, setErr] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
   const m = useMutation({
-    mutationFn: () => trainingApi.createParadeNight({ date, term: Number(term), session_count: Number(count) }),
+    mutationFn: () => trainingApi.createParadeNight({ date, term, session_count: Number(count) }),
     onSuccess: onDone,
     onError: (e) => {
       if (e instanceof ApiError) {
@@ -69,7 +72,12 @@ function CreateParadeModal({ onClose, onDone }: { onClose: () => void; onDone: (
         <input id="pn-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-invalid={!!fields.date} />
         {fields.date && <div className="field-err" role="alert">{fields.date}</div>}
         <label htmlFor="pn-term">Term</label>
-        <input id="pn-term" type="number" min={1} max={4} value={term} onChange={(e) => setTerm(e.target.value)} aria-invalid={!!fields.term} />
+        <select id="pn-term" value={term} onChange={(e) => setTerm(e.target.value)} aria-invalid={!!fields.term}>
+          <option value="T1">Term 1</option>
+          <option value="T2">Term 2</option>
+          <option value="T3">Term 3</option>
+          <option value="T4">Term 4</option>
+        </select>
         {fields.term && <div className="field-err" role="alert">{fields.term}</div>}
         <label htmlFor="pn-count">Session count</label>
         <input id="pn-count" type="number" min={1} max={6} value={count} onChange={(e) => setCount(e.target.value)} aria-invalid={!!fields.session_count} />

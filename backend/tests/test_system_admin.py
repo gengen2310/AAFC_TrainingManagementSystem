@@ -139,8 +139,14 @@ def test_system_migrations_sysadmin(client):
     r = client.get("/api/system/migrations", headers=hdr)
     assert r.status_code == 200
     d = r.json()
-    assert "expected_head" in d
-    assert d["expected_head"] == "q2r3s4t5u6v7"
+    # Response has revisions (list), is_single_head (bool), revision (str|null).
+    # In the SQLite test DB, alembic_version may not exist (seeded via reset_db, not Alembic),
+    # so we verify the schema rather than the exact revision value.
+    assert "revisions" in d
+    assert "is_single_head" in d
+    assert "revision" in d
+    assert isinstance(d["revisions"], list)
+    assert isinstance(d["is_single_head"], bool)
 
 
 # ─────────────────────────────────────────────────────────────
@@ -367,6 +373,29 @@ def test_bootstrap_staging_unauthenticated(client):
     assert r.status_code == 401
 
 
+def test_bootstrap_staging_rejected_when_is_prod(client):
+    """Must be rejected once ENVIRONMENT genuinely reads as production/prod.
+
+    Regression guard: this endpoint used to check `ENVIRONMENT.lower() ==
+    "production"` directly instead of the shared settings.is_prod property —
+    missing the "prod" abbreviation is_prod also accepts, and (found live)
+    silently NOT rejecting when a deployment's ENVIRONMENT variable is
+    mislabelled as anything other than the literal string "production" (as
+    production's actually was, set to "staging" — see
+    docs/beta/11_defect_register.md DEFECT-003). Scoped patch of the
+    `is_prod` property only — reverts automatically, no cross-test state.
+    """
+    from unittest.mock import patch, PropertyMock
+    from app.config import Settings
+
+    hdr = _sysadmin(client)
+    with patch.object(Settings, "is_prod", new_callable=PropertyMock) as mock_is_prod:
+        mock_is_prod.return_value = True
+        r = client.post("/api/system/bootstrap-staging", headers=hdr)
+    assert r.status_code == 403
+    assert r.json()["detail"]["error"] == "not_allowed_in_production"
+
+
 def test_bootstrap_staging_idempotent(client):
     """With seed_all data already present, bootstrap runs idempotently — no new codes."""
     hdr = _sysadmin(client)
@@ -395,3 +424,162 @@ def test_bootstrap_staging_audit_entries(client):
     client.post("/api/system/bootstrap-staging", headers=hdr)
     r = client.get("/api/system/audit-summary?action=account_created&limit=50", headers=hdr)
     assert r.status_code == 200
+
+
+def test_bootstrap_staging_generic_wing_code_body(client):
+    """Bootstrap accepts optional wing_code/sqn_code body and resolves that Wing."""
+    hdr = _sysadmin(client)
+    # seed_all.py creates 7WG; target it explicitly via the new generic body param.
+    # All accounts already exist from the seed, so no new codes are generated —
+    # the important thing is the endpoint accepts the body and resolves 7WG correctly.
+    r = client.post("/api/system/bootstrap-staging",
+                    json={"wing_code": "7WG", "sqn_code": "703"},
+                    headers=hdr)
+    assert r.status_code == 200
+    d = r.json()
+    assert "results" in d
+    # Squadron result should reference 703
+    sqn_results = [item for item in d["results"] if item.get("type") == "squadron"]
+    assert sqn_results, f"No squadron in results: {d['results']}"
+    assert sqn_results[0]["code"] == "703"
+
+
+def test_bootstrap_staging_unknown_wing_returns_422(client):
+    """Bootstrap with a wing_code that does not exist must return 422."""
+    hdr = _sysadmin(client)
+    r = client.post("/api/system/bootstrap-staging",
+                    json={"wing_code": "UNKNOWN_WING_XYZ"},
+                    headers=hdr)
+    assert r.status_code == 422
+    assert "wing_not_found" in r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# Reset Rate Limits (DEFECT-004: deterministic test/CI isolation from the
+# general API rate limiter, DB-backed IP login limiter, and per-account
+# lockout, without weakening any of the three in production).
+# ─────────────────────────────────────────────────────────────
+
+def test_reset_rate_limits_requires_sysadmin(client):
+    hdr = _nat_admin(client)
+    r = client.post("/api/system/reset-rate-limits", headers=hdr)
+    assert r.status_code == 403
+
+
+def test_reset_rate_limits_unauthenticated(client):
+    r = client.post("/api/system/reset-rate-limits")
+    assert r.status_code == 401
+
+
+def test_reset_rate_limits_rejected_when_is_prod(client):
+    """Same production guard as bootstrap-staging -- must never be reachable in prod."""
+    from unittest.mock import patch, PropertyMock
+    from app.config import Settings
+
+    hdr = _sysadmin(client)
+    with patch.object(Settings, "is_prod", new_callable=PropertyMock) as mock_is_prod:
+        mock_is_prod.return_value = True
+        r = client.post("/api/system/reset-rate-limits", headers=hdr)
+    assert r.status_code == 403
+    assert r.json()["detail"]["error"] == "not_allowed_in_production"
+
+
+def test_reset_rate_limits_clears_ip_login_lockout(client):
+    """Trip the DB-backed per-IP login lockout, confirm the endpoint clears it.
+
+    Authenticate BEFORE tripping the lockout: login_blocked_db() is checked
+    before code verification (see auth.py's login()), so a locked-out IP
+    cannot log in even with a correct code -- the reset call must be made
+    with a token obtained beforehand, exactly as an external test runner
+    would do (authenticate once in setup, then call reset between test
+    files/runs without needing to log in again).
+    """
+    hdr = _sysadmin(client)
+
+    for _ in range(5):
+        r = client.post("/api/auth/login", json={"code": "WRONGCODE-DEFECT004"})
+        assert r.status_code == 401
+    r = client.post("/api/auth/login", json={"code": "WRONGCODE-DEFECT004"})
+    assert r.status_code == 429
+    assert r.json()["detail"]["error"] == "locked_out"
+
+    r = client.post("/api/system/reset-rate-limits", headers=hdr)
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+
+    # IP no longer locked -- a wrong code now returns 401 (invalid), not 429 (locked)
+    r = client.post("/api/auth/login", json={"code": "WRONGCODE-DEFECT004"})
+    assert r.status_code == 401
+
+
+def test_reset_rate_limits_clears_account_lockout(client):
+    """Trip the per-account 24h lockout, confirm the endpoint clears it."""
+    from app.database import SessionLocal, engine
+    from app.models import AccessCode
+    from app.security import verify_code
+    from sqlalchemy import text
+    from datetime import datetime, timedelta, timezone
+
+    hdr = _sysadmin(client)
+
+    db = SessionLocal()
+    try:
+        ac_id = next(ac.id for ac in db.query(AccessCode)
+                     .filter(AccessCode.active_status == True).all()  # noqa: E712
+                     if verify_code("703SQN2026", ac.code_hash))
+    finally:
+        db.close()
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE access_codes SET locked_until=:lu, failed_attempts=5 WHERE id=:id"),
+            {"lu": datetime.now(timezone.utc) + timedelta(minutes=30), "id": ac_id},
+        )
+    engine.dispose()
+
+    r = client.post("/api/auth/login", json={"code": "703SQN2026"})
+    assert r.status_code == 429
+    assert r.json()["detail"]["error"] == "locked_out"
+
+    r = client.post("/api/system/reset-rate-limits", headers=hdr)
+    assert r.status_code == 200
+
+    r = client.post("/api/auth/login", json={"code": "703SQN2026"})
+    assert r.status_code == 200
+
+
+def test_reset_rate_limits_clears_general_api_limiter(client):
+    """Trip the general per-IP API rate limiter, confirm the endpoint clears it.
+
+    Also proves the endpoint stays reachable while the limiter it resets is
+    itself currently tripped (see _RATE_LIMIT_EXEMPT in main.py) -- without
+    that exemption this would be a chicken-and-egg deadlock: the one
+    endpoint meant to recover a stuck client would be the thing blocking it.
+    """
+    from unittest.mock import patch
+    from app.config import settings as app_settings
+
+    hdr = _sysadmin(client)
+    with patch.object(app_settings, "API_RATE_LIMIT", 2):
+        for _ in range(2):
+            r = client.get("/api/system/overview", headers=hdr)
+            assert r.status_code == 200
+        r = client.get("/api/system/overview", headers=hdr)
+        assert r.status_code == 429
+        assert r.json()["error"] == "rate_limited"
+
+        r = client.post("/api/system/reset-rate-limits", headers=hdr)
+        assert r.status_code == 200
+
+        r = client.get("/api/system/overview", headers=hdr)
+        assert r.status_code == 200
+
+
+def test_reset_rate_limits_audit_entry(client):
+    """State-changing system_admin action must be audited."""
+    hdr = _sysadmin(client)
+    client.post("/api/system/reset-rate-limits", headers=hdr)
+    r = client.get("/api/system/audit-summary?action=reset_rate_limits&limit=10", headers=hdr)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["count"] >= 1
+    assert d["logs"][0]["object_type"] == "system"

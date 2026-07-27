@@ -1,6 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import type { CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { planningApi } from "../../api";
+import { planningApi, trainingApi, dashboardApi } from "../../api";
+import { ApiError } from "../../api/client";
+import { ImportFacilitatorsModal } from "./ImportFacilitatorsModal";
+import { FacilitatorTimeline, type ZoomPreset } from "../charts/FacilitatorTimeline";
+import { FacilitatorScheduleList } from "../charts/FacilitatorScheduleList";
+import { Loading, ErrorNote } from "../ui";
 import type {
   PlanningFacilitator, PlanningLocation,
   PlanningFacilitatorLeave, FacilitatorWorkload, EquipmentItem,
@@ -9,14 +15,13 @@ import type { DrawerItem } from "./PlanningRightDrawer";
 
 export type BottomTab =
   | "backlog"
-  | "training-planner"
   | "facilitators"
+  | "schedule"
   | "rooms"
   | "equipment"
   | "holidays"
   | "notices"
-  | "activities"
-  | "import-review";
+  | "activities";
 
 interface Props {
   yearId: string | null;
@@ -26,27 +31,27 @@ interface Props {
   facilitators: PlanningFacilitator[];
   locations: PlanningLocation[];
   onItemClick: (item: DrawerItem) => void;
+  squadronId?: string;
 }
 
 const TABS: { key: BottomTab; label: string }[] = [
   { key: "activities", label: "Activities" },
   { key: "backlog", label: "Mission Backlog" },
-  { key: "training-planner", label: "Training Planner" },
   { key: "facilitators", label: "Facilitators" },
+  { key: "schedule", label: "Schedule" },
   { key: "rooms", label: "Rooms" },
   { key: "equipment", label: "Equipment" },
   { key: "holidays", label: "Holidays" },
   { key: "notices", label: "Notices" },
-  { key: "import-review", label: "CEA History" },
 ];
 
 // ─── Styles helpers ───────────────────────────────────────────────────────────
 
-const inputSx: React.CSSProperties = {
+const inputSx: CSSProperties = {
   padding: "5px 8px", borderRadius: 6,
   border: "1.5px solid var(--border)", fontSize: 12, width: "100%",
 };
-const labelSx: React.CSSProperties = {
+const labelSx: CSSProperties = {
   fontSize: 12, fontWeight: 700,
   display: "flex", flexDirection: "column", gap: 4,
 };
@@ -54,6 +59,18 @@ const labelSx: React.CSSProperties = {
 // ─── BacklogContent ───────────────────────────────────────────────────────────
 
 type SortDir = "asc" | "desc";
+
+function getProgramType(cs: string): "foundation" | "extension" | "optional" {
+  if (cs === "foundation" || cs === "core") return "foundation";
+  if (cs === "optional") return "optional";
+  return "extension";
+}
+
+const PROG_TYPE_STYLE: Record<string, CSSProperties> = {
+  foundation: { fontSize: 9, fontWeight: 700, color: "#1A7F4B", background: "#d1fae5", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
+  extension:  { fontSize: 9, fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
+  optional:   { fontSize: 9, fontWeight: 700, color: "#6b7a87", background: "#f1f5f9", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
+};
 
 const SUITABILITY_SHORT: Record<string, string> = {
   "Staff": "Staff",
@@ -69,6 +86,8 @@ function fmtDate(iso: string | null): string {
 }
 
 function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: (item: DrawerItem) => void }) {
+  const queryClient = useQueryClient();
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState("phase");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -78,6 +97,8 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
   const [fStatus, setFStatus] = useState("unscheduled");
   const [fCore, setFCore] = useState("");
   const [fTerm, setFTerm] = useState("");
+  const [fDateStart, setFDateStart] = useState("");
+  const [fDateEnd, setFDateEnd] = useState("");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["planning-missions", yearId, "backlog"],
@@ -101,12 +122,33 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
       if (fPhase && m.phase !== fPhase) return false;
       if (fElement && m.element !== fElement) return false;
       if (fSuitability && m.instructor_suitability !== fSuitability) return false;
-      if (fCore === "core" && m.core_status !== "core") return false;
-      if (fCore === "optional" && m.core_status === "core") return false;
+      if (fCore && getProgramType(m.core_status) !== fCore) return false;
       if (fTerm && m.recommended_term !== fTerm) return false;
       if (fStatus === "scheduled" && !m.is_scheduled) return false;
       if (fStatus === "unscheduled" && m.is_scheduled) return false;
+      // "Cancelled"/"Not delivered" mean "currently awaiting reschedule", not "has
+      // ever had this status" — has_cancelled/has_not_delivered stay true forever
+      // even once a mission is resolved, which previously made a resolved mission
+      // still match these two filters alongside "Resolved", confusingly implying
+      // it still needed action. Match backlog_status like the other four filters.
+      if (fStatus === "cancelled" && m.backlog_status !== "cancelled_awaiting_reschedule") return false;
+      if (fStatus === "not_delivered" && m.backlog_status !== "not_delivered_awaiting_reschedule") return false;
+      if (fStatus === "rescheduled" && m.backlog_status !== "rescheduled") return false;
+      if (fStatus === "resolved" && m.backlog_status !== "resolved") return false;
+      if (fStatus === "planned" && m.backlog_status !== "planned") return false;
       if (q && !m.code.toLowerCase().includes(q) && !m.title.toLowerCase().includes(q)) return false;
+      // TRGO-08: date-range filter. An unscheduled mission has no date to match
+      // against and always needs attention, so it is never hidden by this filter
+      // -- only scheduled missions are narrowed to those with a session in range.
+      if ((fDateStart || fDateEnd) && m.is_scheduled) {
+        const inRange = m.scheduled_sessions.some(s => {
+          if (!s.parade_date) return false;
+          if (fDateStart && s.parade_date < fDateStart) return false;
+          if (fDateEnd && s.parade_date > fDateEnd) return false;
+          return true;
+        });
+        if (!inRange) return false;
+      }
       return true;
     });
 
@@ -129,14 +171,14 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
       return sortDir === "asc" ? cmp : -cmp;
     });
     return rows;
-  }, [data, search, fPhase, fElement, fSuitability, fCore, fTerm, fStatus, sortCol, sortDir]);
+  }, [data, search, fPhase, fElement, fSuitability, fCore, fTerm, fStatus, fDateStart, fDateEnd, sortCol, sortDir]);
 
   function handleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortCol(col); setSortDir("asc"); }
   }
 
-  function SortHdr({ col, label, style }: { col: string; label: string; style?: React.CSSProperties }) {
+  function SortHdr({ col, label, style }: { col: string; label: string; style?: CSSProperties }) {
     const active = sortCol === col;
     return (
       <th
@@ -148,7 +190,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
     );
   }
 
-  const selSx: React.CSSProperties = {
+  const selSx: CSSProperties = {
     fontSize: 11, padding: "2px 4px", borderRadius: 4,
     border: "1px solid var(--border)", width: "100%", background: "#fff",
   };
@@ -176,6 +218,11 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
           <option value="">All statuses</option>
           <option value="unscheduled">Unscheduled</option>
           <option value="scheduled">Scheduled</option>
+          <option value="planned">Planned</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="not_delivered">Not delivered</option>
+          <option value="rescheduled">Rescheduled</option>
+          <option value="resolved">Resolved</option>
         </select>
         <select value={fPhase} onChange={e => setFPhase(e.target.value)} style={{ ...inputSx, width: 150 }}>
           <option value="">All phases</option>
@@ -189,10 +236,11 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
           <option value="">All instructors</option>
           {opts.suitabilities.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <select value={fCore} onChange={e => setFCore(e.target.value)} style={{ ...inputSx, width: 110 }}>
-          <option value="">Core + optional</option>
-          <option value="core">Core only</option>
-          <option value="optional">Optional only</option>
+        <select value={fCore} onChange={e => setFCore(e.target.value)} style={{ ...inputSx, width: 120 }}>
+          <option value="">All types</option>
+          <option value="foundation">Foundation</option>
+          <option value="extension">Extension</option>
+          <option value="optional">Optional</option>
         </select>
         {opts.terms.length > 0 && (
           <select value={fTerm} onChange={e => setFTerm(e.target.value)} style={{ ...inputSx, width: 110 }}>
@@ -200,10 +248,18 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
             {opts.terms.map(t => <option key={t} value={t}>Term {t}</option>)}
           </select>
         )}
+        <label style={{ fontSize: 11, color: "var(--muted-text)", display: "flex", alignItems: "center", gap: 4 }}>
+          From
+          <input type="date" value={fDateStart} onChange={e => setFDateStart(e.target.value)} style={{ ...inputSx, width: 130 }} aria-label="Scheduled from date" />
+        </label>
+        <label style={{ fontSize: 11, color: "var(--muted-text)", display: "flex", alignItems: "center", gap: 4 }}>
+          To
+          <input type="date" value={fDateEnd} onChange={e => setFDateEnd(e.target.value)} style={{ ...inputSx, width: 130 }} aria-label="Scheduled to date" />
+        </label>
         <button
           className="btn sm out"
           style={{ fontSize: 11, padding: "3px 8px", whiteSpace: "nowrap" }}
-          onClick={() => { setSearch(""); setFPhase(""); setFElement(""); setFSuitability(""); setFCore(""); setFTerm(""); setFStatus("unscheduled"); }}
+          onClick={() => { setSearch(""); setFPhase(""); setFElement(""); setFSuitability(""); setFCore(""); setFTerm(""); setFStatus("unscheduled"); setFDateStart(""); setFDateEnd(""); }}
         >
           Reset
         </button>
@@ -231,7 +287,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                 <SortHdr col="suitability" label="Instructor" style={{ minWidth: 100 }} />
                 <SortHdr col="duration" label="Dur." style={{ minWidth: 50 }} />
                 <SortHdr col="term" label="Rec. Term" style={{ minWidth: 80 }} />
-                <th style={{ minWidth: 46 }}>Core</th>
+                <th style={{ minWidth: 80 }}>Type</th>
                 <SortHdr col="status" label="Status" style={{ minWidth: 90 }} />
                 <SortHdr col="date" label="Date" style={{ minWidth: 80 }} />
                 <th style={{ minWidth: 50 }}>Period</th>
@@ -251,7 +307,8 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
 
                 const warnNoFac = m.is_scheduled && s0 && !s0.facilitator_id;
                 const warnNoRoom = m.is_scheduled && s0 && !s0.location_id;
-                const warnCoreUnsched = !m.is_scheduled && m.core_status === "core";
+                const progType = getProgramType(m.core_status);
+                const warnCoreUnsched = !m.is_scheduled && progType === "foundation";
 
                 return (
                   <tr key={m.curriculum_id}>
@@ -268,16 +325,32 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                     {/* Duration */}
                     <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{m.duration_minutes}m</td>
                     {/* Rec. Term */}
-                    <td style={{ textAlign: "center" }}>{m.recommended_term ? `T${m.recommended_term}` : "—"}</td>
-                    {/* Core */}
+                    <td style={{ textAlign: "center" }}>{m.recommended_term ?? "—"}</td>
+                    {/* Type */}
                     <td style={{ textAlign: "center" }}>
-                      {m.core_status === "core" && (
-                        <span style={{ fontSize: 9, fontWeight: 700, color: "var(--aafc-red)" }}>CORE</span>
-                      )}
+                      <span style={PROG_TYPE_STYLE[progType]}>
+                        {progType.toUpperCase()}
+                      </span>
                     </td>
-                    {/* Status */}
+                    {/* Status — see backlog_status's six-state model (backend/app/routers/planning.py) */}
                     <td>
-                      {!m.is_scheduled ? (
+                      {m.backlog_status === "resolved" ? (
+                        <span title={`Previously ${m.has_cancelled ? "cancelled" : "not delivered"}, now delivered.${s0?.outcome_note ? " " + s0.outcome_note : ""}`} style={{ color: "#fff", background: "var(--success, #1A7F4B)", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                          RESOLVED
+                        </span>
+                      ) : m.has_not_delivered ? (
+                        <span title={[s0?.not_delivered_reason, s0?.outcome_note].filter(Boolean).join(" — ") || "No reason recorded"} style={{ color: "#fff", background: "#78909c", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                          NOT DELIVERED
+                        </span>
+                      ) : m.has_cancelled ? (
+                        <span title={[s0?.cancelled_reason, s0?.outcome_note].filter(Boolean).join(" — ") || "No reason recorded"} style={{ color: "#fff", background: "var(--aafc-red)", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                          CANCELLED
+                        </span>
+                      ) : m.backlog_status === "rescheduled" ? (
+                        <span title={s0?.rescheduled_to_date ? `Rescheduled to ${fmtDate(s0.rescheduled_to_date)}` : "Rescheduled"} style={{ color: "#fff", background: "var(--rescheduled, #7C3AED)", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                          RESCHEDULED
+                        </span>
+                      ) : !m.is_scheduled ? (
                         <span style={{ color: "var(--muted-text)", fontWeight: 600 }}>Unscheduled</span>
                       ) : isPartial ? (
                         <span style={{ color: "var(--warning, #d97706)", fontWeight: 600 }}>Partial {m.scheduled_count}/{partCount}</span>
@@ -312,22 +385,24 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                     </td>
                     {/* Warnings */}
                     <td>
-                      {warnCoreUnsched && <span title="Core lesson not scheduled" style={{ color: "var(--aafc-red)", fontSize: 11 }}>⚠ Core</span>}
+                      {warnCoreUnsched && <span title="Foundation lesson not scheduled" style={{ color: "var(--aafc-red)", fontSize: 11 }}>⚠ Foundation</span>}
                       {warnNoFac && <span title="No facilitator assigned" style={{ color: "var(--warning, #d97706)", fontSize: 11 }}>⚠ Fac</span>}
                       {warnNoRoom && !warnCoreUnsched && <span title="No room assigned" style={{ color: "var(--muted-text)", fontSize: 11 }}>⚠ Room</span>}
                     </td>
                     {/* Actions */}
-                    <td>
+                    <td style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                       {s0 ? (
                         <button
                           className="btn sm out"
                           style={{ fontSize: 10, padding: "2px 7px" }}
-                          onClick={() => onItemClick({
-                            type: "session-by-id",
-                            sessionId: s0.session_id,
-                            dateId: s0.parade_date_id ?? "",
-                            date: s0.parade_date ?? "",
-                          })}
+                          onClick={async () => {
+                            const full = await planningApi.getSession(s0.session_id);
+                            onItemClick({
+                              type: "session", session: full,
+                              dateId: s0.parade_date_id ?? "", date: s0.parade_date ?? "",
+                              conflicts: [],
+                            });
+                          }}
                         >
                           Edit
                         </button>
@@ -343,6 +418,35 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                           }})}
                         >
                           Schedule
+                        </button>
+                      )}
+                      {m.needs_reschedule && m.backlog_status !== "resolved" && s0 && (
+                        <button
+                          className="btn sm out"
+                          disabled={reschedulingId === s0.session_id}
+                          style={{ fontSize: 10, padding: "2px 7px", borderColor: "var(--aafc-red)", color: "var(--aafc-red)" }}
+                          title={s0.cancelled_reason ?? s0.not_delivered_reason ?? ""}
+                          onClick={async () => {
+                            if (!window.confirm(
+                              `This session was ${m.has_not_delivered ? "not delivered" : "cancelled"} on ${fmtDate(s0.parade_date)}. ` +
+                              "Mark it as rescheduled and choose a new date now?"
+                            )) return;
+                            setReschedulingId(s0.session_id);
+                            try {
+                              await trainingApi.setStatus(s0.session_id, { status: "rescheduled" });
+                              await queryClient.invalidateQueries({ queryKey: ["planning-missions", yearId] });
+                              onItemClick({ type: "curriculum", curriculum: {
+                                curriculum_id: m.curriculum_id,
+                                code: m.code,
+                                title: m.title,
+                                phase: m.phase,
+                              }});
+                            } finally {
+                              setReschedulingId(null);
+                            }
+                          }}
+                        >
+                          Reschedule
                         </button>
                       )}
                     </td>
@@ -541,6 +645,57 @@ function FacilitatorLeaveSection({
   );
 }
 
+// ─── ScheduleContent ──────────────────────────────────────────────────────────
+// GAP-14 fix: the Facilitator Schedule Explorer (FacilitatorTimeline.tsx /
+// FacilitatorScheduleList.tsx, GET /api/dashboard/facilitator-schedule) was
+// fully built and tested but only registered on the standalone full-app route
+// table (/facilitator-schedule) -- unreachable on the actually-deployed
+// module-mode Planning Workspace service, the same root cause GAP-13 already
+// found for the Facilitators CSV import. This wires the same components into
+// the one surface that IS reachable in module mode: a Bottom Drawer tab.
+// Squadron-scoped directly via the caller's own squadronId (the session's
+// squadron for a squadron-role user) rather than useScopedSquadron's
+// Wing/National selector context, which isn't wired into module mode.
+function ScheduleContent({ squadronId }: { squadronId?: string }) {
+  const [zoom, setZoom] = useState<ZoomPreset>("term");
+  const [view, setView] = useState<"timeline" | "list">("timeline");
+
+  const q = useQuery({
+    queryKey: ["facilitator-schedule", zoom, squadronId],
+    queryFn: () => dashboardApi.facilitatorSchedule(zoom === "week" ? "week" : "year", squadronId),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+        <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+          Zoom
+          <select value={zoom} onChange={(e) => setZoom(e.target.value as ZoomPreset)} style={{ fontSize: 12, padding: "4px 6px" }}>
+            <option value="week">Week</option>
+            <option value="month">Month</option>
+            <option value="term">Term</option>
+            <option value="year">Year</option>
+          </select>
+        </label>
+        <div role="group" aria-label="View">
+          <button type="button" className={`btn sm ${view === "timeline" ? "" : "out"}`} aria-pressed={view === "timeline"} onClick={() => setView("timeline")}>Timeline</button>{" "}
+          <button type="button" className={`btn sm ${view === "list" ? "" : "out"}`} aria-pressed={view === "list"} onClick={() => setView("list")}>List (accessible)</button>
+        </div>
+      </div>
+      {q.isLoading ? (
+        <Loading />
+      ) : q.error ? (
+        <ErrorNote error={q.error} />
+      ) : view === "timeline" ? (
+        <FacilitatorTimeline facilitators={q.data?.facilitators ?? []} items={q.data?.items ?? []} zoomPreset={zoom} />
+      ) : (
+        <FacilitatorScheduleList facilitators={q.data?.facilitators ?? []} items={q.data?.items ?? []} />
+      )}
+    </div>
+  );
+}
+
 // ─── FacilitatorsContent ─────────────────────────────────────────────────────
 
 function FacilitatorsContent({
@@ -550,6 +705,7 @@ function FacilitatorsContent({
   const qc = useQueryClient();
   const [selectedFacId, setSelectedFacId] = useState<string | null>(null);
   const [addingFac, setAddingFac] = useState(false);
+  const [importingFac, setImportingFac] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [rank, setRank] = useState("");
@@ -557,8 +713,16 @@ function FacilitatorsContent({
   const [subjectAreas, setSubjectAreas] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [dupWarning, setDupWarning] = useState<string | null>(null);
 
-  async function handleAddFac() {
+  // TRGO-07 (drawer-tab parity): this form posts to the same POST /api/facilitators
+  // endpoint as the standalone Add Facilitator modal, so it hits the same
+  // 409 possible_duplicate check -- but until this fix it had no way to resubmit
+  // with confirm_duplicate:true, so a genuine same-name-different-person case was
+  // a dead end here too. This tab is the one actually reachable when the app is
+  // deployed in module mode, so the fix belongs here, not only on the standalone
+  // route's own copy of this form.
+  async function handleAddFac(confirmDuplicate = false) {
     if (!firstName.trim() || !lastName.trim()) { setErr("First and last name are required."); return; }
     setSaving(true); setErr(null);
     try {
@@ -567,12 +731,17 @@ function FacilitatorsContent({
         current_rank: rank.trim() || undefined,
         type: facType || undefined,
         subject_areas: subjectAreas ? subjectAreas.split(",").map(s => s.trim()).filter(Boolean) : undefined,
+        confirm_duplicate: confirmDuplicate,
       });
       await qc.invalidateQueries({ queryKey: ["planning-facilitators"] });
       setFirstName(""); setLastName(""); setRank(""); setFacType("officer"); setSubjectAreas("");
-      setAddingFac(false);
+      setAddingFac(false); setDupWarning(null);
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Failed to create facilitator");
+      if (e instanceof ApiError && e.code === "possible_duplicate") {
+        setDupWarning(e.friendly);
+      } else {
+        setErr(e instanceof Error ? e.message : "Failed to create facilitator");
+      }
     } finally {
       setSaving(false);
     }
@@ -580,22 +749,31 @@ function FacilitatorsContent({
 
   return (
     <div>
-      <div style={{ padding: "8px 14px 0", display: "flex", justifyContent: "flex-end" }}>
+      <div style={{ padding: "8px 14px 0", display: "flex", justifyContent: "flex-end", gap: 6 }}>
         {!addingFac && (
-          <button className="btn sm primary" onClick={() => setAddingFac(true)}>+ Add Facilitator</button>
+          <>
+            <button className="btn sm out" onClick={() => setImportingFac(true)}>Import CSV</button>
+            <button className="btn sm primary" onClick={() => { setAddingFac(true); setDupWarning(null); setErr(null); }}>+ Add Facilitator</button>
+          </>
         )}
       </div>
+      {importingFac && (
+        <ImportFacilitatorsModal
+          onClose={() => setImportingFac(false)}
+          onDone={() => { setImportingFac(false); qc.invalidateQueries({ queryKey: ["planning-facilitators"] }); }}
+        />
+      )}
 
       {addingFac && (
         <div style={{ padding: "10px 14px", background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
             <label style={labelSx}>
               First name *
-              <input value={firstName} onChange={e => setFirstName(e.target.value)} style={inputSx} autoFocus />
+              <input value={firstName} onChange={e => { setFirstName(e.target.value); setDupWarning(null); }} style={inputSx} />
             </label>
             <label style={labelSx}>
               Last name *
-              <input value={lastName} onChange={e => setLastName(e.target.value)} style={inputSx} />
+              <input value={lastName} onChange={e => { setLastName(e.target.value); setDupWarning(null); }} style={inputSx} />
             </label>
             <label style={labelSx}>
               Rank
@@ -616,9 +794,17 @@ function FacilitatorsContent({
             </label>
           </div>
           {err && <div style={{ color: "var(--aafc-red)", fontSize: 12, marginBottom: 6 }}>{err}</div>}
+          {dupWarning && (
+            <div style={{ color: "var(--aafc-red)", fontSize: 12, marginBottom: 6 }}>
+              {dupWarning} If this is a different person with the same name, you can add them anyway.
+            </div>
+          )}
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn sm primary" onClick={handleAddFac} disabled={saving}>{saving ? "Saving…" : "Add facilitator"}</button>
-            <button className="btn sm out" onClick={() => { setAddingFac(false); setErr(null); }}>Cancel</button>
+            <button className="btn sm primary" onClick={() => handleAddFac(false)} disabled={saving}>{saving ? "Saving…" : "Add facilitator"}</button>
+            {dupWarning && (
+              <button className="btn sm out" onClick={() => handleAddFac(true)} disabled={saving}>{saving ? "Saving…" : "Add anyway"}</button>
+            )}
+            <button className="btn sm out" onClick={() => { setAddingFac(false); setErr(null); setDupWarning(null); }}>Cancel</button>
           </div>
         </div>
       )}
@@ -778,7 +964,7 @@ function EquipmentContent() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
             <label style={{ ...labelSx, gridColumn: "1 / 3" }}>
               Name *
-              <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Projector" autoFocus style={inputSx} />
+              <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Projector" style={inputSx} />
             </label>
             <label style={labelSx}>
               Type
@@ -930,7 +1116,6 @@ function HolidaysContent({ yearId }: { yearId: string }) {
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="e.g. Spring Break"
-                autoFocus
                 style={{ fontWeight: 400, padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12 }}
               />
             </label>
@@ -952,6 +1137,15 @@ function HolidaysContent({ yearId }: { yearId: string }) {
           <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, marginBottom: 8 }}>
             <input type="checkbox" checked={affectsParade} onChange={e => setAffectsParade(e.target.checked)} />
             Affects parade nights (stand-down)
+          </label>
+          <label style={{ fontSize: 12, fontWeight: 700, display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+            Notes (optional)
+            <input
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="e.g. State school holiday — check local gazette for exact dates"
+              style={{ fontWeight: 400, padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12 }}
+            />
           </label>
           {err && <div style={{ color: "var(--aafc-red)", fontSize: 12, marginBottom: 6 }}>{err}</div>}
           <div style={{ display: "flex", gap: 8 }}>
@@ -1086,6 +1280,8 @@ type UnifiedActivity = {
   unit: string | null;
   extra: string | null;
   is_removed: boolean;
+  is_hidden: boolean;
+  local_note: string | null;
   raw_cea: import("../../api/types").CeaActivity | null;
   raw_anchor: import("../../api/types").AnchorEvent | null;
   raw_holiday: import("../../api/types").HolidayPeriod | null;
@@ -1109,6 +1305,12 @@ function ClassifyModal({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   async function handleSave() {
     setSaving(true); setErr(null);
     try {
@@ -1130,13 +1332,19 @@ function ClassifyModal({
   }
 
   return (
+    // Backdrop click is a mouse-only convenience; Escape (above) and the Cancel button
+    // below are the full keyboard-equivalent dismiss paths.
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 900, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
+      {/* Only stops the backdrop's click-to-close from firing for clicks inside the dialog. */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div style={{ background: "#fff", borderRadius: 10, padding: 24, width: 420, maxWidth: "95vw" }} onClick={e => e.stopPropagation()}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Classify Activity</div>
         <div style={{ fontSize: 12, color: "var(--muted-text)", marginBottom: 16 }}>{activity.activity_name}</div>
 
-        <label style={{ fontSize: 12, fontWeight: 700, display: "block", marginBottom: 4 }}>Importance</label>
+        <label htmlFor="classify-importance" style={{ fontSize: 12, fontWeight: 700, display: "block", marginBottom: 4 }}>Importance</label>
         <select
+          id="classify-importance"
           value={importance}
           onChange={e => setImportance(e.target.value)}
           style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12, marginBottom: 14 }}
@@ -1179,12 +1387,24 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
   const [uploading, setUploading] = useState(false);
   const [importResult, setImportResult] = useState<import("../../api/types").CeaImportResult | null>(null);
   const [importErr, setImportErr] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const { data: batchData, isLoading: batchLoading } = useQuery({
+    queryKey: ["cea-batches", yearId],
+    queryFn: () => planningApi.ceaBatches(yearId),
+    staleTime: 2 * 60 * 1000,
+    enabled: showHistory,
+  });
+  const batches = batchData?.batches ?? [];
   // Filters
   const [fSource, setFSource] = useState("all");
   const [fStatus, setFStatus] = useState("all");
   const [fSearch, setFSearch] = useState("");
   const [fStart, setFStart] = useState("");
   const [fEnd, setFEnd] = useState("");
+  const [fShowHidden, setFShowHidden] = useState(false);
+  const [hidingId, setHidingId] = useState<string | null>(null);
+  const [hideNote, setHideNote] = useState("");
   // Sort
   const [sortCol, setSortCol] = useState("start_date");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
@@ -1231,6 +1451,8 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         unit: a.host_unit ?? a.parent_unit,
         extra: a.cea_activity_id,
         is_removed: a.is_removed_from_cea,
+        is_hidden: a.is_hidden_for_me,
+        local_note: a.local_note,
         raw_cea: a,
         raw_anchor: null,
         raw_holiday: null,
@@ -1249,6 +1471,8 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         unit: a.unit_name,
         extra: a.event_type,
         is_removed: false,
+        is_hidden: false,
+        local_note: null,
         raw_cea: null,
         raw_anchor: a,
         raw_holiday: null,
@@ -1267,6 +1491,8 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         unit: null,
         extra: h.holiday_type.replace(/_/g, " "),
         is_removed: false,
+        is_hidden: false,
+        local_note: null,
         raw_cea: null,
         raw_anchor: null,
         raw_holiday: h,
@@ -1279,6 +1505,10 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
     const q = fSearch.toLowerCase();
     return [...unified]
       .filter(r => {
+        // TRGO-02: hidden items are excluded by default -- local hide is a
+        // "get this out of my way" action, not a delete, so it should not
+        // require a special mode to reach, just an explicit toggle to reveal.
+        if (r.is_hidden && !fShowHidden) return false;
         if (fSource !== "all" && r.source !== fSource) return false;
         if (fStatus === "needs_review" && r.classification_status !== "needs_review") return false;
         if (fStatus === "classified" && r.classification_status !== "classified") return false;
@@ -1297,14 +1527,14 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         const cmp = av < bv ? -1 : av > bv ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [unified, fSource, fStatus, fSearch, fStart, fEnd, sortCol, sortDir]);
+  }, [unified, fSource, fStatus, fSearch, fStart, fEnd, fShowHidden, sortCol, sortDir]);
 
   function handleSort(col: string) {
     if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortCol(col); setSortDir("asc"); }
   }
 
-  function SortTh({ col, label, style }: { col: string; label: string; style?: React.CSSProperties }) {
+  function SortTh({ col, label, style }: { col: string; label: string; style?: CSSProperties }) {
     return (
       <th onClick={() => handleSort(col)} style={{ cursor: "pointer", userSelect: "none", whiteSpace: "nowrap", ...style }}>
         {label}{sortCol === col ? (sortDir === "asc" ? " ▲" : " ▼") : ""}
@@ -1329,6 +1559,16 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
     } finally {
       setCreating(false);
     }
+  }
+
+  // TRGO-02: local hide/note -- a squadron-scoped overlay (ActivityLocalHide)
+  // that never touches the shared CeaActivity source row.
+  async function toggleHide(activity: import("../../api/types").CeaActivity, note?: string) {
+    await planningApi.ceaLocalHide(activity.id, {
+      is_hidden: !activity.is_hidden_for_me,
+      local_note: note !== undefined ? note : (activity.local_note ?? undefined),
+    });
+    await qc.invalidateQueries({ queryKey: ["cea-activities", yearId] });
   }
 
   async function handleFileImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1392,6 +1632,10 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         >
           Reset
         </button>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--muted-text)", cursor: "pointer", whiteSpace: "nowrap" }}>
+          <input type="checkbox" checked={fShowHidden} onChange={e => setFShowHidden(e.target.checked)} />
+          Show hidden
+        </label>
         <span style={{ fontSize: 11, color: "var(--muted-text)", marginLeft: "auto", whiteSpace: "nowrap" }}>
           {filtered.length} of {unified.length}
         </span>
@@ -1429,7 +1673,7 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         <div style={{ padding: "10px 14px", background: "#f0f5ff", borderBottom: "1px solid var(--border)", display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8 }}>
           <label style={{ gridColumn: "1 / 3", ...labelSx }}>
             Activity name *
-            <input value={newName} onChange={e => setNewName(e.target.value)} autoFocus style={{ ...inputSx, fontWeight: 400 }} />
+            <input value={newName} onChange={e => setNewName(e.target.value)} style={{ ...inputSx, fontWeight: 400 }} />
           </label>
           <label style={labelSx}>
             Start date
@@ -1485,7 +1729,7 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
             </thead>
             <tbody>
               {filtered.map(r => (
-                <tr key={`${r.source}-${r.id}`} style={{ background: r.is_removed ? "#fff3cd" : undefined }}>
+                <tr key={`${r.source}-${r.id}`} style={{ background: r.is_removed ? "#fff3cd" : r.is_hidden ? "#f4f5f7" : undefined, opacity: r.is_hidden ? 0.7 : 1 }}>
                   <td>
                     <span style={{
                       fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 3,
@@ -1501,6 +1745,12 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
                     {r.name}
                     {r.is_removed && (
                       <span style={{ marginLeft: 4, fontSize: 9, color: "var(--warning)", fontWeight: 700 }}>[Not in latest import]</span>
+                    )}
+                    {r.is_hidden && (
+                      <span style={{ marginLeft: 4, fontSize: 9, color: "var(--muted-text)", fontWeight: 700 }}>[Hidden for your squadron]</span>
+                    )}
+                    {r.local_note && (
+                      <div style={{ fontSize: 9, color: "var(--muted-text)", fontWeight: 400, fontStyle: "italic" }}>{r.local_note}</div>
                     )}
                   </td>
                   <td style={{ whiteSpace: "nowrap" }}>{r.start_date ?? "—"}</td>
@@ -1522,7 +1772,7 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
                       <span style={{ fontSize: 10, color: "var(--muted-text)" }}>{r.classification_status ?? "—"}</span>
                     )}
                   </td>
-                  <td>
+                  <td style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                     {r.raw_cea && (
                       <button
                         className="btn sm out"
@@ -1530,6 +1780,18 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
                         onClick={() => setClassifying(r.raw_cea!)}
                       >
                         Classify
+                      </button>
+                    )}
+                    {r.raw_cea && (
+                      <button
+                        className="btn sm out"
+                        style={{ fontSize: 10, padding: "2px 6px" }}
+                        onClick={() => {
+                          if (r.is_hidden) { toggleHide(r.raw_cea!); }
+                          else { setHidingId(r.id); setHideNote(r.local_note ?? ""); }
+                        }}
+                      >
+                        {r.is_hidden ? "Unhide" : "Hide / note…"}
                       </button>
                     )}
                   </td>
@@ -1540,6 +1802,51 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         </div>
       )}
 
+      {/* CEA import history — collapsed by default */}
+      <div style={{ borderTop: "1px solid var(--border)", marginTop: 8 }}>
+        <button
+          style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "7px 14px", background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "var(--aafc-dark-blue)", textAlign: "left" }}
+          onClick={() => setShowHistory(v => !v)}
+        >
+          <span style={{ fontSize: 10 }}>{showHistory ? "▾" : "▸"}</span>
+          CEA import history
+        </button>
+        {showHistory && (
+          <div style={{ padding: "0 14px 10px" }}>
+            {batchLoading ? (
+              <div className="pw-loading" style={{ padding: "10px 0" }}>Loading…</div>
+            ) : batches.length === 0 ? (
+              <div style={{ fontSize: 11, color: "var(--muted-text)" }}>No imports yet.</div>
+            ) : (
+              <table className="pw-fac-table" style={{ fontSize: 11 }}>
+                <thead>
+                  <tr>
+                    <th>File</th><th>Imported at</th><th>Rows</th>
+                    <th>New</th><th>Updated</th><th>Dups</th><th>Skipped</th><th>Errors</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batches.map(b => (
+                    <tr key={b.id}>
+                      <td style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>{b.source_file_name ?? "—"}</td>
+                      <td style={{ color: "var(--muted-text)", whiteSpace: "nowrap" }}>
+                        {b.created_at ? new Date(b.created_at).toLocaleDateString("en-CA", { year: "numeric", month: "short", day: "numeric" }) : "—"}
+                      </td>
+                      <td style={{ textAlign: "center" }}>{b.row_count}</td>
+                      <td style={{ textAlign: "center", color: "#1A7F4B", fontWeight: 700 }}>{b.created_count}</td>
+                      <td style={{ textAlign: "center", color: "var(--warning)", fontWeight: 700 }}>{b.updated_count}</td>
+                      <td style={{ textAlign: "center" }}>{b.duplicate_count}</td>
+                      <td style={{ textAlign: "center" }}>{b.skipped_count}</td>
+                      <td style={{ textAlign: "center", color: b.error_count > 0 ? "var(--aafc-red)" : undefined }}>{b.error_count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
+
       {classifying && (
         <ClassifyModal
           activity={classifying}
@@ -1547,453 +1854,45 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
           onClose={() => setClassifying(null)}
         />
       )}
-    </div>
-  );
-}
 
-// ─── ImportReviewContent ──────────────────────────────────────────────────────
-
-function ImportReviewContent({ yearId }: { yearId: string }) {
-  const qc = useQueryClient();
-  const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState<import("../../api/types").CeaImportResult | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-
-  const { data: batchData, isLoading: batchLoading } = useQuery({
-    queryKey: ["cea-batches", yearId],
-    queryFn: () => planningApi.ceaBatches(yearId),
-    staleTime: 2 * 60 * 1000,
-  });
-
-  const batches = batchData?.batches ?? [];
-
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true); setErr(null); setResult(null);
-    try {
-      const res = await planningApi.ceaImport(yearId, file);
-      setResult(res);
-      await qc.invalidateQueries({ queryKey: ["cea-activities"] });
-      await qc.invalidateQueries({ queryKey: ["cea-batches"] });
-    } catch (ex) {
-      setErr(ex instanceof Error ? ex.message : "Import failed");
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
-  }
-
-  return (
-    <div style={{ padding: "10px 14px" }}>
-      {/* Import section */}
-      <div style={{ background: "#f0f5ff", border: "1px solid var(--border)", borderRadius: 8, padding: 12, marginBottom: 14 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--aafc-dark-blue)", marginBottom: 6 }}>
-          Import CEA CSV file
-        </div>
-        <div style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 10 }}>
-          Supports full CEA export (StatusName, ActivityID, ActivityTypeName…) and simple export (SeqNr, Name, Start date…).
-          Duplicate detection by ActivityID or activity name + date.
-          Removed activities marked, not deleted.
-        </div>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-          <input
-            type="file"
-            accept=".csv,.txt"
-            style={{ display: "none" }}
-            onChange={handleFileChange}
-            disabled={uploading}
-          />
-          <span className="btn sm primary" style={{ fontSize: 11, pointerEvents: "none" }}>
-            {uploading ? "Importing…" : "Choose CSV file"}
-          </span>
-          <span style={{ fontSize: 11, color: "var(--muted-text)" }}>
-            {uploading ? "Processing…" : "No file selected"}
-          </span>
-        </label>
-        {err && <div style={{ fontSize: 11, color: "var(--aafc-red)", marginTop: 8 }}>{err}</div>}
-      </div>
-
-      {/* Import result */}
-      {result && (
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
-            Import complete —{" "}
-            <span style={{ color: "var(--aafc-dark-blue)" }}>{result.created} new</span>,{" "}
-            <span style={{ color: "#1A7F4B" }}>{result.updated} updated</span>,{" "}
-            <span style={{ color: "var(--warning)" }}>{result.duplicates} duplicates</span>,{" "}
-            <span style={{ color: "var(--muted-text)" }}>{result.skipped} skipped</span>
-            {result.errors > 0 && <span style={{ color: "var(--aafc-red)" }}>, {result.errors} errors</span>}
-          </div>
-
-          {result.preview.length > 0 && (
-            <div style={{ overflowX: "auto" }}>
-              <table className="pw-fac-table" style={{ fontSize: 11 }}>
-                <thead>
-                  <tr>
-                    <th>Action</th>
-                    <th>Activity name</th>
-                    <th>Start date</th>
-                    <th>Host unit</th>
-                    <th>Location</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.preview.map((p, i) => (
-                    <tr key={i} style={{
-                      background: p.action === "create" ? "#f0fff4" : p.action === "update" ? "#fff8e6" : "#fff3f3",
-                    }}>
-                      <td>
-                        <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase",
-                          color: p.action === "create" ? "#1A7F4B" : p.action === "update" ? "var(--warning)" : "var(--aafc-red)" }}>
-                          {p.action}
-                        </span>
-                      </td>
-                      <td style={{ fontWeight: 600 }}>{p.activity_name}</td>
-                      <td>{p.activity_start_date ?? "—"}</td>
-                      <td style={{ color: "var(--muted-text)" }}>{p.host_unit ?? "—"}</td>
-                      <td style={{ color: "var(--muted-text)" }}>{p.location ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {result.row_count > 50 && (
-                <div style={{ fontSize: 11, color: "var(--muted-text)", padding: "4px 0" }}>
-                  Showing first 50 rows of {result.row_count} total. Go to Activities tab to see all.
-                </div>
-              )}
+      {hidingId && (() => {
+        const target = unified.find(r => r.id === hidingId)?.raw_cea;
+        if (!target) return null;
+        return (
+          <div className="pw-modal-overlay" role="dialog" aria-label="Hide activity for your squadron" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
+            <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, width: 360, boxShadow: "0 8px 24px rgba(0,0,0,0.2)" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Hide "{target.activity_name}" for your squadron</div>
+              <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8 }}>
+                This only affects what your squadron sees -- the shared activity record is not changed, and other squadrons still see it normally.
+              </p>
+              <label style={labelSx}>
+                Note (optional)
+                <textarea value={hideNote} onChange={e => setHideNote(e.target.value)} rows={2} style={{ ...inputSx, resize: "vertical" }} />
+              </label>
+              <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
+                <button className="btn sm out" onClick={() => setHidingId(null)}>Cancel</button>
+                <button
+                  className="btn sm primary"
+                  onClick={async () => {
+                    await toggleHide(target, hideNote.trim() || undefined);
+                    setHidingId(null);
+                  }}
+                >
+                  Hide for my squadron
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Import history */}
-      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--aafc-dark-blue)", marginBottom: 8 }}>
-        Import history
-      </div>
-      {batchLoading ? (
-        <div className="pw-loading" style={{ padding: "10px 0" }}>Loading…</div>
-      ) : batches.length === 0 ? (
-        <div style={{ fontSize: 11, color: "var(--muted-text)" }}>No imports yet.</div>
-      ) : (
-        <table className="pw-fac-table" style={{ fontSize: 11 }}>
-          <thead>
-            <tr>
-              <th>File</th>
-              <th>Imported at</th>
-              <th>Rows</th>
-              <th>New</th>
-              <th>Updated</th>
-              <th>Dups</th>
-              <th>Skipped</th>
-              <th>Errors</th>
-            </tr>
-          </thead>
-          <tbody>
-            {batches.map(b => (
-              <tr key={b.id}>
-                <td style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {b.source_file_name ?? "—"}
-                </td>
-                <td style={{ color: "var(--muted-text)", whiteSpace: "nowrap" }}>
-                  {b.created_at
-                    ? new Date(b.created_at).toLocaleDateString("en-CA", { year: "numeric", month: "short", day: "numeric" })
-                    : "—"}
-                </td>
-                <td style={{ textAlign: "center" }}>{b.row_count}</td>
-                <td style={{ textAlign: "center", color: "#1A7F4B", fontWeight: 700 }}>{b.created_count}</td>
-                <td style={{ textAlign: "center", color: "var(--warning)", fontWeight: 700 }}>{b.updated_count}</td>
-                <td style={{ textAlign: "center" }}>{b.duplicate_count}</td>
-                <td style={{ textAlign: "center" }}>{b.skipped_count}</td>
-                <td style={{ textAlign: "center", color: b.error_count > 0 ? "var(--aafc-red)" : undefined }}>
-                  {b.error_count}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
 
-// ─── TrainingPlannerContent ───────────────────────────────────────────────────
-
-const STATUS_SESSION: Record<string, string> = {
-  planned: "Planned",
-  delivered: "Delivered",
-  not_delivered: "Not delivered",
-  cancelled: "Cancelled",
-};
-
-function TrainingPlannerContent({
-  yearId,
-  onItemClick,
-}: {
-  yearId: string;
-  onItemClick: (item: DrawerItem) => void;
-}) {
-  const [search, setSearch] = useState("");
-  const [phaseFilter, setPhaseFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "scheduled" | "unscheduled">("all");
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["planning-missions", yearId, "planner", phaseFilter],
-    queryFn: () => planningApi.missions(yearId, { phase: phaseFilter || undefined }),
-    staleTime: 60 * 1000,
-  });
-
-  const phases = useMemo(() => {
-    if (!data) return [];
-    return [...new Set(data.missions.map(m => m.phase))].sort();
-  }, [data]);
-
-  const filtered = useMemo(() => {
-    if (!data) return [];
-    const q = search.toLowerCase();
-    return data.missions.filter(m => {
-      if (statusFilter === "scheduled" && !m.is_scheduled) return false;
-      if (statusFilter === "unscheduled" && m.is_scheduled) return false;
-      if (q && !m.code.toLowerCase().includes(q) && !m.title.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [data, search, statusFilter]);
-
-  if (isLoading) return <div className="pw-loading" style={{ padding: "20px" }}>Loading curriculum…</div>;
-  if (error || !data) return <div className="pw-err" style={{ padding: 16 }}>Failed to load training plan.</div>;
-
-  const total = data.missions.length;
-  const scheduledCount = data.scheduled_count;
-  const pct = total > 0 ? Math.round((scheduledCount / total) * 100) : 0;
-
-  return (
-    <div>
-      {/* Summary bar */}
-      <div style={{
-        padding: "8px 14px", background: "var(--surface)", borderBottom: "1px solid var(--border)",
-        display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap",
-      }}>
-        <div style={{ fontSize: 12, color: "var(--aafc-dark-blue)", fontWeight: 700 }}>
-          {scheduledCount} / {total} curriculum items scheduled
-        </div>
-        <div style={{ flex: 1, minWidth: 120, maxWidth: 240, height: 8, background: "var(--border)", borderRadius: 4, overflow: "hidden" }}>
-          <div style={{ width: `${pct}%`, height: "100%", background: pct === 100 ? "var(--success, #1A7F4B)" : "var(--aafc-dark-blue)", borderRadius: 4, transition: "width .3s" }} />
-        </div>
-        <div style={{ fontSize: 11, color: "var(--muted-text)" }}>{pct}% complete</div>
-      </div>
-
-      {/* Toolbar */}
-      <div style={{
-        padding: "8px 14px", background: "var(--surface)", borderBottom: "1px solid var(--border)",
-        display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap",
-      }}>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search code or title…"
-          style={{ ...inputSx, width: 200, flex: "0 0 auto" }}
-        />
-        <select value={phaseFilter} onChange={e => setPhaseFilter(e.target.value)} style={{ ...inputSx, width: 130 }}>
-          <option value="">All phases</option>
-          {phases.map(p => <option key={p} value={p}>Phase {p}</option>)}
-        </select>
-        <div style={{ display: "flex", gap: 3 }}>
-          {(["all", "scheduled", "unscheduled"] as const).map(s => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              style={{
-                fontSize: 11, padding: "3px 9px", borderRadius: 4,
-                border: "1px solid var(--border)", cursor: "pointer",
-                background: statusFilter === s ? "var(--aafc-dark-blue)" : "#fff",
-                color: statusFilter === s ? "#fff" : "var(--text)",
-              }}
-            >
-              {s === "all" ? "All" : s === "scheduled" ? "Scheduled" : "Unscheduled"}
-            </button>
-          ))}
-        </div>
-        <span style={{ fontSize: 11, color: "var(--muted-text)", marginLeft: "auto" }}>
-          Showing {filtered.length} of {total}
-        </span>
-      </div>
-
-      {/* Table */}
-      {filtered.length === 0 ? (
-        <div className="pw-empty" style={{ padding: "20px" }}>No curriculum items match your filters.</div>
-      ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table className="pw-fac-table" style={{ fontSize: 12, minWidth: 800 }}>
-            <thead>
-              <tr>
-                <th style={{ width: 28 }}></th>
-                <th>Code</th>
-                <th>Title</th>
-                <th>Phase</th>
-                <th>Element</th>
-                <th>Duration</th>
-                <th>Core</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(m => {
-                const isExpanded = expandedId === m.curriculum_id;
-                const partCount = m.part_count ?? 1;
-                const isFullyScheduled = m.scheduled_count >= partCount && m.is_scheduled;
-                const isPartial = m.is_scheduled && !isFullyScheduled;
-
-                return (
-                  <>
-                    <tr
-                      key={m.curriculum_id}
-                      style={{
-                        background: isExpanded ? "#f0f5ff" : undefined,
-                        cursor: m.is_scheduled ? "pointer" : undefined,
-                      }}
-                      onClick={m.is_scheduled ? () => setExpandedId(isExpanded ? null : m.curriculum_id) : undefined}
-                    >
-                      <td style={{ textAlign: "center", paddingRight: 0 }}>
-                        {m.is_scheduled && (
-                          <span style={{ fontSize: 10, color: "var(--muted-text)" }}>
-                            {isExpanded ? "▲" : "▼"}
-                          </span>
-                        )}
-                      </td>
-                      <td style={{ fontWeight: 700, color: "var(--aafc-dark-blue)", whiteSpace: "nowrap" }}>{m.code}</td>
-                      <td style={{ maxWidth: 280 }}>{m.title}</td>
-                      <td>
-                        <span style={{
-                          fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 3,
-                          background: "var(--surface-alt, #f0f5ff)", color: "var(--aafc-dark-blue)",
-                        }}>
-                          {m.phase}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: 11, color: "var(--muted-text)" }}>{m.element ?? "—"}</td>
-                      <td style={{ textAlign: "center", whiteSpace: "nowrap", fontSize: 11 }}>
-                        {m.duration_minutes}m
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        {m.core_status === "core" && (
-                          <span style={{ fontSize: 10, fontWeight: 700, color: "var(--aafc-red)" }}>CORE</span>
-                        )}
-                      </td>
-                      <td>
-                        {!m.is_scheduled ? (
-                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-text)" }}>Unscheduled</span>
-                        ) : isPartial ? (
-                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--warning, #d97706)" }}>
-                            Partial ({m.scheduled_count}/{partCount})
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: 11, fontWeight: 700, color: "var(--success, #1A7F4B)" }}>
-                            Scheduled {m.scheduled_count > 1 ? `×${m.scheduled_count}` : ""}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <button
-                          className="btn sm out"
-                          style={{ fontSize: 11, padding: "3px 9px", whiteSpace: "nowrap" }}
-                          onClick={e => {
-                            e.stopPropagation();
-                            onItemClick({ type: "curriculum", curriculum: {
-                              curriculum_id: m.curriculum_id,
-                              code: m.code,
-                              title: m.title,
-                              phase: m.phase,
-                            }});
-                          }}
-                        >
-                          {m.is_scheduled ? "+ Add part" : "Schedule"}
-                        </button>
-                      </td>
-                    </tr>
-
-                    {/* Expanded sessions sub-table */}
-                    {isExpanded && m.scheduled_sessions.length > 0 && (
-                      <tr key={`${m.curriculum_id}-expanded`} style={{ background: "#f7f9ff" }}>
-                        <td colSpan={9} style={{ padding: "0 0 8px 32px" }}>
-                          <table style={{ fontSize: 11, width: "100%", borderCollapse: "collapse" }}>
-                            <thead>
-                              <tr style={{ color: "var(--muted-text)", fontWeight: 700 }}>
-                                <th style={{ textAlign: "left", padding: "4px 8px 2px", fontWeight: 700 }}>Date</th>
-                                <th style={{ textAlign: "left", padding: "4px 8px 2px", fontWeight: 700 }}>Term</th>
-                                <th style={{ textAlign: "center", padding: "4px 8px 2px", fontWeight: 700 }}>Period</th>
-                                <th style={{ textAlign: "center", padding: "4px 8px 2px", fontWeight: 700 }}>Part</th>
-                                <th style={{ textAlign: "left", padding: "4px 8px 2px", fontWeight: 700 }}>Group</th>
-                                <th style={{ textAlign: "left", padding: "4px 8px 2px", fontWeight: 700 }}>Facilitator</th>
-                                <th style={{ textAlign: "left", padding: "4px 8px 2px", fontWeight: 700 }}>Room</th>
-                                <th style={{ textAlign: "left", padding: "4px 8px 2px", fontWeight: 700 }}>Status</th>
-                                <th style={{ padding: "4px 8px 2px" }}></th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {m.scheduled_sessions.map(s => (
-                                <tr
-                                  key={s.session_id}
-                                  style={{ borderTop: "1px solid var(--border)" }}
-                                >
-                                  <td style={{ padding: "4px 8px", color: "var(--aafc-dark-blue)", fontWeight: 600, whiteSpace: "nowrap" }}>
-                                    {s.parade_date
-                                      ? new Date(s.parade_date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
-                                      : "—"}
-                                  </td>
-                                  <td style={{ padding: "4px 8px" }}>{s.term ?? "—"}</td>
-                                  <td style={{ padding: "4px 8px", textAlign: "center" }}>P{s.session_number}</td>
-                                  <td style={{ padding: "4px 8px", textAlign: "center" }}>{s.part_number ?? "—"}</td>
-                                  <td style={{ padding: "4px 8px", textTransform: "capitalize" }}>{s.cadet_group ?? "—"}</td>
-                                  <td style={{ padding: "4px 8px" }}>{s.facilitator_name ?? <span style={{ color: "var(--muted-text)" }}>None</span>}</td>
-                                  <td style={{ padding: "4px 8px" }}>{s.location_name ?? <span style={{ color: "var(--muted-text)" }}>—</span>}</td>
-                                  <td style={{ padding: "4px 8px" }}>
-                                    <span style={{
-                                      fontWeight: 600,
-                                      color: s.status === "delivered" ? "var(--success, #1A7F4B)"
-                                        : s.status === "not_delivered" ? "var(--aafc-red)"
-                                        : s.status === "cancelled" ? "var(--muted-text)"
-                                        : "var(--aafc-dark-blue)",
-                                    }}>
-                                      {STATUS_SESSION[s.status] ?? s.status}
-                                    </span>
-                                  </td>
-                                  <td style={{ padding: "4px 8px" }}>
-                                    <button
-                                      className="btn sm out"
-                                      style={{ fontSize: 10, padding: "2px 7px" }}
-                                      onClick={() => onItemClick({
-                                        type: "session-by-id",
-                                        sessionId: s.session_id,
-                                        dateId: s.parade_date_id ?? "",
-                                        date: s.parade_date ?? "",
-                                      })}
-                                    >
-                                      Edit
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── PlanningBottomDrawer ─────────────────────────────────────────────────────
 
-export function PlanningBottomDrawer({ yearId, tab, onTabChange, onClose, facilitators, locations, onItemClick }: Props) {
+export function PlanningBottomDrawer({ yearId, tab, onTabChange, onClose, facilitators, locations, onItemClick, squadronId }: Props) {
   return (
     <div className="pw-bottom-bar" role="complementary" aria-label="Bottom planning drawer">
       <div className="pw-bottom-tabs">
@@ -2013,12 +1912,11 @@ export function PlanningBottomDrawer({ yearId, tab, onTabChange, onClose, facili
         {tab === "backlog" && yearId && <BacklogContent yearId={yearId} onItemClick={onItemClick} />}
         {tab === "backlog" && !yearId && <div className="pw-empty">No planning year selected.</div>}
 
-        {tab === "training-planner" && yearId && <TrainingPlannerContent yearId={yearId} onItemClick={onItemClick} />}
-        {tab === "training-planner" && !yearId && <div className="pw-empty">No planning year selected.</div>}
-
         {tab === "facilitators" && (
           <FacilitatorsContent yearId={yearId} facilitators={facilitators} />
         )}
+
+        {tab === "schedule" && <ScheduleContent squadronId={squadronId} />}
 
         {tab === "rooms" && (
           <RoomsContent
@@ -2038,9 +1936,6 @@ export function PlanningBottomDrawer({ yearId, tab, onTabChange, onClose, facili
 
         {tab === "activities" && yearId && <ActivitiesContent yearId={yearId} />}
         {tab === "activities" && !yearId && <div className="pw-empty">No planning year selected.</div>}
-
-        {tab === "import-review" && yearId && <ImportReviewContent yearId={yearId} />}
-        {tab === "import-review" && !yearId && <div className="pw-empty">No planning year selected.</div>}
       </div>
     </div>
   );

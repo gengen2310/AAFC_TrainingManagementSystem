@@ -1,10 +1,15 @@
-# Weekly PostgreSQL restore test — AAFC TMS Staging
+# Weekly PostgreSQL restore test — AAFC TMS PRODUCTION
 #
 # Schedule: Monday 03:00 AWST (UTC+8 = Sunday 19:00 UTC).
 # Also supports manual trigger via workflow_dispatch.
 #
+# Restores the most recent PRODUCTION backup artifact
+# (postgresql-production-backup-*) — see test-restore-postgresql-staging.yml
+# for the staging equivalent (postgresql-staging-backup-*). The two cannot
+# be confused: each only ever looks for its own artifact name prefix.
+#
 # What this workflow does:
-#   1. Finds the most recent non-expired backup artifact.
+#   1. Finds the most recent non-expired production backup artifact.
 #   2. Downloads and decrypts it using the GPG private key.
 #   3. Verifies SHA-256 integrity before restore.
 #   4. Restores into a DISPOSABLE PostgreSQL service container
@@ -19,7 +24,7 @@
 #
 # See deployment/backup-dr.md for setup instructions.
 ---
-name: PostgreSQL Restore Test — Weekly
+name: PostgreSQL Restore Test — Production — Weekly
 
 on:
   schedule:
@@ -31,7 +36,7 @@ permissions:
   actions: read             # required to list and download artifacts
 
 concurrency:
-  group: postgresql-restore-test
+  group: postgresql-restore-test-production
   cancel-in-progress: false
 
 jobs:
@@ -42,7 +47,10 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        # Must match the source server's major version (Railway's
+        # postgres-ssl:18 image) — pg_restore of a custom-format dump from a
+        # newer major version into an older server is not supported.
+        image: postgres:18-alpine
         env:
           POSTGRES_USER: restore_user
           POSTGRES_PASSWORD: restore_test_ci_only
@@ -67,11 +75,17 @@ jobs:
 
     steps:
       # ── 1. Install tools ────────────────────────────────────────────────────
+      # Match the backup workflow's client version (PGDG postgresql-client-18)
+      # so pg_restore is compatible with a custom-format dump taken by pg_dump 18.
       - name: Install tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
-            postgresql-client gnupg2 unzip python3
+            curl ca-certificates gnupg2 lsb-release unzip python3
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+          echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client-18
           pg_restore --version
           gpg --version | head -1
 
@@ -100,7 +114,24 @@ jobs:
             || { echo '::error::Private key import failed — no secret keys found'; exit 1; }
           echo "GPG private key imported."
 
-      # ── 3. Find most recent backup artifact ─────────────────────────────────
+      # ── 3. Determine expected Alembic head from the checked-out repo ────────
+      # Dynamic, not hardcoded — fails loudly if the migration chain branches
+      # instead of silently trusting a value that goes stale after every
+      # new migration.
+      - name: Checkout backend
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            backend
+          sparse-checkout-cone-mode: true
+
+      - name: Compute expected Alembic head
+        run: |
+          HEAD=$(python3 backend/scripts/compute_alembic_head.py backend/alembic/versions)
+          echo "Computed head: ${HEAD}"
+          echo "EXPECTED_ALEMBIC_HEAD=${HEAD}" >> "$GITHUB_ENV"
+
+      # ── 4. Find most recent backup artifact ─────────────────────────────────
       - name: Find latest backup artifact
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -109,15 +140,15 @@ jobs:
             "repos/${{ github.repository }}/actions/artifacts?per_page=100" \
             --jq '.artifacts
                   | map(select(
-                      (.name | startswith("postgresql-backup-"))
+                      (.name | startswith("postgresql-production-backup-"))
                       and (.expired == false)
                     ))
                   | sort_by(.created_at)
                   | last')
 
           if [ "$ARTIFACT_JSON" = "null" ] || [ -z "$ARTIFACT_JSON" ]; then
-            echo "::warning::No backup artifacts found — restore test skipped."
-            echo "::warning::Run the backup workflow first: Actions → PostgreSQL Backup — Daily → Run workflow"
+            echo "::warning::No production backup artifacts found — restore test skipped."
+            echo "::warning::Run the backup workflow first: Actions → PostgreSQL Backup — Production — Daily → Run workflow"
             echo "NO_BACKUP=true" >> "$GITHUB_ENV"
             exit 0
           fi
@@ -214,6 +245,12 @@ jobs:
       - name: Restore database
         if: env.NO_BACKUP != 'true'
         run: |
+          # --clean --if-exists: the target database already has a default
+          # `public` schema (every fresh Postgres database does) — without
+          # this, restoring a dump that explicitly includes `CREATE SCHEMA
+          # public;` fails with "schema already exists". --if-exists makes
+          # the preceding DROP statements tolerant of objects that aren't
+          # there yet on a truly empty database.
           pg_restore \
             --host="$PGHOST" \
             --port="$PGPORT" \
@@ -221,6 +258,8 @@ jobs:
             --dbname="$PGDATABASE" \
             --no-owner \
             --no-privileges \
+            --clean \
+            --if-exists \
             --exit-on-error \
             "$DECRYPTED_DUMP" \
             || { echo '::error::pg_restore failed'; exit 1; }
@@ -231,7 +270,7 @@ jobs:
         if: env.NO_BACKUP != 'true'
         run: |
           python3 - << 'PYEOF'
-          import subprocess, sys
+          import subprocess, sys, os
 
           def psql(sql):
               result = subprocess.run(
@@ -243,7 +282,7 @@ jobs:
                       'PGUSER': 'restore_user',
                       'PGDATABASE': 'aafc_tms_restore_test',
                       'PGPASSWORD': 'restore_test_ci_only',
-                      'PATH': '/usr/bin:/bin:/usr/lib/postgresql/16/bin',
+                      'PATH': '/usr/bin:/bin:/usr/lib/postgresql/18/bin',
                   }
               )
               if result.returncode != 0:
@@ -252,8 +291,11 @@ jobs:
 
           failures = []
 
-          # 1. Alembic migration HEAD
-          EXPECTED_HEAD = 'e7a9c2f4b8d1'
+          # 1. Alembic migration HEAD — computed dynamically by the
+          # "Compute expected Alembic head" step earlier in this job (from
+          # the actual checked-out migration files, not a hardcoded value
+          # that would silently go stale after every new migration).
+          EXPECTED_HEAD = os.environ['EXPECTED_ALEMBIC_HEAD']
           try:
               head = psql("SELECT version_num FROM alembic_version;")
               if head != EXPECTED_HEAD:
@@ -310,6 +352,150 @@ jobs:
           else:
               print(f"RESTORE VERIFICATION PASSED — all {len(REQUIRED_TABLES) + 3} checks passed.")
           PYEOF
+
+      # ── 8b. Application-level restore proof ──────────────────────────────────
+      # Schema/row verification above only proves PostgreSQL restored — it
+      # doesn't prove the application can actually read the data. Starts a
+      # real backend against the restored (disposable) database, creates a
+      # throwaway test admin directly via the ORM (no real production access
+      # code is ever used or needed), and drives a representative set of
+      # authenticated reads through the real API. Everything here is
+      # destroyed with the rest of the ephemeral runner at the end of the job
+      # — nothing persists, nothing touches staging or production.
+      - name: Set up Python for application-level check
+        if: env.NO_BACKUP != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install backend dependencies
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        run: |
+          pip install -q -r requirements.txt
+          pip install -q "psycopg2-binary>=2.9"
+
+      - name: Create throwaway test admin in the restored database
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://restore_user:restore_test_ci_only@localhost:5432/aafc_tms_restore_test"
+          ENVIRONMENT: "test"
+          JWT_SECRET: "restore-test-jwt-secret-at-least-32-bytes-long"
+          SECRET_KEY: "restore-test-secret-key-at-least-32-bytes-long"
+        run: |
+          python3 - << 'PYEOF'
+          import secrets
+          from app.database import SessionLocal
+          from app.models import User, AccessCode
+          from app.security import hash_code
+
+          code = secrets.token_hex(8).upper()
+          db = SessionLocal()
+          try:
+              admin = User(display_name="Restore-Test Throwaway Admin", role="system_admin", active_status=True)
+              db.add(admin)
+              db.flush()
+              db.add(AccessCode(user_id=admin.id, code_hash=hash_code(code)))
+              db.commit()
+          finally:
+              db.close()
+
+          with open("/tmp/restore_test_admin_code.txt", "w") as f:
+              f.write(code)
+          print("Throwaway test admin created (code never logged).")
+          PYEOF
+
+      - name: Start backend against restored database
+        if: env.NO_BACKUP != 'true'
+        working-directory: backend
+        env:
+          DATABASE_URL: "postgresql://restore_user:restore_test_ci_only@localhost:5432/aafc_tms_restore_test"
+          ENVIRONMENT: "test"
+          JWT_SECRET: "restore-test-jwt-secret-at-least-32-bytes-long"
+          SECRET_KEY: "restore-test-secret-key-at-least-32-bytes-long"
+        run: |
+          nohup python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/restore_test_backend.log 2>&1 &
+          echo $! > /tmp/restore_test_backend.pid
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/api/health > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8000/api/health || { echo "::error::Backend did not become ready"; cat /tmp/restore_test_backend.log; exit 1; }
+          echo "Backend is up against the restored database."
+
+      - name: Drive authenticated reads through the real API
+        if: env.NO_BACKUP != 'true'
+        run: |
+          python3 - << 'PYEOF'
+          import json
+          import urllib.request
+          import urllib.error
+
+          BASE = "http://127.0.0.1:8000"
+          with open("/tmp/restore_test_admin_code.txt") as f:
+              code = f.read().strip()
+
+          def call(method, path, token=None, body=None):
+              req = urllib.request.Request(
+                  f"{BASE}{path}",
+                  data=json.dumps(body).encode() if body is not None else None,
+                  method=method,
+                  headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {token}"} if token else {})},
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=10) as resp:
+                      return resp.status, json.loads(resp.read())
+              except urllib.error.HTTPError as e:
+                  return e.code, None
+
+          failures = []
+
+          status, body = call("POST", "/api/auth/login", body={"code": code})
+          if status != 200 or not body or "token" not in body:
+              print(f"::error::Login failed: status={status}")
+              raise SystemExit(1)
+          token = body["token"]
+          print("  PASS  login as throwaway restore-test admin")
+
+          status, body = call("GET", "/api/health/ready")
+          if status != 200:
+              failures.append(f"/api/health/ready -> {status}")
+          else:
+              print(f"  PASS  /api/health/ready -> squadrons={body.get('squadrons')}")
+
+          checks = [
+              ("GET", "/api/auth/me"),
+              ("GET", "/api/wings"),
+              ("GET", "/api/squadrons"),
+              ("GET", "/api/users"),
+              ("GET", "/api/planning/years"),
+              ("GET", "/api/planning/facilitators"),
+          ]
+          for method, path in checks:
+              status, body = call(method, path, token=token)
+              if status != 200:
+                  failures.append(f"{path} -> {status}")
+              else:
+                  size = len(body) if isinstance(body, list) else "n/a"
+                  print(f"  PASS  {path} -> 200 (items={size})" if size != "n/a" else f"  PASS  {path} -> 200")
+
+          print()
+          if failures:
+              print(f"APPLICATION-LEVEL RESTORE CHECK FAILED — {len(failures)} check(s) failed:")
+              for f in failures:
+                  print(f"  FAIL  {f}")
+              raise SystemExit(1)
+          print(f"APPLICATION-LEVEL RESTORE CHECK PASSED — all {2 + len(checks)} authenticated reads succeeded against restored production data.")
+          PYEOF
+
+      - name: Stop temporary backend
+        if: always()
+        run: |
+          if [ -f /tmp/restore_test_backend.pid ]; then
+            kill "$(cat /tmp/restore_test_backend.pid)" 2>/dev/null || true
+          fi
+          rm -f /tmp/restore_test_admin_code.txt /tmp/restore_test_backend.pid /tmp/restore_test_backend.log 2>/dev/null || true
 
       # ── 9. Report skip if no backup existed ─────────────────────────────────
       - name: Report skip

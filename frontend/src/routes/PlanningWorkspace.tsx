@@ -15,6 +15,9 @@ import { EightWeekView } from "../components/planning/views/EightWeekView";
 import { TwoWeekView } from "../components/planning/views/TwoWeekView";
 import { ParadeNightGridView } from "../components/planning/views/ParadeNightGridView";
 import { SetupPanel } from "../components/planning/SetupPanel";
+import { UpdateFutureParadeDayModal } from "../components/planning/UpdateFutureParadeDayModal";
+import { GuidedYearSetupModal } from "../components/planning/GuidedYearSetupModal";
+import { canWriteSquadron } from "../auth/permissions";
 import type { PlanningSession, AnchorEvent } from "../api/types";
 
 
@@ -44,11 +47,23 @@ export function PlanningWorkspace() {
     setSelectedYearId(id);
   }, []);
   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
+  const [updatingParadeDay, setUpdatingParadeDay] = useState(false);
+  const [guidedSetupOpen, setGuidedSetupOpen] = useState(false);
   const [bottomOpen, setBottomOpen] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab>("activities");
   const [layers, setLayers] = useState<LayerState>(defaultLayers);
   const [audience, setAudience] = useState<Set<string>>(new Set());
   const [priority, setPriority] = useState<Set<string>>(new Set());
+  // Mobile-only: left filter/backlog panel is off-canvas below 768px, toggled via the
+  // hamburger button in the context bar. Ignored (has no visual effect) above that width.
+  const [leftPanelOpen, setLeftPanelOpen] = useState(false);
+
+  useEffect(() => {
+    if (!leftPanelOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLeftPanelOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [leftPanelOpen]);
 
   // ── Data queries ──────────────────────────────────────────────────────────────
   const { data: years, isLoading: yearsLoading } = useQuery({
@@ -112,14 +127,16 @@ export function PlanningWorkspace() {
   function handleDateClick(dateId: string, _date: string) {
     setSelectedDateId(dateId);
     setViewRange("parade-night");
+    setLeftPanelOpen(false);
   }
 
   function handleSessionClick(s: PlanningSession, dateId: string, date: string) {
     setDrawerItem({ type: "session", session: s, dateId, date, conflicts: [] });
   }
 
-  function handleSessionByIdClick(sessionId: string, dateId: string, date: string) {
-    setDrawerItem({ type: "session-by-id", sessionId, dateId, date });
+  async function handleSessionByIdClick(sessionId: string, dateId: string, date: string) {
+    const s = await planningApi.getSession(sessionId);
+    setDrawerItem({ type: "session", session: s, dateId, date, conflicts: [] });
   }
 
   function handleEmptyCellClick(dateId: string, date: string, cadetGroup: string, period: number) {
@@ -145,6 +162,7 @@ export function PlanningWorkspace() {
         // silently ignore — event may not be accessible
       }
     }
+    setLeftPanelOpen(false);
   }
 
   function handleViewRangeChange(mode: ViewMode) {
@@ -310,6 +328,7 @@ export function PlanningWorkspace() {
         onDisplayModeChange={setDisplayMode}
         onCustomStartChange={setCustomStart}
         onCustomEndChange={setCustomEnd}
+        onToggleLeftPanel={() => setLeftPanelOpen(o => !o)}
       />
 
       {/* Year selector + quick actions */}
@@ -337,13 +356,58 @@ export function PlanningWorkspace() {
           >
             + Anchor event
           </button>
+          {canWriteSquadron(session) && (
+            <button
+              className="btn sm out"
+              style={{ fontSize: 11, padding: "3px 10px" }}
+              onClick={() => setUpdatingParadeDay(true)}
+            >
+              Update future parade nights…
+            </button>
+          )}
+          {canWriteSquadron(session) && (
+            <button
+              className="btn sm out"
+              style={{ fontSize: 11, padding: "3px 10px" }}
+              onClick={() => setGuidedSetupOpen(true)}
+            >
+              Guided year setup…
+            </button>
+          )}
         </div>
+      )}
+      {updatingParadeDay && selectedYearId && (
+        <UpdateFutureParadeDayModal
+          yearId={selectedYearId}
+          onClose={() => setUpdatingParadeDay(false)}
+          onDone={() => qc.invalidateQueries({ queryKey: ["planning-cc"] })}
+        />
+      )}
+      {guidedSetupOpen && (
+        <GuidedYearSetupModal
+          years={years ?? []}
+          onClose={() => setGuidedSetupOpen(false)}
+          onDone={() => {
+            qc.invalidateQueries({ queryKey: ["planning-years"] });
+            qc.invalidateQueries({ queryKey: ["planning-cc"] });
+            qc.invalidateQueries({ queryKey: ["planning-night-summaries"] });
+          }}
+        />
       )}
 
       {/* Main body: left + canvas + right */}
       <div className={`pw-body${drawerItem ? " right-open" : ""}`}>
+        {/* Mobile-only backdrop for the off-canvas left panel. Tap-to-close is a mouse-only
+            convenience; Escape (above) and re-tapping the hamburger button are the full
+            keyboard-equivalent close paths. */}
+        {leftPanelOpen && (
+          // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
+          <div className="pw-left-overlay" onClick={() => setLeftPanelOpen(false)} />
+        )}
+
         {/* Left panel */}
         <PlanningLeftPanel
+          className={leftPanelOpen ? "pw-left-open" : ""}
           layers={layers}
           onLayerToggle={handleLayerToggle}
           audience={audience}
@@ -396,6 +460,7 @@ export function PlanningWorkspace() {
           facilitators={facilitators}
           locations={locations}
           onItemClick={(item) => { setDrawerItem(item); setBottomOpen(false); }}
+          squadronId={session?.squadron_id ?? undefined}
         />
       )}
     </div>

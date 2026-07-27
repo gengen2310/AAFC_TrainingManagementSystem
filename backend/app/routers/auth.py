@@ -18,7 +18,7 @@ from ..services import audit
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 _LOCKOUT_MSG = ("Account locked after too many incorrect attempts. "
-                "Contact 7 Wing SOCAD for access.")
+                "Contact your Wing SOCAD for access.")
 _LOCKOUT_THRESHOLD = 5
 _LOCKOUT_HOURS = 24
 
@@ -136,7 +136,7 @@ def login(body: LoginIn, request: Request, response: Response, db: DBSession = D
     matched.failed_attempts = 0
     matched.locked_until = None
     db.commit()
-    token = create_token(user.id, {"role": user.role})
+    token = create_token(user.id, {"role": user.role}, token_version=user.token_version)
     response.set_cookie(settings.COOKIE_NAME, token, httponly=True,
                         secure=settings.COOKIE_SECURE, samesite=settings.COOKIE_SAMESITE,
                         max_age=settings.ACCESS_TOKEN_TTL_MIN * 60)
@@ -189,7 +189,7 @@ def refresh(response: Response, request: Request, db: DBSession = Depends(get_db
     user = db.get(User, p.user_id)
     if not user or not user.active_status:
         raise HTTPException(401, detail={"error": "invalid_user"})
-    token = create_token(user.id, {"role": user.role})
+    token = create_token(user.id, {"role": user.role}, token_version=user.token_version)
     response.set_cookie(settings.COOKIE_NAME, token, httponly=True,
                         secure=settings.COOKIE_SECURE, samesite=settings.COOKIE_SAMESITE,
                         max_age=settings.ACCESS_TOKEN_TTL_MIN * 60)
@@ -230,6 +230,7 @@ def change_code(body: ChangeCodeIn, db: DBSession = Depends(get_db),
     ac.code_hash = hash_code(plain)
     ac.updated_at = utcnow()
     ac.updated_by = p.user_id
+    target.token_version = (target.token_version or 0) + 1
     db.commit()
     action = "change_own_code" if is_self else "reset_access"
     new_info = {} if is_self else {"target_display_name": target.display_name, "target_role": target.role}

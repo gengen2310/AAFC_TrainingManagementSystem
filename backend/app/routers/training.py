@@ -8,16 +8,27 @@ from typing import List, Optional
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
-from ..models import (CurriculumItem, CurriculumElement, ParadeNight, Session, SessionStatusHistory,
-                      Facilitator, FacilitatorRankHistory, TrainingArea, Equipment,
+from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
+                      Facilitator, FacilitatorRankHistory, SubjectAreaTag, TrainingArea, Equipment,
                       Activity, Cadet, Squadron, TimingTemplate, TimingBlock)
-from ..models.training import ELEMENT_SCOPE_LEVELS
+from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
 from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron)
 from ..services import (audit, score_parade, publish_blockers, close_blockers)
+from ..services_readiness import parade_night_readiness
 
 router = APIRouter(prefix="/api", tags=["training"])
+
+
+def _check_version(obj, client_version: int | None) -> None:
+    """Raise 409 if the client's version is stale (optimistic locking)."""
+    if client_version is not None and obj.version != client_version:
+        raise HTTPException(409, detail={
+            "error": "version_conflict",
+            "current_version": obj.version,
+        })
+
 
 VALID_STATUS = {"draft", "planned", "published", "delivered", "delivered_with_issue",
                 "cancelled", "cancelled_late", "rescheduled", "not_delivered",
@@ -46,6 +57,34 @@ def _active_squadron(p: Principal) -> str:
     return p.squadron_id
 
 
+def _view_squadron_id(p: Principal, squadron_id: str | None, db: DBSession) -> str | None:
+    """Resolve which squadron's data a READ should return. An explicit squadron_id
+    (validated via require_can_view_squadron, the same check dashboard charts and
+    /api/parade-nights already use) lets a wing/national viewer see a specific
+    squadron's operational pages WITHOUT needing to enter Proxy/Delegated
+    Intervention Mode — viewing is broad by design (permissions.py's
+    Principal.can_view_squadron), only writing is proxy-gated (see
+    require_can_write_squadron / Block 7's canWriteSquadron fix). Falls back to
+    _active_squadron() when no squadron_id is given, so existing squadron-scoped
+    callers are unaffected.
+
+    Master transformation plan Block 8: this closes the inconsistency where
+    /api/parade-nights and /api/dashboard/charts already supported this pattern
+    but /api/facilitators, /api/training-areas, /api/equipment, and /api/activities
+    did not — a wing/national viewer's squadron selector must behave the same way
+    on every squadron page, not degrade differently depending which one they're on."""
+    if squadron_id:
+        s = db.get(Squadron, squadron_id)
+        if not s:
+            # A bogus squadron_id must 404, never silently fall back to the
+            # caller's own scope — that would mask a broken link/typo as "no
+            # results" instead of a clear error.
+            raise HTTPException(404, detail={"error": "squadron_not_found"})
+        require_can_view_squadron(p, s.id, s.wing_id)
+        return s.id
+    return _active_squadron(p)
+
+
 def _sess_dict(s: Session) -> dict:
     d = {c.name: getattr(s, c.name) for c in s.__table__.columns}
     d["session_id"] = s.id  # alias for Night Builder compatibility
@@ -54,8 +93,8 @@ def _sess_dict(s: Session) -> dict:
 
 # ── CURRICULUM ──
 @router.get("/curriculum")
-def list_curriculum(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _active_squadron(p)
+def list_curriculum(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _view_squadron_id(p, squadron_id, db)
     # Resolve the wing for the acting scope
     wing_id: str | None = p.acting_wing_id or p.wing_id
     if sq_id:
@@ -217,8 +256,14 @@ def get_parade(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depend
     require_can_view_squadron(p, pn.squadron_id, pn.wing_id)
     sess = [_sess_dict(x) for x in db.query(Session).filter(Session.parade_night_id == pn.id,
                                                             Session.is_archived == False).all()]  # noqa: E712
-    r = score_parade(sess)
-    return {**_pn_dict(pn), "sessions": sess, "readiness": r, "publish_blockers": publish_blockers(sess)}
+    # Computed live from the authoritative services_readiness module (not the stored
+    # ParadeNight.readiness_score/planning_status columns) so this response can never
+    # drift from the list endpoint or the Dashboard even if _recompute() wasn't
+    # triggered by some earlier edit path — same source of truth, always fresh.
+    readiness = parade_night_readiness(sess)
+    r = score_parade(sess)  # legacy shape (score/band/deductions) kept for existing callers of this field
+    return {**_pn_dict(pn), "sessions": sess, "readiness": r, "readiness_v2": readiness,
+            "publish_blockers": publish_blockers(sess)}
 
 
 @router.post("/parade-nights")
@@ -283,6 +328,15 @@ class SessionIn(BaseModel):
     facilitator_id: str | None = None
     training_area_id: str | None = None
     expected_attendance: int | None = None
+    version: int | None = None
+    # Optional outcome/status transition, applied atomically with the field edits
+    # above in one transaction (see edit_session) — a client never ends up with the
+    # fields saved but the status change lost (or vice versa) from a network blip or
+    # validation failure between two separate calls.
+    status: str | None = None
+    reason: str | None = None
+    rescheduled_to_date: str | None = None
+    actual_attendance: int | None = None
 
 
 class StatusIn(BaseModel):
@@ -292,10 +346,48 @@ class StatusIn(BaseModel):
     actual_attendance: int | None = None
 
 
+# Statuses where a bare state change with no explanation would leave an untrustworthy
+# record — matches Session.{not_delivered_reason,cancelled_reason,issue_notes}, the
+# only three status-specific free-text reason fields the model already has.
+REASON_REQUIRED_STATUSES = {"not_delivered", "cancelled", "cancelled_late", "delivered_with_issue"}
+
+
+def _apply_status_transition(s: Session, new_status: str, reason: str | None,
+                              rescheduled_to_date: str | None, actual_attendance: int | None) -> str:
+    """Validate and apply a status transition to `s` in memory (no commit). Returns the
+    old status. Raises HTTPException on invalid input — call this before any other
+    mutation/commit so a rejected transition never partially applies."""
+    if new_status not in VALID_STATUS:
+        raise HTTPException(400, detail={"error": "invalid_status"})
+    if new_status in REASON_REQUIRED_STATUSES and not (reason or "").strip():
+        raise HTTPException(400, detail={"error": f"reason_required_{new_status}"})
+    old_status = s.status
+    s.status = new_status
+    if new_status == "not_delivered":
+        s.not_delivered_reason = reason
+    if new_status in ("cancelled", "cancelled_late"):
+        s.cancelled_reason = reason
+    if new_status == "delivered_with_issue":
+        s.issue_notes = reason
+    if new_status == "rescheduled":
+        s.rescheduled_to_date = rescheduled_to_date
+    if actual_attendance is not None:
+        s.actual_attendance = actual_attendance
+    return old_status
+
+
 def _recompute(db: DBSession, pn: ParadeNight):
+    """The one place ParadeNight's readiness fields are written. Every session
+    create/edit/status-change calls this, so it's the natural point to keep
+    planning_status/data_quality (the authoritative fields) and readiness_score
+    (the legacy numeric projection, derived from the same computation — never
+    computed independently) in sync with each other."""
     sess = [_sess_dict(x) for x in db.query(Session).filter(Session.parade_night_id == pn.id,
                                                             Session.is_archived == False).all()]  # noqa: E712
-    pn.readiness_score = score_parade(sess)["score"]
+    result = parade_night_readiness(sess)
+    pn.planning_status = result["planning_status"]
+    pn.data_quality = result["data_quality"]
+    pn.readiness_score = result["legacy_score"]
     db.commit()
 
 
@@ -317,11 +409,32 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
 
 @router.put("/sessions/{sid}")
 def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Edit session fields, optionally with an atomic status transition in the same
+    request (body.status). All validation happens before any mutation, and the field
+    edit + status transition + status-history row + audit record share ONE commit —
+    if any check fails, nothing is written; if the commit itself fails, nothing is
+    written either, since no earlier partial commit exists to leave stale."""
     s = db.get(Session, sid)
     if not s or s.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     pn = db.get(ParadeNight, s.parade_night_id)
     require_can_write_squadron(p, s.squadron_id, pn.wing_id if pn else None)
+    _check_version(s, body.version)
+
+    # ── Validate everything first — no mutation happens above this line ──
+    if body.curriculum_item_id and not db.get(CurriculumItem, body.curriculum_item_id):
+        raise HTTPException(400, detail={"error": "invalid_curriculum_item"})
+    if body.facilitator_id and not db.get(Facilitator, body.facilitator_id):
+        raise HTTPException(400, detail={"error": "invalid_facilitator"})
+    if body.training_area_id and not db.get(TrainingArea, body.training_area_id):
+        raise HTTPException(400, detail={"error": "invalid_training_area"})
+    status_changing = body.status is not None and body.status != s.status
+    if status_changing and body.status not in VALID_STATUS:
+        raise HTTPException(400, detail={"error": "invalid_status"})
+    if status_changing and body.status in REASON_REQUIRED_STATUSES and not (body.reason or "").strip():
+        raise HTTPException(400, detail={"error": f"reason_required_{body.status}"})
+
+    # ── All validation passed — apply every change, then a single commit ──
     old = {"facilitator_id": s.facilitator_id, "training_area_id": s.training_area_id}
     s.period_number = body.period_number
     s.cadet_group = body.cadet_group
@@ -329,43 +442,50 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
     s.custom_title = body.custom_title
     s.expected_attendance = body.expected_attendance
     _denormalise(db, s, body.curriculum_item_id, body.facilitator_id, body.training_area_id)
-    db.commit()
+    s.version += 1
+
+    old_status = s.status
+    if status_changing:
+        old_status = _apply_status_transition(s, body.status, body.reason,
+                                               body.rescheduled_to_date, body.actual_attendance)
+        db.add(SessionStatusHistory(session_id=s.id, old_status=old_status, new_status=body.status,
+                                    changed_by=p.user_id, reason=body.reason))
+
+    audit(db, p, object_type="session", object_id=s.id, action="edit", old=old,
+          new={"facilitator_id": s.facilitator_id, "training_area_id": s.training_area_id}, commit=False)
+    if status_changing:
+        audit(db, p, object_type="session", object_id=s.id, action="status_change",
+              old={"status": old_status}, new={"status": body.status}, reason=body.reason, commit=False)
+
+    db.commit()  # single commit: field edits + status transition + history + audit rows
+
     if pn:
         _recompute(db, pn)
-    # Edits after publication require a reason (recorded in audit).
-    audit(db, p, object_type="session", object_id=s.id, action="edit", old=old,
-          new={"facilitator_id": s.facilitator_id, "training_area_id": s.training_area_id})
-    return {"ok": True}
+    return {"ok": True, "version": s.version}
 
 
 @router.post("/sessions/{sid}/status")
 def set_status(sid: str, body: StatusIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Status-only transition (no field edits). Kept for callers that only ever
+    change status (e.g. the React app's status-only form) — internally atomic in the
+    same way edit_session is: validate first, one commit covering the status change,
+    history row, and audit record together."""
     s = db.get(Session, sid)
     if not s or s.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     pn = db.get(ParadeNight, s.parade_night_id)
     require_can_write_squadron(p, s.squadron_id, pn.wing_id if pn else None)
-    if body.status not in VALID_STATUS:
-        raise HTTPException(400, detail={"error": "invalid_status"})
-    if body.status == "not_delivered" and not (body.reason or "").strip():
-        raise HTTPException(400, detail={"error": "reason_required_not_delivered"})
-    old = s.status
-    s.status = body.status
-    if body.status == "not_delivered":
-        s.not_delivered_reason = body.reason
-    if body.status in ("cancelled", "cancelled_late"):
-        s.cancelled_reason = body.reason
-    if body.status == "rescheduled":
-        s.rescheduled_to_date = body.rescheduled_to_date
-    if body.actual_attendance is not None:
-        s.actual_attendance = body.actual_attendance
+
+    old = _apply_status_transition(s, body.status, body.reason, body.rescheduled_to_date, body.actual_attendance)
+
     db.add(SessionStatusHistory(session_id=s.id, old_status=old, new_status=body.status,
                                 changed_by=p.user_id, reason=body.reason))
-    db.commit()
+    audit(db, p, object_type="session", object_id=s.id, action="status_change",
+          old={"status": old}, new={"status": body.status}, reason=body.reason, commit=False)
+    db.commit()  # single commit: status transition + history + audit row
+
     if pn:
         _recompute(db, pn)
-    audit(db, p, object_type="session", object_id=s.id, action="status_change",
-          old={"status": old}, new={"status": body.status}, reason=body.reason)
     return {"ok": True}
 
 
@@ -462,23 +582,37 @@ class FacIn(BaseModel):
     current_rank: str | None = None
     type: str | None = "Staff"
     subject_areas: list[str] | None = None
+    confirm_duplicate: bool = False
 
 
 @router.get("/facilitators")
-def list_facs(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _active_squadron(p)
+def list_facs(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    from datetime import date, timedelta
+    from ..models.planning import PlanningFacilitatorLeave
+    sq_id = _view_squadron_id(p, squadron_id, db)
     facs = db.query(Facilitator).filter(Facilitator.squadron_id == sq_id,
                                         Facilitator.is_archived == False).all()  # noqa: E712
+    today = date.today().isoformat()
+    horizon = (date.today() + timedelta(days=90)).isoformat()
     out = []
     for f in facs:
+        leave = (db.query(PlanningFacilitatorLeave)
+                 .filter(PlanningFacilitatorLeave.facilitator_id == f.id,
+                         PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
+                         PlanningFacilitatorLeave.end_date >= today,
+                         PlanningFacilitatorLeave.start_date <= horizon)
+                 .order_by(PlanningFacilitatorLeave.start_date).all())
         out.append({"facilitator_id": f.id, "first_name": f.first_name, "last_name": f.last_name,
                     "current_rank": f.current_rank, "type": f.type,
-                    "subject_areas": _parse_json_list(f.subject_areas)})
+                    "subject_areas": _parse_json_list(f.subject_areas),
+                    "upcoming_leave": [{"start_date": lv.start_date, "end_date": lv.end_date,
+                                        "reason": lv.reason} for lv in leave]})
     return out
 
 
 @router.post("/facilitators")
 def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    from sqlalchemy import func
     if p.role in _WRITE_BLOCKED:
         raise HTTPException(403, detail={"error": "forbidden"})
     sq_id = _active_squadron(p)
@@ -488,6 +622,25 @@ def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends
     if not s:
         raise HTTPException(400, detail={"error": "no_squadron_scope"})
     require_can_write_squadron(p, s.id, s.wing_id)
+    # TRGO-07: warn (don't silently allow) when a facilitator with the same
+    # name already exists in this squadron -- the same person re-added by
+    # accident is common; a same-name-different-person case is legitimate
+    # and rare, so this blocks once and lets the caller explicitly confirm
+    # rather than either always blocking or never warning at all.
+    if not body.confirm_duplicate:
+        existing = db.query(Facilitator).filter(
+            Facilitator.squadron_id == s.id,
+            Facilitator.is_archived == False,  # noqa: E712
+            func.lower(Facilitator.last_name) == body.last_name.strip().lower(),
+            func.lower(func.coalesce(Facilitator.first_name, "")) == (body.first_name or "").strip().lower(),
+        ).first()
+        if existing:
+            raise HTTPException(409, detail={
+                "error": "possible_duplicate",
+                "message": (f"A facilitator named {(body.first_name or '').strip()} "
+                            f"{body.last_name.strip()} already exists in this squadron.").strip(),
+                "existing_facilitator_id": existing.id,
+            })
     f = Facilitator(squadron_id=s.id, wing_id=s.wing_id, first_name=body.first_name,
                     last_name=body.last_name, current_rank=body.current_rank, type=body.type or "Staff",
                     subject_areas=_validate_subject_areas(body.subject_areas))
@@ -496,6 +649,186 @@ def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends
     db.commit()
     audit(db, p, object_type="facilitator", object_id=f.id, action="create")
     return {"ok": True, "facilitator_id": f.id}
+
+
+@router.get("/facilitators/import/template.csv")
+def facilitator_import_template(p: Principal = Depends(get_principal)):
+    """TRGO-05: downloadable CSV template matching the columns import_facilitators_csv accepts."""
+    import io
+    from fastapi.responses import StreamingResponse
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    bio = io.BytesIO(
+        b"rank,first_name,last_name,type,subject_areas,active_status\r\n"
+        b"FLTLT,Jordan,Smith,Staff,Drill;Air_Space,true\r\n"
+    )
+    return StreamingResponse(bio, media_type="text/csv",
+                             headers={"Content-Disposition": "attachment; filename=facilitator_import_template.csv"})
+
+
+_FAC_CSV_FIELDS = {
+    "rank": ("rank", "current_rank"),
+    "first_name": ("first_name", "first name", "firstname", "given name"),
+    "last_name": ("last_name", "last name", "lastname", "surname", "family name"),
+    "type": ("type", "facilitator type"),
+    "subject_areas": ("subject_areas", "subject areas", "subjects"),
+    "active_status": ("active_status", "active", "active status"),
+}
+
+
+def _neutralise_csv_cell(v: str) -> str:
+    """Strip a leading formula-trigger character (=, +, -, @, tab, CR) so a
+    re-exported/opened-in-Excel copy of this data can never execute a
+    formula injected via an uploaded CSV cell (CSV/Excel formula injection)."""
+    v = (v or "").strip()
+    while v and v[0] in "=+-@\t\r":
+        v = v[1:].strip()
+    return v
+
+
+def _fac_csv_get(row: dict, key: str) -> str:
+    norm = {k.strip().lower(): (v or "").strip() for k, v in row.items()}
+    for alias in _FAC_CSV_FIELDS[key]:
+        if alias in norm and norm[alias]:
+            return _neutralise_csv_cell(norm[alias])
+    return ""
+
+
+class FacilitatorImportIn(BaseModel):
+    preview: bool = True
+    # Row indices (0-based, matching the preview's row order) the caller has
+    # explicitly reviewed and wants created despite a name match -- the CSV
+    # equivalent of confirm_duplicate on the single-facilitator endpoint.
+    confirm_duplicate_rows: list[int] = []
+
+
+@router.post("/facilitators/import")
+async def import_facilitators_csv(
+    file: UploadFile = File(...),
+    preview: bool = True,
+    confirm_duplicate_rows: str = "",
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """TRGO-05: governed bulk facilitator import.
+
+    Reuses the CEA import pipeline's preview-then-commit shape and the
+    TRGO-07 duplicate-detection already shipped for single-facilitator
+    create (case-insensitive first+last name match within the squadron) --
+    the same "same person added twice by accident is common, but a genuine
+    same-name-different-person case must still be possible" reasoning
+    applies identically to a bulk import.
+
+    No stable per-row identifier exists on Facilitator today (no email/
+    service-number field), so matching is name-based, same as the single-
+    create endpoint -- this is a real, named limitation, not a silent gap:
+    a CSV with two genuinely different people who happen to share a name
+    needs `confirm_duplicate_rows` to include both.
+
+    CSV formula injection: any cell starting with =, +, -, @ (a formula
+    trigger in Excel/Sheets) is neutralised before it ever reaches storage
+    or a later export.
+    """
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    sq_id = _active_squadron(p)
+    if not sq_id:
+        require_can_write_squadron(p, "none", None)
+    s = db.get(Squadron, sq_id)
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    if not preview:
+        require_can_write_squadron(p, s.id, s.wing_id)
+
+    from ..config import settings as _settings
+    content = await file.read()
+    if len(content) > _settings.UPLOAD_MAX_MB * 1024 * 1024:
+        raise HTTPException(413, detail={"error": "file_too_large"})
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("latin-1")
+
+    import csv, io
+    reader = csv.DictReader(io.StringIO(text))
+    if reader.fieldnames is None:
+        raise HTTPException(400, detail={"error": "invalid_header", "message": "CSV has no header row."})
+
+    existing = {
+        ((e.first_name or "").strip().lower(), e.last_name.strip().lower())
+        for e in db.query(Facilitator).filter(
+            Facilitator.squadron_id == s.id, Facilitator.is_archived == False,  # noqa: E712
+        ).all()
+    }
+    confirm_idx = set()
+    if confirm_duplicate_rows:
+        try:
+            confirm_idx = {int(x) for x in confirm_duplicate_rows.split(",") if x.strip()}
+        except ValueError:
+            raise HTTPException(400, detail={"error": "invalid_confirm_rows"})
+
+    rows_out = []
+    seen_in_file: set[tuple[str, str]] = set()
+    for i, row in enumerate(reader):
+        last_name = _fac_csv_get(row, "last_name")
+        first_name = _fac_csv_get(row, "first_name")
+        if not last_name:
+            rows_out.append({"row": i, "action": "error", "message": "Missing last name.", "last_name": last_name, "first_name": first_name})
+            continue
+        key = (first_name.lower(), last_name.lower())
+        action = "create"
+        if key in existing:
+            action = "duplicate"
+        elif key in seen_in_file:
+            action = "duplicate_in_file"
+        seen_in_file.add(key)
+
+        rec = {
+            "row": i, "action": action,
+            "first_name": first_name or None, "last_name": last_name,
+            "current_rank": _fac_csv_get(row, "rank") or None,
+            "type": _fac_csv_get(row, "type") or "Staff",
+            "subject_areas": [x.strip() for x in _fac_csv_get(row, "subject_areas").split(";") if x.strip()],
+            "active_status": _fac_csv_get(row, "active_status").lower() not in ("false", "0", "no", "inactive"),
+        }
+        rows_out.append(rec)
+
+    if preview:
+        return {
+            "ok": True, "preview": True, "rows": rows_out,
+            "to_create": sum(1 for r in rows_out if r["action"] == "create" or r["row"] in confirm_idx),
+            "duplicates": sum(1 for r in rows_out if r["action"] in ("duplicate", "duplicate_in_file")),
+            "errors": sum(1 for r in rows_out if r["action"] == "error"),
+        }
+
+    created = skipped = errors = 0
+    created_ids = []
+    for r in rows_out:
+        if r["action"] == "error":
+            errors += 1
+            continue
+        if r["action"] in ("duplicate", "duplicate_in_file") and r["row"] not in confirm_idx:
+            skipped += 1
+            continue
+        f = Facilitator(
+            squadron_id=s.id, wing_id=s.wing_id,
+            first_name=r["first_name"], last_name=r["last_name"],
+            current_rank=r["current_rank"], type=r["type"] or "Staff",
+            subject_areas=_validate_subject_areas(r["subject_areas"]),
+            active_status=r["active_status"],
+        )
+        db.add(f); db.flush()
+        db.add(FacilitatorRankHistory(facilitator_id=f.id, rank=r["current_rank"], effective_from=str(utcnow().date())))
+        created += 1
+        created_ids.append(f.id)
+    db.commit()
+    audit(db, p, object_type="facilitator", object_id=None, action="csv_import",
+          new={"created": created, "skipped": skipped, "errors": errors, "source_file_name": file.filename})
+    return {
+        "ok": True, "preview": False,
+        "created": created, "skipped": skipped, "errors": errors,
+        "created_ids": created_ids, "total": len(rows_out),
+    }
 
 
 class FacUpdateIn(BaseModel):
@@ -548,8 +881,8 @@ def fac_stats(fid: str, db: DBSession = Depends(get_db), p: Principal = Depends(
 
 # ── RESOURCES ──
 @router.get("/training-areas")
-def list_rooms(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _active_squadron(p)
+def list_rooms(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _view_squadron_id(p, squadron_id, db)
     rows = db.query(TrainingArea).filter(TrainingArea.squadron_id == sq_id,
                                          TrainingArea.is_archived == False).all()  # noqa: E712
     return [{"training_area_id": r.id, "name": r.name, "type": r.type, "capacity": r.capacity,
@@ -557,8 +890,8 @@ def list_rooms(db: DBSession = Depends(get_db), p: Principal = Depends(get_princ
 
 
 @router.get("/equipment")
-def list_equipment(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _active_squadron(p)
+def list_equipment(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _view_squadron_id(p, squadron_id, db)
     rows = db.query(Equipment).filter(Equipment.squadron_id == sq_id,
                                       Equipment.is_archived == False).all()  # noqa: E712
     return [{"equipment_id": e.id, "name": e.name, "type": e.type, "quantity": e.quantity,
@@ -899,8 +1232,8 @@ def _activity_out(a: Activity) -> dict:
 
 
 @router.get("/activities")
-def list_activities(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _active_squadron(p)
+def list_activities(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _view_squadron_id(p, squadron_id, db)
     rows = db.query(Activity).filter(Activity.squadron_id == sq_id,
                                      Activity.is_archived == False).order_by(Activity.date_start).all()  # noqa: E712
     return [_activity_out(a) for a in rows]
@@ -974,6 +1307,233 @@ def delete_activity(aid: str, db: DBSession = Depends(get_db), p: Principal = De
     db.commit()
     audit(db, p, object_type="activity", object_id=a.id, action="archive")
     return {"ok": True}
+
+
+# ── ACTIVITY GENERATION ──────────────────────────────────────────────────────
+
+RECURRENCE_OPTS = frozenset({"daily", "weekly", "fortnightly", "monthly", "yearly"})
+
+
+class ActivityGenerateIn(BaseModel):
+    activity_name: str
+    activity_type: str = "Optional"
+    start_date: str           # YYYY-MM-DD — first possible date
+    end_date: str             # YYYY-MM-DD — last possible date (inclusive)
+    time_start: str | None = None
+    time_end: str | None = None
+    recurrence: str = "weekly"      # daily|weekly|fortnightly|monthly|yearly
+    weekday: int | None = None      # 0=Mon…6=Sun — required for weekly/fortnightly
+    excluded_dates: list[str] = []  # YYYY-MM-DD dates to skip
+    repeat_count: int | None = None # cap total occurrences if set
+    location: str | None = None
+    audience: list[str] = []
+    notes: str | None = None
+    planning_year_id: str | None = None   # optional; used for holiday lookups
+    preview_only: bool = True
+
+
+def _generate_dates(start: str, end: str, recurrence: str, weekday: int | None,
+                    excluded: set[str], repeat_count: int | None):
+    """Yield ISO date strings matching the recurrence rule within [start, end]."""
+    from datetime import date, timedelta
+    import calendar as _cal
+
+    sd = date.fromisoformat(start)
+    ed = date.fromisoformat(end)
+
+    if recurrence == "daily":
+        cur = sd
+        count = 0
+        while cur <= ed:
+            ds = cur.isoformat()
+            if ds not in excluded:
+                yield ds
+                count += 1
+                if repeat_count and count >= repeat_count:
+                    return
+            cur += timedelta(days=1)
+
+    elif recurrence in ("weekly", "fortnightly"):
+        if weekday is None:
+            weekday = sd.weekday()
+        step = timedelta(days=7 if recurrence == "weekly" else 14)
+        # Find first occurrence on or after start
+        days_ahead = (weekday - sd.weekday()) % 7
+        cur = sd + timedelta(days=days_ahead)
+        count = 0
+        while cur <= ed:
+            ds = cur.isoformat()
+            if ds not in excluded:
+                yield ds
+                count += 1
+                if repeat_count and count >= repeat_count:
+                    return
+            cur += step
+
+    elif recurrence == "monthly":
+        from datetime import date as _date
+        cur = sd.replace(day=1)
+        target_day = sd.day
+        count = 0
+        while cur <= ed:
+            last = _cal.monthrange(cur.year, cur.month)[1]
+            day = min(target_day, last)
+            candidate = _date(cur.year, cur.month, day)
+            if sd <= candidate <= ed:
+                ds = candidate.isoformat()
+                if ds not in excluded:
+                    yield ds
+                    count += 1
+                    if repeat_count and count >= repeat_count:
+                        return
+            if cur.month == 12:
+                cur = cur.replace(year=cur.year + 1, month=1)
+            else:
+                cur = cur.replace(month=cur.month + 1)
+
+    elif recurrence == "yearly":
+        from datetime import date as _date
+        import calendar as _cal
+        cur_year = sd.year
+        count = 0
+        while True:
+            try:
+                candidate = _date(cur_year, sd.month, sd.day)
+            except ValueError:
+                last = _cal.monthrange(cur_year, sd.month)[1]
+                candidate = _date(cur_year, sd.month, last)
+            if candidate > ed:
+                break
+            if candidate >= sd:
+                ds = candidate.isoformat()
+                if ds not in excluded:
+                    yield ds
+                    count += 1
+                    if repeat_count and count >= repeat_count:
+                        return
+            cur_year += 1
+
+
+@router.post("/activities/generate")
+def generate_activities(
+    body: ActivityGenerateIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Preview or batch-create recurring activities.
+
+    When preview_only=True (default), returns a preview list without writing.
+    When preview_only=False, creates all 'include' records and returns a summary.
+    """
+    if body.recurrence not in RECURRENCE_OPTS:
+        raise HTTPException(400, detail={"error": "invalid_recurrence",
+                                         "allowed": sorted(RECURRENCE_OPTS)})
+    if p.role in _WRITE_BLOCKED and not body.preview_only:
+        raise HTTPException(403, detail={"error": "forbidden"})
+
+    sq_id = _active_squadron(p)
+    s = db.get(Squadron, sq_id) if sq_id else None
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    if not body.preview_only:
+        require_can_write_squadron(p, s.id, s.wing_id)
+
+    # Build holiday date set for this squadron (from planning year if given)
+    holiday_dates: dict[str, str] = {}  # date → holiday name
+    if body.planning_year_id:
+        try:
+            from ..models.planning import HolidayPeriod, PlanningYear
+            from datetime import date, timedelta
+            py = db.get(PlanningYear, body.planning_year_id)
+            if py and (py.unit_id == s.id or py.wing_id == s.wing_id):
+                hols = db.query(HolidayPeriod).filter(
+                    HolidayPeriod.planning_year_id == body.planning_year_id
+                ).all()
+                for h in hols:
+                    hd = date.fromisoformat(h.start_date)
+                    end_hd = date.fromisoformat(h.end_date)
+                    while hd <= end_hd:
+                        holiday_dates[hd.isoformat()] = h.name
+                        hd += timedelta(days=1)
+        except Exception:
+            pass  # holiday lookup is best-effort; do not block generation
+
+    # Existing active activities for duplicate detection
+    existing = db.query(Activity).filter(
+        Activity.squadron_id == s.id,
+        Activity.is_archived == False,  # noqa: E712
+        Activity.activity_name == body.activity_name,
+    ).all()
+    existing_map: dict[str, str] = {a.date_start: a.id for a in existing}
+
+    excluded_set = set(body.excluded_dates or [])
+    preview_rows = []
+    for ds in _generate_dates(body.start_date, body.end_date, body.recurrence,
+                               body.weekday, excluded_set, body.repeat_count):
+        holiday_name = holiday_dates.get(ds)
+        dup_id = existing_map.get(ds)
+        if dup_id:
+            status, reason = "skip", "duplicate"
+        elif holiday_name:
+            status, reason = "skip", "holiday"
+        else:
+            status, reason = "include", None
+
+        preview_rows.append({
+            "date": ds,
+            "start_time": body.time_start,
+            "finish_time": body.time_end,
+            "status": status,
+            "reason": reason,
+            "existing_activity_id": dup_id,
+            "holiday_name": holiday_name,
+            "scope": "squadron",
+        })
+
+    if body.preview_only:
+        return {
+            "preview": preview_rows,
+            "would_create": sum(1 for r in preview_rows if r["status"] == "include"),
+            "would_skip": sum(1 for r in preview_rows if r["status"] == "skip"),
+        }
+
+    # Actual creation
+    created_ids = []
+    skipped = []
+    batch_note = f"batch_generate:{body.recurrence}:{body.start_date}:{body.end_date}"
+    for row in preview_rows:
+        if row["status"] != "include":
+            skipped.append({"date": row["date"], "reason": row["reason"]})
+            continue
+        a = Activity(
+            squadron_id=s.id,
+            wing_id=s.wing_id,
+            activity_name=body.activity_name,
+            activity_type=body.activity_type,
+            date_start=row["date"],
+            time_start=body.time_start,
+            time_end=body.time_end,
+            location=body.location,
+            audience=body.audience or [],
+            notes=body.notes,
+            cea_seq_nr=batch_note,
+        )
+        db.add(a)
+        db.flush()
+        created_ids.append(a.id)
+
+    db.commit()
+    audit(db, p, object_type="activity", object_id="batch",
+          action="generate_batch",
+          new={"count": len(created_ids), "name": body.activity_name,
+               "recurrence": body.recurrence, "ids": created_ids})
+    return {
+        "ok": True,
+        "created_count": len(created_ids),
+        "skipped_count": len(skipped),
+        "created_ids": created_ids,
+        "skipped": skipped,
+    }
 
 
 # ── CURRICULUM ELEMENTS ──────────────────────────────────────────────────────
@@ -1125,6 +1685,181 @@ def _upsert_element(db: DBSession, name: str, scope: str = "national",
     db.add(el)
     db.flush()  # get id without full commit
     return el.id
+
+
+# ── CURRICULUM PHASES ─────────────────────────────────────────────────────────
+# Master transformation plan Block 10 / addendum section II.2: a governed
+# training-phase catalogue, deliberately built as CurriculumElement's sibling
+# (same scope model, same idempotent-create/archive shape) rather than a
+# discriminator on curriculum_elements itself — elements are subject-matter
+# categories, phases are program-progression stages, and a discriminator
+# risked confusing list_elements' existing callers. CustomPhase (the
+# pre-existing, fully-unwired dead table) is deliberately left alone, not
+# built on — it lacks the scope columns this table needs, so extending it
+# would have needed the same work as starting fresh here.
+
+class PhaseIn(BaseModel):
+    name: str            # e.g. "A. Orientation" — matches CurriculumItem.phase/Session.phase_at_time
+    display_name: str
+    scope_level: str = "national"
+    wing_id: str | None = None
+    squadron_id: str | None = None
+    sort_order: int = 0
+
+
+def _can_create_phase(p: Principal, scope_level: str,
+                      wing_id: str | None = None, squadron_id: str | None = None) -> None:
+    """Raise 403 if the actor cannot create a phase at the requested scope.
+
+    DEFECT-001 (general-release qualification): the squadron-scope branch
+    used to allow wing_admin/national_admin/system_admin to create a
+    squadron-scope phase for ANY squadron with no Proxy/Delegated
+    Intervention check at all — inconsistent with require_can_write_squadron,
+    the sanctioned mechanism used everywhere else in this app for a higher
+    role writing into a lower organisational scope. Now enforced the same
+    way: sqn_admin writes their own squadron directly; wing_admin needs an
+    active Proxy session targeting that squadron; national_admin/system_admin
+    need active Delegated Intervention targeting that squadron.
+    """
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden",
+                                          "message": "Viewers and auditors cannot create phases."})
+    if scope_level not in PHASE_SCOPE_LEVELS:
+        raise HTTPException(400, detail={"error": "invalid_scope",
+                                          "message": f"scope_level must be one of: {sorted(PHASE_SCOPE_LEVELS)}"})
+    if scope_level == "system":
+        if p.role != "system_admin":
+            raise HTTPException(403, detail={"error": "forbidden",
+                                              "message": "Only system_admin can create system-scope phases."})
+    elif scope_level == "national":
+        if p.role not in _NAT_ADMIN_ROLES:
+            raise HTTPException(403, detail={"error": "forbidden",
+                                              "message": "Only national_admin or system_admin can create national phases."})
+    elif scope_level == "wing":
+        if p.role not in _WING_WRITE_ROLES:
+            raise HTTPException(403, detail={"error": "forbidden",
+                                              "message": "Only wing_admin or above can create wing phases."})
+        effective_wing = wing_id or p.wing_id
+        if p.role == "wing_admin" and effective_wing != p.wing_id:
+            raise HTTPException(403, detail={"error": "out_of_scope",
+                                              "message": "Wing admin can only create phases for their own wing."})
+    elif scope_level == "squadron":
+        if p.role == "sqn_admin":
+            if squadron_id and squadron_id != p.squadron_id:
+                raise HTTPException(403, detail={"error": "out_of_scope",
+                                                  "message": "Squadron admin can only create phases for their own squadron."})
+        elif p.role == "wing_admin":
+            if not p.acting_squadron_id:
+                raise HTTPException(403, detail={"error": "proxy_required",
+                                                  "message": "Wing Admin must enter Proxy Mode to create a squadron-scope phase."})
+            if squadron_id and squadron_id != p.acting_squadron_id:
+                raise HTTPException(403, detail={"error": "out_of_scope",
+                                                  "message": "Can only create a squadron-scope phase for the squadron currently in Proxy Mode."})
+        elif p.role in ("national_admin", "system_admin"):
+            if not p.acting_squadron_id:
+                raise HTTPException(403, detail={"error": "intervention_required",
+                                                  "message": "National Admin must enter Delegated Intervention Mode to create a squadron-scope phase."})
+            if squadron_id and squadron_id != p.acting_squadron_id:
+                raise HTTPException(403, detail={"error": "out_of_scope",
+                                                  "message": "Can only create a squadron-scope phase for the squadron currently in Delegated Intervention Mode."})
+        else:
+            raise HTTPException(403, detail={"error": "forbidden"})
+
+
+def _visible_phases(db: DBSession, p: Principal) -> list[CurriculumPhase]:
+    """Return phases visible to this principal (scoped by role) — identical
+    visibility rule to _visible_elements. This is the "phase is available to
+    this unit" concept from addendum section II.3, distinct from "phase
+    exists in catalogue" (any row) and "phase is scheduled tonight" (a
+    Session's phase_at_time)."""
+    from sqlalchemy import or_
+    conditions = [
+        CurriculumPhase.scope_level == "national",
+        CurriculumPhase.scope_level == "system",
+    ]
+    wing_id = p.acting_wing_id or p.wing_id
+    sq_id = p.acting_squadron_id or p.squadron_id
+    if wing_id:
+        conditions.append(
+            (CurriculumPhase.scope_level == "wing") & (CurriculumPhase.wing_id == wing_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(CurriculumPhase.scope_level == "wing")
+    if sq_id:
+        conditions.append(
+            (CurriculumPhase.scope_level == "squadron") & (CurriculumPhase.squadron_id == sq_id))
+    elif p.role == "wing_admin":
+        pass  # wing admin: no sqn-scope phases unless proxied
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(CurriculumPhase.scope_level == "squadron")
+    return db.query(CurriculumPhase).filter(
+        CurriculumPhase.is_archived == False,  # noqa: E712
+        CurriculumPhase.active_status == True,  # noqa: E712
+        or_(*conditions),
+    ).order_by(CurriculumPhase.sort_order, CurriculumPhase.scope_level, CurriculumPhase.display_name).all()
+
+
+@router.get("/curriculum/phases")
+def list_phases(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Return all training phases visible to the caller's scope, in
+    training-progression order — the phase picker's data source."""
+    return [{"phase_id": ph.id, "name": ph.name, "display_name": ph.display_name,
+             "scope_level": ph.scope_level, "wing_id": ph.wing_id, "squadron_id": ph.squadron_id,
+             "sort_order": ph.sort_order}
+            for ph in _visible_phases(db, p)]
+
+
+@router.post("/curriculum/phases")
+def create_phase(body: PhaseIn, db: DBSession = Depends(get_db),
+                 p: Principal = Depends(get_principal)):
+    """Create a training phase at the requested scope."""
+    scope = body.scope_level
+    _can_create_phase(p, scope, body.wing_id, body.squadron_id)
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(400, detail={"error": "name_required"})
+    # DEFECT-001: fall back to the caller's ACTING wing/squadron (set while a
+    # Proxy/Delegated Intervention session is active), not just their own —
+    # otherwise a wing_admin/national_admin who omits squadron_id here would
+    # have it resolve to their own (nonexistent) squadron_id and silently
+    # create an orphaned scope_level="squadron", squadron_id=None row.
+    wing_id = body.wing_id or ((p.acting_wing_id or p.wing_id) if scope in ("wing", "squadron") else None)
+    sq_id = body.squadron_id or ((p.acting_squadron_id or p.squadron_id) if scope == "squadron" else None)
+    # Idempotent: return existing phase if same name + scope
+    existing = db.query(CurriculumPhase).filter(
+        CurriculumPhase.name == name,
+        CurriculumPhase.scope_level == scope,
+        CurriculumPhase.wing_id == wing_id,
+        CurriculumPhase.squadron_id == sq_id,
+        CurriculumPhase.is_archived == False,  # noqa: E712
+    ).first()
+    if existing:
+        return {"ok": True, "phase_id": existing.id, "name": existing.name,
+                "display_name": existing.display_name, "scope_level": existing.scope_level, "existed": True}
+    ph = CurriculumPhase(
+        name=name, display_name=body.display_name or name,
+        scope_level=scope, wing_id=wing_id, squadron_id=sq_id, sort_order=body.sort_order,
+        active_status=True, created_by=p.user_id)
+    db.add(ph)
+    db.commit()
+    audit(db, p, object_type="curriculum_phase", object_id=ph.id, action="create",
+          new={"name": name, "scope": scope})
+    return {"ok": True, "phase_id": ph.id, "name": ph.name,
+            "display_name": ph.display_name, "scope_level": ph.scope_level, "existed": False}
+
+
+@router.post("/curriculum/phases/{phid}/archive")
+def archive_phase(phid: str, db: DBSession = Depends(get_db),
+                  p: Principal = Depends(get_principal)):
+    ph = db.get(CurriculumPhase, phid)
+    if not ph:
+        raise HTTPException(404, detail={"error": "not_found"})
+    # Only the owning scope or above can archive
+    _can_create_phase(p, ph.scope_level, ph.wing_id, ph.squadron_id)
+    ph.is_archived = True
+    ph.archived_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="curriculum_phase", object_id=ph.id, action="archive")
+    return {"ok": True}
 
 
 # ── CURRICULUM WRITE (SQN-owned items only) ──────────────────────────────────
@@ -1805,170 +2540,163 @@ async def import_curriculum_csv(
     return result
 
 
-# ── CEA ACTIVITY IMPORT ───────────────────────────────────────────────────────
-
-_CEA_DATE_FMTS = ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y", "%d %b %Y"]
-
-
-def _parse_cea_date(raw: str) -> str | None:
-    """Parse a CEA export date to ISO YYYY-MM-DD."""
-    if not raw:
-        return None
-    from datetime import datetime
-    for fmt in _CEA_DATE_FMTS:
-        try:
-            return datetime.strptime(raw.strip(), fmt).strftime("%Y-%m-%d")
-        except ValueError:
-            pass
-    return raw.strip()[:10] or None
-
-
-def _parse_cea_time(raw: str) -> str | None:
-    """Normalise a time string to HH:MM:SS (8 chars max)."""
-    if not raw:
-        return None
-    raw = raw.strip()
-    # Accept HH:MM, HH:MM:SS, H:MM
-    parts = raw.split(":")
-    if len(parts) >= 2:
-        try:
-            hh = int(parts[0])
-            mm = int(parts[1])
-            return f"{hh:02d}:{mm:02d}"
-        except ValueError:
-            pass
-    return raw[:8] or None
-
+# ── CEA ACTIVITY IMPORT (retired -- see docstring below) ─────────────────────
 
 @router.post("/activities/import-cea")
 async def import_activities_cea(
-    file: UploadFile = File(...),
     preview: bool = False,
-    db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    """Import activities from a CEA export CSV.
+    """RETIRED (DEFECT-005, general-release qualification).
 
-    Expected columns (case-insensitive):
-    SeqNr, Name, Start date, Start time, End date, End time,
-    Unit, Location, Activity Notes
+    Connected-frontend's legacy CEA import wrote squadron-scoped Activity
+    rows with no persisted review/classification step and per-squadron-only
+    dedup (by cea_seq_nr). Planning Workspace's CEA import
+    (POST /api/planning/years/{year_id}/cea/import) has since become the
+    single sanctioned pipeline: wing_admin+ only, full needs-review/classify
+    workflow, import-batch history, and a squadron-local hide/note overlay
+    (POST /api/planning/cea/{id}/local-hide) instead of writing squadron
+    data directly. Consolidating onto one reviewed pipeline, as required.
 
-    Deduplication: if a row's SeqNr already exists in the squadron's
-    activities, that row is skipped (not duplicated).
-
-    If preview=true, returns parsed rows without writing to the database.
-    Permissions: squadron_admin or higher (writes to the active squadron).
+    Still requires authentication (not publicly reachable) so this responds
+    with a clear, actionable 410 rather than a bare 404 for any caller that
+    still has this URL bookmarked or scripted -- see
+    docs/beta/15_known_limitations.md.
     """
-    import csv, io
-    if p.role in _WRITE_BLOCKED:
-        raise HTTPException(403, detail={"error": "forbidden"})
+    raise HTTPException(410, detail={
+        "error": "retired",
+        "message": ("CEA import has moved to the Planning Workspace (Import CEA, "
+                    "wing_admin or higher). This endpoint no longer accepts imports."),
+    })
 
-    sq_id = _active_squadron(p)
-    if not sq_id:
-        raise HTTPException(400, detail={"error": "no_squadron_scope"})
-    s = db.get(Squadron, sq_id)
-    if not s:
-        raise HTTPException(400, detail={"error": "no_squadron_scope"})
-    if not preview:
-        require_can_write_squadron(p, s.id, s.wing_id)
 
-    content = await file.read()
-    try:
-        text = content.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        text = content.decode("latin-1")
+# ═══════════════════════════════════════════════════
+#  SUBJECT AREA TAGS
+# ═══════════════════════════════════════════════════
 
-    reader = csv.DictReader(io.StringIO(text))
-    parse_errors: list[str] = []
-    preview_rows: list[dict] = []
-    created = skipped = failed = 0
+def _normalise_tag(name: str) -> str:
+    """Lower-case, collapse internal whitespace, strip edges."""
+    import re
+    return re.sub(r"\s+", " ", name.strip().lower())
 
-    # Load existing seq numbers for deduplication
-    existing_seq = {
-        a.cea_seq_nr for a in
-        db.query(Activity.cea_seq_nr).filter(
-            Activity.squadron_id == sq_id,
-            Activity.cea_seq_nr.isnot(None),
-            Activity.is_archived == False,  # noqa: E712
-        ).all()
-        if a.cea_seq_nr
-    }
 
-    for i, row in enumerate(reader, start=2):
-        norm = {k.strip().lower(): (v or "").strip() for k, v in row.items()}
-
-        seq_nr = norm.get("seqnr") or norm.get("seq nr") or norm.get("seq_nr") or norm.get("seq") or ""
-        name = norm.get("name") or norm.get("activity name") or norm.get("activity") or ""
-        date_start_raw = norm.get("start date") or norm.get("startdate") or norm.get("start_date") or ""
-        time_start_raw = norm.get("start time") or norm.get("starttime") or norm.get("start_time") or ""
-        date_end_raw = norm.get("end date") or norm.get("enddate") or norm.get("end_date") or ""
-        time_end_raw = norm.get("end time") or norm.get("endtime") or norm.get("end_time") or ""
-        unit = norm.get("unit") or ""
-        location = norm.get("location") or ""
-        notes = norm.get("activity notes") or norm.get("notes") or norm.get("activity_notes") or ""
-
-        if not name or not date_start_raw:
-            parse_errors.append(f"Row {i}: missing Name or Start date — skipped.")
-            continue
-
-        date_start = _parse_cea_date(date_start_raw)
-        date_end = _parse_cea_date(date_end_raw) if date_end_raw else None
-        time_start = _parse_cea_time(time_start_raw) if time_start_raw else None
-        time_end = _parse_cea_time(time_end_raw) if time_end_raw else None
-
-        if not date_start:
-            parse_errors.append(f"Row {i}: unrecognised date format '{date_start_raw}' — skipped.")
-            continue
-
-        row_data = {
-            "cea_seq_nr": seq_nr or None,
-            "activity_name": name,
-            "date_start": date_start,
-            "date_end": date_end,
-            "time_start": time_start,
-            "time_end": time_end,
-            "location": location or None,
-            "notes": (notes + (f"\nUnit: {unit}" if unit else "")).strip() or None,
-            "activity_type": "CEA",
-            "status": "duplicate" if seq_nr and seq_nr in existing_seq else "new",
-        }
-
-        if preview:
-            preview_rows.append(row_data)
-            continue
-
-        if seq_nr and seq_nr in existing_seq:
-            skipped += 1
-            continue
-
-        try:
-            a = Activity(
-                squadron_id=s.id, wing_id=s.wing_id,
-                activity_name=name, activity_type="CEA",
-                date_start=date_start, date_end=date_end,
-                time_start=time_start, time_end=time_end,
-                location=location or None,
-                notes=(notes + (f"\nUnit: {unit}" if unit else "")).strip() or None,
-                cea_seq_nr=seq_nr or None,
-            )
-            db.add(a)
-            if seq_nr:
-                existing_seq.add(seq_nr)
-            created += 1
-        except Exception as exc:
-            failed += 1
-            parse_errors.append(f"Row {i}: save failed — {exc}")
-
-    if preview:
-        return {"ok": True, "preview": True, "rows": preview_rows, "parse_errors": parse_errors}
-
-    db.commit()
-    audit(db, p, object_type="activity", object_id="cea_import", action="bulk_import",
-          new={"created": created, "skipped": skipped, "failed": failed})
-
+def _tag_out(t: SubjectAreaTag) -> dict:
     return {
-        "ok": True, "preview": False,
-        "created": created, "skipped": skipped, "failed": failed,
-        "total": created + skipped + failed,
-        "parse_errors": parse_errors,
+        "tag_id": t.id,
+        "display_name": t.display_name,
+        "normalised_name": t.normalised_name,
+        "scope": t.scope,
+        "squadron_id": t.squadron_id,
+        "wing_id": t.wing_id,
+        "is_active": t.is_active,
+        "created_by": t.created_by,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
     }
+
+
+class SubjectAreaTagIn(BaseModel):
+    display_name: str
+    scope: str = "squadron"
+
+
+@router.get("/subject-area-tags")
+def list_subject_area_tags(
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Return all active tags visible to the caller's squadron and wing."""
+    sq = db.get(Squadron, p.squadron_id) if p.squadron_id else None
+    sq_id = sq.id if sq else None
+    wing_id = sq.wing_id if sq else p.wing_id
+    require_can_view_squadron(p, sq_id or "", wing_id)
+    rows = (
+        db.query(SubjectAreaTag)
+        .filter(
+            SubjectAreaTag.is_active == True,  # noqa: E712
+            (
+                (SubjectAreaTag.squadron_id == sq_id) |
+                (SubjectAreaTag.wing_id == wing_id) |
+                (SubjectAreaTag.scope == "global")
+            ),
+        )
+        .order_by(SubjectAreaTag.display_name)
+        .all()
+    )
+    return [_tag_out(t) for t in rows]
+
+
+@router.post("/subject-area-tags", status_code=201)
+def create_subject_area_tag(
+    body: SubjectAreaTagIn,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Create a new subject-area tag (sqn_admin or wing_admin only)."""
+    from ..permissions import require_role
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    sq = db.get(Squadron, p.squadron_id) if p.squadron_id else None
+    if not sq:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    require_can_write_squadron(p, sq.id, sq.wing_id)
+
+    display = body.display_name.strip()
+    if not display:
+        raise HTTPException(400, detail={"error": "tag_name_blank"})
+    if len(display) > 80:
+        raise HTTPException(400, detail={"error": "tag_name_too_long", "max": 80})
+
+    norm = _normalise_tag(display)
+
+    scope = body.scope if body.scope in ("global", "wing", "squadron") else "squadron"
+    wing_id = sq.wing_id if scope in ("wing", "squadron") else None
+    squadron_id = sq.id if scope == "squadron" else None
+
+    existing = (
+        db.query(SubjectAreaTag)
+        .filter(
+            SubjectAreaTag.normalised_name == norm,
+            SubjectAreaTag.is_active == True,  # noqa: E712
+            (
+                (SubjectAreaTag.squadron_id == squadron_id) |
+                (SubjectAreaTag.wing_id == wing_id) |
+                (SubjectAreaTag.scope == "global")
+            ),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(409, detail={"error": "tag_already_exists", "existing_id": existing.id})
+
+    tag = SubjectAreaTag(
+        squadron_id=squadron_id,
+        wing_id=wing_id,
+        scope=scope,
+        display_name=display,
+        normalised_name=norm,
+        is_active=True,
+        created_by=p.user_id,
+    )
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    audit(db, p, object_type="SubjectAreaTag", object_id=tag.id, action="create",
+          new={"display_name": tag.display_name, "scope": tag.scope})
+    return _tag_out(tag)
+
+
+@router.delete("/subject-area-tags/{tag_id}", status_code=200)
+def archive_subject_area_tag(
+    tag_id: str,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Archive a subject-area tag (does not remove existing facilitator references)."""
+    from ..permissions import require_role
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    tag = db.get(SubjectAreaTag, tag_id)
+    if not tag:
+        raise HTTPException(404, detail={"error": "tag_not_found"})
+    tag.is_active = False
+    db.commit()
+    audit(db, p, object_type="SubjectAreaTag", object_id=tag_id, action="archive")
+    return {"ok": True}

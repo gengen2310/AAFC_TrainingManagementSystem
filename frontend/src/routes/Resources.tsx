@@ -2,12 +2,16 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { trainingApi } from "../api";
 import { Card, Empty, Loading, ErrorNote, Button } from "../components/ui";
+import { useScopedSquadron } from "../layout/SquadronViewContext";
 
 export function Resources() {
-  const areas = useQuery({ queryKey: ["training-areas"], queryFn: trainingApi.trainingAreas });
-  const equip = useQuery({ queryKey: ["equipment"], queryFn: trainingApi.equipment });
+  const { needsSelection, squadronId, scoped } = useScopedSquadron();
+  const areas = useQuery({ queryKey: ["training-areas", squadronId], queryFn: () => trainingApi.trainingAreas(squadronId), enabled: scoped });
+  const equip = useQuery({ queryKey: ["equipment", squadronId], queryFn: () => trainingApi.equipment(squadronId), enabled: scoped });
   const [date, setDate] = useState("");
   const clashes = useQuery({ queryKey: ["clashes", date], queryFn: () => trainingApi.clashes(date), enabled: !!date });
+
+  if (needsSelection && !squadronId) return <div><h1>Resources</h1><Empty msg="Select a squadron above to view its training areas and equipment." /></div>;
 
   return (
     <div>

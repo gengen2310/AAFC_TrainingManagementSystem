@@ -22,7 +22,37 @@ if [ "${MODULE_MODE:-false}" = "true" ]; then
         /usr/share/nginx/html/index.html
 fi
 
+# Inject the connected-frontend TMS URL so "Return to TMS" links are environment-aware.
+# Set AAFC_TMS_BASE to the URL of the connected-frontend service for this environment.
+# Example staging: https://aafc-tms-frontend-staging.up.railway.app
+if [ -n "${AAFC_TMS_BASE:-}" ]; then
+    sed -i \
+        "s|<meta name=\"aafc-tms-base\" content=\"[^\"]*\">|<meta name=\"aafc-tms-base\" content=\"${AAFC_TMS_BASE}\">|" \
+        /usr/share/nginx/html/index.html
+fi
+
 # Inject runtime port into nginx config
 sed -i "s/__PORT__/${PORT}/g" /etc/nginx/conf.d/default.conf
+
+# Inject the CSP connect-src origin — the backend this app actually calls. Falls back to
+# https: (any HTTPS origin) if neither VITE_API_BASE_URL nor AAFC_API_BASE is set, mirroring
+# connected-frontend's nginx.conf fallback behaviour for the same placeholder.
+CSP_CONNECT_SRC="${API_BASE:-https:}"
+sed -i \
+    "s#__CSP_CONNECT_SRC__#${CSP_CONNECT_SRC}#" \
+    /etc/nginx/conf.d/default.conf
+
+# Inject build fingerprint (commit SHA | build timestamp).
+# RAILWAY_GIT_COMMIT_SHA is provided by Railway at runtime; falls back to "local" in dev.
+BUILD_SHA="${RAILWAY_GIT_COMMIT_SHA:-local}"
+BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+sed -i \
+  "s#<meta name=\"app-build\" content=\"__APP_BUILD__\">#<meta name=\"app-build\" content=\"${BUILD_SHA}|${BUILD_TIME}\">#" \
+  /usr/share/nginx/html/index.html
+
+# Create /version.json for programmatic fingerprint verification
+cat > /usr/share/nginx/html/version.json <<EOF
+{"commit":"${BUILD_SHA}","source":"frontend","built":"${BUILD_TIME}"}
+EOF
 
 exec nginx -g "daemon off;"

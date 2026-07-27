@@ -34,7 +34,7 @@ export interface Flight {
 export interface CurriculumItem {
   curriculum_id: string; code: string; title: string; phase: string; element: string;
   duration_minutes: number; core_status: string; learning_hub_url: string | null;
-  recommended_term: number | null; session_count: number; progress: string;
+  recommended_term: string | null; session_count: number; progress: string;
 }
 export interface SessionRow {
   id: string; parade_night_id: string; squadron_id: string; period_number: number;
@@ -47,7 +47,7 @@ export interface SessionRow {
   [k: string]: unknown;
 }
 export interface ParadeNight {
-  parade_night_id: string; squadron_id: string; date: string; term: number | null;
+  parade_night_id: string; squadron_id: string; date: string; term: string | null;
   start_time: string | null; end_time: string | null; session_count: number;
   parade_type: string; published_status: boolean; readiness_score: number | null; closeout_status: string | null;
 }
@@ -137,6 +137,12 @@ export interface TimingBlock {
   start_time: string | null; end_time: string | null;
   duration_minutes: number; is_instructional: boolean; period_number: number | null;
 }
+export interface TimingTemplateFull {
+  timing_template_id: string; squadron_id: string; name: string;
+  effective_from: string; effective_to: string | null;
+  is_default: boolean; active_status: boolean; notes: string | null;
+  instructional_period_count: number;
+}
 export interface PlanningConflict {
   conflict_id: string; planning_year_id: string | null; parade_date_id: string | null;
   scheduled_session_id: string | null; conflict_type: string; severity: string;
@@ -195,12 +201,18 @@ export interface MissionItem {
   phase: string; element: string | null; recommended_term: string | null;
   part_count: number | null; duration_minutes: number;
   core_status: string; is_scheduled: boolean;
+  has_cancelled: boolean; has_not_delivered: boolean; has_rescheduled: boolean; needs_reschedule: boolean;
+  // Six-state model: unscheduled | planned | cancelled_awaiting_reschedule |
+  // not_delivered_awaiting_reschedule | rescheduled | resolved.
+  backlog_status: string;
   scheduled_count: number; instructor_suitability: string | null;
   scheduled_sessions: {
     session_id: string; parade_date: string | null; parade_date_id: string | null; term: string | null;
     session_number: number; part_number: number | null; cadet_group: string | null;
     facilitator_id: string | null; facilitator_name: string | null;
     location_id: string | null; location_name: string | null; status: string;
+    cancelled_reason: string | null; not_delivered_reason: string | null;
+    rescheduled_to_date: string | null; outcome_note: string | null;
   }[];
 }
 export interface PlanningLocation {
@@ -391,6 +403,8 @@ export interface CeaActivity {
   is_removed_from_cea: boolean;
   is_archived: boolean;
   created_at: string | null;
+  is_hidden_for_me: boolean;
+  local_note: string | null;
 }
 
 export interface CeaImportBatch {
@@ -426,4 +440,74 @@ export interface CeaImportResult {
     location: string | null;
     existing_id: string | null;
   }>;
+}
+
+// ─── Dashboard charts (GET /api/dashboard/charts, /api/dashboard/charts/strategic) ──
+// Shared schema every chart_id follows — see backend/app/routers/dashboard.py.
+export type ChartType =
+  | "bar_horizontal" | "donut" | "line" | "stacked_bar" | "stacked_bar_horizontal"
+  | "grouped_bar" | "heatmap" | "readiness_card" | "readiness_grid";
+
+export interface ChartSeriesSpec { key: string; label: string; color?: string; }
+export interface ChartThresholds { green?: number; amber?: number; red?: number; }
+
+export interface DashboardChart {
+  chart_id: string;
+  title?: string;
+  explanation?: string;
+  question?: string;
+  chart_type: ChartType;
+  data: unknown;
+  insight?: string | null;
+  empty_state?: string;
+  drill_down?: { route?: string; filters?: Record<string, unknown> } | null;
+  permission_scope?: string;
+  x_axis?: string;
+  y_axis?: string;
+  series?: ChartSeriesSpec[];
+  thresholds?: ChartThresholds;
+  columns?: string[];
+}
+
+export interface DashboardChartsResponse {
+  scope: "squadron" | "wing" | "national";
+  window: string;
+  charts: Record<string, DashboardChart>;
+  error?: string;
+}
+
+// ─── Facilitator Schedule Explorer (master transformation plan Block 9) ────
+export interface FacilitatorScheduleFacilitator {
+  facilitator_id: string;
+  name: string;
+  type: string;
+  subject_areas: string[];
+  on_leave_now: boolean;
+}
+export interface FacilitatorScheduleSessionItem {
+  id: string;
+  facilitator_id: string;
+  kind: "session";
+  date: string;
+  label: string;
+  status: string;
+  parade_night_id: string;
+  session_id: string;
+}
+export interface FacilitatorScheduleLeaveItem {
+  id: string;
+  facilitator_id: string;
+  kind: "leave";
+  start_date: string;
+  end_date: string;
+  label: string;
+}
+export type FacilitatorScheduleItem = FacilitatorScheduleSessionItem | FacilitatorScheduleLeaveItem;
+export interface FacilitatorScheduleResponse {
+  squadron_id: string | null;
+  window: string;
+  window_start: string;
+  window_end: string;
+  facilitators: FacilitatorScheduleFacilitator[];
+  items: FacilitatorScheduleItem[];
 }

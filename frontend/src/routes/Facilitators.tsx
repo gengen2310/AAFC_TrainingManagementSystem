@@ -1,28 +1,40 @@
 import { useState, useRef, type KeyboardEvent, type ChangeEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { trainingApi } from "../api";
+import { trainingApi, reportApi } from "../api";
 import { Card, Empty, Loading, ErrorNote, Button } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { DrilldownPanel } from "../components/DrilldownPanel";
+import { DecisionBadge } from "../components/status/StatusBadge";
 import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { canWriteSquadron } from "../auth/permissions";
+import { useScopedSquadron } from "../layout/SquadronViewContext";
+import { ImportFacilitatorsModal } from "../components/planning/ImportFacilitatorsModal";
 import type { Facilitator } from "../api/types";
 
 export function Facilitators() {
   const { session } = useAuth();
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["facilitators"], queryFn: trainingApi.facilitators });
+  const { needsSelection, squadronId, scoped } = useScopedSquadron();
+  const q = useQuery({ queryKey: ["facilitators", squadronId], queryFn: () => trainingApi.facilitators(squadronId), enabled: scoped });
+  const load = useQuery({ queryKey: ["fac-load", squadronId], queryFn: () => reportApi.facLoad(squadronId), enabled: scoped });
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [tagsFor, setTagsFor] = useState<Facilitator | null>(null);
   const [statsId, setStatsId] = useState<string | null>(null);
   const canWrite = canWriteSquadron(session);
+  if (needsSelection && !squadronId) return <Empty msg="Select a squadron above to view its facilitators." />;
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
   return (
     <div>
       <h1>Facilitators</h1>
-      <Card title="Facilitators" action={canWrite && <Button onClick={() => setAdding(true)}>Add facilitator</Button>}>
+      <Card action={canWrite && (
+        <div style={{ display: "flex", gap: 6 }}>
+          <Button onClick={() => setImporting(true)} variant="out">Import CSV</Button>
+          <Button onClick={() => setAdding(true)}>Add facilitator</Button>
+        </div>
+      )}>
         {(q.data ?? []).length === 0 ? <Empty msg="No facilitators yet." /> : (
           <table>
             <caption className="vis-hidden">Facilitators</caption>
@@ -48,7 +60,27 @@ export function Facilitators() {
         )}
         <p className="muted">Rank is shown point-in-time on historical sessions; updating a facilitator does not rewrite past session rank.</p>
       </Card>
+
+      <Card title="Delivery statistics" action={load.data && <DecisionBadge decision={load.data.decision} />}>
+        {load.isLoading ? <Loading /> : load.error ? <ErrorNote error={load.error} /> :
+          (load.data!.facilitators.length === 0 ? <Empty msg="No session data yet." /> : (
+            <table>
+              <caption className="vis-hidden">Facilitator delivery statistics</caption>
+              <thead><tr><th>Facilitator</th><th>Sessions</th><th>Delivered</th><th>Load risk</th></tr></thead>
+              <tbody>{load.data!.facilitators.map((f) => (
+                <tr key={f.name}>
+                  <td>{f.name}</td>
+                  <td>{f.sessions}</td>
+                  <td>{f.delivered}</td>
+                  <td><span className={`badge ${f.risk === "ok" ? "ok" : f.risk === "high" ? "warn" : "red"}`}>{f.risk}</span></td>
+                </tr>
+              ))}</tbody>
+            </table>
+          ))}
+      </Card>
+
       {adding && <AddFacModal onClose={() => setAdding(false)} onDone={() => { setAdding(false); qc.invalidateQueries({ queryKey: ["facilitators"] }); }} />}
+      {importing && <ImportFacilitatorsModal onClose={() => setImporting(false)} onDone={() => { setImporting(false); qc.invalidateQueries({ queryKey: ["facilitators"] }); }} />}
       {tagsFor && <TagsModal fac={tagsFor} onClose={() => setTagsFor(null)} onDone={() => { setTagsFor(null); qc.invalidateQueries({ queryKey: ["facilitators"] }); }} />}
       {statsId && <FacStats id={statsId} onClose={() => setStatsId(null)} />}
     </div>
@@ -98,6 +130,10 @@ function TagInput({ tags, onChange, id, placeholder = "Type and press Enter or ,
   const atMax = tags.length >= MAX_TAGS;
 
   return (
+    // The onClick here only redirects focus to the real <input> already rendered below,
+    // which is independently keyboard-reachable via Tab — adding a second, duplicate
+    // keyboard-operable target on this wrapper would just confuse tab order.
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
     <div className="tag-input" role="group" aria-label="Subject area tags" onClick={() => ref.current?.focus()}>
       {tags.map((tag, i) => (
         <span key={tag} className="tag-chip">
@@ -116,27 +152,59 @@ function TagInput({ tags, onChange, id, placeholder = "Type and press Enter or ,
 }
 
 // ── Add facilitator modal ──────────────────────────────────────────────────────
+// TRGO-07 (React-app parity): the backend blocks a same-name-in-squadron create
+// with 409 possible_duplicate once, then requires an explicit confirm_duplicate
+// resubmit -- previously this frontend had no way to send that second request,
+// so a genuine same-name-different-person case was a dead end. TRGO-06 (React-
+// app parity): the Add button now shows "Adding…" while pending, matching the
+// save-in-progress feedback already present elsewhere (e.g. SessionForm).
 function AddFacModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [first, setFirst] = useState(""); const [last, setLast] = useState("");
   const [rank, setRank] = useState(""); const [subjects, setSubjects] = useState<string[]>([]);
   const [err, setErr] = useState("");
+  const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const m = useMutation({
-    mutationFn: () => trainingApi.addFacilitator({ first_name: first, last_name: last, current_rank: rank, subject_areas: subjects }),
-    onSuccess: onDone, onError: (e) => setErr(e instanceof ApiError ? e.friendly : "Could not add."),
+    mutationFn: (confirmDuplicate: boolean) => trainingApi.addFacilitator({
+      first_name: first, last_name: last, current_rank: rank, subject_areas: subjects,
+      confirm_duplicate: confirmDuplicate,
+    }),
+    onSuccess: onDone,
+    onError: (e) => {
+      if (e instanceof ApiError && e.code === "possible_duplicate") {
+        setDuplicateWarning(e.friendly);
+        setErr("");
+      } else {
+        setErr(e instanceof ApiError ? e.friendly : "Could not add.");
+      }
+    },
   });
   return (
     <Modal title="Add facilitator" onClose={onClose}>
       <div className="form">
-        <label htmlFor="f-first">First name</label><input id="f-first" value={first} onChange={(e) => setFirst(e.target.value)} />
-        <label htmlFor="f-last">Last name</label><input id="f-last" value={last} onChange={(e) => setLast(e.target.value)} />
+        <label htmlFor="f-first">First name</label><input id="f-first" value={first} onChange={(e) => { setFirst(e.target.value); setDuplicateWarning(null); }} />
+        <label htmlFor="f-last">Last name</label><input id="f-last" value={last} onChange={(e) => { setLast(e.target.value); setDuplicateWarning(null); }} />
         <label htmlFor="f-rank">Current rank</label><input id="f-rank" value={rank} onChange={(e) => setRank(e.target.value)} />
-        <label>Subject areas</label>
-        <TagInput tags={subjects} onChange={setSubjects} />
+        <label htmlFor="add-fac-subjects">Subject areas</label>
+        <TagInput id="add-fac-subjects" tags={subjects} onChange={setSubjects} />
         <p className="muted" style={{ fontSize: 11, margin: "0 0 4px" }}>
           Press Enter or comma to add each tag · max {MAX_TAGS} tags · {MAX_LEN} chars each
         </p>
         {err && <div className="err" role="alert">{err}</div>}
-        <Button onClick={() => m.mutate()} disabled={!first || !last || m.isPending}>Add</Button>
+        {duplicateWarning && (
+          <div className="err" role="alert">
+            {duplicateWarning} If this is a different person with the same name, you can add them anyway.
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button onClick={() => m.mutate(false)} disabled={!first || !last || m.isPending}>
+            {m.isPending ? "Adding…" : "Add"}
+          </Button>
+          {duplicateWarning && (
+            <Button variant="out" onClick={() => m.mutate(true)} disabled={m.isPending}>
+              {m.isPending ? "Adding…" : "Add anyway"}
+            </Button>
+          )}
+        </div>
       </div>
     </Modal>
   );
@@ -155,8 +223,8 @@ function TagsModal({ fac, onClose, onDone }: { fac: Facilitator; onClose: () => 
   return (
     <Modal title={`Subject areas — ${name}`} onClose={onClose}>
       <div className="form">
-        <label>Subject areas</label>
-        <TagInput tags={subjects} onChange={(t) => { setSubjects(t); setErr(""); }} />
+        <label htmlFor="edit-fac-subjects">Subject areas</label>
+        <TagInput id="edit-fac-subjects" tags={subjects} onChange={(t) => { setSubjects(t); setErr(""); }} />
         <p className="muted" style={{ fontSize: 11, margin: "0 0 4px" }}>
           Press Enter or comma to add · Backspace removes last tag · max {MAX_TAGS} tags
         </p>

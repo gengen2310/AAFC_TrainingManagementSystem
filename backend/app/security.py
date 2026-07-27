@@ -43,11 +43,12 @@ def verify_code(code: str, code_hash: str) -> bool:
         return False
 
 
-def create_token(sub: str, extra: dict, ttl_min: int | None = None) -> str:
+def create_token(sub: str, extra: dict, ttl_min: int | None = None,
+                 token_version: int = 0) -> str:
     ttl = ttl_min or settings.ACCESS_TOKEN_TTL_MIN
     now = datetime.now(timezone.utc)
     payload = {"sub": sub, "iat": now, "exp": now + timedelta(minutes=ttl),
-               "jti": str(uuid.uuid4()), **extra}
+               "jti": str(uuid.uuid4()), "tv": token_version, **extra}
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
 
 
@@ -92,6 +93,26 @@ def record_login_success(key: str) -> None:
 def reset_rate_limiter() -> None:
     _attempts.clear()
     _lockouts.clear()
+
+
+# ── Per-IP general API rate limiter (non-login endpoints) ───────────────────
+# In-memory sliding window. Same caveat as above: replace with Redis for
+# true distribution across gunicorn workers in production.
+_api_hits: dict[str, list[float]] = {}
+
+
+def check_api_rate(ip: str) -> bool:
+    """Return True if the IP has exceeded the API rate limit (caller must 429)."""
+    now = time.time()
+    window = settings.API_RATE_WINDOW_SEC
+    hits = [t for t in _api_hits.get(ip, []) if now - t < window]
+    hits.append(now)
+    _api_hits[ip] = hits
+    return len(hits) > settings.API_RATE_LIMIT
+
+
+def reset_api_rate_limiter() -> None:
+    _api_hits.clear()
 
 
 # ── DB-backed per-IP rate limiter (works across gunicorn workers) ──────────────

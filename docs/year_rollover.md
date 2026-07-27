@@ -8,11 +8,11 @@ Year rollover creates the next planning year by copying the structure (holidays,
 
 ## Rollover Procedure
 
-1. Navigate to **Annual Program**, select the year to roll over from
+1. Navigate to the **Planning Workspace**, select the current planning year
 2. Call `POST /api/planning/years/{year_id}/rollover` with optional parameters
 3. Review the new planning year — verify parade dates don't fall in the wrong weeks
 4. Add or adjust holiday periods if the new year has different public holiday dates
-5. Begin mission assignments for the new year via the Training Planner
+5. Begin assigning curriculum items to parade nights for the new year
 
 ---
 
@@ -33,7 +33,7 @@ Year rollover creates the next planning year by copying the structure (holidays,
 
 When `carry_incomplete_sessions=True` (default), the rollover endpoint counts sessions from the source year that have status `planned` or `not_delivered`. These are returned in `incomplete_sessions_noted` for the planner to review.
 
-These sessions are **not** automatically assigned to the new year — the Training Planner should be used to review and re-assign them.
+These sessions are **not** automatically assigned to the new year — review them in Parade Nights and re-assign curriculum items as needed.
 
 ---
 
