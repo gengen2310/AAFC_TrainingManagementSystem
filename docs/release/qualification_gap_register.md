@@ -1005,15 +1005,17 @@ acceptance criteria, and is updated in place as each item closes.
     request stream — the soak's own 5xx counter jumped from 0 to 43 in a narrow
     window (elapsed 776s–896s into the soak, i.e. 11:19:47Z–11:21:47Z), which
     lines up almost exactly with this drill's two deploy timestamps
-    (11:20:12Z, 11:21:21Z–11:22:10Z), and **the count did not increase again for
-    the remainder of the soak** after the second deploy completed. This is
-    interpreted as the rollback drill's own container swaps causing brief
-    connection drops for in-flight requests from the concurrently-running soak —
-    a real methodology mistake (running a rollback drill and a sustained
-    concurrency soak against the same service at the same time), not a capacity
-    defect independently discovered by the soak. **Should have been sequenced
-    serially**; noted here so the 500-user soak's own results section doesn't
-    misattribute this to a genuine capacity problem.
+    (11:20:12Z, 11:21:21Z–11:22:10Z). This first cluster is confidently
+    attributed to the rollback drill's own container swaps causing brief
+    connection drops for in-flight soak requests — a real methodology mistake
+    (running a rollback drill and a sustained concurrency soak against the same
+    service at the same time), not a capacity defect independently discovered
+    by the soak. **A second, separate 43-error cluster appeared roughly 48-58
+    minutes later** (elapsed ~3739s-4365s, ~12:09-12:20Z) with no deploy or any
+    other explanation found — see the soak-concurrency gap entry below for the
+    full account; **should have been sequenced serially** regardless, since the
+    first cluster's overlap makes the soak's own results harder to read cleanly
+    even where it isn't the explanation.
 
 ## GAP-16: Production daily backup and weekly restore-test have been failing for 13 days (new finding, SEV1)
 
@@ -1108,3 +1110,85 @@ acceptance criteria, and is updated in place as each item closes.
   acceptance is conditional on the merge actually happening as part of this
   release** — if the release proceeds without merging (or the merge is reverted
   before production deployment), GAP-16 reverts to a fully open, unaccepted SEV1.
+
+## GAP-17: 500-user/2-hour sustained-concurrency soak — FAIL, with mixed root causes (instruction section 3)
+
+- **Source**: instruction section 3's explicit requirement to close the gap between the
+  released plan's ~500-concurrent-user/2-hour sustained-load target and the 60-user/4h
+  soak actually run. User explicitly chose to run the real 500-user/2h test rather than
+  accept a written justification for the smaller test (`AskUserQuestion`, "Run the full
+  500-user/2h soak").
+- **Run**: 500 concurrent users, 90s ramp + 120 min sustained (7302s total, 121.7 min),
+  2026-07-27T11:06:51Z–13:08:34Z. **Overall: FAIL** — P95 315ms (PASS, target ≤2000ms),
+  but 86 5xx errors (target 0) and a 16.40% unexpected-response rate excluding 429s
+  (target <1%).
+- **Full status-code breakdown** (150,581 total requests): `200` 124,979 (83.0%);
+  connection error/timeout 24,289 (16.1%); `429` 900 (0.6%, expected — single-source-IP
+  rate limiter, per the same disclosed methodology ceiling as the 1,000-user test);
+  `401` 327 (0.2%); `502` 86 (0.1%). Login endpoint specifically: 1,100 attempts, 900 of
+  them (81.8%) hit `429` — the account pool (500 unique volume-seeded accounts) all
+  logging in within the 90s ramp window concentrates login-endpoint traffic enough to
+  trip the per-IP limiter even with the login-once design; not investigated further,
+  same accepted single-IP-methodology caveat as elsewhere in this register.
+- **The 86 5xx split into two temporally distinct clusters, with different confidence
+  levels — not lumped together as one undifferentiated capacity failure**:
+  - **Cluster 1 (43 errors, 11:19:47Z–11:21:47Z) — confidently attributed to a real
+    methodology mistake, not a capacity defect.** This is the rollback drill (GAP-9's
+    rollback-drill entry) running two backend container-swap deploys concurrently with
+    this soak. Temporal correlation is exact; the count did not increase again for
+    roughly 48 minutes after the second deploy completed.
+  - **Cluster 2 (43 errors, ~12:09:10Z–12:20:00Z) — genuinely unresolved.** No deploy or
+    deployment-ID change occurred in or near this window (confirmed via
+    `railway deployment list` — the same deployment, `de9b35d1`, was active throughout
+    the entire soak). **Railway's own server-side metrics for this exact window show
+    zero 5xx** (two overlapping snapshot windows, 11:51–12:07Z and 12:06–12:22Z, both
+    report `"5xx": 0"` in their `http` block) — a real, unresolved discrepancy between
+    what the load-test client recorded (43 real `502` HTTP responses, not connection
+    exceptions) and what Railway's edge/metrics layer reports for the same period. CPU
+    (avg 0.19 vCPU) and memory (avg 550MB) were both unremarkable in that window, ruling
+    out a simple resource-saturation explanation. No further root cause was found: the
+    load-test tool does not log a timestamp or request ID per individual status code
+    (only a periodic cumulative counter, which was used to bound the cluster's time
+    window, not to pinpoint individual requests), and `railway logs`' `--http` HTTP-log
+    query type returned "Problem processing request" for historical windows this old,
+    while the `stdout` application log (which does retain history) shows zero app-level
+    exceptions or 502-adjacent errors in the same window. **Reported as genuinely
+    inconclusive rather than assigned a cause it doesn't have strong evidence for.**
+  - Given the two clusters are equal in size (43 each) and clearly separated in time
+    with a long clean gap between them, the register keeps them distinct rather than
+    reporting "86 5xx, cause unknown" — that would obscure that half of them have a
+    strong, well-evidenced explanation.
+- **Connection error/timeout (24,289, 16.1%) — not root-caused to client vs. server,
+  reported as an open ambiguity**: this is a large share of total requests and was not
+  resolved this pass. 500 concurrent Python threads issuing blocking HTTP requests from
+  one local machine (via the `requests` library, one connection per thread) is a
+  plausible **client-side** bottleneck independent of any real backend capacity limit —
+  OS-level socket/file-descriptor limits, local network-stack contention, or the test
+  machine's own CPU/thread-scheduling overhead at 500 concurrent Python threads could
+  all produce exactly this symptom without the backend being at fault. Equally,
+  genuine backend-side queueing under 500-concurrent load remains a possible
+  explanation and was not ruled out. **Distinguishing these would require running the
+  load generator from infrastructure separate from the analysis/orchestration machine
+  (e.g., a dedicated cloud VM) or adding client-side diagnostics (e.g., logging whether
+  the timeout occurred while establishing a connection vs. while waiting for a
+  response) — neither was done this pass.**
+- **A real, root-caused, and fixed test-tool gap contributed to the `401` count**: the
+  load tool's session-reuse design (added earlier this session to fix the 1,000-user
+  login-storm defect) only re-authenticated on a 401 from the `/api/auth/me` call
+  specifically; the other three per-cycle calls (`/api/reports/summary`,
+  `/api/parade-nights`, `/api/planning/years`) did not check for or recover from a 401.
+  `ACCESS_TOKEN_TTL_MIN` is 30 minutes; this run lasted 121.7 minutes, so every virtual
+  user's session was structurally guaranteed to expire multiple times, and any call
+  other than `/api/auth/me` made in the window between expiry and the next lap's
+  `/api/auth/me` check would record an unretried 401. **Fixed this pass**
+  (`tools/stress/load_test_staging.py`, gitignored/local-only, not committed): added a
+  shared `_get_reauth()` helper used by all five per-cycle calls, each independently
+  re-authenticating on its own 401 rather than relying on one call elsewhere in the
+  cycle to catch it. Not yet re-run with the fix in place — see next steps.
+- **Severity classification**: the confidently-explained cluster (1) and the fixed
+  test-tool 401 gap are not backend defects. The genuinely unresolved cluster (2) and
+  the unresolved connection-timeout ambiguity are real open findings that this session
+  could not fully root-cause with the time and tooling available — flagged for an
+  explicit user decision on how to proceed, per the same discipline as GAP-16, rather
+  than either quietly accepting a FAIL as fully understood or unilaterally spending
+  further Railway compute on another multi-hour re-run to chase it further.
