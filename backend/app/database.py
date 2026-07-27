@@ -23,15 +23,22 @@ connect_args = {"check_same_thread": False} if _is_sqlite else {}
 # Supabase constraint; an environment with a different Postgres (higher
 # max_connections, no external pooler cap) may set these env vars higher without
 # touching this file or affecting any other environment.
-_pool_kwargs = (
-    {}
-    if _is_sqlite
-    else {
-        "pool_size": settings.DB_POOL_SIZE,
-        "max_overflow": settings.DB_POOL_MAX_OVERFLOW,
-        "pool_timeout": settings.DB_POOL_TIMEOUT,
+def build_pool_kwargs(is_sqlite: bool, pool_size: int, max_overflow: int, pool_timeout: int) -> dict:
+    """Pure function (no I/O, no globals) so pool sizing logic is unit-testable
+    without a real Postgres connection — SQLite (local dev/tests) never receives
+    pool kwargs since SQLAlchemy's SQLite driver doesn't support pooling params."""
+    if is_sqlite:
+        return {}
+    return {
+        "pool_size": pool_size,
+        "max_overflow": max_overflow,
+        "pool_timeout": pool_timeout,
         "pool_recycle": 1800,
     }
+
+
+_pool_kwargs = build_pool_kwargs(
+    _is_sqlite, settings.DB_POOL_SIZE, settings.DB_POOL_MAX_OVERFLOW, settings.DB_POOL_TIMEOUT
 )
 
 engine = create_engine(
