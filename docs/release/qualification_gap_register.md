@@ -1099,3 +1099,12 @@ acceptance criteria, and is updated in place as each item closes.
   decision is complete, but the release decision's own "zero SEV1" gate can only
   close once this specific fix is on `main`. Flagging this for an explicit user
   decision rather than choosing a resolution path myself.
+- **User decision (explicit `AskUserQuestion`)**: "Accept this as the reason to
+  proceed with the release decision now" — GAP-16 is treated as fully diagnosed,
+  root-caused, verified-fixed-pending-merge, and explicitly accepted rather than
+  a release-blocking unknown. The fix is not new code written to satisfy this
+  gate — it is this same PR's own pre-existing `a4e07bc`/`d22fbbd` commits,
+  independently confirmed working via the manual dispatches above. **This
+  acceptance is conditional on the merge actually happening as part of this
+  release** — if the release proceeds without merging (or the merge is reverted
+  before production deployment), GAP-16 reverts to a fully open, unaccepted SEV1.
