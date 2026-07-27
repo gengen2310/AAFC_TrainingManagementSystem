@@ -296,18 +296,79 @@ Residual, non-blocking (need a product/owner decision, not more code): GAP-02
 GAP-14's two smaller compounding findings (Training Phase Catalogue has no frontend
 UI at all; the high-contrast theme has no discoverable toggle).
 
+## 16. Production release — merged and deployed
+
+- **PR #3 merged**: merge commit `e998be2a90d4e5e04696c7cd51080ee96a3773fe`, tagged
+  `v17.1.0`. `main`'s own scheduled-equivalent backup workflow run (dispatched from
+  `main`, not a branch) succeeded immediately, independently confirming GAP-16 is
+  resolved on `main`, not just on the feature branch.
+- **Fresh pre-deployment production backup confirmed**: 81,082 bytes,
+  2026-07-27T14:03:41Z, from the exact merge commit.
+- **Backend deployed to production**: deployment `b7c9347e-...` (final, after two
+  corrective redeploys — see below), image digest verified distinct from the
+  pre-deploy baseline. Health/readiness/migration all verified: `alembic upgrade
+  head` completed cleanly in the entrypoint log, bringing production from
+  `d5e6f7a8b9c0` (4 migrations behind) to `y8z9a0b1c2d3`.
+- **Main TMS and Planning Workspace frontends deployed** to production
+  (deployments `6fa9f3dd-...` and `4082877e-...`), both verified via distinct image
+  digests and a clean page render (screenshot-confirmed) with no error state.
+- **A real, live, application-breaking production misconfiguration was found and
+  fixed during smoke testing** (`qualification_gap_register.md` GAP-19): production's
+  `ENVIRONMENT` variable read `"staging"` and `CORS_ALLOWED_ORIGINS` pointed at
+  staging's frontend URLs — a pre-existing issue already documented as `DEFECT-003`
+  with a prepared-but-unapplied fix. Confirmed the fix was safe to apply without
+  reading any secret value (checked `SECRET_KEY`/`JWT_SECRET` length and prefix,
+  `COOKIE_SECURE`, `DATABASE_URL`-not-sqlite), got explicit user approval, applied
+  it, and verified: CORS now correctly allows production's own frontend and still
+  rejects untrusted origins, HSTS now present, `/docs` still hidden.
+- **A real process mistake was also found and fixed in the same pass**: production
+  had somehow picked up this session's staging-only `GUNICORN_WORKERS=6`/
+  `DB_POOL_SIZE=8`/`DB_POOL_MAX_OVERFLOW=4` overrides — deleted, restoring the
+  committed safe defaults (2 workers, 5+2 pool). Confirmed `railway restart` does
+  **not** re-resolve environment variables into the running container (a real
+  operational lesson, now documented) — only `railway redeploy` (a genuine new
+  deployment) actually picked up the correction, verified via the boot log's worker
+  count changing from 6 to 2.
+- **A separate, more fundamental finding surfaced mid-deployment**
+  (`qualification_gap_register.md` GAP-18): production's real runtime database is
+  Railway's own native Postgres, **not** the external Supabase database
+  `SUPABASE_DB_URL` (and both backup workflows) target — meaning production's real,
+  live database currently has **no automated backup coverage** from either workflow
+  in this repository, despite GAP-16's fix making those workflows succeed against
+  their (wrong) target. Confirmed with the user, without reading any secret value,
+  that this predates today's deployment and that `squadrons: 0` on the live
+  database is a genuine, pre-existing, expected state for this pre-launch pilot
+  (not data loss caused by this deployment). **Not fixed this pass** — requires a
+  deliberate infrastructure/credentials decision (point the backup workflows at the
+  correct database, or adopt a Railway-native backup mechanism instead).
+- **Production smoke tests**: health/readiness/DB health all 200; `/docs` not
+  publicly reachable (404); CORS locked correctly (own frontend allowed, untrusted
+  origins rejected) after the GAP-19 fix; both frontends render cleanly in a real
+  browser with no visible error state. **Not performed — genuinely not possible**:
+  logging in as an account per role tier, since production currently has zero user
+  accounts (consistent with the pre-launch pilot state established above) — this is
+  an honest gap in smoke-test coverage, not a skipped step, and should be re-run
+  once production has real (or designated test) accounts to log in with.
+- **Post-release monitoring**: began immediately following the deployment sequence
+  above; see the ongoing record for results (health/latency/error-rate/connection
+  metrics over the following hours).
+
 ## Final determination
 
-**READY FOR GENERAL RELEASE**
-
-Every gate has either passed cleanly or reached an explicit, informed user
-acceptance rather than a silent pass/fail call made unilaterally: the 1,000-user
-load test, staging restart/recovery, the staging rollback drill, and the 4-hour/60-
-user soak all passed outright; the 500-user/2-hour soak's real findings (GAP-17)
-and the production backup/restore gap (GAP-16) were both surfaced in full, with
-their root causes separated from genuine unknowns, and explicitly accepted by the
-user with stated conditions. GAP-14, a real SEV2 found during evidence-gathering,
-was fixed rather than deferred. No SEV1/SEV2 remains open without explicit
-acceptance; no SEV3 remains unaddressed without being named. The path to
-"actually ready" runs through merging this PR (which is what resolves GAP-16), not
-through further pre-merge investigation.
+**RELEASED** — PR #3 merged (`e998be2`, tag `v17.1.0`) and deployed to production
+(backend, Main TMS, Planning Workspace all verified). Every gate through the
+release decision either passed cleanly or reached an explicit, informed user
+acceptance: the 1,000-user load test, staging restart/recovery, the staging
+rollback drill, and the 4-hour/60-user soak all passed outright; the 500-user/2-
+hour soak (GAP-17) and the production backup/restore gap (GAP-16) were both
+surfaced in full and explicitly accepted with stated conditions; GAP-14 was fixed
+rather than deferred. **Two further real findings were caught and fixed live
+during the production deployment itself** (GAP-19: a genuinely application-
+breaking CORS/environment misconfiguration, pre-existing and already documented
+as DEFECT-003, now fixed and verified; a cross-environment variable mistake this
+session made and then caught before it mattered). **One further real finding
+remains open** (GAP-18: production's real database has no backup coverage from
+either workflow in this repository) — does not block this release since
+production currently holds no organisational data at risk, but must be resolved
+before production is populated with real data. Post-release monitoring is
+in progress; see the ongoing record above.
