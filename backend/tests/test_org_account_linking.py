@@ -224,6 +224,19 @@ def test_archive_squadron_forbidden_for_sqn_general(client):
 # System Administrator — view access without Proxy/Intervention Mode
 # ─────────────────────────────────────────────────────────────
 
+def test_sysadmin_can_view_squadron_dashboard_charts_directly(client):
+    """squadron_id with no wing_id must return genuine squadron scope, not a
+    'national' response with squadron charts silently blended in — this is
+    what the System Administrator scope-selector's squadron drill-down uses."""
+    hdr = _sysadmin(client)
+    sqn_id = _sqn_id_by_code(client, hdr, "703")
+    r = client.get("/api/dashboard/charts", params={"squadron_id": sqn_id}, headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["scope"] == "squadron"
+    assert "wing_readiness" not in d["charts"]
+
+
 def test_sysadmin_can_view_wing_dashboard_charts_without_di(client):
     hdr = _sysadmin(client)
     wing_id = _wing_id_by_code(client, hdr, "7WG")

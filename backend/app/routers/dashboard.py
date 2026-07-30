@@ -1291,6 +1291,22 @@ def get_dashboard_charts(
         scope = "wing"
         charts.update(_wing_comparison_charts(db, p, wing_id, squadron_id, w_start, w_end))
 
+    elif p.is_system_admin and squadron_id and not wing_id:
+        # System Administrator's scope-selector, drilled into one Squadron
+        # directly (no Wing selected) — return a genuine squadron-scoped
+        # response matching native squadron view exactly (including the
+        # "tonight" section, which only renders for scope=="squadron"),
+        # rather than the national_admin/national_viewer/auditor contract
+        # below of blending squadron detail into a "national"-scoped
+        # response. Scoped to system_admin specifically so the existing
+        # national-scope drill-down contract (see
+        # test_wing_squadron_view_scope.py) is unchanged for other roles.
+        viewed_sq_id = _view_squadron_id_for_dashboard(p, squadron_id, db)
+        if not viewed_sq_id:
+            raise HTTPException(404, detail={"error": "squadron_not_found"})
+        scope = "squadron"
+        charts.update(_full_squadron_charts(db, viewed_sq_id, w_start, w_end))
+
     else:  # national
         if squadron_id:
             viewed_sq_id = _view_squadron_id_for_dashboard(p, squadron_id, db)
