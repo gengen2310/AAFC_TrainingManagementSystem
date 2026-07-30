@@ -3012,7 +3012,7 @@ function canWritePlan(){
   return canWriteSquadron();
 }
 function proxyActive(){ return !!(S.proxy && S.proxy.active); }
-function proxyMode(){ return (S.proxy && S.proxy.mode) || null; } // 'proxy' | 'intervention'
+function proxyMode(){ return (S.proxy && S.proxy.mode) || null; } // 'proxy' | 'delegated_intervention'
 // Wing admins must enter Proxy Mode before squadron writes; National admins use Delegated Intervention.
 function isProxyRequired(){ return S.role==='wing_admin' && !proxyActive(); }
 function isInterventionRequired(){ return ['national_admin','system_admin'].includes(S.role) && !proxyActive(); }
@@ -3347,9 +3347,9 @@ function updateModeBanner(){
     const mode=proxyMode(); const acting=(S.proxy&&S.proxy.acting_squadron_id)||'';
     const sq=(S.squadrons||[]).find(x=>x.squadron_id===acting);
     const where=S.proxyLabel||(sq?(sq.short_name||sq.code):acting.slice(0,8));
-    const who=mode==='intervention'?'NAT HQ':'Wing';
-    mb.className='mode-banner show'+(mode==='intervention'?' intervention':'');
-    const label=mode==='intervention'?'🛠️ Delegated Intervention Mode':'🛡️ Proxy Mode';
+    const who=mode==='delegated_intervention'?'NAT HQ':'Wing';
+    mb.className='mode-banner show'+(mode==='delegated_intervention'?' intervention':'');
+    const label=mode==='delegated_intervention'?'🛠️ Delegated Intervention Mode':'🛡️ Proxy Mode';
     const reason=S.proxyReason?(' · reason: '+S.proxyReason):'';
     document.getElementById('mode-text').textContent=`${label} — ${who} viewing ${where}${reason}`;
   } else { mb.className='mode-banner'; }
@@ -3360,7 +3360,7 @@ function updateDebugBar(){
   const dev=['localhost','127.0.0.1'].some(h=>location.hostname.includes(h));
   if(!dev){ d.style.display='none'; return; }
   d.style.display='flex';
-  const mode=proxyActive()?('<span class="warn">'+(proxyMode()==='intervention'?'INTERVENTION':'PROXY')+' active</span>'):'none';
+  const mode=proxyActive()?('<span class="warn">'+(proxyMode()==='delegated_intervention'?'INTERVENTION':'PROXY')+' active</span>'):'none';
   d.innerHTML=`<span>origin <b>${location.origin}</b></span><span>api <b>${API_BASE||'(same-origin)'}</b></span>`+
     `<span>role <b>${S.role||'—'}</b></span><span>scope <b>${getScopeType()}</b></span><span>mode ${mode}</span>`+
     `<span>health <b>${API_BASE||''}/api/health</b></span>`;
