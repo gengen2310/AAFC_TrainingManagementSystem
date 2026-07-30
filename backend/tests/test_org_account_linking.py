@@ -212,6 +212,26 @@ def test_archive_squadron_blocked_with_active_accounts(client):
     assert r.json()["detail"]["error"] == "has_active_accounts"
 
 
+def test_archive_squadron_allowed_once_only_disabled_accounts_remain(client):
+    """A disabled account (active_status=False) must not block archiving —
+    only genuinely active accounts should. Found live in staging: the first
+    version of this check used is_archived instead of active_status, so a
+    normally-disabled (not archived) account would have blocked archiving
+    forever even though disabling is the documented way to deactivate a user."""
+    hdr = _sysadmin(client)
+    wing_id = client.post("/api/wings", json={"code": "WGDIS", "name": "Disabled Acct Wing"}, headers=hdr).json()["wing_id"]
+    sqn_id = client.post("/api/squadrons", json={"wing_id": wing_id, "code": "DIS1", "name": "Disabled Acct Unit"}, headers=hdr).json()["squadron_id"]
+    acct = client.post("/api/accounts", json={"display_name": "Disabled Holder", "role": "sqn_general", "squadron_id": sqn_id}, headers=hdr).json()
+    blocked = client.post(f"/api/squadrons/{sqn_id}/archive", headers=hdr)
+    assert blocked.status_code == 409
+
+    disable = client.post(f"/api/accounts/{acct['user_id']}/disable", headers=hdr)
+    assert disable.status_code == 200, disable.text
+
+    allowed = client.post(f"/api/squadrons/{sqn_id}/archive", headers=hdr)
+    assert allowed.status_code == 200, allowed.text
+
+
 def test_archive_squadron_forbidden_for_sqn_general(client):
     hdr = _general(client)
     sysadm_hdr = _sysadmin(client)

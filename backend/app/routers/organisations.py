@@ -209,7 +209,7 @@ def archive_squadron(squadron_id: str, db: DBSession = Depends(get_db),
     if s.is_archived:
         raise HTTPException(409, detail={"error": "already_archived"})
     active_accounts = db.query(User).filter(
-        User.squadron_id == squadron_id, User.is_archived == False  # noqa: E712
+        User.squadron_id == squadron_id, User.active_status == True  # noqa: E712
     ).count()
     if active_accounts:
         raise HTTPException(409, detail={
