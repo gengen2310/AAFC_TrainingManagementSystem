@@ -3542,6 +3542,11 @@ async function _refreshOrgCache(){
   // appearing in Account Management until a full reload.
   try{S.wings=await api('/api/wings');}catch(_){}
   try{S.squadrons=await api('/api/squadrons');}catch(_){}
+  // The System Administrator scope-selector bar builds its Wing/Squadron
+  // dropdowns from this same cache — without this call it stays stale until
+  // the next full bootApp() (login, scope switch, or Proxy/Intervention entry),
+  // which is the same class of bug as the one this helper exists to fix.
+  if(typeof saRenderScopeBar==='function')saRenderScopeBar();
 }
 
 async function scLoadScopeMap(){
