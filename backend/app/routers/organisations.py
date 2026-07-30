@@ -56,10 +56,16 @@ def create_wing(body: WingCreateIn, db: DBSession = Depends(get_db),
     if db.query(Wing).filter(Wing.code == code).first():
         raise HTTPException(409, detail={"error": "code_exists",
                                           "message": f"A Wing with code '{code}' already exists."})
+    name = (body.name or code).strip()
+    dup = db.query(Wing).filter(Wing.is_archived == False,  # noqa: E712
+                                 Wing.name.ilike(name)).first()
+    if dup:
+        raise HTTPException(409, detail={"error": "name_exists",
+                                          "message": f"An active Wing named '{name}' already exists (code '{dup.code}')."})
     nat = db.query(NationalEntity).first()
     if not nat:
         raise HTTPException(500, detail={"error": "no_national_entity"})
-    w = Wing(national_id=nat.id, code=code, name=body.name or code,
+    w = Wing(national_id=nat.id, code=code, name=name,
              short_name=body.short_name or code, active_status=True,
              created_by=p.user_id)
     db.add(w); db.commit()
@@ -94,6 +100,24 @@ def archive_wing(wing_id: str, db: DBSession = Depends(get_db),
     audit(db, p, object_type="wing", object_id=w.id, action="archive",
           old={"code": w.code, "name": w.name})
     return {"ok": True, "wing_id": w.id, "archived": True}
+
+
+@router.post("/wings/{wing_id}/restore")
+def restore_wing(wing_id: str, db: DBSession = Depends(get_db),
+                 p: Principal = Depends(get_principal)):
+    """Restore a previously archived Wing. Requires system_admin or national_admin."""
+    require_system_or_nat_admin(p)
+    w = db.get(Wing, wing_id)
+    if not w:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if not w.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived"})
+    w.is_archived = False
+    w.archived_at = None
+    db.commit()
+    audit(db, p, object_type="wing", object_id=w.id, action="restore",
+          new={"code": w.code, "name": w.name})
+    return {"ok": True, "wing_id": w.id, "archived": False}
 
 
 @router.get("/squadrons")
@@ -151,8 +175,14 @@ def create_squadron(body: SquadronCreateIn, db: DBSession = Depends(get_db),
     if db.query(Squadron).filter(Squadron.code == code).first():
         raise HTTPException(409, detail={"error": "code_exists",
                                           "message": f"A unit with code '{code}' already exists."})
+    name = (body.name or code).strip()
+    dup = db.query(Squadron).filter(Squadron.wing_id == body.wing_id, Squadron.is_archived == False,  # noqa: E712
+                                     Squadron.name.ilike(name)).first()
+    if dup:
+        raise HTTPException(409, detail={"error": "name_exists",
+                                          "message": f"An active unit named '{name}' already exists in this Wing (code '{dup.code}')."})
 
-    s = Squadron(wing_id=body.wing_id, code=code, name=body.name or code,
+    s = Squadron(wing_id=body.wing_id, code=code, name=name,
                  short_name=body.short_name or code, unit_type=unit_type,
                  unit_number=body.unit_number, active_status=True,
                  created_by=p.user_id)
@@ -178,12 +208,46 @@ def archive_squadron(squadron_id: str, db: DBSession = Depends(get_db),
         raise HTTPException(403, detail={"error": "out_of_scope"})
     if s.is_archived:
         raise HTTPException(409, detail={"error": "already_archived"})
+    active_accounts = db.query(User).filter(
+        User.squadron_id == squadron_id, User.is_archived == False  # noqa: E712
+    ).count()
+    if active_accounts:
+        raise HTTPException(409, detail={
+            "error": "has_active_accounts",
+            "message": f"Cannot archive unit with {active_accounts} active account(s) still assigned. Reassign or archive those accounts first."
+        })
     s.is_archived = True
     s.archived_at = datetime.now(timezone.utc)
     db.commit()
     audit(db, p, object_type="squadron", object_id=s.id, action="archive",
           old={"code": s.code, "name": s.name})
     return {"ok": True, "squadron_id": s.id, "archived": True}
+
+
+@router.post("/squadrons/{squadron_id}/restore")
+def restore_squadron(squadron_id: str, db: DBSession = Depends(get_db),
+                     p: Principal = Depends(get_principal)):
+    """Restore a previously archived Squadron/Specialist Unit.
+    system_admin and national_admin: any unit. wing_admin: only units in their own Wing."""
+    if p.role not in {*_NAT_ADMIN_ROLES, "wing_admin"}:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    s = db.get(Squadron, squadron_id)
+    if not s:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if p.role == "wing_admin" and s.wing_id != p.wing_id:
+        raise HTTPException(403, detail={"error": "out_of_scope"})
+    if not s.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived"})
+    w = db.get(Wing, s.wing_id)
+    if w and w.is_archived:
+        raise HTTPException(409, detail={"error": "parent_wing_archived",
+                                          "message": "Cannot restore a unit whose Wing is archived. Restore the Wing first."})
+    s.is_archived = False
+    s.archived_at = None
+    db.commit()
+    audit(db, p, object_type="squadron", object_id=s.id, action="restore",
+          new={"code": s.code, "name": s.name})
+    return {"ok": True, "squadron_id": s.id, "archived": False}
 
 
 @router.get("/squadrons/{squadron_id}")

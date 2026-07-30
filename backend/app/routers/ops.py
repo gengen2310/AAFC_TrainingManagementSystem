@@ -8,7 +8,7 @@ from ..database import get_db, utcnow
 from ..models import (Session, ParadeNight, CurriculumItem, ActionItem, Exception as Exc,
                       Squadron, Wing, ImportLog)
 from ..dependencies import get_principal
-from ..permissions import Principal, require_role, require_can_view_squadron
+from ..permissions import Principal, require_role, require_can_view_squadron, require_can_view_wing
 from ..services import audit, score_parade
 from ..services_readiness import parade_night_readiness
 from .training import _view_squadron_id
@@ -64,8 +64,8 @@ def rep_summary(squadron_id: str | None = None, db: DBSession = Depends(get_db),
 
 
 @router.get("/reports/readiness")
-def rep_readiness(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _active_squadron(p)
+def rep_readiness(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq = _view_squadron_id(p, squadron_id, db) if squadron_id else _active_squadron(p)
     today = date.today().isoformat()
     pns = db.query(ParadeNight).filter(ParadeNight.squadron_id == sq, ParadeNight.date >= today).order_by(ParadeNight.date).all()
     out = []
@@ -85,8 +85,8 @@ def rep_readiness(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
 
 
 @router.get("/reports/curriculum-coverage")
-def rep_coverage(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq = _active_squadron(p)
+def rep_coverage(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq = _view_squadron_id(p, squadron_id, db) if squadron_id else _active_squadron(p)
     items = db.query(CurriculumItem).filter(
         (CurriculumItem.owning_level == "national") | (CurriculumItem.squadron_id == sq),
         CurriculumItem.is_archived == False).all()  # noqa: E712
@@ -133,12 +133,23 @@ def rep_nd(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: P
 
 
 @router.get("/reports/wing-overview")
-def wing_overview(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def wing_overview(wing_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     require_role(p, "wing_viewer", "wing_admin", "national_viewer", "national_admin", "system_admin", "auditor")
-    wing_id = p.wing_id if p.is_wing else None
+    # wing_admin/wing_viewer are always pinned to their own wing; a national-scope
+    # principal may optionally pass wing_id to filter to one Wing (view-only,
+    # no proxy/DI required — mirrors the dashboard's wing_id param).
+    if p.is_wing:
+        w_id = p.wing_id
+    elif wing_id:
+        if not db.get(Wing, wing_id):
+            raise HTTPException(404, detail={"error": "wing_not_found"})
+        require_can_view_wing(p, wing_id)
+        w_id = wing_id
+    else:
+        w_id = None
     q = db.query(Squadron).filter(Squadron.is_archived == False)  # noqa: E712
-    if wing_id:
-        q = q.filter(Squadron.wing_id == wing_id)
+    if w_id:
+        q = q.filter(Squadron.wing_id == w_id)
     out = []
     today = date.today().isoformat()
     for s in q.all():
@@ -234,17 +245,25 @@ def wing_not_delivered(db: DBSession = Depends(get_db), p: Principal = Depends(g
 
 
 @router.get("/reports/wing-phase-coverage")
-def wing_phase_coverage(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def wing_phase_coverage(wing_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     """Squadron x phase coverage matrix for the Wing heatmap.
 
     Returns the ordered list of phases seen across the Wing, and for each squadron the coverage
     percentage in each phase (missing phase = 0). Real data only — no fabricated cells.
     """
     require_role(p, "wing_viewer", "wing_admin", "national_viewer", "national_admin", "system_admin", "auditor")
-    wing_id = p.wing_id if p.is_wing else None
+    if p.is_wing:
+        w_id = p.wing_id
+    elif wing_id:
+        if not db.get(Wing, wing_id):
+            raise HTTPException(404, detail={"error": "wing_not_found"})
+        require_can_view_wing(p, wing_id)
+        w_id = wing_id
+    else:
+        w_id = None
     q = db.query(Squadron).filter(Squadron.is_archived == False)  # noqa: E712
-    if wing_id:
-        q = q.filter(Squadron.wing_id == wing_id)
+    if w_id:
+        q = q.filter(Squadron.wing_id == w_id)
     # Canonical phase order; any extra phases are appended alphabetically.
     order = ["A. Orientation", "B. Initial", "C. Junior", "I. Bronze", "D. Intermediate",
              "J. Silver", "E. Senior", "K. Gold"]
@@ -321,12 +340,20 @@ def _capability_for_squadron(db, s):
     }
 
 @router.get("/reports/wing-capability")
-def wing_capability(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def wing_capability(wing_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     require_role(p, "wing_viewer", "wing_admin", "national_viewer", "national_admin", "system_admin", "auditor")
-    wing_id = p.wing_id if p.is_wing else None
+    if p.is_wing:
+        w_id = p.wing_id
+    elif wing_id:
+        if not db.get(Wing, wing_id):
+            raise HTTPException(404, detail={"error": "wing_not_found"})
+        require_can_view_wing(p, wing_id)
+        w_id = wing_id
+    else:
+        w_id = None
     q = db.query(Squadron).filter(Squadron.is_archived == False)  # noqa: E712
-    if wing_id:
-        q = q.filter(Squadron.wing_id == wing_id)
+    if w_id:
+        q = q.filter(Squadron.wing_id == w_id)
     rows = [_capability_for_squadron(db, s) for s in q.all()]
     # Wing averages and subject totals
     agg = {k: 0 for k in SUBJECT_KEYS}

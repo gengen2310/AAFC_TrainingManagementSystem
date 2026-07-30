@@ -83,12 +83,17 @@ def require_can_write_squadron(p: Principal, squadron_id: str, wing_id: str | No
                                          "message": "Wing Admin must enter Proxy Mode to edit squadron data."})
     if p.role in ("national_admin", "system_admin"):
         raise HTTPException(403, detail={"error": "intervention_required",
-                                         "message": "National Admin must enter Delegated Intervention Mode to edit this data."})
+                                         "message": "National Admin or System Administrator must enter Delegated Intervention Mode to edit this data."})
     raise HTTPException(403, detail={"error": "forbidden"})
 
 
 def require_can_view_squadron(p: Principal, squadron_id: str, wing_id: str | None):
     if not p.can_view_squadron(squadron_id, wing_id):
+        raise HTTPException(403, detail={"error": "forbidden"})
+
+
+def require_can_view_wing(p: Principal, wing_id: str):
+    if not p.can_view_wing(wing_id):
         raise HTTPException(403, detail={"error": "forbidden"})
 
 

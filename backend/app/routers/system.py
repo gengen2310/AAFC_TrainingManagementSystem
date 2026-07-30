@@ -226,21 +226,30 @@ def disable_maintenance(db: DBSession = Depends(get_db), p: Principal = Depends(
 # ── GET /api/system/scope-map ─────────────────────────────────────────────────
 
 @router.get("/scope-map")
-def scope_map(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def scope_map(include_archived: bool = False, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Active Wings/Squadrons by default, matching every sibling list endpoint
+    (/api/wings, /api/squadrons, national_overview) — pass include_archived=true
+    to also return archived rows (for an authorised "Show archived" view)."""
     require_system_admin(p)
-    wings = db.query(Wing).all()
+    wings = db.query(Wing)
+    if not include_archived:
+        wings = wings.filter(Wing.is_archived == False)  # noqa: E712
     out = []
-    for w in wings:
-        sqns = db.query(Squadron).filter(Squadron.wing_id == w.id).all()
+    for w in wings.all():
+        sqns = db.query(Squadron).filter(Squadron.wing_id == w.id)
+        if not include_archived:
+            sqns = sqns.filter(Squadron.is_archived == False)  # noqa: E712
         out.append({
             "wing_id": w.id,
             "wing_name": w.name,
             "wing_code": getattr(w, "code", None),
+            "wing_is_archived": w.is_archived,
             "squadrons": [
                 {"id": s.id, "name": s.name,
                  "unit_type": getattr(s, "unit_type", None),
-                 "active_status": s.active_status}
-                for s in sqns
+                 "active_status": s.active_status,
+                 "is_archived": s.is_archived}
+                for s in sqns.all()
             ],
         })
     return {"wings": out}

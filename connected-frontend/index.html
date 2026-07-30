@@ -529,6 +529,22 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="wing-banner" id="wing-banner" style="display:none"></div>
   <div class="scope-banner" id="scope-banner" style="display:none"><span class="sb-tag" id="sb-tag">SQN</span><span id="sb-text"></span></div>
   <div class="mode-banner" id="mode-banner"><span id="mode-text"></span><button onclick="exitMode()">Exit mode</button></div>
+  <!-- System Administrator scope selector: browse National (default) / a Wing / a Squadron.
+       Viewing never requires Proxy/Intervention Mode (view is broad by design — the backend's
+       can_view_squadron/can_view_wing already grant system_admin unconditional read access).
+       Only protected writes still require Delegated Intervention, entered below via the
+       existing enterMode()/exitMode() machinery shared with Wing Admin's Proxy Mode. -->
+  <div class="no-print" id="sa-scope-bar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 16px;background:#eef4fa;border-bottom:1px solid var(--border);font-size:12px">
+    <span style="font-weight:700;color:var(--dark)">Viewing:</span>
+    <select id="sa-scope-wing" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px" onchange="saSelectWing(this.value)">
+      <option value="">National (all Wings)</option>
+    </select>
+    <select id="sa-scope-sqn" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;display:none" onchange="saSelectSquadron(this.value)">
+      <option value="">Wing overview (all units)</option>
+    </select>
+    <button class="btn btn-xs" id="sa-scope-di-btn" style="display:none" onclick="saEnterIntervention()">Enter Intervention Mode (for writes)</button>
+    <span class="muted" id="sa-scope-hint" style="font-size:11px"></span>
+  </div>
 
   <div class="app-body">
     <!-- SIDENAV -->
@@ -1209,7 +1225,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
         <!-- Scope map card -->
         <div class="card sc-card" id="sc-scope-card">
-          <div class="sc-section-hdr">Scope Map — All Wings and Units</div>
+          <div class="sc-section-hdr">Scope Map — All Wings and Units
+            <label style="float:right;font-weight:400;font-size:11px;color:var(--muted);cursor:pointer">
+              <input type="checkbox" id="sc-scope-show-archived" onchange="scLoadScopeMap()" style="vertical-align:middle;margin-right:4px">Show archived
+            </label>
+          </div>
           <div id="sc-scope-body"><div class="muted">Loading…</div></div>
           <!-- Create Wing form -->
           <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
@@ -3002,34 +3022,43 @@ function isInterventionRequired(){ return ['national_admin','system_admin'].incl
 // ═══════════════════════════════════════════════════════════
 function _facName(s){return s.facilitator_display_name_at_time||'';}
 async function loadData(){
-  const scope=getScopeType();
-  const _sqnId=S.session&&S.session.squadron_id;
+  // effectiveScope() (not getScopeType()) so a system_admin currently browsing
+  // a Wing/Squadron via the sa-scope-bar selector loads that Wing/Squadron's
+  // operational data through the exact same branches wing_admin/sqn_admin use.
+  const scope=effectiveScope();
+  const _saWingId=saBrowseWingId(), _saSqnId=saBrowseSquadronId();
+  const _sqnId=(S.session&&S.session.squadron_id)||_saSqnId;
   const _proxyWasActive=proxyActive();
+  // system_admin has no home wing_id/squadron_id server-side — when browsing,
+  // these explicit IDs must be passed so the backend's view-only (no DI
+  // required) branches added for Defect 2 are actually reached.
+  const _sqq=_saSqnId?('?squadron_id='+encodeURIComponent(_saSqnId)):'';
+  const _wgq=_saWingId?('?wing_id='+encodeURIComponent(_saWingId)):'';
 
   // Fire all requests in parallel — no await until Promise.all below.
   const p_uicfg=fetch(API_BASE+'/api/health/ui-config').then(r=>r.json()).catch(()=>null);
   const p_tags=api('/api/subject-area-tags').catch(()=>[]);
-  const p_pns=api('/api/parade-nights').catch(e=>{S.loadErr=apiErr(e);return null;});
-  const p_facs=api('/api/facilitators').catch(()=>null);
-  const p_cur=api('/api/curriculum').catch(()=>null);
+  const p_pns=api('/api/parade-nights'+_sqq).catch(e=>{S.loadErr=apiErr(e);return null;});
+  const p_facs=api('/api/facilitators'+_sqq).catch(()=>null);
+  const p_cur=api('/api/curriculum'+_sqq).catch(()=>null);
   const p_phases=api('/api/curriculum/phases').catch(()=>null);
   const p_ta=api('/api/training-areas').catch(()=>null);
   const p_eq=api('/api/equipment').catch(()=>null);
   const p_ai=api('/api/action-items').catch(()=>null);
   const p_acts=api('/api/activities').catch(()=>null);
   const p_proxy=api('/api/proxy/current').catch(()=>({active:false}));
-  const p_sum=api('/api/reports/summary').catch(()=>null);
-  const p_read=api('/api/reports/readiness').catch(()=>null);
-  const p_cov=api('/api/reports/curriculum-coverage').catch(()=>null);
-  const p_fload=api('/api/reports/facilitator-load').catch(()=>null);
-  const p_ndel=api('/api/reports/not-delivered').catch(()=>null);
+  const p_sum=api('/api/reports/summary'+_sqq).catch(()=>null);
+  const p_read=api('/api/reports/readiness'+_sqq).catch(()=>null);
+  const p_cov=api('/api/reports/curriculum-coverage'+_sqq).catch(()=>null);
+  const p_fload=api('/api/reports/facilitator-load'+_sqq).catch(()=>null);
+  const p_ndel=api('/api/reports/not-delivered'+_sqq).catch(()=>null);
   const p_sqnData=_sqnId?api('/api/squadrons/'+_sqnId).catch(()=>null):Promise.resolve(null);
-  const p_timing=(scope==='squadron'||_proxyWasActive)?api('/api/timing-templates').catch(()=>[]):Promise.resolve([]);
+  const p_timing=(scope==='squadron'||_proxyWasActive)?api('/api/timing-templates'+_sqq).catch(()=>[]):Promise.resolve([]);
   const p_audit=(scope==='national'||scope==='auditor'||scope==='system_admin')?api('/api/audit').catch(()=>[]):Promise.resolve([]);
-  const p_wov=scope==='wing'?api('/api/reports/wing-overview').catch(()=>null):Promise.resolve(null);
-  const p_wph=scope==='wing'?api('/api/reports/wing-phase-coverage').catch(()=>null):Promise.resolve(null);
-  const p_wcap=scope==='wing'?api('/api/reports/wing-capability').catch(()=>null):Promise.resolve(null);
-  const p_wsqns=scope==='wing'?api('/api/squadrons').catch(()=>[]):Promise.resolve([]);
+  const p_wov=scope==='wing'?api('/api/reports/wing-overview'+_wgq).catch(()=>null):Promise.resolve(null);
+  const p_wph=scope==='wing'?api('/api/reports/wing-phase-coverage'+_wgq).catch(()=>null):Promise.resolve(null);
+  const p_wcap=scope==='wing'?api('/api/reports/wing-capability'+_wgq).catch(()=>null):Promise.resolve(null);
+  const p_wsqns=scope==='wing'?api('/api/squadrons'+_wgq).catch(()=>[]):Promise.resolve([]);
   const p_nat=(scope==='national'||scope==='system_admin')?api('/api/national/overview').catch(()=>null):Promise.resolve(null);
   const p_natov=(scope==='national'||scope==='system_admin')?api('/api/reports/national-overview').catch(()=>null):Promise.resolve(null);
   const p_natcap=(scope==='national'||scope==='system_admin')?api('/api/reports/national-capability').catch(()=>null):Promise.resolve(null);
@@ -3193,7 +3222,77 @@ const NAV_BY_SCOPE={
 const SCOPE_LANDING={squadron:'dashboard',wing:'wing-overview',national:'national',auditor:'audit',system_admin:'system-console'};
 // In Proxy Mode (Wing) or Delegated Intervention (NAT HQ) the UI shows the EXACT SQN workspace
 // for the acting squadron; the backend returns that squadron's data while proxy is active.
-function effectiveScope(){ const sc=getScopeType(); return (proxyActive()&&sc!=='system_admin') ? 'squadron' : sc; }
+//
+// System Administrator additionally has its own browsing scope (S.saScope, set via the
+// sa-scope-bar selector) letting it inspect a specific Wing or Squadron's operational pages
+// with NO Proxy/Intervention Mode required — viewing is unconditionally authorised for
+// system_admin server-side (can_view_squadron/can_view_wing). Only protected writes still
+// require Delegated Intervention (proxyActive()), exactly as for national_admin.
+function effectiveScope(){
+  const sc=getScopeType();
+  if(sc==='system_admin'){
+    if(proxyActive())return 'squadron';
+    if(S.saScope&&S.saScope.level==='squadron')return 'squadron';
+    if(S.saScope&&S.saScope.level==='wing')return 'wing';
+    return 'system_admin';
+  }
+  return proxyActive() ? 'squadron' : sc;
+}
+
+// ── System Administrator scope selector ──────────────────────────────────
+function saBrowseWingId(){ return (S.role==='system_admin'&&S.saScope&&(S.saScope.level==='wing'||S.saScope.level==='squadron'))?S.saScope.wingId:null; }
+function saBrowseSquadronId(){ return (S.role==='system_admin'&&S.saScope&&S.saScope.level==='squadron')?S.saScope.squadronId:null; }
+
+function saRenderScopeBar(){
+  const bar=document.getElementById('sa-scope-bar'); if(!bar)return;
+  if(S.role!=='system_admin'){ bar.style.display='none'; return; }
+  bar.style.display='flex';
+  if(!S.saScope)S.saScope={level:'national',wingId:null,squadronId:null};
+  const wingSel=document.getElementById('sa-scope-wing'), sqnSel=document.getElementById('sa-scope-sqn'),
+        diBtn=document.getElementById('sa-scope-di-btn'), hint=document.getElementById('sa-scope-hint');
+  // Populate Wing dropdown from the cached org list (kept fresh by _refreshOrgCache()).
+  const curWing=S.saScope.wingId||'';
+  wingSel.innerHTML='<option value="">National (all Wings)</option>'+
+    (S.wings||[]).map(w=>`<option value="${w.wing_id}"${w.wing_id===curWing?' selected':''}>${esc(w.code||w.name)} — ${esc(w.name)}</option>`).join('');
+  if(S.saScope.level==='national'){
+    sqnSel.style.display='none'; diBtn.style.display='none';
+    hint.textContent='Read-only National overview.';
+  } else {
+    sqnSel.style.display='';
+    const curSqn=S.saScope.squadronId||'';
+    const sqnsInWing=(S.squadrons||[]).filter(s=>s.wing_id===S.saScope.wingId);
+    sqnSel.innerHTML='<option value="">Wing overview (all units)</option>'+
+      sqnsInWing.map(s=>`<option value="${s.squadron_id}"${s.squadron_id===curSqn?' selected':''}>${esc(s.code||s.name)} — ${esc(s.name)}</option>`).join('');
+    if(S.saScope.level==='squadron'){
+      diBtn.style.display=proxyActive()?'none':'';
+      hint.textContent=proxyActive()?'Delegated Intervention active — writes enabled.':'Read-only. Enter Intervention Mode to make changes.';
+    } else {
+      diBtn.style.display='none';
+      hint.textContent='Read-only Wing overview. Select a unit to view its operational pages.';
+    }
+  }
+}
+
+async function saSelectWing(wingId){
+  if(proxyActive())await exitMode();
+  S.saScope={level:wingId?'wing':'national',wingId:wingId||null,squadronId:null};
+  try{ await loadData(); }catch(e){ alert(apiErr(e)); }
+  updateScopeBanner(); updateModeBanner(); updateDebugBar(); bootApp();
+}
+
+async function saSelectSquadron(sqnId){
+  if(proxyActive())await exitMode();
+  S.saScope.level=sqnId?'squadron':'wing';
+  S.saScope.squadronId=sqnId||null;
+  try{ await loadData(); }catch(e){ alert(apiErr(e)); }
+  updateScopeBanner(); updateModeBanner(); updateDebugBar(); bootApp();
+}
+
+function saEnterIntervention(){
+  const sqnId=S.saScope&&S.saScope.squadronId; if(!sqnId)return;
+  const sqn=(S.squadrons||[]).find(s=>s.squadron_id===sqnId);
+  enterMode(sqnId, sqn?(sqn.short_name||sqn.code):sqnId);
+}
 
 function applyNavScope(){
   const scope=effectiveScope();
@@ -3204,9 +3303,15 @@ function applyNavScope(){
     let show=target&&allowed.has(target);
     if(target==='settings')show=show&&S.role==='sqn_admin';
     if(target==='accounts')show=show&&['sqn_admin','wing_admin','wing_viewer','national_admin','national_viewer','system_admin','auditor'].includes(S.role);
-    if(target==='system-console')show=show&&S.role==='system_admin';
+    // system_admin's System Console must stay reachable regardless of which
+    // Wing/Squadron it is currently browsing (effectiveScope() may be 'wing'/
+    // 'squadron' while browsing, and neither of those NAV_BY_SCOPE lists
+    // includes 'system-console' — this is a deliberate widen, not a narrowing
+    // override like the others above).
+    if(target==='system-console')show=(S.role==='system_admin');
     n.style.display=show?'flex':'none';
   });
+  saRenderScopeBar();
   // System Console section label
   const sysLbl=document.getElementById('nav-system-lbl');
   if(sysLbl)sysLbl.style.display=S.role==='system_admin'?'block':'none';
@@ -3275,7 +3380,7 @@ function bootApp(){
   const pwLink=document.getElementById('nav-pw-link'), pwLbl=document.getElementById('nav-lbl-pw');
   const pwUrl=S.pwUrl;
   if(pwLink&&pwUrl)pwLink.href=pwUrl;
-  const showPW=!!pwUrl&&['squadron','wing','national'].includes(scope);
+  const showPW=!!pwUrl&&['squadron','wing','national','system_admin'].includes(scope);
   if(pwLink)pwLink.style.display=showPW?'flex':'none'; if(pwLbl)pwLbl.style.display=showPW?'block':'none';
   // Write controls: visible only where this role/scope can currently write; auditor/viewers read-only.
   const canWrite = scope==='squadron' ? canWriteSquadron() : false; // wing/national write only via proxy into a squadron
@@ -3430,22 +3535,39 @@ async function scLoadHealth(){
   } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
+async function _refreshOrgCache(){
+  // Shared by every Wing/Squadron create+archive+restore flow (System Console
+  // and Account Management) so S.wings/S.squadrons never go stale — see
+  // qualification_gap_register.md defect on System-Console-created units not
+  // appearing in Account Management until a full reload.
+  try{S.wings=await api('/api/wings');}catch(_){}
+  try{S.squadrons=await api('/api/squadrons');}catch(_){}
+}
+
 async function scLoadScopeMap(){
   const el=document.getElementById('sc-scope-body'); if(!el) return;
+  const showArchived=!!document.getElementById('sc-scope-show-archived')?.checked;
   try {
-    const d=await api('/api/system/scope-map');
+    const d=await api('/api/system/scope-map'+(showArchived?'?include_archived=true':''));
     if(!d.wings||!d.wings.length){ el.innerHTML='<div class="muted">No wings found.</div>'; return; }
     let h='';
     for(const w of d.wings){
-      const chips=(w.squadrons||[]).map(s=>
-        `<span class="sc-sqn-chip${s.active_status===false?' inactive':''}" title="${esc(s.unit_type||'')}">
-          ${esc(s.name||s.id)}
-          <button style="font-size:9px;padding:1px 4px;margin-left:4px;background:transparent;border:1px solid #bbb;cursor:pointer;border-radius:3px;line-height:1" onclick="scArchiveSquadron('${s.id}','${esc(s.name||s.id)}')">Archive</button>
-        </span>`
-      ).join('');
-      const archiveWingBtn=`<button class="btn btn-sm" style="font-size:10px;padding:2px 7px;margin-left:8px;background:#fff;border:1px solid #ccc;color:var(--dark);cursor:pointer" onclick="scArchiveWing('${w.wing_id}','${esc(w.wing_code||w.wing_id)}')">Archive…</button>`;
-      h+=`<div class="sc-wing-row">
-        <div class="sc-wing-name">${esc(w.wing_name||w.wing_id)} <span class="muted" style="font-size:11px;font-weight:400">${esc(w.wing_code||'')}</span>${archiveWingBtn}</div>
+      const wingArchived=w.wing_is_archived===true;
+      const chips=(w.squadrons||[]).map(s=>{
+        const sArchived=s.is_archived===true;
+        const archiveOrRestoreBtn=sArchived
+          ?`<button style="font-size:9px;padding:1px 4px;margin-left:4px;background:transparent;border:1px solid #bbb;cursor:pointer;border-radius:3px;line-height:1" onclick="scRestoreSquadron('${s.id}','${esc(s.name||s.id)}')">Restore</button>`
+          :`<button style="font-size:9px;padding:1px 4px;margin-left:4px;background:transparent;border:1px solid #bbb;cursor:pointer;border-radius:3px;line-height:1" onclick="scArchiveSquadron('${s.id}','${esc(s.name||s.id)}')">Archive</button>`;
+        return `<span class="sc-sqn-chip${sArchived?' inactive':''}" title="${esc(s.unit_type||'')}">
+          ${esc(s.name||s.id)}${sArchived?' <span class="muted" style="font-size:9px">(archived)</span>':''}
+          ${archiveOrRestoreBtn}
+        </span>`;
+      }).join('');
+      const archiveWingBtn=wingArchived
+        ?`<button class="btn btn-sm" style="font-size:10px;padding:2px 7px;margin-left:8px;background:#fff;border:1px solid #ccc;color:var(--dark);cursor:pointer" onclick="scRestoreWing('${w.wing_id}','${esc(w.wing_code||w.wing_id)}')">Restore</button>`
+        :`<button class="btn btn-sm" style="font-size:10px;padding:2px 7px;margin-left:8px;background:#fff;border:1px solid #ccc;color:var(--dark);cursor:pointer" onclick="scArchiveWing('${w.wing_id}','${esc(w.wing_code||w.wing_id)}')">Archive…</button>`;
+      h+=`<div class="sc-wing-row"${wingArchived?' style="opacity:.5"':''}>
+        <div class="sc-wing-name">${esc(w.wing_name||w.wing_id)} <span class="muted" style="font-size:11px;font-weight:400">${esc(w.wing_code||'')}</span>${wingArchived?' <span class="muted" style="font-size:10px">(archived)</span>':''}${archiveWingBtn}</div>
         <div class="sc-sqn-chips">${chips||'<span class="muted" style="font-size:11px">No units</span>'}</div>
       </div>`;
     }
@@ -3458,8 +3580,18 @@ async function scArchiveWing(wingId, wingCode){
   try {
     await api(`/api/wings/${wingId}/archive`,{method:'POST'});
     alert(`Wing '${wingCode}' has been archived.`);
+    await _refreshOrgCache();
     scLoadScopeMap();
   } catch(e){ alert('Archive failed: '+(apiErr(e))); }
+}
+
+async function scRestoreWing(wingId, wingCode){
+  try {
+    await api(`/api/wings/${wingId}/restore`,{method:'POST'});
+    alert(`Wing '${wingCode}' has been restored.`);
+    await _refreshOrgCache();
+    scLoadScopeMap();
+  } catch(e){ alert('Restore failed: '+(apiErr(e))); }
 }
 
 async function scArchiveSquadron(sqnId, sqnName){
@@ -3467,18 +3599,28 @@ async function scArchiveSquadron(sqnId, sqnName){
   try {
     await api(`/api/squadrons/${sqnId}/archive`,{method:'POST'});
     alert(`Unit '${sqnName}' has been archived.`);
+    await _refreshOrgCache();
     scLoadScopeMap();
   } catch(e){ alert('Archive failed: '+(apiErr(e))); }
+}
+
+async function scRestoreSquadron(sqnId, sqnName){
+  try {
+    await api(`/api/squadrons/${sqnId}/restore`,{method:'POST'});
+    alert(`Unit '${sqnName}' has been restored.`);
+    await _refreshOrgCache();
+    scLoadScopeMap();
+  } catch(e){ alert('Restore failed: '+(apiErr(e))); }
 }
 
 async function scPopulateWingSelect(){
   const sel=document.getElementById('sc-sqn-wing'); if(!sel) return;
   try {
-    const d=await api('/api/system/scope-map');
+    const wings=await api('/api/wings');
     sel.innerHTML='<option value="">Select wing…</option>';
-    for(const w of (d.wings||[])){
+    for(const w of (wings||[])){
       const o=document.createElement('option');
-      o.value=w.wing_id; o.textContent=`${w.wing_code||''} — ${w.wing_name||w.wing_id}`;
+      o.value=w.wing_id; o.textContent=`${w.code||''} — ${w.name||w.wing_id}`;
       sel.appendChild(o);
     }
   } catch(e){ sel.innerHTML='<option value="">Error loading wings</option>'; }
@@ -3497,6 +3639,7 @@ async function scCreateWing(){
     document.getElementById('sc-wing-code').value='';
     document.getElementById('sc-wing-name').value='';
     document.getElementById('sc-wing-short').value='';
+    await _refreshOrgCache();
     scLoadScopeMap();
   } catch(e){ msg.style.color='var(--danger)'; msg.textContent='Error: '+(apiErr(e)); }
 }
@@ -3514,6 +3657,7 @@ async function scCreateSquadron(){
     msg.style.color='var(--ok)'; msg.textContent=`Unit '${d.code}' created successfully.`;
     document.getElementById('sc-sqn-code').value='';
     document.getElementById('sc-sqn-name').value='';
+    await _refreshOrgCache();
     scLoadScopeMap();
   } catch(e){ msg.style.color='var(--danger)'; msg.textContent='Error: '+(apiErr(e)); }
 }
@@ -4622,8 +4766,9 @@ function _dRenderChart(containerId,chart,renderFn,insightId){
 // ═══════════════════════════════════════════════════════════
 async function loadDashCharts(){
   const win=document.getElementById('dash-window')?.value||'term';
-  const sqn=document.getElementById('dash-sqn-filter')?.value||'';
+  const sqn=document.getElementById('dash-sqn-filter')?.value||saBrowseSquadronId()||'';
   const params=new URLSearchParams({window:win});if(sqn)params.set('squadron_id',sqn);
+  const wid=saBrowseWingId();if(wid&&!sqn)params.set('wing_id',wid);
 
   // Skeletons while loading
   ['chart-weekly-outcomes','chart-delivery-trend','chart-session-outcomes','chart-cancellation-reasons','chart-curriculum-progress','chart-curriculum-backlog','chart-facilitator-workload'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="chart-skeleton"></div>';});
@@ -4692,7 +4837,8 @@ async function loadDashCharts(){
 async function loadFacilitatorStats(){
   ['fac-chart-status','fac-chart-workload','fac-chart-spof','fac-chart-gaps'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="chart-skeleton"></div>';});
   let data;
-  try{data=await api('/api/dashboard/charts?window=term');}
+  const sqn=saBrowseSquadronId();
+  try{data=await api('/api/dashboard/charts?window=term'+(sqn?'&squadron_id='+encodeURIComponent(sqn):''));}
   catch(e){return;}
   const charts=data.charts||{};
   _dRenderChart('fac-chart-status',charts.facilitator_status_distribution,_chartDonut,'fac-insight-status');
@@ -4705,8 +4851,9 @@ async function _loadDashStrategic(){
   const btn=document.getElementById('btn-load-strategic');
   if(btn){btn.textContent='Loading…';btn.disabled=true;}
   const win=document.getElementById('dash-window')?.value||'term';
+  const wid=saBrowseWingId();
   let data;
-  try{data=await api('/api/dashboard/charts/strategic?window='+win);}
+  try{data=await api('/api/dashboard/charts/strategic?window='+win+(wid?'&wing_id='+encodeURIComponent(wid):''));}
   catch(e){if(btn){btn.textContent='Load Resilience Charts ↓';btn.disabled=false;}return;}
   const charts=data.charts||{};
   const sec=document.getElementById('dash-strategic-section');if(sec)sec.style.display='';
@@ -6185,7 +6332,7 @@ function renderWing(){
   const delPct=sessions?Math.round(delivered/sessions*100):0;
   const avgCov=rows.length?Math.round(rows.reduce((a,r)=>a+(+r.coverage_pct||0),0)/rows.length):0;
   const atRisk=rows.filter(r=>r.no_published_plan||r.no_future_plan||(+r.not_delivered||0)>2).length;
-  const canProxy=S.role==='wing_admin';
+  const canProxy=['wing_admin','national_admin','system_admin'].includes(S.role);
   const reads=rows.map(r=>r.readiness).filter(v=>v!=null&&v!==undefined).sort((a,b)=>a-b);
   const medRead=reads.length?(reads.length%2?reads[(reads.length-1)/2]:Math.round((reads[reads.length/2-1]+reads[reads.length/2])/2)):null;
   const highRisk=rows.filter(r=>r.no_published_plan||r.no_future_plan||(+r.not_delivered||0)>2||(+r.coverage_pct||0)<34).length;

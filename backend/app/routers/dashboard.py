@@ -28,7 +28,7 @@ from ..models import (
     ParadeNight, Session, Facilitator, Squadron, Wing,
     CurriculumItem, Equipment, TrainingArea, PlanningFacilitatorLeave,
 )
-from ..permissions import Principal, require_role, require_can_view_squadron
+from ..permissions import Principal, require_role, require_can_view_squadron, require_can_view_wing
 from ..services_readiness import parade_night_readiness
 from .training import _view_squadron_id
 
@@ -1224,10 +1224,36 @@ def _view_squadron_id_for_dashboard(p: Principal, squadron_id: str, db: DBSessio
 
 # ── main endpoints ────────────────────────────────────────────────────────────
 
+def _wing_comparison_charts(
+    db: DBSession, p: Principal, wing_id: str, squadron_id: str | None, w_start, w_end
+) -> dict:
+    """Wing-level comparison charts plus an optional drilled-in squadron's full
+    chart set. Shared by the wing_admin/wing_viewer path (own wing_id) and the
+    national-scope path (an explicit, view-permission-checked wing_id) so both
+    render identically — see get_dashboard_charts."""
+    charts: dict = {}
+    # If a specific squadron is requested, viewing it needs no Proxy Mode
+    # (view is broad by design) — same _view_squadron_id-style validation
+    # used by /api/facilitators, /api/curriculum etc. (Block 8), and the
+    # FULL squadron chart set (not a 4-chart subset) so a Wing/National
+    # viewer's Dashboard genuinely looks like that squadron's own Dashboard
+    # with comparison charts layered on, not a reduced page.
+    if squadron_id:
+        viewed_sq_id = _view_squadron_id_for_dashboard(p, squadron_id, db)
+        if viewed_sq_id:
+            charts.update(_full_squadron_charts(db, viewed_sq_id, w_start, w_end))
+
+    charts["squadron_readiness"] = _squadron_readiness(db, wing_id, w_start, w_end)
+    charts["squadron_delivery_comparison"] = _squadron_delivery_comparison(db, wing_id, w_start, w_end)
+    charts["wing_subject_area_gaps"] = _wing_subject_area_gaps(db, wing_id)
+    return charts
+
+
 @router.get("/charts")
 def get_dashboard_charts(
     window: str = Query("term", pattern="^(week|term|year)$"),
     squadron_id: str | None = Query(None, description="Wing/National: filter to specific squadron"),
+    wing_id: str | None = Query(None, description="National-scope only: view a specific Wing's comparison charts (requires view access to that Wing)"),
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -1249,25 +1275,21 @@ def get_dashboard_charts(
         charts.update(_full_squadron_charts(db, sq_id, w_start, w_end))
 
     elif scope == "wing":
-        wing_id = p.acting_wing_id or p.wing_id
-        if not wing_id:
+        w_id = p.acting_wing_id or p.wing_id
+        if not w_id:
             return {"scope": scope, "window": window, "charts": {}, "error": "no_wing_scope"}
+        charts.update(_wing_comparison_charts(db, p, w_id, squadron_id, w_start, w_end))
 
-        # If a specific squadron is requested, viewing it needs no Proxy Mode
-        # (view is broad by design) — same _view_squadron_id-style validation
-        # used by /api/facilitators, /api/curriculum etc. (Block 8), and the
-        # FULL squadron chart set (not a 4-chart subset) so a Wing/National
-        # viewer's Dashboard genuinely looks like that squadron's own Dashboard
-        # with comparison charts layered on, not a reduced page.
-        if squadron_id:
-            viewed_sq_id = _view_squadron_id_for_dashboard(p, squadron_id, db)
-            if viewed_sq_id:
-                charts.update(_full_squadron_charts(db, viewed_sq_id, w_start, w_end))
-
-        # Wing-level comparison charts
-        charts["squadron_readiness"] = _squadron_readiness(db, wing_id, w_start, w_end)
-        charts["squadron_delivery_comparison"] = _squadron_delivery_comparison(db, wing_id, w_start, w_end)
-        charts["wing_subject_area_gaps"] = _wing_subject_area_gaps(db, wing_id)
+    elif wing_id:
+        # National-scope principal (national_admin/national_viewer/system_admin/
+        # auditor) browsing a specific Wing — view-only, no proxy/DI required,
+        # mirrors the wing_admin/wing_viewer branch above exactly so a system
+        # administrator's "Wing Dashboard" looks the same as a Wing Admin's.
+        if not db.get(Wing, wing_id):
+            raise HTTPException(404, detail={"error": "wing_not_found"})
+        require_can_view_wing(p, wing_id)
+        scope = "wing"
+        charts.update(_wing_comparison_charts(db, p, wing_id, squadron_id, w_start, w_end))
 
     else:  # national
         if squadron_id:
@@ -1350,9 +1372,31 @@ def _full_squadron_strategic_charts(db: DBSession, sq_id: str) -> dict:
     return charts
 
 
+def _wing_strategic_charts(db: DBSession, wing_id: str) -> dict:
+    charts: dict = {}
+    facs = db.query(Facilitator).filter(
+        Facilitator.wing_id == wing_id,
+        Facilitator.is_archived == False,  # noqa: E712
+    ).all()
+    charts["subject_area_resilience"] = _subject_area_resilience(facs)
+    # Long-term trend: aggregate all wing sessions
+    sqn_ids = _sqn_ids_for_wing(db, wing_id)
+    pns = db.query(ParadeNight).filter(
+        ParadeNight.squadron_id.in_(sqn_ids),
+        ParadeNight.is_archived == False,  # noqa: E712
+    ).all()
+    sessions = db.query(Session).filter(
+        Session.parade_night_id.in_([pn.id for pn in pns]),
+        Session.is_archived == False,  # noqa: E712
+    ).all() if pns else []
+    charts["long_term_delivery_trend"] = _long_term_delivery_trend(sessions, pns)
+    return charts
+
+
 @router.get("/charts/strategic")
 def get_strategic_charts(
     window: str = Query("year", pattern="^(term|year)$"),
+    wing_id: str | None = Query(None, description="National-scope only: view a specific Wing's strategic charts (requires view access to that Wing)"),
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -1379,24 +1423,18 @@ def get_strategic_charts(
         charts.update(_full_squadron_strategic_charts(db, sq_id))
 
     elif scope == "wing":
-        wing_id = p.acting_wing_id or p.wing_id
-        if wing_id:
-            facs = db.query(Facilitator).filter(
-                Facilitator.wing_id == wing_id,
-                Facilitator.is_archived == False,  # noqa: E712
-            ).all()
-            charts["subject_area_resilience"] = _subject_area_resilience(facs)
-            # Long-term trend: aggregate all wing sessions
-            sqn_ids = _sqn_ids_for_wing(db, wing_id)
-            pns = db.query(ParadeNight).filter(
-                ParadeNight.squadron_id.in_(sqn_ids),
-                ParadeNight.is_archived == False,  # noqa: E712
-            ).all()
-            sessions = db.query(Session).filter(
-                Session.parade_night_id.in_([pn.id for pn in pns]),
-                Session.is_archived == False,  # noqa: E712
-            ).all() if pns else []
-            charts["long_term_delivery_trend"] = _long_term_delivery_trend(sessions, pns)
+        w_id = p.acting_wing_id or p.wing_id
+        if w_id:
+            charts.update(_wing_strategic_charts(db, w_id))
+
+    elif wing_id:
+        # National-scope principal browsing a specific Wing — view-only, no
+        # proxy/DI required, mirrors the wing_admin/wing_viewer branch above.
+        if not db.get(Wing, wing_id):
+            raise HTTPException(404, detail={"error": "wing_not_found"})
+        require_can_view_wing(p, wing_id)
+        scope = "wing"
+        charts.update(_wing_strategic_charts(db, wing_id))
 
     return {"scope": scope, "window": window, "charts": charts}
 
