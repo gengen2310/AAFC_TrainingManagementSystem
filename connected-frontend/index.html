@@ -568,10 +568,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-item nav-scope" id="nav-wing" style="display:none" onclick="nav('wing-overview')">Wing Overview</div>
       <div class="nav-item nav-scope" id="nav-wing-calendar" style="display:none" onclick="nav('wing-calendar')">Wing HQ Calendar</div>
       <div class="nav-item nav-scope" id="nav-national" style="display:none" onclick="nav('national')">National Overview</div>
-      <div class="nav-item nav-scope" style="display:none" onclick="nav('curriculum-coverage')">Curriculum Coverage</div>
-      <div class="nav-item nav-scope" style="display:none" onclick="nav('training-balance')">Training Balance</div>
-      <div class="nav-item nav-scope" style="display:none" onclick="nav('facilitator-load')">Facilitator Load</div>
-      <div class="nav-item nav-scope" style="display:none" onclick="nav('risk-bottlenecks')">Risk and Bottlenecks</div>
       <div class="nav-item nav-scope" id="nav-audit" style="display:none" onclick="nav('audit')">Audit</div>
       <div class="nav-lbl" id="nav-system-lbl" style="display:none">System</div>
       <div class="nav-item" id="nav-system-console" style="display:none" onclick="nav('system-console')">System Console</div>
@@ -1180,10 +1176,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
       </div>
       <div id="page-national" class="page"><div id="cmd-dash-national"></div><div id="national-dash"></div></div>
-      <div id="page-curriculum-coverage" class="page"><div id="coverage-host"></div></div>
-      <div id="page-training-balance" class="page"><div id="balance-host"></div></div>
-      <div id="page-facilitator-load" class="page"><div id="facload-host"></div></div>
-      <div id="page-risk-bottlenecks" class="page"><div id="risk-host"></div></div>
       <div id="page-audit" class="page">
         <div class="ph"><div class="ph-title">Audit Log</div><div class="ph-sub">Immutable record of actions — backend authoritative</div></div>
         <div class="card"><div class="tw"><table>
@@ -3214,10 +3206,10 @@ function roomById(id){return (S.rooms||[]).find(r=>r.id===id);}
 const _PLANNING_PAGES=[];
 const NAV_BY_SCOPE={
   squadron:['dashboard','calendar','parade-nights','weekly-program','curriculum','activities','facilitators','resources','action-items','settings','accounts',..._PLANNING_PAGES],
-  wing:['wing-overview','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','audit','accounts',..._PLANNING_PAGES],
-  national:['national','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','audit','accounts',..._PLANNING_PAGES],
+  wing:['wing-overview','wing-calendar','curriculum','audit','accounts',..._PLANNING_PAGES],
+  national:['national','wing-calendar','curriculum','audit','accounts',..._PLANNING_PAGES],
   auditor:['audit','accounts',..._PLANNING_PAGES],
-  system_admin:['system-console','national','wing-calendar','curriculum','curriculum-coverage','training-balance','facilitator-load','risk-bottlenecks','audit','accounts',..._PLANNING_PAGES]
+  system_admin:['system-console','national','wing-calendar','curriculum','audit','accounts',..._PLANNING_PAGES]
 };
 const SCOPE_LANDING={squadron:'dashboard',wing:'wing-overview',national:'national',auditor:'audit',system_admin:'system-console'};
 // In Proxy Mode (Wing) or Delegated Intervention (NAT HQ) the UI shows the EXACT SQN workspace
@@ -3435,13 +3427,13 @@ function renderAll(){
   const scope=effectiveScope();
   if(scope==='system_admin'){
     // National operational data loaded by loadData; pre-render national views for navigation.
-    renderNational(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); renderAudit();
+    renderNational(); renderAudit();
     return;
   }
   if(scope==='squadron'){ renderDash();renderPN();renderCurr();renderActs();renderFacs();renderRooms();renderActions(); }
   else { renderCurr(); }
-  if(scope==='wing'){ renderWing(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); }
-  if(scope==='national'){ renderNational(); renderCoverage(); renderBalance(); renderFacLoad(); renderRisk(); }
+  if(scope==='wing'){ renderWing(); }
+  if(scope==='national'){ renderNational(); }
   if(scope==='national'||scope==='auditor'){ renderAudit(); }
   renderTimingTemplates();
 }
@@ -3466,10 +3458,6 @@ function nav(id){
   if(id==='wing-overview'){renderWing();loadCommandDashboard('wing');}
   if(id==='national'){renderNational();loadCommandDashboard('national');}
   if(id==='audit')renderAudit();
-  if(id==='curriculum-coverage')renderCoverage();
-  if(id==='training-balance')renderBalance();
-  if(id==='facilitator-load')renderFacLoad();
-  if(id==='risk-bottlenecks')renderRisk();
   if(id==='settings')renderSettings();
   if(id==='accounts')renderAccounts();
   if(id==='system-console')loadSystemConsole();
@@ -6679,200 +6667,7 @@ const SUBJECTS=[
   {key:'stem',    label:'Aviation and Air Power',               emoji:'🛩️', cls:'b-teal',   els:['Air_Space','STEM']},
 ];
 function subjectOf(el){ if(!el)return null; const m=SUBJECTS.find(s=>s.els.some(e=>String(el).toLowerCase().includes(e.toLowerCase().split('_')[0]))); return m?m.key:null; }
-const PHASE_FULL={'A. Orientation':'Orientation','B. Initial':'Initial','C. Junior':'Junior','D. Intermediate':'Intermediate','E. Senior':'Senior','I. Bronze':'Bronze CLP','J. Silver':'Silver CLP','K. Gold':'Gold CLP'};
-const PHASE_ORDER=['A. Orientation','B. Initial','C. Junior','D. Intermediate','E. Senior','I. Bronze','J. Silver','K. Gold'];
-function covBadge(p){ p=+p||0; return p>=67?'<span class="badge b-ok">On Track</span>':p>=34?'<span class="badge b-amber">Watch</span>':p>0?'<span class="badge b-red">At Risk</span>':'<span class="badge b-grey">No Data</span>'; }
 
-// ═══ CURRICULUM COVERAGE (redesigned — section 10) ═══
-function renderCoverage(){
-  const host=document.getElementById('coverage-host'); if(!host)return;
-  const scope=getScopeType();
-  let html=`<div class="ph"><div class="ph-title">Curriculum Coverage</div><div class="ph-sub">Coverage by phase across ${scope==='national'?'wings':'squadrons'}</div></div>`;
-  if(scope!=='national' && S.wingPhase && S.wingPhase.phases){
-    const rows=(S.wing&&S.wing.squadrons)||[];
-    const byId={}; rows.forEach(r=>byId[r.squadron_id]=r);
-    const avg=rows.length?Math.round(rows.reduce((a,r)=>a+(+r.coverage_pct||0),0)/rows.length):0;
-    const atRisk=rows.filter(r=>(+r.coverage_pct||0)<34).length;
-    html+=`<div class="stats-grid">
-      <div class="stat"><div class="sval">${rows.length}</div><div class="slbl">Squadrons</div></div>
-      <div class="stat ${avg>=67?'s-ok':avg>=34?'s-warn':'s-red'}"><div class="sval">${avg}%</div><div class="slbl">Average Coverage</div></div>
-      <div class="stat ${atRisk?'s-red':'s-ok'}"><div class="sval">${atRisk}</div><div class="slbl">At Risk (&lt;34%)</div></div>
-    </div>`;
-    html+=`<div class="card"><div class="ctitle">Coverage by Phase</div><div class="tw"><table>
-      <thead><tr><th>Squadron</th><th>Overall</th>${PHASE_ORDER.map(p=>`<th style="font-size:9.5px">${PHASE_FULL[p]||p}</th>`).join('')}<th style="text-align:center">Not Del.</th><th>Status</th></tr></thead><tbody>`;
-    S.wingPhase.squadrons.forEach(sq=>{
-      const r=byId[sq.squadron_id]||{}; const overall=+r.coverage_pct||0;
-      html+=`<tr class="drow" onclick="covDrill('${sq.squadron_id}')"><td style="font-weight:800">${sq.short_name}</td><td>${miniBar(overall)}</td>`+
-        PHASE_ORDER.map(p=>{const v=(sq.phase_pct||{})[p]||0;return `<td style="background:${heatColor(v)};color:#fff;text-align:center;font-weight:800;font-size:10px">${v}</td>`;}).join('')+
-        `<td style="text-align:center"><span class="badge ${(+r.not_delivered||0)===0?'b-ok':(+r.not_delivered<=2?'b-amber':'b-red')}">${r.not_delivered||0}</span></td><td>${covBadge(overall)}</td></tr>`;
-    });
-    html+=`</tbody></table></div><div style="font-size:10px;color:var(--muted);margin-top:8px">🟢 ≥67% · 🟡 ≥34% · 🔴 &lt;34% · ⚪ none. Click a row to drill in.</div></div><div class="drill-panel" id="cov-drill"></div>`;
-  } else if(scope==='national'){
-    const wings=(S.nationalReport&&S.nationalReport.wings)||[];
-    html+=`<div class="card"><div class="ctitle">Coverage by Wing</div><div class="tw"><table>
-      <thead><tr><th>Wing</th><th style="text-align:center">Squadrons</th><th>Coverage</th><th style="text-align:center">Not Del.</th><th>Status</th></tr></thead><tbody>`;
-    wings.forEach(w=>{ html+=`<tr><td style="font-weight:800">${w.name||w.code}</td><td style="text-align:center">${w.squadrons||0}</td><td>${miniBar(w.coverage_pct||0)}</td><td style="text-align:center"><span class="badge ${(+w.not_delivered||0)===0?'b-ok':'b-red'}">${w.not_delivered||0}</span></td><td>${covBadge(w.coverage_pct||0)}</td></tr>`; });
-    html+=`</tbody></table></div><div style="font-size:10px;color:var(--muted);margin-top:8px">Per-SQN coverage detail is available at Wing level and via NAT HQ → Wing drill-down.</div></div>`;
-  } else { html+=`<div class="card">No coverage data for this scope.</div>`; }
-  host.innerHTML=html;
-}
-function covDrill(sid){
-  const sq=((S.wingPhase&&S.wingPhase.squadrons)||[]).find(x=>x.squadron_id===sid);
-  const r=((S.wing&&S.wing.squadrons)||[]).find(x=>x.squadron_id===sid)||{};
-  const p=document.getElementById('cov-drill'); if(!sq||!p)return; p.className='drill-panel show';
-  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${sq.short_name} — phase coverage</div><button class="modal-x" onclick="document.getElementById('cov-drill').className='drill-panel'">×</button></div>
-    <div class="tw"><table><thead><tr><th>Phase</th><th>Coverage</th></tr></thead><tbody>
-    ${PHASE_ORDER.map(ph=>`<tr><td>${PHASE_FULL[ph]||ph}</td><td>${miniBar((sq.phase_pct||{})[ph]||0)}</td></tr>`).join('')}
-    </tbody></table></div><div style="font-size:11px;color:var(--muted);margin-top:8px">Overall ${r.coverage_pct||0}% · Not delivered ${r.not_delivered||0}. ${S.role==='wing_admin'?'Enter Proxy Mode on the Wing Dashboard to view this squadron in full.':''}</div>`;
-}
-
-// ═══ TRAINING BALANCE (section 9 — uses real curriculum element data) ═══
-function balPct(row){ // % of a squadron's subject-tagged sessions per subject
-  const ss=row.subject_sessions||{}; const tot=SUBJECTS.reduce((a,s)=>a+(ss[s.key]||0),0);
-  const out={}; SUBJECTS.forEach(s=>out[s.key]=tot?Math.round((ss[s.key]||0)/tot*100):0); out._tot=tot; return out;
-}
-function balBadge(p){ // p = {pct per subject, _tot}
-  if(!p._tot)return '<span class="badge b-grey">No Data</span>';
-  const vals=SUBJECTS.map(s=>p[s.key]); const mx=Math.max(...vals);
-  if(mx>=60)return '<span class="badge b-red">Over-Concentrated</span>';
-  if(mx>=45)return '<span class="badge b-amber">Watch</span>';
-  return '<span class="badge b-ok">Balanced</span>';
-}
-function balScore(p){ if(!p._tot)return 0; const mx=Math.max(...SUBJECTS.map(s=>p[s.key])); return Math.max(0,Math.round(100-(mx-100/6))); }
-function renderBalance(){
-  const host=document.getElementById('balance-host'); if(!host)return;
-  const scope=getScopeType();
-  let html=`<div class="ph"><div class="ph-title">Training Balance</div><div class="ph-sub">Subject-area distribution vs average</div></div>`;
-  if(scope!=='national' && S.cap && S.cap.squadrons){
-    const rows=S.cap.squadrons, avg=S.cap.wing_avg||{};
-    const withData=rows.filter(r=>(r.subject_sessions&&SUBJECTS.some(s=>r.subject_sessions[s.key]>0)));
-    // KPI strip
-    html+=`<div class="stats-grid">
-      <div class="stat"><div class="sval">${rows.length}</div><div class="slbl">Squadrons</div></div>
-      <div class="stat ${withData.length?'':'s-warn'}"><div class="sval">${withData.length}</div><div class="slbl">With Subject Data</div></div>
-      ${SUBJECTS.map(s=>`<div class="stat"><div class="sval">${avg[s.key]||0}%</div><div class="slbl">${s.emoji} ${s.label}</div></div>`).slice(0,4).join('')}
-    </div>`;
-    // Heatmap SQN x subject + Wing average row
-    html+=`<div class="card"><div class="ctitle">SQN × Subject Area — share of delivered/scheduled sessions</div><div class="tw"><table>
-      <thead><tr><th>Squadron</th>${SUBJECTS.map(s=>`<th style="text-align:center;font-size:10px" title="${s.label}">${s.emoji} ${s.label}</th>`).join('')}<th>Balance</th></tr></thead><tbody>`;
-    const wingLabel=(S.session&&S.session.wing_code)||'Wing';
-    html+=`<tr style="background:var(--surface)"><td style="font-weight:800">${wingLabel} Average</td>${SUBJECTS.map(s=>`<td style="text-align:center;font-weight:800">${avg[s.key]||0}%</td>`).join('')}<td>—</td></tr>`;
-    rows.forEach(r=>{ const p=balPct(r);
-      html+=`<tr class="drow" onclick="balDrill('${r.squadron_id}')"><td style="font-weight:800">${r.short_name}</td>`+
-        SUBJECTS.map(s=>{const v=p[s.key];const bg=p._tot?heatColor(v*1.5):'transparent';return `<td style="text-align:center;${p._tot?`background:${bg};color:#fff;`:''}font-weight:700;font-size:10px">${p._tot?v+'%':'—'}</td>`;}).join('')+
-        `<td>${balBadge(p)}</td></tr>`;
-    });
-    html+=`</tbody></table></div><div style="font-size:10px;color:var(--muted);margin-top:8px">Cells show each SQN's share of its own subject-tagged sessions. Compare a row against the Wing Average row. Click a row to drill in.</div></div>`;
-    // Ranked balance score
-    const scored=rows.map(r=>({n:r.short_name,p:balPct(r)})).filter(x=>x.p._tot).map(x=>({n:x.n,sc:balScore(x.p)})).sort((a,b)=>a.sc-b.sc);
-    if(scored.length){ html+=`<div class="card"><div class="ctitle">Balance Score (lower = more concentrated)</div>`+
-      scored.map(x=>`<div style="display:flex;align-items:center;gap:8px;margin:4px 0"><div style="width:60px;font-size:11px;font-weight:800">${x.n}</div><div style="flex:1">${miniBar(x.sc)}</div></div>`).join('')+`</div>`; }
-    html+=`<div id="bal-drill" class="drill-panel"></div>`;
-    if(!withData.length)html+=`<div class="card" style="font-size:11px;color:var(--muted)">No subject-tagged sessions in scope yet. Balance populates as sessions are scheduled against curriculum items carrying a subject (\`element\`) tag. Facilitator subject coverage is shown on the Facilitator Load page.</div>`;
-  } else if(scope==='national' && S.natCap && S.natCap.wings){
-    html+=`<div class="card"><div class="ctitle">Wing × Subject Area distribution</div><div class="tw"><table>
-      <thead><tr><th>Wing</th>${SUBJECTS.map(s=>`<th style="text-align:center;font-size:10px" title="${s.label}">${s.emoji} ${s.label}</th>`).join('')}<th style="text-align:center">SQNs</th></tr></thead><tbody>`;
-    S.natCap.wings.forEach(w=>{ const d=w.subject_distribution||{};
-      html+=`<tr><td style="font-weight:800">${w.name||w.code}</td>${SUBJECTS.map(s=>`<td style="text-align:center;font-weight:700;font-size:10px">${d[s.key]||0}%</td>`).join('')}<td style="text-align:center">${w.squadrons}</td></tr>`; });
-    html+=`</tbody></table></div></div>`;
-  } else { html+=`<div class="card">No training-balance data for this scope.</div>`; }
-  host.innerHTML=html;
-}
-function balDrill(sid){
-  const r=((S.cap&&S.cap.squadrons)||[]).find(x=>x.squadron_id===sid); const p=document.getElementById('bal-drill'); if(!r||!p)return;
-  p.className='drill-panel show';
-  const ss=r.subject_sessions||{};
-  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${r.short_name} — sessions by subject area</div><button class="modal-x" onclick="document.getElementById('bal-drill').className='drill-panel'">×</button></div>
-    <div class="tw"><table><thead><tr><th>Subject</th><th style="text-align:center">Sessions</th><th>Facilitators tagged</th></tr></thead><tbody>
-    ${SUBJECTS.map(s=>`<tr><td>${s.emoji} ${s.label}</td><td style="text-align:center;font-weight:800">${ss[s.key]||0}</td><td>${(r.subject_facilitators||{})[s.key]||0}</td></tr>`).join('')}
-    </tbody></table></div>${S.role==='wing_admin'?'<div style="font-size:11px;color:var(--muted);margin-top:8px">Enter Proxy Mode on the Wing Dashboard to view this squadron in full.</div>':''}`;
-}
-
-// ═══ FACILITATOR LOAD & CAPABILITY (sections 4/6 — real wing-capability data) ═══
-function capCell(n){ const c=n===0?'b-red':n===1?'b-amber':'b-ok'; const t=n===0?'None':n===1?'Thin':n; return `<span class="badge ${c}" style="min-width:34px;display:inline-block;text-align:center">${t}</span>`; }
-function renderFacLoad(){
-  const host=document.getElementById('facload-host'); if(!host)return;
-  const scope=getScopeType();
-  let html=`<div class="ph"><div class="ph-title">Facilitator Load and Capability</div><div class="ph-sub">Facilitator coverage by ${scope==='national'?'wing':'SQN'} and subject area</div></div>`;
-  if(scope!=='national' && S.cap && S.cap.squadrons){
-    const rows=S.cap.squadrons; const gaps=S.cap.capability_gaps||{};
-    const totFac=rows.reduce((a,r)=>a+(r.facilitator_count||0),0);
-    const noneCnt=SUBJECTS.reduce((a,s)=>a+((gaps[s.key]||{}).none||0),0);
-    html+=`<div class="stats-grid">
-      <div class="stat"><div class="sval">${rows.length}</div><div class="slbl">Squadrons</div></div>
-      <div class="stat"><div class="sval">${totFac}</div><div class="slbl">Facilitators</div></div>
-      <div class="stat ${noneCnt?'s-red':'s-ok'}"><div class="sval">${noneCnt}</div><div class="slbl">SQN×Subject Gaps</div></div>
-      <div class="stat"><div class="sval">${rows.length?Math.round(totFac/rows.length*10)/10:0}</div><div class="slbl">Avg Facilitators/SQN</div></div>
-    </div>`;
-    // Subject capability matrix
-    html+=`<div class="card"><div class="ctitle">Subject-Area Capability Matrix (facilitators tagged per subject)</div><div class="tw"><table>
-      <thead><tr><th>Squadron</th>${SUBJECTS.map(s=>`<th style="text-align:center;font-size:10px" title="${s.label}">${s.emoji} ${s.label}</th>`).join('')}<th style="text-align:center">Total</th></tr></thead><tbody>`;
-    rows.forEach(r=>{ const sf=r.subject_facilitators||{};
-      html+=`<tr class="drow" onclick="facDrill('${r.squadron_id}')"><td style="font-weight:800">${r.short_name}</td>`+
-        SUBJECTS.map(s=>`<td style="text-align:center">${capCell(sf[s.key]||0)}</td>`).join('')+
-        `<td style="text-align:center;font-weight:800">${r.facilitator_count||0}</td></tr>`;
-    });
-    html+=`</tbody></table></div><div style="font-size:10px;color:var(--muted);margin-top:8px">🔴 None · 🟡 Thin (1) · 🟢 Healthy (2+). Click a row to drill in.</div></div>`;
-    // Load comparison
-    html+=`<div class="card"><div class="ctitle">Load Comparison</div><div class="tw"><table>
-      <thead><tr><th>Squadron</th><th style="text-align:center">Facilitators</th><th style="text-align:center">Avg Lessons/Fac</th><th style="text-align:center">Next Night Scheduled</th><th style="text-align:center">Available</th><th style="text-align:center">Unfilled</th></tr></thead><tbody>`+
-      rows.map(r=>`<tr><td style="font-weight:800">${r.short_name}</td><td style="text-align:center">${r.facilitator_count||0}</td><td style="text-align:center">${r.avg_lessons_per_fac||0}</td><td style="text-align:center">${r.next_night_scheduled||0}</td><td style="text-align:center"><span class="badge ${r.next_night_available?'b-ok':'b-grey'}">${r.next_night_available||0}</span></td><td style="text-align:center">${r.next_night_unfilled?`<span class="badge b-red">${r.next_night_unfilled}</span>`:'0'}</td></tr>`).join('')+
-      `</tbody></table></div></div>`;
-    // Capability gaps summary
-    html+=`<div class="card"><div class="ctitle">Capability Gaps (across ${rows.length} SQNs)</div><div class="tw"><table>
-      <thead><tr><th>Subject</th><th style="text-align:center">SQNs with none</th><th style="text-align:center">SQNs with only one</th></tr></thead><tbody>`+
-      SUBJECTS.map(s=>{const g=gaps[s.key]||{};return `<tr><td>${s.emoji} ${s.label}</td><td style="text-align:center">${g.none?`<span class="badge b-red">${g.none}</span>`:'0'}</td><td style="text-align:center">${g.one?`<span class="badge b-amber">${g.one}</span>`:'0'}</td></tr>`;}).join('')+
-      `</tbody></table></div></div><div id="fac-drill" class="drill-panel"></div>`;
-  } else if(scope==='national' && S.natCap && S.natCap.wings){
-    html+=`<div class="card"><div class="ctitle">Wing Capability Roll-up</div><div class="tw"><table>
-      <thead><tr><th>Wing</th><th style="text-align:center">SQNs</th><th style="text-align:center">Facilitators</th>${SUBJECTS.map(s=>`<th style="text-align:center;font-size:10px" title="${s.label} — SQNs with no coverage">${s.emoji} ${s.label}</th>`).join('')}</tr></thead><tbody>`+
-      S.natCap.wings.map(w=>{const nn=w.subject_none_sqns||{};return `<tr><td style="font-weight:800">${w.name||w.code}</td><td style="text-align:center">${w.squadrons}</td><td style="text-align:center">${w.facilitator_total}</td>${SUBJECTS.map(s=>`<td style="text-align:center">${nn[s.key]?`<span class="badge b-red">${nn[s.key]}</span>`:'<span class="badge b-ok">0</span>'}</td>`).join('')}</tr>`;}).join('')+
-      `</tbody></table></div><div style="font-size:10px;color:var(--muted);margin-top:8px">Subject columns show the number of SQNs in each Wing with NO facilitator coverage in that area (red = bottleneck).</div></div>`;
-  } else { html+=`<div class="card">No facilitator-capability data for this scope.</div>`; }
-  host.innerHTML=html;
-}
-function facDrill(sid){
-  const r=((S.cap&&S.cap.squadrons)||[]).find(x=>x.squadron_id===sid); const p=document.getElementById('fac-drill'); if(!r||!p)return;
-  p.className='drill-panel show';
-  const sf=r.subject_facilitators||{};
-  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${r.short_name} — facilitator capability</div><button class="modal-x" onclick="document.getElementById('fac-drill').className='drill-panel'">×</button></div>
-    <div style="font-size:12px;margin-bottom:8px">Facilitators: <b>${r.facilitator_count||0}</b> · Avg lessons/facilitator: <b>${r.avg_lessons_per_fac||0}</b> · Next night available: <b>${r.next_night_available||0}</b></div>
-    <div class="tw"><table><thead><tr><th>Subject</th><th style="text-align:center">Facilitators</th></tr></thead><tbody>
-    ${SUBJECTS.map(s=>`<tr><td>${s.emoji} ${s.label}</td><td style="text-align:center">${capCell(sf[s.key]||0)}</td></tr>`).join('')}
-    </tbody></table></div>${S.role==='wing_admin'?'<div style="font-size:11px;color:var(--muted);margin-top:8px">Enter Proxy Mode to manage facilitators for this squadron.</div>':''}`;
-}
-
-// ═══ RISK & BOTTLENECKS (sections 12 & 16 — units needing attention) ═══
-function renderRisk(){
-  const host=document.getElementById('risk-host'); if(!host)return;
-  const scope=getScopeType();
-  let html=`<div class="ph"><div class="ph-title">Risk and Bottlenecks</div><div class="ph-sub">Units requiring attention</div></div>`;
-  if(scope==='national'){
-    const wings=(S.nationalReport&&S.nationalReport.wings)||[];
-    const flagged=wings.map(w=>{const issues=[]; if((+w.coverage_pct||0)<34)issues.push('Low coverage'); if((+w.not_delivered||0)>2)issues.push(`${w.not_delivered} not delivered`); return {name:w.name||w.code,issues};}).filter(x=>x.issues.length);
-    html+=riskCard('Wings needing attention', flagged);
-  } else {
-    const rows=(S.wing&&S.wing.squadrons)||[];
-    const flagged=rows.map(r=>{const issues=[];
-      if(r.no_published_plan)issues.push('No published plan');
-      else if(r.no_future_plan)issues.push('No future plan');
-      if((+r.coverage_pct||0)<34)issues.push(`Coverage ${r.coverage_pct||0}%`);
-      if((+r.not_delivered||0)>2)issues.push(`${r.not_delivered} not delivered`);
-      const dp=r.sessions?Math.round((r.delivered||0)/r.sessions*100):0; if(r.sessions&&dp<50)issues.push(`Delivery ${dp}%`);
-      return {name:r.short_name||r.code,issues};
-    }).filter(x=>x.issues.length).sort((a,b)=>b.issues.length-a.issues.length);
-    const ok=rows.length-flagged.length;
-    html+=`<div class="stats-grid"><div class="stat ${flagged.length?'s-red':'s-ok'}"><div class="sval">${flagged.length}</div><div class="slbl">Needing Attention</div></div><div class="stat s-ok"><div class="sval">${ok}</div><div class="slbl">On Track</div></div></div>`;
-    html+=riskCard('Squadrons needing attention', flagged);
-  }
-  host.innerHTML=html;
-}
-function riskCard(title, flagged){
-  if(!flagged.length)return `<div class="card"><div class="ctitle">${title}</div><div style="color:var(--ok);font-weight:700">No units flagged.</div></div>`;
-  return `<div class="card"><div class="ctitle">${title}</div><div class="tw"><table><thead><tr><th>Unit</th><th>Issues</th></tr></thead><tbody>`+
-    flagged.map(f=>`<tr><td style="font-weight:800">${f.name}</td><td>${f.issues.map(i=>`<span class="badge b-red" style="margin:1px">${i}</span>`).join(' ')}</td></tr>`).join('')+
-    `</tbody></table></div></div>`;
-}
 
 // ═══ PROXY / DELEGATED INTERVENTION ═══
 async function enterMode(squadronId, label){
