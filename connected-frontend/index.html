@@ -1415,6 +1415,14 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   </div>
 </div>
 
+<!-- Parade Day Change — propagation wizard -->
+<div class="modal-bg" id="m-pday-propagate">
+  <div class="modal" style="max-width:640px">
+    <h2>Apply new parade day to existing nights?</h2>
+    <div id="pday-prop-body"></div>
+  </div>
+</div>
+
 <!-- Add Single Parade Date Modal -->
 <div class="modal-bg" id="m-add-pd">
   <div class="modal">
@@ -6042,9 +6050,11 @@ async function saveSettings(){
   if(!sqnId){alert('No squadron in scope — cannot save settings.');return;}
   const msg=document.getElementById('settings-msg');
   if(msg){msg.textContent='Saving…';msg.style.color='var(--muted)';}
+  const oldDay=(S.cfg&&S.cfg.day)||'';
+  const newDay=document.getElementById('s-pday').value||null;
   const payload={
     address:document.getElementById('s-addr').value||null,
-    default_parade_day:document.getElementById('s-pday').value||null,
+    default_parade_day:newDay,
     default_start_time:document.getElementById('s-start').value||null,
     default_end_time:document.getElementById('s-end').value||null,
     default_session_count:+document.getElementById('s-sess').value||3
@@ -6053,9 +6063,75 @@ async function saveSettings(){
     await api('/api/squadrons/'+sqnId,{method:'PATCH',body:JSON.stringify(payload)});
     if(msg){msg.textContent='✅ Settings saved.';msg.style.color='var(--ok)';}
     await reloadAndRender();
+    // Only newly-created Parade Nights use the new default automatically --
+    // already-generated nights keep their original day/time until explicitly
+    // moved (see update-future-parade-day). Offer that as a separate, explicit,
+    // always-previewed action rather than silently applying it.
+    if(newDay && oldDay && newDay!==oldDay){ await _offerPdayPropagation(oldDay,newDay); }
   }catch(e){
     if(msg){msg.textContent=apiErr(e);msg.style.color='var(--red)';}else alert(apiErr(e));
   }
+}
+
+// ═══ PARADE DAY PROPAGATION WIZARD (Settings → already-generated nights) ═══
+const _DAY_NAME_TO_INT={Monday:0,Tuesday:1,Wednesday:2,Thursday:3,Friday:4,Saturday:5,Sunday:6};
+let _pdayPropYearId=null, _pdayPropNewWeekday=null;
+
+async function _offerPdayPropagation(oldDay,newDay){
+  const body=document.getElementById('pday-prop-body');
+  _pdayPropYearId=await _loadPlanningYears();
+  _pdayPropNewWeekday=_DAY_NAME_TO_INT[newDay];
+  if(!_pdayPropYearId || _pdayPropNewWeekday==null){ return; } // no planning year in scope -- nothing to propagate
+  body.innerHTML=`
+    <p>The default parade day changed from <b>${esc(oldDay)}</b> to <b>${esc(newDay)}</b>. This only applies automatically to <b>new</b> Parade Nights from now on.</p>
+    <p style="font-size:12px;color:var(--muted)">Already-generated Parade Nights keep their original day until you explicitly move them. Delivered, cancelled and manually-protected nights are never moved.</p>
+    <div class="modal-actions" style="flex-wrap:wrap;gap:8px;justify-content:flex-start">
+      <button class="btn btn-secondary" onclick="closeModal('m-pday-propagate')">No — new nights only</button>
+      <button class="btn btn-out" onclick="_pdayPropPreview('draft_only')">Preview: draft nights only</button>
+      <button class="btn btn-out" onclick="_pdayPropPreview('draft_and_planned')">Preview: draft + planned nights</button>
+    </div>`;
+  openModal('m-pday-propagate');
+}
+
+async function _pdayPropPreview(sessionScope){
+  const body=document.getElementById('pday-prop-body');
+  body.innerHTML='<p style="color:var(--muted)">Loading preview…</p>';
+  try{
+    const r=await api(`/api/planning/years/${_pdayPropYearId}/update-future-parade-day`,{method:'POST',body:JSON.stringify({
+      new_weekday:_pdayPropNewWeekday, preview:true, session_status_scope:sessionScope
+    })});
+    const rows=r.changes||[];
+    const dayName=n=>Object.keys(_DAY_NAME_TO_INT).find(k=>_DAY_NAME_TO_INT[k]===n);
+    let html=`<p style="font-size:12px">${r.to_update} night(s) will move. ${r.blocked} blocked by a conflict. ${r.session_status_excluded} excluded (outside the selected scope). ${r.exceptions_preserved} manually-protected exception(s) left untouched.</p>`;
+    if(rows.length){
+      html+=`<div class="tw" style="max-height:280px;overflow-y:auto"><table><thead><tr><th>Old date</th><th>New date</th><th>Status</th></tr></thead><tbody>`+
+        rows.map(c=>`<tr${c.blocked?' style="opacity:.55"':''}><td>${esc(c.old_date)}</td><td>${esc(c.new_date)}</td><td>${c.blocked?`<span class="badge b-red">Blocked: ${esc((c.conflicts||[]).join(', '))}</span>`:'<span class="badge b-ok">Will move</span>'}</td></tr>`).join('')+
+        `</tbody></table></div>`;
+    } else {
+      html+=`<p style="color:var(--muted)">No eligible Parade Nights found in this scope.</p>`;
+    }
+    html+=`<div class="form-group" style="margin-top:12px"><label>Reason (required, audited)</label><input id="pday-prop-reason" placeholder="e.g. Squadron changed parade night to ${esc(dayName(_pdayPropNewWeekday)||'')}"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-pday-propagate')">Cancel</button>
+      <button class="btn btn-primary" ${r.to_update?'':'disabled'} onclick="_pdayPropApply('${sessionScope}')">Apply changes</button>
+    </div>`;
+    body.innerHTML=html;
+  }catch(e){ body.innerHTML=`<p style="color:var(--red)">${esc(apiErr(e))}</p>`; }
+}
+
+async function _pdayPropApply(sessionScope){
+  const body=document.getElementById('pday-prop-body');
+  const reason=(document.getElementById('pday-prop-reason').value||'').trim();
+  if(!reason){ alert('A reason is required.'); return; }
+  body.innerHTML='<p style="color:var(--muted)">Applying…</p>';
+  try{
+    const r=await api(`/api/planning/years/${_pdayPropYearId}/update-future-parade-day`,{method:'POST',body:JSON.stringify({
+      new_weekday:_pdayPropNewWeekday, preview:false, session_status_scope:sessionScope, reason
+    })});
+    body.innerHTML=`<p>✅ Moved <b>${r.updated}</b> Parade Night(s). ${r.skipped} skipped due to a conflict. ${r.session_status_excluded} left untouched (outside the selected scope). ${r.exceptions_preserved} manually-protected exception(s) preserved.</p>
+      <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-pday-propagate')">Done</button></div>`;
+    await reloadAndRender();
+  }catch(e){ body.innerHTML=`<p style="color:var(--red)">${esc(apiErr(e))}</p><div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-pday-propagate')">Close</button></div>`; }
 }
 async function changeMyCode(){
   const msg=document.getElementById('cc-msg');

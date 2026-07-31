@@ -235,6 +235,128 @@ def test_update_future_parade_day_rollback_on_conflict_does_not_partially_apply(
     assert row["parade_date"] == tuesday_date
 
 
+def _seed_session(client, hdr, parade_night_id, status=None, reason=None):
+    r = client.post("/api/sessions", json={"parade_night_id": parade_night_id, "period_number": 1},
+                    headers=hdr)
+    assert r.status_code == 200, r.text
+    sid = r.json()["session_id"]
+    if status:
+        body = {"parade_night_id": parade_night_id, "status": status}
+        if reason:
+            body["reason"] = reason
+        r2 = client.put(f"/api/sessions/{sid}", json=body, headers=hdr)
+        assert r2.status_code == 200, r2.text
+    return sid
+
+
+def _parade_night_id_for_date(client, hdr, year_id, parade_date_id):
+    rows = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=hdr).json()
+    row = next(r for r in rows if r["parade_date_id"] == parade_date_id)
+    return row["parade_night_id"]
+
+
+def test_update_future_parade_day_session_status_scope_invalid_value_rejected(client):
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2084)
+    monday = _future_monday()
+    _seed_parade_dates(client, hdr, year_id, [(monday + timedelta(days=1)).isoformat()])
+
+    r = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                    json={"new_weekday": 4, "preview": True, "session_status_scope": "bogus"},
+                    headers=hdr)
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "invalid_session_status_scope"
+
+
+def test_update_future_parade_day_draft_only_excludes_a_planned_night(client):
+    """A session is created as status='planned' by default -- draft_only must
+    exclude that night entirely, not just flag it.
+
+    Uses a +7-day-offset date (not the shared monday+1 "Tuesday" every other
+    test in this file uses) -- ParadeNight is keyed by (squadron_id, date),
+    all these tests share squadron 703, so reusing that date would silently
+    accumulate sessions from earlier tests onto the same night.
+    """
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2085)
+    monday = _future_monday()
+    test_date = (monday + timedelta(days=8)).isoformat()
+    ids = _seed_parade_dates(client, hdr, year_id, [test_date])
+    pn_id = _parade_night_id_for_date(client, hdr, year_id, ids[0])
+    _seed_session(client, hdr, pn_id)  # status defaults to "planned"
+
+    r = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                    json={"new_weekday": 4, "preview": True, "session_status_scope": "draft_only"},
+                    headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["to_update"] == 0
+    assert d["session_status_excluded"] == 1
+    assert all(c["old_date"] != test_date for c in d["changes"])
+
+
+def test_update_future_parade_day_draft_and_planned_includes_planned_excludes_published(client):
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2086)
+    monday = _future_monday()
+    planned_date = (monday + timedelta(days=15)).isoformat()
+    published_date = (monday + timedelta(days=16)).isoformat()
+    ids = _seed_parade_dates(client, hdr, year_id, [planned_date, published_date])
+    pn_planned = _parade_night_id_for_date(client, hdr, year_id, ids[0])
+    pn_published = _parade_night_id_for_date(client, hdr, year_id, ids[1])
+    _seed_session(client, hdr, pn_planned)  # stays "planned"
+    _seed_session(client, hdr, pn_published, status="published")
+
+    r = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                    json={"new_weekday": 4, "preview": True, "session_status_scope": "draft_and_planned"},
+                    headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    changed_old_dates = {c["old_date"] for c in d["changes"]}
+    assert planned_date in changed_old_dates
+    assert published_date not in changed_old_dates
+    assert d["session_status_excluded"] == 1
+
+
+def test_update_future_parade_day_session_status_scope_omitted_still_includes_published(client):
+    """Backward compatibility: with no session_status_scope, today's unfiltered
+    behaviour is unchanged -- a published night is still eligible."""
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2087)
+    monday = _future_monday()
+    published_date = (monday + timedelta(days=22)).isoformat()
+    ids = _seed_parade_dates(client, hdr, year_id, [published_date])
+    pn_id = _parade_night_id_for_date(client, hdr, year_id, ids[0])
+    _seed_session(client, hdr, pn_id, status="published")
+
+    r = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                    json={"new_weekday": 4, "preview": True},
+                    headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    changed_old_dates = {c["old_date"] for c in d["changes"]}
+    assert published_date in changed_old_dates
+    assert d["session_status_excluded"] == 0
+
+
+def test_update_future_parade_day_draft_only_still_includes_a_night_with_no_sessions(client):
+    """Nothing to protect -- an empty night is always eligible regardless of scope."""
+    hdr = _sqn_admin_hdr(client)
+    year_id = _make_year(client, hdr, year=2088)
+    monday = _future_monday()
+    empty_date = (monday + timedelta(days=29)).isoformat()
+    _seed_parade_dates(client, hdr, year_id, [empty_date])
+
+    r = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
+                    json={"new_weekday": 4, "preview": True, "session_status_scope": "draft_only"},
+                    headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    changed_old_dates = {c["old_date"] for c in d["changes"]}
+    assert empty_date in changed_old_dates
+    assert d["session_status_excluded"] == 0
+
+
 # ─────────────────────────────────────────────────────────────
 # TRGO-02: unified Activities view -- local-hide state surfaced on read
 # ─────────────────────────────────────────────────────────────

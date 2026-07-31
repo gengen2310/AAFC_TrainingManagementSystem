@@ -755,12 +755,23 @@ def generate_parade_dates(
     return {"ok": True, "created": len(created), "linked": len(linked), "dates": created}
 
 
+_SESSION_STATUS_SCOPES = {
+    "draft_only": {"draft"},
+    "draft_and_planned": {"draft", "planned"},
+}
+
+
 class UpdateFutureParadeDayIn(BaseModel):
     new_weekday: int                      # 0=Mon … 6=Sun, same convention as GenerateParadeDatesIn
     from_date: str | None = None          # ISO date; defaults to today
     exclude_ids: list[str] = []           # ParadeDate IDs to leave untouched (kept as one-night exceptions)
     reason: str | None = None             # required when preview=false
     preview: bool = True
+    # Restrict which nights are eligible for a bulk day-of-week move by
+    # how far their sessions have progressed. None/"all" preserves the endpoint's
+    # original unfiltered behaviour for any existing caller. A night with no
+    # sessions at all is always eligible (nothing to protect).
+    session_status_scope: str | None = None   # None|"all" | "draft_only" | "draft_and_planned"
 
 
 @router.post("/years/{year_id}/update-future-parade-day")
@@ -794,6 +805,10 @@ def update_future_parade_day(
                                           "message": "A reason is required to update future parade nights."})
     if body.new_weekday < 0 or body.new_weekday > 6:
         raise HTTPException(400, detail={"error": "invalid_weekday"})
+    status_scope = body.session_status_scope
+    if status_scope not in (None, "all", *_SESSION_STATUS_SCOPES):
+        raise HTTPException(400, detail={"error": "invalid_session_status_scope"})
+    allowed_statuses = _SESSION_STATUS_SCOPES.get(status_scope)
 
     from_date = body.from_date or date.today().isoformat()
     rows = db.query(ParadeDate).filter(
@@ -819,6 +834,7 @@ def update_future_parade_day(
                       ).all()}
 
     plan: list[dict] = []
+    status_excluded = 0
     for pd_row in rows:
         if pd_row.id in body.exclude_ids:
             continue
@@ -835,11 +851,25 @@ def update_future_parade_day(
             conflicts.append("holiday")
 
         has_sessions = False
+        session_statuses: list[str] = []
         if pd_row.parade_night_id:
-            has_sessions = db.query(TrainingSession).filter(
-                TrainingSession.parade_night_id == pd_row.parade_night_id,
-                TrainingSession.is_archived == False,  # noqa: E712
-            ).count() > 0
+            session_statuses = [
+                s.status for s in db.query(TrainingSession).filter(
+                    TrainingSession.parade_night_id == pd_row.parade_night_id,
+                    TrainingSession.is_archived == False,  # noqa: E712
+                ).all()
+            ]
+            has_sessions = len(session_statuses) > 0
+
+        # A night whose sessions have progressed past the requested
+        # scope (e.g. already published/delivered) is left alone entirely --
+        # excluded from the plan the same way a parade_type exception is,
+        # not merely blocked, since this is a protection the caller asked
+        # for, not a data conflict.
+        if allowed_statuses is not None and session_statuses:
+            if any(st not in allowed_statuses for st in session_statuses):
+                status_excluded += 1
+                continue
 
         plan.append({
             "parade_date_id": pd_row.id,
@@ -867,6 +897,7 @@ def update_future_parade_day(
             "to_update": sum(1 for r in plan if not r["blocked"]),
             "blocked": sum(1 for r in plan if r["blocked"]),
             "exceptions_preserved": exceptions,
+            "session_status_excluded": status_excluded,
         }
 
     updated = []
@@ -896,6 +927,7 @@ def update_future_parade_day(
         "updated": len(updated), "skipped": len(skipped),
         "updated_dates": updated, "skipped_conflicts": skipped,
         "exceptions_preserved": exceptions,
+        "session_status_excluded": status_excluded,
     }
 
 
