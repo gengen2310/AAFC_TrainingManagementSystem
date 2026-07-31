@@ -58,9 +58,10 @@ default action.
 ## State and scope
 
 - `S` is the session state object — populated from `/api/auth/me` on login
-- `getScopeType()` returns: `squadron | wing | national | auditor | system_admin`
-- `NAV_BY_SCOPE` defines allowed pages per scope
-- `applyNavScope()` shows/hides nav items based on current scope
+- `getScopeType()` returns the role-derived scope: `squadron | wing | national | auditor | system_admin` — this never changes based on what a user is currently browsing/acting on
+- `effectiveScope()` returns the scope actually used for nav/rendering: same as `getScopeType()` for most roles, but flips to `squadron` while Proxy/Delegated Intervention is active, or to `wing`/`squadron` while system_admin is browsing via `S.saScope` (see "system_admin scope" below). Always use `effectiveScope()`, not `getScopeType()`, when deciding what data to fetch or which nav set to show.
+- `NAV_BY_SCOPE` defines allowed pages per scope (keyed by `effectiveScope()`'s possible values)
+- `applyNavScope()` shows/hides nav items based on `effectiveScope()`
 - Do not store operational data in localStorage
 
 ## Navigation
@@ -71,10 +72,47 @@ default action.
 
 ## system_admin scope
 
-- system_admin gets its own scope (`system_admin`) from `getScopeType()`
-- System Console (`page-system-console`) is the landing page for system_admin
-- System Console loads via `loadSystemConsole()` which calls individual section loaders
-- Do not add operational Squadron/Wing pages to the system_admin scope
+- system_admin gets its own role-scope (`system_admin`) from `getScopeType()`; System
+  Console (`page-system-console`) remains the default landing page and is always reachable
+  from nav regardless of what system_admin is currently browsing (see `applyNavScope()`'s
+  dedicated `system-console` override — a deliberate widen, not a narrowing filter like the
+  other per-page overrides).
+- System Console loads via `loadSystemConsole()` which calls individual section loaders.
+- **system_admin does have operational Squadron/Wing pages** — this reverses the prior rule
+  here, per explicit user instruction; see `docs/release/qualification_gap_register.md`
+  GAP-21 for the full defect this fixed and the reasoning. Reachable via the
+  `sa-scope-bar` widget (persistent header bar, rendered by `saRenderScopeBar()`, visible
+  only for `S.role==='system_admin'`): a Wing `<select>` and a Squadron `<select>`, backed
+  by `S.saScope = {level:'national'|'wing'|'squadron', wingId, squadronId}`.
+  `saSelectWing()`/`saSelectSquadron()` update `S.saScope` and reboot the app; `effectiveScope()`
+  consults `S.saScope` to return `'wing'`/`'squadron'` (reusing the exact same
+  `NAV_BY_SCOPE.wing`/`NAV_BY_SCOPE.squadron` page sets and render functions wing_admin/
+  sqn_admin use — a system_admin's Wing/Squadron Dashboard is not a separate
+  implementation).
+- **Viewing never requires Proxy/Intervention Mode** — `can_view_squadron`/
+  `can_view_wing` already grant system_admin unconditional read access server-side, so
+  browsing a Wing/Squadron via `sa-scope-bar` is a pure read (no reason prompt, no audit
+  entry). Only **writes** require Delegated Intervention, entered via
+  `saEnterIntervention()` → the existing `enterMode()`/`exitMode()` machinery shared with
+  wing_admin's Proxy Mode (labelled "Delegated Intervention" vs "Proxy Mode" by role —
+  see `enterMode()`). Do not wire a write-capable control to `sa-scope-bar`'s selection
+  without also requiring Delegated Intervention to be active.
+- `saBrowseWingId()`/`saBrowseSquadronId()` return the current browsing selection (or
+  `null`) — use these, not `S.session.wing_id`/`squadron_id` (which are always `null` for
+  system_admin), when a page's data-fetch needs an explicit `wing_id`/`squadron_id` query
+  param for a system_admin caller.
+- Any code path that mutates `S.wings`/`S.squadrons` (create/archive/restore) must go
+  through the shared `_refreshOrgCache()` helper, which also re-renders `sa-scope-bar` —
+  do not add a new Wing/Squadron create or archive flow that updates the cache without
+  calling it, or the scope-selector will silently go stale (this was itself GAP-21's
+  first follow-on defect).
+- Native `alert()`/`confirm()`/`prompt()` dialogs used by System Console's archive/create
+  handlers and by `enterMode()` block the page entirely under browser automation (Claude
+  in Chrome, Playwright, etc.) — when testing these flows via an automated browser tool,
+  call the underlying `api(...)` request directly instead of clicking the button, and
+  replicate the handler's own post-call state refresh (see `enterMode()`/`saSelectWing()`
+  for the exact sequence: update `S.proxy`/`S.saScope`, then `loadData(); renderAll();
+  updateScopeBanner(); updateModeBanner(); updateDebugBar(); bootApp();`).
 
 ## API calls
 
