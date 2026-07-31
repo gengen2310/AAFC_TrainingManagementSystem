@@ -557,6 +557,56 @@ def test_facilitator_import_handles_1000_row_file(client):
 
 
 # ─────────────────────────────────────────────────────────────
+# Facilitator save idempotency-key -- a retried POST (client-perceived
+# timeout) with confirm_duplicate already true must not create a second
+# facilitator; the name-based duplicate check alone does not protect this
+# path since confirm_duplicate=true is exactly what bypasses it.
+# ─────────────────────────────────────────────────────────────
+
+def test_facilitator_create_retried_with_same_idempotency_key_does_not_duplicate(client):
+    from app.security import reset_idempotency_cache
+    reset_idempotency_cache()
+    hdr = dict(_sqn_admin_hdr(client))
+    hdr["Idempotency-Key"] = "test-idem-key-001"
+    body = {"first_name": "Idem", "last_name": "Retry", "confirm_duplicate": True}
+
+    r1 = client.post("/api/facilitators", json=body, headers=hdr)
+    assert r1.status_code == 200, r1.text
+    r2 = client.post("/api/facilitators", json=body, headers=hdr)
+    assert r2.status_code == 200, r2.text
+    assert r1.json()["facilitator_id"] == r2.json()["facilitator_id"]
+
+    facs = client.get("/api/facilitators", headers=hdr).json()
+    matches = [f for f in facs if f["first_name"] == "Idem" and f["last_name"] == "Retry"]
+    assert len(matches) == 1
+
+
+def test_facilitator_create_different_idempotency_keys_both_apply(client):
+    from app.security import reset_idempotency_cache
+    reset_idempotency_cache()
+    hdr = dict(_sqn_admin_hdr(client))
+
+    hdr["Idempotency-Key"] = "test-idem-key-002a"
+    r1 = client.post("/api/facilitators", json={"first_name": "Idem", "last_name": "First"}, headers=hdr)
+    assert r1.status_code == 200, r1.text
+
+    hdr["Idempotency-Key"] = "test-idem-key-002b"
+    r2 = client.post("/api/facilitators", json={"first_name": "Idem", "last_name": "Second"}, headers=hdr)
+    assert r2.status_code == 200, r2.text
+    assert r1.json()["facilitator_id"] != r2.json()["facilitator_id"]
+
+
+def test_facilitator_create_without_idempotency_key_unaffected(client):
+    """No header at all -- today's behaviour (each call is independent) is unchanged."""
+    hdr = _sqn_admin_hdr(client)
+    r1 = client.post("/api/facilitators", json={"first_name": "Idem", "last_name": "NoKeyOne"}, headers=hdr)
+    assert r1.status_code == 200, r1.text
+    r2 = client.post("/api/facilitators", json={"first_name": "Idem", "last_name": "NoKeyTwo"}, headers=hdr)
+    assert r2.status_code == 200, r2.text
+    assert r1.json()["facilitator_id"] != r2.json()["facilitator_id"]
+
+
+# ─────────────────────────────────────────────────────────────
 # TRGO-08: Mission Backlog date-range filter
 # ─────────────────────────────────────────────────────────────
 

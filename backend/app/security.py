@@ -115,6 +115,38 @@ def reset_api_rate_limiter() -> None:
     _api_hits.clear()
 
 
+# ── Idempotency-key deduplication (in-memory, single-worker) ────────────────
+# Same caveat as the rate limiters above: per-worker only, not shared across
+# gunicorn workers -- replace with Redis for true distribution in production.
+# Protects against a genuine network-level retry (client times out, resends
+# the same request) creating a duplicate write. Client-side button-disable
+# already covers the common double-click case; this covers the case that
+# doesn't -- a request the client believes failed but the server actually
+# completed.
+_idempotency_cache: dict[str, tuple[float, int, dict]] = {}
+_IDEMPOTENCY_TTL_SEC = 300
+
+
+def idempotency_get(key: str) -> tuple[int, dict] | None:
+    """Return the cached (status_code, body) for this key if present and unexpired."""
+    entry = _idempotency_cache.get(key)
+    if not entry:
+        return None
+    expires_at, status_code, body = entry
+    if time.time() > expires_at:
+        _idempotency_cache.pop(key, None)
+        return None
+    return status_code, body
+
+
+def idempotency_set(key: str, status_code: int, body: dict) -> None:
+    _idempotency_cache[key] = (time.time() + _IDEMPOTENCY_TTL_SEC, status_code, body)
+
+
+def reset_idempotency_cache() -> None:
+    _idempotency_cache.clear()
+
+
 # ── DB-backed per-IP rate limiter (works across gunicorn workers) ──────────────
 # Replaces the in-memory dicts above for production use. Uses IpLoginAttempt
 # table so state is shared across all workers.

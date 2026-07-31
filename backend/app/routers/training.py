@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json as _json
 
-from fastapi import APIRouter, Depends, Request, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, Request, HTTPException, UploadFile, File, Header
 from pydantic import BaseModel
 from typing import List, Optional
 from sqlalchemy.orm import Session as DBSession
@@ -611,10 +611,20 @@ def list_facs(squadron_id: str | None = None, db: DBSession = Depends(get_db), p
 
 
 @router.post("/facilitators")
-def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
+            idempotency_key: str | None = Header(None, alias="Idempotency-Key")):
     from sqlalchemy import func
+    from ..security import idempotency_get, idempotency_set
     if p.role in _WRITE_BLOCKED:
         raise HTTPException(403, detail={"error": "forbidden"})
+    # A retried POST after a client-perceived timeout must not create a second
+    # facilitator, most importantly when confirm_duplicate=true (the "Add
+    # anyway" resubmit) -- that path has no other duplicate protection at all.
+    idem_cache_key = f"{p.user_id}:facilitators:{idempotency_key}" if idempotency_key else None
+    if idem_cache_key:
+        cached = idempotency_get(idem_cache_key)
+        if cached is not None:
+            return cached[1]
     sq_id = _active_squadron(p)
     if not sq_id:
         require_can_write_squadron(p, "none", None)
@@ -648,7 +658,10 @@ def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends
     db.add(FacilitatorRankHistory(facilitator_id=f.id, rank=body.current_rank, effective_from=str(utcnow().date())))
     db.commit()
     audit(db, p, object_type="facilitator", object_id=f.id, action="create")
-    return {"ok": True, "facilitator_id": f.id}
+    result = {"ok": True, "facilitator_id": f.id}
+    if idem_cache_key:
+        idempotency_set(idem_cache_key, 200, result)
+    return result
 
 
 @router.get("/facilitators/import/template.csv")
