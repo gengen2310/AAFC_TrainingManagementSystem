@@ -64,13 +64,28 @@ EOF
 # this guard exists to prevent from recurring silently.
 if [ "${RAILWAY_ENVIRONMENT_NAME:-}" = "production" ]; then
   META_LINES="$(grep -E '<meta name="aafc-(api-base|tms-base)"' /usr/share/nginx/html/index.html)"
-  for forbidden in "backend-staging" "frontend-staging" "planning-workspace-preview-staging" "localhost"; do
+  for forbidden in "backend-staging" "frontend-staging" "planning-workspace-preview-staging" "localhost" "127.0.0.1"; do
     if echo "$META_LINES" | grep -q "$forbidden"; then
       echo "[entrypoint] FATAL: production build's resolved config contains forbidden reference '${forbidden}' — refusing to start." >&2
       echo "$META_LINES" >&2
       exit 1
     fi
   done
+  # aafc-api-base specifically must resolve to a real, non-empty, fully-substituted
+  # value -- an empty content="" (neither VITE_API_BASE_URL nor AAFC_API_BASE set)
+  # or a leftover "__"-style placeholder (matching this file's own __PORT__/
+  # __CSP_CONNECT_SRC__/__APP_BUILD__ convention) is exactly as dangerous as
+  # pointing at the wrong environment.
+  API_BASE_LINE="$(grep -E '<meta name="aafc-api-base"' /usr/share/nginx/html/index.html || true)"
+  API_BASE_VALUE="$(echo "$API_BASE_LINE" | sed -n 's/.*content="\([^"]*\)".*/\1/p')"
+  if [ -z "$API_BASE_VALUE" ]; then
+    echo "[entrypoint] FATAL: production build's resolved aafc-api-base is empty — refusing to start." >&2
+    exit 1
+  fi
+  if echo "$API_BASE_VALUE" | grep -q "__"; then
+    echo "[entrypoint] FATAL: production build's resolved aafc-api-base looks like an unresolved placeholder ('${API_BASE_VALUE}') — refusing to start." >&2
+    exit 1
+  fi
 fi
 
 exec nginx -g "daemon off;"
