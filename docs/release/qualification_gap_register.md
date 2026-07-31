@@ -1455,3 +1455,146 @@ acceptance criteria, and is updated in place as each item closes.
   the same cross-environment variable-setting carelessness already caught once in
   GAP-19; not resolved further here since the practical fix (correct the values,
   add a guard, verify) is the same regardless of exactly when it happened.
+
+## GAP-21: Organisation/account linking, System Administrator scope, and archive visibility — three release-blocking defects, fixed and verified in production
+
+- **Source**: user report, post-release — Wings/Squadrons created in System Console not
+  appearing in Account Management; System Administrator missing National/Wing/Squadron
+  dashboards, scope switching, Proxy Mode and Intervention Mode; archiving a Wing/Squadron
+  in "Scope Map — All Wings and Units" not removing it from active views.
+
+- **Defect 1 root cause — org/account linking**: `connected-frontend/index.html` had two
+  independent "create Wing/Squadron" code paths. System Console's Scope Map form
+  (`scCreateWing`/`scCreateSquadron`) only refreshed its own Scope Map view after a
+  successful create — it never updated the shared `S.wings`/`S.squadrons` in-memory cache
+  that Account Management's org selectors and Units table read from. Account Management's
+  own "+ Create Wing/Unit" modal (`doCreateWing`/`doCreateSqn`) did refresh that cache,
+  which is why the defect only reproduced for System-Console-created units. Backend
+  linkage was already correct throughout — real UUID foreign keys, no name-based
+  matching anywhere in the org/account code.
+
+- **Defect 2 root cause — System Administrator scope**: the backend already granted
+  system_admin unconditional view access (`can_view_squadron` always `True` for
+  national-scope roles) and already allowed system_admin to enter Delegated Intervention
+  (`organisations.py`'s `enter_proxy` explicitly includes `system_admin`) — the actual
+  gaps were narrower: `dashboard.py`'s `_scope()` hardcoded system_admin to `"national"`,
+  making the Wing-dashboard chart branch structurally unreachable regardless of role;
+  `/api/reports/readiness`, `/api/reports/curriculum-coverage`, `/api/reports/wing-overview`,
+  `/api/reports/wing-phase-coverage`, and `/api/reports/wing-capability` had no
+  `squadron_id`/`wing_id` parameter for a national-scope principal to target; and the
+  frontend had zero `NAV_BY_SCOPE` entries and zero UI trigger for system_admin to select
+  a Wing/Squadron or enter Intervention Mode — the backend machinery existed, nothing
+  called it. `Principal.can_view_wing()` existed but was dead code (never called, no
+  `require_can_view_wing` helper), so each router that needed wing-level read gating had
+  reimplemented its own ad hoc, inconsistent version.
+
+- **Defect 3 root cause — archive visibility**: `GET /api/system/scope-map`
+  (`backend/app/routers/system.py`) queried Wings and Squadrons with **no `is_archived`
+  filter at all**, unlike every sibling list endpoint (`/api/wings`, `/api/squadrons`,
+  `national_overview`), which correctly filter. Archive endpoints set `is_archived`/
+  `archived_at` correctly — Scope Map's query simply never checked it. A secondary,
+  independent frontend bug compounded this: the squadron chip's styling checked
+  `s.active_status`, a field archiving never touches, and Wings had no archived-check in
+  the render loop at all.
+
+- **Fix — backend**: added `require_can_view_wing` (wiring up the previously dead
+  `can_view_wing` method); added `wing_id`/`squadron_id` query parameters (with existence
+  + view-permission checks) to the five gapped report/dashboard endpoints above, reusing
+  the exact same wing-scope code path wing_admin/wing_viewer already use so a system
+  administrator's drill-down looks identical to a Wing Admin's or Squadron Admin's own
+  view; added `include_archived` + `is_archived`/`wing_is_archived` fields and restore
+  endpoints (`POST /wings/{id}/restore`, `POST /squadrons/{id}/restore`) to
+  `organisations.py`; added the missing `is_archived` filters to `scope_map()`; added
+  duplicate-name prevention for Wing/Squadron creation (`code` was already unique,
+  `name` was not); added a guard blocking Squadron archive while active accounts remain
+  assigned (mirroring the existing Wing-archive guard against active child squadrons).
+  Write access for squadron-level protected data continues to require Delegated
+  Intervention exactly as before, for both `national_admin` and `system_admin` — this
+  gate was **not** weakened by any part of this fix.
+- **Fix — frontend**: `scCreateWing`/`scCreateSquadron` now refresh the shared org cache
+  (`_refreshOrgCache()`, a new shared helper also used by the archive/restore flows,
+  de-duplicating the two divergent create paths that caused Defect 1); `scPopulateWingSelect`
+  switched to `/api/wings` (already filtered) instead of the unfiltered scope-map; Scope
+  Map render loop now filters archived Wings/Squadrons by default, adds a "Show archived"
+  toggle plus Restore buttons, and fixes the field-name mismatch; added a System
+  Administrator scope-selector bar ("Viewing: National / a Wing / a Squadron") reusing
+  the existing `wing`/`squadron` `NAV_BY_SCOPE` entries via `effectiveScope()` (extended
+  to consult the new browsing-scope state, not just Proxy/Intervention activity) and the
+  existing `enterMode()`/`exitMode()` Intervention trigger (extended, alongside
+  `national_admin`, to the Wing Dashboard's per-squadron "Proxy" button, which was
+  previously hard-restricted to `wing_admin` only).
+- **Deliberate architectural deviation, flagged to and accepted by the user**: this
+  codebase's own `.claude/rules/frontend.md` stated "Do not add operational Squadron/Wing
+  pages to the system_admin scope" — this fix does exactly that, per explicit, detailed
+  user instruction. Not treated as an oversight; surfaced directly before implementation.
+  The rule file has not yet been updated to reflect the new intended architecture — a
+  follow-up documentation task, not a functional gap.
+
+- **Four additional defects found and fixed during live staging verification** (not
+  present in the original report — found by actually exercising the feature end-to-end
+  in a real browser as System Administrator, not just reading the diff):
+  1. The scope-selector's own Wing/Squadron dropdowns were populated once at login and
+     never refreshed after a create — a newly created Wing wouldn't appear in the
+     selector until the next login/mode-change, even though Account Management already
+     showed it correctly. Fixed by having `_refreshOrgCache()` call `saRenderScopeBar()`.
+  2. Drilling into a specific Squadron (no Wing selected) via the scope-selector returned
+     `scope: "national"` from `/api/dashboard/charts` with squadron detail silently
+     blended into a national-aggregate response — the Squadron Dashboard rendered under a
+     "National view" label and the squadron-only "tonight's readiness" section never
+     appeared, even though the underlying chart data was correct. Root cause: the
+     `squadron_id`-only branch was, by design, shared with `national_admin`/
+     `national_viewer`/`auditor`'s own pre-existing drill-down contract (documented in
+     `test_wing_squadron_view_scope.py`). Fixed narrowly, scoped to
+     `p.is_system_admin` specifically, so that pre-existing contract for other roles is
+     unchanged — confirmed by the full test suite staying green throughout.
+  3. The mode banner and debug bar read `proxyMode()==='intervention'` when the backend's
+     actual value is `'delegated_intervention'` — the comparison never matched, so
+     entering Delegated Intervention always displayed the wing_admin-style "Proxy Mode /
+     Wing" wording instead of "Delegated Intervention Mode / NAT HQ". Invisible before
+     this fix because national_admin/system_admin had no working UI trigger to enter
+     Delegated Intervention in the first place.
+  4. The new Squadron-archive active-accounts guard checked `User.is_archived == False`
+     instead of `User.active_status == True` — a *disabled* account (the documented way
+     to deactivate a user, which sets `active_status=False` but not `is_archived`) would
+     have blocked archiving the unit forever, contradicting the guard's own error message
+     ("active account(s)"). Reproduced live (created an account, disabled it, confirmed
+     archiving was still blocked before the fix and succeeded after).
+- **Tests**: 27 new regression tests (`backend/tests/test_org_account_linking.py`)
+  covering every item on the user's required list — org creation/linking by ID,
+  duplicate-name rejection, account-creation scope validation, archive/restore
+  round-trips (including the active-accounts guard and its disabled-account exemption),
+  System Administrator wing/squadron view access without Delegated Intervention,
+  Delegated Intervention entry/audit/write-then-exit, and an explicit check that
+  `wing_admin`'s own existing Proxy-Mode scope check was not loosened by this work. Full
+  suite: 886 passed, 4 skipped (up from 857/4 baseline).
+- **Staging verification — live browser, not just automated tests**: logged in as System
+  Administrator on staging and, in sequence: created a Wing and a Squadron via System
+  Console and confirmed both appeared immediately in Account Management's selectors and
+  Units table with no reload; created an account linked to the new Squadron and confirmed
+  correct role/scope; opened the National, Wing, and Squadron dashboards via the new
+  scope-selector, all rendering correctly with no Delegated Intervention required for
+  viewing; entered Delegated Intervention with a reason, confirmed it was audited
+  (`intervention_enter`, correct role/object/reason/IP), performed a real write (created a
+  parade night) which succeeded, exited cleanly; attempted to archive the Squadron while
+  an account was still assigned (correctly blocked, `has_active_accounts`), disabled the
+  account, archived successfully, confirmed the Squadron disappeared from the default
+  Scope Map and from Account Management's selectors, confirmed "Show archived" surfaced
+  it again, restored it, confirmed it returned to the active view. Each of the four
+  follow-on defects above was found, fixed, redeployed, and re-verified in this same live
+  session before moving to production.
+- **Production deployment**: five commits (`a7a49d2` core fix, then `c4c50bf`, `12d0387`,
+  `2473b64`, `80b8d80` for the four follow-on defects) deployed to production after
+  staging fully passed. Production backend and frontend both confirmed healthy (200
+  health/ready), correct commit fingerprint on both, migrations completed, no reseed
+  (`system_admin already exists — skipping bootstrap`), no production data touched or
+  reset at any point in this pass.
+- **Severity**: SEV2 — real, user-reported functional defects blocking the intended
+  System Administrator workflow and risking silent data-visibility confusion (archived
+  units remaining visible), but not a security boundary failure (all three defects were
+  UI/query completeness gaps; every underlying permission check that mattered — squadron
+  write gating, Delegated Intervention's reason+audit requirement, tenancy scoping for
+  non-system_admin roles — was already correct and was independently re-verified, not
+  weakened, by this fix).
+- **Disposition**: closed. Fixed, tested, deployed to staging then production, verified
+  live in both. Follow-up (non-blocking): update `.claude/rules/frontend.md` to reflect
+  the deliberate system_admin operational-scope architecture change.
