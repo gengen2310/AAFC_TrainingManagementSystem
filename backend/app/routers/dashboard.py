@@ -17,7 +17,7 @@ Endpoints:
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session as DBSession
@@ -29,7 +29,7 @@ from ..models import (
     CurriculumItem, Equipment, TrainingArea, PlanningFacilitatorLeave,
 )
 from ..permissions import Principal, require_role, require_can_view_squadron, require_can_view_wing
-from ..services_readiness import parade_night_readiness
+from ..services_readiness import parade_night_readiness, session_requirements
 from .training import _view_squadron_id
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -78,11 +78,19 @@ def _wing_ids_for_national(db: DBSession) -> list[dict]:
     return [{"id": r.id, "code": r.code, "name": r.name} for r in rows]
 
 
+_WINDOW_LABELS = {
+    "week": "This Week", "term": "This Term", "semester": "Semester",
+    "year": "Training Year",
+}
+
+
 def _date_window(window: str) -> tuple[str, str]:
     """Return (start_date_iso, end_date_iso) for the given window label."""
     today = date.today()
     if window == "week":
         return (today - timedelta(days=7)).isoformat(), (today + timedelta(days=7)).isoformat()
+    if window == "semester":
+        return (today - timedelta(days=182)).isoformat(), (today + timedelta(days=30)).isoformat()
     if window == "year":
         return f"{today.year}-01-01", f"{today.year}-12-31"
     # default: term ≈ last 90 days + next 30 days
@@ -1006,6 +1014,539 @@ def _wing_readiness_comparison(db: DBSession, window_start: str, window_end: str
     }
 
 
+# ── command dashboard: Wing / National (Sections A + B) ────────────────────────
+# Extends the existing Squadron dashboard upward — the Wing dashboard aggregates
+# Squadron information, the National dashboard aggregates Wing information.
+# Every chart aggregates the underlying counts first and never averages
+# per-unit percentages. Every chart carries the operational metadata (purpose/
+# measure/action/data_confidence) the command dashboard design requires, not
+# just a title and a number — see docs/release/qualification_gap_register.md
+# for the requirement this implements.
+
+_RISK_CATEGORY_LABELS = {
+    "no_facilitator": "No facilitator confirmed",
+    "no_facility": "No facility confirmed",
+    "curriculum_not_allocated": "Curriculum not allocated",
+    "activity_conflict": "Activity scheduling conflict",
+    "holiday_conflict": "Falls within a holiday period",
+}
+_RISK_CATEGORY_ACTIONS = {
+    "no_facilitator": "Assign a facilitator in Parade Nights before the session date.",
+    "no_facility": "Assign a training area in Parade Nights before the session date.",
+    "curriculum_not_allocated": "Allocate a curriculum item to this session.",
+    "activity_conflict": "Review the scheduling conflict with the affected Activity.",
+    "holiday_conflict": "Confirm whether this parade night should proceed during the holiday period.",
+}
+
+
+def _command_child_units(db: DBSession, scope: str, wing_id: str | None) -> list[dict]:
+    """Rows for the command dashboard: Squadrons for a Wing view, Wings for a
+    National view. Archived units excluded, matching every other list
+    endpoint in this codebase."""
+    if scope == "wing":
+        rows = db.query(Squadron).filter(
+            Squadron.wing_id == wing_id, Squadron.is_archived == False,  # noqa: E712
+        ).order_by(Squadron.code).all()
+        return [{"id": r.id, "code": r.code, "name": r.short_name or r.name, "kind": "squadron"} for r in rows]
+    rows = db.query(Wing).filter(Wing.is_archived == False).order_by(Wing.code).all()  # noqa: E712
+    return [{"id": r.id, "code": r.code, "name": r.name, "kind": "wing"} for r in rows]
+
+
+def _unit_session_filter(kind: str, unit_id: str):
+    """SQLAlchemy filter clause selecting ParadeNight rows owned by one child unit."""
+    if kind == "squadron":
+        return ParadeNight.squadron_id == unit_id
+    return ParadeNight.wing_id == unit_id
+
+
+def _unit_pns_and_sessions(db: DBSession, kind: str, unit_id: str, window_start: str, window_end: str):
+    pns = db.query(ParadeNight).filter(
+        _unit_session_filter(kind, unit_id),
+        ParadeNight.date >= window_start, ParadeNight.date <= window_end,
+        ParadeNight.is_archived == False,  # noqa: E712
+    ).all()
+    pn_ids = [pn.id for pn in pns]
+    sessions = db.query(Session).filter(
+        Session.parade_night_id.in_(pn_ids), Session.is_archived == False,  # noqa: E712
+    ).all() if pn_ids else []
+    return pns, sessions
+
+
+def _next_unit_readiness(db: DBSession, kind: str, unit_id: str) -> dict | None:
+    """Next programmed parade night for one child unit and its readiness
+    computation — services_readiness.parade_night_readiness(), the same single
+    authoritative computation the Squadron dashboard's own "tonight" card
+    uses. Returns None if nothing is programmed yet (never fabricates a 0%)."""
+    today_str = date.today().isoformat()
+    pns = db.query(ParadeNight).filter(
+        _unit_session_filter(kind, unit_id),
+        ParadeNight.date >= today_str, ParadeNight.is_archived == False,  # noqa: E712
+    ).order_by(ParadeNight.date).all()
+    if not pns:
+        return None
+    next_pn = pns[0]
+    sessions = db.query(Session).filter(
+        Session.parade_night_id == next_pn.id, Session.is_archived == False,  # noqa: E712
+    ).all()
+    readiness = parade_night_readiness([_session_to_readiness_dict(s) for s in sessions])
+    return {"parade_night": next_pn, "readiness": readiness}
+
+
+def _unit_readiness_trend(db: DBSession, kind: str, unit_id: str, current_pct: int | None) -> str:
+    """Compare the upcoming parade night's readiness to the most recently
+    completed one — a genuine trend from real prior data, not a guess.
+    Returns 'up' | 'down' | 'flat' | 'no_data'. A None current_pct (the
+    upcoming night itself has zero sessions — "not_planned") always yields
+    'no_data': there is nothing numeric to compare."""
+    if current_pct is None:
+        return "no_data"
+    today_str = date.today().isoformat()
+    prev_pns = db.query(ParadeNight).filter(
+        _unit_session_filter(kind, unit_id),
+        ParadeNight.date < today_str, ParadeNight.is_archived == False,  # noqa: E712
+    ).order_by(ParadeNight.date.desc()).limit(1).all()
+    if not prev_pns:
+        return "no_data"
+    prev_sessions = db.query(Session).filter(
+        Session.parade_night_id == prev_pns[0].id, Session.is_archived == False,  # noqa: E712
+    ).all()
+    prev_readiness = parade_night_readiness([_session_to_readiness_dict(s) for s in prev_sessions])
+    if prev_readiness["planning_status"] == "not_planned":
+        # The previous PN also had zero sessions — legacy_score there is the
+        # same fabricated-100 legacy value, not a real prior readiness to
+        # compare against.
+        return "no_data"
+    prev_pct = prev_readiness["legacy_score"]
+    if current_pct > prev_pct:
+        return "up"
+    if current_pct < prev_pct:
+        return "down"
+    return "flat"
+
+
+def _matrix_cell(numerator: int | None, denominator: int | None, missing_label: str,
+                  data_available: bool = True, unavailable_reason: str | None = None) -> dict:
+    """One cell of a readiness matrix column: status/numerator/denominator/
+    warning/exception_reason — honestly distinguishing "no data" from "zero"
+    rather than collapsing both into the same 0%."""
+    if not data_available:
+        return {"status": "no_data", "numerator": None, "denominator": None, "pct": None,
+                "warning": False, "exception_reason": unavailable_reason or "Data not available.",
+                "data_available": False}
+    if not denominator:
+        return {"status": "no_data", "numerator": 0, "denominator": 0, "pct": None,
+                "warning": False, "exception_reason": "No sessions scheduled.", "data_available": True}
+    pct = round(numerator / denominator * 100)
+    if numerator == denominator:
+        status, warning, reason = "ok", False, None
+    elif numerator == 0:
+        status, warning, reason = "critical", True, f"No sessions have {missing_label}."
+    else:
+        status, warning = "warning", True
+        reason = f"{denominator - numerator} of {denominator} session(s) missing {missing_label}."
+    return {"status": status, "numerator": numerator, "denominator": denominator, "pct": pct,
+            "warning": warning, "exception_reason": reason, "data_available": True}
+
+
+def _readiness_matrix(db: DBSession, scope: str, units: list[dict]) -> dict:
+    """A1 — Next parade night readiness matrix. Wing view: rows = Squadrons.
+    National view: rows = Wings."""
+    rows = []
+    reporting = 0
+    for u in units:
+        next_r = _next_unit_readiness(db, u["kind"], u["id"])
+        if next_r is None:
+            rows.append({
+                "unit_id": u["id"], "label": u["code"], "name": u["name"], "status": "no_data",
+                "sessions_planned": _matrix_cell(0, 0, "n/a"),
+                "curriculum_allocated": _matrix_cell(None, None, "curriculum allocated", False,
+                                                      "No parade night programmed yet."),
+                "facilitator_confirmed": _matrix_cell(None, None, "a facilitator", False,
+                                                       "No parade night programmed yet."),
+                "facility_confirmed": _matrix_cell(None, None, "a facility", False,
+                                                    "No parade night programmed yet."),
+                "equipment_confirmed": _matrix_cell(None, None, "equipment", False,
+                                                     "Equipment confirmation is not tracked per session in this system."),
+                "overall_readiness": _matrix_cell(0, 0, "n/a"),
+                "trend": "no_data", "last_update": None,
+                "exception_reason": "No upcoming parade night programmed.",
+            })
+            continue
+        reporting += 1
+        readiness = next_r["readiness"]
+        sess = readiness["sessions"]
+        total = readiness["sessions_total"]
+        curriculum_n = sum(1 for s in sess if s["requirements"]["checks"]["curriculum_assigned"])
+        facilitator_n = sum(1 for s in sess if s["requirements"]["checks"]["facilitator_assigned"])
+        facility_n = sum(1 for s in sess if s["requirements"]["checks"]["room_assigned"])
+        # legacy_score is hard-coded to 100 for a zero-session ("not_planned")
+        # parade night by services_readiness.py's own explicit design (a
+        # legacy-consumer compatibility value) — it must NEVER be read as "100%
+        # ready" here, which is exactly the class of bug that module's own
+        # docstring documents fixing elsewhere. A not-planned night reports no
+        # numeric readiness at all, honestly, rather than a fabricated 100%.
+        overall_pct = None if readiness["planning_status"] == "not_planned" else readiness["legacy_score"]
+        trend = _unit_readiness_trend(db, u["kind"], u["id"], overall_pct)
+        overall_status = {"planned": "ok", "partly_planned": "warning", "at_risk": "critical",
+                          "blocked": "critical", "not_planned": "no_data"}[readiness["planning_status"]]
+        rows.append({
+            "unit_id": u["id"], "label": u["code"], "name": u["name"], "status": overall_status,
+            "sessions_planned": {"status": "ok", "numerator": total, "denominator": None, "pct": None,
+                                 "warning": False, "exception_reason": None, "data_available": True},
+            "curriculum_allocated": _matrix_cell(curriculum_n, total, "a curriculum item"),
+            "facilitator_confirmed": _matrix_cell(facilitator_n, total, "a facilitator"),
+            "facility_confirmed": _matrix_cell(facility_n, total, "a facility"),
+            "equipment_confirmed": _matrix_cell(None, None, "equipment", False,
+                                                 "Equipment confirmation is not tracked per session in this system."),
+            "overall_readiness": {
+                "status": overall_status, "numerator": readiness["sessions_ready"], "denominator": total,
+                "pct": overall_pct, "warning": overall_status != "ok",
+                "exception_reason": None if overall_status == "ok" else readiness["requirements_summary"],
+                "data_available": True,
+            },
+            "trend": trend,
+            "last_update": next_r["parade_night"].updated_at.isoformat()
+                if getattr(next_r["parade_night"], "updated_at", None) else None,
+            "exception_reason": None if overall_status == "ok" else readiness["requirements_summary"],
+        })
+
+    at_risk = sum(1 for r in rows if r["status"] in ("critical", "warning"))
+    unit_noun = "Squadrons" if scope == "wing" else "Wings"
+    insight = (f"{at_risk} of {len(rows)} {unit_noun} have an unresolved readiness gap for their next parade night."
+               if rows else None)
+    return {
+        "chart_id": "readiness_matrix",
+        "title": "Next parade night readiness",
+        "purpose": "Determine whether subordinate units can deliver the next programmed training activity and identify matters requiring immediate command attention.",
+        "measure": "Sessions with a curriculum item, facilitator and facility confirmed, against the total sessions programmed for each unit's next parade night.",
+        "assessment": insight or "No subordinate units report an upcoming parade night.",
+        "action": "Direct corrective action, coordinate support, approve an alternate arrangement, accept identified risk, or initiate intervention for units showing a readiness gap.",
+        "question": "Which subordinate formations or units are ready to deliver the next training activity?",
+        "chart_type": "readiness_matrix",
+        "columns": ["sessions_planned", "curriculum_allocated", "facilitator_confirmed",
+                    "facility_confirmed", "equipment_confirmed", "overall_readiness"],
+        "data": rows,
+        "insight": insight,
+        "empty_state": "No subordinate units in scope.",
+        "drill_down": {"route": "parade-nights",
+                       "filters": ({"squadron_id": "{{unit_id}}"} if scope == "wing" else {"wing_id": "{{unit_id}}"})},
+        "data_confidence": {"units_reporting": reporting, "units_expected": len(units),
+                            "completeness_pct": round(reporting / len(units) * 100) if units else None},
+    }
+
+
+def _risk_forecast(db: DBSession, scope: str, wing_id: str | None, units: list[dict]) -> dict:
+    """A2 — Eight-week training risk forecast. Real, non-fabricated risk
+    categories only: no_facilitator/no_facility/curriculum_not_allocated are
+    derived directly from session_requirements(); activity_conflict from the
+    Activity model; holiday_conflict from HolidayPeriod (affects_parade=True).
+    Equipment availability has no per-session confirmation model in this
+    schema — reported as a distinct, honestly-labelled data-confidence gap,
+    never fabricated."""
+    from ..models import Activity, HolidayPeriod, PlanningYear
+
+    today = date.today()
+    horizon = (today + timedelta(weeks=8)).isoformat()
+    today_str = today.isoformat()
+
+    unit_ids = [u["id"] for u in units]
+    unit_by_id = {u["id"]: u for u in units}
+
+    # Activities in the forecast window, grouped by owning unit + date.
+    if scope == "wing":
+        activities = db.query(Activity).filter(
+            Activity.squadron_id.in_(unit_ids), Activity.date_start >= today_str,
+            Activity.date_start <= horizon, Activity.is_archived == False,  # noqa: E712
+        ).all() if unit_ids else []
+        activity_dates: dict[str, set[str]] = defaultdict(set)
+        for a in activities:
+            if a.squadron_id:
+                activity_dates[a.squadron_id].add(a.date_start)
+    else:
+        activities = db.query(Activity).filter(
+            Activity.wing_id.in_(unit_ids), Activity.date_start >= today_str,
+            Activity.date_start <= horizon, Activity.is_archived == False,  # noqa: E712
+        ).all() if unit_ids else []
+        activity_dates = defaultdict(set)
+        for a in activities:
+            if a.wing_id:
+                activity_dates[a.wing_id].add(a.date_start)
+
+    # Holiday periods affecting parade nights, resolved via each unit's own
+    # PlanningYear(s) — a real, existing model, not a fabricated check.
+    holiday_ranges_by_unit: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    if scope == "wing":
+        pys = db.query(PlanningYear).filter(PlanningYear.unit_id.in_(unit_ids)).all() if unit_ids else []
+        py_to_unit = {py.id: py.unit_id for py in pys}
+    else:
+        pys = db.query(PlanningYear).filter(PlanningYear.wing_id.in_(unit_ids)).all() if unit_ids else []
+        py_to_unit = {py.id: py.wing_id for py in pys}
+    if pys:
+        holidays = db.query(HolidayPeriod).filter(
+            HolidayPeriod.planning_year_id.in_(list(py_to_unit.keys())),
+            HolidayPeriod.affects_parade == True,  # noqa: E712
+            HolidayPeriod.end_date >= today_str, HolidayPeriod.start_date <= horizon,
+        ).all()
+        for h in holidays:
+            unit_id = py_to_unit.get(h.planning_year_id)
+            if unit_id:
+                holiday_ranges_by_unit[unit_id].append((h.start_date, h.end_date))
+
+    items = []
+    for u in units:
+        pns, sessions = _unit_pns_and_sessions(db, u["kind"], u["id"], today_str, horizon)
+        pn_date_by_id = {pn.id: pn.date for pn in pns}
+        sess_by_pn: dict[str, list] = defaultdict(list)
+        for s in sessions:
+            sess_by_pn[s.parade_night_id].append(s)
+        for pn in pns:
+            pn_sessions = sess_by_pn.get(pn.id, [])
+            reqs_per_session = [session_requirements(_session_to_readiness_dict(s)) for s in pn_sessions]
+            no_fac = sum(1 for r in reqs_per_session if not r["checks"]["facilitator_assigned"])
+            no_fac_ct = sum(1 for r in reqs_per_session if not r["checks"]["room_assigned"])
+            no_curr = sum(1 for r in reqs_per_session if not r["checks"]["curriculum_assigned"])
+            has_activity_conflict = pn.date in activity_dates.get(u["id"], set())
+            has_holiday_conflict = any(start <= pn.date <= end for start, end in holiday_ranges_by_unit.get(u["id"], []))
+            severity = "high" if pn.date <= (today + timedelta(weeks=2)).isoformat() else "medium"
+            for cat, count in (("no_facilitator", no_fac), ("no_facility", no_fac_ct), ("curriculum_not_allocated", no_curr)):
+                if count:
+                    items.append({
+                        "date": pn.date, "unit_id": u["id"], "unit_label": u["code"],
+                        "parade_night_id": pn.id, "category": cat,
+                        "category_label": _RISK_CATEGORY_LABELS[cat],
+                        "affected_sessions": count, "severity": severity,
+                        "action": _RISK_CATEGORY_ACTIONS[cat],
+                    })
+            if has_activity_conflict:
+                items.append({
+                    "date": pn.date, "unit_id": u["id"], "unit_label": u["code"],
+                    "parade_night_id": pn.id, "category": "activity_conflict",
+                    "category_label": _RISK_CATEGORY_LABELS["activity_conflict"],
+                    "affected_sessions": len(pn_sessions), "severity": severity,
+                    "action": _RISK_CATEGORY_ACTIONS["activity_conflict"],
+                })
+            if has_holiday_conflict:
+                items.append({
+                    "date": pn.date, "unit_id": u["id"], "unit_label": u["code"],
+                    "parade_night_id": pn.id, "category": "holiday_conflict",
+                    "category_label": _RISK_CATEGORY_LABELS["holiday_conflict"],
+                    "affected_sessions": len(pn_sessions), "severity": severity,
+                    "action": _RISK_CATEGORY_ACTIONS["holiday_conflict"],
+                })
+
+    items.sort(key=lambda x: x["date"])
+
+    weekly: dict[str, dict] = defaultdict(lambda: {"label": "", **{c: 0 for c in _RISK_CATEGORY_LABELS}})
+    for it in items:
+        wk = _iso_week(it["date"])
+        weekly[wk]["label"] = wk
+        weekly[wk][it["category"]] += 1
+    weekly_data = sorted(weekly.values(), key=lambda r: r["label"])
+
+    insight = None
+    if items:
+        by_cat: dict[str, int] = defaultdict(int)
+        for it in items:
+            by_cat[it["category"]] += 1
+        top_cat = max(by_cat, key=by_cat.get)
+        insight = f"{len(items)} risk item(s) identified in the next 8 weeks — most common: {_RISK_CATEGORY_LABELS[top_cat]} ({by_cat[top_cat]})."
+
+    return {
+        "chart_id": "risk_forecast",
+        "title": "Eight-week training risk forecast",
+        "purpose": "Identify what programmed training is at risk within the next eight weeks, before forecast deficiencies become failed training outcomes.",
+        "measure": "Parade nights in the next 8 weeks with an unresolved facilitator, facility, curriculum, activity-conflict or holiday-conflict deficiency.",
+        "assessment": insight or "No risk items identified in the next 8 weeks.",
+        "action": "Act on flagged items before the affected parade night, prioritising items marked high severity (within 2 weeks).",
+        "question": "What programmed training is at risk within the next eight weeks?",
+        "chart_type": "risk_timeline",
+        "weekly": weekly_data,
+        "data": items[:200],
+        "insight": insight,
+        "empty_state": "No training risk identified in the next 8 weeks.",
+        "drill_down": {"route": "parade-nights", "filters": {"date": "{{date}}"}},
+        "data_confidence": {
+            "categories_tracked": list(_RISK_CATEGORY_LABELS.keys()),
+            "categories_not_available": ["equipment_unavailable"],
+            "note": "Equipment availability is not confirmed per session in this system — not included above.",
+        },
+    }
+
+
+def _immediate_issues(risk_items: list[dict], units: list[dict], scope: str) -> dict:
+    """A3 — Immediate issues requiring support, ranked by unit. Reuses the
+    near-term (next 2 weeks) slice of A2's real risk items — no separate
+    fabricated count."""
+    by_unit: dict[str, dict] = {u["id"]: {"unit_id": u["id"], "label": u["code"], "name": u["name"],
+                                          **{c: 0 for c in _RISK_CATEGORY_LABELS}, "total": 0}
+                                for u in units}
+    for it in risk_items:
+        if it["severity"] != "high":
+            continue
+        row = by_unit.get(it["unit_id"])
+        if row is None:
+            continue
+        row[it["category"]] += it["affected_sessions"]
+        row["total"] += it["affected_sessions"]
+
+    data = sorted([r for r in by_unit.values() if r["total"] > 0], key=lambda x: -x["total"])
+    unit_noun = "Squadron" if scope == "wing" else "Wing"
+    insight = f"{data[0]['label']} currently requires the greatest command attention ({data[0]['total']} unresolved item(s))." if data else None
+
+    return {
+        "chart_id": "immediate_issues",
+        "title": "Immediate issues requiring support",
+        "purpose": "Identify which subordinate formation or unit currently requires the greatest command attention.",
+        "measure": "Unresolved facilitator, facility, curriculum, and scheduling-conflict items due within the next 2 weeks, by unit.",
+        "assessment": insight or f"No {unit_noun.lower()} currently has an unresolved issue due within 2 weeks.",
+        "action": "Establish support and intervention priorities, starting with the highest-ranked unit.",
+        "question": f"Which subordinate formation or unit currently requires the greatest command attention?",
+        "chart_type": "stacked_bar_horizontal",
+        "x_axis": "Unresolved items (next 2 weeks)",
+        "y_axis": unit_noun,
+        "series": [{"key": k, "label": v} for k, v in _RISK_CATEGORY_LABELS.items()],
+        "data": data,
+        "insight": insight,
+        "empty_state": "No immediate issues requiring support.",
+        "drill_down": {"route": "parade-nights",
+                       "filters": ({"squadron_id": "{{unit_id}}"} if scope == "wing" else {"wing_id": "{{unit_id}}"})},
+    }
+
+
+def _command_weekly_delivered(all_sessions: list, all_pns: list) -> dict:
+    """B1 — Training delivered each week, aggregated across the whole scope
+    (all subordinate units' sessions combined, counted first — not averaged)."""
+    chart = _weekly_outcomes(all_sessions, all_pns)
+    chart.update({
+        "purpose": "Assess whether the approved training program is being delivered across all subordinate units.",
+        "measure": "Sessions by outcome (delivered / delivered with issue / cancelled / not delivered / planned) per week, summed across all subordinate units.",
+        "assessment": chart.get("insight") or "No sessions recorded for this period.",
+        "action": "Investigate degradation, confirm recovery, or note sustained delivery performance to command.",
+    })
+    return chart
+
+
+def _command_reliability_trend(all_sessions: list, all_pns: list) -> dict:
+    """B2 — Delivery reliability, 12-week trend, aggregated across scope.
+    Thresholds are labelled explicitly, not colour-only."""
+    chart = _delivery_trend(all_sessions, all_pns)
+    chart.update({
+        "purpose": "Assess whether delivery reliability across subordinate units is improving, stable or deteriorating.",
+        "measure": "Delivered sessions divided by sessions due for delivery, aggregated across all subordinate units, per week.",
+        "assessment": chart.get("insight") or "Not enough delivery history to assess a trend.",
+        "action": "Assess whether command action is producing the required effect; escalate if reliability is deteriorating.",
+        "threshold_labels": {
+            "80": "80% or greater — meeting reference.",
+            "60": "60–79% — command attention required.",
+            "0": "Below 60% — significant delivery deficiency.",
+        },
+    })
+    return chart
+
+
+def _outcomes_by_unit(db: DBSession, scope: str, units: list[dict], window_start: str, window_end: str) -> dict:
+    """B3 — Session outcomes by subordinate scope, 100%-stacked. Wing view:
+    one bar per Squadron. National view: one bar per Wing. Raw counts are
+    kept alongside percentages — the denominator is never hidden."""
+    rows = []
+    for u in units:
+        _, sessions = _unit_pns_and_sessions(db, u["kind"], u["id"], window_start, window_end)
+        counts = {"delivered": 0, "delivered_with_issue": 0, "cancelled": 0, "not_delivered": 0, "outstanding": 0}
+        for s in sessions:
+            st = s.status or "planned"
+            if st in ("delivered", "delivered_with_issue", "cancelled", "not_delivered"):
+                counts[st] += 1
+            else:
+                counts["outstanding"] += 1
+        total = sum(counts.values())
+        pct = {k: (round(v / total * 100) if total else 0) for k, v in counts.items()}
+        rows.append({"unit_id": u["id"], "label": u["code"], "name": u["name"],
+                     "total": total, "counts": counts, "pct": pct})
+
+    unit_noun = "Squadron" if scope == "wing" else "Wing"
+    isolated = sum(1 for r in rows if r["total"] and r["pct"]["delivered"] + r["pct"]["delivered_with_issue"] < 60)
+    insight = (f"{isolated} of {len(rows)} {unit_noun}s below 60% delivered this period."
+               if rows and isolated else ("Delivery performance is consistent across all units." if rows else None))
+
+    return {
+        "chart_id": "outcomes_by_unit",
+        "title": f"Session outcomes by {unit_noun.lower()}",
+        "purpose": "Determine whether reduced delivery performance is isolated to one unit or systemic across the formation.",
+        "measure": "Delivered, delivered-with-issue, cancelled, not-delivered and outstanding sessions per unit, shown as a percentage of that unit's own total.",
+        "assessment": insight or "No session data for this period.",
+        "action": "Determine the appropriate level of command action — local correction for an isolated unit, coordinated action if systemic.",
+        "question": "Is reduced delivery performance isolated or systemic?",
+        "chart_type": "stacked_bar_horizontal_100",
+        "x_axis": "% of sessions",
+        "y_axis": unit_noun,
+        "series": [
+            {"key": "delivered", "label": "Delivered", "color": _STATUS_COLORS["delivered"]},
+            {"key": "delivered_with_issue", "label": "Delivered (with issue)", "color": _STATUS_COLORS["delivered_with_issue"]},
+            {"key": "cancelled", "label": "Cancelled", "color": _STATUS_COLORS["cancelled"]},
+            {"key": "not_delivered", "label": "Not Delivered", "color": _STATUS_COLORS["not_delivered"]},
+            {"key": "outstanding", "label": "Outcome outstanding", "color": "#b0b7bb"},
+        ],
+        "data": rows,
+        "insight": insight,
+        "empty_state": "No session data for this period.",
+        "drill_down": {"route": "parade-nights",
+                       "filters": ({"squadron_id": "{{unit_id}}"} if scope == "wing" else {"wing_id": "{{unit_id}}"})},
+    }
+
+
+def _cancellation_pareto(all_sessions: list) -> dict:
+    """B4 — Cancellation and non-delivery causes, aggregated across scope,
+    with cumulative percentage (a genuine Pareto chart, not just a ranked bar)."""
+    today_str = date.today().isoformat()
+    reason_cnt: dict[str, int] = defaultdict(int)
+    for s in all_sessions:
+        reason = None
+        if s.status == "cancelled":
+            reason = (s.cancelled_reason or "").strip() or _REASON_NOT_RECORDED_LABEL
+        elif s.status == "not_delivered":
+            reason = (s.not_delivered_reason or "").strip() or _REASON_NOT_RECORDED_LABEL
+        if reason:
+            if reason != _REASON_NOT_RECORDED_LABEL:
+                reason = reason[:60] + ("…" if len(reason) > 60 else "")
+            reason_cnt[reason] += 1
+
+    ranked = sorted(reason_cnt.items(), key=lambda x: -x[1])[:12]
+    total = sum(c for _, c in ranked)
+    running = 0
+    data = []
+    for label, count in ranked:
+        running += count
+        data.append({
+            "label": label, "count": count,
+            "data_quality_gap": label == _REASON_NOT_RECORDED_LABEL,
+            "cumulative_pct": round(running / total * 100) if total else 0,
+        })
+
+    real_data = [d for d in data if not d["data_quality_gap"]]
+    insight = None
+    if real_data:
+        insight = f"Most common cause: \"{real_data[0]['label']}\" ({real_data[0]['count']} sessions, {real_data[0]['cumulative_pct']}% cumulative)."
+    elif data:
+        insight = f"{data[0]['count']} cancelled/not-delivered session(s) have no reason recorded yet."
+
+    return {
+        "chart_id": "cancellation_pareto",
+        "title": "Cancellation and non-delivery causes",
+        "purpose": "Identify which causes account for the majority of failed training across the formation.",
+        "measure": "Cancelled and not-delivered sessions grouped by recorded reason, ranked by frequency, with cumulative percentage.",
+        "assessment": insight or "No cancellations or non-delivered sessions in this period.",
+        "action": "Concentrate command effort on the causes producing the greatest operational effect (the top of the Pareto ranking).",
+        "question": "Which causes account for the majority of failed training?",
+        "chart_type": "pareto",
+        "x_axis": "Reason",
+        "y_axis": "Sessions",
+        "data": data,
+        "insight": insight,
+        "empty_state": "No cancellations or not-delivered sessions in this period.",
+        "drill_down": {"route": "parade-nights", "filters": {"status": "not_delivered"}},
+    }
+
+
 # ── strategic chart builders ──────────────────────────────────────────────────
 
 def _facilitator_capability_dependency(sessions: list) -> dict:
@@ -1556,4 +2097,105 @@ def get_facilitator_schedule(
         "window_end": w_end,
         "facilitators": facilitators,
         "items": items,
+    }
+
+
+@router.get("/command")
+def get_command_dashboard(
+    window: str = Query("term", pattern="^(week|term|semester|year)$"),
+    wing_id: str | None = Query(None, description="National-scope only: view a specific Wing's command dashboard (requires view access to that Wing)"),
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Wing and National Training Dashboard — Sections A (Immediate Training
+    Readiness) and B (Training Delivery Performance). Extends the Squadron
+    dashboard upward: the Wing dashboard aggregates Squadron information, the
+    National dashboard aggregates Wing information — the underlying counts
+    are always aggregated first, never averaged as per-unit percentages.
+
+    Not applicable to squadron-scope principals — /api/dashboard/charts
+    remains the Squadron dashboard's own data source; this endpoint is
+    Wing/National only, matching the brief's explicit two-scope requirement.
+
+    View access requires no Proxy/Delegated Intervention Mode (can_view_wing/
+    can_view_squadron already grant it) — this endpoint performs no writes.
+    """
+    scope = _scope(p)
+    w_start, w_end = _date_window(window)
+
+    if scope == "squadron":
+        raise HTTPException(400, detail={
+            "error": "not_applicable",
+            "message": "The command dashboard is a Wing/National view. See /api/dashboard/charts for the Squadron dashboard.",
+        })
+
+    resolved_wing_id: str | None = None
+    resolved_wing_name: str | None = None
+    if scope == "wing":
+        resolved_wing_id = p.acting_wing_id or p.wing_id
+        if not resolved_wing_id:
+            return {"scope": scope, "window": window, "error": "no_wing_scope", "sections": {}}
+        w = db.get(Wing, resolved_wing_id)
+        resolved_wing_name = w.name if w else None
+    elif wing_id:
+        # National-scope principal (national_admin/national_viewer/system_admin/
+        # auditor) drilling into a specific Wing's command dashboard — view-only,
+        # mirrors the same wing_id pattern already used by /charts and the
+        # /reports/* endpoints.
+        w = db.get(Wing, wing_id)
+        if not w:
+            raise HTTPException(404, detail={"error": "wing_not_found"})
+        require_can_view_wing(p, wing_id)
+        scope = "wing"
+        resolved_wing_id = wing_id
+        resolved_wing_name = w.name
+
+    units = _command_child_units(db, scope, resolved_wing_id)
+
+    # Section A — Immediate Training Readiness (not period-bound; "next" by definition)
+    readiness_matrix = _readiness_matrix(db, scope, units)
+    risk = _risk_forecast(db, scope, resolved_wing_id, units)
+    immediate_issues = _immediate_issues(risk["data"], units, scope)
+
+    # Section B — Training Delivery Performance (period-bound; aggregate counts first)
+    all_pns: list = []
+    all_sessions: list = []
+    units_with_data = 0
+    for u in units:
+        pns, sessions = _unit_pns_and_sessions(db, u["kind"], u["id"], w_start, w_end)
+        if pns:
+            units_with_data += 1
+        all_pns.extend(pns)
+        all_sessions.extend(sessions)
+
+    weekly_delivered = _command_weekly_delivered(all_sessions, all_pns)
+    reliability_trend = _command_reliability_trend(all_sessions, all_pns)
+    outcomes_by_unit = _outcomes_by_unit(db, scope, units, w_start, w_end)
+    cancellation_pareto = _cancellation_pareto(all_sessions)
+
+    return {
+        "scope": scope,
+        "wing_id": resolved_wing_id,
+        "wing_name": resolved_wing_name,
+        "window": window,
+        "period": {"label": _WINDOW_LABELS.get(window, window), "start": w_start, "end": w_end},
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "units_in_scope": len(units),
+        "data_confidence": {
+            "units_reporting": units_with_data, "units_expected": len(units),
+            "completeness_pct": round(units_with_data / len(units) * 100) if units else None,
+        },
+        "sections": {
+            "A": {
+                "readiness_matrix": readiness_matrix,
+                "risk_forecast": risk,
+                "immediate_issues": immediate_issues,
+            },
+            "B": {
+                "weekly_delivered": weekly_delivered,
+                "reliability_trend": reliability_trend,
+                "outcomes_by_unit": outcomes_by_unit,
+                "cancellation_pareto": cancellation_pareto,
+            },
+        },
     }

@@ -1133,7 +1133,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       </div>
 
       <!-- WING OVERVIEW -->
-      <div id="page-wing-overview" class="page"><div id="wing-dash"></div></div>
+      <div id="page-wing-overview" class="page"><div id="cmd-dash-wing"></div><div id="wing-dash"></div></div>
 
       <!-- WING HQ CALENDAR -->
       <div id="page-wing-calendar" class="page">
@@ -1179,7 +1179,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div id="wc-body"><p class="muted">Loading Wing HQ Calendar…</p></div>
         </div>
       </div>
-      <div id="page-national" class="page"><div id="national-dash"></div></div>
+      <div id="page-national" class="page"><div id="cmd-dash-national"></div><div id="national-dash"></div></div>
       <div id="page-curriculum-coverage" class="page"><div id="coverage-host"></div></div>
       <div id="page-training-balance" class="page"><div id="balance-host"></div></div>
       <div id="page-facilitator-load" class="page"><div id="facload-host"></div></div>
@@ -3463,8 +3463,8 @@ function nav(id){
   if(id==='activities'){_loadActivitiesPage();}
   if(id==='facilitators')loadFacilitatorStats();
   if(id==='dashboard')renderDash();
-  if(id==='wing-overview')renderWing();
-  if(id==='national')renderNational();
+  if(id==='wing-overview'){renderWing();loadCommandDashboard('wing');}
+  if(id==='national'){renderNational();loadCommandDashboard('national');}
   if(id==='audit')renderAudit();
   if(id==='curriculum-coverage')renderCoverage();
   if(id==='training-balance')renderBalance();
@@ -6329,6 +6329,223 @@ function readinessDot(v){
 function heatColor(p){ p=+p||0; return p>=67?'#1a7f4b':p>=34?'#c97a00':p>0?'#e51937':'#c2ccd6'; }
 
 // ═══ WING DASHBOARD (backend: /api/reports/wing-overview + wing-phase-coverage) ═══
+// ═══════════════════════════════════════════════════════════
+//  TRAINING DASHBOARD — Wing/National command sections A + B
+// ═══════════════════════════════════════════════════════════
+// Extends the existing Squadron dashboard upward. Every chart shows Purpose/
+// Measure/Action via an info toggle, an Assessment line, and a data-confidence
+// footnote — reusing the existing _chartStackedBar/_chartLine/_chartStackedBarH
+// renderers wherever the backend's chart shape already matches them (the
+// backend deliberately reuses those same chart_ids for that reason), and
+// adding new renderers only for the genuinely new shapes (readiness matrix,
+// risk timeline, 100%-stacked bars, Pareto with cumulative %).
+const _CMD_WINDOW_LABELS={week:'This Week',term:'This Term',semester:'Semester',year:'Training Year'};
+const _CMD_STATUS_SYMBOL={ok:'✓',warning:'▲',critical:'✕',no_data:'—'};
+const _CMD_STATUS_COLOR={ok:'var(--ok)',warning:'var(--warn)',critical:'var(--red)',no_data:'var(--muted)'};
+const _CMD_TREND_SYMBOL={up:'▲ improving',down:'▼ declining',flat:'▬ steady',no_data:'no prior data'};
+let _cmdReadinessRows=[];
+let _cmdInfoSeq=0;
+
+function _cmdInfoToggle(chart){
+  const id='cmd-info-'+(_cmdInfoSeq++);
+  return `<button class="btn btn-xs" style="font-size:10px;padding:2px 6px" onclick="var e=document.getElementById('${id}');e.style.display=e.style.display==='none'?'block':'none'" aria-expanded="false" aria-controls="${id}">ℹ Purpose</button>
+    <div id="${id}" style="display:none;font-size:11px;color:var(--text-2);background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin-top:6px;width:100%">
+      <div><strong>Purpose:</strong> ${esc(chart.purpose||'')}</div>
+      <div style="margin-top:4px"><strong>Measure:</strong> ${esc(chart.measure||'')}</div>
+      <div style="margin-top:4px"><strong>Action:</strong> ${esc(chart.action||'')}</div>
+    </div>`;
+}
+
+function _cmdCard(chart, bodyHtml){
+  if(!chart)return '';
+  const assessment=chart.assessment||chart.insight||'';
+  let confHtml='';
+  const c=chart.data_confidence;
+  if(c){
+    if(c.units_reporting!==undefined){
+      confHtml=`<div style="font-size:10px;color:var(--muted);margin-top:6px">Data confidence: ${c.units_reporting} of ${c.units_expected} unit(s) reporting${c.completeness_pct!=null?` (${c.completeness_pct}% complete)`:''}.</div>`;
+    } else if(c.note){
+      confHtml=`<div style="font-size:10px;color:var(--muted);margin-top:6px">${esc(c.note)}</div>`;
+    }
+  }
+  return `<div class="card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+      <div class="ctitle" style="margin-bottom:0">${esc(chart.title||'')}</div>
+      ${_cmdInfoToggle(chart)}
+    </div>
+    ${assessment?`<div style="font-size:12px;color:var(--text-2);margin:6px 0 10px">${esc(assessment)}</div>`:''}
+    <div>${bodyHtml}</div>
+    ${confHtml}
+  </div>`;
+}
+
+function _cmdCell(cell){
+  if(!cell)return '<span class="muted">—</span>';
+  const sym=_CMD_STATUS_SYMBOL[cell.status]||'—';
+  const col=_CMD_STATUS_COLOR[cell.status]||'var(--muted)';
+  const label=cell.data_available===false?'Data not available':
+    (cell.denominator?`${cell.numerator}/${cell.denominator}`:(cell.numerator!=null?String(cell.numerator):'—'));
+  const title=cell.exception_reason||'';
+  return `<span style="color:${col};font-weight:700" title="${esc(title)}">${sym}</span> <span style="font-size:11px" title="${esc(title)}">${esc(label)}</span>`;
+}
+
+// A1 — readiness matrix: Wing rows=Squadrons, National rows=Wings.
+function _renderReadinessMatrix(chart,scope){
+  const rows=chart.data||[];
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
+  const cols=chart.columns||[];
+  const colLabels={sessions_planned:'Sessions planned',curriculum_allocated:'Curriculum',
+    facilitator_confirmed:'Facilitator',facility_confirmed:'Facility',
+    equipment_confirmed:'Equipment',overall_readiness:'Overall'};
+  let html='<div class="tw"><table><thead><tr><th>Unit</th>'+
+    cols.map(c=>`<th style="text-align:center;font-size:10.5px">${esc(colLabels[c]||c)}</th>`).join('')+
+    '<th style="text-align:center;font-size:10.5px">Trend</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    html+=`<tr class="drow" onclick="cmdDrillReadiness('${r.unit_id}','${scope}')" title="${esc(r.exception_reason||'')}">
+      <td style="font-weight:800">${esc(r.label)}${r.name&&r.name!==r.label?` <span class="muted" style="font-weight:400;font-size:10.5px">${esc(r.name)}</span>`:''}</td>
+      ${cols.map(c=>`<td style="text-align:center">${_cmdCell(r[c])}</td>`).join('')}
+      <td style="text-align:center;font-size:10.5px;color:var(--muted)">${_CMD_TREND_SYMBOL[r.trend]||'—'}</td>
+    </tr>`;
+  });
+  html+='</tbody></table></div>';
+  return html;
+}
+
+function cmdDrillReadiness(unitId,scope){
+  const r=_cmdReadinessRows.find(x=>x.unit_id===unitId);
+  const panelId='cmd-drill-'+(scope||'national');
+  const p=document.getElementById(panelId); if(!r||!p)return;
+  p.className='drill-panel show';
+  const cols=['sessions_planned','curriculum_allocated','facilitator_confirmed','facility_confirmed','equipment_confirmed','overall_readiness'];
+  const colLabels={sessions_planned:'Sessions planned',curriculum_allocated:'Curriculum allocated',
+    facilitator_confirmed:'Facilitator confirmed',facility_confirmed:'Facility confirmed',
+    equipment_confirmed:'Equipment confirmed',overall_readiness:'Overall readiness'};
+  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${esc(r.name||r.label)} — next parade night readiness</div><button class="modal-x" onclick="document.getElementById('${panelId}').className='drill-panel'">×</button></div>
+    <div class="tw"><table><tbody>
+    ${cols.map(c=>`<tr><td style="font-weight:700">${esc(colLabels[c])}</td><td>${_cmdCell(r[c])}</td><td style="font-size:11px;color:var(--muted)">${esc((r[c]&&r[c].exception_reason)||'')}</td></tr>`).join('')}
+    </tbody></table></div>
+    <div style="font-size:11px;color:var(--muted);margin-top:10px">Trend vs previous parade night: ${_CMD_TREND_SYMBOL[r.trend]||'—'}. Last updated: ${r.last_update?new Date(r.last_update).toLocaleString():'—'}.</div>`;
+  p.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// A2 — eight-week risk forecast: weekly stacked timeline + supporting evidence table.
+function _renderRiskTimeline(chart){
+  const weekly=chart.weekly||[];
+  const items=chart.data||[];
+  let html='';
+  if(weekly.length){
+    const cats=[['no_facilitator','No facilitator','#e51937'],['no_facility','No facility','#f57c00'],
+      ['curriculum_not_allocated','Curriculum','#8a93a6'],['activity_conflict','Activity conflict','#455560'],
+      ['holiday_conflict','Holiday conflict','#51b0e3']];
+    const maxV=Math.max(...weekly.map(w=>cats.reduce((s,cc)=>s+(w[cc[0]]||0),0)),1);
+    html+=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">`+
+      cats.map(cc=>`<span style="display:flex;align-items:center;gap:4px;font-size:10px"><span style="display:inline-block;width:10px;height:10px;background:${cc[2]};border-radius:2px"></span>${esc(cc[1])}</span>`).join('')+`</div>`;
+    html+=`<div style="overflow-x:auto"><div style="display:flex;align-items:flex-end;gap:3px;min-width:${Math.max(weekly.length*44,280)}px;height:108px">`;
+    weekly.forEach(w=>{
+      const total=cats.reduce((s,cc)=>s+(w[cc[0]]||0),0);
+      const hPx=Math.round(total/maxV*80);
+      html+=`<div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:32px">
+        <div style="width:100%;max-width:36px;height:${hPx}px;display:flex;flex-direction:column-reverse;border-radius:3px 3px 0 0;overflow:hidden">
+          ${cats.map(cc=>{const v=w[cc[0]]||0;return v?`<div style="flex:${v};width:100%;background:${cc[2]}" title="${esc(cc[1])}: ${v}"></div>`:'';}).join('')}
+        </div>
+        <div style="font-size:8px;color:var(--muted);margin-top:3px" title="${esc(w.label)}">${esc(w.label)}</div>
+      </div>`;
+    });
+    html+='</div></div>';
+  } else {
+    html+=_dEmptyChart(chart.empty_state||'No training risk identified in the next 8 weeks.');
+  }
+  if(items.length){
+    html+=`<div class="tw" style="margin-top:10px"><table><thead><tr><th>Date</th><th>Unit</th><th>Category</th><th style="text-align:center">Sessions</th><th>Severity</th></tr></thead><tbody>`+
+      items.slice(0,20).map(it=>`<tr><td style="font-size:11px">${esc(it.date)}</td><td style="font-weight:700">${esc(it.unit_label)}</td><td style="font-size:11px">${esc(it.category_label)}</td><td style="text-align:center">${it.affected_sessions}</td><td><span class="badge ${it.severity==='high'?'b-red':'b-amber'}">${esc(it.severity)}</span></td></tr>`).join('')+
+      `</tbody></table></div>`;
+    if(items.length>20)html+=`<div style="font-size:10.5px;color:var(--muted);margin-top:4px">Showing 20 of ${items.length} items — refine using Parade Nights for the full list.</div>`;
+  }
+  return html;
+}
+
+// B3 — session outcomes by unit, 100%-stacked (never absolute-value stacked,
+// which would let a low-volume unit's bar look artificially small).
+function _chartStackedBar100(chart){
+  const rows=chart.data||[];const series=chart.series||[];
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
+  let html=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">`+
+    series.map(s=>`<span style="display:flex;align-items:center;gap:4px;font-size:10px"><span style="display:inline-block;width:10px;height:10px;background:${s.color||'var(--royal)'};border-radius:2px"></span>${esc(s.label)}</span>`).join('')+`</div>`;
+  rows.forEach(row=>{
+    const total=row.total||0;
+    html+=`<div class="ph-row" style="margin-bottom:6px" role="img" aria-label="${esc(row.label)}: ${total} sessions">
+      <div class="ph-name" style="min-width:70px;font-size:11px">${esc(row.label)}</div>
+      <div class="ph-bar" style="flex:1">
+        <div style="display:flex;height:16px;border-radius:3px;overflow:hidden;background:var(--bg)">
+          ${total?series.map(s=>{const pct=(row.pct&&row.pct[s.key])||0;return pct?`<div style="flex:${pct};background:${s.color};height:100%" title="${esc(s.label)}: ${row.counts[s.key]} (${pct}%)"></div>`:'';}).join(''):'<div style="flex:1;background:var(--lgrey)" title="No sessions"></div>'}
+        </div>
+      </div>
+      <div class="ph-cnt" style="min-width:44px;text-align:right;font-size:10.5px;color:var(--muted)">${total}</div>
+    </div>`;
+  });
+  return html;
+}
+
+// B4 — cancellation/non-delivery Pareto: ranked bars + cumulative percentage.
+function _renderPareto(chart){
+  const rows=chart.data||[];
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
+  const maxV=Math.max(...rows.map(r=>r.count),1);
+  return rows.map(r=>{
+    const w=Math.round(r.count/maxV*100);
+    const isGap=!!r.data_quality_gap;
+    return `<div class="ph-row" style="margin-bottom:5px" role="img" aria-label="${esc(r.label)}: ${r.count}, cumulative ${r.cumulative_pct}%">
+      <div class="ph-name" style="min-width:130px;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isGap?'font-style:italic;color:var(--muted)':''}" title="${esc(r.label)}">${isGap?'ⓘ ':''}${esc(r.label.substring(0,40))}</div>
+      <div class="ph-bar" style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${isGap?'var(--muted)':'var(--royal)'};border-radius:3px"></div></div></div>
+      <div class="ph-cnt" style="min-width:96px;text-align:right;font-size:10.5px;color:var(--muted)">${r.count} · cum. ${r.cumulative_pct}%</div>
+    </div>`;
+  }).join('');
+}
+
+async function loadCommandDashboard(scope){
+  const containerId=scope==='wing'?'cmd-dash-wing':'cmd-dash-national';
+  const host=document.getElementById(containerId); if(!host)return;
+  host.innerHTML='<div class="card"><div class="ph-title" style="font-size:15px">Training Dashboard</div><div class="muted" style="font-size:12px">Loading…</div></div>';
+  const win=S.cmdWindow||'term';
+  const wingId=(S.role==='system_admin')?saBrowseWingId():null;
+  let url='/api/dashboard/command?window='+encodeURIComponent(win);
+  if(wingId)url+='&wing_id='+encodeURIComponent(wingId);
+  let d;
+  try{ d=await api(url); }
+  catch(e){ host.innerHTML=`<div class="card"><div class="sc-status-err">Training Dashboard unavailable: ${esc(apiErr(e))}</div></div>`; return; }
+  if(d.error==='no_wing_scope'){ host.innerHTML=''; return; }
+
+  _cmdReadinessRows=(d.sections&&d.sections.A&&d.sections.A.readiness_matrix&&d.sections.A.readiness_matrix.data)||[];
+
+  const proxyBanner=proxyActive()?`<div style="font-size:11px;color:var(--warn);background:var(--warn-bg);border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block">Delegated Intervention active — protected writes enabled.</div>`:'';
+  let html=`<div class="ph" style="margin-bottom:6px">
+    <div class="ph-title">Training Dashboard</div>
+    <div class="ph-sub">
+      Viewing as: ${esc(S.role||'')} · Scope: ${esc(d.scope==='wing'?'Wing':'National')}${d.wing_name?' — '+esc(d.wing_name):''} ·
+      Period: <select id="cmd-window-sel" onchange="S.cmdWindow=this.value;loadCommandDashboard('${scope}')" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px" aria-label="Reporting period">
+        ${Object.entries(_CMD_WINDOW_LABELS).map(([k,l])=>`<option value="${k}"${k===win?' selected':''}>${l}</option>`).join('')}
+      </select>
+      · Data current as at ${new Date(d.generated_at).toLocaleString()}
+      · Data confidence: ${d.data_confidence.units_reporting}/${d.data_confidence.units_expected} unit(s) reporting
+    </div>
+    ${proxyBanner}
+  </div>`;
+
+  html+=`<div style="font-size:11.5px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 6px">A — Immediate Training Readiness</div>`;
+  html+=_cmdCard(d.sections.A.readiness_matrix,_renderReadinessMatrix(d.sections.A.readiness_matrix,scope));
+  html+=_cmdCard(d.sections.A.risk_forecast,_renderRiskTimeline(d.sections.A.risk_forecast));
+  html+=_cmdCard(d.sections.A.immediate_issues,_chartStackedBarH(d.sections.A.immediate_issues));
+
+  html+=`<div style="font-size:11.5px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.03em;margin:18px 0 6px">B — Training Delivery Performance</div>`;
+  html+=_cmdCard(d.sections.B.weekly_delivered,_chartStackedBar(d.sections.B.weekly_delivered));
+  html+=_cmdCard(d.sections.B.reliability_trend,_chartLine(d.sections.B.reliability_trend));
+  html+=_cmdCard(d.sections.B.outcomes_by_unit,_chartStackedBar100(d.sections.B.outcomes_by_unit));
+  html+=_cmdCard(d.sections.B.cancellation_pareto,_renderPareto(d.sections.B.cancellation_pareto));
+
+  html+=`<div class="drill-panel" id="cmd-drill-${scope}"></div>`;
+  host.innerHTML=html;
+}
+
 function renderWing(){
   const host=document.getElementById('wing-dash'); if(!host)return;
   const rows=(S.wing&&S.wing.squadrons)||[];
