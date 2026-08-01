@@ -1326,6 +1326,75 @@ acceptance criteria, and is updated in place as each item closes.
   real, open, SEV1 finding requiring a follow-up fix before production holds real
   data it cannot afford to lose.
 
+### GAP-18 — re-verified and fixed (2026-08-02, Final System Assurance pass)
+
+- **Re-confirmed still fully open before touching anything**: production's real
+  `DATABASE_URL` host is Railway-internal (`railway.internal`, no `supabase` in the
+  hostname), while `PROD_DATABASE_BACKUP_URL` — the secret actually used by
+  `backup-postgresql.yml` — still pointed at a Supabase host. Confirmed via
+  hostname-pattern/substring checks only; no credential value was ever printed.
+  **Materially more urgent than when GAP-18 was first recorded**: production now
+  holds real data (`squadrons: 1`, confirmed live via `/api/health/ready` during
+  this session's earlier Phase 2/3 production deploys), so until this pass this repo
+  had zero working backup coverage of a production database that now has something
+  real to lose.
+- **Fix**: pointed `PROD_DATABASE_BACKUP_URL` at Railway's own already-provisioned
+  `DATABASE_PUBLIC_URL` for the production Postgres service (`96f1e5b4-…`) — the
+  same physical database `aafc-tms-backend` reads/writes at runtime, exposed via
+  Railway's own external proxy (`*.proxy.rlwy.net`) for exactly this kind of
+  external-tool access. No credential was created, rotated, or regenerated — this
+  reuses a credential Railway already generates for every Postgres plugin service.
+  Value was piped directly from `railway variable list --json` through a one-line
+  Python filter into `gh secret set`, stdin-to-stdin; the raw value was never
+  written to any tool result I read back. Applied only after explicit user
+  confirmation ("yes proceed with this fix"), since the environment's own auto-mode
+  safety classifier independently gated this write.
+- **Proof, not assertion**: dispatched `backup-postgresql.yml` (fresh run,
+  `postgresql-production-backup-20260801_175755`) then `test-restore-postgresql.yml`
+  against that fresh artifact. Restored-database row counts came back
+  `squadrons: 1`, `wings: 1`, `users: 1`, `audit_logs: 13`, `curriculum_items: 214`
+  — an exact match to production's independently-known live state, and starkly
+  different from GAP-16's old evidence pulled from the wrong database
+  (`users: 39`, `wings: 8`, `squadrons: 16`). This is concrete proof the backup now
+  captures the real production database, not merely that the secret write
+  succeeded.
+- **One residual check failure in that same restore-test run, fully explained as a
+  false positive, not a new defect**: `Migration HEAD mismatch: got 'z1a2b3c4d5e6',
+  expected 'y8z9a0b1c2d3'`. Root-caused precisely: the workflow computes its
+  "expected" head from the checked-out ref's own `alembic/versions/` (dispatched
+  against `origin/main`, since the new `release/final-assurance-2026-08-01` branch
+  had not yet been pushed and `gh workflow run --ref` requires an existing remote
+  ref). `origin/main` is missing one migration file — commit `2ef0926` ("NATHQ/Wing/
+  Squadron Activity inheritance backend, Phase 2.1") — that is already on local
+  `main`/this branch and already deployed to (and applied against) production via
+  the entrypoint's automatic `alembic upgrade head`. Verified directly: computing
+  the head from `origin/main`'s tree yields `y8z9a0b1c2d3` exactly; from local
+  HEAD's tree yields `z1a2b3c4d5e6` exactly — matching "expected" and "got"
+  respectively, with no gap. This is the same class of stale-comparison-baseline
+  issue GAP-16 already documented for an earlier occurrence of this exact check;
+  it resolves itself once the branch is pushed/merged and is not something to
+  "fix" by hardcoding a value (that would reintroduce the exact bug class this
+  script was built to avoid).
+- **Severity: RESOLVED.** Production backup/restore now demonstrably covers the
+  correct, real production database. Recommend re-running the restore-test once
+  `release/final-assurance-2026-08-01` (or `main`) is pushed, purely to get a clean
+  all-green run for the record — not because the current single failure indicates
+  any remaining risk.
+- **Staging follow-up — checked, not assumed fine by analogy**:
+  `backup-postgresql-staging.yml` still uses the old-named `SUPABASE_DB_URL`
+  secret, but independent verification shows no GAP-18-style mismatch exists here.
+  Computed staging's real `DATABASE_PUBLIC_URL` host fingerprint directly from the
+  staging Postgres service's own variables
+  (`c47528fd4d51e55c8c09fae68ab827747c6551acb2b7197635505dda93bd5667`), then
+  dispatched a fresh run of `backup-postgresql-staging.yml`
+  (run 30711823611) and read its own printed (non-secret) source-verification
+  output: `host fingerprint (sha256, non-reversible):
+  c47528fd4d51e55c8c09fae68ab827747c6551acb2b7197635505dda93bd5667` — an exact
+  match, plus a clean `Dump complete: 7,227,214 bytes`. Staging's backup already
+  correctly targets staging's real database; the misleading secret *name* is a
+  cosmetic/documentation debt (already called out honestly in the workflow's own
+  header comment), not a functional defect. No fix required.
+
 ## GAP-19: DEFECT-003 (production ENVIRONMENT=staging) fixed live during production smoke testing; a real cross-environment variable mistake found and corrected in the same pass
 
 - **DEFECT-003 fix applied**. Smoke testing (instruction section 14) found production's
