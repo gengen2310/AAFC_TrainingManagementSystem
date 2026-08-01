@@ -111,6 +111,43 @@ present in code, not just in commit messages.
 | 2 | Line-by-line code assurance + static analysis | In progress |
 | 3–14 | — | Not started |
 
+## Stage 2 progress
+
+- **Backend** (`ruff check app/`): 1029 findings, large majority stylistic/idiomatic
+  noise (469 `B008` are FastAPI's own `Depends(...)`-in-default-argument pattern —
+  correct, not a defect; 239 `RUF100` unused-noqa; 112/55/33/21/3 are import-sort/
+  unused-import/modernization style). Triaged the categories most likely to hide real
+  bugs by hand:
+  - `F841` (unused-variable, 6 instances) → 5 were genuine dead code (harmless); 1
+    (`training.py`) was a real bug — see GAP-22 below.
+  - `S110`/`S112` (bare `except: pass`/`continue`, 5 instances) → 2 fixed to log
+    instead of silently swallowing (`ops.py` automation generator, `system.py`
+    backup-download audit write); 3 reviewed and correctly left as-is (a DB health
+    check, and two already-comment-documented intentional best-effort fallbacks).
+  - `DTZ*` (naive-datetime usage, 38 instances) and `BLE001` (blind except, 25
+    instances) — inventoried, not yet individually triaged; carried forward as
+    Stage 2 remaining work.
+- **`frontend/`** (Planning Workspace): `tsc --noEmit` clean (0 errors). `eslint`: 0
+  errors, 17 warnings — all low-severity (react-refresh fast-refresh-only-exports
+  style notices, a few unused locals, two `useMemo`/`useEffect` exhaustive-deps
+  warnings in `Curriculum.tsx`/`PlanningWorkspace.tsx` worth a closer look in Stage 6
+  since a missing effect dependency can cause stale-data UI bugs, but not confirmed
+  as an actual defect yet).
+- **`connected-frontend/`**: no lint/typecheck tooling exists for this file (plain JS,
+  no build step) — confirmed at Stage 0 as the highest-risk untested surface; static
+  analysis here isn't possible the same way, so it depends more heavily on Stage 2's
+  manual line-by-line pass and Stage 11's browser-driven testing.
+- **GAP-22 (P2, fixed)**: curriculum CSV import silently discarded the "Foundation or
+  Extension" column — every row in a CSV import batch was forced to the same
+  `core_status` regardless of what each row's own data said, and re-importing to
+  correct it didn't work either. Full write-up in the gap register. Fixed, tested
+  (new regression test, full suite 1003/5 passed clean), not yet deployed.
+
+Remaining Stage 2 work: manual line-by-line pass (not yet started — static analysis
+above is necessary but not sufficient, per the instruction's own Part 7), `BLE001`/
+`DTZ*` triage, and `connected-frontend/index.html`'s ~9,900 lines get no static-tool
+coverage at all so need proportionally more manual attention.
+
 Evidence for every stage records: what was checked, how, environment, role, input,
 expected vs. actual, evidence location, Git SHA, and deployment ID where relevant, per
 the instruction's own evidence standard. Raw CSVs/screenshots land under
