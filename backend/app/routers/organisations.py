@@ -1,11 +1,14 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
-from ..models import Wing, Squadron, ProxySession, AuditLog, NationalEntity, User
+from ..models import (
+    Wing, Squadron, ProxySession, AuditLog, NationalEntity, User,
+    ParadeNight, Session as TrainingSession, Facilitator, TrainingArea, Equipment, Activity, WingHQEvent,
+)
 from ..models.organisations import UNIT_TYPES
 from ..dependencies import get_principal, client_meta
 from ..permissions import Principal, require_role, require_can_view_squadron, require_can_write_squadron, require_system_or_nat_admin
@@ -72,6 +75,61 @@ def create_wing(body: WingCreateIn, db: DBSession = Depends(get_db),
     audit(db, p, object_type="wing", object_id=w.id, action="create",
           new={"code": code, "name": w.name})
     return {"ok": True, "wing_id": w.id, "code": w.code, "name": w.name}
+
+
+@router.get("/wings/{wing_id}/archive-impact")
+def wing_archive_impact(wing_id: str, db: DBSession = Depends(get_db),
+                        p: Principal = Depends(get_principal)):
+    """Read-only pre-check for archive_wing. hard_blockers mirrors that
+    endpoint's own active-squadrons condition exactly (so can_archive here
+    never disagrees with what POST .../archive actually enforces) plus
+    soft_warnings for things archive_wing does not itself block on --
+    per the plan, archiving never touches or blocks on these, they are
+    informational only for the wizard."""
+    require_system_or_nat_admin(p)
+    w = db.get(Wing, wing_id)
+    if not w:
+        raise HTTPException(404, detail={"error": "not_found"})
+
+    active_sqns = db.query(Squadron).filter(
+        Squadron.wing_id == wing_id, Squadron.is_archived == False  # noqa: E712
+    ).all()
+    hard_blockers = []
+    if active_sqns:
+        hard_blockers.append({"type": "active_squadrons", "count": len(active_sqns),
+                               "message": f"{len(active_sqns)} active squadron(s) must be archived first."})
+
+    active_wing_accounts = db.query(User).filter(
+        User.wing_id == wing_id, User.squadron_id.is_(None), User.active_status == True  # noqa: E712
+    ).all()
+    today = date.today().isoformat()
+    future_events = db.query(WingHQEvent).filter(
+        WingHQEvent.wing_id == wing_id, WingHQEvent.is_archived == False,  # noqa: E712
+        WingHQEvent.start_date >= today,
+    ).count()
+    wing_activities = db.query(Activity).filter(
+        Activity.wing_id == wing_id, Activity.owning_level == "wing", Activity.is_archived == False  # noqa: E712
+    ).count()
+
+    soft_warnings = []
+    if active_wing_accounts:
+        soft_warnings.append({"type": "active_wing_accounts", "count": len(active_wing_accounts),
+                               "message": f"{len(active_wing_accounts)} account(s) directly assigned to this Wing are still active."})
+    if future_events:
+        soft_warnings.append({"type": "future_wing_events", "count": future_events,
+                               "message": f"{future_events} upcoming Wing HQ Calendar event(s) on or after today."})
+    if wing_activities:
+        soft_warnings.append({"type": "wing_activities", "count": wing_activities,
+                               "message": f"{wing_activities} Wing-owned Activity/Activities will remain archived-with-the-Wing (not deleted)."})
+
+    return {
+        "can_archive": not hard_blockers,
+        "hard_blockers": hard_blockers,
+        "soft_warnings": soft_warnings,
+        "active_accounts": [{"user_id": u.id, "display_name": u.display_name, "role": u.role} for u in active_wing_accounts],
+        "subordinate_orgs": [{"squadron_id": s.id, "code": s.code, "name": s.name} for s in active_sqns],
+        "historical_record_counts": {"future_wing_events": future_events, "wing_activities": wing_activities},
+    }
 
 
 @router.post("/wings/{wing_id}/archive")
@@ -190,6 +248,88 @@ def create_squadron(body: SquadronCreateIn, db: DBSession = Depends(get_db),
     audit(db, p, object_type="squadron", object_id=s.id, action="create",
           new={"code": code, "name": s.name, "unit_type": unit_type, "wing": w.code})
     return {"ok": True, **_sqn(s)}
+
+
+@router.get("/squadrons/{squadron_id}/archive-impact")
+def squadron_archive_impact(squadron_id: str, db: DBSession = Depends(get_db),
+                            p: Principal = Depends(get_principal)):
+    """Read-only pre-check for archive_squadron. hard_blockers mirrors that
+    endpoint's own active-accounts condition exactly; soft_warnings covers
+    future parade nights/sessions and active facilitators/training areas/
+    equipment/local activities -- none of which archive_squadron itself
+    blocks on (archiving never cascades into or destroys these), so they
+    are informational only for the wizard to surface and require
+    acknowledgement of, per the plan's explicit design."""
+    if p.role not in {*_NAT_ADMIN_ROLES, "wing_admin"}:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    s = db.get(Squadron, squadron_id)
+    if not s:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if p.role == "wing_admin" and s.wing_id != p.wing_id:
+        raise HTTPException(403, detail={"error": "out_of_scope"})
+
+    active_accounts = db.query(User).filter(
+        User.squadron_id == squadron_id, User.active_status == True  # noqa: E712
+    ).all()
+    hard_blockers = []
+    if active_accounts:
+        hard_blockers.append({"type": "active_accounts", "count": len(active_accounts),
+                               "message": f"{len(active_accounts)} active account(s) still assigned. Archive or reassign them first."})
+
+    today = date.today().isoformat()
+    future_pn_ids = [pn_id for (pn_id,) in db.query(ParadeNight.id).filter(
+        ParadeNight.squadron_id == squadron_id, ParadeNight.is_archived == False,  # noqa: E712
+        ParadeNight.date >= today,
+    ).all()]
+    future_sessions = db.query(TrainingSession).filter(
+        TrainingSession.squadron_id == squadron_id, TrainingSession.is_archived == False,  # noqa: E712
+        TrainingSession.parade_night_id.in_(future_pn_ids),
+    ).count() if future_pn_ids else 0
+    active_facilitators = db.query(Facilitator).filter(
+        Facilitator.squadron_id == squadron_id, Facilitator.active_status == True, Facilitator.is_archived == False  # noqa: E712
+    ).count()
+    active_training_areas = db.query(TrainingArea).filter(
+        TrainingArea.squadron_id == squadron_id, TrainingArea.active_status == True, TrainingArea.is_archived == False  # noqa: E712
+    ).count()
+    active_equipment = db.query(Equipment).filter(
+        Equipment.squadron_id == squadron_id, Equipment.active_status == True, Equipment.is_archived == False  # noqa: E712
+    ).count()
+    local_activities = db.query(Activity).filter(
+        Activity.squadron_id == squadron_id, Activity.owning_level == "squadron", Activity.is_archived == False  # noqa: E712
+    ).count()
+
+    soft_warnings = []
+    if future_pn_ids:
+        soft_warnings.append({"type": "future_parade_nights", "count": len(future_pn_ids),
+                               "message": f"{len(future_pn_ids)} upcoming Parade Night(s) on or after today."})
+    if future_sessions:
+        soft_warnings.append({"type": "future_sessions", "count": future_sessions,
+                               "message": f"{future_sessions} scheduled session(s) within those upcoming Parade Nights."})
+    if active_facilitators:
+        soft_warnings.append({"type": "active_facilitators", "count": active_facilitators,
+                               "message": f"{active_facilitators} active facilitator(s) on file."})
+    if active_training_areas:
+        soft_warnings.append({"type": "active_training_areas", "count": active_training_areas,
+                               "message": f"{active_training_areas} active training area(s) on file."})
+    if active_equipment:
+        soft_warnings.append({"type": "active_equipment", "count": active_equipment,
+                               "message": f"{active_equipment} active equipment item(s) on file."})
+    if local_activities:
+        soft_warnings.append({"type": "local_activities", "count": local_activities,
+                               "message": f"{local_activities} squadron-owned Activity/Activities will remain archived-with-the-Squadron (not deleted)."})
+
+    return {
+        "can_archive": not hard_blockers,
+        "hard_blockers": hard_blockers,
+        "soft_warnings": soft_warnings,
+        "active_accounts": [{"user_id": u.id, "display_name": u.display_name, "role": u.role} for u in active_accounts],
+        "subordinate_orgs": [],
+        "historical_record_counts": {
+            "future_parade_nights": len(future_pn_ids), "future_sessions": future_sessions,
+            "active_facilitators": active_facilitators, "active_training_areas": active_training_areas,
+            "active_equipment": active_equipment, "local_activities": local_activities,
+        },
+    }
 
 
 @router.post("/squadrons/{squadron_id}/archive")
