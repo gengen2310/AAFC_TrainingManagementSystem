@@ -566,8 +566,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-item" id="nav-accounts" style="display:none" onclick="nav('accounts')">Account Management</div>
       <div class="nav-lbl nav-scope" id="hq-lbl" style="display:none">Command</div>
       <div class="nav-item nav-scope" id="nav-wing" style="display:none" onclick="nav('wing-overview')">Wing Overview</div>
+      <div class="nav-item nav-scope" id="nav-wing-activities" style="display:none" onclick="nav('wing-activities')">Wing Activities</div>
       <div class="nav-item nav-scope" id="nav-wing-calendar" style="display:none" onclick="nav('wing-calendar')">Wing HQ Calendar</div>
       <div class="nav-item nav-scope" id="nav-national" style="display:none" onclick="nav('national')">National Overview</div>
+      <div class="nav-item nav-scope" id="nav-national-activities" style="display:none" onclick="nav('national-activities')">National Activities</div>
       <div class="nav-item nav-scope" id="nav-audit" style="display:none" onclick="nav('audit')">Audit</div>
       <div class="nav-lbl" id="nav-system-lbl" style="display:none">System</div>
       <div class="nav-item" id="nav-system-console" style="display:none" onclick="nav('system-console')">System Console</div>
@@ -904,6 +906,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </table>
         </div>
 
+        <!-- Inherited Wing/National/CEA/Holiday activities (Phase 2) — read-only here;
+             edited at the owning scope. Kept as a separate section from the local-only
+             table above so existing Add/Edit/Delete Activity behaviour is unchanged. -->
+        <div id="act-tab-squadron" style="margin-top:16px"></div>
+
         <!-- ── Planning Year section (Annual Program functions) ── -->
         <div class="card" style="margin-top:20px">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
@@ -1131,6 +1138,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <!-- WING OVERVIEW -->
       <div id="page-wing-overview" class="page"><div id="cmd-dash-wing"></div><div id="wing-dash"></div></div>
 
+      <!-- WING ACTIVITIES (Phase 2 — NATHQ/Wing/Squadron inheritance) -->
+      <div id="page-wing-activities" class="page">
+        <div id="act-tab-wing"></div>
+      </div>
+
       <!-- WING HQ CALENDAR -->
       <div id="page-wing-calendar" class="page">
         <div class="page-header">
@@ -1176,6 +1188,12 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
       </div>
       <div id="page-national" class="page"><div id="cmd-dash-national"></div><div id="national-dash"></div></div>
+
+      <!-- NATIONAL ACTIVITIES (Phase 2 — NATHQ/Wing/Squadron inheritance) -->
+      <div id="page-national-activities" class="page">
+        <div id="act-tab-national"></div>
+      </div>
+
       <div id="page-audit" class="page">
         <div class="ph"><div class="ph-title">Audit Log</div><div class="ph-sub">Immutable record of actions — backend authoritative</div></div>
         <div class="card"><div class="tw"><table>
@@ -3215,10 +3233,10 @@ function roomById(id){return (S.rooms||[]).find(r=>r.id===id);}
 const _PLANNING_PAGES=[];
 const NAV_BY_SCOPE={
   squadron:['dashboard','calendar','parade-nights','weekly-program','curriculum','activities','facilitators','resources','action-items','settings','accounts',..._PLANNING_PAGES],
-  wing:['wing-overview','wing-calendar','curriculum','audit','accounts',..._PLANNING_PAGES],
-  national:['national','wing-calendar','curriculum','audit','accounts',..._PLANNING_PAGES],
+  wing:['wing-overview','wing-activities','wing-calendar','curriculum','audit','accounts',..._PLANNING_PAGES],
+  national:['national','national-activities','wing-calendar','curriculum','audit','accounts',..._PLANNING_PAGES],
   auditor:['audit','accounts',..._PLANNING_PAGES],
-  system_admin:['system-console','national','wing-calendar','curriculum','audit','accounts',..._PLANNING_PAGES]
+  system_admin:['system-console','national','national-activities','wing-activities','wing-calendar','curriculum','audit','accounts',..._PLANNING_PAGES]
 };
 const SCOPE_LANDING={squadron:'dashboard',wing:'wing-overview',national:'national',auditor:'audit',system_admin:'system-console'};
 // In Proxy Mode (Wing) or Delegated Intervention (NAT HQ) the UI shows the EXACT SQN workspace
@@ -3466,6 +3484,8 @@ function nav(id){
   if(id==='dashboard')renderDash();
   if(id==='wing-overview'){renderWing();loadCommandDashboard('wing');}
   if(id==='national'){renderNational();loadCommandDashboard('national');}
+  if(id==='wing-activities'){_actTabLoad('act-tab-wing','wing', (S.role==='system_admin')?saBrowseWingId():null);}
+  if(id==='national-activities'){_actTabLoad('act-tab-national','national',null);}
   if(id==='audit')renderAudit();
   if(id==='settings')renderSettings();
   if(id==='accounts')renderAccounts();
@@ -5577,11 +5597,240 @@ async function deleteCurrItem(id){
 }
 
 // ═══════════════════════════════════════════════════════════
-//  ACTIVITIES
+//  NATHQ / WING / SQUADRON ACTIVITIES (Phase 2 — inheritance-aware tab)
+//  Reused across three hosts: the Squadron Activities page's "Inherited
+//  Activities" card (act-tab-squadron), the new Wing Activities page
+//  (act-tab-wing) and National Activities page (act-tab-national) — one
+//  component, three mount points, matching the backend's own generic
+//  scope_type design rather than three separate implementations.
+// ═══════════════════════════════════════════════════════════
+const _ACT_SOURCE_LABEL={national:'NATHQ',wing:'Wing',squadron:'Squadron',cea:'CEA',holiday:'Holiday'};
+const _ACT_SOURCE_CLASS={national:'b-purple',wing:'b-blue',squadron:'b-ok',cea:'b-amber',holiday:'b-grey'};
+let _actTabState={}; // containerId -> {scopeType, scopeId, items, view}
+let _actEditId=null, _actEditContainerId=null;
+
+function _actSourceBadge(item){
+  const cls=_ACT_SOURCE_CLASS[item.source]||'b-grey';
+  const lbl=_ACT_SOURCE_LABEL[item.source]||item.source||'—';
+  return `<span class="badge ${cls}">${esc(lbl)}</span>`;
+}
+
+async function _actTabLoad(containerId, scopeType, scopeId){
+  if(!scopeId){
+    if(scopeType==='wing') scopeId=(S.role==='system_admin')?saBrowseWingId():(S.session&&S.session.wing_id);
+    if(scopeType==='squadron') scopeId=S.currentSqnId||(S.session&&S.session.squadron_id);
+  }
+  const host=document.getElementById(containerId); if(!host)return;
+  const prior=_actTabState[containerId]||{};
+  const view=prior.view||'list';
+  if(scopeType!=='national' && !scopeId){
+    host.innerHTML=`<div class="card"><div class="muted">No ${esc(scopeType)} in scope.</div></div>`;
+    return;
+  }
+  host.innerHTML='<div class="card"><div class="muted">Loading activities…</div></div>';
+  let url=`/api/activities?scope_type=${scopeType}&view=${view}`;
+  if(scopeId) url+='&scope_id='+encodeURIComponent(scopeId);
+  let d;
+  try{ d=await api(url); }
+  catch(e){ host.innerHTML=`<div class="card"><div class="sc-status-err">Could not load activities: ${esc(apiErr(e))}</div></div>`; return; }
+  _actTabState[containerId]={scopeType, scopeId, items:d.items||[], view, truncated:d.truncated};
+  _actTabRender(containerId);
+}
+
+function _actTabFilters(containerId, items){
+  const typeEl=document.getElementById(containerId+'-f-type');
+  const srcEl=document.getElementById(containerId+'-f-src');
+  const qEl=document.getElementById(containerId+'-search');
+  const typeF=typeEl?typeEl.value:'all';
+  const srcF=srcEl?srcEl.value:'all';
+  const q=(qEl?qEl.value:'').toLowerCase().trim();
+  return items.filter(i=>{
+    if(typeF!=='all' && i.activity_type!==typeF) return false;
+    if(srcF!=='all' && i.source!==srcF) return false;
+    if(q && !((i.activity_name||'').toLowerCase().includes(q) || (i.notes||'').toLowerCase().includes(q) || (i.location||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function _actTabRender(containerId){
+  const st=_actTabState[containerId]; if(!st)return;
+  const host=document.getElementById(containerId); if(!host)return;
+  const filtered=_actTabFilters(containerId, st.items).sort((a,b)=>(a.date_start||'').localeCompare(b.date_start||''));
+  const canManage=(st.scopeType==='national' && ['national_admin','system_admin'].includes(S.role))
+    || (st.scopeType==='wing' && ['wing_admin','national_admin','system_admin'].includes(S.role))
+    || (st.scopeType==='squadron' && false); // squadron-local creation already handled by the existing "+ Add Activity" button
+  const createBtn=canManage?`<button class="btn btn-dk btn-sm no-print" onclick="_actOpenCreate('${containerId}')">+ New ${st.scopeType==='national'?'National':'Wing'} Activity</button>`:'';
+  const viewBtns=['list','upcoming','historical','archived'].map(v=>
+    `<button class="btn btn-xs ${st.view===v?'btn-dk':'btn-out'} no-print" onclick="_actSetView('${containerId}','${v}')">${v[0].toUpperCase()+v.slice(1)}</button>`).join(' ');
+
+  let html=`<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+      <div class="ctitle" style="margin-bottom:0">${st.scopeType==='squadron'?'Inherited Activities':'Activities'}</div>
+      ${createBtn}
+    </div>
+    <div class="fbar no-print" style="margin:10px 0">
+      <select id="${containerId}-f-type" onchange="_actTabRender('${containerId}')">
+        <option value="all">All types</option>
+        ${[...new Set(st.items.map(i=>i.activity_type).filter(Boolean))].map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}
+      </select>
+      <select id="${containerId}-f-src" onchange="_actTabRender('${containerId}')">
+        <option value="all">All sources</option>
+        ${[...new Set(st.items.map(i=>i.source))].map(s=>`<option value="${esc(s)}">${esc(_ACT_SOURCE_LABEL[s]||s)}</option>`).join('')}
+      </select>
+      <input id="${containerId}-search" placeholder="Search…" oninput="_actTabRender('${containerId}')" style="min-width:160px">
+      <span style="margin-left:auto">${viewBtns}</span>
+    </div>`;
+
+  if(!filtered.length){
+    html+=`<div class="muted" style="padding:14px;text-align:center">No activities${st.view!=='list'?' ('+st.view+')':''} found.</div>`;
+  } else {
+    html+=`<div class="tw"><table><thead><tr><th>Source</th><th>Activity</th><th>Date</th><th>Type</th><th>Location</th><th class="no-print"></th></tr></thead><tbody>`;
+    filtered.forEach(i=>{
+      html+=`<tr class="drow" onclick="_actShowDetail('${containerId}','${i.activity_id}')">
+        <td>${_actSourceBadge(i)}</td>
+        <td style="font-weight:700">${esc(i.activity_name)}${i.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
+        <td style="white-space:nowrap">${fmtD(i.date_start)}${i.date_end&&i.date_end!==i.date_start?' – '+fmtD(i.date_end):''}</td>
+        <td style="font-size:11.5px">${esc(i.activity_type||'—')}</td>
+        <td style="font-size:11.5px">${esc(i.location||'—')}</td>
+        <td class="no-print">${i.read_only?'<span class="muted" title="Owned by another scope — view only">🔒</span>':''}</td>
+      </tr>`;
+    });
+    html+='</tbody></table></div>';
+  }
+  if(st.truncated) html+=`<div class="muted" style="font-size:10.5px;margin-top:6px">Showing the first results — narrow your filters to see more.</div>`;
+  html+=`</div><div id="${containerId}-detail"></div>`;
+  host.innerHTML=html;
+}
+
+function _actSetView(containerId, view){
+  _actTabState[containerId].view=view;
+  const st=_actTabState[containerId];
+  _actTabLoad(containerId, st.scopeType, st.scopeId);
+}
+
+function _actShowDetail(containerId, activityId){
+  const st=_actTabState[containerId]; if(!st)return;
+  const item=st.items.find(i=>i.activity_id===activityId); if(!item)return;
+  const panel=document.getElementById(containerId+'-detail'); if(!panel)return;
+  if(item.read_only){
+    const ownerLabel=item.owning_org_label||_ACT_SOURCE_LABEL[item.source]||item.source;
+    panel.innerHTML=`<div class="drill-panel show">
+      <div class="drill-hdr"><div class="drill-title">${esc(item.activity_name)}</div><button class="modal-x" onclick="document.getElementById('${containerId}-detail').innerHTML=''">×</button></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Owned by ${esc(ownerLabel)} — read-only here. ${item.source==='squadron'||item.source==='wing'||item.source==='national'?'Edit it at the owning scope.':''}</div>
+      <div class="sc-kv"><dt>Date</dt><dd>${fmtD(item.date_start)}${item.date_end&&item.date_end!==item.date_start?' – '+fmtD(item.date_end):''}</dd>
+      <dt>Type</dt><dd>${esc(item.activity_type||'—')}</dd>
+      <dt>Location</dt><dd>${esc(item.location||'—')}</dd>
+      <dt>Notes</dt><dd>${esc(item.notes||'—')}</dd></div>
+    </div>`;
+    panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+    return;
+  }
+  _actEditId=item.activity_id; _actEditContainerId=containerId;
+  panel.innerHTML=`<div class="drill-panel show">
+    <div class="drill-hdr"><div class="drill-title">Edit — ${esc(item.activity_name)}</div><button class="modal-x" onclick="document.getElementById('${containerId}-detail').innerHTML=''">×</button></div>
+    <div class="form-row">
+      <div class="ff"><label>Name</label><input id="${containerId}-e-name" value="${esc(item.activity_name)}"></div>
+      <div class="ff"><label>Type</label><input id="${containerId}-e-type" value="${esc(item.activity_type||'')}"></div>
+    </div>
+    <div class="form-row">
+      <div class="ff"><label>Start date</label><input type="date" id="${containerId}-e-start" value="${esc(item.date_start||'')}"></div>
+      <div class="ff"><label>End date</label><input type="date" id="${containerId}-e-end" value="${esc(item.date_end||'')}"></div>
+    </div>
+    <div class="ff"><label>Location</label><input id="${containerId}-e-loc" value="${esc(item.location||'')}"></div>
+    <div class="ff"><label>Notes</label><textarea id="${containerId}-e-notes" rows="2">${esc(item.notes||'')}</textarea></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <button class="btn btn-dk btn-sm" onclick="_actSaveEdit()">Save</button>
+      <button class="btn btn-out btn-sm" onclick="_actArchive('${containerId}','${item.activity_id}')">Archive</button>
+      <span id="${containerId}-e-msg" style="font-size:11px;font-weight:700"></span>
+    </div>
+  </div>`;
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+async function _actSaveEdit(){
+  const c=_actEditContainerId, id=_actEditId;
+  const msg=document.getElementById(c+'-e-msg');
+  const body={
+    activity_name:document.getElementById(c+'-e-name').value.trim(),
+    activity_type:document.getElementById(c+'-e-type').value.trim()||null,
+    date_start:document.getElementById(c+'-e-start').value||null,
+    date_end:document.getElementById(c+'-e-end').value||null,
+    location:document.getElementById(c+'-e-loc').value.trim()||null,
+    notes:document.getElementById(c+'-e-notes').value.trim()||null,
+  };
+  try{
+    await api('/api/activities/'+id,{method:'PATCH',body});
+    if(msg)msg.textContent='Saved.';
+    showToast('Activity saved.', false);
+    const st=_actTabState[c];
+    await _actTabLoad(c, st.scopeType, st.scopeId);
+  }catch(e){ if(msg){msg.textContent=apiErr(e);msg.style.color='var(--red)';} else alert(apiErr(e)); }
+}
+
+async function _actArchive(containerId, activityId){
+  if(!confirm('Archive this activity? It will be removed from active views but preserved for history.'))return;
+  try{
+    await api('/api/activities/'+activityId,{method:'DELETE'});
+    showToast('Activity archived.', false);
+    const st=_actTabState[containerId];
+    await _actTabLoad(containerId, st.scopeType, st.scopeId);
+  }catch(e){ alert(apiErr(e)); }
+}
+
+function _actOpenCreate(containerId){
+  const st=_actTabState[containerId]; if(!st)return;
+  const panel=document.getElementById(containerId+'-detail'); if(!panel)return;
+  panel.innerHTML=`<div class="drill-panel show">
+    <div class="drill-hdr"><div class="drill-title">New ${st.scopeType==='national'?'National':'Wing'} Activity</div><button class="modal-x" onclick="document.getElementById('${containerId}-detail').innerHTML=''">×</button></div>
+    <div class="form-row">
+      <div class="ff"><label>Name *</label><input id="${containerId}-c-name"></div>
+      <div class="ff"><label>Type</label><input id="${containerId}-c-type" placeholder="e.g. Camp, Ceremonial"></div>
+    </div>
+    <div class="form-row">
+      <div class="ff"><label>Start date *</label><input type="date" id="${containerId}-c-start"></div>
+      <div class="ff"><label>End date</label><input type="date" id="${containerId}-c-end"></div>
+    </div>
+    <div class="ff"><label>Location</label><input id="${containerId}-c-loc"></div>
+    <div class="ff"><label>Notes</label><textarea id="${containerId}-c-notes" rows="2"></textarea></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <button class="btn btn-dk btn-sm" onclick="_actSaveCreate('${containerId}')">Create</button>
+      <span id="${containerId}-c-msg" style="font-size:11px;font-weight:700;color:var(--red)"></span>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">This will immediately appear in every subordinate ${st.scopeType==='national'?'Wing and Squadron':'Squadron'}'s Activities list — no republish step needed.</div>
+  </div>`;
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+async function _actSaveCreate(containerId){
+  const st=_actTabState[containerId];
+  const msg=document.getElementById(containerId+'-c-msg');
+  const name=document.getElementById(containerId+'-c-name').value.trim();
+  const start=document.getElementById(containerId+'-c-start').value;
+  if(!name||!start){ if(msg)msg.textContent='Name and start date are required.'; return; }
+  const body={
+    activity_name:name,
+    activity_type:document.getElementById(containerId+'-c-type').value.trim()||null,
+    date_start:start,
+    date_end:document.getElementById(containerId+'-c-end').value||null,
+    location:document.getElementById(containerId+'-c-loc').value.trim()||null,
+    notes:document.getElementById(containerId+'-c-notes').value.trim()||null,
+  };
+  const path=st.scopeType==='national'?'/api/activities/national':'/api/activities/wing';
+  if(st.scopeType==='wing') body.wing_id=st.scopeId;
+  try{
+    await api(path,{method:'POST',body});
+    showToast((st.scopeType==='national'?'National':'Wing')+' activity created.', false);
+    await _actTabLoad(containerId, st.scopeType, st.scopeId);
+  }catch(e){ if(msg){msg.textContent=apiErr(e);} else alert(apiErr(e)); }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SQUADRON ACTIVITIES (existing local-only page)
 // ═══════════════════════════════════════════════════════════
 let _activitiesPageLoaded=false;
 async function _loadActivitiesPage(){
   renderActs();
+  _actTabLoad('act-tab-squadron','squadron',null);
   if(_activitiesPageLoaded)return;
   _activitiesPageLoaded=true;
   await _loadPlanningYears();
