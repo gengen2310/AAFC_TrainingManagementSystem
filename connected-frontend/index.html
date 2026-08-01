@@ -826,6 +826,15 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <select id="wp-sel" onchange="renderWP()"><option value="">— Choose a parade night —</option></select>
           </div>
         </div>
+        <div class="fbar no-print">
+          <input id="wp-search" placeholder="Search facilitator, room, curriculum item…" oninput="renderWP()" style="min-width:220px">
+          <select id="wp-f-status" onchange="renderWP()">
+            <option value="all">All Statuses</option>
+            <option value="planned">Planned</option><option value="delivered">Delivered</option>
+            <option value="cancelled">Cancelled</option><option value="rescheduled">Rescheduled</option>
+            <option value="not_delivered">Not Delivered</option>
+          </select>
+        </div>
         <div id="wp-content"></div>
       </div>
 
@@ -963,6 +972,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ph">
           <div class="ph-title">Facilitators</div>
           <div class="ph-actions no-print">
+            <input id="fac-search" placeholder="Search name or rank…" oninput="renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px;min-width:160px">
             <select id="fac-filter" onchange="S.facFilter=this.value;renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px">
               <option value="">All subject areas</option>
             </select>
@@ -5938,6 +5948,14 @@ function renderWP(){
   if(!ds){el.innerHTML='';return;}
   const pn=S.pns.find(p=>p.date===ds);if(!pn){el.innerHTML='';return;}
   const info=getCurrentUnitInfo();
+  const wpQ=(document.getElementById('wp-search')||{value:''}).value.trim().toLowerCase();
+  const wpSt=(document.getElementById('wp-f-status')||{value:'all'}).value;
+  const allSessions=pn.sessions||[];
+  const shownSessions=allSessions.filter((s,i)=>{
+    if(wpSt!=='all'&&(s.status||'planned')!==wpSt)return false;
+    if(!wpQ)return true;
+    return (s.facName||'').toLowerCase().includes(wpQ)||(s.room||'').toLowerCase().includes(wpQ)||(s.exp||'').toLowerCase().includes(wpQ);
+  });
   el.innerHTML=`
     <div class="card">
       <div style="background:var(--dark);color:white;padding:14px 18px;border-radius:8px;margin-bottom:14px;" class="print-only" style="display:block">
@@ -5955,16 +5973,17 @@ function renderWP(){
       <div class="tw">
         <table class="wp-tbl">
           <thead><tr><th>Session</th><th>Phase / Level</th><th>Curriculum Item</th><th>Facilitator</th><th>Room / Location</th><th>Status</th></tr></thead>
-          <tbody>${(pn.sessions||[]).map((s,i)=>`<tr>
-            <td style="font-weight:800;color:var(--dark)">Sess ${i+1}</td>
+          <tbody>${shownSessions.length?shownSessions.map(s=>`<tr>
+            <td style="font-weight:800;color:var(--dark)">Sess ${allSessions.indexOf(s)+1}</td>
             <td>${phBadge(s.phase||'B. Initial')}</td>
             <td style="font-weight:700">${s.exp||'<em style="color:var(--muted)">Unassigned</em>'}</td>
             <td style="font-size:11.5px">${s.facName||'—'}</td>
             <td style="font-size:11.5px">${s.room||'—'}</td>
             <td>${stBadge(s.status||'planned')}</td>
-          </tr>`).join('')}</tbody>
+          </tr>`).join(''):`<tr class="no-print"><td colspan="6" style="color:var(--muted);text-align:center;padding:14px">No sessions match the filter.</td></tr>`}</tbody>
         </table>
       </div>
+      ${(wpQ||wpSt!=='all')?`<div class="no-print" style="font-size:11px;color:var(--muted);margin-top:4px">Showing ${shownSessions.length} of ${allSessions.length} sessions.</div>`:''}
       <div style="margin-top:12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);padding-top:9px">AAFC Training System · 7 Wing WA · ${new Date().toLocaleDateString('en-AU')} · INSPIRING TODAY — LEADING TOMORROW</div>
     </div>
     <div class="no-print" style="margin-top:8px;display:flex;gap:8px">
@@ -6719,6 +6738,8 @@ function renderFacs(){
   } else {
     list=S.facs.filter(f=>(f.areas||[]).some(a=>subjectOf(a)===flt));
   }
+  const q=(document.getElementById('fac-search')||{value:''}).value.trim().toLowerCase();
+  if(q) list=list.filter(f=>(f.first||'').toLowerCase().includes(q)||(f.last||'').toLowerCase().includes(q)||(f.rank||'').toLowerCase().includes(q));
   document.getElementById('fac-tbody').innerHTML=list.length?list.map((f,i)=>{
     const k=f.id;const tot=counts[k]||0;
     return `<tr class="clk-row" onclick="showFacProfile('${f.id}')">
@@ -6733,7 +6754,7 @@ function renderFacs(){
         ${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="tagFac('${f.id}')">Tags</button> <button class="btn btn-xs btn-sky" onclick="editFac('${f.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delFac('${f.id}')">×</button>`:''}
       </td>
     </tr>`;
-  }).join(''):`<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px">No facilitators${flt?' tagged in this subject area':''}.</td></tr>`;
+  }).join(''):`<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px">No facilitators${flt?' tagged in this subject area':''}${q?' match your search':''}.</td></tr>`;
 }
 // Backend-backed subject-area tagging (PATCH /api/facilitators/{id}; audited server-side).
 const FAC_TAG_VOCAB=['Service Knowledge','Drill and Ceremonial','Field Skills','PDL','Community Engagement','Air & Space','Aviation','Space','Cyber','RPAS'];
