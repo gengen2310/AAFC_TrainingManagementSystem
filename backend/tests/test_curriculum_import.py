@@ -137,6 +137,104 @@ def test_bulk_import_updates_changed_fields(client):
     assert d["created"] == 0
 
 
+def _import_preview(client, hdr, items, owning_level="national", squadron_id=None):
+    payload = {"items": items, "owning_level": owning_level, "preview": True}
+    if squadron_id:
+        payload["squadron_id"] = squadron_id
+    return client.post("/api/curriculum/import", json=payload, headers=hdr)
+
+
+def test_preview_reports_create_but_writes_nothing(client):
+    """Phase 3.4: preview=true must classify rows exactly like a real import
+    (so the caller can trust the count before committing) but must not
+    persist anything -- confirmed by re-running the same preview and getting
+    an identical 'created' count, not 'updated'/'skipped' from a leftover row."""
+    hdr = _sysadmin(client)
+    items = [
+        {"code": "IMP-PREV-01", "title": "Preview Test", "identifier": "IMP-PREV-01(1)",
+         "part_number": 1, "phase": "B. Initial", "duration_minutes": 60},
+    ]
+    r1 = _import_preview(client, hdr, items)
+    assert r1.status_code == 200, r1.text
+    d1 = r1.json()
+    assert d1["preview"] is True
+    assert d1["created"] == 1
+
+    r2 = _import_preview(client, hdr, items)
+    d2 = r2.json()
+    assert d2["created"] == 1  # still "would create" -- nothing was actually written by r1
+
+    # A real, un-previewed GET confirms the item genuinely doesn't exist yet.
+    listed = client.get("/api/curriculum", headers=hdr).json()["items"]
+    assert not any(i.get("identifier") == "IMP-PREV-01(1)" for i in listed)
+
+
+def test_preview_then_commit_creates_the_item(client):
+    hdr = _sysadmin(client)
+    items = [
+        {"code": "IMP-PREV-02", "title": "Preview Then Commit", "identifier": "IMP-PREV-02(1)",
+         "part_number": 1, "phase": "B. Initial", "duration_minutes": 60},
+    ]
+    preview = _import_preview(client, hdr, items)
+    assert preview.json()["created"] == 1
+
+    commit = _import(client, hdr, items)  # preview defaults to False
+    d = commit.json()
+    assert d["preview"] is False
+    assert d["created"] == 1
+
+    listed = client.get("/api/curriculum", headers=hdr).json()["items"]
+    assert any(i.get("identifier") == "IMP-PREV-02(1)" for i in listed)
+
+
+def test_preview_classifies_update_without_changing_the_stored_title(client):
+    hdr = _sysadmin(client)
+    items = [
+        {"code": "IMP-PREV-03", "title": "Original Title", "identifier": "IMP-PREV-03(1)",
+         "part_number": 1, "phase": "B. Initial", "duration_minutes": 60},
+    ]
+    _import(client, hdr, items)  # real create
+
+    items[0]["title"] = "Changed Title"
+    preview = _import_preview(client, hdr, items)
+    d = preview.json()
+    assert d["preview"] is True
+    assert d["updated"] == 1
+
+    listed = client.get("/api/curriculum", headers=hdr).json()["items"]
+    match = next(i for i in listed if i.get("identifier") == "IMP-PREV-03(1)")
+    assert match["title"] == "Original Title"  # preview must not have written the change
+
+
+def test_import_csv_preview_writes_nothing_then_commit_creates(client):
+    """Phase 3.4: the CSV upload endpoint threads preview through to the same
+    JSON import path -- same non-destructive preview-then-commit guarantee,
+    reachable via a real file upload rather than a JSON body."""
+    hdr = _sysadmin(client)
+    csv_content = (
+        "Module Code,Title,Training Phase,Instructor Suitability\r\n"
+        "IMP-CSV-01,CSV Preview Test,B. Initial,Any\r\n"
+    )
+    files = {"file": ("curriculum.csv", csv_content, "text/csv")}
+
+    preview = client.post("/api/curriculum/import-csv?preview=true", headers=hdr, files=files)
+    assert preview.status_code == 200, preview.text
+    dp = preview.json()
+    assert dp["preview"] is True
+    assert dp["created"] == 1
+
+    listed_before = client.get("/api/curriculum", headers=hdr).json()["items"]
+    assert not any(i.get("code") == "IMP-CSV-01" for i in listed_before)
+
+    commit = client.post("/api/curriculum/import-csv", headers=hdr, files=files)
+    dc = commit.json()
+    assert dc["preview"] is False
+    assert dc["created"] == 1
+
+    listed_after = client.get("/api/curriculum", headers=hdr).json()["items"]
+    assert any(i.get("code") == "IMP-CSV-01" for i in listed_after)
+
+
 def test_bulk_import_requires_nat_admin(client):
     """sqn_admin must be denied access to bulk import."""
     hdr = _sqn_admin(client)

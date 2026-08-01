@@ -2057,10 +2057,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
 <!-- CSV Curriculum Import -->
 <div class="modal-bg" id="m-csv-curr-import">
-  <div class="modal" style="max-width:700px">
+  <div class="modal" style="max-width:760px">
     <div class="modal-hdr"><div class="modal-title">Import Curriculum from CSV</div><button class="modal-x" onclick="closeModal('m-csv-curr-import')">×</button></div>
     <div class="modal-body">
-      <div class="alert a-info">Upload a CSV with columns: Training Phase, Experiential Code, Title, Elements, Foundation or Extension, Instructor Suitability, Timing, Location, Learning Hub Link.</div>
+      <div class="alert a-info">Upload a CSV with columns: Training Phase, Experiential Code, Title, Elements, Foundation or Extension, Instructor Suitability, Timing, Location, Learning Hub Link. Preview shows exactly what would be created/updated before anything is written.</div>
       <div class="form-row">
         <div class="form-group"><label>CSV File *</label><input type="file" id="csv-curr-file" accept=".csv,text/csv"></div>
         <div class="form-group"><label>Owning Level</label>
@@ -2072,11 +2072,26 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
       </div>
       <p id="csv-curr-msg" style="color:var(--error)"></p>
+      <div id="csv-curr-preview" style="display:none;margin-top:10px">
+        <div style="font-weight:600;margin-bottom:6px;font-size:0.87rem" id="csv-curr-summary"></div>
+        <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+            <thead><tr style="background:#f5f7fa">
+              <th style="padding:3px 8px;text-align:left">Code</th>
+              <th style="padding:3px 8px;text-align:left">Title</th>
+              <th style="padding:3px 8px;text-align:left">Phase</th>
+              <th style="padding:3px 8px;text-align:left">Action</th>
+            </tr></thead>
+            <tbody id="csv-curr-rows"></tbody>
+          </table>
+        </div>
+      </div>
       <div id="csv-curr-result" style="display:none;margin-top:8px"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-csv-curr-import')">Cancel</button>
-      <button class="btn btn-dk" onclick="submitCsvCurr()">Upload &amp; Import</button>
+      <button class="btn btn-secondary" id="csv-curr-preview-btn" onclick="previewCsvCurr()">Preview Changes</button>
+      <button class="btn btn-dk" id="csv-curr-commit-btn" style="display:none" onclick="commitCsvCurr()">Confirm &amp; Import</button>
     </div>
   </div>
 </div>
@@ -9133,32 +9148,56 @@ async function promptOverrideConflict(cId, yearId){
 function openCsvCurrImport(){
   document.getElementById('csv-curr-file').value='';
   document.getElementById('csv-curr-msg').textContent='';
+  document.getElementById('csv-curr-preview').style.display='none';
   document.getElementById('csv-curr-result').style.display='none';
+  document.getElementById('csv-curr-commit-btn').style.display='none';
+  document.getElementById('csv-curr-preview-btn').style.display='inline-flex';
   openModal('m-csv-curr-import');
 }
-async function submitCsvCurr(){
+const _CSV_CURR_ACTION_CLR={created:'color:var(--ok);font-weight:600',updated:'color:var(--blue);font-weight:600',skipped:'color:var(--muted)',failed:'color:var(--error);font-weight:600'};
+async function _csvCurrRequest(preview){
   const msg=document.getElementById('csv-curr-msg');
   const fileEl=document.getElementById('csv-curr-file');
   const level=document.getElementById('csv-curr-level').value;
-  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select a CSV file first.'; return; }
-  msg.textContent='Uploading…';
+  if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select a CSV file first.'; return null; }
+  msg.textContent=preview?'Parsing…':'Importing…';
   const form=new FormData();
   form.append('file',fileEl.files[0]);
-  try{
-    const res=await fetch(API_BASE+`/api/curriculum/import-csv?owning_level=${encodeURIComponent(level)}`,{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+tokenGet()},
-      body:form,
-    });
-    const d=await res.json();
-    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||JSON.stringify(d.detail); return; }
-    msg.textContent='';
-    const result=document.getElementById('csv-curr-result');
-    result.innerHTML=`<div class="alert a-ok">Import complete: ${d.created} created, ${d.updated} updated, ${d.skipped} unchanged.${d.failed?' '+d.failed+' failed.':''}</div>`+
-      (d.parse_errors&&d.parse_errors.length?`<div style="font-size:11px;color:var(--warn);margin-top:4px">${d.parse_errors.slice(0,5).map(e=>`<div>${esc(e)}</div>`).join('')}</div>`:'');
-    result.style.display='block';
-    await reloadAndRender();
-  }catch(e){ msg.textContent=apiErr(e); }
+  const res=await fetch(API_BASE+`/api/curriculum/import-csv?owning_level=${encodeURIComponent(level)}&preview=${preview}`,{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+tokenGet()},
+    body:form,
+  });
+  const d=await res.json();
+  if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||JSON.stringify(d.detail); return null; }
+  msg.textContent='';
+  return d;
+}
+async function previewCsvCurr(){
+  const d=await _csvCurrRequest(true);
+  if(!d)return;
+  const summary=`${d.created} to create · ${d.updated} to update · ${d.skipped} unchanged${d.failed?' · '+d.failed+' failed':''}`;
+  document.getElementById('csv-curr-summary').textContent=summary;
+  document.getElementById('csv-curr-rows').innerHTML=(d.results||[]).map(r=>`<tr>
+    <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.code||'')}</td>
+    <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.title||'')}</td>
+    <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.phase||'')}</td>
+    <td style="padding:3px 8px;border-bottom:1px solid var(--border);${_CSV_CURR_ACTION_CLR[r.status]||''}">${esc(r.status||'')}${r.error?' — '+esc(r.error):''}</td>
+  </tr>`).join('')||'<tr><td colspan="4" style="padding:8px;color:var(--muted)">No rows parsed.</td></tr>';
+  document.getElementById('csv-curr-preview').style.display='';
+  document.getElementById('csv-curr-commit-btn').style.display=(d.created+d.updated)>0?'inline-flex':'none';
+  if(d.parse_errors&&d.parse_errors.length){
+    document.getElementById('csv-curr-msg').innerHTML=`<span style="color:var(--warn)">${d.parse_errors.slice(0,5).map(e=>esc(e)).join('<br>')}</span>`;
+  }
+}
+async function commitCsvCurr(){
+  const d=await _csvCurrRequest(false);
+  if(!d)return;
+  const result=document.getElementById('csv-curr-result');
+  result.innerHTML=`<div class="alert a-ok">Import complete: ${d.created} created, ${d.updated} updated, ${d.skipped} unchanged.${d.failed?' '+d.failed+' failed.':''}</div>`;
+  result.style.display='block';
+  document.getElementById('csv-curr-commit-btn').style.display='none';
+  await reloadAndRender();
 }
 
 // ── Spreadsheet Export ──────────────────────────────────────

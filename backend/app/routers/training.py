@@ -2254,6 +2254,10 @@ class CurriculumImportIn(BaseModel):
     items: List[CurriculumImportItem]
     squadron_id: str | None = None  # if provided, link scheduled items to this sqn
     owning_level: str = "national"  # national | wing | squadron
+    # Phase 3.4: compute and return the create/update/skip/failed breakdown
+    # without writing anything -- default False preserves this endpoint's
+    # original immediate-commit behaviour for every existing caller.
+    preview: bool = False
 
 
 _NAT_ADMIN_ROLES = frozenset({"national_admin", "system_admin"})
@@ -2547,7 +2551,8 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                 db.add(ci)
                 db.flush()
                 created += 1
-                results.append({"identifier": item.identifier or item.code, "status": "created"})
+                results.append({"identifier": item.identifier or item.code, "status": "created",
+                                "code": item.code, "title": item.title, "phase": item.phase})
             else:
                 ci = existing
                 # Check if any field changed
@@ -2569,10 +2574,12 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                         changed = True
                 if changed:
                     updated += 1
-                    results.append({"identifier": item.identifier or item.code, "status": "updated"})
+                    results.append({"identifier": item.identifier or item.code, "status": "updated",
+                                    "code": item.code, "title": item.title, "phase": item.phase})
                 else:
                     skipped += 1
-                    results.append({"identifier": item.identifier or item.code, "status": "skipped"})
+                    results.append({"identifier": item.identifier or item.code, "status": "skipped",
+                                    "code": item.code, "title": item.title, "phase": item.phase})
 
             # Schedule linking: connect to parade night session if date provided
             if sqn_id and item.scheduled_date and item.session_number:
@@ -2584,16 +2591,23 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                 "identifier": item.identifier or item.code,
                 "status": "failed",
                 "error": str(exc),
+                "code": item.code, "title": item.title, "phase": item.phase,
             })
-
-    db.commit()
 
     summary = {"created": created, "updated": updated, "skipped": skipped, "failed": failed,
                "total": len(body.items)}
-    audit(db, p, object_type="curriculum_item", object_id="import", action="bulk_import",
-          new=summary)
+    # preview=True: discard every pending add/flush/setattr from the loop above
+    # (SQLAlchemy rollback undoes flushed-but-uncommitted INSERTs too) so the
+    # caller sees exactly what WOULD happen with nothing actually written --
+    # same preview-then-commit shape as the Facilitator CSV import.
+    if body.preview:
+        db.rollback()
+    else:
+        db.commit()
+        audit(db, p, object_type="curriculum_item", object_id="import", action="bulk_import",
+              new=summary)
 
-    return {"ok": True, **summary, "results": results}
+    return {"ok": True, "preview": body.preview, **summary, "results": results}
 
 
 def _link_session(db: DBSession, ci: CurriculumItem, sqn_id: str,
@@ -2807,6 +2821,7 @@ def _parse_duration(raw: str) -> int:
 async def import_curriculum_csv(
     file: UploadFile = File(...),
     owning_level: str = "national",
+    preview: bool = False,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -2817,7 +2832,10 @@ async def import_curriculum_csv(
     Foundation or Extension, Instructor Suitability, Timing,
     Location, Learning Hub Link
 
-    Returns the same summary as /curriculum/import.
+    Returns the same summary as /curriculum/import. preview=true (Phase 3.4)
+    parses and evaluates every row exactly as a real import would -- same
+    create/update/skip/failed classification -- but writes nothing, so the
+    caller can review before resubmitting with preview=false to commit.
     """
     import csv, io
     if p.role not in _NAT_ADMIN_ROLES:
@@ -2873,7 +2891,7 @@ async def import_curriculum_csv(
         msg = "No valid rows found. " + "; ".join(parse_errors[:5]) if parse_errors else "File is empty or contains no data rows."
         raise HTTPException(400, detail={"error": "csv_parse_failed", "message": msg})
 
-    import_body = CurriculumImportIn(items=items, owning_level=owning_level)
+    import_body = CurriculumImportIn(items=items, owning_level=owning_level, preview=preview)
     result = import_curriculum(import_body, db, p)
     result["parse_errors"] = parse_errors
     return result
