@@ -1781,6 +1781,44 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   </div>
 </div>
 
+<!-- Accessible module scheduling (Phase 3.1): Move to a different Parade Night -->
+<div class="modal-bg" id="m-sess-move-to">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr"><div class="modal-title">Move Session</div><button class="modal-x" onclick="_sessMoveToCancel()">×</button></div>
+    <div class="modal-body">
+      <div class="ff"><label>Move to Parade Night</label>
+        <select id="smt-pn"></select>
+      </div>
+      <div class="ff"><label>Period</label>
+        <input type="number" id="smt-period" min="1" value="1">
+      </div>
+      <div id="smt-err" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-out" onclick="_sessMoveToCancel()">Cancel</button>
+      <button class="btn btn-dk" onclick="_sessMoveToConfirm()">Move</button>
+    </div>
+  </div>
+</div>
+
+<!-- Accessible module scheduling (Phase 3.1): resource-conflict override prompt.
+     Shared by Move Up/Down, Move to Parade Night, and (Phase 3.2) drag-and-drop --
+     all three call the identical _sessMove()/PUT path and hit this same prompt
+     on a 409 resource_conflict. -->
+<div class="modal-bg" id="m-sched-conflict">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr"><div class="modal-title">Scheduling Conflict</div><button class="modal-x" onclick="_scResolve(false)">×</button></div>
+    <div class="modal-body">
+      <div class="alert a-warn" style="font-size:12px;margin-bottom:8px">This move creates a conflict:</div>
+      <ul id="sc-list" style="margin:0 0 4px 18px;padding:0;font-size:12px"></ul>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-out" onclick="_scResolve(false)">Cancel</button>
+      <button class="btn" style="border-color:var(--red);color:var(--red)" onclick="_scResolve(true)">Move Anyway</button>
+    </div>
+  </div>
+</div>
+
 <!-- Session Quick Edit -->
 <div class="modal-bg" id="m-sess-edit">
   <div class="modal">
@@ -2775,7 +2813,12 @@ async function api(path, opts={}){
     if(res.status===409&&code==='code_exists'&&body&&body.detail&&body.detail.message) msg=body.detail.message;
     if(res.status===409&&code==='tag_already_exists') msg='A tag with that name already exists.';
     if(res.status===429 && !msg) msg='Too many attempts. Please wait and try again.';
-    throw {kind:'http', status:res.status, code, msg};
+    if(res.status===409&&code==='resource_conflict') msg='This facilitator or room is already booked for that period.';
+    // body is included (not just code/msg) so callers that need structured detail --
+    // e.g. the scheduling conflict prompt's list of which facilitator/room clashed --
+    // don't have to re-fetch or re-parse; existing callers only ever destructured
+    // kind/status/code/msg and are unaffected by this additive field.
+    throw {kind:'http', status:res.status, code, msg, body};
   }
   return body;
 }
@@ -3143,7 +3186,8 @@ async function loadData(){
     sessions:(pn.sessions||[]).sort((a,b)=>(a.period_number||0)-(b.period_number||0)).map(s=>({
       id:s.id, phase:s.phase_at_time||'', code:s.curriculum_code_at_time||'',
       exp:s.curriculum_title_at_time||s.custom_title||'', facId:s.facilitator_id||'',
-      facName:_facName(s), room:s.training_area_name_at_time||'', status:s.status||'planned'
+      facName:_facName(s), room:s.training_area_name_at_time||'', status:s.status||'planned',
+      period_number:s.period_number||1
     }))
   }));
   const _parseAreas=a=>{if(!a)return[];if(Array.isArray(a))return a;if(typeof a==='string'){try{const r=JSON.parse(a);return Array.isArray(r)?r:[];}catch(_){return[];}}return[];};
@@ -5561,8 +5605,16 @@ function showPNDetail(ds){
   let html=`<div class="alert a-info"><b>${pn.term}</b> · ${pn.notes||'No notes'}</div>`;
   (pn.sessions||[]).forEach((s,i)=>{
     const stOpts=['planned','delivered','cancelled','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${s.status===v?'selected':''}>${{planned:'Planned',delivered:'Delivered',cancelled:'Cancelled',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
-    html+=`<div style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;${!canWriteSquadron()?'pointer-events:none;opacity:.85':''}">
-      <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Session ${i+1}</div>
+    html+=`<div style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px" data-sess-card="${i}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em">Session ${i+1} · Period ${s.period_number||1}</div>
+        ${canWriteSquadron()?`<div class="no-print" style="display:flex;gap:4px">
+          <button class="btn btn-xs btn-out" ${(s.period_number||1)<=1?'disabled':''} onclick="_sessMoveUpDown('${ds}',${i},'up')" title="Move to the previous period" aria-label="Move Session ${i+1} to the previous period">↑</button>
+          <button class="btn btn-xs btn-out" onclick="_sessMoveUpDown('${ds}',${i},'down')" title="Move to the next period" aria-label="Move Session ${i+1} to the next period">↓</button>
+          <button class="btn btn-xs btn-out" onclick="_sessOpenMoveTo('${ds}',${i})" aria-label="Move Session ${i+1} to a different Parade Night">Move to…</button>
+        </div>`:''}
+      </div>
+      <div style="${!canWriteSquadron()?'pointer-events:none;opacity:.85':''}">
       <div class="form-row">
         <div class="ff"><label>Phase</label><select id="d-ph-${i}" ${!canWriteSquadron()?'disabled':''}>${phOpts}</select></div>
         <div class="ff"><label>Status</label><select id="d-st-${i}" ${!canWriteSquadron()?'disabled':''}>${stOpts}</select></div>
@@ -5577,6 +5629,7 @@ function showPNDetail(ds){
         <div class="ff"><label>Room</label>
           <select id="d-rm-${i}" ${!canWriteSquadron()?'disabled':''}><option value="">— None —</option>${roomOpts}</select>
         </div>
+      </div>
       </div>
     </div>`;
   });
@@ -5640,6 +5693,110 @@ async function savePNDetail(ds,cnt){
     if(errEl)errEl.textContent='';
     await reloadAndRender(); closeModal('m-pn-detail');
   }catch(e){ if(errEl){errEl.textContent=apiErr(e);errEl.style.color='var(--red)';}else showToast(apiErr(e),true); }
+}
+
+// ── Accessible module scheduling (Phase 3.1): Move Up/Down + Move to a
+// different Parade Night. Both funnel through _sessMove(), the same PUT +
+// conflict-check path Phase 3.2's drag-and-drop will call too -- only the
+// initiating gesture (click vs drag) differs, per the plan's explicit
+// "accessible controls first, DnD is a progressive enhancement on the same
+// path" design. ──
+function _sessBuildBody(s,overrides){
+  const ci=allCurr().find(c=>c.title===s.exp);
+  const room=S.rooms.find(r=>r.name===s.room);
+  return Object.assign({
+    parade_night_id:s.__pnId, period_number:s.period_number,
+    phase_at_time:s.phase||'B. Initial', curriculum_item_id:ci?ci.id:null,
+    facilitator_id:s.facId||null, training_area_id:room?room.id:null,
+    custom_title:s.exp&&!ci?s.exp:null,
+  },overrides);
+}
+
+// Resolves true (move anyway) or false (cancelled) -- same Promise-based
+// modal pattern as collectOutcomeReason().
+let _scResolveFn=null;
+function _showConflictPrompt(conflicts){
+  return new Promise(resolve=>{
+    _scResolveFn=resolve;
+    const label=c=>c.type==='facilitator_clash'?'Facilitator':'Room';
+    document.getElementById('sc-list').innerHTML=conflicts.map(c=>
+      `<li>${label(c)} ${esc(c.resource_name||'')} is already booked in that period.</li>`).join('')
+      ||'<li>Resource already booked in that period.</li>';
+    openModal('m-sched-conflict');
+  });
+}
+function _scResolve(v){ closeModal('m-sched-conflict'); if(_scResolveFn)_scResolveFn(v); _scResolveFn=null; }
+
+// Attempts the move; on a 409 resource_conflict, prompts once and retries
+// with override_conflict if the user confirms. Returns true on success
+// (including a confirmed override), false if the user cancelled.
+async function _sessMove(sessionId, body){
+  try{
+    await api('/api/sessions/'+sessionId,{method:'PUT',body:JSON.stringify(body)});
+    return true;
+  }catch(e){
+    if(e&&e.code==='resource_conflict'){
+      const conflicts=(e.body&&e.body.detail&&e.body.detail.conflicts)||[];
+      const proceed=await _showConflictPrompt(conflicts);
+      if(!proceed) return false;
+      await api('/api/sessions/'+sessionId,{method:'PUT',body:JSON.stringify(Object.assign({},body,{override_conflict:true}))});
+      return true;
+    }
+    throw e;
+  }
+}
+
+async function _sessMoveUpDown(date,idx,dir){
+  // Moves the session to the adjacent PERIOD (not a swap with whichever card
+  // is visually next) -- a period can hold several parallel sessions (e.g.
+  // one per cadet group/room), so "next card in the list" and "next period"
+  // are not the same thing. The conflict check still catches a genuine
+  // double-booking against whatever else is already in the target period.
+  const pn=S.pns.find(p=>p.date===date); if(!pn)return;
+  const s=(pn.sessions||[])[idx]; if(!s||!s.id)return;
+  const newPeriod=(s.period_number||1)+(dir==='up'?-1:1);
+  if(newPeriod<1)return;
+  s.__pnId=pn.id;
+  try{
+    const ok=await _sessMove(s.id,_sessBuildBody(s,{period_number:newPeriod}));
+    if(!ok)return; // user cancelled the conflict prompt — session unchanged
+    await reloadAndRender();
+    showPNDetail(date);
+  }catch(e){ showToast(apiErr(e),true); }
+}
+
+function _sessOpenMoveTo(date,idx){
+  const pn=S.pns.find(p=>p.date===date); if(!pn)return;
+  const s=(pn.sessions||[])[idx]; if(!s||!s.id)return;
+  _sessMoveToRef={date,idx};
+  const sel=document.getElementById('smt-pn');
+  const others=[...S.pns].filter(p=>p.date!==date).sort((x,y)=>x.date.localeCompare(y.date));
+  sel.innerHTML=others.map(p=>`<option value="${p.date}">${fmtDL(p.date)} (${p.term})</option>`).join('');
+  document.getElementById('smt-period').value=s.period_number||idx+1;
+  document.getElementById('smt-err').textContent='';
+  openModal('m-sess-move-to');
+}
+function _sessMoveToCancel(){ closeModal('m-sess-move-to'); _sessMoveToRef=null; }
+let _sessMoveToRef=null;
+async function _sessMoveToConfirm(){
+  if(!_sessMoveToRef)return;
+  const {date,idx}=_sessMoveToRef;
+  const pn=S.pns.find(p=>p.date===date); if(!pn)return;
+  const s=(pn.sessions||[])[idx]; if(!s||!s.id)return;
+  const targetDate=document.getElementById('smt-pn').value;
+  const targetPn=S.pns.find(p=>p.date===targetDate);
+  const period=parseInt(document.getElementById('smt-period').value,10)||1;
+  const errEl=document.getElementById('smt-err');
+  if(!targetPn){ errEl.textContent='Select a Parade Night to move to.'; return; }
+  s.__pnId=targetPn.id;
+  errEl.textContent='';
+  try{
+    const ok=await _sessMove(s.id,_sessBuildBody(s,{parade_night_id:targetPn.id,period_number:period}));
+    if(!ok)return; // user cancelled the conflict prompt — session unchanged
+    closeModal('m-sess-move-to'); _sessMoveToRef=null;
+    await reloadAndRender();
+    showToast('Session moved to '+fmtDL(targetDate)+'.');
+  }catch(e){ errEl.textContent=apiErr(e); }
 }
 
 // QUICK EDIT
