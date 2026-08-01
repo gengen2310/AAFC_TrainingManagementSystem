@@ -1109,6 +1109,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <select id="acct-filter-sqn" onchange="renderAccounts()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;display:none">
               <option value="">All Squadrons</option>
             </select>
+            <label id="acct-show-archived-row" style="display:none;font-size:11.5px;align-items:center;gap:5px;color:var(--muted);cursor:pointer">
+              <input type="checkbox" id="acct-show-archived" onchange="renderAccounts()"> Show archived
+            </label>
             <button class="btn btn-dk acct-write-el" id="acct-create-btn" style="display:none" onclick="openCreateAccountModal()">+ Add Account</button>
           </div>
           <div id="acct-table"></div>
@@ -2316,6 +2319,18 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <button class="btn btn-out" onclick="closeModal('m-edit-account')">Cancel</button>
       <button class="btn btn-dk" onclick="doEditAccount()">Save Changes</button>
     </div>
+  </div>
+</div>
+
+<!-- ACCOUNTS: Bulk Archive Wizard (5-step: Selection Review, Impact Assessment,
+     Required Decisions, Confirmation, Result). Body/foot are rebuilt per step
+     by _wizRender() rather than five separate modals, so step state (reason,
+     confirmation checkbox, results) survives Back/Continue navigation. -->
+<div class="modal-bg" id="m-archive-wizard">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-hdr"><div class="modal-title" id="waz-title">Bulk Archive Accounts</div><button class="modal-x" onclick="_wizClose()">×</button></div>
+    <div class="modal-body" id="waz-body"></div>
+    <div class="modal-foot" id="waz-foot"></div>
   </div>
 </div>
 
@@ -3920,6 +3935,8 @@ async function renderAccounts(){
   if(fbtn) fbtn.style.display=canWrite?'':'none';
   const cbtn=document.getElementById('acct-create-btn');
   if(cbtn) cbtn.style.display=canWrite?'':'none';
+  const showArchivedRow=document.getElementById('acct-show-archived-row');
+  if(showArchivedRow) showArchivedRow.style.display=canWrite?'flex':'none';
 
   // Units card: show for wing_admin / nat_admin / system_admin
   const isNatAdmin=['national_admin','system_admin'].includes(S.role);
@@ -3936,10 +3953,12 @@ async function renderAccounts(){
   try{
     const wFilt=(document.getElementById('acct-filter-wing')||{value:''}).value;
     const sFilt=(document.getElementById('acct-filter-sqn')||{value:''}).value;
+    const showArchived=(document.getElementById('acct-show-archived')||{checked:false}).checked;
     let acctUrl='/api/accounts';
     const qp=[];
     if(wFilt) qp.push('wing_id='+encodeURIComponent(wFilt));
     if(sFilt) qp.push('squadron_id='+encodeURIComponent(sFilt));
+    if(showArchived) qp.push('include_archived=true');
     if(qp.length) acctUrl+='?'+qp.join('&');
     S.accountList=await api(acctUrl);
   } catch(_){ S.accountList=[]; }
@@ -3953,12 +3972,21 @@ async function renderAccounts(){
   _renderFlightTable();
 }
 
+// Bulk archive: wing_admin/national_admin/system_admin only (matches the
+// plan's permission matrix -- sqn_admin keeps single-account actions but not
+// the bulk wizard, since a squadron rarely has enough accounts to warrant it
+// and the plan deliberately keeps that surface wing/national-scoped).
+const _ACCT_BULK_ROLES=['wing_admin','national_admin','system_admin'];
+function _acctCanBulk(){ return _ACCT_BULK_ROLES.includes(S.role); }
+
 function _renderAccountTable(){
   const el=document.getElementById('acct-table'); if(!el)return;
   const flt=(document.getElementById('acct-search')||{value:''}).value.toLowerCase();
   const wingFilt=(document.getElementById('acct-filter-wing')||{value:''}).value;
   const sqnFilt=(document.getElementById('acct-filter-sqn')||{value:''}).value;
   const canWrite=_ACCT_WRITE_ROLES.includes(S.role);
+  const canBulk=_acctCanBulk();
+  if(!S.acctSelected) S.acctSelected=new Set();
 
   let rows=(S.accountList||[]).filter(u=>{
     if(wingFilt && u.wing_id!==wingFilt && u.scope_type!=='wing') return false;
@@ -3976,6 +4004,14 @@ function _renderAccountTable(){
     return;
   }
 
+  // Selections that have scrolled out of the current filter/list stay in the
+  // Set (so switching a filter and back doesn't lose them) but should not
+  // count toward "select all" state or the visible floating-bar total below.
+  const myUid=S.session&&S.session.user_id;
+  const selectableRows=rows.filter(u=>u.user_id!==myUid && !u.is_archived);
+  const visibleSelectedCount=selectableRows.filter(u=>S.acctSelected.has(u.user_id)).length;
+  const allVisibleSelected=selectableRows.length>0 && visibleSelectedCount===selectableRows.length;
+
   const unit=u=>{
     if(u.squadron_code) return 'SQN '+u.squadron_code;
     if(u.wing_code) return 'Wing '+u.wing_code;
@@ -3985,6 +4021,7 @@ function _renderAccountTable(){
 
   const isLocked=u=>u.locked_until&&new Date(u.locked_until)>new Date();
   const statusBadge=u=>{
+    if(u.is_archived) return '<span class="badge b-grey">Archived</span>';
     const active=u.active_status!==false?'<span class="badge b-ok">Active</span>':'<span class="badge b-red">Disabled</span>';
     const lock=isLocked(u)?'<span class="badge b-red" style="margin-left:3px">Locked</span>':'';
     return active+lock;
@@ -3995,6 +4032,9 @@ function _renderAccountTable(){
   const actions=u=>{
     if(!canWrite) return '';
     const dn=(u.display_name||'').replace(/'/g,"\\'");
+    if(u.is_archived){
+      return `<button class="btn btn-xs btn-ok" onclick="doRestoreAccount('${u.user_id}','${dn}')">Restore</button>`;
+    }
     const resetBtn=`<button class="btn btn-xs btn-sky" onclick="openAccountResetCode('${u.user_id}','${dn}')" title="Reset access code">Reset access code</button>`;
     const unlockBtn=isLocked(u)?`<button class="btn btn-xs btn-ok" onclick="doUnlockAccount('${u.user_id}','${dn}')">Unlock</button>`:'';
     const toggleBtn=u.active_status!==false
@@ -4004,8 +4044,12 @@ function _renderAccountTable(){
     return `<div style="display:flex;gap:4px;flex-wrap:wrap">${editBtn}${resetBtn}${unlockBtn}${toggleBtn}</div>`;
   };
 
-  el.innerHTML='<div class="tw"><table><thead><tr><th>Name</th><th>Role</th><th>Scope</th><th>Unit</th><th>Status</th><th>Last Login</th><th>Code Last Changed</th>'+(canWrite?'<th class="no-print">Actions</th>':'')+'</tr></thead><tbody>'+
-    rows.map(u=>`<tr>
+  const selCol=canBulk?`<th class="no-print" style="width:24px"><input type="checkbox" id="acct-select-all" ${allVisibleSelected?'checked':''} onchange="_acctToggleAll(this.checked)" aria-label="Select all accounts matching the current filter"></th>`:'';
+  el.innerHTML='<div class="tw"><table><thead><tr>'+selCol+'<th>Name</th><th>Role</th><th>Scope</th><th>Unit</th><th>Status</th><th>Last Login</th><th>Code Last Changed</th>'+(canWrite?'<th class="no-print">Actions</th>':'')+'</tr></thead><tbody>'+
+    rows.map(u=>{
+      const isMe=u.user_id===myUid;
+      const cb=canBulk?`<td class="no-print">${(isMe||u.is_archived)?'':`<input type="checkbox" ${S.acctSelected.has(u.user_id)?'checked':''} onchange="_acctToggleOne('${u.user_id}',this.checked)" aria-label="Select ${(u.display_name||'').replace(/"/g,'')}">`}</td>`:'';
+      return `<tr>${cb}
       <td style="font-weight:700">${u.display_name||'—'}</td>
       <td><span class="badge ${_ROLE_CLS[u.role]||'b-grey'}">${_ROLE_LABELS[u.role]||u.role}</span></td>
       <td><span class="badge ${_SCOPE_CLS[u.scope_type]||'b-grey'}">${_SCOPE_LABELS[u.scope_type]||u.scope_type||'—'}</span></td>
@@ -4014,9 +4058,47 @@ function _renderAccountTable(){
       <td style="font-size:11px">${lastLogin(u)}</td>
       <td style="font-size:11px">${lastChanged(u)}</td>
       ${canWrite?`<td class="no-print">${actions(u)}</td>`:''}
-    </tr>`).join('')+
-    '</tbody></table></div>';
+    </tr>`;}).join('')+
+    '</tbody></table></div>'+
+    (canBulk?_acctSelectionBarHtml():'');
 }
+
+function _acctSelectionBarHtml(){
+  const n=S.acctSelected.size;
+  if(!n) return '';
+  return `<div class="no-print" style="position:sticky;bottom:0;margin-top:8px;padding:8px 12px;background:var(--dark);color:#fff;border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+    <span style="font-size:12px;font-weight:700">${n} account${n===1?'':'s'} selected</span>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-xs" style="background:#fff;color:var(--dark)" onclick="_acctOpenWizard()">Bulk Archive</button>
+      <button class="btn btn-xs btn-out" style="border-color:#fff;color:#fff" onclick="_acctClearSelection()">Clear</button>
+    </div>
+  </div>`;
+}
+
+function _acctToggleOne(uid,checked){
+  if(!S.acctSelected) S.acctSelected=new Set();
+  if(checked) S.acctSelected.add(uid); else S.acctSelected.delete(uid);
+  _renderAccountTable();
+}
+function _acctToggleAll(checked){
+  if(!S.acctSelected) S.acctSelected=new Set();
+  const myUid=S.session&&S.session.user_id;
+  const flt=(document.getElementById('acct-search')||{value:''}).value.toLowerCase();
+  const wingFilt=(document.getElementById('acct-filter-wing')||{value:''}).value;
+  const sqnFilt=(document.getElementById('acct-filter-sqn')||{value:''}).value;
+  const visible=(S.accountList||[]).filter(u=>{
+    if(u.user_id===myUid || u.is_archived) return false;
+    if(wingFilt && u.wing_id!==wingFilt && u.scope_type!=='wing') return false;
+    if(sqnFilt && u.squadron_id!==sqnFilt) return false;
+    if(!flt) return true;
+    return (u.display_name||'').toLowerCase().includes(flt)||(u.role||'').includes(flt)||
+      (u.squadron_code||'').toLowerCase().includes(flt)||(u.wing_code||'').toLowerCase().includes(flt)||
+      (u.scope_type||'').includes(flt);
+  });
+  visible.forEach(u=>{ if(checked) S.acctSelected.add(u.user_id); else S.acctSelected.delete(u.user_id); });
+  _renderAccountTable();
+}
+function _acctClearSelection(){ S.acctSelected=new Set(); _renderAccountTable(); }
 
 function _renderFlightTable(){
   const el=document.getElementById('flight-table'); if(!el)return;
@@ -4315,12 +4397,189 @@ async function doReactivateAccount(userId, displayName){
     S.accountList=null; renderAccounts();
   }catch(e){ alert('Could not reactivate: '+apiErr(e)); }
 }
+async function doRestoreAccount(userId, displayName){
+  if(!confirm('Restore account for '+displayName+'? It will become active again immediately.'))return;
+  try{
+    await api('/api/accounts/'+userId+'/restore',{method:'POST'});
+    S.accountList=null; renderAccounts();
+    showToast('Restored '+displayName+'.');
+  }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
+}
 async function doUnlockAccount(userId, displayName){
   if(!confirm('Unlock account for '+displayName+'? This will clear the login lockout so they can sign in again.'))return;
   try{
     await api('/api/accounts/'+userId+'/unlock',{method:'POST'});
     S.accountList=null; renderAccounts();
   }catch(e){ alert('Could not unlock: '+apiErr(e)); }
+}
+
+// ── Bulk Archive Wizard (5-step: Selection Review → Impact Assessment →
+// Required Decisions → Confirmation → Result). One modal, body/foot rebuilt
+// per step by _wizRender()/_wizRenderFoot() rather than five separate
+// modals, so step state (reason, confirmation checkbox, in-flight results)
+// survives Back/Continue navigation within the same wizard session. ──
+function _acctOpenWizard(){
+  const ids=[...S.acctSelected];
+  if(!ids.length) return;
+  const byId=new Map((S.accountList||[]).map(u=>[u.user_id,u]));
+  const accounts=ids.map(id=>byId.get(id)).filter(Boolean);
+  S.wiz={step:1, accounts, reason:'', confirmRevocation:false, effectiveAt:'', results:null, summary:null, batchId:null, batchAudit:null};
+  openModal('m-archive-wizard');
+  _wizRender();
+}
+
+function _wizClose(){
+  closeModal('m-archive-wizard');
+  S.wiz=null;
+}
+
+function _wizRemove(uid){
+  if(!S.wiz) return;
+  S.wiz.accounts=S.wiz.accounts.filter(u=>u.user_id!==uid);
+  S.acctSelected.delete(uid);
+  _wizRender();
+}
+
+function _wizBack(){ if(S.wiz && S.wiz.step>1){ S.wiz.step--; _wizRender(); } }
+function _wizNext(){ if(S.wiz && S.wiz.step<4){ S.wiz.step++; _wizRender(); } }
+function _wizReasonInput(v){ if(S.wiz){ S.wiz.reason=v; _wizRenderFoot(); } }
+function _wizConfirmToggle(v){ if(S.wiz){ S.wiz.confirmRevocation=v; _wizRenderFoot(); } }
+function _wizEffectiveInput(v){ if(S.wiz){ S.wiz.effectiveAt=v; } }
+function _wizReasonValid(){ return S.wiz && (S.wiz.reason||'').trim().length>=10; }
+function _wizStep3Valid(){ return _wizReasonValid() && S.wiz && S.wiz.confirmRevocation; }
+
+async function _wizSubmit(){
+  if(!S.wiz || !_wizStep3Valid()) return;
+  const foot=document.getElementById('waz-foot');
+  if(foot) foot.querySelectorAll('button').forEach(b=>b.disabled=true);
+  try{
+    const body={
+      account_ids:S.wiz.accounts.map(u=>u.user_id),
+      reason:S.wiz.reason.trim(),
+      confirm_session_revocation:true,
+    };
+    if(S.wiz.effectiveAt) body.effective_at=S.wiz.effectiveAt;
+    const r=await api('/api/accounts/batch-archive',{method:'POST',body:JSON.stringify(body)});
+    S.wiz.results=r.results; S.wiz.summary=r.summary; S.wiz.batchId=r.batch_id;
+    S.wiz.step=5;
+    S.acctSelected=new Set();
+    S.accountList=null;
+    _wizRender();
+    renderAccounts();
+    showToast(`Archived ${r.summary.archived} of ${body.account_ids.length} selected account(s).`, r.summary.failed>0);
+  }catch(e){
+    showToast('Bulk archive failed: '+apiErr(e), true);
+    _wizRender();
+  }
+}
+
+async function _wizViewBatchAudit(){
+  if(!S.wiz || !S.wiz.batchId) return;
+  try{
+    S.wiz.batchAudit=await api('/api/audit?batch_id='+encodeURIComponent(S.wiz.batchId));
+  }catch(_){ S.wiz.batchAudit=[]; }
+  _wizRender();
+}
+
+const _WIZ_RESULT_BADGE={archived:'b-ok',already_archived:'b-grey',skipped:'b-amber',failed:'b-red'};
+const _WIZ_RESULT_LABEL={archived:'Archived',already_archived:'Already archived',skipped:'Skipped',failed:'Failed'};
+const _WIZ_SKIP_REASON={
+  cannot_archive_self:'You cannot archive your own account.',
+  last_active_system_admin:'Would remove the last active System Administrator.',
+  out_of_scope:'Outside your management authority.',
+};
+
+function _wizRender(){
+  if(!S.wiz) return;
+  const body=document.getElementById('waz-body');
+  const title=document.getElementById('waz-title');
+  if(!body) return;
+  const w=S.wiz;
+  const n=w.accounts.length;
+
+  if(w.step===1){
+    title.textContent='Step 1 of 5 — Selection Review';
+    body.innerHTML=`<p style="font-size:12px;color:var(--muted);margin:0 0 10px">Confirm the accounts to archive. Remove any that shouldn't be included before continuing.</p>
+      <div class="tw" style="max-height:280px;overflow:auto"><table><thead><tr><th>Name</th><th>Role</th><th>Unit</th><th class="no-print"></th></tr></thead><tbody>
+      ${w.accounts.map(u=>`<tr>
+        <td style="font-weight:700">${esc(u.display_name||'—')}</td>
+        <td><span class="badge ${_ROLE_CLS[u.role]||'b-grey'}">${_ROLE_LABELS[u.role]||u.role}</span></td>
+        <td style="font-size:11px;color:var(--muted)">${esc(u.squadron_code?('SQN '+u.squadron_code):(u.wing_code?('Wing '+u.wing_code):(u.scope_type==='national'?'NAT HQ':'—')))}</td>
+        <td class="no-print"><button class="btn btn-xs btn-out" onclick="_wizRemove('${u.user_id}')">Remove</button></td>
+      </tr>`).join('')}
+      </tbody></table></div>
+      <div style="font-size:11.5px;margin-top:8px;color:var(--muted)">${n} account${n===1?'':'s'} selected.</div>`;
+  } else if(w.step===2){
+    title.textContent='Step 2 of 5 — Impact Assessment';
+    body.innerHTML=`
+      <div class="alert a-warn" style="font-size:12px;margin-bottom:8px">Archiving immediately revokes sign-in for ${n} account${n===1?'':'s'} and deactivates their access code${n===1?'':'s'}. This is reversible — archived accounts can be restored at any time from the same page.</div>
+      <div class="alert a-info" style="font-size:12px">If any selected account is the last active System Administrator, or is outside your management authority, that one account is skipped (with a visible reason) — the rest of the batch still proceeds. No account is silently dropped.</div>`;
+  } else if(w.step===3){
+    title.textContent='Step 3 of 5 — Required Decisions';
+    body.innerHTML=`
+      <div class="ff"><label>Reason (required, minimum 10 characters)</label>
+        <textarea id="waz-reason" rows="3" oninput="_wizReasonInput(this.value)" placeholder="e.g. End-of-year account cleanup — cadets who have left the unit">${esc(w.reason||'')}</textarea>
+      </div>
+      <div class="ff"><label>Effective date (optional — audit record only; archiving happens immediately, there is no scheduled/deferred archiving)</label>
+        <input type="date" id="waz-effective" value="${esc(w.effectiveAt||'')}" onchange="_wizEffectiveInput(this.value)">
+      </div>
+      <label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;margin-top:10px;cursor:pointer">
+        <input type="checkbox" id="waz-confirm" ${w.confirmRevocation?'checked':''} onchange="_wizConfirmToggle(this.checked)" style="margin-top:2px">
+        <span>I confirm that active sessions for these accounts will be revoked immediately.</span>
+      </label>`;
+  } else if(w.step===4){
+    title.textContent='Step 4 of 5 — Confirmation';
+    body.innerHTML=`
+      <p style="font-size:12px">You are about to archive <strong>${n}</strong> account${n===1?'':'s'}.</p>
+      <div style="font-size:11.5px;color:var(--muted);white-space:pre-wrap;border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin:8px 0"><strong>Reason:</strong> ${esc(w.reason.trim())}</div>
+      <p style="font-size:11.5px;color:var(--muted)">This takes effect immediately on confirmation and is recorded in the Audit Log under one correlated batch.</p>`;
+  } else if(w.step===5){
+    title.textContent='Step 5 of 5 — Result';
+    const results=w.results||[];
+    body.innerHTML=`
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:11.5px">
+        <span class="badge b-ok">${w.summary.archived} archived</span>
+        <span class="badge b-grey">${w.summary.already_archived} already archived</span>
+        <span class="badge b-amber">${w.summary.skipped} skipped</span>
+        <span class="badge b-red">${w.summary.failed} failed</span>
+      </div>
+      <div class="tw" style="max-height:240px;overflow:auto"><table><thead><tr><th>Name</th><th>Role</th><th>Result</th></tr></thead><tbody>
+      ${results.map(r=>`<tr>
+        <td style="font-weight:700">${esc(r.display_name||r.account_id)}</td>
+        <td>${r.role?`<span class="badge ${_ROLE_CLS[r.role]||'b-grey'}">${_ROLE_LABELS[r.role]||r.role}</span>`:'—'}</td>
+        <td><span class="badge ${_WIZ_RESULT_BADGE[r.result]||'b-grey'}">${_WIZ_RESULT_LABEL[r.result]||r.result}</span>${r.reason&&_WIZ_SKIP_REASON[r.reason]?` <span style="font-size:10.5px;color:var(--muted)">${_WIZ_SKIP_REASON[r.reason]}</span>`:''}</td>
+      </tr>`).join('')}
+      </tbody></table></div>
+      <div style="margin-top:10px">
+        ${w.batchAudit?`<div class="tw" style="max-height:180px;overflow:auto;margin-top:6px"><table><thead><tr><th>Time</th><th>Action</th><th>Object</th></tr></thead><tbody>
+          ${w.batchAudit.map(a=>`<tr><td style="font-size:11px;white-space:nowrap">${(a.timestamp||'').replace('T',' ').slice(0,16)}</td><td style="font-size:11px">${esc(a.action||'')}</td><td style="font-size:11px;color:var(--muted)">${esc(a.object_type||'')}</td></tr>`).join('')}
+        </tbody></table></div>`
+        :`<button class="btn btn-xs btn-out" onclick="_wizViewBatchAudit()">View batch audit (${esc(w.batchId||'')})</button>`}
+      </div>`;
+  }
+  _wizRenderFoot();
+}
+
+function _wizRenderFoot(){
+  if(!S.wiz) return;
+  const foot=document.getElementById('waz-foot');
+  if(!foot) return;
+  const w=S.wiz;
+  if(w.step===1){
+    foot.innerHTML=`<button class="btn btn-out" onclick="_wizClose()">Cancel</button>
+      <button class="btn btn-dk" ${w.accounts.length?'':'disabled'} onclick="_wizNext()">Continue</button>`;
+  } else if(w.step===2){
+    foot.innerHTML=`<button class="btn btn-out" onclick="_wizBack()">Back</button>
+      <button class="btn btn-dk" onclick="_wizNext()">Continue</button>`;
+  } else if(w.step===3){
+    foot.innerHTML=`<button class="btn btn-out" onclick="_wizBack()">Back</button>
+      <button class="btn btn-dk" ${_wizStep3Valid()?'':'disabled'} onclick="_wizNext()">Continue</button>`;
+  } else if(w.step===4){
+    foot.innerHTML=`<button class="btn btn-out" onclick="_wizBack()">Back</button>
+      <button class="btn btn-dk" onclick="_wizSubmit()">Confirm &amp; Archive</button>`;
+  } else if(w.step===5){
+    foot.innerHTML=`<button class="btn btn-dk" onclick="_wizClose()">Done</button>`;
+  }
 }
 
 // ── Flights ───────────────────────────────────────────────

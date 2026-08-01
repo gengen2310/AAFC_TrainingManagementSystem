@@ -389,7 +389,7 @@ _AUDIT_READ_ROLES = frozenset({"auditor", "sqn_admin", "wing_admin", "national_a
 
 # ── Audit (read-only; auditor + wing/national admins) ──
 @router.get("/audit")
-def get_audit(object_type: str | None = None, object_id: str | None = None,
+def get_audit(object_type: str | None = None, object_id: str | None = None, batch_id: str | None = None,
               limit: int = 300, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     if p.role not in _AUDIT_READ_ROLES:
         raise HTTPException(403, detail={"error": "forbidden"})
@@ -403,7 +403,9 @@ def get_audit(object_type: str | None = None, object_id: str | None = None,
         q = q.filter(AuditLog.object_type == object_type)
     if object_id:
         q = q.filter(AuditLog.object_id == object_id)
+    if batch_id:
+        q = q.filter(AuditLog.batch_id == batch_id)
     rows = q.order_by(AuditLog.timestamp.desc()).limit(min(limit, 1000)).all()
     return [{"audit_id": r.id, "timestamp": r.timestamp.isoformat(), "role": r.role,
              "action": r.action, "object_type": r.object_type, "object_id": r.object_id,
-             "reason": r.reason, "proxy_session_id": r.proxy_session_id} for r in rows]
+             "reason": r.reason, "proxy_session_id": r.proxy_session_id, "batch_id": r.batch_id} for r in rows]

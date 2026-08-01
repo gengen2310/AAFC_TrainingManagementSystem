@@ -220,6 +220,15 @@ def test_batch_archive_writes_one_correlated_batch_id_across_rows(client):
     audit_rows = client.get(f"/api/system/audit-summary?action=batch_archive&limit=10", headers=auditor_hdr).json()
     assert audit_rows["count"] >= 1
 
+    # GET /api/audit?batch_id=... returns every row this batch wrote -- one
+    # per archived account plus the batch-level summary row -- so the
+    # frontend wizard's "View batch audit" step can show a correlated view
+    # without the caller having to know each individual account_id up front.
+    correlated = client.get(f"/api/audit?batch_id={batch_id}", headers=auditor_hdr).json()
+    assert len(correlated) == 3  # u1 + u2 account_archived rows, plus 1 batch_archive summary row
+    assert all(row["batch_id"] == batch_id for row in correlated)
+    assert {row["action"] for row in correlated} == {"account_archived", "batch_archive"}
+
 
 def test_restore_reverses_archive(client):
     hdr = _sysadmin(client)
