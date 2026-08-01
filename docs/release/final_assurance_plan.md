@@ -74,9 +74,19 @@ re-verification addendum. Summary:
   only a stale secret name, already disclosed honestly in the workflow's own header
   comment.
 
-Remaining Stage 1 work: full source/function/API inventory (`final_source_inventory.md`,
-`final_feature_inventory.md`, `file-inventory.csv`, `function-inventory.csv`,
-`api-inventory.csv`) — not yet started.
+Full source/function/API inventory complete: `final_source_inventory.md`,
+`final_feature_inventory.md`, and `reports/final-assurance/{file,function,frontend-
+function,connected-frontend-function,api}-inventory.csv`. Headline numbers: 341 tracked
+files, 237 backend API endpoints (0 true duplicates after correcting for router
+prefixes — one apparent duplicate was caught and disproved during this pass, see
+`final_source_inventory.md`'s self-correction note), 57 SQLAlchemy model classes (was
+estimated "~30" in the original plan — corrected), 641 backend functions/classes, 238
+`frontend/src` definitions, 631 `connected-frontend` top-level definitions. Fresh
+full test-suite run: **1002 passed, 5 skipped** (materially supersedes the stale "310
+passed, 1 skipped" recorded in `.claude/rules/testing.md`). Spot-verified this
+session's own previously-claimed shipped features (setup checklist, import preview,
+drag-and-drop, Activity inheritance, GAP-21 system_admin scope bar) are genuinely
+present in code, not just in commit messages.
 
 ## Skill-use register
 
@@ -96,9 +106,10 @@ Remaining Stage 1 work: full source/function/API inventory (`final_source_invent
 
 | # | Stage | Status |
 |---|---|---|
-| 0 | Baseline, branch, contamination scan, skill register | Substantially complete (this doc); "confirm previously-approved work present" checklist from instruction Part 5 still pending |
-| 1 | GAP-18/GAP-16 re-verification + source/function/API inventory | GAP-18/GAP-16 done; inventory not started |
-| 2–14 | — | Not started |
+| 0 | Baseline, branch, contamination scan, skill register | Complete |
+| 1 | GAP-18/GAP-16 re-verification + source/function/API inventory | Complete |
+| 2 | Line-by-line code assurance + static analysis | In progress |
+| 3–14 | — | Not started |
 
 Evidence for every stage records: what was checked, how, environment, role, input,
 expected vs. actual, evidence location, Git SHA, and deployment ID where relevant, per
