@@ -1833,3 +1833,37 @@ acceptance criteria, and is updated in place as each item closes.
   the pattern already used by `main.py`'s own 500 handler. New tests
   (`test_health.py`) assert both the happy path and, via monkeypatched failures,
   that a forced exception message never appears in the response body.
+
+## GAP-25: Business-date logic uses server clock, not an AU timezone (P3, documented, not fixed)
+
+- **Source**: Stage 2 static analysis, `ruff --select DTZ*` (38 findings across
+  `dashboard.py`, `ops.py`, `organisations.py`, `planning.py`, `setup.py`,
+  `timing.py`, `training.py`, `wing_calendar.py`).
+- **Triage**: individually reviewed all 38. The 6 `strptime()`/naive-datetime
+  findings are all pure date-string parsing/validation (`"%Y-%m-%d"` in, `.date()`
+  or a reformatted date string out) where timezone-naivety is irrelevant — no
+  wall-clock-time semantics are ever involved. The remaining 32 are all
+  `date.today()` (or `datetime.now().year` in one spot) used for business-date
+  logic: "is this parade night due soon", "days until X", default-year inference.
+  These resolve to a single underlying pattern, not 32 separate defects.
+- **Finding**: `date.today()`/`datetime.now()` compute against the deployment
+  server's system clock (Railway containers run UTC), not against an AAFC
+  squadron's local Australian timezone (AWST/ACST/AEST, UTC+8 to UTC+11
+  depending on state and DST). Near local midnight in any of those zones, the
+  server's UTC "today" and a squadron's real local "today" can disagree by up to
+  several hours — e.g. a Perth (UTC+8) admin checking a "days until parade
+  night" countdown shortly after their local midnight could see a value computed
+  against the server's still-previous-day UTC date.
+- **Severity: P3** — narrow time window (a few hours per day, only near local
+  midnight), no data corruption (dates are still stored/compared consistently,
+  just potentially off-by-one for a display/countdown calculation during that
+  window), and no security implication.
+- **Not fixed this pass**: a proper fix means establishing a canonical "AAFC
+  business timezone" concept (the system currently has none — no per-squadron or
+  global timezone setting exists in `config.py` or the org models) and routing
+  every business-date computation through it, which is a real design decision
+  (single national timezone constant vs. per-Wing/Squadron timezone, given
+  squadrons span at least 3 Australian timezones) rather than a mechanical fix —
+  appropriately deferred to a deliberate follow-up rather than rushed during a
+  static-analysis triage pass.
+- **Disposition**: open, P3, carried to Stage 13's findings-classification pass.
