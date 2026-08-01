@@ -1722,3 +1722,33 @@ acceptance criteria, and is updated in place as each item closes.
 - **Disposition**: closed. Fixed and tested on `release/final-assurance-2026-08-01`,
   not yet deployed to staging/production (Stage 13 handles the deploy/re-verify cycle
   for all findings from this pass together, not one at a time).
+
+## GAP-23: CEA activity import swallows per-row error detail (P3, not fixed — documented for Stage 13 prioritisation)
+
+- **Source**: Stage 2 manual review of `BLE001` (blind-except) static-analysis
+  findings in `planning.py`/`training.py`/`accounts.py`/`export_import.py`/
+  `timing.py`/`workers/dispatcher.py` (24 sites total). Most are legitimate,
+  correctly-scoped fallback/degradation patterns (date-parse fallbacks, Celery
+  broker fallback, admin-facing error surfacing) — reviewed individually, no
+  action needed. One genuine gap found by comparing sibling code paths.
+- **Finding**: the CEA activity import loop (`planning.py`, `~line 4185`) catches
+  per-row exceptions and only increments an `errors` counter — no row number, no
+  reason, nothing identifying which row failed or why, anywhere in the response.
+  The near-identical curriculum CSV/JSON import loop in the same codebase
+  (`training.py:2590`) handles the same class of per-row failure by appending
+  `{"identifier": ..., "status": "failed", "error": str(exc), ...}` to its results
+  array — giving the importing admin exactly what they need to fix their source
+  data. CEA import is inconsistent with this established, better pattern next to
+  it, not a novel design choice.
+- **Severity: P3** — no data loss (failed rows are simply not imported, safely
+  retryable), no security/tenancy implication (admin-only endpoint, same
+  `_NAT_ADMIN_ROLES`-class gating as the curriculum path). Purely an operability/
+  UX gap: a national_admin importing a real CEA file with some malformed rows sees
+  only a count, not which rows or why, and has to guess at fixes.
+- **Not fixed this pass** — deliberately deferred rather than rushed: a proper fix
+  means adding a `failed_rows: [{row, reason}]`-shaped field to the CEA import
+  response and its consumer in the frontend, which is a small but real behaviour
+  change to a Stage 5-critical workflow, better done together with that stage's
+  full CEA import Verification pass rather than in isolation during Stage 2.
+- **Disposition**: open, P3, carried to Stage 13's findings-classification pass for
+  scheduling alongside other P2/P3 items rather than fixed ad hoc.
