@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 from sqlalchemy.orm import Session as DBSession
@@ -17,8 +18,11 @@ def health_db(db: DBSession = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
         return {"status": "ok", "db": "ok"}
-    except Exception as e:  # pragma: no cover
-        return {"status": "degraded", "db": str(e)}
+    except Exception:  # pragma: no cover
+        # Unauthenticated endpoint -- never echo the raw driver exception (it
+        # can include internal hostnames/schema details), just log it server-side.
+        logging.exception("health_db check failed")
+        return {"status": "degraded", "db": "error"}
 
 
 @router.get("/ready")
@@ -27,8 +31,9 @@ def ready(db: DBSession = Depends(get_db)):
     try:
         count = db.query(Squadron).count()
         return {"status": "ready", "squadrons": count}
-    except Exception as e:  # pragma: no cover
-        return {"status": "not_ready", "error": str(e)}
+    except Exception:  # pragma: no cover
+        logging.exception("readiness check failed")
+        return {"status": "not_ready", "error": "error"}
 
 
 @router.get("/ui-config")

@@ -4196,7 +4196,7 @@ function _renderAccountTable(){
 
   const actions=u=>{
     if(!canWrite) return '';
-    const dn=(u.display_name||'').replace(/'/g,"\\'");
+    const dn=_jsAttr(u.display_name||'');
     if(u.is_archived){
       return `<button class="btn btn-xs btn-ok" onclick="doRestoreAccount('${u.user_id}','${dn}')">Restore</button>`;
     }
@@ -4215,7 +4215,7 @@ function _renderAccountTable(){
       const isMe=u.user_id===myUid;
       const cb=canBulk?`<td class="no-print">${(isMe||u.is_archived)?'':`<input type="checkbox" ${S.acctSelected.has(u.user_id)?'checked':''} onchange="_acctToggleOne('${u.user_id}',this.checked)" aria-label="Select ${esc(u.display_name||'')}">`}</td>`:'';
       return `<tr>${cb}
-      <td style="font-weight:700">${u.display_name||'—'}</td>
+      <td style="font-weight:700">${esc(u.display_name||'—')}</td>
       <td><span class="badge ${_ROLE_CLS[u.role]||'b-grey'}">${_ROLE_LABELS[u.role]||u.role}</span></td>
       <td><span class="badge ${_SCOPE_CLS[u.scope_type]||'b-grey'}">${_SCOPE_LABELS[u.scope_type]||u.scope_type||'—'}</span></td>
       <td style="font-size:11px;color:var(--muted)">${unit(u)}</td>
@@ -4272,13 +4272,13 @@ function _renderFlightTable(){
   if(!flights.length){ el.innerHTML='<div style="color:var(--muted);font-size:11.5px;padding:8px 0">No flights defined.</div>'; return; }
 
   const sqnName=fid=>{ const f=flights.find(x=>x.flight_id===fid); return f?f.squadron_name||'':''; };
-  const renameBtn=f=>`<button class="btn btn-xs" onclick="openRenameFlightModal('${f.flight_id}','${(f.name||'').replace(/'/g,"\\'")}')">Rename</button>`;
-  const archiveBtn=f=>`<button class="btn btn-xs" style="border-color:var(--red);color:var(--red)" onclick="doArchiveFlight('${f.flight_id}','${(f.name||'').replace(/'/g,"\\'")}')">Archive</button>`;
+  const renameBtn=f=>`<button class="btn btn-xs" onclick="openRenameFlightModal('${f.flight_id}','${_jsAttr(f.name||'')}')">Rename</button>`;
+  const archiveBtn=f=>`<button class="btn btn-xs" style="border-color:var(--red);color:var(--red)" onclick="doArchiveFlight('${f.flight_id}','${_jsAttr(f.name||'')}')">Archive</button>`;
 
   el.innerHTML='<div class="tw"><table><thead><tr><th>Flight Name</th><th>Squadron</th><th>Members</th>'+(canWrite?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
     flights.map(f=>`<tr>
-      <td style="font-weight:700">${f.name}</td>
-      <td style="font-size:11.5px;color:var(--muted)">${f.squadron_code||f.squadron_name||'—'}</td>
+      <td style="font-weight:700">${esc(f.name)}</td>
+      <td style="font-size:11.5px;color:var(--muted)">${esc(f.squadron_code||f.squadron_name||'—')}</td>
       <td style="font-size:11.5px">${f.member_count??'—'}</td>
       ${canWrite?`<td class="no-print" style="display:flex;gap:4px">${renameBtn(f)}${archiveBtn(f)}</td>`:''}
     </tr>`).join('')+
@@ -5064,10 +5064,10 @@ function renderUserDir(){
   if(!rows.length){ el.innerHTML='<div style="color:var(--muted);font-size:11.5px;padding:8px 0">'+(!(S.users||[]).length?'No users in scope.':'No users match the filter.')+'</div>'; return; }
   const unit=u=>u.squadron_code?'SQN '+u.squadron_code:u.wing_code?'Wing '+u.wing_code:u.national_id?'NAT HQ':'—';
   el.innerHTML='<div class="tw"><table><thead><tr><th>Name</th><th>Role</th><th>Unit</th><th></th></tr></thead><tbody>'+
-    rows.map(u=>`<tr><td style="font-weight:700">${u.display_name}</td>
+    rows.map(u=>`<tr><td style="font-weight:700">${esc(u.display_name)}</td>
       <td><span class="badge ${ROLE_CLS[u.role]||'b-grey'}">${ROLE_L[u.role]||u.role}</span></td>
-      <td style="font-size:11px;color:var(--muted)">${unit(u)}</td>
-      <td><button class="btn btn-xs btn-sky" onclick="openResetCodeModal('${u.user_id}','${(u.display_name||'').replace(/'/g,"\\'")}','${u.role}','${unit(u)}')">Reset code</button></td>
+      <td style="font-size:11px;color:var(--muted)">${esc(unit(u))}</td>
+      <td><button class="btn btn-xs btn-sky" onclick="openResetCodeModal('${u.user_id}','${_jsAttr(u.display_name||'')}','${u.role}','${_jsAttr(unit(u))}')">Reset code</button></td>
     </tr>`).join('')+
     '</tbody></table></div>';
 }
@@ -5540,7 +5540,7 @@ function renderCal(){
     let cls='cal-cell'+(pn?' parade':'')+(isT?' today':'')+(acts.length&&!pn?' act-day':'');
     let chips='';
     if(pn)(pn.sessions||[]).slice(0,3).forEach(s=>{chips+=`<span class="cal-chip ${stCls(s.status)}">${PH_S[s.phase]||s.phase}</span>`;});
-    acts.slice(0,1).forEach(a=>chips+=`<span class="cal-chip act">${a.name.substring(0,16)}</span>`);
+    acts.slice(0,1).forEach(a=>chips+=`<span class="cal-chip act">${esc(a.name.substring(0,16))}</span>`);
     const oc=pn?`onclick="showPNDetail('${ds}')"`:canWriteSquadron()?`onclick="openWithDate('${ds}')"`:'';
     cells+=`<div class="${cls}" ${oc}><div class="cal-dt">${d}</div>${chips}</div>`;
   }
@@ -5585,7 +5585,7 @@ function buildPNCard(pn){
     </div>`).join('');
   return `<div class="pn-card">
     <div class="pn-hdr">
-      <div><div class="pn-date">${fmtDL(pn.date)}</div><div class="pn-meta">${pn.term} · ${(pn.sessions||[]).length} sessions${pn.notes?' · '+pn.notes:''}</div></div>
+      <div><div class="pn-date">${fmtDL(pn.date)}</div><div class="pn-meta">${pn.term} · ${(pn.sessions||[]).length} sessions${pn.notes?' · '+esc(pn.notes):''}</div></div>
       <div style="display:flex;gap:6px;align-items:center" class="no-print">
         ${allDel?stBadge('delivered'):stBadge('planned')}
         <button class="btn btn-xs btn-sky" onclick="showPNDetail('${pn.date}')">Detail</button>
@@ -5618,9 +5618,9 @@ async function delPN(date){
 // ADD PARADE NIGHT
 function buildSlots(){
   const n=parseInt(document.getElementById('pn-nsess').value);
-  const currOpts=allCurr().map(e=>`<option value="${e.title}">${e.code} — ${e.title}</option>`).join('');
+  const currOpts=allCurr().map(e=>`<option value="${esc(e.title)}">${esc(e.code)} — ${esc(e.title)}</option>`).join('');
   const facOpts=S.facs.map(f=>`<option value="${f.id}">${facDisplay(f)}</option>`).join('');
-  const roomOpts=S.rooms.map(r=>`<option value="${r.name}">${r.name}</option>`).join('');
+  const roomOpts=S.rooms.map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('');
   // Governed phase catalogue (master transformation plan Block 10) — S.phases
   // is loaded at app-load time and already scope-filtered server-side.
   const phaseOpts=(S.phases||[]).map(p=>`<option value="${esc(p.name)}">${esc(p.displayName)}</option>`).join('');
@@ -5690,14 +5690,14 @@ function addPN(){
 function showPNDetail(ds){
   const pn=S.pns.find(p=>p.date===ds);if(!pn)return;
   document.getElementById('pn-det-title').textContent=fmtDL(ds);
-  const currOpts=allCurr().map(e=>`<option value="${e.title}">${e.code} — ${e.title}</option>`).join('');
+  const currOpts=allCurr().map(e=>`<option value="${esc(e.title)}">${esc(e.code)} — ${esc(e.title)}</option>`).join('');
   const facOpts=S.facs.map(f=>`<option value="${f.id}">${facDisplay(f)}</option>`).join('');
-  const roomOpts=S.rooms.map(r=>`<option value="${r.name}">${r.name}</option>`).join('');
+  const roomOpts=S.rooms.map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('');
   // Governed phase catalogue (master transformation plan Block 10) — falls
   // back to PH_S's short label for the 8 built-in names, else uses the
   // phase's own display_name (a custom wing/squadron phase).
   const phOpts=(S.phases||[]).map(p=>`<option value="${esc(p.name)}">${esc(PH_S[p.name]||p.displayName)}</option>`).join('');
-  let html=`<div class="alert a-info"><b>${pn.term}</b> · ${pn.notes||'No notes'}</div>`;
+  let html=`<div class="alert a-info"><b>${esc(pn.term)}</b> · ${esc(pn.notes||'No notes')}</div>`;
   (pn.sessions||[]).forEach((s,i)=>{
     const stOpts=['planned','delivered','cancelled','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${s.status===v?'selected':''}>${{planned:'Planned',delivered:'Delivered',cancelled:'Cancelled',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
     const dragAttrs=canWriteSquadron()?`ondragover="_sessDragOver(event,'${ds}',${i})" ondragleave="_sessDragLeave(event)" ondrop="_sessDrop(event,'${ds}',${i})"`:'';
@@ -5961,9 +5961,9 @@ function quickEdit(date,idx){
   editSessRef={date,idx};
   const pn=S.pns.find(p=>p.date===date);if(!pn)return;
   const s=pn.sessions[idx];
-  const currOpts=allCurr().map(e=>`<option value="${e.title}" ${e.title===s.exp?'selected':''}>${e.code} — ${e.title}</option>`).join('');
+  const currOpts=allCurr().map(e=>`<option value="${esc(e.title)}" ${e.title===s.exp?'selected':''}>${esc(e.code)} — ${esc(e.title)}</option>`).join('');
   const facOpts=S.facs.map(f=>`<option value="${f.id}" ${f.id===s.facId?'selected':''}>${facDisplay(f)}</option>`).join('');
-  const roomOpts=S.rooms.map(r=>`<option value="${r.name}" ${r.name===s.room?'selected':''}>${r.name}</option>`).join('');
+  const roomOpts=S.rooms.map(r=>`<option value="${esc(r.name)}" ${r.name===s.room?'selected':''}>${esc(r.name)}</option>`).join('');
   const stOpts=['planned','delivered','cancelled','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${v===s.status?'selected':''}>${{planned:'Planned',delivered:'Delivered',cancelled:'Cancelled',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
   document.getElementById('sess-edit-body').innerHTML=`
     <div class="ff"><label>Status</label><select id="qe-st">${stOpts}</select></div>
@@ -6037,15 +6037,15 @@ function renderWP(){
     <div class="card">
       <div style="background:var(--dark);color:white;padding:14px 18px;border-radius:8px;margin-bottom:14px;" class="print-only" style="display:block">
         <div style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:3px">7 Wing Australian Air Force Cadets</div>
-        <div style="font-size:17px;font-weight:900">${info.name}</div>
+        <div style="font-size:17px;font-weight:900">${esc(info.name)}</div>
         <div style="font-size:12px;opacity:.75;margin-top:2px">Weekly Training Program — ${fmtDL(ds)}</div>
-        <div style="font-size:10px;opacity:.58;margin-top:2px">${info.start}–${info.end} · ${pn.term}${pn.notes?' · '+pn.notes:''}</div>
+        <div style="font-size:10px;opacity:.58;margin-top:2px">${esc(info.start)}–${esc(info.end)} · ${esc(pn.term)}${pn.notes?' · '+esc(pn.notes):''}</div>
       </div>
       <div style="background:var(--dark);color:white;padding:14px 18px;border-radius:8px;margin-bottom:14px" class="no-print">
         <div style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:3px">7 Wing Australian Air Force Cadets</div>
-        <div style="font-size:17px;font-weight:900">${info.name}</div>
+        <div style="font-size:17px;font-weight:900">${esc(info.name)}</div>
         <div style="font-size:12px;opacity:.75;margin-top:2px">Weekly Training Program — ${fmtDL(ds)}</div>
-        <div style="font-size:10px;opacity:.58;margin-top:2px">${info.start}–${info.end} · ${pn.term}${pn.notes?' · '+pn.notes:''}</div>
+        <div style="font-size:10px;opacity:.58;margin-top:2px">${esc(info.start)}–${esc(info.end)} · ${esc(pn.term)}${pn.notes?' · '+esc(pn.notes):''}</div>
       </div>
       <div class="tw">
         <table class="wp-tbl">
@@ -6850,10 +6850,10 @@ function tagFac(id){
   el.innerHTML=allVocab.map(v=>{
     const on=cur.includes(v);
     const isApiTag=apiTagNames.includes(v)&&!FAC_TAG_VOCAB.includes(v);
-    return `<button type="button" onclick="toggleTagVocab(this,'${v.replace(/'/g,"\\'")}',${on?'false':'true'})"
+    return `<button type="button" onclick="toggleTagVocab(this,'${_jsAttr(v)}',${on?'false':'true'})"
       style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;
              border:1.5px solid var(--royal);background:${on?'var(--royal)':'white'};color:${on?'white':'var(--royal)'}${isApiTag?';border-style:dashed':''}"
-      data-active="${on}" title="${isApiTag?'Unit-created tag':''}">${v}</button>`;
+      data-active="${on}" title="${isApiTag?'Unit-created tag':''}">${esc(v)}</button>`;
   }).join('');
   // Custom tags (not in any vocab) go in the text field
   const custom=cur.filter(t=>!allVocab.includes(t));
@@ -6882,7 +6882,7 @@ async function createAndAddTag(){
 }
 function toggleTagVocab(btn,val,makeActive){
   const active=makeActive==='true'||makeActive===true;
-  btn.setAttribute('onclick',`toggleTagVocab(this,'${val.replace(/'/g,"\\'")}',${active?'false':'true'})`);
+  btn.setAttribute('onclick',`toggleTagVocab(this,'${_jsAttr(val)}',${active?'false':'true'})`);
   btn.dataset.active=active?'true':'false';
   btn.style.background=active?'var(--royal)':'white';
   btn.style.color=active?'white':'var(--royal)';
@@ -7043,15 +7043,15 @@ async function delFac(id){
 // ═══════════════════════════════════════════════════════════
 function renderRooms(){
   document.getElementById('room-tbody').innerHTML=S.rooms.map((r,i)=>`<tr>
-    <td style="font-weight:700">${r.name}</td>
+    <td style="font-weight:700">${esc(r.name)}</td>
     <td style="text-align:center">${r.capacity}</td>
     <td><span class="badge b-blue" style="font-size:8.5px">${r.type}</span></td>
     <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editRoom('${r.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delRoom('${r.id}')">×</button>`:'—'}</td>
   </tr>`).join('');
   document.getElementById('equip-tbody').innerHTML=S.equip.map((eq,i)=>`<tr>
-    <td style="font-weight:700">${eq.name}</td>
+    <td style="font-weight:700">${esc(eq.name)}</td>
     <td style="text-align:center">${eq.qty}</td>
-    <td style="font-size:11.5px;color:var(--muted)">${eq.notes||''}</td>
+    <td style="font-size:11.5px;color:var(--muted)">${esc(eq.notes||'')}</td>
     <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editEquip('${eq.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delEquip('${eq.id}')">×</button>`:'—'}</td>
   </tr>`).join('');
 }
@@ -7115,7 +7115,7 @@ function renderActions(){
   });
   document.getElementById('action-tbody').innerHTML=items.length?items.map(it=>`<tr style="background:#fffbf0">
     <td><code style="font-size:10px">${it.code}</code></td>
-    <td style="font-weight:700">${it.title}</td>
+    <td style="font-weight:700">${esc(it.title)}</td>
     <td>${it.phase!=='—'?phBadge(it.phase):'—'}</td>
     <td>${it.el!=='—'?elBadge(it.el):'—'}</td>
     <td>${it.term!=='—'?`<span class="badge b-blue" style="font-size:8.5px">${it.term}</span>`:'—'}</td>
@@ -7776,7 +7776,7 @@ function renderNational(){
   wings.forEach(w=>{
     const dp=w.sessions?Math.round((w.delivered||0)/w.sessions*100):0;
     html+=`<tr class="drow" onclick="nationalDrill('${w.wing_id}')">
-      <td style="font-weight:800">${w.name||w.code}</td>
+      <td style="font-weight:800">${esc(w.name||w.code)}</td>
       <td style="text-align:center;font-weight:700">${w.squadrons||0}</td>
       <td style="text-align:center">${w.sessions||0}</td>
       <td>${miniBar(dp)}</td><td>${miniBar(w.coverage_pct||0)}</td>
@@ -7789,7 +7789,7 @@ function renderNational(){
   if(S.natCap&&S.natCap.wings){
     html+=`<div class="card"><div class="ctitle">National Capability — SQNs with no facilitator coverage</div><div class="tw"><table>
       <thead><tr><th>Wing</th>${SUBJECTS.map(s=>`<th style="text-align:center;font-size:10px" title="${s.label}">${s.label}</th>`).join('')}</tr></thead><tbody>`+
-      S.natCap.wings.map(w=>{const nn=w.subject_none_sqns||{};return `<tr><td style="font-weight:800">${w.name||w.code}</td>${SUBJECTS.map(s=>`<td style="text-align:center">${nn[s.key]?`<span class="badge b-red">${nn[s.key]}</span>`:'<span class="badge b-ok">&#10003;</span>'}</td>`).join('')}</tr>`;}).join('')+
+      S.natCap.wings.map(w=>{const nn=w.subject_none_sqns||{};return `<tr><td style="font-weight:800">${esc(w.name||w.code)}</td>${SUBJECTS.map(s=>`<td style="text-align:center">${nn[s.key]?`<span class="badge b-red">${nn[s.key]}</span>`:'<span class="badge b-ok">&#10003;</span>'}</td>`).join('')}</tr>`;}).join('')+
       `</tbody></table></div><div style="font-size:10px;color:var(--muted);margin-top:8px">Red = number of SQNs in that Wing with no facilitator tagged in the subject. Refer to Facilitator Load and Training Balance for detail.</div></div>`;
   }
   host.innerHTML=html;
@@ -7814,7 +7814,7 @@ function renderAudit(){
     <td><span class="badge b-blue">${a.role||'—'}</span></td>
     <td style="font-weight:700">${a.action||''}</td>
     <td style="font-size:11px">${a.object_type||''}</td>
-    <td style="font-size:11px;color:var(--muted)">${a.reason||''}</td></tr>`).join('')
+    <td style="font-size:11px;color:var(--muted)">${esc(a.reason||'')}</td></tr>`).join('')
     :'<tr><td colspan="5" style="color:var(--muted)">No audit entries.</td></tr>';
 }
 
