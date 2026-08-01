@@ -39,6 +39,10 @@ node_modules/
 frontend/dist/
 *.tsbuildinfo
 
+# Local-dev-only patched copy served by RUN_TMS_CONNECTED_FRONTEND_MAC.sh
+# (never the checked-in connected-frontend/index.html itself)
+connected-frontend/.local-dev/
+
 # macOS
 .DS_Store
 .AppleDouble

@@ -344,15 +344,23 @@ acceptance criteria, and is updated in place as each item closes.
   production backend instead.
 - **Severity**: SEV3 (safety/correctness risk for local dev and testing workflows, not a
   currently-exploitable production vulnerability — deployed behavior is unaffected).
-- **Status**: NOT fixed this pass — deliberately left as-is rather than unilaterally
-  reverting a decision a prior session made on purpose, since the reason for that change
-  isn't recorded and reverting it without knowing why could break whatever it was for
-  (e.g. a specific demo/handoff). This pass's own testing avoided the hazard by serving a
-  temporary local copy with the tag pointed at localhost, never editing or committing a
-  changed default. Flagged for an explicit owner decision: either restore the localhost
-  default (matching the documented dev workflow) or update
-  `RUN_TMS_CONNECTED_FRONTEND_MAC.sh`'s comment and add an explicit local-override step to
-  match the current committed default.
+- **Status**: FIXED. Resolved without reverting the deliberate production-pointing default
+  (its reason still isn't recorded, but reverting it risked breaking whatever it was for —
+  e.g. a demo/handoff link). Instead, `RUN_TMS_CONNECTED_FRONTEND_MAC.sh` now serves a
+  locally-patched *copy* of `index.html` (never the checked-in file) with the meta tag
+  rewritten to `http://localhost:8000` before starting the static server — the same
+  substitution `docker-entrypoint.sh` performs for a real deploy, just done locally
+  instead of in a container. The copy lives in a gitignored
+  `connected-frontend/.local-dev/` directory, regenerated on every run. Verified live:
+  local backend + this script, login against `http://localhost:8000` succeeds with the
+  correct CORS-allowed origin, and the checked-in `index.html`'s own meta tag is
+  unchanged (still points at production). Also hardened both frontends'
+  `docker-entrypoint.sh` production guards while touching this area: added `127.0.0.1`,
+  an empty-value check, an unresolved-`__placeholder__` check, and a positive
+  "looks like a production HTTPS URL" shape check (the four blocklist substrings alone
+  only reject known-bad values, not arbitrary unlisted misconfiguration) — see
+  `backend/tests/test_frontend_deploy_guard.py`, which executes the real entrypoint
+  scripts' guard logic against real copies of both frontends' `index.html`/`nginx.conf`.
 
 ## GAP-12: DB/migration gate, expanded data-integrity audit, backup/restore gate not run this pass (new tracking entry)
 

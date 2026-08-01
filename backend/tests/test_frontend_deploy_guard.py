@@ -15,12 +15,12 @@ index.html + nginx.conf, with controlled environment variables, and asserts
 on the actual resulting file content and the script's exit code — exactly
 what a Railway deploy would see, not a reimplementation of the guard's rules.
 
-Background: GAP-20 (docs/beta/qualification_gap_register.md) records the
+Background: GAP-20 (docs/release/qualification_gap_register.md) records the
 production incident this class of guard exists to prevent (AAFC_API_BASE
-misconfigured to point at the staging backend). GAP-11 records a separate,
-still-open, *local-dev-only* documentation inconsistency — not a production
-defect — see docs/beta/qualification_gap_register.md and
-connected-frontend/RUN_TMS_CONNECTED_FRONTEND_MAC.sh.
+misconfigured to point at the staging backend). GAP-11 recorded a separate,
+local-dev-only documentation inconsistency — not a production defect — see
+docs/release/qualification_gap_register.md and
+RUN_TMS_CONNECTED_FRONTEND_MAC.sh (repo root).
 """
 import os
 import shutil
@@ -130,6 +130,26 @@ def test_production_deploy_refuses_to_boot_with_forbidden_api_base(target, bad_v
         target["api_base_env"]: bad_value,
     })
     assert code != 0, f"guard should have refused to boot for {bad_value!r}, but exited 0. stdout={out}"
+    assert "FATAL" in err
+
+
+@pytest.mark.parametrize("target", _TARGETS, ids=lambda t: t["name"])
+@pytest.mark.parametrize("garbage_value", [
+    "not-a-url-at-all",
+    "http://some-typo-domain.example.com",  # http, not https -- and not on any blocklist
+    "https://onedomainnodot",  # no dot -- not a real hostname
+])
+def test_production_deploy_refuses_to_boot_with_unlisted_malformed_api_base(target, garbage_value):
+    """The forbidden-substring checks are a blocklist -- on their own they only
+    reject values someone thought to list, so any *unlisted* malformed value
+    (a typo, a bare hostname, a non-https scheme) would silently pass. The
+    positive "looks like a production HTTPS URL" shape check closes that gap
+    independent of the blocklist."""
+    code, out, err, html = _run_entrypoint(target, {
+        "RAILWAY_ENVIRONMENT_NAME": "production",
+        target["api_base_env"]: garbage_value,
+    })
+    assert code != 0, f"guard should have refused to boot for {garbage_value!r}, but exited 0. stdout={out}"
     assert "FATAL" in err
 
 

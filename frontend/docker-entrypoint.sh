@@ -86,6 +86,19 @@ if [ "${RAILWAY_ENVIRONMENT_NAME:-}" = "production" ]; then
     echo "[entrypoint] FATAL: production build's resolved aafc-api-base looks like an unresolved placeholder ('${API_BASE_VALUE}') — refusing to start." >&2
     exit 1
   fi
+  # The checks above are a blocklist (reject known-bad substrings) and, on
+  # their own, only catch values someone thought to list -- an unlisted
+  # mistake (a typo'd domain, a plain http:// URL, an IP address, a bare
+  # hostname) would silently pass. Require the shape of a real production
+  # HTTPS URL as a positive check on top, not just the absence of a known-bad
+  # one.
+  case "$API_BASE_VALUE" in
+    https://*.*) : ;;
+    *)
+      echo "[entrypoint] FATAL: production build's resolved aafc-api-base ('${API_BASE_VALUE}') does not look like a production HTTPS URL — refusing to start." >&2
+      exit 1
+      ;;
+  esac
 fi
 
 exec nginx -g "daemon off;"
