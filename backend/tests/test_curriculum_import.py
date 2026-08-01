@@ -235,6 +235,51 @@ def test_import_csv_preview_writes_nothing_then_commit_creates(client):
     assert any(i.get("code") == "IMP-CSV-01" for i in listed_after)
 
 
+def test_import_csv_core_status_column_is_respected(client):
+    """Final-assurance Stage 2 finding: the CSV import path computed a per-row
+    core_status ("Foundation"->core, "Extension"->additional) from the
+    "Foundation or Extension"/"Type" column but silently discarded it --
+    CurriculumImportItem had no core_status field to carry it, so every
+    imported item silently got the same core_status derived only from
+    owning_level, regardless of what the CSV actually said. Fixed by adding
+    the field and threading it through create + update."""
+    hdr = _sysadmin(client)
+    csv_content = (
+        "Module Code,Title,Training Phase,Foundation or Extension\r\n"
+        "IMP-CORE-01,Core Module,B. Initial,Foundation\r\n"
+        "IMP-CORE-02,Extension Module,B. Initial,Extension\r\n"
+    )
+    files = {"file": ("curriculum.csv", csv_content, "text/csv")}
+
+    commit = client.post("/api/curriculum/import-csv", headers=hdr, files=files)
+    assert commit.status_code == 200, commit.text
+    assert commit.json()["created"] == 2
+
+    listed = client.get("/api/curriculum", headers=hdr).json()["items"]
+    core = next(i for i in listed if i["code"] == "IMP-CORE-01")
+    extension = next(i for i in listed if i["code"] == "IMP-CORE-02")
+    assert core["core_status"] == "core"
+    assert extension["core_status"] == "additional"
+
+    # Re-import with the Foundation/Extension values swapped -- the update
+    # path must also respect the CSV, not just the create path.
+    csv_swapped = (
+        "Module Code,Title,Training Phase,Foundation or Extension\r\n"
+        "IMP-CORE-01,Core Module,B. Initial,Extension\r\n"
+        "IMP-CORE-02,Extension Module,B. Initial,Foundation\r\n"
+    )
+    files2 = {"file": ("curriculum.csv", csv_swapped, "text/csv")}
+    commit2 = client.post("/api/curriculum/import-csv", headers=hdr, files=files2)
+    assert commit2.status_code == 200, commit2.text
+    assert commit2.json()["updated"] == 2
+
+    listed2 = client.get("/api/curriculum", headers=hdr).json()["items"]
+    core2 = next(i for i in listed2 if i["code"] == "IMP-CORE-01")
+    extension2 = next(i for i in listed2 if i["code"] == "IMP-CORE-02")
+    assert core2["core_status"] == "additional"
+    assert extension2["core_status"] == "core"
+
+
 def test_bulk_import_requires_nat_admin(client):
     """sqn_admin must be denied access to bulk import."""
     hdr = _sqn_admin(client)

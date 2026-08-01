@@ -1,4 +1,4 @@
-import io, csv, json
+import io, csv, json, logging
 from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -464,6 +464,7 @@ def run_checks(db: DBSession = Depends(get_db), p: Principal = Depends(get_princ
         try:
             d = datetime.strptime(pn.date, "%Y-%m-%d").date()
         except Exception:
+            logging.warning("run_checks: unparsable ParadeNight.date %r on parade_night_id=%s", pn.date, pn.id)
             continue
         days = (d - today).days
         sess = db.query(Session).filter(Session.parade_night_id == pn.id).all()

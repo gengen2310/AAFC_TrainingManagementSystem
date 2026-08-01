@@ -2242,6 +2242,7 @@ class CurriculumImportItem(BaseModel):
     instructor_suitability: str | None = None
     learning_hub_url: str | None = None
     recommended_term: str | None = None
+    core_status: str | None = None    # "core" | "additional" -- None means "not specified by caller"
     # Scheduling fields — used to link to existing parade night sessions
     scheduled_date: str | None = None  # ISO date string e.g. "2026-02-13"
     session_number: int | None = None  # period number (1, 2, 3)
@@ -2545,7 +2546,7 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                     instructor_suitability=item.instructor_suitability,
                     learning_hub_url=item.learning_hub_url,
                     recommended_term=item.recommended_term,
-                    core_status="core" if owning_level == "national" else "additional",
+                    core_status=item.core_status or ("core" if owning_level == "national" else "additional"),
                     active_status=True,
                 )
                 db.add(ci)
@@ -2568,6 +2569,7 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
                     ("recommended_term", item.recommended_term),
                     ("identifier", item.identifier),
                     ("part_number", item.part_number),
+                    ("core_status", item.core_status),
                 ]:
                     if val is not None and getattr(ci, field) != val:
                         setattr(ci, field, val)
@@ -2885,6 +2887,7 @@ async def import_curriculum_csv(
             instructor_suitability=mapped.get("instructor_suitability") or None,
             learning_hub_url=mapped.get("learning_hub_url") or None,
             location=mapped.get("location") or None,
+            core_status=core_status,
         ))
 
     if not items:

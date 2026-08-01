@@ -3,6 +3,7 @@
 All state-changing actions are audited. No secrets, hashes, or access-code plaintext
 are returned from any endpoint here.
 """
+import logging
 import os
 import shutil
 import subprocess
@@ -393,13 +394,15 @@ def pg_dump_backup(db: DBSession = Depends(get_db), p: Principal = Depends(get_p
                        "Ensure postgresql-client is installed in the Docker image.",
         })
 
-    # Audit before streaming; ignore DB errors here so the download still starts.
+    # Audit before streaming; ignore DB errors here so the download still starts,
+    # but log so a failed audit write for a system_admin backup download is never
+    # silently invisible (CLAUDE.md: "system_admin actions must be audited").
     try:
         _set_setting(db, "last_backup_at", datetime.now(timezone.utc).isoformat(), p.user_id)
         audit(db, p, object_type="system", object_id="backup", action="pg_dump_initiated",
               new={"filename": filename})
     except Exception:
-        pass
+        logging.exception("Failed to write audit log for pg_dump_initiated by user_id=%s", p.user_id)
 
     def _generate():
         try:
