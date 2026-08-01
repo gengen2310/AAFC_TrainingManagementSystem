@@ -1752,3 +1752,84 @@ acceptance criteria, and is updated in place as each item closes.
   full CEA import Verification pass rather than in isolation during Stage 2.
 - **Disposition**: open, P3, carried to Stage 13's findings-classification pass for
   scheduling alongside other P2/P3 items rather than fixed ad hoc.
+
+## GAP-24: Stored XSS via free-text fields in connected-frontend, multiple injection points (P0/P1, CONFIRMED EXPLOITABLE, fixed and re-verified live)
+
+- **Source**: Stage 2 manual line-by-line review of `connected-frontend/index.html`
+  (the file explicitly flagged at Stage 0 as the highest-risk untested surface: no
+  build step, no lint/typecheck tooling of any kind). Found while auditing
+  `innerHTML` call sites for `esc()` discipline per `.claude/rules/security.md`'s
+  own hard invariant ("Never use innerHTML with unsanitised user-controlled
+  content").
+- **Root cause, two distinct patterns**:
+  1. **Attribute-context injection**: several inline `onclick="...('${x}')"`
+     handlers escaped only single quotes (`.replace(/'/g,"\\'")`) before embedding
+     free-text fields (account `display_name`, `Flight.name`, subject-area tag
+     `display_name`) inside a **double-quoted** HTML attribute. A value containing
+     a double quote breaks out of the attribute entirely — e.g.
+     `display_name = 'XSS" onmouseover="window.__xss_fired=true" x="'` becomes a
+     live, attacker-controlled `onmouseover` handler the instant any admin views
+     the page. The codebase already had the *correct* fix pattern written and
+     documented (`_jsAttr()`, `connected-frontend/index.html:4288-4297`, with a
+     comment giving this exact attack shape as the reason it exists) for one
+     field (Wing/Squadron codes) — but it was never propagated to the other
+     vulnerable call sites.
+  2. **Plain-text-content injection**: several other sites interpolated the same
+     class of free-text fields (account `display_name`, `Flight.name`, curriculum
+     `title`, room/equipment `name`, parade-night `notes`, action-item `reason`)
+     directly into `innerHTML`-assigned template literals with **no escaping at
+     all** — not even the flawed single-quote-only version.
+  - All affected backend fields are genuinely free text server-side (`str`, no
+    character/pattern restriction beyond a couple of length caps), confirmed by
+    reading each Pydantic input model directly (`AccountCreateIn.display_name`,
+    `FlightIn.name`, `SubjectAreaTagIn.display_name`, `CurriculumImportItem.title`,
+    etc.) rather than assumed.
+- **Exploitability, confirmed live, not asserted from static reading**: started a
+  fresh local backend + an isolated local copy of `connected-frontend` (never
+  pointed at any deployed environment — the file's default `aafc-api-base` meta
+  tag targets production, so a throwaway copy was used specifically to avoid any
+  risk of touching staging/production), seeded demo data, logged in as
+  `system_admin` through the real UI login flow, and created an account via the
+  real authenticated API with `display_name = 'XSS" onmouseover="window.__xss_fired=true" x="'`
+  — the exact payload shape from the code's own `_jsAttr()` comment. Opened
+  Account Management as `system_admin`: **before the fix**, this breaks out of
+  the `onclick` attribute and installs a live `onmouseover` handler on page render
+  (any admin who so much as moves their mouse over the row executes attacker JS in
+  their own authenticated session — a real cross-role/privilege-escalation vector,
+  since a lower-privileged role that can create accounts, e.g. `sqn_admin` naming
+  an account, can plant a payload a `national_admin`/`system_admin` later
+  triggers). **After the fix**, confirmed `window.__xss_fired === false` and the
+  payload renders as inert literal text in the table — verified via direct DOM
+  inspection (`outerHTML`), not just visual inspection.
+- **Fix**: applied the codebase's own existing, already-correct `_jsAttr()`
+  helper (JS-string-escape then HTML-attribute-escape, for values embedded inside
+  an inline event-handler attribute) and `esc()` (for plain HTML text/attribute
+  content) at every remaining unsafe site: account action buttons (×2 locations),
+  Flight rename/archive buttons, subject-area tag toggle buttons (×2 locations),
+  and plain-text renders of account display names, Flight names, curriculum
+  titles (×5 locations across scheduling dropdowns and tables), room/equipment
+  names and notes, parade-night notes (×3 locations), Wing names (×2 locations),
+  and action-item reasons. Verified zero remaining `.replace(/'/g,...)`-only
+  escaping sites in the file (only the safe helper definitions themselves match
+  that pattern now), and verified the full inline `<script>` block still parses
+  as syntactically valid JS after every edit (`node --check`).
+- **Severity: P0/P1** — genuinely exploitable stored XSS in an admin-facing
+  surface, reachable by any role that can create/name an account, Flight, tag, or
+  curriculum item (a wide set of roles, not just system_admin), executing in the
+  browser session of whoever later views the affected list — meets this
+  engagement's own zero-tolerance bar for public release.
+- **Disposition**: fixed and re-verified live on `release/final-assurance-2026-08-01`,
+  full backend suite re-run clean (1008 passed, 5 skipped — no backend logic
+  changed, this is a frontend-only fix), not yet deployed (Stage 13 handles the
+  deploy/re-verify cycle for this pass's findings together).
+- **Also fixed in the same pass (unrelated, found by the same static-analysis
+  sweep, not by the same manual review)**: two unauthenticated backend health
+  endpoints (`GET /api/health/db`, `GET /api/health/ready`) previously echoed the
+  raw driver exception string (`str(e)`) on failure. Locally confirmed the
+  message never includes the database password (psycopg2 redacts it) but does
+  include the internal hostname on a connection failure — minor backend-internals
+  disclosure to an unauthenticated caller during any DB outage, not a credential
+  leak. Fixed to log server-side and return a generic `"error"` string, matching
+  the pattern already used by `main.py`'s own 500 handler. New tests
+  (`test_health.py`) assert both the happy path and, via monkeypatched failures,
+  that a forced exception message never appears in the response body.
