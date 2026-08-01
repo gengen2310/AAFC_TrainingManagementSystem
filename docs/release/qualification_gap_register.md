@@ -1818,6 +1818,20 @@ acceptance criteria, and is updated in place as each item closes.
   curriculum item (a wide set of roles, not just system_admin), executing in the
   browser session of whoever later views the affected list — meets this
   engagement's own zero-tolerance bar for public release.
+- **Self-check performed before finalising this severity**: verified CSP does not
+  already mitigate this independent of the escaping fix. `connected-frontend`'s
+  own `nginx.conf` sets `script-src 'self' 'unsafe-inline'` (explicitly, with a
+  comment: "required — app is a single-file SPA with all JS inline") — a
+  materially looser policy than the FastAPI backend's separate CSP on its own
+  JSON API responses (`main.py`'s `security_headers` middleware, no
+  `unsafe-inline`), which only protects the API, never the HTML page itself.
+  Confirmed empirically in-browser with two minimal pages serving identical
+  markup and an `onmouseover` payload: under the backend's stricter policy the
+  handler never fires; under `connected-frontend`'s actual, real policy (with
+  `unsafe-inline`) it fires every time. This confirms the original severity
+  assessment was accurate, not overstated — CSP provides no backstop for this
+  frontend's architecture, so the `esc()`/`_jsAttr()` fix is the only real
+  defense, not defense-in-depth on top of another layer.
 - **Disposition**: fixed and re-verified live on `release/final-assurance-2026-08-01`,
   full backend suite re-run clean (1008 passed, 5 skipped — no backend logic
   changed, this is a frontend-only fix), not yet deployed (Stage 13 handles the
