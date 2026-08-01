@@ -1116,6 +1116,14 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </div>
           <div id="acct-table"></div>
         </div>
+        <!-- Wings sub-section (NAT HQ admin only) -->
+        <div class="card" id="acct-wings-card" style="display:none">
+          <div class="ctitle" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+            <span>Wings</span>
+            <button class="btn btn-xs btn-sky" id="wing-create-btn-2" style="display:none" onclick="openCreateWingModal()">+ Add Wing</button>
+          </div>
+          <div id="wings-table"></div>
+        </div>
         <!-- Units sub-section: Squadrons / Specialist Units (Wing + NAT HQ) -->
         <div class="card" id="acct-units-card" style="display:none">
           <div class="ctitle" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
@@ -2331,6 +2339,18 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-hdr"><div class="modal-title" id="waz-title">Bulk Archive Accounts</div><button class="modal-x" onclick="_wizClose()">×</button></div>
     <div class="modal-body" id="waz-body"></div>
     <div class="modal-foot" id="waz-foot"></div>
+  </div>
+</div>
+
+<!-- ORGANISATIONS: Wing/Squadron Archive Wizard (same 5-step shell as the
+     account wizard; Step 2 is populated from GET .../archive-impact and, for
+     a Squadron blocked by active accounts, nests the bulk-account-selection
+     flow so the admin can resolve the block without leaving the wizard). -->
+<div class="modal-bg" id="m-org-archive-wizard">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-hdr"><div class="modal-title" id="owz-title">Archive Organisation</div><button class="modal-x" onclick="_owzClose()">×</button></div>
+    <div class="modal-body" id="owz-body"></div>
+    <div class="modal-foot" id="owz-foot"></div>
   </div>
 </div>
 
@@ -3947,6 +3967,12 @@ async function renderAccounts(){
   if(wingCreateBtn) wingCreateBtn.style.display=isNatAdmin?'':'none';
   const sqnCreateBtn=document.getElementById('sqn-create-btn');
   if(sqnCreateBtn) sqnCreateBtn.style.display=(isNatAdmin||isWingAdmin)?'':'none';
+  // Wings card: NAT HQ admin / system_admin only (matches archive_wing's own require_system_or_nat_admin)
+  const wingsCard=document.getElementById('acct-wings-card');
+  if(wingsCard) wingsCard.style.display=isNatAdmin?'':'none';
+  const wingCreateBtn2=document.getElementById('wing-create-btn-2');
+  if(wingCreateBtn2) wingCreateBtn2.style.display=isNatAdmin?'':'none';
+  _renderWingsTable();
   _renderUnitsTable();
 
   // Load accounts — pass active filter values as query params so backend scope is exercised
@@ -4120,6 +4146,23 @@ function _renderFlightTable(){
     '</tbody></table></div>';
 }
 
+// ── Wings management ──────
+function _renderWingsTable(){
+  const el=document.getElementById('wings-table'); if(!el)return;
+  const wings=S.wings||[];
+  const isNatAdmin=['national_admin','system_admin'].includes(S.role);
+  if(!wings.length){ el.innerHTML='<div style="color:var(--muted);font-size:11.5px;padding:8px 0">No Wings found.</div>'; return; }
+  const sqnCount=wid=>(S.squadrons||[]).filter(s=>s.wing_id===wid).length;
+  el.innerHTML='<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Squadrons</th>'+(isNatAdmin?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
+    wings.map(w=>`<tr>
+      <td style="font-weight:700">${esc(w.code)}</td>
+      <td style="font-size:11.5px">${esc(w.name||w.short_name||'')}</td>
+      <td style="font-size:11.5px;color:var(--muted)">${sqnCount(w.wing_id)}</td>
+      ${isNatAdmin?`<td class="no-print"><button class="btn btn-xs btn-out" onclick="_orgOpenWizard('wing','${w.wing_id}','${(w.code||'').replace(/'/g,"\\'")}')">Archive</button></td>`:''}
+    </tr>`).join('')+
+    '</tbody></table></div>';
+}
+
 // ── Units management (Squadrons / Specialist Units) ──────
 const _UNIT_TYPE_LABELS={standard_squadron:'Standard Squadron',specialist_squadron:'Specialist Squadron',specialist_flight:'Specialist Flight',support_unit:'Support Unit'};
 
@@ -4127,14 +4170,18 @@ function _renderUnitsTable(){
   const el=document.getElementById('units-table'); if(!el)return;
   const sqns=S.squadrons||[];
   const wings=S.wings||[];
+  const isNatAdmin=['national_admin','system_admin'].includes(S.role);
+  const isWingAdmin=S.role==='wing_admin';
+  const canArchive=s=>isNatAdmin||(isWingAdmin&&s.wing_id===(S.session&&S.session.wing_id));
   const wName=wid=>{ const w=wings.find(x=>x.wing_id===wid); return w?w.code||w.name:wid||'—'; };
   if(!sqns.length){ el.innerHTML='<div style="color:var(--muted);font-size:11.5px;padding:8px 0">No units found.</div>'; return; }
-  el.innerHTML='<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Wing</th></tr></thead><tbody>'+
+  el.innerHTML='<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Wing</th>'+((isNatAdmin||isWingAdmin)?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
     sqns.map(s=>`<tr>
       <td style="font-weight:700">${esc(s.code)}</td>
       <td style="font-size:11.5px">${esc(s.name||s.short_name||'')}</td>
       <td style="font-size:11px"><span class="badge b-blue" style="font-size:9px">${_UNIT_TYPE_LABELS[s.unit_type]||s.unit_type||'Squadron'}</span></td>
       <td style="font-size:11.5px;color:var(--muted)">${esc(wName(s.wing_id))}</td>
+      ${(isNatAdmin||isWingAdmin)?`<td class="no-print">${canArchive(s)?`<button class="btn btn-xs btn-out" onclick="_orgOpenWizard('squadron','${s.squadron_id}','${(s.code||'').replace(/'/g,"\\'")}')">Archive</button>`:''}</td>`:''}
     </tr>`).join('')+
     '</tbody></table></div>';
 }
@@ -4579,6 +4626,169 @@ function _wizRenderFoot(){
       <button class="btn btn-dk" onclick="_wizSubmit()">Confirm &amp; Archive</button>`;
   } else if(w.step===5){
     foot.innerHTML=`<button class="btn btn-dk" onclick="_wizClose()">Done</button>`;
+  }
+}
+
+// ── Organisation (Wing/Squadron) Archive Wizard ──────────────────────────
+// Same 5-step shell as the account wizard. archive_wing/archive_squadron
+// take no reason parameter and are called unchanged (see architecture.md --
+// the wizard wraps the existing endpoints, it does not modify their
+// contract), so Step 3 here is a confirmation gate only, no reason field.
+const _ORG_KIND_LABEL={wing:'Wing',squadron:'Squadron'};
+
+function _orgOpenWizard(kind,id,label){
+  S.owz={kind,id,label,step:1,impact:null,nestedSelected:new Set(),confirmArchive:false,result:null,error:null};
+  openModal('m-org-archive-wizard');
+  _owzRender();
+}
+function _owzClose(){ closeModal('m-org-archive-wizard'); S.owz=null; }
+function _owzBack(){ if(S.owz && S.owz.step>1){ S.owz.step--; _owzRender(); } }
+
+async function _owzNext(){
+  if(!S.owz) return;
+  if(S.owz.step===1){ S.owz.step=2; await _owzLoadImpact(); return; }
+  S.owz.step++; _owzRender();
+}
+
+async function _owzLoadImpact(){
+  const w=S.owz; if(!w) return;
+  const path=w.kind==='wing'?`/api/wings/${w.id}/archive-impact`:`/api/squadrons/${w.id}/archive-impact`;
+  try{
+    w.impact=await api(path);
+  }catch(e){
+    w.impact={can_archive:false,hard_blockers:[{type:'error',message:apiErr(e)}],soft_warnings:[],active_accounts:[],subordinate_orgs:[],historical_record_counts:{}};
+  }
+  w.nestedSelected=new Set();
+  _owzRender();
+}
+
+function _owzNestedToggle(uid,checked){
+  if(!S.owz) return;
+  if(checked) S.owz.nestedSelected.add(uid); else S.owz.nestedSelected.delete(uid);
+  _owzRenderFoot();
+  const btn=document.getElementById('owz-nested-archive-btn');
+  if(btn) btn.disabled=S.owz.nestedSelected.size===0;
+}
+
+async function _owzArchiveNestedAccounts(){
+  const w=S.owz; if(!w || !w.nestedSelected.size) return;
+  try{
+    await api('/api/accounts/batch-archive',{method:'POST',body:JSON.stringify({
+      account_ids:[...w.nestedSelected],
+      reason:`Archived as part of ${_ORG_KIND_LABEL[w.kind]} archival: ${w.label}`,
+      confirm_session_revocation:true,
+    })});
+    showToast('Archived selected account(s). Re-checking impact…');
+  }catch(e){ showToast('Could not archive selected accounts: '+apiErr(e), true); }
+  await _owzLoadImpact();
+}
+
+function _owzConfirmToggle(v){ if(S.owz){ S.owz.confirmArchive=v; _owzRenderFoot(); } }
+
+async function _owzSubmit(){
+  const w=S.owz; if(!w || !w.confirmArchive) return;
+  const foot=document.getElementById('owz-foot');
+  if(foot) foot.querySelectorAll('button').forEach(b=>b.disabled=true);
+  const path=w.kind==='wing'?`/api/wings/${w.id}/archive`:`/api/squadrons/${w.id}/archive`;
+  try{
+    await api(path,{method:'POST'});
+    w.result='ok';
+    S.accountList=null; S.wings=null; S.squadrons=null;
+    try{ S.wings=await api('/api/wings'); }catch(_){}
+    try{ S.squadrons=await api('/api/squadrons'); }catch(_){}
+    showToast(`${_ORG_KIND_LABEL[w.kind]} ${w.label} archived.`);
+  }catch(e){
+    w.result='error'; w.error=apiErr(e);
+    showToast('Archive failed: '+apiErr(e), true);
+  }
+  w.step=5;
+  _owzRender();
+  renderAccounts();
+}
+
+function _owzRender(){
+  if(!S.owz) return;
+  const body=document.getElementById('owz-body');
+  const title=document.getElementById('owz-title');
+  if(!body) return;
+  const w=S.owz;
+  const kindLabel=_ORG_KIND_LABEL[w.kind];
+
+  if(w.step===1){
+    title.textContent=`Step 1 of 5 — Confirm ${kindLabel}`;
+    body.innerHTML=`<p style="font-size:12px">You are starting an archive workflow for:</p>
+      <div style="font-size:14px;font-weight:700;border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin:8px 0">${esc(kindLabel)}: ${esc(w.label)}</div>
+      <p style="font-size:11.5px;color:var(--muted)">The next step checks whether anything currently blocks archiving this ${kindLabel.toLowerCase()}.</p>`;
+  } else if(w.step===2){
+    title.textContent='Step 2 of 5 — Impact Assessment';
+    if(!w.impact){
+      body.innerHTML='<p class="muted" style="font-size:12px">Loading impact assessment…</p>';
+    } else {
+      const hb=w.impact.hard_blockers||[], sw=w.impact.soft_warnings||[];
+      let blockersHtml='';
+      if(hb.length){
+        blockersHtml=`<div class="alert a-warn" style="font-size:12px;margin-bottom:8px">
+          ${hb.map(b=>esc(b.message||b.type)).join('<br>')}
+        </div>`;
+        if(w.kind==='squadron' && (w.impact.active_accounts||[]).length){
+          blockersHtml+=`<div style="font-size:11.5px;font-weight:700;margin:8px 0 4px">Select accounts to archive now to clear this block:</div>
+            <div class="tw" style="max-height:180px;overflow:auto"><table><thead><tr><th></th><th>Name</th><th>Role</th></tr></thead><tbody>
+            ${w.impact.active_accounts.map(a=>`<tr>
+              <td><input type="checkbox" onchange="_owzNestedToggle('${a.user_id}',this.checked)" aria-label="Select ${esc(a.display_name||'')}"></td>
+              <td style="font-weight:700">${esc(a.display_name||'—')}</td>
+              <td><span class="badge ${_ROLE_CLS[a.role]||'b-grey'}">${_ROLE_LABELS[a.role]||a.role}</span></td>
+            </tr>`).join('')}
+            </tbody></table></div>
+            <button class="btn btn-xs btn-dk" id="owz-nested-archive-btn" style="margin-top:6px" disabled onclick="_owzArchiveNestedAccounts()">Archive selected accounts now</button>`;
+        } else if(w.kind==='wing' && (w.impact.subordinate_orgs||[]).length){
+          blockersHtml+=`<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Archive these Squadrons / Specialist Units individually first (Squadrons / Specialist Units table below):<br>${w.impact.subordinate_orgs.map(s=>esc(s.code)).join(', ')}</div>`;
+        }
+      } else {
+        blockersHtml='<div class="alert a-info" style="font-size:12px;margin-bottom:8px">No blocking conditions. This '+kindLabel.toLowerCase()+' can be archived.</div>';
+      }
+      const warningsHtml=sw.length?`<div style="font-size:11.5px;margin-top:8px"><strong>Also note:</strong><ul style="margin:4px 0 0 18px;padding:0">${sw.map(x=>`<li>${esc(x.message||x.type)}</li>`).join('')}</ul></div>`:'';
+      body.innerHTML=blockersHtml+warningsHtml;
+    }
+  } else if(w.step===3){
+    title.textContent='Step 3 of 5 — Required Decisions';
+    body.innerHTML=`<label style="display:flex;align-items:flex-start;gap:8px;font-size:12px;cursor:pointer">
+        <input type="checkbox" ${w.confirmArchive?'checked':''} onchange="_owzConfirmToggle(this.checked)" style="margin-top:2px">
+        <span>I understand this will archive ${esc(kindLabel)} ${esc(w.label)} and remove it from active use. This is reversible via Restore.</span>
+      </label>`;
+  } else if(w.step===4){
+    title.textContent='Step 4 of 5 — Confirmation';
+    body.innerHTML=`<p style="font-size:12px">You are about to archive <strong>${esc(kindLabel)}: ${esc(w.label)}</strong>.</p>
+      <p style="font-size:11.5px;color:var(--muted)">This takes effect immediately on confirmation and is recorded in the Audit Log.</p>`;
+  } else if(w.step===5){
+    title.textContent='Step 5 of 5 — Result';
+    body.innerHTML=w.result==='ok'
+      ? `<div class="alert a-info" style="font-size:12px">${esc(kindLabel)} ${esc(w.label)} archived successfully.</div>`
+      : `<div class="alert a-warn" style="font-size:12px">Could not archive: ${esc(w.error||'unknown error')}</div>`;
+  }
+  _owzRenderFoot();
+}
+
+function _owzRenderFoot(){
+  if(!S.owz) return;
+  const foot=document.getElementById('owz-foot');
+  if(!foot) return;
+  const w=S.owz;
+  if(w.step===1){
+    foot.innerHTML=`<button class="btn btn-out" onclick="_owzClose()">Cancel</button>
+      <button class="btn btn-dk" onclick="_owzNext()">Continue</button>`;
+  } else if(w.step===2){
+    const canContinue=w.impact && (w.impact.hard_blockers||[]).length===0;
+    foot.innerHTML=`<button class="btn btn-out" onclick="_owzClose()">Cancel</button>
+      <button class="btn btn-out" onclick="_owzLoadImpact()">Re-check</button>
+      <button class="btn btn-dk" ${canContinue?'':'disabled'} onclick="_owzNext()">Continue</button>`;
+  } else if(w.step===3){
+    foot.innerHTML=`<button class="btn btn-out" onclick="_owzBack()">Back</button>
+      <button class="btn btn-dk" ${w.confirmArchive?'':'disabled'} onclick="_owzNext()">Continue</button>`;
+  } else if(w.step===4){
+    foot.innerHTML=`<button class="btn btn-out" onclick="_owzBack()">Back</button>
+      <button class="btn btn-dk" onclick="_owzSubmit()">Confirm &amp; Archive</button>`;
+  } else if(w.step===5){
+    foot.innerHTML=`<button class="btn btn-dk" onclick="_owzClose()">Done</button>`;
   }
 }
 
