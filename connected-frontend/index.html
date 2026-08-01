@@ -4074,7 +4074,7 @@ function _renderAccountTable(){
   el.innerHTML='<div class="tw"><table><thead><tr>'+selCol+'<th>Name</th><th>Role</th><th>Scope</th><th>Unit</th><th>Status</th><th>Last Login</th><th>Code Last Changed</th>'+(canWrite?'<th class="no-print">Actions</th>':'')+'</tr></thead><tbody>'+
     rows.map(u=>{
       const isMe=u.user_id===myUid;
-      const cb=canBulk?`<td class="no-print">${(isMe||u.is_archived)?'':`<input type="checkbox" ${S.acctSelected.has(u.user_id)?'checked':''} onchange="_acctToggleOne('${u.user_id}',this.checked)" aria-label="Select ${(u.display_name||'').replace(/"/g,'')}">`}</td>`:'';
+      const cb=canBulk?`<td class="no-print">${(isMe||u.is_archived)?'':`<input type="checkbox" ${S.acctSelected.has(u.user_id)?'checked':''} onchange="_acctToggleOne('${u.user_id}',this.checked)" aria-label="Select ${esc(u.display_name||'')}">`}</td>`:'';
       return `<tr>${cb}
       <td style="font-weight:700">${u.display_name||'—'}</td>
       <td><span class="badge ${_ROLE_CLS[u.role]||'b-grey'}">${_ROLE_LABELS[u.role]||u.role}</span></td>
@@ -4146,6 +4146,17 @@ function _renderFlightTable(){
     '</tbody></table></div>';
 }
 
+// Safe for embedding free-text (Wing/Squadron code -- no server-side charset
+// restriction beyond strip+uppercase) inside a double-quoted inline onclick
+// attribute: JS-escape first so the string decodes to a valid single-quoted
+// JS literal, then HTML-escape so a literal " in the source can never break
+// out of the onclick="..." attribute before the browser gets to decode it
+// (that break-out, e.g. code = 'X" onmouseover="...', is exactly what plain
+// .replace(/'/g,...)-only escaping elsewhere in this file does not stop).
+function _jsAttr(str){
+  return esc(String(str||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
+}
+
 // ── Wings management ──────
 function _renderWingsTable(){
   const el=document.getElementById('wings-table'); if(!el)return;
@@ -4158,7 +4169,7 @@ function _renderWingsTable(){
       <td style="font-weight:700">${esc(w.code)}</td>
       <td style="font-size:11.5px">${esc(w.name||w.short_name||'')}</td>
       <td style="font-size:11.5px;color:var(--muted)">${sqnCount(w.wing_id)}</td>
-      ${isNatAdmin?`<td class="no-print"><button class="btn btn-xs btn-out" onclick="_orgOpenWizard('wing','${w.wing_id}','${(w.code||'').replace(/'/g,"\\'")}')">Archive</button></td>`:''}
+      ${isNatAdmin?`<td class="no-print"><button class="btn btn-xs btn-out" onclick="_orgOpenWizard('wing','${w.wing_id}','${_jsAttr(w.code)}')">Archive</button></td>`:''}
     </tr>`).join('')+
     '</tbody></table></div>';
 }
@@ -4181,7 +4192,7 @@ function _renderUnitsTable(){
       <td style="font-size:11.5px">${esc(s.name||s.short_name||'')}</td>
       <td style="font-size:11px"><span class="badge b-blue" style="font-size:9px">${_UNIT_TYPE_LABELS[s.unit_type]||s.unit_type||'Squadron'}</span></td>
       <td style="font-size:11.5px;color:var(--muted)">${esc(wName(s.wing_id))}</td>
-      ${(isNatAdmin||isWingAdmin)?`<td class="no-print">${canArchive(s)?`<button class="btn btn-xs btn-out" onclick="_orgOpenWizard('squadron','${s.squadron_id}','${(s.code||'').replace(/'/g,"\\'")}')">Archive</button>`:''}</td>`:''}
+      ${(isNatAdmin||isWingAdmin)?`<td class="no-print">${canArchive(s)?`<button class="btn btn-xs btn-out" onclick="_orgOpenWizard('squadron','${s.squadron_id}','${_jsAttr(s.code)}')">Archive</button>`:''}</td>`:''}
     </tr>`).join('')+
     '</tbody></table></div>';
 }
