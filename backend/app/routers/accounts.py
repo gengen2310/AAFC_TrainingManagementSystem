@@ -191,6 +191,8 @@ def _account_out(u: User, db: DBSession) -> dict:
         "flight_id": u.flight_id,
         "flight_name": flight_name,
         "active_status": u.active_status,
+        "is_archived": u.is_archived,
+        "archived_at": u.archived_at.isoformat() if u.archived_at else None,
         "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
         "created_at": u.created_at.isoformat() if u.created_at else None,
         "created_by": u.created_by,
@@ -241,11 +243,14 @@ class FlightUpdateIn(BaseModel):
 
 @router.get("/accounts")
 def list_accounts(wing_id: str | None = None, squadron_id: str | None = None,
-                  flight_id: str | None = None,
+                  flight_id: str | None = None, role: str | None = None,
+                  active_status: bool | None = None, include_archived: bool = False,
                   db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     if p.role not in _READ_ROLES:
         raise HTTPException(403, detail={"error": "forbidden"})
-    q = db.query(User).filter(User.is_archived == False)  # noqa: E712
+    q = db.query(User)
+    if not include_archived:
+        q = q.filter(User.is_archived == False)  # noqa: E712
 
     # Scope filtering based on actor role
     if p.role in ("national_admin", "national_viewer", "system_admin", "auditor"):
@@ -265,6 +270,10 @@ def list_accounts(wing_id: str | None = None, squadron_id: str | None = None,
 
     if flight_id:
         q = q.filter(User.flight_id == flight_id)
+    if role:
+        q = q.filter(User.role == role)
+    if active_status is not None:
+        q = q.filter(User.active_status == active_status)
 
     users = q.order_by(User.display_name).all()
     return [_account_out(u, db) for u in users]
@@ -474,6 +483,143 @@ def reactivate_account(uid: str, db: DBSession = Depends(get_db), p: Principal =
     audit(db, p, object_type="account", object_id=u.id, action="account_reactivated",
           new={"display_name": u.display_name, "role": u.role})
     return {"ok": True}
+
+
+def _last_active_system_admin_count(db: DBSession) -> int:
+    return db.query(User).filter(User.role == "system_admin", User.active_status == True,  # noqa: E712
+                                 User.is_archived == False).count()  # noqa: E712
+
+
+@router.post("/accounts/{uid}/archive")
+def archive_account(uid: str, reason: str | None = None, db: DBSession = Depends(get_db),
+                    p: Principal = Depends(get_principal)):
+    """Archive (not delete) a single account: active_status=False + is_archived=True.
+    Reversible via .../restore. Extends the existing disable mechanism rather
+    than a parallel one -- archiving implies disabling (access is revoked)."""
+    _require_write_actor(p)
+    u = db.get(User, uid)
+    if not u or u.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if uid == p.user_id:
+        raise HTTPException(400, detail={"error": "cannot_archive_self"})
+    _require_manage_authority(p, u, db)
+    if u.role == "system_admin" and u.active_status and _last_active_system_admin_count(db) <= 1:
+        raise HTTPException(409, detail={"error": "last_active_system_admin",
+                                          "message": "Cannot archive the last active System Administrator."})
+    u.active_status = False
+    u.is_archived = True
+    u.archived_at = utcnow()
+    u.updated_by = p.user_id
+    for ac in db.query(AccessCode).filter(AccessCode.user_id == u.id).all():
+        ac.active_status = False
+    db.commit()
+    audit(db, p, object_type="account", object_id=u.id, action="account_archived",
+          new={"display_name": u.display_name, "role": u.role}, reason=reason)
+    return {"ok": True}
+
+
+@router.post("/accounts/{uid}/restore")
+def restore_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Restore an archived account directly to active (not merely un-archived-but-
+    still-disabled) -- a restored account should be immediately usable pending a
+    fresh decision to disable it again, not left in a confusing third state."""
+    _require_write_actor(p)
+    u = db.get(User, uid)
+    if not u or not u.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    _require_manage_authority(p, u, db)
+    u.is_archived = False
+    u.archived_at = None
+    u.active_status = True
+    u.updated_by = p.user_id
+    for ac in db.query(AccessCode).filter(AccessCode.user_id == u.id).all():
+        ac.active_status = True
+    db.commit()
+    audit(db, p, object_type="account", object_id=u.id, action="account_restored",
+          new={"display_name": u.display_name, "role": u.role})
+    return {"ok": True}
+
+
+class BatchArchiveIn(BaseModel):
+    account_ids: list[str]
+    reason: str
+    effective_at: str | None = None  # audit-display only -- no job scheduler exists in this codebase
+    confirm_session_revocation: bool = False
+
+
+@router.post("/accounts/batch-archive")
+def batch_archive_accounts(body: BatchArchiveIn, db: DBSession = Depends(get_db),
+                           p: Principal = Depends(get_principal)):
+    """Archive multiple accounts in one guided operation. Each account is its own
+    commit (not one outer transaction) so one bad row's failure never discards
+    already-decided, already-correct outcomes for the rest of the batch -- every
+    item gets an explicit, inspectable per-item result, never a silent partial
+    success. One batch_id correlates every row's audit entry plus one summary row."""
+    import uuid as _uuid
+    _require_write_actor(p)
+    if not (body.reason or "").strip() or len(body.reason.strip()) < 10:
+        raise HTTPException(400, detail={"error": "reason_required",
+                                          "message": "A reason of at least 10 characters is required."})
+    if not body.confirm_session_revocation:
+        raise HTTPException(400, detail={"error": "session_revocation_not_confirmed",
+                                          "message": "You must confirm that active sessions will be revoked."})
+    if not body.account_ids:
+        raise HTTPException(400, detail={"error": "no_accounts_selected"})
+
+    batch_id = str(_uuid.uuid4())
+    remaining_active_system_admins = _last_active_system_admin_count(db)
+    results = []
+    for uid in body.account_ids:
+        try:
+            u = db.get(User, uid)
+            if not u:
+                results.append({"account_id": uid, "result": "failed", "reason": "not_found"})
+                continue
+            if u.is_archived:
+                results.append({"account_id": uid, "result": "already_archived",
+                               "display_name": u.display_name, "role": u.role})
+                continue
+            if uid == p.user_id:
+                results.append({"account_id": uid, "result": "skipped", "reason": "cannot_archive_self",
+                               "display_name": u.display_name, "role": u.role})
+                continue
+            try:
+                _require_manage_authority(p, u, db)
+            except HTTPException:
+                results.append({"account_id": uid, "result": "failed", "reason": "out_of_scope",
+                               "display_name": u.display_name, "role": u.role})
+                continue
+            if u.role == "system_admin" and u.active_status:
+                if remaining_active_system_admins <= 1:
+                    results.append({"account_id": uid, "result": "skipped", "reason": "last_active_system_admin",
+                                   "display_name": u.display_name, "role": u.role})
+                    continue
+                remaining_active_system_admins -= 1
+            u.active_status = False
+            u.is_archived = True
+            u.archived_at = utcnow()
+            u.updated_by = p.user_id
+            for ac in db.query(AccessCode).filter(AccessCode.user_id == u.id).all():
+                ac.active_status = False
+            audit(db, p, object_type="account", object_id=u.id, action="account_archived",
+                  new={"display_name": u.display_name, "role": u.role}, reason=body.reason,
+                  batch_id=batch_id, commit=False)
+            db.commit()
+            results.append({"account_id": uid, "result": "archived",
+                           "display_name": u.display_name, "role": u.role})
+        except Exception as e:
+            db.rollback()
+            results.append({"account_id": uid, "result": "failed", "reason": str(e)})
+
+    summary = {
+        "archived": sum(1 for r in results if r["result"] == "archived"),
+        "already_archived": sum(1 for r in results if r["result"] == "already_archived"),
+        "skipped": sum(1 for r in results if r["result"] == "skipped"),
+        "failed": sum(1 for r in results if r["result"] == "failed"),
+    }
+    audit(db, p, object_type="account_archive_batch", object_id=batch_id, action="batch_archive",
+          new={"total": len(body.account_ids), **summary}, reason=body.reason, batch_id=batch_id)
+    return {"ok": True, "batch_id": batch_id, "results": results, "summary": summary}
 
 
 @router.post("/accounts/{uid}/unlock")
