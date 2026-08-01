@@ -873,13 +873,13 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <button class="tab-btn" onclick="setCurrTab('K. Gold',this)">Gold CLP</button>
         </div>
         <div class="fbar no-print">
-          <select id="curr-f-el" onchange="renderCurr()">
+          <select id="curr-f-el" onchange="renderCurr()" aria-label="Filter curriculum by element">
             <option value="all">All Elements</option>
             <option value="Drill">Drill</option><option value="Air_Space">Air &amp; Space</option>
             <option value="Field">Field Skills</option><option value="Personal_Dev">Personal Dev / PDL</option>
             <option value="Service_Community">Service &amp; Community</option><option value="SQN_Affairs">SQN Affairs</option>
           </select>
-          <select id="curr-f-prog" onchange="renderCurr()">
+          <select id="curr-f-prog" onchange="renderCurr()" aria-label="Filter curriculum by progress status">
             <option value="all">All Progress</option>
             <option value="delivered">Delivered</option>
             <option value="planned">Planned</option>
