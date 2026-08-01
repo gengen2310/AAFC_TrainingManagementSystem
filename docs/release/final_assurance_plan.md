@@ -143,10 +143,33 @@ present in code, not just in commit messages.
   correct it didn't work either. Full write-up in the gap register. Fixed, tested
   (new regression test, full suite 1003/5 passed clean), not yet deployed.
 
-Remaining Stage 2 work: manual line-by-line pass (not yet started — static analysis
-above is necessary but not sufficient, per the instruction's own Part 7), `BLE001`/
-`DTZ*` triage, and `connected-frontend/index.html`'s ~9,900 lines get no static-tool
-coverage at all so need proportionally more manual attention.
+`BLE001` (blind-except, 24 sites) fully triaged: all reviewed individually, all
+legitimate except GAP-23 (found and documented, deferred as P3).
+
+**GAP-24 (P0/P1, fixed and live-verified)**: manual line-by-line review of
+`connected-frontend/index.html` found a real, confirmed-exploitable stored XSS
+reachable through multiple free-text fields (account display names, Flight names,
+tag names, curriculum titles, room/equipment names, notes, reasons) — some via
+attribute-breakout in inline `onclick` handlers, some via zero escaping at all.
+Reproduced live end-to-end (created a malicious account through the real
+authenticated API, loaded Account Management as system_admin, confirmed the
+payload executed pre-fix and was inert post-fix via direct DOM/window-state
+inspection) before and after the fix, using an isolated local copy so no
+deployed environment was ever touched. Full write-up and fix details in the gap
+register. This is the most severe finding of the engagement so far.
+
+Manual line-by-line pass of `permissions.py`/`dependencies.py`/`security.py`
+(the core RBAC/auth engine) also complete: no defects found. Correctly
+algorithm-pinned JWT verification, correct token-version session revocation,
+fail-closed defaults throughout, documented IDOR-prevention discipline in
+`can_write_activity`.
+
+Remaining Stage 2 work: `DTZ*` (naive-datetime, 38 sites) not yet triaged;
+`connected-frontend/index.html`'s remaining ~9,800 lines beyond what's been
+covered so far still need proportionally more manual attention since no static
+tooling exists for that file. Given GAP-24's severity, recommend Stage 4
+(role/scope/tenancy) and Stage 9 (security) move up in priority relative to the
+original stage ordering.
 
 Evidence for every stage records: what was checked, how, environment, role, input,
 expected vs. actual, evidence location, Git SHA, and deployment ID where relevant, per
