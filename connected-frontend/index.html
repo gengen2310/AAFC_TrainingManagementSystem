@@ -224,6 +224,14 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .a-ok{background:#d4f0e3;color:#1a5c35;border-left:4px solid var(--ok);}
 .a-red{background:#fde8e8;color:#8b1a1a;border-left:4px solid var(--red);}
 
+/* ── SCHEDULING DRAG-AND-DROP (Phase 3.2) — progressive enhancement over the
+   accessible Move Up/Down/To controls; drop-target outline reflects a
+   client-side conflict prediction, same data the accessible path uses. ── */
+.sess-drag-handle{cursor:grab;}
+.sess-drag-handle:active{cursor:grabbing;}
+.dnd-valid{outline:2px solid var(--ok);outline-offset:2px;}
+.dnd-invalid{outline:2px solid var(--red);outline-offset:2px;}
+
 /* ── EMPTY STATE ── */
 .empty{text-align:center;padding:40px 20px;color:var(--muted);}
 .empty .ei{font-size:36px;margin-bottom:8px;}
@@ -5605,9 +5613,13 @@ function showPNDetail(ds){
   let html=`<div class="alert a-info"><b>${pn.term}</b> · ${pn.notes||'No notes'}</div>`;
   (pn.sessions||[]).forEach((s,i)=>{
     const stOpts=['planned','delivered','cancelled','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${s.status===v?'selected':''}>${{planned:'Planned',delivered:'Delivered',cancelled:'Cancelled',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
-    html+=`<div style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px" data-sess-card="${i}">
+    const dragAttrs=canWriteSquadron()?`ondragover="_sessDragOver(event,'${ds}',${i})" ondragleave="_sessDragLeave(event)" ondrop="_sessDrop(event,'${ds}',${i})"`:'';
+    html+=`<div style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px" data-sess-card="${i}" ${dragAttrs}>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em">Session ${i+1} · Period ${s.period_number||1}</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${canWriteSquadron()?`<span class="no-print sess-drag-handle" draggable="true" ondragstart="_sessDragStart(event,'${ds}',${i})" ondragend="_sessDragEnd(event)" title="Drag to reorder" aria-hidden="true">⠿</span>`:''}
+          <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em">Session ${i+1} · Period ${s.period_number||1}</div>
+        </div>
         ${canWriteSquadron()?`<div class="no-print" style="display:flex;gap:4px">
           <button class="btn btn-xs btn-out" ${(s.period_number||1)<=1?'disabled':''} onclick="_sessMoveUpDown('${ds}',${i},'up')" title="Move to the previous period" aria-label="Move Session ${i+1} to the previous period">↑</button>
           <button class="btn btn-xs btn-out" onclick="_sessMoveUpDown('${ds}',${i},'down')" title="Move to the next period" aria-label="Move Session ${i+1} to the next period">↓</button>
@@ -5797,6 +5809,64 @@ async function _sessMoveToConfirm(){
     await reloadAndRender();
     showToast('Session moved to '+fmtDL(targetDate)+'.');
   }catch(e){ errEl.textContent=apiErr(e); }
+}
+
+// ── Drag-and-drop (Phase 3.2): a progressive enhancement over the Move
+// Up/Down/To controls above, never the only way to reorder -- it calls the
+// identical _sessMove()/_sessBuildBody() path, dropping a card onto another
+// simply means "take that card's period". The drag handle is aria-hidden
+// since the accessible buttons already cover this same action for keyboard
+// and screen-reader users. ──
+let _dragSessionRef=null;
+function _sessDragStart(e,date,idx){
+  const pn=S.pns.find(p=>p.date===date); const s=pn&&(pn.sessions||[])[idx];
+  if(!s||!s.id){ e.preventDefault(); return; }
+  _dragSessionRef={date,idx};
+  e.dataTransfer.effectAllowed='move';
+  try{ e.dataTransfer.setData('text/plain', s.id); }catch(_){}
+}
+function _sessDragEnd(){
+  _dragSessionRef=null;
+  document.querySelectorAll('.dnd-valid,.dnd-invalid').forEach(el=>el.classList.remove('dnd-valid','dnd-invalid'));
+}
+// Client-side prediction only (mirrors the server's same-period/same-resource
+// check) so the drop outline is instant; the server call after drop is still
+// the real authority and will show the same conflict prompt Move Up/Down uses
+// if this prediction and the live server state ever disagree.
+function _sessWouldConflict(date,fromIdx,toIdx){
+  const pn=S.pns.find(p=>p.date===date); if(!pn)return false;
+  const sessions=pn.sessions||[];
+  const from=sessions[fromIdx], to=sessions[toIdx];
+  if(!from||!to||fromIdx===toIdx)return false;
+  const targetPeriod=to.period_number||1;
+  return sessions.some((sib,i)=>i!==fromIdx&&(sib.period_number||1)===targetPeriod&&
+    ((from.facId&&sib.facId===from.facId)||(from.room&&sib.room===from.room)));
+}
+function _sessDragOver(e,date,idx){
+  if(!_dragSessionRef||_dragSessionRef.date!==date)return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect='move';
+  const card=e.currentTarget;
+  card.classList.remove('dnd-valid','dnd-invalid');
+  card.classList.add(_sessWouldConflict(date,_dragSessionRef.idx,idx)?'dnd-invalid':'dnd-valid');
+}
+function _sessDragLeave(e){ e.currentTarget.classList.remove('dnd-valid','dnd-invalid'); }
+async function _sessDrop(e,date,idx){
+  e.preventDefault();
+  e.currentTarget.classList.remove('dnd-valid','dnd-invalid');
+  if(!_dragSessionRef||_dragSessionRef.date!==date){ _dragSessionRef=null; return; }
+  const fromIdx=_dragSessionRef.idx; _dragSessionRef=null;
+  if(fromIdx===idx)return;
+  const pn=S.pns.find(p=>p.date===date); if(!pn)return;
+  const from=(pn.sessions||[])[fromIdx], to=(pn.sessions||[])[idx];
+  if(!from||!to||!from.id)return;
+  from.__pnId=pn.id;
+  try{
+    const ok=await _sessMove(from.id,_sessBuildBody(from,{period_number:to.period_number||1}));
+    if(!ok)return;
+    await reloadAndRender();
+    showPNDetail(date);
+  }catch(err){ showToast(apiErr(err),true); }
 }
 
 // QUICK EDIT
