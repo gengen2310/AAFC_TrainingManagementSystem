@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from .config import settings
 from .database import init_db, SessionLocal
-from .routers import auth, organisations, training, ops, health, program, export_import, accounts, timing, planning, system, wing_calendar, jobs, dashboard
+from .routers import auth, organisations, training, ops, health, program, export_import, accounts, timing, planning, system, wing_calendar, jobs, dashboard, setup
 
 # ── Maintenance mode cache (avoid DB hit on every request) ──────────────────
 _maint_cache: dict = {"active": False, "msg": "", "block_reads": False, "block_logins": False, "expires": 0.0}
@@ -233,7 +233,7 @@ async def security_headers(request: Request, call_next):
 for r in (health.router, auth.router, organisations.router, accounts.router,
           training.router, timing.router, ops.router, program.router, export_import.router,
           planning.router, wing_calendar.router, system.router, jobs.router,
-          dashboard.router):
+          dashboard.router, setup.router):
     app.include_router(r)
 
 
