@@ -1675,3 +1675,50 @@ acceptance criteria, and is updated in place as each item closes.
 - **Disposition**: closed. Fixed, tested, deployed to staging then production, verified
   live in both. Follow-up (non-blocking): update `.claude/rules/frontend.md` to reflect
   the deliberate system_admin operational-scope architecture change.
+
+## GAP-22: Curriculum CSV import silently discarded the Foundation/Extension column (Stage 2, Final System Assurance pass)
+
+- **Source**: found by static analysis, not manual review — `ruff check --select F841`
+  (unused-variable) flagged a computed-but-unused local `core_status` in
+  `training.py`'s CSV import handler. Read as a lead rather than dismissed as a style
+  nit, per this engagement's own instruction to distrust nothing without checking.
+- **Root cause**: `_CSV_CURR_COL_MAP` maps the CSV headers `"foundation or extension"`
+  and `"type"` to a `core_status` field, and the CSV-import handler correctly computed
+  `core_status = "core" if "foundation" in cs_raw or cs_raw in ("core", "f") else
+  "additional"` per row — but `CurriculumImportItem` (the Pydantic schema the computed
+  value was supposed to flow through) had no `core_status` field at all, so the
+  computed value was discarded at construction time. The actual DB-write logic in
+  `import_curriculum` then always set `core_status="core" if owning_level ==
+  "national" else "additional"` — derived purely from the import's `owning_level`
+  parameter, with no way to differ per row. Net effect: uploading a CSV with a mixed
+  Foundation/Extension column had **zero effect** on the resulting items'
+  `core_status` — every item in a given import batch was silently forced to the same
+  value, and re-importing to correct a miscategorised item via CSV did not work either
+  (the update-path field list also excluded `core_status`).
+- **Fix**: added `core_status: str | None = None` to `CurriculumImportItem`, passed
+  the CSV-computed value through at construction, and used `item.core_status or
+  (owning_level-based default)` on create plus added `core_status` to the update
+  field list — so an explicit per-row CSV value is honoured, and callers that don't
+  provide one (the manual/JSON add path) keep the exact prior default behaviour.
+- **Verified, not asserted**: new regression test
+  (`test_import_csv_core_status_column_is_respected`) imports two rows with different
+  Foundation/Extension values, asserts they land as different `core_status` values;
+  then re-imports the same codes with the values swapped and asserts the update path
+  also picks up the change. Full backend suite re-run clean: 1003 passed, 5 skipped
+  (was 1002/5 before this fix — one net new test, zero regressions).
+- **Severity: P2** — a real, silent data-correctness defect reachable by any
+  national_admin/system_admin importing a CSV with mixed module types (a normal,
+  expected use case for a national curriculum import), but not a security or tenancy
+  boundary failure, and every item remained editable/correctable manually after the
+  fact (just not via the CSV re-import path a real user would actually reach for).
+- **Also reviewed in the same pass, no fix needed**: two `except Exception:
+  pass`/`continue` swallows in `ops.py` (automation action-item generation) and
+  `system.py` (audit-log write during backup download) now log instead of silently
+  swallowing — the download/generation still proceeds unchanged on error, only the
+  previously-invisible failure now leaves an operational trace. Two other bare
+  excepts (a DB health check, and an already-comment-documented best-effort holiday
+  lookup) were reviewed and correctly left unchanged — both are deliberate,
+  low-risk, and logging every occurrence would be pure noise.
+- **Disposition**: closed. Fixed and tested on `release/final-assurance-2026-08-01`,
+  not yet deployed to staging/production (Stage 13 handles the deploy/re-verify cycle
+  for all findings from this pass together, not one at a time).
