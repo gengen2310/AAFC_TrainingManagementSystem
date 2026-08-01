@@ -14,7 +14,8 @@ from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, Parade
 from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
-from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron)
+from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron,
+                          require_can_view_wing, require_can_write_activity, require_role, NATIONAL_LEVEL)
 from ..services import (audit, score_parade, publish_blockers, close_blockers)
 from ..services_readiness import parade_night_readiness
 
@@ -1233,23 +1234,265 @@ class ActivityUpdateIn(BaseModel):
     cea_seq_nr: str | None = None
 
 
-def _activity_out(a: Activity) -> dict:
+class ActivityWingIn(ActivityIn):
+    wing_id: str | None = None
+
+
+def _activity_out(a: Activity, p: Principal, view_scope_type: str | None,
+                  org_names: dict[str, str] | None = None) -> dict:
+    org_names = org_names or {}
+    owning_scope_id = (a.national_id if a.owning_level == "national"
+                       else a.wing_id if a.owning_level == "wing" else a.squadron_id)
+    is_inherited = (view_scope_type == "squadron" and a.owning_level != "squadron") or \
+                   (view_scope_type == "wing" and a.owning_level == "national")
     return {
-        "activity_id": a.id, "activity_name": a.activity_name,
+        "activity_id": a.id, "source": a.owning_level, "owning_level": a.owning_level,
+        "owning_scope_id": owning_scope_id,
+        "owning_org_label": org_names.get(owning_scope_id, "National") if a.owning_level == "national" else org_names.get(owning_scope_id),
+        "wing_id": a.wing_id, "squadron_id": a.squadron_id,
+        "activity_name": a.activity_name,
         "activity_type": a.activity_type, "date_start": a.date_start,
         "date_end": a.date_end, "time_start": a.time_start, "time_end": a.time_end,
         "location": a.location, "audience": a.audience or [],
         "notes": a.notes, "workflow_status": a.workflow_status,
-        "cea_seq_nr": a.cea_seq_nr,
+        "cea_seq_nr": a.cea_seq_nr, "is_archived": a.is_archived,
+        "is_inherited": is_inherited,
+        "read_only": not p.can_write_activity(a.owning_level, a.wing_id, a.squadron_id),
     }
 
 
+def _activities_visibility_filter(scope_type: str, scope_id: str | None, wing_id_of_scope: str | None):
+    """OR-branched inheritance filter -- mirrors CurriculumItem's already-proven
+    national/wing/squadron pattern (list_curriculum above) rather than a UNION.
+    National activities are always visible; Wing activities are visible at Wing
+    scope (that wing) and Squadron scope (that squadron's wing); Squadron
+    activities are visible only at that Squadron's own scope -- never
+    "inherited upward" and never copied into a sibling squadron's view."""
+    from sqlalchemy import or_
+    conditions = [Activity.owning_level == "national"]
+    if scope_type in ("wing", "squadron") and wing_id_of_scope:
+        conditions.append((Activity.owning_level == "wing") & (Activity.wing_id == wing_id_of_scope))
+    if scope_type == "squadron" and scope_id:
+        conditions.append((Activity.owning_level == "squadron") & (Activity.squadron_id == scope_id))
+    return or_(*conditions)
+
+
+def _cea_source_items(db: DBSession, wing_id: str | None, squadron_id: str | None,
+                      date_from: str | None, date_end: str | None, viewer_squadron_id: str | None) -> list[dict]:
+    """CEA activities are read-time merged, never copied into `Activity` --
+    only classification_status=='classified' rows are shown (needs_review is
+    an internal wing-admin review state), excluded if removed from the source
+    import or locally hidden for the viewing squadron."""
+    from ..models.planning import CeaActivity, ActivityLocalHide
+    q = db.query(CeaActivity).filter(
+        CeaActivity.classification_status == "classified",
+        CeaActivity.is_removed_from_cea == False,  # noqa: E712
+        CeaActivity.is_archived == False,  # noqa: E712
+    )
+    if squadron_id:
+        q = q.filter(CeaActivity.unit_id == squadron_id)
+    elif wing_id:
+        q = q.filter(CeaActivity.wing_id == wing_id)
+    else:
+        return []  # CEA import is wing-scoped only -- no meaningful "all-national" CEA view
+    if date_from:
+        q = q.filter((CeaActivity.activity_end_date == None) | (CeaActivity.activity_end_date >= date_from))  # noqa: E711
+    if date_end:
+        q = q.filter((CeaActivity.activity_start_date == None) | (CeaActivity.activity_start_date <= date_end))  # noqa: E711
+    rows = q.order_by(CeaActivity.activity_start_date).limit(2000).all()
+    hidden_ids: set[str] = set()
+    if viewer_squadron_id:
+        hides = db.query(ActivityLocalHide.cea_activity_id).filter(
+            ActivityLocalHide.unit_id == viewer_squadron_id, ActivityLocalHide.is_hidden == True).all()  # noqa: E712
+        hidden_ids = {h[0] for h in hides}
+    out = []
+    for c in rows:
+        if c.id in hidden_ids:
+            continue
+        out.append({
+            "activity_id": c.id, "source": "cea", "owning_level": None, "owning_scope_id": None,
+            "owning_org_label": "CEA", "wing_id": c.wing_id, "squadron_id": c.unit_id,
+            "activity_name": c.activity_name, "activity_type": c.activity_type,
+            "date_start": c.activity_start_date, "date_end": c.activity_end_date,
+            "time_start": c.start_time, "time_end": c.end_time,
+            "location": c.location, "audience": [], "notes": c.notes,
+            "workflow_status": c.status_name, "cea_seq_nr": c.cea_activity_id,
+            "is_archived": False, "is_inherited": True, "read_only": True,
+        })
+    return out
+
+
+def _holiday_source_items(db: DBSession, scope_type: str, wing_id: str | None, squadron_id: str | None,
+                          date_from: str | None, date_end: str | None) -> list[dict]:
+    """Holidays are year-scoped (via PlanningYear), not scope-tagged directly,
+    so relevance is resolved by joining through this scope's own planning
+    years -- Wing-level years for a Wing view, that Squadron's (and its
+    Wing's) years for a Squadron view. National view shows none (no single
+    "national planning year" concept exists) -- a deliberate, documented
+    simplification, not an oversight."""
+    from ..models.planning import HolidayPeriod, PlanningYear
+    year_ids: list[str] = []
+    if scope_type == "wing" and wing_id:
+        year_ids = [y.id for y in db.query(PlanningYear.id).filter(PlanningYear.wing_id == wing_id).all()]
+    elif scope_type == "squadron" and squadron_id:
+        sq = db.get(Squadron, squadron_id)
+        yq = db.query(PlanningYear.id).filter(PlanningYear.unit_id == squadron_id)
+        year_ids = [y.id for y in yq.all()]
+        if sq and sq.wing_id:
+            year_ids += [y.id for y in db.query(PlanningYear.id).filter(PlanningYear.wing_id == sq.wing_id).all()]
+    if not year_ids:
+        return []
+    q = db.query(HolidayPeriod).filter(HolidayPeriod.planning_year_id.in_(year_ids))
+    if date_from:
+        q = q.filter(HolidayPeriod.end_date >= date_from)
+    if date_end:
+        q = q.filter(HolidayPeriod.start_date <= date_end)
+    rows = q.order_by(HolidayPeriod.start_date).limit(500).all()
+    return [{
+        "activity_id": h.id, "source": "holiday", "owning_level": None, "owning_scope_id": None,
+        "owning_org_label": "Holiday", "wing_id": wing_id, "squadron_id": squadron_id,
+        "activity_name": h.name, "activity_type": h.holiday_type,
+        "date_start": h.start_date, "date_end": h.end_date,
+        "time_start": None, "time_end": None, "location": None, "audience": [],
+        "notes": h.notes, "workflow_status": None, "cea_seq_nr": None,
+        "is_archived": False, "is_inherited": True, "read_only": True,
+    } for h in rows]
+
+
 @router.get("/activities")
-def list_activities(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    sq_id = _view_squadron_id(p, squadron_id, db)
-    rows = db.query(Activity).filter(Activity.squadron_id == sq_id,
-                                     Activity.is_archived == False).order_by(Activity.date_start).all()  # noqa: E712
-    return [_activity_out(a) for a in rows]
+def list_activities(
+    squadron_id: str | None = None,
+    scope_type: str | None = None,       # national|wing|squadron -- opt-in to the new inheritance-aware shape
+    scope_id: str | None = None,
+    view: str = "list",                  # list|calendar|upcoming|historical|archived
+    sources: str | None = None,          # comma-separated: activity,cea,holiday (default all)
+    date_from: str | None = None,
+    date_end: str | None = None,
+    activity_type: str | None = None,
+    status: str | None = None,
+    location: str | None = None,
+    cea_seq_nr: str | None = None,
+    q: str | None = None,
+    include_subordinates: bool = False,  # Wing view convenience rollup of descendant squadron-local activities
+    db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
+):
+    if not scope_type:
+        # Backward-compatible path: existing single-squadron behaviour, unchanged.
+        sq_id = _view_squadron_id(p, squadron_id, db)
+        rows = db.query(Activity).filter(Activity.squadron_id == sq_id,
+                                         Activity.is_archived == False).order_by(Activity.date_start).all()  # noqa: E712
+        return [_activity_out(a, p, "squadron") for a in rows]
+
+    if scope_type not in ("national", "wing", "squadron"):
+        raise HTTPException(400, detail={"error": "invalid_scope_type"})
+
+    wing_id_of_scope: str | None = None
+    resolved_squadron_id: str | None = None
+    if scope_type == "national":
+        require_role(p, *NATIONAL_LEVEL)
+    elif scope_type == "wing":
+        if not scope_id:
+            raise HTTPException(400, detail={"error": "scope_id_required"})
+        require_can_view_wing(p, scope_id)
+        wing_id_of_scope = scope_id
+    else:  # squadron
+        if not scope_id:
+            raise HTTPException(400, detail={"error": "scope_id_required"})
+        s = db.get(Squadron, scope_id)
+        if not s:
+            raise HTTPException(404, detail={"error": "squadron_not_found"})
+        require_can_view_squadron(p, s.id, s.wing_id)
+        wing_id_of_scope = s.wing_id
+        resolved_squadron_id = s.id
+
+    show_archived = view == "archived"
+    a_conditions = _activities_visibility_filter(scope_type, resolved_squadron_id, wing_id_of_scope)
+    aq = db.query(Activity).filter(Activity.is_archived == show_archived, a_conditions)
+    if scope_type == "wing" and include_subordinates:
+        from sqlalchemy import or_
+        sqn_ids = [x.id for x in db.query(Squadron.id).filter(Squadron.wing_id == wing_id_of_scope,
+                                                               Squadron.is_archived == False).all()]  # noqa: E712
+        if sqn_ids:
+            aq = db.query(Activity).filter(
+                Activity.is_archived == show_archived,
+                or_(a_conditions, (Activity.owning_level == "squadron") & (Activity.squadron_id.in_(sqn_ids))))
+    if activity_type:
+        aq = aq.filter(Activity.activity_type == activity_type)
+    if status:
+        aq = aq.filter(Activity.workflow_status == status)
+    if location:
+        aq = aq.filter(Activity.location.ilike(f"%{location}%"))
+    if cea_seq_nr:
+        aq = aq.filter(Activity.cea_seq_nr == cea_seq_nr)
+    if q:
+        like = f"%{q}%"
+        from sqlalchemy import or_ as _or
+        aq = aq.filter(_or(Activity.activity_name.ilike(like), Activity.notes.ilike(like)))
+    if date_from:
+        aq = aq.filter((Activity.date_end == None) | (Activity.date_end >= date_from))  # noqa: E711
+    if date_end:
+        aq = aq.filter(Activity.date_start <= date_end)
+    activity_rows = aq.order_by(Activity.date_start).limit(2000).all()
+
+    src_set = set((sources or "activity,cea,holiday").split(","))
+    truncated = len(activity_rows) >= 2000
+
+    # Batch-resolve owning org labels (Wing/Squadron names) for the response.
+    wing_ids = {a.wing_id for a in activity_rows if a.owning_level == "wing" and a.wing_id}
+    sqn_ids = {a.squadron_id for a in activity_rows if a.owning_level == "squadron" and a.squadron_id}
+    org_names: dict[str, str] = {}
+    if wing_ids:
+        from ..models import Wing as WingModel
+        for w in db.query(WingModel).filter(WingModel.id.in_(wing_ids)).all():
+            org_names[w.id] = w.name
+    if sqn_ids:
+        for s in db.query(Squadron).filter(Squadron.id.in_(sqn_ids)).all():
+            org_names[s.id] = s.name
+
+    items = [_activity_out(a, p, scope_type, org_names) for a in activity_rows] if "activity" in src_set else []
+    if "cea" in src_set and not show_archived:
+        items += _cea_source_items(db, wing_id_of_scope, resolved_squadron_id, date_from, date_end,
+                                   resolved_squadron_id or _active_squadron(p))
+        truncated = truncated or len(items) >= 2000
+    if "holiday" in src_set and not show_archived:
+        items += _holiday_source_items(db, scope_type, wing_id_of_scope, resolved_squadron_id, date_from, date_end)
+
+    now = utcnow().date().isoformat()
+    if view == "upcoming":
+        items = [i for i in items if (i["date_end"] or i["date_start"] or "") >= now]
+    elif view == "historical":
+        items = [i for i in items if (i["date_end"] or i["date_start"] or "") < now]
+
+    items.sort(key=lambda i: (i["date_start"] or "", i["time_start"] or "", i["activity_name"] or ""))
+    return {"items": items, "total": len(items), "truncated": truncated}
+
+
+@router.get("/activities/{aid}")
+def get_activity(aid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    a = db.get(Activity, aid)
+    if not a:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if a.owning_level == "national":
+        require_role(p, *NATIONAL_LEVEL)
+        view_scope = "national"
+    elif a.owning_level == "wing":
+        require_can_view_wing(p, a.wing_id)
+        view_scope = "wing"
+    else:
+        s = db.get(Squadron, a.squadron_id) if a.squadron_id else None
+        require_can_view_squadron(p, a.squadron_id, s.wing_id if s else None)
+        view_scope = "squadron"
+    org_names: dict[str, str] = {}
+    if a.owning_level == "wing" and a.wing_id:
+        from ..models import Wing as WingModel
+        w = db.get(WingModel, a.wing_id)
+        if w:
+            org_names[w.id] = w.name
+    elif a.owning_level == "squadron" and a.squadron_id:
+        s = db.get(Squadron, a.squadron_id)
+        if s:
+            org_names[s.id] = s.name
+    return _activity_out(a, p, view_scope, org_names)
 
 
 @router.post("/activities")
@@ -1263,13 +1506,54 @@ def create_activity(body: ActivityIn, db: DBSession = Depends(get_db), p: Princi
     if not s:
         raise HTTPException(400, detail={"error": "no_squadron_scope"})
     require_can_write_squadron(p, s.id, s.wing_id)
-    a = Activity(squadron_id=s.id, wing_id=s.wing_id, activity_name=body.activity_name,
+    a = Activity(squadron_id=s.id, wing_id=s.wing_id, owning_level="squadron",
+                 activity_name=body.activity_name,
                  activity_type=body.activity_type, date_start=body.date_start,
                  date_end=body.date_end, time_start=body.time_start, time_end=body.time_end,
                  location=body.location, audience=body.audience, notes=body.notes)
     db.add(a)
     db.commit()
-    audit(db, p, object_type="activity", object_id=a.id, action="create")
+    audit(db, p, object_type="activity", object_id=a.id, action="create", new={"owning_level": "squadron"})
+    return {"ok": True, "activity_id": a.id}
+
+
+@router.post("/activities/wing")
+def create_wing_activity(body: ActivityWingIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Create a Wing-owned activity, automatically visible in every subordinate
+    Squadron's Activities list/calendar -- no republish or per-squadron import step."""
+    wing_id = body.wing_id or p.acting_wing_id or p.wing_id
+    if not wing_id:
+        raise HTTPException(400, detail={"error": "no_wing_scope",
+                                          "message": "Provide wing_id in the request body or enter Delegated Intervention first."})
+    require_can_write_activity(p, "wing", wing_id, None)
+    from ..models import Wing as WingModel
+    w = db.get(WingModel, wing_id)
+    if not w or w.is_archived:
+        raise HTTPException(404, detail={"error": "wing_not_found"})
+    a = Activity(wing_id=wing_id, squadron_id=None, owning_level="wing",
+                 activity_name=body.activity_name,
+                 activity_type=body.activity_type, date_start=body.date_start,
+                 date_end=body.date_end, time_start=body.time_start, time_end=body.time_end,
+                 location=body.location, audience=body.audience, notes=body.notes)
+    db.add(a)
+    db.commit()
+    audit(db, p, object_type="activity", object_id=a.id, action="create", new={"owning_level": "wing", "wing_id": wing_id})
+    return {"ok": True, "activity_id": a.id}
+
+
+@router.post("/activities/national")
+def create_national_activity(body: ActivityIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Create a National activity, automatically visible in every Wing and
+    Squadron's Activities list/calendar -- no republish or per-unit import step."""
+    require_can_write_activity(p, "national", None, None)
+    a = Activity(wing_id=None, squadron_id=None, owning_level="national",
+                 activity_name=body.activity_name,
+                 activity_type=body.activity_type, date_start=body.date_start,
+                 date_end=body.date_end, time_start=body.time_start, time_end=body.time_end,
+                 location=body.location, audience=body.audience, notes=body.notes)
+    db.add(a)
+    db.commit()
+    audit(db, p, object_type="activity", object_id=a.id, action="create", new={"owning_level": "national"})
     return {"ok": True, "activity_id": a.id}
 
 
@@ -1279,8 +1563,7 @@ def update_activity(aid: str, body: ActivityUpdateIn, db: DBSession = Depends(ge
     a = db.get(Activity, aid)
     if not a:
         raise HTTPException(404, detail={"error": "not_found"})
-    s = db.get(Squadron, a.squadron_id) if a.squadron_id else None
-    require_can_write_squadron(p, a.squadron_id, s.wing_id if s else None)
+    require_can_write_activity(p, a.owning_level, a.wing_id, a.squadron_id)
     if body.activity_name is not None:
         a.activity_name = body.activity_name
     if body.activity_type is not None:
@@ -1313,8 +1596,7 @@ def delete_activity(aid: str, db: DBSession = Depends(get_db), p: Principal = De
     a = db.get(Activity, aid)
     if not a:
         raise HTTPException(404, detail={"error": "not_found"})
-    s = db.get(Squadron, a.squadron_id) if a.squadron_id else None
-    require_can_write_squadron(p, a.squadron_id, s.wing_id if s else None)
+    require_can_write_activity(p, a.owning_level, a.wing_id, a.squadron_id)
     a.is_archived = True
     a.archived_at = utcnow()
     db.commit()

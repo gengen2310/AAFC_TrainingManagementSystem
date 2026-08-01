@@ -62,6 +62,7 @@ class AuditLog(Base, UUIDMixin):
     reason: Mapped[str | None] = mapped_column(Text)
     ip_address: Mapped[str | None] = mapped_column(String(64))
     user_agent: Mapped[str | None] = mapped_column(String(300))
+    batch_id: Mapped[str | None] = mapped_column(String(36), index=True)
 
 
 class SystemSetting(Base):

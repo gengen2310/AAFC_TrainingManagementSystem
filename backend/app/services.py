@@ -9,11 +9,16 @@ from .services_readiness import parade_night_readiness
 
 def audit(db: DBSession, principal: Principal | None, *, object_type: str, object_id: str | None,
           action: str, old=None, new=None, reason: str | None = None,
-          ip: str | None = None, ua: str | None = None, commit: bool = True) -> None:
+          ip: str | None = None, ua: str | None = None, commit: bool = True,
+          batch_id: str | None = None) -> None:
     """Write an audit row. `commit=False` lets a caller fold the audit write into its
     own transaction (e.g. one atomic session edit + status change + audit record that
     must all succeed or all roll back together) instead of this always being a second,
-    independent commit after the caller's own change is already durable."""
+    independent commit after the caller's own change is already durable.
+
+    `batch_id` correlates multiple audit rows from one bulk operation (e.g. a
+    batch account archive) plus one summary row sharing the same value, so the
+    whole batch is queryable via GET /audit?... without a dedicated batch table."""
     entry = AuditLog(
         user_id=principal.user_id if principal else None,
         role=principal.role if principal else None,
@@ -26,6 +31,7 @@ def audit(db: DBSession, principal: Principal | None, *, object_type: str, objec
         old_value=json.dumps(old, default=str) if old is not None else None,
         new_value=json.dumps(new, default=str) if new is not None else None,
         reason=reason, ip_address=ip, user_agent=(ua or "")[:300] or None,
+        batch_id=batch_id,
     )
     db.add(entry)
     if commit:
