@@ -338,6 +338,9 @@ class SessionIn(BaseModel):
     reason: str | None = None
     rescheduled_to_date: str | None = None
     actual_attendance: int | None = None
+    # Skip the synchronous resource-conflict check below (Phase 3 scheduling UX) --
+    # the caller has already shown the conflict to the user and confirmed the move.
+    override_conflict: bool = False
 
 
 class StatusIn(BaseModel):
@@ -435,8 +438,47 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
     if status_changing and body.status in REASON_REQUIRED_STATUSES and not (body.reason or "").strip():
         raise HTTPException(400, detail={"error": f"reason_required_{body.status}"})
 
+    # ── Moving to a different Parade Night (accessible "Move to session" control,
+    # Phase 3) — body.parade_night_id was previously accepted but never read here,
+    # so a session could never actually move. Same squadron only; cross-squadron
+    # session transfer is out of scope for this control. ──
+    target_pn = pn
+    if body.parade_night_id != s.parade_night_id:
+        target_pn = db.get(ParadeNight, body.parade_night_id)
+        if not target_pn or target_pn.is_archived:
+            raise HTTPException(404, detail={"error": "target_parade_night_not_found"})
+        if target_pn.squadron_id != s.squadron_id:
+            raise HTTPException(403, detail={"error": "cross_squadron_move_forbidden"})
+
+    # ── Synchronous resource-conflict check (Phase 3) — adapts GET /resources/clashes's
+    # same-period/same-resource logic, which was read-only and never wired into any
+    # write path, so a facilitator/room double-booking was only ever visible after
+    # the fact. Runs against the TARGET parade night + period, so it correctly covers
+    # both a plain reorder and a move to a different Parade Night. A pure swap between
+    # two sessions that didn't already clash can never trigger this against each other
+    # (relabelling two non-overlapping period numbers doesn't create new overlap) --
+    # only a genuine new collision against a third session's resource does. ──
+    if not body.override_conflict:
+        siblings = db.query(Session).filter(
+            Session.parade_night_id == target_pn.id, Session.id != s.id,
+            Session.period_number == body.period_number, Session.is_archived == False,  # noqa: E712
+        ).all()
+        conflicts = []
+        for sib in siblings:
+            if body.facilitator_id and sib.facilitator_id == body.facilitator_id:
+                conflicts.append({"type": "facilitator_clash", "session_id": sib.id,
+                                  "resource_id": sib.facilitator_id,
+                                  "resource_name": sib.facilitator_display_name_at_time})
+            if body.training_area_id and sib.training_area_id == body.training_area_id:
+                conflicts.append({"type": "room_clash", "session_id": sib.id,
+                                  "resource_id": sib.training_area_id,
+                                  "resource_name": sib.training_area_name_at_time})
+        if conflicts:
+            raise HTTPException(409, detail={"error": "resource_conflict", "conflicts": conflicts})
+
     # ── All validation passed — apply every change, then a single commit ──
     old = {"facilitator_id": s.facilitator_id, "training_area_id": s.training_area_id}
+    s.parade_night_id = target_pn.id
     s.period_number = body.period_number
     s.cadet_group = body.cadet_group
     s.phase_at_time = body.phase_at_time
@@ -461,7 +503,9 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
     db.commit()  # single commit: field edits + status transition + history + audit rows
 
     if pn:
-        _recompute(db, pn)
+        _recompute(db, pn)  # old Parade Night, if this was a move -- its readiness changed too
+    if target_pn and target_pn.id != (pn.id if pn else None):
+        _recompute(db, target_pn)
     return {"ok": True, "version": s.version}
 
 
