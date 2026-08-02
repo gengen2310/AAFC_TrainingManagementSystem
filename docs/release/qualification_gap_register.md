@@ -1958,3 +1958,71 @@ acceptance criteria, and is updated in place as each item closes.
   failure (Planning Workspace has its own independent auth) and affects a
   secondary navigation link, not core functionality.
 - **Disposition**: closed, fixed live on production, verified.
+
+## GAP-28: Improved load-test methodology reveals a real capacity limit at genuine 1,000-concurrent-connection load (post-deployment hardening reconciliation)
+
+- **Source**: Part 4 of the post-deployment reconciliation instruction, explicitly
+  asking to either prove the 1,000-user gate with an improved method or honestly
+  amend the release claim, since the earlier threading-based test's own gate
+  verdict was FAIL and had been explained (not just asserted) as a client-harness
+  artifact via Railway server-side metrics showing 0.0% error rate and excellent
+  latency during that same test.
+- **Built** `tools/stress/load_test_staging_async.py`: asyncio + aiohttp instead
+  of one OS thread per virtual user (removing the client-side thread/TLS-handshake
+  bottleneck the old tool had), jittered staggered login across the ramp window
+  (not a single-instant storm), and explicit per-virtual-user outcome tracking
+  (completed full workflow / throttled / auth-failed / timeout / connection-error
+  / server-error) instead of aggregate request counts only.
+- **First attempt had its own bug**: `aiohttp.ClientSession()` defaults to a
+  100-connection pool — with 1,000 virtual users, 900 sat queued client-side and
+  timed out before ever reaching the server (0.4% completion, 1012 timeouts).
+  Found via the same client-vs-server-metrics reconciliation discipline used
+  throughout this pass, fixed by explicitly sizing `TCPConnector(limit=...)` to
+  the actual requested concurrency, and validated clean at 50 concurrent users
+  (92% completion, zero genuine failures) before re-running at scale.
+- **Corrected tool, full 1,000-user run — result is a genuine capacity finding,
+  not a test-harness artifact this time**: 0/1000 (0.0%) fully completed
+  workflows, 0 throttled, 1,016 timeouts, 8 real 5xx. Cross-checked against
+  Railway's own server-side metrics for the identical window (not the test
+  tool's self-report): **p50 latency 20,584ms, p90 20,849ms, real 0.5% server-side
+  error rate (13 5xx of 2.8K requests), CPU averaging 2.2 vCPU with a brief spike
+  to 10.4 vCPU (over the 8.0 vCPU limit)**. Zero throttled responses in this run
+  rules out account-lockout state as the explanation (a locked account fails fast
+  via 429, not slowly via a 20s timeout).
+- **Why this is different from the earlier (dismissed) FAIL**: that one showed a
+  huge gap between client-measured and server-measured latency/error-rate (client
+  said bad, server said fine) — clear evidence of a client-side artifact. This run
+  shows the client and server measurements **agree** (both show severe latency
+  and real errors) — the server itself is confirming the problem.
+- **Most likely root cause, not yet confirmed by direct experimentation**:
+  staging's `GUNICORN_WORKERS=6` (sync workers) can only truly process 6 requests
+  in parallel; ~1,000 requests arriving over a 90s window plausibly exceeds what
+  6 workers can drain before requests queue past a reasonable timeout.
+  `DB_POOL_SIZE=8` + `DB_POOL_MAX_OVERFLOW=4` (12 max DB connections) is a
+  secondary plausible contributor. Not fixed or re-tested with a higher worker
+  count this pass — that is real, valuable follow-up capacity work, scoped
+  separately rather than chased indefinitely inside this reconciliation.
+- **Reconciled release claim** (per the instruction's own Option B, since Option
+  A's improved method did not prove the gate — it disproved the earlier
+  unqualified pass):
+  - 300 concurrent users: freshly demonstrated clean on the current release
+    candidate (Stage 10's original sustained test, unchanged conclusion).
+  - The backend remained healthy under the *threading-based* 1,000-user attempt
+    specifically (0% server-side error rate that time) — but that attempt is now
+    understood to not have generated genuine 1,000-concurrent load in the first
+    place, so it is not evidence for capacity at that level.
+  - A current, fully authenticated, genuinely-concurrent 1,000-user end-to-end
+    pass has **not** been proven — attempting one with corrected tooling reveals
+    a real capacity limit under staging's current worker/pool configuration.
+  - **1,000-concurrent-user capability is a stated limitation of the current
+    staging configuration, not a passed gate.**
+- **Severity: P2** — this is staging-configuration-specific (production's own
+  `GUNICORN_WORKERS`/pool sizing has not been tested this way and may differ),
+  and 300-user capacity remains solidly proven; not classified P0/P1 since it
+  does not indicate the *deployed* candidate is broken at realistic production
+  load, only that a specific untested-until-now peak scenario needs real
+  capacity work before it can be claimed.
+- **Disposition**: open, P2, documented rather than silently reduced. Recommend a
+  dedicated capacity-tuning follow-up (raise `GUNICORN_WORKERS` and
+  `DB_POOL_SIZE`/`DB_POOL_MAX_OVERFLOW`, re-test with this same corrected async
+  tool) before any future claim of proven 1,000-concurrent-user capacity.
