@@ -1881,3 +1881,46 @@ acceptance criteria, and is updated in place as each item closes.
   appropriately deferred to a deliberate follow-up rather than rushed during a
   static-analysis triage pass.
 - **Disposition**: open, P3, carried to Stage 13's findings-classification pass.
+
+## GAP-26: Backend Dockerfile's postgresql-client is unpinned -- likely the same GAP-16 version mismatch, but in a different code path (P1/P2, fixed by analogy, not locally build-verified)
+
+- **Source**: Stage 12 (deployment artefacts) review of `backend/Dockerfile`,
+  prompted by already knowing GAP-16's root cause pattern cold from earlier in
+  this pass.
+- **Finding**: `backend/Dockerfile` installed `postgresql-client` via plain
+  `apt-get install postgresql-client` — Debian's own default repo package, not
+  pinned to any version. Checked directly against Debian's package archive: the
+  `postgresql-client` metapackage resolves to PostgreSQL **15** on bookworm (12)
+  and PostgreSQL **17** on trixie (13) — whichever codename `python:3.13-slim`'s
+  floating tag currently resolves to, **neither matches production's 17.x or
+  staging's 18.x server** (per `.github/workflows/backup-postgresql.yml`'s own
+  comment, already fixed for exactly this reason under GAP-16). `pg_dump` refuses
+  to dump from a server newer than itself, so this container's own `pg_dump`
+  (invoked by `system.py`'s `POST /api/system/backup` — the System Console
+  "Download PostgreSQL Backup" button, a *manual*, in-container code path
+  completely separate from the GitHub Actions automated backup GAP-16/GAP-18
+  already fixed) was very likely broken or version-blocked in exactly the same
+  way, just never checked because prior passes were scoped to the GitHub Actions
+  workflow specifically, not this second, independent `pg_dump` call site.
+- **Fix**: added the official PGDG apt repository and pinned
+  `postgresql-client-18`, mirroring `.github/workflows/backup-postgresql.yml`'s
+  already-proven fix line-for-line (same GPG key, same repo URL pattern, same
+  target version) rather than inventing a new approach.
+- **Not verified by a local Docker build this pass** — no Docker is available in
+  this environment (confirmed: `docker` command not found). The fix is
+  reasoned from strong analogical evidence (Debian's own published package
+  archive metadata confirming the version mismatch, and an already-proven fix
+  for the identical failure mode elsewhere in this exact repo), not from
+  actually building and running the container. **Flagged explicitly**: Stage 13
+  should build this image for real (CI, or a machine with Docker) before this
+  is treated as fully closed.
+- **Severity: P1/P2** — if the analysis is correct, a real system_admin-facing
+  feature (manual backup download) has likely been silently broken since
+  whenever this Dockerfile was last touched, with no automated coverage that
+  would have caught it (this endpoint has no test that actually invokes real
+  `pg_dump`, only mocks/skips per typical test-suite scoping for external
+  binaries). Downgraded from GAP-16/18's SEV1 because the *automated* backup
+  path (the one actually relied on for disaster recovery) is unaffected and
+  already proven working — this is the manual/on-demand download path only.
+- **Disposition**: fixed on `release/final-assurance-2026-08-01`, pending a real
+  Docker build to fully confirm, not yet deployed.
