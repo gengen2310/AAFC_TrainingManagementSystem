@@ -47,11 +47,16 @@ purpose: `test_planner_v14.py`, `test_planning.py`, `test_curriculum_import.py`,
 - Actually creating a new session on an empty parade night through the UI
   (attempted; the "Weekly Program" page turned out to be a print/report view rather
   than the session editor — the real editor is reached from a different entry point
-  not located within this pass's time budget). Covered by `test_planning.py`/
-  `test_planner_v14.py`'s session-creation tests at the API level instead.
+  not located within this pass's time budget).
+  **Closed by Stage 11**: `frontend/e2e/parade-nights.spec.ts`'s
+  `sqn_admin can add a session to a parade night` (real Playwright browser test,
+  not a unit shortcut) passes clean. `connected-frontend`'s own equivalent flow is
+  covered separately in Stage 11's `e2e-connected` run.
 - Full click-through of Proxy Mode / Delegated Intervention entry and exit via the
-  UI (verified via direct API calls in Stage 4, not via UI clicks — the UI wraps the
-  same `/api/proxy/enter` endpoint already tested).
+  UI. **Closed by Stage 11**: `frontend/e2e/wing-proxy.spec.ts` covers both
+  `wing admin can enter and exit proxy mode` and `wing viewer cannot enter proxy
+  mode` as real browser tests, corroborating Stage 4's direct-API tenancy tests
+  from the UI layer too.
 - Facilitator CRUD, Activities, Resources, Wing/National dashboards, System Console's
   maintenance-mode toggle and backup-download button — not clicked through live this
   pass. All have dedicated automated test coverage in `backend/tests/`.
