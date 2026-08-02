@@ -266,13 +266,18 @@ Full detail: `final_operational_readiness.md`.
   limitation on staging's current configuration (GAP-28, P2), not a passed
   gate.** Full detail: `final_performance_assessment.md`.
 - **Fresh 4-hour soak test**: dispatched against the exact current candidate.
-  First dispatch was investigated and re-run after a client-harness ramp
-  artifact (not a backend issue — confirmed via Railway server-side metrics
-  agreeing with a clean picture, not the client's initial false-alarm
-  timeouts); the corrected run is in progress at the time of this report
-  (started 2026-08-02T07:38:18Z, ~4 hours). **Result to be appended to
-  `final_performance_assessment.md` once complete — not yet available at the
-  time this report was written.**
+  Two successive client-harness artifacts were investigated and fixed before
+  a valid run was underway — both confirmed via Railway server-side metrics
+  showing a clean backend throughout (0 5xx, sub-140ms p99 both times), not
+  taken at face value from the client tool alone: (1) an unjittered initial
+  login burst (150 simultaneous logins), and (2) an unjittered re-login
+  burst roughly 30 minutes in, caused by `ACCESS_TOKEN_TTL_MIN=30` expiring
+  nearly the whole population's tokens in the same tight cluster since they
+  all logged in within the same ramp window. Both fixed with the same
+  jittered-delay pattern. The corrected run is in progress at the time of
+  this report (third dispatch, started 2026-08-02T08:28:58Z, ~4 hours).
+  **Result to be appended to `final_performance_assessment.md` once
+  complete — not yet available at the time this report was written.**
 - **Backup/recovery**: GAP-18 re-verified with a fully clean restore-test run
   (zero caveats, resolving the earlier stale-`origin/main` artifact), plus a
   newly-highlighted application-level verification layer already built into

@@ -181,7 +181,28 @@ minutes post-fix: 111/150 active users, 0 timeouts, 0 5xx (the remaining
 39 were real `auth_failed`/`throttled` outcomes from the shared LV-prefixed
 account pool's residual state after today's earlier load tests, not a
 ramp-related artifact). Re-dispatched the full 4-hour soak
-2026-08-02T07:38:18Z, expected completion ~2026-08-02T11:38Z.
+2026-08-02T07:38:18Z.
+
+**Second dispatch hit a related, second thundering-herd bug at T+30min** —
+investigated with the same client-vs-server discipline before concluding
+anything. The T+15min window was clean (96 active users, 0 timeouts), but
+T+30min showed active users collapse from 96 to 17 with 87 client-side
+timeouts. Railway server-side metrics for that exact window (08:05-08:25Z)
+again showed a completely healthy backend: 0 5xx, 0.0% error rate, p50 25ms,
+p99 139ms, CPU at 0.2% utilization — ruling out a real backend problem
+before looking further. Root cause traced to `ACCESS_TOKEN_TTL_MIN=30`
+(`backend/app/config.py:36`): all 150 users logged in within the same 90s
+ramp window, so ~30 minutes later nearly the whole population's tokens
+expire in the same tight cluster, and the soak tool's 401-triggered
+re-login had no jitter — recreating the exact login-storm pattern the
+ramp fix above was meant to prevent, just on the re-auth path instead of
+the initial-login path. Fixed by applying the same jittered-delay pattern
+(`random.uniform(0, 45)` seconds) before each re-login attempt. Stopped
+and re-dispatched a third time, 2026-08-02T08:28:58Z, expected completion
+~2026-08-02T12:29Z. This dispatch's early windows are being watched
+specifically to confirm active-user count holds steady through at least
+one full 30-minute token-expiry cycle before treating the fix as
+confirmed, not just reasoned.
 
 *(Results appended below once the soak completes.)*
 
