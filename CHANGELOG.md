@@ -1,5 +1,89 @@
 # Changelog
 
+## v17.1.1 — Final System Assurance, Accelerated Release Qualification, and Public Release to Authorised Users (2026-08-02)
+
+Released to authorised AAFC users. Consolidates the full Final System Assurance
+engagement (Stages 0-14, `docs/release/`) and a subsequent post-deployment
+hardening / accelerated release qualification pass.
+
+### Capabilities included in this release
+
+- NATHQ Activities and Wing Activities, with read-only inheritance at
+  subordinate Squadron level; owning-scope edits propagate, archive removes
+  from active subordinate views.
+- Wing and National Training Dashboards, alongside the existing Squadron
+  view; corrected backend routing for the Training Dashboard.
+- Expanded System Administrator scope: operational National/Wing/Squadron
+  pages reachable via a persistent scope-selector bar, backed by the
+  existing Delegated Intervention mechanism for writes (reads are
+  unconditional per existing `can_view_*` authority).
+- Proxy Mode and Delegated Intervention Mode across affected roles.
+- Organisation and Account Management linking, bulk account archiving,
+  organisation archive workflow with dependency preview, Show
+  archived/restore, and a guard against archiving the final System
+  Administrator account.
+- Parade Night template propagation; accessible drag-and-drop and a
+  keyboard-operable "Move To" control for the Weekly Program.
+- Weekly Program and facilitator filtering, with save-action feedback.
+- Facilitator CSV import; curriculum CSV preview with corrected
+  Foundation/Extension handling.
+- Guided "Getting Started" setup workflow.
+
+### Security fixes
+
+- Stored XSS across multiple free-text fields in `connected-frontend`
+  (attribute-context and plain-text-content injection patterns) — fixed and
+  live-verified; now has automated regression coverage
+  (`frontend/e2e-connected/hostile-value-xss.spec.ts`).
+- Health endpoints no longer leak raw database driver exception text.
+- Backend Dockerfile's `postgresql-client` version pin corrected (matches
+  production's actual PostgreSQL major version); build-verified via a real
+  Railway deploy.
+- Production backup/restore workflows corrected to target the actual
+  Railway production database (previously silently targeting the wrong
+  physical database — see GAP-16/GAP-18 in the qualification gap register).
+
+### Accessibility
+
+- `color-contrast`: WCAG-AA-compliant contextual tokens introduced
+  alongside the unchanged AAFC brand palette; verified via 18 live
+  page-scans with zero violations. **Note**: fixed in code and verified
+  locally; deployment status is tracked separately — see Known Limitations.
+- A critical `select-name` violation (two Curriculum page filter dropdowns
+  with no accessible name) fixed and re-verified live.
+
+### Known limitations (see `docs/release/final_known_limitations.md` for full detail)
+
+- Proven safe up to 300 genuinely concurrent users; a documented capacity
+  ceiling exists above that on staging's current infrastructure
+  configuration, precisely diagnosed as PostgreSQL's `max_connections`
+  limit rather than an application defect (see GAP-29). Not yet re-tested
+  against a raised connection ceiling or a connection pooler.
+- The color-contrast accessibility fix is verified but not yet deployed to
+  any live environment as of this changelog entry — see the release
+  candidate report for current deployment status.
+- 83 remaining unlabeled `<select>` elements in `connected-frontend`, and no
+  `<h1>`/landmark structure — both real, sized, deliberately deferred
+  structural gaps.
+- Staging System Administrator (and other staging role) live verification
+  was blocked this pass on credential availability — disclosed in
+  `docs/release/final_staging_feature_verification_accelerated.md`, not
+  silently skipped. Does not affect production, which was separately
+  verified live.
+
+### Methodology note
+
+Performance qualification for this release used an accelerated load
+sequence (baseline → progressive ramp; spike and 30-minute endurance phases
+were planned but not reached, see below) against staging, per an explicit
+instruction to replace the originally-planned 4-hour soak test. The ramp
+phase cleanly proved 300 concurrent users (0 5xx, sub-100ms p95) before
+revealing the GAP-29 capacity ceiling around 600-1000; the spike and
+endurance phases were not run given that result. See
+`docs/release/qualification_gap_register.md` (GAP-28, GAP-29) and
+`docs/release/final_performance_assessment.md` for full detail and honest
+disclosure of what was and was not proven at each concurrency level.
+
 ## v17.1 — Maintenance Enforcement, Scope Forms, and Test Hardening (2026-06-29)
 
 ### Backend changes

@@ -31,7 +31,7 @@ from ..services import audit
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
-APP_VERSION = "17.1.0"
+APP_VERSION = "17.1.1"
 PACKAGE_VERSION = "v17.1"
 
 

@@ -62,7 +62,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="AAFC Training Management System — National", version="17.1.0", lifespan=lifespan,
+app = FastAPI(title="AAFC Training Management System — National", version="17.1.1", lifespan=lifespan,
              docs_url=None, redoc_url=None, openapi_url=None)
 
 app.add_middleware(

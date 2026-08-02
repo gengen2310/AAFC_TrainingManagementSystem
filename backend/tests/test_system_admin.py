@@ -120,7 +120,7 @@ def test_system_version_sysadmin(client):
     r = client.get("/api/system/version", headers=hdr)
     assert r.status_code == 200
     d = r.json()
-    assert d["app_version"] == "17.1.0"
+    assert d["app_version"] == "17.1.1"
     assert d["package_version"] == "v17.1"
 
 
