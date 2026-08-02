@@ -29,7 +29,30 @@
   /* Text hierarchy */
   --text:   #1e2d3d;   /* deep navy-dark for primary text */
   --text-2: #3a4a55;
-  --muted:  #6b7a87;
+  --muted:  #657380;   /* darkened from #6b7a87 -- the original failed WCAG AA
+                          (4.13-4.41:1 against --bg/--surface, needs 4.5:1); this
+                          value is >=4.5:1 against both, computed not guessed */
+  /* Accessible contextual text tokens (WCAG 2.2 AA) -- for contexts where the
+     AAFC brand colour itself does not meet 4.5:1 as a text/foreground colour.
+     The brand colour stays available unchanged for decorative/background use;
+     these exist only to give text an accessible ink on top of it. */
+  --muted-text-on-light: #6e7275; /* was --lgrey (#b0b7bb) used as text at 2.03:1 --
+                                      --lgrey itself is unchanged for its documented
+                                      border/background purpose. Computed against
+                                      both --surface (#fff, 4.85:1) and --bg
+                                      (#f4f8fc, 4.55:1) since this token is used on
+                                      both. */
+  --text-on-dark-muted: #7e9bbb;  /* was rgba(255,255,255,.45) on --dark at 3.83:1 */
+  --link-on-light: var(--royal);  /* was --accent/--blue (#51b0e3) as link text on
+                                      --accent-light at 2.07:1; --royal keeps the
+                                      same blue family, gives 7.53:1 */
+  --status-text-danger: #d41733;  /* was --red (#e51937) as text on --surface
+                                      (4.64:1), --bg (4.35:1), and a computed
+                                      table-row/button hover shade #efefef
+                                      (4.19:1) -- this value clears all three
+                                      (5.29/4.96/4.60). --red itself is unchanged
+                                      for badges/buttons with their own solid
+                                      background. */
   /* Semantic */
   --ok:     #1a7f4b;   --ok-bg:   #d4f0e3;
   --warn:   #c97a00;   --warn-bg: #fff3cd;
@@ -87,7 +110,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .tb-wm{font-size:13px;font-weight:700;color:white;letter-spacing:.03em;}
 .tb-wm .r{color:var(--blue);}
 .tb-sep{color:rgba(255,255,255,.25);}
-.tb-unit{font-size:11px;font-weight:400;color:rgba(255,255,255,.45);}
+.tb-unit{font-size:11px;font-weight:400;color:var(--text-on-dark-muted);}
 .tb-right{display:flex;align-items:center;gap:8px;}
 .sqn-chip{background:var(--blue);color:var(--dark);border-radius:4px;padding:3px 10px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;}
 .sqn-chip.admin{background:#ffd700;color:var(--dark);}
@@ -98,7 +121,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 
 /* ── SIDENAV ── */
 .sidenav{width:210px;background:white;border-right:1px solid var(--border);flex-shrink:0;padding:12px 0;height:calc(100vh - 52px);position:sticky;top:52px;overflow-y:auto;}
-.nav-lbl{font-size:9px;font-weight:800;color:var(--lgrey);letter-spacing:.12em;text-transform:uppercase;padding:14px 16px 4px;}
+.nav-lbl{font-size:9px;font-weight:800;color:var(--muted-text-on-light);letter-spacing:.12em;text-transform:uppercase;padding:14px 16px 4px;}
 .nav-item{display:flex;align-items:center;padding:8px 18px;font-size:12.5px;font-weight:500;color:var(--steel);cursor:pointer;transition:background .1s,color .1s;border-left:3px solid transparent;gap:8px;user-select:none;}
 .nav-item:hover{background:var(--bg);color:var(--dark);}
 .nav-item.active{background:#deeefa;color:var(--dark);border-left-color:var(--blue);font-weight:700;}
@@ -295,9 +318,14 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .cal-cell:hover{border-color:var(--blue);box-shadow:0 2px 8px rgba(81,176,227,.18);}
 .cal-cell.parade{background:#e6f3fc;border-color:var(--blue);}
 .cal-cell.today{border-color:var(--dark);border-width:2px;}
-.cal-cell.other{opacity:.4;background:var(--bg);}
+.cal-cell.other{background:var(--bg);}
+/* De-emphasised via an explicit accessible colour on the date text itself, not
+   opacity -- opacity:.4 on the whole cell used to blend an already-accessible
+   --muted text colour down to ~1.66:1, well under the 4.5:1 a date number (real
+   information, not decoration) needs. */
 .cal-cell.act-day{border-left:3px solid var(--warn);}
 .cal-dt{font-size:10px;font-weight:800;color:var(--muted);}
+.cal-cell.other .cal-dt{color:var(--muted-text-on-light);}
 .cal-cell.parade .cal-dt{color:var(--dark);}
 .cal-cell.today .cal-dt{color:var(--blue);}
 .cal-chip{display:block;font-size:8px;margin-top:1px;padding:1px 4px;border-radius:3px;background:var(--dark);color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;}
@@ -381,7 +409,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .exp-title{font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:3px;}
 .exp-meta{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
 .exp-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;}
-.lh-btn{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:5px;background:var(--accent-light);color:var(--accent);font-size:10px;font-weight:600;text-decoration:none;transition:background .12s;}
+.lh-btn{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:5px;background:var(--accent-light);color:var(--link-on-light);font-size:10px;font-weight:600;text-decoration:none;transition:background .12s;}
 .lh-btn:hover{background:#cce0ff;}
 
 /* ── RESOURCE CHIPS ── */
@@ -394,11 +422,14 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 
 /* ── SCOPE / MODE BANNERS ── */
 .scope-banner{display:flex;align-items:center;gap:10px;padding:7px 22px;font-size:11px;font-weight:700;letter-spacing:.04em;background:#eef4fb;color:var(--dark);border-bottom:1px solid var(--border);}
-.scope-banner .sb-tag{font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:2px 9px;border-radius:20px;font-size:9.5px;background:var(--blue);color:#fff;}
-.scope-banner.sb-national .sb-tag{background:#7c3aed;}
-.scope-banner.sb-wing .sb-tag{background:var(--royal);}
-.scope-banner.sb-auditor .sb-tag{background:var(--steel);}
-.scope-banner.sb-system_admin .sb-tag{background:#1a1a2e;}
+.scope-banner .sb-tag{font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:2px 9px;border-radius:20px;font-size:9.5px;background:var(--blue);color:var(--dark);}
+/* Base .sb-tag uses --dark text because --blue (#51b0e3) is too light for white
+   text at 4.5:1 (was 2.42:1); the four darker background variants below keep
+   white text explicitly since they already meet contrast with it. */
+.scope-banner.sb-national .sb-tag{background:#7c3aed;color:#fff;}
+.scope-banner.sb-wing .sb-tag{background:var(--royal);color:#fff;}
+.scope-banner.sb-auditor .sb-tag{background:var(--steel);color:#fff;}
+.scope-banner.sb-system_admin .sb-tag{background:#1a1a2e;color:#fff;}
 .mode-banner{display:none;align-items:center;justify-content:space-between;gap:12px;padding:8px 22px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:#ffd700;color:#3a2e00;border-bottom:2px solid #c9a800;}
 .mode-banner.intervention{background:#ffe0e0;color:#7a1010;border-bottom-color:#c25;}
 .mode-banner.show{display:flex;}
@@ -794,7 +825,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;color:var(--muted);">
           <span>Parade night</span><span>Activity</span><span style="color:var(--ok);">● Delivered</span>
-          <span style="color:var(--lgrey);">● Not Delivered</span><span style="color:var(--red);">● Cancelled</span>
+          <span style="color:var(--muted-text-on-light);">● Not Delivered</span><span style="color:var(--status-text-danger);">● Cancelled</span>
         </div>
       </div>
 
@@ -1842,7 +1873,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="_scResolve(false)">Cancel</button>
-      <button class="btn" style="border-color:var(--red);color:var(--red)" onclick="_scResolve(true)">Move Anyway</button>
+      <button class="btn" style="border-color:var(--red);color:var(--status-text-danger)" onclick="_scResolve(true)">Move Anyway</button>
     </div>
   </div>
 </div>
@@ -4203,7 +4234,7 @@ function _renderAccountTable(){
     const resetBtn=`<button class="btn btn-xs btn-sky" onclick="openAccountResetCode('${u.user_id}','${dn}')" title="Reset access code">Reset access code</button>`;
     const unlockBtn=isLocked(u)?`<button class="btn btn-xs btn-ok" onclick="doUnlockAccount('${u.user_id}','${dn}')">Unlock</button>`:'';
     const toggleBtn=u.active_status!==false
-      ? `<button class="btn btn-xs" style="border-color:var(--red);color:var(--red)" onclick="doDisableAccount('${u.user_id}','${dn}')">Disable</button>`
+      ? `<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doDisableAccount('${u.user_id}','${dn}')">Disable</button>`
       : `<button class="btn btn-xs btn-ok" onclick="doReactivateAccount('${u.user_id}','${dn}')">Reactivate</button>`;
     const editBtn=`<button class="btn btn-xs" onclick="openEditAccountModal('${u.user_id}')">Edit</button>`;
     return `<div style="display:flex;gap:4px;flex-wrap:wrap">${editBtn}${resetBtn}${unlockBtn}${toggleBtn}</div>`;
@@ -4273,7 +4304,7 @@ function _renderFlightTable(){
 
   const sqnName=fid=>{ const f=flights.find(x=>x.flight_id===fid); return f?f.squadron_name||'':''; };
   const renameBtn=f=>`<button class="btn btn-xs" onclick="openRenameFlightModal('${f.flight_id}','${_jsAttr(f.name||'')}')">Rename</button>`;
-  const archiveBtn=f=>`<button class="btn btn-xs" style="border-color:var(--red);color:var(--red)" onclick="doArchiveFlight('${f.flight_id}','${_jsAttr(f.name||'')}')">Archive</button>`;
+  const archiveBtn=f=>`<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doArchiveFlight('${f.flight_id}','${_jsAttr(f.name||'')}')">Archive</button>`;
 
   el.innerHTML='<div class="tw"><table><thead><tr><th>Flight Name</th><th>Squadron</th><th>Members</th>'+(canWrite?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
     flights.map(f=>`<tr>
