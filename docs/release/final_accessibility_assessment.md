@@ -50,27 +50,37 @@ recorded here as real, sized-but-unquantified remaining work rather than either
 ignored or rushed through with guessed labels (a wrong guessed label is arguably
 worse than a missing one for a screen-reader user).
 
-## Not fixed this pass, needs a stakeholder decision: `color-contrast`
+## `color-contrast` — fixed in the post-deployment reconciliation pass
 
-Root-caused, not just observed. The specific failing combinations trace directly to
-`.claude/rules/frontend.md`'s own documented AAFC VIG palette tokens:
+**Update**: the original release-blocker classification here (per this
+reassessment's own instruction: *"This cannot be classified as a minor P3 solely
+because the failing colours are derived from AAFC visual-identity tokens"*) was
+correct, and the finding is now **fixed**, not merely documented as a design
+question. Introduced contextual accessible tokens alongside the existing brand
+palette (which is unchanged for its legitimate border/background/badge uses,
+preserving the approved AAFC visual identity as instructed):
 
-| Foreground | Background | Ratio found | Required | Token match |
-|---|---|---:|---:|---|
-| `#738daa` | `#002f65` | 3.83 | 4.5 | close to `--pale`/`--dark` |
-| `#ffffff` | `#51b0e3` | 2.42 | 4.5 | `--blue` used as a text background |
-| `#b0b7bb` | `#ffffff` | 2.03 | 4.5 | **exactly `--lgrey`**, documented as "borders, table headers, quiet backgrounds" — being used as *text* colour, not its documented purpose |
+| New token | Replaces | Old ratio | New ratio |
+|---|---|---:|---:|
+| `--muted` (darkened in place: `#6b7a87`→`#657380`) | secondary text almost everywhere | 4.13-4.41:1 | ≥4.5:1 |
+| `--muted-text-on-light` | `--lgrey` used as text | 2.03:1 | 4.55-4.85:1 |
+| `--text-on-dark-muted` | low-opacity white on dark navy header | 3.83:1 | 4.57:1 |
+| `--link-on-light` (= `--royal`) | `--accent`/`--blue` as link text on a pale background | 2.07:1 | 7.53:1 |
+| `--status-text-danger` | `--red` as text directly on page/table backgrounds | 4.03-4.35:1 | 4.60-5.29:1 |
 
-The `--lgrey`/`--blue` failures aren't narrow misses — 2.03 and 2.42 against a 4.5
-requirement are both well under half the needed ratio. This is systemic (40-43
-elements per page, present on every page scanned) and traces to the brand palette
-itself, not a one-off styling mistake. **Deliberately not changed this pass**: these
-are official AAFC VIG (Visual Identity Guidelines) brand colours per
-`.claude/rules/frontend.md` — adjusting them is a real design/branding decision with
-organisational implications beyond code correctness, exactly the kind of change this
-engagement's own operating rules say to surface rather than silently alter. Recorded
-here with the precise failing combinations so whoever makes that call has the exact
-numbers, not a vague "contrast is bad somewhere."
+Every value was computed (WCAG relative-luminance formula, not eyeballed) against
+every real background it appears on — several first-pass values only satisfied
+one of two-or-three actual backgrounds and had to be recomputed after live
+re-scanning caught the gap (documented in `connected-frontend/index.html`'s own
+token comments). Also fixed: an `opacity:.4` de-emphasis technique for calendar
+"other month" dates, which blended an already-accessible colour back down below
+threshold — replaced with an explicit colour on the text itself.
+
+**Verified live, not asserted**: zero `color-contrast` violations across 18
+page-scans (all 12 `sqn_admin`-scope pages, all 6 `wing_admin`-scope pages) after
+the fix. Full connected-frontend e2e suite (24 tests, excluding the staging-only
+screenshot utility) re-run clean, zero regressions. Deployed to staging and
+production, confirmed present in the live served asset at both.
 
 ## Not fixed, lower-severity structural gaps
 
