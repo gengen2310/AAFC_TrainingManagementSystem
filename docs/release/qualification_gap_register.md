@@ -1924,3 +1924,37 @@ acceptance criteria, and is updated in place as each item closes.
   already proven working — this is the manual/on-demand download path only.
 - **Disposition**: fixed on `release/final-assurance-2026-08-01`, pending a real
   Docker build to fully confirm, not yet deployed.
+
+## GAP-27: Production's PLANNING_WORKSPACE_URL pointed at staging's domain (found during post-deploy verification, fixed live)
+
+- **Source**: routine, read-only post-deploy health verification immediately after
+  merging `release/final-assurance-2026-08-01` to `main` and deploying to
+  production (user-authorized: "Merge to main and deploy to production"). Not a
+  pre-planned check — surfaced from `GET /api/health/ui-config`'s own response
+  while confirming the deploy was healthy.
+- **Finding**: production's `PLANNING_WORKSPACE_URL` environment variable was set
+  to `https://aafc-tms-planning-workspace-preview-staging.up.railway.app/planning`
+  — staging's domain — instead of production's own
+  (`https://aafc-tms-planning-workspace-preview-production.up.railway.app/planning`,
+  confirmed to exist and be active). Same defect class as GAP-19/GAP-20
+  (cross-environment variable/URL contamination), on a variable neither of those
+  passes had checked. Not introduced by this deploy — this session never touched
+  this variable; it was already live and wrong before this pass's deploy, and had
+  been for an unknown period.
+- **Impact**: any real production user clicking "Open Planning Workspace" from the
+  Main TMS nav was sent to staging's synthetic-data environment instead of
+  production's own real one — a real functional defect and a data-context
+  confusion risk (a user could believe they were viewing/editing real production
+  planning data while actually on staging).
+- **Fix**: with explicit user confirmation, set `PLANNING_WORKSPACE_URL` on the
+  production backend service to production's own Planning Workspace URL. The
+  variable change auto-triggered a new deployment (Railway's standard behaviour);
+  monitored it to `SUCCESS`.
+- **Verified**: `GET /api/health/ui-config` now returns the correct production URL;
+  production backend health unchanged (`squadrons: 1`, matching the pre-fix
+  baseline exactly — no data disruption); both the Main TMS frontend and the real
+  Planning Workspace domain return 200.
+- **Severity: P2** — real, live, user-facing defect, but not a security boundary
+  failure (Planning Workspace has its own independent auth) and affects a
+  secondary navigation link, not core functionality.
+- **Disposition**: closed, fixed live on production, verified.
