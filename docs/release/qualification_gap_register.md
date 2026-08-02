@@ -2128,6 +2128,72 @@ acceptance criteria, and is updated in place as each item closes.
   touched or tested this way this pass — this finding is staging-specific
   until production is separately verified.
 
+### Follow-up attempt: PgBouncer pooling — real, partial improvement; not a complete fix; staging reverted to known-safe baseline
+
+At the user's explicit request, attempted the recommended remediation
+(raise the connection limit, add pooling) in a later part of this same
+session. Real progress, real new problems, honestly disclosed rather than
+either overclaimed as solved or silently abandoned:
+
+- Deployed a new `pgbouncer-staging` service (`edoburu/pgbouncer` image,
+  transaction pooling mode) in front of staging's Postgres.
+- **First attempt broke staging outright**: PgBouncer's default
+  `auth_type=md5` didn't match Postgres 18's actual `scram-sha-256`
+  authentication — the backend crashed with `wrong password type` on every
+  connection attempt. Diagnosed from the crash log, not guessed. Reverted
+  the backend's `DATABASE_URL` to the direct Postgres connection immediately
+  to restore staging (a brief real outage, not "instant" — the interval
+  between the crashed redeploy and the reverted redeploy taking effect).
+- **Second attempt fixed the auth mismatch** (`AUTH_TYPE=scram-sha-256`) and
+  worked: the backend connected through PgBouncer successfully, health
+  checks passed, and `GUNICORN_WORKERS`/`DB_POOL_SIZE`/`DB_POOL_MAX_OVERFLOW`
+  were safely raised back to the originally-attempted values (12/16/8) since
+  the pooler, not raw Postgres, now absorbs the connection fan-out.
+- **A fresh validation load test found a new bottleneck**: PgBouncer's own
+  `DEFAULT_POOL_SIZE=25` (the number of *real* Postgres connections it
+  maintains) was itself too small — PgBouncer's own stats line showed an
+  average client wait time of **15.8 seconds** per transaction once
+  concurrent demand exceeded the pool. This is architecturally the same
+  class of problem as the original finding, just moved one layer down the
+  stack, not eliminated by adding a pooler on its own.
+- Raised `DEFAULT_POOL_SIZE` to 70 (comfortable headroom under Postgres's
+  100-connection ceiling) and re-ran validation. **Materially better but
+  still not clean**: wait time dropped from 15.8s to as low as 0.17-0.6s in
+  good windows, and one window showed 92.6% success (498/538) — but the
+  pattern still oscillated into full-timeout windows at a lower concurrency
+  (~48 active) than hoped, not yet a clean pass through the levels the
+  original 72-connection baseline already proved.
+- **Decision: stopped iterating rather than continue live-tuning against a
+  shared environment under time pressure.** Three real incidents in
+  succession (an auth-mismatch crash, a credential-exposure near-miss during
+  diagnosis, and two rounds of incomplete pool-sizing) is a signal to pause
+  and resume with more care in a dedicated session, not to keep pushing.
+  Reverted the backend fully to the known-safe original configuration
+  (direct Postgres connection, `GUNICORN_WORKERS=6`, `DB_POOL_SIZE=8`,
+  `DB_POOL_MAX_OVERFLOW=4`) and confirmed staging healthy. The
+  `pgbouncer-staging` service was left deployed (idle, not wired into the
+  live connection path) so this work is resumable rather than lost.
+- **A credential-handling near-miss during this investigation**: an
+  attempted database connectivity test hit a shell quoting/escaping bug that
+  echoed the staging Postgres password into a tool error message within
+  this session. Flagged to the user immediately; they instructed to
+  continue without a rotation. Recorded here for completeness since it's a
+  real process finding, not swept aside.
+- **Revised disposition**: still open, still P2. GAP-29's original diagnosis
+  (Postgres `max_connections` is the real ceiling) remains correct. Pooling
+  is confirmed as the right architectural direction — it demonstrably
+  removed the original "too many clients already" hard failure mode — but
+  correctly sizing a pooler in front of a real workload needs iterative,
+  unhurried tuning (pool size, min/reserve pool settings, possibly
+  session-vs-transaction mode reconsideration for specific query patterns)
+  that this pass did not have the safe runway to complete. Recommended
+  follow-up: resume this work in a dedicated session with no other
+  concurrent release pressure, retain the existing `pgbouncer-staging`
+  service as the starting point, and validate incrementally (raise one
+  parameter, re-test, confirm stable, then raise the next) rather than
+  jumping to a large configuration change and validating with a single full
+  load-sequence run.
+
 ### Section 4 classification: CONDITIONAL PASS
 
 Per the instruction's own Section 5 criteria: server remained healthy (0 5xx)
