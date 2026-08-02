@@ -11,9 +11,9 @@ P3-Minor scheme. Full detail for each lives in
 |---|---|---|
 | GAP-18 | Production backup targeted the wrong physical database (SEV1) | **Fixed, proven live** (fresh backup+restore cycle matches production's real data) |
 | GAP-24 | Stored XSS, multiple injection points, connected-frontend | **Fixed, proven live** (before/after browser reproduction, CSP checked and doesn't mitigate) |
-| GAP-26 | Backend Dockerfile's unpinned postgresql-client (same class as GAP-16, different code path) | **Fixed by analogy to a proven pattern; not Docker-build-verified (no Docker in this environment)** |
+| GAP-26 | Backend Dockerfile's unpinned postgresql-client (same class as GAP-16, different code path) | **Fixed, build-verified** (real Railway Docker build succeeded deploying to staging, closing the earlier "not locally build-verified" caveat) |
 
-Zero P0/P1 findings remain open. GAP-26 carries one explicit caveat (below).
+Zero P0/P1 findings remain open. All three fully verified, including a real deploy.
 
 ## P2 — significant, fixed
 
@@ -49,8 +49,9 @@ Zero P0/P1 findings remain open. GAP-26 carries one explicit caveat (below).
 - **GAP-18**: live backup+restore cycle with real data matching production.
 - **GAP-22**: new regression test, full suite green.
 - **GAP-26**: reasoned from Debian package-archive evidence and an already-proven
-  identical fix elsewhere in this repo; **explicitly not build-verified** — flagged
-  as the one open verification gap among all fixes this pass.
+  identical fix elsewhere in this repo, then **confirmed by a real Railway Docker
+  build succeeding and deploying to staging** — no longer just reasoned, actually
+  built.
 
 ## Commits on this branch (chronological, `release/final-assurance-2026-08-01`)
 
@@ -59,15 +60,48 @@ documenting evidence as work progressed — see `git log release/final-assurance
 for the full sequence. No squashing performed; the commit history itself is part of
 the audit trail.
 
+## Staging redeploy and live re-verification (done this pass, with explicit user approval)
+
+Deployed both changed services to staging from this branch:
+
+- **Backend** (`deb53faa-…`): deployment `b9cd65da-…` → **SUCCESS**. This is the
+  first real Docker build of GAP-26's Dockerfile fix (`postgresql-client-18` via
+  the PGDG repo) — **closes that fix's one open verification gap**; it builds and
+  deploys cleanly, not just "reasoned to work."
+- **Main TMS frontend / connected-frontend** (`2b5e6359-…`): deployment
+  `fa32adfc-…` → **SUCCESS**.
+
+Live re-verification against the deployed staging services:
+
+- `GET /api/health/ready` → `{"status":"ready","squadrons":140}`; frontend → 200.
+- `smoke_test.py` against staging: **19/25 passed, 1 pre-existing failure**
+  (`system_admin` login — already documented in GAP-09 as a pre-existing staging
+  credential issue affecting only that one role, unrelated to and unchanged by
+  this pass's fixes; not a new regression).
+- `security_scope_test.py` against staging: **23/25 passed, 2 failures**, both
+  explained rather than dismissed: the same pre-existing `system_admin` credential
+  issue, and one rate-limit-trip test that needs more attempts in a single run to
+  trigger (rate limiting itself independently verified working repeatedly this
+  session — Stage 9's local 31/31 pass, plus abundant real `429`s observed during
+  both Stage 10 load tests against this same staging backend minutes earlier).
+- **GAP-24 (XSS fix) confirmed live on the deployed asset**: fetched staging's real
+  served `index.html` directly, confirmed `_jsAttr(u.display_name` and the
+  `aria-label="Filter curriculum…"` fixes are both present in what's actually
+  being served, not just in the source tree.
+- **GAP-22 (curriculum CSV fix) confirmed live**: a non-destructive preview-mode
+  CSV import against the live staging backend, using the same payload shape as the
+  regression test, returns 200 with the item accepted — the deployed backend is
+  running the fixed code path.
+
 ## What remains before this branch could be considered for merge/deploy
 
-1. **GAP-26 needs a real Docker build** to fully close (currently reasoned, not built).
-2. **A genuinely distributed (multi-IP) load test** was never run in this program —
+1. **A genuinely distributed (multi-IP) load test** was never run in this program —
    inherited gap, not new, but real.
-3. **A full manual DR drill** (human following `deployment/backup-dr.md`'s restore
+2. **A full manual DR drill** (human following `deployment/backup-dr.md`'s restore
    steps by hand) has not been performed — only the automated workflow has run.
-4. The P3 items above are open by deliberate choice, not oversight — each has a
+3. The P3 items above are open by deliberate choice, not oversight — each has a
    documented reason.
-5. Per this engagement's own non-negotiable boundary: **production deployment and
+4. Per this engagement's own non-negotiable boundary: **production deployment and
    merging this branch to `main` remain gated behind separate, explicit
-   authorisation** — nothing above changes that.
+   authorisation** — nothing above changes that. Staging now runs this branch's
+   fixes (deployed and re-verified this pass); production does not yet.
