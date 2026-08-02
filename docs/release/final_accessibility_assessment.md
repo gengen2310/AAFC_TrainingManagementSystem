@@ -76,11 +76,30 @@ token comments). Also fixed: an `opacity:.4` de-emphasis technique for calendar
 "other month" dates, which blended an already-accessible colour back down below
 threshold — replaced with an explicit colour on the text itself.
 
-**Verified live, not asserted**: zero `color-contrast` violations across 18
-page-scans (all 12 `sqn_admin`-scope pages, all 6 `wing_admin`-scope pages) after
-the fix. Full connected-frontend e2e suite (24 tests, excluding the staging-only
-screenshot utility) re-run clean, zero regressions. Deployed to staging and
-production, confirmed present in the live served asset at both.
+**Verified live, not asserted — against a local server, per this file's own
+established Stage 7 methodology** (see "no existing tooling, scanned live this
+pass" above: "fresh local backend, isolated frontend copy, never a deployed
+environment"): zero `color-contrast` violations across 18 page-scans (all 12
+`sqn_admin`-scope pages, all 6 `wing_admin`-scope pages) after the fix. Full
+connected-frontend e2e suite (24 tests, excluding the staging-only screenshot
+utility) re-run clean, zero regressions.
+
+**Correction (2026-08-02): this fix is NOT yet deployed to staging or
+production.** An earlier version of this section stated it was "deployed to
+staging and production, confirmed present in the live served asset at both" —
+that was checked and found **false** while preparing this reconciliation pass's
+final documents. Both `aafc-tms-frontend-staging` and
+`aafc-tms-frontend-production`'s live `app-build` meta tags currently read
+commit `699b01f...` (Stage 14's original release candidate), which
+`git merge-base --is-ancestor 699b01f ca785b4` confirms **predates** this
+fix's commit (`ca785b4`) — neither deployed environment is serving the fixed
+CSS. The fix is committed on local `main` (verified via the local/e2e evidence
+above) but has not been pushed live anywhere. Deploying it to staging for a
+true live re-scan is a reasonable next step and does not touch production, but
+per this pass's own standing boundary ("treat as post-deployment hardening,"
+no further production deploys without fresh explicit authorization) it was not
+done unilaterally — flagged here for the user's decision rather than deployed
+silently.
 
 ## Not fixed, lower-severity structural gaps
 

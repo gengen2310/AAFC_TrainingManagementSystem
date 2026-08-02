@@ -13,9 +13,17 @@ investigated to closure and are no longer open (marked accordingly).
 **Was reconsidered rather than left at a design-decision P3.** Investigated
 further, computed exact WCAG-AA-compliant replacement values against every real
 background the failing colours appear on, and **fixed** — contextual accessible
-tokens introduced, brand palette itself untouched. Re-scanned live: zero
+tokens introduced, brand palette itself untouched. Re-scanned (local server, per
+this repo's established Stage 7 methodology for `connected-frontend`): zero
 color-contrast violations across 18 page-scans (12 `sqn_admin`-scope, 6
-`wing_admin`-scope pages). **No longer an open finding.**
+`wing_admin`-scope pages). **Code-level finding closed; deployment status
+corrected below — this fix is NOT yet live on staging or production**, see
+`final_accessibility_assessment.md`'s 2026-08-02 correction. An earlier version
+of that document incorrectly claimed it was deployed and confirmed live at
+both; that was checked and found false while preparing this pass's final
+documents (`app-build` fingerprints on both deployed connected-frontend
+services still read commit `699b01f`, which precedes the fix commit
+`ca785b4`).
 
 ### React hook dependency warnings (were: unexamined "worth a closer look")
 
@@ -178,7 +186,7 @@ color-contrast violations across 18 page-scans (12 `sqn_admin`-scope, 6
 
 | Finding | Prior status | This pass | Final severity |
 |---|---|---|---|
-| Colour-contrast failures | Serious, undetermined | Investigated, fixed | Closed |
+| Colour-contrast failures | Serious, undetermined | Investigated, fixed in code | Closed (code); **not yet deployed to staging/production** |
 | React hook warnings | Unexamined | Investigated, confirmed non-issues | Closed |
 | Staging system_admin auth | Open | Re-affirmed with full disclosure | P2, open, blocked on user |
 | 1,000-user capacity (GAP-28) | New this pass | Reasoned from real evidence | P2, open, disclosed |
