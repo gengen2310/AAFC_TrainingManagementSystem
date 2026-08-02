@@ -163,8 +163,27 @@ snapshot every 15 minutes for 4 hours against the exact current release
 candidate (staging is running commit `699b01f`, confirmed via the `app-build`
 fingerprint fixed earlier in this reconciliation pass).
 
-*(Results appended below once the soak completes — dispatched
-2026-08-02T07:15:54Z, expected completion ~2026-08-02T11:16Z.)*
+**First dispatch (2026-08-02T07:15:54Z) was stopped after 15 minutes and
+re-run — investigated, not silently discarded.** The tool spawned all 150
+persistent users' initial logins via a single `asyncio.gather` with no
+stagger. The first 15-minute report showed only 10/150 users reaching
+active state and 143 client-side timeouts. Cross-checked against Railway
+server-side metrics for the identical window before concluding anything:
+0 5xx errors, 0.0% error rate, p50 28ms, p99 149ms, CPU/memory nowhere near
+limits — the same client-vs-server disagreement pattern already diagnosed
+once this pass (`GAP-28`'s first, buggy async-tool run), this time in a
+different tool. Root cause: 150 simultaneous TLS handshakes + password-hash
+logins from one process competing for local resources at the same instant,
+not a backend problem. Fix: ported the already-proven jittered-ramp stagger
+from `load_test_staging_async.py` into `soak_test_staging.py`
+(`--ramp-seconds 90`, default). Validated at full 150-user scale for ~2
+minutes post-fix: 111/150 active users, 0 timeouts, 0 5xx (the remaining
+39 were real `auth_failed`/`throttled` outcomes from the shared LV-prefixed
+account pool's residual state after today's earlier load tests, not a
+ramp-related artifact). Re-dispatched the full 4-hour soak
+2026-08-02T07:38:18Z, expected completion ~2026-08-02T11:38Z.
+
+*(Results appended below once the soak completes.)*
 
 **Recommendation for the final release-candidate report**: performance is
 release-ready **at proven concurrency (up to 300 users)**, with 1,000-concurrent-
