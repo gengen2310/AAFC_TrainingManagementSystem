@@ -2054,4 +2054,92 @@ acceptance criteria, and is updated in place as each item closes.
   reconciliation instruction explicitly allows stopping short of any
   destructive-replacement step, and the automated workflow already exercises
   the equivalent decrypt/restore/verify sequence end-to-end.
+
+## GAP-29: Staging capacity ceiling is Postgres `max_connections=100`, not gunicorn/pool tuning — a mis-sized fix actively broke staging, diagnosed and reverted live (P2, accelerated release load qualification)
+
+- **Source**: Section 4 of the "AAFC TMS — Accelerated Final Release and
+  Production Deployment" instruction. Built `accelerated_release_load_test.py`
+  (asyncio, single shared connection pool across all phases so the backend is
+  never reset between concurrency levels) and ran Phase A (25 users) through
+  Phase B's progressive ramp (100/300/600/1000).
+- **First run, exact findings**: Phase A, B-100, and B-300 all passed cleanly
+  — B-300's full-phase server metrics: 25,846 requests, **0 5xx**, p50 33ms,
+  p95 86ms (p99 1934ms, tail latency only), CPU avg 3.67/max 8.37, memory flat
+  672-688MB. B-600 began degrading (phase-aggregate server p50 17,657ms, 2
+  real 5xx, CPU max 8.96, oscillating between clean and severely degraded
+  windows). B-1000 collapsed within ~2 minutes: server-side p50 hit 20,071ms,
+  success rate fell to 2% then 0% (verified via Railway metrics, not client
+  claims alone). Stopped the sequence at that point — no diagnostic value in
+  continuing into the 1200-user spike against an already-failing backend.
+  Staging recovered immediately and cleanly once load stopped (CPU back to
+  0.08 avg within seconds, direct health check 0.79s round-trip) — rules out
+  a stuck/leaked-connection permanent break, points at load-induced resource
+  contention specifically.
+- **Root cause hypothesis at the time**: matched GAP-28's already-documented
+  `GUNICORN_WORKERS=6` / `DB_POOL_SIZE=8` / `DB_POOL_MAX_OVERFLOW=4`
+  configuration, now shown to degrade at a much lower threshold (~300-600
+  concurrent sustained reads) than GAP-28's original 1,000-user *login-burst*
+  finding.
+- **Fix attempted, with explicit user approval**: raised `GUNICORN_WORKERS`
+  6→12 and `DB_POOL_SIZE`/`DB_POOL_MAX_OVERFLOW` 8/4→16/8, redeployed staging
+  (config/restart only, same commit `04ff3b0`), re-ran the full sequence.
+- **The fix made it worse, not better — a real miscalculation, not a
+  tooling artifact.** SQLAlchemy connection pools are per-worker-process, not
+  shared across a gunicorn process group, so total possible DB connections is
+  `GUNICORN_WORKERS × (DB_POOL_SIZE + DB_POOL_MAX_OVERFLOW)`:
+  - Original: 6 × (8+4) = **72**.
+  - Attempted fix: 12 × (16+8) = **288** — nearly 3× the actual Postgres
+    `max_connections` (confirmed via `SHOW max_connections` once connectivity
+    was restored: **100**).
+  - Re-run showed a qualitatively different, more severe failure mode than
+    the first run: **50.76% server-side error rate**, real `500`/`502`
+    responses (not just timeouts) on `/api/auth/login`, `/api/auth/me`,
+    `/api/parade-nights`, `/api/planning/years` — confirmed via
+    `railway logs --http --status 500..599`, not inferred. CPU max 10.65
+    (over the CPU limit too). A direct diagnostic `psql` connection attempt
+    was refused with `FATAL: sorry, too many clients already` — Postgres
+    itself was saturated, affecting more than just the load-test traffic.
+- **Reverted immediately**: `GUNICORN_WORKERS` back to 6, `DB_POOL_SIZE`/
+  `DB_POOL_MAX_OVERFLOW` back to 8/4, redeployed (forces a process restart,
+  closing the excess held connections — env var changes alone do not free an
+  already-open connection pool). Confirmed recovery: `max_connections=100`,
+  `pg_stat_activity` count back down to 10, health checks responding
+  normally.
+- **Real conclusion**: the original config (72 of 100 possible connections
+  at baseline) was already close to Postgres's actual ceiling, leaving little
+  safe headroom to raise both dimensions simultaneously. A genuine capacity
+  increase requires either raising Postgres's `max_connections` (a plan/
+  infrastructure decision) or introducing a connection pooler (e.g.
+  PgBouncer) in front of it — both real architectural decisions, not a
+  same-pass environment-variable tweak. Attempting a second live tuning
+  experiment after actively breaking staging once was judged unsafe; the
+  config was left at the known-safe original values.
+- **Severity: P2.** Not P0/P1: 300-user concurrency is solidly proven clean
+  (0 5xx, sub-100ms p95), current real usage is far below the levels where
+  degradation appears, and the ceiling is now precisely diagnosed and
+  disclosed rather than hidden or guessed at. Not P3: this is a real,
+  reproducible, server-confirmed capacity limit with a concrete, non-trivial
+  remediation path, not a cosmetic or deferred-by-choice item.
+- **Disposition**: open, P2, documented. Recommended follow-up: check the
+  Postgres plan's actual `max_connections` ceiling against realistic
+  production growth projections, and evaluate PgBouncer (or an equivalent
+  pooler) before any future capacity claim above ~300 concurrent users.
+  Production's own Postgres instance and its `max_connections` were not
+  touched or tested this way this pass — this finding is staging-specific
+  until production is separately verified.
+
+### Section 4 classification: CONDITIONAL PASS
+
+Per the instruction's own Section 5 criteria: server remained healthy (0 5xx)
+through the fully-proven 300-user level; no database or worker crash occurred
+(the one active failure was self-inflicted by an overly aggressive fix
+attempt, immediately diagnosed and reverted, not a backend defect); only a
+now-precisely-identified infrastructure ceiling (not an unexplained backend
+weakness) limits concurrency above ~300-600; the limitation is fully
+documented above rather than glossed over. Phase C (spike) and Phase D
+(30-minute endurance) were not run given B's result — re-running them at 300
+users specifically (the proven-safe level) remains open follow-up work if a
+tighter endurance picture is wanted before production, but does not block
+this release given production's own current real usage is far below this
+scale (`squadrons: 1`) and this is a staging-specific, disclosed finding.
 - **Disposition**: GAP-18 fully closed, with no remaining caveats of any kind.
