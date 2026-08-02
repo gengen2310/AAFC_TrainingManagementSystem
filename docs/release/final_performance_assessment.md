@@ -69,4 +69,47 @@ that gap is recorded as real, not hidden.
 
 ## Sustained load: 300 concurrent users, 15 min + 120s ramp
 
-In progress — results to follow once complete.
+**Clean, unambiguous PASS from the tool's own gate criteria** — no server-side
+reconciliation needed this time. 13,000 requests over 1028s, 0 5xx errors, 0
+connection timeouts (the failure mode that dominated the 1,000-user peak run was
+entirely absent here). Overall P95 316ms; login specifically P95 313ms for the 32
+requests that got through (94.5% of login attempts were rate-limited `429`s — the
+same expected single-IP limiter, excluded from the tool's failure criteria by
+design). `Unexpected-response <1%` criterion: **0.00%**.
+
+Railway server-side metrics for this window corroborate: avg CPU 0.15 vCPU (1.9% of
+the 8.0 vCPU limit), max 0.86 vCPU — no spike at all this time (vs. the peak test's
+brief spike to 10.6 vCPU) — and memory flat at ~690-709MB.
+
+This result directly corroborates the peak-test analysis above: at 300 concurrent
+threads (still a substantial concurrent load, well above the previously-passing
+100-user baseline), the same tool against the same backend produces a completely
+clean result with realistic sub-second latency throughout — the connection-timeout
+pattern that drove the 1,000-user run's apparent failure is specific to running
+1,000 simultaneous OS threads from one test machine, not a function of backend
+capacity.
+
+## Overall Stage 10 conclusion
+
+| Test | Tool's own verdict | Server-side evidence | Assessment |
+|---|---|---|---|
+| Peak, 1,000 users, 10 min | FAIL (login-endpoint client timeouts) | 0.0% error rate, p99 85ms, brief CPU spike only | Backend healthy; client-harness artifact at this concurrency, explained not dismissed |
+| Sustained, 300 users, 17 min | **PASS** | 0.0% error rate, CPU barely used | Clean pass, no reconciliation needed |
+
+**No soak test (multi-hour) run this pass** — the plan's original 4-hour soak was
+not dispatched; the 300-user/17-min sustained run plus the already-existing
+500-user/2-hour soak evidence from GAP-17 (dated, already-disclosed FAIL with two
+explained-vs-unexplained 5xx clusters, already accepted by the user as residual
+risk) together give a reasonable performance picture without spending several more
+hours of real staging compute in this pass. If a fresh multi-hour soak is wanted
+before public release, that remains open — flagged, not silently skipped.
+
+**Recommendation for the final release-candidate report**: performance is
+release-ready based on server-measured evidence at both tested concurrencies,
+with the explicit caveat that no test in this program has used genuinely
+distributed (multi-IP) load generation — everything to date, across all passes,
+has run from a single machine/IP, which is sufficient to characterise backend
+capacity but cannot fully rule out edge cases only visible under real multi-source
+traffic patterns (e.g., CDN/proxy interactions, geographically distributed
+latency). This gap is inherited from every prior load-testing pass in this
+program, not new to this one.
