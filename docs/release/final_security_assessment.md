@@ -72,12 +72,37 @@ window (`api_rate_limit` middleware, `main.py`), with OPTIONS/health/login
 correctly exempted from the general limiter to avoid double-counting (a real fix
 already recorded in this file's own comments, not new this pass).
 
+## Privacy / PII handling
+
+Cadet records are the most sensitive data category in the system (minors' welfare
+data — `service_number`, name, attendance, and `support_notes`). Reviewed
+`GET /api/cadets` and `GET /api/cadets/risk` directly:
+
+- Both correctly deny `sqn_general` (the lowest-privilege read-only role) entirely
+  — no cadet data reachable at all for that role.
+- Both scope via the same server-resolved `_active_squadron(p)` pattern verified
+  safe in Stage 4/8 (never client-suppliable).
+- `support_notes` — explicitly commented in the source as "sensitive" — is only
+  included in the response for admin-tier roles (`sqn_admin`/`wing_admin`/
+  `national_admin`/`system_admin`); `wing_viewer`/`national_viewer`/`auditor` see
+  basic roster fields but not welfare notes.
+- **Reads of sensitive welfare data are explicitly audited** (`action:
+  "view_sensitive"`) — a deliberate, narrow exception to this codebase's general
+  "don't audit reads" policy specifically for the most sensitive data category.
+  This is good practice found already in place, not something this pass added.
+- No bulk CSV/XLSX export of Cadet PII exists anywhere in the API (checked
+  `export_import.py`/`ops.py`/the background export dispatcher) — the only
+  Cadet-adjacent string in any export path is a disclaimer sentence, not real
+  data. Smaller attack surface than a system with bulk cadet export would have;
+  noted as a product-capability gap if squadrons need this, not a security issue.
+
+No privacy defect found in this pass.
+
 ## Not yet done in this pass (remaining Stage 9 work)
 
 - Full OWASP Top 10 structured pass using the `security-guidance` skill (only an
   ad hoc subset covered so far: injection, XSS, secrets, fail-closed config).
 - `42crunch-api-security-testing` live OpenAPI/BOLA/BFLA conformance scan against
   staging — not yet dispatched.
-- Privacy/PII handling review (Part 23 of the original instruction) — not started.
 - CORS preflight behavior and header allowlist verified only by reading config,
   not by a live cross-origin request test.
