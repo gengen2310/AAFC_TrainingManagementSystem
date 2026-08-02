@@ -1,5 +1,19 @@
 # Final Findings Classification (Stage 13)
 
+**Superseded in part — see `docs/release/final_findings_reclassification.md` for
+the current, authoritative open-findings list.** This document is a snapshot from
+before `release/final-assurance-2026-08-01` was merged to `main` and deployed to
+production (that merge and deploy have since happened, with user authorisation,
+followed by a post-deployment hardening reconciliation pass). Everything below
+that describes P0/P1/P2 findings **fixed and verified in this document** remains
+accurate — those fixes shipped to production and are not revisited here. Section
+"What remains before this branch could be considered for merge/deploy" at the
+bottom is **stale** (the branch has since merged and deployed) and is kept only
+as a historical record of what was still open at Stage 13 — do not treat it as
+current status. For the current open-findings list (staging system_admin auth,
+GAP-28 capacity, and the re-affirmed P3s), use
+`final_findings_reclassification.md`.
+
 All findings from this engagement (`release/final-assurance-2026-08-01`), classified
 per the instruction's own P0-Critical / P1-Release-Blocker / P2-Significant /
 P3-Minor scheme. Full detail for each lives in
@@ -93,7 +107,7 @@ Live re-verification against the deployed staging services:
   regression test, returns 200 with the item accepted — the deployed backend is
   running the fixed code path.
 
-## What remains before this branch could be considered for merge/deploy
+## What remains before this branch could be considered for merge/deploy (stale — historical only, see banner above)
 
 1. **A genuinely distributed (multi-IP) load test** was never run in this program —
    inherited gap, not new, but real.

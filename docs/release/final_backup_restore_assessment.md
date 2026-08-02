@@ -12,12 +12,21 @@ without re-reading the full gap register.
   independently-known live state. Full detail: gap register, GAP-18.
 - Staging's backup independently re-verified to already target the correct
   database (a misleadingly-named secret, not a functional defect).
-- The one remaining restore-test failure (`Migration HEAD mismatch`) was
-  root-caused precisely to `origin/main` being 14 commits behind local at dispatch
-  time — a stale-comparison artifact, not a real defect, and resolves itself once
-  this branch is pushed/merged.
+- **Updated 2026-08-02 (post-deployment reconciliation): the earlier `Migration
+  HEAD mismatch` caveat is now fully resolved, not just explained.** A fresh
+  restore-test dispatch against current `main` (fully pushed, containing the
+  complete migration set) came back with **zero caveats — all 15 checks pass**,
+  expected head `z1a2b3c4d5e6` exactly matching the restored database's actual
+  head. Confirms the earlier hypothesis (stale `origin/main` at dispatch time)
+  was correct.
+- **New evidence layer, this pass**: beyond the SQL-level checks, the workflow
+  (already built this way, not new this pass) creates a throwaway admin, starts
+  a real backend against the restored database, and drives 8 authenticated API
+  reads through it — all 8 pass. This is genuine application-level proof a
+  restored backup produces a fully functional, API-servable application, not
+  merely a SQL dump that restores without error.
 
-## In-container manual backup path (GAP-26, new finding this pass)
+## In-container manual backup path (GAP-26)
 
 - `backend/Dockerfile`'s `postgresql-client` was unpinned, resolving to a version
   (15 or 17 depending on the base image's floating Debian codename) older than
@@ -26,9 +35,10 @@ without re-reading the full gap register.
   Console "Download PostgreSQL Backup" button) that GAP-16/18's fix never touched
   because it was scoped to the GitHub Actions workflow only.
 - Fixed by mirroring the already-proven PGDG-repo pattern from
-  `backup-postgresql.yml`. **Not verified by an actual Docker build** — no Docker
-  available in this environment. Flagged explicitly as needing a real build
-  before full closure.
+  `backup-postgresql.yml`. **Updated: now build-verified, not just reasoned.** A
+  real Railway Docker build of this Dockerfile succeeded and deployed to staging
+  during Stage 13 — the earlier "not verified by an actual Docker build" gap is
+  closed.
 
 ## Documentation reconciliation
 
@@ -41,22 +51,29 @@ the secret-location guidance now points to Railway's `DATABASE_PUBLIC_URL` patte
 and the Render/Supabase references in the "what backup does not cover" section were
 updated to reflect the actual current (Railway) deployment.
 
-## Restore procedure — proven for the automated path, not yet drilled manually end-to-end
+## Restore procedure — proven for the automated path, plus an operator DR walkthrough this pass; still not literally hand-run
 
 The automated restore-test workflow (`test-restore-postgresql.yml`) has now been
-run fresh and passed (data checks) this pass. A **full manual disaster-recovery
-drill** — an operator following `deployment/backup-dr.md`'s own "Restore procedure"
-section by hand, from a downloaded artifact, against a real disposable target — was
-not performed this pass. The automated workflow exercises materially the same
-steps (decrypt, `pg_restore`, verify), so this is lower-risk than it would be
-otherwise, but a literal human dry-run of the documented manual steps is still
-recommended before calling backup/DR fully proven end-to-end.
+run fresh and passed cleanly, zero caveats (see above). This pass additionally
+performed an **operator DR walkthrough**: every artefact `deployment/backup-dr.md`
+tells an operator to rely on was independently confirmed to exist and match the
+doc exactly — `.github/backup-public-key.asc` (a real key, not a placeholder),
+all 4 backup/restore workflow files, `backend/scripts/compute_alembic_head.py`,
+and all 4 required GitHub secrets
+(`BACKUP_GPG_PASSPHRASE`, `BACKUP_GPG_PRIVATE_KEY`, `PROD_DATABASE_BACKUP_URL`,
+`SUPABASE_DB_URL`). **What this walkthrough did not do**: actually generate a new
+GPG keypair or run `pg_restore` by hand from a downloaded artifact — a literal
+human dry-run of the documented manual steps, keystroke by keystroke, remains
+un-run. The automated workflow exercises materially the same decrypt/restore/
+verify sequence end-to-end (including, now, live application-level verification —
+see above), which meaningfully de-risks this gap without fully closing it.
 
 ## Still open / not covered this pass
 
 - Whether Railway's native Postgres plugin offers point-in-time recovery on the
   current plan — not confirmed either way (previously assumed Supabase PITR,
   which is now known to be the wrong product entirely).
-- A full manual DR drill (see above).
+- A literal, hand-run manual DR drill (artefacts confirmed present and correct
+  this pass; the steps themselves were not manually executed — see above).
 - Key rotation procedure (`deployment/backup-dr.md`'s own documented steps) has
   not been exercised this pass — no rotation was due.

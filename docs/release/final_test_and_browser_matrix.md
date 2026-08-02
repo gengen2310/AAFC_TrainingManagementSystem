@@ -70,3 +70,40 @@ stage).
 
 No test-suite defect found. One local-environment configuration gap identified,
 diagnosed, and fixed in this pass's own test setup (not the application).
+
+---
+
+## Post-deployment reconciliation update (2026-08-02)
+
+Re-run against current `main` (`55678c7`, migration head `z1a2b3c4d5e6`, single
+linear head confirmed via `alembic heads`) after this pass's fixes (accessible
+color-contrast tokens, GAP-28 async load-test tooling, soak-test ramp fix):
+
+| Suite | Result | Change from Stage 11 baseline |
+|---|---|---|
+| Backend (`pytest`) | **1008 passed, 5 skipped** | Unchanged — no regressions |
+| `frontend` TypeScript (`tsc --noEmit`) | **0 errors** | Unchanged |
+| `frontend` ESLint | **0 errors, 16 warnings** | Unchanged — the 2 hook-dependency warnings among them were investigated to a definitive non-bug conclusion this pass (see `final_findings_reclassification.md`); the rest are pre-existing `react-refresh/only-export-components` style warnings and one unused-variable warning, none release-relevant |
+| `connected-frontend` accessibility (axe-core, live) | **0 `color-contrast` violations** across 18 page-scans (12 `sqn_admin`-scope, 6 `wing_admin`-scope), re-scanned after the token fix | **Improved** — was 40-43 nodes/page failing before this pass; full detail in `final_accessibility_assessment.md` |
+| `connected-frontend` e2e (`e2e-connected/`, excluding the staging-only screenshot utility) | **24/24 passed**, re-run after the color-contrast fix | Unchanged pass rate, confirms zero functional regression from the CSS token changes |
+| Migration state | Single head `z1a2b3c4d5e6`, `alembic upgrade head` clean against a disposable Postgres (GAP-18 re-verification) | Unchanged |
+
+**Staging role/scope qualification matrix — honest scope, not exhaustive.**
+Attempted live-browser verification of staging behaviour across every named
+role. Two role scopes were fully verified this pass with live evidence
+(18 page-scans across `sqn_admin` and `wing_admin`, cited above). A
+`national_admin` browser login attempt became unresponsive mid-flow during
+cross-role verification (tab stopped responding after several rapid logins in
+the same session, likely cumulative rate-limiting) — not forced through with
+repeated retries, since the tab instability risked losing already-good
+evidence for no clear gain. `system_admin` staging verification remains
+blocked entirely on the separate, already-tracked credential issue (see
+"Staging System Administrator authentication" in
+`final_findings_reclassification.md`, Task #45 — awaiting the user's current
+access code). **This is reported as the actual scope of what was verified —
+2 of 4 non-`auditor` staging role scopes with live browser evidence — not
+claimed as exhaustive role coverage.** Production's own equivalent surfaces
+were separately verified live in production during this session's earlier
+GAP-27 fix (which required and used a working production login flow across
+multiple roles), so this gap is staging-verification-specific, not a
+production-readiness gap.
