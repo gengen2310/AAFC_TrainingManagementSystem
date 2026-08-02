@@ -108,10 +108,14 @@ session during the GAP-27 fix.
 
 ## First-hour monitoring result
 
-*(Appended once the monitoring window completes — dispatched
-2026-08-02T15:06:04Z, 8 checkpoints over 60 minutes: every 5 minutes for the
-first 30, then every 15 minutes through 60. See
-`docs/release/final_first_hour_monitoring.md` once complete.)*
+**PASS — all 9 checkpoints clean.** Monitored 2026-08-02T15:06:04Z through
+16:06:50Z (every 5 minutes for the first 30 minutes, then every 15 minutes
+through 60). Zero 5xx at every checkpoint, zero unexpected 4xx/login
+failures/429s (the single 4xx at T+0 was this session's own expected
+pre-auth smoke-test probe), latency consistently sub-120ms, CPU flat at
+~0.0 (idle), memory flat 169-183MB with no growth trend. No rollback/
+forward-fix trigger criteria were met at any point. Full detail:
+`docs/release/final_first_hour_monitoring.md`.
 
 ## Outstanding limitations
 
