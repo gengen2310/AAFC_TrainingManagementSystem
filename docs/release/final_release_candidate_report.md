@@ -210,4 +210,156 @@ explicit decision for the user to make.
 
 ---
 
-**READY FOR PUBLIC RELEASE — AWAITING AUTHORISATION**
+**Historical verdict, as it stood at the end of Stage 14, before merge/deploy:
+READY FOR PUBLIC RELEASE — AWAITING AUTHORISATION.**
+
+The user then explicitly authorised: *"Merge to main and deploy to
+production."* That merge and production deployment happened. Production has
+been live since. §16 below covers everything found and done after that point.
+
+---
+
+## 16. Post-deployment reconciliation pass (2026-08-02)
+
+After production deployment, the user issued a further instruction (the
+"AAFC TMS — Final Pre-Production Reconciliation" instruction) whose premise —
+that production had not yet been deployed — was checked against concrete
+evidence (git SHAs, live deployment IDs) and found stale. The user's explicit
+response: *"Yes, treat it as post-deployment hardening."* Everything in this
+section operates under that reframing: the same rigor, applied to
+already-shipped code, with the same standing boundary that any **further**
+production deploy or `main` push requires a fresh, separate authorisation.
+
+### Exact current identifiers
+
+| | Value |
+|---|---|
+| Production backend deployment | `9c183e03-3e2b-4b83-a7bf-a970acb98a56` (SUCCESS) |
+| Production `connected-frontend` deployment | `4166d3ef-2d0d-40b0-8c79-da0c257864bb` (SUCCESS) |
+| Production/staging `connected-frontend` `app-build` fingerprint | `699b01f` (both — verified live, both identical) |
+| Migration head | `z1a2b3c4d5e6`, single linear head |
+| Local `main` HEAD | `e7a7f24`, **9 commits ahead of `origin/main`, 0 behind — not yet pushed** |
+| Backend test suite (current `main`) | 1008 passed, 5 skipped — unchanged, zero regressions |
+
+Full detail: `final_operational_readiness.md`.
+
+### What this pass found and did
+
+- **Accessibility (`color-contrast`)**: fixed properly this time, not deferred
+  as a design question — contextual accessible tokens introduced alongside
+  the unchanged AAFC brand palette. Verified via 18 live page-scans (zero
+  violations) and the full local e2e suite (24/24). **Caught and corrected an
+  inaccurate claim in an earlier draft of this documentation** that the fix
+  was already deployed live — it is not; it exists only on local `main`,
+  unpushed and undeployed. Full detail: `final_accessibility_assessment.md`.
+- **Staging System Administrator authentication**: diagnosed without exposing
+  or resetting any credential — the account is healthy; a legitimate prior
+  code rotation (2026-07-30) means the test tooling's recorded code no longer
+  matches. Blocked on the user supplying the current code. Does not affect
+  production, which was separately verified live during this session's
+  earlier GAP-27 fix.
+- **1,000-user performance claim**: the original Stage 10 conclusion was
+  re-examined, found correct-but-incomplete (the threading-based tool never
+  generated genuine 1,000-concurrent load), and honestly amended after
+  building a corrected async tool. Reconciled claim: **300 concurrent users
+  is solidly proven; 1,000 concurrent users is a disclosed capacity
+  limitation on staging's current configuration (GAP-28, P2), not a passed
+  gate.** Full detail: `final_performance_assessment.md`.
+- **Fresh 4-hour soak test**: dispatched against the exact current candidate.
+  First dispatch was investigated and re-run after a client-harness ramp
+  artifact (not a backend issue — confirmed via Railway server-side metrics
+  agreeing with a clean picture, not the client's initial false-alarm
+  timeouts); the corrected run is in progress at the time of this report
+  (started 2026-08-02T07:38:18Z, ~4 hours). **Result to be appended to
+  `final_performance_assessment.md` once complete — not yet available at the
+  time this report was written.**
+- **Backup/recovery**: GAP-18 re-verified with a fully clean restore-test run
+  (zero caveats, resolving the earlier stale-`origin/main` artifact), plus a
+  newly-highlighted application-level verification layer already built into
+  the workflow (8 authenticated API reads against the restored database, all
+  pass). An operator DR walkthrough confirmed every artefact
+  `deployment/backup-dr.md` references genuinely exists and matches — a
+  literal hand-run restore by a human was still not performed. GAP-26
+  (Dockerfile pin) reconfirmed build-verified. Full detail:
+  `final_backup_restore_assessment.md`.
+- **Findings reclassification**: every open finding rigorously re-examined
+  against explicit anti-inflation and anti-deflation criteria, not
+  reflexively re-stamped. Two items (`color-contrast`, the two React
+  hook-dependency ESLint warnings) were investigated to full closure this
+  pass. **Zero P0. Zero P1. Two P2 findings remain open** (staging
+  system_admin auth; GAP-28 capacity), both fully disclosed with severity
+  reasoning, operational effect, owner, and target date. Full detail:
+  `final_findings_reclassification.md`.
+- **Staging qualification matrix**: attempted across every named role;
+  actual verified scope is 2 of 4 non-`auditor` roles with full live-browser
+  evidence (`sqn_admin`, `wing_admin`) — `national_admin` was cut short by
+  browser-tab instability (not forced through), `system_admin` is blocked
+  per above. Reported as the honest scope, not claimed as exhaustive. Full
+  detail: `final_test_and_browser_matrix.md`.
+- **Documentation amended**: `final_accessibility_assessment.md`,
+  `final_performance_assessment.md`, `final_findings_reclassification.md`,
+  `final_findings_classification.md` (marked superseded in part, pointing to
+  the reclassification doc), `final_test_and_browser_matrix.md`,
+  `final_backup_restore_assessment.md`, plus two new documents required by
+  this instruction: `final_operational_readiness.md` and
+  `final_known_limitations.md`.
+
+### What is still open, stated plainly
+
+1. The fresh 4-hour soak test has not finished at the time of writing.
+2. Two P2 findings are open and disclosed (staging system_admin auth,
+   blocked on the user; GAP-28's 1,000-user capacity ceiling, a
+   configuration-tuning item).
+3. One real, verified code fix (accessibility color-contrast) exists on
+   local `main` but is not pushed to `origin/main` and not deployed to
+   staging or production.
+4. A literal hand-run manual DR drill and a genuinely distributed (multi-IP)
+   load test remain un-run — both inherited, disclosed gaps, not new this
+   pass.
+5. All P3-class items from the original Stage 14 report remain open by the
+   same deliberate, individually-documented choices — none reclassified up
+   or down without reason (see `final_findings_reclassification.md`).
+
+None of the above is a P0 or P1 finding, and none of it describes the
+currently-running production deployment as broken — production (`699b01f`)
+has zero open P0/P1 findings against it and remains the same candidate
+Stage 14 already qualified.
+
+### Production deployment order, rollback, and monitoring (for any future deploy of this pass's pending fix)
+
+- **Order**: push the 9 pending commits to `origin/main` → deploy
+  `connected-frontend` (the only service with a code change) to staging
+  first and re-verify live → deploy to production. Backend/database are
+  unchanged; no migration is involved.
+- **Rollback**: `railway rollback` to the current, already-proven-stable
+  production deployment (`9c183e03-…`), or a fresh `railway up` from commit
+  `699b01f`. The change is a static-HTML CSS/token revert only — no data or
+  migration implication either direction.
+- **Required monitoring period**: at least one full soak-equivalent window
+  (a few hours) of `railway metrics` after any such deploy, watching for
+  error-rate or latency drift, matching the discipline this pass's own soak
+  test exercises.
+- **None of the above has been executed.** Per this pass's own standing
+  boundary, no further `main` push or deployment happens without a fresh,
+  separate, explicit authorisation from the user.
+
+### This pass's closing line
+
+Production's current deployment is sound (zero open P0/P1). This pass's own
+new candidate (local `main` HEAD) has one verified fix pending deployment, a
+still-in-progress soak test, and two disclosed P2s — real but not
+release-blocking, and specifically bounded by the proven-vs-unproven
+concurrency split. That combination — nothing blocking, but real disclosed
+limits and one piece of evidence (the soak) not yet in hand — calls for the
+"controlled" form of the release verdict rather than an unconditional one.
+
+---
+
+**READY FOR CONTROLLED PUBLIC RELEASE — AWAITING AUTHORISATION**
+
+**Next recommended production instruction** (not executed, awaiting the
+user's explicit decision): *"Wait for the 4-hour soak test to complete and
+append its results to `final_performance_assessment.md`; if clean, push the
+9 pending commits to `origin/main`, deploy the color-contrast fix to staging
+for a final live re-verification, then deploy to production following the
+order and rollback plan in §16 above."*
