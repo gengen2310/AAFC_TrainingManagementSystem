@@ -94,7 +94,7 @@ each targets a different database and cannot be confused for the other's evidenc
 
 | Secret name | Used by | Value to enter | Where to find it |
 |---|---|---|---|
-| `PROD_DATABASE_BACKUP_URL` | `backup-postgresql.yml` | Production Postgres **session-mode** URI, port 5432, `sslmode=require` | Supabase Dashboard → Settings → Database → Session Pooler. **Do not use the Transaction Pooler (port 6543)** — that's what the app's own `DATABASE_URL` uses at runtime, and pg_dump against it is unsupported/unreliable. |
+| `PROD_DATABASE_BACKUP_URL` | `backup-postgresql.yml` | Production Postgres URI (Railway's production Postgres, public proxy) | `railway variable list --service Postgres --environment production --json` → `DATABASE_PUBLIC_URL`. **As of 2026-08 (GAP-18 fix), production runs on Railway-native Postgres, not Supabase** — a prior version of this doc pointed here at a Supabase Session Pooler URL, which was a genuine, since-fixed defect (the backup was silently targeting the wrong physical database; see `docs/release/qualification_gap_register.md` GAP-18). Do not use the service's own internal `DATABASE_URL` — that's the private in-network address the app uses at runtime, not reachable from GitHub Actions. |
 | `SUPABASE_DB_URL` | `backup-postgresql-staging.yml` | Staging Postgres URI (Railway's staging Postgres, public proxy, port 5432) | `railway variable list --service Postgres --environment staging --json` → `DATABASE_PUBLIC_URL`. Name kept for continuity with earlier setup — despite the name, this secret is **staging-only**. |
 | `BACKUP_GPG_PRIVATE_KEY` | both restore-test workflows | Contents of `/tmp/backup-private-key.b64` | Generated in Step 2 |
 | `BACKUP_GPG_PASSPHRASE` | both restore-test workflows | Passphrase chosen when generating the key | Your password manager |
@@ -202,7 +202,9 @@ PGPASSWORD="your-password" pg_restore \
   --exit-on-error \
   aafc_tms_backup.dump
 
-# For Supabase: use the Session Pooler host (port 5432, not 6543 or 5432 direct)
+# Production (Railway-native Postgres): use the service's public proxy host
+# (railway variable list --service Postgres --environment production --json
+# → DATABASE_PUBLIC_URL), not the internal railway.internal address.
 ```
 
 ---
@@ -267,8 +269,15 @@ Run this checklist quarterly:
 
 ## What the backup does NOT cover
 
-- Render's ephemeral filesystem (not used for application data)
+- Railway's ephemeral container filesystem (not used for application data)
 - `STAGING_BOOTSTRAP_SYSADMIN_CODE` (one-time env var, discarded after first login)
-- JWT_SECRET / SECRET_KEY (auto-generated per Render deploy; invalidates all sessions on rotate, which is acceptable for staging)
+- JWT_SECRET / SECRET_KEY (set per-environment via `railway variable set`, never
+  auto-rotated; rotating either invalidates all sessions on that environment)
 
-For production, add point-in-time recovery (Supabase PITR, available on paid plans) in addition to pg_dump backups.
+For production, check whether Railway's own native Postgres plugin offers a
+point-in-time-recovery option on the current plan, in addition to these pg_dump
+backups — not yet confirmed either way (see `final_backup_restore_assessment.md`
+if/when that stage is completed).
+
+*(This section previously referenced Render and Supabase — both stale from an
+earlier architecture; corrected 2026-08 alongside the GAP-18 fix above.)*
