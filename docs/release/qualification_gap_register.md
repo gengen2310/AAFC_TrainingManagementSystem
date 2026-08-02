@@ -2026,3 +2026,32 @@ acceptance criteria, and is updated in place as each item closes.
   dedicated capacity-tuning follow-up (raise `GUNICORN_WORKERS` and
   `DB_POOL_SIZE`/`DB_POOL_MAX_OVERFLOW`, re-test with this same corrected async
   tool) before any future claim of proven 1,000-concurrent-user capacity.
+
+### GAP-18 — final clean re-verification (2026-08-02, post-deployment reconciliation)
+
+- **Dispatched a fresh backup + restore-test cycle against current `main`** (now
+  fully pushed to `origin/main`, containing the complete migration set) — the
+  earlier restore-test's one caveat (a migration-head mismatch explained as a
+  stale-`origin/main` artifact) is now fully resolved with a clean run: expected
+  head `z1a2b3c4d5e6` exactly matches the restored database's actual head.
+  **All 15 checks pass, zero caveats.**
+- **New evidence layer observed this run** (already built into
+  `test-restore-postgresql.yml`, not something added this pass): after the
+  data-level checks, the workflow creates a throwaway admin account, starts a
+  real backend process against the restored database, and drives 8 authenticated
+  reads through the actual API (login, `/api/health/ready`, `/api/auth/me`,
+  `/api/wings`, `/api/squadrons`, `/api/users`, `/api/planning/years`,
+  `/api/planning/facilitators`) — all 8 pass. This is genuine, real,
+  application-level proof that a restored backup produces a fully functional,
+  API-servable application, not merely a SQL dump that restores without error.
+- **Operator DR walkthrough** (`deployment/backup-dr.md`): every referenced
+  artifact independently confirmed to exist and match the doc exactly —
+  `.github/backup-public-key.asc` (real key, not the placeholder), all 4
+  workflow files, `backend/scripts/compute_alembic_head.py`, and all 4 required
+  GitHub secrets (`BACKUP_GPG_PASSPHRASE`, `BACKUP_GPG_PRIVATE_KEY`,
+  `PROD_DATABASE_BACKUP_URL`, `SUPABASE_DB_URL`). Not executed: actually
+  generating a new GPG keypair or running a manual `pg_restore` by hand — the
+  reconciliation instruction explicitly allows stopping short of any
+  destructive-replacement step, and the automated workflow already exercises
+  the equivalent decrypt/restore/verify sequence end-to-end.
+- **Disposition**: GAP-18 fully closed, with no remaining caveats of any kind.
