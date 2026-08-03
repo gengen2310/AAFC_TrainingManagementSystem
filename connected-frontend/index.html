@@ -498,8 +498,15 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="auth-div"></div>
     </div>
 
+    <!-- Session-restore check — shown briefly on page load while a saved
+         sessionStorage token is verified against the backend, before the
+         login form (step 1) is ever shown. -->
+    <div id="auth-restoring">
+      <div class="muted" style="text-align:center;font-size:12.5px;padding:18px 0">Checking your session…</div>
+    </div>
+
     <!-- Step 1 — identify account -->
-    <div id="auth-step1">
+    <div id="auth-step1" style="display:none">
       <div class="fg">
         <label>Account type</label>
         <select id="auth-type" onchange="onAuthTypeChange()">
@@ -824,7 +831,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="cal-grid" id="cal-grid"></div>
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;color:var(--muted);">
-          <span>Parade night</span><span>Activity</span><span style="color:var(--ok);">● Delivered</span>
+          <span>Parade night</span><span>Activity</span><span style="color:var(--warn);">● Holiday</span><span style="color:var(--ok);">● Delivered</span>
           <span style="color:var(--muted-text-on-light);">● Not Delivered</span><span style="color:var(--status-text-danger);">● Cancelled</span>
         </div>
       </div>
@@ -977,6 +984,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <option value="">— select a planning year —</option>
             </select>
             <span id="py-ctx-label-sqn" style="font-size:11px;color:var(--muted)"></span>
+            <span id="py-action-btns" style="display:flex;gap:6px"></span>
             <button class="btn btn-dk plan-write-el" style="display:none" onclick="openNewYearModal()">+ New Year</button>
           </div>
           <div id="py-sqn-filter-row" style="display:none;margin-bottom:12px">
@@ -1099,7 +1107,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="form-row">
             <div class="ff"><label>Parade Day</label>
               <select id="s-pday">
-                <option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option>
+                <option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
               </select>
             </div>
             <div class="ff"><label>Parade Time</label>
@@ -1179,7 +1187,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="card" id="acct-wings-card" style="display:none">
           <div class="ctitle" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
             <span>Wings</span>
-            <button class="btn btn-xs btn-sky" id="wing-create-btn-2" style="display:none" onclick="openCreateWingModal()">+ Add Wing</button>
+            <div style="display:flex;align-items:center;gap:10px">
+              <label style="font-size:11px;font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="wings-show-archived" onchange="_orgToggleShowArchived('wing')"> Show archived</label>
+              <button class="btn btn-xs btn-sky" id="wing-create-btn-2" style="display:none" onclick="openCreateWingModal()">+ Add Wing</button>
+            </div>
           </div>
           <div id="wings-table"></div>
         </div>
@@ -1187,7 +1198,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="card" id="acct-units-card" style="display:none">
           <div class="ctitle" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
             <span>Squadrons / Specialist Units</span>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <label style="font-size:11px;font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="units-show-archived" onchange="_orgToggleShowArchived('squadron')"> Show archived</label>
               <button class="btn btn-xs btn-sky" id="wing-create-btn" style="display:none" onclick="openCreateWingModal()">+ Add Wing</button>
               <button class="btn btn-xs btn-sky" id="sqn-create-btn" style="display:none" onclick="openCreateSqnModal()">+ Add Squadron / Specialist Unit</button>
             </div>
@@ -2430,6 +2442,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-hdr"><div class="modal-title">Edit Account</div><button class="modal-x" onclick="closeModal('m-edit-account')">×</button></div>
     <div class="modal-body">
       <div class="ff"><label>Display Name</label><input id="ea-name" placeholder="Display name" autocomplete="off"></div>
+      <div class="ff" id="ea-role-row" style="display:none"><label>Role / Access Type</label>
+        <select id="ea-role"></select>
+        <div class="muted" style="font-size:10.5px;margin-top:3px">Changing role within the same scope level only. The account will need to sign in again for the new role to take effect.</div>
+      </div>
       <div class="ff" id="ea-flight-row" style="display:none"><label>Flight (optional)</label>
         <select id="ea-flight"><option value="">— no flight —</option></select>
       </div>
@@ -2797,7 +2813,7 @@ const PN_703=[
 //  STATE
 // ═══════════════════════════════════════════════════════════
 let S={sqn:null,isAdmin:false,isWing:false,isNational:false,isAuditor:false,session:null,role:null,scopeName:'',pns:[],facs:[],acts:[],rooms:[],equip:[],cfg:{},curr:[],reports:{},actionItems:[]};
-let calYear=2026,calMonth=0;
+let calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
 let currTabFilter='all';
 let editCurrCode=null,editFacId=null,editRoomId=null,editEquipId=null,editSessRef=null;
 
@@ -3142,6 +3158,40 @@ async function doLogout(){
   document.getElementById('auth-screen').style.display='flex';
   document.getElementById('app').style.display='none';
 }
+
+// Restore an existing session on page load/refresh instead of always dropping
+// back to the login screen. A sessionStorage token surviving a refresh is the
+// normal case; only a genuinely invalid/expired session (401) or an explicit
+// "give up" after retry should ever show the login form again -- a transient
+// network blip surfaces a Retry action instead (api()'s own GET-retry logic
+// already absorbs the sub-second single-replica-redeploy gap before this
+// ever runs).
+async function tryRestoreSession(){
+  const restoring=document.getElementById('auth-restoring');
+  if(!tokenGet()){
+    restoring.style.display='none';
+    showAuthStep1();
+    return;
+  }
+  try{
+    const out=await api('/api/auth/me');
+    S.session=out.session;
+    applySession(out.session);
+    await loadData();
+    bootApp();
+  }catch(e){
+    if(e && e.kind==='network'){
+      restoring.innerHTML='<div style="text-align:center;padding:18px 0">'
+        +'<div class="sc-status-err" style="margin-bottom:10px">'+esc(apiErr(e))+'</div>'
+        +'<button class="btn-auth" onclick="tryRestoreSession()">Retry</button></div>';
+      return;
+    }
+    tokenClear();
+    restoring.style.display='none';
+    showAuthStep1();
+  }
+}
+tryRestoreSession();
 // Map the backend session to the UI's scope/role flags. Backend remains the security boundary.
 function applySession(sess){
   S.session=sess;
@@ -3231,6 +3281,16 @@ async function loadData(){
   const p_eq=api('/api/equipment').catch(()=>null);
   const p_ai=api('/api/action-items').catch(()=>null);
   const p_acts=api('/api/activities').catch(()=>null);
+  // Holidays for the Training Calendar overlay -- active planning year(s) for
+  // this squadron, flattened across years (usually just one).
+  const p_holidays=_sqnId?(async()=>{
+    try{
+      const years=await api('/api/planning/years?unit_id='+encodeURIComponent(_sqnId));
+      const activeIds=(years||[]).filter(y=>y.active_status).map(y=>y.planning_year_id);
+      const lists=await Promise.all(activeIds.map(id=>api('/api/planning/years/'+id+'/holidays').catch(()=>[])));
+      return lists.flat();
+    }catch(_){ return []; }
+  })():Promise.resolve([]);
   const p_proxy=api('/api/proxy/current').catch(()=>({active:false}));
   const p_sum=api('/api/reports/summary'+_sqq).catch(()=>null);
   const p_read=api('/api/reports/readiness'+_sqq).catch(()=>null);
@@ -3252,14 +3312,14 @@ async function loadData(){
 
   const[
     uicfg,tags,
-    pns,facs,cur,phases,ta,eq,ai,acts,proxy,
+    pns,facs,cur,phases,ta,eq,ai,acts,holidays,proxy,
     repSum,repRead,repCov,repFload,repNdel,
     sqnData,timing,auditData,
     wov,wph,wcap,wsqns,
     nat,natov,natcap,wings,nsqns,
   ]=await Promise.all([
     p_uicfg,p_tags,
-    p_pns,p_facs,p_cur,p_phases,p_ta,p_eq,p_ai,p_acts,p_proxy,
+    p_pns,p_facs,p_cur,p_phases,p_ta,p_eq,p_ai,p_acts,p_holidays,p_proxy,
     p_sum,p_read,p_cov,p_fload,p_ndel,
     p_sqnData,p_timing,p_audit,
     p_wov,p_wph,p_wcap,p_wsqns,
@@ -3290,6 +3350,7 @@ async function loadData(){
   S.equip=(eq||[]).map(x=>({id:x.equipment_id||x.id,name:x.name,qty:x.quantity||x.qty,notes:x.notes||''}));
   S.actionItems=(ai||[]).map(a=>({id:a.action_id,title:a.title,description:a.description,owner:a.owner,due:a.due_date,status:a.status,severity:a.severity,source:a.source}));
   S.acts=(acts||[]).map(a=>({id:a.activity_id,name:a.activity_name,date:a.date_start,dateEnd:a.date_end,timeStart:a.time_start,timeEnd:a.time_end,type:a.activity_type||'Optional',location:a.location||'',audience:a.audience||[],notes:a.notes||'',ceaSeqNr:a.cea_seq_nr||''}));
+  S.holidays=(holidays||[]).map(h=>({id:h.holiday_id,name:h.name,start:h.start_date,end:h.end_date}));
   S.proxy=proxy||{active:false};
   S.pwUrl=(uicfg&&uicfg.planning_workspace_url)||null;
   S.trainingYear=(uicfg&&uicfg.training_year)||2026;
@@ -3612,7 +3673,7 @@ function bootApp(){
   setVal('s-start',S.cfg.start||''); setVal('s-end',S.cfg.end||''); setVal('s-sess',S.cfg.sess||3);
   renderTimingTemplates();
   const ccMsg=document.getElementById('cc-msg'); if(ccMsg)ccMsg.textContent='';
-  calYear=2026;calMonth=0;
+  calYear=new Date().getFullYear();calMonth=new Date().getMonth();
   populateWPDD();
   renderAll();
   nav(SCOPE_LANDING[scope]||'dashboard');
@@ -4111,6 +4172,23 @@ const _ROLE_CLS={sqn_general:'b-blue',sqn_admin:'b-blue',wing_viewer:'b-ok',wing
 const _SCOPE_CLS={squadron:'b-blue',wing:'b-ok',national:'b-amber'};
 const _SCOPE_LABELS={squadron:'SQN',wing:'Wing',national:'NAT HQ'};
 
+// Mirrors backend _CREATE_AUTHORITY / _scope_type (app/routers/accounts.py) --
+// UI convenience only for populating the role picker; the server is always
+// the authoritative check on POST /accounts/{id}/change-role.
+const _ROLE_ASSIGN_AUTHORITY={
+  system_admin:['system_admin','national_admin','national_viewer','wing_admin','wing_viewer','sqn_admin','sqn_general','auditor'],
+  national_admin:['national_admin','national_viewer','wing_admin','wing_viewer','sqn_admin','sqn_general','auditor'],
+  wing_admin:['wing_viewer','sqn_admin','sqn_general'],
+  sqn_admin:['sqn_general'],
+};
+const _NATIONAL_SCOPE_ROLES=['national_admin','national_viewer','system_admin','auditor'];
+const _WING_SCOPE_ROLES=['wing_viewer','wing_admin'];
+function _roleScopeType(role){
+  if(_NATIONAL_SCOPE_ROLES.includes(role)) return 'national';
+  if(_WING_SCOPE_ROLES.includes(role)) return 'wing';
+  return 'squadron';
+}
+
 async function renderAccounts(){
   const canWrite=_ACCT_WRITE_ROLES.includes(S.role);
   document.querySelectorAll('.acct-write-el').forEach(el=>el.style.display=canWrite?'':'none');
@@ -4189,6 +4267,28 @@ async function renderAccounts(){
 const _ACCT_BULK_ROLES=['wing_admin','national_admin','system_admin'];
 function _acctCanBulk(){ return _ACCT_BULK_ROLES.includes(S.role); }
 
+// Organisational-hierarchy ordering for Account Management (System Admin >
+// National > Wing > Squadron, numeric unit code ascending, Admin > Viewer/
+// General > Auditor within each unit, display name as a final stable
+// tiebreak) -- replaces the prior implicit creation-date order from the API.
+const _ACCT_ORG_RANK={system_admin:0,national_admin:1,national_viewer:1,auditor:1,wing_admin:2,wing_viewer:2,sqn_admin:3,sqn_general:3};
+const _ACCT_ROLE_TIER={system_admin:0,national_admin:0,wing_admin:0,sqn_admin:0,national_viewer:1,wing_viewer:1,sqn_general:1,auditor:2};
+function _acctNumCode(code){ const m=/\d+/.exec(code||''); return m?parseInt(m[0],10):Number.MAX_SAFE_INTEGER; }
+function _acctSortKey(u){
+  const orgRank=_ACCT_ORG_RANK[u.role]!==undefined?_ACCT_ORG_RANK[u.role]:4;
+  const codeNum=orgRank===2?_acctNumCode(u.wing_code):orgRank===3?_acctNumCode(u.squadron_code):0;
+  const roleTier=_ACCT_ROLE_TIER[u.role]!==undefined?_ACCT_ROLE_TIER[u.role]:3;
+  const hasFlight=u.flight_id?1:0; // Flight-assigned accounts sort after their squadron's non-Flight accounts
+  return [orgRank,codeNum,roleTier,hasFlight,(u.display_name||'').toLowerCase()];
+}
+function _acctSortRows(rows){
+  return rows.slice().sort((a,b)=>{
+    const ka=_acctSortKey(a), kb=_acctSortKey(b);
+    for(let i=0;i<ka.length;i++){ if(ka[i]<kb[i])return -1; if(ka[i]>kb[i])return 1; }
+    return 0;
+  });
+}
+
 function _renderAccountTable(){
   const el=document.getElementById('acct-table'); if(!el)return;
   const flt=(document.getElementById('acct-search')||{value:''}).value.toLowerCase();
@@ -4208,6 +4308,7 @@ function _renderAccountTable(){
       (u.wing_code||'').toLowerCase().includes(flt)||
       (u.scope_type||'').includes(flt);
   });
+  rows=_acctSortRows(rows);
 
   if(!rows.length){
     el.innerHTML='<div style="color:var(--muted);font-size:11.5px;padding:8px 0">'+(!(S.accountList||[]).length?'No accounts in scope.':'No accounts match the filter.')+'</div>';
@@ -4243,7 +4344,8 @@ function _renderAccountTable(){
     if(!canWrite) return '';
     const dn=_jsAttr(u.display_name||'');
     if(u.is_archived){
-      return `<button class="btn btn-xs btn-ok" onclick="doRestoreAccount('${u.user_id}','${dn}')">Restore</button>`;
+      return `<button class="btn btn-xs btn-ok" onclick="doRestoreAccount('${u.user_id}','${dn}')">Restore</button> `+
+        `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteAccount('${u.user_id}','${dn}')">Delete Permanently…</button>`;
     }
     const resetBtn=`<button class="btn btn-xs btn-sky" onclick="openAccountResetCode('${u.user_id}','${dn}')" title="Reset access code">Reset access code</button>`;
     const unlockBtn=isLocked(u)?`<button class="btn btn-xs btn-ok" onclick="doUnlockAccount('${u.user_id}','${dn}')">Unlock</button>`:'';
@@ -4251,7 +4353,8 @@ function _renderAccountTable(){
       ? `<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doDisableAccount('${u.user_id}','${dn}')">Disable</button>`
       : `<button class="btn btn-xs btn-ok" onclick="doReactivateAccount('${u.user_id}','${dn}')">Reactivate</button>`;
     const editBtn=`<button class="btn btn-xs" onclick="openEditAccountModal('${u.user_id}')">Edit</button>`;
-    return `<div style="display:flex;gap:4px;flex-wrap:wrap">${editBtn}${resetBtn}${unlockBtn}${toggleBtn}</div>`;
+    const deleteBtn=u.user_id===myUid?'':`<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doDeleteAccount('${u.user_id}','${dn}')" title="Archives the account — reversible via Restore">Delete</button>`;
+    return `<div style="display:flex;gap:4px;flex-wrap:wrap">${editBtn}${resetBtn}${unlockBtn}${toggleBtn}${deleteBtn}</div>`;
   };
 
   const selCol=canBulk?`<th class="no-print" style="width:24px"><input type="checkbox" id="acct-select-all" ${allVisibleSelected?'checked':''} onchange="_acctToggleAll(this.checked)" aria-label="Select all accounts matching the current filter"></th>`:'';
@@ -4342,18 +4445,36 @@ function _jsAttr(str){
 }
 
 // ── Wings management ──────
+let _orgArchivedWings=null, _orgArchivedSqns=null; // fetched lazily, separate from
+// S.wings/S.squadrons (which stay active-only for every other feature that reads them)
+async function _orgToggleShowArchived(kind){
+  const checked=document.getElementById(kind==='wing'?'wings-show-archived':'units-show-archived').checked;
+  if(!checked){ _renderWingsTable(); _renderUnitsTable(); return; }
+  try{
+    if(kind==='wing') _orgArchivedWings=await api('/api/wings?include_archived=true');
+    else _orgArchivedSqns=await api('/api/squadrons?include_archived=true');
+  }catch(e){ showToast('Could not load archived: '+apiErr(e), true); }
+  _renderWingsTable(); _renderUnitsTable();
+}
 function _renderWingsTable(){
   const el=document.getElementById('wings-table'); if(!el)return;
-  const wings=S.wings||[];
+  const showArchived=(document.getElementById('wings-show-archived')||{}).checked;
+  const wings=showArchived?(_orgArchivedWings||[]):(S.wings||[]);
   const isNatAdmin=['national_admin','system_admin'].includes(S.role);
   if(!wings.length){ el.innerHTML='<div style="color:var(--muted);font-size:11.5px;padding:8px 0">No Wings found.</div>'; return; }
   const sqnCount=wid=>(S.squadrons||[]).filter(s=>s.wing_id===wid).length;
+  const actionsCell=w=>{
+    if(!isNatAdmin) return '';
+    if(w.is_archived) return `<button class="btn btn-xs btn-ok" onclick="doRestoreWing('${w.wing_id}','${_jsAttr(w.code)}')">Restore</button> `+
+      `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteWing('${w.wing_id}','${_jsAttr(w.code)}')">Delete Permanently…</button>`;
+    return `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="_orgOpenWizard('wing','${w.wing_id}','${_jsAttr(w.code)}')" title="Archives the Wing — reversible">Delete</button>`;
+  };
   el.innerHTML='<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Squadrons</th>'+(isNatAdmin?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
-    wings.map(w=>`<tr>
-      <td style="font-weight:700">${esc(w.code)}</td>
+    wings.map(w=>`<tr${w.is_archived?' style="opacity:.6"':''}>
+      <td style="font-weight:700">${esc(w.code)}${w.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
       <td style="font-size:11.5px">${esc(w.name||w.short_name||'')}</td>
       <td style="font-size:11.5px;color:var(--muted)">${sqnCount(w.wing_id)}</td>
-      ${isNatAdmin?`<td class="no-print"><button class="btn btn-xs btn-out" onclick="_orgOpenWizard('wing','${w.wing_id}','${_jsAttr(w.code)}')">Archive</button></td>`:''}
+      ${isNatAdmin?`<td class="no-print" style="display:flex;gap:4px;flex-wrap:wrap">${actionsCell(w)}</td>`:''}
     </tr>`).join('')+
     '</tbody></table></div>';
 }
@@ -4363,22 +4484,80 @@ const _UNIT_TYPE_LABELS={standard_squadron:'Standard Squadron',specialist_squadr
 
 function _renderUnitsTable(){
   const el=document.getElementById('units-table'); if(!el)return;
-  const sqns=S.squadrons||[];
+  const showArchived=(document.getElementById('units-show-archived')||{}).checked;
+  const sqns=showArchived?(_orgArchivedSqns||[]):(S.squadrons||[]);
   const wings=S.wings||[];
   const isNatAdmin=['national_admin','system_admin'].includes(S.role);
   const isWingAdmin=S.role==='wing_admin';
   const canArchive=s=>isNatAdmin||(isWingAdmin&&s.wing_id===(S.session&&S.session.wing_id));
   const wName=wid=>{ const w=wings.find(x=>x.wing_id===wid); return w?w.code||w.name:wid||'—'; };
   if(!sqns.length){ el.innerHTML='<div style="color:var(--muted);font-size:11.5px;padding:8px 0">No units found.</div>'; return; }
+  const actionsCell=s=>{
+    if(!canArchive(s)) return '';
+    if(s.is_archived) return `<button class="btn btn-xs btn-ok" onclick="doRestoreSquadron('${s.squadron_id}','${_jsAttr(s.code)}')">Restore</button> `+
+      `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteSquadron('${s.squadron_id}','${_jsAttr(s.code)}')">Delete Permanently…</button>`;
+    return `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="_orgOpenWizard('squadron','${s.squadron_id}','${_jsAttr(s.code)}')" title="Archives the unit — reversible">Delete</button>`;
+  };
   el.innerHTML='<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Wing</th>'+((isNatAdmin||isWingAdmin)?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
-    sqns.map(s=>`<tr>
-      <td style="font-weight:700">${esc(s.code)}</td>
+    sqns.map(s=>`<tr${s.is_archived?' style="opacity:.6"':''}>
+      <td style="font-weight:700">${esc(s.code)}${s.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
       <td style="font-size:11.5px">${esc(s.name||s.short_name||'')}</td>
       <td style="font-size:11px"><span class="badge b-blue" style="font-size:9px">${_UNIT_TYPE_LABELS[s.unit_type]||s.unit_type||'Squadron'}</span></td>
       <td style="font-size:11.5px;color:var(--muted)">${esc(wName(s.wing_id))}</td>
-      ${(isNatAdmin||isWingAdmin)?`<td class="no-print">${canArchive(s)?`<button class="btn btn-xs btn-out" onclick="_orgOpenWizard('squadron','${s.squadron_id}','${_jsAttr(s.code)}')">Archive</button>`:''}</td>`:''}
+      ${(isNatAdmin||isWingAdmin)?`<td class="no-print" style="display:flex;gap:4px;flex-wrap:wrap">${actionsCell(s)}</td>`:''}
     </tr>`).join('')+
     '</tbody></table></div>';
+}
+
+async function doRestoreWing(wingId, wingCode){
+  try{
+    await api(`/api/wings/${wingId}/restore`,{method:'POST'});
+    showToast(`Wing '${wingCode}' restored.`);
+    _orgArchivedWings=await api('/api/wings?include_archived=true');
+    await _refreshOrgCache();
+    _renderWingsTable();
+  }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
+}
+async function doPermanentlyDeleteWing(wingId, wingCode){
+  const typed=prompt(`This permanently deletes Wing '${wingCode}' — this cannot be undone. It will only succeed if the Wing has no linked records; otherwise it stays archived.\n\nType the Wing's code to confirm:`);
+  if(typed===null)return;
+  if(typed.trim()!==wingCode){ showToast('Code did not match — nothing was deleted.', true); return; }
+  try{
+    await api(`/api/wings/${wingId}`,{method:'DELETE'});
+    showToast(`Wing '${wingCode}' permanently deleted.`);
+    _orgArchivedWings=await api('/api/wings?include_archived=true');
+    _renderWingsTable();
+  }catch(e){
+    if(e && e.kind==='http' && e.status===409 && e.body && e.body.detail && e.body.detail.dependents){
+      const dep=Object.entries(e.body.detail.dependents).map(([k,v])=>`${k}: ${v}`).join(', ');
+      showToast(`Can't permanently delete — linked records exist (${dep}). It remains archived.`, true);
+    } else { showToast('Could not delete: '+apiErr(e), true); }
+  }
+}
+async function doRestoreSquadron(sqnId, sqnCode){
+  try{
+    await api(`/api/squadrons/${sqnId}/restore`,{method:'POST'});
+    showToast(`Unit '${sqnCode}' restored.`);
+    _orgArchivedSqns=await api('/api/squadrons?include_archived=true');
+    await _refreshOrgCache();
+    _renderUnitsTable();
+  }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
+}
+async function doPermanentlyDeleteSquadron(sqnId, sqnCode){
+  const typed=prompt(`This permanently deletes unit '${sqnCode}' — this cannot be undone. It will only succeed if the unit has no linked records; otherwise it stays archived.\n\nType the unit's code to confirm:`);
+  if(typed===null)return;
+  if(typed.trim()!==sqnCode){ showToast('Code did not match — nothing was deleted.', true); return; }
+  try{
+    await api(`/api/squadrons/${sqnId}`,{method:'DELETE'});
+    showToast(`Unit '${sqnCode}' permanently deleted.`);
+    _orgArchivedSqns=await api('/api/squadrons?include_archived=true');
+    _renderUnitsTable();
+  }catch(e){
+    if(e && e.kind==='http' && e.status===409 && e.body && e.body.detail && e.body.detail.dependents){
+      const dep=Object.entries(e.body.detail.dependents).map(([k,v])=>`${k}: ${v}`).join(', ');
+      showToast(`Can't permanently delete — linked records exist (${dep}). It remains archived.`, true);
+    } else { showToast('Could not delete: '+apiErr(e), true); }
+  }
 }
 
 function openCreateWingModal(){
@@ -4638,6 +4817,29 @@ async function doReactivateAccount(userId, displayName){
     await api('/api/accounts/'+userId+'/reactivate',{method:'POST'});
     S.accountList=null; renderAccounts();
   }catch(e){ alert('Could not reactivate: '+apiErr(e)); }
+}
+async function doDeleteAccount(userId, displayName){
+  if(!confirm('Delete account for '+displayName+'?\n\nThis archives the account: access is revoked immediately and it is removed from active views. It is reversible — use "Show archived" + Restore to undo.'))return;
+  try{
+    await api('/api/accounts/'+userId+'/archive',{method:'POST'});
+    S.accountList=null; renderAccounts();
+    showToast('Deleted (archived) '+displayName+'.');
+  }catch(e){ showToast('Could not delete: '+apiErr(e), true); }
+}
+async function doPermanentlyDeleteAccount(userId, displayName){
+  const typed=prompt(`This permanently deletes the account for "${displayName}" — this cannot be undone. It will only succeed if the account has never logged in and has no audit history of its own actions; otherwise it stays archived.\n\nType the account's name to confirm:`);
+  if(typed===null)return;
+  if(typed.trim()!==displayName){ showToast('Name did not match — nothing was deleted.', true); return; }
+  try{
+    await api('/api/accounts/'+userId,{method:'DELETE'});
+    showToast('Account for '+displayName+' permanently deleted.');
+    S.accountList=null; renderAccounts();
+  }catch(e){
+    if(e && e.kind==='http' && e.status===409 && e.body && e.body.detail && e.body.detail.dependents){
+      const dep=Object.entries(e.body.detail.dependents).map(([k,v])=>`${k}: ${v}`).join(', ');
+      showToast(`Can't permanently delete — history exists (${dep}). It remains archived.`, true);
+    } else { showToast('Could not delete: '+apiErr(e), true); }
+  }
 }
 async function doRestoreAccount(userId, displayName){
   if(!confirm('Restore account for '+displayName+'? It will become active again immediately.'))return;
@@ -5023,10 +5225,12 @@ async function doArchiveFlight(flightId, name){
 
 // ── Edit Account ──────────────────────────────────────────
 let _editAccountId=null;
+let _editAccountOrigRole=null;
 function openEditAccountModal(uid){
   const u=(S.accountList||[]).find(x=>x.user_id===uid);
   if(!u)return;
   _editAccountId=uid;
+  _editAccountOrigRole=u.role;
   document.getElementById('ea-name').value=u.display_name||'';
   document.getElementById('ea-msg').textContent='';
   // Show flight selector only for squadron-scoped accounts
@@ -5039,6 +5243,25 @@ function openEditAccountModal(uid){
       const o=new Option(f.name,f.flight_id); if(f.flight_id===u.flight_id) o.selected=true; sel.appendChild(o);
     });
   } else { flightRow.style.display='none'; }
+
+  // Role selector: only same-scope-level roles the actor has authority to
+  // assign, and only for accounts other than the actor's own (self-role-change
+  // is blocked server-side, so don't offer it here).
+  const roleRow=document.getElementById('ea-role-row');
+  const roleSel=document.getElementById('ea-role');
+  const myUid=S.session&&S.session.user_id;
+  const assignable=(_ROLE_ASSIGN_AUTHORITY[S.role]||[]).filter(r=>_roleScopeType(r)===u.scope_type);
+  if(uid!==myUid && assignable.length){
+    roleRow.style.display='';
+    roleSel.innerHTML='';
+    // Always include the account's current role even if the actor's authority
+    // list wouldn't otherwise offer it, so the select reflects reality.
+    const opts=new Set([u.role, ...assignable]);
+    [...opts].forEach(r=>{
+      const o=new Option(_ROLE_LABELS[r]||r, r); if(r===u.role) o.selected=true; roleSel.appendChild(o);
+    });
+  } else { roleRow.style.display='none'; }
+
   openModal('m-edit-account');
 }
 async function doEditAccount(){
@@ -5054,6 +5277,15 @@ async function doEditAccount(){
     const flightRow=document.getElementById('ea-flight-row');
     if(flightRow.style.display!=='none') body.flight_id=flightId||'';
     await api('/api/accounts/'+_editAccountId,{method:'PATCH',body:JSON.stringify(body)});
+
+    const roleRow=document.getElementById('ea-role-row');
+    if(roleRow.style.display!=='none'){
+      const newRole=document.getElementById('ea-role').value;
+      if(newRole && newRole!==_editAccountOrigRole){
+        await api('/api/accounts/'+_editAccountId+'/change-role',{method:'POST',body:JSON.stringify({new_role:newRole})});
+      }
+    }
+
     closeModal('m-edit-account');
     S.accountList=null; renderAccounts();
   }catch(e){ msg.textContent=apiErr(e); msg.style.color='var(--red)'; }
@@ -5581,9 +5813,11 @@ function renderCal(){
     const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const pn=S.pns.find(p=>p.date===ds);
     const acts=S.acts.filter(a=>a.date===ds);
+    const hol=(S.holidays||[]).find(h=>ds>=h.start&&ds<=h.end);
     const isT=new Date(calYear,calMonth,d).getTime()===td.getTime();
-    let cls='cal-cell'+(pn?' parade':'')+(isT?' today':'')+(acts.length&&!pn?' act-day':'');
+    let cls='cal-cell'+(pn?' parade':'')+(isT?' today':'')+(acts.length&&!pn?' act-day':'')+(hol?' holiday-day':'');
     let chips='';
+    if(hol)chips+=`<span class="cal-chip" style="background:var(--warn-bg);color:var(--warn)" title="${esc(hol.name)}">${esc(hol.name.substring(0,16))}</span>`;
     if(pn)(pn.sessions||[]).slice(0,3).forEach(s=>{chips+=`<span class="cal-chip ${stCls(s.status)}">${PH_S[s.phase]||s.phase}</span>`;});
     acts.slice(0,1).forEach(a=>chips+=`<span class="cal-chip act">${esc(a.name.substring(0,16))}</span>`);
     const oc=pn?`onclick="showPNDetail('${ds}')"`:canWriteSquadron()?`onclick="openWithDate('${ds}')"`:'';
@@ -6540,7 +6774,8 @@ function _actTabRender(containerId){
         <td style="white-space:nowrap">${fmtD(i.date_start)}${i.date_end&&i.date_end!==i.date_start?' – '+fmtD(i.date_end):''}</td>
         <td style="font-size:11.5px">${esc(i.activity_type||'—')}</td>
         <td style="font-size:11.5px">${esc(i.location||'—')}</td>
-        <td class="no-print">${i.read_only?'<span class="muted" title="Owned by another scope — view only">🔒</span>':''}</td>
+        <td class="no-print">${i.read_only?'<span class="muted" title="Owned by another scope — view only">🔒</span>':
+          (st.view==='archived'?`<button class="btn btn-xs btn-ok" onclick="event.stopPropagation();_actRestore('${containerId}','${i.activity_id}')">Restore</button>`:'')}</td>
       </tr>`;
     });
     html+='</tbody></table></div>';
@@ -6623,6 +6858,16 @@ async function _actArchive(containerId, activityId){
     const st=_actTabState[containerId];
     await _actTabLoad(containerId, st.scopeType, st.scopeId);
   }catch(e){ alert(apiErr(e)); }
+}
+
+async function _actRestore(containerId, activityId){
+  if(!confirm('Restore this activity? It will become active and visible again.'))return;
+  try{
+    await api('/api/activities/'+activityId+'/restore',{method:'POST'});
+    showToast('Activity restored.', false);
+    const st=_actTabState[containerId];
+    await _actTabLoad(containerId, st.scopeType, st.scopeId);
+  }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
 }
 
 function _actOpenCreate(containerId){
@@ -7900,7 +8145,7 @@ function openModal(id){document.getElementById(id).classList.add('active');}
 function closeModal(id){document.getElementById(id).classList.remove('active');}
 document.querySelectorAll('.modal-bg').forEach(bg=>{bg.addEventListener('click',function(e){if(e.target===this)this.classList.remove('active');});});
 document.getElementById('m-add-pn').addEventListener('click',function(e){if(e.target===this)return;if(!document.getElementById('pn-slots').innerHTML)buildSlots();});
-window.addEventListener('DOMContentLoaded',()=>{calYear=2026;calMonth=0;});
+window.addEventListener('DOMContentLoaded',()=>{calYear=new Date().getFullYear();calMonth=new Date().getMonth();});
 // Warn on tab-close / hard reload when Proxy Mode or Delegated Intervention is active.
 window.addEventListener('beforeunload',function(e){ if(proxyActive()){ e.preventDefault(); e.returnValue=''; } });
 
@@ -7962,13 +8207,91 @@ async function _loadPlanningYears() {
         const prefix = showUnitPrefix
           ? (y.unit_code ? `${y.unit_code} — ` : y.wing_code ? `${y.wing_code} — ` : '')
           : '';
-        o.textContent = prefix + (y.name || String(y.year));
+        o.textContent = prefix + (y.name || String(y.year)) + (y.active_status?'':' (archived)');
         el.appendChild(o);
       });
       if(P.currentYearId) el.value = P.currentYearId;
     });
+    _renderPyActionBtns();
     return P.currentYearId || null;
   } catch(e) { console.warn('planning years load failed', e); return null; }
+}
+
+// ── Planning Year rename/archive/restore -- wires the existing, previously-
+// unused PATCH /api/planning/years/{id} into the UI, matching the confirm-
+// dialog pattern already established for Wings/Squadrons/Accounts. ──
+function _renderPyActionBtns(){
+  const el=document.getElementById('py-action-btns'); if(!el)return;
+  const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
+  if(!y){ el.innerHTML=''; return; }
+  el.innerHTML=`<button class="btn btn-out btn-xs plan-write-el" style="display:none" onclick="doRenamePlanningYear()">Rename</button>`+
+    (y.active_status
+      ? `<button class="btn btn-out btn-xs plan-write-el" style="display:none;border-color:var(--red);color:var(--status-text-danger)" onclick="doArchivePlanningYear()">Archive</button>`
+      : `<button class="btn btn-ok btn-xs plan-write-el" style="display:none" onclick="doRestorePlanningYear()">Restore</button>`)+
+    `<button class="btn btn-out btn-xs plan-write-el" style="display:none;border-color:var(--red);color:var(--status-text-danger)" onclick="doDeletePlanningYear()">Delete…</button>`;
+  document.querySelectorAll('#py-action-btns .plan-write-el').forEach(b=>{b.style.display=canWritePlan()?'inline-flex':'none';});
+}
+async function doRenamePlanningYear(){
+  const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
+  if(!y)return;
+  const newName=prompt('Rename Training Year',y.name||String(y.year));
+  if(newName===null)return;
+  const trimmed=newName.trim();
+  if(!trimmed){ showToast('Name cannot be empty.', true); return; }
+  try{
+    await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({name:trimmed,version:y.version})});
+    showToast('Training Year renamed.');
+    await _loadPlanningYears();
+  }catch(e){ showToast('Could not rename: '+apiErr(e), true); }
+}
+async function doArchivePlanningYear(){
+  const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
+  if(!y)return;
+  if(!confirm(`Archive the ${y.name||y.year} Training Year? It will be removed from active selectors. All historical records are preserved and it can be restored later.`))return;
+  try{
+    await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({active_status:false,version:y.version})});
+    showToast('Training Year archived.');
+    await _loadPlanningYears();
+  }catch(e){ showToast('Could not archive: '+apiErr(e), true); }
+}
+async function doRestorePlanningYear(){
+  const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
+  if(!y)return;
+  try{
+    await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({active_status:true,version:y.version})});
+    showToast('Training Year restored.');
+    await _loadPlanningYears();
+  }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
+}
+
+// Permanent delete -- only succeeds server-side when the Training Year has
+// zero linked records of any kind (parade dates, holidays, notices, CEA
+// data, etc.). Requires the exact name typed back before the call is made,
+// on top of the server's own dependency gate.
+async function doDeletePlanningYear(){
+  const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
+  if(!y)return;
+  const label=y.name||String(y.year);
+  const typed=prompt(`This permanently deletes "${label}" -- this cannot be undone. It will only succeed if the year has no linked records (parade dates, holidays, notices, etc.); otherwise use Archive instead.\n\nType the year's name to confirm:`);
+  if(typed===null)return;
+  if(typed.trim()!==label){ showToast('Name did not match — nothing was deleted.', true); return; }
+  try{
+    await api('/api/planning/years/'+P.currentYearId,{method:'DELETE'});
+    showToast('Training Year permanently deleted.');
+    P.currentYearId=null;
+    await _loadPlanningYears();
+    loadYearMap('');
+  }catch(e){
+    if(e && e.kind==='http' && e.status===409 && e.body && e.body.detail && e.body.detail.dependents){
+      const dep=e.body.detail.dependents;
+      const depList=Object.entries(dep).map(([k,v])=>`${k.replace(/_/g,' ')}: ${v}`).join(', ');
+      if(confirm(`Can't permanently delete — this Training Year has linked records (${depList}). Archive it instead? (reversible, keeps history)`)){
+        doArchivePlanningYear();
+      }
+    } else {
+      showToast('Could not delete: '+apiErr(e), true);
+    }
+  }
 }
 
 // ── Hook into nav() so planning-adjacent pages auto-load on first visit ──
@@ -8240,6 +8563,7 @@ async function doCreateYear(){
 
 async function loadYearMap(yearId){
   P.currentYearId = yearId;
+  _renderPyActionBtns();
   const body = document.getElementById('py-map-body');
   const datesCard = document.getElementById('py-dates-card');
   const holCard = document.getElementById('py-holidays-card');
