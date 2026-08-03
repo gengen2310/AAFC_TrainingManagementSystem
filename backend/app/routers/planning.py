@@ -523,6 +523,44 @@ def update_planning_year(
         wing_code=wg.code if wg else None)
 
 
+@router.delete("/years/{year_id}")
+def delete_planning_year(
+    year_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Permanent delete -- only when a dependency check shows zero linked
+    records of any kind. This is additive to (not a replacement for) the
+    existing archive path (PATCH .../years/{id} with active_status=false):
+    archive remains the default whenever any dependent exists."""
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py, write=True)
+
+    dependents = {
+        "parade_dates": db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).count(),
+        "holidays": db.query(HolidayPeriod).filter(HolidayPeriod.planning_year_id == year_id).count(),
+        "anchor_events": db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id).count(),
+        "notices": db.query(PlanningNotice).filter(PlanningNotice.planning_year_id == year_id).count(),
+        "cea_activities": db.query(CeaActivity).filter(CeaActivity.planning_year_id == year_id).count(),
+        "cea_import_batches": db.query(CeaImportBatch).filter(CeaImportBatch.planning_year_id == year_id).count(),
+        "facilitator_leave": db.query(PlanningFacilitatorLeave).filter(PlanningFacilitatorLeave.planning_year_id == year_id).count(),
+        "conflicts": db.query(PlanningConflict).filter(PlanningConflict.planning_year_id == year_id).count(),
+    }
+    blockers = {k: v for k, v in dependents.items() if v > 0}
+    if blockers:
+        raise HTTPException(409, detail={
+            "error": "has_dependents", "dependents": blockers,
+            "message": "This Training Year has linked records and cannot be permanently deleted. Archive it instead.",
+        })
+
+    name, year_num = py.name, py.year
+    db.delete(py)
+    db.commit()
+    audit(db, p, object_type="planning_year", object_id=year_id, action="delete",
+          old={"name": name, "year": year_num})
+    return {"ok": True}
+
+
 # ─────────────────────────────────────────────────────────────
 # Parade Dates
 # ─────────────────────────────────────────────────────────────

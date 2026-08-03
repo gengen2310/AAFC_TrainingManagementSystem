@@ -96,6 +96,106 @@ def test_sqn_admin_can_patch_own_planning_year(client):
     assert r.json()["name"] == "Updated Name"
 
 
+def test_sqn_admin_can_archive_and_restore_own_planning_year(client):
+    """Wires PATCH .../years/{id} for archive (active_status=false) and
+    restore (active_status=true) -- the same already-working endpoint the
+    Getting Started / Account Management archive pattern uses elsewhere,
+    now surfaced in the frontend Planning Year controls."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+
+    r = client.patch(f"/api/planning/years/{yr_id}", json={"active_status": False}, headers=hdr)
+    assert r.status_code == 200, r.text
+    assert r.json()["active_status"] is False
+
+    listed = client.get("/api/planning/years", headers=hdr).json()
+    assert any(y["planning_year_id"] == yr_id and y["active_status"] is False for y in listed)
+
+    r2 = client.patch(f"/api/planning/years/{yr_id}", json={"active_status": True}, headers=hdr)
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["active_status"] is True
+
+
+def test_general_cannot_archive_planning_year(client):
+    hdr_admin = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr_admin)
+    yr_id = year["planning_year_id"]
+    hdr_general = _general_hdr(client)
+    r = client.patch(f"/api/planning/years/{yr_id}", json={"active_status": False}, headers=hdr_general)
+    assert r.status_code == 403
+
+
+def test_patch_nonexistent_planning_year_returns_404(client):
+    hdr = _sqn_admin_hdr(client)
+    r = client.patch("/api/planning/years/does-not-exist", json={"active_status": False}, headers=hdr)
+    assert r.status_code == 404
+
+
+def test_archive_planning_year_is_audited(client):
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    client.patch(f"/api/planning/years/{yr_id}", json={"active_status": False}, headers=hdr)
+    audit = client.get("/api/audit", headers=hdr).json()
+    found = any(a.get("object_id") == yr_id and a.get("action") == "update" for a in audit)
+    assert found, "planning year archive not found in audit log"
+
+
+def test_delete_empty_planning_year_succeeds(client):
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.delete(f"/api/planning/years/{yr_id}", headers=hdr)
+    assert r.status_code == 200, r.text
+    assert client.get(f"/api/planning/years/{yr_id}", headers=hdr).status_code == 404
+
+
+def test_delete_planning_year_blocked_when_holiday_exists(client):
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    client.post(f"/api/planning/years/{yr_id}/holidays", json={
+        "name": "Blocker Holiday", "start_date": "2026-04-01", "end_date": "2026-04-14",
+    }, headers=hdr)
+
+    r = client.delete(f"/api/planning/years/{yr_id}", headers=hdr)
+    assert r.status_code == 409, r.text
+    body = r.json()["detail"]
+    assert body["error"] == "has_dependents"
+    assert body["dependents"]["holidays"] == 1
+
+    # Still exists and can still be archived instead (the offered fallback).
+    still_there = client.get(f"/api/planning/years/{yr_id}", headers=hdr)
+    assert still_there.status_code == 200
+    archive_r = client.patch(f"/api/planning/years/{yr_id}", json={"active_status": False}, headers=hdr)
+    assert archive_r.status_code == 200
+
+
+def test_delete_planning_year_forbidden_for_general(client):
+    hdr_admin = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr_admin)
+    yr_id = year["planning_year_id"]
+    hdr_general = _general_hdr(client)
+    r = client.delete(f"/api/planning/years/{yr_id}", headers=hdr_general)
+    assert r.status_code == 403
+
+
+def test_delete_planning_year_unauthenticated(client):
+    r = client.delete("/api/planning/years/some-id")
+    assert r.status_code == 401
+
+
+def test_delete_planning_year_is_audited(client):
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    client.delete(f"/api/planning/years/{yr_id}", headers=hdr)
+    audit = client.get("/api/audit", headers=hdr).json()
+    found = any(a.get("object_id") == yr_id and a.get("action") == "delete" for a in audit)
+    assert found, "planning year delete not found in audit log"
+
+
 def test_get_nonexistent_year_returns_404(client):
     hdr = _sqn_admin_hdr(client)
     r = client.get("/api/planning/years/nonexistent-id", headers=hdr)
