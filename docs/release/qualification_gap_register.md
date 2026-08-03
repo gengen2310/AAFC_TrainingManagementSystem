@@ -2194,6 +2194,68 @@ either overclaimed as solved or silently abandoned:
   jumping to a large configuration change and validating with a single full
   load-sequence run.
 
+### Second follow-up round: two more real diagnoses, still no clean pass, staging fully reverted again
+
+At the user's continued request, resumed the investigation with smaller,
+more controlled tests (100 users, isolating one variable at a time) instead
+of immediately re-running the full 1200-user sequence. This produced two
+more genuine, evidence-based findings, and one more honest non-result:
+
+- **A controlled 100-user test with conservative backend settings (unchanged
+  `GUNICORN_WORKERS=6`) isolated PgBouncer cleanly and found problems at an
+  even lower threshold (26-27 active users)** than the original direct-
+  connection baseline ever showed at 300. PgBouncer's own wait-time stat was
+  negligible (94μs) and its container resource usage was trivial (0.0 CPU,
+  6.5MB memory) — ruling out PgBouncer itself as the cause this time.
+- **Root cause #2, found by reading the actual code, not guessing**:
+  `backend/app/database.py` sets `pool_pre_ping=True`. This is a documented
+  incompatibility with PgBouncer's *transaction* pooling mode — pre-ping
+  issues a validation query on every connection checkout, and in transaction
+  mode each checkout can map to a different real Postgres connection, so the
+  overhead multiplies per-request instead of staying cheap. This explains
+  why problems appeared at low concurrency (per-checkout overhead, not a
+  capacity/exhaustion effect).
+- **Fix**: switched PgBouncer to `pool_mode=session` (keeps each checkout on
+  a stable real connection, closer to direct-connection semantics). Re-ran
+  the same controlled test: the first window was clean (37 active, 100%
+  success), materially better than any transaction-mode attempt — but the
+  full run's cumulative totals showed 778 successful reads against 447
+  *login* timeouts specifically (not general reads), pointing at a third
+  factor.
+- **Root cause #3**: the test still had `GUNICORN_WORKERS=6` (kept low
+  deliberately, to isolate the PgBouncer variable) — but 6 synchronous
+  workers cannot serve 100 concurrent login requests regardless of the
+  database layer. This was never going to look clean; the test was
+  inadvertently measuring worker-count exhaustion, not PgBouncer.
+- **Combined fix**: raised `GUNICORN_WORKERS` to 12 and re-sized every layer
+  consistently (backend `DB_POOL_SIZE=5`/`DB_POOL_MAX_OVERFLOW=2` per
+  worker × 12 = 84; PgBouncer `DEFAULT_POOL_SIZE=90`; Postgres
+  `max_connections=100` — each layer with headroom under the next). Re-ran
+  the controlled test a third time: **materially better than every prior
+  attempt** (one window hit 94% success, 255/271) but still oscillated
+  between good and degraded windows across the full run rather than settling
+  into a clean, stable pass. The test's own final health check timed out at
+  the very end, consistent with the same ongoing instability rather than a
+  new separate failure.
+- **Stopped here.** Three real, evidence-based root causes were found and
+  fixed in this investigation across both rounds (Postgres `max_connections`
+  exhaustion, a `pool_pre_ping`/transaction-mode incompatibility, and
+  worker-count exhaustion at low worker counts) — each fix produced a real,
+  measurable improvement over the last. But the combination has not yet
+  converged to a clean, stable pass, and a fourth root cause (not yet
+  identified) is still oscillating results even under the best
+  configuration tried. Reverted staging fully to the original known-safe
+  configuration (direct Postgres connection, `GUNICORN_WORKERS=6`,
+  `DB_POOL_SIZE=8`, `DB_POOL_MAX_OVERFLOW=4`) and confirmed healthy.
+  `pgbouncer-staging` remains deployed but disconnected.
+- **Disposition unchanged**: still P2, still open. This is now a
+  well-characterized, partially-solved problem with a clear paper trail of
+  what's been tried, what worked, and what didn't — genuinely useful
+  groundwork for whoever picks this up next, even though it isn't finished.
+  Continuing to iterate further in this same session was judged not
+  productive given the pattern of oscillating, non-converging results
+  despite real fixes each round.
+
 ### Section 4 classification: CONDITIONAL PASS
 
 Per the instruction's own Section 5 criteria: server remained healthy (0 5xx)
