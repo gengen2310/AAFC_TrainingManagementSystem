@@ -70,7 +70,7 @@ def test_steps_list_scoped_to_squadron_only_for_sqn_admin(client):
     step_keys = {s["key"] for s in d["steps"]}
     assert step_keys == {
         "facilitators_added", "training_areas_added", "timing_template_confirmed",
-        "cea_imported", "parade_nights_generated", "curriculum_coverage",
+        "holidays_configured", "cea_imported", "parade_nights_generated", "curriculum_coverage",
     }
 
 
@@ -109,8 +109,33 @@ def test_new_squadron_with_nothing_set_up_is_not_complete(client):
     # wings/squadrons already exist globally from the seed data. Only this
     # brand-new squadron's OWN steps should all be pending.
     squadron_step_keys = {"facilitators_added", "training_areas_added", "timing_template_confirmed",
-                          "cea_imported", "parade_nights_generated", "curriculum_coverage"}
+                          "holidays_configured", "cea_imported", "parade_nights_generated", "curriculum_coverage"}
     assert all(not s["done"] for s in d["steps"] if s["key"] in squadron_step_keys)
+
+
+def test_holidays_configured_false_until_a_holiday_exists_for_the_active_year(client):
+    # A fresh squadron, not the seeded "703" -- 703's seed data already
+    # includes WA holidays for its planning year, so it can't demonstrate the
+    # "not yet configured" starting state.
+    hdr = _sysadmin(client)
+    wing_id = client.post("/api/wings", json={"code": "HOLWG1", "name": "Holiday Setup Test Wing"}, headers=hdr).json()["wing_id"]
+    sqn_id = client.post("/api/squadrons", json={"wing_id": wing_id, "code": "HOL01", "name": "Holiday Setup Test Unit"},
+                         headers=hdr).json()["squadron_id"]
+
+    d0 = client.get(f"/api/setup/status?squadron_id={sqn_id}", headers=hdr).json()
+    assert d0["squadron"]["holidays_configured"] is False
+
+    year_id = client.post("/api/planning/years", json={
+        "year": 2099, "name": "Holiday Setup Test Year", "unit_id": sqn_id,
+    }, headers=hdr).json()["planning_year_id"]
+    client.post(f"/api/planning/years/{year_id}/holidays", json={
+        "name": "Test School Holidays", "start_date": "2099-04-01", "end_date": "2099-04-14",
+    }, headers=hdr)
+
+    d1 = client.get(f"/api/setup/status?squadron_id={sqn_id}", headers=hdr).json()
+    assert d1["squadron"]["holidays_configured"] is True
+    step = next(s for s in d1["steps"] if s["key"] == "holidays_configured")
+    assert step["done"] is True
 
 
 def test_setup_status_unauthenticated(client):

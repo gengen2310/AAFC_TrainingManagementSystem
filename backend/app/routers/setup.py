@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session as DBSession
 from ..database import get_db
 from ..models import (
     Wing, Squadron, Facilitator, TrainingArea, TimingTemplate, CurriculumItem,
-    ParadeNight, Session as TrainingSession, CeaActivity,
+    ParadeNight, Session as TrainingSession, CeaActivity, PlanningYear, HolidayPeriod,
 )
 from ..dependencies import get_principal
 from ..permissions import Principal
@@ -50,6 +50,11 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
                 ParadeNight.date >= today).count()
             cea_imported = db.query(CeaActivity).filter(CeaActivity.wing_id == s.wing_id).count() > 0
 
+            active_year_ids = [y.id for y in db.query(PlanningYear).filter(
+                PlanningYear.unit_id == sq_id, PlanningYear.active_status == True).all()]  # noqa: E712
+            holidays_configured = bool(active_year_ids) and db.query(HolidayPeriod).filter(
+                HolidayPeriod.planning_year_id.in_(active_year_ids)).count() > 0
+
             # Curriculum coverage: % of items visible to this squadron (national +
             # this wing + this squadron -- same visibility rule as GET /curriculum)
             # that have at least one scheduled session.
@@ -74,6 +79,7 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
                 "parade_nights_generated": parade_nights_generated,
                 "cea_imported": cea_imported,
                 "curriculum_coverage_pct": curriculum_coverage_pct,
+                "holidays_configured": holidays_configured,
             }
 
     steps = []
@@ -92,6 +98,8 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
                       "link_page": "resources"})
         steps.append({"key": "timing_template_confirmed", "label": "Confirm Parade Night Timing Template",
                       "done": squadron["timing_template_confirmed"], "count": None, "link_page": "settings"})
+        steps.append({"key": "holidays_configured", "label": "Add or Import Holidays",
+                      "done": squadron["holidays_configured"], "count": None, "link_page": "activities"})
         steps.append({"key": "cea_imported", "label": "Import CEA Activities", "done": squadron["cea_imported"],
                       "count": None, "link_page": "activities"})
         steps.append({"key": "parade_nights_generated", "label": "Generate Parade Nights",
