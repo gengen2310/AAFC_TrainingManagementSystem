@@ -2832,11 +2832,25 @@ async function api(path, opts={}){
     fetchOpts.body=JSON.stringify(fetchOpts.body);
   }
   let res;
-  try{
-    res=await fetch(API_BASE+path,fetchOpts);
-  }catch(e){
-    // fetch() throws only on true network failure or CORS preflight block — not on HTTP errors
-    throw {kind:'network', msg:'Cannot reach the backend at '+(API_BASE||location.origin)+'. Check the backend is running and try again.'};
+  // Single-replica deployments (see .claude/rules/deployment.md) have no overlap
+  // between the old and new container during a redeploy -- a real, brief
+  // (typically well under a second) connectivity gap, not a stuck backend.
+  // Retry transient network failures with backoff before surfacing an error,
+  // but only for GET (safe/idempotent) -- fetch() can throw after a request
+  // already reached the server, so retrying a write here risks a duplicate.
+  const method=(fetchOpts.method||'GET').toUpperCase();
+  const maxAttempts=method==='GET'?3:1;
+  for(let attempt=1;;attempt++){
+    try{
+      res=await fetch(API_BASE+path,fetchOpts);
+      break;
+    }catch(e){
+      // fetch() throws only on true network failure or CORS preflight block — not on HTTP errors
+      if(attempt>=maxAttempts){
+        throw {kind:'network', msg:'Cannot reach the backend at '+(API_BASE||location.origin)+'. Check the backend is running and try again.'};
+      }
+      await new Promise(r=>setTimeout(r,attempt*400));
+    }
   }
   if(res.status===401){
     tokenClear();
