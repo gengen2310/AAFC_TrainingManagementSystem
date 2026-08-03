@@ -88,13 +88,25 @@ materially equivalent sequence end-to-end.
 
 ## All staging features confirmed in production
 
-**Not verified this pass** — see the feature reconciliation table below and
-Section 6/10's disclosed credential blocker. Source-commit evidence exists
-for every capability (all are present in the deployed `d4f00cb` commit,
-which was already live-deployed to production earlier the same day as part
-of the original Final System Assurance engagement's own authorized
-production release). Fresh live-browser runtime re-verification specific to
-this pass was blocked on staging/production credential availability.
+**Partially verified this pass, updated after the credential blocker was
+resolved.** The user supplied the current staging `system_admin` code
+mid-session. Live-verified against staging: login, System Console, Account
+Management, the `sa-scope-bar` Wing-selection mechanism, Wing Training
+Dashboard (correct scoping, honest no-fabricated-data states), National/Wing
+Activities, Curriculum, and Audit Log — zero console errors throughout. See
+`final_staging_feature_verification_accelerated.md` for full detail,
+including one real finding (10 duplicate leftover `PLAYWRIGHT TEST HOLIDAY`
+rows on staging). Remaining roles (`wing_admin`, `national_admin`,
+`sqn_admin`, `sqn_general`, `auditor`) and Proxy/Intervention Mode entry are
+still unverified this pass — no credentials available for them, and this
+pass deliberately avoided actions that could trigger a native `confirm()`
+dialog. Beyond this live evidence, source-commit evidence exists for every
+capability (all present in the deployed `d4f00cb` commit, already
+live-deployed to production earlier the same day as part of the original
+Final System Assurance engagement's own authorized production release).
+Production's own credentials are separate from staging's per this repo's
+security invariants, so the staging code was not assumed to work there —
+production's authenticated smoke checklist remains as documented below.
 
 ## Production smoke result
 
@@ -122,10 +134,20 @@ forward-fix trigger criteria were met at any point. Full detail:
 1. **GAP-29** (P2): capacity ceiling ~600-1000 concurrent users on staging's
    current PostgreSQL connection limit. Does not affect current real usage
    (`squadrons: 1`). Production's own connection limit untested this way.
-2. **Staging/production credential availability** (P2): Sections 6 and 10's
-   live-authenticated verification were both blocked this pass. Partially
-   mitigated by prior-session production verification (GAP-27) and the
-   backend test suite's 188 targeted RBAC tests.
+2. **Staging/production credential availability** (downgraded P2→P3 for
+   staging, still P2 for production): the user supplied the current staging
+   `system_admin` code mid-session, and that role — plus the shared Wing/
+   Squadron render path other roles reuse — is now live-verified on
+   staging (see Section 6 above). `wing_admin`/`national_admin`/
+   `sqn_admin`/`sqn_general`/`auditor` and Proxy/Intervention Mode entry
+   remain unverified on staging. Production's authenticated checklist
+   (Section 10) is still fully open — production uses separate credentials
+   per this repo's security invariants, not assumed from the staging code —
+   partially mitigated by prior-session production verification (GAP-27)
+   and the backend test suite's 188 targeted RBAC tests. One new, real,
+   staging-only finding from this verification: 10 duplicate leftover
+   `PLAYWRIGHT TEST HOLIDAY` rows on staging's Wing Activities (test data
+   never cleaned up after a prior run) — cosmetic, not a production risk.
 3. 83 remaining unlabeled `<select>` elements in `connected-frontend` (P3,
    unchanged from prior passes).
 4. No `<h1>`/semantic landmark structure in `connected-frontend` (P3,
@@ -181,7 +203,8 @@ direction — purely a CSS/token and deployment-script change.
 | PostgreSQL client version fix (GAP-26) | Build-verified via real Railway deploy | Deployed | **Released** |
 | Accessibility corrections (select-name, color-contrast) | Live-verified this pass (18 page-scans + fresh critical-check, 0 violations) | Deployed this pass (`d4f00cb`) | **Released** |
 | Backup configuration correction (GAP-16/18) | Live-verified, zero-caveat restore test | N/A (backend/DB-level, not per-service) | **Released** |
-| Live staging role verification (all roles) | Attempted, blocked on credentials | N/A | **Blocked** — see `final_staging_feature_verification_accelerated.md` |
+| Live staging role verification — `system_admin` | Live-verified (login, System Console, Account Management, Wing scoping, dashboards, Curriculum, Audit) | N/A | **Released** |
+| Live staging role verification — other roles (`wing_admin`/`national_admin`/`sqn_admin`/`sqn_general`/`auditor`) | Attempted, blocked on credentials | N/A | **Blocked** — see `final_staging_feature_verification_accelerated.md` |
 | Live production authenticated smoke checklist | N/A | Attempted, blocked on credentials; partially covered by prior-session GAP-27 verification | **Blocked** — see `final_production_smoke_test.md` |
 | 1,000-1,200 concurrent user capacity | Tested, real failure found and diagnosed (GAP-29) | Not tested this way | **Intentionally excluded** — reason: precisely-diagnosed infrastructure ceiling, remediation is an infrastructure decision beyond this pass's safe scope, current real usage far below this threshold |
 
