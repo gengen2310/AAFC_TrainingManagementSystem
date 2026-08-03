@@ -4,10 +4,12 @@ Accounts:
   GET    /api/accounts            — list (scoped to actor's authority)
   POST   /api/accounts            — create (returns new code once)
   GET    /api/accounts/{id}       — single account
-  PATCH  /api/accounts/{id}       — update display_name / role / flight_id
+  PATCH  /api/accounts/{id}       — update display_name / flight_id
+  POST   /api/accounts/{id}/change-role — change role/access type (same scope level only)
   POST   /api/accounts/{id}/reset-code  — generate or set new code (returned once)
   POST   /api/accounts/{id}/disable     — deactivate user
   POST   /api/accounts/{id}/reactivate  — reactivate user
+  POST   /api/accounts/{id}/archive     — soft-delete (reversible via .../restore)
 
 Flights (Squadron-local groupings only — no tenancy, no permissions):
   GET    /api/flights              — list (scoped)
@@ -27,11 +29,11 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
-from ..models import User, AccessCode, Wing, Squadron, Flight, NationalEntity
+from ..models import User, AccessCode, Wing, Squadron, Flight, NationalEntity, AuditLog
 from ..dependencies import get_principal
 from ..permissions import Principal
 from ..security import hash_code, generate_code
-from ..services import audit
+from ..services import audit, fk_dependents
 from ..permissions import ROLES as _ALL_ROLES
 
 router = APIRouter(prefix="/api", tags=["accounts"])
@@ -398,6 +400,55 @@ def update_account(uid: str, body: AccountUpdateIn, db: DBSession = Depends(get_
     return {"ok": True}
 
 
+class ChangeRoleIn(BaseModel):
+    new_role: str
+
+
+@router.post("/accounts/{uid}/change-role")
+def change_role(uid: str, body: ChangeRoleIn, db: DBSession = Depends(get_db),
+                p: Principal = Depends(get_principal)):
+    """Change a target account's role/access type, within the same scope level
+    (squadron/wing/national) the account already belongs to. Cross-scope changes
+    (e.g. squadron -> wing) are rejected -- that requires reassigning the account's
+    org membership too, which is a materially different, riskier operation than a
+    permission-level change and isn't handled here."""
+    _require_write_actor(p)
+    u = db.get(User, uid)
+    if not u or u.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if uid == p.user_id:
+        raise HTTPException(400, detail={"error": "cannot_change_own_role"})
+    _require_manage_authority(p, u, db)
+
+    new_role = body.new_role
+    if new_role not in _ALL_ROLES:
+        raise HTTPException(422, detail={"error": "invalid_role"})
+    allowed = _CREATE_AUTHORITY.get(p.role, set())
+    if new_role not in allowed:
+        raise HTTPException(403, detail={"error": "forbidden",
+                                          "message": f"Your role ({p.role}) cannot assign {new_role}."})
+    if new_role == u.role:
+        raise HTTPException(400, detail={"error": "role_unchanged"})
+    if _scope_type(new_role) != _scope_type(u.role):
+        raise HTTPException(422, detail={"error": "cross_scope_role_change",
+                                          "message": "Changing role across scope levels isn't supported here. Archive this account and create a new one with the target role/scope instead."})
+    if (u.role == "system_admin" and u.active_status
+            and _last_active_system_admin_count(db) <= 1):
+        raise HTTPException(409, detail={"error": "last_active_system_admin",
+                                          "message": "Cannot change the role of the last active System Administrator."})
+
+    old_role = u.role
+    u.role = new_role
+    u.updated_by = p.user_id
+    # Force re-login so the new role/permissions take effect immediately rather
+    # than the old JWT continuing to carry stale role/scope claims.
+    u.token_version = (u.token_version or 0) + 1
+    db.commit()
+    audit(db, p, object_type="account", object_id=u.id, action="role_changed",
+          old={"role": old_role}, new={"role": new_role, "display_name": u.display_name})
+    return {"ok": True}
+
+
 @router.post("/accounts/{uid}/reset-code")
 def reset_code(uid: str, body: ResetCodeIn, db: DBSession = Depends(get_db),
                p: Principal = Depends(get_principal)):
@@ -537,6 +588,58 @@ def restore_account(uid: str, db: DBSession = Depends(get_db), p: Principal = De
     db.commit()
     audit(db, p, object_type="account", object_id=u.id, action="account_restored",
           new={"display_name": u.display_name, "role": u.role})
+    return {"ok": True}
+
+
+@router.delete("/accounts/{uid}")
+def delete_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Permanent delete -- only when already archived AND a dependency check
+    shows the account performed no privileged actions of its own and has
+    never actually been used (no last_login_at). Deliberately does NOT block
+    on audit entries where this account is merely the *target* (e.g. its own
+    account_created/account_archived rows) -- those are just this account's
+    own lifecycle history, not another record depending on it, and archiving
+    is itself a required precondition here, so treating it as a blocker
+    would make every hard-delete unreachable. AuditLog.user_id has no
+    DB-level foreign key (deliberately decoupled so audit history survives
+    account changes), so the "performed privileged actions" check below is a
+    policy choice, not something the database enforces on its own -- matching
+    "block where audit or operational history requires the account
+    identifier". Additive to the existing archive path; archive remains the
+    default whenever any dependent exists."""
+    _require_write_actor(p)
+    u = db.get(User, uid)
+    if not u:
+        raise HTTPException(404, detail={"error": "not_found"})
+    _require_manage_authority(p, u, db)
+    if not u.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived",
+                                          "message": "Archive this account first before permanently deleting it."})
+
+    # fk_dependents walks every real foreign key pointing at users.id (today:
+    # ProxySession.actor_user_id; automatically covers anything added later)
+    # -- access_codes.user_id is excluded since those rows are intentionally
+    # cascade-deleted below as part of the account, not a blocker.
+    dependents = fk_dependents(db, "users", uid)
+    dependents.pop("access_codes.user_id", None)
+    audit_as_actor = db.query(AuditLog).filter(AuditLog.user_id == uid).count()
+    if audit_as_actor:
+        dependents["audit_log_as_actor"] = audit_as_actor
+    if u.last_login_at is not None:
+        dependents["has_logged_in"] = 1
+    if dependents:
+        raise HTTPException(409, detail={
+            "error": "has_dependents", "dependents": dependents,
+            "message": "This account has audit or login history and cannot be permanently deleted. It remains archived.",
+        })
+
+    display_name, role = u.display_name, u.role
+    for ac in db.query(AccessCode).filter(AccessCode.user_id == uid).all():
+        db.delete(ac)
+    db.delete(u)
+    db.commit()
+    audit(db, p, object_type="account", object_id=uid, action="delete",
+          old={"display_name": display_name, "role": role})
     return {"ok": True}
 
 

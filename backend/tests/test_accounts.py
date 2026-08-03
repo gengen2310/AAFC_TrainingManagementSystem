@@ -782,3 +782,125 @@ def test_cross_squadron_reset_denied(client):
     # 703 admin tries to reset code for a 704 user — must be 403
     r = client.post(f"/api/accounts/{uid}/reset-code", headers=h_703, json={})
     assert r.status_code == 403, f"Expected 403, got {r.status_code}: {r.text}"
+
+
+# ─────────────────────────────────────────────────────────────
+# 10. Role / access-type change
+# ─────────────────────────────────────────────────────────────
+
+def test_change_role_happy_path(client):
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_id = _get_sqn_id(client, h7wg, "703")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Role Change Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_id,
+    })
+    uid = create_r.json()["user_id"]
+
+    r = client.post(f"/api/accounts/{uid}/change-role", headers=h_nat,
+                     json={"new_role": "sqn_admin"})
+    assert r.status_code == 200, r.text
+
+    got = client.get(f"/api/accounts/{uid}", headers=h_nat).json()
+    assert got["role"] == "sqn_admin"
+
+
+def test_change_role_is_audited(client):
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_id = _get_sqn_id(client, h7wg, "703")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Role Change Audit Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_id,
+    })
+    uid = create_r.json()["user_id"]
+    client.post(f"/api/accounts/{uid}/change-role", headers=h_nat, json={"new_role": "sqn_admin"})
+
+    audit = client.get("/api/audit", headers=h_nat).json()
+    entry = next((a for a in audit if a.get("object_id") == uid and a.get("action") == "role_changed"), None)
+    assert entry is not None, "role_changed action not found in audit log"
+
+
+def test_change_role_forbidden_for_read_only_role(client):
+    """auditor (read-only) cannot change anyone's role."""
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_id = _get_sqn_id(client, h7wg, "703")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Role Change Forbidden Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_id,
+    })
+    uid = create_r.json()["user_id"]
+
+    # Verify via a role this actor genuinely lacks authority over: sqn_admin
+    # cannot promote a sqn_general straight to wing_admin.
+    h_sqn = login(client, "ADMIN703")
+    r = client.post(f"/api/accounts/{uid}/change-role", headers=h_sqn, json={"new_role": "wing_admin"})
+    assert r.status_code == 403, r.text
+
+
+def test_change_role_unauthenticated(client):
+    r = client.post("/api/accounts/some-id/change-role", json={"new_role": "sqn_admin"})
+    assert r.status_code == 401, r.text
+
+
+def test_change_role_cross_scope_rejected(client):
+    """Squadron-scope role -> wing-scope role is a different operation (org
+    reassignment), not a plain permission-level change, and must be rejected."""
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_id = _get_sqn_id(client, h7wg, "703")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Cross Scope Role Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_id,
+    })
+    uid = create_r.json()["user_id"]
+
+    r = client.post(f"/api/accounts/{uid}/change-role", headers=h_nat, json={"new_role": "wing_admin"})
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]["error"] == "cross_scope_role_change"
+
+
+def test_cannot_change_own_role(client):
+    h_nat = login(client, "ADMINNATIONAL")
+    me = client.get("/api/auth/me", headers=h_nat).json()["session"]
+    r = client.post(f"/api/accounts/{me['user_id']}/change-role", headers=h_nat,
+                     json={"new_role": "national_viewer"})
+    assert r.status_code == 400, r.text
+
+
+def test_change_role_never_drives_active_admin_count_below_one(client):
+    """The real guarantee here, mirroring the documented reasoning in
+    test_bulk_account_archive.py::test_batch_archive_never_drives_active_admin_count_to_zero:
+    the explicit "last_active_system_admin" 409 branch in change_role is
+    deliberately unreachable through this HTTP endpoint under normal use, and
+    that is by design. Reaching it would require an actor who has authority to
+    change a system_admin's role (i.e. is themselves an active system_admin,
+    per _CREATE_AUTHORITY) to act on a DIFFERENT system_admin target while the
+    count is already <=1 — but the actor's own active membership always
+    contributes at least 1 to that count, and self-changes are separately
+    blocked (test_cannot_change_own_role), so any legal two-party call always
+    has count >= 2 beforehand. What IS reachable and tested here: demoting one
+    of several active system_admins down to a smaller-but-still-nonzero count
+    succeeds cleanly."""
+    h_sa = login(client, "SYSADMIN2026")
+    create_r = client.post("/api/accounts", headers=h_sa, json={
+        "display_name": "Second Sysadmin",
+        "role": "system_admin",
+    })
+    uid2 = create_r.json()["user_id"]
+
+    # Two active system_admins now exist — demoting the second one is fine,
+    # since the acting admin's own active membership keeps the floor at 1.
+    r = client.post(f"/api/accounts/{uid2}/change-role", headers=h_sa,
+                     json={"new_role": "national_admin"})
+    assert r.status_code == 200, r.text

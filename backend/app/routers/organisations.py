@@ -12,7 +12,7 @@ from ..models import (
 from ..models.organisations import UNIT_TYPES
 from ..dependencies import get_principal, client_meta
 from ..permissions import Principal, require_role, require_can_view_squadron, require_can_write_squadron, require_system_or_nat_admin
-from ..services import audit
+from ..services import audit, fk_dependents
 
 router = APIRouter(prefix="/api", tags=["organisations"])
 
@@ -32,13 +32,16 @@ def national_overview(db: DBSession = Depends(get_db), p: Principal = Depends(ge
 
 
 @router.get("/wings")
-def list_wings(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    q = db.query(Wing).filter(Wing.is_archived == False)  # noqa: E712
+def list_wings(include_archived: bool = False, db: DBSession = Depends(get_db),
+               p: Principal = Depends(get_principal)):
+    q = db.query(Wing)
+    if not include_archived:
+        q = q.filter(Wing.is_archived == False)  # noqa: E712
     wings = q.all()
     if not p.is_national:
         wings = [w for w in wings if w.id == p.wing_id]
     return [{"wing_id": w.id, "code": w.code, "name": w.name,
-             "short_name": getattr(w, "short_name", w.code)} for w in wings]
+             "short_name": getattr(w, "short_name", w.code), "is_archived": w.is_archived} for w in wings]
 
 
 class WingCreateIn(BaseModel):
@@ -178,10 +181,46 @@ def restore_wing(wing_id: str, db: DBSession = Depends(get_db),
     return {"ok": True, "wing_id": w.id, "archived": False}
 
 
+@router.delete("/wings/{wing_id}")
+def delete_wing(wing_id: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Permanent delete -- only when already archived AND a dependency check
+    shows zero linked records. Uses fk_dependents() (walks every real foreign
+    key pointing at wings.id) so a table added later is automatically
+    covered, plus an explicit Activity check since Activity.wing_id is a
+    denormalized column, not a DB-enforced foreign key. Additive to the
+    existing archive path; archive remains the default whenever any
+    dependent exists."""
+    require_system_or_nat_admin(p)
+    w = db.get(Wing, wing_id)
+    if not w:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if not w.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived",
+                                          "message": "Archive this Wing first before permanently deleting it."})
+
+    blockers = fk_dependents(db, "wings", wing_id)
+    activities = db.query(Activity).filter(Activity.wing_id == wing_id).count()
+    if activities:
+        blockers["activities.wing_id"] = activities
+    if blockers:
+        raise HTTPException(409, detail={
+            "error": "has_dependents", "dependents": blockers,
+            "message": "This Wing has linked records and cannot be permanently deleted. It remains archived.",
+        })
+
+    code, name = w.code, w.name
+    db.delete(w)
+    db.commit()
+    audit(db, p, object_type="wing", object_id=wing_id, action="delete", old={"code": code, "name": name})
+    return {"ok": True}
+
+
 @router.get("/squadrons")
-def list_squadrons(wing_id: str | None = None, unit_type: str | None = None,
+def list_squadrons(wing_id: str | None = None, unit_type: str | None = None, include_archived: bool = False,
                    db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    q = db.query(Squadron).filter(Squadron.is_archived == False)  # noqa: E712
+    q = db.query(Squadron)
+    if not include_archived:
+        q = q.filter(Squadron.is_archived == False)  # noqa: E712
     sqns = q.all()
     if p.is_national:
         pass
@@ -390,6 +429,46 @@ def restore_squadron(squadron_id: str, db: DBSession = Depends(get_db),
     return {"ok": True, "squadron_id": s.id, "archived": False}
 
 
+@router.delete("/squadrons/{squadron_id}")
+def delete_squadron(squadron_id: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Permanent delete -- only when already archived AND a dependency check
+    shows zero linked records. Uses fk_dependents() (walks every real foreign
+    key pointing at squadrons.id -- Flight, ParadeNight, Facilitator,
+    TrainingArea, Equipment, PlanningYear, ParadeDate, AnchorEvent, and every
+    other FK-constrained table, present now or added later) so a manually
+    maintained list can't silently miss one and crash with an
+    IntegrityError, plus an explicit Activity check since Activity.squadron_id
+    is a denormalized column, not a DB-enforced foreign key. Additive to the
+    existing archive path; archive remains the default whenever any
+    dependent exists."""
+    if p.role not in {*_NAT_ADMIN_ROLES, "wing_admin"}:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    s = db.get(Squadron, squadron_id)
+    if not s:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if p.role == "wing_admin" and s.wing_id != p.wing_id:
+        raise HTTPException(403, detail={"error": "out_of_scope"})
+    if not s.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived",
+                                          "message": "Archive this unit first before permanently deleting it."})
+
+    blockers = fk_dependents(db, "squadrons", squadron_id)
+    activities = db.query(Activity).filter(Activity.squadron_id == squadron_id).count()
+    if activities:
+        blockers["activities.squadron_id"] = activities
+    if blockers:
+        raise HTTPException(409, detail={
+            "error": "has_dependents", "dependents": blockers,
+            "message": "This unit has linked records and cannot be permanently deleted. It remains archived.",
+        })
+
+    code, name = s.code, s.name
+    db.delete(s)
+    db.commit()
+    audit(db, p, object_type="squadron", object_id=squadron_id, action="delete", old={"code": code, "name": name})
+    return {"ok": True}
+
+
 @router.get("/squadrons/{squadron_id}")
 def get_squadron(squadron_id: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     s = db.get(Squadron, squadron_id)
@@ -466,7 +545,8 @@ def _sqn(s: Squadron) -> dict:
             "short_name": s.short_name, "unit_type": getattr(s, "unit_type", "standard_squadron"),
             "address": s.address, "default_parade_day": s.default_parade_day,
             "default_start_time": s.default_start_time, "default_end_time": s.default_end_time,
-            "default_session_count": s.default_session_count, "active_status": s.active_status}
+            "default_session_count": s.default_session_count, "active_status": s.active_status,
+            "is_archived": s.is_archived}
 
 
 # ── Proxy / Delegated Intervention ──

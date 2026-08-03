@@ -1,7 +1,9 @@
 """Audit logging (append-only) and the readiness scoring engine."""
 import json
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DBSession
 
+from .database import Base
 from .models import AuditLog
 from .permissions import Principal
 from .services_readiness import parade_night_readiness
@@ -36,6 +38,34 @@ def audit(db: DBSession, principal: Principal | None, *, object_type: str, objec
     db.add(entry)
     if commit:
         db.commit()
+
+
+def fk_dependents(db: DBSession, target_table: str, target_id: str) -> dict[str, int]:
+    """Generic hard-delete safety check: find every table with a foreign key
+    column pointing at `target_table`, and count rows where that column
+    equals `target_id`. Used by permanent-delete endpoints (Wing/Squadron/
+    Account) instead of a hand-maintained per-entity list of dependent
+    tables -- a manually enumerated list silently drifts out of date as new
+    models are added, and a missed one doesn't fail loudly: it lets
+    db.delete() proceed and crash with an IntegrityError (or, on a backend
+    that doesn't enforce FKs, silently orphan rows) instead of returning a
+    clean 409. Walking Base.metadata's actual foreign keys means a newly
+    added model with a FK to this entity is automatically covered.
+
+    Returns {"table.column": count} for every table/column with at least
+    one matching row; an empty dict means the delete is safe to proceed."""
+    dependents: dict[str, int] = {}
+    for table in Base.metadata.sorted_tables:
+        for col in table.columns:
+            for fk in col.foreign_keys:
+                if fk.column.table.name != target_table:
+                    continue
+                count = db.execute(
+                    select(func.count()).select_from(table).where(col == target_id)
+                ).scalar()
+                if count:
+                    dependents[f"{table.name}.{col.name}"] = count
+    return dependents
 
 
 # ── Readiness engine ──
