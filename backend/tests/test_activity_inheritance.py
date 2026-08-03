@@ -235,6 +235,60 @@ def test_archived_activity_excluded_from_active_view_included_in_archived_view(c
     assert any(i["activity_id"] == aid for i in archived)
 
 
+def test_restore_activity_happy_path(client):
+    hdr = _sysadmin(client)
+    aid = client.post("/api/activities/national", json={"activity_name": "REST01", "date_start": "2026-09-19"},
+                      headers=hdr).json()["activity_id"]
+    client.delete(f"/api/activities/{aid}", headers=hdr)
+
+    r = client.post(f"/api/activities/{aid}/restore", headers=hdr)
+    assert r.status_code == 200, r.text
+
+    active = client.get("/api/activities?scope_type=national&view=list", headers=hdr).json()["items"]
+    assert any(i["activity_id"] == aid for i in active)
+    archived = client.get("/api/activities?scope_type=national&view=archived", headers=hdr).json()["items"]
+    assert not any(i["activity_id"] == aid for i in archived)
+
+
+def test_restore_activity_forbidden_for_wrong_scope(client):
+    """A Wing admin cannot restore a National-owned activity."""
+    hdr_nat = _sysadmin(client)
+    aid = client.post("/api/activities/national", json={"activity_name": "REST02", "date_start": "2026-09-20"},
+                      headers=hdr_nat).json()["activity_id"]
+    client.delete(f"/api/activities/{aid}", headers=hdr_nat)
+
+    hdr_wing = _wing_admin_7wg(client)
+    r = client.post(f"/api/activities/{aid}/restore", headers=hdr_wing)
+    assert r.status_code == 403, r.text
+
+
+def test_restore_activity_unauthenticated(client):
+    r = client.post("/api/activities/some-id/restore")
+    assert r.status_code == 401, r.text
+
+
+def test_restore_activity_not_found_when_not_archived(client):
+    """Restoring an activity that isn't archived (or doesn't exist) is a 404,
+    not a silent no-op -- matches restore_account's own not-archived guard."""
+    hdr = _sysadmin(client)
+    aid = client.post("/api/activities/national", json={"activity_name": "REST03", "date_start": "2026-09-21"},
+                      headers=hdr).json()["activity_id"]
+    r = client.post(f"/api/activities/{aid}/restore", headers=hdr)
+    assert r.status_code == 404, r.text
+
+
+def test_restore_activity_is_audited(client):
+    hdr = _sysadmin(client)
+    aid = client.post("/api/activities/national", json={"activity_name": "REST04", "date_start": "2026-09-22"},
+                      headers=hdr).json()["activity_id"]
+    client.delete(f"/api/activities/{aid}", headers=hdr)
+    client.post(f"/api/activities/{aid}/restore", headers=hdr)
+
+    audit = client.get("/api/audit", headers=hdr).json()
+    found = any(a.get("object_id") == aid and a.get("action") == "restore" for a in audit)
+    assert found, "restore action not found in audit log"
+
+
 # ─────────────────────────────────────────────────────────────
 # Backward compatibility -- existing single-squadron shape unchanged
 # ─────────────────────────────────────────────────────────────

@@ -1648,6 +1648,19 @@ def delete_activity(aid: str, db: DBSession = Depends(get_db), p: Principal = De
     return {"ok": True}
 
 
+@router.post("/activities/{aid}/restore")
+def restore_activity(aid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    a = db.get(Activity, aid)
+    if not a or not a.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_activity(p, a.owning_level, a.wing_id, a.squadron_id)
+    a.is_archived = False
+    a.archived_at = None
+    db.commit()
+    audit(db, p, object_type="activity", object_id=a.id, action="restore")
+    return {"ok": True}
+
+
 # ── ACTIVITY GENERATION ──────────────────────────────────────────────────────
 
 RECURRENCE_OPTS = frozenset({"daily", "weekly", "fortnightly", "monthly", "yearly"})
