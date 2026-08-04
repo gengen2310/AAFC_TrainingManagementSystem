@@ -80,6 +80,14 @@ Never hardcode a specific `down_revision` value in this file — it will go stal
 - Do not remove existing audit logging, tenancy, or access-code controls
 - `ENVIRONMENT` must accurately reflect the deployment (`production`/`staging`/`development`) — `config.py`'s `is_production` and `validate_for_production()` fail-closed checks key off this value
 
+## Capability preservation
+
+See `.claude/rules/capability-preservation.md` for the non-negotiable rules on
+preserving existing features/routes/endpoints/roles/data during any refactor or
+remediation work, the required bug-resolution protocol, the "no false closure"
+discipline, and data-safety/git-safety requirements. Applies to all work on this
+repository, not only the remediation program it was written for.
+
 ## Before packaging/releasing
 
 See `.claude/skills/beta-release/SKILL.md` for the full release-gate process. In short: full backend test suite must pass, security greps (`.claude/rules/security.md`) must return 0, both frontends must be verified in-browser, migrations must be verified against a disposable DB, and `docs/beta/` release-readiness docs must be current — not just written once and forgotten.
