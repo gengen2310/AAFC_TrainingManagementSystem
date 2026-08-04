@@ -1799,6 +1799,16 @@ def create_location(
     unit_id = body.unit_id or p.squadron_id
     if p.role == "sqn_admin":
         unit_id = p.squadron_id
+    # A squadron-scoped Training Area is a delegated write on that squadron's
+    # data -- require Proxy/Delegated Intervention like every other squadron-
+    # scoped write, not just a bare role check (REM-45, Stage 12 follow-up;
+    # same class of gap as create_planning_year, fixed in Stage 10).
+    if unit_id:
+        wing_id = None
+        sqn = db.get(Squadron, unit_id)
+        if sqn:
+            wing_id = sqn.wing_id
+        require_can_write_squadron(p, unit_id, wing_id)
     loc = TrainingArea(
         id=str(uuid.uuid4()), squadron_id=unit_id, name=body.name,
         type=body.location_type, capacity=body.capacity,
@@ -1822,8 +1832,16 @@ def update_location(
     if not loc or loc.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     _require_plan_write(p)
-    if p.role == "sqn_admin" and loc.squadron_id != p.squadron_id:
-        raise HTTPException(403, detail={"error": "out_of_scope"})
+    # Resolved from the row's own squadron_id, never from caller-supplied
+    # context (REM-45, Stage 12 follow-up) -- previously only sqn_admin's own
+    # scope was checked; wing_admin/national_admin/system_admin could edit
+    # ANY squadron's Training Area with zero scope check at all.
+    if loc.squadron_id:
+        wing_id = None
+        sqn = db.get(Squadron, loc.squadron_id)
+        if sqn:
+            wing_id = sqn.wing_id
+        require_can_write_squadron(p, loc.squadron_id, wing_id)
     if body.name is not None:
         loc.name = body.name
     if body.location_type is not None:
@@ -1991,6 +2009,20 @@ def override_conflict(
     c = db.get(PlanningConflict, conflict_id)
     if not c:
         raise HTTPException(404, detail={"error": "not_found"})
+    # Resolved from the conflict's own linked PlanningYear, not caller-
+    # supplied context (REM-45, Stage 12 follow-up) -- previously
+    # wing_admin/national_admin/system_admin could resolve ANY conflict
+    # anywhere with zero scope check.
+    if c.planning_year_id:
+        py = db.get(PlanningYear, c.planning_year_id)
+        if py and py.unit_id:
+            wing_id = py.wing_id
+            sqn = db.get(Squadron, py.unit_id)
+            if sqn:
+                wing_id = sqn.wing_id
+            require_can_write_squadron(p, py.unit_id, wing_id)
+        elif py:
+            _require_year_access(p, py, write=True)
     c.is_resolved = True
     c.override_reason = body.override_reason
     c.resolved_by = p.user_id
@@ -3340,6 +3372,18 @@ async def import_annual_program(
     _require_plan_write(p)
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True)
+    # _require_year_access has no proxy/delegation awareness (by design, per
+    # architecture.md, for endpoints with no proxy concept) -- but importing
+    # a schedule into a squadron's plan IS a proxy/delegation-relevant
+    # squadron-scoped write, same as any other. Only enforced when this call
+    # will actually write (preview=true never touches the database) (REM-45,
+    # Stage 12 follow-up).
+    if not preview and py.unit_id:
+        wing_id = py.wing_id
+        sqn = db.get(Squadron, py.unit_id)
+        if sqn:
+            wing_id = sqn.wing_id
+        require_can_write_squadron(p, py.unit_id, wing_id)
 
     # Build the set of squadrons in scope for unit resolution
     sqn_q = db.query(Squadron).filter(Squadron.is_archived == False)  # noqa: E712

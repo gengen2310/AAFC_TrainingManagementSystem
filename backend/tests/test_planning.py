@@ -1206,6 +1206,127 @@ def test_national_admin_cannot_create_squadron_year_without_intervention(client)
 
 
 # ─────────────────────────────────────────────────────────────
+# REM-45 follow-up: the same Proxy/Intervention requirement extended to
+# create_location, update_location, override_conflict, and the Annual
+# Program import -- previously wing_admin/national_admin/system_admin could
+# perform each of these squadron-scoped writes with no scope check at all.
+# ─────────────────────────────────────────────────────────────
+
+def test_wing_admin_cannot_create_squadron_location_without_proxy(client):
+    wing_hdr = _wing_admin_hdr(client)
+    sqn_id = client.get("/api/auth/me", headers=_sqn_admin_hdr(client)).json()["session"]["squadron_id"]
+    r = client.post("/api/planning/locations", json={"name": "Test Room", "unit_id": sqn_id}, headers=wing_hdr)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "proxy_required"
+
+
+def test_wing_admin_can_create_squadron_location_with_proxy(client):
+    wing_hdr = _wing_admin_hdr(client)
+    sqn_id = client.get("/api/auth/me", headers=_sqn_admin_hdr(client)).json()["session"]["squadron_id"]
+    enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "REM-45 regression test"}, headers=wing_hdr)
+    assert enter.status_code == 200, enter.text
+    r = client.post("/api/planning/locations", json={"name": "Test Room 2", "unit_id": sqn_id}, headers=wing_hdr)
+    assert r.status_code == 200, r.text
+    client.post("/api/proxy/exit", headers=wing_hdr)
+
+
+def test_national_admin_cannot_update_squadron_location_without_intervention(client):
+    hdr = _sqn_admin_hdr(client)
+    loc_id = client.post("/api/planning/locations", json={"name": "Owned Room"}, headers=hdr).json()["location_id"]
+    nat_hdr = _nat_admin_hdr(client)
+    r = client.patch(f"/api/planning/locations/{loc_id}", json={"capacity": 99}, headers=nat_hdr)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "intervention_required"
+
+
+def test_national_admin_can_update_squadron_location_with_intervention(client):
+    hdr = _sqn_admin_hdr(client)
+    sqn_id = client.get("/api/auth/me", headers=hdr).json()["session"]["squadron_id"]
+    loc_id = client.post("/api/planning/locations", json={"name": "Owned Room 2"}, headers=hdr).json()["location_id"]
+    nat_hdr = _nat_admin_hdr(client)
+    enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "REM-45 regression test"}, headers=nat_hdr)
+    assert enter.status_code == 200, enter.text
+    r = client.patch(f"/api/planning/locations/{loc_id}", json={"capacity": 99}, headers=nat_hdr)
+    assert r.status_code == 200, r.text
+    client.post("/api/proxy/exit", headers=nat_hdr)
+
+
+def _make_holiday_conflict(client, hdr):
+    """Real PlanningConflict via the proven holiday-conflict pattern (mirrors
+    test_holiday_conflict_flagged_on_parade_date above)."""
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    client.post(f"/api/planning/years/{yr_id}/holidays",
+                json={"name": "Conflict Test Hols", "start_date": "2026-09-18",
+                      "end_date": "2026-10-02", "affects_parade": True}, headers=hdr)
+    client.post(f"/api/planning/years/{yr_id}/parade-dates",
+                json={"parade_date": "2026-09-25"}, headers=hdr)
+    client.post(f"/api/planning/years/{yr_id}/run-checks", headers=hdr)
+    conflicts = client.get(f"/api/planning/years/{yr_id}/conflicts", headers=hdr).json()["conflicts"]
+    assert conflicts, "expected at least one conflict"
+    return conflicts[0]["conflict_id"]
+
+
+def test_wing_admin_cannot_override_squadron_conflict_without_proxy(client):
+    hdr = _sqn_admin_hdr(client)
+    conflict_id = _make_holiday_conflict(client, hdr)
+    wing_hdr = _wing_admin_hdr(client)
+    r = client.post(f"/api/planning/conflicts/{conflict_id}/override",
+                    json={"override_reason": "should be blocked"}, headers=wing_hdr)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "proxy_required"
+
+
+def test_wing_admin_can_override_squadron_conflict_with_proxy(client):
+    hdr = _sqn_admin_hdr(client)
+    sqn_id = client.get("/api/auth/me", headers=hdr).json()["session"]["squadron_id"]
+    conflict_id = _make_holiday_conflict(client, hdr)
+    wing_hdr = _wing_admin_hdr(client)
+    enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "REM-45 regression test"}, headers=wing_hdr)
+    assert enter.status_code == 200, enter.text
+    r = client.post(f"/api/planning/conflicts/{conflict_id}/override",
+                    json={"override_reason": "resolved via proxy"}, headers=wing_hdr)
+    assert r.status_code == 200, r.text
+    client.post("/api/proxy/exit", headers=wing_hdr)
+
+
+def test_wing_admin_cannot_import_program_without_proxy(client):
+    hdr = _sqn_admin_hdr(client)
+    yr_id = _make_year(client, hdr)["planning_year_id"]
+    wing_hdr = _wing_admin_hdr(client)
+    files = {"file": ("program.csv", "SeqNr,Name\r\n", "text/csv")}
+    r = client.post(f"/api/planning/years/{yr_id}/import-program", headers=wing_hdr, files=files)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "proxy_required"
+
+
+def test_wing_admin_import_program_preview_does_not_require_proxy(client):
+    """preview=true never writes to the database -- viewing/validating is
+    broad by design, only the commit needs Proxy/Intervention."""
+    hdr = _sqn_admin_hdr(client)
+    yr_id = _make_year(client, hdr)["planning_year_id"]
+    wing_hdr = _wing_admin_hdr(client)
+    files = {"file": ("program.csv", "SeqNr,Name\r\n", "text/csv")}
+    r = client.post(f"/api/planning/years/{yr_id}/import-program?preview=true", headers=wing_hdr, files=files)
+    assert r.status_code != 403, r.text
+
+
+def test_wing_admin_can_import_program_with_proxy(client):
+    hdr = _sqn_admin_hdr(client)
+    sqn_id = client.get("/api/auth/me", headers=hdr).json()["session"]["squadron_id"]
+    yr_id = _make_year(client, hdr)["planning_year_id"]
+    wing_hdr = _wing_admin_hdr(client)
+    enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "REM-45 regression test"}, headers=wing_hdr)
+    assert enter.status_code == 200, enter.text
+    files = {"file": ("program.csv", "SeqNr,Name\r\n", "text/csv")}
+    r = client.post(f"/api/planning/years/{yr_id}/import-program", headers=wing_hdr, files=files)
+    # Permission check passed (not 403) -- an empty-body CSV then correctly
+    # 400s as empty_file, proving business logic was reached.
+    assert r.status_code != 403, r.text
+    client.post("/api/proxy/exit", headers=wing_hdr)
+
+
+# ─────────────────────────────────────────────────────────────
 # PATCH /api/parade-nights/{id} -- core field editing (remediation Stage 5)
 # ─────────────────────────────────────────────────────────────
 
