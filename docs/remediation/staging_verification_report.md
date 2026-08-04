@@ -4,6 +4,35 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Stage 2 (error classification fixes)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`d937cd79fc6a41e1b5917fc5bc1f95005e5c5d84`.
+
+**Pre-deploy gates**: backend `pytest tests/` → 1049 passed, 5 skipped (includes
+an incidental fix to a date-fragile test found while running this gate — see
+commit `83da2be`, unrelated to Stage 2's own scope). connected-frontend e2e → 27
+passed, 10 pre-existing `PLANNING_WORKSPACE_URL` failures (identical baseline, no
+new regressions). Frontend `tsc --noEmit` clean, `vitest run` → 19 passed (4 new
+this stage).
+
+**Deployed**: Main TMS and Planning Workspace staging (backend untouched this
+stage, not redeployed).
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-frontend` (staging, Main TMS) | `d8466d2e-b5dc-43b5-84c4-3ee52aa18b37` | SUCCESS |
+| `aafc-tms-planning-workspace-preview` (staging) | `156365fd-ca3d-4c69-a5bb-42b060e72978` | SUCCESS |
+
+**Post-deploy verification**: Main TMS `<meta name="app-build">` confirmed exact
+commit SHA. Planning Workspace `/planning` → HTTP 200. Backend `/api/health/ready`
+→ `{"status":"ready","squadrons":140}` (sanity check, unchanged).
+
+**Known gap, same as last entry**: no live browser verification available in this
+background session (no Chrome extension connectivity) — the error-classification
+fixes are verified at the unit-test and code level, not with an actual browser
+hitting a real 502/cancelled-request/malformed-response scenario against staging.
+
 ## 2026-08-04 — "TMS/Planning Workspace Integration" pass (pre-dates this branch, on `main`)
 
 Commit `ab1dd8dbece88d12c76db6c19b76bd0d53bc852e`.
