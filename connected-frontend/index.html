@@ -2209,7 +2209,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="form-row">
         <div class="ff"><label>Current Rank</label><input id="fac-rank" placeholder="e.g. FLTLT(AAFC), CUO, CPL(AAFC)" oninput="_markFacUnsaved()"></div>
         <div class="ff"><label>Type</label>
-          <select id="fac-type" onchange="_markFacUnsaved()"><option value="Officer">Officer (AAFC)</option><option value="NCO">Warrant Officer / NCO (AAFC)</option><option value="Senior Cadet">Senior Cadet</option><option value="Civilian">Civilian Instructor</option></select>
+          <select id="fac-type" onchange="_onFacTypeChange(this)"><option value="Staff">Staff</option><option value="Officer">Officer (AAFC)</option><option value="NCO">Warrant Officer / NCO (AAFC)</option><option value="Senior Cadet">Senior Cadet</option><option value="Civilian">Civilian Instructor</option></select>
         </div>
       </div>
       <div class="form-row">
@@ -3310,6 +3310,7 @@ async function loadData(){
   // Fire all requests in parallel — no await until Promise.all below.
   const p_uicfg=fetch(API_BASE+'/api/health/ui-config').then(r=>r.json()).catch(()=>null);
   const p_tags=api('/api/subject-area-tags').catch(()=>[]);
+  const p_factypes=api('/api/facilitator-type-tags').catch(()=>[]);
   const p_pns=api('/api/parade-nights'+_sqq).catch(e=>{S.loadErr=apiErr(e);return null;});
   const p_facs=api('/api/facilitators'+_sqq).catch(()=>null);
   const p_cur=api('/api/curriculum'+_sqq).catch(()=>null);
@@ -3348,14 +3349,14 @@ async function loadData(){
   const p_nsqns=(scope==='national'||scope==='system_admin')?api('/api/squadrons').catch(()=>[]):Promise.resolve([]);
 
   const[
-    uicfg,tags,
+    uicfg,tags,factypes,
     pns,facs,cur,phases,ta,eq,ai,acts,holidays,proxy,
     repSum,repRead,repCov,repFload,repNdel,
     sqnData,timing,auditData,
     wov,wph,wcap,wsqns,
     nat,natov,natcap,wings,nsqns,
   ]=await Promise.all([
-    p_uicfg,p_tags,
+    p_uicfg,p_tags,p_factypes,
     p_pns,p_facs,p_cur,p_phases,p_ta,p_eq,p_ai,p_acts,p_holidays,p_proxy,
     p_sum,p_read,p_cov,p_fload,p_ndel,
     p_sqnData,p_timing,p_audit,
@@ -3392,6 +3393,8 @@ async function loadData(){
   S.pwUrl=(uicfg&&uicfg.planning_workspace_url)||null;
   S.trainingYear=(uicfg&&uicfg.training_year)||2026;
   S.subjectAreaTags=Array.isArray(tags)?tags.filter(t=>t.is_active):[];
+  S.facilitatorTypeTags=Array.isArray(factypes)?factypes.filter(t=>t.is_active):[];
+  _populateFacTypeSelect();
   S.reports={summary:repSum,readiness:repRead,coverage:repCov,facload:repFload,notdelivered:repNdel};
   S.cfg={day:'',start:'',end:'',sess:3,dur:35,addr:''};
   if(sqnData){
@@ -7380,11 +7383,47 @@ function saveFac(confirmDuplicate){
     })
     .finally(done);
 }
+// Friendlier labels for the known seeded short codes -- custom types created
+// via manageFacilitatorTypes() have no such mapping and just show their own
+// display_name as-is, matching how Subject Area tags already behave.
+const _FAC_TYPE_LABELS={Staff:'Staff',Officer:'Officer (AAFC)',NCO:'Warrant Officer / NCO (AAFC)','Senior Cadet':'Senior Cadet',Civilian:'Civilian Instructor'};
+function _populateFacTypeSelect(){
+  const sel=document.getElementById('fac-type'); if(!sel)return;
+  const prior=sel.value;
+  const tags=(S.facilitatorTypeTags||[]);
+  const opts=tags.length
+    ? tags.map(t=>`<option value="${esc(t.display_name)}">${esc(_FAC_TYPE_LABELS[t.display_name]||t.display_name)}</option>`).join('')
+    : '<option value="Staff">Staff</option><option value="Officer">Officer (AAFC)</option><option value="NCO">Warrant Officer / NCO (AAFC)</option><option value="Senior Cadet">Senior Cadet</option><option value="Civilian">Civilian Instructor</option>';
+  const addOpt=canWriteSquadron()?'<option value="__add_new__">+ Add new type…</option>':'';
+  sel.innerHTML=opts+addOpt;
+  if(prior && [...sel.options].some(o=>o.value===prior)) sel.value=prior;
+}
+async function _onFacTypeChange(sel){
+  if(sel.value!=='__add_new__'){ _markFacUnsaved(); return; }
+  const name=(prompt('New facilitator type name:')||'').trim();
+  if(!name){ sel.value=S.facilitatorTypeTags&&S.facilitatorTypeTags[0]?S.facilitatorTypeTags[0].display_name:'Staff'; return; }
+  try{
+    const t=await api('/api/facilitator-type-tags',{method:'POST',body:JSON.stringify({display_name:name})});
+    S.facilitatorTypeTags=[...(S.facilitatorTypeTags||[]),t];
+    _populateFacTypeSelect();
+    sel.value=t.display_name;
+    showToast('Facilitator type "'+t.display_name+'" created.');
+  }catch(e){
+    showToast(e.code==='tag_already_exists'?'That type already exists.':'Could not create type: '+apiErr(e), true);
+    sel.value=S.facilitatorTypeTags&&S.facilitatorTypeTags[0]?S.facilitatorTypeTags[0].display_name:'Staff';
+  }
+  _markFacUnsaved();
+}
 function editFac(id){
   const f=facById(id);if(!f)return;editFacId=id;
   document.getElementById('fac-modal-title').textContent='Edit Facilitator';
   document.getElementById('fac-rank').value=f.rank||'';document.getElementById('fac-first').value=f.first||'';
-  document.getElementById('fac-last').value=f.last||'';document.getElementById('fac-type').value=({Staff:'Officer',Civilian:'Civilian','Senior Cadet':'Senior Cadet',NCO:'NCO',Officer:'Officer'}[f.type]||f.type||'Officer');
+  document.getElementById('fac-last').value=f.last||'';
+  // "Staff" is now a real #fac-type option (backed by the seeded reference
+  // tag of the same name) -- previously this remapped it to "Officer" since
+  // no matching option existed, which meant saving a Staff record without
+  // touching the dropdown silently rewrote it to Officer.
+  document.getElementById('fac-type').value=f.type||'Staff';
   ['drill','air','field','pd','sc','sqn'].forEach(k=>{const a={drill:'Drill',air:'Air_Space',field:'Field',pd:'Personal_Dev',sc:'Service_Community',sqn:'SQN_Affairs'}[k];document.getElementById('fa-'+k).checked=(f.areas||[]).includes(a);});
   _clearFacDupWarning();
   _resetFacSaveState();

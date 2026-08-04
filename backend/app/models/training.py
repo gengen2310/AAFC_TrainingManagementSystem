@@ -161,6 +161,23 @@ class SubjectAreaTag(Base, UUIDMixin, TimestampMixin):
     created_by: Mapped[str | None] = mapped_column(String(36))
 
 
+class FacilitatorTypeTag(Base, UUIDMixin, TimestampMixin):
+    """Canonical facilitator-type reference data; user-creatable, scoped to
+    squadron/wing/global -- mirrors SubjectAreaTag's exact shape (remediation
+    program Section 6, Stage 3). Facilitator.type stays a free-text column
+    (matches the existing Facilitator.subject_areas convention: reference
+    tags are advisory/suggested, not a hard foreign key), so this table adds
+    governance without a migration risk to existing Facilitator rows."""
+    __tablename__ = "facilitator_type_tags"
+    squadron_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
+    wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    scope: Mapped[str] = mapped_column(String(20), default="squadron")  # global / wing / squadron
+    display_name: Mapped[str] = mapped_column(String(80))
+    normalised_name: Mapped[str] = mapped_column(String(80), index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str | None] = mapped_column(String(36))
+
+
 class TrainingArea(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "training_areas"
     squadron_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), index=True)

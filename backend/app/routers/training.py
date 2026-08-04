@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
 from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
-                      Facilitator, FacilitatorRankHistory, SubjectAreaTag, TrainingArea, Equipment,
+                      Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, TrainingArea, Equipment,
                       Activity, Cadet, Squadron, TimingTemplate, TimingBlock)
 from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS
 from .timing import _effective_template
@@ -3072,4 +3072,130 @@ def archive_subject_area_tag(
     tag.is_active = False
     db.commit()
     audit(db, p, object_type="SubjectAreaTag", object_id=tag_id, action="archive")
+    return {"ok": True}
+
+
+# ── Facilitator Type reference data — mirrors subject-area-tags exactly
+# (remediation program Section 6, Stage 3). Facilitator.type stays free-text;
+# this is advisory/governed reference data, not a hard foreign key. ──
+
+def _fac_type_out(t: FacilitatorTypeTag) -> dict:
+    return {
+        "tag_id": t.id,
+        "display_name": t.display_name,
+        "normalised_name": t.normalised_name,
+        "scope": t.scope,
+        "squadron_id": t.squadron_id,
+        "wing_id": t.wing_id,
+        "is_active": t.is_active,
+        "created_by": t.created_by,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+    }
+
+
+class FacilitatorTypeTagIn(BaseModel):
+    display_name: str
+    scope: str = "squadron"
+
+
+@router.get("/facilitator-type-tags")
+def list_facilitator_type_tags(
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Return all active facilitator-type tags visible to the caller's squadron and wing."""
+    sq = db.get(Squadron, p.squadron_id) if p.squadron_id else None
+    sq_id = sq.id if sq else None
+    wing_id = sq.wing_id if sq else p.wing_id
+    require_can_view_squadron(p, sq_id or "", wing_id)
+    rows = (
+        db.query(FacilitatorTypeTag)
+        .filter(
+            FacilitatorTypeTag.is_active == True,  # noqa: E712
+            (
+                (FacilitatorTypeTag.squadron_id == sq_id) |
+                (FacilitatorTypeTag.wing_id == wing_id) |
+                (FacilitatorTypeTag.scope == "global")
+            ),
+        )
+        .order_by(FacilitatorTypeTag.display_name)
+        .all()
+    )
+    return [_fac_type_out(t) for t in rows]
+
+
+@router.post("/facilitator-type-tags", status_code=201)
+def create_facilitator_type_tag(
+    body: FacilitatorTypeTagIn,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Create a new facilitator-type tag (sqn_admin or wing_admin+ only)."""
+    from ..permissions import require_role
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    sq = db.get(Squadron, p.squadron_id) if p.squadron_id else None
+    if not sq:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    require_can_write_squadron(p, sq.id, sq.wing_id)
+
+    display = body.display_name.strip()
+    if not display:
+        raise HTTPException(400, detail={"error": "tag_name_blank"})
+    if len(display) > 80:
+        raise HTTPException(400, detail={"error": "tag_name_too_long", "max": 80})
+
+    norm = _normalise_tag(display)
+
+    scope = body.scope if body.scope in ("global", "wing", "squadron") else "squadron"
+    wing_id = sq.wing_id if scope in ("wing", "squadron") else None
+    squadron_id = sq.id if scope == "squadron" else None
+
+    existing = (
+        db.query(FacilitatorTypeTag)
+        .filter(
+            FacilitatorTypeTag.normalised_name == norm,
+            FacilitatorTypeTag.is_active == True,  # noqa: E712
+            (
+                (FacilitatorTypeTag.squadron_id == squadron_id) |
+                (FacilitatorTypeTag.wing_id == wing_id) |
+                (FacilitatorTypeTag.scope == "global")
+            ),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(409, detail={"error": "tag_already_exists", "existing_id": existing.id})
+
+    tag = FacilitatorTypeTag(
+        squadron_id=squadron_id,
+        wing_id=wing_id,
+        scope=scope,
+        display_name=display,
+        normalised_name=norm,
+        is_active=True,
+        created_by=p.user_id,
+    )
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    audit(db, p, object_type="FacilitatorTypeTag", object_id=tag.id, action="create",
+          new={"display_name": tag.display_name, "scope": tag.scope})
+    return _fac_type_out(tag)
+
+
+@router.delete("/facilitator-type-tags/{tag_id}", status_code=200)
+def archive_facilitator_type_tag(
+    tag_id: str,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Archive a facilitator-type tag (does not remove existing facilitator references)."""
+    from ..permissions import require_role
+    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    tag = db.get(FacilitatorTypeTag, tag_id)
+    if not tag:
+        raise HTTPException(404, detail={"error": "tag_not_found"})
+    tag.is_active = False
+    db.commit()
+    audit(db, p, object_type="FacilitatorTypeTag", object_id=tag_id, action="archive")
     return {"ok": True}

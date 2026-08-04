@@ -8,7 +8,7 @@ from ..security import hash_code
 from ..models import (NationalEntity, Wing, Squadron, Flight, User, AccessCode,
                       CurriculumItem, CurriculumElement, CurriculumPhase, Facilitator, FacilitatorRankHistory,
                       TrainingArea, Equipment, ParadeNight, Session, Cadet,
-                      TimingTemplate, TimingBlock)
+                      TimingTemplate, TimingBlock, FacilitatorTypeTag)
 
 _DEFAULT_ELEMENTS = [
     ("Air_Space",         "Air & Space",                "national"),
@@ -18,6 +18,20 @@ _DEFAULT_ELEMENTS = [
     ("Service_Community", "Service & Community",        "national"),
     ("SQN_Affairs",       "Squadron Affairs",           "national"),
     ("CDT_Skills",        "Cadet Skills",               "national"),
+]
+
+# Remediation program Section 6, Stage 3 — same values as the v45 migration's
+# Postgres seed (facilitator_type_tags: the short codes #fac-type's <select>
+# actually stores as its option values, not its more descriptive display
+# text, plus "Staff" -- Facilitator.type's real default), duplicated here
+# since reset_db() bypasses Alembic (see the curriculum-phases seed below
+# for the same, already-established reasoning).
+_DEFAULT_FACILITATOR_TYPES = [
+    "Staff",
+    "Officer",
+    "NCO",
+    "Senior Cadet",
+    "Civilian",
 ]
 
 # Master transformation plan Block 10 — same names as dashboard.py's _PHASES
@@ -302,6 +316,16 @@ def seed_all():
         ).first():
             db.add(CurriculumPhase(name=name, display_name=display_name,
                                    scope_level=scope, sort_order=sort_order, active_status=True))
+    # Seed default facilitator-type reference data (idempotent) — same reasoning
+    # as the curriculum phases seed above.
+    for name in _DEFAULT_FACILITATOR_TYPES:
+        norm = " ".join(name.strip().lower().split())
+        if not db.query(FacilitatorTypeTag).filter(
+            FacilitatorTypeTag.normalised_name == norm,
+            FacilitatorTypeTag.scope == "global",
+        ).first():
+            db.add(FacilitatorTypeTag(scope="global", display_name=name,
+                                      normalised_name=norm, is_active=True))
     db.commit()
     db.close()
     print("Seeded: National HQ, 7 Wing, 16 squadrons, users/access codes, 13 core curriculum items, 703 demo data (incl. Alpha/Bravo flights, planning year, WA holidays).")
