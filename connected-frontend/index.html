@@ -9486,11 +9486,26 @@ async function doSaveSession(){
       const grp = document.getElementById('sess-edit-id').dataset.cadetGroup;
       const sn = parseInt(document.getElementById('sess-edit-id').dataset.sessionNumber);
       if(mode==='pn'){
-        // Direct parade night mode: create via /api/sessions
-        await api('/api/sessions',{method:'POST',body:{
-          ...body, parade_night_id:dateId,
-          period_number:sn, cadet_group:grp
+        // Direct parade night mode: create via /api/sessions, whose schema
+        // (SessionIn) uses different field names than the planning-module
+        // body built above (custom_title not activity_title, training_area_id
+        // not location_id, curriculum_item_id not curriculum_id) and has no
+        // notes field at all on creation -- previously these were silently
+        // dropped by FastAPI/Pydantic since neither name matched, so the
+        // chosen room, curriculum item, and any notes text never saved.
+        const r = await api('/api/sessions',{method:'POST',body:{
+          parade_night_id:dateId, period_number:sn, cadet_group:grp,
+          facilitator_id:body.facilitator_id, status:body.status,
+          custom_title:body.activity_title,
+          training_area_id:body.location_id,
+          curriculum_item_id:body.curriculum_id||null,
         }});
+        // notes has no creation-time field on this endpoint -- follow up with
+        // the same PATCH the edit path already uses (it does support notes),
+        // rather than silently discarding what the user typed.
+        if(body.notes && r && r.session_id){
+          await api(`/api/planning/sessions/${r.session_id}`,{method:'PATCH',body:{notes:body.notes}});
+        }
       } else {
         await api(`/api/planning/parade-dates/${dateId}/sessions`,{
           method:'POST', body:{...body, cadet_group:grp, session_number:sn}
