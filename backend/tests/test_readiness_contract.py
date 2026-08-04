@@ -17,8 +17,18 @@ ADM7WG = "ADMIN7WG"
 def _make_parade_night_with_one_incomplete_session(client, hdr, days_ahead=1):
     """A parade night with exactly one session missing its facilitator and room —
     every surface should agree this is "at_risk". `days_ahead` must differ between
-    tests sharing the same squadron/DB to avoid the unique (squadron, date) conflict."""
-    target_date = (date.today() + timedelta(days=days_ahead)).isoformat()
+    tests sharing the same squadron/DB to avoid the unique (squadron, date) conflict.
+
+    703's seeded demo data recurs weekly on its own default_parade_day (Friday) --
+    a small fixed days_ahead can land on that same weekday depending on what day
+    the suite happens to run (confirmed: passed for weeks, then broke the day
+    "today + 2" first landed on a Friday), colliding with an already-seeded
+    parade night. Nudge forward a day whenever the candidate date is a Friday so
+    this is robust regardless of which day the suite runs on."""
+    candidate = date.today() + timedelta(days=days_ahead)
+    if candidate.weekday() == 4:  # Monday=0 .. Friday=4
+        candidate += timedelta(days=1)
+    target_date = candidate.isoformat()
     r = client.get("/api/auth/me", headers=hdr)
     session_info = r.json()["session"]  # /api/auth/me nests fields under "session"
     sqn_id, wing_id = session_info.get("squadron_id"), session_info.get("wing_id")
@@ -88,7 +98,10 @@ def test_same_parade_night_reports_same_planning_status_from_wing_scope(client):
     # Ensure at least one incomplete-session future night exists (exercises the
     # same "at_risk" computation as the other tests), though wing-overview may
     # still pick an earlier night from the squadron's existing seeded data.
-    _make_parade_night_with_one_incomplete_session(client, hdr_sqn, days_ahead=2)
+    # Deliberately far from the other test's days_ahead=1 (not just +1) so that
+    # even after each independently nudges off a Friday collision (see the
+    # helper's docstring), the two can never land on the same date.
+    _make_parade_night_with_one_incomplete_session(client, hdr_sqn, days_ahead=9)
 
     r = client.get("/api/auth/me", headers=hdr_sqn)
     sqn_id = r.json()["session"].get("squadron_id")
