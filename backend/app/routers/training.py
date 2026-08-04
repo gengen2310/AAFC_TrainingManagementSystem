@@ -588,6 +588,24 @@ def set_status(sid: str, body: StatusIn, db: DBSession = Depends(get_db), p: Pri
     return {"ok": True}
 
 
+@router.get("/sessions/{sid}/status-history")
+def get_status_history(sid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Read-only timeline of a session's status transitions. SessionStatusHistory
+    rows were already written on every transition (set_status/edit_session above)
+    but nothing ever read them back -- squadron-level users had no way to see a
+    session's history at all (only national/auditor/system_admin via the generic
+    /api/audit log). Stage 7."""
+    s = db.get(Session, sid)
+    if not s or s.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id)
+    require_can_view_squadron(p, s.squadron_id, pn.wing_id if pn else None)
+    rows = db.query(SessionStatusHistory).filter(
+        SessionStatusHistory.session_id == sid).order_by(SessionStatusHistory.timestamp).all()
+    return [{"old_status": r.old_status, "new_status": r.new_status, "changed_by": r.changed_by,
+             "reason": r.reason, "timestamp": r.timestamp.isoformat()} for r in rows]
+
+
 def _denormalise(db, s: Session, cid, fid, rid):
     if cid is not None:
         s.curriculum_item_id = cid

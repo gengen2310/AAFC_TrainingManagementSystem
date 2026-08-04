@@ -6085,12 +6085,14 @@ function showPNDetail(ds){
           ${canWriteSquadron()?`<span class="no-print sess-drag-handle" draggable="true" ondragstart="_sessDragStart(event,'${ds}',${i})" ondragend="_sessDragEnd(event)" title="Drag to reorder" aria-hidden="true">⠿</span>`:''}
           <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em">Session ${i+1} · Period ${s.period_number||1}</div>
         </div>
-        ${canWriteSquadron()?`<div class="no-print" style="display:flex;gap:4px">
-          <button class="btn btn-xs btn-out" ${(s.period_number||1)<=1?'disabled':''} onclick="_sessMoveUpDown('${ds}',${i},'up')" title="Move to the previous period" aria-label="Move Session ${i+1} to the previous period">↑</button>
+        <div class="no-print" style="display:flex;gap:4px">
+          ${canWriteSquadron()?`<button class="btn btn-xs btn-out" ${(s.period_number||1)<=1?'disabled':''} onclick="_sessMoveUpDown('${ds}',${i},'up')" title="Move to the previous period" aria-label="Move Session ${i+1} to the previous period">↑</button>
           <button class="btn btn-xs btn-out" onclick="_sessMoveUpDown('${ds}',${i},'down')" title="Move to the next period" aria-label="Move Session ${i+1} to the next period">↓</button>
-          <button class="btn btn-xs btn-out" onclick="_sessOpenMoveTo('${ds}',${i})" aria-label="Move Session ${i+1} to a different Parade Night">Move to…</button>
-        </div>`:''}
+          <button class="btn btn-xs btn-out" onclick="_sessOpenMoveTo('${ds}',${i})" aria-label="Move Session ${i+1} to a different Parade Night">Move to…</button>`:''}
+          ${s.id?`<button class="btn btn-xs btn-out" onclick="_toggleSessHistory('${s.id}',${i})" aria-label="Show status history for Session ${i+1}">History</button>`:''}
+        </div>
       </div>
+      <div id="sess-hist-${i}" style="display:none;font-size:11px;color:var(--muted);margin-bottom:8px;padding:8px;background:var(--surface-2);border-radius:6px"></div>
       <div style="${!canWriteSquadron()?'pointer-events:none;opacity:.85':''}">
       <div class="form-row">
         <div class="ff"><label>Phase</label><select id="d-ph-${i}" ${!canWriteSquadron()?'disabled':''}>${phOpts}</select></div>
@@ -6258,6 +6260,21 @@ async function _sessMoveUpDown(date,idx,dir){
   }catch(e){ showToast(apiErr(e),true); }
 }
 
+async function _toggleSessHistory(sessId,idx){
+  const el=document.getElementById('sess-hist-'+idx);
+  if(!el)return;
+  if(el.style.display!=='none'){ el.style.display='none'; return; }
+  el.style.display='block'; el.textContent='Loading…';
+  try{
+    const rows=await api('/api/sessions/'+sessId+'/status-history');
+    if(!rows.length){ el.textContent='No status changes recorded yet.'; return; }
+    el.innerHTML=rows.map(r=>{
+      const when=new Date(r.timestamp).toLocaleString();
+      const change=r.old_status?`${r.old_status} → ${r.new_status}`:`Set to ${r.new_status}`;
+      return `<div style="padding:3px 0;border-bottom:1px solid var(--border-light)"><b>${esc(change)}</b> · ${esc(when)}${r.reason?' · '+esc(r.reason):''}</div>`;
+    }).join('');
+  }catch(e){ el.textContent=apiErr(e); }
+}
 function _sessOpenMoveTo(date,idx){
   const pn=S.pns.find(p=>p.date===date); if(!pn)return;
   const s=(pn.sessions||[])[idx]; if(!s||!s.id)return;
@@ -9543,7 +9560,15 @@ async function loadWeeklyProgram(dateId){
 // ═══════════════
 //  LONG RANGE
 // ═══════════════
-
+// Deliberately unreachable in this frontend, not dead/incomplete code:
+// _PLANNING_PAGES is empty for this pilot ("Remaining tabs (anchors, term,
+// long-range, rooms, checks) are hidden from nav for this pilot" -- see that
+// constant's own comment), so there is no id="page-long-range" container and
+// nothing calls loadLongRange(). The real Long Range view lives in Planning
+// Workspace (the "Planning Workspace ↗" nav link routes there) and reads the
+// same GET /api/planning/years/{id}/long-range endpoint this function also
+// calls. Confirmed during remediation Stage 7 research, 2026-08-05 -- kept
+// here rather than deleted in case a future pilot phase re-enables this tab.
 async function loadLongRange(yearId){
   const card = document.getElementById('lr-card');
   const empty = document.getElementById('lr-empty');

@@ -140,6 +140,72 @@ def test_set_status_nonexistent_session(client):
 
 # ── TRAINING AREAS CRUD ───────────────────────────────────────────────────────
 
+# ── SESSION STATUS HISTORY (Stage 7) ──────────────────────────────────────────
+
+def test_status_history_records_transitions_in_order(client):
+    hdr = login(client, ADM703)
+    sid, _ = _get_planned_session(client, hdr)
+    client.post(f"/api/sessions/{sid}/status", json={"status": "delivered"}, headers=hdr)
+    client.post(f"/api/sessions/{sid}/status",
+               json={"status": "not_delivered", "reason": "Facilitator absent"}, headers=hdr)
+    r = client.get(f"/api/sessions/{sid}/status-history", headers=hdr)
+    assert r.status_code == 200
+    rows = r.json()
+    assert len(rows) >= 2
+    assert rows[-2]["new_status"] == "delivered"
+    assert rows[-1]["new_status"] == "not_delivered"
+    assert rows[-1]["reason"] == "Facilitator absent"
+    assert rows[-1]["changed_by"]
+    assert rows[-1]["timestamp"]
+
+
+def test_status_history_empty_for_untouched_session(client):
+    """Uses a freshly-created session (not the shared seeded T3 one, which
+    earlier tests in this module may already have transitioned) so this
+    assertion isn't order-dependent on other tests in the file."""
+    hdr = login(client, ADM703)
+    _, pnid = _get_planned_session(client, hdr)
+    r = client.post("/api/sessions", json={"parade_night_id": pnid, "period_number": 3,
+                                            "custom_title": "Fresh untouched session"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    sid = r.json()["session_id"]
+    hist = client.get(f"/api/sessions/{sid}/status-history", headers=hdr)
+    assert hist.status_code == 200
+    assert hist.json() == []
+
+
+def test_status_history_visible_to_read_only_role(client):
+    hdr_adm = login(client, ADM703)
+    sid, _ = _get_planned_session(client, hdr_adm)
+    client.post(f"/api/sessions/{sid}/status", json={"status": "delivered"}, headers=hdr_adm)
+    hdr_gen = login(client, GEN703)
+    r = client.get(f"/api/sessions/{sid}/status-history", headers=hdr_gen)
+    assert r.status_code == 200
+    assert len(r.json()) >= 1
+
+
+def test_status_history_cross_squadron_blocked(client):
+    hdr_adm = login(client, ADM703)
+    sid, _ = _get_planned_session(client, hdr_adm)
+    hdr_704 = login(client, ADM704)
+    r = client.get(f"/api/sessions/{sid}/status-history", headers=hdr_704)
+    assert r.status_code == 403
+
+
+def test_status_history_requires_auth(client):
+    hdr = login(client, ADM703)
+    sid, _ = _get_planned_session(client, hdr)
+    fresh = TestClient(app)
+    r = fresh.get(f"/api/sessions/{sid}/status-history")
+    assert r.status_code == 401
+
+
+def test_status_history_nonexistent_session(client):
+    hdr = login(client, ADM703)
+    r = client.get("/api/sessions/00000000-0000-0000-0000-000000000099/status-history", headers=hdr)
+    assert r.status_code == 404
+
+
 def test_list_training_areas(client):
     hdr = login(client, ADM703)
     r = client.get("/api/training-areas", headers=hdr)
