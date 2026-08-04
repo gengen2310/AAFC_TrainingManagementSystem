@@ -97,6 +97,12 @@ export interface WingSquadronRow {
   coverage_pct: number; not_delivered: number;
 }
 export interface WingPhaseCoverage { phases: string[]; squadrons: { squadron_id: string; short_name: string; phase_pct: Record<string, number> }[]; }
+export interface WingCapability {
+  subjects: string[];
+  squadrons: { squadron_id: string; code: string; short_name: string; subject_facilitators: Record<string, number> }[];
+  wing_avg: Record<string, number>;
+  squadron_count: number;
+}
 export interface NationalOverview { wings: { wing_id: string; code: string; name: string; squadrons: number; sessions: number; delivered: number; not_delivered: number; coverage_pct: number }[]; }
 export interface NationalCapabilityWing {
   wing_id: string; code: string; name: string;

@@ -30,6 +30,7 @@ function squadronRisk(s: SqnRow): number {
 export function WingOverview() {
   const q = useQuery({ queryKey: ["wing-overview"], queryFn: reportApi.wingOverview });
   const heat = useQuery({ queryKey: ["wing-phase-coverage"], queryFn: reportApi.wingPhaseCoverage });
+  const cap = useQuery({ queryKey: ["wing-capability"], queryFn: reportApi.wingCapability });
   const [open, setOpen] = useState<SqnRow | null>(null);
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
@@ -89,6 +90,17 @@ export function WingOverview() {
             rows={heat.data.squadrons.map((s) => ({ id: s.squadron_id, label: s.short_name, values: s.phase_pct }))}
           />
           <p className="muted" style={{ marginTop: 8 }}>Each cell = % of that phase's curriculum items scheduled. Green ≥ 67, amber ≥ 34, red &lt; 34.</p>
+        </Card>
+      )}
+
+      {cap.data && cap.data.squadrons.length > 0 && (
+        <Card title="Facilitator subject-area coverage (squadron × subject)">
+          <HeatmapGrid
+            label="Squadron by subject facilitator count"
+            cols={cap.data.subjects.map((s) => ({ key: s, label: SUBJECT_LABELS[s] ?? s }))}
+            rows={cap.data.squadrons.map((s) => ({ id: s.squadron_id, label: s.short_name, values: s.subject_facilitators }))}
+          />
+          <p className="muted" style={{ marginTop: 8 }}>Each cell = number of facilitators in that squadron tagged for the subject. 0 = no coverage.</p>
         </Card>
       )}
 

@@ -756,6 +756,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <div id="chart-facilitator-gaps"><div class="chart-skeleton"></div></div>
               <div id="insight-facilitator-gaps" class="chart-insight" style="display:none"></div>
             </div>
+            <div class="card">
+              <div class="ctitle">Sessions needing a substitute</div>
+              <div id="chart-facilitator-leave-impact"><div class="chart-skeleton"></div></div>
+              <div id="insight-facilitator-leave-impact" class="chart-insight" style="display:none"></div>
+            </div>
           </div>
           <div class="card">
             <div class="ctitle">Long-term delivery trend by term</div>
@@ -5855,6 +5860,11 @@ async function _loadDashStrategic(){
   _dRenderChart('chart-subject-area-resilience',charts.subject_area_resilience,_chartHBar,'insight-subject-area-resilience');
   _dRenderChart('chart-facilitator-status',charts.facilitator_status_distribution,_chartDonut,'insight-facilitator-status');
   _dRenderChart('chart-facilitator-gaps',charts.facilitator_repeated_gaps,_chartHBar,'insight-facilitator-gaps');
+  // Stage 9, 2026-08-05: backend already computed this ("who needs a
+  // substitute" -- upcoming sessions clashing with recorded facilitator
+  // leave) and Planning Workspace already renders it; connected-frontend
+  // never had a card for it at all.
+  _dRenderChart('chart-facilitator-leave-impact',charts.facilitator_leave_impact,_chartHBar,'insight-facilitator-leave-impact');
   _dRenderChart('chart-long-term-trend',charts.long_term_delivery_trend,_chartLine);
   if(btn)btn.style.display='none';
 }
@@ -8207,7 +8217,31 @@ function renderWing(){
   });
   html+=`</tbody></table></div></div>`;
   html+=`<div class="drill-panel" id="wing-drill"></div>`;
-  html+=`<div class="card" style="font-size:11px;color:var(--muted)">Subject-area balance: Training Balance. Facilitator coverage: Facilitator Load. Phase-by-phase curriculum coverage: Curriculum Coverage. Units needing support: Risk and Bottlenecks.</div>`;
+  // Phase-by-phase curriculum coverage and facilitator subject-area balance --
+  // this data was already being fetched (S.wingPhase/S.cap, loadData()) but
+  // never rendered anywhere; this card previously just pointed at page names
+  // ("Curriculum Coverage", "Training Balance") that don't exist in this app.
+  // Stage 9, 2026-08-05.
+  if(S.wingPhase&&S.wingPhase.phases&&S.wingPhase.phases.length){
+    const wp=S.wingPhase;
+    html+=`<div class="card"><div class="ctitle">Curriculum Coverage — by Phase</div><div class="tw"><table>
+      <thead><tr><th>Squadron</th>${wp.phases.map(ph=>`<th style="text-align:center;font-size:10px">${esc(PH_S[ph]||ph)}</th>`).join('')}</tr></thead><tbody>`+
+      wp.squadrons.map(s=>`<tr><td style="font-weight:800">${esc(s.short_name||'')}</td>${wp.phases.map(ph=>{
+        const pct=(s.phase_pct&&s.phase_pct[ph])||0;
+        return `<td style="text-align:center"><span class="badge ${pct>=67?'b-ok':pct>=34?'b-amber':pct?'b-red':''}">${pct}%</span></td>`;
+      }).join('')}</tr>`).join('')+
+      `</tbody></table></div></div>`;
+  }
+  if(S.cap&&S.cap.squadrons&&S.cap.squadrons.length){
+    const cp=S.cap;
+    html+=`<div class="card"><div class="ctitle">Training Balance — Facilitator Subject-Area Coverage</div><div class="tw"><table>
+      <thead><tr><th>Squadron</th>${SUBJECTS.map(s=>`<th style="text-align:center;font-size:10px" title="${esc(s.label)}">${s.emoji}</th>`).join('')}</tr></thead><tbody>`+
+      cp.squadrons.map(s=>`<tr><td style="font-weight:800">${esc(s.short_name||'')}</td>${SUBJECTS.map(su=>{
+        const n=(s.subject_facilitators&&s.subject_facilitators[su.key])||0;
+        return `<td style="text-align:center">${n===0?'<span class="badge b-red">0</span>':`<span class="badge b-ok">${n}</span>`}</td>`;
+      }).join('')}</tr>`).join('')+
+      `</tbody></table></div><div style="font-size:10px;color:var(--muted);margin-top:8px">Red = no facilitator in this Squadron tagged for that subject area.</div></div>`;
+  }
   host.innerHTML=html;
 }
 function wingDrill(sid){

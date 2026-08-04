@@ -5,7 +5,7 @@ import type {
   SessionRow, Facilitator, FacilitatorStats, TrainingArea, Equipment, ClashResult, Cadet,
   CadetRiskFlag, AuditRow, ActionItem, SummaryReport, ReadinessReport, CoverageReport,
   FacLoadReport, NotDeliveredReport, WingOverview, NationalOverview, NationalCapability,
-  WingPhaseCoverage, ImportPreview, ImportCommitResult,
+  WingPhaseCoverage, WingCapability, ImportPreview, ImportCommitResult,
   PlanningYear, AnnualProgram, LongRangeView, WeeklyProgramData,
   MissionItem, PlanningLocation, PlanningFacilitator, LocalLesson,
   WingHQEvent, CommandCentreData, PlanningConflict, HolidayPeriod,
@@ -139,6 +139,11 @@ export const reportApi = {
   nationalOverview: () => api.get<NationalOverview>("/api/reports/national-overview"),
   nationalCapability: () => api.get<NationalCapability>("/api/reports/national-capability"),
   wingPhaseCoverage: () => api.get<WingPhaseCoverage>("/api/reports/wing-phase-coverage"),
+  // Backend has computed this since before this program (ops.py's wing_capability)
+  // but neither frontend rendered it -- connected-frontend fetched it and
+  // silently discarded the response, Planning Workspace never fetched it at
+  // all. Stage 9, 2026-08-05.
+  wingCapability: () => api.get<WingCapability>("/api/reports/wing-capability"),
 };
 
 export const opsApi = {
