@@ -4,6 +4,61 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Stage 12 (final stage: DB pool-sizing doc fix + full program regression)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`8a06a07f7977dd23d6163ddfd7c9b9202e17e09f`.
+
+**Pre-deploy gates — full final regression across the entire program, not
+just this stage's own small change**: backend `pytest tests/` → **1091
+passed, 5 skipped, 0 failed**. `tsc --noEmit` clean. Frontend `vitest run`
+→ 19 passed. Planning Workspace e2e (`playwright.config.ts`) → **87
+passed, 0 failed**. connected-frontend e2e (`playwright.connected.config.ts`)
+→ **27 passed, 10 pre-existing unrelated (`PLANNING_WORKSPACE_URL`
+local-env gap) — the identical baseline held across every single stage
+of this program (Stages 2 through 12), confirming no regression was ever
+introduced across the whole remediation pass.**
+
+**Deployed**: backend only (this stage's fix was a documentation/rationale
+correction with no functional or frontend change).
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-backend` (staging) | `cb8d2574-4c42-40d5-9f24-443720d3dd9d` | SUCCESS |
+
+**Post-deploy verification**: `/api/health/ready` → `{"status":"ready","squadrons":140}`.
+`/api/health/db` → `{"status":"ok","db":"ok"}` — both live-checked directly
+against staging, confirming the health-check infrastructure this stage's
+research verified (genuine DB-connectivity checks, not fake always-200
+probes) is actually working in the deployed environment, not just correct
+in source.
+
+**Program-wide known-gap summary** (see `master_gap_register.csv` for full
+detail on every item below — not re-litigated here):
+- No live browser (`claude-in-chrome`) was available in this background
+  session for any stage — every stage's frontend-visible changes were
+  verified at the code/type-check/e2e-regression/served-HTML level, never
+  by an actual browser session. This is the single most consistent residual
+  limitation across the whole program, honestly disclosed in every stage's
+  entry above rather than glossed over.
+- REM-45 (P1, security-relevant): 4 sibling endpoints to the one fixed in
+  Stage 10 (`create_location`, `update_location`, `override_conflict`,
+  Annual Program import) share the same missing-Proxy/Intervention-check
+  gap. Flagged with elevated priority for prompt dedicated follow-up — not
+  fixed in this program due to blast radius requiring its own test
+  coverage per endpoint.
+- REM-13/REM-41 (P2): full multi-scope Wing/National calendar grid and
+  Wing/National command-dashboard parity in Planning Workspace — both real,
+  substantial, well-scoped features documented but not built (comparable
+  in size to a stage's worth of work each).
+- REM-26: `ProgramItem`/`ProgramPackage`/`LearningHubResource`/
+  `PromotionRequest` system remains explicitly untouched pending the user's
+  own review, per their stated intent.
+- Several smaller P2/P3 items (REM-30, REM-32, REM-34, REM-35, REM-39,
+  REM-46, REM-47, REM-49's a11y-suite/color-only-chip halves, REM-50) are
+  documented, not built — each with its own stated reason in the gap
+  register, none silently dropped.
+
 ## 2026-08-05 — Stage 11 (Session status labels + accessibility fixes)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
