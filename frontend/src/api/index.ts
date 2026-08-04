@@ -50,6 +50,24 @@ export const orgApi = {
   exitProxy: () => api.post<{ ok: boolean }>("/api/proxy/exit"),
 };
 
+export interface CanonicalActivity {
+  activity_id: string;
+  source: string;
+  owning_level: "national" | "wing" | "squadron";
+  activity_name: string;
+  activity_type: string | null;
+  date_start: string;
+  date_end: string | null;
+  time_start: string | null;
+  time_end: string | null;
+  location: string | null;
+  audience: string[];
+  notes: string | null;
+  is_archived: boolean;
+  is_inherited: boolean;
+  read_only: boolean;
+}
+
 export const trainingApi = {
   // squadron_id (optional): lets a wing/national viewer see a specific squadron's
   // data without needing Proxy/Delegated Intervention Mode — see backend/app/
@@ -85,6 +103,14 @@ export const trainingApi = {
       created?: number; skipped?: number; created_ids?: string[]; total?: number;
     }>(`/api/facilitators/import?${params}`, form);
   },
+  // Canonical Activity records -- the same backward-compatible, session-scoped
+  // endpoint (backend/app/routers/training.py list_activities's no-scope_type
+  // path) Main TMS's own loadData() calls, so this always resolves "my
+  // squadron's activities" the same way regardless of which frontend is
+  // asking. This is the read side of closing the one real cross-frontend
+  // data split: CEA import still owns CeaActivity as its own pipeline, but
+  // an Activity created in Main TMS was previously invisible here entirely.
+  canonicalActivities: () => api.get<CanonicalActivity[]>("/api/activities"),
   trainingAreas: (squadron_id?: string) => api.get<TrainingArea[]>(`/api/training-areas${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   equipment: (squadron_id?: string) => api.get<Equipment[]>(`/api/equipment${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   clashes: (date: string) => api.get<ClashResult>(`/api/resources/clashes?date=${date}`),

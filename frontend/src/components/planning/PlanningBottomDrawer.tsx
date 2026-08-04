@@ -1259,6 +1259,7 @@ const SOURCE_COLORS: Record<string, string> = {
   manual: "#1A7F4B",
   anchor: "#7c3aed",
   holiday: "#b45309",
+  tms_activity: "#455560",
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -1266,11 +1267,12 @@ const SOURCE_LABELS: Record<string, string> = {
   manual: "Manual",
   anchor: "Anchor",
   holiday: "Holiday",
+  tms_activity: "Main TMS",
 };
 
 type UnifiedActivity = {
   id: string;
-  source: "cea" | "manual" | "anchor" | "holiday";
+  source: "cea" | "manual" | "anchor" | "holiday" | "tms_activity";
   name: string;
   start_date: string | null;
   end_date: string | null;
@@ -1434,7 +1436,17 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
     staleTime: 5 * 60 * 1000,
   });
 
-  const isLoading = ceaLoading || anchorsLoading || holidaysLoading;
+  // Canonical Activity records created in Main TMS (National/Wing/Squadron) --
+  // read-only here; CEA import keeps owning CeaActivity as its own pipeline.
+  // See trainingApi.canonicalActivities for why this closes the one real
+  // cross-frontend visibility gap without a data migration.
+  const { data: tmsActivitiesData = [], isLoading: tmsActivitiesLoading } = useQuery({
+    queryKey: ["tms-canonical-activities"],
+    queryFn: () => trainingApi.canonicalActivities(),
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const isLoading = ceaLoading || anchorsLoading || holidaysLoading || tmsActivitiesLoading;
 
   const unified = useMemo((): UnifiedActivity[] => {
     const rows: UnifiedActivity[] = [];
@@ -1498,8 +1510,28 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
         raw_holiday: h,
       });
     }
+    for (const a of tmsActivitiesData) {
+      rows.push({
+        id: a.activity_id,
+        source: "tms_activity",
+        name: a.activity_name,
+        start_date: a.date_start,
+        end_date: a.date_end,
+        location: a.location,
+        importance: null,
+        classification_status: "classified",
+        unit: a.owning_level === "national" ? "National" : a.owning_level === "wing" ? "Wing" : "Squadron",
+        extra: a.activity_type,
+        is_removed: false,
+        is_hidden: false,
+        local_note: null,
+        raw_cea: null,
+        raw_anchor: null,
+        raw_holiday: null,
+      });
+    }
     return rows;
-  }, [ceaData, anchorsData, holidaysData]);
+  }, [ceaData, anchorsData, holidaysData, tmsActivitiesData]);
 
   const filtered = useMemo(() => {
     const q = fSearch.toLowerCase();
@@ -1611,6 +1643,7 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
           <option value="manual">Manual</option>
           <option value="anchor">Anchor</option>
           <option value="holiday">Holiday</option>
+          <option value="tms_activity">Main TMS</option>
         </select>
         <select value={fStatus} onChange={e => setFStatus(e.target.value)} style={{ ...inputSx, width: 140 }}>
           <option value="all">All statuses</option>

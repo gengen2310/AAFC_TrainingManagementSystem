@@ -27,7 +27,12 @@ import { WingOverview, NationalOverview } from "./routes/Overviews";
 import { PlanningWorkspace } from "./routes/PlanningWorkspace";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
-const qc = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
+// refetchOnWindowFocus/refetchOnReconnect: stale data (e.g. a Parade Night
+// edited in the other frontend, or in another tab) should surface when the
+// user comes back to this tab or the network returns, not require a manual
+// reload -- matches the same freshness expectation Main TMS's own page
+// Refresh buttons are built to satisfy.
+const qc = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: true, refetchOnReconnect: true } } });
 
 const USE_HASH = import.meta.env.VITE_HASH_ROUTER === "true";
 const BASENAME = USE_HASH ? "/" : (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "/";

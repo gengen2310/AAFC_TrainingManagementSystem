@@ -643,6 +643,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <div class="ph-sub" id="dash-scope-label"></div>
           </div>
           <div class="ph-actions no-print" style="gap:6px">
+            <span id="dash-refresh-status" style="font-size:10px;color:var(--muted)"></span>
+            <button class="btn btn-secondary btn-sm" onclick="_refreshDashboard()">Refresh</button>
             <label for="dash-window" style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Period</label>
             <select id="dash-window" onchange="loadDashCharts()" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px">
               <option value="term">This Term</option>
@@ -816,7 +818,12 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- CALENDAR -->
       <div id="page-calendar" class="page">
-        <div class="ph"><div class="ph-title">Training Calendar</div><div class="ph-sub">Monthly overview</div></div>
+        <div class="ph"><div class="ph-title">Training Calendar</div><div class="ph-sub">Monthly overview</div>
+          <div class="ph-actions no-print">
+            <span id="cal-refresh-status" style="font-size:10px;color:var(--muted)"></span>
+            <button class="btn btn-secondary btn-sm" onclick="_refreshCalendar()">Refresh</button>
+          </div>
+        </div>
         <div class="card">
           <div class="cal-nav">
             <button class="cal-nbtn" onclick="calMove(-1)">‹</button>
@@ -949,6 +956,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ph">
           <div class="ph-title">Activities</div>
           <div class="ph-actions no-print">
+            <span id="act-refresh-status" style="font-size:10px;color:var(--muted)"></span>
+            <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('act-refresh-status',_loadActivitiesPage)">Refresh</button>
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-act')">+ Add Activity</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openGenerateActivitiesModal()">Generate Activities</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddHolidayModal()">+ Add Holiday</button>
@@ -1165,6 +1174,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ph">
           <div class="ph-title">Account Management</div>
           <div class="ph-sub">Manage accounts within your authorised scope</div>
+          <div class="ph-actions no-print">
+            <span id="acct-refresh-status" style="font-size:10px;color:var(--muted)"></span>
+            <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('acct-refresh-status',renderAccounts)">Refresh</button>
+          </div>
         </div>
         <!-- filter + create -->
         <div class="card">
@@ -3399,6 +3412,24 @@ function showToast(msg, isErr){
   t.textContent=msg;
   region.appendChild(t);
   setTimeout(()=>t.remove(),isErr?7000:4000);
+}
+
+// Shared manual-refresh pattern for primary pages (Training Dashboard,
+// Activities, Calendar, Account Management) -- matches the one precedent
+// already in this app (System Console's own Refresh button), just factored
+// out so each page doesn't hand-roll the same "Refreshing… / Updated at /
+// failed, Retry" states. Filters/scope/selected date are untouched since
+// this only re-runs the page's own loader, never a full reload.
+async function _pageRefresh(statusElId, loaderFn){
+  const el=document.getElementById(statusElId);
+  if(el){ el.textContent='Refreshing…'; el.style.color='var(--muted)'; }
+  try{
+    await loaderFn();
+    if(el){ el.textContent='Updated at '+new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'}); el.style.color='var(--muted)'; }
+  }catch(e){
+    if(el){ el.textContent='Refresh failed — try again'; el.style.color='var(--red)'; }
+    showToast('Refresh failed: '+apiErr(e), true);
+  }
 }
 
 // ── Statuses that require a reason before saving, and their user-facing context text ──
@@ -5679,6 +5710,14 @@ function _dRenderChart(containerId,chart,renderFn,insightId){
   if(insightId&&chart.insight)_dSetInsight(insightId,chart.insight);
 }
 
+async function _refreshDashboard(){
+  await _pageRefresh('dash-refresh-status', async()=>{
+    await loadData();
+    renderDash();
+    await loadDashCharts();
+  });
+}
+
 // ═══════════════════════════════════════════════════════════
 //  DASHBOARD — API-DRIVEN CHART LOADER
 // ═══════════════════════════════════════════════════════════
@@ -5802,6 +5841,11 @@ function renderDash(){
 // ═══════════════════════════════════════════════════════════
 //  CALENDAR
 // ═══════════════════════════════════════════════════════════
+async function _refreshCalendar(){
+  // loadData() only resets calYear/calMonth in bootApp()'s own reset step,
+  // not on a plain reload, so the currently-viewed month/year survives.
+  await _pageRefresh('cal-refresh-status', async()=>{ await loadData(); renderCal(); });
+}
 function renderCal(){
   document.getElementById('cal-m').textContent=MONTHS[calMonth]+' '+calYear;
   document.getElementById('cal-yr').value=calYear;
