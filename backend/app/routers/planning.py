@@ -468,6 +468,14 @@ def create_planning_year(
             sqn = db.get(Squadron, unit_id)
             if not sqn or sqn.wing_id != p.wing_id:
                 raise HTTPException(403, detail={"error": "out_of_scope"})
+    # A squadron-scoped plan is a delegated write on that squadron's data --
+    # require the same Proxy/Delegated Intervention state every other
+    # squadron-scoped write in this app requires (require_can_write_squadron),
+    # not just a bare role check. Previously wing_admin/national_admin/
+    # system_admin could create a year for any unit_id with no proxy/
+    # intervention at all (Stage 10, 2026-08-05).
+    if unit_id:
+        require_can_write_squadron(p, unit_id, wing_id)
     py = PlanningYear(
         id=str(uuid.uuid4()), year=body.year, name=body.name,
         unit_id=unit_id, wing_id=wing_id, active_status=body.active_status,

@@ -125,12 +125,18 @@ def test_holidays_configured_false_until_a_holiday_exists_for_the_active_year(cl
     d0 = client.get(f"/api/setup/status?squadron_id={sqn_id}", headers=hdr).json()
     assert d0["squadron"]["holidays_configured"] is False
 
+    # Creating a squadron-scoped plan year is a delegated write on that
+    # squadron's data (Stage 10 remediation) -- system_admin needs Delegated
+    # Intervention for it, same as any other squadron-scoped write.
+    enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "Holiday setup test"}, headers=hdr)
+    assert enter.status_code == 200, enter.text
     year_id = client.post("/api/planning/years", json={
         "year": 2099, "name": "Holiday Setup Test Year", "unit_id": sqn_id,
     }, headers=hdr).json()["planning_year_id"]
     client.post(f"/api/planning/years/{year_id}/holidays", json={
         "name": "Test School Holidays", "start_date": "2099-04-01", "end_date": "2099-04-14",
     }, headers=hdr)
+    client.post("/api/proxy/exit", headers=hdr)
 
     d1 = client.get(f"/api/setup/status?squadron_id={sqn_id}", headers=hdr).json()
     assert d1["squadron"]["holidays_configured"] is True

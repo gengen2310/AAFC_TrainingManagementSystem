@@ -1172,6 +1172,40 @@ def test_builder_returns_nonempty_timing_blocks(client):
 
 
 # ─────────────────────────────────────────────────────────────
+# POST /api/planning/years -- squadron-scoped write requires Proxy/Intervention
+# (remediation Stage 10) -- previously wing_admin/national_admin/system_admin
+# could create a plan for any squadron with only a bare role check, no
+# proxy/intervention state at all.
+# ─────────────────────────────────────────────────────────────
+
+def test_wing_admin_cannot_create_squadron_year_without_proxy(client):
+    wing_hdr = _wing_admin_hdr(client)
+    sqn_id = client.get("/api/auth/me", headers=_sqn_admin_hdr(client)).json()["session"]["squadron_id"]
+    r = client.post("/api/planning/years", json={"year": 2031, "name": "2031 Test Year", "unit_id": sqn_id}, headers=wing_hdr)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "proxy_required"
+
+
+def test_wing_admin_can_create_squadron_year_with_proxy(client):
+    wing_hdr = _wing_admin_hdr(client)
+    sqn_id = client.get("/api/auth/me", headers=_sqn_admin_hdr(client)).json()["session"]["squadron_id"]
+    enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "Stage 10 regression test"}, headers=wing_hdr)
+    assert enter.status_code == 200, enter.text
+    r = client.post("/api/planning/years", json={"year": 2032, "name": "2032 Test Year", "unit_id": sqn_id}, headers=wing_hdr)
+    assert r.status_code == 200, r.text
+    assert r.json()["unit_id"] == sqn_id
+    client.post("/api/proxy/exit", headers=wing_hdr)
+
+
+def test_national_admin_cannot_create_squadron_year_without_intervention(client):
+    nat_hdr = _nat_admin_hdr(client)
+    sqn_id = client.get("/api/auth/me", headers=_sqn_admin_hdr(client)).json()["session"]["squadron_id"]
+    r = client.post("/api/planning/years", json={"year": 2033, "name": "2033 Test Year", "unit_id": sqn_id}, headers=nat_hdr)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "intervention_required"
+
+
+# ─────────────────────────────────────────────────────────────
 # PATCH /api/parade-nights/{id} -- core field editing (remediation Stage 5)
 # ─────────────────────────────────────────────────────────────
 
