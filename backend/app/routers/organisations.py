@@ -485,6 +485,7 @@ class SquadronUpdateIn(BaseModel):
     default_end_time: str | None = None
     default_session_count: int | None = None
     unit_type: str | None = None
+    crest_url: str | None = None  # pass "" to clear
 
 
 @router.patch("/squadrons/{squadron_id}")
@@ -506,6 +507,17 @@ def update_squadron(squadron_id: str, body: SquadronUpdateIn, db: DBSession = De
         s.default_session_count = body.default_session_count
     if body.unit_type is not None and body.unit_type in UNIT_TYPES:
         s.unit_type = body.unit_type
+    if body.crest_url is not None:
+        crest = body.crest_url.strip()
+        if not crest:
+            s.crest_url = None
+        else:
+            if not (crest.startswith("http://") or crest.startswith("https://")):
+                raise HTTPException(422, detail={"error": "invalid_crest_url",
+                                                  "message": "Crest URL must start with http:// or https://."})
+            if len(crest) > 500:
+                raise HTTPException(422, detail={"error": "crest_url_too_long", "max": 500})
+            s.crest_url = crest
     db.commit()
     audit(db, p, object_type="squadron", object_id=s.id, action="update_settings")
     return {"ok": True}
@@ -546,7 +558,7 @@ def _sqn(s: Squadron) -> dict:
             "address": s.address, "default_parade_day": s.default_parade_day,
             "default_start_time": s.default_start_time, "default_end_time": s.default_end_time,
             "default_session_count": s.default_session_count, "active_status": s.active_status,
-            "is_archived": s.is_archived}
+            "is_archived": s.is_archived, "crest_url": s.crest_url}
 
 
 # ── Proxy / Delegated Intervention ──

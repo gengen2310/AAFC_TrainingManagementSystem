@@ -43,6 +43,12 @@ class Squadron(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     default_end_time: Mapped[str | None] = mapped_column(String(10))
     default_session_count: Mapped[int] = mapped_column(Integer, default=3)
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
+    # External URL, not a binary upload -- Railway's filesystem is ephemeral per
+    # deployment (.claude/rules/deployment.md) and this codebase has no object
+    # storage (S3/CDN) configured anywhere (remediation program Section 7,
+    # Stage 4). Validated as http(s) at the API boundary; None means "use the
+    # default crest" (frontend concern, not stored here).
+    crest_url: Mapped[str | None] = mapped_column(String(500))
     wing: Mapped["Wing"] = relationship(back_populates="squadrons")
 
 

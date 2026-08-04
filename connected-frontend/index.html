@@ -1125,6 +1125,15 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               </div>
             </div>
           </div>
+          <div class="form-row">
+            <div class="ff"><label>Squadron Crest URL (optional)</label>
+              <input id="s-crest" type="url" placeholder="https://…" oninput="_renderCrestPreview()">
+              <div class="muted" style="font-size:10.5px;margin-top:3px">Link to an image hosted elsewhere — must start with http:// or https://. Leave blank to use the default crest.</div>
+            </div>
+            <div class="ff"><label>Preview</label>
+              <div id="s-crest-preview" style="display:flex;align-items:center;height:38px"></div>
+            </div>
+          </div>
         </div>
         <div class="card">
           <div class="ctitle">Session Structure</div>
@@ -3396,9 +3405,9 @@ async function loadData(){
   S.facilitatorTypeTags=Array.isArray(factypes)?factypes.filter(t=>t.is_active):[];
   _populateFacTypeSelect();
   S.reports={summary:repSum,readiness:repRead,coverage:repCov,facload:repFload,notdelivered:repNdel};
-  S.cfg={day:'',start:'',end:'',sess:3,dur:35,addr:''};
+  S.cfg={day:'',start:'',end:'',sess:3,dur:35,addr:'',crestUrl:''};
   if(sqnData){
-    S.cfg={day:sqnData.default_parade_day||'',start:sqnData.default_start_time||'',end:sqnData.default_end_time||'',sess:sqnData.default_session_count||3,dur:35,addr:sqnData.address||''};
+    S.cfg={day:sqnData.default_parade_day||'',start:sqnData.default_start_time||'',end:sqnData.default_end_time||'',sess:sqnData.default_session_count||3,dur:35,addr:sqnData.address||'',crestUrl:sqnData.crest_url||''};
     S.currentSqnId=sqnData.squadron_id;
   }
   S.timingTemplates=timing||[];
@@ -3729,6 +3738,7 @@ function bootApp(){
   const setVal=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v;};
   setVal('s-sqn',S.scopeName||info.name); setVal('s-addr',S.cfg.addr||''); setVal('s-pday',S.cfg.day||'');
   setVal('s-start',S.cfg.start||''); setVal('s-end',S.cfg.end||''); setVal('s-sess',S.cfg.sess||3);
+  setVal('s-crest',S.cfg.crestUrl||''); _renderCrestPreview();
   renderTimingTemplates();
   const ccMsg=document.getElementById('cc-msg'); if(ccMsg)ccMsg.textContent='';
   calYear=new Date().getFullYear();calMonth=new Date().getMonth();
@@ -7527,6 +7537,17 @@ function renderActions(){
 // ═══════════════════════════════════════════════════════════
 //  SETTINGS
 // ═══════════════════════════════════════════════════════════
+// Shows the crest image live as the URL is typed, or a plain placeholder
+// when empty -- never renders anything before the field is actually saved,
+// since <img src> failures (bad URL, blocked host) just show the browser's
+// own broken-image icon rather than crashing anything.
+function _renderCrestPreview(){
+  const el=document.getElementById('s-crest-preview'); if(!el)return;
+  const url=(document.getElementById('s-crest')||{}).value||'';
+  el.innerHTML=url
+    ? `<img src="${esc(url)}" alt="Squadron crest" style="max-height:36px;max-width:120px;object-fit:contain">`
+    : '<span class="muted" style="font-size:11px">No crest set — default will be used</span>';
+}
 async function saveSettings(){
   const sqnId=S.currentSqnId||(S.session&&S.session.squadron_id);
   if(!sqnId){alert('No squadron in scope — cannot save settings.');return;}
@@ -7539,7 +7560,8 @@ async function saveSettings(){
     default_parade_day:newDay,
     default_start_time:document.getElementById('s-start').value||null,
     default_end_time:document.getElementById('s-end').value||null,
-    default_session_count:+document.getElementById('s-sess').value||3
+    default_session_count:+document.getElementById('s-sess').value||3,
+    crest_url:document.getElementById('s-crest').value||''
   };
   try{
     await api('/api/squadrons/'+sqnId,{method:'PATCH',body:JSON.stringify(payload)});

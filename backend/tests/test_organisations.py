@@ -468,6 +468,43 @@ def test_sqn_admin_can_patch_own_squadron_settings(client):
     assert sqn["default_session_count"] == 4
 
 
+def test_sqn_admin_can_set_and_clear_crest_url(client):
+    h = login(client, "ADMIN703")
+    sqn_id = _get_sqn_id(client, h)
+    r = client.patch(f"/api/squadrons/{sqn_id}", headers=h, json={
+        "crest_url": "https://example.org/crests/703.png",
+    })
+    assert r.status_code == 200, r.text
+    sqn = client.get(f"/api/squadrons/{sqn_id}", headers=h).json()
+    assert sqn["crest_url"] == "https://example.org/crests/703.png"
+
+    # Clearing with an empty string sets it back to null.
+    r2 = client.patch(f"/api/squadrons/{sqn_id}", headers=h, json={"crest_url": ""})
+    assert r2.status_code == 200, r2.text
+    sqn2 = client.get(f"/api/squadrons/{sqn_id}", headers=h).json()
+    assert sqn2["crest_url"] is None
+
+
+def test_crest_url_rejects_non_http_scheme(client):
+    h = login(client, "ADMIN703")
+    sqn_id = _get_sqn_id(client, h)
+    r = client.patch(f"/api/squadrons/{sqn_id}", headers=h, json={
+        "crest_url": "javascript:alert(1)",
+    })
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]["error"] == "invalid_crest_url"
+
+
+def test_crest_url_rejects_too_long(client):
+    h = login(client, "ADMIN703")
+    sqn_id = _get_sqn_id(client, h)
+    r = client.patch(f"/api/squadrons/{sqn_id}", headers=h, json={
+        "crest_url": "https://example.org/" + ("x" * 500),
+    })
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]["error"] == "crest_url_too_long"
+
+
 def test_sqn_admin_patch_settings_is_audited(client):
     h = login(client, "ADMIN703")
     sqn_id = _get_sqn_id(client, h)
