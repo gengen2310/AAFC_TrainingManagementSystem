@@ -4,6 +4,33 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Stage 6 (Planning Workspace canonical-Activities visibility fix)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`91938d12676aae08ae67e15fc37c096c694a895c`.
+
+**Pre-deploy gates**: no migration, no backend change (frontend-only fix).
+`tsc --noEmit` clean. `vitest run` → 19 passed (no regressions). Planning
+Workspace e2e (`playwright.config.ts`, the React-app suite, distinct from
+`playwright.connected.config.ts`) → **87 passed**, 0 failed, against a
+freshly reseeded local backend.
+
+**Deployed**: Planning Workspace only (backend and Main TMS untouched this
+stage).
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-planning-workspace-preview` (staging) | `6a944919-6d5a-4a07-8e73-9e4f4cca0623` | SUCCESS |
+
+**Post-deploy verification**: `/planning` → HTTP 200.
+
+**Known gap**: no live browser verification that Wing/National activities
+now actually render in the drawer's unified list on the live staging
+environment (no Chrome extension connectivity in this background session)
+— verified at the type-check/unit-test/e2e level and by direct code trace
+of the request URL and response shape, not by an actual browser opening
+the drawer against real Wing/National activity data on staging.
+
 ## 2026-08-05 — Stage 5 (Parade Night PATCH + cross-interface verification)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
