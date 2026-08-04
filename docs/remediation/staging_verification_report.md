@@ -4,6 +4,36 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Stage 11 (Session status labels + accessibility fixes)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`e5b60d07518863a0d485e98b3784a8a5137422f3`.
+
+**Pre-deploy gates**: no migration, no backend change (connected-frontend
+only). connected-frontend e2e → 27 passed, 10 pre-existing unrelated
+(identical established baseline).
+
+**Deployed**: Main TMS only.
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-frontend` (staging, Main TMS) | `37161ed6-c21d-45d0-a6df-8c4c80c98385` | SUCCESS |
+
+**Post-deploy verification**: `<meta name="app-build">` confirmed exact
+commit SHA. **Live-checked the actual fix, not just the build fingerprint**:
+`curl`'d the served HTML and counted `aria-label="Close"` occurrences →
+39 (matches the exact number of modal-close buttons fixed), confirming
+the change is really in the rendered output the browser receives, not
+just present in source.
+
+**Known gap, same as prior entries**: no live browser verification that
+the new status dropdown options / badge colors render correctly for an
+actual `delivered_with_issue`/`cancelled_late` session, or that a screen
+reader correctly announces the new aria-labels (no Chrome extension
+connectivity in this background session) — verified at the code/
+e2e-regression/served-HTML level, not with an actual browser or screen
+reader.
+
 ## 2026-08-05 — Stage 10 (Planning Workspace squadron-scoping + Proxy/Intervention fix)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
