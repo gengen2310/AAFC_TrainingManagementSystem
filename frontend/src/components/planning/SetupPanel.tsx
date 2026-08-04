@@ -41,10 +41,11 @@ const FREQUENCIES = [
 
 interface Props {
   session: SessionInfo | null;
+  squadronId?: string;
   onYearCreated: () => void;
 }
 
-export function SetupPanel({ onYearCreated }: Props) {
+export function SetupPanel({ squadronId, onYearCreated }: Props) {
   const [step, setStep] = useState<"year" | "dates">("year");
   const [createdYearId, setCreatedYearId] = useState<string | null>(null);
 
@@ -68,7 +69,7 @@ export function SetupPanel({ onYearCreated }: Props) {
     if (!yearName.trim()) { setYearErr("Name is required."); return; }
     setSavingYear(true); setYearErr(null);
     try {
-      const year = await planningApi.createYear({ year: yearNum, name: yearName.trim() });
+      const year = await planningApi.createYear({ year: yearNum, name: yearName.trim(), unit_id: squadronId });
       // createYear returns a PlanningYear — extract the ID from the response
       const id = (year as unknown as Record<string, unknown>).planning_year_id as string;
       setCreatedYearId(id);

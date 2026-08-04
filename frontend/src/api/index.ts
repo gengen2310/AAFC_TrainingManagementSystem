@@ -206,7 +206,12 @@ export const dashboardApi = {
 
 // ─── Planning Workspace API ─────────────────────────────────────────────────
 export const planningApi = {
-  years: () => api.get<PlanningYear[]>("/api/planning/years"),
+  // unit_id (squadron): required for wing/national/system_admin sessions to see a
+  // specific squadron's plan -- without it, list_planning_years falls back to
+  // "every squadron in the wing" (wing_admin) or "every squadron nationwide, no
+  // filter at all" (national_admin/system_admin), and PlanningWorkspace.tsx used
+  // to auto-pick years[0] from that undifferentiated list (Stage 10, 2026-08-05).
+  years: (unit_id?: string) => api.get<PlanningYear[]>(`/api/planning/years${unit_id ? `?unit_id=${unit_id}` : ""}`),
   commandCentre: (year_id?: string) =>
     api.get<CommandCentreData>(`/api/planning/command-centre${year_id ? `?year_id=${year_id}` : ""}`),
   annualProgram: (year_id: string) =>
@@ -275,7 +280,7 @@ export const planningApi = {
     api.patch<{ ok: boolean }>(`/api/wing-calendar/events/${event_id}/squadron-status`, { status, notes }),
   getWingEvent: (event_id: string) =>
     api.get<WingHQEvent>(`/api/wing-calendar/events/${event_id}`),
-  createYear: (body: { year: number; name: string }) =>
+  createYear: (body: { year: number; name: string; unit_id?: string }) =>
     api.post<PlanningYear>("/api/planning/years", body),
   generateParadeDates: (year_id: string, body: {
     weekday: number; start_date: string; end_date?: string;

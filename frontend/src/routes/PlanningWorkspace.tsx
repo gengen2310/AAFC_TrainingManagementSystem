@@ -18,12 +18,23 @@ import { SetupPanel } from "../components/planning/SetupPanel";
 import { UpdateFutureParadeDayModal } from "../components/planning/UpdateFutureParadeDayModal";
 import { GuidedYearSetupModal } from "../components/planning/GuidedYearSetupModal";
 import { canWriteSquadron } from "../auth/permissions";
+import { useScopedSquadron } from "../layout/SquadronViewContext";
 import type { PlanningSession, AnchorEvent } from "../api/types";
 
 
 export function PlanningWorkspace() {
   const { session } = useAuth();
   const qc = useQueryClient();
+  // wing_admin/national_admin/system_admin have no session.squadron_id of their
+  // own -- without an explicit squadron pick, GET /api/planning/years falls back
+  // to "every squadron in the wing" or "every squadron nationwide, no filter at
+  // all", and this page used to silently auto-select years[0] from that
+  // undifferentiated list with no indication of whose plan was showing (Stage
+  // 10, 2026-08-05). resolvedSquadronId also feeds the bottom drawer's
+  // canonical-Activities lookup (Stage 6), which previously only worked for
+  // squadron-role sessions.
+  const { needsSelection, squadronId: pickedSquadronId, scoped } = useScopedSquadron();
+  const resolvedSquadronId = session?.squadron_id ?? pickedSquadronId;
 
   // Body class to remove .main padding/max-width
   useEffect(() => {
@@ -67,8 +78,9 @@ export function PlanningWorkspace() {
 
   // ── Data queries ──────────────────────────────────────────────────────────────
   const { data: years, isLoading: yearsLoading } = useQuery({
-    queryKey: ["planning-years"],
-    queryFn: planningApi.years,
+    queryKey: ["planning-years", resolvedSquadronId],
+    queryFn: () => planningApi.years(resolvedSquadronId),
+    enabled: scoped,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -172,11 +184,19 @@ export function PlanningWorkspace() {
 
   // ── Canvas content ────────────────────────────────────────────────────────────
   function renderCanvas() {
+    if (needsSelection && !pickedSquadronId) {
+      return (
+        <div className="pw-empty">
+          <span>Select a squadron above to view its Planning Workspace.</span>
+        </div>
+      );
+    }
     if (yearsLoading) return <div className="pw-loading">Loading planning years…</div>;
     if (!yearsLoading && years && years.length === 0) {
       return (
         <SetupPanel
           session={session}
+          squadronId={resolvedSquadronId}
           onYearCreated={() => qc.invalidateQueries({ queryKey: ["planning-years"] })}
         />
       );
@@ -460,7 +480,7 @@ export function PlanningWorkspace() {
           facilitators={facilitators}
           locations={locations}
           onItemClick={(item) => { setDrawerItem(item); setBottomOpen(false); }}
-          squadronId={session?.squadron_id ?? undefined}
+          squadronId={resolvedSquadronId ?? undefined}
         />
       )}
     </div>

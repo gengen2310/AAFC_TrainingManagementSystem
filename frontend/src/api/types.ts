@@ -119,6 +119,7 @@ export interface ImportCommitResult { ok: boolean; import_id: string; accepted: 
 export interface PlanningYear {
   planning_year_id: string; unit_id: string | null; wing_id: string | null;
   year: number; name: string; active_status: boolean;
+  unit_code?: string | null; unit_name?: string | null; wing_code?: string | null;
 }
 export interface ParadeDate {
   parade_date_id: string; planning_year_id: string; unit_id: string | null;
