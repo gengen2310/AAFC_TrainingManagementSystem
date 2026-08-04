@@ -2867,14 +2867,29 @@ async function api(path, opts={}){
   // Retry transient network failures with backoff before surfacing an error,
   // but only for GET (safe/idempotent) -- fetch() can throw after a request
   // already reached the server, so retrying a write here risks a duplicate.
+  // 502/503/504 are the same class of transient gap seen as an HTTP response
+  // instead of a raw connection failure (e.g. a proxy/edge in front of the
+  // backend) -- retried the same way, still GET-only.
   const method=(fetchOpts.method||'GET').toUpperCase();
   const maxAttempts=method==='GET'?3:1;
+  const RETRYABLE_STATUS=new Set([502,503,504]);
   for(let attempt=1;;attempt++){
     try{
       res=await fetch(API_BASE+path,fetchOpts);
+      if(RETRYABLE_STATUS.has(res.status)&&attempt<maxAttempts){
+        await new Promise(r=>setTimeout(r,attempt*400));
+        continue;
+      }
       break;
     }catch(e){
-      // fetch() throws only on true network failure or CORS preflight block — not on HTTP errors
+      // A caller-supplied AbortSignal firing (page/scope/year change cancelling
+      // a stale in-flight request) throws a DOMException named 'AbortError' --
+      // this is an intentional cancellation, not a connectivity failure, and
+      // must never be retried or reported as "cannot reach the backend".
+      if(e&&e.name==='AbortError'){
+        throw {kind:'cancelled', msg:'Request cancelled.'};
+      }
+      // Any other fetch() throw is a true network failure or CORS preflight block.
       if(attempt>=maxAttempts){
         throw {kind:'network', msg:'Cannot reach the backend at '+(API_BASE||location.origin)+'. Check the backend is running and try again.'};
       }
@@ -2888,7 +2903,16 @@ async function api(path, opts={}){
     const msg401=c401==='invalid_user'?'Your account has been deactivated. Contact your Wing HQ.':'Your session has expired. Please sign in again.';
     throw {kind:'auth', status:401, code:c401, msg:msg401};
   }
-  let body=null; try{ body=await res.json(); }catch(_){}
+  let body=null, bodyParseFailed=false;
+  try{ body=await res.json(); }catch(_){ bodyParseFailed=true; }
+  if(res.ok&&bodyParseFailed){
+    // A 2xx with a body that isn't valid JSON is a distinct failure mode from
+    // both a network error and an application-level error response -- the
+    // request reached the server and "succeeded" by HTTP status, but the
+    // payload can't be used. Surfacing it as a generic network failure would
+    // be misleading (the backend IS reachable).
+    throw {kind:'invalid_response', status:res.status, msg:'The server returned an unreadable response. Try again.'};
+  }
   if(!res.ok){
     // Extract structured error code (custom responses only — not present on standard FastAPI errors)
     const code=(body&&body.detail&&typeof body.detail==='object'&&!Array.isArray(body.detail)&&body.detail.error)||(body&&body.error)||'';
