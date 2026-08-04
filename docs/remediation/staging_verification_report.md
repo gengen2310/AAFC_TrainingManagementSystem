@@ -4,6 +4,33 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Stage 7 (Session status-history endpoint + UI)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`13c42ec479ab6a0cd63d1f69e7ace3d4993489e9`.
+
+**Pre-deploy gates**: no migration needed (no new columns — SessionStatusHistory
+already existed, only a read endpoint was added). Backend `pytest tests/` →
+1084 passed, 5 skipped (6 new). connected-frontend e2e → 27 passed, 10
+pre-existing unrelated failures (identical established baseline).
+
+**Deployed**: backend and Main TMS (Planning Workspace untouched this stage).
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-backend` (staging) | `879965b6-cb53-4067-83b4-ba7e0301c0de` | SUCCESS |
+| `aafc-tms-frontend` (staging, Main TMS) | `e883771f-b17f-431d-b699-86437ed45033` | SUCCESS |
+
+**Post-deploy verification**: `/api/health/ready` → ready, 140 squadrons.
+Main TMS `<meta name="app-build">` confirmed exact commit SHA. `GET
+/api/sessions/some-id/status-history` unauthenticated against live staging →
+401 (not 404) — confirms the new route is registered and live.
+
+**Known gap, same as prior entries**: no live browser verification of the
+new "History" toggle's actual rendered behavior in the Parade Night Detail
+modal (no Chrome extension connectivity in this background session) —
+verified at the API/contract level and via e2e regression only.
+
 ## 2026-08-05 — Stage 6 (Planning Workspace canonical-Activities visibility fix)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
