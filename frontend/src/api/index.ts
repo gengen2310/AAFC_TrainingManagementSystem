@@ -115,6 +115,13 @@ export const trainingApi = {
   // here too would duplicate rows.
   canonicalActivities: (squadronId: string) =>
     api.get<CanonicalActivity[]>(`/api/activities?scope_type=squadron&scope_id=${squadronId}&sources=activity`),
+  // Facilitator type reference data (backend/app/routers/training.py) -- connected-
+  // frontend's Add Facilitator form already uses this; Planning Workspace's own
+  // form previously had a hardcoded 4-option select whose values (officer/nco/
+  // civcpersonal/guest) didn't even match the seeded display names (Staff/Officer/
+  // NCO/Senior Cadet/Civilian), so a facilitator created there got a `type` no
+  // dropdown anywhere could later recognise (Stage 8, 2026-08-05).
+  facilitatorTypeTags: () => api.get<{ tag_id: string; display_name: string }[]>("/api/facilitator-type-tags"),
   trainingAreas: (squadron_id?: string) => api.get<TrainingArea[]>(`/api/training-areas${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   equipment: (squadron_id?: string) => api.get<Equipment[]>(`/api/equipment${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   clashes: (date: string) => api.get<ClashResult>(`/api/resources/clashes?date=${date}`),

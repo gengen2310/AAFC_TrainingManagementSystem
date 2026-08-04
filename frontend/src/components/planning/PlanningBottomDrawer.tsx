@@ -709,7 +709,12 @@ function FacilitatorsContent({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [rank, setRank] = useState("");
-  const [facType, setFacType] = useState("officer");
+  const [facType, setFacType] = useState("");
+  const { data: facTypeTags = [] } = useQuery({
+    queryKey: ["facilitator-type-tags"],
+    queryFn: () => trainingApi.facilitatorTypeTags(),
+    staleTime: 5 * 60 * 1000,
+  });
   const [subjectAreas, setSubjectAreas] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -734,7 +739,7 @@ function FacilitatorsContent({
         confirm_duplicate: confirmDuplicate,
       });
       await qc.invalidateQueries({ queryKey: ["planning-facilitators"] });
-      setFirstName(""); setLastName(""); setRank(""); setFacType("officer"); setSubjectAreas("");
+      setFirstName(""); setLastName(""); setRank(""); setFacType(""); setSubjectAreas("");
       setAddingFac(false); setDupWarning(null);
     } catch (e: unknown) {
       if (e instanceof ApiError && e.code === "possible_duplicate") {
@@ -782,10 +787,8 @@ function FacilitatorsContent({
             <label style={labelSx}>
               Type
               <select value={facType} onChange={e => setFacType(e.target.value)} style={inputSx}>
-                <option value="officer">Officer</option>
-                <option value="nco">NCO</option>
-                <option value="civcpersonal">Civ Instructor</option>
-                <option value="guest">Guest</option>
+                <option value="">— default (Staff) —</option>
+                {facTypeTags.map(t => <option key={t.tag_id} value={t.display_name}>{t.display_name}</option>)}
               </select>
             </label>
             <label style={{ ...labelSx, gridColumn: "2 / -1" }}>
