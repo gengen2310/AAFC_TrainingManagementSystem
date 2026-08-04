@@ -4,6 +4,36 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Stage 8 (Session conflict enforcement + silent data-loss fix + facilitator-type reference data)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`63df2ce2237788b867fb8189d8b2a10399a61e6d`.
+
+**Pre-deploy gates**: no migration. Backend `pytest tests/` → 1088 passed,
+5 skipped (4 new). `tsc --noEmit` clean. `vitest run` → 19 passed. Planning
+Workspace e2e (`playwright.config.ts`) → 87 passed, 0 failed. connected-frontend
+e2e (`playwright.connected.config.ts`) → 27 passed, 10 pre-existing unrelated
+(same established baseline).
+
+**Deployed**: all three staging services (backend, Main TMS, Planning Workspace).
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-backend` (staging) | `08aff83e-33b6-4a75-99d5-05808d6daad1` | SUCCESS |
+| `aafc-tms-frontend` (staging, Main TMS) | `73ef945a-0eaf-405e-82af-bfb4018fa75a` | SUCCESS |
+| `aafc-tms-planning-workspace-preview` (staging) | `2f9c8ac0-fea8-4806-95f5-89b81edde409` | SUCCESS |
+
+**Post-deploy verification**: `/api/health/ready` → ready, 140 squadrons.
+Main TMS `<meta name="app-build">` confirmed exact commit SHA. `/planning`
+→ HTTP 200.
+
+**Known gap, same as prior entries**: no live browser verification of the
+actual fixed create-session flow (room/curriculum now saving correctly) or
+the new facilitator-type dropdown's rendered behavior on the real staging
+environment (no Chrome extension connectivity in this background session)
+— verified at the schema/contract/test level, not by an actual browser
+performing the flows end-to-end against staging.
+
 ## 2026-08-05 — Stage 7 (Session status-history endpoint + UI)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
