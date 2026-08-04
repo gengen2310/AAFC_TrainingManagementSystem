@@ -4,6 +4,38 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Stage 10 (Planning Workspace squadron-scoping + Proxy/Intervention fix)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`76ce841625df26a6ba8e5f3f9c0549ce976183e0`.
+
+**Pre-deploy gates**: no migration. Backend `pytest tests/` → 1091 passed,
+5 skipped (3 new; one existing test updated to correctly enter Delegated
+Intervention rather than rely on the now-fixed permissive behaviour).
+`tsc --noEmit` clean. `vitest run` → 19 passed. Planning Workspace e2e
+(`playwright.config.ts`) → 87 passed, 0 failed (incl. wing-proxy specs).
+connected-frontend e2e → 27 passed, 10 pre-existing unrelated (identical
+baseline — connected-frontend itself wasn't touched this stage, but its
+regression suite was still run since the backend permission model changed).
+
+**Deployed**: backend and Planning Workspace (Main TMS untouched this stage).
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-backend` (staging) | `ef5386e0-2de6-4904-86b1-3bcfe2ce9c6e` | SUCCESS |
+| `aafc-tms-planning-workspace-preview` (staging) | `a00db96d-722c-41b7-a2d2-42db75d9011c` | SUCCESS |
+
+**Post-deploy verification**: `/api/health/ready` → ready, 140 squadrons.
+`/planning` → HTTP 200. `POST /api/planning/years` unauthenticated → 401
+(route live, auth enforced).
+
+**Known gap, same as prior entries**: no live browser verification that a
+wing_admin/national_admin/system_admin session now sees the correct
+squadron's plan after picking one via the selector (no Chrome extension
+connectivity in this background session) — verified at the
+code/contract/e2e-regression/new-test level, not by an actual browser
+session walking through the fixed flow on staging.
+
 ## 2026-08-05 — Stage 9 (Wing dashboard data rendering + Training Summary merge verification)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
