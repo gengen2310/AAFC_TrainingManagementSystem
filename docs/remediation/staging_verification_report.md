@@ -4,6 +4,32 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Stage 4 (Squadron Crest URL)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`9d3e2165326ae44344f9ab586765a9a169cf998e`.
+
+**Pre-deploy gates**: migration `81734c0f34bf` verified up/down/up against
+disposable Postgres 18. Backend `pytest tests/` → 1069 passed, 5 skipped (3
+new). connected-frontend e2e → 27 passed, 10 pre-existing unrelated failures
+(identical baseline).
+
+**Deployed**: backend and Main TMS (Planning Workspace untouched, not
+redeployed).
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-backend` (staging) | `7f35b3e9-1056-41d7-a983-fe2addab3126` | SUCCESS |
+| `aafc-tms-frontend` (staging, Main TMS) | `7eb77046-b87b-484b-be36-84d5109bf9e6` | SUCCESS |
+
+**Post-deploy verification**: `/api/health/ready` → ready. `railway ssh ...
+alembic current` → `81734c0f34bf (head)`. Main TMS build fingerprint confirmed.
+**CSP header live-checked via `curl -I`** (not just read from source) —
+confirmed `img-src 'self' data: https:` is actually being served by the real
+nginx container, not just present in the config file that was edited. This is
+the one item this stage where I specifically avoided the "verified by reading
+source, not the rendered app" trap capability-preservation.md warns against.
+
 ## 2026-08-05 — Stage 3 (FacilitatorTypeTag reference data)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
