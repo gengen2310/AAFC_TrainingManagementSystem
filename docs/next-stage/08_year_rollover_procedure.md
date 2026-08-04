@@ -196,7 +196,14 @@ Gap #11 is proven by:
 
 ## Known Limitations
 
-1. **No rollover UI** — The rollover must be triggered via API (curl or Swagger UI). A rollover button in the Planning Workspace Setup panel is planned for the V1 release. Until then, this procedure provides the workaround.
+**Correction (2026-08-05, remediation Stage 5)**: item 1 below is stale. A rollover UI now
+exists — Planning Workspace's Guided Year Setup modal (`GuidedYearSetupModal.tsx`, added
+2026-07-26) offers a "Roll over from `<most recent year>`" option that calls the same
+`POST /api/planning/years/{id}/rollover` endpoint described in Step 2 below. The curl/Swagger
+workaround in Step 2 remains valid (same endpoint) but is no longer the only way to trigger a
+rollover — most admins should use the Guided Year Setup modal instead.
+
+1. ~~**No rollover UI** — The rollover must be triggered via API (curl or Swagger UI). A rollover button in the Planning Workspace Setup panel is planned for the V1 release. Until then, this procedure provides the workaround.~~ **Resolved** — see correction above.
 
 2. **Session carry-forward is advisory** — Incomplete sessions are counted and noted but not automatically assigned to the new year. The planner must manually review and re-schedule them.
 
