@@ -26,18 +26,24 @@ distinct fixes landed without a single schema migration, which is itself evidenc
 the underlying data model was closer to sound than the remediation instruction's
 framing assumed (see `master_remediation_plan.md`'s "Not a blank slate" section).
 
-## Anticipated future migrations (not yet started)
+## Duplicate/near-duplicate migration designs (Section 4 format)
 
-- **`PlanningLocation` retirement** — once the router-level reconciliation
-  (confirmed complete) is trusted long enough, the dead table itself could be
-  dropped. Requires separate explicit authorisation per capability-preservation.md
-  §1 — not scheduled.
-- **`Activity`/`CeaActivity` consolidation** (if a single-table outcome is chosen
-  over the current dual-pipeline-with-shared-read design) — would need a real
-  backfill/mapping-table migration. Not designed yet; REM-01 is currently tracking
-  the *design decision*, not an implementation.
-- **`ParadeDate`/`ParadeNight` consolidation** — not designed yet.
+Design only — none of the rows below have been implemented. Each still needs an
+explicit go/no-go decision (most require product input, not just engineering
+judgement) before any code changes.
+
+| Existing names | Meaning | Canonical name (proposed) | Compatibility plan | Migration |
+|---|---|---|---|---|
+| `TrainingArea` / `PlanningLocation` | A physical room/space | `TrainingArea` (already the de facto canonical — router-level reconciliation done) | None needed — both frontends already resolve to `training_areas` | **Retirement only**: drop the now-orphaned `planning_locations` table and `PlanningLocation` model once confirmed nothing reads it (grep-confirmed zero live query paths today). Zero data migration — no rows in the old table are the source of truth for anything live. Needs explicit authorisation per capability-preservation.md §1 before the drop (destructive, even though the table is unused). |
+| `Session`/`TrainingSession` / `ScheduledSession` | A curriculum item scheduled into a parade-night slot | `Session` (already canonical) | None needed | **Retirement only**: same shape as above — `scheduled_sessions` table confirmed zero live writes. Authorisation required before drop. |
+| `Activity` / `CeaActivity` | A training/administrative event on a date | Two real options, needs a decision: **(a)** keep split — `Activity` stays the operational/internally-created record, `CeaActivity` stays the external-feed staging/review record, permanently — this is closest to the instruction's own "Preferred outcome" wording ("a CEA import row or staging record may exist for review and provenance"); **(b)** fully merge into one `Activity` table with a `source` discriminator column and CEA-specific fields (`cea_activity_id`, `classification_status`, `is_removed_from_cea`) added to `Activity` itself | **This session already shipped the read-side compatibility path** regardless of which option is chosen later: Planning Workspace now reads canonical `Activity` rows (`GET /api/activities`) alongside its own `CeaActivity` rows, read-only, no write-path change. That satisfies "no second source of truth for viewing" today without committing to (a) or (b) | If (b) is chosen: backfill `Activity` rows from `CeaActivity` (mapping `cea_activity_id`→`Activity.cea_seq_nr`, already a column), keep `CeaActivity` as an immutable import-history/provenance table (rename conceptually, not necessarily physically), update Planning Workspace's CEA-import write path to create/update `Activity` rows instead. Real backfill migration, needs a decision first — **not scheduled** |
+| `ParadeDate` / `ParadeNight` | "A parade night on a specific date" | Two real options: **(a)** keep split (current design) — `ParadeDate` is the planning-layer entry (can exist before any operational commitment), `ParadeNight` is the operational record (created once sessions are scheduled) — this split is **documented as intentional** in `docs/beta/28_authoritative_data_model.md` ("allowing planning without committing session slots"), not accidental drift; **(b)** merge into one table with a `planning_status` discriminator | Given (a) is explicitly documented as an intentional design (not found duplication), default recommendation is **keep split**, re-verify the FK-bridge behaviour (`ParadeDate.parade_night_id`) still matches this description rather than migrate | No migration recommended unless a concrete symptom (not just a naming-lint pass) shows the split causing real problems |
+| `CurriculumItem` / `ProgramItem`+`ProgramPackage` | Curriculum content: phase/element/duration/suitability/ownership | `CurriculumItem` (the live, seeded, UI-reachable system) — `program.py`'s tables are very likely dead/superseded (see `domain_model_inventory.md`'s Stage 1 finding) | **Needs explicit product confirmation before any code change** — this is the biggest, most consequential finding this pass and must not be acted on unilaterally. If confirmed dead: no migration needed (zero real data in the `program_*` tables), just a retirement decision. If NOT dead (e.g. reserved for an unbuilt import pipeline): Section 6's "Program and Reference Data" capability could reuse `ProgramItemDeployment`'s inheritance model and `ProgramItem.core_status`'s richer value set (`core|optional|extension|local|wing_required|national_required`) as a head start, rather than designing new reference-data tables from scratch | Blocked on the product-confirmation question above |
+
+## Anticipated future migrations (not yet started, additive-only, lower risk)
+
 - **Reference-data tables** (Training Stage, Facilitator Type, Subject Area,
   Notice Type, etc., Section 6) — entirely new tables, additive, no existing data
   to migrate other than possibly backfilling free-text values into the new scoped
-  records. Not designed yet.
+  records. Blocked on the `ProgramItem` question above — building these from
+  scratch before that's resolved risks creating a *third* parallel system.
