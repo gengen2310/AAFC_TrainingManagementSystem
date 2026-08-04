@@ -6058,6 +6058,24 @@ function showPNDetail(ds){
   // phase's own display_name (a custom wing/squadron phase).
   const phOpts=(S.phases||[]).map(p=>`<option value="${esc(p.name)}">${esc(PH_S[p.name]||p.displayName)}</option>`).join('');
   let html=`<div class="alert a-info"><b>${esc(pn.term)}</b> · ${esc(pn.notes||'No notes')}</div>`;
+  if(pn.closeout_status==='closed'){
+    html+=`<div class="alert a-warn" style="margin-bottom:10px">This Parade Night is closed. Its date, term, timing and type can no longer be edited.</div>`;
+  }else if(canWriteSquadron()){
+    const typeOpts=['normal','activity','ceremonial','admin','stand_down','cancelled'].map(v=>`<option value="${v}" ${pn.parade_type===v?'selected':''}>${v.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase())}</option>`).join('');
+    html+=`<div style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">
+      <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Parade Night Details</div>
+      <div class="form-row">
+        <div class="ff"><label>Term</label><input id="pnd-term" value="${esc(pn.term||'')}"></div>
+        <div class="ff"><label>Type</label><select id="pnd-type">${typeOpts}</select></div>
+      </div>
+      <div class="form-row">
+        <div class="ff"><label>Start Time</label><input type="time" id="pnd-start" value="${esc(pn.start_time||'')}"></div>
+        <div class="ff"><label>End Time</label><input type="time" id="pnd-end" value="${esc(pn.end_time||'')}"></div>
+      </div>
+      <div class="ff"><label>Notes</label><input id="pnd-notes" value="${esc(pn.notes||'')}"></div>
+      <button class="btn btn-xs btn-sky" style="margin-top:6px" onclick="savePNCoreDetails('${ds}')">Save Details</button>
+    </div>`;
+  }
   (pn.sessions||[]).forEach((s,i)=>{
     const stOpts=['planned','delivered','cancelled','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${s.status===v?'selected':''}>${{planned:'Planned',delivered:'Delivered',cancelled:'Cancelled',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
     const dragAttrs=canWriteSquadron()?`ondragover="_sessDragOver(event,'${ds}',${i})" ondragleave="_sessDragLeave(event)" ondrop="_sessDrop(event,'${ds}',${i})"`:'';
@@ -6112,6 +6130,22 @@ function showPNDetail(ds){
     });
   },30);
   openModal('m-pn-detail');
+}
+async function savePNCoreDetails(ds){
+  const pn=S.pns.find(p=>p.date===ds);if(!pn)return;
+  const errEl=document.getElementById('pn-det-err');
+  const body={
+    term:document.getElementById('pnd-term')?.value||'',
+    parade_type:document.getElementById('pnd-type')?.value||'normal',
+    start_time:document.getElementById('pnd-start')?.value||'',
+    end_time:document.getElementById('pnd-end')?.value||'',
+    notes:document.getElementById('pnd-notes')?.value||'',
+  };
+  try{
+    await api('/api/parade-nights/'+pn.id,{method:'PATCH',body:JSON.stringify(body)});
+    await reloadAndRender(); showPNDetail(ds);
+    if(errEl)errEl.textContent='';
+  }catch(e){ if(errEl){errEl.textContent=apiErr(e);errEl.style.color='var(--red)';}else showToast(apiErr(e),true); }
 }
 async function savePNDetail(ds,cnt){
   const pn=S.pns.find(p=>p.date===ds);if(!pn)return;

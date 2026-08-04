@@ -313,9 +313,63 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
 def _pn_dict(pn: ParadeNight) -> dict:
     return {"parade_night_id": pn.id, "squadron_id": pn.squadron_id, "date": pn.date, "term": pn.term,
             "start_time": pn.start_time, "end_time": pn.end_time, "session_count": pn.session_count,
-            "parade_type": pn.parade_type, "published_status": pn.published_status,
+            "parade_type": pn.parade_type, "notes": pn.notes, "published_status": pn.published_status,
             "readiness_score": pn.readiness_score, "closeout_status": pn.closeout_status,
             "timing_template_id": pn.timing_template_id}
+
+
+class ParadeNightUpdateIn(BaseModel):
+    date: str | None = None
+    term: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    session_count: int | None = None
+    parade_type: str | None = None
+    notes: str | None = None
+
+
+@router.patch("/parade-nights/{pnid}")
+def update_parade_night(pnid: str, body: ParadeNightUpdateIn, db: DBSession = Depends(get_db),
+                        p: Principal = Depends(get_principal)):
+    """Edit a Parade Night's own core fields after creation -- previously no
+    endpoint existed for this in either frontend (only publish/close/archive,
+    remediation program Section 9, Stage 5). Closed nights are historical
+    records and protected; open (including published-but-not-yet-delivered)
+    nights remain editable, matching this codebase's existing distinction
+    between 'published' (a workflow milestone) and 'closed' (the actual
+    protected/historical state)."""
+    pn = db.get(ParadeNight, pnid)
+    if not pn or pn.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    if pn.closeout_status == "closed":
+        raise HTTPException(409, detail={"error": "parade_night_closed",
+                                          "message": "This Parade Night is closed and its core details can no longer be edited."})
+    if body.date is not None and body.date != pn.date:
+        existing = db.query(ParadeNight).filter(
+            ParadeNight.squadron_id == pn.squadron_id,
+            ParadeNight.date == body.date,
+            ParadeNight.is_archived == False,  # noqa: E712
+            ParadeNight.id != pn.id,
+        ).first()
+        if existing:
+            raise HTTPException(409, detail={"error": "duplicate_date", "existing_id": existing.id})
+        pn.date = body.date
+    if body.term is not None:
+        pn.term = body.term
+    if body.start_time is not None:
+        pn.start_time = body.start_time
+    if body.end_time is not None:
+        pn.end_time = body.end_time
+    if body.session_count is not None:
+        pn.session_count = body.session_count
+    if body.parade_type is not None:
+        pn.parade_type = body.parade_type
+    if body.notes is not None:
+        pn.notes = body.notes
+    db.commit()
+    audit(db, p, object_type="parade_night", object_id=pn.id, action="update", new={"date": pn.date})
+    return _pn_dict(pn)
 
 
 # ── SESSIONS ──

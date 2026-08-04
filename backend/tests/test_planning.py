@@ -583,6 +583,42 @@ def test_room_created_via_planning_workspace_visible_in_connected_frontend(clien
     assert "Reverse Cross-App Room" in names
 
 
+def test_parade_night_created_via_connected_frontend_visible_in_planning_workspace(client):
+    """A Parade Night created via /api/parade-nights (connected-frontend's Generate/
+    Add Parade Night flow) must be immediately visible via the exact same endpoint
+    call Planning Workspace's own pages make (trainingApi.paradeNights(squadronId) in
+    ParadeNights.tsx/Calendar.tsx/Dashboard.tsx/WeeklyProgram.tsx) -- one canonical
+    ParadeNight table, same read/write endpoint for both frontends, not a duplicate
+    store (mirrors the proven Rooms pattern above)."""
+    hdr = _sqn_admin_hdr(client)
+    pn_r = client.post("/api/parade-nights", json={"date": "2027-05-07", "term": "T4"}, headers=hdr)
+    assert pn_r.status_code == 200, pn_r.text
+    pnid = pn_r.json()["parade_night_id"]
+    sqn_id = client.get("/api/auth/me", headers=hdr).json()["session"]["squadron_id"]
+    r = client.get(f"/api/parade-nights?squadron_id={sqn_id}", headers=hdr)
+    assert r.status_code == 200
+    ids = [pn["parade_night_id"] for pn in r.json()]
+    assert pnid in ids, "Parade Night created via connected-frontend's endpoint must be visible via the same query Planning Workspace uses"
+
+
+def test_parade_night_created_via_planning_workspace_parade_date_visible_via_connected_frontend(client):
+    """The reverse direction: a Parade Night created by adding a Planning
+    Workspace parade date (/api/planning/years/{id}/parade-dates) must be visible
+    via /api/parade-nights/{id} -- the exact endpoint connected-frontend's own
+    Parade Nights/Calendar pages use to read a single night's detail."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.post(f"/api/planning/years/{yr_id}/parade-dates",
+                    json={"parade_date": "2027-05-14"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    pnid = r.json()["parade_night_id"]
+    assert pnid, "Adding a Planning Workspace parade date must link a real ParadeNight"
+    pn_r = client.get(f"/api/parade-nights/{pnid}", headers=hdr)
+    assert pn_r.status_code == 200
+    assert pn_r.json()["date"] == "2027-05-14"
+
+
 def test_room_created_via_planning_workspace_attaches_to_a_session(client):
     """Regression for a real, live bug: create_session/update_session's room
     resolution only ever looked up TrainingArea rows (`db.get(TrainingArea,
@@ -1133,6 +1169,85 @@ def test_builder_returns_nonempty_timing_blocks(client):
     assert all(b.get("period_number") is not None for b in ips), "Instructional blocks must have period_number"
     assert all(b.get("start_time") is not None for b in ips), "Instructional blocks must have start_time"
     assert all(b.get("end_time") is not None for b in ips), "Instructional blocks must have end_time"
+
+
+# ─────────────────────────────────────────────────────────────
+# PATCH /api/parade-nights/{id} -- core field editing (remediation Stage 5)
+# ─────────────────────────────────────────────────────────────
+
+def test_sqn_admin_can_patch_parade_night_core_fields(client):
+    hdr = _sqn_admin_hdr(client)
+    pn_r = client.post("/api/parade-nights", json={"date": "2027-03-05", "term": "T4"}, headers=hdr)
+    assert pn_r.status_code == 200, pn_r.text
+    pnid = pn_r.json()["parade_night_id"]
+    r = client.patch(f"/api/parade-nights/{pnid}", headers=hdr, json={
+        "start_time": "18:30", "end_time": "21:00", "notes": "Moved start time", "parade_type": "admin",
+    })
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["start_time"] == "18:30"
+    assert d["end_time"] == "21:00"
+    assert d["parade_type"] == "admin"
+    builder = client.get(f"/api/parade-nights/{pnid}/builder", headers=hdr).json()
+    assert builder["parade_night_id"] == pnid
+
+
+def test_patch_parade_night_date_rejects_duplicate(client):
+    hdr = _sqn_admin_hdr(client)
+    client.post("/api/parade-nights", json={"date": "2027-03-12", "term": "T4"}, headers=hdr)
+    pn2 = client.post("/api/parade-nights", json={"date": "2027-03-19", "term": "T4"}, headers=hdr)
+    pnid2 = pn2.json()["parade_night_id"]
+    r = client.patch(f"/api/parade-nights/{pnid2}", headers=hdr, json={"date": "2027-03-12"})
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"]["error"] == "duplicate_date"
+
+
+def test_patch_parade_night_blocked_when_closed(client):
+    hdr = _sqn_admin_hdr(client)
+    pn_r = client.post("/api/parade-nights", json={"date": "2027-03-26", "term": "T4"}, headers=hdr)
+    pnid = pn_r.json()["parade_night_id"]
+    from app.database import SessionLocal
+    from app.models import ParadeNight
+    db = SessionLocal()
+    try:
+        pn = db.get(ParadeNight, pnid)
+        pn.closeout_status = "closed"
+        db.commit()
+    finally:
+        db.close()
+    r = client.patch(f"/api/parade-nights/{pnid}", headers=hdr, json={"notes": "should be blocked"})
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"]["error"] == "parade_night_closed"
+
+
+def test_patch_parade_night_forbidden_for_general(client):
+    admin_hdr = _sqn_admin_hdr(client)
+    pn_r = client.post("/api/parade-nights", json={"date": "2027-04-02", "term": "T4"}, headers=admin_hdr)
+    pnid = pn_r.json()["parade_night_id"]
+    general_hdr = _general_hdr(client)
+    r = client.patch(f"/api/parade-nights/{pnid}", headers=general_hdr, json={"notes": "nope"})
+    assert r.status_code == 403
+
+
+def test_patch_parade_night_unauthenticated(client):
+    r = client.patch("/api/parade-nights/some-id", json={"notes": "nope"})
+    assert r.status_code == 401
+
+
+def test_patch_parade_night_is_audited(client):
+    hdr = _sqn_admin_hdr(client)
+    pn_r = client.post("/api/parade-nights", json={"date": "2027-04-16", "term": "T4"}, headers=hdr)
+    pnid = pn_r.json()["parade_night_id"]
+    client.patch(f"/api/parade-nights/{pnid}", headers=hdr, json={"notes": "audit me"})
+    audit = client.get("/api/audit", headers=hdr).json()
+    found = any(a.get("object_id") == pnid and a.get("action") == "update" for a in audit)
+    assert found, "Parade night PATCH not audited"
+
+
+def test_patch_parade_night_not_found(client):
+    hdr = _sqn_admin_hdr(client)
+    r = client.patch("/api/parade-nights/does-not-exist", headers=hdr, json={"notes": "x"})
+    assert r.status_code == 404
 
 
 def test_planning_session_persists_in_weekly_program(client):
