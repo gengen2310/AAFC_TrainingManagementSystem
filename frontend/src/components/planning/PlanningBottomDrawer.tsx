@@ -1382,7 +1382,7 @@ function ClassifyModal({
   );
 }
 
-function ActivitiesContent({ yearId }: { yearId: string }) {
+function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?: string }) {
   const qc = useQueryClient();
   const [classifying, setClassifying] = useState<import("../../api/types").CeaActivity | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -1441,8 +1441,9 @@ function ActivitiesContent({ yearId }: { yearId: string }) {
   // See trainingApi.canonicalActivities for why this closes the one real
   // cross-frontend visibility gap without a data migration.
   const { data: tmsActivitiesData = [], isLoading: tmsActivitiesLoading } = useQuery({
-    queryKey: ["tms-canonical-activities"],
-    queryFn: () => trainingApi.canonicalActivities(),
+    queryKey: ["tms-canonical-activities", squadronId],
+    queryFn: () => trainingApi.canonicalActivities(squadronId!),
+    enabled: !!squadronId,
     staleTime: 2 * 60 * 1000,
   });
 
@@ -1967,7 +1968,7 @@ export function PlanningBottomDrawer({ yearId, tab, onTabChange, onClose, facili
         {tab === "notices" && yearId && <NoticesContent yearId={yearId} />}
         {tab === "notices" && !yearId && <div className="pw-empty">No planning year selected.</div>}
 
-        {tab === "activities" && yearId && <ActivitiesContent yearId={yearId} />}
+        {tab === "activities" && yearId && <ActivitiesContent yearId={yearId} squadronId={squadronId} />}
         {tab === "activities" && !yearId && <div className="pw-empty">No planning year selected.</div>}
       </div>
     </div>

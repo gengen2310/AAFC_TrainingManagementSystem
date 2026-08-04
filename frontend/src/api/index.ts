@@ -103,14 +103,18 @@ export const trainingApi = {
       created?: number; skipped?: number; created_ids?: string[]; total?: number;
     }>(`/api/facilitators/import?${params}`, form);
   },
-  // Canonical Activity records -- the same backward-compatible, session-scoped
-  // endpoint (backend/app/routers/training.py list_activities's no-scope_type
-  // path) Main TMS's own loadData() calls, so this always resolves "my
-  // squadron's activities" the same way regardless of which frontend is
-  // asking. This is the read side of closing the one real cross-frontend
-  // data split: CEA import still owns CeaActivity as its own pipeline, but
-  // an Activity created in Main TMS was previously invisible here entirely.
-  canonicalActivities: () => api.get<CanonicalActivity[]>("/api/activities"),
+  // Canonical Activity records -- uses list_activities's inheritance-aware
+  // scope_type=squadron path (backend/app/routers/training.py), not the
+  // legacy no-scope_type path. The legacy path filters strictly on
+  // Activity.squadron_id, which is always NULL for Wing/National-owned
+  // Activity rows (see create_wing_activity/create_national_activity), so it
+  // silently dropped every Wing/National activity from this view (found and
+  // fixed in the remediation program's Stage 6, 2026-08-05). sources=activity
+  // excludes the endpoint's own CEA/Holiday merge -- this drawer already
+  // fetches those separately via ceaData/holidaysData, so merging them in
+  // here too would duplicate rows.
+  canonicalActivities: (squadronId: string) =>
+    api.get<CanonicalActivity[]>(`/api/activities?scope_type=squadron&scope_id=${squadronId}&sources=activity`),
   trainingAreas: (squadron_id?: string) => api.get<TrainingArea[]>(`/api/training-areas${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   equipment: (squadron_id?: string) => api.get<Equipment[]>(`/api/equipment${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   clashes: (date: string) => api.get<ClashResult>(`/api/resources/clashes?date=${date}`),
