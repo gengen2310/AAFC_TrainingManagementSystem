@@ -455,6 +455,29 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
     if not pn or pn.is_archived:
         raise HTTPException(404, detail={"error": "parade_night_not_found"})
     require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+
+    # ── Same synchronous resource-conflict check as edit_session below (Stage 8) --
+    # previously only PUT /sessions/{sid} was checked, so a facilitator/room could
+    # still be double-booked with zero warning by creating a brand new session
+    # rather than editing an existing one into a clash. ──
+    if not body.override_conflict:
+        siblings = db.query(Session).filter(
+            Session.parade_night_id == pn.id,
+            Session.period_number == body.period_number, Session.is_archived == False,  # noqa: E712
+        ).all()
+        conflicts = []
+        for sib in siblings:
+            if body.facilitator_id and sib.facilitator_id == body.facilitator_id:
+                conflicts.append({"type": "facilitator_clash", "session_id": sib.id,
+                                  "resource_id": sib.facilitator_id,
+                                  "resource_name": sib.facilitator_display_name_at_time})
+            if body.training_area_id and sib.training_area_id == body.training_area_id:
+                conflicts.append({"type": "room_clash", "session_id": sib.id,
+                                  "resource_id": sib.training_area_id,
+                                  "resource_name": sib.training_area_name_at_time})
+        if conflicts:
+            raise HTTPException(409, detail={"error": "resource_conflict", "conflicts": conflicts})
+
     s = Session(parade_night_id=pn.id, squadron_id=pn.squadron_id, period_number=body.period_number,
                 cadet_group=body.cadet_group, phase_at_time=body.phase_at_time, custom_title=body.custom_title,
                 expected_attendance=body.expected_attendance, status="planned", created_by=p.user_id)

@@ -179,3 +179,65 @@ def test_edit_session_conflict_check_scoped_to_target_parade_night(client):
         "parade_night_id": pn_b, "period_number": 1, "facilitator_id": fac_id,
     }, headers=hdr)
     assert r.status_code == 200, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# Create-path conflict check (Stage 8) -- previously only PUT /sessions/{sid}
+# (edit) was checked; POST /sessions (create) had zero conflict enforcement,
+# so a facilitator/room could be double-booked with no warning by creating a
+# brand new session directly into an existing clash rather than editing one.
+# ─────────────────────────────────────────────────────────────
+
+def test_create_session_facilitator_clash_blocked(client):
+    hdr = _sqn_admin_703(client)
+    fac_id = _first_facilitator_id(client, hdr)
+    pn = _make_pn(client, hdr, "2027-11-12", session_count=2)
+    _make_session(client, hdr, pn, 1, facilitator_id=fac_id)
+
+    r = client.post("/api/sessions", json={
+        "parade_night_id": pn, "period_number": 1, "facilitator_id": fac_id,
+    }, headers=hdr)
+    assert r.status_code == 409, r.text
+    d = r.json()["detail"]
+    assert d["error"] == "resource_conflict"
+    assert any(c["type"] == "facilitator_clash" for c in d["conflicts"])
+
+
+def test_create_session_room_clash_blocked(client):
+    hdr = _sqn_admin_703(client)
+    area_id = _first_training_area_id(client, hdr)
+    pn = _make_pn(client, hdr, "2027-11-13", session_count=2)
+    _make_session(client, hdr, pn, 1, training_area_id=area_id)
+
+    r = client.post("/api/sessions", json={
+        "parade_night_id": pn, "period_number": 1, "training_area_id": area_id,
+    }, headers=hdr)
+    assert r.status_code == 409, r.text
+    d = r.json()["detail"]
+    assert d["error"] == "resource_conflict"
+    assert any(c["type"] == "room_clash" for c in d["conflicts"])
+
+
+def test_create_session_conflict_override_bypasses_check(client):
+    hdr = _sqn_admin_703(client)
+    fac_id = _first_facilitator_id(client, hdr)
+    pn = _make_pn(client, hdr, "2027-11-14", session_count=2)
+    _make_session(client, hdr, pn, 1, facilitator_id=fac_id)
+
+    r = client.post("/api/sessions", json={
+        "parade_night_id": pn, "period_number": 1, "facilitator_id": fac_id,
+        "override_conflict": True,
+    }, headers=hdr)
+    assert r.status_code == 200, r.text
+
+
+def test_create_session_different_period_no_conflict(client):
+    hdr = _sqn_admin_703(client)
+    fac_id = _first_facilitator_id(client, hdr)
+    pn = _make_pn(client, hdr, "2027-11-15", session_count=2)
+    _make_session(client, hdr, pn, 1, facilitator_id=fac_id)
+
+    r = client.post("/api/sessions", json={
+        "parade_night_id": pn, "period_number": 2, "facilitator_id": fac_id,
+    }, headers=hdr)
+    assert r.status_code == 200, r.text
