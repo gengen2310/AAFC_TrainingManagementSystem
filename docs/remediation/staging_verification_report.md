@@ -4,6 +4,34 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Stage 9 (Wing dashboard data rendering + Training Summary merge verification)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`cef77ac5c732a9ea09278b266677db91f0166a4b`.
+
+**Pre-deploy gates**: no migration, no backend change (frontend-only fixes,
+both frontends). `tsc --noEmit` clean. `vitest run` → 19 passed. Planning
+Workspace e2e (`playwright.config.ts`) → 87 passed, 0 failed (includes the
+Report Catalogue accessibility check, unaffected by the two corrected row
+values). connected-frontend e2e → 27 passed, 10 pre-existing unrelated
+(identical established baseline).
+
+**Deployed**: Main TMS and Planning Workspace (backend untouched this stage).
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-frontend` (staging, Main TMS) | `829ae2ce-21ff-4f85-a70f-189c4e192e07` | SUCCESS |
+| `aafc-tms-planning-workspace-preview` (staging) | `beb8780b-56d6-4041-b301-4abec108cdc2` | SUCCESS |
+
+**Post-deploy verification**: Main TMS `<meta name="app-build">` confirmed
+exact commit SHA. `/planning` → HTTP 200.
+
+**Known gap, same as prior entries**: no live browser verification of the
+new Wing Dashboard tables (connected-frontend) or the new capability
+heatmap (Planning Workspace's Wing Overview) against real staging data (no
+Chrome extension connectivity in this background session) — verified at
+the code/contract/e2e-regression level only.
+
 ## 2026-08-05 — Stage 8 (Session conflict enforcement + silent data-loss fix + facilitator-type reference data)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
