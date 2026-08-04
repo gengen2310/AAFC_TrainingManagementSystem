@@ -4,6 +4,46 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Stage 5 (Parade Night PATCH + cross-interface verification)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`98154a49bd32e80dee39eaf160583d448923e12d`.
+
+**Pre-deploy gates**: no migration needed (no new columns). Backend
+`pytest tests/` → 1078 passed, 5 skipped (9 new: 7 for the PATCH endpoint, 2
+cross-interface). connected-frontend e2e → 27 passed, 10 pre-existing
+unrelated failures (identical baseline) — **on the second run**; the first
+run showed 32 failures across unrelated spec files (login/dashboard/XSS/
+screenshots), traced to an hours-old leftover `uvicorn` process (PID
+started `Wed 5 Aug 00:34:11`, left running since an earlier stage this
+session) still bound to port 8000 with accumulated rate-limit/lockout
+state — not a regression from this stage's code. Killed it, reseeded a
+genuinely fresh backend (`python manage.py --seed`), re-ran, got the
+established baseline. Flagging this explicitly since it could otherwise
+look like a silently-dismissed regression.
+
+**Deployed**: backend and Main TMS (Planning Workspace untouched, no
+changes this stage).
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-backend` (staging) | `eba995eb-7ae9-487a-ae59-f3ed10bfd864` | SUCCESS |
+| `aafc-tms-frontend` (staging, Main TMS) | `c444616d-5de0-4c50-820f-d45997394b9c` | SUCCESS |
+
+**Post-deploy verification**: `/api/health/ready` → ready, 140 squadrons.
+Main TMS `<meta name="app-build">` confirmed exact commit SHA
+`98154a49bd32e80dee39eaf160583d448923e12d`. `PATCH /api/parade-nights/some-id`
+unauthenticated against the live staging backend → 401 (not 404) —
+confirms the new route is actually registered and live, not just present
+in source.
+
+**Known gap, same as prior entries**: no live browser verification of the
+new "Parade Night Details" edit block's actual rendered behavior in
+connected-frontend's detail modal (no Chrome extension connectivity in
+this background session) — verified at the API/contract level (curl,
+pytest) and via e2e regression, not with an actual browser opening the
+modal and clicking Save Details.
+
 ## 2026-08-05 — Stage 4 (Squadron Crest URL)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
