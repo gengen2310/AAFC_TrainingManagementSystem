@@ -15,14 +15,16 @@ from .config import settings
 _is_sqlite = settings.DATABASE_URL.startswith("sqlite")
 connect_args = {"check_same_thread": False} if _is_sqlite else {}
 
-# Supabase Session Pooler caps connections at 15.  With 2 gunicorn workers
-# each pool must stay under 8 (7 + 1 pre-ping headroom = 14 total < 15).
-# Switch DATABASE_URL to port 6543 (Transaction Pooler) for higher concurrency.
+# Production runs on Railway-native Postgres, not a Supabase Session Pooler
+# (GAP-18 fix, 2026-08 -- see deployment/backup-dr.md and config.py's
+# DB_POOL_SIZE comment for the full history, including a real incident where
+# sizing reasoned from the older, stale Supabase-pooler premise blew past the
+# real ceiling). The real, load-tested ceiling is Postgres's own
+# max_connections=100 (docs/release/qualification_gap_register.md GAP-28/29).
 # Pool size is configurable per-environment (DB_POOL_SIZE / DB_POOL_MAX_OVERFLOW /
-# DB_POOL_TIMEOUT) — the 5/2/30 defaults below are what's safe for production's
-# Supabase constraint; an environment with a different Postgres (higher
-# max_connections, no external pooler cap) may set these env vars higher without
-# touching this file or affecting any other environment.
+# DB_POOL_TIMEOUT) — the 5/2/30 defaults below are conservative and safe; do not
+# raise them without checking current `workers x (pool_size + max_overflow)`
+# against the target environment's actual max_connections.
 def build_pool_kwargs(is_sqlite: bool, pool_size: int, max_overflow: int, pool_timeout: int) -> dict:
     """Pure function (no I/O, no globals) so pool sizing logic is unit-testable
     without a real Postgres connection — SQLite (local dev/tests) never receives

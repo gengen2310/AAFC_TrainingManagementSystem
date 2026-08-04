@@ -18,11 +18,19 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # SQLAlchemy connection pool sizing (Postgres only; ignored for SQLite).
-    # Defaults are sized for PRODUCTION's Supabase Session Pooler, which caps total
-    # connections at 15 -- with 2 gunicorn workers, each pool must stay under 8
-    # (7 + 1 pre-ping headroom = 14 total < 15). Do not raise these defaults without
-    # re-checking that constraint. Environments without that constraint (e.g. a
-    # staging database that isn't behind Supabase's pooler) may override via env var.
+    # As of 2026-08 (GAP-18 fix, see deployment/backup-dr.md), production runs on
+    # Railway-native Postgres, not a Supabase Session Pooler -- an earlier version
+    # of this comment cited a stale "15 total connections" Supabase pooler cap as
+    # the rationale, which no longer applies. The real, load-tested ceiling is
+    # Postgres's own max_connections=100 (docs/release/qualification_gap_register.md
+    # GAP-28/GAP-29) -- GAP-29 documents a real incident where someone raised
+    # workers/pool sizes reasoning from the old (already-stale-then) per-service
+    # mental model and blew past that ceiling (12 workers x (16+2) = 216 > 100),
+    # producing a >50% server error rate on staging before being reverted. These
+    # defaults (2 workers x (5+2) = 14 total) are conservative and safe under the
+    # real ceiling; do not raise them without checking current
+    # `workers x (pool_size + max_overflow)` against Postgres's actual
+    # max_connections for the target environment.
     DB_POOL_SIZE: int = 5
     DB_POOL_MAX_OVERFLOW: int = 2
     DB_POOL_TIMEOUT: int = 30

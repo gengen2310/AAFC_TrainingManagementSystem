@@ -22,12 +22,21 @@ def test_postgres_receives_exact_configured_values():
     }
 
 
-def test_production_defaults_stay_under_supabase_session_pooler_cap():
+def test_production_defaults_stay_under_postgres_max_connections():
     """Production's committed defaults (app/config.py) times its 2-worker
-    entrypoint default must stay under Supabase Session Pooler's 15-connection
-    cap, with headroom for pool_pre_ping. This is the exact constraint the
-    5/2/30 defaults exist to satisfy -- a regression here means someone
-    changed a default without re-checking the constraint it was chosen for."""
+    entrypoint default must stay well under Postgres's real, load-tested
+    connection ceiling. Production runs on Railway-native Postgres (GAP-18
+    fix, 2026-08 -- see deployment/backup-dr.md), not a Supabase Session
+    Pooler; an earlier version of this test enforced a stale "15 connections"
+    Supabase-pooler premise that no longer applies. The real ceiling is
+    Postgres's own max_connections=100 (docs/release/qualification_gap_register.md
+    GAP-28/GAP-29) -- GAP-29 documents a real incident where sizing reasoned
+    from that stale premise (raising workers/pool sizes without re-checking
+    the real constraint) blew past 100 and produced a >50% server error rate
+    on staging before being reverted. This assertion keeps meaningful headroom
+    under the real ceiling, not just squeaking under the old, wrong number --
+    a regression here means someone changed a default without re-checking the
+    constraint it was chosen for."""
     from app.config import Settings
 
     defaults = Settings()
@@ -36,7 +45,9 @@ def test_production_defaults_stay_under_supabase_session_pooler_cap():
         False, defaults.DB_POOL_SIZE, defaults.DB_POOL_MAX_OVERFLOW, defaults.DB_POOL_TIMEOUT
     )
     total_connections = workers * (kwargs["pool_size"] + kwargs["max_overflow"])
-    assert total_connections < 15, (
+    assert total_connections < 50, (
         f"{workers} workers x (pool_size+overflow)={kwargs['pool_size']}+{kwargs['max_overflow']} "
-        f"= {total_connections} connections -- must stay under Supabase's 15-connection cap"
+        f"= {total_connections} connections -- should stay well under Postgres's real "
+        f"max_connections=100 ceiling (GAP-28/29), with room for other connections "
+        f"(migrations, admin tools, other services) sharing the same database"
     )
