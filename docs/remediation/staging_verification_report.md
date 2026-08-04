@@ -4,6 +4,41 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Stage 3 (FacilitatorTypeTag reference data)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`5b2a9420e0d1c93c93941501c7653944299faad0`.
+
+**Pre-deploy gates**: migration `abc97c354bbb` verified up/down/up against a
+disposable Postgres 18 in both an empty-table and already-seeded starting state
+(the latter simulating what a Postgres environment already carrying the same
+data via a different path would see — no-op, no error). Backend `pytest tests/`
+→ 1066 passed, 5 skipped (17 new). connected-frontend e2e → 27 passed, 10
+pre-existing unrelated failures (identical baseline). Live local verification:
+`GET /api/facilitator-type-tags` with a real ADMIN703 session token returned all
+5 seeded global types correctly.
+
+**Deployed**: backend and Main TMS (Planning Workspace untouched this stage, not
+redeployed).
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-backend` (staging) | `2b56a061-a55c-4181-88d2-e5678cef3144` | SUCCESS |
+| `aafc-tms-frontend` (staging, Main TMS) | `b0cee8d9-7b9e-433f-a372-c5fb940433ee` | SUCCESS |
+
+**Post-deploy verification**: `/api/health/ready` → ready, 140 squadrons.
+`railway ssh ... alembic current` confirmed `abc97c354bbb (head)` — the
+migration ran automatically via `docker-entrypoint-staging.sh`'s own `alembic
+upgrade head` step. Main TMS `<meta name="app-build">` confirmed exact commit
+SHA. `GET /api/facilitator-type-tags` unauthenticated → 401 (correct — auth
+required, endpoint live).
+
+**Known gap, same as prior entries**: no live browser verification of the
+`#fac-type` dropdown's actual rendered behavior (no Chrome extension
+connectivity in this background session) — verified at the API/contract level
+and via e2e regression, not with an actual browser opening the Add Facilitator
+modal.
+
 ## 2026-08-05 — Stage 2 (error classification fixes)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
