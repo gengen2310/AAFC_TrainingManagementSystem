@@ -200,7 +200,9 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .ph-gld{background:#fff7cc;color:#7a6000;}
 .st-planned{background:var(--accent-light);color:var(--dark);}
 .st-delivered{background:#d4f0e3;color:#1a5c35;}
+.st-delivered_with_issue{background:#eaf3d8;color:#4a5d1f;}
 .st-cancelled{background:#fde8e8;color:#8b1a1a;}
+.st-cancelled_late{background:#fde8e8;color:#8b1a1a;border:1px solid #8b1a1a;}
 .st-rescheduled{background:#fff3cd;color:#7a5200;}
 .st-not_delivered{background:#eef0f2;color:var(--steel);}
 
@@ -330,6 +332,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .cal-cell.today .cal-dt{color:var(--blue);}
 .cal-chip{display:block;font-size:8px;margin-top:1px;padding:1px 4px;border-radius:3px;background:var(--dark);color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;}
 .cal-chip.delivered{background:var(--ok);}.cal-chip.cancelled{background:var(--red);}
+.cal-chip.delivered_with_issue{background:#8a9a3a;}.cal-chip.cancelled_late{background:var(--red);}
 .cal-chip.not_delivered{background:var(--lgrey);}.cal-chip.rescheduled{background:var(--warn);}
 .cal-chip.act{background:var(--warn);}
 
@@ -831,9 +834,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
         <div class="card">
           <div class="cal-nav">
-            <button class="cal-nbtn" onclick="calMove(-1)">‹</button>
+            <button class="cal-nbtn" onclick="calMove(-1)" aria-label="Previous month">‹</button>
             <div class="cal-mo" id="cal-m"></div>
-            <button class="cal-nbtn" onclick="calMove(1)">›</button>
+            <button class="cal-nbtn" onclick="calMove(1)" aria-label="Next month">›</button>
             <div style="flex:1"></div>
             <select onchange="calYear=+this.value;renderCal()" id="cal-yr" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;">
               <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
@@ -1481,7 +1484,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="modal" style="max-width:480px">
     <div class="modal-hdr">
       <div class="modal-title">Assign Mission</div>
-      <button class="modal-x" onclick="closeModal('m-assign-mission')">×</button>
+      <button class="modal-x" aria-label="Close" onclick="closeModal('m-assign-mission')">×</button>
     </div>
     <p id="assign-title" style="font-weight:600;margin-bottom:12px"></p>
     <div class="form-group">
@@ -1574,7 +1577,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Auto-Generate Parade Dates Modal -->
 <div class="modal-bg" id="m-gen-dates">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title">Bulk Generate Parade Dates</div><button class="modal-x" onclick="closeModal('m-gen-dates')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Bulk Generate Parade Dates</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-gen-dates')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label>Repeat every</label>
@@ -1625,7 +1628,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="modal" style="max-width:640px">
     <div class="modal-hdr">
       <div class="modal-title" id="we-modal-title">New Wing HQ Event</div>
-      <button class="modal-x" onclick="closeModal('m-wing-event')">×</button>
+      <button class="modal-x" aria-label="Close" onclick="closeModal('m-wing-event')">×</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="we-edit-id">
@@ -1706,7 +1709,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="modal" style="max-width:580px">
     <div class="modal-hdr">
       <div class="modal-title">Wing HQ Event</div>
-      <button class="modal-x" onclick="closeModal('m-wing-event-detail')">×</button>
+      <button class="modal-x" aria-label="Close" onclick="closeModal('m-wing-event-detail')">×</button>
     </div>
     <div class="modal-body" id="we-detail-body">
     </div>
@@ -1841,7 +1844,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Add Parade Night -->
 <div class="modal-bg" id="m-add-pn">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title">+ Add Parade Night</div><button class="modal-x" onclick="closeModal('m-add-pn')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">+ Add Parade Night</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-pn')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="ff"><label>Date</label><input type="date" id="pn-date"></div>
@@ -1870,7 +1873,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Parade Night Detail -->
 <div class="modal-bg" id="m-pn-detail">
   <div class="modal modal-xl">
-    <div class="modal-hdr"><div class="modal-title" id="pn-det-title">Parade Night</div><button class="modal-x" onclick="closeModal('m-pn-detail')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="pn-det-title">Parade Night</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-detail')">×</button></div>
     <div class="modal-body" id="pn-det-body"></div>
     <div class="modal-foot">
       <span id="pn-det-err" style="font-size:11.5px;margin-right:auto;font-weight:700"></span>
@@ -1882,7 +1885,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Accessible module scheduling (Phase 3.1): Move to a different Parade Night -->
 <div class="modal-bg" id="m-sess-move-to">
   <div class="modal" style="max-width:420px">
-    <div class="modal-hdr"><div class="modal-title">Move Session</div><button class="modal-x" onclick="_sessMoveToCancel()">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Move Session</div><button class="modal-x" aria-label="Close" onclick="_sessMoveToCancel()">×</button></div>
     <div class="modal-body">
       <div class="ff"><label>Move to Parade Night</label>
         <select id="smt-pn"></select>
@@ -1905,7 +1908,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
      on a 409 resource_conflict. -->
 <div class="modal-bg" id="m-sched-conflict">
   <div class="modal" style="max-width:420px">
-    <div class="modal-hdr"><div class="modal-title">Scheduling Conflict</div><button class="modal-x" onclick="_scResolve(false)">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Scheduling Conflict</div><button class="modal-x" aria-label="Close" onclick="_scResolve(false)">×</button></div>
     <div class="modal-body">
       <div class="alert a-warn" style="font-size:12px;margin-bottom:8px">This move creates a conflict:</div>
       <ul id="sc-list" style="margin:0 0 4px 18px;padding:0;font-size:12px"></ul>
@@ -1920,7 +1923,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Session Quick Edit -->
 <div class="modal-bg" id="m-sess-edit">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title">Edit Session</div><button class="modal-x" onclick="closeModal('m-sess-edit')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Edit Session</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-sess-edit')">×</button></div>
     <div class="modal-body" id="sess-edit-body"></div>
     <div class="modal-foot">
       <span id="sess-edit-err" style="font-size:11.5px;margin-right:auto;font-weight:700"></span>
@@ -1968,7 +1971,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Add/Edit Curriculum Item -->
 <div class="modal-bg" id="m-add-curr">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title" id="curr-modal-title">+ Add Curriculum Item</div><button class="modal-x" onclick="closeModal('m-add-curr')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="curr-modal-title">+ Add Curriculum Item</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-curr')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="ff"><label>Module Code</label><input id="c-code" placeholder="e.g. JNR-M99"></div>
@@ -2035,7 +2038,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Curriculum Item Detail -->
 <div class="modal-bg" id="m-curr-detail">
   <div class="modal modal-lg">
-    <div class="modal-hdr"><div class="modal-title" id="cd-title">Curriculum Item Detail</div><button class="modal-x" onclick="closeModal('m-curr-detail')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="cd-title">Curriculum Item Detail</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-curr-detail')">×</button></div>
     <div class="modal-body" id="cd-body"></div>
     <div class="modal-foot"><button class="btn btn-out" onclick="closeModal('m-curr-detail')">Close</button></div>
   </div>
@@ -2044,7 +2047,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Add Activity -->
 <div class="modal-bg" id="m-add-act">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title">+ Add Activity</div><button class="modal-x" onclick="closeModal('m-add-act')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">+ Add Activity</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-act')">×</button></div>
     <div class="modal-body">
       <div class="ff"><label>Activity Name</label><input id="act-name" placeholder="e.g. ANZAC Day — Fremantle"></div>
       <div class="form-row">
@@ -2074,7 +2077,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Generate Recurring Activities -->
 <div class="modal-bg" id="m-gen-acts">
   <div class="modal" style="max-width:680px">
-    <div class="modal-hdr"><div class="modal-title">Generate Recurring Activities</div><button class="modal-x" onclick="closeModal('m-gen-acts')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Generate Recurring Activities</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-gen-acts')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="ff" style="flex:2"><label>Activity Name *</label><input id="ga-name" placeholder="e.g. Drill Night"></div>
@@ -2138,7 +2141,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- CSV Curriculum Import -->
 <div class="modal-bg" id="m-csv-curr-import">
   <div class="modal" style="max-width:760px">
-    <div class="modal-hdr"><div class="modal-title">Import Curriculum from CSV</div><button class="modal-x" onclick="closeModal('m-csv-curr-import')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Import Curriculum from CSV</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-csv-curr-import')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info">Upload a CSV with columns: Training Phase, Experiential Code, Title, Elements, Foundation or Extension, Instructor Suitability, Timing, Location, Learning Hub Link. Preview shows exactly what would be created/updated before anything is written.</div>
       <div class="form-row">
@@ -2179,7 +2182,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Schedule XLSX Import -->
 <div class="modal-bg" id="m-sched-import">
   <div class="modal" style="max-width:720px">
-    <div class="modal-hdr"><div class="modal-title">Import Schedule from XLSX</div><button class="modal-x" onclick="closeModal('m-sched-import')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Import Schedule from XLSX</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-sched-import')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info" style="margin-bottom:10px">Upload an edited schedule XLSX. Expected columns: <strong>Date, Session, Group, Code, Title</strong>. Only curriculum code / title changes are imported — other session fields are unchanged. Changes are role-permission-gated.</div>
       <div class="form-group">
@@ -2216,7 +2219,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Add Facilitator -->
 <div class="modal-bg" id="m-add-fac">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title" id="fac-modal-title">+ Add Facilitator</div><button class="modal-x" onclick="closeModal('m-add-fac')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="fac-modal-title">+ Add Facilitator</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-fac')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info">Rank is stored separately so historical records stay accurate when rank changes.</div>
       <div class="alert a-warn" id="fac-dup-warn" style="display:none"></div>
@@ -2253,7 +2256,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Facilitator Profile -->
 <div class="modal-bg" id="m-fac-profile">
   <div class="modal modal-xl">
-    <div class="modal-hdr"><div class="modal-title" id="fp-title">Facilitator Profile</div><button class="modal-x" onclick="closeModal('m-fac-profile')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="fp-title">Facilitator Profile</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-fac-profile')">×</button></div>
     <div class="modal-body" id="fp-body"></div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-fac-profile')">Close</button>
@@ -2264,7 +2267,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Subject-area tag editor -->
 <div class="modal-bg" id="m-tag-fac">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title" id="m-tag-title">Edit Subject Areas</div><button class="modal-x" onclick="closeModal('m-tag-fac')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-tag-title">Edit Subject Areas</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-tag-fac')">×</button></div>
     <div class="modal-body">
       <p style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Click a tag to toggle it. Dashed border = unit-created tag. Max 20 tags.</p>
       <div id="m-tag-checks" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px"></div>
@@ -2288,7 +2291,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Admin: reset another user's access code -->
 <div class="modal-bg" id="m-reset-code">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title" id="m-reset-title">Reset Access Code</div><button class="modal-x" onclick="closeModal('m-reset-code')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-reset-title">Reset Access Code</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-reset-code')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info" style="margin-bottom:10px">The old code is not recoverable. The new code is hashed immediately.</div>
       <div class="ff"><label>New access code</label><input id="m-reset-new" type="password" autocomplete="new-password" placeholder="Enter new code"></div>
@@ -2305,7 +2308,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Add Room -->
 <div class="modal-bg" id="m-add-room">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title" id="room-modal-title">+ Add Room / Training Area</div><button class="modal-x" onclick="closeModal('m-add-room')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="room-modal-title">+ Add Room / Training Area</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-room')">×</button></div>
     <div class="modal-body">
       <div class="ff"><label>Room Name</label><input id="room-name" placeholder="e.g. Bravo, Major Parade Ground, Aviation Room"></div>
       <div class="form-row">
@@ -2326,7 +2329,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- Add Equipment -->
 <div class="modal-bg" id="m-add-equip">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title" id="equip-modal-title">+ Add Equipment</div><button class="modal-x" onclick="closeModal('m-add-equip')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="equip-modal-title">+ Add Equipment</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-equip')">×</button></div>
     <div class="modal-body">
       <div class="ff"><label>Equipment Name</label><input id="equip-name" placeholder="e.g. Drones, Projector, Radio Sets"></div>
       <div class="form-row">
@@ -2344,7 +2347,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- ACCOUNTS: Create Account Modal -->
 <div class="modal-bg" id="m-create-account">
   <div class="modal" style="max-width:540px">
-    <div class="modal-hdr"><div class="modal-title">Add Account</div><button class="modal-x" onclick="closeModal('m-create-account')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Add Account</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-create-account')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info" style="font-size:11px;margin-bottom:10px">Backend validates your authority. You can only create accounts within your permitted scope.</div>
       <div class="ff"><label>Display Name</label><input id="ca-name" placeholder="e.g. Smith, J — 703 SQN Admin"></div>
@@ -2390,7 +2393,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- ACCOUNTS: New Code Display Modal (one-time) -->
 <div class="modal-bg" id="m-new-code">
   <div class="modal" style="max-width:440px">
-    <div class="modal-hdr"><div class="modal-title" id="m-new-code-title">New Access Code</div><button class="modal-x" onclick="closeNewCodeModal()">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-new-code-title">New Access Code</div><button class="modal-x" aria-label="Close" onclick="closeNewCodeModal()">×</button></div>
     <div class="modal-body">
       <div class="alert a-warn" style="font-weight:700;margin-bottom:12px">⚠️ This code will not be shown again. Copy it now before closing this window.</div>
       <div style="background:#1a1a2e;color:#7efff5;font-family:monospace;font-size:22px;font-weight:900;letter-spacing:4px;text-align:center;padding:18px 12px;border-radius:8px;user-select:all;margin-bottom:12px" id="m-new-code-value">—</div>
@@ -2421,7 +2424,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- ACCOUNTS: Reset Code Modal (new endpoint) -->
 <div class="modal-bg" id="m-acct-reset-code">
   <div class="modal" style="max-width:420px">
-    <div class="modal-hdr"><div class="modal-title" id="m-acct-reset-title">Reset Access Code</div><button class="modal-x" onclick="closeModal('m-acct-reset-code')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-acct-reset-title">Reset Access Code</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-acct-reset-code')">×</button></div>
     <div class="modal-body">
       <div class="alert a-warn" style="font-size:11.5px;margin-bottom:10px">The existing code will be invalidated immediately. The user must use the new code at next sign-in.</div>
       <div class="card" style="background:var(--hover);padding:12px">
@@ -2447,7 +2450,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- ACCOUNTS: Create Flight Modal -->
 <div class="modal-bg" id="m-create-flight">
   <div class="modal" style="max-width:380px">
-    <div class="modal-hdr"><div class="modal-title">Add Flight</div><button class="modal-x" onclick="closeModal('m-create-flight')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Add Flight</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-create-flight')">×</button></div>
     <div class="modal-body">
       <div class="ff"><label>Flight Name</label><input id="cf-name" placeholder="e.g. Alpha Flight, Bravo Flight"></div>
       <div class="ff" id="cf-sqn-row"><label>Squadron</label>
@@ -2466,7 +2469,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- ACCOUNTS: Edit Account Modal -->
 <div class="modal-bg" id="m-edit-account">
   <div class="modal" style="max-width:380px">
-    <div class="modal-hdr"><div class="modal-title">Edit Account</div><button class="modal-x" onclick="closeModal('m-edit-account')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Edit Account</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-edit-account')">×</button></div>
     <div class="modal-body">
       <div class="ff"><label>Display Name</label><input id="ea-name" placeholder="Display name" autocomplete="off"></div>
       <div class="ff" id="ea-role-row" style="display:none"><label>Role / Access Type</label>
@@ -2491,7 +2494,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
      confirmation checkbox, results) survives Back/Continue navigation. -->
 <div class="modal-bg" id="m-archive-wizard">
   <div class="modal" style="max-width:560px">
-    <div class="modal-hdr"><div class="modal-title" id="waz-title">Bulk Archive Accounts</div><button class="modal-x" onclick="_wizClose()">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="waz-title">Bulk Archive Accounts</div><button class="modal-x" aria-label="Close" onclick="_wizClose()">×</button></div>
     <div class="modal-body" id="waz-body"></div>
     <div class="modal-foot" id="waz-foot"></div>
   </div>
@@ -2503,7 +2506,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
      flow so the admin can resolve the block without leaving the wizard). -->
 <div class="modal-bg" id="m-org-archive-wizard">
   <div class="modal" style="max-width:560px">
-    <div class="modal-hdr"><div class="modal-title" id="owz-title">Archive Organisation</div><button class="modal-x" onclick="_owzClose()">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="owz-title">Archive Organisation</div><button class="modal-x" aria-label="Close" onclick="_owzClose()">×</button></div>
     <div class="modal-body" id="owz-body"></div>
     <div class="modal-foot" id="owz-foot"></div>
   </div>
@@ -2512,7 +2515,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- ACCOUNTS: Rename Flight Modal -->
 <div class="modal-bg" id="m-rename-flight">
   <div class="modal" style="max-width:360px">
-    <div class="modal-hdr"><div class="modal-title">Rename Flight</div><button class="modal-x" onclick="closeModal('m-rename-flight')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Rename Flight</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-rename-flight')">×</button></div>
     <div class="modal-body">
       <div class="ff"><label>Flight Name</label><input id="rf-name" placeholder="e.g. Alpha Flight" autocomplete="off"></div>
       <div id="rf-msg" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
@@ -2527,7 +2530,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- UNITS: Create Wing Modal (NAT HQ only) -->
 <div class="modal-bg" id="m-create-wing">
   <div class="modal" style="max-width:460px">
-    <div class="modal-hdr"><div class="modal-title">Create Wing</div><button class="modal-x" onclick="closeModal('m-create-wing')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Create Wing</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-create-wing')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info" style="font-size:11px;margin-bottom:10px">NAT HQ admin only. Creates a Wing under the National Headquarters. Wing code must be unique (e.g. 7WG, 1WG).</div>
       <div class="form-row">
@@ -2547,7 +2550,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- UNITS: Create Squadron / Specialist Unit Modal -->
 <div class="modal-bg" id="m-create-sqn">
   <div class="modal" style="max-width:500px">
-    <div class="modal-hdr"><div class="modal-title">Create Squadron / Specialist Unit</div><button class="modal-x" onclick="closeModal('m-create-sqn')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Create Squadron / Specialist Unit</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-create-sqn')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info" style="font-size:11px;margin-bottom:10px">Wing admin: own Wing only. NAT HQ admin: any Wing. Unit code must be unique (e.g. 703, SPECFLT01).</div>
       <div class="form-row">
@@ -2580,7 +2583,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- ── Timing Template Editor Modal ─────────────────────────────────────── -->
 <div class="modal-bg" id="m-timing">
   <div class="modal" style="max-width:720px;width:96%">
-    <div class="modal-hdr"><div class="modal-title" id="timing-modal-title">New Timing Template</div><button class="modal-x" onclick="closeModal('m-timing')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="timing-modal-title">New Timing Template</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-timing')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="ff"><label>Template Name</label><input id="tt-name" type="text" placeholder="e.g. Standard 3-Period Night"></div>
@@ -2634,7 +2637,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <!-- ── Parade Night Timing Override Modal ────────────────────────────────── -->
 <div class="modal-bg" id="m-pn-timing-override">
   <div class="modal" style="max-width:480px">
-    <div class="modal-hdr"><div class="modal-title">Override Parade Night Timing</div><button class="modal-x" onclick="closeModal('m-pn-timing-override')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Override Parade Night Timing</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-timing-override')">×</button></div>
     <div class="modal-body">
       <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Applies a different timing template to this one parade night only. Does not change future parade nights.</div>
       <div class="form-row">
@@ -5466,11 +5469,18 @@ const PH_C={'A. Orientation':'ph-ori','B. Initial':'ph-ini','C. Junior':'ph-jun'
 function elBadge(el){return `<span class="badge ${EL_C[el]||'b-grey'}">${EL_L[el]||el}</span>`;}
 function phBadge(ph){return `<span class="badge ${PH_C[ph]||'b-grey'}">${PH_S[ph]||ph}</span>`;}
 function stBadge(st){
-  const m={planned:'st-planned',delivered:'st-delivered',cancelled:'st-cancelled',rescheduled:'st-rescheduled',not_delivered:'st-not_delivered'};
-  const l={planned:'Planned',delivered:'Delivered',cancelled:'Cancelled',rescheduled:'Rescheduled',not_delivered:'Not Delivered'};
+  // delivered_with_issue/cancelled_late (Stage 11, 2026-08-05): both valid
+  // backend statuses (VALID_STATUS, training.py) and already reachable via
+  // Planning Workspace, but connected-frontend previously had no label/class
+  // for either -- a session in one of these states rendered as a raw grey
+  // badge showing the literal snake_case string.
+  const m={planned:'st-planned',delivered:'st-delivered',delivered_with_issue:'st-delivered_with_issue',
+    cancelled:'st-cancelled',cancelled_late:'st-cancelled_late',rescheduled:'st-rescheduled',not_delivered:'st-not_delivered'};
+  const l={planned:'Planned',delivered:'Delivered',delivered_with_issue:'Delivered (issue)',
+    cancelled:'Cancelled',cancelled_late:'Cancelled late',rescheduled:'Rescheduled',not_delivered:'Not Delivered'};
   return `<span class="badge ${m[st]||'b-grey'}">${l[st]||st||'—'}</span>`;
 }
-function stCls(st){return {delivered:'delivered',cancelled:'cancelled',rescheduled:'rescheduled',not_delivered:'not_delivered'}[st]||'';}
+function stCls(st){return {delivered:'delivered',delivered_with_issue:'delivered_with_issue',cancelled:'cancelled',cancelled_late:'cancelled_late',rescheduled:'rescheduled',not_delivered:'not_delivered'}[st]||'';}
 
 function allSess(){
   const rows=[];
@@ -6087,7 +6097,7 @@ function showPNDetail(ds){
     </div>`;
   }
   (pn.sessions||[]).forEach((s,i)=>{
-    const stOpts=['planned','delivered','cancelled','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${s.status===v?'selected':''}>${{planned:'Planned',delivered:'Delivered',cancelled:'Cancelled',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
+    const stOpts=['planned','delivered','delivered_with_issue','cancelled','cancelled_late','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${s.status===v?'selected':''}>${{planned:'Planned',delivered:'Delivered',delivered_with_issue:'Delivered (issue)',cancelled:'Cancelled',cancelled_late:'Cancelled late',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
     const dragAttrs=canWriteSquadron()?`ondragover="_sessDragOver(event,'${ds}',${i})" ondragleave="_sessDragLeave(event)" ondrop="_sessDrop(event,'${ds}',${i})"`:'';
     html+=`<div style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px" data-sess-card="${i}" ${dragAttrs}>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -6385,7 +6395,7 @@ function quickEdit(date,idx){
   const currOpts=allCurr().map(e=>`<option value="${esc(e.title)}" ${e.title===s.exp?'selected':''}>${esc(e.code)} — ${esc(e.title)}</option>`).join('');
   const facOpts=S.facs.map(f=>`<option value="${f.id}" ${f.id===s.facId?'selected':''}>${facDisplay(f)}</option>`).join('');
   const roomOpts=S.rooms.map(r=>`<option value="${esc(r.name)}" ${r.name===s.room?'selected':''}>${esc(r.name)}</option>`).join('');
-  const stOpts=['planned','delivered','cancelled','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${v===s.status?'selected':''}>${{planned:'Planned',delivered:'Delivered',cancelled:'Cancelled',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
+  const stOpts=['planned','delivered','delivered_with_issue','cancelled','cancelled_late','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${v===s.status?'selected':''}>${{planned:'Planned',delivered:'Delivered',delivered_with_issue:'Delivered (issue)',cancelled:'Cancelled',cancelled_late:'Cancelled late',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
   document.getElementById('sess-edit-body').innerHTML=`
     <div class="ff"><label>Status</label><select id="qe-st">${stOpts}</select></div>
     <div class="ff"><label>Curriculum Item</label><select id="qe-ex"><option value="">— Unassigned —</option>${currOpts}</select></div>
@@ -6940,7 +6950,7 @@ function _actShowDetail(containerId, activityId){
   if(item.read_only){
     const ownerLabel=item.owning_org_label||_ACT_SOURCE_LABEL[item.source]||item.source;
     panel.innerHTML=`<div class="drill-panel show">
-      <div class="drill-hdr"><div class="drill-title">${esc(item.activity_name)}</div><button class="modal-x" onclick="document.getElementById('${containerId}-detail').innerHTML=''">×</button></div>
+      <div class="drill-hdr"><div class="drill-title">${esc(item.activity_name)}</div><button class="modal-x" aria-label="Close" onclick="document.getElementById('${containerId}-detail').innerHTML=''">×</button></div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Owned by ${esc(ownerLabel)} — read-only here. ${item.source==='squadron'||item.source==='wing'||item.source==='national'?'Edit it at the owning scope.':''}</div>
       <div class="sc-kv"><dt>Date</dt><dd>${fmtD(item.date_start)}${item.date_end&&item.date_end!==item.date_start?' – '+fmtD(item.date_end):''}</dd>
       <dt>Type</dt><dd>${esc(item.activity_type||'—')}</dd>
@@ -6952,7 +6962,7 @@ function _actShowDetail(containerId, activityId){
   }
   _actEditId=item.activity_id; _actEditContainerId=containerId;
   panel.innerHTML=`<div class="drill-panel show">
-    <div class="drill-hdr"><div class="drill-title">Edit — ${esc(item.activity_name)}</div><button class="modal-x" onclick="document.getElementById('${containerId}-detail').innerHTML=''">×</button></div>
+    <div class="drill-hdr"><div class="drill-title">Edit — ${esc(item.activity_name)}</div><button class="modal-x" aria-label="Close" onclick="document.getElementById('${containerId}-detail').innerHTML=''">×</button></div>
     <div class="form-row">
       <div class="ff"><label>Name</label><input id="${containerId}-e-name" value="${esc(item.activity_name)}"></div>
       <div class="ff"><label>Type</label><input id="${containerId}-e-type" value="${esc(item.activity_type||'')}"></div>
@@ -7016,7 +7026,7 @@ function _actOpenCreate(containerId){
   const st=_actTabState[containerId]; if(!st)return;
   const panel=document.getElementById(containerId+'-detail'); if(!panel)return;
   panel.innerHTML=`<div class="drill-panel show">
-    <div class="drill-hdr"><div class="drill-title">New ${st.scopeType==='national'?'National':'Wing'} Activity</div><button class="modal-x" onclick="document.getElementById('${containerId}-detail').innerHTML=''">×</button></div>
+    <div class="drill-hdr"><div class="drill-title">New ${st.scopeType==='national'?'National':'Wing'} Activity</div><button class="modal-x" aria-label="Close" onclick="document.getElementById('${containerId}-detail').innerHTML=''">×</button></div>
     <div class="form-row">
       <div class="ff"><label>Name *</label><input id="${containerId}-c-name"></div>
       <div class="ff"><label>Type</label><input id="${containerId}-c-type" placeholder="e.g. Camp, Ceremonial"></div>
@@ -8049,7 +8059,7 @@ function cmdDrillReadiness(unitId,scope){
   const colLabels={sessions_planned:'Sessions planned',curriculum_allocated:'Curriculum allocated',
     facilitator_confirmed:'Facilitator confirmed',facility_confirmed:'Facility confirmed',
     equipment_confirmed:'Equipment confirmed',overall_readiness:'Overall readiness'};
-  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${esc(r.name||r.label)} — next parade night readiness</div><button class="modal-x" onclick="document.getElementById('${panelId}').className='drill-panel'">×</button></div>
+  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${esc(r.name||r.label)} — next parade night readiness</div><button class="modal-x" aria-label="Close" onclick="document.getElementById('${panelId}').className='drill-panel'">×</button></div>
     <div class="tw"><table><tbody>
     ${cols.map(c=>`<tr><td style="font-weight:700">${esc(colLabels[c])}</td><td>${_cmdCell(r[c])}</td><td style="font-size:11px;color:var(--muted)">${esc((r[c]&&r[c].exception_reason)||'')}</td></tr>`).join('')}
     </tbody></table></div>
@@ -8247,7 +8257,7 @@ function renderWing(){
 function wingDrill(sid){
   const r=((S.wing&&S.wing.squadrons)||[]).find(x=>x.squadron_id===sid); const p=document.getElementById('wing-drill'); if(!r||!p)return;
   p.className='drill-panel show';
-  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${r.short_name||r.code} — detail</div><button class="modal-x" onclick="document.getElementById('wing-drill').className='drill-panel'">×</button></div>
+  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${r.short_name||r.code} — detail</div><button class="modal-x" aria-label="Close" onclick="document.getElementById('wing-drill').className='drill-panel'">×</button></div>
     <div class="stats-grid" style="margin:0">
       <div class="stat"><div class="sval">${r.nights||0}</div><div class="slbl">Nights (${r.published||0} published)</div></div>
       <div class="stat"><div class="sval">${r.sessions||0}</div><div class="slbl">Sessions</div></div>
@@ -8302,7 +8312,7 @@ function nationalDrill(wid){
   const w=((S.nationalReport&&S.nationalReport.wings)||[]).find(x=>x.wing_id===wid);
   const sqs=(S.squadrons||[]).filter(x=>x.wing_id===wid);
   const p=document.getElementById('national-drill'); if(!p)return; p.className='drill-panel show';
-  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${w?(w.name||w.code):'Wing'} — squadrons</div><button class="modal-x" onclick="document.getElementById('national-drill').className='drill-panel'">×</button></div>
+  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${w?(w.name||w.code):'Wing'} — squadrons</div><button class="modal-x" aria-label="Close" onclick="document.getElementById('national-drill').className='drill-panel'">×</button></div>
     <div class="tw"><table><thead><tr><th>Squadron</th><th>Parade Day</th><th>Address</th></tr></thead><tbody>
     ${sqs.length?sqs.map(s=>`<tr><td style="font-weight:800">${s.short_name||s.code}</td><td>${s.default_parade_day||'—'}</td><td style="font-size:11px">${(s.address||'').split(',')[0]}</td></tr>`).join(''):'<tr><td colspan="3" style="color:var(--muted)">No squadrons returned</td></tr>'}
     </tbody></table></div>
