@@ -4,6 +4,49 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — REM-45 follow-up (closed the flagged security gap from Stage 10)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`0cf2e8d724ed90a311f88daebf53619bc86af8bd`.
+
+**Context**: after closing Stage 12 (the program's last planned stage), continued
+directly to close REM-45 — the P1 security-relevant gap flagged in Stage 10
+but deliberately not fixed at the time due to blast radius. `create_location`,
+`update_location`, `override_conflict`, and `import_annual_program`'s write
+path now all require Proxy/Delegated Intervention for delegated squadron
+writes, matching `create_planning_year` (REM-44).
+
+**Pre-deploy gates**: no migration. Backend `pytest tests/` → 1100 passed,
+5 skipped (12 new). Planning Workspace e2e → 87 passed, 0 failed.
+connected-frontend e2e → 27 passed, 10 pre-existing unrelated (identical
+baseline). **Both e2e suites were re-run against a genuinely fresh backend
+after an initial pass showed spurious failures** — running the same suite
+twice against one long-lived backend process without reseeding produced
+duplicate-date/rate-limit contamination (the identical false-alarm pattern
+already documented in Stage 5's entry above); killing the process and
+reseeding fresh resolved it completely, confirming the fix itself introduced
+no regression.
+
+**Deployed**: backend only.
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-backend` (staging) | `bad3f2ce-8a5a-446f-9e99-0d6e500b7076` | SUCCESS |
+
+**Post-deploy verification**: `/api/health/ready` → ready, 140 squadrons.
+`POST /api/planning/locations` unauthenticated → 401 (route live, auth
+enforced).
+
+**Known gap, same as prior entries**: no live browser verification that a
+wing_admin/national_admin/system_admin session is actually correctly
+blocked/allowed through the real UI flow on staging (no Chrome extension
+connectivity) — verified at the code/test/contract level only.
+
+**Residual limitation carried forward**: Annual Program import into a
+wing/national-scoped plan year that routes CSV rows to multiple squadrons
+via the Unit column is not covered by this fix — recorded in REM-45's
+gap-register entry, not silently left uncovered.
+
 ## 2026-08-05 — Stage 12 (final stage: DB pool-sizing doc fix + full program regression)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
