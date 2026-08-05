@@ -246,28 +246,30 @@ just once per session).
 
 ## Summary
 
+**Re-verified 2026-08-05 as Gate 9 of the formal 11-gate release process.** The table below was last
+accurate 2026-07-16; since then this codebase has been deployed to production twice more (the
+77-commit REM-53–76 remediation program, then today's REM-77 P0 fix) — every "open in production"
+status below was stale and has been directly re-checked, not assumed, before updating:
+
 | ID | Severity | Status |
 |---|---|---|
-| DEFECT-001 | BLOCKER | Fixed on release branch, staging-verified; **open in production** |
+| DEFECT-001 | BLOCKER | **Fixed and confirmed live in production** — fix commits `051ba4d`/`906f59f` confirmed present in `main` via `git merge-base --is-ancestor`; production's current deployment (`269fd2e3`, 2026-08-05) builds from `main` HEAD. Directly re-verified live 2026-08-05 with a genuine cross-squadron read: `ADMIN704` attempting `GET /api/planning/facilitators/{703's facilitator}/leave` against **production** → `403 {"error":"forbidden"}`, not the pre-fix 200 leak. |
 | DEFECT-002 | HIGH | **Fixed** |
-| DEFECT-003 | **HIGH** (reclassified from MEDIUM) | `bootstrap-staging` code fixed (`f303895`); production `ENVIRONMENT` variable change prepared, **pending approval** |
+| DEFECT-003 | **HIGH** (reclassified from MEDIUM) | **Fully resolved** — `bootstrap-staging` code fix (`f303895`) confirmed in `main`; production `ENVIRONMENT` variable re-checked 2026-08-05 via `railway variable list` and confirmed set to `production` (the approval this row was waiting on has since happened) |
 | DEFECT-004 | N/A | **Resolved as not-a-defect** — `SameSite=none` proven required by the current architecture, empirically tested on staging |
-| DEFECT-005 | HIGH | Fixed on release branch, staging-verified; **open in production** |
-| DEFECT-006 | BLOCKER | **Resolved — proven end-to-end (backup, restore, application-level reads), all against real production data** |
+| DEFECT-005 | HIGH | **Fixed and confirmed live in production** — fix commit `96584e9` confirmed in `main`; `frontend/Dockerfile` exists; `GET https://aafc-tms-planning-workspace-preview-production.up.railway.app/planning` directly re-checked 2026-08-05 → `200` |
+| DEFECT-006 | BLOCKER | **Resolved — proven end-to-end (backup, restore, application-level reads), all against real production data.** Re-verified again 2026-08-05 as Gate 5 with a fresh run (see `docs/beta/32_final_stress_and_resilience_report.md`) |
 | DEFECT-007 | LOW | Fixed |
-| DEFECT-008 | HIGH (process) | Open — belongs to a concurrent session, flagged not fixed |
-| DEFECT-009 | BLOCKER | **Fixed** (`d95e67d`) — cross-squadron planning-years leak for `sqn_general` |
-| DEFECT-010 | MEDIUM (informational) | **Resolved 2026-07-16** — clean solo re-run: 106,151 req, 0 real 5xx, P95 830ms, PASS |
+| DEFECT-008 | HIGH (process) | **Resolved** — the revision-ID collision this row describes no longer exists in the current migration chain; `alembic heads` re-checked 2026-08-05 returns exactly one head (`5a195a98148a`), confirmed via both the CLI and this session's own AST-based regression test (`backend/tests/test_migration_schema_drift.py`, added 2026-08-05 for an unrelated but related class of migration defect, REM-77) |
+| DEFECT-009 | BLOCKER | **Fixed and confirmed live in production** — commit `d95e67d` confirmed in `main`, deployed with the same 2026-08-05 production release as DEFECT-001/005 above |
+| DEFECT-010 | MEDIUM (informational) | **Resolved 2026-07-16** — clean solo re-run: 106,151 req, 0 real 5xx, P95 830ms, PASS. Superseded by a fresh Gate 7 run, 2026-08-05 — see that run's results below/in `32_final_stress_and_resilience_report.md` once complete |
 
-**One of two original BLOCKERs fully resolved (DEFECT-006, backup/restore — proven end-to-end); a
-third BLOCKER (DEFECT-009) found and fixed this session.** DEFECT-001 and DEFECT-009 (live-production
-IDORs) are fixed and verified on the release branch/staging but require a production deploy +
-approval to close there. DEFECT-003 was reclassified HIGH after finding a concrete, currently-live
-consequence (`bootstrap-staging` not rejecting in production) — code-fixed, but the underlying
-production `ENVIRONMENT` variable still needs your approval to change. DEFECT-004 turned out not to
-be a defect at all. **The 100-user load test gate is now cleanly closed** — a solo, uncontaminated
-run (task `bo8g2d7kc`, 2026-07-16) passed both mandated criteria (P95 830ms ≤ 2000ms; 0 real 5xx).
-The `/api/auth/login` P95-under-load observation is flagged for post-beta attention, not blocking.
-Not release-ready until: the production IDOR deploys happen, DEFECT-003's production variable change
-is approved and applied, DEFECT-005 (Planning Workspace Dockerfile) is deployed to production, and
-DEFECT-008 (migration-ID collision, owned by a concurrent session) is resolved.
+**Every BLOCKER and HIGH item in this register that was previously "open in production" is now
+confirmed fixed and live in production**, re-checked directly (not assumed from a stale status line)
+during this Gate 9 pass: DEFECT-001, 003, 005, 008, and 009 all closed out between the 2026-07-16
+snapshot and today, across two real production deployments this session performed and verified
+(the REM-53–76 remediation merge, and today's REM-77 P0 fix). DEFECT-004 was never a real defect.
+**No BLOCKER or HIGH severity item remains open in this register as of 2026-08-05.** New findings
+from today's gate work (REM-77 P0 schema drift, REM-78 rollback-after-migration process gap) are
+tracked in `docs/remediation/master_gap_register.csv`, not duplicated into this older register —
+see that file for their full detail.
