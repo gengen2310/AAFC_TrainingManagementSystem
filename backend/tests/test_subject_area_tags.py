@@ -21,6 +21,22 @@ def _auditor(client):
     return login(client, "AUDITOR2026")
 
 
+def _wing_admin(client):
+    return login(client, "ADMIN7WG")
+
+
+def _nat_admin(client):
+    return login(client, "ADMINNATIONAL")
+
+
+def _sysadmin(client):
+    return login(client, "SYSADMIN2026")
+
+
+def _own_squadron_id(client, hdr):
+    return client.get("/api/auth/me", headers=hdr).json()["session"]["squadron_id"]
+
+
 # ── list ──────────────────────────────────────────────────────────────────────
 
 def test_list_tags_requires_auth(client):
@@ -150,6 +166,99 @@ def test_archive_tag_forbidden_for_read_only(client):
     r = client.post("/api/subject-area-tags", json={"display_name": "ArchiveTest"}, headers=h_admin)
     tag_id = r.json()["tag_id"]
     r2 = client.delete(f"/api/subject-area-tags/{tag_id}", headers=h_gen)
+    assert r2.status_code == 403
+
+
+# ── wing/national/system_admin scope creation ──────────────────────────────────
+# DEFECT: create_subject_area_tag used to unconditionally require p.squadron_id
+# (db.get(Squadron, p.squadron_id)) -- wing_admin/national_admin/system_admin
+# never have that set (only p.acting_squadron_id changes during Proxy/
+# Delegated Intervention), so those roles could never create a tag at ANY
+# scope. Fixed to mirror _can_create_phase's proven role/proxy pattern.
+
+def test_wing_admin_can_create_wing_scope_tag(client):
+    h = _wing_admin(client)
+    r = client.post("/api/subject-area-tags", json={"display_name": "Wing Custom Tag", "scope": "wing"}, headers=h)
+    assert r.status_code == 201, r.text
+    assert r.json()["scope"] == "wing"
+    listed = client.get("/api/subject-area-tags", headers=h).json()
+    assert "Wing Custom Tag" in [t["display_name"] for t in listed]
+
+
+def test_nat_admin_can_create_global_scope_tag(client):
+    h = _nat_admin(client)
+    r = client.post("/api/subject-area-tags", json={"display_name": "Global Custom Tag", "scope": "global"}, headers=h)
+    assert r.status_code == 201, r.text
+    assert r.json()["scope"] == "global"
+
+
+def test_sysadmin_can_create_global_scope_tag(client):
+    h = _sysadmin(client)
+    r = client.post("/api/subject-area-tags", json={"display_name": "SysAdmin Global Tag", "scope": "global"}, headers=h)
+    assert r.status_code == 201, r.text
+
+
+def test_wing_admin_cannot_create_global_scope_tag(client):
+    h = _wing_admin(client)
+    r = client.post("/api/subject-area-tags", json={"display_name": "Wing Attempt Global", "scope": "global"}, headers=h)
+    assert r.status_code == 403
+
+
+def test_wing_admin_without_proxy_cannot_create_squadron_scope_tag(client):
+    h = _wing_admin(client)
+    r = client.post("/api/subject-area-tags", json={"display_name": "Wing Attempt Squadron", "scope": "squadron"}, headers=h)
+    assert r.status_code == 403
+    assert r.json()["detail"]["error"] == "proxy_required"
+
+
+def test_wing_admin_with_active_proxy_can_create_squadron_scope_tag(client):
+    h_sqn = _sqn_admin(client)
+    sqn_id = _own_squadron_id(client, h_sqn)
+    h = _wing_admin(client)
+    enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "tag setup"}, headers=h)
+    assert enter.status_code == 200, enter.text
+    try:
+        r = client.post("/api/subject-area-tags", json={"display_name": "Proxied Squadron Tag", "scope": "squadron"}, headers=h)
+        assert r.status_code == 201, r.text
+    finally:
+        client.post("/api/proxy/exit", headers=h)
+
+
+def test_nat_admin_without_intervention_cannot_create_squadron_scope_tag(client):
+    h = _nat_admin(client)
+    r = client.post("/api/subject-area-tags", json={"display_name": "Nat Attempt Squadron", "scope": "squadron"}, headers=h)
+    assert r.status_code == 403
+    assert r.json()["detail"]["error"] == "intervention_required"
+
+
+def test_nat_admin_can_view_tags_at_every_scope(client):
+    """A national_admin/system_admin's own list view must reflect exactly what
+    they're allowed to create -- otherwise a create succeeds but the tag
+    appears to vanish from their own view."""
+    h_wing = _wing_admin(client)
+    client.post("/api/subject-area-tags", json={"display_name": "NatView Wing Tag", "scope": "wing"}, headers=h_wing)
+    h = _nat_admin(client)
+    listed = client.get("/api/subject-area-tags", headers=h).json()
+    names = [t["display_name"] for t in listed]
+    assert "NatView Wing Tag" in names
+
+
+def test_wing_admin_can_archive_own_wing_scope_tag(client):
+    h = _wing_admin(client)
+    r = client.post("/api/subject-area-tags", json={"display_name": "Wing Tag To Archive", "scope": "wing"}, headers=h)
+    tag_id = r.json()["tag_id"]
+    r2 = client.delete(f"/api/subject-area-tags/{tag_id}", headers=h)
+    assert r2.status_code == 200, r2.text
+
+
+def test_sqn_admin_cannot_archive_a_wing_scope_tag(client):
+    """Archive is now scope-checked the same as creation -- previously any
+    sqn_admin could archive ANY tag regardless of owning scope."""
+    h_wing = _wing_admin(client)
+    r = client.post("/api/subject-area-tags", json={"display_name": "Wing Tag Protected", "scope": "wing"}, headers=h_wing)
+    tag_id = r.json()["tag_id"]
+    h_sqn = _sqn_admin(client)
+    r2 = client.delete(f"/api/subject-area-tags/{tag_id}", headers=h_sqn)
     assert r2.status_code == 403
 
 

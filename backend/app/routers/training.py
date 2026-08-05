@@ -3079,6 +3079,72 @@ def _normalise_tag(name: str) -> str:
     return re.sub(r"\s+", " ", name.strip().lower())
 
 
+def _can_create_tag(p: Principal, scope: str, wing_id: str | None = None, squadron_id: str | None = None) -> None:
+    """Raise 403/400 if the actor cannot create/archive a subject-area or
+    facilitator-type tag at the requested scope. Mirrors _can_create_phase's
+    proven role/proxy pattern (global ~ CurriculumPhase's national+system
+    combined; tags only have 3 scope levels, not 4).
+
+    Fixes a real defect found while building reference-data management UI
+    (risk-register ask: every admin role must be able to create reference
+    data "respective to their scope"): the prior create endpoints
+    unconditionally required p.squadron_id (db.get(Squadron, p.squadron_id)),
+    which wing_admin/national_admin/system_admin never have -- even while
+    Proxy/Delegated Intervention is active, only p.acting_squadron_id
+    changes -- so those roles could never create a tag at ANY scope,
+    contradicting the ask outright.
+    """
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden",
+                                          "message": "Viewers and auditors cannot create tags."})
+    if scope not in ("global", "wing", "squadron"):
+        raise HTTPException(400, detail={"error": "invalid_scope",
+                                          "message": "scope must be one of: global, wing, squadron"})
+    if scope == "global":
+        if p.role not in _NAT_ADMIN_ROLES:
+            raise HTTPException(403, detail={"error": "forbidden",
+                                              "message": "Only national_admin or system_admin can create global tags."})
+    elif scope == "wing":
+        if p.role not in _WING_WRITE_ROLES:
+            raise HTTPException(403, detail={"error": "forbidden",
+                                              "message": "Only wing_admin or above can create wing tags."})
+        effective_wing = wing_id or p.wing_id
+        if p.role == "wing_admin" and effective_wing != p.wing_id:
+            raise HTTPException(403, detail={"error": "out_of_scope",
+                                              "message": "Wing admin can only create tags for their own wing."})
+    else:  # squadron
+        if p.role == "sqn_admin":
+            if squadron_id and squadron_id != p.squadron_id:
+                raise HTTPException(403, detail={"error": "out_of_scope",
+                                                  "message": "Squadron admin can only create tags for their own squadron."})
+        elif p.role == "wing_admin":
+            if not p.acting_squadron_id:
+                raise HTTPException(403, detail={"error": "proxy_required",
+                                                  "message": "Wing Admin must enter Proxy Mode to create a squadron-scope tag."})
+            if squadron_id and squadron_id != p.acting_squadron_id:
+                raise HTTPException(403, detail={"error": "out_of_scope",
+                                                  "message": "Can only create a squadron-scope tag for the squadron currently in Proxy Mode."})
+        elif p.role in _NAT_ADMIN_ROLES:
+            if not p.acting_squadron_id:
+                raise HTTPException(403, detail={"error": "intervention_required",
+                                                  "message": "National Admin must enter Delegated Intervention Mode to create a squadron-scope tag."})
+            if squadron_id and squadron_id != p.acting_squadron_id:
+                raise HTTPException(403, detail={"error": "out_of_scope",
+                                                  "message": "Can only create a squadron-scope tag for the squadron currently in Delegated Intervention Mode."})
+        else:
+            raise HTTPException(403, detail={"error": "forbidden"})
+
+
+def _visible_tag_scope(p: Principal) -> tuple[str | None, str | None]:
+    """Resolve (wing_id, squadron_id) for tag-visibility filtering -- same
+    acting-scope-first fallback _visible_phases uses, so a wing_admin/
+    national_admin's own list view sees exactly what they're allowed to
+    create at that scope."""
+    wing_id = p.acting_wing_id or p.wing_id
+    sq_id = p.acting_squadron_id or p.squadron_id
+    return wing_id, sq_id
+
+
 def _tag_out(t: SubjectAreaTag) -> dict:
     return {
         "tag_id": t.id,
@@ -3096,6 +3162,8 @@ def _tag_out(t: SubjectAreaTag) -> dict:
 class SubjectAreaTagIn(BaseModel):
     display_name: str
     scope: str = "squadron"
+    wing_id: str | None = None
+    squadron_id: str | None = None
 
 
 @router.get("/subject-area-tags")
@@ -3104,20 +3172,21 @@ def list_subject_area_tags(
     db: DBSession = Depends(get_db),
 ):
     """Return all active tags visible to the caller's squadron and wing."""
-    sq = db.get(Squadron, p.squadron_id) if p.squadron_id else None
-    sq_id = sq.id if sq else None
-    wing_id = sq.wing_id if sq else p.wing_id
+    wing_id, sq_id = _visible_tag_scope(p)
     require_can_view_squadron(p, sq_id or "", wing_id)
+    conditions = [SubjectAreaTag.scope == "global"]
+    if wing_id:
+        conditions.append((SubjectAreaTag.scope == "wing") & (SubjectAreaTag.wing_id == wing_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(SubjectAreaTag.scope == "wing")
+    if sq_id:
+        conditions.append((SubjectAreaTag.scope == "squadron") & (SubjectAreaTag.squadron_id == sq_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(SubjectAreaTag.scope == "squadron")
+    from sqlalchemy import or_ as _or_tags
     rows = (
         db.query(SubjectAreaTag)
-        .filter(
-            SubjectAreaTag.is_active == True,  # noqa: E712
-            (
-                (SubjectAreaTag.squadron_id == sq_id) |
-                (SubjectAreaTag.wing_id == wing_id) |
-                (SubjectAreaTag.scope == "global")
-            ),
-        )
+        .filter(SubjectAreaTag.is_active == True, _or_tags(*conditions))  # noqa: E712
         .order_by(SubjectAreaTag.display_name)
         .all()
     )
@@ -3130,13 +3199,11 @@ def create_subject_area_tag(
     p: Principal = Depends(get_principal),
     db: DBSession = Depends(get_db),
 ):
-    """Create a new subject-area tag (sqn_admin or wing_admin only)."""
-    from ..permissions import require_role
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
-    sq = db.get(Squadron, p.squadron_id) if p.squadron_id else None
-    if not sq:
-        raise HTTPException(400, detail={"error": "no_squadron_scope"})
-    require_can_write_squadron(p, sq.id, sq.wing_id)
+    """Create a new subject-area tag at the requested scope (sqn_admin: squadron
+    only; wing_admin/national_admin/system_admin: their own wing/global, or a
+    squadron scope while Proxy/Delegated Intervention is active)."""
+    scope = body.scope if body.scope in ("global", "wing", "squadron") else "squadron"
+    _can_create_tag(p, scope, body.wing_id, body.squadron_id)
 
     display = body.display_name.strip()
     if not display:
@@ -3146,9 +3213,8 @@ def create_subject_area_tag(
 
     norm = _normalise_tag(display)
 
-    scope = body.scope if body.scope in ("global", "wing", "squadron") else "squadron"
-    wing_id = sq.wing_id if scope in ("wing", "squadron") else None
-    squadron_id = sq.id if scope == "squadron" else None
+    wing_id = body.wing_id or ((p.acting_wing_id or p.wing_id) if scope in ("wing", "squadron") else None)
+    squadron_id = body.squadron_id or ((p.acting_squadron_id or p.squadron_id) if scope == "squadron" else None)
 
     existing = (
         db.query(SubjectAreaTag)
@@ -3189,12 +3255,14 @@ def archive_subject_area_tag(
     p: Principal = Depends(get_principal),
     db: DBSession = Depends(get_db),
 ):
-    """Archive a subject-area tag (does not remove existing facilitator references)."""
-    from ..permissions import require_role
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    """Archive a subject-area tag (does not remove existing facilitator references).
+    Scope-checked the same way as creation -- previously any sqn_admin could
+    archive ANY tag regardless of owning scope (a role-only check, no
+    ownership verification at all)."""
     tag = db.get(SubjectAreaTag, tag_id)
     if not tag:
         raise HTTPException(404, detail={"error": "tag_not_found"})
+    _can_create_tag(p, tag.scope, tag.wing_id, tag.squadron_id)
     tag.is_active = False
     db.commit()
     audit(db, p, object_type="SubjectAreaTag", object_id=tag_id, action="archive")
@@ -3222,6 +3290,8 @@ def _fac_type_out(t: FacilitatorTypeTag) -> dict:
 class FacilitatorTypeTagIn(BaseModel):
     display_name: str
     scope: str = "squadron"
+    wing_id: str | None = None
+    squadron_id: str | None = None
 
 
 @router.get("/facilitator-type-tags")
@@ -3230,20 +3300,21 @@ def list_facilitator_type_tags(
     db: DBSession = Depends(get_db),
 ):
     """Return all active facilitator-type tags visible to the caller's squadron and wing."""
-    sq = db.get(Squadron, p.squadron_id) if p.squadron_id else None
-    sq_id = sq.id if sq else None
-    wing_id = sq.wing_id if sq else p.wing_id
+    wing_id, sq_id = _visible_tag_scope(p)
     require_can_view_squadron(p, sq_id or "", wing_id)
+    conditions = [FacilitatorTypeTag.scope == "global"]
+    if wing_id:
+        conditions.append((FacilitatorTypeTag.scope == "wing") & (FacilitatorTypeTag.wing_id == wing_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(FacilitatorTypeTag.scope == "wing")
+    if sq_id:
+        conditions.append((FacilitatorTypeTag.scope == "squadron") & (FacilitatorTypeTag.squadron_id == sq_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(FacilitatorTypeTag.scope == "squadron")
+    from sqlalchemy import or_ as _or_factype
     rows = (
         db.query(FacilitatorTypeTag)
-        .filter(
-            FacilitatorTypeTag.is_active == True,  # noqa: E712
-            (
-                (FacilitatorTypeTag.squadron_id == sq_id) |
-                (FacilitatorTypeTag.wing_id == wing_id) |
-                (FacilitatorTypeTag.scope == "global")
-            ),
-        )
+        .filter(FacilitatorTypeTag.is_active == True, _or_factype(*conditions))  # noqa: E712
         .order_by(FacilitatorTypeTag.display_name)
         .all()
     )
@@ -3256,13 +3327,11 @@ def create_facilitator_type_tag(
     p: Principal = Depends(get_principal),
     db: DBSession = Depends(get_db),
 ):
-    """Create a new facilitator-type tag (sqn_admin or wing_admin+ only)."""
-    from ..permissions import require_role
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
-    sq = db.get(Squadron, p.squadron_id) if p.squadron_id else None
-    if not sq:
-        raise HTTPException(400, detail={"error": "no_squadron_scope"})
-    require_can_write_squadron(p, sq.id, sq.wing_id)
+    """Create a new facilitator-type tag at the requested scope (sqn_admin: squadron
+    only; wing_admin/national_admin/system_admin: their own wing/global, or a
+    squadron scope while Proxy/Delegated Intervention is active)."""
+    scope = body.scope if body.scope in ("global", "wing", "squadron") else "squadron"
+    _can_create_tag(p, scope, body.wing_id, body.squadron_id)
 
     display = body.display_name.strip()
     if not display:
@@ -3272,9 +3341,8 @@ def create_facilitator_type_tag(
 
     norm = _normalise_tag(display)
 
-    scope = body.scope if body.scope in ("global", "wing", "squadron") else "squadron"
-    wing_id = sq.wing_id if scope in ("wing", "squadron") else None
-    squadron_id = sq.id if scope == "squadron" else None
+    wing_id = body.wing_id or ((p.acting_wing_id or p.wing_id) if scope in ("wing", "squadron") else None)
+    squadron_id = body.squadron_id or ((p.acting_squadron_id or p.squadron_id) if scope == "squadron" else None)
 
     existing = (
         db.query(FacilitatorTypeTag)
@@ -3315,12 +3383,14 @@ def archive_facilitator_type_tag(
     p: Principal = Depends(get_principal),
     db: DBSession = Depends(get_db),
 ):
-    """Archive a facilitator-type tag (does not remove existing facilitator references)."""
-    from ..permissions import require_role
-    require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
+    """Archive a facilitator-type tag (does not remove existing facilitator references).
+    Scope-checked the same way as creation -- previously any sqn_admin could
+    archive ANY tag regardless of owning scope (a role-only check, no
+    ownership verification at all)."""
     tag = db.get(FacilitatorTypeTag, tag_id)
     if not tag:
         raise HTTPException(404, detail={"error": "tag_not_found"})
+    _can_create_tag(p, tag.scope, tag.wing_id, tag.squadron_id)
     tag.is_active = False
     db.commit()
     audit(db, p, object_type="FacilitatorTypeTag", object_id=tag_id, action="archive")

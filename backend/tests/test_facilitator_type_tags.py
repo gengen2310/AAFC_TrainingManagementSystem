@@ -22,6 +22,22 @@ def _auditor(client):
     return login(client, "AUDITOR2026")
 
 
+def _wing_admin(client):
+    return login(client, "ADMIN7WG")
+
+
+def _nat_admin(client):
+    return login(client, "ADMINNATIONAL")
+
+
+def _sysadmin(client):
+    return login(client, "SYSADMIN2026")
+
+
+def _own_squadron_id(client, hdr):
+    return client.get("/api/auth/me", headers=hdr).json()["session"]["squadron_id"]
+
+
 # ── list ──────────────────────────────────────────────────────────────────────
 
 def test_list_tags_requires_auth(client):
@@ -163,4 +179,65 @@ def test_archive_tag_forbidden_for_read_only(client):
     r = client.post("/api/facilitator-type-tags", json={"display_name": "ArchiveTestFacType"}, headers=h_admin)
     tag_id = r.json()["tag_id"]
     r2 = client.delete(f"/api/facilitator-type-tags/{tag_id}", headers=h_gen)
+    assert r2.status_code == 403
+
+
+# ── wing/national/system_admin scope creation ──────────────────────────────────
+# Same defect and fix as test_subject_area_tags.py -- create_facilitator_type_tag
+# used to unconditionally require p.squadron_id, which wing_admin/national_admin/
+# system_admin never have, so those roles could never create a tag at any scope.
+
+def test_wing_admin_can_create_wing_scope_tag(client):
+    h = _wing_admin(client)
+    r = client.post("/api/facilitator-type-tags", json={"display_name": "Wing Custom FacType", "scope": "wing"}, headers=h)
+    assert r.status_code == 201, r.text
+    assert r.json()["scope"] == "wing"
+
+
+def test_nat_admin_can_create_global_scope_tag(client):
+    h = _nat_admin(client)
+    r = client.post("/api/facilitator-type-tags", json={"display_name": "Global Custom FacType", "scope": "global"}, headers=h)
+    assert r.status_code == 201, r.text
+    assert r.json()["scope"] == "global"
+
+
+def test_sysadmin_can_create_global_scope_tag(client):
+    h = _sysadmin(client)
+    r = client.post("/api/facilitator-type-tags", json={"display_name": "SysAdmin Global FacType", "scope": "global"}, headers=h)
+    assert r.status_code == 201, r.text
+
+
+def test_wing_admin_without_proxy_cannot_create_squadron_scope_tag(client):
+    h = _wing_admin(client)
+    r = client.post("/api/facilitator-type-tags", json={"display_name": "Wing Attempt Squadron FacType", "scope": "squadron"}, headers=h)
+    assert r.status_code == 403
+    assert r.json()["detail"]["error"] == "proxy_required"
+
+
+def test_wing_admin_with_active_proxy_can_create_squadron_scope_tag(client):
+    h_sqn = _sqn_admin(client)
+    sqn_id = _own_squadron_id(client, h_sqn)
+    h = _wing_admin(client)
+    enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "fac type setup"}, headers=h)
+    assert enter.status_code == 200, enter.text
+    try:
+        r = client.post("/api/facilitator-type-tags", json={"display_name": "Proxied Squadron FacType", "scope": "squadron"}, headers=h)
+        assert r.status_code == 201, r.text
+    finally:
+        client.post("/api/proxy/exit", headers=h)
+
+
+def test_nat_admin_without_intervention_cannot_create_squadron_scope_tag(client):
+    h = _nat_admin(client)
+    r = client.post("/api/facilitator-type-tags", json={"display_name": "Nat Attempt Squadron FacType", "scope": "squadron"}, headers=h)
+    assert r.status_code == 403
+    assert r.json()["detail"]["error"] == "intervention_required"
+
+
+def test_sqn_admin_cannot_archive_a_wing_scope_tag(client):
+    h_wing = _wing_admin(client)
+    r = client.post("/api/facilitator-type-tags", json={"display_name": "Wing FacType Protected", "scope": "wing"}, headers=h_wing)
+    tag_id = r.json()["tag_id"]
+    h_sqn = _sqn_admin(client)
+    r2 = client.delete(f"/api/facilitator-type-tags/{tag_id}", headers=h_sqn)
     assert r2.status_code == 403
