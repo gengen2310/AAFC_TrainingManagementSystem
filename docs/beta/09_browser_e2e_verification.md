@@ -97,8 +97,35 @@ Two unrelated bugs in this session's own test code were found and fixed in the s
 collided with a leftover record from an earlier manual run against staging's persistent (never
 reseeded) database. Both fixed; the test now passes cleanly against live staging.
 
-### Planning Workspace suites — not yet re-run this pass
+### Planning Workspace suites
 
-`playwright.planning.staging.config.ts` and `playwright.staging.config.ts` (the latter historically
-CORS-blocked for most tests when proxying local Vite → staging backend) were not re-run in this
-gate pass. Recommend running before final GO/NO-GO consolidation (Gate 11).
+**`playwright.planning.staging.config.ts` run against live staging: 5 passed, 40 failed.** Investigated
+before accepting this number: every failure is a `loginWing`/`loginNational`/legacy-DOM-selector
+timeout (`#auth-type`, `#auth-code`, `nav()`) — this config points the `e2e-connected` test
+directory (written against connected-frontend's plain-HTML login form and `nav()` routing) at the
+**Planning Workspace's** baseURL, a completely different React SPA with no such DOM. The config
+file's own header comment confirms this was built for a narrower purpose (screenshot evidence
+capture matching the deployed module-mode build), not as a full-suite runner — running the entire
+`e2e-connected` directory against it was this session's own scoping mismatch, not a Planning
+Workspace defect. The 5 passes are almost certainly the handful of tests with no legacy-DOM
+dependency. **Not counted as Gate 6 evidence either way** (neither a pass nor a fail signal for
+Planning Workspace itself) — re-run only `capture-screenshots.spec.ts` against this config for its
+intended purpose, or run Planning Workspace's own `frontend/e2e/` suite instead, before treating
+Planning Workspace as separately verified.
+
+`playwright.staging.config.ts` (Planning Workspace's own 95-test `e2e/` suite via local Vite dev
+server proxied to staging backend, historically CORS-blocked for most tests) was not run this pass —
+recommend running before final GO/NO-GO consolidation (Gate 11), or accepting this as a disclosed
+gap in Gate 6 coverage.
+
+### Staging data hygiene — observation, not a defect (relevant to Gate 7 load-test realism)
+
+`GET /api/health/ready` on staging reports `squadrons: 139–140`, not the ~16 real seeded squadrons.
+Investigated via `/api/squadrons` (national_admin token): 16 real squadrons (701–723 series) plus
+123 `Test Sqn ...`-named records, accumulated from e2e test runs across this multi-day session —
+staging is deliberately never reseeded between runs (see `main-tms.spec.ts` fix comment, this same
+gate), so test-created entities persist indefinitely. Not a code defect and not touched (deleting
+org records requires explicit user sign-off per `.claude/rules/capability-preservation.md` §4). Flagging
+because a 100-user load test (Gate 7) run against this inflated dataset will not reflect a clean
+production-scale profile — worth a human decision on whether to archive the test squadrons before
+Gate 7, or accept the load test as run against contaminated-but-realistic staging data.

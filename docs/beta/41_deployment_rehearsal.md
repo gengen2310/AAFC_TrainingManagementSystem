@@ -223,3 +223,62 @@ curl -s -X POST https://backboard.railway.com/graphql/v2 \
 This rehearsal must be completed with all steps PASS before production deployment is approved.
 
 **Gate status**: COMPLETE (automated). D7 browser smoke test steps must be completed by a human tester before production deployment is authorised. Update `12_full_beta_release_readiness.md` and `35_release_evidence_chain.md` Link 11 when D7 browser steps are done.
+
+---
+
+## Re-rehearsal — 2026-08-05 (Gate 8 of the formal 11-gate release process)
+
+Deploy mechanism was already re-proven twice today via real deploys (REM-77's staging then
+production migration deploy, both SUCCESS, both verified via health check + direct curl of the
+previously-broken endpoints). This section re-rehearses rollback specifically, using the actual
+`railway up` mechanism this whole session has used (not the July 14 rehearsal's GraphQL
+`deploymentRedeploy` workaround), on staging only.
+
+### Procedure
+
+1. Checked out the pre-REM-77 commit (`0fdd21e`, the commit immediately before the P0 migration)
+   into an isolated git worktree.
+2. `railway up --detach` from that worktree's `backend/`, targeting staging — simulating "roll the
+   app code back to before the migration" without first rolling back the database.
+3. Polled deployment status: reached `SUCCESS` (Railway considers the container "deployed" once it
+   starts listening) — **but the container was actually crash-looping**, confirmed via
+   `railway logs`: `alembic upgrade head` on the older codebase failed with
+   `Can't locate revision identified by '5a195a98148a'` on every restart attempt (the DB's
+   `alembic_version` was already stamped to the newer migration from earlier today; the older
+   codebase's migration graph has never heard of that revision ID). `GET /api/health/ready` returned
+   `502 Application failed to respond` for the duration.
+4. Immediately redeployed the current head (`main` @ `3184766`) to staging via `railway up`, which
+   restored service — confirmed via `alembic upgrade head` running cleanly and
+   `GET /api/health/ready` returning `200 {"status":"ready",...}` again, plus both REM-77 endpoints
+   re-confirmed 200.
+5. Removed the temporary worktree.
+
+**Staging downtime during this rehearsal**: approximately the time between steps 2 and 4 (two
+sequential `railway up` build+deploy cycles, each ~1–2 minutes) — staging only, synthetic data,
+no user-facing impact.
+
+### Finding — real, previously undocumented rollback risk (recorded as REM-78)
+
+**A deployment that adds a migration cannot be safely rolled back by redeploying old application
+code alone once the migration has run** — Railway/Alembic's own `deploymentRedeploy` (or an
+equivalent `railway up` of an older commit) does not roll the database back with it, and the older
+codebase's Alembic version graph has no entry for a revision created after that commit was cut, so
+`alembic upgrade head` hard-fails on every container start. The July 14 rehearsal's rollback (R1–R5)
+happened not to hit this because that rollback target was already at the same Alembic head as the
+RC (a no-op migration case) — this is the first rollback rehearsal in this project's history to
+actually test the "DB is ahead of the code being rolled back to" case, and it fails immediately.
+
+**Practical implication for any future incident response**: a code-level rollback is only safe
+without a coordinated action when the migration between the two versions is a pure additive,
+backward-compatible schema change AND the target rollback commit is either (a) already past that
+same migration, or (b) the operator also runs `alembic downgrade` to the older head before/alongside
+the code rollback. Until this is formalized: `docs/beta/42_release_stop_and_rollback_plan.md` should
+be reviewed and updated to state this explicitly, and the reflex "just redeploy the last good commit"
+must not be used as first response to a post-deploy incident without checking whether a migration
+shipped in between. See gap register REM-78 for the tracked finding.
+
+**Result**: Gate 8's deploy-rehearsal requirement re-confirmed PASS (deploy mechanism proven live
+twice today). Rollback rehearsal executed and is a genuine, disclosed FAIL for the specific "DB ahead
+of app" case — not swept under "PASS (automated gates)" the way the July 14 doc's summary line
+phrased it. This is exactly the kind of finding Gate 8 exists to surface before it happens for real
+in production.
