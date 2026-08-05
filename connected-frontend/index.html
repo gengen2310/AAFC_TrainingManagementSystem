@@ -3310,7 +3310,24 @@ function isInterventionRequired(){ return ['national_admin','system_admin'].incl
 //  DATA LOADING  (fetched from the backend; adapted to the view shapes)
 // ═══════════════════════════════════════════════════════════
 function _facName(s){return s.facilitator_display_name_at_time||'';}
+// Wraps a background GET used by loadData() so a transient failure is
+// recorded instead of silently swallowed. Previously nearly every fetch in
+// loadData() used a bare `.catch(()=>fallback)` with zero error surfaced --
+// a transient failure (especially right after a create/edit, when
+// reloadAndRender() re-fetches everything) rendered the affected list
+// silently empty/stale with no indication anything went wrong, reproducing
+// "I added it and it's not there" with no error message anywhere. Tracks
+// failures on S._loadFailures so a single consolidated warning can be shown
+// once, after Promise.all settles, instead of one alert per failed call.
+function _apiT(path,fallback,label){
+  return api(path).catch(e=>{
+    (S._loadFailures=S._loadFailures||[]).push(label||path);
+    return fallback;
+  });
+}
+
 async function loadData(){
+  S._loadFailures=[];
   // effectiveScope() (not getScopeType()) so a system_admin currently browsing
   // a Wing/Squadron via the sa-scope-bar selector loads that Wing/Squadron's
   // operational data through the exact same branches wing_admin/sqn_admin use.
@@ -3328,14 +3345,14 @@ async function loadData(){
   const p_uicfg=fetch(API_BASE+'/api/health/ui-config').then(r=>r.json()).catch(()=>null);
   const p_tags=api('/api/subject-area-tags').catch(()=>[]);
   const p_factypes=api('/api/facilitator-type-tags').catch(()=>[]);
-  const p_pns=api('/api/parade-nights'+_sqq).catch(e=>{S.loadErr=apiErr(e);return null;});
-  const p_facs=api('/api/facilitators'+_sqq).catch(()=>null);
-  const p_cur=api('/api/curriculum'+_sqq).catch(()=>null);
-  const p_phases=api('/api/curriculum/phases').catch(()=>null);
-  const p_ta=api('/api/training-areas').catch(()=>null);
-  const p_eq=api('/api/equipment').catch(()=>null);
-  const p_ai=api('/api/action-items').catch(()=>null);
-  const p_acts=api('/api/activities').catch(()=>null);
+  const p_pns=_apiT('/api/parade-nights'+_sqq,null,'Parade Nights');
+  const p_facs=_apiT('/api/facilitators'+_sqq,null,'Facilitators');
+  const p_cur=_apiT('/api/curriculum'+_sqq,null,'Curriculum');
+  const p_phases=_apiT('/api/curriculum/phases',null,'Curriculum phases');
+  const p_ta=_apiT('/api/training-areas',null,'Training Areas');
+  const p_eq=_apiT('/api/equipment',null,'Equipment');
+  const p_ai=_apiT('/api/action-items',null,'Action Items');
+  const p_acts=_apiT('/api/activities',null,'Activities');
   // Holidays for the Training Calendar overlay -- active planning year(s) for
   // this squadron, flattened across years (usually just one).
   const p_holidays=_sqnId?(async()=>{
@@ -3352,7 +3369,7 @@ async function loadData(){
   const p_cov=api('/api/reports/curriculum-coverage'+_sqq).catch(()=>null);
   const p_fload=api('/api/reports/facilitator-load'+_sqq).catch(()=>null);
   const p_ndel=api('/api/reports/not-delivered'+_sqq).catch(()=>null);
-  const p_sqnData=_sqnId?api('/api/squadrons/'+_sqnId).catch(()=>null):Promise.resolve(null);
+  const p_sqnData=_sqnId?_apiT('/api/squadrons/'+_sqnId,null,'Squadron settings'):Promise.resolve(null);
   const p_timing=(scope==='squadron'||_proxyWasActive)?api('/api/timing-templates'+_sqq).catch(()=>[]):Promise.resolve([]);
   const p_audit=(scope==='national'||scope==='auditor'||scope==='system_admin')?api('/api/audit').catch(()=>[]):Promise.resolve([]);
   const p_wov=scope==='wing'?api('/api/reports/wing-overview'+_wgq).catch(()=>null):Promise.resolve(null);
@@ -3432,6 +3449,9 @@ async function loadData(){
     S.natCap=natcap||null;
     S.wings=wings||[];
     S.squadrons=nsqns||[];
+  }
+  if(S._loadFailures&&S._loadFailures.length){
+    showToast('Some data failed to load ('+S._loadFailures.join(', ')+'). Refresh to try again.',true);
   }
 }
 // Writes now go to the backend then re-load. save() is retained as a no-op so existing
@@ -5778,6 +5798,29 @@ async function _refreshDashboard(){
 // ═══════════════════════════════════════════════════════════
 //  DASHBOARD — API-DRIVEN CHART LOADER
 // ═══════════════════════════════════════════════════════════
+// Every dashboard chart container this page can render, paired with its
+// insight div (or null) -- one shared list used for both the loading-
+// skeleton reset AND the fetch-failure cleanup below, so a failed refresh
+// can never leave some containers stuck on their skeleton forever or leave
+// stale "success" insight text sitting next to a chart that just failed
+// (previously the skeleton-reset list covered 7 containers and the failure
+// cleanup covered only 2 of those 7, and neither ever touched any insight
+// div at all).
+const _DASH_CHART_IDS=[
+  ['chart-weekly-outcomes','insight-weekly-outcomes'],
+  ['chart-delivery-trend','insight-delivery-trend'],
+  ['chart-session-outcomes','insight-session-outcomes'],
+  ['chart-cancellation-reasons','insight-cancellation-reasons'],
+  ['chart-curriculum-progress','insight-curriculum-progress'],
+  ['chart-curriculum-backlog','insight-curriculum-backlog'],
+  ['chart-facilitator-workload','insight-facilitator-workload'],
+  ['chart-squadron-readiness','insight-squadron-readiness'],
+  ['chart-squadron-delivery',null],
+  ['chart-wing-subject-gaps','insight-wing-subject-gaps'],
+  ['chart-wing-readiness','insight-wing-readiness'],
+  ['chart-wing-delivery',null],
+];
+
 async function loadDashCharts(){
   const win=document.getElementById('dash-window')?.value||'term';
   const sqn=document.getElementById('dash-sqn-filter')?.value||saBrowseSquadronId()||'';
@@ -5785,12 +5828,16 @@ async function loadDashCharts(){
   const wid=saBrowseWingId();if(wid&&!sqn)params.set('wing_id',wid);
 
   // Skeletons while loading
-  ['chart-weekly-outcomes','chart-delivery-trend','chart-session-outcomes','chart-cancellation-reasons','chart-curriculum-progress','chart-curriculum-backlog','chart-facilitator-workload'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="chart-skeleton"></div>';});
+  _DASH_CHART_IDS.forEach(([id])=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="chart-skeleton"></div>';});
 
   let data;
   try{data=await api('/api/dashboard/charts?'+params);}
   catch(e){
-    ['chart-weekly-outcomes','chart-curriculum-progress'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=_dEmptyChart('Could not load chart data. Try refreshing.');});
+    _DASH_CHART_IDS.forEach(([id,insightId])=>{
+      const el=document.getElementById(id);
+      if(el)el.innerHTML=_dEmptyChart('Could not load chart data. Try refreshing.');
+      if(insightId)_dSetInsight(insightId,null);
+    });
     return;
   }
   const charts=data.charts||{};const scope=data.scope||'squadron';
@@ -5965,7 +6012,7 @@ function buildPNCard(pn){
   const sessCards=(pn.sessions||[]).map((s,i)=>`
     <div class="sess-card ${stCls(s.status)||(!s.exp?'unassigned':'')}" onclick="showPNDetail('${pn.date}')">
       <div class="sess-hdr"><span class="sess-num">Sess ${i+1}</span>${stBadge(s.status||'planned')}</div>
-      <div class="sess-title">${s.exp||'<em style="color:var(--muted)">Unassigned</em>'}</div>
+      <div class="sess-title">${s.exp||'<em style="color:var(--muted)">Lesson: Unassigned</em>'}</div>
       <div class="sess-info">${s.phase?phBadge(s.phase)+' ':''} ${s.facName?''+s.facName:''} ${s.room?'· '+s.room:''}</div>
       ${canWriteSquadron()?`<div class="sess-acts no-print" onclick="event.stopPropagation()">
         <button class="btn btn-xs btn-ok" onclick="qkSt('${pn.date}',${i},'delivered')" aria-label="Mark Session ${i+1} delivered">✓</button>
@@ -6495,7 +6542,7 @@ function renderWP(){
           <tbody>${shownSessions.length?shownSessions.map(s=>`<tr>
             <td style="font-weight:800;color:var(--dark)">Sess ${allSessions.indexOf(s)+1}</td>
             <td>${phBadge(s.phase||'B. Initial')}</td>
-            <td style="font-weight:700">${s.exp||'<em style="color:var(--muted)">Unassigned</em>'}</td>
+            <td style="font-weight:700">${s.exp||'<em style="color:var(--muted)">Lesson: Unassigned</em>'}</td>
             <td style="font-size:11.5px">${s.facName||'—'}</td>
             <td style="font-size:11.5px">${s.room||'—'}</td>
             <td>${stBadge(s.status||'planned')}</td>
@@ -9035,7 +9082,12 @@ async function deleteParadeDate(pdId, yearId){
 }
 
 function openGenerateDatesModal(){
-  document.getElementById('gen-weekday').value='4';
+  // Seed from the Squadron's own Parade Day setting (Unit Settings) --
+  // previously this always hardcoded Friday regardless of what the squadron
+  // had actually configured, so changing the setting had no visible effect
+  // on this modal at all.
+  const _defDay=_DAY_NAME_TO_INT[S.cfg&&S.cfg.day];
+  document.getElementById('gen-weekday').value=(_defDay!==undefined?_defDay:4);
   document.getElementById('gen-start').value='';
   document.getElementById('gen-end').value='';
   document.getElementById('gen-excl-hols').checked=true;
