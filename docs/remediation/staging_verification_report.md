@@ -4,6 +4,74 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Phase D complete: conflict tooltips, bulk mark-delivered, visual token alignment (REM-74, REM-75, REM-76)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commits
+`ac26db6` through `64325a2`. This entry closes out Phase D (the 6 larger,
+substantial features), and with it the full plan approved at the start of
+this risk-register pass (Phases A through D). Full detail per item in
+`master_gap_register.csv` REM-74–REM-76.
+
+1. **Conflict/warning tooltips** (REM-74) -- extended explanatory hover
+   tooltips to the aggregate "N conflict(s)"/"N unstaffed" indicators that
+   previously had icon+colour+count but no explanation of what was wrong or
+   where to look. Where full conflict detail was available at render time
+   (`ParadeNightGridView`), the tooltip lists every specific conflict message;
+   where only a count was available (`ParadeNightBlock`'s summary badges used
+   across Year/Term/8-week grids, `ListView`'s per-row count), the tooltip
+   explains what the count means and where to resolve it.
+2. **"Mark all delivered, then flag exceptions" bulk action** (REM-75) -- new
+   `POST /api/parade-nights/{id}/mark-remaining-delivered`, added to both
+   frontends' parade-night detail view next to Publish/Close. The other 3
+   sub-asks in the same data-entry UX document (default non-blank session
+   status, quick-tap reason chips, a per-facilitator "my sessions tonight"
+   view) are honestly documented as not built this pass -- the facilitator-
+   identity sub-ask in particular surfaced a real data-model gap
+   (`Facilitator` records have no link to `User`/login accounts at all)
+   that needs an explicit product decision, not something to invent
+   unilaterally.
+3. **Visual token alignment** (REM-76) -- aligned Planning Workspace's
+   neutral/surface design tokens to connected-frontend's exact AAFC VIG hex
+   values. **Caught a real regression during this item's own verification**:
+   naively copying connected-frontend's exact `--muted-text` value broke
+   WCAG AA contrast (4.41:1, below the 4.5:1 threshold) across 21 pages,
+   caught immediately by this app's own accessibility suite -- reverted that
+   one token to its original AA-compliant value rather than propagating a
+   real accessibility regression for pixel-matching, and left the rest of
+   the alignment in place. This also surfaces a genuine, previously-unknown
+   latent accessibility issue in connected-frontend's own `--muted` colour
+   (untested there -- no accessibility suite exists for connected-frontend,
+   REM-49) for a future look, out of this item's own scope to fix.
+
+**Pre-deploy gates**: `tsc --noEmit` clean throughout. `vitest run` → 22
+passed. Planning Workspace e2e → 95 passed, 0 failed (includes the
+accessibility suite's real catch-and-fix described above). connected-frontend
+e2e (regular suite) → 38 passed, 0 failed. Full backend suite → 1139 passed,
+5 skipped.
+
+**Deployed**: `aafc-tms-backend`, `aafc-tms-frontend`, and
+`aafc-tms-planning-workspace-preview` for REM-74/REM-75;
+`aafc-tms-planning-workspace-preview` only for REM-76.
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-backend` (staging) | `b83eb1de-87a5-4427-a676-f862fae211a7` | SUCCESS |
+| `aafc-tms-frontend` (staging) | `476ecf66-fe1a-41a7-b0df-9e366b4451e7` (supersedes `42e16545-5083-4efc-84c6-e491bf93927a`) | SUCCESS |
+| `aafc-tms-planning-workspace-preview` (staging) | `e38b4b33-5ef5-430b-b2a8-b1d14afcbecf` (supersedes `fad595c3-fa0c-42cc-9468-cb9df712f207` and `f7b086e9-b4b2-418b-887e-0e053e945839`) | SUCCESS |
+
+**Post-deploy verification**: `GET /api/health/ready` → ready. Both
+frontends → HTTP 200.
+
+**Phase D closing note**: 6 items planned, all delivered with honest scope
+boundaries disclosed where a sub-ask needed a product decision this program
+couldn't make unilaterally (calendar cross-wing aggregation, Planning
+Workspace's own calendar grid, per-facilitator session logging, non-blank
+default session status, reason-chip UI upgrade, connected-frontend's latent
+contrast issue). No live browser verification of any Phase D feature's
+actual rendered behaviour was possible this session (no Chrome extension
+connectivity) — every item verified at the code/type-check/e2e-regression/
+axe-core level, same discipline as every prior phase in this program.
+
 ## 2026-08-05 — Phase D (continued): Wing HQ Calendar grid view (REM-73)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
