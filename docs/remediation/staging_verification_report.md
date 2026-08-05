@@ -4,6 +4,38 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Phase D (continued): Wing HQ Calendar grid view (REM-73)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`3d0d721`. Full detail in `master_gap_register.csv` REM-73.
+
+connected-frontend's Wing HQ Calendar (used at both Wing and National scope)
+rendered a flat table only. Added a real month-grid view as the new default
+(Mon-Sun, 4-6 week rows, month navigation, colour-coded event chips,
+overflow handling), with a Grid/Table toggle preserving the existing table
+view unchanged. Found and fixed a real empty-state bug during e2e testing
+(grid+nav were being hidden entirely for a zero-event month instead of
+showing an empty, still-navigable grid).
+
+**Pre-deploy gates**: 4 new e2e tests, connected-frontend e2e (regular
+suite) → 37 passed, 0 failed. No backend or Planning Workspace changes this
+commit, so their suites are unaffected (still 1133 passed / 5 skipped and 94
+passed respectively, per the prior entry).
+
+**Deployed**: `aafc-tms-frontend` only.
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-frontend` (staging) | `86691510-dfc1-4fb8-8010-54338803718d` | SUCCESS |
+
+**Post-deploy verification**: root → HTTP 200.
+
+**Residual limitation, disclosed not dropped**: no cross-wing aggregated
+National view (still one wing at a time via the existing selector); Planning
+Workspace's own Calendar.tsx remains squadron-only with no wing/national
+scope at all — both judged out of scope for this pass given their size
+relative to remaining Phase D work.
+
 ## 2026-08-05 — Phase D (in progress): facilitator type chart + Command Dashboard parity (REM-71, REM-72)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commits `0cdcfb9`
