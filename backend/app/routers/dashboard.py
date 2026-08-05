@@ -1690,6 +1690,38 @@ def _subject_area_resilience(facs: list) -> dict:
     }
 
 
+def _facilitator_type_distribution(facs: list) -> dict:
+    """Grouped bar: active facilitator counts per type (Officer/NCO/Senior
+    Cadet/Civilian/etc). Sibling to _subject_area_resilience -- risk-register
+    ask was "a second chart comparing facilitator counts per subject area AND
+    type"; subject-area coverage already existed, type coverage did not."""
+    type_counts: dict[str, int] = defaultdict(int)
+    for f in facs:
+        if not f.active_status:
+            continue
+        type_counts[f.type or "Unspecified"] += 1
+
+    data = sorted(
+        [{"label": t, "count": c} for t, c in type_counts.items()],
+        key=lambda x: -x["count"],
+    )
+
+    return {
+        "chart_id": "facilitator_type_distribution",
+        "title": "Facilitators by type",
+        "explanation": "Number of active facilitators of each type (Officer, NCO, Senior Cadet, Civilian, etc).",
+        "question": "What mix of facilitator types is available to draw on?",
+        "chart_type": "bar_horizontal",
+        "x_axis": "Facilitators",
+        "y_axis": "Type",
+        "data": data,
+        "insight": None,
+        "empty_state": "No active facilitators recorded.",
+        "drill_down": {"route": "facilitators"},
+        "permission_scope": "squadron",
+    }
+
+
 def _long_term_delivery_trend(sessions: list, pns: list, terms: int = 4) -> dict:
     """Line: delivery reliability per term (long-range strategic view)."""
     pn_map = {pn.id: (pn.date, pn.term) for pn in pns}
@@ -1792,6 +1824,8 @@ def _full_squadron_charts(db: DBSession, sq_id: str, w_start: str, w_end: str) -
     charts["capability_dependency"] = _safe_chart(
         "capability_dependency", _facilitator_capability_dependency, all_sessions)
     charts["subject_area_resilience"] = _safe_chart("subject_area_resilience", _subject_area_resilience, facs)
+    charts["facilitator_type_distribution"] = _safe_chart(
+        "facilitator_type_distribution", _facilitator_type_distribution, facs)
     fac_leave = db.query(PlanningFacilitatorLeave).filter(
         PlanningFacilitatorLeave.facilitator_id.in_([f.id for f in facs]),
         PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
@@ -1978,6 +2012,8 @@ def _full_squadron_strategic_charts(db: DBSession, sq_id: str) -> dict:
     charts["capability_dependency"] = _safe_chart(
         "capability_dependency", _facilitator_capability_dependency, all_sessions)
     charts["subject_area_resilience"] = _safe_chart("subject_area_resilience", _subject_area_resilience, facs)
+    charts["facilitator_type_distribution"] = _safe_chart(
+        "facilitator_type_distribution", _facilitator_type_distribution, facs)
     charts["long_term_delivery_trend"] = _safe_chart(
         "long_term_delivery_trend", _long_term_delivery_trend, all_sessions, all_pns)
     fac_leave = db.query(PlanningFacilitatorLeave).filter(
@@ -2001,6 +2037,8 @@ def _wing_strategic_charts(db: DBSession, wing_id: str) -> dict:
         Facilitator.is_archived == False,  # noqa: E712
     ).all()
     charts["subject_area_resilience"] = _safe_chart("subject_area_resilience", _subject_area_resilience, facs)
+    charts["facilitator_type_distribution"] = _safe_chart(
+        "facilitator_type_distribution", _facilitator_type_distribution, facs)
     # Long-term trend: aggregate all wing sessions
     sqn_ids = _sqn_ids_for_wing(db, wing_id)
     pns = db.query(ParadeNight).filter(

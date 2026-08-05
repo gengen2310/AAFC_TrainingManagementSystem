@@ -755,6 +755,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <div id="insight-facilitator-status" class="chart-insight" style="display:none"></div>
             </div>
             <div class="card">
+              <div class="ctitle">Facilitators by type</div>
+              <div id="chart-facilitator-type"><div class="chart-skeleton"></div></div>
+              <div id="insight-facilitator-type" class="chart-insight" style="display:none"></div>
+            </div>
+            <div class="card">
               <div class="ctitle">Repeated facilitator gaps — last 8 weeks</div>
               <div id="chart-facilitator-gaps"><div class="chart-skeleton"></div></div>
               <div id="insight-facilitator-gaps" class="chart-insight" style="display:none"></div>
@@ -1074,6 +1079,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <div class="ctitle">Repeated gaps — unfilled sessions by subject area (last 8 weeks)</div>
             <div id="fac-chart-gaps"><div class="chart-skeleton"></div></div>
             <div id="fac-insight-gaps" class="chart-insight" style="display:none"></div>
+          </div>
+          <div class="card">
+            <div class="ctitle">Facilitators by type</div>
+            <div id="fac-chart-type"><div class="chart-skeleton"></div></div>
+            <div id="fac-insight-type" class="chart-insight" style="display:none"></div>
           </div>
         </div>
         <div class="tw">
@@ -6034,7 +6044,7 @@ async function loadDashCharts(){
 //  FACILITATORS — VISUAL STATISTICS
 // ═══════════════════════════════════════════════════════════
 async function loadFacilitatorStats(){
-  ['fac-chart-status','fac-chart-workload','fac-chart-spof','fac-chart-gaps'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="chart-skeleton"></div>';});
+  ['fac-chart-status','fac-chart-workload','fac-chart-spof','fac-chart-gaps','fac-chart-type'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="chart-skeleton"></div>';});
   let data;
   const sqn=saBrowseSquadronId();
   try{data=await api('/api/dashboard/charts?window=term'+(sqn?'&squadron_id='+encodeURIComponent(sqn):''));}
@@ -6044,6 +6054,7 @@ async function loadFacilitatorStats(){
   _dRenderChart('fac-chart-workload',charts.facilitator_workload,_chartHBar,'fac-insight-workload');
   _dRenderChart('fac-chart-spof',charts.subject_area_resilience,_chartHBar,'fac-insight-spof');
   _dRenderChart('fac-chart-gaps',charts.facilitator_repeated_gaps,_chartHBar,'fac-insight-gaps');
+  _dRenderChart('fac-chart-type',charts.facilitator_type_distribution,_chartHBar,'fac-insight-type');
 }
 
 async function _loadDashStrategic(){
@@ -6059,6 +6070,7 @@ async function _loadDashStrategic(){
   _dRenderChart('chart-capability-dependency',charts.capability_dependency,_chartHBar,'insight-capability-dependency');
   _dRenderChart('chart-subject-area-resilience',charts.subject_area_resilience,_chartHBar,'insight-subject-area-resilience');
   _dRenderChart('chart-facilitator-status',charts.facilitator_status_distribution,_chartDonut,'insight-facilitator-status');
+  _dRenderChart('chart-facilitator-type',charts.facilitator_type_distribution,_chartHBar,'insight-facilitator-type');
   _dRenderChart('chart-facilitator-gaps',charts.facilitator_repeated_gaps,_chartHBar,'insight-facilitator-gaps');
   // Stage 9, 2026-08-05: backend already computed this ("who needs a
   // substitute" -- upcoming sessions clashing with recorded facilitator

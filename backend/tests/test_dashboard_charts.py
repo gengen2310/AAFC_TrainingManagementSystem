@@ -219,6 +219,19 @@ def test_squadron_returns_subject_area_resilience(client):
     for row in sar.get("data", []):
         assert row["risk"] in ("critical", "warn", "ok")
 
+def test_squadron_returns_facilitator_type_distribution(client):
+    hdrs = _sqn_admin(client)
+    r = client.get(CHARTS_URL + "?window=year", headers=hdrs)
+    charts = _charts(r)
+    assert "facilitator_type_distribution" in charts
+    ftd = charts["facilitator_type_distribution"]
+    assert ftd["chart_type"] == "bar_horizontal"
+    for row in ftd.get("data", []):
+        assert "label" in row
+        assert row["count"] >= 1
+    # 703 squadron demo data seeds 5 active facilitators across known types.
+    assert sum(row["count"] for row in ftd["data"]) == 5
+
 def test_squadron_returns_facilitator_repeated_gaps(client):
     hdrs = _sqn_admin(client)
     r = client.get(CHARTS_URL + "?window=year", headers=hdrs)
