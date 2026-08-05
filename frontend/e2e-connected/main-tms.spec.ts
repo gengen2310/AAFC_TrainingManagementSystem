@@ -111,9 +111,13 @@ test.describe("Parade Night detail — bulk actions", () => {
   test("sqn_admin can bulk-mark remaining sessions delivered", async ({ page }) => {
     await loginSquadron(page, "ADMIN703");
     const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
-    const apiBase = LOCAL_API_BASE || "http://localhost:8000";
+    const apiBase = process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000";
+    // Staging is a persistent environment (never reseeded between runs, unlike
+    // local) -- a fixed date collides with any earlier run's leftover record
+    // (duplicate_date 409). Derive a unique far-future date per run instead.
+    const testDate = new Date(2099, 0, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
     const create = await page.request.post(`${apiBase}/api/parade-nights`, {
-      data: { date: "2099-12-21", term: "T4", session_count: 1 },
+      data: { date: testDate, term: "T4", session_count: 1 },
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(create.ok()).toBe(true);
@@ -124,7 +128,7 @@ test.describe("Parade Night detail — bulk actions", () => {
     });
 
     await page.evaluate(() => (window as any).reloadAndRender());
-    await page.evaluate((ds) => (window as any).showPNDetail(ds), "2099-12-21");
+    await page.evaluate((ds) => (window as any).showPNDetail(ds), testDate);
     await expect(page.locator("#m-pn-detail")).toBeVisible({ timeout: 8000 });
     await page.getByRole("button", { name: "Mark remaining delivered" }).click();
     await expect(page.getByText(/session.*marked delivered/i)).toBeVisible({ timeout: 8000 });
