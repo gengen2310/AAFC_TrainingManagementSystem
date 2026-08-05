@@ -424,6 +424,7 @@ export function PlanningWorkspace() {
       {guidedSetupOpen && (
         <GuidedYearSetupModal
           years={years ?? []}
+          squadronId={resolvedSquadronId ?? undefined}
           onClose={() => setGuidedSetupOpen(false)}
           onDone={() => {
             qc.invalidateQueries({ queryKey: ["planning-years"] });

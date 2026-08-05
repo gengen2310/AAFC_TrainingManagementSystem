@@ -1,6 +1,11 @@
-import { useState } from "react";
-import { planningApi } from "../../api";
+import { useState, useEffect } from "react";
+import { planningApi, orgApi } from "../../api";
 import type { SessionInfo } from "../../api/types";
+
+// Mon=0 .. Sun=6, matching connected-frontend's _DAY_NAME_TO_INT convention.
+const _DAY_NAME_TO_INDEX: Record<string, number> = {
+  Monday: 0, Tuesday: 1, Wednesday: 2, Thursday: 3, Friday: 4, Saturday: 5, Sunday: 6,
+};
 
 const JS_DOW = [1, 2, 3, 4, 5, 6, 0]; // Mon=0→JS1, ..., Sun=6→JS0
 
@@ -56,7 +61,7 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
   const [yearErr, setYearErr] = useState<string | null>(null);
 
   // Step 2 – generate parade dates
-  const [weekday, setWeekday] = useState(3); // Thursday
+  const [weekday, setWeekday] = useState(3); // Thursday, until the squadron's own setting loads (below)
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [frequency, setFrequency] = useState("weekly");
@@ -64,6 +69,21 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
   const [savingDates, setSavingDates] = useState(false);
   const [datesErr, setDatesErr] = useState<string | null>(null);
   const [datesResult, setDatesResult] = useState<{ created: number; dates: string[] } | null>(null);
+
+  // Seed the weekday picker from the Squadron's own Parade Day setting (Unit
+  // Settings) -- previously this always hardcoded Thursday regardless of what
+  // the squadron had actually configured, and this component never fetched
+  // the squadron record at all.
+  useEffect(() => {
+    if (!squadronId) return;
+    let cancelled = false;
+    orgApi.squadron(squadronId).then(sq => {
+      if (cancelled) return;
+      const idx = sq.default_parade_day ? _DAY_NAME_TO_INDEX[sq.default_parade_day] : undefined;
+      if (idx !== undefined) setWeekday(idx);
+    }).catch(() => { /* keep the Thursday default if the fetch fails */ });
+    return () => { cancelled = true; };
+  }, [squadronId]);
 
   async function handleCreateYear() {
     if (!yearName.trim()) { setYearErr("Name is required."); return; }

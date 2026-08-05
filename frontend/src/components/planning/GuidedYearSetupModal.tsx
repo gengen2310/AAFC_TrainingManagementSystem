@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Modal } from "../Modal";
 import { Button } from "../ui";
-import { planningApi, trainingApi } from "../../api";
+import { planningApi, trainingApi, orgApi } from "../../api";
 import { ApiError } from "../../api/client";
 import type { PlanningYear, TimingTemplateFull, CurriculumItem } from "../../api/types";
 
@@ -26,11 +26,12 @@ const PERIODS = [1, 2, 3, 4, 5, 6];
 
 interface Props {
   years: PlanningYear[];
+  squadronId?: string;
   onClose: () => void;
   onDone: () => void;
 }
 
-export function GuidedYearSetupModal({ years, onClose, onDone }: Props) {
+export function GuidedYearSetupModal({ years, squadronId, onClose, onDone }: Props) {
   const [step, setStep] = useState<Step>("start");
   const [yearId, setYearId] = useState<string | null>(null);
   const [yearLabel, setYearLabel] = useState<string>("");
@@ -146,6 +147,7 @@ export function GuidedYearSetupModal({ years, onClose, onDone }: Props) {
         {step === "dates" && yearId && (
           <DatesStep
             yearId={yearId}
+            squadronId={squadronId}
             alreadyDone={datesAlreadyDone}
             onSkip={() => setStep("placement")}
             onDone={() => setStep("placement")}
@@ -262,11 +264,16 @@ function TimingStep({ onSkip, onDone }: { onSkip: () => void; onDone: () => void
   );
 }
 
+// Mon=0 .. Sun=6, matching connected-frontend's _DAY_NAME_TO_INT convention.
+const _DAY_NAME_TO_INDEX: Record<string, number> = {
+  Monday: 0, Tuesday: 1, Wednesday: 2, Thursday: 3, Friday: 4, Saturday: 5, Sunday: 6,
+};
+
 // ── Step: generate parade dates (skipped/shown-as-done if rollover already copied them) ──
-function DatesStep({ yearId, alreadyDone, onSkip, onDone }: {
-  yearId: string; alreadyDone: boolean; onSkip: () => void; onDone: () => void;
+function DatesStep({ yearId, squadronId, alreadyDone, onSkip, onDone }: {
+  yearId: string; squadronId?: string; alreadyDone: boolean; onSkip: () => void; onDone: () => void;
 }) {
-  const [weekday, setWeekday] = useState(3);
+  const [weekday, setWeekday] = useState(3); // Thursday, until the squadron's own setting loads (below)
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [frequency, setFrequency] = useState("weekly");
@@ -274,6 +281,20 @@ function DatesStep({ yearId, alreadyDone, onSkip, onDone }: {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [result, setResult] = useState<{ created: number } | null>(null);
+
+  // Seed the weekday picker from the Squadron's own Parade Day setting (Unit
+  // Settings) -- previously this always hardcoded Thursday regardless of
+  // what the squadron had actually configured.
+  useEffect(() => {
+    if (!squadronId) return;
+    let cancelled = false;
+    orgApi.squadron(squadronId).then(sq => {
+      if (cancelled) return;
+      const idx = sq.default_parade_day ? _DAY_NAME_TO_INDEX[sq.default_parade_day] : undefined;
+      if (idx !== undefined) setWeekday(idx);
+    }).catch(() => { /* keep the Thursday default if the fetch fails */ });
+    return () => { cancelled = true; };
+  }, [squadronId]);
 
   async function generate() {
     if (!startDate || !endDate) { setErr("Start and end dates are required."); return; }
