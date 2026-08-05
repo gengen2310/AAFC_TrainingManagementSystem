@@ -107,6 +107,30 @@ test.describe("Activities page", () => {
   });
 });
 
+test.describe("Parade Night detail — bulk actions", () => {
+  test("sqn_admin can bulk-mark remaining sessions delivered", async ({ page }) => {
+    await loginSquadron(page, "ADMIN703");
+    const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
+    const apiBase = LOCAL_API_BASE || "http://localhost:8000";
+    const create = await page.request.post(`${apiBase}/api/parade-nights`, {
+      data: { date: "2099-12-21", term: "T4", session_count: 1 },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(create.ok()).toBe(true);
+    const pnId = (await create.json()).parade_night_id as string;
+    await page.request.post(`${apiBase}/api/sessions`, {
+      data: { parade_night_id: pnId, period_number: 1, custom_title: "Bulk test session" },
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    await page.evaluate(() => (window as any).reloadAndRender());
+    await page.evaluate((ds) => (window as any).showPNDetail(ds), "2099-12-21");
+    await expect(page.locator("#m-pn-detail")).toBeVisible({ timeout: 8000 });
+    await page.getByRole("button", { name: "Mark remaining delivered" }).click();
+    await expect(page.getByText(/session.*marked delivered/i)).toBeVisible({ timeout: 8000 });
+  });
+});
+
 test.describe("Account Management — Reference Data", () => {
   test("sqn_admin can create a Training Stage at squadron scope", async ({ page }) => {
     await loginSquadron(page, "ADMIN703");

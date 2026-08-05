@@ -151,6 +151,33 @@ test("sqn_admin can add a session to a parade night", async ({ page }) => {
   await expect(dialog.locator("tbody tr").first()).toBeVisible({ timeout: 8000 });
 });
 
+// ── "Mark remaining delivered" bulk action ────────────────────────────────────
+
+test("sqn_admin can bulk-mark remaining sessions delivered", async ({ page }) => {
+  const hdr = await authHeader(page, ADMIN_CODE);
+  const r = await page.request.post("/api/parade-nights", {
+    data: { date: "2099-12-20", term: "T4", session_count: 1 },
+    headers: hdr,
+  });
+  expect(r.status()).toBe(200);
+  const pnId = (await r.json()).parade_night_id as string;
+  await page.request.post("/api/sessions", {
+    data: { parade_night_id: pnId, period_number: 1, custom_title: "Bulk test session" },
+    headers: hdr,
+  });
+
+  await page.goto("/parade-nights");
+  await expect(page.getByRole("heading", { name: "Parade Nights" })).toBeVisible({ timeout: 8000 });
+  const row = page.locator("tr").filter({ hasText: "2099-12-20" });
+  await row.getByRole("button", { name: "Open" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Parade night" });
+  await expect(dialog).toBeVisible({ timeout: 8000 });
+  await dialog.getByRole("button", { name: "Mark remaining delivered" }).click();
+  await expect(page.getByText(/session.*marked delivered/i)).toBeVisible({ timeout: 8000 });
+  await expect(dialog.getByText("Delivered").first()).toBeVisible({ timeout: 8000 });
+});
+
 // ── 6. Publish a parade night ─────────────────────────────────────────────────
 
 test("parade night status changes to published after Publish", async ({ page }) => {

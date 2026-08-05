@@ -99,6 +99,14 @@ export const trainingApi = {
     api.post<{ ok: boolean; parade_night_id: string }>("/api/parade-nights", b),
   publish: (id: string) => api.post<{ ok: boolean }>(`/api/parade-nights/${id}/publish`),
   close: (id: string) => api.post<{ ok: boolean }>(`/api/parade-nights/${id}/close`),
+  // "Mark all delivered, then flag exceptions" bulk action (risk-register
+  // data-entry UX ask): flag the few known exceptions individually first,
+  // then bulk-clear everything else still draft/planned/published in one
+  // action instead of clicking "Delivered" on every session.
+  markRemainingDelivered: (id: string) =>
+    api.post<{ ok: boolean; batch_id: string; sessions_updated: number; session_ids: string[] }>(
+      `/api/parade-nights/${id}/mark-remaining-delivered`
+    ),
   createSession: (b: Record<string, unknown>) => api.post<{ ok: boolean; session_id: string }>("/api/sessions", b),
   editSession: (id: string, b: Record<string, unknown>) => api.put<{ ok: boolean }>(`/api/sessions/${id}`, b),
   setStatus: (id: string, b: { status: string; reason?: string; rescheduled_to_date?: string; actual_attendance?: number }) =>

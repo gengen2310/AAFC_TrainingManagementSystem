@@ -436,3 +436,96 @@ def test_facilitator_stats_cross_squadron_blocked(client):
     hdr_704 = login(client, ADM704)
     r2 = client.get(f"/api/facilitators/{fid}/stats", headers=hdr_704)
     assert r2.status_code == 403
+
+
+# ── mark-remaining-delivered (bulk "mark all delivered, then flag exceptions") ──
+# Risk-register data-entry UX ask: flag the few known exceptions individually
+# first, then bulk-clear everything else as delivered in one action.
+
+def _t3_builder(client, hdr):
+    pns = client.get("/api/parade-nights", headers=hdr).json()
+    t3 = next(p for p in pns if p.get("term") == "T3")
+    pnid = t3["parade_night_id"]
+    return pnid, client.get(f"/api/parade-nights/{pnid}/builder", headers=hdr).json()["sessions"]
+
+
+def test_mark_remaining_delivered_transitions_planned_sessions(client):
+    # This suite's DB is session-scoped (no reset between tests, see
+    # conftest.py) and several earlier tests in this file already mutate
+    # T3's session[0] via _get_planned_session -- pick whichever session is
+    # CURRENTLY eligible (draft/planned/published) at run time rather than
+    # assuming a fixed index is still untouched.
+    hdr = login(client, ADM703)
+    pnid, sessions = _t3_builder(client, hdr)
+    eligible = [s["id"] for s in sessions if s.get("status") in ("draft", "planned", "published")]
+    assert eligible, "No eligible (non-terminal) session found in T3 -- earlier tests exhausted them all"
+
+    r = client.post(f"/api/parade-nights/{pnid}/mark-remaining-delivered", headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["ok"] is True
+    assert d["sessions_updated"] == len(eligible)
+    assert set(d["session_ids"]) == set(eligible)
+
+    sid = eligible[0]
+    hist = client.get(f"/api/sessions/{sid}/status-history", headers=hdr).json()
+    assert any(h["new_status"] == "delivered" for h in hist)
+
+
+def test_mark_remaining_delivered_skips_already_flagged_exception(client):
+    # Creates its own fresh sessions rather than relying on shared T3 state --
+    # the previous test in this file legitimately exhausts every pre-existing
+    # eligible session via its own bulk call (session-scoped DB, no reset
+    # between tests, see conftest.py).
+    hdr = login(client, ADM703)
+    pnid, _ = _t3_builder(client, hdr)
+    c1 = client.post("/api/sessions", json={"parade_night_id": pnid, "period_number": 97}, headers=hdr)
+    c2 = client.post("/api/sessions", json={"parade_night_id": pnid, "period_number": 98}, headers=hdr)
+    assert c1.status_code == 200, c1.text
+    assert c2.status_code == 200, c2.text
+    flagged_sid, other_sid = c1.json()["session_id"], c2.json()["session_id"]
+
+    # Flag one exception individually first (the intended workflow order).
+    flag_r = client.post(f"/api/sessions/{flagged_sid}/status",
+                         json={"status": "not_delivered", "reason": "Facilitator unavailable"}, headers=hdr)
+    assert flag_r.status_code == 200, flag_r.text
+
+    bulk_r = client.post(f"/api/parade-nights/{pnid}/mark-remaining-delivered", headers=hdr)
+    assert bulk_r.status_code == 200, bulk_r.text
+    assert flagged_sid not in bulk_r.json()["session_ids"]
+    assert other_sid in bulk_r.json()["session_ids"]
+
+    builder2 = client.get(f"/api/parade-nights/{pnid}/builder", headers=hdr).json()
+    by_id = {s["id"]: s for s in builder2["sessions"]}
+    assert by_id[flagged_sid]["status"] == "not_delivered"
+    assert by_id[other_sid]["status"] == "delivered"
+
+
+def test_mark_remaining_delivered_forbidden_for_read_only(client):
+    hdr = login(client, GEN703)
+    _, pnid = _get_planned_session(client, hdr)
+    r = client.post(f"/api/parade-nights/{pnid}/mark-remaining-delivered", headers=hdr)
+    assert r.status_code == 403
+
+
+def test_mark_remaining_delivered_requires_auth(client):
+    hdr = login(client, ADM703)
+    _, pnid = _get_planned_session(client, hdr)
+    fresh = TestClient(app)
+    r = fresh.post(f"/api/parade-nights/{pnid}/mark-remaining-delivered")
+    assert r.status_code == 401
+
+
+def test_mark_remaining_delivered_404_for_missing_parade_night(client):
+    hdr = login(client, ADM703)
+    r = client.post("/api/parade-nights/nonexistent-id/mark-remaining-delivered", headers=hdr)
+    assert r.status_code == 404
+
+
+def test_mark_remaining_delivered_is_audited(client):
+    hdr = login(client, ADM703)
+    _, pnid = _get_planned_session(client, hdr)
+    client.post(f"/api/parade-nights/{pnid}/mark-remaining-delivered", headers=hdr)
+    rows = client.get("/api/audit?object_type=parade_night_bulk", headers=hdr).json()
+    matches = [a for a in rows if a["action"] == "bulk_mark_remaining_delivered"]
+    assert len(matches) >= 1

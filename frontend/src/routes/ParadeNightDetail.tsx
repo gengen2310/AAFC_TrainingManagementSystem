@@ -17,6 +17,12 @@ export function ParadeNightDetailView({ id, canWrite }: { id: string; canWrite: 
   const refetch = () => { qc.invalidateQueries({ queryKey: ["parade-night", id] }); qc.invalidateQueries({ queryKey: ["parade-nights"] }); };
   const publish = useMutation({ mutationFn: () => trainingApi.publish(id), onSuccess: () => { setActionErr(""); refetch(); }, onError: (e) => setActionErr(e instanceof ApiError ? e.friendly : "Publish failed.") });
   const close = useMutation({ mutationFn: () => trainingApi.close(id), onSuccess: () => { setActionErr(""); refetch(); }, onError: (e) => setActionErr(e instanceof ApiError ? e.friendly : "Close failed.") });
+  const [bulkMsg, setBulkMsg] = useState("");
+  const markRemainingDelivered = useMutation({
+    mutationFn: () => trainingApi.markRemainingDelivered(id),
+    onSuccess: (r) => { setActionErr(""); setBulkMsg(r.sessions_updated > 0 ? `${r.sessions_updated} session${r.sessions_updated !== 1 ? "s" : ""} marked delivered.` : "No remaining sessions to mark -- everything already has a status."); refetch(); },
+    onError: (e) => setActionErr(e instanceof ApiError ? e.friendly : "Bulk update failed."),
+  });
 
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
@@ -30,6 +36,7 @@ export function ParadeNightDetailView({ id, canWrite }: { id: string; canWrite: 
         <div className="errnote" role="alert">Publish blockers: {pn.publish_blockers.join("; ")}</div>
       )}
       {actionErr && <div className="errnote" role="alert">{actionErr}</div>}
+      {bulkMsg && <p className="muted" style={{ fontSize: 12 }}>{bulkMsg}</p>}
 
       <table>
         <caption className="vis-hidden">Sessions for this parade night</caption>
@@ -50,6 +57,14 @@ export function ParadeNightDetailView({ id, canWrite }: { id: string; canWrite: 
       {canWrite && (
         <div className="row-actions">
           <Button variant="out" onClick={() => setAddOpen(true)}>Add session</Button>
+          <Button
+            variant="out"
+            onClick={() => { setBulkMsg(""); markRemainingDelivered.mutate(); }}
+            disabled={markRemainingDelivered.isPending || pn.sessions.length === 0}
+            title="Marks every session still Draft/Planned/Published as Delivered. Flag any exceptions (cancelled, not delivered, rescheduled) individually first -- this only fills in the rest."
+          >
+            {markRemainingDelivered.isPending ? "Marking…" : "Mark remaining delivered"}
+          </Button>
           <Button onClick={() => publish.mutate()} disabled={publish.isPending}>Publish</Button>
           <Button variant="out" onClick={() => close.mutate()} disabled={close.isPending}>Close out</Button>
         </div>

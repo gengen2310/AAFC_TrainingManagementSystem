@@ -672,6 +672,48 @@ def publish(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(g
     return {"ok": True}
 
 
+@router.post("/parade-nights/{pnid}/mark-remaining-delivered")
+def mark_remaining_delivered(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """"Mark all delivered, then flag exceptions" bulk action (data-entry UX
+    ask from the risk-register submission): transitions every session still
+    sitting in draft/planned/published to delivered, leaving untouched any
+    session the user has already individually flagged as cancelled/
+    not_delivered/delivered_with_issue/rescheduled -- the intended workflow
+    is to flag the few known exceptions first, then bulk-clear the rest in
+    one action rather than clicking "Delivered" on every session
+    individually. Each session still gets its own SessionStatusHistory row
+    and audit entry (per-session commit, like batch_archive_accounts), not a
+    silent bulk UPDATE that skips the normal record-keeping."""
+    import uuid as _uuid
+    pn = db.get(ParadeNight, pnid)
+    if not pn or pn.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+
+    batch_id = str(_uuid.uuid4())
+    sessions = db.query(Session).filter(
+        Session.parade_night_id == pn.id,
+        Session.is_archived == False,  # noqa: E712
+        Session.status.in_(("draft", "planned", "published")),
+    ).all()
+    updated_ids = []
+    for s in sessions:
+        old_status = _apply_status_transition(s, "delivered", None, None, None)
+        db.add(SessionStatusHistory(session_id=s.id, old_status=old_status, new_status="delivered",
+                                    changed_by=p.user_id, reason="Bulk: mark remaining delivered"))
+        audit(db, p, object_type="session", object_id=s.id, action="status_change",
+              old={"status": old_status}, new={"status": "delivered"},
+              reason="bulk_mark_remaining_delivered", batch_id=batch_id, commit=False)
+        db.commit()
+        updated_ids.append(s.id)
+
+    if updated_ids:
+        _recompute(db, pn)
+    audit(db, p, object_type="parade_night_bulk", object_id=batch_id, action="bulk_mark_remaining_delivered",
+          new={"parade_night_id": pn.id, "sessions_updated": len(updated_ids)}, batch_id=batch_id)
+    return {"ok": True, "batch_id": batch_id, "sessions_updated": len(updated_ids), "session_ids": updated_ids}
+
+
 @router.post("/parade-nights/{pnid}/close")
 def close(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     pn = db.get(ParadeNight, pnid)

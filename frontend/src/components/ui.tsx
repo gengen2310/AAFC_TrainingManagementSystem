@@ -32,7 +32,7 @@ export function ErrorNote({ error }: { error: unknown }) {
   const msg = error instanceof ApiError ? error.friendly : "Something went wrong.";
   return <div className="errnote" role="alert">{msg}</div>;
 }
-export function Button({ children, onClick, variant = "primary", type = "button", disabled }:
-  { children: ReactNode; onClick?: () => void; variant?: "primary" | "out" | "danger"; type?: "button" | "submit"; disabled?: boolean }) {
-  return <button className={`btn ${variant === "out" ? "out" : variant === "danger" ? "danger" : ""}`} onClick={onClick} type={type} disabled={disabled}>{children}</button>;
+export function Button({ children, onClick, variant = "primary", type = "button", disabled, title }:
+  { children: ReactNode; onClick?: () => void; variant?: "primary" | "out" | "danger"; type?: "button" | "submit"; disabled?: boolean; title?: string }) {
+  return <button className={`btn ${variant === "out" ? "out" : variant === "danger" ? "danger" : ""}`} onClick={onClick} type={type} disabled={disabled} title={title}>{children}</button>;
 }

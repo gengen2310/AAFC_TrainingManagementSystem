@@ -6365,7 +6365,10 @@ function showPNDetail(ds){
       </div>
     </div>`;
   });
-  if(canWriteSquadron())html+=`<button class="btn btn-dk" onclick="savePNDetail('${ds}',${(pn.sessions||[]).length})">Save Changes</button>`;
+  if(canWriteSquadron()&&(pn.sessions||[]).length>0){
+    html+=`<button class="btn btn-dk" onclick="savePNDetail('${ds}',${(pn.sessions||[]).length})">Save Changes</button>
+    <button class="btn btn-out" style="margin-left:8px" onclick="doMarkRemainingDelivered('${ds}')" title="Marks every session still Planned/Published as Delivered. Flag any exceptions (cancelled, not delivered, rescheduled) individually first — this only fills in the rest.">Mark remaining delivered</button>`;
+  }
   document.getElementById('pn-det-body').innerHTML=html;
   setTimeout(()=>{
     (pn.sessions||[]).forEach((s,i)=>{
@@ -6385,6 +6388,19 @@ function showPNDetail(ds){
     });
   },30);
   openModal('m-pn-detail');
+}
+// "Mark all delivered, then flag exceptions" bulk action (risk-register
+// data-entry UX ask): flag the few known exceptions individually first (via
+// the per-session Status dropdown above), then bulk-clear everything else
+// still Planned/Published in one action instead of clicking through each
+// session's Save Changes flow one at a time.
+async function doMarkRemainingDelivered(ds){
+  const pn=S.pns.find(p=>p.date===ds);if(!pn)return;
+  try{
+    const r=await api('/api/parade-nights/'+pn.id+'/mark-remaining-delivered',{method:'POST'});
+    showToast(r.sessions_updated>0?`${r.sessions_updated} session${r.sessions_updated!==1?'s':''} marked delivered.`:'No remaining sessions to mark — everything already has a status.',false);
+    await reloadAndRender(); showPNDetail(ds);
+  }catch(e){ showToast(apiErr(e),true); }
 }
 async function savePNCoreDetails(ds){
   const pn=S.pns.find(p=>p.date===ds);if(!pn)return;
