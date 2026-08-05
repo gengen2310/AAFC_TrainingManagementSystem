@@ -66,23 +66,68 @@ If ANY of the following are observed during or after deployment, STOP and execut
 
 ## Rollback Procedure
 
-### Railway Rollback (Standard — under 2 minutes)
+**CORRECTION (2026-08-05, from a real Gate 8 rehearsal — see REM-78 in
+`docs/remediation/master_gap_register.csv`)**: the version of this section below dated 2026-07-14
+assumed `railway rollback <id>` exists as a CLI command and that a code-only rollback is always
+safe. Neither is true. `railway rollback` is not a real command (confirmed via `railway --help` —
+the only options are `railway deployment redeploy` [latest deployment only, no target-ID selection]
+or the GraphQL `deploymentRedeploy(id)` mutation). And a code-only rollback **crash-loops the backend**
+if any migration ran between the rollback target and the current deployment — reproduced live on
+staging 2026-08-05: `alembic upgrade head` on the older codebase fails with `Can't locate revision
+identified by '<newer-id>'` because that codebase's migration graph has no entry for a revision
+created after it was cut. **Step 0 below is now mandatory, not optional.**
 
-Railway stores all successful deployment history. Rolling back redeploys the previous successful deployment ID.
+### Step 0 — Check for migrations since the rollback target (MANDATORY, do this first)
 
-**Step 1: Identify the previous deployment ID** (recorded in the baselines table above)
+```bash
+cd backend
+git log --oneline <previous-good-commit>..HEAD -- alembic/versions/
+```
 
-**Step 2: Roll back each service in reverse order of deployment**
+- **No output (no new migration files)** → code-only rollback is safe. Proceed to Step 1.
+- **Any output (one or more new migration files)** → a code-only rollback WILL crash-loop the
+  backend. Do not run Step 1 yet. Choose one:
+  - **(a) Preferred — roll forward with a fix instead of rolling back.** If the incident is caused
+    by application logic, not the schema change itself, a small forward-fix commit (deployed the
+    normal way) resolves it without ever taking the database out of sync with what's been deployed
+    to it. This is almost always faster and safer than a coordinated rollback.
+  - **(b) Coordinated rollback — only if (a) is not viable.** Roll back the database schema and the
+    application code together, in this order:
+    1. `cd backend && source .venv/bin/activate && railway run --service aafc-tms-backend --environment production alembic downgrade <previous-good-revision>` — confirm the migration(s) being undone have real, safe `downgrade()` functions (check the migration file itself; a migration that only adds nullable columns, like REM-77/v47, downgrades safely by dropping them — but not every migration is this simple, e.g. one with a data backfill may not be cleanly reversible. If any migration in the range lacks a safe downgrade, (b) is not available — use (a) instead).
+    2. Only after the downgrade succeeds and is verified (`railway run ... alembic current`), redeploy the older application code per Step 1 below.
+  - Do not attempt a "partial" rollback (app code back, schema left forward, or vice versa) outside
+    of these two options — that is exactly the state that crash-loops.
+
+### Railway Rollback (Standard — under 2 minutes, once Step 0 confirms it's safe)
+
+**Step 1: Identify the previous deployment** (recorded in the baselines table above, or via
+`railway deployment list --service <svc> --environment production --json`)
+
+**Step 2: Roll back each service in reverse order of deployment**, using `railway up` from a
+worktree/checkout of the target commit (the mechanism actually proven working this session — not
+the nonexistent `railway rollback` command):
 
 ```bash
 # Roll back Planning Workspace first (frontend, no migrations)
-railway rollback <previous-pw-deployment-id> --service aafc-tms-planning-workspace-preview --environment production
+git worktree add --detach /tmp/rollback-pw <previous-pw-good-commit>
+cd /tmp/rollback-pw/frontend && railway up --detach -m "ROLLBACK: <reason>" \
+  --service aafc-tms-planning-workspace-preview --environment production
 
 # Roll back connected frontend
-railway rollback <previous-frontend-deployment-id> --service aafc-tms-frontend --environment production
+git worktree add --detach /tmp/rollback-fe <previous-frontend-good-commit>
+cd /tmp/rollback-fe/connected-frontend && railway up --detach -m "ROLLBACK: <reason>" \
+  --service aafc-tms-frontend --environment production
 
-# Roll back backend last (may include migration implications)
-railway rollback <previous-backend-deployment-id> --service aafc-tms-backend --environment production
+# Roll back backend last — ONLY if Step 0 confirmed no migration in the range,
+# or Step 0(b)'s coordinated downgrade has already completed and been verified
+git worktree add --detach /tmp/rollback-be <previous-backend-good-commit>
+cd /tmp/rollback-be/backend && railway up --detach -m "ROLLBACK: <reason>" \
+  --service aafc-tms-backend --environment production
+
+# Clean up worktrees once verified
+git worktree remove /tmp/rollback-pw --force
+git worktree remove /tmp/rollback-fe --force
+git worktree remove /tmp/rollback-be --force
 ```
 
 **Step 3: Verify**
@@ -90,24 +135,32 @@ railway rollback <previous-backend-deployment-id> --service aafc-tms-backend --e
 # Backend health
 curl https://aafc-tms-backend-production.up.railway.app/api/health/ready
 
-# Confirm Alembic revision
-curl -H "Cookie: aafc_session=..." https://aafc-tms-backend-production.up.railway.app/api/system/status
+# Confirm the backend actually started (not crash-looping) — check for repeated
+# "Starting Container" / Alembic FAILED lines, which the health check alone can
+# mask for a few seconds if the previous container is still draining
+railway logs --service aafc-tms-backend --environment production --lines 50
+
+# Confirm Alembic revision matches expectation
+railway run --service aafc-tms-backend --environment production alembic current
 ```
 
 **Step 4: Communicate**
 
 Send the maintenance message (template below) to all users immediately after initiating rollback. Do not wait for rollback to complete before communicating.
 
-### Database Rollback (Only if migration failure)
+### Database Rollback (only when Step 0 found a migration in range and forward-fix isn't viable)
 
-This release introduces NO new migrations. If a migration failure occurs, it means the database was already at `x9y0z1a2b3c4` and Alembic correctly identifies no action needed. A migration failure would indicate a configuration error, not a schema change.
-
-If a data integrity issue requires restoring to the pre-deployment database state:
+See Step 0(b) above for the coordinated procedure. Do not run `alembic downgrade` against
+production without first confirming every migration being undone has a genuinely safe `downgrade()`
+— read the migration file, don't assume. If a data integrity issue (not just a schema mismatch)
+requires restoring to the pre-deployment database state entirely:
 ```bash
 # 1. Trigger a fresh backup of the current (potentially corrupted) state for forensics
 railway run python scripts/backup_trigger.py  # or trigger GitHub Actions workflow
 
-# 2. Restore from the pre-deploy backup (taken in Phase 9 / rehearsal)
+# 2. Restore from the pre-deploy backup (taken in Phase 9 / rehearsal, or the most
+# recent daily backup — see docs/beta/32_final_stress_and_resilience_report.md for
+# the proven restore procedure, which includes an application-level verification step)
 # Follow the runbook at deployment/backup-dr.md
 # This is a DRASTIC action — confirm with the authorised owner before executing
 ```
@@ -169,12 +222,18 @@ A staging rollback rehearsal must be completed before production deployment. Rec
 
 | Item | Value |
 |---|---|
-| Rehearsal date | PENDING |
-| Staging deployment rolled back from | — |
-| Staging deployment rolled back to | — |
-| Rollback duration | — |
-| Health check post-rollback | — |
-| Data verified after rollback | — |
-| Rehearsal result | PENDING |
+| Rehearsal date | 2026-08-05 (full re-run; see `docs/beta/41_deployment_rehearsal.md` for the 2026-07-14 first rehearsal and today's re-rehearsal detail) |
+| Staging deployment rolled back from | `4d1bc434` (main @ `5414abf`, includes REM-77 migration `5a195a98148a`) |
+| Staging deployment rolled back to | `0fdd21e` (pre-REM-77, does not know about the migration) |
+| Rollback duration | ~1–2 min to redeploy old code; service was down (502, crash-loop) for the full duration until the forward redeploy completed |
+| Health check post-rollback (to the OLD commit) | **502 `Application failed to respond`, crash-looping** — this is the REM-78 finding, not a rehearsal failure to execute, a genuine discovered defect in the naive rollback path |
+| Data verified after rollback | N/A — backend never came up; database itself was untouched (no data loss, no data risk — only the application container failed to start) |
+| Recovery action | Immediately redeployed current head (`main` @ `3184766` at the time) — `railway up` from the real branch, ~1–2 min, restored `200 {"status":"ready"}` and both REM-77 endpoints re-confirmed 200 |
+| Rehearsal result | **FAIL for naive code-only rollback when a migration is in range (REM-78, open)**; **PASS for the underlying deploy mechanism** (both the broken and the fixed deploys completed and were verifiable via health check + logs within the expected ~1-2 minute window) |
 
-**Do not proceed with production deployment until the rollback rehearsal is marked complete.**
+**This rehearsal is exactly why Gate 8 exists**: it found a real gap (no migration-awareness in the
+rollback procedure) before it was needed in a genuine incident, not during one. Production was never
+touched by this rehearsal — the FAIL above is a staging-only, fully-recovered-within-minutes finding.
+Do not treat "rehearsal executed and found a real problem" as equivalent to "rollback procedure is
+production-ready" — REM-78 must be resolved (Step 0 above adopted as mandatory practice, ideally with
+the entrypoint fast-fail improvement also implemented) before this plan can be considered complete.
