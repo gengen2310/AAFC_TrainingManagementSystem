@@ -5884,7 +5884,7 @@ function _renderTonightReadiness(chart){
         <div class="rdp-ring" style="background:${conic};width:72px;height:72px">
           <div class="rdp-inner" style="width:52px;height:52px;font-size:15px;color:${rdC}">${pct}%</div>
         </div>
-        ${unstaffedCount>0?`<div style="font-size:10.5px;color:var(--red);font-weight:700;margin-top:4px;text-align:center">⚠ ${unstaffedCount} unstaffed</div>`:''}
+        ${unstaffedCount>0?`<div style="font-size:10.5px;color:var(--red);font-weight:700;margin-top:4px;text-align:center" title="${unstaffedCount} session${unstaffedCount!==1?'s have':' has'} no facilitator assigned yet — see \\"No facilitator assigned\\" in the Session Plan list">⚠ ${unstaffedCount} unstaffed</div>`:''}
       </div>
       <div style="flex:1">
         <div style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Session Plan</div>
@@ -5915,7 +5915,7 @@ function _renderUpcomingReadiness(chart){
         <div style="font-size:10.5px;font-weight:800;color:var(--dark)">${dateLabel}</div>
         <div class="pbar" style="margin:5px 0"><div style="height:100%;width:${pct}%;background:${col};border-radius:3px"></div></div>
         <div style="font-size:10.5px;color:${col};font-weight:700">${pct}% ready</div>
-        ${r.unstaffed?`<div style="font-size:10px;color:var(--warn);font-weight:700">⚠ ${r.unstaffed} unstaffed</div>`:''}
+        ${r.unstaffed?`<div style="font-size:10px;color:var(--warn);font-weight:700" title="${r.unstaffed} session${r.unstaffed!==1?'s have':' has'} no facilitator assigned yet — open this parade night to assign one">⚠ ${r.unstaffed} unstaffed</div>`:''}
         <div style="font-size:9.5px;color:var(--muted)">${r.sessions_total||0} sessions</div>
       </div>`;
     }).join('')+`</div>`;

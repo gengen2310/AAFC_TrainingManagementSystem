@@ -276,7 +276,10 @@ export function ListView({ yearId, viewRange, customStart, customEnd, onDateClic
 
                     <td className="pw-lv-td" style={{ textAlign: "center" }}>
                       {s.conflict_count > 0 ? (
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--warning)" }}>
+                        <span
+                          style={{ fontSize: 11, fontWeight: 700, color: "var(--warning)" }}
+                          title={`${s.conflict_count} unresolved conflict${s.conflict_count !== 1 ? "s" : ""} (room, facilitator, or workload double-booking) — open this parade night to see and resolve each one`}
+                        >
                           ⚠ {s.conflict_count}
                         </span>
                       ) : (

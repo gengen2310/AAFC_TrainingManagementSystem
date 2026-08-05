@@ -284,7 +284,10 @@ export function ParadeNightBlock({
         {inHoliday && <span className="pw-block-standdown">Stand-down</span>}
         {fillLabel && !compact && <span className="pw-block-fill">{fillLabel}</span>}
         {conflictCount > 0 && (
-          <span className="pw-conflict-badge room">
+          <span
+            className="pw-conflict-badge room"
+            title={`${conflictCount} unresolved conflict${conflictCount !== 1 ? "s" : ""} (room, facilitator, or workload double-booking) — open this parade night to see and resolve each one`}
+          >
             ⚠ {conflictCount}
           </span>
         )}

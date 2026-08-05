@@ -228,7 +228,10 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span className="pw-pn-view-date">{dateLabel}</span>
           {unresolvedConflicts.length > 0 && (
-            <span className="pw-conflict-badge room">
+            <span
+              className="pw-conflict-badge room"
+              title={unresolvedConflicts.map(c => c.message).join("\n")}
+            >
               ⚠ {unresolvedConflicts.length} conflict{unresolvedConflicts.length !== 1 ? "s" : ""}
             </span>
           )}
