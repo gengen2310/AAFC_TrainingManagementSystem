@@ -5468,17 +5468,22 @@ const PH_C={'A. Orientation':'ph-ori','B. Initial':'ph-ini','C. Junior':'ph-jun'
 
 function elBadge(el){return `<span class="badge ${EL_C[el]||'b-grey'}">${EL_L[el]||el}</span>`;}
 function phBadge(ph){return `<span class="badge ${PH_C[ph]||'b-grey'}">${PH_S[ph]||ph}</span>`;}
+// delivered_with_issue/cancelled_late (Stage 11, 2026-08-05): both valid
+// backend statuses (VALID_STATUS, training.py) and already reachable via
+// Planning Workspace, but connected-frontend previously had no label/class
+// for either -- a session in one of these states rendered as a raw grey
+// badge showing the literal snake_case string.
+const _ST_LABEL={planned:'Planned',delivered:'Delivered',delivered_with_issue:'Delivered (issue)',
+  cancelled:'Cancelled',cancelled_late:'Cancelled late',rescheduled:'Rescheduled',not_delivered:'Not Delivered'};
+// Status icon, not colour alone (WCAG / colour-blind safe) -- mirrors
+// Planning Workspace's StatusBadge.tsx icon set (Stage 11 follow-up).
+const _ST_ICON={planned:'•',delivered:'✓',delivered_with_issue:'✓!',cancelled:'✕',
+  cancelled_late:'✕',rescheduled:'↻',not_delivered:'▲'};
+function stLabel(st){return _ST_LABEL[st]||st||'—';}
 function stBadge(st){
-  // delivered_with_issue/cancelled_late (Stage 11, 2026-08-05): both valid
-  // backend statuses (VALID_STATUS, training.py) and already reachable via
-  // Planning Workspace, but connected-frontend previously had no label/class
-  // for either -- a session in one of these states rendered as a raw grey
-  // badge showing the literal snake_case string.
   const m={planned:'st-planned',delivered:'st-delivered',delivered_with_issue:'st-delivered_with_issue',
     cancelled:'st-cancelled',cancelled_late:'st-cancelled_late',rescheduled:'st-rescheduled',not_delivered:'st-not_delivered'};
-  const l={planned:'Planned',delivered:'Delivered',delivered_with_issue:'Delivered (issue)',
-    cancelled:'Cancelled',cancelled_late:'Cancelled late',rescheduled:'Rescheduled',not_delivered:'Not Delivered'};
-  return `<span class="badge ${m[st]||'b-grey'}">${l[st]||st||'—'}</span>`;
+  return `<span class="badge ${m[st]||'b-grey'}">${stLabel(st)}</span>`;
 }
 function stCls(st){return {delivered:'delivered',delivered_with_issue:'delivered_with_issue',cancelled:'cancelled',cancelled_late:'cancelled_late',rescheduled:'rescheduled',not_delivered:'not_delivered'}[st]||'';}
 
@@ -5919,7 +5924,13 @@ function renderCal(){
     let cls='cal-cell'+(pn?' parade':'')+(isT?' today':'')+(acts.length&&!pn?' act-day':'')+(hol?' holiday-day':'');
     let chips='';
     if(hol)chips+=`<span class="cal-chip" style="background:var(--warn-bg);color:var(--warn)" title="${esc(hol.name)}">${esc(hol.name.substring(0,16))}</span>`;
-    if(pn)(pn.sessions||[]).slice(0,3).forEach(s=>{chips+=`<span class="cal-chip ${stCls(s.status)}">${PH_S[s.phase]||s.phase}</span>`;});
+    if(pn)(pn.sessions||[]).slice(0,3).forEach(s=>{
+      // Status icon prefix, not color alone (WCAG / colour-blind safe) --
+      // matches Planning Workspace's StatusBadge.tsx icon set (Stage 11
+      // follow-up, 2026-08-05).
+      const icon=_ST_ICON[s.status]||'';
+      chips+=`<span class="cal-chip ${stCls(s.status)}" title="${esc(stLabel(s.status))}">${icon?icon+' ':''}${PH_S[s.phase]||s.phase}</span>`;
+    });
     acts.slice(0,1).forEach(a=>chips+=`<span class="cal-chip act">${esc(a.name.substring(0,16))}</span>`);
     const oc=pn?`onclick="showPNDetail('${ds}')"`:canWriteSquadron()?`onclick="openWithDate('${ds}')"`:'';
     cells+=`<div class="${cls}" ${oc}><div class="cal-dt">${d}</div>${chips}</div>`;
