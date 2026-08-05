@@ -4,6 +4,37 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Phase C: data-consistency verification (REM-68 through REM-70)
+
+Branch `remediation/2026-08-04-complete-system-remediation`. No code changes
+this pass — verification only, per the plan's Phase C scope. Full detail per
+item in `master_gap_register.csv` REM-68–REM-70.
+
+1. **Resources field parity** (REM-68) -- verified real, minor field-level
+   gaps exist between the two frontends' TrainingArea/Equipment forms
+   (`indoor_outdoor`/`availability_status` missing from both; connected-
+   frontend also missing Equipment `type`/`available_quantity`/`condition`/
+   `approval_required`). **Deliberately not fixed**: the user's own
+   risk-register submission explicitly said "Location and Resources work
+   okay" — building out full field parity in an area the user has already
+   signalled is satisfactory would be unrequested scope creep. Documented,
+   not silently dropped.
+2. **Calendar manual/CEA duplicate risk** (REM-69) -- verified a **real gap**
+   that corrects an earlier, incorrect research note in this program's own
+   history (which had assumed read-time source-tagging amounted to dedup).
+   It doesn't: `list_activities` merges `Activity` and `CeaActivity` rows by
+   source-labelling only, with no matching/promotion/suppression mechanism
+   between them, and `CeaActivity` has no link back to `Activity`. A user can
+   genuinely see the same real event twice. **Deliberately not fixed**:
+   building safe dedup needs an explicit product decision on matching
+   strategy first — a wrong heuristic risks false-merging two genuinely
+   different activities, which is worse than the current honest
+   double-listing. Flagged for a follow-up decision, not guessed at.
+3. **Import Review UI location** (REM-70) -- verified already fully
+   satisfied in both frontends; closed with no code change.
+
+**Tests**: none run this pass (no code changed). No deploy this pass.
+
 ## 2026-08-05 — Phase B: concretely-specified new features (REM-62 through REM-67)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commits `d4b4b18`
