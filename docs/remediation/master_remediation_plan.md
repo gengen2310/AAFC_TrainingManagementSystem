@@ -62,6 +62,51 @@ below is where reconciliation against this prior art happens explicitly.
 | 11 | Learning Hub links, terminology, accessibility, visual consistency | **PARTIALLY DONE** — research found the Learning Hub link feature already correctly built in both frontends (uses the in-scope `CurriculumItem.learning_hub_url` field, confirmed architecturally separate from the off-limits REM-26/`ProgramItem`/`LearningHubResource` system — not touched) and terminology already consistent between the two frontends (Parade Night/Unit/Instructor-Facilitator, no drift found). Fixed 2 concrete gaps: (1) `delivered_with_issue`/`cancelled_late` — 2 of 7 valid session statuses were unreachable in connected-frontend's status dropdowns and rendered as a raw mislabelled grey badge with no CSS class if set via Planning Workspace (REM-48); (2) 39 of 40 icon-only modal-close buttons and 2 calendar nav buttons had no `aria-label` (REM-49). Documented, not built: connected-frontend's calendar day-chips still convey status by color only (no icon/text fallback like Planning Workspace's `StatusBadge`), and connected-frontend has no automated accessibility test suite at all (Planning Workspace has one, axe-core, ~15 pages, currently passing) — both flagged as real but separately-scoped follow-ups (REM-49). |
 | 12 | Capacity, monitoring, complete regression, staging deployment, verification | **DONE** — capacity/monitoring research confirmed health checks (`/api/health/ready` genuinely checks DB connectivity, not a fake always-200 probe), structured logging, and the release monitoring plan (`docs/beta/43`) are all already adequate; error-tracking/APM and an in-app `/metrics` endpoint are genuine absences but correctly out of scope (real infra/spend decisions, not code fixes) (REM-52). Found and fixed one real, concrete issue: `config.py`/`database.py`'s DB connection-pool sizing comments still cited a stale "Supabase Session Pooler caps at 15" premise, when production has run on Railway-native Postgres since the GAP-18 fix — this exact kind of stale premise already caused one real incident (GAP-29, a mis-sized pool config that produced a >50% staging error rate) — corrected the comments and the regression test that enforced the stale number (REM-51). `TrainingArea.capacity` confirmed a pure display field with a dead soft-scoring hook, documented for a future product decision (REM-50). Final full regression run clean: backend 1091 passed/5 skipped; `tsc --noEmit` clean; frontend vitest 19 passed; Planning Workspace e2e 87 passed; connected-frontend e2e 27 passed/10 pre-existing-unrelated (identical baseline maintained across every stage of this program, 4 through 12). |
 
+## Post-program review pass (2026-08-05, user-requested: "review of remaining REM items")
+
+After Stage 12 closed the program, went back through every open Stage 6-12 gap-
+register item to re-check whether any were actually tractable rather than
+trusting the original sizing (REM-45 had already proven smaller than its initial
+scoping once looked at closely, in the RE-45-follow-up work done right after the
+program's closing report). Also found and fixed 7 gap-register rows with
+unescaped-comma CSV quoting bugs (introduced when originally written via raw
+heredoc) — fixed those first so the register is actually machine-parseable.
+
+Converted from "documented, not built" to "fixed, tested, staging-verified":
+- **REM-45** — closed the P1 security-relevant gap fully: all 4 sibling
+  endpoints (`create_location`, `update_location`, `override_conflict`,
+  `import_annual_program`) now require Proxy/Intervention for delegated
+  squadron writes, matching `create_planning_year` (REM-44). 12 new tests.
+- **REM-46** — Account Management parity in Planning Workspace: archive/
+  restore/permanent-delete/change-role/unlock, mirroring connected-frontend's
+  already-correct backend-scope-checked endpoints.
+- **REM-49 (half)** — added a status icon prefix to Training Calendar day chips
+  (not colour alone) in connected-frontend, closing the visual half of the
+  finding. The automated-a11y-test-suite half remains a genuine, separately-
+  scoped test-infrastructure project, not attempted.
+- **REM-39 (half)** — wired the previously-dead `planningApi.conflicts()` into
+  `PlanningWorkspace.tsx` so conflict override now works from every view, not
+  just the single-night grid. The cell-level visual-indicator half (a warning
+  dot on unopened session cells) remains a separate, view-by-view follow-up.
+
+Left open, confirmed genuinely requiring a product/architecture decision or a
+separately-scoped larger effort rather than a same-pass fix: REM-13 (unified
+calendar grid), REM-26 (explicitly deferred to the user's own review), REM-30
+(Planning Year archive cascading visibility), REM-32 (dead `wingEvents` client
+method — needs a decision on whether the surface is wanted), REM-34
+(connected-frontend Notices UI — blocked on a ParadeDate/ParadeNight linkage
+design decision), REM-35 (Mission Backlog non-syllabus scope), REM-41 (Wing/
+National command dashboard parity in Planning Workspace), REM-47 (Planning
+Workspace org-management UI), REM-50 (`TrainingArea.capacity` enforcement).
+
+Notable operational finding this pass: one e2e run took 1.1 hours (vs. the
+normal ~40s) with cascading unrelated failures, diagnosed as local-machine
+resource exhaustion after a very long continuous session (load average 9.85,
+<100MB free memory) rather than a code regression — confirmed by disabling the
+suspected new code path and reproducing the identical failure anyway, then
+getting a clean run immediately after killing stray processes. Documented in
+`staging_verification_report.md` rather than silently retried away.
+
 ## Working method going forward
 
 - Every stage's changes get committed separately (small, coherent commits, one
