@@ -4,6 +4,69 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Phase D (in progress): facilitator type chart + Command Dashboard parity (REM-71, REM-72)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commits `0cdcfb9`
+and `d40fa5c`. Continuation into Phase D (larger, substantial features) after
+the user explicitly chose "continue into Phase D now" over pausing at the
+Phase C checkpoint. Full detail per item in `master_gap_register.csv`
+REM-71–REM-72.
+
+1. **Facilitator type-distribution chart** (REM-71) -- new chart filling the
+   one genuine gap in an otherwise already-comprehensive facilitator-charting
+   surface (workload, status, subject-area resilience, repeated gaps were all
+   already built and already on both the Facilitators tab and Dashboard).
+   Also investigated the "flexible zoomable chart" ask and found it already
+   fully built in Planning Workspace (`FacilitatorTimeline.tsx`) -- honestly
+   flagged as a residual gap that connected-frontend has no equivalent,
+   rather than attempting a risky from-scratch vanilla-JS timeline build.
+2. **Wing/National Command Dashboard parity** (REM-72, re-affirms prior
+   program item REM-41) -- `GET /api/dashboard/command` (Sections A/B, the
+   rich readiness-matrix/risk-forecast system connected-frontend's
+   `training-dashboard.spec.ts` already exercises with 26 tests) had zero
+   Planning Workspace consumer. Discovered mid-build that the natural landing
+   pages for these roles are `WingOverview`/`NationalOverview`
+   (`Overviews.tsx`), not `Dashboard.tsx` as initially assumed — corrected
+   course to add the new `CommandDashboardSection` to all three rather than
+   leaving it stranded on a page these roles only reach via a secondary nav
+   item. 4 new chart-type renderers added to the shared chart library
+   (readiness matrix, risk-forecast list, 2 aliases) plus a Purpose/Measure/
+   Action info toggle matching connected-frontend's own narrative pattern.
+
+**Pre-deploy gates**: `tsc --noEmit` clean throughout. `vitest run` → 22
+passed. Planning Workspace e2e → 94 passed, 0 failed (includes 3 new
+Command Dashboard tests and 2 new accessibility tests for
+WingOverview/NationalOverview — both passed cleanly on first run, no
+violations found). connected-frontend e2e (regular suite) → 33 passed, 0
+failed. Full backend suite → 1133 passed, 5 skipped.
+
+**Investigation note**: two more full-suite runs during this pass showed the
+same familiar 9-test rate-limit-contamination pattern from cumulative manual
+verification runs against one long-lived local backend (documented multiple
+times already in this program). Both times resolved by a clean backend
+restart (kill + reseed + reload) reproducing a fully green run immediately
+after — not re-litigated at length here since the pattern and root cause are
+already well established in this document's history.
+
+**Deployed**: `aafc-tms-backend`, `aafc-tms-frontend`, and
+`aafc-tms-planning-workspace-preview` for REM-71; `aafc-tms-planning-workspace-preview`
+only for REM-72 (no backend or connected-frontend changes in that commit).
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-backend` (staging) | `3a0d7718-b33e-4c2d-9a45-ddedd761f680` | SUCCESS |
+| `aafc-tms-frontend` (staging) | `58700638-2541-401c-b54e-9f5fee6b0d1a` | SUCCESS |
+| `aafc-tms-planning-workspace-preview` (staging) | `4ce589e4-43fa-4ad1-afdf-8af14fe0a972` (REM-71), then `633612c2-8062-4ef0-940c-99df052d427c` (REM-72, supersedes) | SUCCESS |
+
+**Post-deploy verification**: `GET /api/health/ready` → ready. `/planning` →
+HTTP 200.
+
+**Known gap, same as prior entries**: no live browser verification of either
+feature's actual rendered behavior (no Chrome extension connectivity this
+session) — verified at the code/type-check/e2e-regression/axe-core level.
+Phase D continues into REM-73 onward (multi-scope Calendar, conflict
+tooltips, session-outcome UX redesign, visual token-alignment pass).
+
 ## 2026-08-05 — Phase C: data-consistency verification (REM-68 through REM-70)
 
 Branch `remediation/2026-08-04-complete-system-remediation`. No code changes
