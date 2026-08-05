@@ -61,23 +61,23 @@ For each limitation, Claude Code provides a technical recommendation. Only the a
 
 ## Security Limitations
 
-### SL-01: ENVIRONMENT=staging in Production (High — Fix Ready)
+### SL-01: ENVIRONMENT=staging in Production (High — RESOLVED)
 
 | Field | Value |
 |---|---|
 | Description | Production backend running with ENVIRONMENT=staging; fail-closed startup check and HSTS not active |
 | User impact | None visible to users; technical configuration issue |
-| Fix status | Fix ready; variable change requires approval |
-| Release recommendation | **FIX BEFORE RELEASE** (DEFECT-003) |
-| Owner acceptance | PENDING — approval required to apply |
+| Fix status | **DEPLOYED AND VERIFIED 2026-08-05** — `railway variable list` against production confirms `ENVIRONMENT=production`; re-checked as part of Gate 9 |
+| Release recommendation | Fixed — no longer a release blocker |
+| Owner acceptance | N/A — technical fix confirmed live, this line item is closed |
 
-### SL-02: IDOR Gap (Blocker — Fix Ready)
+### SL-02: IDOR Gap (Blocker — RESOLVED)
 
 | Field | Value |
 |---|---|
-| Fix status | Fixed on release branch; deployment required |
-| Release recommendation | **FIX BEFORE RELEASE** (DEFECT-001) |
-| Owner acceptance | PENDING — production deploy approval required |
+| Fix status | **DEPLOYED AND VERIFIED 2026-08-05** — confirmed via a genuine cross-squadron read attempt directly against production (`ADMIN704` → 403 on another squadron's facilitator-leave, not the pre-fix 200 leak); see Gate 9 update in `docs/beta/11_defect_register.md` |
+| Release recommendation | Fixed — no longer a release blocker |
+| Owner acceptance | N/A — technical fix confirmed live, this line item is closed |
 
 ### SL-03: No CSRF Tokens (Low)
 
@@ -96,11 +96,13 @@ For each limitation, Claude Code provides a technical recommendation. Only the a
 
 ## Functional Limitations
 
-### FL-01: Planning Workspace Stale in Production (High — Fix Ready)
+### FL-01: Planning Workspace Stale in Production (High — RESOLVED)
 
-| Release recommendation | **FIX BEFORE RELEASE** (DEFECT-005) |
+| Field | Value |
 |---|---|
-| Owner acceptance | PENDING — production deploy approval required |
+| Fix status | **DEPLOYED AND VERIFIED 2026-08-05** — `GET https://aafc-tms-planning-workspace-preview-production.up.railway.app/planning` directly re-checked, returns 200 |
+| Release recommendation | Fixed — no longer a release blocker |
+| Owner acceptance | N/A — technical fix confirmed live, this line item is closed |
 
 ### FL-02: No Playwright E2E Coverage (Low)
 
@@ -177,16 +179,16 @@ For each limitation, Claude Code provides a technical recommendation. Only the a
 | DL-01: Rooms duplication | Accept for beta | PENDING |
 | DL-02: Facilitators duplication | Accept for beta | PENDING |
 | DL-03: Dates vs nights | Expected behaviour | N/A |
-| SL-01: ENVIRONMENT=staging | Fix before release | PENDING (approval) |
-| SL-02: IDOR gap | Fix before release | PENDING (approval) |
+| SL-01: ENVIRONMENT=staging | **RESOLVED 2026-08-05** — deployed and verified live | N/A — closed |
+| SL-02: IDOR gap | **RESOLVED 2026-08-05** — deployed and verified live | N/A — closed |
 | SL-03: No CSRF | Accept for beta | PENDING |
-| FL-01: Stale PW in production | Fix before release | PENDING (approval) |
-| FL-02: No E2E coverage | Accept for beta | PENDING |
-| FL-03: No 100-user test | Accept with monitoring | PENDING |
-| FL-04: Browser verification | Accept for controlled beta | PENDING |
+| FL-01: Stale PW in production | **RESOLVED 2026-08-05** — deployed and verified live | N/A — closed |
+| FL-02: No E2E coverage | Accept for beta (partially addressed — see FL-04) | PENDING |
+| FL-03: No 100-user test | Accept with monitoring (in progress — Gate 7 load test running against staging as of this update; result to be recorded here on completion) | PENDING |
+| FL-04: Browser verification | Accept for controlled beta (partially addressed 2026-08-05 — Gate 6 ran connected-frontend's full e2e suite live against staging: 35/45 passed, all 10 failures traced to one disclosed, non-code limitation — see `09_browser_e2e_verification.md`. Planning Workspace's own suite and full multi-role human browser walkthrough remain outstanding.) | PENDING |
 | FL-05: CEA manual | Expected | N/A |
 | IL-01–03 | Accept | N/A |
 
-**All PENDING items require explicit confirmation from the authorised project owner before the GO decision is finalised.**
+**All PENDING items require explicit confirmation from the authorised project owner before the GO decision is finalised.** Three items previously in this category (SL-01, SL-02, FL-01) are now technically resolved and no longer need an approval decision — they needed a production deploy, which happened 2026-08-05, and this document has been updated accordingly rather than left claiming a stale PENDING status.
 
-**Claude Code's technical recommendation**: all accepted items are appropriate for a controlled beta with ~100 users from known squadrons. The three "Fix before release" items (SL-01, SL-02, FL-01) must be deployed before distributing access codes.
+**Claude Code's technical recommendation**: all accepted items are appropriate for a controlled beta with ~100 users from known squadrons. The three former "Fix before release" items (SL-01, SL-02, FL-01) are now deployed and verified — no further action needed on those specifically. The remaining PENDING rows are genuinely this project's owner's decision to make, not something further technical work can close on their behalf.
