@@ -4,6 +4,43 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Post-program review pass: REM-39 (conflict override in every Planning Workspace view)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`ef8e75e1eeb9983530a09eec0005278955382da7`.
+
+**Pre-deploy gates**: no migration, no backend change (Planning Workspace only).
+`tsc --noEmit` clean. `vitest run` → 19 passed. Planning Workspace e2e → 87
+passed, 0 failed. connected-frontend e2e → 27 passed, 10 pre-existing
+unrelated.
+
+**Notable investigation this pass**: an interim e2e run took **1.1 hours**
+(vs. the normal ~40 seconds) with 10+ failures across unrelated spec files
+(dashboard, facilitators, resources, parade-nights, reports, session-
+lifecycle, wing-proxy, year-rollover) — diagnosed as local-machine resource
+contention after a very long continuous session (load average 9.85, <100MB
+free physical memory at the time), not a code regression. Verified the root
+cause was NOT this change specifically by re-running the single previously-
+flaky test with the new `planning-conflicts` query explicitly disabled
+(`enabled: false`) — it still failed identically, proving the query itself
+wasn't the trigger. Killed stray processes, confirmed load had dropped, and
+reran clean: 87 passed in 42 seconds.
+
+**Deployed**: Planning Workspace only.
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-planning-workspace-preview` (staging) | `c947434d-6a30-45ae-8a6f-6ea91bec4906` | SUCCESS |
+
+**Post-deploy verification**: `/planning` → HTTP 200.
+
+**Known gap, same as prior entries**: no live browser verification that a
+real unresolved conflict actually shows and can be overridden from, say,
+Year view (no Chrome extension connectivity) — verified at the code/type-
+check/e2e-regression level, plus direct reasoning about the exact data flow
+(scheduled_session_id matching, cache invalidation) rather than an
+end-to-end click-through.
+
 ## 2026-08-05 — Post-program review pass: REM-46 (Account Management parity) + REM-49 remainder (calendar chip icons)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
