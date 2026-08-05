@@ -107,6 +107,25 @@ test.describe("Activities page", () => {
   });
 });
 
+test.describe("Account Management — Reference Data", () => {
+  test("sqn_admin can create a Training Stage at squadron scope", async ({ page }) => {
+    await loginSquadron(page, "ADMIN703");
+    await page.evaluate(() => (window as any).nav("accounts"));
+    await expect(page.locator("#acct-refdata-card")).toBeVisible();
+    await expect(page.locator("#refdata-scope-label")).toHaveText("squadron");
+    const stageName = `E2E Stage ${Date.now()}`;
+    await page.locator("#refdata-new-phase").fill(stageName);
+    await page.locator("#refdata-add-phase").click();
+    await expect(page.locator("#refdata-list-phase")).toContainText(stageName, { timeout: 8000 });
+  });
+
+  test("sqn_general (read-only) does not see the Reference Data card", async ({ page }) => {
+    await loginSquadron(page, "703SQN2026", "sqn_general");
+    await page.evaluate(() => (window as any).nav("accounts"));
+    await expect(page.locator("#acct-refdata-card")).toBeHidden();
+  });
+});
+
 test.describe("Parade Nights — automatic generation", () => {
   test("generator modal has all required fields with correct labels", async ({ page }) => {
     await loginSquadron(page, "ADMIN703");

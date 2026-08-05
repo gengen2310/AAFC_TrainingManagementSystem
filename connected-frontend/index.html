@@ -1254,6 +1254,19 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="alert a-info" style="font-size:11px;margin:6px 0 10px">Flights are local squadron groupings only. They do not create separate tenancy or change permissions. A user assigned to a Flight still belongs entirely to the Squadron.</div>
           <div id="flight-table"></div>
         </div>
+        <!-- Reference Data: Training Stages / Facilitator Types / Subject Areas,
+             each created at the caller's own natural scope (squadron for sqn_admin,
+             wing for wing_admin, global/national for national_admin/system_admin).
+             Cross-scope creation (e.g. a national_admin creating a tag for a
+             specific OTHER wing) remains available via the existing inline
+             creators elsewhere (Add Curriculum modal's "+ New" phase creator,
+             the Facilitator Tags modal) -- this card covers the common
+             "create at my own level" case, not a full cross-scope picker. -->
+        <div class="card acct-write-el" id="acct-refdata-card" style="display:none">
+          <div class="ctitle">Reference Data</div>
+          <p class="muted" style="font-size:11px;margin:0 0 10px">Training stages, facilitator types, and subject areas are created here at your own scope (<span id="refdata-scope-label"></span>).</p>
+          <div id="refdata-sections" style="display:grid;gap:14px"></div>
+        </div>
       </div>
 
       <!-- WING OVERVIEW -->
@@ -4376,6 +4389,97 @@ async function renderAccounts(){
 
   _renderAccountTable();
   _renderFlightTable();
+  const refCard=document.getElementById('acct-refdata-card');
+  if(refCard){ refCard.style.display=canWrite?'':'none'; if(canWrite)_renderRefData(); }
+}
+
+// ── Reference Data (Training Stages / Facilitator Types / Subject Areas) ──
+// "Respective to their scope" (risk-register submission) -- each admin role
+// creates at its own natural scope: sqn_admin -> squadron, wing_admin ->
+// wing, national_admin/system_admin -> global. Backed by the already-governed
+// /api/curriculum/phases, /api/subject-area-tags, /api/facilitator-type-tags
+// endpoints (see backend/app/routers/training.py's _can_create_tag /
+// _can_create_phase for the full scope/proxy rules this UI intentionally
+// simplifies down to the common case).
+function _naturalRefScope(){
+  if(S.role==='sqn_admin')return'squadron';
+  if(S.role==='wing_admin')return'wing';
+  if(S.role==='national_admin'||S.role==='system_admin')return'global';
+  return null;
+}
+const _REFDATA_TYPES=[
+  {key:'phase',label:'Training Stages',listUrl:'/api/curriculum/phases',createUrl:'/api/curriculum/phases',
+   archiveUrl:id=>`/api/curriculum/phases/${id}/archive`,archiveMethod:'POST',
+   idField:'phase_id',nameField:'display_name',scopeField:'scope_level',ownScopeName:s=>s==='global'?'national':s},
+  {key:'factype',label:'Facilitator Types',listUrl:'/api/facilitator-type-tags',createUrl:'/api/facilitator-type-tags',
+   archiveUrl:id=>`/api/facilitator-type-tags/${id}`,archiveMethod:'DELETE',
+   idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
+  {key:'subjarea',label:'Subject Areas',listUrl:'/api/subject-area-tags',createUrl:'/api/subject-area-tags',
+   archiveUrl:id=>`/api/subject-area-tags/${id}`,archiveMethod:'DELETE',
+   idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
+];
+async function _renderRefData(){
+  const natScope=_naturalRefScope();
+  const lbl=document.getElementById('refdata-scope-label');
+  if(lbl)lbl.textContent=natScope==='global'?'national':natScope;
+  if(!natScope)return;
+  const wrap=document.getElementById('refdata-sections');
+  if(!wrap)return;
+  wrap.innerHTML=_REFDATA_TYPES.map(t=>`
+    <div>
+      <div style="font-size:11px;font-weight:800;color:var(--steel);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${esc(t.label)}</div>
+      <div id="refdata-list-${t.key}" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"><span class="muted" style="font-size:11px">Loading…</span></div>
+      <div style="display:flex;gap:6px">
+        <input id="refdata-new-${t.key}" placeholder="New ${esc(t.label.replace(/s$/,''))} name…" style="flex:1;min-width:160px;padding:6px 9px;border:1px solid var(--border);border-radius:7px;font-size:12px">
+        <button id="refdata-add-${t.key}" class="btn btn-sky btn-sm" onclick="_addRefItem('${t.key}')">+ Add</button>
+      </div>
+      <p id="refdata-msg-${t.key}" style="color:var(--error);font-size:11px;margin:4px 0 0"></p>
+    </div>`).join('');
+  await Promise.all(_REFDATA_TYPES.map(t=>_loadRefList(t)));
+}
+async function _loadRefList(t){
+  const el=document.getElementById(`refdata-list-${t.key}`);
+  if(!el)return;
+  const natScope=_naturalRefScope();
+  try{
+    const items=await api(t.listUrl);
+    if(!items.length){ el.innerHTML='<span class="muted" style="font-size:11px">None yet.</span>'; return; }
+    el.innerHTML=items.map(it=>{
+      const scope=it[t.scopeField];
+      const scopeName=t.ownScopeName(scope);
+      const mine=scopeName===natScope && (
+        natScope==='global' ||
+        (natScope==='wing' && it.wing_id===((S.session||{}).wing_id)) ||
+        (natScope==='squadron' && it.squadron_id===((S.session||{}).squadron_id))
+      );
+      return `<span class="badge b-grey" style="display:inline-flex;align-items:center;gap:5px">${esc(it[t.nameField])} <em style="font-style:normal;opacity:.6;font-size:9px">${esc(scopeName)}</em>${mine?` <button onclick="_archiveRefItem('${t.key}','${it[t.idField]}')" style="border:none;background:none;cursor:pointer;color:var(--error);font-size:11px;padding:0" title="Archive">×</button>`:''}</span>`;
+    }).join('');
+  }catch(_){ el.innerHTML='<span class="muted" style="font-size:11px">Could not load.</span>'; }
+}
+async function _addRefItem(key){
+  const t=_REFDATA_TYPES.find(x=>x.key===key); if(!t)return;
+  const input=document.getElementById(`refdata-new-${key}`);
+  const msgEl=document.getElementById(`refdata-msg-${key}`);
+  const name=(input.value||'').trim();
+  if(!name){ msgEl.textContent='Name is required.'; return; }
+  msgEl.textContent='';
+  const natScope=_naturalRefScope();
+  const body=t.key==='phase'
+    ? {name,display_name:name,scope_level:natScope==='global'?'national':natScope}
+    : {display_name:name,scope:natScope};
+  try{
+    await api(t.createUrl,{method:'POST',body});
+    input.value='';
+    await _loadRefList(t);
+  }catch(e){ msgEl.textContent=apiErr(e); }
+}
+async function _archiveRefItem(key,id){
+  const t=_REFDATA_TYPES.find(x=>x.key===key); if(!t)return;
+  if(!confirm('Archive this item? It will no longer appear in pickers, but existing records are unaffected.'))return;
+  try{
+    await api(t.archiveUrl(id),{method:t.archiveMethod});
+    await _loadRefList(t);
+  }catch(e){ alert(apiErr(e)); }
 }
 
 // Bulk archive: wing_admin/national_admin/system_admin only (matches the
