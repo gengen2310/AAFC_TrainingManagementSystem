@@ -313,6 +313,38 @@ class TestFacilitatorLeaveScoping:
         assert len(facs) > 0, "Expected seeded facilitators for 703"
         return facs[0]["facilitator_id"]
 
+    def test_sqn_admin_only_sees_own_squadron_facilitators(self, client):
+        """GET /api/planning/facilitators must resolve scope via the same
+        _view_squadron_id() every other resource endpoint uses -- previously
+        this endpoint had its own bespoke role filter with no national_admin/
+        system_admin branch at all (silently unfiltered), so a squadron
+        admin's own list here could disagree with what /api/facilitators
+        (training.py) shows for the same squadron."""
+        hdr703 = _hdr(client, "ADMIN703")
+        facs = client.get("/api/planning/facilitators", headers=hdr703).json()
+        assert facs, "Expected seeded facilitators for 703"
+        assert all(f["unit_id"] == facs[0]["unit_id"] for f in facs)
+
+    def test_national_admin_sees_empty_list_without_explicit_squadron(self, client):
+        """Previously national_admin/system_admin hit no role branch at all in
+        this endpoint's old bespoke filter, so the query stayed completely
+        unfiltered and returned every facilitator in the system. Viewing a
+        specific squadron's facilitators as national_admin now requires an
+        explicit, permission-checked unit_id -- same as every other resource
+        endpoint -- not an accidental full dump."""
+        hdr_nat = _hdr(client, "ADMINNATIONAL")
+        r = client.get("/api/planning/facilitators", headers=hdr_nat)
+        assert r.status_code == 200
+        assert r.json() == []
+
+    def test_national_admin_can_view_explicit_squadron_facilitators(self, client):
+        hdr_nat = _hdr(client, "ADMINNATIONAL")
+        hdr703 = _hdr(client, "ADMIN703")
+        sqn_id = client.get("/api/auth/me", headers=hdr703).json()["session"]["squadron_id"]
+        r = client.get(f"/api/planning/facilitators?unit_id={sqn_id}", headers=hdr_nat)
+        assert r.status_code == 200
+        assert len(r.json()) > 0
+
     def test_owner_can_list_facilitator_leave(self, client):
         hdr = _hdr(client, "ADMIN703")
         fac_id = self._get_703_facilitator_id(client)

@@ -1868,13 +1868,19 @@ def list_planning_facilitators(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    q = db.query(Facilitator).filter(Facilitator.active_status == True)  # noqa: E712
-    if p.role == "sqn_admin":
-        q = q.filter(Facilitator.squadron_id == p.squadron_id)
-    elif p.role in ("wing_admin", "wing_viewer"):
-        q = q.filter(Facilitator.wing_id == p.wing_id)
-    if unit_id:
-        q = q.filter(Facilitator.squadron_id == unit_id)
+    # Aligned to the same _view_squadron_id() resolution every other resource
+    # endpoint in training.py already standardizes on (GET /api/facilitators,
+    # /api/training-areas, /api/equipment, /api/activities) -- this endpoint
+    # previously had its own bespoke role filter with no national_admin/
+    # system_admin branch at all (silently unfiltered = every facilitator in
+    # the system) and no proxy/acting-squadron awareness, so it could disagree
+    # with what a squadron's own facilitator list actually shows.
+    from .training import _view_squadron_id
+    sq_id = _view_squadron_id(p, unit_id, db)
+    q = db.query(Facilitator).filter(
+        Facilitator.active_status == True,  # noqa: E712
+        Facilitator.squadron_id == sq_id,
+    )
     return [
         {
             "facilitator_id": f.id,
