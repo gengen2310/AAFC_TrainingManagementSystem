@@ -9,16 +9,27 @@ Created: 2026-07-14.
 
 ### Backup and Restore (Phase 6 — PROVEN)
 
+**Re-verified 2026-08-05 as Gate 5 of the formal 11-gate release process** (the July 14 run IDs
+below are superseded — kept for history, current evidence is the 2026-08-05 rows):
+
 | Test | Result | Evidence |
 |---|---|---|
-| Production backup (pg_dump → GPG-encrypted artifact) | PASS | Run `29281190414` — 432,758-byte dump |
-| Production restore (PostgreSQL schema + row counts) | PASS | Run `29281292666` — schema verified |
-| Application-level restore (API read from restored DB) | PASS | Run `29297143467` — 8 authenticated API reads: wings=8, squadrons=16, users=39, audit_logs=441, curriculum_items=217, planning_years=10 |
-| Alembic revision check post-restore | PASS | Revision `x9y0z1a2b3c4` confirmed in restored environment |
+| Production backup (pg_dump → GPG-encrypted artifact) | PASS | Run [`31020353143`](https://github.com/gengen2310/AAFC_TrainingManagementSystem/actions/runs/31020353143), 2026-08-05 — artifact `postgresql-production-backup-20260805_152727` |
+| SHA-256 integrity check on decrypted dump | PASS | Same run — computed hash matched stored checksum exactly |
+| Production restore into ephemeral Postgres (schema + row counts) | PASS | Run [`31020333935`](https://github.com/gengen2310/AAFC_TrainingManagementSystem/actions/runs/31020333935), 2026-08-05 — 15/15 checks passed: `alembic_version` matched expected head, all 12 required tables present and readable (users=19, wings=1, squadrons=15, audit_logs=161, system_settings=7, access_codes=19, proxy_sessions=1, curriculum_items=214, planning_years=5), users≥1 confirmed |
+| Application-level restore (real backend process against restored DB, real authenticated API reads) | PASS | Same run — spun up the actual FastAPI app against the restored database, logged in as a throwaway restore-test admin, then 8/8 authenticated reads succeeded: `/api/health/ready` (squadrons=15), `/api/auth/me`, `/api/wings` (1), `/api/squadrons` (15), `/api/users` (20), `/api/planning/years` (5), `/api/planning/facilitators` (0) |
 | Daily backup schedule | ACTIVE | `.github/workflows/backup-postgresql.yml` |
 | Weekly restore-test schedule | ACTIVE | `.github/workflows/test-restore-postgresql.yml` |
 
-Recovery Time Objective (demonstrated): ~8 minutes for dump + restore + verification in GitHub Actions runner.
+Recovery Time Objective (demonstrated): both workflows ran in under 2 minutes combined (restore-test
+job 1m7s, backup job 31s) in a GitHub Actions runner.
+
+**Note on timing relative to REM-77**: this backup/restore pair ran ~40 minutes before the REM-77
+P0 migration (`5a195a98148a`) was deployed to production, so the restored database's
+`alembic_version` reflects the prior head (`81734c0f34bf`), not a gap in the restore mechanism
+itself — the check correctly compares against the dynamically-computed expected head at time of
+run, not a hardcoded value. The mechanism is proven end-to-end regardless of which head is current;
+the next scheduled daily/weekly run will naturally pick up the new head.
 
 ### Security Resilience
 
