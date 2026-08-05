@@ -118,14 +118,24 @@ server proxied to staging backend, historically CORS-blocked for most tests) was
 recommend running before final GO/NO-GO consolidation (Gate 11), or accepting this as a disclosed
 gap in Gate 6 coverage.
 
-### Staging data hygiene — observation, not a defect (relevant to Gate 7 load-test realism)
+### Staging data hygiene — observation, not a defect, RESOLVED before Gate 7
 
-`GET /api/health/ready` on staging reports `squadrons: 139–140`, not the ~16 real seeded squadrons.
+`GET /api/health/ready` on staging reported `squadrons: 139–140`, not the ~16 real seeded squadrons.
 Investigated via `/api/squadrons` (national_admin token): 16 real squadrons (701–723 series) plus
 123 `Test Sqn ...`-named records, accumulated from e2e test runs across this multi-day session —
 staging is deliberately never reseeded between runs (see `main-tms.spec.ts` fix comment, this same
-gate), so test-created entities persist indefinitely. Not a code defect and not touched (deleting
-org records requires explicit user sign-off per `.claude/rules/capability-preservation.md` §4). Flagging
-because a 100-user load test (Gate 7) run against this inflated dataset will not reflect a clean
-production-scale profile — worth a human decision on whether to archive the test squadrons before
-Gate 7, or accept the load test as run against contaminated-but-realistic staging data.
+gate), so test-created entities persist indefinitely. Not a code defect.
+
+**User approved cleanup 2026-08-05.** Archiving the 123 squadrons required first archiving 1,208
+accounts tied to them (of 1,246 total on staging) — the squadron-archive endpoint correctly blocks
+on active accounts (`.claude/rules/capability-preservation.md` §4's data-safety guard working as
+designed). Both operations used only existing, real, audited API endpoints — no direct DB writes:
+`POST /api/accounts/batch-archive` (9 chunks of ≤150, reason recorded, `confirm_session_revocation`
+required) → 1,208/1,208 archived, 0 failures; then `POST /api/squadrons/{id}/archive` per squadron →
+123/123 archived, 0 failures, 0 remaining blockers. Both are reversible via their `/restore`
+counterparts and fully audit-logged (`account_archived` / `squadron` archive actions, all
+attributable to the acting `national_admin` principal). Verified after: `GET /api/squadrons` (via
+API, not the raw table-count health endpoint) shows exactly 16 active squadrons, `GET /api/users`
+shows exactly 38 active users — matching the original synthetic seed. `ADMIN703` login and session
+still work correctly (real squadron/account untouched). Staging is now a clean baseline for Gate 7's
+load test.
