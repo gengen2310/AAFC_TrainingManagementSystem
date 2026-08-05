@@ -113,8 +113,22 @@ export const trainingApi = {
   // excludes the endpoint's own CEA/Holiday merge -- this drawer already
   // fetches those separately via ceaData/holidaysData, so merging them in
   // here too would duplicate rows.
+  // The scope_type-aware path (opted into here via scope_type=squadron) returns
+  // {items, total, truncated}, not a bare array -- unlike the legacy no-scope_type
+  // path's plain list response. Unwrap .items here so every call site can keep
+  // treating this as CanonicalActivity[] (found while adding e2e coverage for the
+  // Getting Help section: an unhandled scope_type/legacy response-shape mismatch
+  // was crashing the whole Activities tab for any squadron-scoped caller with
+  // "tmsActivitiesData is not iterable").
   canonicalActivities: (squadronId: string) =>
-    api.get<CanonicalActivity[]>(`/api/activities?scope_type=squadron&scope_id=${squadronId}&sources=activity`),
+    api.get<{ items: CanonicalActivity[]; total: number; truncated: boolean }>(
+      `/api/activities?scope_type=squadron&scope_id=${squadronId}&sources=activity`
+    ).then(r => r.items),
+  // Activities tab "Getting Help" free text -- readable by any authenticated
+  // role, editable by system_admin only (backend/app/routers/training.py).
+  gettingHelp: () => api.get<{ content: string; updated_at: string | null }>("/api/activities/getting-help"),
+  updateGettingHelp: (content: string) =>
+    api.put<{ content: string; updated_at: string | null }>("/api/activities/getting-help", { content }),
   // Facilitator type reference data (backend/app/routers/training.py) -- connected-
   // frontend's Add Facilitator form already uses this; Planning Workspace's own
   // form previously had a hardcoded 4-option select whose values (officer/nco/

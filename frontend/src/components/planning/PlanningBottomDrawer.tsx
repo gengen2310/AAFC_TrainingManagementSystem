@@ -8,6 +8,8 @@ import { FacilitatorTimeline, type ZoomPreset } from "../charts/FacilitatorTimel
 import { FacilitatorScheduleList } from "../charts/FacilitatorScheduleList";
 import { Loading, ErrorNote } from "../ui";
 import { getProgramType } from "../../utils/planningFilters";
+import { useAuth } from "../../auth/AuthProvider";
+import { isSystemAdmin } from "../../auth/permissions";
 import type {
   PlanningFacilitator, PlanningLocation,
   PlanningFacilitatorLeave, FacilitatorWorkload, EquipmentItem,
@@ -1381,6 +1383,73 @@ function ClassifyModal({
   );
 }
 
+// Activities tab "Getting Help" free text -- visible to every role, editable
+// by system_admin only. Mirrors connected-frontend's equivalent card so both
+// apps show identical content (backend/app/routers/training.py's
+// GET/PUT /api/activities/getting-help, a single global SystemSetting row).
+function GettingHelpSection() {
+  const qc = useQueryClient();
+  const { session } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<unknown>(null);
+
+  const { data } = useQuery({
+    queryKey: ["getting-help"],
+    queryFn: () => trainingApi.gettingHelp(),
+    staleTime: 60 * 1000,
+  });
+
+  const openEdit = () => {
+    setDraft(data?.content ?? "");
+    setErr(null);
+    setEditing(true);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setErr(null);
+    try {
+      await trainingApi.updateGettingHelp(draft);
+      await qc.invalidateQueries({ queryKey: ["getting-help"] });
+      setEditing(false);
+    } catch (e) {
+      setErr(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+        <h4 style={{ margin: 0 }}>Getting Help</h4>
+        {isSystemAdmin(session) && !editing && (
+          <button className="btn sm out" onClick={openEdit}>Edit</button>
+        )}
+      </div>
+      {editing ? (
+        <div>
+          <label style={labelSx}>
+            Content
+            <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={6} style={{ ...inputSx, resize: "vertical" }} />
+          </label>
+          {err != null && <ErrorNote error={err} />}
+          <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
+            <button className="btn sm out" onClick={() => setEditing(false)} disabled={saving}>Cancel</button>
+            <button className="btn sm primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
+          </div>
+        </div>
+      ) : (
+        <p style={{ whiteSpace: "pre-wrap", margin: 0 }}>
+          {data?.content || "No help content has been added yet."}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?: string }) {
   const qc = useQueryClient();
   const [classifying, setClassifying] = useState<import("../../api/types").CeaActivity | null>(null);
@@ -1918,6 +1987,8 @@ function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?
           </div>
         );
       })()}
+
+      <GettingHelpSection />
     </div>
   );
 }

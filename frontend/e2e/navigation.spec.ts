@@ -83,6 +83,18 @@ test("Mission Backlog Rec. Term column is not double-prefixed", async ({ page })
   }
 });
 
+test("Activities tab shows Getting Help section, Edit hidden for sqn_admin", async ({ page }) => {
+  await page.goto("/planning");
+  await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
+
+  await page.getByText("Activities ▲").click();
+  const helpHeading = page.getByRole("heading", { name: "Getting Help" });
+  await expect(helpHeading).toBeVisible({ timeout: 8000 });
+  // sqn_admin is not system_admin -- the Edit control must not render.
+  const helpCard = helpHeading.locator("..");
+  await expect(helpCard.getByRole("button", { name: "Edit" })).toHaveCount(0);
+});
+
 test("read-only role (sqn_general) cannot see admin controls", async ({ page }) => {
   // Log out and back in as general user
   await page.getByRole("button", { name: /log out|sign out/i }).click();
