@@ -178,6 +178,22 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .btn-lnk{background:none;border:none;color:var(--royal);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;padding:0;text-decoration:underline dotted;}
 .btn-lnk:hover{color:var(--blue);}
 
+/* ── SEGMENTED TOGGLE (view switchers) ── */
+.seg{display:inline-flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
+.seg-btn{background:var(--surface);border:none;border-right:1.5px solid var(--border);padding:5px 12px;font-size:11px;font-weight:700;font-family:inherit;color:var(--steel);cursor:pointer}
+.seg-btn:last-child{border-right:none}
+.seg-btn.active{background:var(--dark);color:#fff}
+
+/* ── CALENDAR GRID (Wing HQ Calendar) ── */
+.cal-grid-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.cal-grid-table th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:6px 4px;text-align:left;border-bottom:1.5px solid var(--border)}
+.cal-grid-cell{vertical-align:top;border:1px solid var(--border-light);height:92px;padding:4px;overflow:hidden}
+.cal-grid-cell.outside{background:var(--surface-2);opacity:.55}
+.cal-grid-cell.today{background:var(--accent-light)}
+.cal-grid-daynum{font-size:11px;font-weight:800;color:var(--steel);margin-bottom:3px}
+.cal-grid-evt{display:block;font-size:9.5px;font-weight:700;padding:1px 4px;border-radius:4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:#fff}
+.cal-grid-more{font-size:9px;color:var(--muted);cursor:pointer}
+
 /* ── BADGES ── */
 .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:9.5px;font-weight:700;letter-spacing:.05em;white-space:nowrap;}
 .badge-green,.b-ok{background:#d4f0e3;color:#1a5c35;}
@@ -1324,10 +1340,19 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <option value="optional">Optional</option>
               <option value="noting">Noting</option>
             </select>
+            <div class="seg" role="group" aria-label="View">
+              <button class="seg-btn active" id="wc-view-grid-btn" onclick="_wcSetView('grid')">Grid</button>
+              <button class="seg-btn" id="wc-view-table-btn" onclick="_wcSetView('table')">Table</button>
+            </div>
             <button class="btn btn-secondary" id="wc-create-btn" style="display:none" onclick="openWingEventModal()">+ New Event</button>
           </div>
         </div>
         <div class="card" id="wc-card">
+          <div id="wc-grid-nav" style="display:none;align-items:center;justify-content:center;gap:14px;margin-bottom:10px">
+            <button class="btn-xs btn-secondary" onclick="_wcShiftMonth(-1)" aria-label="Previous month">‹</button>
+            <strong id="wc-grid-month-label" style="min-width:150px;text-align:center;font-size:13px"></strong>
+            <button class="btn-xs btn-secondary" onclick="_wcShiftMonth(1)" aria-label="Next month">›</button>
+          </div>
           <div id="wc-body"><p class="muted">Loading Wing HQ Calendar…</p></div>
         </div>
       </div>
@@ -10225,6 +10250,8 @@ async function commitSchedImport(){
 let _wingCalEvents=[];
 let _wingCalWingId=null;
 let _wcDetailEventId=null;
+let _wcView='grid';
+let _wcGridDate=new Date();
 
 // ─── Importance badge / label ────────────────────────────────────────────────
 const _WC_IMP_BADGE={
@@ -10247,6 +10274,10 @@ async function loadWingCalendar(){
   const body=document.getElementById('wc-body');
   if(!body) return;
   const year=document.getElementById('wc-year-sel')?.value||'2026';
+  if(String(_wcGridDate.getFullYear())!==year){
+    const curYear=new Date().getFullYear();
+    _wcGridDate=new Date(+year, +year===curYear?new Date().getMonth():0, 1);
+  }
   const isWingWrite=['wing_admin','national_admin','system_admin'].includes(S.role);
   const btn=document.getElementById('wc-create-btn');
   if(btn) btn.style.display=isWingWrite?'':'none';
@@ -10274,19 +10305,95 @@ async function loadWingCalendar(){
   }catch(e){ body.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
 }
 
-function renderWingCalendar(){
-  const body=document.getElementById('wc-body');
-  if(!body) return;
+function _wcFilteredRows(){
   const typeF=document.getElementById('wc-type-filter')?.value||'';
   const impF=document.getElementById('wc-imp-filter')?.value||'';
-  const isWingWrite=['wing_admin','national_admin','system_admin'].includes(S.role);
-
   let rows=_wingCalEvents;
   if(typeF) rows=rows.filter(e=>e.event_type===typeF);
   if(impF)  rows=rows.filter(e=>e.planning_importance===impF);
+  return rows;
+}
+function _wcSetView(mode){
+  _wcView=mode;
+  document.getElementById('wc-view-grid-btn')?.classList.toggle('active',mode==='grid');
+  document.getElementById('wc-view-table-btn')?.classList.toggle('active',mode==='table');
+  document.getElementById('wc-grid-nav').style.display=mode==='grid'?'flex':'none';
+  renderWingCalendar();
+}
+function _wcShiftMonth(delta){
+  _wcGridDate=new Date(_wcGridDate.getFullYear(),_wcGridDate.getMonth()+delta,1);
+  const yr=String(_wcGridDate.getFullYear());
+  const yrSel=document.getElementById('wc-year-sel');
+  if(yrSel&&[...yrSel.options].some(o=>o.value===yr)&&yrSel.value!==yr){ yrSel.value=yr; loadWingCalendar(); return; }
+  renderWingCalendar();
+}
+const _WC_IMP_COLOR={must_attend:'#e51937',key_event:'#004b8d',recommended:'#1a7f4b',optional:'#7a8590',home_parade:'#7a8590',noting:'#7a8590'};
+function renderWingCalendarGrid(){
+  const body=document.getElementById('wc-body');
+  const rows=_wcFilteredRows();
+  const y=_wcGridDate.getFullYear(), m=_wcGridDate.getMonth();
+  const lbl=document.getElementById('wc-grid-month-label');
+  if(lbl)lbl.textContent=_wcGridDate.toLocaleDateString('en-AU',{month:'long',year:'numeric'});
 
-  if(!rows.length){
+  const byDate={};
+  rows.forEach(e=>{
+    const start=new Date(e.start_date+'T00:00:00'), end=new Date((e.end_date||e.start_date)+'T00:00:00');
+    for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+      const key=d.toISOString().slice(0,10);
+      (byDate[key]=byDate[key]||[]).push(e);
+    }
+  });
+
+  const firstOfMonth=new Date(y,m,1);
+  const startOffset=(firstOfMonth.getDay()+6)%7; // Monday=0
+  const gridStart=new Date(y,m,1-startOffset);
+  const todayKey=new Date().toISOString().slice(0,10);
+  const days=[];
+  for(let i=0;i<42;i++){ const d=new Date(gridStart); d.setDate(gridStart.getDate()+i); days.push(d); }
+  // Trim trailing all-empty rows beyond the 5th week if the 6th week is entirely next month
+  const weeks=[]; for(let i=0;i<days.length;i+=7) weeks.push(days.slice(i,i+7));
+  while(weeks.length>4 && weeks[weeks.length-1].every(d=>d.getMonth()!==m)) weeks.pop();
+
+  const dayNames=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  body.innerHTML=`<table class="cal-grid-table">
+    <thead><tr>${dayNames.map(n=>`<th>${n}</th>`).join('')}</tr></thead>
+    <tbody>${weeks.map(week=>`<tr>${week.map(d=>{
+      const key=d.toISOString().slice(0,10);
+      const evts=byDate[key]||[];
+      const outside=d.getMonth()!==m;
+      const isToday=key===todayKey;
+      const shown=evts.slice(0,3);
+      const extra=evts.length-shown.length;
+      return `<td class="cal-grid-cell${outside?' outside':''}${isToday?' today':''}">
+        <div class="cal-grid-daynum">${d.getDate()}</div>
+        ${shown.map(e=>`<span class="cal-grid-evt" style="background:${_WC_IMP_COLOR[e.planning_importance]||'#7a8590'}" title="${esc(e.title)}" onclick="openWingEventDetail('${esc(e.id)}')">${esc(e.title)}</span>`).join('')}
+        ${extra>0?`<span class="cal-grid-more">+${extra} more</span>`:''}
+      </td>`;
+    }).join('')}</tr>`).join('')}</tbody>
+  </table>`;
+}
+function renderWingCalendar(){
+  const body=document.getElementById('wc-body');
+  if(!body) return;
+  const isWingWrite=['wing_admin','national_admin','system_admin'].includes(S.role);
+
+  if(_wcView==='grid'){
+    document.getElementById('wc-grid-nav').style.display='flex';
+    renderWingCalendarGrid();
+    if(!_wingCalEvents.length){
+      body.innerHTML+=`<p class="muted" style="margin-top:10px">No Wing HQ events for this year yet. Use <strong>+ New Event</strong> to add one, or import from your Wing Master Schedule.</p>`;
+    }
+    return;
+  }
+  document.getElementById('wc-grid-nav').style.display='none';
+
+  if(!_wingCalEvents.length){
     body.innerHTML='<p class="muted">No Wing HQ events for this year. Use <strong>+ New Event</strong> to add one, or import from your Wing Master Schedule.</p>';
+    return;
+  }
+  const rows=_wcFilteredRows();
+  if(!rows.length){
+    body.innerHTML='<p class="muted">No events match the current filters.</p>';
     return;
   }
 
