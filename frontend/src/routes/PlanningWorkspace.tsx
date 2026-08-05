@@ -103,6 +103,24 @@ export function PlanningWorkspace() {
     staleTime: 2 * 60 * 1000,
   });
 
+  // REM-39 follow-up: previously only ParadeNightGridView (the single-night
+  // detail grid) ever received real conflict data -- Year/Term/8-Week/2-Week/
+  // custom-range views (including the default landing view) hardcoded
+  // conflicts:[] in handleSessionClick/handleSessionByIdClick below, so a
+  // session could have a genuine unresolved PlanningConflict but show no
+  // indicator and offer no override from the view most users land on first.
+  // planningApi.conflicts() already existed with zero call sites; wiring it
+  // in here closes the gap for every view without touching any of them.
+  const { data: yearConflicts = [] } = useQuery({
+    queryKey: ["planning-conflicts", selectedYearId],
+    queryFn: () => planningApi.conflicts(selectedYearId!),
+    enabled: !!selectedYearId,
+    staleTime: 60 * 1000,
+  });
+  function conflictsForSession(sessionId: string) {
+    return yearConflicts.filter(c => c.scheduled_session_id === sessionId && !c.is_resolved);
+  }
+
   const { data: facilitators = [] } = useQuery({
     queryKey: ["planning-facilitators"],
     queryFn: planningApi.facilitators,
@@ -143,12 +161,12 @@ export function PlanningWorkspace() {
   }
 
   function handleSessionClick(s: PlanningSession, dateId: string, date: string) {
-    setDrawerItem({ type: "session", session: s, dateId, date, conflicts: [] });
+    setDrawerItem({ type: "session", session: s, dateId, date, conflicts: conflictsForSession(s.session_id) });
   }
 
   async function handleSessionByIdClick(sessionId: string, dateId: string, date: string) {
     const s = await planningApi.getSession(sessionId);
-    setDrawerItem({ type: "session", session: s, dateId, date, conflicts: [] });
+    setDrawerItem({ type: "session", session: s, dateId, date, conflicts: conflictsForSession(sessionId) });
   }
 
   function handleEmptyCellClick(dateId: string, date: string, cadetGroup: string, period: number) {

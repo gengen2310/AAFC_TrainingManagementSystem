@@ -194,6 +194,11 @@ function SessionForm({
     try {
       await planningApi.overrideConflict(conflictId, overrideReason.trim());
       await qc.invalidateQueries({ queryKey: ["planning-weekly", dateId] });
+      // REM-39 follow-up: also invalidate the year-wide conflicts list
+      // PlanningWorkspace.tsx now fetches (previously only planning-weekly
+      // existed, so overriding from any view other than the single-night
+      // grid would leave stale unresolved-conflict indicators everywhere else).
+      if (yearId) await qc.invalidateQueries({ queryKey: ["planning-conflicts", yearId] });
       setOverridingId(null);
       setOverrideReason("");
     } catch (e: unknown) {
