@@ -10,12 +10,13 @@ from sqlalchemy.orm import Session as DBSession
 from ..database import get_db, utcnow
 from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
                       Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, TrainingArea, Equipment,
-                      Activity, Cadet, Squadron, TimingTemplate, TimingBlock)
+                      Activity, Cadet, Squadron, TimingTemplate, TimingBlock, SystemSetting)
 from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
 from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron,
-                          require_can_view_wing, require_can_write_activity, require_role, NATIONAL_LEVEL)
+                          require_can_view_wing, require_can_write_activity, require_role, require_system_admin,
+                          NATIONAL_LEVEL)
 from ..services import (audit, score_parade, publish_blockers, close_blockers)
 from ..services_readiness import parade_night_readiness
 
@@ -1496,6 +1497,36 @@ def _holiday_source_items(db: DBSession, scope_type: str, wing_id: str | None, s
         "notes": h.notes, "workflow_status": None, "cea_seq_nr": None,
         "is_archived": False, "is_inherited": True, "read_only": True,
     } for h in rows]
+
+
+_GETTING_HELP_KEY = "activities_getting_help_content"
+
+
+@router.get("/activities/getting-help")
+def get_activities_getting_help(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    row = db.get(SystemSetting, _GETTING_HELP_KEY)
+    return {"content": row.value if row else "", "updated_at": row.updated_at if row else None}
+
+
+class GettingHelpIn(BaseModel):
+    content: str = ""
+
+
+@router.put("/activities/getting-help")
+def update_activities_getting_help(body: GettingHelpIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    row = db.get(SystemSetting, _GETTING_HELP_KEY)
+    old_value = row.value if row else None
+    if row is None:
+        row = SystemSetting(key=_GETTING_HELP_KEY)
+        db.add(row)
+    row.value = body.content
+    row.updated_at = utcnow()
+    row.updated_by = p.user_id
+    db.commit()
+    audit(db, p, object_type="system_setting", object_id=_GETTING_HELP_KEY,
+          action="getting_help_content_updated", old={"content": old_value}, new={"content": body.content})
+    return {"content": row.value, "updated_at": row.updated_at}
 
 
 @router.get("/activities")
