@@ -4,6 +4,43 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Post-program review pass: REM-46 (Account Management parity) + REM-49 remainder (calendar chip icons)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commit
+`860121af73114ff87c3d344062e377f6ad61ab80`.
+
+**Context**: continuing a review of Stages 6-12's remaining open gap-register
+items to re-check whether any were actually tractable (REM-45 turned out
+smaller than its original sizing). Also fixed 7 gap-register rows with
+unescaped-comma CSV quoting bugs found while re-parsing the register
+properly for this review.
+
+**Pre-deploy gates**: no migration, no backend change (both frontends only).
+`tsc --noEmit` clean. `vitest run` → 19 passed. Planning Workspace e2e →
+87 passed, 0 failed (incl. the Account Management accessibility check).
+connected-frontend e2e → 27 passed, 10 pre-existing unrelated (identical
+baseline) — **one transient failure seen on an interim run** (`Accessibility
+— Audit` test's login timed out) that reproduced as a pass in isolation and
+disappeared entirely on a fresh-backend full rerun, consistent with the
+same login/rate-limit contention pattern already documented for this suite,
+not a regression from these changes.
+
+**Deployed**: Main TMS and Planning Workspace (backend untouched).
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-frontend` (staging, Main TMS) | `e302b350-28f5-4a93-a03e-c70b5964b0b3` | SUCCESS |
+| `aafc-tms-planning-workspace-preview` (staging) | `ea1551bc-a8b1-4f6f-8881-44957e896889` | SUCCESS |
+
+**Post-deploy verification**: Main TMS `<meta name="app-build">` confirmed
+exact commit SHA. `/planning` → HTTP 200.
+
+**Known gap, same as prior entries**: no live browser verification that the
+new Account Management actions (archive/restore/delete/change-role/unlock)
+or the calendar chip icons actually render/function correctly against real
+staging data (no Chrome extension connectivity in this background session)
+— verified at the code/type-check/e2e-regression level only.
+
 ## 2026-08-05 — REM-45 follow-up (closed the flagged security gap from Stage 10)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
