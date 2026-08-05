@@ -16,6 +16,7 @@ Endpoints:
 """
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 
@@ -27,6 +28,7 @@ from ..dependencies import get_principal
 from ..models import (
     ParadeNight, Session, Facilitator, Squadron, Wing,
     CurriculumItem, Equipment, TrainingArea, PlanningFacilitatorLeave,
+    CurriculumPhase,
 )
 from ..permissions import Principal, require_role, require_can_view_squadron, require_can_view_wing
 from ..services_readiness import parade_night_readiness, session_requirements
@@ -51,6 +53,30 @@ _STATUS_COLORS = {
     "rescheduled": "#f57c00",
     "planned": "#51b0e3",
 }
+
+
+_logger = logging.getLogger(__name__)
+
+
+def _safe_chart(chart_id: str, builder, *args, **kwargs) -> dict:
+    """Run one chart builder in isolation -- an exception in any single
+    builder previously 500'd the ENTIRE /api/dashboard/charts response,
+    taking every other chart down with it even though only one was actually
+    broken. Catches and logs server-side (full traceback, never sent to the
+    client), returning a distinct ChartSpec-shaped failure marker instead so
+    the frontend can render "this chart failed" for just this one chart."""
+    try:
+        return builder(*args, **kwargs)
+    except Exception:
+        _logger.exception("Dashboard chart builder failed: %s", chart_id)
+        return {
+            "chart_id": chart_id,
+            "title": chart_id.replace("_", " ").title(),
+            "chart_type": "error",
+            "data": [],
+            "error": True,
+            "empty_state": "This chart could not be loaded. Try refreshing.",
+        }
 
 
 # ── scope helpers ─────────────────────────────────────────────────────────────
@@ -217,13 +243,42 @@ def _delivery_trend(sessions: list, pns: list, weeks: int = 12) -> dict:
     }
 
 
-def _curriculum_progress(sessions: list, curr_items: list) -> dict:
-    """Horizontal stacked bar: delivered vs not-delivered vs planned per phase."""
+def _phases_for_squadron(db: DBSession, sq_id: str | None) -> list[str]:
+    """Governed phase names visible to a given squadron (national/system +
+    that squadron's own wing + the squadron's own custom phases), in
+    training-progression order. Scoped to the VIEWED squadron, not the
+    calling principal -- a wing/national/system_admin viewing a different
+    squadron's dashboard must see that squadron's phases, not their own.
+    Mirrors training.py's _visible_phases() visibility rule but resolved
+    from a squadron_id instead of a Principal, since dashboard chart
+    builders view squadrons other than the caller's own."""
+    from sqlalchemy import or_
+    conditions = [CurriculumPhase.scope_level.in_(["system", "national"])]
+    sq = db.get(Squadron, sq_id) if sq_id else None
+    if sq and sq.wing_id:
+        conditions.append((CurriculumPhase.scope_level == "wing") & (CurriculumPhase.wing_id == sq.wing_id))
+    if sq_id:
+        conditions.append((CurriculumPhase.scope_level == "squadron") & (CurriculumPhase.squadron_id == sq_id))
+    rows = db.query(CurriculumPhase).filter(
+        CurriculumPhase.is_archived == False,  # noqa: E712
+        CurriculumPhase.active_status == True,  # noqa: E712
+        or_(*conditions),
+    ).order_by(CurriculumPhase.sort_order, CurriculumPhase.scope_level, CurriculumPhase.display_name).all()
+    return [ph.name for ph in rows] or _PHASES  # fall back if the catalogue is somehow empty
+
+
+def _curriculum_progress(sessions: list, curr_items: list, phases: list[str]) -> dict:
+    """Horizontal stacked bar: delivered vs not-delivered vs planned per phase.
+
+    `phases` must be the full governed phase catalogue for the squadron being
+    viewed (see _phases_for_squadron) -- previously this iterated a hardcoded
+    8-phase constant, so any custom wing/squadron phase was silently dropped
+    from the chart entirely rather than shown at 0%."""
     # Count from sessions
     phase_data: dict[str, dict] = {
         ph: {"phase": ph, "delivered": 0, "delivered_with_issue": 0,
              "not_delivered": 0, "cancelled": 0, "planned": 0, "total_items": 0}
-        for ph in _PHASES
+        for ph in phases
     }
     for s in sessions:
         ph = s.phase_at_time
@@ -239,7 +294,7 @@ def _curriculum_progress(sessions: list, curr_items: list) -> dict:
         if ph and ph in phase_data:
             phase_data[ph]["total_items"] += 1
 
-    data = [phase_data[ph] for ph in _PHASES]
+    data = [phase_data[ph] for ph in phases]
     total_del = sum(d["delivered"] + d["delivered_with_issue"] for d in data)
     total_planned = sum(d["planned"] for d in data)
     insight = None
@@ -1717,11 +1772,11 @@ def _full_squadron_charts(db: DBSession, sq_id: str, w_start: str, w_end: str) -
     ).all() if all_pn_ids else []
 
     charts: dict = {}
-    charts["tonight"] = _tonight_readiness(all_pns, all_sessions, facs, rooms)
-    charts["upcoming_readiness"] = _upcoming_readiness(all_pns, all_sessions)
-    charts["session_outcomes"] = _session_outcomes_distribution(sessions)
-    charts["weekly_outcomes"] = _weekly_outcomes(sessions, pns)
-    charts["delivery_trend"] = _delivery_trend(all_sessions, all_pns)
+    charts["tonight"] = _safe_chart("tonight", _tonight_readiness, all_pns, all_sessions, facs, rooms)
+    charts["upcoming_readiness"] = _safe_chart("upcoming_readiness", _upcoming_readiness, all_pns, all_sessions)
+    charts["session_outcomes"] = _safe_chart("session_outcomes", _session_outcomes_distribution, sessions)
+    charts["weekly_outcomes"] = _safe_chart("weekly_outcomes", _weekly_outcomes, sessions, pns)
+    charts["delivery_trend"] = _safe_chart("delivery_trend", _delivery_trend, all_sessions, all_pns)
     # all_sessions (not the window-filtered `sessions`) — curriculum phase
     # progress is a cumulative measure like its sibling curriculum_backlog
     # (already all_sessions below), not a windowed one. Using the window-
@@ -1729,19 +1784,23 @@ def _full_squadron_charts(db: DBSession, sq_id: str, w_start: str, w_end: str) -
     # squadron's delivered history predates the window (e.g. "term" only
     # looks back 90 days), with no visible error — exactly the kind of
     # empty-looks-like-broken chart-trust problem this pass targets.
-    charts["curriculum_progress"] = _curriculum_progress(all_sessions, curr_items)
-    charts["curriculum_backlog"] = _curriculum_backlog(all_sessions, all_pns)
-    charts["cancellation_reasons"] = _cancellation_reasons(sessions, pns)
-    charts["facilitator_workload"] = _facilitator_workload(sessions)
-    charts["capability_dependency"] = _facilitator_capability_dependency(all_sessions)
-    charts["subject_area_resilience"] = _subject_area_resilience(facs)
+    charts["curriculum_progress"] = _safe_chart(
+        "curriculum_progress", _curriculum_progress, all_sessions, curr_items, _phases_for_squadron(db, sq_id))
+    charts["curriculum_backlog"] = _safe_chart("curriculum_backlog", _curriculum_backlog, all_sessions, all_pns)
+    charts["cancellation_reasons"] = _safe_chart("cancellation_reasons", _cancellation_reasons, sessions, pns)
+    charts["facilitator_workload"] = _safe_chart("facilitator_workload", _facilitator_workload, sessions)
+    charts["capability_dependency"] = _safe_chart(
+        "capability_dependency", _facilitator_capability_dependency, all_sessions)
+    charts["subject_area_resilience"] = _safe_chart("subject_area_resilience", _subject_area_resilience, facs)
     fac_leave = db.query(PlanningFacilitatorLeave).filter(
         PlanningFacilitatorLeave.facilitator_id.in_([f.id for f in facs]),
         PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
     ).all() if facs else []
-    charts["facilitator_status_distribution"] = _facilitator_status_distribution(facs, fac_leave)
+    charts["facilitator_status_distribution"] = _safe_chart(
+        "facilitator_status_distribution", _facilitator_status_distribution, facs, fac_leave)
     all_pn_date_by_id = {pn.id: pn.date for pn in all_pns}
-    charts["facilitator_repeated_gaps"] = _facilitator_repeated_gaps(all_sessions, all_pn_date_by_id)
+    charts["facilitator_repeated_gaps"] = _safe_chart(
+        "facilitator_repeated_gaps", _facilitator_repeated_gaps, all_sessions, all_pn_date_by_id)
     return charts
 
 
@@ -1784,9 +1843,10 @@ def _wing_comparison_charts(
         if viewed_sq_id:
             charts.update(_full_squadron_charts(db, viewed_sq_id, w_start, w_end))
 
-    charts["squadron_readiness"] = _squadron_readiness(db, wing_id, w_start, w_end)
-    charts["squadron_delivery_comparison"] = _squadron_delivery_comparison(db, wing_id, w_start, w_end)
-    charts["wing_subject_area_gaps"] = _wing_subject_area_gaps(db, wing_id)
+    charts["squadron_readiness"] = _safe_chart("squadron_readiness", _squadron_readiness, db, wing_id, w_start, w_end)
+    charts["squadron_delivery_comparison"] = _safe_chart(
+        "squadron_delivery_comparison", _squadron_delivery_comparison, db, wing_id, w_start, w_end)
+    charts["wing_subject_area_gaps"] = _safe_chart("wing_subject_area_gaps", _wing_subject_area_gaps, db, wing_id)
     return charts
 
 
@@ -1854,7 +1914,7 @@ def get_dashboard_charts(
             if viewed_sq_id:
                 charts.update(_full_squadron_charts(db, viewed_sq_id, w_start, w_end))
 
-        charts["wing_readiness"] = _wing_readiness_comparison(db, w_start, w_end)
+        charts["wing_readiness"] = _safe_chart("wing_readiness", _wing_readiness_comparison, db, w_start, w_end)
         # Wing delivery comparison (re-use squadron_delivery_comparison per-wing)
         wings_data = _wing_ids_for_national(db)
         wing_delivery = []
@@ -1915,17 +1975,22 @@ def _full_squadron_strategic_charts(db: DBSession, sq_id: str) -> dict:
         Facilitator.is_archived == False,  # noqa: E712
     ).all()
     charts: dict = {}
-    charts["capability_dependency"] = _facilitator_capability_dependency(all_sessions)
-    charts["subject_area_resilience"] = _subject_area_resilience(facs)
-    charts["long_term_delivery_trend"] = _long_term_delivery_trend(all_sessions, all_pns)
+    charts["capability_dependency"] = _safe_chart(
+        "capability_dependency", _facilitator_capability_dependency, all_sessions)
+    charts["subject_area_resilience"] = _safe_chart("subject_area_resilience", _subject_area_resilience, facs)
+    charts["long_term_delivery_trend"] = _safe_chart(
+        "long_term_delivery_trend", _long_term_delivery_trend, all_sessions, all_pns)
     fac_leave = db.query(PlanningFacilitatorLeave).filter(
         PlanningFacilitatorLeave.facilitator_id.in_([f.id for f in facs]),
         PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
     ).all() if facs else []
-    charts["facilitator_status_distribution"] = _facilitator_status_distribution(facs, fac_leave)
+    charts["facilitator_status_distribution"] = _safe_chart(
+        "facilitator_status_distribution", _facilitator_status_distribution, facs, fac_leave)
     all_pn_date_by_id = {pn.id: pn.date for pn in all_pns}
-    charts["facilitator_repeated_gaps"] = _facilitator_repeated_gaps(all_sessions, all_pn_date_by_id)
-    charts["facilitator_leave_impact"] = _facilitator_leave_impact(facs, fac_leave, all_pns, all_sessions)
+    charts["facilitator_repeated_gaps"] = _safe_chart(
+        "facilitator_repeated_gaps", _facilitator_repeated_gaps, all_sessions, all_pn_date_by_id)
+    charts["facilitator_leave_impact"] = _safe_chart(
+        "facilitator_leave_impact", _facilitator_leave_impact, facs, fac_leave, all_pns, all_sessions)
     return charts
 
 
@@ -1935,7 +2000,7 @@ def _wing_strategic_charts(db: DBSession, wing_id: str) -> dict:
         Facilitator.wing_id == wing_id,
         Facilitator.is_archived == False,  # noqa: E712
     ).all()
-    charts["subject_area_resilience"] = _subject_area_resilience(facs)
+    charts["subject_area_resilience"] = _safe_chart("subject_area_resilience", _subject_area_resilience, facs)
     # Long-term trend: aggregate all wing sessions
     sqn_ids = _sqn_ids_for_wing(db, wing_id)
     pns = db.query(ParadeNight).filter(
@@ -1946,7 +2011,7 @@ def _wing_strategic_charts(db: DBSession, wing_id: str) -> dict:
         Session.parade_night_id.in_([pn.id for pn in pns]),
         Session.is_archived == False,  # noqa: E712
     ).all() if pns else []
-    charts["long_term_delivery_trend"] = _long_term_delivery_trend(sessions, pns)
+    charts["long_term_delivery_trend"] = _safe_chart("long_term_delivery_trend", _long_term_delivery_trend, sessions, pns)
     return charts
 
 

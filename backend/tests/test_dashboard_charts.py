@@ -3,6 +3,8 @@
 Covers: auth, scope detection, chart shape, key presence, empty state,
 squadron/wing/national scope, window parameter validation.
 """
+from unittest.mock import patch
+
 import pytest
 from conftest import login
 
@@ -129,11 +131,57 @@ def test_squadron_returns_curriculum_progress(client):
     assert "curriculum_progress" in charts
     cp = charts["curriculum_progress"]
     assert cp["chart_type"] == "stacked_bar_horizontal"
-    # All 8 phases present even with zero data
+    # All seeded national phases present even with zero data. Not an exact-count
+    # assertion: the chart now sources phases from the live, governed
+    # CurriculumPhase catalogue (not a hardcoded constant), so other tests in
+    # the full suite legitimately add more national/wing-scope phases that are
+    # visible here too -- that's the correct, intended behaviour, not pollution.
     phases = [d["phase"] for d in cp["data"]]
     assert "A. Orientation" in phases
     assert "I. Bronze" in phases
-    assert len(phases) == 8
+    assert len(phases) >= 8
+
+def test_curriculum_progress_includes_custom_squadron_phase(client):
+    """A squadron-scoped custom CurriculumPhase must appear in the chart, not be
+    silently dropped -- previously curriculum_progress iterated a hardcoded
+    8-phase constant instead of the governed CurriculumPhase catalogue, so a
+    custom phase like this never showed up (not even at 0%). Uses 704 (not
+    703) so this doesn't change 703's phase count for other tests in this file."""
+    hdrs = login(client, "ADMIN704")
+    r = client.post("/api/curriculum/phases", json={
+        "name": "Z. Custom Squadron Phase", "display_name": "Custom Squadron Phase",
+        "scope_level": "squadron",
+    }, headers=hdrs)
+    assert r.status_code == 200, r.text
+
+    charts = _charts(client.get(CHARTS_URL + "?window=year", headers=hdrs))
+    cp = charts["curriculum_progress"]
+    phases = [d["phase"] for d in cp["data"]]
+    assert "Z. Custom Squadron Phase" in phases
+    # Still includes the national catalogue too
+    assert "A. Orientation" in phases
+
+def test_one_broken_chart_builder_does_not_take_down_the_others(client):
+    """Previously _full_squadron_charts had zero fault isolation -- one
+    builder throwing 500'd the ENTIRE /api/dashboard/charts response, taking
+    every other chart down with it. Simulates a single builder failing and
+    confirms the endpoint still returns 200 with every other chart intact,
+    and the broken one marked distinctly rather than missing or crashing
+    the whole response."""
+    hdrs = _sqn_admin(client)
+    with patch("app.routers.dashboard._weekly_outcomes", side_effect=RuntimeError("boom")):
+        r = client.get(CHARTS_URL + "?window=year", headers=hdrs)
+    assert r.status_code == 200, r.text
+    charts = _charts(r)
+    # The broken chart is present but marked as failed, not silently missing
+    assert charts["weekly_outcomes"]["error"] is True
+    assert charts["weekly_outcomes"]["chart_type"] == "error"
+    # Every other chart in the same bundle survived untouched
+    assert charts["curriculum_progress"]["chart_type"] == "stacked_bar_horizontal"
+    assert "error" not in charts["curriculum_progress"]
+    assert charts["tonight"]["chart_id"] == "tonight"
+    assert "error" not in charts["tonight"]
+
 
 def test_squadron_returns_facilitator_workload(client):
     hdrs = _sqn_admin(client)
