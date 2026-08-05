@@ -232,3 +232,25 @@ test.describe("Accessibility — Settings", () => {
     assertNoViolations(results.violations);
   });
 });
+
+test.describe("Accessibility — Wing/National Assurance (Command Dashboard)", () => {
+  test("wing assurance has no critical/serious/moderate violations", async ({ page }) => {
+    await page.goto("/");
+    await page.getByLabel("Access code").fill("ADMIN7WG");
+    await page.getByRole("button", { name: "Log in" }).click();
+    await expect(page.getByRole("heading", { name: /wing assurance/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Command Dashboard/i)).toBeVisible({ timeout: 10000 });
+    const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+    assertNoViolations(results.violations);
+  });
+
+  test("national assurance has no critical/serious/moderate violations", async ({ page }) => {
+    await page.goto("/");
+    await page.getByLabel("Access code").fill("ADMINNATIONAL");
+    await page.getByRole("button", { name: "Log in" }).click();
+    await expect(page.getByRole("heading", { name: /national assurance/i })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/Command Dashboard/i)).toBeVisible({ timeout: 10000 });
+    const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
+    assertNoViolations(results.violations);
+  });
+});

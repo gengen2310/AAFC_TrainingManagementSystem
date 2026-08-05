@@ -5,6 +5,7 @@ import { Card, Stat, Empty, Loading, ErrorNote } from "../components/ui";
 import { StatusBadge, DecisionBadge } from "../components/status/StatusBadge";
 import { DrilldownPanel } from "../components/DrilldownPanel";
 import { ChartCard } from "../components/charts/DashboardCharts";
+import { CommandDashboardSection } from "../components/charts/CommandDashboardSection";
 import type { DashboardChart } from "../api/types";
 import { useAuth } from "../auth/AuthProvider";
 import { canViewCadets } from "../auth/permissions";
@@ -152,6 +153,15 @@ export function Dashboard() {
           ))}
         </div>
       </Card>
+
+      {/* Command Dashboard — Sections A (Immediate Training Readiness) and B
+          (Training Delivery Performance), Wing/National scope only. Mirrors
+          connected-frontend's cmd-dash-wing/cmd-dash-national view. Also
+          shown on WingOverview/NationalOverview (the primary landing pages
+          for these roles) via the same shared component. */}
+      {scope !== "squadron" && (
+        <CommandDashboardSection window={win === "week" ? "week" : win === "year" ? "year" : "term"} />
+      )}
 
       {/* C — Strategic / resilience, deferred load. The backend's
           /charts/strategic endpoint has no "national" scope branch at all

@@ -4,6 +4,7 @@ import { reportApi } from "../api";
 import { Card, Empty, Loading, ErrorNote, Stat, Bar } from "../components/ui";
 import { ComparisonTable, RankBars, ReadinessPanel, HeatmapGrid, GapHeatmap, type Column } from "../components/assurance";
 import { DrilldownPanel } from "../components/DrilldownPanel";
+import { CommandDashboardSection } from "../components/charts/CommandDashboardSection";
 import type { NationalCapability } from "../api/types";
 
 // Wing-overview row shape (from GET /api/reports/wing-overview).
@@ -62,6 +63,8 @@ export function WingOverview() {
     <div>
       <h1>Wing Assurance</h1>
       <p className="scope-note">Viewing Wing-level assurance data. Unit of analysis: squadron. Editing a squadron requires Proxy Mode with a reason.</p>
+
+      <CommandDashboardSection window="term" />
 
       <div className="sg">
         <Stat label="Squadrons" value={rows.length} />
@@ -243,6 +246,8 @@ export function NationalOverview() {
     <div>
       <h1>National Assurance</h1>
       <p className="scope-note">Viewing National-level assurance data. Unit of analysis: wing. Editing a squadron requires Delegated Intervention with a reason.</p>
+
+      <CommandDashboardSection window="term" />
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <button className={view === "delivery" ? "btn" : "btn out"} onClick={() => setView("delivery")}>Delivery</button>

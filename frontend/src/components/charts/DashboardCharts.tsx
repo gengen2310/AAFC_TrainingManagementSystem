@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { DashboardChart } from "../../api/types";
 
@@ -379,6 +380,123 @@ export function ReadinessGrid({ chart }: { chart: DashboardChart }) {
   );
 }
 
+const MATRIX_STATUS_COLOR: Record<string, string> = {
+  ok: "var(--success, #1A7F4B)", warning: "var(--warning, #C97A00)",
+  critical: "var(--aafc-red, #E51937)", no_data: "var(--muted-text, #8a93a6)",
+};
+const MATRIX_STATUS_ICON: Record<string, string> = { ok: "✓", warning: "▲", critical: "✕", no_data: "—" };
+interface MatrixCell { status: string; numerator: number | null; denominator: number | null; pct: number | null; exception_reason: string | null; data_available: boolean; }
+function MatrixCellDot({ cell }: { cell: MatrixCell }) {
+  const col = MATRIX_STATUS_COLOR[cell.status] ?? MATRIX_STATUS_COLOR.no_data;
+  const title = cell.exception_reason ?? (cell.numerator != null && cell.denominator != null ? `${cell.numerator}/${cell.denominator}` : "No data");
+  return (
+    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, color: col, fontWeight: 700 }}>
+      {MATRIX_STATUS_ICON[cell.status] ?? "—"}
+      {cell.numerator != null && cell.denominator != null && <span style={{ fontWeight: 400, fontSize: 10 }}>{cell.numerator}/{cell.denominator}</span>}
+    </span>
+  );
+}
+/** Wing/National readiness matrix table -- chart_type "readiness_matrix".
+ * Never colour-alone: every cell pairs an icon with its colour (matches
+ * StatusBadge's own "never colour alone" convention used elsewhere). */
+export function ReadinessMatrixChart({ chart }: { chart: DashboardChart }) {
+  const rows = rowsOf(chart) as unknown as Array<{
+    unit_id: string; label: string; name: string; status: string;
+    curriculum_allocated: MatrixCell; facilitator_confirmed: MatrixCell; facility_confirmed: MatrixCell;
+    overall_readiness: MatrixCell; exception_reason: string | null;
+  }>;
+  if (!rows.length) return <EmptyState chart={chart} />;
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ fontSize: 11, width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr style={{ borderBottom: "1px solid var(--border)" }}>
+            <th style={{ textAlign: "left", padding: "4px 8px", fontSize: 10, color: "var(--muted-text)" }}>Unit</th>
+            <th style={{ padding: "4px 8px", fontSize: 10, color: "var(--muted-text)" }}>Curriculum</th>
+            <th style={{ padding: "4px 8px", fontSize: 10, color: "var(--muted-text)" }}>Facilitator</th>
+            <th style={{ padding: "4px 8px", fontSize: 10, color: "var(--muted-text)" }}>Facility</th>
+            <th style={{ padding: "4px 8px", fontSize: 10, color: "var(--muted-text)" }}>Overall</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.unit_id} style={{ borderBottom: "1px solid var(--border-light, var(--border))" }} title={r.exception_reason ?? undefined}>
+              <td style={{ padding: "5px 8px", fontWeight: 700, whiteSpace: "nowrap" }}>{r.name || r.label}</td>
+              <td style={{ padding: "5px 8px", textAlign: "center" }}><MatrixCellDot cell={r.curriculum_allocated} /></td>
+              <td style={{ padding: "5px 8px", textAlign: "center" }}><MatrixCellDot cell={r.facilitator_confirmed} /></td>
+              <td style={{ padding: "5px 8px", textAlign: "center" }}><MatrixCellDot cell={r.facility_confirmed} /></td>
+              <td style={{ padding: "5px 8px", textAlign: "center" }}><MatrixCellDot cell={r.overall_readiness} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Eight-week risk forecast -- chart_type "risk_timeline". Lists individual
+ * risk items (already capped to 200 server-side) grouped by severity. */
+export function RiskTimelineChart({ chart }: { chart: DashboardChart }) {
+  const items = rowsOf(chart) as unknown as Array<{
+    unit_label?: string; category: string; severity: string; affected_sessions: number; description?: string; date?: string;
+  }>;
+  if (!items.length) return <EmptyState chart={chart} />;
+  const high = items.filter(i => i.severity === "high");
+  const rest = items.filter(i => i.severity !== "high");
+  const row = (i: (typeof items)[number], idx: number) => (
+    <div key={idx} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: 11, padding: "3px 0", borderBottom: "1px solid var(--border-light, var(--border))" }}>
+      <span style={{ color: i.severity === "high" ? "var(--aafc-red, #E51937)" : "var(--warning, #C97A00)", fontWeight: 700 }}>
+        {i.severity === "high" ? "▲" : "•"}
+      </span>
+      {i.date && <span style={{ color: "var(--muted-text)", minWidth: 70 }}>{i.date}</span>}
+      <span style={{ flex: 1 }}>{i.description ?? i.category.replace(/_/g, " ")}</span>
+    </div>
+  );
+  return (
+    <div>
+      {high.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "var(--aafc-red, #E51937)", marginBottom: 4 }}>WITHIN 2 WEEKS ({high.length})</div>
+          {high.slice(0, 25).map(row)}
+        </div>
+      )}
+      {rest.length > 0 && (
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "var(--muted-text)", marginBottom: 4 }}>LATER IN THE 8-WEEK WINDOW ({rest.length})</div>
+          {rest.slice(0, 25).map(row)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Section A/B "Purpose / Measure / Assessment / Action" info toggle -- every
+ * Command Dashboard chart exposes these (see training-dashboard.spec.ts's
+ * "Every Section A/B chart exposes Purpose, Measure and Action"). */
+export function ChartInfoToggle({ chart }: { chart: DashboardChart }) {
+  const [open, setOpen] = useState(false);
+  if (!chart.purpose && !chart.measure && !chart.action) return null;
+  return (
+    <div style={{ marginTop: 6 }}>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        aria-expanded={open}
+        style={{ background: "none", border: "none", padding: 0, fontSize: 10, color: "var(--aafc-royal-blue, #004B8D)", cursor: "pointer", textDecoration: "underline" }}
+      >
+        {open ? "Hide" : "Purpose, measure & action"}
+      </button>
+      {open && (
+        <dl style={{ fontSize: 11, margin: "6px 0 0", color: "var(--muted-text)" }}>
+          {chart.purpose && <><dt style={{ fontWeight: 700, color: "var(--text)" }}>Purpose</dt><dd style={{ margin: "0 0 6px" }}>{chart.purpose}</dd></>}
+          {chart.measure && <><dt style={{ fontWeight: 700, color: "var(--text)" }}>Measure</dt><dd style={{ margin: "0 0 6px" }}>{chart.measure}</dd></>}
+          {chart.action && <><dt style={{ fontWeight: 700, color: "var(--text)" }}>Action</dt><dd style={{ margin: 0 }}>{chart.action}</dd></>}
+        </dl>
+      )}
+    </div>
+  );
+}
+
 /** Renders any chart by chart_type, plus its title/explanation/insight wrapper. */
 export function ChartCard({ chart, onDrillDown }: { chart: DashboardChart; onDrillDown?: (chart: DashboardChart) => void }) {
   const body = (() => {
@@ -392,6 +510,10 @@ export function ChartCard({ chart, onDrillDown }: { chart: DashboardChart; onDri
       case "heatmap": return <HeatmapChart chart={chart} />;
       case "readiness_card": return <ReadinessCard chart={chart} />;
       case "readiness_grid": return <ReadinessGrid chart={chart} />;
+      case "readiness_matrix": return <ReadinessMatrixChart chart={chart} />;
+      case "risk_timeline": return <RiskTimelineChart chart={chart} />;
+      case "stacked_bar_horizontal_100": return <StackedBarHChart chart={chart} />;
+      case "pareto": return <HBarChart chart={chart} />;
       default: return <EmptyState chart={chart} />;
     }
   })();
@@ -408,6 +530,7 @@ export function ChartCard({ chart, onDrillDown }: { chart: DashboardChart; onDri
       {chart.explanation && <div style={expSx}>{chart.explanation}</div>}
       {body}
       {chart.insight && <div style={insightSx}>{chart.insight}</div>}
+      <ChartInfoToggle chart={chart} />
     </div>
   );
 }

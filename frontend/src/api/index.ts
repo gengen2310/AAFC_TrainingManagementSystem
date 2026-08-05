@@ -257,6 +257,14 @@ export const dashboardApi = {
     ),
   strategic: (window: "term" | "year" = "year") =>
     api.get<DashboardChartsResponse>(`/api/dashboard/charts/strategic?window=${window}`),
+  // Wing/National Command Dashboard (Sections A/B) -- connected-frontend's
+  // rich cmd-dash-wing/cmd-dash-national view; previously had no Planning
+  // Workspace consumer at all (risk register: "wing/national/system admin
+  // dashboards get full squadron-dashboard parity PLUS comparison").
+  command: (window: "week" | "term" | "semester" | "year" = "term", wing_id?: string) =>
+    api.get<import("./types").CommandDashboardResponse>(
+      `/api/dashboard/command?window=${window}${wing_id ? `&wing_id=${wing_id}` : ""}`
+    ),
   facilitatorSchedule: (window: "week" | "term" | "year" = "year", squadron_id?: string) =>
     api.get<import("./types").FacilitatorScheduleResponse>(
       `/api/dashboard/facilitator-schedule?window=${window}${squadron_id ? `&squadron_id=${squadron_id}` : ""}`

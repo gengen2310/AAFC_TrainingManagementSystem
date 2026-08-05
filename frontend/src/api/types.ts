@@ -454,7 +454,8 @@ export interface CeaImportResult {
 // Shared schema every chart_id follows — see backend/app/routers/dashboard.py.
 export type ChartType =
   | "bar_horizontal" | "donut" | "line" | "stacked_bar" | "stacked_bar_horizontal"
-  | "grouped_bar" | "heatmap" | "readiness_card" | "readiness_grid";
+  | "grouped_bar" | "heatmap" | "readiness_card" | "readiness_grid"
+  | "readiness_matrix" | "risk_timeline" | "stacked_bar_horizontal_100" | "pareto" | "error";
 
 export interface ChartSeriesSpec { key: string; label: string; color?: string; }
 export interface ChartThresholds { green?: number; amber?: number; red?: number; }
@@ -475,12 +476,63 @@ export interface DashboardChart {
   series?: ChartSeriesSpec[];
   thresholds?: ChartThresholds;
   columns?: string[];
+  error?: boolean;
+  // Command Dashboard (Wing/National) narrative fields -- every Section A/B
+  // chart exposes these via an info toggle (see connected-frontend's
+  // training-dashboard.spec.ts "Purpose, Measure and Action").
+  purpose?: string;
+  measure?: string;
+  assessment?: string;
+  action?: string;
+  weekly?: unknown;
+  data_confidence?: { units_reporting?: number; units_expected?: number; completeness_pct?: number | null };
 }
 
 export interface DashboardChartsResponse {
   scope: "squadron" | "wing" | "national";
   window: string;
   charts: Record<string, DashboardChart>;
+  error?: string;
+}
+
+// ─── Command Dashboard (Wing/National training readiness/delivery) ────────
+export interface ReadinessMatrixCell {
+  status: "ok" | "warning" | "critical" | "no_data";
+  numerator: number | null;
+  denominator: number | null;
+  pct: number | null;
+  warning: boolean;
+  exception_reason: string | null;
+  data_available: boolean;
+}
+export interface ReadinessMatrixRow {
+  unit_id: string;
+  label: string;
+  name: string;
+  status: "ok" | "warning" | "critical" | "no_data";
+  sessions_planned: ReadinessMatrixCell;
+  curriculum_allocated: ReadinessMatrixCell;
+  facilitator_confirmed: ReadinessMatrixCell;
+  facility_confirmed: ReadinessMatrixCell;
+  equipment_confirmed: ReadinessMatrixCell;
+  overall_readiness: ReadinessMatrixCell;
+  trend: string;
+  last_update: string | null;
+  exception_reason: string | null;
+}
+export interface CommandDashboardResponse {
+  scope: "wing" | "national";
+  wing_id: string | null;
+  wing_name: string | null;
+  window: string;
+  period: { label: string; start: string; end: string };
+  generated_at: string;
+  units_in_scope: number;
+  data_confidence: { units_reporting: number; units_expected: number; completeness_pct: number | null };
+  sections: {
+    A: { readiness_matrix: DashboardChart; risk_forecast: DashboardChart; immediate_issues: DashboardChart };
+    B: { weekly_delivered: DashboardChart; reliability_trend: DashboardChart; outcomes_by_unit: DashboardChart; cancellation_pareto: DashboardChart };
+  };
   error?: string;
 }
 
