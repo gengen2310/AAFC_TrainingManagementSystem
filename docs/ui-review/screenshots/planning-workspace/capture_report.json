@@ -1,0 +1,592 @@
+{
+  "sqn_admin": {
+    "captures": [
+      {
+        "route": "/",
+        "file": "sqn_admin_desktop_1440_home.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/dashboard",
+        "file": "sqn_admin_desktop_1440_dashboard.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/calendar",
+        "file": "sqn_admin_desktop_1440_calendar.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/parade-nights",
+        "file": "sqn_admin_desktop_1440_parade-nights.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/weekly-program",
+        "file": "sqn_admin_desktop_1440_weekly-program.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/curriculum",
+        "file": "sqn_admin_desktop_1440_curriculum.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/facilitators",
+        "file": "sqn_admin_desktop_1440_facilitators.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/facilitator-schedule",
+        "file": "sqn_admin_desktop_1440_facilitator-schedule.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/resources",
+        "file": "sqn_admin_desktop_1440_resources.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/cadets",
+        "file": "sqn_admin_desktop_1440_cadets.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/reports",
+        "file": "sqn_admin_desktop_1440_reports.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/report-catalogue",
+        "file": "sqn_admin_desktop_1440_report-catalogue.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/action-items",
+        "file": "sqn_admin_desktop_1440_action-items.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/imports",
+        "file": "sqn_admin_desktop_1440_imports.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/audit",
+        "file": "sqn_admin_desktop_1440_audit.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/admin",
+        "file": "sqn_admin_desktop_1440_admin.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/accounts",
+        "file": "sqn_admin_desktop_1440_accounts.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/settings",
+        "file": "sqn_admin_desktop_1440_settings.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/planning",
+        "file": "sqn_admin_desktop_1440_planning.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/",
+        "file": "sqn_admin_mobile_390_home.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/dashboard",
+        "file": "sqn_admin_mobile_390_dashboard.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/calendar",
+        "file": "sqn_admin_mobile_390_calendar.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/parade-nights",
+        "file": "sqn_admin_mobile_390_parade-nights.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/weekly-program",
+        "file": "sqn_admin_mobile_390_weekly-program.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/curriculum",
+        "file": "sqn_admin_mobile_390_curriculum.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/facilitators",
+        "file": "sqn_admin_mobile_390_facilitators.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/facilitator-schedule",
+        "file": "sqn_admin_mobile_390_facilitator-schedule.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/resources",
+        "file": "sqn_admin_mobile_390_resources.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/cadets",
+        "file": "sqn_admin_mobile_390_cadets.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/reports",
+        "file": "sqn_admin_mobile_390_reports.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/report-catalogue",
+        "file": "sqn_admin_mobile_390_report-catalogue.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/action-items",
+        "file": "sqn_admin_mobile_390_action-items.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/imports",
+        "file": "sqn_admin_mobile_390_imports.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/audit",
+        "file": "sqn_admin_mobile_390_audit.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/admin",
+        "file": "sqn_admin_mobile_390_admin.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/accounts",
+        "file": "sqn_admin_mobile_390_accounts.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/settings",
+        "file": "sqn_admin_mobile_390_settings.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/planning",
+        "file": "sqn_admin_mobile_390_planning.png",
+        "viewport": "mobile_390"
+      }
+    ],
+    "console_errors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "network_errors": [
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      }
+    ]
+  },
+  "sqn_general": {
+    "captures": [
+      {
+        "route": "/",
+        "file": "sqn_general_desktop_1440_home.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/dashboard",
+        "file": "sqn_general_desktop_1440_dashboard.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/calendar",
+        "file": "sqn_general_desktop_1440_calendar.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/parade-nights",
+        "file": "sqn_general_desktop_1440_parade-nights.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/weekly-program",
+        "file": "sqn_general_desktop_1440_weekly-program.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/curriculum",
+        "file": "sqn_general_desktop_1440_curriculum.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/facilitators",
+        "file": "sqn_general_desktop_1440_facilitators.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/resources",
+        "file": "sqn_general_desktop_1440_resources.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/cadets",
+        "file": "sqn_general_desktop_1440_cadets.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/reports",
+        "file": "sqn_general_desktop_1440_reports.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/action-items",
+        "file": "sqn_general_desktop_1440_action-items.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/planning",
+        "file": "sqn_general_desktop_1440_planning.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/",
+        "file": "sqn_general_mobile_390_home.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/dashboard",
+        "file": "sqn_general_mobile_390_dashboard.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/calendar",
+        "file": "sqn_general_mobile_390_calendar.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/parade-nights",
+        "file": "sqn_general_mobile_390_parade-nights.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/weekly-program",
+        "file": "sqn_general_mobile_390_weekly-program.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/curriculum",
+        "file": "sqn_general_mobile_390_curriculum.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/facilitators",
+        "file": "sqn_general_mobile_390_facilitators.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/resources",
+        "file": "sqn_general_mobile_390_resources.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/cadets",
+        "file": "sqn_general_mobile_390_cadets.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/reports",
+        "file": "sqn_general_mobile_390_reports.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/action-items",
+        "file": "sqn_general_mobile_390_action-items.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/planning",
+        "file": "sqn_general_mobile_390_planning.png",
+        "viewport": "mobile_390"
+      }
+    ],
+    "console_errors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "network_errors": [
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/cadets",
+        "status": 403
+      },
+      {
+        "url": "/api/cadets/risk",
+        "status": 403
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/cadets",
+        "status": 403
+      },
+      {
+        "url": "/api/cadets/risk",
+        "status": 403
+      }
+    ]
+  },
+  "wing_admin": {
+    "captures": [
+      {
+        "route": "/wing-overview",
+        "file": "wing_admin_desktop_1440_wing-overview.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/national-overview",
+        "file": "wing_admin_desktop_1440_national-overview.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/audit",
+        "file": "wing_admin_desktop_1440_audit.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/accounts",
+        "file": "wing_admin_desktop_1440_accounts.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/planning",
+        "file": "wing_admin_desktop_1440_planning.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/wing-overview",
+        "file": "wing_admin_mobile_390_wing-overview.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/national-overview",
+        "file": "wing_admin_mobile_390_national-overview.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/audit",
+        "file": "wing_admin_mobile_390_audit.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/accounts",
+        "file": "wing_admin_mobile_390_accounts.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/planning",
+        "file": "wing_admin_mobile_390_planning.png",
+        "viewport": "mobile_390"
+      }
+    ],
+    "console_errors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ],
+    "network_errors": [
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/reports/national-overview",
+        "status": 403
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/reports/national-overview",
+        "status": 403
+      }
+    ]
+  },
+  "national_admin": {
+    "captures": [
+      {
+        "route": "/national-overview",
+        "file": "national_admin_desktop_1440_national-overview.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/audit",
+        "file": "national_admin_desktop_1440_audit.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/accounts",
+        "file": "national_admin_desktop_1440_accounts.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/planning",
+        "file": "national_admin_desktop_1440_planning.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/national-overview",
+        "file": "national_admin_mobile_390_national-overview.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/audit",
+        "file": "national_admin_mobile_390_audit.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/accounts",
+        "file": "national_admin_mobile_390_accounts.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/planning",
+        "file": "national_admin_mobile_390_planning.png",
+        "viewport": "mobile_390"
+      }
+    ],
+    "console_errors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "network_errors": [
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      }
+    ]
+  },
+  "auditor": {
+    "captures": [
+      {
+        "route": "/audit",
+        "file": "auditor_desktop_1440_audit.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/accounts",
+        "file": "auditor_desktop_1440_accounts.png",
+        "viewport": "desktop_1440"
+      },
+      {
+        "route": "/audit",
+        "file": "auditor_mobile_390_audit.png",
+        "viewport": "mobile_390"
+      },
+      {
+        "route": "/accounts",
+        "file": "auditor_mobile_390_accounts.png",
+        "viewport": "mobile_390"
+      }
+    ],
+    "console_errors": [
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+      "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    ],
+    "network_errors": [
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      },
+      {
+        "url": "/api/auth/me",
+        "status": 401
+      }
+    ]
+  }
+}
