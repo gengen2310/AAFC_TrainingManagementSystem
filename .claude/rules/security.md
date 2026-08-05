@@ -38,18 +38,28 @@
 
 ## Security greps before packaging
 
+**Use `-E` (extended regex) on every one of these — without it, `|` is a literal
+pipe character, not alternation, and the whole check silently passes even when
+a real match exists.** Confirmed live: the pre-`-E` versions of these exact
+commands returned "0 matches, PASS" during a 2026-08-05 production release
+while `grep -c -E` on the same files found 2 real matches (both later confirmed
+benign — an audit-log filter option and a `pg_restore` example command, not
+actual secrets/codes — but the check itself had been giving false negatives).
+
 ```bash
 # Removed wording check
-grep -Rc "your unit only|Controlled access for training" connected-frontend backend
+grep -Rc -E "your unit only|Controlled access for training" connected-frontend backend
 
 # Access code exposure
-grep -Rc "View current code|Show access code|Reveal code|Display existing code" connected-frontend backend
+grep -Rc -E "View current code|Show access code|Reveal code|Display existing code" connected-frontend backend
 
 # Seeded codes in frontend
-grep -Rc "ADMIN703|ADMIN7WG|ADMINNATIONAL|SYSADMIN2026|plain_code|code_hash|access_code|localStorage" connected-frontend
+grep -Rc -E "ADMIN703|ADMIN7WG|ADMINNATIONAL|SYSADMIN2026|plain_code|code_hash|access_code|localStorage" connected-frontend
 
 # Secrets in frontend
-grep -Rc "JWT_SECRET|SECRET_KEY|DATABASE_URL" connected-frontend
+grep -Rc -E "JWT_SECRET|SECRET_KEY|DATABASE_URL" connected-frontend
 ```
 
-All must return 0 matches.
+All must return 0 matches -- or, if a match is found, it must be manually reviewed
+and confirmed as a false positive (e.g. an audit-action-type label, a help-text
+placeholder) before packaging, never assumed safe from the count alone.
