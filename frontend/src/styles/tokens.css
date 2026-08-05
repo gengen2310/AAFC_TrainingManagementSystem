@@ -1,8 +1,20 @@
 :root{
   --aafc-blue:#51B0E3; --aafc-dark-blue:#002F65; --aafc-royal-blue:#004B8D;
   --aafc-gunmetal:#455560; --aafc-light-grey:#B0B7BB; --aafc-red:#E51937;
-  --surface:#FFFFFF; --background:#F5F7FA; --text:#1D2733; --muted-text:#5A6E7F;
-  --success:#1A7F4B; --warning:#C97A00; --rescheduled:#7C3AED; --border:#D8DEE4;
+  /* Neutral/surface values aligned to connected-frontend's actual AAFC VIG hex
+     values (index.html's --bg/--surface-2/--border/--text/--muted -- see
+     .claude/rules/frontend.md) so both apps render the same palette, not just
+     the same brand intent under different-drifted values. Values only, not a
+     rename/merge of the two token systems (see .claude/rules/architecture.md:
+     that stays an explicit separate decision, not done here). */
+  /* --muted-text intentionally NOT set to connected-frontend's exact #6B7A87:
+     that value is only 4.41:1 on white, below WCAG AA's 4.5:1 for normal text
+     -- confirmed as a real regression by this app's own accessibility suite
+     (connected-frontend has no equivalent suite to catch the same latent
+     issue there). Kept at the original, AA-compliant value; every other
+     neutral token below is aligned to the exact hex value. */
+  --surface:#FFFFFF; --background:#F4F8FC; --text:#1E2D3D; --muted-text:#5A6E7F;
+  --success:#1A7F4B; --warning:#C97A00; --rescheduled:#7C3AED; --border:#D1DCE8;
   --space-1:8px; --space-2:16px; --space-3:24px; --space-4:32px; --radius:10px;
   --primary:var(--aafc-dark-blue); --accent:var(--aafc-blue);
   /* Previously used as var(--name, #hardcoded-fallback) at each call site with
@@ -10,7 +22,7 @@
      (surface-2 alone had 4 slightly different hardcoded greys across call
      sites), and never adapted to dark/hc theme. Defining them for real once,
      here, is the fix — not a new design decision. */
-  --surface-2:#EEF2F7; --line:var(--border); --ink-2:#44506A;
+  --surface-2:#F0F5FA; --line:var(--border); --ink-2:#44506A;
   --navy:var(--aafc-dark-blue); --ok:var(--success); --warn:var(--warning);
   --danger:var(--aafc-red);
 }
