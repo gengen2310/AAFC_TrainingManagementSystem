@@ -4,6 +4,99 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Phase A: risk-register/bug-list root-cause fixes (REM-53 through REM-61)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commits `38f871f`
+through `6843d6b` (7 logical commits; see `git log` for the full list).
+
+User submitted a large combined report (27-section risk register, first-hand
+bug list, dashboard-readiness critique, data-entry UX philosophy). Three
+parallel Explore-agent investigations plus direct code checks sorted stale
+claims (already fixed earlier this session, e.g. Rooms/TrainingAreas
+consolidation) from genuine new defects before planning fixes. This entry
+covers Phase A of that plan: 9 confirmed, well-scoped bug fixes.
+
+**Fixes** (full detail per item in `master_gap_register.csv` REM-53–REM-61):
+1. Dashboard Progress-by-Phase now sources phases from the governed
+   CurriculumPhase catalogue instead of a hardcoded 8-phase constant.
+2. Dashboard chart-builder calls are fault-isolated — one broken builder no
+   longer 500s every chart.
+3. connected-frontend's chart-failure handler now resets every chart
+   container + insight div, not just 2 of 7+.
+4. connected-frontend's `loadData()` silent `.catch(()=>null)` pattern
+   (present on ~9 background fetches, not just facilitators) replaced with a
+   tracked-failure + consolidated toast warning.
+5. Parade Day (Squadron Details) now seeds the parade-night generator's
+   default weekday in both frontends — previously hardcoded and unused.
+6. `wing_admin`/`sqn_admin` can now edit their own account (was a 403 via
+   `_CREATE_AUTHORITY`'s intentional-but-overreaching self-exclusion).
+7. `GET /api/planning/facilitators` now uses the standard
+   `_view_squadron_id()` scoping pattern instead of a bespoke filter with no
+   `national_admin`/`system_admin` branch.
+8. Foundation/Extension/Optional labeling fixed to derive from the phase
+   letter prefix in **both** frontends (Planning Workspace's Mission Backlog
+   drawers and connected-frontend's Curriculum page both had the same
+   core_status-based mislabeling; the connected-frontend instance was found
+   and fixed after the initial pass via an explicit parity re-check, not
+   missed silently).
+9. "Unassigned" badge relabeled to "Lesson: Unassigned" for clarity.
+
+**Regression found and fixed during this pass**: A.1's fix made
+`test_squadron_returns_curriculum_progress` (`test_dashboard_charts.py`)
+fail intermittently in full-suite runs (`assert 16 == 8`) — its exact-count
+assertion assumed no other test would ever add a national-scope
+`CurriculumPhase`, which was true before A.1 (hardcoded constant) but is no
+longer a safe assumption now that the chart correctly reads live governed
+state. Relaxed to `>=8` plus specific membership checks. Full suite
+confirmed green after the fix: 1108 passed, 5 skipped, 0 failed.
+
+**Pre-deploy gates**: `tsc --noEmit` clean. `vitest run` → 22 passed.
+Planning Workspace e2e → 87 passed, 0 failed. connected-frontend e2e (actual
+regular suite, i.e. `main-tms`/`training-dashboard`/`activities-inheritance`/
+`hostile-value-xss`/`capture-screenshots-planning` — see note below) → 30
+passed, 0 failed.
+
+**Investigation note — two false alarms ruled out during verification**:
+- Running the connected-frontend suite with `PLANNING_WORKSPACE_URL` unset
+  (the default for a bare local `RUN_TMS_BACKEND_MAC.sh` run) produces 10
+  failures — 3 in `main-tms.spec.ts` (the PW nav link genuinely depends on
+  that env var) and 7 in `capture-screenshots.spec.ts`. Setting the env var
+  fixed the 3; the remaining 7 persisted. Investigation traced these 7 to
+  `capture-screenshots.spec.ts`'s own header comment: it is explicitly a
+  "one-off evidence capture against live staging — not part of the regular
+  verification suite," meant to run under `playwright.connected.staging.config.ts`,
+  not the local `playwright.connected.config.ts` used here. Confirmed via
+  `git stash` that these 7 fail identically on the pre-Phase-A code — a
+  config-mismatch artifact, not a regression, not a Phase A defect. Excluded
+  from the "30 passed" count above accordingly; not silently dropped.
+- A stray already-running `uvicorn` process (from an earlier connection
+  attempt this session) had auto-created an empty, unseeded
+  `backend/aafc_tms.db` before `RUN_TMS_BACKEND_MAC.sh` ran, so its own
+  seed-guard (`if [ ! -f aafc_tms.db ]`) saw a file already present and
+  skipped seeding — surfaced as `{"status":"ready","squadrons":0}` on the
+  first health check. Fixed by killing the stray process, deleting the
+  empty db, and re-running the script clean (confirmed 16 squadrons seeded).
+
+**Deployed**: all three application services.
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-backend` (staging) | `ed0f94f3-4111-4655-b0ab-4fae91019477` | SUCCESS |
+| `aafc-tms-frontend` (staging) | `ca8630f7-8970-41f6-97ed-565344c296a1` (supersedes `85ceb884-cdd7-4082-8d18-6fbc8ac61acd`, which predated the connected-frontend Curriculum-page addendum) | SUCCESS |
+| `aafc-tms-planning-workspace-preview` (staging) | `8918b1c2-4837-45c2-a56b-09217ef080d6` | SUCCESS |
+
+**Post-deploy verification**: `GET /api/health/ready` → `{"status":"ready","squadrons":140}`.
+`GET /api/health/ui-config` → `planning_workspace_url` correctly points at
+the staging PW preview URL. `aafc-tms-frontend` root → HTTP 200.
+`/planning` → HTTP 200.
+
+**Known gap, same as prior entries**: no live browser verification of any of
+the 9 fixes' actual rendered behavior (no Chrome extension connectivity this
+session) — verified at the code/type-check/e2e-regression/API-test level,
+with direct reasoning about each fix's data flow, not an end-to-end
+click-through. Each item's specific residual limitation is recorded per-row
+in `master_gap_register.csv`.
+
 ## 2026-08-05 — Post-program review pass: REM-39 (conflict override in every Planning Workspace view)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commit
