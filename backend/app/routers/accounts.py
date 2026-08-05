@@ -368,7 +368,17 @@ def update_account(uid: str, body: AccountUpdateIn, db: DBSession = Depends(get_
     u = db.get(User, uid)
     if not u or u.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
-    _require_manage_authority(p, u, db)
+    # Editing your OWN account (display name / flight only -- AccountUpdateIn
+    # has no role/scope field, so this carries no privilege-escalation risk)
+    # must not go through _require_manage_authority: that check is keyed off
+    # _CREATE_AUTHORITY, whose wing_admin/sqn_admin entries deliberately don't
+    # include their own role (so they can't mass-create peer-level accounts)
+    # -- which meant a wing_admin/sqn_admin editing even their own display
+    # name always 403'd. Every other account-management endpoint
+    # (change-role, archive, disable, reset-code, ...) keeps its own existing
+    # self-action guards untouched; this bypass is scoped to this endpoint only.
+    if uid != p.user_id:
+        _require_manage_authority(p, u, db)
 
     if body.display_name is not None:
         name = body.display_name.strip()

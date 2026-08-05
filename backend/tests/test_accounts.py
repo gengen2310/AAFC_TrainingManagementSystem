@@ -904,3 +904,39 @@ def test_change_role_never_drives_active_admin_count_below_one(client):
     r = client.post(f"/api/accounts/{uid2}/change-role", headers=h_sa,
                      json={"new_role": "national_admin"})
     assert r.status_code == 200, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# Self-edit (display name / flight only, no role field): must not 403.
+# _CREATE_AUTHORITY's wing_admin/sqn_admin entries deliberately exclude their
+# own role (so they can't mass-create peer-level accounts), but that map was
+# also being used to gate ordinary self-edits via _require_manage_authority,
+# so a sqn_admin/wing_admin editing even their own display name always 403'd.
+# ─────────────────────────────────────────────────────────────
+
+def test_sqn_admin_can_edit_own_display_name(client):
+    h = login(client, "ADMIN703")
+    me = client.get("/api/auth/me", headers=h).json()["session"]["user_id"]
+    r = client.patch(f"/api/accounts/{me}", headers=h, json={"display_name": "Renamed Self"})
+    assert r.status_code == 200, r.text
+    acct = client.get(f"/api/accounts/{me}", headers=h).json()
+    assert acct["display_name"] == "Renamed Self"
+
+
+def test_wing_admin_can_edit_own_display_name(client):
+    h = login(client, "ADMIN7WG")
+    me = client.get("/api/auth/me", headers=h).json()["session"]["user_id"]
+    r = client.patch(f"/api/accounts/{me}", headers=h, json={"display_name": "Wing Self Rename"})
+    assert r.status_code == 200, r.text
+    acct = client.get(f"/api/accounts/{me}", headers=h).json()
+    assert acct["display_name"] == "Wing Self Rename"
+
+
+def test_sqn_admin_still_cannot_edit_another_squadrons_account(client):
+    """The self-edit bypass must be scoped to uid == the caller's own id --
+    editing an unrelated account is still properly authority-checked."""
+    h703 = login(client, "ADMIN703")
+    h704 = login(client, "ADMIN704")
+    other_uid = client.get("/api/auth/me", headers=h704).json()["session"]["user_id"]
+    r = client.patch(f"/api/accounts/{other_uid}", headers=h703, json={"display_name": "Should not work"})
+    assert r.status_code == 403, r.text
