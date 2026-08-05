@@ -158,11 +158,12 @@ export const opsApi = {
 };
 
 export const accountApi = {
-  list: (params: { wing_id?: string; squadron_id?: string; flight_id?: string } = {}) => {
+  list: (params: { wing_id?: string; squadron_id?: string; flight_id?: string; include_archived?: boolean } = {}) => {
     const p = new URLSearchParams();
     if (params.wing_id) p.set("wing_id", params.wing_id);
     if (params.squadron_id) p.set("squadron_id", params.squadron_id);
     if (params.flight_id) p.set("flight_id", params.flight_id);
+    if (params.include_archived) p.set("include_archived", "true");
     const qs = p.toString();
     return api.get<AccountRecord[]>(`/api/accounts${qs ? `?${qs}` : ""}`);
   },
@@ -175,6 +176,16 @@ export const accountApi = {
     api.post<{ ok: boolean; new_code: string; new_code_notice: string }>(`/api/accounts/${uid}/reset-code`, new_code ? { new_code } : {}),
   disable: (uid: string) => api.post<{ ok: boolean }>(`/api/accounts/${uid}/disable`),
   reactivate: (uid: string) => api.post<{ ok: boolean }>(`/api/accounts/${uid}/reactivate`),
+  // Account Management parity fixes (REM-46, 2026-08-05) -- these already
+  // existed in connected-frontend; Planning Workspace's Account Management
+  // page never got them.
+  changeRole: (uid: string, new_role: string) =>
+    api.post<{ ok: boolean }>(`/api/accounts/${uid}/change-role`, { new_role }),
+  archive: (uid: string, reason?: string) =>
+    api.post<{ ok: boolean }>(`/api/accounts/${uid}/archive${reason ? `?reason=${encodeURIComponent(reason)}` : ""}`),
+  restore: (uid: string) => api.post<{ ok: boolean }>(`/api/accounts/${uid}/restore`),
+  remove: (uid: string) => api.delete<{ ok: boolean }>(`/api/accounts/${uid}`),
+  unlock: (uid: string) => api.post<{ ok: boolean }>(`/api/accounts/${uid}/unlock`),
   flights: (squadron_id?: string) => {
     const qs = squadron_id ? `?squadron_id=${encodeURIComponent(squadron_id)}` : "";
     return api.get<Flight[]>(`/api/flights${qs}`);

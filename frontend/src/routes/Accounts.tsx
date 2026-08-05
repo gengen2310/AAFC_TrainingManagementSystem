@@ -19,6 +19,20 @@ const CREATE_ROLES: Record<string, string[]> = {
   wing_admin: ["wing_viewer","sqn_admin","sqn_general"],
   sqn_admin: ["sqn_general"],
 };
+// Mirrors backend _CREATE_AUTHORITY / _scope_type (app/routers/accounts.py) --
+// same "which roles can this actor assign" map used for account creation
+// applies to change-role too, further filtered to the target's own scope
+// type below (change-role never crosses scope levels).
+const NATIONAL_SCOPE_ROLES = new Set(["national_admin", "national_viewer", "system_admin", "auditor"]);
+const WING_SCOPE_ROLES_SET = new Set(["wing_viewer", "wing_admin"]);
+function roleScopeType(role: string): string {
+  if (NATIONAL_SCOPE_ROLES.has(role)) return "national";
+  if (WING_SCOPE_ROLES_SET.has(role)) return "wing";
+  return "squadron";
+}
+function isLocked(a: AccountRecord): boolean {
+  return !!a.locked_until && new Date(a.locked_until) > new Date();
+}
 
 // One-time code display modal — code shown once; never retrievable after close
 function NewCodeModal({ code, forName, onClose }: { code: string; forName: string; onClose: () => void }) {
@@ -55,11 +69,12 @@ export function Accounts() {
   const [wingFilter, setWingFilter] = useState("");
   const [sqnFilter, setSqnFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [includeArchived, setIncludeArchived] = useState(false);
 
   // Queries
   const accounts = useQuery({
-    queryKey: ["accounts", wingFilter, sqnFilter],
-    queryFn: () => accountApi.list({ wing_id: wingFilter || undefined, squadron_id: sqnFilter || undefined }),
+    queryKey: ["accounts", wingFilter, sqnFilter, includeArchived],
+    queryFn: () => accountApi.list({ wing_id: wingFilter || undefined, squadron_id: sqnFilter || undefined, include_archived: includeArchived }),
   });
   const flights = useQuery({ queryKey: ["flights"], queryFn: () => accountApi.flights() });
   const wings = useQuery({ queryKey: ["wings"], queryFn: orgApi.wings });
@@ -88,6 +103,15 @@ export function Accounts() {
   const [editUid, setEditUid] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editFlight, setEditFlight] = useState("");
+
+  // Change role form state (REM-46)
+  const [roleUid, setRoleUid] = useState<string | null>(null);
+  const [roleValue, setRoleValue] = useState("");
+  const [roleErr, setRoleErr] = useState("");
+
+  // Permanent-delete confirmation state (REM-46)
+  const [deleteUid, setDeleteUid] = useState<string | null>(null);
+  const [deleteErr, setDeleteErr] = useState("");
 
   // Rename flight form state
   const [renameFid, setRenameFid] = useState<string | null>(null);
@@ -129,6 +153,29 @@ export function Accounts() {
     mutationFn: ({ uid, body }: { uid: string; body: { display_name?: string; flight_id?: string } }) =>
       accountApi.update(uid, body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["accounts"] }); setEditUid(null); },
+  });
+  // REM-46: archive/restore/permanent-delete/change-role/unlock parity with connected-frontend
+  const archiveMut = useMutation({
+    mutationFn: ({ uid, reason }: { uid: string; reason?: string }) => accountApi.archive(uid, reason),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+  });
+  const restoreMut = useMutation({
+    mutationFn: accountApi.restore,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+  });
+  const deleteMut = useMutation({
+    mutationFn: accountApi.remove,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["accounts"] }); setDeleteUid(null); setDeleteErr(""); },
+    onError: (e: Error) => setDeleteErr(e.message),
+  });
+  const unlockMut = useMutation({
+    mutationFn: accountApi.unlock,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+  });
+  const changeRoleMut = useMutation({
+    mutationFn: ({ uid, new_role }: { uid: string; new_role: string }) => accountApi.changeRole(uid, new_role),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["accounts"] }); setRoleUid(null); setRoleErr(""); },
+    onError: (e: Error) => setRoleErr(e.message),
   });
   const createFlightMut = useMutation({
     mutationFn: accountApi.createFlight,
@@ -189,6 +236,10 @@ export function Accounts() {
               {sqnsForWing(wingFilter).map(s => <option key={s.squadron_id} value={s.squadron_id}>{s.code}</option>)}
             </select>
           )}
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <input type="checkbox" checked={includeArchived} onChange={e => setIncludeArchived(e.target.checked)} />
+            Show archived
+          </label>
           {canWrite && <button className="btn primary sm" onClick={() => { setShowCreate(true); setCreateErr(""); }}>+ Add Account</button>}
         </div>
 
@@ -212,19 +263,46 @@ export function Accounts() {
                     <td className="muted" style={{ fontSize: 11 }}>
                       {a.squadron_code ? `SQN ${a.squadron_code}` : a.wing_code ? `Wing ${a.wing_code}` : "NAT HQ"}
                     </td>
-                    <td>{a.active_status ? <span className="badge ok">Active</span> : <span className="badge warn">Disabled</span>}</td>
+                    <td>
+                      {a.is_archived ? <span className="badge muted">Archived</span>
+                        : a.active_status ? <span className="badge ok">Active</span> : <span className="badge warn">Disabled</span>}
+                      {isLocked(a) && <span className="badge warn" style={{ marginLeft: 4 }}>Locked</span>}
+                    </td>
                     <td style={{ fontSize: 11 }}>
                       {a.last_login_at ? new Date(a.last_login_at).toLocaleDateString("en-AU") : "Never"}
                     </td>
                     {canWrite && (
                       <td style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                        <button className="btn sm" onClick={() => openEdit(a)}>Edit</button>
-                        <button className="btn sm" onClick={() => { setResetUid(a.user_id); setResetMode("auto"); setResetManual(""); }}>
-                          Reset code
-                        </button>
-                        {a.active_status
+                        {!a.is_archived && <button className="btn sm" onClick={() => openEdit(a)}>Edit</button>}
+                        {!a.is_archived && (
+                          <button className="btn sm" onClick={() => { setResetUid(a.user_id); setResetMode("auto"); setResetManual(""); }}>
+                            Reset code
+                          </button>
+                        )}
+                        {!a.is_archived && (
+                          <button className="btn sm" onClick={() => { setRoleUid(a.user_id); setRoleValue(a.role); setRoleErr(""); }}>
+                            Change role
+                          </button>
+                        )}
+                        {isLocked(a) && (
+                          <button className="btn sm" onClick={() => unlockMut.mutate(a.user_id)}>Unlock</button>
+                        )}
+                        {!a.is_archived && (a.active_status
                           ? <button className="btn sm danger" onClick={() => { if (window.confirm(`Disable ${a.display_name}?`)) disableMut.mutate(a.user_id); }}>Disable</button>
-                          : <button className="btn sm ok" onClick={() => reactivateMut.mutate(a.user_id)}>Reactivate</button>}
+                          : <button className="btn sm ok" onClick={() => reactivateMut.mutate(a.user_id)}>Reactivate</button>)}
+                        {!a.is_archived && (
+                          <button className="btn sm danger" onClick={() => { if (window.confirm(`Archive ${a.display_name}? This can be undone via Restore.`)) archiveMut.mutate({ uid: a.user_id, reason: undefined }); }}>
+                            Archive
+                          </button>
+                        )}
+                        {a.is_archived && (
+                          <button className="btn sm ok" onClick={() => restoreMut.mutate(a.user_id)}>Restore</button>
+                        )}
+                        {a.is_archived && (
+                          <button className="btn sm danger" onClick={() => { setDeleteUid(a.user_id); setDeleteErr(""); }}>
+                            Delete permanently
+                          </button>
+                        )}
                       </td>
                     )}
                   </tr>
@@ -405,6 +483,63 @@ export function Accounts() {
                   editMut.mutate({ uid: editUid, body });
                 }}>
                   {editMut.isPending ? "Saving…" : "Save Changes"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Change role modal (REM-46) */}
+      {roleUid && (() => {
+        const acct = (accounts.data ?? []).find(a => a.user_id === roleUid);
+        const allowed = (CREATE_ROLES[session?.role ?? ""] ?? []).filter(
+          r => acct && roleScopeType(r) === acct.scope_type,
+        );
+        return (
+          <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Change role">
+            <div className="modal-box" style={{ maxWidth: 380 }}>
+              <h2 style={{ marginTop: 0 }}>Change Role</h2>
+              <p className="muted">Account: <strong>{acct?.display_name ?? roleUid}</strong></p>
+              <p className="muted" style={{ fontSize: 12 }}>
+                Only roles at the same scope level ({SCOPE_LABELS[acct?.scope_type ?? ""] ?? acct?.scope_type}) can be assigned here.
+                Changing scope level requires archiving this account and creating a new one.
+              </p>
+              <label>New Role
+                <select value={roleValue} onChange={e => setRoleValue(e.target.value)}>
+                  {allowed.map(r => <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>)}
+                </select>
+              </label>
+              {roleErr && <p className="error">{roleErr}</p>}
+              <div className="modal-foot">
+                <button className="btn out" onClick={() => setRoleUid(null)}>Cancel</button>
+                <button className="btn primary" disabled={changeRoleMut.isPending || roleValue === acct?.role}
+                  onClick={() => changeRoleMut.mutate({ uid: roleUid, new_role: roleValue })}>
+                  {changeRoleMut.isPending ? "Saving…" : "Change Role"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Permanent delete confirmation (REM-46) */}
+      {deleteUid && (() => {
+        const acct = (accounts.data ?? []).find(a => a.user_id === deleteUid);
+        return (
+          <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Delete account permanently">
+            <div className="modal-box" style={{ maxWidth: 420 }}>
+              <h2 style={{ marginTop: 0 }}>Delete Account Permanently</h2>
+              <p className="muted">Account: <strong>{acct?.display_name ?? deleteUid}</strong></p>
+              <div className="alert warn" style={{ fontSize: 12, marginBottom: 10 }}>
+                This cannot be undone. Only succeeds if the account has no audit or login
+                history — otherwise it remains archived (the safe, reversible default).
+              </div>
+              {deleteErr && <p className="error">{deleteErr}</p>}
+              <div className="modal-foot">
+                <button className="btn out" onClick={() => { setDeleteUid(null); setDeleteErr(""); }}>Cancel</button>
+                <button className="btn danger" disabled={deleteMut.isPending} onClick={() => deleteMut.mutate(deleteUid)}>
+                  {deleteMut.isPending ? "Deleting…" : "Delete Permanently"}
                 </button>
               </div>
             </div>

@@ -22,6 +22,7 @@ export interface AccountRecord {
   flight_id: string | null; squadron_code: string | null; wing_code: string | null;
   active_status: boolean; last_login_at: string | null;
   code_last_changed: string | null; code_changed_by: string | null;
+  is_archived: boolean; archived_at: string | null; locked_until: string | null;
 }
 export interface AccountCreateResult extends AccountRecord {
   new_code: string; new_code_notice: string;
