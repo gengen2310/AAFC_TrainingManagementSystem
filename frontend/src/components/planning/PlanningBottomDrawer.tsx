@@ -7,6 +7,7 @@ import { ImportFacilitatorsModal } from "./ImportFacilitatorsModal";
 import { FacilitatorTimeline, type ZoomPreset } from "../charts/FacilitatorTimeline";
 import { FacilitatorScheduleList } from "../charts/FacilitatorScheduleList";
 import { Loading, ErrorNote } from "../ui";
+import { getProgramType } from "../../utils/planningFilters";
 import type {
   PlanningFacilitator, PlanningLocation,
   PlanningFacilitatorLeave, FacilitatorWorkload, EquipmentItem,
@@ -60,11 +61,6 @@ const labelSx: CSSProperties = {
 
 type SortDir = "asc" | "desc";
 
-function getProgramType(cs: string): "foundation" | "extension" | "optional" {
-  if (cs === "foundation" || cs === "core") return "foundation";
-  if (cs === "optional") return "optional";
-  return "extension";
-}
 
 const PROG_TYPE_STYLE: Record<string, CSSProperties> = {
   foundation: { fontSize: 9, fontWeight: 700, color: "#1A7F4B", background: "#d1fae5", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
@@ -122,7 +118,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
       if (fPhase && m.phase !== fPhase) return false;
       if (fElement && m.element !== fElement) return false;
       if (fSuitability && m.instructor_suitability !== fSuitability) return false;
-      if (fCore && getProgramType(m.core_status) !== fCore) return false;
+      if (fCore && getProgramType(m.phase) !== fCore) return false;
       if (fTerm && m.recommended_term !== fTerm) return false;
       if (fStatus === "scheduled" && !m.is_scheduled) return false;
       if (fStatus === "unscheduled" && m.is_scheduled) return false;
@@ -307,7 +303,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
 
                 const warnNoFac = m.is_scheduled && s0 && !s0.facilitator_id;
                 const warnNoRoom = m.is_scheduled && s0 && !s0.location_id;
-                const progType = getProgramType(m.core_status);
+                const progType = getProgramType(m.phase);
                 const warnCoreUnsched = !m.is_scheduled && progType === "foundation";
 
                 return (

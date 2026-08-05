@@ -3,6 +3,7 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../api";
 import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent } from "../../api/types";
 import { ActivityFullDetail, anchorToDisplay } from "./ActivityDetailBlock";
+import { getProgramType } from "../../utils/planningFilters";
 
 // ─── Drawer item discriminated union ──────────────────────────────────────────
 export type DrawerItem =
@@ -726,9 +727,7 @@ function ScheduleFromBacklogPanel({
           <div className="pw-drawer-section">
             <div className="pw-drawer-label">Program type</div>
             <div className="pw-drawer-value" style={{ textTransform: "capitalize" }}>
-              {mission.core_status === "foundation" || mission.core_status === "core" ? "Foundation"
-                : mission.core_status === "optional" ? "Optional"
-                : "Extension"}
+              {getProgramType(mission.phase)}
             </div>
           </div>
           {mission.instructor_suitability && (

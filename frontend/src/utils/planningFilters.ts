@@ -20,6 +20,26 @@ const PRIORITY_IMPORTANCE: Record<string, string> = {
   "Noting":      "recommended",
 };
 
+// Foundation/Extension/Optional per the national phase catalogue, not the
+// ambiguous 2-valued CurriculumItem.core_status field (core|additional) --
+// core_status made every "additional" item fall through to "Extension"
+// regardless of its actual phase. Derived instead from the governed phase
+// name's letter prefix (A-E = Orientation/Initial/Junior/Intermediate/Senior
+// = Foundation, I/J/K = Bronze/Silver/Gold = Extension), matching the
+// national CurriculumPhase catalogue's sort order (backend training.py). A
+// phase outside that set (a custom wing/squadron phase, or missing) is
+// Optional -- "other programs added by squadrons," per spec. Shared between
+// PlanningBottomDrawer.tsx and PlanningRightDrawer.tsx so the two can't
+// drift back out of sync with each other the way core_status-based copies did.
+const _FOUNDATION_PREFIXES = new Set(["A", "B", "C", "D", "E"]);
+const _EXTENSION_PREFIXES = new Set(["I", "J", "K"]);
+export function getProgramType(phase: string | null | undefined): "foundation" | "extension" | "optional" {
+  const prefix = (phase || "").trim().charAt(0).toUpperCase();
+  if (_FOUNDATION_PREFIXES.has(prefix)) return "foundation";
+  if (_EXTENSION_PREFIXES.has(prefix)) return "extension";
+  return "optional";
+}
+
 export function filterAnchors(
   anchors: AnchorEvent[],
   audience: Set<string>,
