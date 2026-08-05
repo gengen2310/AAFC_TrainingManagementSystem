@@ -115,18 +115,14 @@ For each limitation, Claude Code provides a technical recommendation. Only the a
 | Release recommendation | **ACCEPT FOR BETA** |
 | Owner acceptance | PENDING |
 
-### FL-03: No 100-User Load Test (Medium)
+### FL-03: No 100-User Load Test (RESOLVED)
 
 | Field | Value |
 |---|---|
 | Description | Load test not yet executed; concurrent capacity unknown |
-| User impact | Possible performance degradation during initial access surge |
-| Workaround | Release monitoring plan (`43_release_monitoring_plan.md`) covers this case |
-| Likelihood | LOW (16 squadrons × ~5 users each = 80 max concurrent) |
-| Consequence | Possible slowness; no data loss |
-| Recommended action | Accept for beta with monitoring; run load test before general availability |
-| Release recommendation | **ACCEPT FOR BETA WITH MONITORING** |
-| Owner acceptance | PENDING |
+| Fix status | **EXECUTED AND PASSED 2026-08-05** — 100 concurrent virtual users, full 46-minute sustained run against staging: 111,468 requests, 0 5xx errors, P95 253ms (vs. the 2000ms target). See `docs/beta/32_final_stress_and_resilience_report.md` for full detail, including one disclosed, non-reproduced anomaly from an earlier interrupted attempt (REM-79, low severity, not blocking). |
+| Release recommendation | Resolved — concurrent capacity now demonstrated at well above this deployment's realistic peak (16 squadrons × ~5 users ≈ 80 max concurrent; tested at 100) |
+| Owner acceptance | N/A — technical verification complete, this line item is closed |
 
 ### FL-04: Squadron Browser Verification Incomplete (Medium)
 
@@ -184,7 +180,7 @@ For each limitation, Claude Code provides a technical recommendation. Only the a
 | SL-03: No CSRF | Accept for beta | PENDING |
 | FL-01: Stale PW in production | **RESOLVED 2026-08-05** — deployed and verified live | N/A — closed |
 | FL-02: No E2E coverage | Accept for beta (partially addressed — see FL-04) | PENDING |
-| FL-03: No 100-user test | Accept with monitoring (in progress — Gate 7 load test running against staging as of this update; result to be recorded here on completion) | PENDING |
+| FL-03: No 100-user test | **RESOLVED 2026-08-05** — executed, PASS (0 5xx, P95 253ms, 111,468 requests) | N/A — closed |
 | FL-04: Browser verification | Accept for controlled beta (partially addressed 2026-08-05 — Gate 6 ran connected-frontend's full e2e suite live against staging: 35/45 passed, all 10 failures traced to one disclosed, non-code limitation — see `09_browser_e2e_verification.md`. Planning Workspace's own suite and full multi-role human browser walkthrough remain outstanding.) | PENDING |
 | FL-05: CEA manual | Expected | N/A |
 | IL-01–03 | Accept | N/A |
