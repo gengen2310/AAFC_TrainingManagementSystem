@@ -993,6 +993,15 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
              table above so existing Add/Edit/Delete Activity behaviour is unchanged. -->
         <div id="act-tab-squadron" style="margin-top:16px"></div>
 
+        <!-- Getting Help — admin-editable free text, visible to every role, edited by system_admin only -->
+        <div class="card" style="margin-top:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
+            <div class="ctitle" style="margin:0">Getting Help</div>
+            <button id="gh-edit-btn" class="btn btn-secondary btn-sm" style="display:none" onclick="openGettingHelpModal()">Edit</button>
+          </div>
+          <div id="gh-content-display" class="muted" style="font-size:12.5px;white-space:pre-wrap"></div>
+        </div>
+
         <!-- ── Planning Year section (Annual Program functions) ── -->
         <div class="card" style="margin-top:20px">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
@@ -1736,6 +1745,19 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-add-holiday')">Cancel</button>
       <button class="btn btn-primary" onclick="doAddHoliday()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Getting Help Edit Modal (system_admin only) -->
+<div class="modal-bg" id="m-getting-help">
+  <div class="modal">
+    <h2>Edit Getting Help Content</h2>
+    <div class="form-group"><label>Content</label><textarea id="gh-content-inp" rows="8" placeholder="e.g. Contact your Wing Training Officer for support with this page."></textarea></div>
+    <p id="gh-msg" style="color:var(--error)"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-getting-help')">Cancel</button>
+      <button class="btn btn-primary" onclick="doSaveGettingHelp()">Save</button>
     </div>
   </div>
 </div>
@@ -7146,10 +7168,36 @@ let _activitiesPageLoaded=false;
 async function _loadActivitiesPage(){
   renderActs();
   _actTabLoad('act-tab-squadron','squadron',null);
+  _loadGettingHelp();
   if(_activitiesPageLoaded)return;
   _activitiesPageLoaded=true;
   await _loadPlanningYears();
   if(P.currentYearId)loadYearMap(P.currentYearId);
+}
+async function _loadGettingHelp(){
+  const editBtn=document.getElementById('gh-edit-btn');
+  if(editBtn)editBtn.style.display=(S.role==='system_admin')?'inline-flex':'none';
+  try{
+    const r=await api('/api/activities/getting-help');
+    document.getElementById('gh-content-display').textContent=(r&&r.content)||'No help content has been added yet.';
+  }catch(_){
+    document.getElementById('gh-content-display').textContent='Could not load Getting Help content.';
+  }
+}
+function openGettingHelpModal(){
+  const current=document.getElementById('gh-content-display').textContent;
+  document.getElementById('gh-content-inp').value=(current==='No help content has been added yet.')?'':current;
+  document.getElementById('gh-msg').textContent='';
+  openModal('m-getting-help');
+}
+async function doSaveGettingHelp(){
+  const msgEl=document.getElementById('gh-msg');
+  const content=document.getElementById('gh-content-inp').value;
+  try{
+    await api('/api/activities/getting-help',{method:'PUT',body:{content}});
+    closeModal('m-getting-help');
+    await _loadGettingHelp();
+  }catch(e){ msgEl.textContent=apiErr(e); }
 }
 function renderActs(){
   const td=today();

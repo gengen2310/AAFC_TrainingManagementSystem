@@ -98,6 +98,13 @@ test.describe("Activities page", () => {
     await expect(page.locator("#hol-end-inp")).toBeVisible();
     await expect(page.locator("#hol-affects-inp")).toBeVisible();
   });
+
+  test("Getting Help section is visible with its Edit control hidden for sqn_admin", async ({ page }) => {
+    await loginSquadron(page, "ADMIN703");
+    await page.evaluate(() => (window as any).nav("activities"));
+    await expect(page.locator("#gh-content-display")).toBeVisible();
+    await expect(page.locator("#gh-edit-btn")).toBeHidden();
+  });
 });
 
 test.describe("Parade Nights — automatic generation", () => {
