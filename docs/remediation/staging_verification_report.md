@@ -4,6 +4,80 @@ Living document — append a new dated entry per deployment, per
 `.claude/rules/capability-preservation.md` §5 ("after every stage: ... record
 tests/evidence").
 
+## 2026-08-05 — Phase B: concretely-specified new features (REM-62 through REM-67)
+
+Branch `remediation/2026-08-04-complete-system-remediation`, commits `d4b4b18`
+through `8efa971`.
+
+Continuation of the same risk-register plan's Phase B (4 concretely-specified
+features). Full detail per item in `master_gap_register.csv` REM-62–REM-67.
+
+**Delivered**:
+1. **Getting Help** (REM-62) -- new admin-editable free-text section on the
+   Activities tab, backed by the existing generic `SystemSetting` table (no
+   new model/migration). Read open to any role; write requires `system_admin`,
+   audited. Built in both frontends.
+2. **Reference Data management** (REM-64, REM-65) -- every admin role can now
+   create Training Stages / Facilitator Types / Subject Areas at their own
+   scope from Account Management in both frontends. This surfaced and fixed a
+   real, independent P1 bug (REM-64): `wing_admin`/`national_admin`/
+   `system_admin` could never create a subject-area or facilitator-type tag
+   at ANY scope (the create endpoints unconditionally required
+   `p.squadron_id`, which those roles never have) -- directly contradicting
+   the risk register's explicit ask. Archive was also tightened: previously a
+   bare role check with zero ownership verification (any `sqn_admin` could
+   archive any tag regardless of scope).
+3. **Mission Backlog usability** (REM-66) -- verified the cancelled/reschedule
+   tag and Foundation/Extension/Optional relabeling are already built
+   (the latter via this program's own REM-59); font-consistency polish
+   deferred, honestly, pending live browser access.
+4. **Activities inline Holiday creation** (REM-67) -- verified already fully
+   built in both frontends; closed with no code change.
+
+**Bonus fix found during REM-62's e2e coverage work** (REM-63, P1): the
+Planning Workspace Activities tab crashed entirely
+(`"tmsActivitiesData is not iterable"`) for any caller with a resolved
+squadron -- i.e. most users -- because `GET /api/activities`'s
+`scope_type=squadron` path returns `{items, total, truncated}`, not a bare
+array, but the API client was typed and consumed as if it always returned a
+bare array. Invisible to prior e2e coverage because no existing test dwelt on
+the Activities tab itself. Fixed by unwrapping `.items` in the client method.
+
+**Pre-deploy gates**: `tsc --noEmit` clean throughout. `vitest run` → 22
+passed. Planning Workspace e2e → 89 passed, 0 failed (89th test is the new
+Reference Data test; also includes one caught-and-fixed WCAG color-contrast
+violation from opacity-dimmed scope-label text in the new UI, fixed before
+this entry). connected-frontend e2e (regular suite) → 33 passed, 0 failed.
+Full backend suite → 1132 passed, 5 skipped.
+
+**Investigation note**: an interim full-suite Planning Workspace e2e run
+showed 9 unrelated failures (facilitators, parade-nights, year-rollover) —
+diagnosed as cumulative rate-limit contamination from many consecutive manual
+debug/verification runs against the same long-lived local backend earlier in
+this session, not a code regression. Confirmed by a clean backend restart
+(kill + reseed + reload) reproducing a fully green 88/88 (then 89/89) run.
+Same root cause as this program's earlier documented "1.1 hour anomalous
+run" entry — this session's discipline of restarting the backend before
+trusting a full-suite result held up again.
+
+**Deployed**: all three application services, twice (once after REM-62/63/64,
+once after REM-65's Account Management UI landed on top).
+
+| Service | Deployment ID | Result |
+|---|---|---|
+| `aafc-tms-backend` (staging) | `c6ecca7d-6ad6-4455-974d-d7410ee9748d` | SUCCESS |
+| `aafc-tms-frontend` (staging) | `78752d98-59ac-4e34-b1d8-09a865cee886` | SUCCESS |
+| `aafc-tms-planning-workspace-preview` (staging) | `ca0f7a62-f233-47bb-9dba-45e126db48c1` | SUCCESS |
+
+**Post-deploy verification**: `GET /api/health/ready` → `{"status":"ready","squadrons":140}`.
+`aafc-tms-frontend` root → HTTP 200. `/planning` → HTTP 200.
+
+**Known gap, same as prior entries**: no live browser verification of any of
+these features' actual rendered behavior (no Chrome extension connectivity
+this session) — verified at the code/type-check/e2e-regression/API-test
+level. Each item's specific residual limitation is recorded per-row in
+`master_gap_register.csv`.
+
 ## 2026-08-05 — Phase A: risk-register/bug-list root-cause fixes (REM-53 through REM-61)
 
 Branch `remediation/2026-08-04-complete-system-remediation`, commits `38f871f`
