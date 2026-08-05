@@ -95,6 +95,17 @@ test("Activities tab shows Getting Help section, Edit hidden for sqn_admin", asy
   await expect(helpCard.getByRole("button", { name: "Edit" })).toHaveCount(0);
 });
 
+test("Account Management shows Reference Data card, sqn_admin can create a Training Stage", async ({ page }) => {
+  await page.goto("/accounts");
+  await expect(page.getByText("Reference Data")).toBeVisible({ timeout: 8000 });
+  await expect(page.getByText("your own scope (squadron)")).toBeVisible();
+  const stageName = `E2E PW Stage ${Date.now()}`;
+  const stageInput = page.getByPlaceholder("New Training Stage name…");
+  await stageInput.fill(stageName);
+  await stageInput.locator("..").getByRole("button", { name: "+ Add", exact: true }).click();
+  await expect(page.getByText(stageName)).toBeVisible({ timeout: 8000 });
+});
+
 test("read-only role (sqn_general) cannot see admin controls", async ({ page }) => {
   // Log out and back in as general user
   await page.getByRole("button", { name: /log out|sign out/i }).click();

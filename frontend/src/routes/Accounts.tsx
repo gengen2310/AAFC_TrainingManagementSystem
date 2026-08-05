@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { accountApi, orgApi } from "../api";
+import { accountApi, orgApi, trainingApi } from "../api";
+import type { TagRecord, PhaseRecord } from "../api";
 import { Card, Empty, Loading, ErrorNote } from "../components/ui";
 import { useAuth } from "../auth/AuthProvider";
 import type { AccountRecord, Flight } from "../api/types";
@@ -345,6 +346,8 @@ export function Accounts() {
         </Card>
       )}
 
+      {canWrite && <ReferenceDataCard />}
+
       {/* Create account modal */}
       {showCreate && (
         <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Create account">
@@ -595,5 +598,157 @@ export function Accounts() {
       {/* One-time new code display */}
       {newCode && <NewCodeModal code={newCode.code} forName={newCode.forName} onClose={() => setNewCode(null)} />}
     </div>
+  );
+}
+
+// ── Reference Data (Training Stages / Facilitator Types / Subject Areas) ──
+// "Respective to their scope" (risk-register submission) -- each admin role
+// creates at its own natural scope: sqn_admin -> squadron, wing_admin ->
+// wing, national_admin/system_admin -> national (tags call this "global").
+// Mirrors connected-frontend's equivalent card exactly. Backed by the
+// already-governed /api/curriculum/phases, /api/subject-area-tags,
+// /api/facilitator-type-tags endpoints -- see backend/app/routers/
+// training.py's _can_create_tag / _can_create_phase for the full scope/proxy
+// rules this UI intentionally simplifies down to the common case.
+type RefScope = "squadron" | "wing" | "national";
+type RefItem = TagRecord | PhaseRecord;
+interface RefConfig {
+  key: "phase" | "factype" | "subjarea";
+  label: string;
+  list: () => Promise<RefItem[]>;
+  create: (name: string, scope: RefScope) => Promise<unknown>;
+  archive: (id: string) => Promise<unknown>;
+  idOf: (item: RefItem) => string;
+  scopeOf: (item: RefItem) => RefScope;
+  wingIdOf: (item: RefItem) => string | null;
+  squadronIdOf: (item: RefItem) => string | null;
+}
+function naturalRefScope(role: string | undefined): RefScope | null {
+  if (role === "sqn_admin") return "squadron";
+  if (role === "wing_admin") return "wing";
+  if (role === "national_admin" || role === "system_admin") return "national";
+  return null;
+}
+const REF_CONFIGS: RefConfig[] = [
+  {
+    key: "phase", label: "Training Stages",
+    list: () => trainingApi.phases(),
+    create: (name, scope) => trainingApi.createPhase(name, scope),
+    archive: (id) => trainingApi.archivePhase(id),
+    idOf: (i) => (i as PhaseRecord).phase_id,
+    scopeOf: (i) => ((i as PhaseRecord).scope_level === "national" ? "national" : (i as PhaseRecord).scope_level) as RefScope,
+    wingIdOf: (i) => (i as PhaseRecord).wing_id,
+    squadronIdOf: (i) => (i as PhaseRecord).squadron_id,
+  },
+  {
+    key: "factype", label: "Facilitator Types",
+    list: () => trainingApi.facilitatorTypeTags() as unknown as Promise<RefItem[]>,
+    create: (name, scope) => trainingApi.createFacilitatorTypeTag(name, scope === "national" ? "global" : scope),
+    archive: (id) => trainingApi.archiveFacilitatorTypeTag(id),
+    idOf: (i) => (i as TagRecord).tag_id,
+    scopeOf: (i) => ((i as TagRecord).scope === "global" ? "national" : (i as TagRecord).scope) as RefScope,
+    wingIdOf: (i) => (i as TagRecord).wing_id,
+    squadronIdOf: (i) => (i as TagRecord).squadron_id,
+  },
+  {
+    key: "subjarea", label: "Subject Areas",
+    list: () => trainingApi.subjectAreaTags(),
+    create: (name, scope) => trainingApi.createSubjectAreaTag(name, scope === "national" ? "global" : scope),
+    archive: (id) => trainingApi.archiveSubjectAreaTag(id),
+    idOf: (i) => (i as TagRecord).tag_id,
+    scopeOf: (i) => ((i as TagRecord).scope === "global" ? "national" : (i as TagRecord).scope) as RefScope,
+    wingIdOf: (i) => (i as TagRecord).wing_id,
+    squadronIdOf: (i) => (i as TagRecord).squadron_id,
+  },
+];
+
+function RefDataSection({ config, naturalScope, ownWingId, ownSquadronId }: {
+  config: RefConfig; naturalScope: RefScope; ownWingId: string | null; ownSquadronId: string | null;
+}) {
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [err, setErr] = useState<unknown>(null);
+  const q = useQuery({ queryKey: ["refdata", config.key], queryFn: config.list });
+
+  const createMut = useMutation({
+    mutationFn: () => config.create(name.trim(), naturalScope),
+    onSuccess: () => { setName(""); setErr(null); qc.invalidateQueries({ queryKey: ["refdata", config.key] }); },
+    onError: (e) => setErr(e),
+  });
+  const archiveMut = useMutation({
+    mutationFn: (id: string) => config.archive(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["refdata", config.key] }),
+  });
+
+  const items = q.data ?? [];
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>
+        {config.label}
+      </div>
+      {q.isLoading ? <Loading /> : items.length === 0 ? (
+        <p className="muted" style={{ fontSize: 11 }}>None yet.</p>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+          {items.map((it) => {
+            const scope = config.scopeOf(it);
+            const mine = scope === naturalScope && (
+              naturalScope === "national" ||
+              (naturalScope === "wing" && config.wingIdOf(it) === ownWingId) ||
+              (naturalScope === "squadron" && config.squadronIdOf(it) === ownSquadronId)
+            );
+            const label = "display_name" in it ? it.display_name : "";
+            return (
+              <span key={config.idOf(it)} className="badge" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                {label} <em className="muted" style={{ fontStyle: "normal", fontSize: 9 }}>{scope}</em>
+                {mine && (
+                  <button
+                    onClick={() => { if (window.confirm("Archive this item? It will no longer appear in pickers, but existing records are unaffected.")) archiveMut.mutate(config.idOf(it)); }}
+                    style={{ border: "none", background: "none", cursor: "pointer", color: "var(--danger)", fontSize: 11, padding: 0 }}
+                    title="Archive"
+                  >×</button>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 6 }}>
+        <input
+          value={name} onChange={(e) => setName(e.target.value)}
+          placeholder={`New ${config.label.replace(/s$/, "")} name…`}
+          style={{ flex: 1, minWidth: 160 }}
+        />
+        <button className="btn sm primary" disabled={!name.trim() || createMut.isPending} onClick={() => createMut.mutate()}>
+          {createMut.isPending ? "Adding…" : "+ Add"}
+        </button>
+      </div>
+      {err != null && <ErrorNote error={err} />}
+    </div>
+  );
+}
+
+function ReferenceDataCard() {
+  const { session } = useAuth();
+  const naturalScope = naturalRefScope(session?.role);
+  if (!naturalScope) return null;
+  return (
+    <Card title="Reference Data">
+      <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+        Training stages, facilitator types, and subject areas are created here at your own scope ({naturalScope}).
+      </p>
+      <div style={{ display: "grid", gap: 14 }}>
+        {REF_CONFIGS.map((c) => (
+          <RefDataSection
+            key={c.key}
+            config={c}
+            naturalScope={naturalScope}
+            ownWingId={session?.wing_id ?? null}
+            ownSquadronId={session?.squadron_id ?? null}
+          />
+        ))}
+      </div>
+    </Card>
   );
 }

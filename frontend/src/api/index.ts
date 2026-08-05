@@ -68,6 +68,25 @@ export interface CanonicalActivity {
   read_only: boolean;
 }
 
+export interface TagRecord {
+  tag_id: string;
+  display_name: string;
+  normalised_name: string;
+  scope: "global" | "wing" | "squadron";
+  wing_id: string | null;
+  squadron_id: string | null;
+  is_active: boolean;
+}
+
+export interface PhaseRecord {
+  phase_id: string;
+  name: string;
+  display_name: string;
+  scope_level: "system" | "national" | "wing" | "squadron";
+  wing_id: string | null;
+  squadron_id: string | null;
+}
+
 export const trainingApi = {
   // squadron_id (optional): lets a wing/national viewer see a specific squadron's
   // data without needing Proxy/Delegated Intervention Mode — see backend/app/
@@ -136,6 +155,21 @@ export const trainingApi = {
   // NCO/Senior Cadet/Civilian), so a facilitator created there got a `type` no
   // dropdown anywhere could later recognise (Stage 8, 2026-08-05).
   facilitatorTypeTags: () => api.get<{ tag_id: string; display_name: string }[]>("/api/facilitator-type-tags"),
+  createFacilitatorTypeTag: (display_name: string, scope: string) =>
+    api.post<{ tag_id: string }>("/api/facilitator-type-tags", { display_name, scope }),
+  archiveFacilitatorTypeTag: (tag_id: string) => api.delete<{ ok: boolean }>(`/api/facilitator-type-tags/${tag_id}`),
+  // Subject-area tags -- same shape/scope model as facilitator-type tags (see
+  // backend/app/routers/training.py's _tag_out / _can_create_tag).
+  subjectAreaTags: () => api.get<TagRecord[]>("/api/subject-area-tags"),
+  createSubjectAreaTag: (display_name: string, scope: string) =>
+    api.post<{ tag_id: string }>("/api/subject-area-tags", { display_name, scope }),
+  archiveSubjectAreaTag: (tag_id: string) => api.delete<{ ok: boolean }>(`/api/subject-area-tags/${tag_id}`),
+  // Training-stage (CurriculumPhase) reference data -- same governed catalogue
+  // used by the dashboard's Progress-by-Phase chart and curriculum item forms.
+  phases: () => api.get<PhaseRecord[]>("/api/curriculum/phases"),
+  createPhase: (name: string, scope_level: string) =>
+    api.post<{ phase_id: string }>("/api/curriculum/phases", { name, display_name: name, scope_level }),
+  archivePhase: (phase_id: string) => api.post<{ ok: boolean }>(`/api/curriculum/phases/${phase_id}/archive`),
   trainingAreas: (squadron_id?: string) => api.get<TrainingArea[]>(`/api/training-areas${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   equipment: (squadron_id?: string) => api.get<Equipment[]>(`/api/equipment${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   clashes: (date: string) => api.get<ClashResult>(`/api/resources/clashes?date=${date}`),
