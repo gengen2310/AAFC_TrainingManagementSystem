@@ -53,3 +53,52 @@ CORS misconfiguration) with genuine browser evidence rather than assuming it wor
 final GO/NO-GO: Term/8-week/2-week/Custom-range views specifically (the original brief's named
 regression targets — blank screen, infinite loading, Custom Range 422), logout propagation across
 both origins, and a pass at 125%/150% browser zoom.
+
+## Gate 6 re-run — full `playwright.connected.staging.config.ts` suite, 2026-08-05
+
+Full connected-frontend e2e suite run against live staging (`aafc-tms-frontend-staging`,
+`aafc-tms-backend-staging`), real Chromium, not localhost.
+
+**Result: 35 passed, 10 failed.**
+
+### The 10 failures — all one known, disclosed limitation, not new defects
+
+Every failing test calls a login helper with the hardcoded code `SYSADMIN2026`
+(`training-dashboard.spec.ts` ×8, `activities-inheritance.spec.ts` ×1, `hostile-value-xss.spec.ts`
+×1). Confirmed directly via `curl -X POST .../api/auth/login -d '{"code":"SYSADMIN2026"}'` against
+staging: `401 {"detail":{"error":"invalid_code"}}`. Staging's actual system_admin bootstrap code is
+generated from the `STAGING_BOOTSTRAP_SYSADMIN_CODE` env var at deploy time and was never disclosed
+to this session — correctly so, per this project's own security discipline (`.claude/rules/security.md`:
+never retrieve existing access codes). Counted the total `SYSADMIN2026`-dependent tests in the suite
+(`grep -c SYSADMIN2026 e2e-connected/*.spec.ts`) — exactly 10, an exact match to the 10 failures. No
+unexplained failure exists in this run.
+
+**Disclosed limitation, not closed**: this session cannot exercise system_admin-only flows against
+staging (National Training Dashboard, System Administrator scope-drill, hostile-value XSS check
+under system_admin, National-scope activity inheritance) without a human supplying the real staging
+bootstrap code out-of-band. This is Gate 10 (human-gated items) territory, not a Gate 6 defect.
+
+### A real P0 defect found and fixed during this pass (see REM-77)
+
+One of the failures investigated in this run — `activities-inheritance.spec.ts`'s companion
+`main-tms.spec.ts` "Reference Data / Training Stage" test — led to discovering that
+`GET /api/curriculum/phases` and `GET /api/facilitator-type-tags` were 500ing on **any** real
+Postgres environment (both staging and production) with `psycopg2.errors.UndefinedColumn:
+...updated_by does not exist`. Root-caused to migrations v42/v45 both omitting a `TimestampMixin`
+column (the same defect class v24 and v40 already patched twice before). Fixed via migration
+`5a195a98148a` (v47), given a permanent AST-based regression test
+(`backend/tests/test_migration_schema_drift.py`), deployed to staging then production, verified via
+direct curl against both live URLs (200 with real data, previously 500), and merged to `main`. Full
+detail: `docs/remediation/master_gap_register.csv` REM-77.
+
+Two unrelated bugs in this session's own test code were found and fixed in the same investigation
+(not product defects): `main-tms.spec.ts`'s "bulk-mark remaining sessions delivered" test had a
+`localhost:8000` fallback that ignored `E2E_BACKEND_BASE_URL` when set, and a hardcoded date that
+collided with a leftover record from an earlier manual run against staging's persistent (never
+reseeded) database. Both fixed; the test now passes cleanly against live staging.
+
+### Planning Workspace suites — not yet re-run this pass
+
+`playwright.planning.staging.config.ts` and `playwright.staging.config.ts` (the latter historically
+CORS-blocked for most tests when proxying local Vite → staging backend) were not re-run in this
+gate pass. Recommend running before final GO/NO-GO consolidation (Gate 11).
