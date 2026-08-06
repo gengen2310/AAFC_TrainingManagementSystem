@@ -423,17 +423,28 @@ staging_api_call() {
 # ── Playwright smoke (hard gate) ──────────────────────────────────────────────
 require_playwright_smoke() {
   local pattern="$1" desc="$2"
-  local spec="tools/playwright-staging/tests/staging-verification.spec.ts"
-  if ! command -v npx &>/dev/null || [ ! -f "$spec" ]; then
-    die "Playwright not available — required gate cannot run: $desc. Install dependencies."
+  local pw_dir="tools/playwright-staging"
+  local spec="tests/staging-verification.spec.ts"
+  if [ ! -d "$pw_dir" ] || [ ! -f "$pw_dir/$spec" ]; then
+    die "Playwright staging suite not found — required gate cannot run: $desc. Check $pw_dir."
   fi
+  # Check required staging role credentials.
+  [ -z "${STAGING_SQN_ADMIN_CODE:-}" ] \
+    && die "STAGING_SQN_ADMIN_CODE env var required for Playwright gate — HARD FAIL."
   info "Running required Playwright gate: $desc"
-  npx playwright test \
-      --project=chromium \
-      --grep "$pattern" \
-      --reporter=line \
-      --timeout=60000 \
-      "$spec" 2>&1 \
+  # Run from the playwright-staging dir so the local playwright binary and config
+  # are picked up. Map STAGING_SYSTEM_ADMIN_CODE → STAGING_SYSADMIN_CODE for the
+  # test auth helpers which use that name.
+  (
+    cd "$pw_dir"
+    STAGING_SYSADMIN_CODE="${STAGING_SYSTEM_ADMIN_CODE:-}" \
+    npx playwright test \
+        --project=chromium \
+        --grep "$pattern" \
+        --reporter=line \
+        --timeout=60000 \
+        "$spec" 2>&1
+  ) \
     && ok "Playwright gate PASSED: $desc" \
     || die "Playwright gate FAILED: $desc — HARD FAIL."
 }
