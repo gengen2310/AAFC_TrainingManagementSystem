@@ -473,8 +473,12 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   .sidenav.nav-open{display:block;}
   .nav-overlay{display:none;position:fixed;inset:0;top:52px;background:rgba(0,0,0,.35);z-index:299;}
   .nav-overlay.nav-open{display:block;}
-  .btn-hamburger{display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:6px 8px;margin-right:4px;color:white;}
+  /* 44×44px min touch target for hamburger */
+  .btn-hamburger{display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:10px 8px;margin-right:4px;color:white;min-height:44px;min-width:44px;}
   .btn-hamburger span{display:block;width:20px;height:2px;background:white;margin:4px 0;border-radius:1px;}
+  /* Compact topbar: hide redundant unit name (shown in scope-banner below) and print-only action */
+  .tb-sep,.tb-unit{display:none;}
+  #btn-print-program{display:none!important;}
   .main{padding:14px;}
   .stats-grid{grid-template-columns:repeat(2,1fr);}
   .form-row{grid-template-columns:1fr;}
@@ -585,7 +589,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="tb-unit" id="tb-unit">Training System</div>
     </div>
     <div class="tb-right">
-      <button class="tb-btn no-print" onclick="nav('weekly-program')" title="Quick print weekly program">Print Program</button>
+      <button id="btn-print-program" class="tb-btn no-print" onclick="nav('weekly-program')" title="Quick print weekly program">Print Program</button>
       <span class="sqn-chip" id="tb-chip">SQN</span>
       <button class="tb-btn no-print" onclick="doLogout()">Sign Out</button>
     </div>
@@ -10777,6 +10781,12 @@ function closeMobileNav(){
   if(overlay)overlay.classList.remove('nav-open');
   if(btn)btn.setAttribute('aria-expanded','false');
 }
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){
+    const sidenav=document.querySelector('.sidenav');
+    if(sidenav&&sidenav.classList.contains('nav-open'))closeMobileNav();
+  }
+});
 </script>
 </body>
 </html>
