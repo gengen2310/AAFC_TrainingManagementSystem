@@ -130,10 +130,11 @@ test("[Nav] Mobile — hamburger opens drawer, Parade Nights visible and clickab
     await expect(missionItem).toBeVisible();
   }
 
-  // Close overlay by clicking outside
+  // Close overlay by clicking outside (right of sidenav — sidenav is 210px wide on 390px viewport;
+  // clicking at the overlay's center x≈195 would be intercepted by the sidenav at z-index:300)
   const overlay = page.locator(".nav-overlay");
   await expect(overlay, "Overlay must be visible when drawer is open").toBeVisible();
-  await overlay.click();
+  await overlay.click({ position: { x: 300, y: 200 } });
   await expect(sidenav, "Drawer must close after overlay click").not.toBeVisible();
 
   expect(errors, `Console/page errors on mobile nav: ${errors.join("; ")}`).toHaveLength(0);
