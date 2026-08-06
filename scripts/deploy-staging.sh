@@ -422,7 +422,7 @@ staging_api_call() {
 
 # ── Playwright smoke (hard gate) ──────────────────────────────────────────────
 require_playwright_smoke() {
-  local pattern="$1" desc="$2"
+  local pattern="$1" desc="$2" project="${3:-chromium}"
   local pw_dir="tools/playwright-staging"
   local spec="tests/staging-verification.spec.ts"
   if [ ! -d "$pw_dir" ] || [ ! -f "$pw_dir/$spec" ]; then
@@ -431,7 +431,7 @@ require_playwright_smoke() {
   # Check required staging role credentials.
   [ -z "${STAGING_SQN_ADMIN_CODE:-}" ] \
     && die "STAGING_SQN_ADMIN_CODE env var required for Playwright gate — HARD FAIL."
-  info "Running required Playwright gate: $desc"
+  info "Running required Playwright gate: $desc (project=$project)"
   # Run from the playwright-staging dir so the local playwright binary and config
   # are picked up. Map STAGING_SYSTEM_ADMIN_CODE → STAGING_SYSADMIN_CODE for the
   # test auth helpers which use that name.
@@ -439,7 +439,7 @@ require_playwright_smoke() {
     cd "$pw_dir"
     STAGING_SYSADMIN_CODE="${STAGING_SYSTEM_ADMIN_CODE:-}" \
     npx playwright test \
-        --project=chromium \
+        --project="$project" \
         --grep "$pattern" \
         --reporter=line \
         --timeout=60000 \
@@ -925,7 +925,8 @@ ok "Frontend build fingerprint: $FRONTEND_BUILD"
 
 echo
 echo "  ── Frontend gate 4/4: Playwright smoke ──────────────────────────────"
-require_playwright_smoke '\[Dashboard\]|\[Nav\] Mobile|\[Network\]' "Dashboard + Mobile nav + Network"
+require_playwright_smoke '\[Dashboard\]|\[Network\]' "Dashboard + Network" chromium
+require_playwright_smoke '\[Nav\] Mobile' "Mobile nav" mobile
 ok "Frontend gate PASSED."
 
 # ══════════════════════════════════════════════════════════════════════════════
