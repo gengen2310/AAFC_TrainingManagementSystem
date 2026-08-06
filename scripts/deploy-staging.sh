@@ -965,7 +965,7 @@ _pw_elapsed=0
 while [ "$_pw_elapsed" -lt 180 ]; do
   if curl -s --connect-timeout 10 --max-time 30 \
     "https://$EXPECTED_STAGING_PW_DOMAIN/" 2>/dev/null \
-    | grep -qiE 'react|vite|__vite_|data-reactroot'; then
+    | grep -qiE 'id="root"|type="module"|/assets/'; then
     _pw_ready=1
     break
   fi
@@ -973,8 +973,8 @@ while [ "$_pw_elapsed" -lt 180 ]; do
   sleep 15
   _pw_elapsed=$((_pw_elapsed + 15))
 done
-[ "$_pw_ready" -eq 0 ] && die "PW HTML lacks React app markers after 180s — HARD FAIL."
-ok "PW HTML contains React app markers"
+[ "$_pw_ready" -eq 0 ] && die "PW HTML lacks React app markers (id=root / type=module / /assets/) after 180s — HARD FAIL."
+ok "PW HTML contains React app markers (id=root / type=module / /assets/)"
 PW_BUILD=$(curl -s --connect-timeout 15 --max-time 60 \
   "https://$EXPECTED_STAGING_PW_DOMAIN/" 2>/dev/null \
   | grep -o 'name="app-build" content="[^"]*"' | head -1 || echo "no fingerprint")
