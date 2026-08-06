@@ -108,7 +108,7 @@ The following findings from `docs/ui-review/ux_findings.md`, `accessibility_find
 | Original ID | Description | Audit priority | Release-register severity | Rationale |
 |---|---|---|---|---|
 | F-NAV-01 | Main TMS mobile nav completely absent | P0 | **FIXED** — hamburger+drawer were already implemented; UX pass added 44px touch target, compact topbar (tb-sep/tb-unit hidden on mobile), hide Print Program on mobile, Escape key to close |
-| A11Y-01 | 83 unlabelled `<select>` elements | P0 | **HIGH** | Essential controls inaccessible to screen reader users; 85 found, only 2 fixed |
+| A11Y-01 | 83 unlabelled `<select>` elements | P0 | **FIXED** — `aria-label` added to all 83 unlabelled selects in `connected-frontend/index.html` (static HTML + JS-generated templates); 2 pre-existing `aria-label` selects and 3 already correctly associated via `<label for=...>` untouched |
 | F-FUNC-01 | `national_viewer` shown Audit nav but backend returns 403 | P1 | **FIXED** — `national_viewer` added to `_AUDIT_READ_ROLES` (this pass) |
 | A11Y-02 | Colour-contrast 40-43 violations/page | P1 | **CLOSED** — fix deployed in production (ca785b4 in all deployed artefacts) |
 | F-NAV-02 | Inconsistent login experience (5-step vs 1-step) | P1 | MEDIUM — design decision required; intentional security difference |
@@ -195,7 +195,7 @@ All items in the UI remediation backlog except the three colour-contrast and `__
 | HOL-EDIT-01 — Holiday records not editable | **FIXED** | PATCH endpoint added to `planning.py`; Edit modal added to `connected-frontend`; 2 regression tests pass |
 | HOL-TYPE-01 — Holiday type always school_holiday | **FIXED** | Type selector added to Add Holiday form; `holiday_type` sent on POST; regression test passes |
 | F-NAV-01 — Main TMS mobile nav absent | OPEN — P0 | Requires implementation: hamburger button, slide-in drawer, focus management, Escape-to-close, backdrop, ARIA labelling |
-| A11Y-01 — 83 unlabelled select elements | OPEN — HIGH | Requires systematic pass through `connected-frontend/index.html`; 83 of 85 remain |
+| A11Y-01 — 83 unlabelled select elements | **FIXED** | `aria-label` added to all 83 selects in `connected-frontend/index.html` (static HTML + JS template literals); 0 unlabelled selects remain |
 | F-CONT-01 — Wing Overview table illegible | OPEN — MEDIUM | Requires redesign: pagination or collapsible rows |
 | A11Y-03 — No `<h1>` in Main TMS SPA | OPEN — MEDIUM | Single-pass change across page-{id} blocks |
 | A11Y-04 — No landmark regions | OPEN — MEDIUM | Add `role="navigation"`, `role="main"`, `role="banner"` |
@@ -301,7 +301,7 @@ All 13 addendum defects imported (REM-96 through REM-108).
 | P0 item | Status |
 |---|---|
 | F-NAV-01 — Main TMS mobile nav absent | **FIXED** — hamburger+drawer pre-existed; UX improvements added (44px touch target, compact topbar, Print Program hidden on mobile, Escape key) |
-| A11Y-01 — 83 unlabelled selects | OPEN |
+| A11Y-01 — 83 unlabelled selects | **FIXED this pass** |
 | PW-CTX-01 — Planning Workspace MODULE_MODE crash | **FIXED this pass** |
 
 ### P1 Status
@@ -323,6 +323,10 @@ Axe-core: 0 critical/serious violations (last verified locally against ca785b4 �
 
 **FIXED** — The hamburger+drawer implementation was present in `connected-frontend/index.html` before this reconciliation pass was written (confirmed by git history and screenshots in `docs/ui-review/screenshots/main-tms/`; the `[Nav] Mobile` Playwright test passes against staging). The reconciliation doc's "ABSENT in both frontends (code confirmed)" was incorrect. UX improvements committed: 44px touch target, compact topbar (tb-sep/tb-unit hidden on mobile to prevent 3-line wrap), Print Program button hidden on mobile, Escape key closes drawer. Planning Workspace mobile nav remains unaddressed (separate app, separate defect).
 
+### A11Y-01 Unlabelled Selects Result
+
+**FIXED** — `aria-label` added to all 83 unlabelled `<select>` elements in `connected-frontend/index.html`. Coverage: 59 static HTML selects (auth, filters, settings, modals) and 24 JS-generated selects in template literals (`buildSlots`, `renderPNDetail`, `quickEdit`, `_actTabHtml`, `_ttBlockRow`). Exceptions intentionally left untouched: `#curr-f-el` and `#curr-f-prog` (pre-existing `aria-label`); `#or-reason`, `#dash-window`, and `#cmd-window-sel` (already correctly associated via `<label for=...>`); `#ca-flight` (parent has `aria-hidden="true"` and select has `tabindex="-1"` — intentionally hidden from assistive technology).
+
 ### National Viewer Audit Result
 
 **FIXED** — `national_viewer` added to `_AUDIT_READ_ROLES` in `organisations.py`. 2 regression tests pass (F-FUNC-01 regression: national_viewer gets 200 from GET /api/audit; write operations still return 403).
@@ -339,11 +343,11 @@ Axe-core: 0 critical/serious violations (last verified locally against ca785b4 �
 
 1. **Gate 10 human actions** (G10-01 through G10-13) — all pending organisational authority
 2. **F-NAV-01** mobile navigation — **FIXED** (UX improvements + correct assessment: implementation was pre-existing)
-3. **A11Y-01** 83 unlabelled selects — HIGH severity, not yet systematically fixed
+3. **A11Y-01** 83 unlabelled selects — **FIXED** (`aria-label` added to all selects this pass)
 4. **Staging deploy of this pass's fixes** (PW-CTX-01, F-FUNC-01, HOL-TYPE-01/EDIT-01) — **DONE** (deployed and Playwright-verified this session)
 
 ### Release Recommendation
 
 **CONTROLLED TRIAL TECHNICALLY READY — ORGANISATIONAL APPROVAL PENDING**
 
-Engineering evidence supports a controlled trial with the trial Squadron already in production (`squadrons: 15`). The four fixes applied this pass (PW-CTX-01, F-FUNC-01, HOL-TYPE-01, HOL-EDIT-01) should be deployed to staging for verification before production. Two HIGH-severity UI items (mobile nav, unlabelled selects) remain open and should be communicated to trial users as known limitations pending remediation. No engineering gate blocks the controlled trial; Gate 10 organisational actions do.
+Engineering evidence supports a controlled trial with the trial Squadron already in production (`squadrons: 15`). Six fixes have been applied this pass: PW-CTX-01, F-FUNC-01, HOL-TYPE-01, HOL-EDIT-01, F-NAV-01 (UX improvements), and A11Y-01 (83 selects labelled). All should be deployed to staging for verification before production. No HIGH-severity UI items remain open from the audit. No engineering gate blocks the controlled trial; Gate 10 organisational actions do.

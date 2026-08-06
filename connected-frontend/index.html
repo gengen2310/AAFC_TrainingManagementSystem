@@ -532,7 +532,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div id="auth-step1" style="display:none">
       <div class="fg">
         <label>Account type</label>
-        <select id="auth-type" onchange="onAuthTypeChange()">
+        <select id="auth-type" aria-label="Account type" onchange="onAuthTypeChange()">
           <option value="">Select…</option>
           <option value="squadron">Squadron</option>
           <option value="wing">Wing</option>
@@ -542,14 +542,14 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <!-- Wing selector (squadron + wing login types) -->
       <div class="fg" id="auth-wing-wrap" style="display:none">
         <label>Wing</label>
-        <select id="auth-wing-select" onchange="onAuthWingChange()">
+        <select id="auth-wing-select" aria-label="Wing" onchange="onAuthWingChange()">
           <option value="">Select wing…</option>
         </select>
       </div>
       <!-- Squadron / Unit selector (squadron login type only) -->
       <div class="fg" id="auth-sqn-wrap" style="display:none">
         <label>Squadron / Unit</label>
-        <select id="auth-sqn-select" onchange="onAuthFieldChange()">
+        <select id="auth-sqn-select" aria-label="Squadron / Unit" onchange="onAuthFieldChange()">
           <option value="">Select squadron…</option>
         </select>
       </div>
@@ -557,7 +557,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <input type="hidden" id="auth-ident" value="">
       <div class="fg" id="auth-role-wrap" style="display:none">
         <label>Role</label>
-        <select id="auth-role" onchange="onAuthFieldChange()">
+        <select id="auth-role" aria-label="Role" onchange="onAuthFieldChange()">
           <option value="">Select…</option>
         </select>
       </div>
@@ -605,10 +605,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
        existing enterMode()/exitMode() machinery shared with Wing Admin's Proxy Mode. -->
   <div class="no-print" id="sa-scope-bar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 16px;background:#eef4fa;border-bottom:1px solid var(--border);font-size:12px">
     <span style="font-weight:700;color:var(--dark)">Viewing:</span>
-    <select id="sa-scope-wing" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px" onchange="saSelectWing(this.value)">
+    <select id="sa-scope-wing" aria-label="Browse Wing" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px" onchange="saSelectWing(this.value)">
       <option value="">National (all Wings)</option>
     </select>
-    <select id="sa-scope-sqn" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;display:none" onchange="saSelectSquadron(this.value)">
+    <select id="sa-scope-sqn" aria-label="Browse Squadron" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;display:none" onchange="saSelectSquadron(this.value)">
       <option value="">Wing overview (all units)</option>
     </select>
     <button class="btn btn-xs" id="sa-scope-di-btn" style="display:none" onclick="saEnterIntervention()">Enter Intervention Mode (for writes)</button>
@@ -674,7 +674,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <option value="week">This Week</option>
               <option value="year">This Year</option>
             </select>
-            <select id="dash-sqn-filter" onchange="loadDashCharts()" style="display:none;padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px"><option value="">All Squadrons</option></select>
+            <select id="dash-sqn-filter" aria-label="Filter by squadron" onchange="loadDashCharts()" style="display:none;padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px"><option value="">All Squadrons</option></select>
           </div>
         </div>
 
@@ -863,7 +863,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <div class="cal-mo" id="cal-m"></div>
             <button class="cal-nbtn" onclick="calMove(1)" aria-label="Next month">›</button>
             <div style="flex:1"></div>
-            <select onchange="calYear=+this.value;renderCal()" id="cal-yr" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;">
+            <select onchange="calYear=+this.value;renderCal()" id="cal-yr" aria-label="Calendar year" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;">
               <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
             </select>
           </div>
@@ -889,12 +889,12 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </div>
         </div>
         <div class="fbar no-print">
-          <select id="pn-f-term" onchange="renderPN()">
+          <select id="pn-f-term" aria-label="Filter by term" onchange="renderPN()">
             <option value="all">All Terms</option>
             <option value="T1">Term 1</option><option value="T2">Term 2</option>
             <option value="T3">Term 3</option><option value="T4">Term 4</option>
           </select>
-          <select id="pn-f-status" onchange="renderPN()">
+          <select id="pn-f-status" aria-label="Filter by status" onchange="renderPN()">
             <option value="all">All Statuses</option>
             <option value="planned">Planned</option><option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option><option value="rescheduled">Rescheduled</option>
@@ -911,12 +911,12 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="card no-print">
           <div class="ff">
             <label>Parade Night</label>
-            <select id="wp-sel" onchange="renderWP()"><option value="">— Choose a parade night —</option></select>
+            <select id="wp-sel" aria-label="Select parade night" onchange="renderWP()"><option value="">— Choose a parade night —</option></select>
           </div>
         </div>
         <div class="fbar no-print">
           <input id="wp-search" placeholder="Search facilitator, room, curriculum item…" oninput="renderWP()" style="min-width:220px">
-          <select id="wp-f-status" onchange="renderWP()">
+          <select id="wp-f-status" aria-label="Filter by status" onchange="renderWP()">
             <option value="all">All Statuses</option>
             <option value="planned">Planned</option><option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option><option value="rescheduled">Rescheduled</option>
@@ -997,7 +997,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </div>
         </div>
         <div class="fbar no-print">
-          <select id="act-f-type" onchange="renderActs()">
+          <select id="act-f-type" aria-label="Filter by activity type" onchange="renderActs()">
             <option value="all">All Types</option>
             <option value="Must Attend">Must Attend</option>
             <option value="Key Event">Key Event</option>
@@ -1031,7 +1031,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="card" style="margin-top:20px">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
             <div class="ctitle" style="margin:0">Planning Year</div>
-            <select id="py-select" onchange="loadYearMap(this.value)" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;flex:1;min-width:180px">
+            <select id="py-select" aria-label="Select planning year" onchange="loadYearMap(this.value)" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;flex:1;min-width:180px">
               <option value="">— select a planning year —</option>
             </select>
             <span id="py-ctx-label-sqn" style="font-size:11px;color:var(--muted)"></span>
@@ -1040,7 +1040,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </div>
           <div id="py-sqn-filter-row" style="display:none;margin-bottom:12px">
             <label style="font-size:11px;font-weight:700;color:var(--muted);margin-right:8px">Squadron filter:</label>
-            <select id="py-sqn-filter" onchange="_loadPlanningYears()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px"></select>
+            <select id="py-sqn-filter" aria-label="Filter planning years by squadron" onchange="_loadPlanningYears()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px"></select>
           </div>
           <div id="py-map-body" style="min-height:40px"><p class="muted">Select a planning year to view the annual overview.</p></div>
         </div>
@@ -1073,7 +1073,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="ph-title">Facilitators</div>
           <div class="ph-actions no-print">
             <input id="fac-search" placeholder="Search name or rank…" oninput="renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px;min-width:160px">
-            <select id="fac-filter" onchange="S.facFilter=this.value;renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px">
+            <select id="fac-filter" aria-label="Filter facilitators by subject area" onchange="S.facFilter=this.value;renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px">
               <option value="">All subject areas</option>
             </select>
             <button class="btn btn-dk admin-el" style="display:none" onclick="editFacId=null;document.getElementById('fac-rank').value='';document.getElementById('fac-first').value='';document.getElementById('fac-last').value='';document.getElementById('fac-modal-title').textContent='+ Add Facilitator';_clearFacDupWarning();_resetFacSaveState();openModal('m-add-fac')">+ Add Facilitator</button>
@@ -1162,7 +1162,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </div>
           <div class="form-row">
             <div class="ff"><label>Parade Day</label>
-              <select id="s-pday">
+              <select id="s-pday" aria-label="Parade day of week">
                 <option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
               </select>
             </div>
@@ -1186,7 +1186,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="ctitle">Session Structure</div>
           <div class="form-row">
             <div class="ff"><label>Default Sessions Per Night (fallback)</label>
-              <select id="s-sess">
+              <select id="s-sess" aria-label="Default sessions per night">
                 <option value="1">1 Session</option><option value="2">2 Sessions</option><option value="3" selected>3 Sessions</option>
               </select>
             </div>
@@ -1239,10 +1239,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="card">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
             <input id="acct-search" placeholder="Filter by name, role, unit…" oninput="renderAccounts()" autocomplete="off" style="flex:1;min-width:200px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px">
-            <select id="acct-filter-wing" onchange="renderAccounts()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;display:none">
+            <select id="acct-filter-wing" aria-label="Filter accounts by Wing" onchange="renderAccounts()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;display:none">
               <option value="">All Wings</option>
             </select>
-            <select id="acct-filter-sqn" onchange="renderAccounts()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;display:none">
+            <select id="acct-filter-sqn" aria-label="Filter accounts by Squadron" onchange="renderAccounts()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;display:none">
               <option value="">All Squadrons</option>
             </select>
             <label id="acct-show-archived-row" style="display:none;font-size:11.5px;align-items:center;gap:5px;color:var(--muted);cursor:pointer">
@@ -1315,13 +1315,13 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <div class="page-subtitle">Authoritative Wing-level events. Squadrons see these as inherited overlays on their parade night calendar.</div>
           </div>
           <div class="page-actions">
-            <select id="wc-wing-sel" style="display:none;max-width:160px" onchange="loadWingCalendar()"><option value="">— Select Wing —</option></select>
-            <select id="wc-year-sel" onchange="loadWingCalendar()" style="max-width:120px">
+            <select id="wc-wing-sel" aria-label="Select Wing" style="display:none;max-width:160px" onchange="loadWingCalendar()"><option value="">— Select Wing —</option></select>
+            <select id="wc-year-sel" aria-label="Select year" onchange="loadWingCalendar()" style="max-width:120px">
               <option value="2025">2025</option>
               <option value="2026" selected>2026</option>
               <option value="2027">2027</option>
             </select>
-            <select id="wc-type-filter" onchange="renderWingCalendar()" style="max-width:180px">
+            <select id="wc-type-filter" aria-label="Filter by event type" onchange="renderWingCalendar()" style="max-width:180px">
               <option value="">All event types</option>
               <option value="wing_event">Wing Event</option>
               <option value="cadet_training">Cadet Training</option>
@@ -1336,7 +1336,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <option value="home_parade">Home Parade</option>
               <option value="noting">Noting</option>
             </select>
-            <select id="wc-imp-filter" onchange="renderWingCalendar()" style="max-width:180px">
+            <select id="wc-imp-filter" aria-label="Filter by importance" onchange="renderWingCalendar()" style="max-width:180px">
               <option value="">All importance</option>
               <option value="must_attend">Must Attend</option>
               <option value="key_event">Key Event</option>
@@ -1436,12 +1436,12 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <div style="font-weight:700;font-size:12px;color:var(--dark);margin-bottom:8px">Create New Squadron / Specialist Unit</div>
               <div class="form-row" style="grid-template-columns:1fr 120px 1fr 160px;gap:8px;margin-bottom:8px">
                 <div class="form-group" style="margin:0"><label style="font-size:11px">Wing *</label>
-                  <select id="sc-sqn-wing" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:4px"><option value="">Select wing…</option></select>
+                  <select id="sc-sqn-wing" aria-label="Wing for new unit" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:4px"><option value="">Select wing…</option></select>
                 </div>
                 <div class="form-group" style="margin:0"><label style="font-size:11px">Unit Code *</label><input id="sc-sqn-code" type="text" placeholder="e.g. 703" style="width:100%"></div>
                 <div class="form-group" style="margin:0"><label style="font-size:11px">Full Name *</label><input id="sc-sqn-name" type="text" placeholder="e.g. 703 City Squadron" style="width:100%"></div>
                 <div class="form-group" style="margin:0"><label style="font-size:11px">Unit Type</label>
-                  <select id="sc-sqn-type" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:4px">
+                  <select id="sc-sqn-type" aria-label="Unit type for new unit" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:4px">
                     <option value="standard_squadron">Standard Squadron</option>
                     <option value="specialist_squadron">Specialist Squadron</option>
                     <option value="specialist_flight">Specialist Flight</option>
@@ -1512,7 +1512,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="card sc-card" id="sc-audit-card">
           <div class="sc-section-hdr">Recent Audit Activity</div>
           <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-            <select id="sc-audit-action" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px">
+            <select id="sc-audit-action" aria-label="Filter audit log by action" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px">
               <option value="">All actions</option>
               <option value="login">login</option>
               <option value="logout">logout</option>
@@ -1550,12 +1550,12 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <p id="assign-title" style="font-weight:600;margin-bottom:12px"></p>
     <div class="form-group">
       <label>Parade Night *</label>
-      <select id="assign-date-sel" style="width:100%"><option value="">— select night —</option></select>
+      <select id="assign-date-sel" aria-label="Select parade night" style="width:100%"><option value="">— select night —</option></select>
     </div>
     <div class="form-row" style="gap:8px">
       <div class="form-group" style="flex:1">
         <label>Session *</label>
-        <select id="assign-sess-sel" style="width:100%">
+        <select id="assign-sess-sel" aria-label="Select session period" style="width:100%">
           <option value="1">Period 1</option>
           <option value="2">Period 2</option>
           <option value="3">Period 3</option>
@@ -1563,7 +1563,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       </div>
       <div class="form-group" style="flex:1">
         <label>Cadet Group *</label>
-        <select id="assign-group-sel" style="width:100%">
+        <select id="assign-group-sel" aria-label="Select cadet group" style="width:100%">
           <option value="">— select —</option>
           <option value="orientation">Orientation</option>
           <option value="initial">Initial</option>
@@ -1575,11 +1575,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     </div>
     <div class="form-group" id="assign-part-row" style="display:none">
       <label>Part Number</label>
-      <select id="assign-part-sel" style="width:100%"></select>
+      <select id="assign-part-sel" aria-label="Select part number" style="width:100%"></select>
     </div>
     <div class="form-group">
       <label>Facilitator</label>
-      <select id="assign-fac-sel" style="width:100%"><option value="">— none assigned —</option></select>
+      <select id="assign-fac-sel" aria-label="Select facilitator" style="width:100%"><option value="">— none assigned —</option></select>
     </div>
     <p id="assign-msg" style="color:var(--error);font-size:0.85rem;min-height:1.2em"></p>
     <div class="modal-actions">
@@ -1596,7 +1596,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="form-group"><label>Name *</label><input type="text" id="py-name-inp" placeholder="2026 Training Year"></div>
     <div class="form-group" id="py-unit-row" style="display:none">
       <label>Squadron <span class="muted" style="font-weight:400">(optional — leave blank for a wing-level year)</span></label>
-      <select id="py-unit-sel" style="width:100%"><option value="">— Wing-level year —</option></select>
+      <select id="py-unit-sel" aria-label="Select squadron (optional, leave blank for wing-level year)" style="width:100%"><option value="">— Wing-level year —</option></select>
     </div>
     <p id="py-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
@@ -1620,7 +1620,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <h2>Add Parade Date</h2>
     <div class="form-group"><label>Date *</label><input type="date" id="pd-date-inp"></div>
     <div class="form-group"><label>Type</label>
-      <select id="pd-type-inp">
+      <select id="pd-type-inp" aria-label="Parade date type">
         <option value="standard">Standard</option>
         <option value="special">Special</option>
         <option value="cancelled">Cancelled</option>
@@ -1642,7 +1642,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label>Repeat every</label>
-          <select id="gen-freq">
+          <select id="gen-freq" aria-label="Repeat frequency">
             <option value="weekly">Weekly</option>
             <option value="fortnightly">Fortnightly</option>
             <option value="monthly">Monthly (first weekday)</option>
@@ -1651,7 +1651,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </select>
         </div>
         <div class="form-group"><label>Parade day</label>
-          <select id="gen-weekday">
+          <select id="gen-weekday" aria-label="Parade day of week">
             <option value="0">Monday</option>
             <option value="1">Tuesday</option>
             <option value="2">Wednesday</option>
@@ -1700,7 +1700,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
         <div class="form-group" style="flex:1">
           <label>Event Type *</label>
-          <select id="we-type">
+          <select id="we-type" aria-label="Event type">
             <option value="wing_event">Wing Event</option>
             <option value="cadet_training">Cadet Training</option>
             <option value="adult_training">Adult Training</option>
@@ -1723,7 +1723,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="form-row">
         <div class="form-group" style="flex:1">
           <label>Importance *</label>
-          <select id="we-importance">
+          <select id="we-importance" aria-label="Event importance">
             <option value="must_attend">Must Attend</option>
             <option value="key_event" selected>Key Event</option>
             <option value="recommended">Recommended</option>
@@ -1789,7 +1789,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <h2>Add Holiday / Stand-Down Period</h2>
     <div class="form-group"><label>Name *</label><input type="text" id="hol-name-inp" placeholder="e.g. Easter Break"></div>
     <div class="form-group"><label>Type *</label>
-      <select id="hol-type-inp">
+      <select id="hol-type-inp" aria-label="Holiday or stand-down type">
         <option value="school_holiday">School Holiday</option>
         <option value="public_holiday">Public Holiday</option>
         <option value="squadron_stand_down">Squadron Stand-Down</option>
@@ -1820,7 +1820,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <input type="hidden" id="hol-edit-id">
     <div class="form-group"><label>Name *</label><input type="text" id="hol-edit-name" placeholder="e.g. Easter Break"></div>
     <div class="form-group"><label>Type *</label>
-      <select id="hol-edit-type">
+      <select id="hol-edit-type" aria-label="Holiday or stand-down type">
         <option value="school_holiday">School Holiday</option>
         <option value="public_holiday">Public Holiday</option>
         <option value="squadron_stand_down">Squadron Stand-Down</option>
@@ -1864,7 +1864,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="form-group"><label>Event Name *</label><input type="text" id="anch-name-inp"></div>
     <div class="form-row">
       <div class="form-group"><label>Type</label>
-        <select id="anch-type-inp">
+        <select id="anch-type-inp" aria-label="Anchor event type">
           <option value="ceremonial">Ceremonial</option>
           <option value="fieldcraft">Fieldcraft</option>
           <option value="adventure_training">Adventure Training</option>
@@ -1877,7 +1877,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </select>
       </div>
       <div class="form-group"><label>Importance</label>
-        <select id="anch-imp-inp">
+        <select id="anch-imp-inp" aria-label="Anchor event importance">
           <option value="must_attend">Must Attend</option>
           <option value="key_event" selected>Key Event</option>
           <option value="optional">Optional</option>
@@ -1904,7 +1904,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <h2>Add Planning Location</h2>
     <div class="form-group"><label>Name *</label><input type="text" id="loc-name-inp" placeholder="e.g. Main Hall"></div>
     <div class="form-group"><label>Type</label>
-      <select id="loc-type-inp">
+      <select id="loc-type-inp" aria-label="Location type">
         <option value="indoor">Indoor</option>
         <option value="outdoor">Outdoor</option>
         <option value="offsite">Off-Site</option>
@@ -1927,17 +1927,17 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <input type="hidden" id="sess-edit-id">
     <input type="hidden" id="sess-pd-id">
     <div class="form-group"><label>Curriculum Item</label>
-      <select id="sess-curr-inp"><option value="">— none (use custom title) —</option></select>
+      <select id="sess-curr-inp" aria-label="Curriculum item"><option value="">— none (use custom title) —</option></select>
     </div>
     <div class="form-group"><label>Custom Title (if no curriculum item)</label><input type="text" id="sess-title-inp" placeholder="Leave blank if using curriculum item above"></div>
     <div class="form-group"><label>Facilitator</label>
-      <select id="sess-fac-inp"><option value="">— none —</option></select>
+      <select id="sess-fac-inp" aria-label="Facilitator"><option value="">— none —</option></select>
     </div>
     <div class="form-group"><label>Location / Room</label>
-      <select id="sess-loc-inp"><option value="">— none —</option></select>
+      <select id="sess-loc-inp" aria-label="Location or room"><option value="">— none —</option></select>
     </div>
     <div class="form-group"><label>Status</label>
-      <select id="sess-status-inp">
+      <select id="sess-status-inp" aria-label="Session status">
         <option value="planned">Planned</option>
         <option value="published">Published</option>
         <option value="delivered">Delivered</option>
@@ -1966,12 +1966,12 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="form-row">
         <div class="ff"><label>Date</label><input type="date" id="pn-date"></div>
         <div class="ff"><label>Term</label>
-          <select id="pn-term"><option value="T1">Term 1 (Feb–Mar)</option><option value="T2">Term 2 (Apr–Jun)</option><option value="T3">Term 3 (Jul–Sep)</option><option value="T4">Term 4 (Oct–Dec)</option></select>
+          <select id="pn-term" aria-label="Term"><option value="T1">Term 1 (Feb–Mar)</option><option value="T2">Term 2 (Apr–Jun)</option><option value="T3">Term 3 (Jul–Sep)</option><option value="T4">Term 4 (Oct–Dec)</option></select>
         </div>
       </div>
       <div class="form-row">
         <div class="ff"><label>Sessions This Night</label>
-          <select id="pn-nsess" onchange="buildSlots()">
+          <select id="pn-nsess" aria-label="Number of sessions this night" onchange="buildSlots()">
             <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option>
           </select>
         </div>
@@ -2005,7 +2005,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-hdr"><div class="modal-title">Move Session</div><button class="modal-x" aria-label="Close" onclick="_sessMoveToCancel()">×</button></div>
     <div class="modal-body">
       <div class="ff"><label>Move to Parade Night</label>
-        <select id="smt-pn"></select>
+        <select id="smt-pn" aria-label="Move to parade night"></select>
       </div>
       <div class="ff"><label>Period</label>
         <input type="number" id="smt-period" min="1" value="1">
@@ -2102,7 +2102,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ff">
           <label>Phase</label>
           <div style="display:flex;gap:6px;align-items:center">
-            <select id="c-phase" style="flex:1"></select>
+            <select id="c-phase" aria-label="Training phase" style="flex:1"></select>
             <button type="button" class="btn" style="white-space:nowrap;font-size:11px;padding:4px 8px" onclick="openCreatePhaseInline()">+ New</button>
           </div>
           <div id="c-phase-new" style="display:none;margin-top:6px">
@@ -2117,7 +2117,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ff">
           <label>Element</label>
           <div style="display:flex;gap:6px;align-items:center">
-            <select id="c-el" style="flex:1"><option value="">— select element —</option></select>
+            <select id="c-el" aria-label="Curriculum element" style="flex:1"><option value="">— select element —</option></select>
             <button type="button" class="btn" style="white-space:nowrap;font-size:11px;padding:4px 8px" onclick="openCreateElementInline()">+ New</button>
           </div>
           <div id="c-el-new" style="display:none;margin-top:6px">
@@ -2133,16 +2133,16 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="form-row" id="c-term-row">
         <div class="ff">
           <label id="c-term-label">Term <span id="c-term-optional" class="muted" style="font-weight:400;font-size:10px"></span></label>
-          <select id="c-term"><option value="">— no term assigned —</option><option value="T1">T1</option><option value="T2">T2</option><option value="T3">T3</option><option value="T4">T4</option></select>
+          <select id="c-term" aria-label="Term"><option value="">— no term assigned —</option><option value="T1">T1</option><option value="T2">T2</option><option value="T3">T3</option><option value="T4">T4</option></select>
         </div>
         <div class="ff"><label>Hours</label><input type="number" id="c-hours" value="1" min="0.25" step="0.25"></div>
       </div>
       <div class="ff" id="c-wing-row" style="display:none"><label>Wing</label>
-        <select id="c-wing-id"></select>
+        <select id="c-wing-id" aria-label="Owning wing"></select>
       </div>
       <div class="ff"><label>Learning Hub URL</label><input id="c-lh" placeholder="https://airforcecadets.net.au/lh/…"></div>
       <div class="ff"><label>Instructor Suitability</label>
-        <select id="c-instr"><option value="Staff">Staff</option><option value="Senior Cadet OR Staff">Senior Cadet OR Staff</option><option value="Senior Cadet">Senior Cadet</option></select>
+        <select id="c-instr" aria-label="Instructor suitability"><option value="Staff">Staff</option><option value="Senior Cadet OR Staff">Senior Cadet OR Staff</option><option value="Senior Cadet">Senior Cadet</option></select>
       </div>
     </div>
     <div class="modal-foot">
@@ -2170,7 +2170,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="form-row">
         <div class="ff"><label>Date</label><input type="date" id="act-date"></div>
         <div class="ff"><label>Importance</label>
-          <select id="act-type"><option value="Must Attend">Must Attend</option><option value="Key Event">Key Event</option><option value="Optional">Optional</option></select>
+          <select id="act-type" aria-label="Activity importance"><option value="Must Attend">Must Attend</option><option value="Key Event">Key Event</option><option value="Optional">Optional</option></select>
         </div>
       </div>
       <div class="ff"><label>Audience</label>
@@ -2199,7 +2199,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="form-row">
         <div class="ff" style="flex:2"><label>Activity Name *</label><input id="ga-name" placeholder="e.g. Drill Night"></div>
         <div class="ff"><label>Type</label>
-          <select id="ga-type"><option value="Must Attend">Must Attend</option><option value="Key Event">Key Event</option><option value="Optional" selected>Optional</option></select>
+          <select id="ga-type" aria-label="Activity type"><option value="Must Attend">Must Attend</option><option value="Key Event">Key Event</option><option value="Optional" selected>Optional</option></select>
         </div>
       </div>
       <div class="form-row">
@@ -2212,7 +2212,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       </div>
       <div class="form-row">
         <div class="ff"><label>Recurrence *</label>
-          <select id="ga-recur" onchange="_gaRecurChange()">
+          <select id="ga-recur" aria-label="Recurrence frequency" onchange="_gaRecurChange()">
             <option value="daily">Daily</option>
             <option value="weekly" selected>Weekly</option>
             <option value="fortnightly">Fortnightly</option>
@@ -2221,7 +2221,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </select>
         </div>
         <div class="ff" id="ga-weekday-row"><label>Weekday</label>
-          <select id="ga-weekday">
+          <select id="ga-weekday" aria-label="Day of week">
             <option value="0">Monday</option><option value="1">Tuesday</option>
             <option value="2">Wednesday</option><option value="3">Thursday</option>
             <option value="4">Friday</option><option value="5">Saturday</option>
@@ -2264,7 +2264,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="form-row">
         <div class="form-group"><label>CSV File *</label><input type="file" id="csv-curr-file" accept=".csv,text/csv"></div>
         <div class="form-group"><label>Owning Level</label>
-          <select id="csv-curr-level">
+          <select id="csv-curr-level" aria-label="Owning level">
             <option value="national">National</option>
             <option value="wing">Wing</option>
             <option value="squadron">Squadron</option>
@@ -2343,7 +2343,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="form-row">
         <div class="ff"><label>Current Rank</label><input id="fac-rank" placeholder="e.g. FLTLT(AAFC), CUO, CPL(AAFC)" oninput="_markFacUnsaved()"></div>
         <div class="ff"><label>Type</label>
-          <select id="fac-type" onchange="_onFacTypeChange(this)"><option value="Staff">Staff</option><option value="Officer">Officer (AAFC)</option><option value="NCO">Warrant Officer / NCO (AAFC)</option><option value="Senior Cadet">Senior Cadet</option><option value="Civilian">Civilian Instructor</option></select>
+          <select id="fac-type" aria-label="Facilitator type" onchange="_onFacTypeChange(this)"><option value="Staff">Staff</option><option value="Officer">Officer (AAFC)</option><option value="NCO">Warrant Officer / NCO (AAFC)</option><option value="Senior Cadet">Senior Cadet</option><option value="Civilian">Civilian Instructor</option></select>
         </div>
       </div>
       <div class="form-row">
@@ -2431,7 +2431,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="form-row">
         <div class="ff"><label>Capacity</label><input type="number" id="room-cap" value="20" min="1"></div>
         <div class="ff"><label>Type</label>
-          <select id="room-type"><option value="Indoor">Indoor</option><option value="Outdoor">Outdoor</option><option value="Indoor/Outdoor">Indoor/Outdoor</option></select>
+          <select id="room-type" aria-label="Room type"><option value="Indoor">Indoor</option><option value="Outdoor">Outdoor</option><option value="Indoor/Outdoor">Indoor/Outdoor</option></select>
         </div>
       </div>
       <div class="ff"><label>Notes</label><input id="room-notes" placeholder="Any relevant details"></div>
@@ -2470,17 +2470,17 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="ff"><label>Display Name</label><input id="ca-name" placeholder="e.g. Smith, J — 703 SQN Admin"></div>
       <div class="form-row">
         <div class="ff"><label>Role</label>
-          <select id="ca-role" onchange="onCreateAccountRoleChange()">
+          <select id="ca-role" aria-label="Account role" onchange="onCreateAccountRoleChange()">
             <option value="">— select role —</option>
           </select>
         </div>
         <div class="ff" id="ca-wing-row" style="display:none"><label>Wing</label>
-          <select id="ca-wing" onchange="onCreateAccountWingChange()"><option value="">— select wing —</option></select>
+          <select id="ca-wing" aria-label="Wing" onchange="onCreateAccountWingChange()"><option value="">— select wing —</option></select>
         </div>
       </div>
       <div class="form-row">
         <div class="ff" id="ca-sqn-row" style="display:none"><label>Squadron</label>
-          <select id="ca-sqn" onchange="onCreateAccountSqnChange()"><option value="">— select squadron —</option></select>
+          <select id="ca-sqn" aria-label="Squadron" onchange="onCreateAccountSqnChange()"><option value="">— select squadron —</option></select>
         </div>
         <div class="ff" id="ca-flight-row" style="display:none" aria-hidden="true">
           <select id="ca-flight" tabindex="-1"><option value="">— no flight —</option></select>
@@ -2571,7 +2571,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-body">
       <div class="ff"><label>Flight Name</label><input id="cf-name" placeholder="e.g. Alpha Flight, Bravo Flight"></div>
       <div class="ff" id="cf-sqn-row"><label>Squadron</label>
-        <select id="cf-sqn"><option value="">— select squadron —</option></select>
+        <select id="cf-sqn" aria-label="Squadron"><option value="">— select squadron —</option></select>
       </div>
       <div class="alert a-info" style="font-size:11px;margin-top:8px">Flights are local display groupings only. They do not create separate permissions or tenancy.</div>
       <div id="cf-msg" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
@@ -2590,11 +2590,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-body">
       <div class="ff"><label>Display Name</label><input id="ea-name" placeholder="Display name" autocomplete="off"></div>
       <div class="ff" id="ea-role-row" style="display:none"><label>Role / Access Type</label>
-        <select id="ea-role"></select>
+        <select id="ea-role" aria-label="Role / Access type"></select>
         <div class="muted" style="font-size:10.5px;margin-top:3px">Changing role within the same scope level only. The account will need to sign in again for the new role to take effect.</div>
       </div>
       <div class="ff" id="ea-flight-row" style="display:none"><label>Flight (optional)</label>
-        <select id="ea-flight"><option value="">— no flight —</option></select>
+        <select id="ea-flight" aria-label="Flight (optional)"><option value="">— no flight —</option></select>
       </div>
       <div id="ea-msg" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
     </div>
@@ -2672,10 +2672,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="alert a-info" style="font-size:11px;margin-bottom:10px">Wing admin: own Wing only. NAT HQ admin: any Wing. Unit code must be unique (e.g. 703, SPECFLT01).</div>
       <div class="form-row">
         <div class="ff"><label>Wing</label>
-          <select id="csq-wing"><option value="">— select wing —</option></select>
+          <select id="csq-wing" aria-label="Wing"><option value="">— select wing —</option></select>
         </div>
         <div class="ff"><label>Unit Type</label>
-          <select id="csq-type">
+          <select id="csq-type" aria-label="Unit type">
             <option value="standard_squadron">Standard Squadron</option>
             <option value="specialist_squadron">Specialist Squadron</option>
             <option value="specialist_flight">Specialist Flight</option>
@@ -2711,7 +2711,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ff"><label>Notes</label><input id="tt-notes" type="text" placeholder="e.g. Applies Term 3 onwards"></div>
         <div class="ff"><label>Quick setup</label>
           <div style="display:flex;gap:6px;align-items:center">
-            <select id="tt-quick-n"><option value="">— periods —</option><option value="1">1 IP</option><option value="2">2 IP</option><option value="3">3 IP</option><option value="4">4 IP</option></select>
+            <select id="tt-quick-n" aria-label="Number of instructional periods for quick setup"><option value="">— periods —</option><option value="1">1 IP</option><option value="2">2 IP</option><option value="3">3 IP</option><option value="4">4 IP</option></select>
             <button class="btn" onclick="ttQuickSetup()">Auto-populate</button>
           </div>
         </div>
@@ -2758,7 +2758,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-body">
       <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Applies a different timing template to this one parade night only. Does not change future parade nights.</div>
       <div class="form-row">
-        <div class="ff"><label>Template</label><select id="pn-override-tid"></select></div>
+        <div class="ff"><label>Template</label><select id="pn-override-tid" aria-label="Timing template"></select></div>
       </div>
       <div class="form-row">
         <div class="ff"><label>Reason (required)</label><input id="pn-override-reason" type="text" placeholder="e.g. Shortened ANZAC night"></div>
@@ -6290,18 +6290,18 @@ function buildSlots(){
       <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Session ${i+1}</div>
       <div class="form-row">
         <div class="ff"><label>Phase</label>
-          <select id="np-ph-${i}">${phaseOpts}</select>
+          <select id="np-ph-${i}" aria-label="Phase for session ${i+1}">${phaseOpts}</select>
         </div>
         <div class="ff"><label>Curriculum Item</label>
-          <select id="np-ex-${i}"><option value="">— Unassigned —</option>${currOpts}</select>
+          <select id="np-ex-${i}" aria-label="Curriculum item for session ${i+1}"><option value="">— Unassigned —</option>${currOpts}</select>
         </div>
       </div>
       <div class="form-row">
         <div class="ff"><label>Facilitator</label>
-          <select id="np-fa-${i}"><option value="">— None —</option>${facOpts}</select>
+          <select id="np-fa-${i}" aria-label="Facilitator for session ${i+1}"><option value="">— None —</option>${facOpts}</select>
         </div>
         <div class="ff"><label>Room</label>
-          <select id="np-rm-${i}"><option value="">— None —</option>${roomOpts}</select>
+          <select id="np-rm-${i}" aria-label="Room for session ${i+1}"><option value="">— None —</option>${roomOpts}</select>
         </div>
       </div>
     </div>`;
@@ -6366,7 +6366,7 @@ function showPNDetail(ds){
       <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Parade Night Details</div>
       <div class="form-row">
         <div class="ff"><label>Term</label><input id="pnd-term" value="${esc(pn.term||'')}"></div>
-        <div class="ff"><label>Type</label><select id="pnd-type">${typeOpts}</select></div>
+        <div class="ff"><label>Type</label><select id="pnd-type" aria-label="Parade night type">${typeOpts}</select></div>
       </div>
       <div class="form-row">
         <div class="ff"><label>Start Time</label><input type="time" id="pnd-start" value="${esc(pn.start_time||'')}"></div>
@@ -6395,18 +6395,18 @@ function showPNDetail(ds){
       <div id="sess-hist-${i}" style="display:none;font-size:11px;color:var(--muted);margin-bottom:8px;padding:8px;background:var(--surface-2);border-radius:6px"></div>
       <div style="${!canWriteSquadron()?'pointer-events:none;opacity:.85':''}">
       <div class="form-row">
-        <div class="ff"><label>Phase</label><select id="d-ph-${i}" ${!canWriteSquadron()?'disabled':''}>${phOpts}</select></div>
-        <div class="ff"><label>Status</label><select id="d-st-${i}" ${!canWriteSquadron()?'disabled':''}>${stOpts}</select></div>
+        <div class="ff"><label>Phase</label><select id="d-ph-${i}" aria-label="Phase for session ${i+1}" ${!canWriteSquadron()?'disabled':''}>${phOpts}</select></div>
+        <div class="ff"><label>Status</label><select id="d-st-${i}" aria-label="Status for session ${i+1}" ${!canWriteSquadron()?'disabled':''}>${stOpts}</select></div>
       </div>
       <div class="ff"><label>Curriculum Item</label>
-        <select id="d-ex-${i}" ${!canWriteSquadron()?'disabled':''}><option value="">— Unassigned —</option>${currOpts}</select>
+        <select id="d-ex-${i}" aria-label="Curriculum item for session ${i+1}" ${!canWriteSquadron()?'disabled':''}><option value="">— Unassigned —</option>${currOpts}</select>
       </div>
       <div class="form-row">
         <div class="ff"><label>Facilitator</label>
-          <select id="d-fa-${i}" ${!canWriteSquadron()?'disabled':''}><option value="">— None —</option>${facOpts}</select>
+          <select id="d-fa-${i}" aria-label="Facilitator for session ${i+1}" ${!canWriteSquadron()?'disabled':''}><option value="">— None —</option>${facOpts}</select>
         </div>
         <div class="ff"><label>Room</label>
-          <select id="d-rm-${i}" ${!canWriteSquadron()?'disabled':''}><option value="">— None —</option>${roomOpts}</select>
+          <select id="d-rm-${i}" aria-label="Room for session ${i+1}" ${!canWriteSquadron()?'disabled':''}><option value="">— None —</option>${roomOpts}</select>
         </div>
       </div>
       </div>
@@ -6693,10 +6693,10 @@ function quickEdit(date,idx){
   const roomOpts=S.rooms.map(r=>`<option value="${esc(r.name)}" ${r.name===s.room?'selected':''}>${esc(r.name)}</option>`).join('');
   const stOpts=['planned','delivered','delivered_with_issue','cancelled','cancelled_late','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${v===s.status?'selected':''}>${{planned:'Planned',delivered:'Delivered',delivered_with_issue:'Delivered (issue)',cancelled:'Cancelled',cancelled_late:'Cancelled late',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
   document.getElementById('sess-edit-body').innerHTML=`
-    <div class="ff"><label>Status</label><select id="qe-st">${stOpts}</select></div>
-    <div class="ff"><label>Curriculum Item</label><select id="qe-ex"><option value="">— Unassigned —</option>${currOpts}</select></div>
-    <div class="ff"><label>Facilitator</label><select id="qe-fa"><option value="">— None —</option>${facOpts}</select></div>
-    <div class="ff"><label>Room</label><select id="qe-rm"><option value="">— None —</option>${roomOpts}</select></div>`;
+    <div class="ff"><label>Status</label><select id="qe-st" aria-label="Session status">${stOpts}</select></div>
+    <div class="ff"><label>Curriculum Item</label><select id="qe-ex" aria-label="Curriculum item"><option value="">— Unassigned —</option>${currOpts}</select></div>
+    <div class="ff"><label>Facilitator</label><select id="qe-fa" aria-label="Facilitator"><option value="">— None —</option>${facOpts}</select></div>
+    <div class="ff"><label>Room</label><select id="qe-rm" aria-label="Room"><option value="">— None —</option>${roomOpts}</select></div>`;
   openModal('m-sess-edit');
 }
 async function saveSessEdit(){
@@ -7199,11 +7199,11 @@ function _actTabRender(containerId){
       ${createBtn}
     </div>
     <div class="fbar no-print" style="margin:10px 0">
-      <select id="${containerId}-f-type" onchange="_actTabRender('${containerId}')">
+      <select id="${containerId}-f-type" aria-label="Filter activities by type" onchange="_actTabRender('${containerId}')">
         <option value="all">All types</option>
         ${[...new Set(st.items.map(i=>i.activity_type).filter(Boolean))].map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}
       </select>
-      <select id="${containerId}-f-src" onchange="_actTabRender('${containerId}')">
+      <select id="${containerId}-f-src" aria-label="Filter activities by source" onchange="_actTabRender('${containerId}')">
         <option value="all">All sources</option>
         ${[...new Set(st.items.map(i=>i.source))].map(s=>`<option value="${esc(s)}">${esc(_ACT_SOURCE_LABEL[s]||s)}</option>`).join('')}
       </select>
@@ -8124,7 +8124,7 @@ function _ttBlockRow(b,i){
   return `<tr>
     <td style="padding:3px 4px;color:var(--muted);white-space:nowrap">${i+1}</td>
     <td style="padding:2px 3px"><input value="${esc(b.block_name||'')}" oninput="_ttBSet(${i},'block_name',this.value)" style="width:100%;min-width:95px;font-size:11.5px"></td>
-    <td style="padding:2px 3px"><select onchange="_ttBSet(${i},'block_type',this.value)" style="width:100%;font-size:11.5px">${typeOpts}</select></td>
+    <td style="padding:2px 3px"><select onchange="_ttBSet(${i},'block_type',this.value)" aria-label="Block type for period ${i+1}" style="width:100%;font-size:11.5px">${typeOpts}</select></td>
     <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_ttBSet(${i},'start_time',this.value);renderTTBlocks()" style="width:82px;font-size:11.5px"></td>
     <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_ttBSet(${i},'end_time',this.value);renderTTBlocks()" style="width:82px;font-size:11.5px"></td>
     <td style="padding:2px 4px;text-align:center;font-size:11px;color:var(--muted)">${dur!=null?dur:''}</td>
