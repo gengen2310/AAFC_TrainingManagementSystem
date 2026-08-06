@@ -893,18 +893,23 @@ info "Frontend: new=$FRONTEND_NEW_DEPLOY_ID"
 
 echo
 echo "  ── Frontend gate 3/4: build fingerprint ─────────────────────────────"
-sleep 10
-# Pipe curl directly to grep to avoid storing 600KB in a bash variable.
-curl -s --connect-timeout 15 --max-time 60 \
-  "https://$EXPECTED_STAGING_FRONTEND_DOMAIN/" 2>/dev/null \
-  | grep -q 'name="app-build"' \
-  || die 'Build fingerprint meta (name="app-build") NOT found — HARD FAIL.'
-FRONTEND_BUILD=$(curl -s --connect-timeout 15 --max-time 60 \
-  "https://$EXPECTED_STAGING_FRONTEND_DOMAIN/" 2>/dev/null \
-  | grep -o 'name="app-build" content="[^"]*"' | head -1 || echo "no fingerprint")
-# Confirm placeholder was replaced (not still __APP_BUILD__).
-echo "$FRONTEND_BUILD" | grep -q '__APP_BUILD__' \
-  && die 'Build fingerprint still contains placeholder — entrypoint did not run — HARD FAIL.'
+# Poll until the new container is serving traffic (Railway's 'SUCCESS' fires on
+# build completion; the LB may take up to ~120s to switch to the new container).
+FRONTEND_BUILD=""
+_fp_elapsed=0
+while [ "$_fp_elapsed" -lt 180 ]; do
+  _fb=$(curl -s --connect-timeout 10 --max-time 30 \
+    "https://$EXPECTED_STAGING_FRONTEND_DOMAIN/" 2>/dev/null \
+    | grep -o 'name="app-build" content="[^"]*"' | head -1 2>/dev/null || true)
+  if [ -n "$_fb" ] && ! echo "$_fb" | grep -q '__APP_BUILD__'; then
+    FRONTEND_BUILD="$_fb"
+    break
+  fi
+  info "Frontend fingerprint not ready yet (${_fp_elapsed}s elapsed) — retrying in 15s…"
+  sleep 15
+  _fp_elapsed=$((_fp_elapsed + 15))
+done
+[ -z "$FRONTEND_BUILD" ] && die 'Build fingerprint meta (name="app-build") NOT found after 180s — HARD FAIL.'
 ok "Frontend build fingerprint: $FRONTEND_BUILD"
 
 echo
@@ -942,11 +947,21 @@ info "PW: new=$PW_NEW_DEPLOY_ID"
 
 echo
 echo "  ── PW gate 3/4: build fingerprint ───────────────────────────────────"
-sleep 10
-curl -s --connect-timeout 15 --max-time 60 \
-  "https://$EXPECTED_STAGING_PW_DOMAIN/" 2>/dev/null \
-  | grep -qiE 'react|vite|__vite_|data-reactroot' \
-  || die "PW HTML lacks React app markers — HARD FAIL."
+# Poll until PW container is serving traffic (same LB-switchover delay as Frontend).
+_pw_ready=0
+_pw_elapsed=0
+while [ "$_pw_elapsed" -lt 180 ]; do
+  if curl -s --connect-timeout 10 --max-time 30 \
+    "https://$EXPECTED_STAGING_PW_DOMAIN/" 2>/dev/null \
+    | grep -qiE 'react|vite|__vite_|data-reactroot'; then
+    _pw_ready=1
+    break
+  fi
+  info "PW not ready yet (${_pw_elapsed}s elapsed) — retrying in 15s…"
+  sleep 15
+  _pw_elapsed=$((_pw_elapsed + 15))
+done
+[ "$_pw_ready" -eq 0 ] && die "PW HTML lacks React app markers after 180s — HARD FAIL."
 ok "PW HTML contains React app markers"
 PW_BUILD=$(curl -s --connect-timeout 15 --max-time 60 \
   "https://$EXPECTED_STAGING_PW_DOMAIN/" 2>/dev/null \
