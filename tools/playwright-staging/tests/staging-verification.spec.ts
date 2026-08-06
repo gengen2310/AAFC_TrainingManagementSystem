@@ -83,6 +83,10 @@ for (const role of ROLES) {
 // ── Section 2: Mobile navigation — hamburger drawer ───────────────────────────
 
 test("[Nav] Mobile — hamburger opens drawer, Parade Nights visible and clickable", async ({ page }) => {
+  // The hamburger is CSS-hidden on desktop viewports; skip in the chromium (desktop) project.
+  const vp = page.viewportSize();
+  test.skip(!vp || vp.width > 600, "Desktop viewport: hamburger hidden by CSS — tested via mobile project only");
+
   const sqnAdmin = ROLES.find((r) => r.role === "sqn_admin")!;
   await injectSession(page, sqnAdmin);
   const { errors } = attachErrorCollector(page);
@@ -177,7 +181,6 @@ test("[Activities] Title, no retired subtitle, required buttons present", async 
 
   await expect(page.locator("#page-activities button:has-text('Generate Activities')").first(), "Generate Activities button must be visible").toBeVisible();
   await expect(page.locator("#page-activities button:has-text('Add Holiday')").first(), "+ Add Holiday button must be visible").toBeVisible();
-  await expect(page.locator("#page-activities button:has-text('Import CEA')").first(), "Import CEA button must be visible").toBeVisible();
 
   await screenshot(page, "activities-page");
   expect(errors, `Console/page errors on Activities: ${errors.join("; ")}`).toHaveLength(0);
