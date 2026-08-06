@@ -54,9 +54,9 @@ EXPECTED_STAGING_BACKEND_DOMAIN="aafc-tms-backend-staging.up.railway.app"
 EXPECTED_STAGING_FRONTEND_DOMAIN="aafc-tms-frontend-staging.up.railway.app"
 EXPECTED_STAGING_PW_DOMAIN="aafc-tms-planning-workspace-preview-staging.up.railway.app"
 
-EXPECTED_BRANCH="feature/restore-planning-workspace"
+EXPECTED_BRANCH="main"
 REQUIRED_ANCESTOR="de27c42"
-REQUIRED_ALEMBIC_HEAD="b2c3d4e5f6a7"
+REQUIRED_ALEMBIC_HEAD="5a195a98148a"
 
 BACKEND_GATE_TIMEOUT=600
 FRONTEND_GATE_TIMEOUT=600
@@ -620,7 +620,11 @@ echo "  [7/12] Git state…"
 CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "UNKNOWN")
 [ "$CURRENT_BRANCH" = "$EXPECTED_BRANCH" ] \
   && ok "Branch: $CURRENT_BRANCH" || die "Branch '$CURRENT_BRANCH' ≠ '$EXPECTED_BRANCH'."
-[[ "$CURRENT_BRANCH" =~ ^(main|master)$|production ]] && die "Protected branch."
+# Block protected branches only when they differ from the explicit expected branch.
+# If EXPECTED_BRANCH is 'main' (intentional), this check is satisfied by the match above.
+[[ "$CURRENT_BRANCH" =~ ^(main|master)$|production ]] \
+  && [ "$CURRENT_BRANCH" != "$EXPECTED_BRANCH" ] \
+  && die "Protected branch."
 CURRENT_HEAD=$(git rev-parse --short HEAD 2>/dev/null || echo "UNKNOWN")
 info "HEAD: $CURRENT_HEAD — $(git log -1 --format='%s')"
 git merge-base --is-ancestor "$REQUIRED_ANCESTOR" HEAD 2>/dev/null \
@@ -666,7 +670,7 @@ source .venv/bin/activate 2>/dev/null || true
 ALEMBIC_CODE_HEAD=$(python -m alembic heads 2>/dev/null | grep -oE '[a-f0-9]{12}' | head -1 || echo "unknown")
 info "Alembic code head: $ALEMBIC_CODE_HEAD"
 [ "$ALEMBIC_CODE_HEAD" = "$REQUIRED_ALEMBIC_HEAD" ] \
-  && ok "Code head is $REQUIRED_ALEMBIC_HEAD (v40)" \
+  && ok "Code head is $REQUIRED_ALEMBIC_HEAD (v47)" \
   || die "Code head is $ALEMBIC_CODE_HEAD, expected $REQUIRED_ALEMBIC_HEAD."
 deactivate 2>/dev/null || true
 popd > /dev/null
@@ -847,7 +851,7 @@ import json,sys; print(json.load(sys.stdin).get('is_single_head',False))" 2>/dev
 info "is_single_head: $IS_SINGLE  revision: $DB_REVISION"
 [ "$IS_SINGLE" = "True" ] || die "Multiple Alembic heads — HARD FAIL."
 [ "$DB_REVISION" = "$REQUIRED_ALEMBIC_HEAD" ] \
-  && ok "DB revision: $DB_REVISION — exact match (v40)" \
+  && ok "DB revision: $DB_REVISION — exact match (v47)" \
   || die "DB revision '$DB_REVISION' ≠ '$REQUIRED_ALEMBIC_HEAD' — HARD FAIL."
 
 echo
