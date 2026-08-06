@@ -122,7 +122,7 @@ test("[Nav] Mobile — hamburger opens drawer, Parade Nights visible and clickab
   // Verify Activities is also in the drawer
   await hamburger.click();
   await expect(sidenav).toBeVisible();
-  await expect(sidenav.locator("text=Activities"), "Activities must be visible in mobile drawer").toBeVisible();
+  await expect(sidenav.getByText("Activities", { exact: true }), "Activities must be visible in mobile drawer").toBeVisible();
   const missionItem = sidenav.locator("text=Mission Backlog");
   // Mission Backlog may be absent from nav scope — check and skip rather than fail
   const missionCount = await missionItem.count();
