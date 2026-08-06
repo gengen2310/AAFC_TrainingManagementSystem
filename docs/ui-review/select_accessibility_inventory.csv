@@ -1,0 +1,96 @@
+Control ID,Page/Context,Static/Dynamic,Visible label (for=),Accessible name method,Final accessible name,Line,Status
+auth-type,unknown,Static,Account type,label[for],Account type,535,PASS
+auth-wing-select,unknown,Static,Wing,label[for],Wing,545,PASS
+auth-sqn-select,unknown,Static,Squadron / Unit,label[for],Squadron / Unit,552,PASS
+auth-role,unknown,Static,Role,label[for],Role,560,PASS
+sa-scope-wing,unknown,Static,N/A,aria-label,Browse Wing,608,PASS
+sa-scope-sqn,unknown,Static,N/A,aria-label,Browse Squadron,611,PASS
+dash-window,Dashboard,Static,Period,label[for],Period,672,PASS
+dash-sqn-filter,Dashboard,Static,N/A,aria-label,Filter Wing Dashboard by squadron,677,PASS
+cal-yr,unknown,Static,N/A,aria-label,Calendar year,866,PASS
+pn-f-term,Parade Nights,Static,N/A,aria-label,Filter Parade Nights by term,892,PASS
+pn-f-status,Parade Nights,Static,N/A,aria-label,Filter Parade Nights by status,897,PASS
+wp-sel,Weekly Program,Static,Parade Night,aria-label + label[for],Select parade night,914,PASS
+wp-f-status,Weekly Program,Static,N/A,aria-label,Filter Weekly Program by status,919,PASS
+curr-f-el,Curriculum,Static,N/A,aria-label,Filter curriculum by element,954,PASS
+curr-f-prog,unknown,Static,N/A,aria-label,Filter curriculum by progress status,960,PASS
+act-f-type,Activities,Static,N/A,aria-label,Filter by activity type,1000,PASS
+py-select,unknown,Static,N/A,aria-label,Select planning year,1034,PASS
+py-sqn-filter,unknown,Static,Squadron filter:,aria-label + label[for],Filter planning years by squadron,1043,PASS
+fac-filter,Facilitators,Static,N/A,aria-label,Filter facilitators by subject area,1076,PASS
+s-pday,unknown,Static,Parade Day,aria-label + label[for],Parade day of week,1165,PASS
+s-sess,unknown,Static,Default Sessions Per Night (fallback),aria-label + label[for],Default sessions per night,1189,PASS
+acct-filter-wing,Accounts,Static,N/A,aria-label,Filter accounts by Wing,1242,PASS
+acct-filter-sqn,Accounts,Static,N/A,aria-label,Filter accounts by Squadron,1245,PASS
+wc-wing-sel,Wing Calendar,Static,N/A,aria-label,Select Wing,1318,PASS
+wc-year-sel,Wing Calendar,Static,N/A,aria-label,Select Wing Calendar year,1319,PASS
+wc-type-filter,Wing Calendar,Static,N/A,aria-label,Filter Wing Calendar by event type,1324,PASS
+wc-imp-filter,Wing Calendar,Static,N/A,aria-label,Filter Wing Calendar by importance,1339,PASS
+sc-sqn-wing,unknown,Static,Wing *,aria-label + label[for],Wing for new unit,1439,PASS
+sc-sqn-type,unknown,Static,Unit Type,aria-label + label[for],Unit type for new unit,1444,PASS
+sc-audit-action,unknown,Static,N/A,aria-label,Filter audit log by action,1515,PASS
+assign-date-sel,Modal,Static,Parade Night *,aria-label + label[for],Select parade night,1553,PASS
+assign-sess-sel,Modal,Static,Session *,aria-label + label[for],Select session period,1558,PASS
+assign-group-sel,Modal,Static,Cadet Group *,aria-label + label[for],Select cadet group,1566,PASS
+assign-part-sel,Modal,Static,Part Number,aria-label + label[for],Select part number,1578,PASS
+assign-fac-sel,Modal,Static,Facilitator,aria-label + label[for],Select facilitator,1582,PASS
+py-unit-sel,Modal,Static,N/A,aria-label,"Select squadron (optional, leave blank for wing-level year)",1599,PASS
+pd-type-inp,Modal,Static,Type,aria-label + label[for],Parade date type,1623,PASS
+gen-freq,Modal,Static,Repeat every,aria-label + label[for],Repeat frequency,1645,PASS
+gen-weekday,Modal,Static,Parade day,aria-label + label[for],Parade day of week,1654,PASS
+we-type,Modal,Static,Event Type *,aria-label + label[for],Event type,1703,PASS
+we-importance,Modal,Static,Importance *,aria-label + label[for],Event importance,1726,PASS
+hol-type-inp,Modal,Static,Type *,aria-label + label[for],Holiday or stand-down type,1792,PASS
+hol-edit-type,Modal,Static,Type *,aria-label + label[for],Holiday or stand-down type,1823,PASS
+anch-type-inp,Modal,Static,Type,aria-label + label[for],Anchor event type,1867,PASS
+anch-imp-inp,Modal,Static,Importance,aria-label + label[for],Anchor event importance,1880,PASS
+loc-type-inp,Modal,Static,Type,aria-label + label[for],Location type,1907,PASS
+sess-curr-inp,Modal,Static,Curriculum Item,label[for],Curriculum Item,1930,PASS
+sess-fac-inp,Modal,Static,Facilitator,label[for],Facilitator,1934,PASS
+sess-loc-inp,Modal,Static,Location / Room,aria-label + label[for],Location or room,1937,PASS
+sess-status-inp,Modal,Static,Status,aria-label + label[for],Session status,1940,PASS
+pn-term,Modal,Static,Term,aria-label + label[for],Parade night term,1969,PASS
+pn-nsess,Modal,Static,Sessions This Night,aria-label + label[for],Number of sessions this night,1974,PASS
+smt-pn,Modal,Static,Move to Parade Night,label[for],Move to Parade Night,2008,PASS
+or-reason,Modal,Static,Reason,label[for],Reason,2063,PASS
+c-phase,Modal,Static,Phase,aria-label + label[for],Training phase,2105,PASS
+c-el,Modal,Static,Element,aria-label + label[for],Curriculum element,2120,PASS
+c-term,unknown,Static,Term,aria-label + label[for],Curriculum item term,2136,PASS
+c-wing-id,unknown,Static,Wing,aria-label + label[for],Owning wing,2141,PASS
+c-instr,unknown,Static,Instructor Suitability,label[for],Instructor Suitability,2145,PASS
+act-type,Modal,Static,Importance,aria-label + label[for],Activity importance,2173,PASS
+ga-type,Modal,Static,Type,aria-label + label[for],Activity type,2202,PASS
+ga-recur,Modal,Static,Recurrence *,aria-label + label[for],Recurrence frequency,2215,PASS
+ga-weekday,Modal,Static,Weekday,aria-label + label[for],Parade day of week,2224,PASS
+csv-curr-level,Modal,Static,Owning Level,label[for],Owning Level,2267,PASS
+fac-type,Modal,Static,Type,aria-label + label[for],Facilitator type,2346,PASS
+room-type,Modal,Static,Type,aria-label + label[for],Room type,2434,PASS
+ca-role,Modal,Static,Role,aria-label + label[for],Account role,2473,PASS
+ca-wing,Modal,Static,Wing,label[for],Wing,2478,PASS
+ca-sqn,Modal,Static,Squadron,label[for],Squadron,2483,PASS
+ca-flight,Modal,Static,N/A,AT-hidden,N/A (aria-hidden parent),2486,EXEMPT
+cf-sqn,Modal,Static,Squadron,label[for],Squadron,2574,PASS
+ea-role,Modal,Static,Role / Access Type,label[for],Role / Access Type,2593,PASS
+ea-flight,Modal,Static,Flight (optional),label[for],Flight (optional),2597,PASS
+csq-wing,Modal,Static,Wing,label[for],Wing,2675,PASS
+csq-type,Modal,Static,Unit Type,label[for],Unit Type,2678,PASS
+tt-quick-n,Modal,Static,Quick setup,aria-label + label[for],Number of instructional periods for quick setup,2714,PASS
+pn-override-tid,Modal,Static,Template,aria-label + label[for],Timing template,2761,PASS
+np-ph-${i},JS Template,Dynamic,Phase,aria-label + label[for],Phase for session ${i+1},6293,PASS
+np-ex-${i},JS Template,Dynamic,Curriculum Item,aria-label + label[for],Curriculum item for session ${i+1},6296,PASS
+np-fa-${i},JS Template,Dynamic,Facilitator,aria-label + label[for],Facilitator for session ${i+1},6301,PASS
+np-rm-${i},JS Template,Dynamic,Room,aria-label + label[for],Room for session ${i+1},6304,PASS
+pnd-type,Dynamic JS,Static,Type,aria-label + label[for],Parade night type,6369,PASS
+d-ph-${i},unknown,Dynamic,Phase,aria-label + label[for],Phase for session ${i+1},6398,PASS
+d-st-${i},unknown,Dynamic,Status,aria-label + label[for],Status for session ${i+1},6399,PASS
+d-ex-${i},unknown,Dynamic,Curriculum Item,aria-label + label[for],Curriculum item for session ${i+1},6402,PASS
+d-fa-${i},unknown,Dynamic,Facilitator,aria-label + label[for],Facilitator for session ${i+1},6406,PASS
+d-rm-${i},unknown,Dynamic,Room,aria-label + label[for],Room for session ${i+1},6409,PASS
+qe-st,Dynamic JS,Static,Status,aria-label + label[for],Session status,6696,PASS
+qe-ex,Dynamic JS,Static,Curriculum Item,label[for],Curriculum Item,6697,PASS
+qe-fa,Dynamic JS,Static,Facilitator,label[for],Facilitator,6698,PASS
+qe-rm,Dynamic JS,Dynamic,Room,label[for],Room,6699,PASS
+${containerId}-f-type,unknown,Dynamic,N/A,aria-label,Filter activities by type,7202,PASS
+${containerId}-f-src,unknown,Dynamic,N/A,aria-label,Filter activities by source,7206,PASS
+(no id),Modal,Static,N/A,aria-label,Block type for period ${i+1},8127,PASS
+cmd-window-sel,Dynamic JS,Static,N/A,aria-label,Reporting period,8486,PASS
