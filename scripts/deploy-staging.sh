@@ -453,12 +453,12 @@ run_subject_area_tags_crud() {
 
   local tag_name="Deployment Verification $(date -u '+%Y%m%dT%H%M%SZ')"
   staging_api_call POST "/api/subject-area-tags" \
-    "{\"display_name\": \"$tag_name\", \"scope\": \"squadron\"}"
+    "{\"display_name\": \"$tag_name\", \"scope\": \"global\"}"
   [ "$STAGING_API_CODE" = "201" ] \
     || die "POST /api/subject-area-tags → $STAGING_API_CODE (expected 201) — HARD FAIL."
   local tag_id
   tag_id=$(echo "$STAGING_API_BODY" | python3 -c "
-import json,sys; print(json.load(sys.stdin).get('id','MISSING'))" 2>/dev/null || echo "MISSING")
+import json,sys; print(json.load(sys.stdin).get('tag_id','MISSING'))" 2>/dev/null || echo "MISSING")
   [ "$tag_id" = "MISSING" ] || [ -z "$tag_id" ] \
     && die "POST response missing stable ID — HARD FAIL." || true
   ok "POST /api/subject-area-tags → 201, id=$tag_id"
@@ -468,7 +468,7 @@ import json,sys; print(json.load(sys.stdin).get('id','MISSING'))" 2>/dev/null ||
     || die "GET (after create) → $STAGING_API_CODE — HARD FAIL."
   local found
   found=$(echo "$STAGING_API_BODY" | python3 -c "
-import json,sys; print('yes' if any(t.get('id')=='$tag_id' for t in json.load(sys.stdin)) else 'no')" 2>/dev/null || echo "no")
+import json,sys; print('yes' if any(t.get('tag_id')=='$tag_id' for t in json.load(sys.stdin)) else 'no')" 2>/dev/null || echo "no")
   [ "$found" = "yes" ] \
     && ok "Created tag $tag_id present in active list" \
     || die "Created tag $tag_id NOT found in active list — HARD FAIL."
@@ -483,7 +483,7 @@ import json,sys; print('yes' if any(t.get('id')=='$tag_id' for t in json.load(sy
     || die "GET (after archive) → $STAGING_API_CODE — HARD FAIL."
   local still
   still=$(echo "$STAGING_API_BODY" | python3 -c "
-import json,sys; print('yes' if any(t.get('id')=='$tag_id' for t in json.load(sys.stdin)) else 'no')" 2>/dev/null || echo "yes")
+import json,sys; print('yes' if any(t.get('tag_id')=='$tag_id' for t in json.load(sys.stdin)) else 'no')" 2>/dev/null || echo "yes")
   [ "$still" = "no" ] \
     && ok "Archived tag $tag_id absent from active list — CRUD PASS" \
     || die "Archived tag $tag_id still in active list — HARD FAIL."
