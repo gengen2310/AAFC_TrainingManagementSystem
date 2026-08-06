@@ -617,7 +617,7 @@ def current_proxy(p: Principal = Depends(get_principal)):
     return {"active": True, "mode": p.proxy_mode, "acting_squadron_id": p.acting_squadron_id}
 
 
-_AUDIT_READ_ROLES = frozenset({"auditor", "sqn_admin", "wing_admin", "national_admin", "system_admin"})
+_AUDIT_READ_ROLES = frozenset({"auditor", "sqn_admin", "wing_admin", "national_admin", "national_viewer", "system_admin"})
 
 # ── Audit (read-only; auditor + wing/national admins) ──
 @router.get("/audit")

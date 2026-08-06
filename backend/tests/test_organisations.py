@@ -616,3 +616,19 @@ def test_nat_admin_can_delete_wing_curriculum_without_proxy(client):
     cid = r.json()["curriculum_id"]
     delete = client.delete(f"/api/curriculum/{cid}", headers=h_nat)
     assert delete.status_code == 200, delete.text
+
+
+def test_national_viewer_can_read_audit_log(client):
+    """F-FUNC-01 regression: national_viewer must get 200 from GET /api/audit (not 403)."""
+    h = login(client, "NATIONAL2026")
+    r = client.get("/api/audit", headers=h)
+    assert r.status_code == 200, f"national_viewer got {r.status_code}: {r.text}"
+    assert isinstance(r.json(), list)
+
+
+def test_national_viewer_audit_is_read_only(client):
+    """national_viewer must not be able to call write endpoints (confirmation that access is read-only)."""
+    h = login(client, "NATIONAL2026")
+    # Attempt to create a wing (write operation) — must still be denied
+    r = client.post("/api/wings", headers=h, json={"code": "TEST", "name": "Test Wing"})
+    assert r.status_code == 403

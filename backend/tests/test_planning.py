@@ -381,6 +381,44 @@ def test_holiday_conflict_flagged_on_parade_date(client):
     assert "holiday_conflict" in types
 
 
+def test_sqn_admin_can_patch_holiday(client):
+    """HOL-EDIT-01 regression: PATCH /api/planning/holidays/{id} must update fields."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.post(f"/api/planning/years/{yr_id}/holidays",
+                    json={"name": "Original", "start_date": "2026-07-01", "end_date": "2026-07-14",
+                          "holiday_type": "school_holiday"},
+                    headers=hdr)
+    hol_id = r.json()["holiday_id"]
+    rp = client.patch(f"/api/planning/holidays/{hol_id}",
+                      json={"name": "Updated", "holiday_type": "public_holiday"},
+                      headers=hdr)
+    assert rp.status_code == 200
+    d = rp.json()
+    assert d["name"] == "Updated"
+    assert d["holiday_type"] == "public_holiday"
+    # start/end unchanged
+    assert d["start_date"] == "2026-07-01"
+
+
+def test_holiday_type_stored_and_returned(client):
+    """HOL-TYPE-01 regression: holiday_type sent on create must round-trip."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.post(f"/api/planning/years/{yr_id}/holidays",
+                    json={"name": "ANZAC Day", "start_date": "2026-04-25", "end_date": "2026-04-25",
+                          "holiday_type": "public_holiday"},
+                    headers=hdr)
+    assert r.status_code == 200
+    assert r.json()["holiday_type"] == "public_holiday"
+    listed = client.get(f"/api/planning/years/{yr_id}/holidays", headers=hdr).json()
+    match = next((h for h in listed if h["name"] == "ANZAC Day"), None)
+    assert match is not None
+    assert match["holiday_type"] == "public_holiday"
+
+
 # ─────────────────────────────────────────────────────────────
 # Anchor Events
 # ─────────────────────────────────────────────────────────────

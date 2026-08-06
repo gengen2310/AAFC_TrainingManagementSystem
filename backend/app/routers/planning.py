@@ -1058,6 +1058,58 @@ def add_holiday(
     return _holiday_out(h)
 
 
+class HolidayUpdateIn(BaseModel):
+    name: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    holiday_type: Optional[str] = None
+    affects_parade: Optional[bool] = None
+    notes: Optional[str] = None
+    jurisdiction: Optional[str] = None
+
+    def model_post_init(self, __context) -> None:
+        if self.start_date:
+            _validate_iso_date(self.start_date, "start_date")
+        if self.end_date:
+            _validate_iso_date(self.end_date, "end_date")
+
+
+@router.patch("/holidays/{holiday_id}")
+def update_holiday(
+    holiday_id: str,
+    body: HolidayUpdateIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    h = db.get(HolidayPeriod, holiday_id)
+    if not h:
+        raise HTTPException(404, detail={"error": "not_found"})
+    py = _get_year_or_404(h.planning_year_id, db)
+    _require_year_access(p, py, write=True)
+    old = {"name": h.name, "start": h.start_date, "end": h.end_date, "type": h.holiday_type}
+    if body.name is not None:
+        h.name = body.name
+    if body.start_date is not None:
+        h.start_date = body.start_date
+    if body.end_date is not None:
+        h.end_date = body.end_date
+    if body.holiday_type is not None:
+        h.holiday_type = body.holiday_type
+    if body.affects_parade is not None:
+        h.affects_parade = body.affects_parade
+    if body.notes is not None:
+        h.notes = body.notes
+    if body.jurisdiction is not None:
+        h.jurisdiction = body.jurisdiction
+    if h.end_date < h.start_date:
+        raise HTTPException(400, detail={"error": "end_before_start"})
+    h.updated_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="holiday_period", object_id=h.id, action="update",
+          old=old, new={"name": h.name, "start": h.start_date, "end": h.end_date, "type": h.holiday_type})
+    return _holiday_out(h)
+
+
 @router.delete("/holidays/{holiday_id}")
 def delete_holiday(
     holiday_id: str,

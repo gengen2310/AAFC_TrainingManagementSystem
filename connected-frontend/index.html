@@ -1784,6 +1784,18 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="modal">
     <h2>Add Holiday / Stand-Down Period</h2>
     <div class="form-group"><label>Name *</label><input type="text" id="hol-name-inp" placeholder="e.g. Easter Break"></div>
+    <div class="form-group"><label>Type *</label>
+      <select id="hol-type-inp">
+        <option value="school_holiday">School Holiday</option>
+        <option value="public_holiday">Public Holiday</option>
+        <option value="squadron_stand_down">Squadron Stand-Down</option>
+        <option value="wing_stand_down">Wing Stand-Down</option>
+        <option value="national_stand_down">National Stand-Down</option>
+        <option value="local_closure">Local Closure</option>
+        <option value="training_pause">Training Pause</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
     <div class="form-row">
       <div class="form-group"><label>Start *</label><input type="date" id="hol-start-inp"></div>
       <div class="form-group"><label>End *</label><input type="date" id="hol-end-inp"></div>
@@ -1793,6 +1805,37 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-add-holiday')">Cancel</button>
       <button class="btn btn-primary" onclick="doAddHoliday()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Holiday Modal -->
+<div class="modal-bg" id="m-edit-holiday">
+  <div class="modal">
+    <h2>Edit Holiday / Stand-Down Period</h2>
+    <input type="hidden" id="hol-edit-id">
+    <div class="form-group"><label>Name *</label><input type="text" id="hol-edit-name" placeholder="e.g. Easter Break"></div>
+    <div class="form-group"><label>Type *</label>
+      <select id="hol-edit-type">
+        <option value="school_holiday">School Holiday</option>
+        <option value="public_holiday">Public Holiday</option>
+        <option value="squadron_stand_down">Squadron Stand-Down</option>
+        <option value="wing_stand_down">Wing Stand-Down</option>
+        <option value="national_stand_down">National Stand-Down</option>
+        <option value="local_closure">Local Closure</option>
+        <option value="training_pause">Training Pause</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Start *</label><input type="date" id="hol-edit-start"></div>
+      <div class="form-group"><label>End *</label><input type="date" id="hol-edit-end"></div>
+    </div>
+    <div class="form-group"><label><input type="checkbox" id="hol-edit-affects"> Affects parade nights</label></div>
+    <p id="hol-edit-msg" style="color:var(--error)"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-edit-holiday')">Cancel</button>
+      <button class="btn btn-primary" onclick="doEditHoliday()">Save</button>
     </div>
   </div>
 </div>
@@ -9260,13 +9303,15 @@ async function _renderHolidays(yearId){
   try {
     const rows = await api(`/api/planning/years/${yearId}/holidays`);
     if(!rows.length){ el.innerHTML='<p class="muted">No holiday periods added yet.</p>'; return; }
-    el.innerHTML = `<table class="data-table"><thead><tr><th>Name</th><th>Start</th><th>End</th><th>Affects Parade</th><th></th></tr></thead><tbody>`+
+    const canWrite=canWriteSquadron();
+    el.innerHTML = `<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Start</th><th>End</th><th>Affects Parade</th><th></th></tr></thead><tbody>`+
       rows.map(h=>`<tr>
         <td>${esc(h.name)}</td>
+        <td>${esc(_HOL_TYPE_LABELS[h.holiday_type]||h.holiday_type||'—')}</td>
         <td>${esc(h.start_date)}</td>
         <td>${esc(h.end_date)}</td>
         <td>${h.affects_parade?'Yes':'No'}</td>
-        <td><button class="btn-xs btn-danger" onclick="deleteHoliday('${esc(h.holiday_id)}','${esc(yearId)}')">Remove</button></td>
+        <td style="white-space:nowrap">${canWrite?`<button class="btn-xs" onclick='openEditHolidayModal(${JSON.stringify(h)})' style="margin-right:4px">Edit</button>`:''}${canWrite?`<button class="btn-xs btn-danger" onclick="deleteHoliday('${esc(h.holiday_id)}','${esc(yearId)}')">Remove</button>`:''}</td>
       </tr>`).join('')+
       `</tbody></table>`;
   } catch(e){ el.innerHTML='<p class="muted">Error loading holidays.</p>'; }
@@ -9358,8 +9403,10 @@ async function doGenerateDates(){
   } catch(e){ msg.textContent=apiErr(e); }
 }
 
+const _HOL_TYPE_LABELS={'school_holiday':'School Holiday','public_holiday':'Public Holiday','squadron_stand_down':'Squadron Stand-Down','wing_stand_down':'Wing Stand-Down','national_stand_down':'National Stand-Down','local_closure':'Local Closure','training_pause':'Training Pause','other':'Other'};
 function openAddHolidayModal(){
   ['hol-name-inp','hol-start-inp','hol-end-inp'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('hol-type-inp').value='school_holiday';
   document.getElementById('hol-affects-inp').checked=true;
   document.getElementById('hol-msg').textContent='';
   openModal('m-add-holiday');
@@ -9370,13 +9417,37 @@ async function doAddHoliday(){
   const name = document.getElementById('hol-name-inp').value.trim();
   const start = document.getElementById('hol-start-inp').value;
   const end = document.getElementById('hol-end-inp').value;
+  const holiday_type = document.getElementById('hol-type-inp').value;
   if(!name||!start||!end){ hm.textContent='All fields required.'; return; }
   try {
     await api(`/api/planning/years/${P.currentYearId}/holidays`,{
-      method:'POST', body:{ name, start_date:start, end_date:end,
+      method:'POST', body:{ name, start_date:start, end_date:end, holiday_type,
         affects_parade: document.getElementById('hol-affects-inp').checked }
     });
     closeModal('m-add-holiday'); await _renderHolidays(P.currentYearId);
+  } catch(e){ hm.textContent=apiErr(e); }
+}
+function openEditHolidayModal(h){
+  document.getElementById('hol-edit-id').value=h.holiday_id;
+  document.getElementById('hol-edit-name').value=h.name||'';
+  document.getElementById('hol-edit-type').value=h.holiday_type||'school_holiday';
+  document.getElementById('hol-edit-start').value=h.start_date||'';
+  document.getElementById('hol-edit-end').value=h.end_date||'';
+  document.getElementById('hol-edit-affects').checked=!!h.affects_parade;
+  document.getElementById('hol-edit-msg').textContent='';
+  openModal('m-edit-holiday');
+}
+async function doEditHoliday(){
+  const hm=document.getElementById('hol-edit-msg');
+  const hId=document.getElementById('hol-edit-id').value;
+  const name=document.getElementById('hol-edit-name').value.trim();
+  const start=document.getElementById('hol-edit-start').value;
+  const end=document.getElementById('hol-edit-end').value;
+  const holiday_type=document.getElementById('hol-edit-type').value;
+  if(!name||!start||!end){ hm.textContent='All fields required.'; return; }
+  try {
+    await api(`/api/planning/holidays/${hId}`,{method:'PATCH',body:{name,start_date:start,end_date:end,holiday_type,affects_parade:document.getElementById('hol-edit-affects').checked}});
+    closeModal('m-edit-holiday'); await _renderHolidays(P.currentYearId);
   } catch(e){ hm.textContent=apiErr(e); }
 }
 async function deleteHoliday(hId, yearId){

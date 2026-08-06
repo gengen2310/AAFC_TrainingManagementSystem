@@ -118,10 +118,12 @@ function ModuleEntry() {
   if (!session) return <NotAuthenticated />;
   return (
     <ModuleErrorBoundary>
-      <Routes>
-        <Route path="/planning" element={<PlanningWorkspace />} />
-        <Route path="*" element={<Navigate to="/planning" replace />} />
-      </Routes>
+      <SquadronViewProvider>
+        <Routes>
+          <Route path="/planning" element={<PlanningWorkspace />} />
+          <Route path="*" element={<Navigate to="/planning" replace />} />
+        </Routes>
+      </SquadronViewProvider>
     </ModuleErrorBoundary>
   );
 }
