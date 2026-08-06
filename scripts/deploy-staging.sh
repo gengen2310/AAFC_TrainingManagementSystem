@@ -812,7 +812,7 @@ info "  PRE_LATEST:   $PRE_BACKEND_LATEST"
 info "  PRE_ACTIVE:   $PRE_BACKEND_ACTIVE"
 echo
 
-railway up \
+railway up ./backend --path-as-root \
   --project "$EXPECTED_PROJECT_ID" \
   --service "$ACTUAL_BACKEND_SVC_ID" \
   --environment "$ACTUAL_STAGING_ENV_ID" \
@@ -873,7 +873,7 @@ info "  Service UUID: $ACTUAL_FRONTEND_SVC_ID"
 info "  PRE_LATEST:   $PRE_FRONTEND_LATEST"
 echo
 
-railway up \
+railway up ./connected-frontend --path-as-root \
   --project "$EXPECTED_PROJECT_ID" \
   --service "$ACTUAL_FRONTEND_SVC_ID" \
   --environment "$ACTUAL_STAGING_ENV_ID" \
@@ -917,7 +917,7 @@ info "  Service UUID: $ACTUAL_PW_SVC_ID"
 info "  PRE_LATEST:   $PRE_PW_LATEST"
 echo
 
-railway up \
+railway up ./frontend --path-as-root \
   --project "$EXPECTED_PROJECT_ID" \
   --service "$ACTUAL_PW_SVC_ID" \
   --environment "$ACTUAL_STAGING_ENV_ID" \
