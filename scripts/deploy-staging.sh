@@ -893,17 +893,19 @@ info "Frontend: new=$FRONTEND_NEW_DEPLOY_ID"
 
 echo
 echo "  ── Frontend gate 3/4: build fingerprint ─────────────────────────────"
-# Brief wait for Railway's load balancer to route to the new container.
 sleep 10
-FRONTEND_HTML=$(curl -s --connect-timeout 10 --max-time 20 \
-  "https://$EXPECTED_STAGING_FRONTEND_DOMAIN/" 2>/dev/null || echo "")
-echo "$FRONTEND_HTML" | grep -q 'name="app-build"' \
+# Pipe curl directly to grep to avoid storing 600KB in a bash variable.
+curl -s --connect-timeout 15 --max-time 60 \
+  "https://$EXPECTED_STAGING_FRONTEND_DOMAIN/" 2>/dev/null \
+  | grep -q 'name="app-build"' \
   || die 'Build fingerprint meta (name="app-build") NOT found — HARD FAIL.'
-# Confirm the placeholder was replaced by docker-entrypoint.sh (not still __APP_BUILD__).
-echo "$FRONTEND_HTML" | grep -q '__APP_BUILD__' \
+FRONTEND_BUILD=$(curl -s --connect-timeout 15 --max-time 60 \
+  "https://$EXPECTED_STAGING_FRONTEND_DOMAIN/" 2>/dev/null \
+  | grep -o 'name="app-build" content="[^"]*"' | head -1 || echo "no fingerprint")
+# Confirm placeholder was replaced (not still __APP_BUILD__).
+echo "$FRONTEND_BUILD" | grep -q '__APP_BUILD__' \
   && die 'Build fingerprint still contains placeholder — entrypoint did not run — HARD FAIL.'
-FRONTEND_BUILD=$(echo "$FRONTEND_HTML" | grep -o 'name="app-build" content="[^"]*"' | head -1 || echo "")
-ok "Build fingerprint present and resolved: $FRONTEND_BUILD"
+ok "Frontend build fingerprint: $FRONTEND_BUILD"
 
 echo
 echo "  ── Frontend gate 4/4: Playwright smoke ──────────────────────────────"
@@ -941,12 +943,14 @@ info "PW: new=$PW_NEW_DEPLOY_ID"
 echo
 echo "  ── PW gate 3/4: build fingerprint ───────────────────────────────────"
 sleep 10
-PW_HTML=$(curl -s --connect-timeout 10 --max-time 20 \
-  "https://$EXPECTED_STAGING_PW_DOMAIN/" 2>/dev/null || echo "")
-echo "$PW_HTML" | grep -qiE 'react|vite|__vite_|data-reactroot' \
+curl -s --connect-timeout 15 --max-time 60 \
+  "https://$EXPECTED_STAGING_PW_DOMAIN/" 2>/dev/null \
+  | grep -qiE 'react|vite|__vite_|data-reactroot' \
   || die "PW HTML lacks React app markers — HARD FAIL."
 ok "PW HTML contains React app markers"
-PW_BUILD=$(echo "$PW_HTML" | grep -o 'name="app-build" content="[^"]*"' | head -1 || echo "no fingerprint")
+PW_BUILD=$(curl -s --connect-timeout 15 --max-time 60 \
+  "https://$EXPECTED_STAGING_PW_DOMAIN/" 2>/dev/null \
+  | grep -o 'name="app-build" content="[^"]*"' | head -1 || echo "no fingerprint")
 ok "PW build fingerprint: $PW_BUILD"
 
 echo
