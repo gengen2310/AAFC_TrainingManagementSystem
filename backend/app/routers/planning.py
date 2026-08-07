@@ -21,11 +21,20 @@ from ..models import (
 from ..models import Session as TrainingSession
 from ..models.planning import (
     PlanningYear, ParadeDate, HolidayPeriod, AnchorEvent,
-    AnchorPrepRule, AnchorPrepPlan, ScheduledSession,
-    PlanningLocation, PlanningConflict, PlanningFacilitatorLeave, PlanningNotice,
+    AnchorPrepRule, AnchorPrepPlan,
+    PlanningConflict, PlanningFacilitatorLeave, PlanningNotice,
     CeaImportBatch, CeaActivity, ActivityLocalHide,
     CADET_GROUPS, IMPORTANCE_LEVELS, EVENT_TYPES,
 )
+# ScheduledSession and PlanningLocation models are intentionally NOT imported here:
+# both are fully superseded (TrainingSession/TrainingArea are canonical -- see
+# docs/qualification/02_architecture_review.md, 03_data_integrity_review.md, and
+# QUAL-001/QUAL-002 in docs/remediation/master_gap_register.csv). This router's last
+# reference to either (the dead _session_out() serializer, never called) was removed
+# 2026-08-08. The model classes and their tables (scheduled_sessions,
+# planning_locations) still exist -- retiring them is a schema change requiring
+# explicit user authorisation per .claude/rules/capability-preservation.md, not done
+# here.
 from ..models.training import TimingTemplate, TimingBlock, Activity
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
@@ -294,37 +303,6 @@ def _anchor_out(a: AnchorEvent) -> dict:
         "created_by": a.created_by,
         "created_at": a.created_at.isoformat() if a.created_at else None,
         "version": a.version,
-    }
-
-
-def _session_out(s: ScheduledSession, db: DBSession) -> dict:
-    curr_code = curr_title = None
-    if s.curriculum_id:
-        ci = db.get(CurriculumItem, s.curriculum_id)
-        if ci:
-            curr_code, curr_title = ci.code, ci.title
-    fac_name = None
-    if s.facilitator_id:
-        f = db.get(Facilitator, s.facilitator_id)
-        if f:
-            fac_name = f"{f.current_rank or ''} {f.last_name}".strip()
-    loc_name = None
-    if s.location_id:
-        loc = db.get(PlanningLocation, s.location_id)
-        if loc:
-            loc_name = loc.name
-    return {
-        "scheduled_session_id": s.id, "parade_date_id": s.parade_date_id,
-        "unit_id": s.unit_id, "cadet_group": s.cadet_group,
-        "session_number": s.session_number, "curriculum_id": s.curriculum_id,
-        "curriculum_code": curr_code, "curriculum_title": curr_title,
-        "activity_title": s.activity_title or curr_title,
-        "facilitator_id": s.facilitator_id, "facilitator_name": fac_name,
-        "location_id": s.location_id, "location_name": loc_name,
-        "is_combined": s.is_combined, "combined_groups": s.combined_groups or [],
-        "override_conflict": s.override_conflict, "override_reason": s.override_reason,
-        "status": s.status, "notes": s.notes,
-        "created_at": s.created_at.isoformat() if s.created_at else None,
     }
 
 
@@ -1459,7 +1437,7 @@ def get_builder(
 # Scheduled Sessions
 # ─────────────────────────────────────────────────────────────
 
-class ScheduledSessionIn(BaseModel):
+class SessionCreateIn(BaseModel):
     cadet_group: str
     session_number: int
     curriculum_id: Optional[str] = None
@@ -1474,7 +1452,7 @@ class ScheduledSessionIn(BaseModel):
     notes: Optional[str] = None
 
 
-class ScheduledSessionUpdateIn(BaseModel):
+class SessionUpdateIn(BaseModel):
     curriculum_id: Optional[str] = None
     activity_title: Optional[str] = None
     facilitator_id: Optional[str] = None
@@ -1491,7 +1469,7 @@ class ScheduledSessionUpdateIn(BaseModel):
 @router.post("/parade-dates/{date_id}/sessions")
 def create_session(
     date_id: str,
-    body: ScheduledSessionIn,
+    body: SessionCreateIn,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -1579,7 +1557,7 @@ def get_session(
 @router.patch("/sessions/{session_id}")
 def update_session(
     session_id: str,
-    body: ScheduledSessionUpdateIn,
+    body: SessionUpdateIn,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):

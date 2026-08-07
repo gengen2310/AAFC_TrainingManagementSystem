@@ -52,3 +52,20 @@ gap would misrepresent what was actually used.
 **How to apply**: If these skills become available in a later session (e.g. installed by the user or
 present in an updated plugin cache), re-run the relevant portion of Phase H against them and note the
 addition here.
+
+### 2026-08-08 — Table retirement and C-5 refactor both deferred (user decision)
+
+**Decision**: After Phase C's dead-code cleanup (removing the last live references to
+`ScheduledSession`/`PlanningLocation`), the user was asked whether to (1) drop the now-fully-unused
+`scheduled_sessions`/`planning_locations` tables and model classes, and (2) take on C-5 (centralising
+duplicated squadron-scope-derivation logic into `permissions.py`) now. User chose to defer both.
+
+**Why**: Table/schema removal is exactly the class of change `capability-preservation.md` requires
+explicit authorisation for — asking first rather than assuming "confirmed unused" is equivalent to
+"authorised to remove" was the correct default. C-5 is a multi-router refactor of working code (not a
+confirmed defect, marked P3/DESIGN by the architecture review) — deferring it keeps this pass's change
+minimal and focused, consistent with ground rule 3 ("do not rewrite a working subsystem merely because
+another architecture looks cleaner") and the overall program's long remaining scope (Phases D-J).
+
+**How to apply**: Both remain open, documented items (`QUAL-002` residual risk; C-5 in
+`02_architecture_review.md`'s Phase C feed table) for a future dedicated pass, not silently dropped.
