@@ -184,6 +184,158 @@ test.describe("Facilitator statistics", () => {
     // Named facilitator list must remain below the charts.
     await expect(page.locator("#fac-tbody tr").first()).toBeVisible();
   });
+
+  // REM-111 regression: create/edit/archive/merge success handlers must call
+  // loadFacilitatorStats() (or an equivalent refresh) so the summary charts
+  // never go stale after a mutation. Before the fix, the roster table
+  // (#fac-tbody, driven by client-side S.facs) updated immediately but the
+  // charts (driven by a separate GET /api/dashboard/charts call) stayed
+  // frozen on pre-mutation values until the next full page load.
+  //
+  // Design note on scope: facilitator_workload and subject_area_resilience
+  // are derived strictly from session-assignment history / subject-area tags
+  // respectively (backend/app/routers/dashboard.py) -- a brand-new
+  // facilitator with zero sessions and no tags legitimately never appears as
+  // a new row in either, by design, not by defect. Asserting a new row would
+  // be a wrong test, not a strict one. What *must* be true regardless: the
+  // refresh actually fires (proven via a real network wait, which times out
+  // and fails the test if loadFacilitatorStats() is ever removed again) and
+  // returns the same, single, freshly-computed payload for all five charts
+  // together. Facilitator Status and Facilitators By Type *are* guaranteed
+  // to include any active facilitator regardless of sessions/tags, so those
+  // two get concrete before/after value assertions.
+  test("REM-111: create/edit/archive/merge all refresh every facilitator summary statistic", async ({ page }) => {
+    await loginSquadron(page, "ADMIN703");
+    page.on("dialog", (d) => d.accept()); // delFac() uses a native confirm()
+    await page.evaluate(() => (window as any).nav("facilitators"));
+    await expect(page.locator("#fac-chart-status")).toBeVisible();
+
+    const CHART_KEYS = [
+      "facilitator_status_distribution",
+      "facilitator_workload",
+      "subject_area_resilience",
+      "facilitator_repeated_gaps",
+      "facilitator_type_distribution",
+    ];
+    type Charts = Record<string, { data: { label?: string; status?: string; count: number }[] }>;
+
+    async function fetchCharts(): Promise<Charts> {
+      return await page.evaluate(async () => {
+        const r = (await (window as any).api("/api/dashboard/charts?window=term")) as { charts: Charts };
+        return r.charts;
+      });
+    }
+    function statusTotal(c: Charts): number {
+      return c.facilitator_status_distribution.data.reduce((s, r) => s + r.count, 0);
+    }
+    function typeCount(c: Charts, label: string): number {
+      return c.facilitator_type_distribution.data.find((r) => r.label === label)?.count ?? 0;
+    }
+    function assertAllChartsFresh(c: Charts) {
+      for (const key of CHART_KEYS) expect(c, `charts payload must include ${key}`).toHaveProperty(key);
+    }
+    async function waitForFreshCharts(action: () => Promise<void>): Promise<Charts> {
+      const respPromise = page.waitForResponse(
+        (r) => r.url().includes("/api/dashboard/charts") && r.request().method() === "GET",
+        { timeout: 10000 }
+      );
+      await action();
+      const resp = await respPromise; // times out (fails) if the refresh call never fires
+      const body = (await resp.json()) as { charts: Charts };
+      return body.charts;
+    }
+
+    const stamp = Date.now().toString(36);
+    const alphaName = `ZZRem111A${stamp}`;
+    const bravoName = `ZZRem111B${stamp}`;
+    const charlieName = `ZZRem111C${stamp}`;
+    const deltaName = `ZZRem111D${stamp}`;
+
+    async function addFacilitatorViaForm(firstName: string, type: string) {
+      await page.getByRole("button", { name: "+ Add Facilitator" }).click();
+      await page.locator("#fac-first").fill(firstName);
+      await page.locator("#fac-last").fill("Regression");
+      await page.locator("#fac-type").selectOption(type);
+      await page.locator("#fac-save-btn").click();
+      await expect(page.locator("#m-add-fac")).toBeHidden();
+    }
+    async function facIdByName(firstName: string): Promise<string> {
+      // `S` is a top-level `let` in connected-frontend's classic (non-module)
+      // script -- that does NOT attach to `window` (unlike `function`
+      // declarations or `var`), so it must be referenced bare here, not as
+      // `window.S`, even though this runs as injected page-context code.
+      const id = await page.evaluate((name) => {
+        // eslint-disable-next-line no-undef
+        const f = (S.facs as { id: string; first: string }[]).find((x) => x.first === name);
+        return f?.id ?? null;
+      }, firstName);
+      expect(id, `facilitator ${firstName} must exist in S.facs after creation`).not.toBeNull();
+      return id!;
+    }
+
+    const baseline = await fetchCharts();
+    const baselineTotal = statusTotal(baseline);
+    const baselineStaff = typeCount(baseline, "Staff");
+    const baselineCivilian = typeCount(baseline, "Civilian");
+
+    // ── CREATE: roster + count + status + type must all update, no reload ──
+    const afterCreateAlpha = await waitForFreshCharts(() => addFacilitatorViaForm(alphaName, "Staff"));
+    await expect(page.locator("#fac-tbody")).toContainText(alphaName); // roster
+    assertAllChartsFresh(afterCreateAlpha);
+    expect(statusTotal(afterCreateAlpha), "Facilitator Status total must increment on create").toBe(baselineTotal + 1);
+    expect(typeCount(afterCreateAlpha, "Staff"), "Facilitators By Type (Staff) must increment on create").toBe(baselineStaff + 1);
+    await expect(page.locator("#fac-chart-status"), "Facilitator Status widget DOM must show the new total").toContainText(String(baselineTotal + 1));
+    const alphaId = await facIdByName(alphaName);
+
+    // ── EDIT: changing type must move the facilitator between type buckets ──
+    const afterEdit = await waitForFreshCharts(async () => {
+      await page.evaluate((id) => (window as any).editFac(id), alphaId);
+      await page.locator("#fac-type").selectOption("Civilian");
+      await page.locator("#fac-save-btn").click();
+      await expect(page.locator("#m-add-fac")).toBeHidden();
+    });
+    assertAllChartsFresh(afterEdit);
+    expect(statusTotal(afterEdit), "total must be unchanged by an edit").toBe(baselineTotal + 1);
+    expect(typeCount(afterEdit, "Staff"), "Staff count must decrement — this facilitator moved out").toBe(baselineStaff);
+    expect(typeCount(afterEdit, "Civilian"), "Civilian count must increment — this facilitator moved in").toBe(baselineCivilian + 1);
+    await expect(page.locator("#fac-tbody")).toContainText(alphaName);
+
+    // ── ARCHIVE: a dedicated facilitator, so Alpha's edit result above is undisturbed ──
+    await addFacilitatorViaForm(bravoName, "Staff");
+    const bravoId = await facIdByName(bravoName);
+    const beforeArchive = await fetchCharts();
+    const afterArchive = await waitForFreshCharts(() => page.evaluate((id) => (window as any).delFac(id), bravoId));
+    assertAllChartsFresh(afterArchive);
+    expect(statusTotal(afterArchive), "total must decrement on archive").toBe(statusTotal(beforeArchive) - 1);
+    await expect(page.locator("#fac-chart-status")).toContainText(String(statusTotal(beforeArchive) - 1));
+    await expect(page.locator("#fac-tbody")).not.toContainText(bravoName);
+
+    // ── MERGE: a dedicated, genuinely-safe pair (no real session/assignment
+    // history on either side — both created fresh by this test seconds ago) ──
+    await addFacilitatorViaForm(charlieName, "Staff");
+    await addFacilitatorViaForm(deltaName, "Staff");
+    const charlieId = await facIdByName(charlieName);
+    const deltaId = await facIdByName(deltaName);
+    const beforeMerge = await fetchCharts();
+    const afterMerge = await waitForFreshCharts(async () => {
+      await page.evaluate((id) => (window as any).openMergeFac(id), deltaId);
+      await page.locator("#fac-merge-target").selectOption(charlieId);
+      await page.locator("#fac-merge-btn").click();
+      await expect(page.locator("#m-fac-merge")).toBeHidden();
+    });
+    assertAllChartsFresh(afterMerge);
+    expect(statusTotal(afterMerge), "total must decrement by 1 — Delta absorbed into Charlie").toBe(statusTotal(beforeMerge) - 1);
+    await expect(page.locator("#fac-tbody")).toContainText(charlieName);
+    await expect(page.locator("#fac-tbody")).not.toContainText(deltaName);
+
+    // ── Cleanup: archive the two survivors so staging returns to baseline ──
+    await page.evaluate((id) => (window as any).delFac(id), alphaId);
+    await page.waitForTimeout(500);
+    await page.evaluate((id) => (window as any).delFac(id), charlieId);
+    await page.waitForTimeout(500);
+    const final = await fetchCharts();
+    expect(statusTotal(final), "staging must return to its exact pre-test baseline").toBe(baselineTotal);
+  });
 });
 
 test.describe("Subtitle removal", () => {
