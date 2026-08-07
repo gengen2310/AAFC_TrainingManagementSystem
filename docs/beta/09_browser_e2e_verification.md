@@ -139,3 +139,29 @@ API, not the raw table-count health endpoint) shows exactly 16 active squadrons,
 shows exactly 38 active users — matching the original synthetic seed. `ADMIN703` login and session
 still work correctly (real squadron/account untouched). Staging is now a clean baseline for Gate 7's
 load test.
+
+## P0 incident closeout, 2026-08-08 — System Administrator Planning Workspace scope
+
+During the P0 incident investigation (Planning Workspace squadron-selector gap, REM-109) and this
+formal closeout pass, every reproduction path with an available credential was exercised directly:
+`sqn_admin` (703), `wing_admin` (7WG), `national_admin` — all confirmed working live in a real
+browser, with automated regression coverage added for `wing_admin`/`national_admin`
+(`tools/playwright-staging/tests/verify-fixes.spec.ts`, `PW-CTX-01b`).
+
+`system_admin`'s Planning Workspace scope (System Administrator browsing a Squadron via
+`sa-scope-bar`, per `.claude/rules/frontend.md`'s documented mechanism) was **not** verified this
+pass — no valid staging `system_admin` bootstrap code is known to this session (`SYSADMIN2026`
+confirmed invalid via direct `curl`, `401 invalid_code`), and per this project's own security
+discipline (`.claude/rules/security.md`), an access code is never guessed at or retrieved, only
+reset (one-time display) by an authorised human. This is a genuine, disclosed gap, not a silent
+skip:
+
+**AUTHENTICATED ROLE VERIFICATION PENDING — CREDENTIAL NOT AVAILABLE**
+
+Closing this gap requires a human with staging `system_admin` access (or authority to reset the
+bootstrap code) to either supply the credential for an automated run or personally walk the
+`sa-scope-bar` → Squadron browsing → Planning Workspace path once. Until then, `system_admin`'s
+Planning Workspace behaviour should be treated as unverified, not assumed equivalent to
+`wing_admin`/`national_admin` just because the underlying `useScopedSquadron()` code path is
+shared — the fix in `PlanningWorkspace.tsx` was verified for the two roles that could actually be
+tested, not for all three roles `needsSelection` covers.
