@@ -438,6 +438,40 @@ def test_facilitator_stats_cross_squadron_blocked(client):
     assert r2.status_code == 403
 
 
+def test_facilitator_patch_rank_records_history(client):
+    """FAC-04: PATCH /facilitators/{fid} with a new rank must write a FacilitatorRankHistory row."""
+    hdr = login(client, ADM703)
+    r = client.post("/api/facilitators", json={"last_name": "RankTest", "current_rank": "CPL"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    fid = r.json()["facilitator_id"]
+
+    r2 = client.patch(f"/api/facilitators/{fid}", json={"current_rank": "SGT"}, headers=hdr)
+    assert r2.status_code == 200, r2.text
+
+    r3 = client.get(f"/api/facilitators/{fid}/stats", headers=hdr)
+    assert r3.status_code == 200
+    fac = r3.json()["facilitator"]
+    assert "SGT" in fac["name"]
+
+
+def test_facilitator_patch_without_subject_areas_preserves_tags(client):
+    """FAC-03: PATCH /facilitators/{fid} with no subject_areas field must not clear existing tags."""
+    hdr = login(client, ADM703)
+    r = client.post("/api/facilitators",
+                    json={"last_name": "TagPreserveTest", "subject_areas": ["Drill", "Air_Space"]},
+                    headers=hdr)
+    assert r.status_code == 200, r.text
+    fid = r.json()["facilitator_id"]
+
+    r2 = client.patch(f"/api/facilitators/{fid}", json={"current_rank": "WO2"}, headers=hdr)
+    assert r2.status_code == 200, r2.text
+
+    facs = client.get("/api/facilitators", headers=hdr).json()
+    updated = next((f for f in facs if f["facilitator_id"] == fid), None)
+    assert updated is not None
+    assert "Drill" in updated["subject_areas"], "subject areas must be preserved when not sent in PATCH"
+
+
 # ── mark-remaining-delivered (bulk "mark all delivered, then flag exceptions") ──
 # Risk-register data-entry UX ask: flag the few known exceptions individually
 # first, then bulk-clear everything else as delivered in one action.

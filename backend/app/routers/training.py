@@ -1046,6 +1046,7 @@ def update_fac(fid: str, body: FacUpdateIn, db: DBSession = Depends(get_db),
         f.subject_areas = _validate_subject_areas(body.subject_areas)
     if body.type is not None:
         f.type = body.type
+    rank_changed = body.current_rank is not None and body.current_rank != f.current_rank
     if body.current_rank is not None:
         f.current_rank = body.current_rank
     if body.first_name is not None:
@@ -1053,6 +1054,10 @@ def update_fac(fid: str, body: FacUpdateIn, db: DBSession = Depends(get_db),
     if body.last_name is not None:
         f.last_name = body.last_name
     db.commit()
+    if rank_changed:
+        db.add(FacilitatorRankHistory(facilitator_id=f.id, rank=body.current_rank,
+                                      effective_from=str(utcnow().date())))
+        db.commit()
     audit(db, p, object_type="facilitator", object_id=f.id, action="update",
           reason="subject-area tags" if body.subject_areas is not None else "update")
     return {"ok": True, "facilitator_id": f.id,

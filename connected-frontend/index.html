@@ -1076,7 +1076,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <select id="fac-filter" aria-label="Filter facilitators by subject area" onchange="S.facFilter=this.value;renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px">
               <option value="">All subject areas</option>
             </select>
-            <button class="btn btn-dk admin-el" style="display:none" onclick="editFacId=null;document.getElementById('fac-rank').value='';document.getElementById('fac-first').value='';document.getElementById('fac-last').value='';document.getElementById('fac-modal-title').textContent='+ Add Facilitator';_clearFacDupWarning();_resetFacSaveState();openModal('m-add-fac')">+ Add Facilitator</button>
+            <button class="btn btn-dk admin-el" style="display:none" onclick="editFacId=null;document.getElementById('fac-rank').value='';document.getElementById('fac-first').value='';document.getElementById('fac-last').value='';document.getElementById('fac-modal-title').textContent='+ Add Facilitator';document.getElementById('fa-areas-create').style.display='';document.getElementById('fa-areas-edit').style.display='none';_clearFacDupWarning();_resetFacSaveState();openModal('m-add-fac')">+ Add Facilitator</button>
           </div>
         </div>
         <div class="dash-grid" style="margin-bottom:16px">
@@ -2350,7 +2350,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ff"><label>First Name</label><input id="fac-first" oninput="_clearFacDupWarning();_markFacUnsaved()"></div>
         <div class="ff"><label>Last Name</label><input id="fac-last" oninput="_clearFacDupWarning();_markFacUnsaved()"></div>
       </div>
-      <div class="ff"><label>Subject Areas</label>
+      <div id="fa-areas-create" class="ff"><label>Subject Areas</label>
         <div class="chk-grp">
           <label class="chk-item"><input type="checkbox" id="fa-drill" onchange="_markFacUnsaved()"> Drill</label>
           <label class="chk-item"><input type="checkbox" id="fa-air" onchange="_markFacUnsaved()"> Air &amp; Space</label>
@@ -2359,6 +2359,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <label class="chk-item"><input type="checkbox" id="fa-sc" onchange="_markFacUnsaved()"> Service &amp; Community</label>
           <label class="chk-item"><input type="checkbox" id="fa-sqn" onchange="_markFacUnsaved()"> SQN Affairs</label>
         </div>
+      </div>
+      <div id="fa-areas-edit" class="ff" style="display:none"><label>Subject Areas</label>
+        <div style="font-size:11.5px;color:var(--muted);padding:6px 0">Use the <strong>Tags</strong> button in the facilitator list to manage subject areas.</div>
       </div>
     </div>
     <div class="modal-foot">
@@ -7754,7 +7757,7 @@ function saveFac(confirmDuplicate){
   const done=()=>{ if(btn){btn.disabled=false;btn.textContent=btnLabel;} if(anywayBtn)anywayBtn.disabled=false; };
   if(editFacId){
     const fid=editFacId; editFacId=null;
-    api('/api/facilitators/'+fid,{method:'PATCH',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type,subject_areas:areas})})
+    api('/api/facilitators/'+fid,{method:'PATCH',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type})})
       .then(async()=>{
         const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
         _setFacSaveState('Saved at '+savedAt,'var(--ok)');
@@ -7834,7 +7837,12 @@ function editFac(id){
   // no matching option existed, which meant saving a Staff record without
   // touching the dropdown silently rewrote it to Officer.
   document.getElementById('fac-type').value=f.type||'Staff';
-  ['drill','air','field','pd','sc','sqn'].forEach(k=>{const a={drill:'Drill',air:'Air_Space',field:'Field',pd:'Personal_Dev',sc:'Service_Community',sqn:'SQN_Affairs'}[k];document.getElementById('fa-'+k).checked=(f.areas||[]).includes(a);});
+  // Hide the checkbox area selector in edit mode — the Tags button is the
+  // authoritative subject-area editor and supports the full tag vocabulary.
+  // Sending checkbox values from here would silently clobber any tags set via
+  // the extended vocab (e.g. "Air & Space" vs old "Air_Space" key).
+  document.getElementById('fa-areas-create').style.display='none';
+  document.getElementById('fa-areas-edit').style.display='';
   _clearFacDupWarning();
   _resetFacSaveState();
   openModal('m-add-fac');
