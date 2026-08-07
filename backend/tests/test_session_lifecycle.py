@@ -472,6 +472,69 @@ def test_facilitator_patch_without_subject_areas_preserves_tags(client):
     assert "Drill" in updated["subject_areas"], "subject areas must be preserved when not sent in PATCH"
 
 
+# ── facilitator merge (absorb) ────────────────────────────────────────────────
+
+def _make_fac(client, hdr, last_name, rank="CPL"):
+    r = client.post("/api/facilitators", json={"last_name": last_name, "current_rank": rank,
+                                               "confirm_duplicate": True}, headers=hdr)
+    assert r.status_code == 200, r.text
+    return r.json()["facilitator_id"]
+
+
+def test_absorb_reassigns_sessions_and_archives_source(client):
+    """DUP-02: POST /facilitators/{target}/absorb must move all sessions and archive source."""
+    hdr = login(client, ADM703)
+    facs = client.get("/api/facilitators", headers=hdr).json()
+    source_id = _make_fac(client, hdr, "AbsorbSource")
+    target_id = facs[0]["facilitator_id"]
+
+    sqn_id = client.get("/api/auth/me", headers=hdr).json()["session"]["squadron_id"]
+    wing_id = client.get("/api/auth/me", headers=hdr).json()["session"]["wing_id"]
+
+    r_absorb = client.post(f"/api/facilitators/{target_id}/absorb",
+                           json={"source_id": source_id}, headers=hdr)
+    assert r_absorb.status_code == 200, r_absorb.text
+    body = r_absorb.json()
+    assert body["ok"] is True
+    assert body["source_id"] == source_id
+    assert body["target_id"] == target_id
+
+    remaining = client.get("/api/facilitators", headers=hdr).json()
+    ids = [f["facilitator_id"] for f in remaining]
+    assert source_id not in ids, "source must be archived after absorb"
+    assert target_id in ids, "target must still be visible"
+
+
+def test_absorb_rejects_cross_squadron(client):
+    hdr_703 = login(client, ADM703)
+    hdr_704 = login(client, ADM704)
+    # source belongs to 703; target belongs to 704 — 704 admin has write access to
+    # their own target but the cross-squadron check must still reject the merge.
+    source_id = _make_fac(client, hdr_703, "CrossSqnSource703")
+    target_id = _make_fac(client, hdr_704, "CrossSqnTarget704")
+    r = client.post(f"/api/facilitators/{target_id}/absorb",
+                    json={"source_id": source_id}, headers=hdr_704)
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "cross_squadron"
+
+
+def test_absorb_rejects_same_facilitator(client):
+    hdr = login(client, ADM703)
+    facs = client.get("/api/facilitators", headers=hdr).json()
+    fid = facs[0]["facilitator_id"]
+    r = client.post(f"/api/facilitators/{fid}/absorb", json={"source_id": fid}, headers=hdr)
+    assert r.status_code == 400
+    assert r.json()["detail"]["error"] == "same_facilitator"
+
+
+def test_absorb_forbidden_for_viewer(client):
+    hdr_gen = login(client, GEN703)
+    facs = client.get("/api/facilitators", headers=hdr_gen).json()
+    fid = facs[0]["facilitator_id"]
+    r = client.post(f"/api/facilitators/{fid}/absorb", json={"source_id": fid}, headers=hdr_gen)
+    assert r.status_code == 403
+
+
 # ── mark-remaining-delivered (bulk "mark all delivered, then flag exceptions") ──
 # Risk-register data-entry UX ask: flag the few known exceptions individually
 # first, then bulk-clear everything else as delivered in one action.

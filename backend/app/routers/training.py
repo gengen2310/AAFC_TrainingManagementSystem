@@ -1248,6 +1248,54 @@ def delete_fac(fid: str, db: DBSession = Depends(get_db), p: Principal = Depends
     return {"ok": True}
 
 
+# ── FACILITATOR MERGE ────────────────────────────────────────────────────────
+class FacAbsorbIn(BaseModel):
+    source_id: str
+
+
+@router.post("/facilitators/{fid}/absorb")
+def absorb_fac(fid: str, body: FacAbsorbIn, db: DBSession = Depends(get_db),
+               p: Principal = Depends(get_principal)):
+    """Merge source facilitator into target (fid): reassign all session references
+    and leave records, then archive the source.  Both must belong to the same
+    squadron and neither may already be archived."""
+    from ..models.planning import PlanningFacilitatorLeave
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    target = db.get(Facilitator, fid)
+    if not target or target.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    source = db.get(Facilitator, body.source_id)
+    if not source or source.is_archived:
+        raise HTTPException(404, detail={"error": "source_not_found",
+                                         "message": "Source facilitator not found or already archived."})
+    if target.id == source.id:
+        raise HTTPException(400, detail={"error": "same_facilitator",
+                                         "message": "Source and target must be different facilitators."})
+    require_can_write_squadron(p, target.squadron_id, target.wing_id)
+    if source.squadron_id != target.squadron_id:
+        raise HTTPException(400, detail={"error": "cross_squadron",
+                                         "message": "Both facilitators must belong to the same squadron."})
+    moved = (db.query(Session)
+             .filter(Session.facilitator_id == source.id)
+             .update({"facilitator_id": target.id}, synchronize_session=False))
+    db.query(Session).filter(Session.assistant_facilitator_id == source.id).update(
+        {"assistant_facilitator_id": target.id}, synchronize_session=False)
+    db.query(Session).filter(Session.backup_facilitator_id == source.id).update(
+        {"backup_facilitator_id": target.id}, synchronize_session=False)
+    db.query(PlanningFacilitatorLeave).filter(
+        PlanningFacilitatorLeave.facilitator_id == source.id
+    ).update({"facilitator_id": target.id}, synchronize_session=False)
+    source.is_archived = True
+    source.archived_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="facilitator", object_id=target.id, action="absorb",
+          reason=f"absorbed source={source.id} sessions_moved={moved}")
+    audit(db, p, object_type="facilitator", object_id=source.id, action="archive",
+          reason=f"merged into target={target.id}")
+    return {"ok": True, "target_id": target.id, "source_id": source.id, "sessions_moved": moved}
+
+
 # ── TRAINING AREA WRITE ──────────────────────────────────────────────────────
 class TrainingAreaIn(BaseModel):
     name: str

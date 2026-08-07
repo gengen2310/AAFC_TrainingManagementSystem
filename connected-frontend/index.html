@@ -2384,6 +2384,26 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   </div>
 </div>
 
+<!-- Merge Facilitator -->
+<div class="modal-bg" id="m-fac-merge">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title">Merge Facilitator</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-fac-merge')">×</button></div>
+    <div class="modal-body">
+      <div class="alert a-warn" style="margin-bottom:12px">The duplicate will be archived. All their sessions, leave records, and assistant/backup assignments will be re-attributed to the selected facilitator. This cannot be undone.</div>
+      <div id="fac-merge-info" style="font-size:12px;margin-bottom:12px"></div>
+      <div class="ff">
+        <label for="fac-merge-target">Keep this facilitator instead</label>
+        <select id="fac-merge-target" aria-label="Facilitator to keep (duplicate will be archived)"></select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <span id="fac-merge-state" role="status" aria-live="polite" style="font-size:11.5px;font-weight:700;margin-right:auto"></span>
+      <button class="btn btn-out" onclick="closeModal('m-fac-merge')">Cancel</button>
+      <button class="btn btn-red" id="fac-merge-btn" onclick="doMergeFac()">Merge &amp; Archive</button>
+    </div>
+  </div>
+</div>
+
 <!-- Subject-area tag editor -->
 <div class="modal-bg" id="m-tag-fac">
   <div class="modal">
@@ -7595,7 +7615,7 @@ function renderFacs(){
       <td>${(f.areas||[]).map(a=>elBadge(a)).join(' ')||'<span style="color:var(--muted);font-size:11px">untagged</span>'}</td>
       <td style="text-align:center"><button class="btn-lnk" onclick="event.stopPropagation();showFacProfile('${f.id}')">${tot}</button></td>
       <td class="no-print" onclick="event.stopPropagation()">
-        ${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="tagFac('${f.id}')">Tags</button> <button class="btn btn-xs btn-sky" onclick="editFac('${f.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delFac('${f.id}')">×</button>`:''}
+        ${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="tagFac('${f.id}')">Tags</button> <button class="btn btn-xs btn-sky" onclick="editFac('${f.id}')">Edit</button> <button class="btn btn-xs btn-out" onclick="openMergeFac('${f.id}')">Merge</button> <button class="btn btn-xs btn-red" onclick="delFac('${f.id}')">×</button>`:''}
       </td>
     </tr>`;
   }).join(''):`<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px">No facilitators${flt?' tagged in this subject area':''}${q?' match your search':''}.</td></tr>`;
@@ -7784,8 +7804,10 @@ function saveFac(confirmDuplicate){
     })
     .catch(e=>{
       if(e&&e.code==='possible_duplicate'&&!confirmDuplicate){
+        const existingId=(e.body&&e.body.detail&&e.body.detail.existing_facilitator_id)||'';
+        const viewBtn=existingId?` <button class="btn-lnk" style="font-size:11px;margin-left:4px" onclick="closeModal('m-add-fac');showFacProfile('${existingId}')">View existing ↗</button>`:'';
         const w=document.getElementById('fac-dup-warn');
-        w.textContent=apiErr(e)+' If this is a different person with the same name, you can add them anyway.';
+        w.innerHTML=esc(apiErr(e))+' If this is a different person with the same name, you can add them anyway.'+viewBtn;
         w.style.display='';
         if(anywayBtn)anywayBtn.style.display='';
         _setFacSaveState('Unsaved changes','var(--muted)');
@@ -7851,6 +7873,36 @@ async function delFac(id){
   if(!confirm('Archive this facilitator? Past session records are preserved.'))return;
   try{ await api('/api/facilitators/'+id,{method:'DELETE'}); await reloadAndRender(); }
   catch(e){ alert(apiErr(e)); }
+}
+
+let _mergeFacSourceId=null;
+function openMergeFac(sourceId){
+  const f=facById(sourceId);if(!f)return;
+  _mergeFacSourceId=sourceId;
+  const others=S.facs.filter(x=>x.id!==sourceId);
+  if(!others.length){showToast('No other facilitators to merge into.',true);return;}
+  document.getElementById('fac-merge-info').innerHTML='<strong>'+esc(facDisplay(f))+'</strong> will be archived. Select the facilitator to keep:';
+  document.getElementById('fac-merge-target').innerHTML=others.map(x=>`<option value="${x.id}">${esc(facDisplay(x))}</option>`).join('');
+  document.getElementById('fac-merge-state').textContent='';
+  document.getElementById('fac-merge-btn').disabled=false;
+  openModal('m-fac-merge');
+}
+async function doMergeFac(){
+  if(!_mergeFacSourceId)return;
+  const targetId=document.getElementById('fac-merge-target').value;if(!targetId)return;
+  const btn=document.getElementById('fac-merge-btn');
+  if(btn)btn.disabled=true;
+  document.getElementById('fac-merge-state').textContent='Merging…';
+  try{
+    const r=await api('/api/facilitators/'+targetId+'/absorb',{method:'POST',body:JSON.stringify({source_id:_mergeFacSourceId})});
+    closeModal('m-fac-merge');
+    await reloadAndRender();
+    showToast('Merged: '+(r.sessions_moved||0)+' session(s) re-attributed.',false);
+  }catch(e){
+    document.getElementById('fac-merge-state').textContent='';
+    if(btn)btn.disabled=false;
+    showToast('Merge failed: '+apiErr(e),true);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
