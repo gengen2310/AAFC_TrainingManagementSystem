@@ -5798,7 +5798,7 @@ function _chartHBar(chart){
   const rows=chart.data||[];
   if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
   const r0=rows[0];
-  const valKey=r0.readiness_pct!==undefined?'readiness_pct':r0.delivered!==undefined?'delivered':r0.count!==undefined?'count':r0.value!==undefined?'value':'count';
+  const valKey=chart.value_key||(r0.readiness_pct!==undefined?'readiness_pct':r0.delivered!==undefined?'delivered':r0.count!==undefined?'count':r0.value!==undefined?'value':'count');
   const maxV=Math.max(...rows.map(r=>+(r[valKey])||0),1);
   const colorFor=r=>{
     if(r.color)return r.color;
@@ -7781,7 +7781,7 @@ function saveFac(confirmDuplicate){
       .then(async()=>{
         const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
         _setFacSaveState('Saved at '+savedAt,'var(--ok)');
-        await reloadAndRender(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
+        await reloadAndRender(); loadFacilitatorStats(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
         showToast('Facilitator profile saved at '+savedAt+'.', false);
       })
       .catch(e=>{
@@ -7799,7 +7799,7 @@ function saveFac(confirmDuplicate){
     .then(async()=>{
       const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
       _setFacSaveState('Saved at '+savedAt,'var(--ok)');
-      await reloadAndRender(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
+      await reloadAndRender(); loadFacilitatorStats(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
       showToast('Facilitator added at '+savedAt+'.', false);
     })
     .catch(e=>{
@@ -7871,7 +7871,7 @@ function editFac(id){
 }
 async function delFac(id){
   if(!confirm('Archive this facilitator? Past session records are preserved.'))return;
-  try{ await api('/api/facilitators/'+id,{method:'DELETE'}); await reloadAndRender(); }
+  try{ await api('/api/facilitators/'+id,{method:'DELETE'}); await reloadAndRender(); loadFacilitatorStats(); }
   catch(e){ alert(apiErr(e)); }
 }
 
@@ -7897,6 +7897,7 @@ async function doMergeFac(){
     const r=await api('/api/facilitators/'+targetId+'/absorb',{method:'POST',body:JSON.stringify({source_id:_mergeFacSourceId})});
     closeModal('m-fac-merge');
     await reloadAndRender();
+    loadFacilitatorStats();
     showToast('Merged: '+(r.sessions_moved||0)+' session(s) re-attributed.',false);
   }catch(e){
     document.getElementById('fac-merge-state').textContent='';

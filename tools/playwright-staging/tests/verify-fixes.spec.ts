@@ -9,6 +9,8 @@ const PW_BASE = "https://aafc-tms-planning-workspace-preview-staging.up.railway.
 
 const SQN_ADMIN = ROLES.find((r) => r.role === "sqn_admin")!;
 const SYS_ADMIN = ROLES.find((r) => r.role === "system_admin")!;
+const WING_ADMIN = ROLES.find((r) => r.role === "wing_admin")!;
+const NATIONAL_ADMIN = ROLES.find((r) => r.role === "national_admin")!;
 
 // Navigate to Activities page and select the first available planning year.
 // Returns false if no planning years exist on staging.
@@ -61,10 +63,68 @@ test("PW-CTX-01: Planning Workspace loads in module mode without crash", async (
   expect(body, "PW body must not show React error boundary text").not.toContain("Something went wrong");
   expect(body, "PW body must not be blank (crash leaves empty page)").not.toBe("");
   await expect(page.locator("#root"), "#root must not be empty — React must have mounted").not.toBeEmpty();
+  // These three assertions alone previously also passed against the
+  // NotAuthenticated "Session not found" screen (non-empty body, no crash
+  // text, non-empty #root) -- that screen is a legitimate, different UI
+  // state, not evidence the actual Planning Workspace content loaded. Assert
+  // real workspace chrome is present so a broken cross-origin handoff (which
+  // is exactly what this test's own auth setup silently had until 2026-08-08
+  // — see the comment in helpers/auth.ts's injectSession) fails loudly.
+  expect(body, "must not have silently landed on the cross-origin auth-handoff failure screen").not.toContain("Session not found");
+  await expect(page.getByText("Select a squadron above").or(page.locator(".pw-ctx"))).toBeVisible({ timeout: 10000 });
 
   await page.screenshot({ path: "test-results/pw-ctx-01.png", fullPage: false });
   expect(pageErrors, `PW page errors: ${pageErrors.join("; ")}`).toHaveLength(0);
 });
+
+// ── PW-CTX-01 (P0 incident, 2026-08-08): wing/national scope, missing selector ────
+//
+// The test above only ever exercised sqn_admin, whose squadron is implicit
+// (session.squadron_id) and never hits useScopedSquadron()'s needsSelection
+// branch at all -- it could not have caught this. wing_admin/national_admin
+// DO hit that branch, and the empty state told them to "Select a squadron
+// above" while AppShell (the only thing that ever rendered SquadronSelector)
+// is never mounted in MODULE_MODE at all -- there was no selector anywhere
+// on the page, a genuine dead end. Fixed by rendering SquadronSelector
+// inline in PlanningWorkspace.tsx's own empty state (frontend/src/routes/
+// PlanningWorkspace.tsx) so it works regardless of which shell renders the
+// route. This test would have failed before that fix (selector count 0,
+// stuck on the prompt with no way to proceed) and must keep passing after.
+for (const role of [WING_ADMIN, NATIONAL_ADMIN]) {
+  test(`PW-CTX-01b: ${role.label} sees a working squadron selector in module-mode Planning Workspace`, async ({ page }) => {
+    await injectSession(page, role);
+
+    const pageErrors: string[] = [];
+    page.on("pageerror", (e) => pageErrors.push(e.message));
+
+    await page.goto(`${PW_BASE}/planning`);
+    await page.waitForTimeout(3000);
+
+    const body = await page.locator("body").innerText().catch(() => "");
+    expect(body, "PW body must never show the provider-throw message").not.toContain(
+      "useSquadronView must be used within SquadronViewProvider"
+    );
+    expect(body, "PW body must not show React error boundary text").not.toContain("Something went wrong");
+
+    // The actual defect: no <select> anywhere let a wing/national user act on
+    // "Select a squadron above". Assert a real, populated selector exists.
+    const selector = page.locator("#sqn-view-select");
+    await expect(selector, "squadron selector must be present and visible").toBeVisible({ timeout: 10000 });
+    const optionCount = await selector.locator("option").count();
+    expect(optionCount, "squadron selector must be populated with real squadrons, not just the placeholder").toBeGreaterThan(1);
+
+    // Selecting a squadron must actually load the workspace, not stay stuck.
+    const firstRealValue = await selector.locator("option").nth(1).getAttribute("value");
+    await selector.selectOption(firstRealValue!);
+    await page.waitForTimeout(2000);
+    const bodyAfterSelect = await page.locator("body").innerText().catch(() => "");
+    expect(bodyAfterSelect, "after selecting a squadron, the empty-state prompt must be gone").not.toContain(
+      "Select a squadron above to view its Planning Workspace"
+    );
+
+    expect(pageErrors, `PW page errors: ${pageErrors.join("; ")}`).toHaveLength(0);
+  });
+}
 
 // ── HOL-TYPE-01 ───────────────────────────────────────────────────────────────
 test("HOL-TYPE-01: Add Holiday modal has type selector; list shows Type column", async ({ page }) => {

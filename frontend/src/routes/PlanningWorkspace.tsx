@@ -19,6 +19,7 @@ import { UpdateFutureParadeDayModal } from "../components/planning/UpdateFutureP
 import { GuidedYearSetupModal } from "../components/planning/GuidedYearSetupModal";
 import { canWriteSquadron } from "../auth/permissions";
 import { useScopedSquadron } from "../layout/SquadronViewContext";
+import { SquadronSelector } from "../layout/SquadronSelector";
 import type { PlanningSession, AnchorEvent } from "../api/types";
 
 
@@ -203,8 +204,19 @@ export function PlanningWorkspace() {
   // ── Canvas content ────────────────────────────────────────────────────────────
   function renderCanvas() {
     if (needsSelection && !pickedSquadronId) {
+      // AppShell's own SquadronSelector (rendered in the nav sidebar) covers
+      // full-app mode, but MODULE_MODE's ModuleEntry (App.tsx) never mounts
+      // AppShell at all -- a wing/national user opening the standalone
+      // Planning Workspace preview had no selector anywhere on the page,
+      // despite this exact text telling them to use one "above". Render a
+      // real, working selector inline so the message is always actionable
+      // regardless of which shell the page is running in (PW-CTX-01 P0
+      // incident, 2026-08-08).
       return (
         <div className="pw-empty">
+          <div style={{ maxWidth: 280, margin: "0 auto" }}>
+            <SquadronSelector />
+          </div>
           <span>Select a squadron above to view its Planning Workspace.</span>
         </div>
       );

@@ -116,6 +116,35 @@ export async function addApiProxy(page: Page): Promise<void> {
 export async function injectSession(page: Page, role: RoleCred): Promise<void> {
   const token = await getToken(role);
 
+  // The connected-frontend/Planning-Workspace cross-origin handoff (see
+  // .claude/rules/architecture.md) relies on the `aafc_session` cookie as a
+  // fallback when there's no sessionStorage token to send (a fresh tab/origin
+  // — exactly what a Playwright test navigating straight to PW_BASE is).
+  // getToken() logs in via a Node.js-side fetch(), so any Set-Cookie the
+  // backend returned was only ever seen by Node's fetch implementation, never
+  // by this page's actual browser cookie jar -- every PW-CTX-01 test that
+  // navigated cross-origin was therefore silently hitting the "Session not
+  // found" NotAuthenticated screen instead of real Planning Workspace
+  // content, undetected because the original assertions (non-empty body, no
+  // "Something went wrong" text) are also true for that screen. Found and
+  // fixed 2026-08-08 while adding PW-CTX-01b. The token itself IS the cookie
+  // value (backend/app/routers/auth.py sets response.set_cookie(COOKIE_NAME,
+  // token, ...)), so add it directly to the browser context with the same
+  // attributes staging actually uses (SameSite=None; Secure -- confirmed via
+  // `railway variable list` against the backend service, not guessed).
+  const backendHost = new URL(API).hostname;
+  await page.context().addCookies([
+    {
+      name: "aafc_session",
+      value: token,
+      domain: backendHost,
+      path: "/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "None",
+    },
+  ]);
+
   // Proxy must be registered before page.goto() so the first navigation's sub-requests
   // (e.g. loadData API calls triggered by the boot sequence) are also intercepted.
   await addApiProxy(page);
