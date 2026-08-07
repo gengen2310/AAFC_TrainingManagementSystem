@@ -1,0 +1,3904 @@
+{
+  "generated": "2026-08-08",
+  "generated_from_commit": "76d6723",
+  "method": "mechanical extraction (FastAPI app.openapi(), SQLAlchemy Base metadata, React Router route table, connected-frontend page-* IDs) -- not hand-typed",
+  "roles": {
+    "count": 8,
+    "list": [
+      "sqn_general",
+      "sqn_admin",
+      "wing_viewer",
+      "wing_admin",
+      "national_viewer",
+      "national_admin",
+      "system_admin",
+      "auditor"
+    ]
+  },
+  "backend": {
+    "endpoint_count": 259,
+    "endpoints_by_tag": {
+      "untagged": 1,
+      "accounts": 17,
+      "ops": 19,
+      "training": 67,
+      "organisations": 20,
+      "auth": 7,
+      "dashboard": 4,
+      "export-import": 4,
+      "health": 4,
+      "jobs": 2,
+      "cadet-program": 19,
+      "timing": 10,
+      "planning": 61,
+      "setup": 1,
+      "system": 14,
+      "wing-calendar": 9
+    },
+    "endpoints": [
+      {
+        "method": "GET",
+        "path": "/",
+        "operation_id": "root__get",
+        "tags": [],
+        "summary": "Root"
+      },
+      {
+        "method": "GET",
+        "path": "/api/accounts",
+        "operation_id": "list_accounts_api_accounts_get",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "List Accounts"
+      },
+      {
+        "method": "POST",
+        "path": "/api/accounts",
+        "operation_id": "create_account_api_accounts_post",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Create Account"
+      },
+      {
+        "method": "POST",
+        "path": "/api/accounts/batch-archive",
+        "operation_id": "batch_archive_accounts_api_accounts_batch_archive_post",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Batch Archive Accounts"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/accounts/{uid}",
+        "operation_id": "delete_account_api_accounts__uid__delete",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Delete Account"
+      },
+      {
+        "method": "GET",
+        "path": "/api/accounts/{uid}",
+        "operation_id": "get_account_api_accounts__uid__get",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Get Account"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/accounts/{uid}",
+        "operation_id": "update_account_api_accounts__uid__patch",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Update Account"
+      },
+      {
+        "method": "POST",
+        "path": "/api/accounts/{uid}/archive",
+        "operation_id": "archive_account_api_accounts__uid__archive_post",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Archive Account"
+      },
+      {
+        "method": "POST",
+        "path": "/api/accounts/{uid}/change-role",
+        "operation_id": "change_role_api_accounts__uid__change_role_post",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Change Role"
+      },
+      {
+        "method": "POST",
+        "path": "/api/accounts/{uid}/disable",
+        "operation_id": "disable_account_api_accounts__uid__disable_post",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Disable Account"
+      },
+      {
+        "method": "POST",
+        "path": "/api/accounts/{uid}/reactivate",
+        "operation_id": "reactivate_account_api_accounts__uid__reactivate_post",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Reactivate Account"
+      },
+      {
+        "method": "POST",
+        "path": "/api/accounts/{uid}/reset-code",
+        "operation_id": "reset_code_api_accounts__uid__reset_code_post",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Reset Code"
+      },
+      {
+        "method": "POST",
+        "path": "/api/accounts/{uid}/restore",
+        "operation_id": "restore_account_api_accounts__uid__restore_post",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Restore Account"
+      },
+      {
+        "method": "POST",
+        "path": "/api/accounts/{uid}/unlock",
+        "operation_id": "unlock_account_api_accounts__uid__unlock_post",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Unlock Account"
+      },
+      {
+        "method": "GET",
+        "path": "/api/action-items",
+        "operation_id": "list_actions_api_action_items_get",
+        "tags": [
+          "ops"
+        ],
+        "summary": "List Actions"
+      },
+      {
+        "method": "POST",
+        "path": "/api/action-items",
+        "operation_id": "add_action_api_action_items_post",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Add Action"
+      },
+      {
+        "method": "POST",
+        "path": "/api/action-items/{aid}/close",
+        "operation_id": "close_action_api_action_items__aid__close_post",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Close Action"
+      },
+      {
+        "method": "GET",
+        "path": "/api/activities",
+        "operation_id": "list_activities_api_activities_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "List Activities"
+      },
+      {
+        "method": "POST",
+        "path": "/api/activities",
+        "operation_id": "create_activity_api_activities_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Activity"
+      },
+      {
+        "method": "POST",
+        "path": "/api/activities/generate",
+        "operation_id": "generate_activities_api_activities_generate_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Generate Activities"
+      },
+      {
+        "method": "GET",
+        "path": "/api/activities/getting-help",
+        "operation_id": "get_activities_getting_help_api_activities_getting_help_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "Get Activities Getting Help"
+      },
+      {
+        "method": "PUT",
+        "path": "/api/activities/getting-help",
+        "operation_id": "update_activities_getting_help_api_activities_getting_help_put",
+        "tags": [
+          "training"
+        ],
+        "summary": "Update Activities Getting Help"
+      },
+      {
+        "method": "POST",
+        "path": "/api/activities/import-cea",
+        "operation_id": "import_activities_cea_api_activities_import_cea_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Import Activities Cea"
+      },
+      {
+        "method": "POST",
+        "path": "/api/activities/national",
+        "operation_id": "create_national_activity_api_activities_national_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create National Activity"
+      },
+      {
+        "method": "POST",
+        "path": "/api/activities/wing",
+        "operation_id": "create_wing_activity_api_activities_wing_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Wing Activity"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/activities/{aid}",
+        "operation_id": "delete_activity_api_activities__aid__delete",
+        "tags": [
+          "training"
+        ],
+        "summary": "Delete Activity"
+      },
+      {
+        "method": "GET",
+        "path": "/api/activities/{aid}",
+        "operation_id": "get_activity_api_activities__aid__get",
+        "tags": [
+          "training"
+        ],
+        "summary": "Get Activity"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/activities/{aid}",
+        "operation_id": "update_activity_api_activities__aid__patch",
+        "tags": [
+          "training"
+        ],
+        "summary": "Update Activity"
+      },
+      {
+        "method": "POST",
+        "path": "/api/activities/{aid}/restore",
+        "operation_id": "restore_activity_api_activities__aid__restore_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Restore Activity"
+      },
+      {
+        "method": "GET",
+        "path": "/api/audit",
+        "operation_id": "get_audit_api_audit_get",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Get Audit"
+      },
+      {
+        "method": "POST",
+        "path": "/api/auth/change-code",
+        "operation_id": "change_code_api_auth_change_code_post",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Change Code"
+      },
+      {
+        "method": "POST",
+        "path": "/api/auth/login",
+        "operation_id": "login_api_auth_login_post",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Login"
+      },
+      {
+        "method": "POST",
+        "path": "/api/auth/logout",
+        "operation_id": "logout_api_auth_logout_post",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Logout"
+      },
+      {
+        "method": "POST",
+        "path": "/api/auth/lookup",
+        "operation_id": "lookup_api_auth_lookup_post",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Lookup"
+      },
+      {
+        "method": "GET",
+        "path": "/api/auth/me",
+        "operation_id": "me_api_auth_me_get",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Me"
+      },
+      {
+        "method": "GET",
+        "path": "/api/auth/organisations",
+        "operation_id": "list_organisations_api_auth_organisations_get",
+        "tags": [
+          "auth"
+        ],
+        "summary": "List Organisations"
+      },
+      {
+        "method": "POST",
+        "path": "/api/auth/refresh",
+        "operation_id": "refresh_api_auth_refresh_post",
+        "tags": [
+          "auth"
+        ],
+        "summary": "Refresh"
+      },
+      {
+        "method": "GET",
+        "path": "/api/cadets",
+        "operation_id": "list_cadets_api_cadets_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "List Cadets"
+      },
+      {
+        "method": "GET",
+        "path": "/api/cadets/risk",
+        "operation_id": "cadet_risk_api_cadets_risk_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "Cadet Risk"
+      },
+      {
+        "method": "GET",
+        "path": "/api/curriculum",
+        "operation_id": "list_curriculum_api_curriculum_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "List Curriculum"
+      },
+      {
+        "method": "POST",
+        "path": "/api/curriculum",
+        "operation_id": "create_curriculum_api_curriculum_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Curriculum"
+      },
+      {
+        "method": "GET",
+        "path": "/api/curriculum/elements",
+        "operation_id": "list_elements_api_curriculum_elements_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "List Elements"
+      },
+      {
+        "method": "POST",
+        "path": "/api/curriculum/elements",
+        "operation_id": "create_element_api_curriculum_elements_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Element"
+      },
+      {
+        "method": "POST",
+        "path": "/api/curriculum/elements/{eid}/archive",
+        "operation_id": "archive_element_api_curriculum_elements__eid__archive_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Archive Element"
+      },
+      {
+        "method": "GET",
+        "path": "/api/curriculum/export.xlsx",
+        "operation_id": "export_curriculum_xlsx_api_curriculum_export_xlsx_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "Export Curriculum Xlsx"
+      },
+      {
+        "method": "POST",
+        "path": "/api/curriculum/import",
+        "operation_id": "import_curriculum_api_curriculum_import_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Import Curriculum"
+      },
+      {
+        "method": "POST",
+        "path": "/api/curriculum/import-csv",
+        "operation_id": "import_curriculum_csv_api_curriculum_import_csv_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Import Curriculum Csv"
+      },
+      {
+        "method": "POST",
+        "path": "/api/curriculum/import-xlsm",
+        "operation_id": "import_curriculum_xlsm_api_curriculum_import_xlsm_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Import Curriculum Xlsm"
+      },
+      {
+        "method": "POST",
+        "path": "/api/curriculum/national",
+        "operation_id": "create_national_curriculum_api_curriculum_national_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create National Curriculum"
+      },
+      {
+        "method": "GET",
+        "path": "/api/curriculum/phases",
+        "operation_id": "list_phases_api_curriculum_phases_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "List Phases"
+      },
+      {
+        "method": "POST",
+        "path": "/api/curriculum/phases",
+        "operation_id": "create_phase_api_curriculum_phases_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Phase"
+      },
+      {
+        "method": "POST",
+        "path": "/api/curriculum/phases/{phid}/archive",
+        "operation_id": "archive_phase_api_curriculum_phases__phid__archive_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Archive Phase"
+      },
+      {
+        "method": "POST",
+        "path": "/api/curriculum/wing",
+        "operation_id": "create_wing_curriculum_api_curriculum_wing_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Wing Curriculum"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/curriculum/{cid}",
+        "operation_id": "delete_curriculum_api_curriculum__cid__delete",
+        "tags": [
+          "training"
+        ],
+        "summary": "Delete Curriculum"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/curriculum/{cid}",
+        "operation_id": "update_curriculum_api_curriculum__cid__patch",
+        "tags": [
+          "training"
+        ],
+        "summary": "Update Curriculum"
+      },
+      {
+        "method": "GET",
+        "path": "/api/curriculum/{cid}/sessions",
+        "operation_id": "curriculum_sessions_api_curriculum__cid__sessions_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "Curriculum Sessions"
+      },
+      {
+        "method": "GET",
+        "path": "/api/dashboard/charts",
+        "operation_id": "get_dashboard_charts_api_dashboard_charts_get",
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Dashboard Charts"
+      },
+      {
+        "method": "GET",
+        "path": "/api/dashboard/charts/strategic",
+        "operation_id": "get_strategic_charts_api_dashboard_charts_strategic_get",
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Strategic Charts"
+      },
+      {
+        "method": "GET",
+        "path": "/api/dashboard/command",
+        "operation_id": "get_command_dashboard_api_dashboard_command_get",
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Command Dashboard"
+      },
+      {
+        "method": "GET",
+        "path": "/api/dashboard/facilitator-schedule",
+        "operation_id": "get_facilitator_schedule_api_dashboard_facilitator_schedule_get",
+        "tags": [
+          "dashboard"
+        ],
+        "summary": "Get Facilitator Schedule"
+      },
+      {
+        "method": "GET",
+        "path": "/api/equipment",
+        "operation_id": "list_equipment_api_equipment_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "List Equipment"
+      },
+      {
+        "method": "POST",
+        "path": "/api/equipment",
+        "operation_id": "create_equip_api_equipment_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Equip"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/equipment/{eid}",
+        "operation_id": "delete_equip_api_equipment__eid__delete",
+        "tags": [
+          "training"
+        ],
+        "summary": "Delete Equip"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/equipment/{eid}",
+        "operation_id": "update_equip_api_equipment__eid__patch",
+        "tags": [
+          "training"
+        ],
+        "summary": "Update Equip"
+      },
+      {
+        "method": "POST",
+        "path": "/api/exceptions/run-checks",
+        "operation_id": "run_checks_api_exceptions_run_checks_post",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Run Checks"
+      },
+      {
+        "method": "GET",
+        "path": "/api/export/{export_type}.csv",
+        "operation_id": "export_csv_api_export__export_type__csv_get",
+        "tags": [
+          "export-import"
+        ],
+        "summary": "Export Csv"
+      },
+      {
+        "method": "GET",
+        "path": "/api/export/{export_type}.pdf",
+        "operation_id": "export_pdf_api_export__export_type__pdf_get",
+        "tags": [
+          "export-import"
+        ],
+        "summary": "Export Pdf"
+      },
+      {
+        "method": "GET",
+        "path": "/api/export/{export_type}.xlsx",
+        "operation_id": "export_xlsx_api_export__export_type__xlsx_get",
+        "tags": [
+          "export-import"
+        ],
+        "summary": "Export Xlsx"
+      },
+      {
+        "method": "GET",
+        "path": "/api/facilitator-type-tags",
+        "operation_id": "list_facilitator_type_tags_api_facilitator_type_tags_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "List Facilitator Type Tags"
+      },
+      {
+        "method": "POST",
+        "path": "/api/facilitator-type-tags",
+        "operation_id": "create_facilitator_type_tag_api_facilitator_type_tags_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Facilitator Type Tag"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/facilitator-type-tags/{tag_id}",
+        "operation_id": "archive_facilitator_type_tag_api_facilitator_type_tags__tag_id__delete",
+        "tags": [
+          "training"
+        ],
+        "summary": "Archive Facilitator Type Tag"
+      },
+      {
+        "method": "GET",
+        "path": "/api/facilitators",
+        "operation_id": "list_facs_api_facilitators_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "List Facs"
+      },
+      {
+        "method": "POST",
+        "path": "/api/facilitators",
+        "operation_id": "add_fac_api_facilitators_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Add Fac"
+      },
+      {
+        "method": "POST",
+        "path": "/api/facilitators/import",
+        "operation_id": "import_facilitators_csv_api_facilitators_import_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Import Facilitators Csv"
+      },
+      {
+        "method": "GET",
+        "path": "/api/facilitators/import/template.csv",
+        "operation_id": "facilitator_import_template_api_facilitators_import_template_csv_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "Facilitator Import Template"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/facilitators/{fid}",
+        "operation_id": "delete_fac_api_facilitators__fid__delete",
+        "tags": [
+          "training"
+        ],
+        "summary": "Delete Fac"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/facilitators/{fid}",
+        "operation_id": "update_fac_api_facilitators__fid__patch",
+        "tags": [
+          "training"
+        ],
+        "summary": "Update Fac"
+      },
+      {
+        "method": "POST",
+        "path": "/api/facilitators/{fid}/absorb",
+        "operation_id": "absorb_fac_api_facilitators__fid__absorb_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Absorb Fac"
+      },
+      {
+        "method": "GET",
+        "path": "/api/facilitators/{fid}/stats",
+        "operation_id": "fac_stats_api_facilitators__fid__stats_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "Fac Stats"
+      },
+      {
+        "method": "GET",
+        "path": "/api/flights",
+        "operation_id": "list_flights_api_flights_get",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "List Flights"
+      },
+      {
+        "method": "POST",
+        "path": "/api/flights",
+        "operation_id": "create_flight_api_flights_post",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Create Flight"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/flights/{fid}",
+        "operation_id": "update_flight_api_flights__fid__patch",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Update Flight"
+      },
+      {
+        "method": "POST",
+        "path": "/api/flights/{fid}/archive",
+        "operation_id": "archive_flight_api_flights__fid__archive_post",
+        "tags": [
+          "accounts"
+        ],
+        "summary": "Archive Flight"
+      },
+      {
+        "method": "GET",
+        "path": "/api/health",
+        "operation_id": "health_api_health_get",
+        "tags": [
+          "health"
+        ],
+        "summary": "Health"
+      },
+      {
+        "method": "GET",
+        "path": "/api/health/db",
+        "operation_id": "health_db_api_health_db_get",
+        "tags": [
+          "health"
+        ],
+        "summary": "Health Db"
+      },
+      {
+        "method": "GET",
+        "path": "/api/health/ready",
+        "operation_id": "ready_api_health_ready_get",
+        "tags": [
+          "health"
+        ],
+        "summary": "Ready"
+      },
+      {
+        "method": "GET",
+        "path": "/api/health/ui-config",
+        "operation_id": "ui_config_api_health_ui_config_get",
+        "tags": [
+          "health"
+        ],
+        "summary": "Ui Config"
+      },
+      {
+        "method": "POST",
+        "path": "/api/import/commit",
+        "operation_id": "import_commit_api_import_commit_post",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Import Commit"
+      },
+      {
+        "method": "POST",
+        "path": "/api/import/preview",
+        "operation_id": "import_preview_api_import_preview_post",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Import Preview"
+      },
+      {
+        "method": "POST",
+        "path": "/api/import/rollback",
+        "operation_id": "import_rollback_api_import_rollback_post",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Import Rollback"
+      },
+      {
+        "method": "POST",
+        "path": "/api/jobs/export",
+        "operation_id": "submit_export_job_api_jobs_export_post",
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Submit Export Job"
+      },
+      {
+        "method": "GET",
+        "path": "/api/jobs/{job_id}",
+        "operation_id": "get_job_api_jobs__job_id__get",
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Job"
+      },
+      {
+        "method": "GET",
+        "path": "/api/learning-hub-resources",
+        "operation_id": "list_lh_api_learning_hub_resources_get",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "List Lh"
+      },
+      {
+        "method": "GET",
+        "path": "/api/learning-hub-resources/missing",
+        "operation_id": "lh_missing_api_learning_hub_resources_missing_get",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Lh Missing"
+      },
+      {
+        "method": "GET",
+        "path": "/api/national/overview",
+        "operation_id": "national_overview_api_national_overview_get",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "National Overview"
+      },
+      {
+        "method": "GET",
+        "path": "/api/parade-nights",
+        "operation_id": "list_parades_api_parade_nights_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "List Parades"
+      },
+      {
+        "method": "POST",
+        "path": "/api/parade-nights",
+        "operation_id": "create_parade_api_parade_nights_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Parade"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/parade-nights/{pnid}",
+        "operation_id": "delete_parade_api_parade_nights__pnid__delete",
+        "tags": [
+          "training"
+        ],
+        "summary": "Delete Parade"
+      },
+      {
+        "method": "GET",
+        "path": "/api/parade-nights/{pnid}",
+        "operation_id": "get_parade_api_parade_nights__pnid__get",
+        "tags": [
+          "training"
+        ],
+        "summary": "Get Parade"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/parade-nights/{pnid}",
+        "operation_id": "update_parade_night_api_parade_nights__pnid__patch",
+        "tags": [
+          "training"
+        ],
+        "summary": "Update Parade Night"
+      },
+      {
+        "method": "GET",
+        "path": "/api/parade-nights/{pnid}/builder",
+        "operation_id": "parade_night_builder_api_parade_nights__pnid__builder_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "Parade Night Builder"
+      },
+      {
+        "method": "POST",
+        "path": "/api/parade-nights/{pnid}/close",
+        "operation_id": "close_api_parade_nights__pnid__close_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Close"
+      },
+      {
+        "method": "POST",
+        "path": "/api/parade-nights/{pnid}/mark-remaining-delivered",
+        "operation_id": "mark_remaining_delivered_api_parade_nights__pnid__mark_remaining_delivered_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Mark Remaining Delivered"
+      },
+      {
+        "method": "POST",
+        "path": "/api/parade-nights/{pnid}/publish",
+        "operation_id": "publish_api_parade_nights__pnid__publish_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Publish"
+      },
+      {
+        "method": "GET",
+        "path": "/api/parade-nights/{pnid}/timing",
+        "operation_id": "get_parade_timing_api_parade_nights__pnid__timing_get",
+        "tags": [
+          "timing"
+        ],
+        "summary": "Get Parade Timing"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/parade-nights/{pnid}/timing-override",
+        "operation_id": "remove_timing_override_api_parade_nights__pnid__timing_override_delete",
+        "tags": [
+          "timing"
+        ],
+        "summary": "Remove Timing Override"
+      },
+      {
+        "method": "POST",
+        "path": "/api/parade-nights/{pnid}/timing-override",
+        "operation_id": "set_timing_override_api_parade_nights__pnid__timing_override_post",
+        "tags": [
+          "timing"
+        ],
+        "summary": "Set Timing Override"
+      },
+      {
+        "method": "GET",
+        "path": "/api/phases",
+        "operation_id": "list_phases_api_phases_get",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "List Phases"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/planning/anchors/{anchor_id}",
+        "operation_id": "archive_anchor_api_planning_anchors__anchor_id__delete",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Archive Anchor"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/planning/anchors/{anchor_id}",
+        "operation_id": "update_anchor_api_planning_anchors__anchor_id__patch",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Update Anchor"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/anchors/{anchor_id}/prep-suggestions",
+        "operation_id": "get_prep_suggestions_api_planning_anchors__anchor_id__prep_suggestions_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Get Prep Suggestions"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/planning/cea/{activity_id}/classify",
+        "operation_id": "classify_cea_activity_api_planning_cea__activity_id__classify_patch",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Classify Cea Activity"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/cea/{activity_id}/local-hide",
+        "operation_id": "set_local_hide_api_planning_cea__activity_id__local_hide_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Set Local Hide"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/command-centre",
+        "operation_id": "get_command_centre_api_planning_command_centre_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Get Command Centre"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/conflicts/{conflict_id}/override",
+        "operation_id": "override_conflict_api_planning_conflicts__conflict_id__override_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Override Conflict"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/planning/facilitator-leave/{leave_id}",
+        "operation_id": "delete_facilitator_leave_api_planning_facilitator_leave__leave_id__delete",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Delete Facilitator Leave"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/facilitators",
+        "operation_id": "list_planning_facilitators_api_planning_facilitators_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "List Planning Facilitators"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/facilitators/{fac_id}/leave",
+        "operation_id": "list_facilitator_leave_api_planning_facilitators__fac_id__leave_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "List Facilitator Leave"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/facilitators/{fac_id}/leave",
+        "operation_id": "add_facilitator_leave_api_planning_facilitators__fac_id__leave_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Add Facilitator Leave"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/planning/holidays/{holiday_id}",
+        "operation_id": "delete_holiday_api_planning_holidays__holiday_id__delete",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Delete Holiday"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/planning/holidays/{holiday_id}",
+        "operation_id": "update_holiday_api_planning_holidays__holiday_id__patch",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Update Holiday"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/locations",
+        "operation_id": "list_locations_api_planning_locations_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "List Locations"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/locations",
+        "operation_id": "create_location_api_planning_locations_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Create Location"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/planning/locations/{location_id}",
+        "operation_id": "update_location_api_planning_locations__location_id__patch",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Update Location"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/planning/notices/{notice_id}",
+        "operation_id": "update_notice_api_planning_notices__notice_id__patch",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Update Notice"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/notices/{notice_id}/archive",
+        "operation_id": "archive_notice_api_planning_notices__notice_id__archive_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Archive Notice"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/planning/parade-dates/{date_id}",
+        "operation_id": "delete_parade_date_api_planning_parade_dates__date_id__delete",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Delete Parade Date"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/parade-dates/{date_id}/builder",
+        "operation_id": "get_builder_api_planning_parade_dates__date_id__builder_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Get Builder"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/parade-dates/{date_id}/notices",
+        "operation_id": "list_notices_api_planning_parade_dates__date_id__notices_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "List Notices"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/parade-dates/{date_id}/notices",
+        "operation_id": "create_notice_api_planning_parade_dates__date_id__notices_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Create Notice"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/parade-dates/{date_id}/sessions",
+        "operation_id": "create_session_api_planning_parade_dates__date_id__sessions_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Create Session"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/parade-dates/{date_id}/weekly-program",
+        "operation_id": "get_weekly_program_api_planning_parade_dates__date_id__weekly_program_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Get Weekly Program"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/prep-rules",
+        "operation_id": "list_prep_rules_api_planning_prep_rules_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "List Prep Rules"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/planning/sessions/{session_id}",
+        "operation_id": "delete_session_api_planning_sessions__session_id__delete",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Delete Session"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/sessions/{session_id}",
+        "operation_id": "get_session_api_planning_sessions__session_id__get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Get Session"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/planning/sessions/{session_id}",
+        "operation_id": "update_session_api_planning_sessions__session_id__patch",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Update Session"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years",
+        "operation_id": "list_planning_years_api_planning_years_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "List Planning Years"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years",
+        "operation_id": "create_planning_year_api_planning_years_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Create Planning Year"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/planning/years/{year_id}",
+        "operation_id": "delete_planning_year_api_planning_years__year_id__delete",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Delete Planning Year"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}",
+        "operation_id": "get_planning_year_api_planning_years__year_id__get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Get Planning Year"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/planning/years/{year_id}",
+        "operation_id": "update_planning_year_api_planning_years__year_id__patch",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Update Planning Year"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/anchors",
+        "operation_id": "list_anchors_api_planning_years__year_id__anchors_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "List Anchors"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years/{year_id}/anchors",
+        "operation_id": "create_anchor_api_planning_years__year_id__anchors_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Create Anchor"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/annual-program",
+        "operation_id": "get_annual_program_api_planning_years__year_id__annual_program_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Get Annual Program"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years/{year_id}/assign-mission",
+        "operation_id": "assign_mission_api_planning_years__year_id__assign_mission_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Assign Mission"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/cea/activities",
+        "operation_id": "list_cea_activities_api_planning_years__year_id__cea_activities_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "List Cea Activities"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years/{year_id}/cea/activities",
+        "operation_id": "create_manual_activity_api_planning_years__year_id__cea_activities_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Create Manual Activity"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/cea/batches",
+        "operation_id": "list_cea_batches_api_planning_years__year_id__cea_batches_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "List Cea Batches"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years/{year_id}/cea/import",
+        "operation_id": "import_cea_csv_api_planning_years__year_id__cea_import_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Import Cea Csv"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/conflicts",
+        "operation_id": "get_conflicts_api_planning_years__year_id__conflicts_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Get Conflicts"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/decision-guide",
+        "operation_id": "get_decision_guide_api_planning_years__year_id__decision_guide_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Get Decision Guide"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/export.xlsx",
+        "operation_id": "export_annual_program_xlsx_api_planning_years__year_id__export_xlsx_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Export Annual Program Xlsx"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/facilitators/{fac_id}/workload",
+        "operation_id": "facilitator_workload_api_planning_years__year_id__facilitators__fac_id__workload_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Facilitator Workload"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years/{year_id}/generate-parade-dates",
+        "operation_id": "generate_parade_dates_api_planning_years__year_id__generate_parade_dates_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Generate Parade Dates"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/holidays",
+        "operation_id": "list_holidays_api_planning_years__year_id__holidays_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "List Holidays"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years/{year_id}/holidays",
+        "operation_id": "add_holiday_api_planning_years__year_id__holidays_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Add Holiday"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years/{year_id}/import-program",
+        "operation_id": "import_annual_program_api_planning_years__year_id__import_program_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Import Annual Program"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/long-range",
+        "operation_id": "get_long_range_api_planning_years__year_id__long_range_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Get Long Range"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/missions",
+        "operation_id": "list_missions_api_planning_years__year_id__missions_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "List Missions"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/night-summaries",
+        "operation_id": "night_summaries_api_planning_years__year_id__night_summaries_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Night Summaries"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/parade-dates",
+        "operation_id": "list_parade_dates_api_planning_years__year_id__parade_dates_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "List Parade Dates"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years/{year_id}/parade-dates",
+        "operation_id": "add_parade_date_api_planning_years__year_id__parade_dates_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Add Parade Date"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years/{year_id}/preview-parade-dates",
+        "operation_id": "preview_parade_dates_api_planning_years__year_id__preview_parade_dates_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Preview Parade Dates"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years/{year_id}/rollover",
+        "operation_id": "rollover_year_api_planning_years__year_id__rollover_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Rollover Year"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years/{year_id}/run-checks",
+        "operation_id": "run_checks_api_planning_years__year_id__run_checks_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Run Checks"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/schedule/export.xlsx",
+        "operation_id": "export_schedule_xlsx_api_planning_years__year_id__schedule_export_xlsx_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Export Schedule Xlsx"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years/{year_id}/schedule/import",
+        "operation_id": "import_schedule_xlsx_api_planning_years__year_id__schedule_import_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Import Schedule Xlsx"
+      },
+      {
+        "method": "GET",
+        "path": "/api/planning/years/{year_id}/term-planner",
+        "operation_id": "get_term_planner_api_planning_years__year_id__term_planner_get",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Get Term Planner"
+      },
+      {
+        "method": "POST",
+        "path": "/api/planning/years/{year_id}/update-future-parade-day",
+        "operation_id": "update_future_parade_day_api_planning_years__year_id__update_future_parade_day_post",
+        "tags": [
+          "planning"
+        ],
+        "summary": "Update Future Parade Day"
+      },
+      {
+        "method": "GET",
+        "path": "/api/program-coverage/squadron",
+        "operation_id": "coverage_squadron_api_program_coverage_squadron_get",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Coverage Squadron"
+      },
+      {
+        "method": "GET",
+        "path": "/api/program-coverage/wing",
+        "operation_id": "coverage_wing_api_program_coverage_wing_get",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Coverage Wing"
+      },
+      {
+        "method": "POST",
+        "path": "/api/program-imports/preview",
+        "operation_id": "program_import_preview_api_program_imports_preview_post",
+        "tags": [
+          "export-import"
+        ],
+        "summary": "Program Import Preview"
+      },
+      {
+        "method": "GET",
+        "path": "/api/program-items",
+        "operation_id": "list_items_api_program_items_get",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "List Items"
+      },
+      {
+        "method": "POST",
+        "path": "/api/program-items",
+        "operation_id": "create_item_api_program_items_post",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Create Item"
+      },
+      {
+        "method": "GET",
+        "path": "/api/program-items/{item_id}",
+        "operation_id": "get_item_api_program_items__item_id__get",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Get Item"
+      },
+      {
+        "method": "POST",
+        "path": "/api/program-items/{item_id}/retire",
+        "operation_id": "retire_item_api_program_items__item_id__retire_post",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Retire Item"
+      },
+      {
+        "method": "GET",
+        "path": "/api/program-packages",
+        "operation_id": "list_packages_api_program_packages_get",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "List Packages"
+      },
+      {
+        "method": "POST",
+        "path": "/api/program-packages",
+        "operation_id": "create_package_api_program_packages_post",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Create Package"
+      },
+      {
+        "method": "POST",
+        "path": "/api/program-packages/{pkg_id}/approve",
+        "operation_id": "handler_api_program_packages__pkg_id__approve_post",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Handler"
+      },
+      {
+        "method": "POST",
+        "path": "/api/program-packages/{pkg_id}/archive",
+        "operation_id": "handler_api_program_packages__pkg_id__archive_post",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Handler"
+      },
+      {
+        "method": "POST",
+        "path": "/api/program-packages/{pkg_id}/publish",
+        "operation_id": "handler_api_program_packages__pkg_id__publish_post",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Handler"
+      },
+      {
+        "method": "POST",
+        "path": "/api/program-packages/{pkg_id}/retire",
+        "operation_id": "handler_api_program_packages__pkg_id__retire_post",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Handler"
+      },
+      {
+        "method": "POST",
+        "path": "/api/program-packages/{pkg_id}/submit-review",
+        "operation_id": "handler_api_program_packages__pkg_id__submit_review_post",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Handler"
+      },
+      {
+        "method": "GET",
+        "path": "/api/program-promotion/requests",
+        "operation_id": "list_promotions_api_program_promotion_requests_get",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "List Promotions"
+      },
+      {
+        "method": "POST",
+        "path": "/api/program-promotion/squadron-to-wing",
+        "operation_id": "promote_sq_to_wing_api_program_promotion_squadron_to_wing_post",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Promote Sq To Wing"
+      },
+      {
+        "method": "POST",
+        "path": "/api/program-promotion/{req_id}/approve",
+        "operation_id": "approve_promotion_api_program_promotion__req_id__approve_post",
+        "tags": [
+          "cadet-program"
+        ],
+        "summary": "Approve Promotion"
+      },
+      {
+        "method": "GET",
+        "path": "/api/proxy/current",
+        "operation_id": "current_proxy_api_proxy_current_get",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Current Proxy"
+      },
+      {
+        "method": "POST",
+        "path": "/api/proxy/enter/{squadron_id}",
+        "operation_id": "enter_proxy_api_proxy_enter__squadron_id__post",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Enter Proxy"
+      },
+      {
+        "method": "POST",
+        "path": "/api/proxy/exit",
+        "operation_id": "exit_proxy_api_proxy_exit_post",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Exit Proxy"
+      },
+      {
+        "method": "GET",
+        "path": "/api/reports/curriculum-coverage",
+        "operation_id": "rep_coverage_api_reports_curriculum_coverage_get",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Rep Coverage"
+      },
+      {
+        "method": "GET",
+        "path": "/api/reports/facilitator-load",
+        "operation_id": "rep_load_api_reports_facilitator_load_get",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Rep Load"
+      },
+      {
+        "method": "GET",
+        "path": "/api/reports/national-capability",
+        "operation_id": "national_capability_api_reports_national_capability_get",
+        "tags": [
+          "ops"
+        ],
+        "summary": "National Capability"
+      },
+      {
+        "method": "GET",
+        "path": "/api/reports/national-overview",
+        "operation_id": "national_overview_api_reports_national_overview_get",
+        "tags": [
+          "ops"
+        ],
+        "summary": "National Overview"
+      },
+      {
+        "method": "GET",
+        "path": "/api/reports/not-delivered",
+        "operation_id": "rep_nd_api_reports_not_delivered_get",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Rep Nd"
+      },
+      {
+        "method": "GET",
+        "path": "/api/reports/readiness",
+        "operation_id": "rep_readiness_api_reports_readiness_get",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Rep Readiness"
+      },
+      {
+        "method": "GET",
+        "path": "/api/reports/summary",
+        "operation_id": "rep_summary_api_reports_summary_get",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Rep Summary"
+      },
+      {
+        "method": "GET",
+        "path": "/api/reports/wing-cancellation-trend",
+        "operation_id": "wing_cancellation_trend_api_reports_wing_cancellation_trend_get",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Wing Cancellation Trend"
+      },
+      {
+        "method": "GET",
+        "path": "/api/reports/wing-capability",
+        "operation_id": "wing_capability_api_reports_wing_capability_get",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Wing Capability"
+      },
+      {
+        "method": "GET",
+        "path": "/api/reports/wing-not-delivered",
+        "operation_id": "wing_not_delivered_api_reports_wing_not_delivered_get",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Wing Not Delivered"
+      },
+      {
+        "method": "GET",
+        "path": "/api/reports/wing-overview",
+        "operation_id": "wing_overview_api_reports_wing_overview_get",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Wing Overview"
+      },
+      {
+        "method": "GET",
+        "path": "/api/reports/wing-phase-coverage",
+        "operation_id": "wing_phase_coverage_api_reports_wing_phase_coverage_get",
+        "tags": [
+          "ops"
+        ],
+        "summary": "Wing Phase Coverage"
+      },
+      {
+        "method": "GET",
+        "path": "/api/resources/clashes",
+        "operation_id": "resource_clashes_api_resources_clashes_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "Resource Clashes"
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions",
+        "operation_id": "create_session_api_sessions_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Session"
+      },
+      {
+        "method": "PUT",
+        "path": "/api/sessions/{sid}",
+        "operation_id": "edit_session_api_sessions__sid__put",
+        "tags": [
+          "training"
+        ],
+        "summary": "Edit Session"
+      },
+      {
+        "method": "POST",
+        "path": "/api/sessions/{sid}/status",
+        "operation_id": "set_status_api_sessions__sid__status_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Set Status"
+      },
+      {
+        "method": "GET",
+        "path": "/api/sessions/{sid}/status-history",
+        "operation_id": "get_status_history_api_sessions__sid__status_history_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "Get Status History"
+      },
+      {
+        "method": "GET",
+        "path": "/api/setup/status",
+        "operation_id": "setup_status_api_setup_status_get",
+        "tags": [
+          "setup"
+        ],
+        "summary": "Setup Status"
+      },
+      {
+        "method": "GET",
+        "path": "/api/squadrons",
+        "operation_id": "list_squadrons_api_squadrons_get",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "List Squadrons"
+      },
+      {
+        "method": "POST",
+        "path": "/api/squadrons",
+        "operation_id": "create_squadron_api_squadrons_post",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Create Squadron"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/squadrons/{squadron_id}",
+        "operation_id": "delete_squadron_api_squadrons__squadron_id__delete",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Delete Squadron"
+      },
+      {
+        "method": "GET",
+        "path": "/api/squadrons/{squadron_id}",
+        "operation_id": "get_squadron_api_squadrons__squadron_id__get",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Get Squadron"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/squadrons/{squadron_id}",
+        "operation_id": "update_squadron_api_squadrons__squadron_id__patch",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Update Squadron"
+      },
+      {
+        "method": "POST",
+        "path": "/api/squadrons/{squadron_id}/archive",
+        "operation_id": "archive_squadron_api_squadrons__squadron_id__archive_post",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Archive Squadron"
+      },
+      {
+        "method": "GET",
+        "path": "/api/squadrons/{squadron_id}/archive-impact",
+        "operation_id": "squadron_archive_impact_api_squadrons__squadron_id__archive_impact_get",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Squadron Archive Impact"
+      },
+      {
+        "method": "POST",
+        "path": "/api/squadrons/{squadron_id}/restore",
+        "operation_id": "restore_squadron_api_squadrons__squadron_id__restore_post",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Restore Squadron"
+      },
+      {
+        "method": "GET",
+        "path": "/api/subject-area-tags",
+        "operation_id": "list_subject_area_tags_api_subject_area_tags_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "List Subject Area Tags"
+      },
+      {
+        "method": "POST",
+        "path": "/api/subject-area-tags",
+        "operation_id": "create_subject_area_tag_api_subject_area_tags_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Subject Area Tag"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/subject-area-tags/{tag_id}",
+        "operation_id": "archive_subject_area_tag_api_subject_area_tags__tag_id__delete",
+        "tags": [
+          "training"
+        ],
+        "summary": "Archive Subject Area Tag"
+      },
+      {
+        "method": "GET",
+        "path": "/api/system/audit-summary",
+        "operation_id": "audit_summary_api_system_audit_summary_get",
+        "tags": [
+          "system"
+        ],
+        "summary": "Audit Summary"
+      },
+      {
+        "method": "GET",
+        "path": "/api/system/backups",
+        "operation_id": "list_backups_api_system_backups_get",
+        "tags": [
+          "system"
+        ],
+        "summary": "List Backups"
+      },
+      {
+        "method": "POST",
+        "path": "/api/system/backups",
+        "operation_id": "create_backup_api_system_backups_post",
+        "tags": [
+          "system"
+        ],
+        "summary": "Create Backup"
+      },
+      {
+        "method": "GET",
+        "path": "/api/system/backups/pg-dump",
+        "operation_id": "pg_dump_backup_api_system_backups_pg_dump_get",
+        "tags": [
+          "system"
+        ],
+        "summary": "Pg Dump Backup"
+      },
+      {
+        "method": "POST",
+        "path": "/api/system/bootstrap-staging",
+        "operation_id": "bootstrap_staging_api_system_bootstrap_staging_post",
+        "tags": [
+          "system"
+        ],
+        "summary": "Bootstrap Staging"
+      },
+      {
+        "method": "GET",
+        "path": "/api/system/health",
+        "operation_id": "system_health_api_system_health_get",
+        "tags": [
+          "system"
+        ],
+        "summary": "System Health"
+      },
+      {
+        "method": "GET",
+        "path": "/api/system/maintenance",
+        "operation_id": "get_maintenance_api_system_maintenance_get",
+        "tags": [
+          "system"
+        ],
+        "summary": "Get Maintenance"
+      },
+      {
+        "method": "POST",
+        "path": "/api/system/maintenance/disable",
+        "operation_id": "disable_maintenance_api_system_maintenance_disable_post",
+        "tags": [
+          "system"
+        ],
+        "summary": "Disable Maintenance"
+      },
+      {
+        "method": "POST",
+        "path": "/api/system/maintenance/enable",
+        "operation_id": "enable_maintenance_api_system_maintenance_enable_post",
+        "tags": [
+          "system"
+        ],
+        "summary": "Enable Maintenance"
+      },
+      {
+        "method": "GET",
+        "path": "/api/system/migrations",
+        "operation_id": "system_migrations_api_system_migrations_get",
+        "tags": [
+          "system"
+        ],
+        "summary": "System Migrations"
+      },
+      {
+        "method": "GET",
+        "path": "/api/system/overview",
+        "operation_id": "system_overview_api_system_overview_get",
+        "tags": [
+          "system"
+        ],
+        "summary": "System Overview"
+      },
+      {
+        "method": "POST",
+        "path": "/api/system/reset-rate-limits",
+        "operation_id": "reset_rate_limits_api_system_reset_rate_limits_post",
+        "tags": [
+          "system"
+        ],
+        "summary": "Reset Rate Limits"
+      },
+      {
+        "method": "GET",
+        "path": "/api/system/scope-map",
+        "operation_id": "scope_map_api_system_scope_map_get",
+        "tags": [
+          "system"
+        ],
+        "summary": "Scope Map"
+      },
+      {
+        "method": "GET",
+        "path": "/api/system/version",
+        "operation_id": "system_version_api_system_version_get",
+        "tags": [
+          "system"
+        ],
+        "summary": "System Version"
+      },
+      {
+        "method": "GET",
+        "path": "/api/timing-templates",
+        "operation_id": "list_timing_templates_api_timing_templates_get",
+        "tags": [
+          "timing"
+        ],
+        "summary": "List Timing Templates"
+      },
+      {
+        "method": "POST",
+        "path": "/api/timing-templates",
+        "operation_id": "create_timing_template_api_timing_templates_post",
+        "tags": [
+          "timing"
+        ],
+        "summary": "Create Timing Template"
+      },
+      {
+        "method": "GET",
+        "path": "/api/timing-templates/effective",
+        "operation_id": "get_effective_template_api_timing_templates_effective_get",
+        "tags": [
+          "timing"
+        ],
+        "summary": "Get Effective Template"
+      },
+      {
+        "method": "GET",
+        "path": "/api/timing-templates/{tid}",
+        "operation_id": "get_timing_template_api_timing_templates__tid__get",
+        "tags": [
+          "timing"
+        ],
+        "summary": "Get Timing Template"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/timing-templates/{tid}",
+        "operation_id": "update_timing_template_api_timing_templates__tid__patch",
+        "tags": [
+          "timing"
+        ],
+        "summary": "Update Timing Template"
+      },
+      {
+        "method": "POST",
+        "path": "/api/timing-templates/{tid}/apply-from-date",
+        "operation_id": "apply_from_date_api_timing_templates__tid__apply_from_date_post",
+        "tags": [
+          "timing"
+        ],
+        "summary": "Apply From Date"
+      },
+      {
+        "method": "POST",
+        "path": "/api/timing-templates/{tid}/archive",
+        "operation_id": "archive_timing_template_api_timing_templates__tid__archive_post",
+        "tags": [
+          "timing"
+        ],
+        "summary": "Archive Timing Template"
+      },
+      {
+        "method": "GET",
+        "path": "/api/training-areas",
+        "operation_id": "list_rooms_api_training_areas_get",
+        "tags": [
+          "training"
+        ],
+        "summary": "List Rooms"
+      },
+      {
+        "method": "POST",
+        "path": "/api/training-areas",
+        "operation_id": "create_room_api_training_areas_post",
+        "tags": [
+          "training"
+        ],
+        "summary": "Create Room"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/training-areas/{rid}",
+        "operation_id": "delete_room_api_training_areas__rid__delete",
+        "tags": [
+          "training"
+        ],
+        "summary": "Delete Room"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/training-areas/{rid}",
+        "operation_id": "update_room_api_training_areas__rid__patch",
+        "tags": [
+          "training"
+        ],
+        "summary": "Update Room"
+      },
+      {
+        "method": "GET",
+        "path": "/api/users",
+        "operation_id": "list_users_api_users_get",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "List Users"
+      },
+      {
+        "method": "GET",
+        "path": "/api/wing-calendar/events",
+        "operation_id": "list_wing_events_api_wing_calendar_events_get",
+        "tags": [
+          "wing-calendar"
+        ],
+        "summary": "List Wing Events"
+      },
+      {
+        "method": "POST",
+        "path": "/api/wing-calendar/events",
+        "operation_id": "create_wing_event_api_wing_calendar_events_post",
+        "tags": [
+          "wing-calendar"
+        ],
+        "summary": "Create Wing Event"
+      },
+      {
+        "method": "GET",
+        "path": "/api/wing-calendar/events/{event_id}",
+        "operation_id": "get_wing_event_api_wing_calendar_events__event_id__get",
+        "tags": [
+          "wing-calendar"
+        ],
+        "summary": "Get Wing Event"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/wing-calendar/events/{event_id}",
+        "operation_id": "update_wing_event_api_wing_calendar_events__event_id__patch",
+        "tags": [
+          "wing-calendar"
+        ],
+        "summary": "Update Wing Event"
+      },
+      {
+        "method": "POST",
+        "path": "/api/wing-calendar/events/{event_id}/archive",
+        "operation_id": "archive_wing_event_api_wing_calendar_events__event_id__archive_post",
+        "tags": [
+          "wing-calendar"
+        ],
+        "summary": "Archive Wing Event"
+      },
+      {
+        "method": "POST",
+        "path": "/api/wing-calendar/events/{event_id}/curriculum-links",
+        "operation_id": "add_curriculum_link_api_wing_calendar_events__event_id__curriculum_links_post",
+        "tags": [
+          "wing-calendar"
+        ],
+        "summary": "Add Curriculum Link"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/wing-calendar/events/{event_id}/curriculum-links/{curriculum_item_id}",
+        "operation_id": "remove_curriculum_link_api_wing_calendar_events__event_id__curriculum_links__curriculum_item_id__delete",
+        "tags": [
+          "wing-calendar"
+        ],
+        "summary": "Remove Curriculum Link"
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/wing-calendar/events/{event_id}/squadron-status",
+        "operation_id": "update_squadron_status_api_wing_calendar_events__event_id__squadron_status_patch",
+        "tags": [
+          "wing-calendar"
+        ],
+        "summary": "Update Squadron Status"
+      },
+      {
+        "method": "GET",
+        "path": "/api/wing-calendar/squadron-overlay",
+        "operation_id": "get_squadron_overlay_api_wing_calendar_squadron_overlay_get",
+        "tags": [
+          "wing-calendar"
+        ],
+        "summary": "Get Squadron Overlay"
+      },
+      {
+        "method": "GET",
+        "path": "/api/wings",
+        "operation_id": "list_wings_api_wings_get",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "List Wings"
+      },
+      {
+        "method": "POST",
+        "path": "/api/wings",
+        "operation_id": "create_wing_api_wings_post",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Create Wing"
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/wings/{wing_id}",
+        "operation_id": "delete_wing_api_wings__wing_id__delete",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Delete Wing"
+      },
+      {
+        "method": "POST",
+        "path": "/api/wings/{wing_id}/archive",
+        "operation_id": "archive_wing_api_wings__wing_id__archive_post",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Archive Wing"
+      },
+      {
+        "method": "GET",
+        "path": "/api/wings/{wing_id}/archive-impact",
+        "operation_id": "wing_archive_impact_api_wings__wing_id__archive_impact_get",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Wing Archive Impact"
+      },
+      {
+        "method": "POST",
+        "path": "/api/wings/{wing_id}/restore",
+        "operation_id": "restore_wing_api_wings__wing_id__restore_post",
+        "tags": [
+          "organisations"
+        ],
+        "summary": "Restore Wing"
+      }
+    ]
+  },
+  "database": {
+    "table_count": 58,
+    "tables": [
+      {
+        "model_class": "AccessCode",
+        "table": "access_codes",
+        "columns": [
+          "user_id",
+          "code_hash",
+          "active_status",
+          "failed_attempts",
+          "locked_until",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 10,
+        "foreign_keys": [
+          "user_id->users.id"
+        ]
+      },
+      {
+        "model_class": "ActionItem",
+        "table": "action_items",
+        "columns": [
+          "scope",
+          "squadron_id",
+          "wing_id",
+          "title",
+          "description",
+          "owner",
+          "due_date",
+          "status",
+          "severity",
+          "linked_object_type",
+          "linked_object_id",
+          "source",
+          "closed_by",
+          "closed_at",
+          "closure_note",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 20,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "Activity",
+        "table": "activities",
+        "columns": [
+          "owning_level",
+          "national_id",
+          "wing_id",
+          "squadron_id",
+          "activity_name",
+          "activity_type",
+          "date_start",
+          "date_end",
+          "audience",
+          "location",
+          "time_start",
+          "time_end",
+          "cea_seq_nr",
+          "oic",
+          "twoic",
+          "risk_status",
+          "permission_status",
+          "workflow_status",
+          "closeout_status",
+          "notes",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 27,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "ActivityLocalHide",
+        "table": "activity_local_hides",
+        "columns": [
+          "cea_activity_id",
+          "unit_id",
+          "is_hidden",
+          "local_note",
+          "hidden_by",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 10,
+        "foreign_keys": [
+          "cea_activity_id->cea_activities.id",
+          "unit_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "AnchorEvent",
+        "table": "anchor_events",
+        "columns": [
+          "planning_year_id",
+          "owning_level",
+          "wing_id",
+          "unit_id",
+          "event_name",
+          "event_type",
+          "importance",
+          "importance_level",
+          "start_date",
+          "end_date",
+          "audience_orientation",
+          "audience_initial",
+          "audience_junior",
+          "audience_intermediate",
+          "audience_senior",
+          "audience_staff_only",
+          "audience_proficient",
+          "audience_first_years",
+          "cea_activity_id",
+          "nomination_end_date",
+          "unit_name",
+          "planning_impact",
+          "readiness_requirements",
+          "notes",
+          "created_by",
+          "updated_by",
+          "version",
+          "id",
+          "created_at",
+          "updated_at",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 32,
+        "foreign_keys": [
+          "planning_year_id->planning_years.id",
+          "unit_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "AnchorPrepPlan",
+        "table": "anchor_prep_plans",
+        "columns": [
+          "anchor_event_id",
+          "curriculum_id",
+          "planned_parade_date_id",
+          "planned_session_number",
+          "cadet_group",
+          "status",
+          "notes",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 12,
+        "foreign_keys": [
+          "anchor_event_id->anchor_events.id",
+          "curriculum_id->curriculum_items.id",
+          "planned_parade_date_id->parade_dates.id"
+        ]
+      },
+      {
+        "model_class": "AnchorPrepRule",
+        "table": "anchor_prep_rules",
+        "columns": [
+          "event_type",
+          "subject_area",
+          "suggested_curriculum_tags",
+          "weeks_before_min",
+          "weeks_before_max",
+          "suggested_activity",
+          "notes",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 12,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "AuditLog",
+        "table": "audit_logs",
+        "columns": [
+          "timestamp",
+          "user_id",
+          "role",
+          "scope",
+          "wing_id",
+          "squadron_id",
+          "proxy_session_id",
+          "object_type",
+          "object_id",
+          "action",
+          "old_value",
+          "new_value",
+          "reason",
+          "ip_address",
+          "user_agent",
+          "batch_id",
+          "id"
+        ],
+        "column_count": 17,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "Cadet",
+        "table": "cadets",
+        "columns": [
+          "squadron_id",
+          "service_number",
+          "rank",
+          "first_name",
+          "last_name",
+          "phase",
+          "flight",
+          "attendance_percentage",
+          "recent_attendance_trend",
+          "last_attended",
+          "sitrep_part_1_status",
+          "sitrep_part_2_status",
+          "promotion_interest",
+          "extension_completion",
+          "support_flag",
+          "support_notes",
+          "active_status",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 24,
+        "foreign_keys": [
+          "squadron_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "CeaActivity",
+        "table": "cea_activities",
+        "columns": [
+          "import_batch_id",
+          "planning_year_id",
+          "wing_id",
+          "unit_id",
+          "cea_activity_id",
+          "activity_type",
+          "status_name",
+          "parent_unit",
+          "host_unit",
+          "activity_name",
+          "nomination_start_date",
+          "nomination_end_date",
+          "activity_start_date",
+          "activity_end_date",
+          "start_time",
+          "end_time",
+          "location",
+          "activity_poc",
+          "notes",
+          "source_type",
+          "classification_status",
+          "importance",
+          "audience_staff_only",
+          "audience_seniors",
+          "audience_proficient",
+          "audience_first_years",
+          "classified_by",
+          "classified_at",
+          "is_removed_from_cea",
+          "is_archived",
+          "created_by",
+          "updated_by",
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "column_count": 35,
+        "foreign_keys": [
+          "import_batch_id->cea_import_batches.id",
+          "planning_year_id->planning_years.id",
+          "unit_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "CeaImportBatch",
+        "table": "cea_import_batches",
+        "columns": [
+          "planning_year_id",
+          "wing_id",
+          "imported_by",
+          "source_file_name",
+          "row_count",
+          "created_count",
+          "updated_count",
+          "duplicate_count",
+          "skipped_count",
+          "error_count",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 15,
+        "foreign_keys": [
+          "planning_year_id->planning_years.id"
+        ]
+      },
+      {
+        "model_class": "CurriculumElement",
+        "table": "curriculum_elements",
+        "columns": [
+          "name",
+          "display_name",
+          "scope_level",
+          "wing_id",
+          "squadron_id",
+          "active_status",
+          "created_by",
+          "id",
+          "created_at",
+          "updated_at",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 13,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "CurriculumItem",
+        "table": "curriculum_items",
+        "columns": [
+          "owning_level",
+          "wing_id",
+          "squadron_id",
+          "identifier",
+          "code",
+          "part_number",
+          "title",
+          "phase",
+          "element",
+          "duration_minutes",
+          "part_count",
+          "instructor_suitability",
+          "core_status",
+          "learning_hub_url",
+          "recommended_term",
+          "recommended_sequence",
+          "active_status",
+          "retired_at",
+          "replacement_curriculum_id",
+          "location_type",
+          "internal_admin_notes",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 28,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "CurriculumPhase",
+        "table": "curriculum_phases",
+        "columns": [
+          "name",
+          "display_name",
+          "scope_level",
+          "wing_id",
+          "squadron_id",
+          "sort_order",
+          "active_status",
+          "created_by",
+          "id",
+          "created_at",
+          "updated_at",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 14,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "CustomPhase",
+        "table": "custom_phases",
+        "columns": [
+          "squadron_id",
+          "phase_key",
+          "name",
+          "abbr",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 9,
+        "foreign_keys": [
+          "squadron_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "Equipment",
+        "table": "equipment",
+        "columns": [
+          "squadron_id",
+          "name",
+          "type",
+          "quantity",
+          "available_quantity",
+          "condition",
+          "approval_required",
+          "notes",
+          "active_status",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 16,
+        "foreign_keys": [
+          "squadron_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "Exception",
+        "table": "exceptions",
+        "columns": [
+          "scope",
+          "squadron_id",
+          "wing_id",
+          "source_module",
+          "affected_object_type",
+          "affected_object_id",
+          "severity",
+          "title",
+          "description",
+          "owner",
+          "due_date",
+          "status",
+          "escalation_level",
+          "resolved_at",
+          "resolution_note",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 20,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "ExportLog",
+        "table": "export_logs",
+        "columns": [
+          "user_id",
+          "scope",
+          "export_type",
+          "filters",
+          "filename",
+          "row_count",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 11,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "FacilitatorRankHistory",
+        "table": "facilitator_rank_history",
+        "columns": [
+          "facilitator_id",
+          "rank",
+          "effective_from",
+          "effective_to",
+          "changed_by",
+          "reason",
+          "id"
+        ],
+        "column_count": 7,
+        "foreign_keys": [
+          "facilitator_id->facilitators.id"
+        ]
+      },
+      {
+        "model_class": "FacilitatorTypeTag",
+        "table": "facilitator_type_tags",
+        "columns": [
+          "squadron_id",
+          "wing_id",
+          "scope",
+          "display_name",
+          "normalised_name",
+          "is_active",
+          "created_by",
+          "id",
+          "created_at",
+          "updated_at",
+          "updated_by"
+        ],
+        "column_count": 11,
+        "foreign_keys": [
+          "squadron_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "Facilitator",
+        "table": "facilitators",
+        "columns": [
+          "squadron_id",
+          "wing_id",
+          "first_name",
+          "last_name",
+          "current_rank",
+          "type",
+          "qualifications",
+          "subject_areas",
+          "max_sessions_per_night",
+          "max_sessions_per_month",
+          "active_status",
+          "notes",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 19,
+        "foreign_keys": [
+          "squadron_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "Flight",
+        "table": "flights",
+        "columns": [
+          "squadron_id",
+          "name",
+          "active_status",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 10,
+        "foreign_keys": [
+          "squadron_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "HolidayPeriod",
+        "table": "holiday_periods",
+        "columns": [
+          "planning_year_id",
+          "jurisdiction",
+          "name",
+          "start_date",
+          "end_date",
+          "holiday_type",
+          "affects_parade",
+          "notes",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 13,
+        "foreign_keys": [
+          "planning_year_id->planning_years.id"
+        ]
+      },
+      {
+        "model_class": "ImportLog",
+        "table": "import_logs",
+        "columns": [
+          "user_id",
+          "squadron_id",
+          "import_type",
+          "filename",
+          "rows_read",
+          "rows_accepted",
+          "rows_rejected",
+          "validation_errors",
+          "committed",
+          "rollback_status",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 15,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "IpLoginAttempt",
+        "table": "ip_login_attempts",
+        "columns": [
+          "ip",
+          "attempt_count",
+          "window_start",
+          "locked_until"
+        ],
+        "column_count": 4,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "JobStatus",
+        "table": "job_status",
+        "columns": [
+          "job_type",
+          "requested_by",
+          "scope",
+          "status",
+          "progress_percentage",
+          "result_reference",
+          "error_message",
+          "started_at",
+          "completed_at",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 14,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "LearningHubResource",
+        "table": "learning_hub_resources",
+        "columns": [
+          "title",
+          "url",
+          "phase",
+          "resource_type",
+          "source",
+          "requires_login",
+          "last_verified_at",
+          "verification_status",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 13,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "NationalEntity",
+        "table": "national_entities",
+        "columns": [
+          "name",
+          "short_name",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 7,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "ParadeDate",
+        "table": "parade_dates",
+        "columns": [
+          "planning_year_id",
+          "unit_id",
+          "parade_date",
+          "parade_type",
+          "term",
+          "week_number",
+          "is_active",
+          "notes",
+          "cancellation_reason",
+          "parade_night_id",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 15,
+        "foreign_keys": [
+          "planning_year_id->planning_years.id",
+          "unit_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "ParadeNightTimingOverride",
+        "table": "parade_night_timing_overrides",
+        "columns": [
+          "parade_night_id",
+          "timing_template_id",
+          "reason",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 10,
+        "foreign_keys": [
+          "parade_night_id->parade_nights.id",
+          "timing_template_id->timing_templates.id"
+        ]
+      },
+      {
+        "model_class": "ParadeNight",
+        "table": "parade_nights",
+        "columns": [
+          "squadron_id",
+          "wing_id",
+          "training_year",
+          "date",
+          "term",
+          "start_time",
+          "end_time",
+          "session_count",
+          "parade_type",
+          "notes",
+          "published_status",
+          "readiness_score",
+          "planning_status",
+          "data_quality",
+          "closeout_status",
+          "published_by",
+          "closed_by",
+          "published_at",
+          "closed_at",
+          "timing_template_id",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 27,
+        "foreign_keys": [
+          "squadron_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "Phase",
+        "table": "phases",
+        "columns": [
+          "name",
+          "short_name",
+          "display_order",
+          "parent_program",
+          "is_core",
+          "is_extension",
+          "learning_hub_url",
+          "active_status",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 13,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "PlanningConflict",
+        "table": "planning_conflicts",
+        "columns": [
+          "planning_year_id",
+          "parade_date_id",
+          "scheduled_session_id",
+          "conflict_type",
+          "severity",
+          "message",
+          "is_resolved",
+          "override_reason",
+          "resolved_by",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 14,
+        "foreign_keys": [
+          "planning_year_id->planning_years.id",
+          "parade_date_id->parade_dates.id",
+          "scheduled_session_id->scheduled_sessions.id"
+        ]
+      },
+      {
+        "model_class": "PlanningFacilitatorLeave",
+        "table": "planning_facilitator_leave",
+        "columns": [
+          "facilitator_id",
+          "planning_year_id",
+          "start_date",
+          "end_date",
+          "reason",
+          "notes",
+          "created_by",
+          "is_archived",
+          "id",
+          "created_at",
+          "updated_at",
+          "updated_by"
+        ],
+        "column_count": 12,
+        "foreign_keys": [
+          "facilitator_id->facilitators.id",
+          "planning_year_id->planning_years.id"
+        ]
+      },
+      {
+        "model_class": "PlanningLocation",
+        "table": "planning_locations",
+        "columns": [
+          "unit_id",
+          "name",
+          "location_type",
+          "capacity",
+          "notes",
+          "active_status",
+          "created_by",
+          "id",
+          "created_at",
+          "updated_at",
+          "updated_by"
+        ],
+        "column_count": 11,
+        "foreign_keys": [
+          "unit_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "PlanningNotice",
+        "table": "planning_notices",
+        "columns": [
+          "planning_year_id",
+          "parade_date_id",
+          "notice_text",
+          "audience",
+          "priority",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "version",
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "column_count": 12,
+        "foreign_keys": [
+          "planning_year_id->planning_years.id",
+          "parade_date_id->parade_dates.id"
+        ]
+      },
+      {
+        "model_class": "PlanningYear",
+        "table": "planning_years",
+        "columns": [
+          "unit_id",
+          "wing_id",
+          "year",
+          "name",
+          "active_status",
+          "created_by",
+          "updated_by",
+          "version",
+          "id",
+          "created_at",
+          "updated_at"
+        ],
+        "column_count": 11,
+        "foreign_keys": [
+          "unit_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "ProgramItemDeployment",
+        "table": "program_item_deployments",
+        "columns": [
+          "program_item_id",
+          "available_to_scope",
+          "national_id",
+          "wing_id",
+          "squadron_id",
+          "inherited_from_scope",
+          "inherited_from_package_id",
+          "is_visible",
+          "can_schedule",
+          "can_copy",
+          "can_request_change",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 16,
+        "foreign_keys": [
+          "program_item_id->program_items.id"
+        ]
+      },
+      {
+        "model_class": "ProgramItem",
+        "table": "program_items",
+        "columns": [
+          "package_id",
+          "owning_scope",
+          "national_id",
+          "wing_id",
+          "squadron_id",
+          "code",
+          "title",
+          "phase_id",
+          "phase_name_at_time",
+          "element",
+          "category",
+          "foundation_or_extension",
+          "core_status",
+          "duration_minutes",
+          "duration_variable",
+          "suggested_parts",
+          "instructor_suitability",
+          "location_type",
+          "required_equipment",
+          "prerequisite_item_ids",
+          "learning_hub_resource_id",
+          "source_file_id",
+          "source_row_reference",
+          "source_sheet_name",
+          "version",
+          "status",
+          "replacement_item_id",
+          "internal_notes",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 35,
+        "foreign_keys": [
+          "package_id->program_packages.id"
+        ]
+      },
+      {
+        "model_class": "ProgramPackage",
+        "table": "program_packages",
+        "columns": [
+          "title",
+          "description_internal",
+          "owning_scope",
+          "national_id",
+          "wing_id",
+          "squadron_id",
+          "program_year",
+          "version",
+          "status",
+          "effective_from",
+          "effective_to",
+          "approved_by",
+          "published_by",
+          "published_at",
+          "retired_at",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 22,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "PromotionRequest",
+        "table": "promotion_requests",
+        "columns": [
+          "program_item_id",
+          "from_scope",
+          "to_scope",
+          "requested_by",
+          "reason",
+          "status",
+          "decided_by",
+          "decision_note",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 13,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "ProxySession",
+        "table": "proxy_sessions",
+        "columns": [
+          "actor_user_id",
+          "actor_role",
+          "mode",
+          "acting_wing_id",
+          "acting_squadron_id",
+          "reason",
+          "active",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 12,
+        "foreign_keys": [
+          "actor_user_id->users.id"
+        ]
+      },
+      {
+        "model_class": "ScheduledSession",
+        "table": "scheduled_sessions",
+        "columns": [
+          "parade_date_id",
+          "unit_id",
+          "cadet_group",
+          "session_number",
+          "curriculum_id",
+          "activity_title",
+          "facilitator_id",
+          "location_id",
+          "is_combined",
+          "combined_groups",
+          "override_conflict",
+          "override_reason",
+          "status",
+          "notes",
+          "created_by",
+          "updated_by",
+          "version",
+          "id",
+          "created_at",
+          "updated_at",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 22,
+        "foreign_keys": [
+          "parade_date_id->parade_dates.id",
+          "unit_id->squadrons.id",
+          "curriculum_id->curriculum_items.id",
+          "facilitator_id->facilitators.id",
+          "location_id->planning_locations.id"
+        ]
+      },
+      {
+        "model_class": "SessionStatusHistory",
+        "table": "session_status_history",
+        "columns": [
+          "session_id",
+          "old_status",
+          "new_status",
+          "changed_by",
+          "reason",
+          "timestamp",
+          "id"
+        ],
+        "column_count": 7,
+        "foreign_keys": [
+          "session_id->sessions.id"
+        ]
+      },
+      {
+        "model_class": "Session",
+        "table": "sessions",
+        "columns": [
+          "parade_night_id",
+          "squadron_id",
+          "period_number",
+          "session_title",
+          "curriculum_item_id",
+          "curriculum_code_at_time",
+          "curriculum_title_at_time",
+          "custom_title",
+          "phase_at_time",
+          "element_at_time",
+          "facilitator_id",
+          "facilitator_rank_at_time",
+          "facilitator_display_name_at_time",
+          "assistant_facilitator_id",
+          "backup_facilitator_id",
+          "training_area_id",
+          "training_area_name_at_time",
+          "equipment_required",
+          "expected_attendance",
+          "actual_attendance",
+          "status",
+          "delivery_notes",
+          "issue_notes",
+          "not_delivered_reason",
+          "cancelled_reason",
+          "rescheduled_to_date",
+          "cadet_group",
+          "part_number",
+          "follow_up_required",
+          "follow_up_due_date",
+          "evidence_text",
+          "evidence_url",
+          "version",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 40,
+        "foreign_keys": [
+          "parade_night_id->parade_nights.id"
+        ]
+      },
+      {
+        "model_class": "SourceConflict",
+        "table": "source_conflicts",
+        "columns": [
+          "source_file_id",
+          "conflict_type",
+          "object_type",
+          "object_key",
+          "field_name",
+          "value_a",
+          "value_b",
+          "source_a",
+          "source_b",
+          "resolution_status",
+          "resolved_value",
+          "resolution_reason",
+          "resolved_by",
+          "resolved_at",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 19,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "SourceFile",
+        "table": "source_files",
+        "columns": [
+          "filename",
+          "file_type",
+          "source_category",
+          "uploaded_by",
+          "parsed_status",
+          "parser_version",
+          "row_count",
+          "error_count",
+          "notes",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 14,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "SquadronEventStatus",
+        "table": "squadron_event_status",
+        "columns": [
+          "wing_event_id",
+          "squadron_id",
+          "status",
+          "notes",
+          "reviewed_by",
+          "reviewed_at",
+          "local_activity_id",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 12,
+        "foreign_keys": [
+          "wing_event_id->wing_hq_events.id",
+          "squadron_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "Squadron",
+        "table": "squadrons",
+        "columns": [
+          "wing_id",
+          "code",
+          "unit_number",
+          "name",
+          "short_name",
+          "unit_type",
+          "address",
+          "default_parade_day",
+          "default_start_time",
+          "default_end_time",
+          "default_session_count",
+          "active_status",
+          "crest_url",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 20,
+        "foreign_keys": [
+          "wing_id->wings.id"
+        ]
+      },
+      {
+        "model_class": "SubjectAreaTag",
+        "table": "subject_area_tags",
+        "columns": [
+          "squadron_id",
+          "wing_id",
+          "scope",
+          "display_name",
+          "normalised_name",
+          "is_active",
+          "created_by",
+          "id",
+          "created_at",
+          "updated_at",
+          "updated_by"
+        ],
+        "column_count": 11,
+        "foreign_keys": [
+          "squadron_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "SystemSetting",
+        "table": "system_settings",
+        "columns": [
+          "key",
+          "value",
+          "updated_at",
+          "updated_by"
+        ],
+        "column_count": 4,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "TimingBlock",
+        "table": "timing_blocks",
+        "columns": [
+          "timing_template_id",
+          "display_order",
+          "block_name",
+          "block_type",
+          "start_time",
+          "end_time",
+          "duration_minutes",
+          "is_instructional_period",
+          "period_number",
+          "is_optional",
+          "notes",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 16,
+        "foreign_keys": [
+          "timing_template_id->timing_templates.id"
+        ]
+      },
+      {
+        "model_class": "TimingTemplate",
+        "table": "timing_templates",
+        "columns": [
+          "squadron_id",
+          "name",
+          "effective_from",
+          "effective_to",
+          "is_default",
+          "active_status",
+          "notes",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 14,
+        "foreign_keys": [
+          "squadron_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "TrainingArea",
+        "table": "training_areas",
+        "columns": [
+          "squadron_id",
+          "name",
+          "type",
+          "capacity",
+          "indoor_outdoor",
+          "availability_status",
+          "notes",
+          "active_status",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 15,
+        "foreign_keys": [
+          "squadron_id->squadrons.id"
+        ]
+      },
+      {
+        "model_class": "User",
+        "table": "users",
+        "columns": [
+          "display_name",
+          "role",
+          "national_id",
+          "wing_id",
+          "squadron_id",
+          "flight_id",
+          "active_status",
+          "last_login_at",
+          "token_version",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 16,
+        "foreign_keys": [
+          "national_id->national_entities.id",
+          "wing_id->wings.id",
+          "squadron_id->squadrons.id",
+          "flight_id->flights.id"
+        ]
+      },
+      {
+        "model_class": "WingEventCurriculumLink",
+        "table": "wing_event_curriculum_links",
+        "columns": [
+          "wing_event_id",
+          "curriculum_item_id",
+          "link_type",
+          "notes",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by"
+        ],
+        "column_count": 9,
+        "foreign_keys": [
+          "wing_event_id->wing_hq_events.id",
+          "curriculum_item_id->curriculum_items.id"
+        ]
+      },
+      {
+        "model_class": "WingHQEvent",
+        "table": "wing_hq_events",
+        "columns": [
+          "wing_id",
+          "year",
+          "title",
+          "description",
+          "event_type",
+          "start_date",
+          "end_date",
+          "start_time",
+          "end_time",
+          "location",
+          "source_system",
+          "source_reference",
+          "source_event_code",
+          "planning_importance",
+          "audience",
+          "visibility",
+          "status",
+          "requires_squadron_action",
+          "is_planning_anchor",
+          "notes",
+          "created_by",
+          "updated_by",
+          "id",
+          "created_at",
+          "updated_at",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 27,
+        "foreign_keys": []
+      },
+      {
+        "model_class": "Wing",
+        "table": "wings",
+        "columns": [
+          "national_id",
+          "code",
+          "name",
+          "short_name",
+          "active_status",
+          "id",
+          "created_at",
+          "updated_at",
+          "created_by",
+          "updated_by",
+          "is_archived",
+          "archived_at"
+        ],
+        "column_count": 12,
+        "foreign_keys": [
+          "national_id->national_entities.id"
+        ]
+      }
+    ]
+  },
+  "frontend_planning_workspace": {
+    "route_count": 21,
+    "routes": [
+      "/",
+      "/accounts",
+      "/action-items",
+      "/admin",
+      "/audit",
+      "/cadets",
+      "/calendar",
+      "/curriculum",
+      "/dashboard",
+      "/facilitator-schedule",
+      "/facilitators",
+      "/imports",
+      "/national-overview",
+      "/parade-nights",
+      "/planning",
+      "/report-catalogue",
+      "/reports",
+      "/resources",
+      "/settings",
+      "/weekly-program",
+      "/wing-overview"
+    ]
+  },
+  "frontend_connected": {
+    "page_count": 20,
+    "pages": [
+      "accounts",
+      "action-items",
+      "activities",
+      "audit",
+      "calendar",
+      "curriculum",
+      "dashboard",
+      "facilitators",
+      "getting-started",
+      "long-range",
+      "national-activities",
+      "national",
+      "parade-nights",
+      "resources",
+      "settings",
+      "system-console",
+      "weekly-program",
+      "wing-activities",
+      "wing-calendar",
+      "wing-overview"
+    ]
+  }
+}

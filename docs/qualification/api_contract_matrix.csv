@@ -1,0 +1,1 @@
+method,path,router_file,auth_required,permission_helper,request_model,response_model,tested_happy_path,tested_forbidden,tested_unauthenticated,notes
