@@ -78,16 +78,23 @@ tooling, recorded per the instruction's own requirement to inspect before creati
 
 | Phase | Description | Status |
 |---|---|---|
-| A | Discover and map. No application changes. | **IN PROGRESS** |
-| B | Correct trust/data defects | Not started |
-| C | Correct architecture/integration defects | Not started |
+| A | Discover and map. No application changes. | **Core discovery complete** (capability baseline, architecture review, data integrity audit, security reconnaissance — see docs 01/02/03/06). Remaining Phase A work (frontend/backend engineer deep-dives, full granular capability_matrix.csv, UX/accessibility/visualisation/parity/personnel-info reviews) not yet started — those are scheduled for their own phases (G/H/I) or as Phase A continues. |
+| B | Correct trust/data defects | **Started.** QUAL-001 (command-centre + facilitator-leave reading a never-written table — P1, silently wrong dashboard/safety data) found by Phase A, fixed, tested (3 new regression tests, verified fail-before/pass-after), deployed to staging, verified live. See `defect_register.csv`. |
+| C | Correct architecture/integration defects | Not started (queued: architecture review's C-2 through C-8 findings) |
 | D | Strengthen tests | Not started |
-| E | Adversarial security/reliability | Not started |
-| F | Performance | Not started |
+| E | Adversarial security/reliability | Not started (security review produced a prioritised live-test candidate list — QUAL-003 already live-verified as part of Phase A/B crossover, QUAL-004 and others queued) |
+| F | Performance | Not started (architecture review already flagged concrete N+1/pagination candidates — C-4, C-6) |
 | G | Workflow optimisation | Not started |
 | H | Visual redesign | Not started |
 | I | Accessibility and human factors | Not started |
 | J | Complete staging qualification | Not started |
+
+**Honest note on phase boundaries**: QUAL-001's fix and QUAL-003's live verification happened during
+what was nominally "Phase A" because a P1 trust defect was found with strong, cross-agent-confirmed
+evidence and a proven low-risk fix pattern already present in the same file — fixing it immediately
+matched §31's own instruction ("Do not redesign while basic data correctness is unresolved") better
+than deferring a known, well-evidenced bug to a later phase for process purity. This is recorded here
+rather than silently reclassified as "Phase A" work it isn't.
 
 Per §31: "Do not redesign while basic data correctness is unresolved." Phases G/H/I will not begin
 until B/C/D find no unresolved P0/P1 trust or data-correctness defect.

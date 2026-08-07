@@ -2334,24 +2334,43 @@ def get_command_centre(
                 if e.id not in reviewed_ids
             ]
 
-    # Unscheduled required curriculum items (core items with no session this year)
-    parade_date_ids = [
-        row[0]
-        for row in db.query(ParadeDate.id)
+    # Unscheduled required curriculum items (core items with no session this year), and
+    # nights missing a facilitator.
+    # NOTE: this previously queried ScheduledSession (parade_date_id FK) -- a model with
+    # no live write path anywhere in this codebase (confirmed: no `ScheduledSession(...)`
+    # instantiation exists), the exact same defect class already fixed once for
+    # facilitator_workload() above. Because the table is never populated,
+    # scheduled_curriculum_ids was always empty (every core item silently shown as
+    # "unscheduled required", regardless of the real schedule) and nights_missing_fac was
+    # always 0 (silently hiding real unstaffed nights). Rewritten to the same
+    # ParadeDate -> ParadeNight -> TrainingSession join qualification-program Phase B,
+    # 2026-08-08; see docs/qualification/03_data_integrity_review.md P1 finding #1.
+    pd_rows_cc = (
+        db.query(ParadeDate)
         .filter(ParadeDate.planning_year_id == py.id)
         .all()
-    ]
+    )
+    pn_to_pd_cc: dict[str, ParadeDate] = {
+        pd_obj.parade_night_id: pd_obj for pd_obj in pd_rows_cc if pd_obj.parade_night_id
+    }
     scheduled_curriculum_ids: set[str] = set()
-    if parade_date_ids:
-        scheduled_curriculum_ids = {
-            row[0]
-            for row in db.query(ScheduledSession.curriculum_id)
+    nights_missing_fac_ids: set[str] = set()
+    if pn_to_pd_cc:
+        cc_sessions = (
+            db.query(TrainingSession)
             .filter(
-                ScheduledSession.parade_date_id.in_(parade_date_ids),
-                ScheduledSession.curriculum_id != None,  # noqa: E711
-                ScheduledSession.is_archived == False,  # noqa: E712
+                TrainingSession.parade_night_id.in_(list(pn_to_pd_cc.keys())),
+                TrainingSession.is_archived == False,  # noqa: E712
             )
             .all()
+        )
+        scheduled_curriculum_ids = {
+            s.curriculum_item_id for s in cc_sessions if s.curriculum_item_id
+        }
+        nights_missing_fac_ids = {
+            pn_to_pd_cc[s.parade_night_id].id
+            for s in cc_sessions
+            if s.facilitator_id is None
         }
 
     curriculum_q = _curriculum_scope_query(db, p).filter(
@@ -2368,19 +2387,7 @@ def get_command_centre(
         if ci.id not in scheduled_curriculum_ids
     ]
 
-    # Nights missing facilitator: parade dates where at least one session has no facilitator
-    nights_missing_fac = 0
-    if parade_date_ids:
-        sessions_no_fac = (
-            db.query(func.count(func.distinct(ScheduledSession.parade_date_id)))
-            .filter(
-                ScheduledSession.parade_date_id.in_(parade_date_ids),
-                ScheduledSession.facilitator_id == None,  # noqa: E711
-                ScheduledSession.is_archived == False,  # noqa: E712
-            )
-            .scalar()
-        )
-        nights_missing_fac = sessions_no_fac or 0
+    nights_missing_fac = len(nights_missing_fac_ids)
 
     return {
         "planning_year_id": py.id,
@@ -3672,30 +3679,40 @@ def add_facilitator_leave(
     db.add(leave)
     db.flush()
 
-    # Find ScheduledSessions that use this facilitator on parade dates in the leave window
+    # Find TrainingSessions that use this facilitator on parade dates in the leave window.
+    # NOTE: this previously queried ScheduledSession -- the same never-written model
+    # already fixed once for facilitator_workload() and again just above for
+    # get_command_centre() -- so this conflict warning silently never fired for any real
+    # session. Rewritten to the same ParadeDate -> ParadeNight -> TrainingSession join,
+    # batched to avoid an N+1 ParadeDate lookup per session. Qualification-program Phase B,
+    # 2026-08-08; see docs/qualification/03_data_integrity_review.md P1 finding #2.
     affected: list[dict] = []
     sessions_with_fac = (
-        db.query(ScheduledSession)
+        db.query(TrainingSession)
         .filter(
-            ScheduledSession.facilitator_id == fac_id,
-            ScheduledSession.is_archived == False,  # noqa: E712
+            TrainingSession.facilitator_id == fac_id,
+            TrainingSession.is_archived == False,  # noqa: E712
         )
         .all()
     )
+    parade_night_ids = {s.parade_night_id for s in sessions_with_fac if s.parade_night_id}
+    pd_by_night: dict[str, ParadeDate] = {}
+    if parade_night_ids:
+        pd_by_night = {
+            pd_obj.parade_night_id: pd_obj
+            for pd_obj in db.query(ParadeDate)
+            .filter(ParadeDate.parade_night_id.in_(list(parade_night_ids)))
+            .all()
+        }
     for s in sessions_with_fac:
-        pd_obj = db.get(ParadeDate, s.parade_date_id)
+        pd_obj = pd_by_night.get(s.parade_night_id)
         if pd_obj and body.start_date <= pd_obj.parade_date <= body.end_date:
-            title = s.activity_title
-            if not title and s.curriculum_id:
-                ci = db.get(CurriculumItem, s.curriculum_id)
-                if ci:
-                    title = ci.title
             affected.append({
                 "session_id": s.id,
                 "parade_date": pd_obj.parade_date,
-                "session_number": s.session_number,
+                "session_number": s.period_number,
                 "cadet_group": s.cadet_group,
-                "title": title,
+                "title": s.curriculum_title_at_time or s.custom_title,
             })
 
     db.commit()

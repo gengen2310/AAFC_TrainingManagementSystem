@@ -1922,6 +1922,106 @@ def test_facilitator_workload_nonexistent_facilitator(client):
 
 
 # ─────────────────────────────────────────────────────────────
+# Command Centre / facilitator-leave — real-schedule regression
+#
+# Qualification program Phase B, 2026-08-08. Same defect class already fixed
+# once for facilitator_workload() above: get_command_centre() and
+# add_facilitator_leave() both queried ScheduledSession, a model with no live
+# write path anywhere in this codebase, so unscheduled_required always
+# included every core curriculum item regardless of real scheduling,
+# nights_missing_facilitator was always 0 regardless of real unstaffed
+# nights, and the facilitator-leave conflict warning never fired for a real
+# session. See docs/qualification/03_data_integrity_review.md P1 #1/#2.
+# ─────────────────────────────────────────────────────────────
+
+def test_command_centre_excludes_a_curriculum_item_with_a_real_scheduled_session(client):
+    """A core curriculum item with a real TrainingSession must not be reported
+    as unscheduled_required. Fails before the fix: ScheduledSession is never
+    written, so this item would always appear in unscheduled_required
+    regardless of the session created below."""
+    hdr = _sqn_admin_hdr(client)
+    yr_id, pd_id = _setup_year_with_date(client, hdr)
+
+    curr_list = client.get("/api/curriculum", headers=hdr).json()["items"]
+    core_items = [c for c in curr_list if c["core_status"] == "core"]
+    if not core_items:
+        import pytest
+        pytest.skip("No core curriculum items seeded for 703")
+    curriculum_id = core_items[0]["curriculum_id"]
+
+    rs = client.post(f"/api/planning/parade-dates/{pd_id}/sessions",
+                      json={"cadet_group": "junior", "session_number": 1,
+                            "curriculum_id": curriculum_id},
+                      headers=hdr)
+    assert rs.status_code == 200, rs.text
+
+    r = client.get(f"/api/planning/command-centre?year_id={yr_id}", headers=hdr)
+    assert r.status_code == 200, r.text
+    unscheduled_ids = {c["curriculum_id"] for c in r.json()["unscheduled_required"]}
+    assert curriculum_id not in unscheduled_ids, (
+        "A curriculum item with a real scheduled session must not appear in "
+        "unscheduled_required — regression to the dead ScheduledSession table"
+    )
+
+
+def test_command_centre_counts_a_real_unstaffed_night(client):
+    """A parade night with a real session that has no facilitator must be
+    counted in nights_missing_facilitator. Fails before the fix: this was
+    always 0 regardless of real unstaffed nights."""
+    hdr = _sqn_admin_hdr(client)
+    yr_id, pd_id = _setup_year_with_date(client, hdr)
+
+    rs = client.post(f"/api/planning/parade-dates/{pd_id}/sessions",
+                      json={"cadet_group": "senior", "session_number": 1,
+                            "activity_title": "Needs a facilitator"},
+                      headers=hdr)
+    assert rs.status_code == 200, rs.text
+    assert rs.json().get("facilitator_id") is None
+
+    r = client.get(f"/api/planning/command-centre?year_id={yr_id}", headers=hdr)
+    assert r.status_code == 200, r.text
+    assert r.json()["nights_missing_facilitator"] >= 1, (
+        "A real session with no facilitator must be counted — regression to "
+        "the dead ScheduledSession table"
+    )
+
+
+def test_facilitator_leave_flags_a_real_affected_session(client):
+    """Adding a leave period covering a date on which the facilitator has a
+    real scheduled session must return that session in affected_sessions.
+    Fails before the fix: this list was always empty regardless of real
+    sessions, so the conflict warning never fired."""
+    hdr = _sqn_admin_hdr(client)
+    yr_id, pd_id = _setup_year_with_date(client, hdr)  # parade_date = 2026-09-04
+
+    facs = client.get("/api/planning/facilitators", headers=hdr).json()
+    if not facs:
+        import pytest
+        pytest.skip("No facilitators seeded for 703")
+    fac_id = facs[0]["facilitator_id"]
+
+    rs = client.post(f"/api/planning/parade-dates/{pd_id}/sessions",
+                      json={"cadet_group": "junior", "session_number": 1,
+                            "activity_title": "Leave Conflict Test",
+                            "facilitator_id": fac_id},
+                      headers=hdr)
+    assert rs.status_code == 200, rs.text
+    session_id = rs.json()["session_id"]
+
+    r = client.post(f"/api/planning/facilitators/{fac_id}/leave",
+                     json={"start_date": "2026-09-01", "end_date": "2026-09-10",
+                           "reason": "Regression test leave", "planning_year_id": yr_id},
+                     headers=hdr)
+    assert r.status_code == 200, r.text
+    affected_ids = {s["session_id"] for s in r.json()["affected_sessions"]}
+    assert session_id in affected_ids, (
+        "A real session assigned to the facilitator on a date within the "
+        "leave window must appear in affected_sessions — regression to the "
+        "dead ScheduledSession table"
+    )
+
+
+# ─────────────────────────────────────────────────────────────
 # Planning year Excel export
 # ─────────────────────────────────────────────────────────────
 
