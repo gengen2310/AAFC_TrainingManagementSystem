@@ -286,3 +286,15 @@ violation). Full reasoning and accepted-risk rationale in `docs/remediation/mast
 Concurrency policy for this resource class is now explicitly defined and documented (per Section 23's
 ask): **advisory check with explicit override**, not optimistic-lock/hard-invariant -- a deliberate
 product decision, not an oversight.
+
+## 10. Role-matrix testing (Section 27)
+
+Closed as **REM-123**. Added `backend/tests/test_role_matrix.py` (11 new tests) systematically
+covering all 8 seed roles against representative read/write/system-admin/audit endpoints in one
+place, targeting the two previously-thinnest-covered roles (`national_viewer`, `wing_viewer`).
+Manually audited every `.is_national`/`.is_wing` usage across `app/routers/*.py` for write-path
+misuse (a role check that accidentally grants a viewer/auditor role write authority by checking
+too-broad a scope helper) -- none found; all writes correctly channel through
+`permissions.py`'s `can_write_squadron`/`can_write_activity`, which explicitly enumerate only the
+4 write-capable roles. Full suite: 1242 passed, 5 skipped (was 1231/5, 0 regressions). No
+application code changed -- test-only addition, no staging deploy required.
