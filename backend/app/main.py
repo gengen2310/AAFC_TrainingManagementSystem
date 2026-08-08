@@ -74,6 +74,37 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def request_size_guard(request: Request, call_next):
+    """Reject an oversized request from its Content-Length header, before any body is
+    read into memory.
+
+    REM-124: every file-upload endpoint (6 sites across planning.py/training.py) already
+    checks `len(content) > UPLOAD_MAX_MB * 1024 * 1024` -- but only *after*
+    `await file.read()` has already buffered the entire body in memory, so the existing
+    checks bound what gets *processed*, not what gets *allocated*. The same applies to
+    every other POST/PUT/PATCH/DELETE endpoint's implicit Pydantic JSON body parsing --
+    FastAPI resolves the body alongside other dependencies (including auth), so this is
+    reachable pre-authentication, not just on already-permission-checked upload routes.
+    This middleware closes the common case (any client that sends an honest
+    Content-Length, which is virtually all real clients and simple attackers) by
+    rejecting before `call_next` -- so the body is never touched. It cannot catch a
+    request that omits Content-Length and streams a large body via chunked transfer
+    encoding while lying about its size; that residual is inherent to a header-based
+    check and would require wrapping the ASGI receive channel to close, which is a
+    larger change than this residual's likelihood/impact currently justifies.
+    """
+    cl = request.headers.get("content-length")
+    if cl is not None:
+        try:
+            declared = int(cl)
+        except ValueError:
+            declared = None
+        if declared is not None and declared > settings.MAX_REQUEST_BODY_MB * 1024 * 1024:
+            return JSONResponse(status_code=413, content={"error": "request_too_large"})
+    return await call_next(request)
+
+
 _WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 # Always reachable regardless of maintenance flags — system_admin must be able to
 # disable maintenance, sessions must be inspectable, health probes must not be blocked.

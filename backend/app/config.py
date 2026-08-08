@@ -65,6 +65,12 @@ class Settings(BaseSettings):
     EXPORT_DIR: str = "./exports"
     BACKUP_DIR: str = "./backups"
 
+    # Global request body cap, checked via Content-Length before any body is read (see
+    # main.py's request_size_guard middleware) -- deliberately higher than UPLOAD_MAX_MB
+    # to allow for multipart form overhead around a file at the upload limit, while still
+    # bounding worst-case per-request memory use for every endpoint, not just uploads.
+    MAX_REQUEST_BODY_MB: int = 20
+
     TRAINING_YEAR: int = 2026
 
     # URL for the Planning Workspace frontend (served separately).
