@@ -175,3 +175,18 @@ an unrelated environmental reason and was cleanly re-run).
 Concurrency/multi-user-conflict testing (two users editing the same Parade Night, same facilitator,
 etc. -- the qualitative half of Section 23/24) was not covered by this load test, which exercises
 read-heavy workflows only. Recorded as a residual for a future pass, not silently dropped.
+
+## 6. Continuation (autonomous ticks after the first working session)
+
+- REM-121: found and fixed a real concurrency bug -- ParadeNight (the entity explicitly named in
+  the governing instruction's own concurrency-testing example) had zero conflict detection.
+  Reproduced live: concurrent edits silently overwrote each other with no warning. Added optimistic
+  locking (version column + check, matching the pattern already used on PlanningYear/AnchorEvent/
+  PlanningNotice/Session), plus a clear conflict message in connected-frontend. 4 new regression
+  tests, fail-before/pass-after verified. Deployed to staging, confirmed healthy.
+- Task queue for continued autonomous work: backup/restore verification, mobile/responsive testing,
+  remaining concurrency scenarios (facilitator/Training Area double-booking, simultaneous CEA
+  import), remaining UI/UX audit items (FAC-11-15, ACT-INH-01, ADMIN-ORG/SPEC/ARCH-01), TRGO review
+  items not yet addressed (setup wizard, holiday prepopulation, drag-and-drop scheduling, CEA .51
+  format, bulk/CSV setup for more entities), documentation currency pass across CLAUDE.md/.claude/
+  rules, executive go/no-go report.
