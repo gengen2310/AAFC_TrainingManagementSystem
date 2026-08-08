@@ -233,3 +233,35 @@ topbar (redundant unit name hidden), Print Program button hidden on mobile, resp
 / 390x844 / 360x800 / 200% zoom, table/dialog/planning-grid behavior on real small viewports, touch
 target tap-ability. Recommend a human pass with real devices or a working DevTools-emulation-capable
 tool, since this session's available tooling could not reliably drive it.
+
+## 9. Concurrency — facilitator/Training Area double-booking (Section 23, continued)
+
+REM-121 (ParadeNight core-field optimistic locking) closed the proven, common-case concurrency gap
+(two sequential edits silently last-write-winning). The remaining Section 23 scenario -- two users
+simultaneously allocating the same facilitator or Training Area to overlapping sessions -- was
+investigated as task #152 and tracked as **REM-122**.
+
+Finding: `create_session`/`edit_session` (`backend/app/routers/training.py`) already have a
+synchronous facilitator/room conflict check (query siblings at the same `parade_night_id`+
+`period_number`, reject with 409 `resource_conflict` on a match), built and tested in a prior stage
+("Stage 8"/"Phase 3", 13 existing tests in `test_session_scheduling_conflicts.py`). No DB-level
+unique constraint backs this check, so a genuine TOCTOU race under true concurrent Postgres requests
+(not reproducible via this repo's single-threaded SQLite test harness) is theoretically possible.
+
+**Evaluated and explicitly rejected**: adding a DB-level unique constraint as a backstop. The
+existing, deliberately-designed `override_conflict` escape hatch (tested by
+`test_edit_session_conflict_override_bypasses_check`) proves the product's actual policy for this
+resource class is "advisory warning, explicit override allowed" -- a caller can already deliberately
+produce the identical double-booked end state today via `override_conflict=True`, and the endpoint
+returns 200 for that today. A hard unique constraint would be *stricter* than the shipped, tested,
+intentional policy and would break the override path (every legitimate override submission matching
+an existing conflict would 500 instead of succeeding) -- a real capability regression, not safe
+hardening, under `.claude/rules/capability-preservation.md`.
+
+**Closed as REM-122**: documented residual, no code change, matching the established
+QUAL-009/QUAL-013/QUAL-118 pattern (test-precision/theoretical gap, confirmed non-corrupting because
+the race's worst case is identical to an already-permitted user choice, not a new invariant
+violation). Full reasoning and accepted-risk rationale in `docs/remediation/master_gap_register.csv`.
+Concurrency policy for this resource class is now explicitly defined and documented (per Section 23's
+ask): **advisory check with explicit override**, not optimistic-lock/hard-invariant -- a deliberate
+product decision, not an oversight.
