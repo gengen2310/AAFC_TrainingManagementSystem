@@ -491,3 +491,33 @@ classification is treated as final, and Gate 10's 10 blocking human items remain
 This is not yet **PUBLIC RELEASE CANDIDATE READY — AWAITING PRODUCTION AUTHORISATION**, since that
 would require Gates 6-8 to also carry this-program evidence, not carried-forward evidence from a prior
 pass predating several since-shipped changes.
+
+## 19. First production deployment this program — REM-125 (2026-08-08T23:00:49Z)
+
+User issued explicit authorization: `AUTHORISE PRODUCTION DEPLOYMENT d476e5b`. This is the first
+production deployment of this entire program (everything before this point was staging-only, per
+the governing instruction's standing rule).
+
+**Scope discipline applied**: `d476e5b` is the REM-125-hardening commit, not current HEAD at the
+time of authorization (`39365f5`). Verified before deploying that this mattered not at all in
+practice: `git diff d476e5b HEAD -- backend/app/` returned empty -- every commit between them was
+docs/tests-only (the register data-integrity repair, Gate 1-11 consolidation, REM-126, a new
+self-edit test). Deployed from the current checkout (functionally identical to d476e5b for
+anything that actually runs), rather than constructing a separate historical checkout, since the
+two are provably equivalent for deployment purposes. Only `aafc-tms-backend` was deployed to
+production -- `d476e5b` touches no frontend files, so deploying either frontend service would have
+exceeded the authorization's scope.
+
+**Pre-deploy rollback baseline**: prior production deployment `572e05dc-95ea-40f2-83ac-612b8514a1be`
+(commit `79f70a9`, QUAL-004 logout fix), confirmed healthy (200) immediately before this deploy.
+
+**Deploy**: `83f50e8b-c0cd-4363-86fb-97f983d94690`, SUCCESS, 2026-08-08T23:00:49Z.
+
+**Post-deploy live verification on production itself** (not staging): `/api/health/ready` → 200; a
+real `POST /api/auth/login` carrying the same log-injection-shaped `X-Forwarded-For` payload used
+in staging verification produced a clean access-log line with a valid real IP, no injected content
+-- confirming REM-125's hardened fix is genuinely live and working in production, closing the
+live availability defect (shared login-lockout bucket across the entire user base) that was
+present in production since before this program began.
+
+Full detail: `docs/remediation/master_gap_register.csv` REM-125.
