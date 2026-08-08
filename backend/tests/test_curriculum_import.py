@@ -280,6 +280,35 @@ def test_import_csv_core_status_column_is_respected(client):
     assert extension2["core_status"] == "core"
 
 
+def test_import_csv_oversized_file_rejected_before_parsing(client):
+    """Security review candidate 5 (docs/qualification/06_security_review.md Finding 4.4):
+    the whole uploaded body is read into memory before parsing -- confirm a size limit is
+    enforced, matching every other upload endpoint in this codebase, rather than reading
+    an arbitrarily large file into memory unbounded (a DoS/memory candidate)."""
+    from app.config import settings as _settings
+    hdr = _sysadmin(client)
+    oversized = "A" * (_settings.UPLOAD_MAX_MB * 1024 * 1024 + 1)
+    files = {"file": ("huge.csv", oversized, "text/csv")}
+    r = client.post("/api/curriculum/import-csv", headers=hdr, files=files)
+    assert r.status_code == 413, r.text
+    assert r.json()["detail"]["error"] == "file_too_large"
+
+
+def test_import_xlsm_oversized_file_rejected_before_parsing(client):
+    """Same size-limit protection for the .xlsm import endpoint -- this one hands the raw
+    bytes straight to openpyxl.load_workbook(), which has significant memory overhead of
+    its own on top of the raw read, making an unbounded upload here worse than the CSV
+    case, not just equivalent."""
+    from app.config import settings as _settings
+    hdr = _sysadmin(client)
+    oversized = b"P" * (_settings.UPLOAD_MAX_MB * 1024 * 1024 + 1)
+    files = {"file": ("huge.xlsm", oversized,
+                      "application/vnd.ms-excel.sheet.macroEnabled.12")}
+    r = client.post("/api/curriculum/import-xlsm", headers=hdr, files=files)
+    assert r.status_code == 413, r.text
+    assert r.json()["detail"]["error"] == "file_too_large"
+
+
 def test_bulk_import_requires_nat_admin(client):
     """sqn_admin must be denied access to bulk import."""
     hdr = _sqn_admin(client)

@@ -131,9 +131,24 @@ test — not static reasoning — confirming the payload is received as inert st
 confirming the identical test methodology DOES detect the live breakout pre-fix. Full detail:
 `master_gap_register.csv` REM-117.
 
+## Candidate 5 — Upload size enforcement (LOW)
+
+**Verdict: CONFIRMED gap, FIXED. Recorded as `REM-119`.** Two curriculum-import endpoints
+(`POST /api/curriculum/import-xlsm`, `POST /api/curriculum/import-csv`) read the entire uploaded
+body into memory with no size check at all, unlike every other upload endpoint in the codebase.
+Fixed with the same `settings.UPLOAD_MAX_MB` check used consistently elsewhere. Verified fail-before:
+without the fix, an oversized upload doesn't fail cleanly — it crashes with an unhandled `csv.Error`
+or a confusing `invalid_file` message after already parsing the oversized buffer, proving the fix is
+real protection, not a redundant check.
+
+## Candidate 7 — `change_role` session behaviour (LOW)
+
+**Verdict: CONFIRMED already correct. Recorded as `REM-118`.** `change_role` already bumps
+`token_version` in addition to role already being read live from the DB — a role change takes effect
+immediately AND actively revokes the pre-change token (401 `session_revoked`), not merely left to
+expire naturally. No code change needed; only a missing test, now added.
+
 ## Candidates not yet started
 
 3. Multi-squadron Annual Program import scope (MEDIUM, REM-45 residual)
-5. Upload size enforcement (LOW)
 6. Per-IP rate-limit behaviour under multiple workers (LOW)
-7. `change_role` session behaviour (LOW)

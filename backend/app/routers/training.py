@@ -2911,7 +2911,10 @@ async def import_curriculum_xlsm(
         raise HTTPException(403, detail={"error": "forbidden",
                                          "message": "Only national_admin or system_admin can import curriculum."})
 
+    from ..config import settings as _settings
     content = await file.read()
+    if len(content) > _settings.UPLOAD_MAX_MB * 1024 * 1024:
+        raise HTTPException(413, detail={"error": "file_too_large"})
     try:
         import io
         import openpyxl
@@ -3080,7 +3083,10 @@ async def import_curriculum_csv(
             "message": "Only national_admin or system_admin can import curriculum.",
         })
 
+    from ..config import settings as _settings
     content = await file.read()
+    if len(content) > _settings.UPLOAD_MAX_MB * 1024 * 1024:
+        raise HTTPException(413, detail={"error": "file_too_large"})
     try:
         text = content.decode("utf-8-sig")
     except UnicodeDecodeError:

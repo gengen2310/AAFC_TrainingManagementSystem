@@ -853,6 +853,49 @@ def test_change_role_happy_path(client):
     assert got["role"] == "sqn_admin"
 
 
+def test_change_role_revokes_the_target_users_existing_session(client):
+    """Security review Finding 1.2 (docs/qualification/06_security_review.md): confirm
+    change_role bumps token_version, not just the live role field -- so a role change
+    doesn't merely take effect on the target's next request (which it does regardless,
+    since get_principal reads role live from the DB, not the JWT), it also actively
+    revokes any token issued before the change, forcing a fresh login rather than
+    leaving a stale-privilege token usable until it naturally expires."""
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_id = _get_sqn_id(client, h7wg, "703")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Session Revocation Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_id,
+        "new_code": "REVOKETEST1",
+    })
+    assert create_r.status_code == 200, create_r.text
+    uid = create_r.json()["user_id"]
+
+    # The target logs in and holds a token BEFORE their role changes.
+    target_hdr = login(client, "REVOKETEST1")
+    pre_change = client.get("/api/auth/me", headers=target_hdr)
+    assert pre_change.status_code == 200
+    assert pre_change.json()["session"]["role"] == "sqn_general"
+
+    r = client.post(f"/api/accounts/{uid}/change-role", headers=h_nat,
+                     json={"new_role": "sqn_admin"})
+    assert r.status_code == 200, r.text
+
+    # The target's pre-change token must now be rejected, not silently continue to work.
+    post_change = client.get("/api/auth/me", headers=target_hdr)
+    assert post_change.status_code == 401
+    assert post_change.json()["detail"]["error"] == "session_revoked"
+
+    # A fresh login (same code -- role change doesn't rotate the access code) picks up
+    # the new role immediately.
+    fresh_hdr = login(client, "REVOKETEST1")
+    fresh = client.get("/api/auth/me", headers=fresh_hdr)
+    assert fresh.status_code == 200
+    assert fresh.json()["session"]["role"] == "sqn_admin"
+
+
 def test_change_role_is_audited(client):
     h_nat = login(client, "ADMINNATIONAL")
     h7wg = login(client, "ADMIN7WG")
