@@ -410,3 +410,40 @@ facilitator-leave authorization, CSV import scope, account self-edit, parade-day
 resource-conflict TOCTOU, idempotency-key scoping, SQL injection, path traversal, CORS,
 mass-assignment) represent a genuine, broad pass, not a token effort. Moving to task #156 (final
 staging soak + release-gate consolidation) next.
+
+## 16. Release-gate consolidation, started (Sections 39-43) — task #156
+
+Began building the consolidated release-gate picture. Ran the beta-release skill's gate
+checklist against current state: security greps all clean (2 known benign matches, matching
+security.md's own documented findings from 2026-08-05 -- an audit-filter label and a pg_restore
+help-text placeholder), migration head confirmed applied on staging via the entrypoint's own
+"Migrations complete" log (direct `alembic current` against the Postgres internal hostname isn't
+reachable from outside Railway's network, so used the deploy log as legitimate evidence instead
+of fabricating a direct check). Staging soak window started 2026-08-08T21:58:29Z (baseline:
+health 200, 0 5xx in recent access log) -- no further staging changes planned until the soak
+check completes on a later tick, per Section 39's "no casual changes during observation."
+
+**Found and fixed a real data-integrity problem in the register itself** (Section 20's "audit the
+harness" applies here too): 16 of 164 rows had the wrong CSV column count, which silently
+produced wrong data for any tooling (including this tick's own aggregate analysis) that trusts
+the 15-column schema. 3 rows had free-text fragmented across extra columns by unescaped
+commas/quotes from before this session's disciplined csv.writer-based appends; reconstructed by
+rejoining fragments to their original field per each fragment's own content. 13 rows (including a
+self-caught omission in my own REM-123) were missing one field each; backfilled with an honest,
+clearly-labeled placeholder rather than fabricated content. Row count unchanged (164) -- no data
+lost, alignment corrected.
+
+With the register now trustworthy, aggregated status: 164 total entries, 52 not yet fully closed
+(mostly P2/P3/MEDIUM/LOW severity -- feature-completeness/polish/product-decision items, not
+blocking defects). Only 2 were tagged HIGH severity and open -- both re-verified against current
+code and found stale: REM-80 (claimed "mobile nav completely broken, no hamburger") is false, a
+working hamburger nav with real Playwright coverage already exists; REM-81 (claimed "83 unlabeled
+select elements remain") is also false, direct measurement found only 1 without an aria-label,
+and that one is permanently dead/unreachable markup (aria-hidden, never toggled, never read into
+any payload), not a live gap. Both closed with evidence, not assumption. **Zero HIGH-or-above
+severity items remain open in the register as of this commit** -- a meaningful, positive signal
+for the eventual go/no-go, though the 52 remaining P2/P3/MEDIUM/LOW items and the still-pending
+human/organizational gates (Section 41) mean this is not yet a full GO.
+
+Not yet done: the formal A-J gate table, the executive go/no-go classification (one of the 3
+exact required strings), and the soak-completion check. Continuing on a later tick.
