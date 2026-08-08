@@ -156,3 +156,4 @@ Target: staging only, real workflows (login/me/parade-nights/planning-years/repo
 |---|---|---|---|---|---|
 | 12 users, 3 min | 943 | 0 | 273ms | 100% (12/12) | **PASS** |
 | 25 users, 4.5 min | 2637 | 0 | 252ms | 100% (25/25) | **PASS** |
+| 50 users, 6.6 min | 7742 | 0 | 250ms | 100% (50/50) | **PASS** |
