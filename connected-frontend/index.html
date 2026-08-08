@@ -8660,9 +8660,9 @@ function renderWing(){
   html+=`<div class="card"><div class="ctitle">Squadron Comparison</div><div class="tw"><table>
     <thead><tr><th>Squadron</th><th>Parade Day</th><th style="text-align:center">Nights</th><th style="text-align:center">Pub.</th><th style="text-align:center">Sessions</th><th>Delivered</th><th>Coverage</th><th style="text-align:center">Not Del.</th><th style="text-align:center">Readiness</th><th>Status</th>${canProxy?'<th class="no-print"></th>':''}</tr></thead><tbody>`;
   rows.forEach(r=>{
-    html+=`<tr class="drow" onclick="wingDrill('${r.squadron_id}')">
-      <td style="font-weight:800">${r.short_name||r.code}</td>
-      <td style="font-size:11.5px">${r.parade_day||'—'}</td>
+    html+=`<tr class="drow" onclick="wingDrill('${_jsAttr(r.squadron_id)}')">
+      <td style="font-weight:800">${esc(r.short_name||r.code)}</td>
+      <td style="font-size:11.5px">${esc(r.parade_day||'—')}</td>
       <td style="text-align:center;font-weight:700">${r.nights||0}</td>
       <td style="text-align:center">${r.published||0}</td>
       <td style="text-align:center;font-weight:700">${r.sessions||0}</td>
@@ -8671,7 +8671,7 @@ function renderWing(){
       <td style="text-align:center"><span class="badge ${(+r.not_delivered||0)===0?'b-ok':(+r.not_delivered<=2?'b-amber':'b-red')}">${r.not_delivered||0}</span></td>
       <td style="text-align:center;font-weight:700">${readinessDot(r.readiness)}</td>
       <td>${statusBadge(r)}</td>
-      ${canProxy?`<td class="no-print"><button class="btn btn-out btn-sm" onclick="event.stopPropagation();enterMode('${r.squadron_id}','${(r.short_name||r.code)}')">Proxy</button></td>`:''}
+      ${canProxy?`<td class="no-print"><button class="btn btn-out btn-sm" onclick="event.stopPropagation();enterMode('${_jsAttr(r.squadron_id)}','${_jsAttr(r.short_name||r.code)}')">Proxy</button></td>`:''}
     </tr>`;
   });
   html+=`</tbody></table></div></div>`;
@@ -8706,7 +8706,7 @@ function renderWing(){
 function wingDrill(sid){
   const r=((S.wing&&S.wing.squadrons)||[]).find(x=>x.squadron_id===sid); const p=document.getElementById('wing-drill'); if(!r||!p)return;
   p.className='drill-panel show';
-  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${r.short_name||r.code} — detail</div><button class="modal-x" aria-label="Close" onclick="document.getElementById('wing-drill').className='drill-panel'">×</button></div>
+  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${esc(r.short_name||r.code)} — detail</div><button class="modal-x" aria-label="Close" onclick="document.getElementById('wing-drill').className='drill-panel'">×</button></div>
     <div class="stats-grid" style="margin:0">
       <div class="stat"><div class="sval">${r.nights||0}</div><div class="slbl">Nights (${r.published||0} published)</div></div>
       <div class="stat"><div class="sval">${r.sessions||0}</div><div class="slbl">Sessions</div></div>
@@ -8761,9 +8761,9 @@ function nationalDrill(wid){
   const w=((S.nationalReport&&S.nationalReport.wings)||[]).find(x=>x.wing_id===wid);
   const sqs=(S.squadrons||[]).filter(x=>x.wing_id===wid);
   const p=document.getElementById('national-drill'); if(!p)return; p.className='drill-panel show';
-  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${w?(w.name||w.code):'Wing'} — squadrons</div><button class="modal-x" aria-label="Close" onclick="document.getElementById('national-drill').className='drill-panel'">×</button></div>
+  p.innerHTML=`<div class="drill-hdr"><div class="drill-title">${esc(w?(w.name||w.code):'Wing')} — squadrons</div><button class="modal-x" aria-label="Close" onclick="document.getElementById('national-drill').className='drill-panel'">×</button></div>
     <div class="tw"><table><thead><tr><th>Squadron</th><th>Parade Day</th><th>Address</th></tr></thead><tbody>
-    ${sqs.length?sqs.map(s=>`<tr><td style="font-weight:800">${s.short_name||s.code}</td><td>${s.default_parade_day||'—'}</td><td style="font-size:11px">${(s.address||'').split(',')[0]}</td></tr>`).join(''):'<tr><td colspan="3" style="color:var(--muted)">No squadrons returned</td></tr>'}
+    ${sqs.length?sqs.map(s=>`<tr><td style="font-weight:800">${esc(s.short_name||s.code)}</td><td>${esc(s.default_parade_day||'—')}</td><td style="font-size:11px">${esc((s.address||'').split(',')[0])}</td></tr>`).join(''):'<tr><td colspan="3" style="color:var(--muted)">No squadrons returned</td></tr>'}
     </tbody></table></div>
     <div style="font-size:11px;color:var(--muted);margin-top:10px">Read-only national oversight. ${['national_admin','system_admin'].includes(S.role)?'Deeper squadron changes require Delegated Intervention Mode where the backend permits.':'National viewers are read-only.'}</div>`;
 }

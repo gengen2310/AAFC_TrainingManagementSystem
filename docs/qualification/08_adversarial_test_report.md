@@ -116,10 +116,24 @@ Proxy Mode to edit squadron data.") instead of silently succeeding. Deployed com
 
 ---
 
+## Candidate 4 — Stored XSS via org names (LOW–MEDIUM)
+
+**Verdict: CONFIRMED and FIXED.** Recorded as `REM-117` (Final Remediation, Product Hardening and
+Public-Release Program, not a QUAL-number since it was found and fixed under that later program,
+continuing this same candidate list). All 5 sites the original review named (`index.html`
+~8664/8674/8709/8764/8766) were genuinely unescaped. One (the Proxy button's
+`onclick="...enterMode('id','NAME')"`) is a materially different, deeper vulnerability class than
+the other four — plain HTML-escaping does not prevent breakout in an inline event-handler attribute,
+since browsers HTML-decode attribute values before compiling them as JS. Fixed with `esc()` for the
+4 plain-content sites and the codebase's existing `_jsAttr()` helper (already used correctly
+elsewhere for the identical pattern) for the onclick site. Verified with a real Node.js JS-engine
+test — not static reasoning — confirming the payload is received as inert string data post-fix and
+confirming the identical test methodology DOES detect the live breakout pre-fix. Full detail:
+`master_gap_register.csv` REM-117.
+
 ## Candidates not yet started
 
 3. Multi-squadron Annual Program import scope (MEDIUM, REM-45 residual)
-4. Stored XSS via org names (LOW–MEDIUM)
 5. Upload size enforcement (LOW)
 6. Per-IP rate-limit behaviour under multiple workers (LOW)
 7. `change_role` session behaviour (LOW)
