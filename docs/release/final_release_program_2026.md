@@ -391,3 +391,22 @@ unescaped injection-payload fragment. Full suite 1252 passed/5 skipped (0 regres
 to staging and live-verified: a real request carrying a log-injection-shaped
 `X-Forwarded-For` produced a clean access-log line with a valid IP, no injected content. Current
 staged HEAD: see `git log`. Still not on production pending explicit authorization.
+
+## 15. Adversarial pass, further sweep (Section 38) — task #155 wrap-up
+
+Continued task #155 across SQL injection (no raw string-interpolated SQL anywhere in the
+codebase -- only 3 `text()` call sites, all static, zero-parameter `SELECT 1`/schema-version
+queries), path traversal (backup/export endpoints never accept a client-supplied filename that
+reaches the filesystem), CORS (already fail-closed in production per `validate_for_production()`),
+and mass-assignment on the REM-45-era self-edit bypass in `update_account` -- proved directly
+(not just trusted from its own comment) that `AccountUpdateIn` genuinely cannot smuggle a role/
+scope change: a live test sends `role`/`squadron_id`/`wing_id` alongside a self-edit and confirms
+they're silently dropped by Pydantic, role unchanged. No new defects found beyond REM-124/REM-125
+(already fixed, staging-verified, hardened per the background security review).
+
+Task #155 substantially complete for this pass -- adversarial testing is inherently open-ended,
+but the areas swept across this program's several ticks (file uploads, IP/rate-limiting,
+facilitator-leave authorization, CSV import scope, account self-edit, parade-day seeding,
+resource-conflict TOCTOU, idempotency-key scoping, SQL injection, path traversal, CORS,
+mass-assignment) represent a genuine, broad pass, not a token effort. Moving to task #156 (final
+staging soak + release-gate consolidation) next.
