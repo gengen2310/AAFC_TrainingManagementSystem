@@ -20,6 +20,11 @@ caused four production incidents against tables built purely through the
 migration chain (invisible locally/in CI because seed_all()/init_db() build
 schema from SQLAlchemy metadata directly, bypassing Alembic) -- fixing
 proactively rather than waiting for the next incident report.
+
+Column-existence-checked rather than bare add_column, same reason as v44: an
+environment whose schema was ever rebuilt via seed_all()'s metadata-based
+reset_db() and then alembic-stamped may already have these columns even though
+it never actually ran the migration that "should" have added them.
 """
 from alembic import op
 import sqlalchemy as sa
@@ -30,17 +35,29 @@ branch_labels = None
 depends_on = None
 
 _TABLES = ["squadron_event_status", "wing_event_curriculum_links", "activity_local_hides"]
+_COLUMNS = ["created_by", "updated_by"]
+
+
+def _existing_columns(table: str) -> set[str]:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    return {c["name"] for c in inspector.get_columns(table)}
 
 
 def upgrade() -> None:
     for table in _TABLES:
+        existing = _existing_columns(table)
+        missing = [c for c in _COLUMNS if c not in existing]
+        if not missing:
+            continue
         with op.batch_alter_table(table) as batch_op:
-            batch_op.add_column(sa.Column("created_by", sa.String(36), nullable=True))
-            batch_op.add_column(sa.Column("updated_by", sa.String(36), nullable=True))
+            for col in missing:
+                batch_op.add_column(sa.Column(col, sa.String(36), nullable=True))
 
 
 def downgrade() -> None:
-    for table in reversed(_TABLES):
-        with op.batch_alter_table(table) as batch_op:
-            batch_op.drop_column("updated_by")
-            batch_op.drop_column("created_by")
+    # Deliberately a no-op, not a symmetric drop_column -- see v44's downgrade for
+    # the same reasoning: these columns are unconditionally required by
+    # TimestampMixin, so dropping them would immediately re-break every
+    # environment's ORM queries against these tables.
+    pass
