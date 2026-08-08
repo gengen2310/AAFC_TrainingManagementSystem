@@ -314,3 +314,26 @@ suite 1245 passed/5 skipped (0 regressions). Deployed to staging and live-verifi
 (documented, not fixed): a client that omits Content-Length and lies via chunked transfer encoding
 bypasses this specific guard -- the 6 existing per-endpoint post-read checks remain the backstop
 for that narrower case. Full detail: `docs/remediation/master_gap_register.csv` REM-124.
+
+## 12. Adversarial pass, continued (Section 38) — negative findings recorded
+
+Continuing task #155 after REM-124. Spot-checked several older findings from a prior
+(pre-this-program) risk-register plan to confirm current state rather than trust stale claims
+(Section 6 discipline):
+
+- **Account self-edit 403** (`_CREATE_AUTHORITY` map excluding `wing_admin`/`sqn_admin` from their
+  own role): already fixed. `update_account` (`backend/app/routers/accounts.py`) has an explicit,
+  well-commented `if uid != p.user_id: _require_manage_authority(...)` bypass scoped to exactly
+  this case. No action needed.
+- **Parade Day setting not seeding parade-date generation**: already fixed on both frontends.
+  `connected-frontend/index.html`'s `openGenerateDatesModal()` seeds from `S.cfg.day` via
+  `_DAY_NAME_TO_INT`; Planning Workspace's `SetupPanel.tsx`/`GuidedYearSetupModal.tsx` both fetch
+  the squadron record and seed `weekday` from `default_parade_day`. No action needed.
+- **CSV import squadron-resolution scope** (`import_annual_program`'s `all_sqns` query): checked
+  for a cross-tenant enumeration leak in preview mode, separate from REM-120's write-scope fix —
+  none found. The squadron set is filtered by the plan year's own level (single squadron / wing /
+  unfiltered-national) before any row is matched, consistent with the actor's own already-granted
+  visibility at that level. No action needed.
+
+No new defect found this pass beyond REM-124. Continuing task #155 with different code areas next
+tick.
