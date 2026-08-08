@@ -129,5 +129,10 @@ against what this session's qualification program has already independently foun
 - All work committed to `main`, pushed, deployed to staging (backend + both frontends), verified
   healthy. **Nothing deployed to production this session** — no `AUTHORISE PRODUCTION DEPLOYMENT
   <SHA>` instruction has been given.
-- Remaining from this session's task queue: Phase E adversarial security (5 of 7 candidates not yet
-  live-tested), concurrency/staged stress testing (12→100 users). Program continues.
+- REM-117: found and fixed a real stored-XSS gap (5 sites, one requiring a deeper fix than plain
+  HTML-escaping since it lived inside an inline `onclick` attribute) — verified with a real Node.js
+  JS-engine test proving both the vulnerability and the fix, not static reasoning.
+- Remaining from this session's task queue: Phase E adversarial security (4 of 7 candidates not yet
+  live-tested: multi-squadron import scope, upload size enforcement, per-IP rate limiting,
+  `change_role` session behaviour), concurrency/staged stress testing (12→100 users). Program
+  continues.
