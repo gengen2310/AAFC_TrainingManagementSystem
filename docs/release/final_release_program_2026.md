@@ -298,3 +298,19 @@ too-broad a scope helper) -- none found; all writes correctly channel through
 `permissions.py`'s `can_write_squadron`/`can_write_activity`, which explicitly enumerate only the
 4 write-capable roles. Full suite: 1242 passed, 5 skipped (was 1231/5, 0 regressions). No
 application code changed -- test-only addition, no staging deploy required.
+
+## 11. Adversarial pass finding (Section 38) — REM-124: request-size guard
+
+While investigating REM-119's file-upload size checks for a residual gap (task #155), found that
+all 6 file-upload sites, and by extension every POST/PUT/PATCH/DELETE endpoint's implicit JSON
+body parsing, buffer the full request body into memory *before* any size check runs -- reachable
+pre-authentication. No global request-body size limit existed anywhere in the app.
+
+Fixed: `request_size_guard` middleware (`backend/app/main.py`) rejects a request whose
+Content-Length exceeds `settings.MAX_REQUEST_BODY_MB` (new setting, default 20MB) with 413 before
+`call_next` runs -- the body is never read. 3 new tests, fail-before/pass-after verified. Full
+suite 1245 passed/5 skipped (0 regressions). Deployed to staging and live-verified over real HTTP:
+`/api/health/ready` → 200; a 21MB POST to `/api/curriculum` → 413 `request_too_large`. Residual
+(documented, not fixed): a client that omits Content-Length and lies via chunked transfer encoding
+bypasses this specific guard -- the 6 existing per-endpoint post-read checks remain the backstop
+for that narrower case. Full detail: `docs/remediation/master_gap_register.csv` REM-124.
