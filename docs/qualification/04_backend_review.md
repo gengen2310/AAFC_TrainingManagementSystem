@@ -208,6 +208,89 @@ dismissed as another false alarm.
 
 ---
 
+## 2c. Mutation testing — `app/security.py`
+
+**Why this module third**: `security.py` holds the token/hashing primitives `dependencies.py` (§2b)
+calls — access-code verification, JWT encode/decode, and both the in-memory and DB-backed
+login-lockout / API-rate-limit mechanisms. Same hand-crafted-mutation methodology as §2/§2b.
+
+**Scoping note**: the plain in-memory `login_blocked`/`record_login_failure`/`record_login_success`
+functions are dead code in the live request path — grep confirms `backend/app/routers/auth.py` only
+calls the DB-backed `login_blocked_db`/`record_login_failure_db`/`record_login_success_db` variants
+(the in-memory ones are reachable only via `reset_rate_limiter()`, itself only called from a system
+maintenance-reset endpoint). Mutating dead code and reporting "SURVIVED" would misrepresent a
+non-finding as a gap, so mutations target the six live-path functions instead: `verify_code`,
+`decode_token`, `create_token`, and the three DB-backed lockout/rate-limit functions.
+
+| ID | Mutation | Result |
+|---|---|---|
+| S1 | `verify_code` always returns `True` — any code accepted for any account | **KILLED** — 748 tests failed |
+| S2 | `decode_token`'s `algorithms=` allowlist also accepts `"none"` — JWT algorithm-confusion | **SURVIVED** — 0 tests failed |
+| S3 | `create_token` omits the `exp` claim entirely — issued tokens never expire | **SURVIVED** — 0 tests failed |
+| S4 | `login_blocked_db`'s lockout check disabled | **KILLED** — 3 tests failed |
+| S5 | `record_login_failure_db` never sets `locked_until` regardless of attempt count | **KILLED** — 4 tests failed |
+| S6 | `check_api_rate` always returns `False` — per-IP API rate limiting disabled | **KILLED** — 4 tests failed |
+
+**Result: 4/6 killed on first pass (67%).**
+
+### S3 — the real finding (QUAL-012)
+
+`create_token`'s payload dict omits `exp` under this mutation. PyJWT only enforces expiry if the
+`exp` claim is present at all — remove the claim and the token is valid forever. **No existing test
+— out of 1211 — asserted that `create_token`'s output actually contains an `exp` claim**; every
+existing expiry test (`test_time_expired_token_rejected` in `test_session_revocation.py`) constructs
+its own token directly via `create_token(uid, {...}, ttl_min=-1)` and checks the *already-expired*
+case, never asserting the claim's mere presence on a normally-issued token. This is a genuine gap:
+if `create_token` were ever refactored and silently dropped this claim, no test would catch it before
+it shipped every session-bound user a token that never expires.
+
+**Fix**: added `backend/tests/test_security_module.py` — no dedicated unit-test file for
+`security.py`'s primitives existed before this pass, same process gap already noted for
+`permissions.py` in §2. `test_create_token_always_sets_a_real_exp_claim` decodes a freshly created
+token with signature verification off (to isolate the claim's presence from decode_token's other
+checks) and asserts `exp` is present and strictly after `iat`; `test_create_token_respects_explicit_
+ttl_for_exp` asserts a 1-minute `ttl_min` produces an `exp` within a sane window. **Verified, not
+assumed**: re-applied S3 in isolation — both new tests failed exactly as expected (`assert 'exp' in
+{...}` and `KeyError: 'exp'`). Reverted to the clean original (`diff` confirmed empty). Full suite
+re-run clean afterward: **1215 passed** (1211 + 4 new), 5 skipped, 0 failures.
+
+### S2 — investigated, confirmed NOT a live gap (QUAL-013, contrast with S3)
+
+Unlike S3, directly verifying S2 showed the mutation is not exploitable given how this codebase
+calls PyJWT. `decode_token` always calls `jwt.decode(token, settings.JWT_SECRET, algorithms=[...])`
+— the key argument is never `None`. Confirmed directly: forging a token with
+`jwt.encode(payload, key=None, algorithm="none")` and decoding it with
+`algorithms=["HS256", "none"]` (i.e. S2's exact mutated allowlist) against `settings.JWT_SECRET`
+raises PyJWT's own `InvalidKeyError: When alg = "none", key value must be None.` — a hardcoded
+protection inside PyJWT itself, entirely independent of the `algorithms=` parameter, that fires
+because the code always supplies a real (non-`None`) key. So S2 "survives" not because the
+algorithm-confusion attack actually works against this code, but because a second, independent
+layer (PyJWT's internal key/algorithm consistency check) already blocks it regardless of the
+allowlist mutation — the same defense-in-depth shape as D4 in the `dependencies.py` pass (§2b), not
+a standalone bypass like S3 or D1.
+
+Two regression tests were still added — not because S2's mutation needs "catching" (it can't be,
+without S2 itself becoming exploitable, which it isn't), but because the *underlying security
+property* ("a forged or wrongly-signed token is always rejected") is worth pinning independent of
+which internal mechanism currently enforces it:
+`test_decode_token_rejects_alg_none_forged_token` and `test_decode_token_rejects_token_signed_with_
+wrong_algorithm`. Both pass against the clean code and continued to pass with S2 applied (confirmed
+directly, not assumed) — recorded honestly as such, not claimed as "kills S2."
+
+### A note on an automated background scanner false-flag during this work
+
+While S4 (the DB-backed lockout-check-disabled mutation) was deliberately, temporarily applied
+mid-test-run, this session's own background security-review tooling flagged it as a live HIGH
+finding — "Authentication Bypass / Account Lockout Disabled." As with M4 (§2) and D1 (§2b), this was
+correctly identified in the moment as this program's own controlled, monitored, already-in-progress
+mutation test — confirmed via `ps aux` showing the script still actively running and `diff` showing
+the file mid-mutation exactly where the scanner's snapshot was taken — rather than a persisted
+defect. No manual intervention was taken mid-script. Unlike D1, S4's mutation was itself cleanly
+KILLED by the existing suite (3 failures) once the run completed normally — this flag corroborates
+that S4 targets a real, already-well-tested control, not an undiscovered gap.
+
+---
+
 ## 3. Static analysis
 
 `ruff` (already configured in `pyproject.toml`) re-run against the current tree as a baseline check:
@@ -225,11 +308,11 @@ here.
 ## 4. What Phase D has NOT yet covered
 
 Per mission §6, still outstanding for a future Phase D pass or Phase E:
-- Mutation testing on other critical modules (`security.py`, `accounts.py`'s
-  `_require_manage_authority`) — `permissions.py` and `dependencies.py::get_principal` (§2, §2b)
-  were prioritised as the two highest-blast-radius targets; the pattern established here
-  (hand-crafted mutations, `diff`-verified revert, direct unit tests targeting the exact branch) is
-  reusable for the next module.
+- Mutation testing on other critical modules (`accounts.py`'s `_require_manage_authority`) —
+  `permissions.py`, `dependencies.py::get_principal`, and `security.py` (§2, §2b, §2c) were
+  prioritised as the highest-blast-radius targets; the pattern established here (hand-crafted
+  mutations, `diff`-verified revert, direct unit tests targeting the exact branch) is reusable for
+  the next module.
 - Full static analysis suite (`ruff` baseline only; no `mypy`/type-checking, no dead-code analysis
   tool like `vulture`, no duplicate-code or circular-import analysis run this pass).
 - `frontend/` and `connected-frontend/` have no coverage/mutation-testing pass yet — this document
