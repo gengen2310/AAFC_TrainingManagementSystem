@@ -2,7 +2,7 @@ module,statement_coverage,branch_coverage,function_coverage,mutation_score,criti
 app/__init__.py,100.0%,100.0%,,,,,"measured 2026-08-08 via pytest-cov, real run against 1204-test suite"
 app/config.py,95.2%,87.5%,,,,,"measured 2026-08-08 via pytest-cov, real run against 1204-test suite"
 app/database.py,97.1%,100.0%,,,,,"measured 2026-08-08 via pytest-cov, real run against 1204-test suite"
-app/dependencies.py,95.7%,91.7%,,,,,"measured 2026-08-08 via pytest-cov, real run against 1204-test suite"
+app/dependencies.py,95.7%,91.7%,,"4/5 killed after fix (80%) -- 3/5 on first pass, D1 (inactive-user check, real gap -- archived accounts don't bump token_version, corroborated by background scanner) closed with a new test; D4 (missing-token check) survives but confirmed not exploitable -- decode_token(None) falls through to the invalid_or_expired check, 2026-08-08","get_principal: user active_status, token_version match, ProxySession.active overlay, missing-token, invalid/expired-token -- all hand-mutated and verified","D4 residual: no test pins the exact error code (auth_required vs invalid_or_expired) for a missing token specifically -- not a live gap, low-priority precision hygiene","measured 2026-08-08 via pytest-cov, real run against 1204-test suite; mutation pass 2026-08-08 against 1210/1211-test suite"
 app/main.py,87.6%,96.4%,,,,,"measured 2026-08-08 via pytest-cov, real run against 1204-test suite"
 app/models/__init__.py,100.0%,100.0%,,,,,"measured 2026-08-08 via pytest-cov, real run against 1204-test suite"
 app/models/operations.py,100.0%,100.0%,,,,,"measured 2026-08-08 via pytest-cov, real run against 1204-test suite"

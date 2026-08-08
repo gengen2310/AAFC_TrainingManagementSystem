@@ -116,6 +116,98 @@ here for the record, not because it indicated a real problem.
 
 ---
 
+## 2b. Mutation testing — `app/dependencies.py::get_principal`
+
+**Why this module second**: `get_principal` is the authentication gatekeeper for every single
+request — it decodes the JWT, checks the user is active, checks `token_version` for session
+revocation, and overlays any active Proxy/Intervention session. `permissions.py` (§2 above) decides
+*what* an already-authenticated principal can do; this 51-line file decides *whether there is a
+principal at all*. Same hand-crafted-mutation methodology as §2: one mutation applied at a time
+against the real file, full suite run, `diff`-verified revert before the next.
+
+| ID | Mutation | Result |
+|---|---|---|
+| D1 | `if not user or not user.active_status:` → `if not user:` (inactive-user check removed) | **SURVIVED** — 0 tests failed |
+| D2 | `token_version` mismatch check inverted (`!=` → `==`, backwards) | **KILLED** — 984 tests failed |
+| D3 | `ProxySession.active == True` filter removed from the overlay query | **KILLED** — 16 tests failed |
+| D4 | `if not token: raise ...` (missing-token check) removed entirely | **SURVIVED** — 0 tests failed |
+| D5 | `if not payload: raise ...` (invalid/expired-token check) removed entirely | **KILLED** — 1 test failed |
+
+**Result: 3/5 killed on first pass (60%).**
+
+Two implementation notes on how these results were obtained, in the interest of not overstating the
+methodology: D4 and D5 were initially mutated by deleting the whole `if/raise` block via string
+replacement, which left syntactically invalid Python (`IndentationError` on collection) for both —
+producing no valid test evidence, not a false result. Both were redone using `if False:  # mutated`
+in place of the real condition, which preserves valid syntax while still disabling the check; the
+corrected D4 and D5 results above are from that second, valid form. Separately, the mutation
+runner script initially misclassified an unrelated invalid `pytest --timeout` flag (from the
+`permissions.py` pass, §2) as "killed" rather than a tooling error — caught by checking the raw
+output file directly rather than trusting the script's own summary, and fixed before this pass
+began. Both are recorded here as the same "verify tooling output, don't just trust the summary"
+discipline applied throughout this program, now caught in the program's own tooling.
+
+### D1 — the real finding
+
+Removing the `active_status` check means a **deactivated (archived) user's already-issued,
+time-valid JWT continues to authenticate indefinitely** — confirmed to matter in practice, not just
+in theory, by reading `backend/app/routers/accounts.py::archive_account` (lines 553–576): archiving
+an account sets `active_status = False` and `is_archived = True`, but **does not bump
+`token_version`**. That means D2's protection (token_version mismatch) cannot catch this case either
+— the `active_status` check in `get_principal` is the *only* server-side control standing between an
+archived account and continued API access with a pre-archival token. This independently confirms the
+automated background security-review scanner's own HIGH-severity flag on this exact mutation during
+the run (see note below) — two independent methods (hand-crafted mutation testing here, pattern-based
+static scanning in the background) converged on the same real gap.
+
+**No existing test — out of 1210 — exercised this.** All existing revocation tests (`test_session_
+revocation.py`) cover code-change and code-reset (both of which *do* bump `token_version`), never
+archival.
+
+**Fix**: added `test_token_rejected_after_account_archived` to
+`backend/tests/test_session_revocation.py` — archives a `sqn_general` account via the `sqn_admin`
+archive endpoint, then asserts the pre-archival token is rejected with `401 invalid_user`, then
+restores the account so later tests are unaffected. **Verified, not assumed**: re-applied D1 in
+isolation — the new test failed with exactly `assert 200 == 401` (the archived user's token kept
+authenticating). Reverted to the clean original (`diff` confirmed empty). Full suite re-run clean
+afterward: **1211 passed** (1210 + 1 new), 5 skipped, 0 failures.
+
+**Result after fix: 4/5 mutations would now be killed** (D4 addressed separately below — it is not
+a fix candidate in the same sense).
+
+### D4 — surviving, but not a security gap: a redundant-check finding, not a bypass
+
+D4 removes the explicit `if not token: raise HTTPException(401, "auth_required")` early check. It
+survived the full suite with zero failures — but this is **not** the same shape of finding as D1.
+Directly verified the reason by calling `decode_token(None)` in isolation: it returns `None`
+gracefully (no exception), which means a missing token still falls through to the very next check,
+`if not payload: raise HTTPException(401, "invalid_or_expired")` — so a request with no token is
+still correctly rejected with a 401 end-to-end, just via a different branch and a different error
+code (`invalid_or_expired` instead of `auth_required`) than the one the removed check was
+responsible for. **The missing-token case itself is not exploitable under this mutation** — this is
+a gap in *test precision for that specific branch's own error code*, not a gap in the actual
+authentication guarantee. Recorded here rather than folded into D1's severity so the distinction
+isn't lost: D1 is a genuine standalone bypass; D4 is defense-in-depth doing its job, just without a
+test that pins the exact branch/error-code taken. No regression test was added for D4 — a test
+asserting the specific `auth_required` vs `invalid_or_expired` error code for a missing token would
+be pure test-precision hygiene, not closing a live gap, and is noted as a low-priority candidate for
+a future pass rather than done here.
+
+### A note on an automated background scanner false-flag during this work
+
+While D1 (the inactive-user-check mutation) was deliberately, temporarily applied mid-test-run, this
+session's own background security-review tooling flagged it as a live HIGH-severity finding —
+"Authentication Bypass / Disabled Account Access." As with M4 in §2, this was correctly identified in
+the moment as this program's own controlled, monitored, already-in-progress mutation test (confirmed
+via `ps aux` showing the script still actively running, and `diff` showing the file had already moved
+past this mutation stage onto the next one) rather than a persisted defect. Unlike M4, however, D1's
+*underlying pattern* turned out to be a genuine, confirmed real gap once the mutation testing and the
+`archive_account` cross-check were both complete — the scanner's flag and this pass's own finding
+independently agree on the same root cause, which is recorded above as corroborating evidence, not
+dismissed as another false alarm.
+
+---
+
 ## 3. Static analysis
 
 `ruff` (already configured in `pyproject.toml`) re-run against the current tree as a baseline check:
@@ -133,10 +225,10 @@ here.
 ## 4. What Phase D has NOT yet covered
 
 Per mission §6, still outstanding for a future Phase D pass or Phase E:
-- Mutation testing on other critical modules (`security.py`, `dependencies.py::get_principal`,
-  `accounts.py`'s `_require_manage_authority`) — `permissions.py` was deliberately prioritised as the
-  single highest-blast-radius target; the pattern established here (hand-crafted mutations from the
-  mission's own examples, `diff`-verified revert, `test_permissions.py`-style direct unit tests) is
+- Mutation testing on other critical modules (`security.py`, `accounts.py`'s
+  `_require_manage_authority`) — `permissions.py` and `dependencies.py::get_principal` (§2, §2b)
+  were prioritised as the two highest-blast-radius targets; the pattern established here
+  (hand-crafted mutations, `diff`-verified revert, direct unit tests targeting the exact branch) is
   reusable for the next module.
 - Full static analysis suite (`ruff` baseline only; no `mypy`/type-checking, no dead-code analysis
   tool like `vulture`, no duplicate-code or circular-import analysis run this pass).

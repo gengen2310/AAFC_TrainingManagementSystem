@@ -115,6 +115,34 @@ def test_time_expired_token_rejected(client):
     assert r.status_code == 401
 
 
+def test_token_rejected_after_account_archived(client):
+    """An archived (deactivated) user's already-issued, time-valid, token_version-
+    matching JWT must still be rejected. archive_account() only flips active_status
+    -- it does not bump token_version -- so the active_status check in get_principal
+    is the *only* server-side control standing between a deactivated account and
+    continued API access with a token issued before archival."""
+    admin_hdr = login(client, "ADMIN703")
+    general_hdr = login(client, "703SQN2026")
+
+    me = client.get("/api/auth/me", headers=general_hdr)
+    assert me.status_code == 200
+    gen_uid = me.json()["session"]["user_id"]
+
+    r = client.post(f"/api/accounts/{gen_uid}/archive", headers=admin_hdr)
+    assert r.status_code == 200
+
+    # The pre-archive token must now be rejected, not silently continue to authenticate.
+    r2 = client.get("/api/auth/me", headers=general_hdr)
+    assert r2.status_code == 401
+    assert r2.json()["detail"]["error"] == "invalid_user"
+
+    # Restore so other tests are not affected.
+    client.post(f"/api/accounts/{gen_uid}/restore", headers=admin_hdr)
+    restored_hdr = login(client, "703SQN2026")
+    me2 = client.get("/api/auth/me", headers=restored_hdr)
+    assert me2.status_code == 200
+
+
 def test_unrelated_user_token_not_revoked(client):
     """Resetting one user's code must NOT revoke another user's active token."""
     admin_hdr = login(client, "ADMIN703")
