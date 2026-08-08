@@ -217,7 +217,8 @@ async def api_rate_limit(request: Request, call_next):
     if (request.method != "OPTIONS" and request.url.path not in _RATE_LIMIT_EXEMPT
             and request.url.path.startswith("/api/")):
         from .security import check_api_rate
-        ip = request.client.host if request.client else "anon"
+        from .dependencies import real_client_ip
+        ip = real_client_ip(request)
         if check_api_rate(ip):
             return JSONResponse(
                 status_code=429,
@@ -237,7 +238,8 @@ async def access_log(request: Request, call_next):
     start = _time.perf_counter()
     response = await call_next(request)
     dur_ms = round((_time.perf_counter() - start) * 1000, 1)
-    client = request.client.host if request.client else "-"
+    from .dependencies import real_client_ip
+    client = real_client_ip(request)
     logging.getLogger("access").info(
         '{"method":"%s","path":"%s","status":%d,"dur_ms":%s,"client":"%s","req_id":"%s"}',
         request.method, request.url.path, response.status_code, dur_ms, client, req_id)

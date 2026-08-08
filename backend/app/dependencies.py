@@ -19,6 +19,40 @@ def _token_from_request(request: Request) -> str | None:
     return request.cookies.get(settings.COOKIE_NAME)
 
 
+def real_client_ip(request: Request) -> str:
+    """The IP every per-IP security control (login lockout, API rate limiter,
+    access logging) should key off.
+
+    REM-125: this app is only ever reachable through Railway's own edge, which
+    terminates TLS and forwards over plain HTTP -- so `request.client.host` is
+    ALWAYS Railway's internal edge address (confirmed live: every request in the
+    staging access log shows the identical "100.64.0.2" regardless of the real
+    caller), never the actual end user. Every per-IP control keyed off the raw
+    peer therefore shared ONE bucket across every user of the whole deployed
+    application: 5 failed login attempts by anyone, anywhere, within the 5-minute
+    window locked out login for everyone for 15 minutes (LOGIN_MAX_ATTEMPTS/
+    LOGIN_WINDOW_SEC/LOGIN_LOCKOUT_SEC), and the API rate limiter's 300
+    req/60s budget was likewise shared by the whole user base at once.
+
+    Fix: take the left-most (original client) entry of X-Forwarded-For, the
+    de facto standard header set by essentially every HTTP-layer proxy/load
+    balancer including Railway's. This is safe to trust unconditionally here
+    specifically because Railway's network topology makes its own edge the
+    ONLY thing that can ever open a direct connection to this container --
+    there is no public path that reaches gunicorn without going through it
+    first, so nothing external can inject a spoofed header at the hop this
+    process actually sees. Falls back to the raw peer address when the header
+    is absent (local dev, tests, or any environment without a proxy in front)
+    so existing behaviour there is unchanged.
+    """
+    fwd = request.headers.get("X-Forwarded-For")
+    if fwd:
+        first = fwd.split(",")[0].strip()
+        if first:
+            return first
+    return request.client.host if request.client else "anon"
+
+
 def get_principal(request: Request, db: DBSession = Depends(get_db)) -> Principal:
     token = _token_from_request(request)
     if not token:
@@ -46,5 +80,5 @@ def get_principal(request: Request, db: DBSession = Depends(get_db)) -> Principa
 
 
 def client_meta(request: Request) -> dict:
-    return {"ip": request.client.host if request.client else None,
+    return {"ip": real_client_ip(request),
             "ua": request.headers.get("User-Agent")}

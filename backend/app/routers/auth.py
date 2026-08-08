@@ -11,7 +11,7 @@ from ..security import (verify_code, create_token, hash_code,
                         login_blocked_db, record_login_failure_db, record_login_success_db)
 from ..database import utcnow
 from ..models import User, AccessCode, Wing, Squadron, NationalEntity, ProxySession
-from ..dependencies import get_principal, client_meta
+from ..dependencies import get_principal, client_meta, real_client_ip
 from ..permissions import Principal
 from ..services import audit
 
@@ -89,7 +89,7 @@ def lookup(body: LookupIn, db: DBSession = Depends(get_db)):
 
 @router.post("/login")
 def login(body: LoginIn, request: Request, response: Response, db: DBSession = Depends(get_db)):
-    key = (request.client.host if request.client else "anon")
+    key = real_client_ip(request)
     if login_blocked_db(key, db):
         raise HTTPException(429, detail={"error": "locked_out",
                                          "message": "Too many attempts. Try again later."})
