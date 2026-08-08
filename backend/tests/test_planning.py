@@ -402,6 +402,30 @@ def test_sqn_admin_can_patch_holiday(client):
     assert d["start_date"] == "2026-07-01"
 
 
+def test_oversized_holiday_name_rejected_cleanly_not_500(client):
+    """Live-found on staging (task #156 e2e re-run): HolidayPeriod.name is a real
+    DB column (String(120)), but neither HolidayIn nor HolidayUpdateIn enforced a
+    matching length limit -- a name over 120 chars hit Postgres directly and raised
+    an unhandled StringDataRightTruncation, surfacing as a raw 500 instead of a
+    clean validation error. Covers both create and update."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    long_name = "x" * 121
+
+    r = client.post(f"/api/planning/years/{yr_id}/holidays",
+                    json={"name": long_name, "start_date": "2026-07-01", "end_date": "2026-07-14"},
+                    headers=hdr)
+    assert r.status_code == 422, r.text
+
+    r = client.post(f"/api/planning/years/{yr_id}/holidays",
+                    json={"name": "Short Name", "start_date": "2026-07-01", "end_date": "2026-07-14"},
+                    headers=hdr)
+    hol_id = r.json()["holiday_id"]
+    rp = client.patch(f"/api/planning/holidays/{hol_id}", json={"name": long_name}, headers=hdr)
+    assert rp.status_code == 422, rp.text
+
+
 def test_holiday_type_stored_and_returned(client):
     """HOL-TYPE-01 regression: holiday_type sent on create must round-trip."""
     hdr = _sqn_admin_hdr(client)

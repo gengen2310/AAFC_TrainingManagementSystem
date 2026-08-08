@@ -11,7 +11,7 @@ from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
@@ -985,7 +985,7 @@ def _validate_iso_date(v: str, field_name: str) -> str:
 
 
 class HolidayIn(BaseModel):
-    name: str
+    name: str = Field(max_length=120)
     start_date: str
     end_date: str
     jurisdiction: Optional[str] = None
@@ -1037,7 +1037,7 @@ def add_holiday(
 
 
 class HolidayUpdateIn(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(default=None, max_length=120)
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     holiday_type: Optional[str] = None
