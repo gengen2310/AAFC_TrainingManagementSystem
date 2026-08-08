@@ -155,3 +155,4 @@ Target: staging only, real workflows (login/me/parade-nights/planning-years/repo
 | Tier | Requests | 5xx | P95 | Login success | Result |
 |---|---|---|---|---|---|
 | 12 users, 3 min | 943 | 0 | 273ms | 100% (12/12) | **PASS** |
+| 25 users, 4.5 min | 2637 | 0 | 252ms | 100% (25/25) | **PASS** |
