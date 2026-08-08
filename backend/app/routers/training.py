@@ -316,7 +316,7 @@ def _pn_dict(pn: ParadeNight) -> dict:
             "start_time": pn.start_time, "end_time": pn.end_time, "session_count": pn.session_count,
             "parade_type": pn.parade_type, "notes": pn.notes, "published_status": pn.published_status,
             "readiness_score": pn.readiness_score, "closeout_status": pn.closeout_status,
-            "timing_template_id": pn.timing_template_id}
+            "timing_template_id": pn.timing_template_id, "version": pn.version}
 
 
 class ParadeNightUpdateIn(BaseModel):
@@ -327,6 +327,7 @@ class ParadeNightUpdateIn(BaseModel):
     session_count: int | None = None
     parade_type: str | None = None
     notes: str | None = None
+    version: int | None = None
 
 
 @router.patch("/parade-nights/{pnid}")
@@ -346,6 +347,7 @@ def update_parade_night(pnid: str, body: ParadeNightUpdateIn, db: DBSession = De
     if pn.closeout_status == "closed":
         raise HTTPException(409, detail={"error": "parade_night_closed",
                                           "message": "This Parade Night is closed and its core details can no longer be edited."})
+    _check_version(pn, body.version)
     if body.date is not None and body.date != pn.date:
         existing = db.query(ParadeNight).filter(
             ParadeNight.squadron_id == pn.squadron_id,
@@ -368,6 +370,7 @@ def update_parade_night(pnid: str, body: ParadeNightUpdateIn, db: DBSession = De
         pn.parade_type = body.parade_type
     if body.notes is not None:
         pn.notes = body.notes
+    pn.version += 1
     db.commit()
     audit(db, p, object_type="parade_night", object_id=pn.id, action="update", new={"date": pn.date})
     return _pn_dict(pn)

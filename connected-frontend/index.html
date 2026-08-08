@@ -3548,7 +3548,7 @@ async function loadData(){
   S.pns=(Array.isArray(pns)?pns:[]).map(pn=>({
     id:pn.parade_night_id, date:pn.date, term:pn.term, nsess:pn.session_count,
     notes:pn.parade_type||'', published:!!pn.published_status, closeout:pn.closeout_status,
-    readiness:pn.readiness_score,
+    readiness:pn.readiness_score, version:pn.version,
     sessions:(pn.sessions||[]).sort((a,b)=>(a.period_number||0)-(b.period_number||0)).map(s=>({
       id:s.id, phase:s.phase_at_time||'', code:s.curriculum_code_at_time||'',
       exp:s.curriculum_title_at_time||s.custom_title||'', facId:s.facilitator_id||'',
@@ -6487,12 +6487,26 @@ async function savePNCoreDetails(ds){
     start_time:document.getElementById('pnd-start')?.value||'',
     end_time:document.getElementById('pnd-end')?.value||'',
     notes:document.getElementById('pnd-notes')?.value||'',
+    version:pn.version,
   };
   try{
     await api('/api/parade-nights/'+pn.id,{method:'PATCH',body:JSON.stringify(body)});
     await reloadAndRender(); showPNDetail(ds);
     if(errEl)errEl.textContent='';
-  }catch(e){ if(errEl){errEl.textContent=apiErr(e);errEl.style.color='var(--red)';}else showToast(apiErr(e),true); }
+  }catch(e){
+    // version_conflict: someone else saved a change to this Parade Night while this form
+    // was open. Reloading fresh data before re-showing the edit form would silently
+    // discard whatever the current user just typed -- warn instead and let them decide
+    // (re-open the (now-refreshed) form themselves, or retype/overwrite deliberately).
+    if(e&&e.code==='version_conflict'){
+      if(errEl){
+        errEl.innerHTML='Someone else updated this Parade Night while you were editing it. Your changes were <b>not</b> saved. Close and reopen this Parade Night to see the latest version before trying again.';
+        errEl.style.color='var(--red)';
+      }else{
+        showToast('This Parade Night was changed by someone else. Your changes were not saved -- reopen it to see the latest version.',true);
+      }
+    }else if(errEl){errEl.textContent=apiErr(e);errEl.style.color='var(--red)';}else showToast(apiErr(e),true);
+  }
 }
 async function savePNDetail(ds,cnt){
   const pn=S.pns.find(p=>p.date===ds);if(!pn)return;

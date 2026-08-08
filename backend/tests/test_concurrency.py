@@ -253,6 +253,66 @@ def _make_planning_notice(client, hdr, year=2098):
     return r2.json()
 
 
+def _make_parade_night(client, hdr, date):
+    r = client.post("/api/parade-nights", json={"date": date, "term": "T4"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    return r.json()["parade_night_id"]
+
+
+def test_parade_night_version_starts_at_zero(client):
+    """Governing instruction Section 23: concurrency test ("two users edit one Parade
+    Night"). Confirmed live before this fix that update_parade_night had NO optimistic
+    locking at all -- two concurrent PATCHes silently last-write-won with zero conflict
+    signal, discarding one editor's change with no warning to either user. Every other
+    frequently-co-edited entity in this file already had this pattern; ParadeNight was the
+    one gap."""
+    hdr = _sqn_admin(client)
+    pnid = _make_parade_night(client, hdr, "2029-11-07")
+    pn = client.get(f"/api/parade-nights/{pnid}", headers=hdr).json()
+    assert pn["version"] == 0
+
+
+def test_parade_night_version_increments_on_update(client):
+    hdr = _sqn_admin(client)
+    pnid = _make_parade_night(client, hdr, "2029-11-14")
+    r = client.patch(f"/api/parade-nights/{pnid}", json={"notes": "Updated"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    assert r.json()["version"] == 1
+
+
+def test_parade_night_stale_version_returns_409(client):
+    """The exact scenario confirmed live: User A and User B both load the same Parade
+    Night (same version), A saves first, B -- still holding the version from before A's
+    save -- tries to save next. B's stale-version save must be rejected with a clear
+    conflict, not silently applied over A's change."""
+    hdr = _sqn_admin(client)
+    pnid = _make_parade_night(client, hdr, "2029-11-21")
+
+    r1 = client.patch(f"/api/parade-nights/{pnid}",
+                      json={"notes": "User A's update", "version": 0}, headers=hdr)
+    assert r1.status_code == 200, r1.text
+    assert r1.json()["version"] == 1
+
+    r2 = client.patch(f"/api/parade-nights/{pnid}",
+                      json={"notes": "User B's overwrite attempt", "version": 0}, headers=hdr)
+    assert r2.status_code == 409, r2.text
+    assert r2.json()["detail"]["error"] == "version_conflict"
+    assert r2.json()["detail"]["current_version"] == 1
+
+    final = client.get(f"/api/parade-nights/{pnid}", headers=hdr).json()
+    assert final["notes"] == "User A's update", "User A's change must not be silently overwritten"
+
+
+def test_parade_night_update_without_version_succeeds(client):
+    """Backward compatibility: omitting version skips the check, matching every other
+    version-checked endpoint in this file."""
+    hdr = _sqn_admin(client)
+    pnid = _make_parade_night(client, hdr, "2029-11-28")
+    r = client.patch(f"/api/parade-nights/{pnid}", json={"notes": "No version sent"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    assert r.json()["notes"] == "No version sent"
+
+
 def test_notice_stale_version_returns_409(client):
     hdr = _sqn_admin(client)
     try:

@@ -74,6 +74,11 @@ class ParadeNight(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     timing_template_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    # Optimistic locking for update_parade_night's own-field edits (date/term/time/notes/
+    # etc.) -- confirmed via live testing that two concurrent PATCHes silently last-write-
+    # win with zero conflict signal before this. Same pattern already used on PlanningYear/
+    # AnchorEvent/PlanningNotice/Session.
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
 class Session(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
