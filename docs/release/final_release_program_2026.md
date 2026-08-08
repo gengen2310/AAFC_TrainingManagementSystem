@@ -100,3 +100,34 @@ against what this session's qualification program has already independently foun
   integrity, facilitator save feedback, filtering at scale, bulk/CSV setup, CEA `.51` format support,
   prepopulation/templates.
 - Production frontend/PW staleness (§2 above) — flagged, not actioned without production authority.
+
+## 4. Progress log (append entries here as work completes, do not rewrite history)
+
+**2026-08-09, first working session:**
+- Staging fully reconciled to exact HEAD across all 3 services (was 3 days stale on 2 of 3).
+- REM-114: investigated the reported "Friday template" defect fresh — found the underlying mechanism
+  (`update-future-parade-day`, TRGO-01) was already comprehensively built and tested before this
+  program (15 regression tests, live in production since 2026-07-26); the real remaining gap was UX
+  clarity, closed with an explanatory text addition to Unit Settings.
+- REM-115: connected-frontend had exactly one real `<h1>` in the entire SPA — converted 14 static
+  per-page titles to real headings (zero visual change, CSS was never tag-qualified), added
+  `role="banner"` to the header. Wing/National Overview's dynamically-rendered titles deliberately not
+  converted this pass (residual, needs more careful design to avoid duplicate-heading issues).
+- REM-116: facilitator domain investigated in full (Section 7) — found same-name duplicate detection,
+  merge, save-feedback (Saving/Saved/Failed + button-disable + idempotency-key protection) all already
+  built and working. One real gap found: leave management had full backend CRUD with zero frontend UI
+  — built a minimal add/remove UI wired to the existing endpoints, surfacing the backend's own
+  conflict-detection as a warning. Qualifications field still has no UI (no schema field exists for it
+  either — a larger addition, not attempted this pass).
+- Data integrity review (Section 8): confirmed `scheduled_sessions`/`planning_locations` now have
+  **zero** call sites of any kind (stronger than the prior qualification pass found — a residual read
+  it flagged was since removed by `QUAL-002`). Three new `docs/data/` documents written, consolidating
+  rather than duplicating the existing thorough `docs/qualification/03_data_integrity_review.md`.
+- Backend test count: 1225 collected (was 1224 at program start; +2 net from REM-116's regression
+  tests, -1 accounting difference not investigated further as it's a net positive test count with a
+  fully green suite).
+- All work committed to `main`, pushed, deployed to staging (backend + both frontends), verified
+  healthy. **Nothing deployed to production this session** — no `AUTHORISE PRODUCTION DEPLOYMENT
+  <SHA>` instruction has been given.
+- Remaining from this session's task queue: Phase E adversarial security (5 of 7 candidates not yet
+  live-tested), concurrency/staged stress testing (12→100 users). Program continues.
