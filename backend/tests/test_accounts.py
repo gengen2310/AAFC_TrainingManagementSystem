@@ -529,6 +529,32 @@ def test_cannot_disable_self(client):
     assert r.status_code == 400, r.text
 
 
+def test_self_edit_cannot_smuggle_a_role_or_scope_change(client):
+    """PATCH /api/accounts/{own_id} deliberately bypasses _require_manage_authority
+    for self-edits (a wing_admin/sqn_admin editing their own display name previously
+    always 403'd, since _CREATE_AUTHORITY's wing_admin/sqn_admin entries don't
+    include their own role -- see update_account's own comment). That bypass is only
+    safe because AccountUpdateIn has no role/scope field for Pydantic to bind --
+    proving that here, not just trusting the comment: a client sending extra
+    role/squadron_id/wing_id fields in the same request must have them silently
+    ignored, never applied."""
+    h = login(client, "ADMIN703")  # sqn_admin -- would 403 via _require_manage_authority for their own role
+    me = client.get("/api/auth/me", headers=h).json()["session"]
+    assert me["role"] == "sqn_admin"
+
+    r = client.patch(f"/api/accounts/{me['user_id']}", headers=h, json={
+        "display_name": "Self Edit Escalation Check",
+        "role": "system_admin",
+        "squadron_id": "some-other-squadron",
+        "wing_id": "some-other-wing",
+    })
+    assert r.status_code == 200, r.text
+
+    me_after = client.get("/api/auth/me", headers=h).json()["session"]
+    assert me_after["role"] == "sqn_admin", "role must never change via the self-edit path"
+    assert me_after["display_name"] == "Self Edit Escalation Check"
+
+
 # ─────────────────────────────────────────────────────────────
 # 8. Account changes are audited
 # ─────────────────────────────────────────────────────────────
