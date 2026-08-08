@@ -482,6 +482,7 @@ def _facilitator_workload(sessions: list) -> dict:
         "explanation": "Sessions assigned per facilitator — delivered, planned, and not delivered.",
         "question": "Is facilitator workload evenly distributed or concentrated on one person?",
         "chart_type": "bar_horizontal",
+        "value_key": "total",
         "x_axis": "Sessions",
         "y_axis": "Facilitator",
         "series": [
@@ -992,7 +993,7 @@ def _wing_subject_area_gaps(db: DBSession, wing_id: str) -> dict:
         for sa in subject_areas:
             count = sum(1 for f in facs_sqn if sa in (f.subject_areas or []))
             risk = "ok" if count >= 3 else "warn" if count >= 1 else "critical"
-            cells.append({"subject_area": sa, "count": count, "risk": risk})
+            cells.append({"label": sa, "subject_area": sa, "count": count, "risk": risk})
         rows.append({"label": sqn.code, "name": sqn.short_name, "cells": cells})
 
     critical_gaps = sum(
@@ -1618,7 +1619,9 @@ def _facilitator_capability_dependency(sessions: list) -> dict:
     for name, cnt in ranked:
         cumulative += cnt
         data.append({
+            "label": name,
             "name": name,
+            "count": cnt,
             "sessions": cnt,
             "pct": round(cnt / total * 100) if total else 0,
             "cumulative_pct": round(cumulative / total * 100) if total else 0,

@@ -464,3 +464,44 @@ def test_response_scope_matches_role(client):
     for fn, expected in [(_sqn_admin, "squadron"), (_wing_admin, "wing"), (_national, "national")]:
         r = client.get(CHARTS_URL, headers=fn(client))
         assert r.json()["scope"] == expected, f"Expected {expected} for {fn.__name__}"
+
+
+# ── data-contract regression tests (DASH-01/02/03) ───────────────────────────
+# These guard the exact field names that frontend chart renderers depend on.
+# A backend change that renames a key without updating the renderer would
+# previously pass all backend tests but silently blank the chart in the browser.
+
+def test_capability_dependency_rows_have_label_and_count(client):
+    """_chartHBar auto-detects valKey from row fields; without 'label'/'count'
+    the capability_dependency bars all render at 0 width with blank labels."""
+    hdrs = _sqn_admin(client)
+    r = client.get(CHARTS_URL + "?window=year", headers=hdrs)
+    cd = _charts(r).get("capability_dependency", {})
+    for row in cd.get("data", []):
+        assert "label" in row, f"capability_dependency row missing 'label': {row}"
+        assert "count" in row, f"capability_dependency row missing 'count': {row}"
+        assert row["count"] >= 1
+
+
+def test_wing_subject_area_gaps_cells_have_label(client):
+    """_renderHeatmap uses c.label for column headers and tooltips; without it
+    all column headers are blank and tooltips say 'undefined'."""
+    hdrs = _wing_admin(client)
+    r = client.get(CHARTS_URL, headers=hdrs)
+    gaps = _charts(r).get("wing_subject_area_gaps", {})
+    for row in gaps.get("data", []):
+        for cell in row.get("cells", []):
+            assert "label" in cell, f"wing_subject_area_gaps cell missing 'label': {cell}"
+
+
+def test_facilitator_workload_value_key_is_total(client):
+    """_chartHBar respects chart.value_key to choose bar width field.
+    Without value_key='total', bars are sized by 'delivered' only — a
+    facilitator with 0 delivered but 10 planned shows as a zero-width bar."""
+    hdrs = _sqn_admin(client)
+    r = client.get(CHARTS_URL + "?window=year", headers=hdrs)
+    fw = _charts(r).get("facilitator_workload", {})
+    assert fw.get("value_key") == "total", (
+        f"facilitator_workload must set value_key='total' so bars are sized by total sessions, "
+        f"not delivered only; got value_key={fw.get('value_key')!r}"
+    )
