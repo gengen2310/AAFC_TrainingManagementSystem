@@ -788,7 +788,7 @@ def list_facs(squadron_id: str | None = None, db: DBSession = Depends(get_db), p
         out.append({"facilitator_id": f.id, "first_name": f.first_name, "last_name": f.last_name,
                     "current_rank": f.current_rank, "type": f.type,
                     "subject_areas": _parse_json_list(f.subject_areas),
-                    "upcoming_leave": [{"start_date": lv.start_date, "end_date": lv.end_date,
+                    "upcoming_leave": [{"id": lv.id, "start_date": lv.start_date, "end_date": lv.end_date,
                                         "reason": lv.reason} for lv in leave]})
     return out
 

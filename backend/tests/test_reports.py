@@ -273,10 +273,46 @@ def test_facilitators_list_includes_upcoming_leave_field(client):
 
 
 def test_facilitators_upcoming_leave_shape_when_present(client):
-    """Each leave record must have start_date, end_date, reason fields."""
+    """Each leave record must have id, start_date, end_date, reason fields.
+
+    id is required for the connected-frontend's delete action
+    (DELETE /api/planning/facilitator-leave/{id}) to have anything to target --
+    without it, a leave row rendered from this list has no way to be removed."""
     h = login(client, SQN_ADMIN)
     r = client.get("/api/facilitators", headers=h)
     assert r.status_code == 200, r.text
     for f in r.json():
         for lv in f["upcoming_leave"]:
-            assert "start_date" in lv and "end_date" in lv and "reason" in lv
+            assert "id" in lv and "start_date" in lv and "end_date" in lv and "reason" in lv
+
+
+def test_facilitator_leave_add_then_appears_in_list_then_delete_removes_it(client):
+    """End-to-end: add leave via the planning endpoint, confirm it shows up in
+    GET /api/facilitators' upcoming_leave with a real id, then delete it via that
+    id and confirm it's gone from the list -- the full round trip the connected-
+    frontend's leave-management UI depends on."""
+    h = login(client, SQN_ADMIN)
+    facs = client.get("/api/facilitators", headers=h).json()
+    assert facs, "no facilitators seeded"
+    fac_id = facs[0]["facilitator_id"]
+
+    from datetime import date, timedelta
+    start = (date.today() + timedelta(days=5)).isoformat()
+    end = (date.today() + timedelta(days=7)).isoformat()
+    add_r = client.post(f"/api/planning/facilitators/{fac_id}/leave", headers=h,
+                        json={"start_date": start, "end_date": end, "reason": "Test leave"})
+    assert add_r.status_code == 200, add_r.text
+    leave_id = add_r.json()["leave"]["id"]
+
+    facs2 = client.get("/api/facilitators", headers=h).json()
+    fac2 = next(f for f in facs2 if f["facilitator_id"] == fac_id)
+    matching = [lv for lv in fac2["upcoming_leave"] if lv["id"] == leave_id]
+    assert matching, "newly-added leave not present in upcoming_leave with matching id"
+    assert matching[0]["start_date"] == start and matching[0]["reason"] == "Test leave"
+
+    del_r = client.delete(f"/api/planning/facilitator-leave/{leave_id}", headers=h)
+    assert del_r.status_code == 200, del_r.text
+
+    facs3 = client.get("/api/facilitators", headers=h).json()
+    fac3 = next(f for f in facs3 if f["facilitator_id"] == fac_id)
+    assert not any(lv["id"] == leave_id for lv in fac3["upcoming_leave"]), "deleted leave still present"
