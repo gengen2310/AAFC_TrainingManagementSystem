@@ -369,3 +369,25 @@ theoretical) across the entire deployed user base in both environments. **Not ye
 production still requires a fresh explicit `AUTHORISE PRODUCTION DEPLOYMENT <SHA>` instruction per
 the governing instruction; this fix is staged and ready pending that authorization, and should be
 flagged to the user as a high-priority candidate given its live production impact.
+
+## 14. REM-125 hardened after background security review
+
+A background security review of the REM-125 commit correctly flagged the first version:
+`real_client_ip` trusted `X-Forwarded-For` unconditionally, with no check the request came
+through a trusted hop, and fed the unvalidated value straight into `main.py`'s hand-built
+access-log line with no escaping (a log-injection path).
+
+Hardened with two independently-verifiable guards (not assumptions): (1) only trust the header
+when the immediate connecting peer is itself in the RFC 6598 CGNAT range Railway's own edge was
+directly observed using in staging's real logs; (2) validate the extracted value parses as a real
+IP address before ever returning it. A web search performed while investigating this surfaced
+third-party Railway community-forum claims (not official documentation, and internally
+inconsistent with the CGNAT range actually observed) -- explicitly not relied on for a security
+control; the guard uses only this deployment's own directly-observed behaviour plus the
+well-established RFC 6598 block.
+
+7 tests (3 new), fail-before/pass-after re-verified -- the old code demonstrably returned an
+unescaped injection-payload fragment. Full suite 1252 passed/5 skipped (0 regressions). Redeployed
+to staging and live-verified: a real request carrying a log-injection-shaped
+`X-Forwarded-For` produced a clean access-log line with a valid IP, no injected content. Current
+staged HEAD: see `git log`. Still not on production pending explicit authorization.
