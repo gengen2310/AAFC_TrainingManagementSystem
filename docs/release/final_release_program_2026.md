@@ -190,3 +190,25 @@ read-heavy workflows only. Recorded as a residual for a future pass, not silentl
   items not yet addressed (setup wizard, holiday prepopulation, drag-and-drop scheduling, CEA .51
   format, bulk/CSV setup for more entities), documentation currency pass across CLAUDE.md/.claude/
   rules, executive go/no-go report.
+
+## 7. Backup/restore verification (Section 26)
+
+Checked via `gh run list` (read-only, non-destructive) rather than triggering a fresh manual run --
+existing evidence is current and comprehensive enough to cite directly:
+
+- Daily production backup (`.github/workflows/backup-postgresql.yml`): last 5 scheduled runs all
+  SUCCESS, most recent completing today (2026-08-08T18:36:49Z).
+- Weekly restore test (`.github/workflows/test-restore-postgresql.yml`): last 3 runs SUCCESS (most
+  recent 2026-08-05). Inspected the actual log output of run `31020333935` (not just its pass/fail
+  status): decrypts and restores a **real production backup** into a disposable database, verifies
+  the Alembic migration head matches, checks row counts across 12 real tables (users: 19,
+  squadrons: 15, curriculum_items: 214, planning_years: 5, etc.), then spins up a **real backend
+  process against the restored database** and drives **8 real authenticated API reads** through it
+  (login, health, wings, squadrons, users, planning years, facilitators) -- all 8 passed:
+  `APPLICATION-LEVEL RESTORE CHECK PASSED`. This already fully satisfies the governing instruction's
+  Section 26 ask ("use restored isolated database for restore testing... verify representative
+  authenticated reads against the restored environment").
+- Key custody (`docs/beta/36_backup_key_custody_checklist.md`): correctly documented as **PENDING —
+  human confirmation required**, not fabricated. This is a genuinely human-only gate (who holds the
+  GPG passphrase in the real world) that no amount of engineering work can close -- left exactly as
+  found, per the governing instruction's own explicit rule against fabricating this.
