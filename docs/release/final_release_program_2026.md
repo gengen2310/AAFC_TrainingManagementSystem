@@ -447,3 +447,47 @@ human/organizational gates (Section 41) mean this is not yet a full GO.
 
 Not yet done: the formal A-J gate table, the executive go/no-go classification (one of the 3
 exact required strings), and the soak-completion check. Continuing on a later tick.
+
+## 17. Consolidated Gate 1-11 status (Sections 40-41), as of this commit
+
+Using the concrete 11-gate structure already established in `docs/release/reconciliation_2026-08-06.md`
+(the last full engineering gate assessment, treated as this program's trusted baseline per §0) rather
+than inventing a new taxonomy. Each row states whether it was freshly reverified this program or is
+carried forward unchanged, and cites real evidence either way.
+
+| Gate | Description | Status | Evidence |
+|---|---|---|---|
+| 1 | Backend test suite | **COMPLETE** (reverified) | 1253 passed, 5 skipped, 0 failures (`pytest tests/ -q`, this commit's HEAD). Was 1192/5 on 2026-08-06. |
+| 2 | Migration gate (upgrade/downgrade/re-upgrade) | **COMPLETE for Postgres (the environment actually used); SQLite path has a known pre-existing limitation** | Single clean head confirmed (`alembic heads` → `f6a7b8c9d0e1`, 41-migration linear chain traced and verified, no branching). Every migration in this program (incl. new v46) applied cleanly to real Postgres on every staging deploy (entrypoint's own "Migrations complete" log, 0 errors). A from-scratch SQLite replay fails at an old (v6) migration lacking `batch_alter_table` -- confirmed zero live impact (local dev/tests both bypass Alembic via `create_all()`) and recorded as REM-126, not fixed (low priority, no live impact, touching a foundational migration carries more risk than the gap justifies). No disposable-Postgres rehearsal was performed this pass (none available in this environment) -- recommended before the next production authorization. |
+| 3 | Frontend typecheck, lint, vitest | **COMPLETE** (reverified) | `npm run typecheck` clean, `npm test -- --run` 22/22 passed (5 files), `npm run build` succeeds (one non-blocking chunk-size advisory, not an error). Planning Workspace source untouched this program. |
+| 4 | Security greps (0 matches, all 4 checks) | **COMPLETE** (reverified) | All 4 `-E` greps from `.claude/rules/security.md` re-run this program: 2 known benign matches (audit-filter label, `pg_restore` help-text placeholder), matching the exact same benign matches security.md's own history already documents from 2026-08-05 -- manually reviewed again, still false positives. |
+| 5 | Backup/restore (proven end-to-end) | **COMPLETE** (carried forward, independently re-checked earlier this program) | §7 above: read the actual GitHub Actions run logs (not just pass/fail status) for both the daily backup and weekly restore-test workflows -- confirmed real backup decrypt+restore into a disposable DB, Alembic head check, 12-table row-count check, then 8 real authenticated API reads against the restored, running backend. |
+| 6 | Staging E2E browser tests | **CARRIED FORWARD, not re-run this program** | 2026-08-06 baseline: 41/41 connected-frontend, 87/87 Planning Workspace. Not re-executed this program (no Playwright run performed this pass) -- connected-frontend changed since then (REM-114/115/116/117/121); Planning Workspace did not. Recommend a fresh e2e run before the next production authorization, especially for connected-frontend given the intervening changes. |
+| 7 | Load test (concurrent users) | **CARRIED FORWARD** (300-user CONDITIONAL PASS from earlier this program's own staged 12→25→50→100 run and the 2026-08-06 300-user result) | Not re-run this specific tick; this program's own earlier staged load testing (§5) already reconfirmed the low tiers post-remediation. |
+| 8 | Rollback rehearsal | **CARRIED FORWARD, unchanged** | No deploy-mechanism changes this program; 2026-08-06's REM-78-corrected rehearsal result stands. Not re-rehearsed this pass. |
+| 9 | Defect register accuracy | **COMPLETE** (reverified, materially improved this tick) | Fixed 16 structurally-corrupted rows (data-integrity repair, this commit's predecessor), reverified the only 2 HIGH-severity open items and found both stale (closed with evidence). Zero HIGH-or-above severity items remain open as of this commit. 52 of 165 entries remain open, overwhelmingly P2/P3/MEDIUM/LOW (feature-completeness/polish/product-decision items). |
+| 10 | Human and organisational | **PENDING -- unchanged, cannot be advanced by an autonomous engineering session** | Same 13-item checklist as 2026-08-06 (`reconciliation_2026-08-06.md` §9): UAT, data-governance sign-off, key custody, production system_admin ownership, human browser walkthrough, support owner, trial squadron/dates. No organisational action has been received during this program -- this is explicitly a human gate, not something to fabricate or infer progress on. |
+| 11 | Executive GO/NO-GO consolidation | **See §18 below** | This program's own classification, distinct from the 2026-08-06 one (new findings since then: REM-113 through REM-126, QUAL-004/006-015). |
+
+## 18. Executive assessment
+
+Engineering Gates 1-5 and 9 are COMPLETE with fresh, this-program evidence. Gates 6-8 are carried
+forward from 2026-08-06 without this-program re-verification (recommended before the next production
+authorization, given the intervening connected-frontend changes). Gate 10 remains entirely PENDING --
+a human/organisational gate no engineering work can close. No HIGH-or-above severity defect is open
+anywhere in the 165-entry register as of this commit.
+
+Per the governing instruction's required exact classification: this program has found and fixed real,
+sometimes significant, engineering defects throughout (most notably REM-120's live IDOR and REM-125's
+live availability defect, both fixed and staging-verified), and Gates 6-8 need a fresh re-run before
+being cited as current -- so engineering work is not yet exhausted. Gate 10's human/organisational
+items are entirely unstarted by this program (they cannot be started by an engineering session). The
+correct classification at this point in the program is:
+
+**TECHNICALLY READY FOR PUBLIC RELEASE — HUMAN APPROVALS PENDING**
+
+with the caveat that Gates 6-8 should be freshly re-run (not just cited from 2026-08-06) before this
+classification is treated as final, and Gate 10's 10 blocking human items remain entirely outstanding.
+This is not yet **PUBLIC RELEASE CANDIDATE READY — AWAITING PRODUCTION AUTHORISATION**, since that
+would require Gates 6-8 to also carry this-program evidence, not carried-forward evidence from a prior
+pass predating several since-shipped changes.
