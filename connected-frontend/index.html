@@ -581,7 +581,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
 <!-- ═══ APP ═══ -->
 <div id="app">
-  <div class="topbar">
+  <div class="topbar" role="banner">
     <div class="tb-brand">
       <button class="btn-hamburger no-print" id="btn-hamburger" aria-label="Open navigation menu" aria-expanded="false" onclick="toggleMobileNav()"><span></span><span></span><span></span></button>
       <div class="tb-wm">AAFC <span class="r">·</span> Training Management</div>
@@ -652,7 +652,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <!-- GETTING STARTED (Phase 3.5) -->
       <div id="page-getting-started" class="page">
         <div class="ph">
-          <div class="ph-title">Getting Started</div>
+          <h1 class="ph-title">Getting Started</h1>
           <div class="ph-sub">Initial setup checklist — reuses the same pages you'd use anyway, nothing new to learn.</div>
         </div>
         <div id="gs-body"><p class="muted">Loading…</p></div>
@@ -662,7 +662,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-dashboard" class="page active">
         <div class="ph">
           <div>
-            <div class="ph-title" id="dash-title">Training Dashboard</div>
+            <h1 class="ph-title" id="dash-title">Training Dashboard</h1>
             <div class="ph-sub" id="dash-scope-label"></div>
           </div>
           <div class="ph-actions no-print" style="gap:6px">
@@ -851,7 +851,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- CALENDAR -->
       <div id="page-calendar" class="page">
-        <div class="ph"><div class="ph-title">Training Calendar</div><div class="ph-sub">Monthly overview</div>
+        <div class="ph"><h1 class="ph-title">Training Calendar</h1><div class="ph-sub">Monthly overview</div>
           <div class="ph-actions no-print">
             <span id="cal-refresh-status" style="font-size:10px;color:var(--muted)"></span>
             <button class="btn btn-secondary btn-sm" onclick="_refreshCalendar()">Refresh</button>
@@ -879,7 +879,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <!-- PARADE NIGHTS -->
       <div id="page-parade-nights" class="page">
         <div class="ph">
-          <div class="ph-title">Parade Nights</div>
+          <h1 class="ph-title">Parade Nights</h1>
           <div class="ph-sub">Parade nights and session status</div>
           <div class="ph-actions no-print">
             <button class="btn btn-dk" onclick="openModal('m-add-pn')">+ Add Parade Night</button>
@@ -907,7 +907,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- WEEKLY PROGRAM -->
       <div id="page-weekly-program" class="page">
-        <div class="ph no-print"><div class="ph-title">Weekly Program</div><div class="ph-sub">Select a parade night to generate the printable program</div></div>
+        <div class="ph no-print"><h1 class="ph-title">Weekly Program</h1><div class="ph-sub">Select a parade night to generate the printable program</div></div>
         <div class="card no-print">
           <div class="ff">
             <label for="wp-sel">Parade Night</label>
@@ -929,7 +929,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <!-- CURRICULUM -->
       <div id="page-curriculum" class="page">
         <div class="ph">
-          <div class="ph-title">Curriculum</div>
+          <h1 class="ph-title">Curriculum</h1>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" id="btn-add-curr-sqn" style="display:none" onclick="openAddCurr()">+ Add Squadron Curriculum</button>
             <button class="btn btn-dk admin-el" id="btn-add-curr-wing" style="display:none" onclick="openAddCurrWing()">+ Add Wing Curriculum</button>
@@ -987,7 +987,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <!-- ACTIVITIES -->
       <div id="page-activities" class="page">
         <div class="ph">
-          <div class="ph-title">Activities</div>
+          <h1 class="ph-title">Activities</h1>
           <div class="ph-actions no-print">
             <span id="act-refresh-status" style="font-size:10px;color:var(--muted)"></span>
             <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('act-refresh-status',_loadActivitiesPage)">Refresh</button>
@@ -1070,7 +1070,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <!-- FACILITATORS -->
       <div id="page-facilitators" class="page">
         <div class="ph">
-          <div class="ph-title">Facilitators</div>
+          <h1 class="ph-title">Facilitators</h1>
           <div class="ph-actions no-print">
             <input id="fac-search" placeholder="Search name or rank…" oninput="renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px;min-width:160px">
             <select id="fac-filter" aria-label="Filter facilitators by subject area" onchange="S.facFilter=this.value;renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px">
@@ -1117,7 +1117,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <!-- RESOURCES (Training Areas) -->
       <div id="page-resources" class="page">
         <div class="ph">
-          <div class="ph-title">Resources &amp; Training Areas</div>
+          <h1 class="ph-title">Resources &amp; Training Areas</h1>
           <div class="ph-actions no-print">
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-room')">+ Add Room</button>
             <button class="btn btn-out admin-el" style="display:none" onclick="openModal('m-add-equip')">+ Add Equipment</button>
@@ -1143,7 +1143,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- NEEDS ACTION -->
       <div id="page-action-items" class="page">
-        <div class="ph"><div class="ph-title">Needs Attention</div><div class="ph-sub">Curriculum items not yet scheduled, and sessions missing required details.</div></div>
+        <div class="ph"><h1 class="ph-title">Needs Attention</h1><div class="ph-sub">Curriculum items not yet scheduled, and sessions missing required details.</div></div>
         <div class="alert a-warn">The items below require attention. Use the shortcut link to navigate directly to the session or schedule the curriculum item.</div>
         <div class="tw"><table>
           <thead><tr><th>Code</th><th>Title</th><th>Phase</th><th>Element</th><th>Term</th><th>Issue</th><th class="no-print">Shortcut</th></tr></thead>
@@ -1153,7 +1153,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- SETTINGS (admin only) -->
       <div id="page-settings" class="page">
-        <div class="ph"><div class="ph-title">Unit Settings</div><div class="ph-sub">Unit configuration</div></div>
+        <div class="ph"><h1 class="ph-title">Unit Settings</h1><div class="ph-sub">Unit configuration</div></div>
         <div class="card">
           <div class="ctitle">Squadron Details</div>
           <div class="form-row">
@@ -1234,7 +1234,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <!-- ACCOUNTS (admin roles + auditor read-only) -->
       <div id="page-accounts" class="page">
         <div class="ph">
-          <div class="ph-title">Account Management</div>
+          <h1 class="ph-title">Account Management</h1>
           <div class="ph-sub">Manage accounts within your authorised scope</div>
           <div class="ph-actions no-print">
             <span id="acct-refresh-status" style="font-size:10px;color:var(--muted)"></span>
@@ -1374,7 +1374,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       </div>
 
       <div id="page-audit" class="page">
-        <div class="ph"><div class="ph-title">Audit Log</div><div class="ph-sub">Immutable record of actions — backend authoritative</div></div>
+        <div class="ph"><h1 class="ph-title">Audit Log</h1><div class="ph-sub">Immutable record of actions — backend authoritative</div></div>
         <div class="card"><div class="tw"><table>
           <thead><tr><th>Time</th><th>Role</th><th>Action</th><th>Object</th><th>Reason</th></tr></thead>
           <tbody id="audit-tbody"></tbody>
@@ -1388,7 +1388,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
         <div class="ph">
           <div>
-            <div class="ph-title">System Console</div>
+            <h1 class="ph-title">System Console</h1>
             <div class="ph-sub">Platform administration, maintenance, backup and system health controls.</div>
           </div>
           <div class="page-actions">
