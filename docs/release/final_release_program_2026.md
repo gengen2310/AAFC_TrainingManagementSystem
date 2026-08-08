@@ -521,3 +521,30 @@ live availability defect (shared login-lockout bucket across the entire user bas
 present in production since before this program began.
 
 Full detail: `docs/remediation/master_gap_register.csv` REM-125.
+
+## 20. Frontends deployed to production (2026-08-08T23:07Z, user-directed)
+
+Following REM-125's backend production deployment, user explicitly instructed: "deploy the
+frontends to production too." No specific SHA was named for this instruction (unlike the backend's
+exact-SHA authorization) -- interpreted as deploying current HEAD (`6e1cf8a`, clean working tree,
+no uncommitted changes) for both frontend services, the natural reading of "deploy the frontends
+too" immediately following the backend deployment in the same live exchange.
+
+**Pre-deploy state**: both frontend production deployments were confirmed stale before this --
+`fad9965d` (connected-frontend) and `e4c0f1dc` (Planning Workspace), both dated 2026-08-05T15:1x,
+predating REM-114 through REM-121 (connected-frontend) and the P0 SquadronSelector/facilitator-
+stats-refresh fix `89cd192` (Planning Workspace) -- exactly the staleness this program's §2 flagged
+at the very start, now resolved. Both confirmed healthy (200) immediately before deploying (rollback
+baseline).
+
+**Deploys**: connected-frontend `c7d343d0-f8ff-4a93-be27-ea9f1680d428` SUCCESS 2026-08-08T23:07:31Z;
+Planning Workspace `3d45fcac-cf83-4381-8718-3226c125accf` SUCCESS 2026-08-08T23:07:40Z.
+
+**Post-deploy verification**: both health-check 200. connected-frontend additionally confirmed
+serving genuinely new code (not a stale cache) by grepping the live response for
+"Someone else updated this Parade Night" -- REM-121's version-conflict UI text, present only in
+the post-fix build. Planning Workspace's build/deploy succeeded but was not further verified via
+live browser interaction this pass (no Chrome extension session active this tick) -- recommend a
+role-login smoke check when a browser session is next available.
+
+Production now runs current HEAD across all 3 services for the first time this program.
