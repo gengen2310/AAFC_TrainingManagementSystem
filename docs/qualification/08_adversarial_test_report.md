@@ -107,6 +107,13 @@ Recorded as `QUAL-004`, status **CLOSED**, in both `defect_register.csv` and
 `master_gap_register.csv` (the latter had never actually received a QUAL-004 row despite being
 referenced — added when the live finding was first confirmed).
 
+**Fix re-verified live on staging after deploy**, same real browser session, same 703SQN: entered
+Proxy Mode (fresh reason), confirmed `GET /api/proxy/current` → `active: true`, logged out via
+`POST /api/auth/logout`, user logged back in via the real login flow. Result:
+`GET /api/proxy/current` → `{"active": false}`, and an actual write attempt
+(`POST /api/parade-nights`) now correctly returns `403 proxy_required` ("Wing Admin must enter
+Proxy Mode to edit squadron data.") instead of silently succeeding. Deployed commit: `b3cff98`.
+
 ---
 
 ## Candidates not yet started
