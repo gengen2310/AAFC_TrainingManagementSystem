@@ -337,3 +337,35 @@ Continuing task #155 after REM-124. Spot-checked several older findings from a p
 
 No new defect found this pass beyond REM-124. Continuing task #155 with different code areas next
 tick.
+
+## 13. Adversarial pass finding (Section 38) — REM-125: shared-IP security controls (HIGH, live-affecting)
+
+While verifying REM-124 on staging, inspected the real access log (`railway logs`) and found every
+request -- regardless of actual origin -- logged the identical `"client":"100.64.0.2"`. Root cause:
+this app is only reachable through Railway's edge (TLS termination + HTTP-layer forwarding), so
+`request.client.host` was always Railway's own internal proxy address, never the real caller, and no
+proxy-header handling was configured anywhere.
+
+**This was a currently-live defect in both staging and production**, not theoretical: with
+`LOGIN_MAX_ATTEMPTS=5`/`LOGIN_WINDOW_SEC=300`/`LOGIN_LOCKOUT_SEC=900`, 5 failed login attempts by
+*anyone, anywhere* in the deployed application within 5 minutes locked out login for *every user* for
+15 minutes -- a handful of ordinary mistyped access codes across unrelated squadrons could silently
+lock out the whole live pilot. The API rate limiter's 300 req/60s budget was likewise one bucket
+shared by the entire user base. The separate account-level lockout (keyed by access code, not IP) was
+unaffected and remained the working primary defense against a targeted brute-force on one account.
+
+Fixed: `real_client_ip()` (`backend/app/dependencies.py`) derives the IP from `X-Forwarded-For`'s
+first entry, applied at all 4 call sites (login lockout, API rate limiter, access log, audit
+`client_meta`). 4 new tests including an end-to-end proof that two different forwarded IPs now get
+independent lockout buckets. Fail-before/pass-after verified. Full suite 1249 passed/5 skipped (0
+regressions). Deployed to staging and live-verified two ways: (1) access log now shows real, varying
+external IPs instead of the fixed `100.64.0.2`; (2) a deliberately spoofed `X-Forwarded-For` sent in
+live testing was overwritten by Railway's edge with the true connection IP, not trusted through --
+confirming the fix is safe even beyond the topology argument its docstring originally relied on. Full
+detail: `docs/remediation/master_gap_register.csv` REM-125.
+
+This is the most significant finding of this program to date given it was live-affecting (not
+theoretical) across the entire deployed user base in both environments. **Not yet on production** --
+production still requires a fresh explicit `AUTHORISE PRODUCTION DEPLOYMENT <SHA>` instruction per
+the governing instruction; this fix is staged and ready pending that authorization, and should be
+flagged to the user as a high-priority candidate given its live production impact.

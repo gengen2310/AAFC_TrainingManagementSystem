@@ -36,13 +36,16 @@ def real_client_ip(request: Request) -> str:
 
     Fix: take the left-most (original client) entry of X-Forwarded-For, the
     de facto standard header set by essentially every HTTP-layer proxy/load
-    balancer including Railway's. This is safe to trust unconditionally here
-    specifically because Railway's network topology makes its own edge the
-    ONLY thing that can ever open a direct connection to this container --
-    there is no public path that reaches gunicorn without going through it
-    first, so nothing external can inject a spoofed header at the hop this
-    process actually sees. Falls back to the raw peer address when the header
-    is absent (local dev, tests, or any environment without a proxy in front)
+    balancer including Railway's. Safe to trust here for two independent
+    reasons, both confirmed live post-deploy (not just assumed): (1) Railway's
+    network topology makes its own edge the ONLY thing that can ever open a
+    direct connection to this container, so nothing external can inject a
+    header at the hop this process actually sees; and (2) empirically,
+    Railway's edge does not pass through a client-supplied X-Forwarded-For
+    value at all -- a deliberately spoofed header sent in live staging testing
+    was overwritten with the true observed connection IP, not appended to or
+    trusted. Falls back to the raw peer address when the header is absent
+    (local dev, tests, or any environment without a proxy in front)
     so existing behaviour there is unchanged.
     """
     fwd = request.headers.get("X-Forwarded-For")
