@@ -212,3 +212,24 @@ existing evidence is current and comprehensive enough to cite directly:
   human confirmation required**, not fabricated. This is a genuinely human-only gate (who holds the
   GPG passphrase in the real world) that no amount of engineering work can close -- left exactly as
   found, per the governing instruction's own explicit rule against fabricating this.
+
+## 8. Mobile/responsive testing (Section 28) — partial, tooling limitation disclosed
+
+Attempted live visual verification via Claude in Chrome's `resize_window` tool at 390x844 (mobile).
+**The screenshot after resizing did not reflect the requested viewport** -- it rendered as a clearly
+desktop-width layout, indicating this tool doesn't reliably drive genuine mobile-viewport/device
+emulation in this environment (window resize vs. actual rendering viewport did not stay in sync).
+Rather than fabricate a "tested at mobile size, looks fine" claim from a screenshot that wasn't
+actually mobile-width, this is disclosed honestly as a tooling limitation, not a completed check.
+
+**What was verified instead (source-level, real evidence, not a substitute for live rendering):**
+connected-frontend's mobile CSS (`@media(max-width:768px)`) confirmed present and matches exactly
+what the prior UI/UX audit (2026-08-06) already verified working via a real Playwright `[Nav] Mobile`
+test: hamburger nav with a 44px minimum touch target, slide-in drawer with backdrop overlay, compact
+topbar (redundant unit name hidden), Print Program button hidden on mobile, responsive grid collapse
+(`stats-grid` to 2 columns, `form-row` to 1 column).
+
+**Not verified this pass**: actual rendering/interaction at 1440x900 / 1280x800 / 1024x768 / 768x1024
+/ 390x844 / 360x800 / 200% zoom, table/dialog/planning-grid behavior on real small viewports, touch
+target tap-ability. Recommend a human pass with real devices or a working DevTools-emulation-capable
+tool, since this session's available tooling could not reliably drive it.
