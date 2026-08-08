@@ -3509,6 +3509,21 @@ async def import_annual_program(
         else:
             resolved_sqn = None  # wing/national activity with no unit specified
 
+        # REM-45 residual / security review candidate 3: a wing/national-scoped plan year
+        # only had year-level access enforced (_require_year_access, no proxy awareness --
+        # correct for the year itself, which is wing/national-level data). But each row
+        # here can resolve to a SPECIFIC squadron via the Unit column, and writing
+        # squadron-scoped data must go through the same Proxy/Delegated-Intervention gate
+        # every other squadron-scoped write in this app requires. Without this check, a
+        # wing_admin could import CADET.Net rows into any squadron in their wing without
+        # ever entering Proxy Mode -- confirmed live during this program (a wing_admin,
+        # never in Proxy Mode, successfully created a real Activity for a squadron via this
+        # exact path). Rows targeting a squadron the actor cannot write to are skipped
+        # (both in preview, so the user can see it before committing, and at commit time),
+        # not silently written -- the rest of a legitimate import is not blocked by one
+        # out-of-authority row.
+        scope_denied = resolved_sqn is not None and not p.can_write_squadron(resolved_sqn.id, resolved_sqn.wing_id)
+
         is_parade = _is_parade_row(name)
         row_type = "parade_date" if is_parade else "activity"
 
@@ -3520,8 +3535,15 @@ async def import_annual_program(
                 "unit": unit_col,
                 "resolved_sqn": resolved_sqn.code if resolved_sqn else None,
                 "owner": owner or None,
-                "status": "new",
+                "status": "blocked_scope" if scope_denied else "new",
             })
+            continue
+
+        if scope_denied:
+            parse_errors.append(
+                f"Row {i}: you do not have write authority for squadron '{resolved_sqn.code}' "
+                f"(enter Proxy/Delegated Intervention for that squadron first) — skipped.")
+            skipped += 1
             continue
 
         if is_parade:

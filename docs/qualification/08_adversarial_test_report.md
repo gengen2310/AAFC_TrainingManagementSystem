@@ -148,7 +148,40 @@ real protection, not a redundant check.
 immediately AND actively revokes the pre-change token (401 `session_revoked`), not merely left to
 expire naturally. No code change needed; only a missing test, now added.
 
-## Candidates not yet started
+## Candidate 3 — Multi-squadron Annual Program import scope (MEDIUM, REM-45 residual)
 
-3. Multi-squadron Annual Program import scope (MEDIUM, REM-45 residual)
-6. Per-IP rate-limit behaviour under multiple workers (LOW)
+**Verdict: CONFIRMED LIVE and FIXED. Recorded as `REM-120`.** This is the most severe finding of
+Phase E. Reproduced end-to-end against a real backend session (not a static read): a `wing_admin`,
+never entering Proxy/Delegated Intervention Mode, imported a CADET.Net CSV into a wing-scoped
+Planning Year whose `Unit` column routed a row to a specific squadron — and the row was written as a
+real, persisted `Activity` for that squadron, confirmed visible via a separate `sqn_admin` login. A
+second probe confirmed Proxy Mode for a *different* squadron doesn't grant authority into the target
+squadron either — the gap was per-row, not a blanket proxy-or-not check.
+
+Root cause: the endpoint's only squadron-write check was gated behind `if not preview and
+py.unit_id:`, so it never ran at all for a wing/national-scoped plan year, even though individual
+rows resolve to specific squadrons via the `Unit` column. Fixed with a per-row
+`can_write_squadron` check (surfaced as `blocked_scope` in preview, skipped with a clear message at
+commit). 4 new regression tests, verified fail-before/pass-after. Full detail:
+`master_gap_register.csv` REM-120.
+
+## Candidate 6 — Per-IP rate-limit behaviour under multiple workers (LOW)
+
+**Verdict: verified by source reading, consistent with the security review's own framing — not
+independently re-tested against a live multi-worker deployment this pass.** `security.py`'s
+`check_api_rate`/`_api_hits` (the per-IP scan limiter) is confirmed in-memory and per-process
+(module-level dict, no shared store), so under gunicorn's multiple worker processes each worker has
+an independent counter — the effective per-IP limit across the whole service is
+`configured_limit × worker_count`, weaker than the configured value implies. This matches the
+security review's own §1.3 framing exactly ("explicitly documented as needing Redis for
+production... not a blocker, note for the load/abuse test") and QUAL-006-era mutation testing already
+confirmed the DB-backed **per-account** lockout (the meaningful control for credential-stuffing) does
+correctly hold across workers. Not fixed this pass — matches the security review's own prioritization
+(this is explicitly framed as a load/scale finding, not an authentication-bypass one) and Redis
+migration is infrastructure work, not a quick code fix. Recorded here as confirmed-by-source, not
+independently load-tested live.
+
+**All 7 of the security review's live-test candidates have now been addressed** (5 fixed with real
+defects found: QUAL-004, REM-117, REM-119, REM-120, plus one already-correct behavior confirmed with
+a new test — REM-118; candidate 1 confirmed passing infrastructure config; candidate 6 confirmed via
+source reading, consistent with its own LOW/informational framing).
