@@ -1,4 +1,19 @@
-# AAFC TMS — Release State Checkpoint
+# AAFC TMS — Release State Checkpoint (SUPERSEDED)
+
+**Superseded 2026-08-09.** The current living release-state document is
+`docs/release/final_release_program_2026.md` (created for the "Final Remediation, Product
+Hardening and Public-Release Program") — check there first for ground truth (HEAD, migration
+head, test baseline, deployment fingerprints, progress log). Per this file's own rule ("stale
+entries here are worse than none"), the 2026-07-14 snapshot below is being retired rather than
+left to look current: production ENVIRONMENT/COOKIE_SAMESITE was resolved, the IDOR fixes
+described below have long since merged to `main` and been superseded by further security work
+(see `docs/remediation/master_gap_register.csv` QUAL-/REM- entries), and the backup/restore
+"outstanding" items were completed and independently re-verified (see
+`docs/release/final_release_program_2026.md` §7). The historical narrative is kept below for
+provenance/audit trail only — do not treat any commit SHA, test count, or "not yet done" item
+below as reflecting current state.
+
+---
 
 Living document. Update in place rather than appending — stale entries here are worse than none.
 Last updated: 2026-07-14 (session covering staging provisioning, backup/restore redesign,

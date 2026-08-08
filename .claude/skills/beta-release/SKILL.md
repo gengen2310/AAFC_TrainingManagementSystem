@@ -7,9 +7,11 @@ description: Use before packaging, tagging, or deploying an AAFC TMS beta releas
 
 This skill is the release-gate process referenced from `CLAUDE.md`'s "Before
 packaging/releasing" section. It does not replace `docs/beta/` — it tells you which document
-proves which gate, and in what order to run the checks. Treat `docs/beta/00_release_state.md`
-as the current living status; everything else in `docs/beta/` is either a plan, a checklist, or
-an evidence record for one gate.
+proves which gate, and in what order to run the checks. Treat
+`docs/release/final_release_program_2026.md` as the current living status (as of 2026-08-09;
+`docs/beta/00_release_state.md` is a 2026-07-14 snapshot, marked superseded — check the newer
+doc first); everything else in `docs/beta/` is either a plan, a checklist, or an evidence record
+for one gate.
 
 ## Non-negotiable rules (apply to every release pass)
 

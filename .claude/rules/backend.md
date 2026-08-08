@@ -16,7 +16,9 @@
 
 ## Migrations
 
-- New migration: set `down_revision = 'e7a9c2f4b8d1'`
+- New migration: run `alembic heads` first and set `down_revision` to the actual current head — never
+  hardcode a specific revision id in this file, it goes stale the moment another migration lands (this
+  line itself previously hardcoded `e7a9c2f4b8d1`, which drifted 3 migrations behind the real head)
 - Use batch_alter_table for SQLite-compatible ALTER TABLE
 - Never drop columns or rename primary keys without confirming SQLite compatibility
 - Run `alembic upgrade head` after adding a migration

@@ -2,7 +2,15 @@
 
 ## Local demo
 
-1. Extract ZIP to a working directory
+**Note (2026-08-09): this section describes an older extracted-ZIP distribution workflow.**
+Per `CLAUDE.md`'s "Working directory" section, this repo is now worked in directly as a git
+checkout — there is no separate extracted-ZIP or versioned-folder convention for this package.
+Steps 2–6 below (running the backend/frontend locally) remain accurate; step 1 and the "ZIP
+packaging command" subsection are retained only for the historical case of producing a
+standalone distributable ZIP for an offline/non-git recipient — not the normal dev workflow.
+
+1. (Historical/offline-distribution only) Extract ZIP to a working directory — for normal
+   development, skip this and work directly in the git checkout.
 2. `cd backend && pip install -r requirements.txt` (or activate .venv)
 3. `uvicorn app.main:app --reload --port 8000` — backend starts, creates SQLite DB, runs seeds
 4. `cd connected-frontend && python3 -m http.server 8080`
@@ -19,17 +27,20 @@ Reset demo DB: `rm -f backend/aafc_tms.db && bash RUN_TMS_BACKEND_MAC.sh`
 4. `bash scripts/pre_alpha_check.sh`
 5. Update `CHANGELOG.md`
 
-## ZIP packaging command
+## ZIP packaging command (historical/offline-distribution only — not the normal dev workflow)
 
 ```bash
-cd /Users/jennydv/Desktop/AAFC_TMS_National_Connected_Pilot_Package_v10
+cd /Users/jennydv/Desktop/AAFC_TMS_National_Connected_Pilot_Package_v17_1_source
 zip -r /Users/jennydv/Desktop/AAFC_TMS_National_Connected_Pilot_Package_vXX.zip . \
   --exclude "*.pyc" --exclude "__pycache__/*" --exclude ".git/*" \
   --exclude "*.db" --exclude "*.db-shm" --exclude "*.db-wal" \
   --exclude ".DS_Store" --exclude "backend/.venv/*" --exclude "frontend/*"
 ```
 
-ZIP must extract directly into package files — no nested version folder.
+ZIP must extract directly into package files — no nested version folder. (The source directory
+above was `_v10` in this file until 2026-08-09; corrected to match the actual current checkout
+path — always verify against `pwd` before running this rather than trusting the path in this
+file, since the checkout gets renamed on every version bump.)
 
 ## Production requirements (not yet completed for this package)
 

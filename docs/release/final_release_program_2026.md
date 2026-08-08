@@ -28,7 +28,9 @@ This program (mission: "FINAL REMEDIATION, PRODUCT HARDENING AND PUBLIC-RELEASE 
 directly from where those left off, reconciling stale claims against fresh evidence per its own
 Section 2, rather than re-litigating already-closed items from scratch.
 
-## 1. Ground truth, verified 2026-08-09 (not assumed from any prior doc)
+## 1. Ground truth
+
+**Verified 2026-08-09 at program start** (not assumed from any prior doc):
 
 | Field | Value |
 |---|---|
@@ -47,7 +49,26 @@ Section 2, rather than re-litigating already-closed items from scratch.
 | Master gap register entries | 152 (REM + QUAL combined) |
 | Qualification defect register entries | 14 (QUAL-001–015, minus one number never separately used) |
 
+**Re-verified 2026-08-09, later in the same program (post REM-114–REM-122, per §4/§6/§9 below)** —
+this table is updated in place rather than left to drift the way `docs/beta/00_release_state.md`
+did; see §4's progress log for what changed between the two snapshots:
+
+| Field | Value |
+|---|---|
+| Local HEAD | `5a6932b` |
+| Migration head | `f6a7b8c9d0e1` (v46) — single head confirmed via `alembic heads` |
+| Backend tests | 1231 passed, 5 skipped (full `pytest tests/ -q` run) |
+| Master gap register entries | 161 (REM + QUAL combined, includes REM-122) |
+
 ## 2. Deployment fingerprints, verified 2026-08-09 (not inferred from git log)
+
+**This table is a point-in-time snapshot from the start of this program, kept as evidence — it
+is not the latest deployment state.** Staging has been redeployed multiple times since (REM-114
+through REM-121, confirmed healthy each time — see §4's progress log entries), and `main`'s HEAD
+has since advanced past the commits shown below (current HEAD `5a6932b`, per §1's re-verified
+row). No production deploy has occurred since the QUAL-004 row below — production still needs a
+fresh explicit `AUTHORISE PRODUCTION DEPLOYMENT <SHA>` instruction before any further deploy, per
+the governing instruction.
 
 | Service | Environment | Deployment status | Deployed | Commit message (as recorded) |
 |---|---|---|---|---|
