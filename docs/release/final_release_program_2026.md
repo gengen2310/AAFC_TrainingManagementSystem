@@ -548,3 +548,35 @@ live browser interaction this pass (no Chrome extension session active this tick
 role-login smoke check when a browser session is next available.
 
 Production now runs current HEAD across all 3 services for the first time this program.
+
+## 21. Gate 6 (staging e2e) freshly re-run — task #156
+
+Ran `tools/playwright-staging` (staging-verification.spec.ts + verify-fixes.spec.ts, chromium +
+mobile projects) against live staging for the first time this program, per §17's Gate 6
+recommendation. First attempt failed entirely (missing `STAGING_*_CODE` env vars in this shell --
+a tooling gap, not a product defect); re-run after setting them to the same established demo/seed
+codes already used throughout this program's own test suite (never real credentials).
+
+**Result: 42 passed, 7 failed, 1 skipped.** Failure triage:
+
+- **2 failures (both projects) on "[Nav] System Admin"**, and the 2 F-FUNC-01 failures: all traced
+  to the staging `SYSADMIN2026` demo account hitting its own account-level login lockout
+  (`AccessCode.failed_attempts`/`locked_until` in auth.py -- unrelated to REM-125's IP-layer fix)
+  partway through this large, repeated-retries run. Synthetic staging data only, self-heals on
+  the lockout timer; not investigated further as a product defect this pass, since it's a
+  test-run-volume artifact on a demo account, not a live-user-facing issue.
+- **REM-127 (real defect, found and fixed this tick)**: HOL-EDIT-01 failed reproducibly (both
+  projects, both attempts) with a raw PATCH 500. Traced to a genuine, previously-unknown backend
+  gap -- `HolidayPeriod.name`'s DB column (Postgres `VARCHAR(120)`) had no matching request-schema
+  `max_length`, so an oversized name crashed instead of being cleanly rejected. Fixed, tested
+  (fail-before proved the bug is invisible to the SQLite-backed local suite -- only Postgres
+  enforces the column width), deployed to staging, and live-verified against real Postgres: a
+  121-character name now gets a clean 422, not a 500.
+- **1 failure (both projects) on Subject-area-tag persistence**: "Tag must remain active (assigned
+  to facilitator) after reload" -- reproducible on both attempts, not yet root-caused this tick.
+  Genuine finding, not yet fixed -- carried forward as a follow-up (see task list).
+
+This is real, valuable evidence Gate 6 needed a fresh run: the 2026-08-06 baseline (41/41, 87/87)
+predates REM-114 through REM-127 and could not have caught REM-127, which only manifests against
+real Postgres. Gate 6 is now **CONDITIONAL PASS** -- one genuine, unresolved finding (subject-area-
+tag reload persistence) remains open, tracked as a new follow-up item, not silently dropped.
