@@ -132,7 +132,17 @@ against what this session's qualification program has already independently foun
 - REM-117: found and fixed a real stored-XSS gap (5 sites, one requiring a deeper fix than plain
   HTML-escaping since it lived inside an inline `onclick` attribute) — verified with a real Node.js
   JS-engine test proving both the vulnerability and the fix, not static reasoning.
-- Remaining from this session's task queue: Phase E adversarial security (4 of 7 candidates not yet
-  live-tested: multi-squadron import scope, upload size enforcement, per-IP rate limiting,
-  `change_role` session behaviour), concurrency/staged stress testing (12→100 users). Program
+- REM-118: confirmed `change_role` already correctly revokes the target's pre-change session
+  (`token_version` bump) — no code change needed, added the missing test.
+- REM-119: found and fixed a real gap — two curriculum-import endpoints read the entire uploaded file
+  into memory with no size check at all, unlike every other upload path in the codebase.
+- **REM-120 (most significant finding of this program to date)**: found and fixed a **live-confirmed
+  IDOR-class vulnerability** — a `wing_admin`, never entering Proxy/Delegated Intervention Mode, could
+  import Annual Program CSV rows into any squadron in their wing via the `Unit` column, bypassing the
+  Proxy Mode gate every other squadron-scoped write in this app requires. Reproduced end-to-end
+  against a real backend session (not a static read) before fixing. 4 new regression tests,
+  fail-before/pass-after verified.
+- **All 7 of the security review's Phase E live-test candidates are now addressed** (5 real fixes, 1
+  already-correct behavior newly tested, 1 confirmed via source reading).
+- Remaining from this session's task queue: concurrency/staged stress testing (12→100 users). Program
   continues.
