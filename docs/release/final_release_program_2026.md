@@ -146,3 +146,12 @@ against what this session's qualification program has already independently foun
   already-correct behavior newly tested, 1 confirmed via source reading).
 - Remaining from this session's task queue: concurrency/staged stress testing (12→100 users). Program
   continues.
+
+## 5. Staged stress test results (Section 24)
+
+Target: staging only, real workflows (login/me/parade-nights/planning-years/reports-summary), not
+`/health` hammering. Start low, increase only if the previous tier stays healthy.
+
+| Tier | Requests | 5xx | P95 | Login success | Result |
+|---|---|---|---|---|---|
+| 12 users, 3 min | 943 | 0 | 273ms | 100% (12/12) | **PASS** |
