@@ -10,7 +10,7 @@ from ..config import settings
 from ..security import (verify_code, create_token, hash_code,
                         login_blocked_db, record_login_failure_db, record_login_success_db)
 from ..database import utcnow
-from ..models import User, AccessCode, Wing, Squadron, NationalEntity
+from ..models import User, AccessCode, Wing, Squadron, NationalEntity, ProxySession
 from ..dependencies import get_principal, client_meta
 from ..permissions import Principal
 from ..services import audit
@@ -160,6 +160,20 @@ def _raise_if_locked(ac: AccessCode):
 @router.post("/logout")
 def logout(response: Response, request: Request, db: DBSession = Depends(get_db),
            p: Principal = Depends(get_principal)):
+    # QUAL-004: an active Proxy/Delegated Intervention session must not silently persist
+    # across logout+re-login -- get_principal re-attaches any active ProxySession for this
+    # user_id on the very next authenticated request, regardless of which token is used, so
+    # logging out is the actor's clearest signal that the elevated write context should end.
+    active_proxy = (db.query(ProxySession)
+                    .filter(ProxySession.actor_user_id == p.user_id, ProxySession.active == True)  # noqa: E712
+                    .all())
+    for ps in active_proxy:
+        ps.active = False
+    if active_proxy:
+        db.commit()
+        for ps in active_proxy:
+            audit(db, p, object_type="proxy", object_id=ps.acting_squadron_id,
+                  action=("proxy_exit_on_logout" if ps.mode == "proxy" else "intervention_exit_on_logout"))
     audit(db, p, object_type="auth", object_id=p.user_id, action="logout")
     response.delete_cookie(settings.COOKIE_NAME)
     return {"ok": True}

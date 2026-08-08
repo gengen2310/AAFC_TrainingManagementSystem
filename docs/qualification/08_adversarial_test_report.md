@@ -83,13 +83,29 @@ elevated write context with zero re-authorization step. Combined with §3.2's se
 TTL at all — a session stays active indefinitely until explicitly exited), this is a standing,
 unbounded elevated-write window with no operator-visible expiry and no re-consent on re-login.
 
-**Not fixed in this pass.** This is session-security *behavior*, not a pure bug with one obviously
-correct fix — remediation direction (deactivate `ProxySession` on logout, add a TTL enforced in
-`get_principal`, or both) needs an explicit decision before implementing, consistent with this
-program's own discipline against making that call unilaterally for a security-relevant behavior
-change. Recorded as `QUAL-004`, status OPEN, in both `defect_register.csv` and
+**Fixed, 2026-08-09, user-directed.** Asked the user which remediation direction to take (deactivate
+on logout / add a TTL / both / not now) rather than deciding unilaterally, since this is
+security-session behavior with more than one defensible answer. User chose **deactivate on
+logout**. `logout()` (`auth.py`) now queries every active `ProxySession` row for the actor's
+`user_id` and deactivates them — mirroring `exit_proxy`'s own `ps.active = False` pattern — auditing
+each as `proxy_exit_on_logout`/`intervention_exit_on_logout` before the normal logout audit entry.
+
+Added `test_proxy_mode_does_not_survive_logout_and_relogin` to `backend/tests/test_core.py`,
+reproducing the exact live-verified scenario: enter Proxy, write succeeds, log out via the real
+endpoint, log back in with a fresh token, assert `GET /api/proxy/current` returns `active: false`
+and a write attempt is rejected (400/403). **Verified, not assumed:** temporarily stripped the fix
+and re-ran — failed with `AssertionError: Proxy session silently re-attached after logout+relogin`,
+the exact right reason. Reverted and re-ran clean. Full suite: **1219 passed**, 5 skipped, 0
+failures.
+
+**Deliberately not fixed as part of this change:** the separate TTL/unattended-session gap (security
+review §3.2 — a session that's never logged out of at all, e.g. an unattended device, still has no
+auto-expiry). The user was offered "both" and chose deactivate-on-logout only; this residual is
+recorded in `QUAL-004`'s `residual_risk` field, not silently dropped.
+
+Recorded as `QUAL-004`, status **CLOSED**, in both `defect_register.csv` and
 `master_gap_register.csv` (the latter had never actually received a QUAL-004 row despite being
-referenced — added now for consistency).
+referenced — added when the live finding was first confirmed).
 
 ---
 

@@ -115,6 +115,39 @@ def test_wing_admin_cannot_proxy_other_wing_scope(client):
     assert r.status_code == 404
 
 
+def test_proxy_mode_does_not_survive_logout_and_relogin(client):
+    """QUAL-004: an active Proxy session must not silently re-attach after the actor
+    logs out and logs back in with a fresh token -- confirmed live on staging via a
+    real browser session (see docs/qualification/08_adversarial_test_report.md
+    candidate 2) before this fix. logout() must end the active session, not merely
+    delete the cookie, since get_principal re-attaches any active ProxySession for the
+    user's id regardless of which token is presented."""
+    h1 = login(client, "ADMIN7WG")
+    s703 = _sqn_id(client, h1, "703")
+    r = client.post(f"/api/proxy/enter/{s703}", headers=h1, json={"reason": "Assist July planning"})
+    assert r.status_code == 200
+
+    # Writing to 703 works while proxied.
+    r2 = client.post("/api/parade-nights", headers=h1, json={"date": "2027-02-11", "session_count": 1})
+    assert r2.status_code == 200
+
+    # Log out via the real endpoint (not just discarding the token client-side).
+    logout_r = client.post("/api/auth/logout", headers=h1)
+    assert logout_r.status_code == 200
+
+    # Log back in -- a fresh token for the same user, simulating a real re-login.
+    h2 = login(client, "ADMIN7WG")
+    current = client.get("/api/proxy/current", headers=h2)
+    assert current.status_code == 200
+    assert current.json()["active"] is False, (
+        "Proxy session silently re-attached after logout+relogin with no re-prompt"
+    )
+
+    # The elevated write capability must not have persisted either.
+    r3 = client.post("/api/parade-nights", headers=h2, json={"date": "2027-02-18", "session_count": 1})
+    assert r3.status_code in (400, 403)
+
+
 # ── CURRICULUM ──
 def test_curriculum_progress_and_lh(client):
     h = login(client, "ADMIN703")
