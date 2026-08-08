@@ -1,6 +1,8 @@
 """Request dependencies: build the Principal from the JWT (cookie or bearer)
 and overlay any active proxy/intervention session from the database.
 """
+import ipaddress
+
 from fastapi import Depends, Request, HTTPException
 from sqlalchemy.orm import Session as DBSession
 
@@ -19,6 +21,22 @@ def _token_from_request(request: Request) -> str | None:
     return request.cookies.get(settings.COOKIE_NAME)
 
 
+# RFC 6598 (Carrier-Grade NAT / shared address space) -- the range Railway's own internal
+# edge/proxy address was directly observed in (100.64.0.2, from live staging access logs).
+# Used below as a real, independently-verifiable guard, not a bare assumption: only trust
+# X-Forwarded-For when the immediate connecting peer actually looks like Railway's own
+# infrastructure, not from any arbitrary source that reaches this process.
+_CGNAT_RANGE = ipaddress.ip_network("100.64.0.0/10")
+
+
+def _looks_like_ip(value: str) -> bool:
+    try:
+        ipaddress.ip_address(value)
+        return True
+    except ValueError:
+        return False
+
+
 def real_client_ip(request: Request) -> str:
     """The IP every per-IP security control (login lockout, API rate limiter,
     access logging) should key off.
@@ -34,26 +52,56 @@ def real_client_ip(request: Request) -> str:
     LOGIN_WINDOW_SEC/LOGIN_LOCKOUT_SEC), and the API rate limiter's 300
     req/60s budget was likewise shared by the whole user base at once.
 
-    Fix: take the left-most (original client) entry of X-Forwarded-For, the
-    de facto standard header set by essentially every HTTP-layer proxy/load
-    balancer including Railway's. Safe to trust here for two independent
-    reasons, both confirmed live post-deploy (not just assumed): (1) Railway's
-    network topology makes its own edge the ONLY thing that can ever open a
-    direct connection to this container, so nothing external can inject a
-    header at the hop this process actually sees; and (2) empirically,
-    Railway's edge does not pass through a client-supplied X-Forwarded-For
-    value at all -- a deliberately spoofed header sent in live staging testing
-    was overwritten with the true observed connection IP, not appended to or
-    trusted. Falls back to the raw peer address when the header is absent
-    (local dev, tests, or any environment without a proxy in front)
-    so existing behaviour there is unchanged.
+    Fix: take the left-most (original client) entry of X-Forwarded-For, the de
+    facto standard header set by essentially every HTTP-layer proxy/load
+    balancer including Railway's -- but with two hardenings a background
+    security review of the first version of this fix correctly flagged as
+    missing, not blindly trusting a client-suppliable header:
+
+    1. Only trusted when the immediate connecting peer (`request.client.host`)
+       is itself in the RFC 6598 CGNAT range Railway's own edge was directly
+       observed using -- i.e. the request must already look like it came
+       through Railway's proxy layer before its forwarded-for claim is used
+       at all. A request whose raw peer is NOT in that range (some other,
+       unexpected direct-connection path) falls back to the raw peer instead
+       of trusting an arbitrary header -- this is a real, independently
+       checkable condition, not an assumption about Railway's topology taken
+       on faith. (A general community web search surfaced claims about
+       Railway's proxy-header behaviour during this investigation, but those
+       were third-party forum answers, not Railway's own documentation, and
+       one even misstated the CGNAT range -- not treated as a trustworthy
+       basis for a security control; this guard relies only on this
+       deployment's own directly-observed behaviour and the well-established
+       RFC 6598 block.)
+    2. The extracted value must parse as a syntactically valid IP address
+       (`ipaddress.ip_address`) before it is ever returned. Closes a log/
+       audit-injection path the first version of this fix introduced: `client`
+       feeds directly into main.py's hand-built access-log line with no
+       escaping, so an unvalidated header value could break that line's JSON
+       structure or inject fabricated fields. An attacker can still supply a
+       fake-but-well-formed IP (an inherent limit of any header-based scheme,
+       not new), but can no longer inject arbitrary log content or bypass
+       hardening #1 with a non-IP payload.
+
+    Falls back to the raw peer address when the header is absent, the peer
+    isn't in the trusted range, or the header's value doesn't parse as an IP
+    (local dev, tests, or any environment without a proxy in front) so
+    existing behaviour there is unchanged.
     """
-    fwd = request.headers.get("X-Forwarded-For")
-    if fwd:
-        first = fwd.split(",")[0].strip()
-        if first:
-            return first
-    return request.client.host if request.client else "anon"
+    peer = request.client.host if request.client else None
+    trusted_peer = False
+    if peer:
+        try:
+            trusted_peer = ipaddress.ip_address(peer) in _CGNAT_RANGE
+        except ValueError:
+            trusted_peer = False
+    if trusted_peer:
+        fwd = request.headers.get("X-Forwarded-For")
+        if fwd:
+            first = fwd.split(",")[0].strip()
+            if first and _looks_like_ip(first):
+                return first
+    return peer or "anon"
 
 
 def get_principal(request: Request, db: DBSession = Depends(get_db)) -> Principal:
