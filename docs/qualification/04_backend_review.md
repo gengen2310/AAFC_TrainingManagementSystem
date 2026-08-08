@@ -291,6 +291,82 @@ that S4 targets a real, already-well-tested control, not an undiscovered gap.
 
 ---
 
+## 2d. Mutation testing — `app/routers/accounts.py::_require_manage_authority`
+
+**Why this module fourth**: `_require_manage_authority` is the gate every account-management
+endpoint (`update_account`, `change_role`, `archive_account`, `disable`, `reset-code`, and others —
+9 call sites) goes through before touching a target `User` row. It's the accounts equivalent of
+`permissions.py`'s squadron/wing checks (§2), but router-level and DB-backed rather than a pure
+`Principal` method, so mutations are verified via real HTTP requests through `login()`/`client`
+rather than direct construction. This completes Phase D's four originally-identified
+highest-blast-radius targets (`permissions.py`, `dependencies.py`, `security.py`, `accounts.py`).
+
+| ID | Mutation | Result |
+|---|---|---|
+| A1 | Top-level role-authority check (`target.role not in allowed`) removed entirely | **SURVIVED** — 0 tests failed |
+| A2 | Wing-scope `wing_id` equality check removed (target role `wing_viewer`) | **SURVIVED** — 0 tests failed |
+| A3 | Squadron-scope, `wing_admin` branch: `sqn.wing_id != p.wing_id` check removed | **KILLED** — 2 tests failed |
+| A4 | Squadron-scope, `sqn_admin` branch: `target.squadron_id != p.squadron_id` check removed | **KILLED** — 1 test failed |
+| A5 | Top-level role-authority check inverted (fail-open in reverse) | **KILLED** — 25 tests failed |
+
+**Result: 3/5 killed on first pass (60%) — the weakest first-pass score of the four Phase D
+modules**, and worth naming honestly: A3 and A4's squadron-scope branches were well covered by
+existing tests (`test_cross_wing_disable_denied`, `test_cross_squadron_reset_denied`), but nothing
+exercised the top-level role-authority gate itself (A1) or the wing-scope branch specifically for a
+`wing_viewer` target (A2) — both squadron-scope-shaped tests happened to also incidentally pass the
+top-level check without isolating it, and no test used a `wing_viewer` target at all.
+
+### A1 — the real finding (QUAL-014)
+
+With the top-level `target.role not in allowed` check disabled, **any write-capable actor could
+manage an account of any role**, not just the roles their own `_CREATE_AUTHORITY` entry permits —
+concretely verified: a `sqn_admin` (whose `_CREATE_AUTHORITY` entry is `{"sqn_general"}` only) could
+successfully `POST /api/accounts/{wing_admin_uid}/disable` a `wing_admin` account, returning `200
+{"ok": true}` instead of `403`. This is a distinct failure mode from the existing "different
+squadron/different wing" tests — those all use same-scope-role targets (`sqn_general`), so they
+never isolate the role-authority gate from the scope-matching gate underneath it.
+
+**Fix**: added `test_sqn_admin_cannot_manage_account_outside_authority_role` to
+`backend/tests/test_accounts.py` — logs in as `sqn_admin` and `wing_admin`, then asserts the
+`sqn_admin` gets `403` attempting both `disable` and `reset-code` against the `wing_admin`'s own
+account. **Verified, not assumed**: re-applied A1 in isolation — the test failed with exactly
+`AssertionError: Expected 403, got 200: {"ok":true}`. Reverted to the clean original (`diff`
+confirmed empty).
+
+### A2 — the second real finding (QUAL-015)
+
+With the wing-scope `wing_id` equality check disabled, a `wing_admin` could manage a `wing_viewer`
+account belonging to an entirely different wing — an IDOR-class gap in the same shape as
+`permissions.py`'s M3 (§2) and `dependencies.py`'s D1 (§2b), this time in the accounts router.
+Concretely verified: `ADMIN7WG` (wing_admin of 7WG) successfully disabled a freshly created
+`wing_viewer` account under a brand-new, unrelated wing, returning `200` instead of `403`.
+
+**Fix**: added `test_cross_wing_disable_denied_for_wing_viewer_target` — deliberately named and
+placed next to the existing `test_cross_wing_disable_denied` to make the distinction obvious: that
+existing test's target role is `sqn_general` (squadron scope), so it never actually reaches the
+`scope == "wing"` branch this mutation broke. The new test creates a `wing_viewer` account under a
+new wing and asserts a different wing's `wing_admin` is denied. **Verified, not assumed**:
+re-applied A2 in isolation — failed with exactly `AssertionError: Expected 403, got 200:
+{"ok":true}`. Reverted to the clean original (`diff` confirmed empty).
+
+**Result after fix: 5/5 mutations would now be killed.** Full suite re-run clean afterward: **1217
+passed** (1215 + 2 new), 5 skipped, 0 failures.
+
+### A note on an automated background scanner false-flag during this work
+
+While A1 (the top-level role-authority-check-disabled mutation) was deliberately, temporarily
+applied mid-test-run, this session's own background security-review tooling flagged it as a live
+CRITICAL finding — "Authorization Bypass (Fail-Open)." As with M4 (§2), D1 (§2b), and S4 (§2c), this
+was correctly identified in the moment as this program's own controlled, monitored,
+already-in-progress mutation test — confirmed via `ps aux` showing the script still actively running
+and `diff` showing the file mid-mutation exactly where the scanner's snapshot was taken — rather
+than a persisted defect. No manual intervention was taken mid-script. Unlike the three prior
+false-flags, this one flagged a mutation that *did* turn out to survive and become a real, confirmed
+finding (QUAL-014) once the run completed — the scanner's flag and this pass's own result agree,
+recorded here as corroborating evidence rather than dismissed.
+
+---
+
 ## 3. Static analysis
 
 `ruff` (already configured in `pyproject.toml`) re-run against the current tree as a baseline check:
@@ -308,11 +384,16 @@ here.
 ## 4. What Phase D has NOT yet covered
 
 Per mission §6, still outstanding for a future Phase D pass or Phase E:
-- Mutation testing on other critical modules (`accounts.py`'s `_require_manage_authority`) —
-  `permissions.py`, `dependencies.py::get_principal`, and `security.py` (§2, §2b, §2c) were
-  prioritised as the highest-blast-radius targets; the pattern established here (hand-crafted
-  mutations, `diff`-verified revert, direct unit tests targeting the exact branch) is reusable for
-  the next module.
+- The four originally-identified highest-blast-radius modules (`permissions.py`, `dependencies.py
+  ::get_principal`, `security.py`, `accounts.py::_require_manage_authority` — §2, §2b, §2c, §2d) are
+  now all mutation-tested, with every surviving mutation either fixed with a verified regression
+  test or honestly characterized as not a live gap. This is the end of Phase D's originally-scoped
+  target list, **not** the end of Phase D itself or the qualification program — mutation testing
+  could still be extended to other modules (e.g. `training.py`, `planning.py`'s write endpoints) if
+  prioritised, and Phase D's static-analysis and frontend-coverage items below remain undone. The
+  pattern established across all four passes (hand-crafted mutations, `diff`-verified revert, direct
+  tests targeting the exact branch, honest survived-but-not-exploitable characterization where
+  applicable) is documented and reusable for whichever module is picked next.
 - Full static analysis suite (`ruff` baseline only; no `mypy`/type-checking, no dead-code analysis
   tool like `vulture`, no duplicate-code or circular-import analysis run this pass).
 - `frontend/` and `connected-frontend/` have no coverage/mutation-testing pass yet — this document

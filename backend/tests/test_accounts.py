@@ -784,6 +784,51 @@ def test_cross_squadron_reset_denied(client):
     assert r.status_code == 403, f"Expected 403, got {r.status_code}: {r.text}"
 
 
+def test_sqn_admin_cannot_manage_account_outside_authority_role(client):
+    """SQN admin cannot manage (disable / reset-code) an account whose role isn't
+    in their authority at all (e.g. a wing_admin) -- distinct from the cross-scope
+    "different squadron/wing" checks above: this must be denied purely because
+    wing_admin is never in sqn_admin's _CREATE_AUTHORITY set, regardless of which
+    wing or squadron either account belongs to."""
+    h_703 = login(client, "ADMIN703")
+    h7wg = login(client, "ADMIN7WG")
+
+    me = client.get("/api/auth/me", headers=h7wg)
+    assert me.status_code == 200
+    wing_admin_uid = me.json()["session"]["user_id"]
+
+    r = client.post(f"/api/accounts/{wing_admin_uid}/disable", headers=h_703, json={})
+    assert r.status_code == 403, f"Expected 403, got {r.status_code}: {r.text}"
+
+    r2 = client.post(f"/api/accounts/{wing_admin_uid}/reset-code", headers=h_703, json={})
+    assert r2.status_code == 403, f"Expected 403, got {r2.status_code}: {r2.text}"
+
+
+def test_cross_wing_disable_denied_for_wing_viewer_target(client):
+    """Wing admin cannot disable a wing_viewer account under a DIFFERENT wing --
+    covers the wing-scope branch of manage-authority specifically (target role
+    wing_viewer), which is a different code path than the squadron-scope cross-wing
+    check test_cross_wing_disable_denied above (target role sqn_general)."""
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+
+    wing_r = client.post("/api/wings", headers=h_nat, json={"code": "XWGV01", "name": "Cross Wing Viewer"})
+    assert wing_r.status_code == 200, wing_r.text
+    other_wing_id = wing_r.json()["wing_id"]
+
+    acct_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Cross Wing Viewer Target",
+        "role": "wing_viewer",
+        "wing_id": other_wing_id,
+    })
+    assert acct_r.status_code == 200, acct_r.text
+    uid = acct_r.json()["user_id"]
+
+    # 7WG admin attempts to disable a wing_viewer under a different wing — must be 403
+    r = client.post(f"/api/accounts/{uid}/disable", headers=h7wg, json={})
+    assert r.status_code == 403, f"Expected 403, got {r.status_code}: {r.text}"
+
+
 # ─────────────────────────────────────────────────────────────
 # 10. Role / access-type change
 # ─────────────────────────────────────────────────────────────
