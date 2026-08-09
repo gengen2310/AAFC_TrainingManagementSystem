@@ -1009,3 +1009,34 @@ This substantially closes Section 29 for the roles/pages covered. Not yet covere
 reader pass (VoiceOver/NVDA -- no such tooling available to this session, matches Gate 10's G10-07
 human-gated item), and the `system_admin`-specific test block (blocked by the unrelated account
 lockout, not a coverage gap in the suite itself -- re-run once the lockout clears or is reset).
+
+## 36. JWT_SECRET/SECRET_KEY rotation CONFIRMED COMPLETE (task #161 closed)
+
+After several unsuccessful dashboard-based attempts (each checked and confirmed unchanged --
+deployment history stuck at the same 05:43:33 timestamp, variable hashes unchanged across every
+check), the user ran the Railway CLI directly:
+
+```
+railway variable set JWT_SECRET="$(openssl rand -hex 32)" --service aafc-tms-backend --environment production
+railway variable set SECRET_KEY="$(openssl rand -hex 32)" --service aafc-tms-backend --environment production
+```
+
+**Confirmed successful via three independent signals**:
+1. Fresh deployments at 09:00:01-09:00:12 UTC (completely different from the stuck 05:43:33
+   timestamp every prior check showed).
+2. Variable hashes changed (`JWT_SECRET` and `SECRET_KEY` both now hash differently from staging's
+   -- previously identical).
+3. **Functional test, the definitive proof**: presenting a real staging-issued token to production's
+   `/api/auth/me` now returns `invalid_or_expired` (signature verification fails) instead of the
+   previous `invalid_user` (signature verification passed, only the downstream user lookup failed).
+   This distinction is mechanical, not interpretive -- `decode_token()` catches all `jwt.PyJWTError`
+   subclasses including `InvalidSignatureError` and returns `None`, which is what produces
+   `invalid_or_expired`; reaching `invalid_user` requires the signature check to have already
+   succeeded. The error changing confirms the signing keys now genuinely differ.
+
+Also confirmed production login still behaves normally post-rotation (`POST /api/auth/login` with
+a garbage code returns a clean `401 invalid_code`, not a crash) -- the rotation did not break
+anything.
+
+**The cross-environment auth exposure identified in §28/§29 is now fully closed.** This was the
+last open item from the 2026-08-09 production incident. Incident status: **RESOLVED**.
