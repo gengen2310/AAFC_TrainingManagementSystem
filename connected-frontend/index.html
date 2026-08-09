@@ -3600,7 +3600,18 @@ async function loadData(){
   // Set state from resolved results
   S.pns=(Array.isArray(pns)?pns:[]).map(pn=>({
     id:pn.parade_night_id, date:pn.date, term:pn.term, nsess:pn.session_count,
-    notes:pn.parade_type||'', published:!!pn.published_status, closeout:pn.closeout_status,
+    // Found while adding Training Class UI (task #170): this previously read
+    // pn.parade_type instead of pn.notes -- the actual notes text a user
+    // types into the Parade Night Details panel (showPNDetail's pnd-notes
+    // field) was saved correctly to the backend but never displayed back
+    // anywhere that reads S.pns (the card list's .pn-meta line, the search
+    // filter in renderPN(), and two other display locations), and the
+    // separate Parade Night Type dropdown (showPNDetail's pnd-type select)
+    // never correctly pre-selected the saved type either, since it read
+    // pn.parade_type from this same mapped object where that key was never
+    // actually populated.
+    notes:pn.notes||'', parade_type:pn.parade_type||'normal',
+    published:!!pn.published_status, closeout:pn.closeout_status,
     readiness:pn.readiness_score, version:pn.version,
     sessions:(pn.sessions||[]).sort((a,b)=>(a.period_number||0)-(b.period_number||0)).map(s=>({
       id:s.id, phase:s.phase_at_time||'', code:s.curriculum_code_at_time||'',
@@ -6780,7 +6791,7 @@ async function _sessDrop(e,date,idx){
 }
 
 // QUICK EDIT
-function quickEdit(date,idx){
+async function quickEdit(date,idx){
   editSessRef={date,idx};
   const pn=S.pns.find(p=>p.date===date);if(!pn)return;
   const s=pn.sessions[idx];
@@ -6792,9 +6803,70 @@ function quickEdit(date,idx){
     <div class="ff"><label for="qe-st">Status</label><select id="qe-st" aria-label="Session status">${stOpts}</select></div>
     <div class="ff"><label for="qe-ex">Curriculum Item</label><select id="qe-ex"><option value="">— Unassigned —</option>${currOpts}</select></div>
     <div class="ff"><label for="qe-fa">Facilitator</label><select id="qe-fa"><option value="">— None —</option>${facOpts}</select></div>
-    <div class="ff"><label for="qe-rm">Room</label><select id="qe-rm"><option value="">— None —</option>${roomOpts}</select></div>`;
+    <div class="ff"><label for="qe-rm">Room</label><select id="qe-rm"><option value="">— None —</option>${roomOpts}</select></div>
+    <div class="ff" id="qe-classes-group" style="display:none">
+      <label>Training Classes</label>
+      <p class="muted" style="font-size:11px;margin:0 0 6px">
+        Select which Training Class(es) this Session is for. Leave all unchecked if you are not
+        yet using Training Classes for this Squadron.
+      </p>
+      <div id="qe-classes-list" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px"></div>
+    </div>`;
   openModal('m-sess-edit');
+  // Awaited (not fire-and-forget) so a rapid re-open of this same modal --
+  // e.g. Save, then immediately re-open the same session -- can never have
+  // an earlier, still-in-flight populate call resolve after a later one and
+  // clobber it with stale data.
+  await _populateQuickEditClasses(s.id);
 }
+
+// ── Session <-> Training Class audience (CLASS-03) ───────────────────────────
+// A Session can target one or more Training Classes (addendum's combined-Session
+// example: Senior 1 + Senior 2 doing the same Drill session together). Wired
+// into the real, live "Quick Edit" flow (quickEdit()/saveSessEdit()/#m-sess-edit)
+// -- NOT into the separate #m-edit-session/doSaveSession()/openEditSessionModalPn
+// family, which was found during this same task to have no reachable trigger
+// anywhere in the rendered page (#builder-card/#builder-grid, the containers
+// those functions target, do not exist in any static or dynamically-inserted
+// HTML in this file) -- building into that dead code would have delivered zero
+// real capability.
+//
+// Deliberately NOT scoped to "the active Training Year": a Squadron can have
+// more than one active PlanningYear at once (no auto-deactivation on create),
+// so guessing which one is "the" active year for a given Session would be
+// unreliable. /api/training-classes without training_year_id already returns
+// every active class for the caller's squadron across all years, which is
+// what a Session-assignment picker actually needs.
+async function _populateQuickEditClasses(sessionId){
+  const group=document.getElementById('qe-classes-group');
+  const list=document.getElementById('qe-classes-list');
+  if(!group||!list) return;
+  let classes=[];
+  try{ classes=await api('/api/training-classes'); }
+  catch(_){ group.style.display='none'; return; }
+  if(!classes.length){ group.style.display='none'; return; }
+
+  let checkedIds=new Set();
+  if(sessionId){
+    try{
+      const audience=await api(`/api/sessions/${sessionId}/audience`);
+      checkedIds=new Set((audience||[]).map(a=>a.training_class_id));
+    }catch(_){ /* no existing audience -- leave unchecked */ }
+  }
+
+  // quickEdit() may have already been superseded by a later call (double-click,
+  // or the user closed the modal before this async fetch resolved) -- editSessRef
+  // is cleared by saveSessEdit()/closeModal-adjacent flows, so bail rather than
+  // populate a checklist for a session the modal is no longer showing.
+  if(!document.getElementById('m-sess-edit').classList.contains('active')) return;
+
+  group.style.display='';
+  list.innerHTML=classes.map(c=>`<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12.5px">
+      <input type="checkbox" class="qe-class-chk" value="${esc(c.training_class_id)}" ${checkedIds.has(c.training_class_id)?'checked':''}>
+      ${esc(c.display_name)}
+    </label>`).join('');
+}
+
 async function saveSessEdit(){
   if(!editSessRef)return;
   const pn=S.pns.find(p=>p.date===editSessRef.date);if(!pn)return;
@@ -6827,6 +6899,15 @@ async function saveSessEdit(){
     // Single atomic PUT — see savePNDetail()'s comment for why this replaced the
     // previous separate PUT-then-POST(/status) two-call sequence.
     await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify(body)});
+    // Training Class audience (CLASS-03) -- save whatever is checked, even an
+    // empty set (clearing all classes is a valid, deliberate choice). Only
+    // when the group is visible: hidden means no classes exist for this
+    // Squadron, so there is nothing meaningful to save.
+    const classesGroup=document.getElementById('qe-classes-group');
+    if(classesGroup && classesGroup.style.display!=='none'){
+      const checked=[...document.querySelectorAll('.qe-class-chk:checked')].map(c=>c.value);
+      await api(`/api/sessions/${s.id}/audience`,{method:'PUT',body:JSON.stringify({training_class_ids:checked})});
+    }
     if(sessErrEl)sessErrEl.textContent='';
     await reloadAndRender(); closeModal('m-sess-edit'); editSessRef=null;
   }catch(e){
