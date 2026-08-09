@@ -1313,3 +1313,56 @@ not merely "blocked and about to cascade closed." Next concrete step:
 CLASS-04, class-specific curriculum progress — the first real consumer of
 this linkage, and the one dashboard-metric-dictionary.md already flagged as
 currently blended-per-Stage rather than per-Class.
+
+## 42. CLASS-04 (class-specific curriculum progress) implemented and staging-verified
+
+Continuing directly from §41 (CLASS-03). Built two read-model endpoints
+deriving curriculum progress per Training Class rather than blended per
+Training Stage — see commit `c85cce7` for full detail.
+
+- `GET /api/training-classes/{id}/curriculum-progress` — per-class item
+  status, proving addendum §43's core example (Senior 1 completing a
+  requirement must not mark it complete for Senior 2).
+- `GET /api/curriculum/phases/{id}/class-progress` — stage-level rollup
+  using the weighted-completion formula (sum of delivered / sum of
+  applicable across classes), not an average of per-class percentages,
+  per addendum §53/§74.
+- 8 new regression tests, full suite 1288 passed / 5 skipped / 0
+  regressions.
+- **Two real cross-test pollution bugs found and fixed** while writing
+  these tests against the shared session-scoped test DB: a relative
+  "days ahead of today" date offset collided with `test_timing.py`'s own
+  hardcoded literal dates (today+60/63 days landed on dates that file
+  already claimed), and creating curriculum items without a
+  `learning_hub_url` broke `test_core.py`'s assertion that every
+  curriculum item visible to squadron 703 has one. Fixed by switching to a
+  fixed far-future date range confirmed clear of the whole suite's
+  literals, always setting `learning_hub_url`, and isolating every test
+  onto its own dedicated squadron-scoped Training Stage rather than the
+  shared national catalogue. Same underlying lesson as REM-128/REM-131:
+  tests sharing one DB must not assume isolation they don't have.
+- Deployed to staging (no migration needed — pure read model). Live
+  functional round-trip verified over real HTTP: created a real stage,
+  class, curriculum item, and Session; delivered it; confirmed the class
+  progress endpoint flipped correctly; confirmed the stage-aggregate
+  endpoint's weighted math was correct (1/1/100%); archived everything
+  created for the test afterward. Both frontends confirmed healthy.
+  Capability manifest: 266→268 routes, 60→60 tables (pure addition).
+- `docs/remediation/master_gap_register.csv`'s CLASS-04 entry updated to
+  `IMPLEMENTED — staging-verified (backend only; frontend consumption not
+  built)`.
+
+**A genuine architectural limitation was discovered and documented, not
+hidden**: because curriculum items are stage-wide (every class of a stage
+shares the identical applicable-item set, per addendum §105's explicit
+prohibition on per-class curriculum duplication), every class currently has
+the same denominator — which means the weighted-sum formula mathematically
+coincides with a simple average whenever compared classes have equal item
+counts. The formula is still the objectively correct one (matches addendum
+§53's own definition verbatim) and is forward-compatible with real
+divergence once per-class applicability exceptions (addendum §65) exist —
+that's a separate, not-yet-built feature, not a defect in this pass.
+
+Next concrete step: CLASS-05 (Mission Backlog class-awareness) or CLASS-07
+(dashboard integration of this new aggregate) — the first UI-facing
+consumers of the Training Class work so far.
