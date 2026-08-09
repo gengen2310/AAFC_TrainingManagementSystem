@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session as DBSession
 from ..database import get_db, utcnow
 from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
                       Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, TrainingArea, Equipment,
-                      Activity, Cadet, Squadron, TimingTemplate, TimingBlock, SystemSetting)
+                      Activity, Cadet, Squadron, TimingTemplate, TimingBlock, SystemSetting, TrainingClass, PlanningYear)
 from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
@@ -1408,6 +1408,164 @@ def delete_room(rid: str, db: DBSession = Depends(get_db), p: Principal = Depend
     r.archived_at = utcnow()
     db.commit()
     audit(db, p, object_type="training_area", object_id=r.id, action="archive")
+    return {"ok": True}
+
+
+# ── TRAINING CLASSES ─────────────────────────────────────────────────────────
+# CLASS-01 (docs/remediation/master_gap_register.csv): a Squadron-specific
+# local group undertaking a Training Stage (CurriculumPhase) during a
+# Training Year. See docs/product-review/parallel-class-impact-analysis.md
+# for the full design rationale. This is the base CRUD surface only --
+# Session<->TrainingClass audience linkage (CLASS-03), Mission Backlog/
+# dashboard class-awareness (CLASS-04..07), and bulk setup (addendum §36)
+# are separate, dependent follow-up work, not built in this pass.
+
+def _training_class_dict(c: TrainingClass) -> dict:
+    return {
+        "training_class_id": c.id,
+        "squadron_id": c.squadron_id,
+        "training_year_id": c.training_year_id,
+        "training_stage_id": c.training_stage_id,
+        "display_name": c.display_name,
+        "sequence": c.sequence,
+        "start_date": c.start_date,
+        "end_date": c.end_date,
+        "expected_count": c.expected_count,
+        "notes": c.notes,
+        "is_archived": c.is_archived,
+        "version": c.version,
+    }
+
+
+def _require_visible_stage(db: DBSession, p: Principal, training_stage_id: str) -> CurriculumPhase:
+    """A Training Class's stage must be a CurriculumPhase actually visible to
+    this principal (national/own-wing/own-squadron), not any row in the
+    catalogue -- reuses the exact same visibility rule _visible_phases()
+    already applies to /api/curriculum/phases, so a class can never be
+    silently linked to a Stage the caller cannot see."""
+    visible_ids = {ph.id for ph in _visible_phases(db, p)}
+    if training_stage_id not in visible_ids:
+        raise HTTPException(400, detail={"error": "training_stage_not_visible"})
+    stage = db.get(CurriculumPhase, training_stage_id)
+    if not stage:
+        raise HTTPException(404, detail={"error": "training_stage_not_found"})
+    return stage
+
+
+def _require_own_year(db: DBSession, sq_id: str, training_year_id: str) -> PlanningYear:
+    year = db.get(PlanningYear, training_year_id)
+    if not year or year.unit_id != sq_id:
+        raise HTTPException(400, detail={"error": "training_year_not_found_for_squadron"})
+    return year
+
+
+class TrainingClassIn(BaseModel):
+    training_year_id: str
+    training_stage_id: str
+    display_name: str
+    sequence: int = 0
+    start_date: str | None = None
+    end_date: str | None = None
+    expected_count: int | None = None
+    notes: str | None = None
+
+
+class TrainingClassUpdateIn(BaseModel):
+    display_name: str | None = None
+    training_stage_id: str | None = None
+    sequence: int | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    expected_count: int | None = None
+    notes: str | None = None
+    client_version: int | None = None
+
+
+@router.get("/training-classes")
+def list_training_classes(squadron_id: str | None = None, training_year_id: str | None = None,
+                           include_archived: bool = False,
+                           db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    sq_id = _view_squadron_id(p, squadron_id, db)
+    if not sq_id:
+        return []
+    q = db.query(TrainingClass).filter(TrainingClass.squadron_id == sq_id)
+    if training_year_id:
+        q = q.filter(TrainingClass.training_year_id == training_year_id)
+    if not include_archived:
+        q = q.filter(TrainingClass.is_archived == False)  # noqa: E712
+    rows = q.order_by(TrainingClass.sequence, TrainingClass.display_name).all()
+    return [_training_class_dict(c) for c in rows]
+
+
+@router.post("/training-classes")
+def create_training_class(body: TrainingClassIn, db: DBSession = Depends(get_db),
+                           p: Principal = Depends(get_principal)):
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    sq_id = _active_squadron(p)
+    if not sq_id:
+        require_can_write_squadron(p, "none", None)
+    s = db.get(Squadron, sq_id)
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    require_can_write_squadron(p, s.id, s.wing_id)
+    _require_own_year(db, s.id, body.training_year_id)
+    _require_visible_stage(db, p, body.training_stage_id)
+    c = TrainingClass(
+        squadron_id=s.id, training_year_id=body.training_year_id,
+        training_stage_id=body.training_stage_id, display_name=body.display_name,
+        sequence=body.sequence, start_date=body.start_date, end_date=body.end_date,
+        expected_count=body.expected_count, notes=body.notes,
+        created_by=p.user_id, updated_by=p.user_id,
+    )
+    db.add(c)
+    db.commit()
+    audit(db, p, object_type="training_class", object_id=c.id, action="create")
+    return {"ok": True, "training_class_id": c.id}
+
+
+@router.patch("/training-classes/{cid}")
+def update_training_class(cid: str, body: TrainingClassUpdateIn, db: DBSession = Depends(get_db),
+                           p: Principal = Depends(get_principal)):
+    c = db.get(TrainingClass, cid)
+    if not c:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, c.squadron_id)
+    require_can_write_squadron(p, c.squadron_id, s.wing_id if s else None)
+    _check_version(c, body.client_version)
+    if body.training_stage_id is not None:
+        _require_visible_stage(db, p, body.training_stage_id)
+        c.training_stage_id = body.training_stage_id
+    if body.display_name is not None:
+        c.display_name = body.display_name
+    if body.sequence is not None:
+        c.sequence = body.sequence
+    if body.start_date is not None:
+        c.start_date = body.start_date
+    if body.end_date is not None:
+        c.end_date = body.end_date
+    if body.expected_count is not None:
+        c.expected_count = body.expected_count
+    if body.notes is not None:
+        c.notes = body.notes
+    c.version += 1
+    c.updated_by = p.user_id
+    db.commit()
+    audit(db, p, object_type="training_class", object_id=c.id, action="update")
+    return {"ok": True, "training_class_id": c.id, "version": c.version}
+
+
+@router.delete("/training-classes/{cid}")
+def archive_training_class(cid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    c = db.get(TrainingClass, cid)
+    if not c:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, c.squadron_id)
+    require_can_write_squadron(p, c.squadron_id, s.wing_id if s else None)
+    c.is_archived = True
+    c.archived_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="training_class", object_id=c.id, action="archive")
     return {"ok": True}
 
 

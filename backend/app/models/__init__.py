@@ -12,7 +12,7 @@ from .organisations import (
 from .training import (
     CurriculumItem, CurriculumElement, CurriculumPhase, CustomPhase, ParadeNight, Session, SessionStatusHistory,
     Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, TrainingArea, Equipment, Activity, Cadet,
-    TimingTemplate, TimingBlock, ParadeNightTimingOverride,
+    TimingTemplate, TimingBlock, ParadeNightTimingOverride, TrainingClass,
 )
 from .operations import (
     ActionItem, Exception, AuditLog, ImportLog, ExportLog, SystemSetting,
@@ -26,7 +26,7 @@ __all__ = [
     "NationalEntity", "Wing", "Squadron", "Flight", "User", "AccessCode", "ProxySession", "IpLoginAttempt",
     "CurriculumItem", "CurriculumElement", "CurriculumPhase", "CustomPhase", "ParadeNight", "Session", "SessionStatusHistory",
     "Facilitator", "FacilitatorRankHistory", "SubjectAreaTag", "FacilitatorTypeTag", "TrainingArea", "Equipment", "Activity", "Cadet",
-    "TimingTemplate", "TimingBlock", "ParadeNightTimingOverride",
+    "TimingTemplate", "TimingBlock", "ParadeNightTimingOverride", "TrainingClass",
     "ActionItem", "Exception", "AuditLog", "ImportLog", "ExportLog", "SystemSetting",
     "Phase", "ProgramPackage", "ProgramItem", "LearningHubResource", "ProgramItemDeployment",
     "SourceFile", "SourceConflict", "PromotionRequest", "JobStatus",

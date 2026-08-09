@@ -364,3 +364,36 @@ class CurriculumPhase(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+
+class TrainingClass(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
+    """A Squadron-specific local group undertaking a Training Stage during a
+    Training Year (e.g. "Senior 1", "Senior 2" — both undertaking the same
+    Senior CurriculumPhase). See docs/product-review/parallel-class-impact-analysis.md
+    for the full design rationale.
+
+    Distinct from CurriculumPhase (the Stage/program definition, which stays
+    a single scoped catalogue row shared by every class undertaking it) and
+    from Flight (Cadet/User sub-squadron grouping — a different, unrelated
+    concept; see .claude/rules/architecture.md).
+
+    Squadron-and-year scoped, like PlanningYear, not nationally/wing
+    inheritable like CurriculumPhase — a class belongs to exactly one
+    Squadron's one Training Year. Session.cadet_group and Cadet.phase remain
+    in place as free-text compatibility fields; this table is additive, not
+    a replacement, until every consumer has migrated (addendum §86-87).
+    """
+    __tablename__ = "training_classes"
+    squadron_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), index=True)
+    training_year_id: Mapped[str] = mapped_column(ForeignKey("planning_years.id"), index=True)
+    training_stage_id: Mapped[str] = mapped_column(ForeignKey("curriculum_phases.id"), index=True)
+    display_name: Mapped[str] = mapped_column(String(80))
+    sequence: Mapped[int] = mapped_column(Integer, default=0)
+    start_date: Mapped[str | None] = mapped_column(String(10), nullable=True)  # ISO date
+    end_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    expected_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Optimistic locking, same pattern as ParadeNight/PlanningYear/Session --
+    # rename/archive is exactly the kind of low-frequency-but-real-conflict
+    # edit that pattern protects.
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
