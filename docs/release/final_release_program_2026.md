@@ -858,3 +858,30 @@ This is a meaningful lesson for this program's own verification discipline going
 `curl`/health-check-based "is it up" check is not sufficient evidence that browser-based
 functionality actually works when CORS is in play -- recorded here rather than quietly folded into
 §28 as if it had been caught the first time.
+
+## 30. Incident follow-up — PLANNING_WORKSPACE_URL also contaminated; full variable sweep complete
+
+Continuing §29's discovery pattern, checked `PLANNING_WORKSPACE_URL` on the production backend
+directly (also not a secret, a public URL) -- **also contaminated**, pointing at staging's
+Planning Workspace. This feeds `GET /api/health/ui-config`, which connected-frontend uses to
+render its "Open Planning Workspace ↗" cross-frontend navigation link -- production users clicking
+that link would have landed on staging's Planning Workspace. Fixed; verified directly via the live
+`ui-config` endpoint, which now correctly returns the production URL (and confirms
+`"environment": "production"` is genuinely active, not just set).
+
+**Completed a full variable sweep of all three production services** to check for any further
+contamination beyond what symptom-driven discovery had found:
+- `aafc-tms-backend` production: `COOKIE_SAMESITE`, `COOKIE_SECURE`, `DB_POOL_SIZE`,
+  `DB_POOL_MAX_OVERFLOW`, `GUNICORN_WORKERS`, `LOG_LEVEL`, `PORT` all checked -- all
+  environment-agnostic-by-design values (matching `.claude/rules/architecture.md`'s explicit note
+  that `COOKIE_SAMESITE=none` is intentional and identical across environments), not further
+  contamination.
+- `aafc-tms-frontend` production: only `AAFC_API_BASE` (already fixed) and `PORT` -- clean.
+- `aafc-tms-planning-workspace-preview` production: only `AAFC_API_BASE` (already fixed) and
+  `MODULE_MODE` -- clean.
+
+**Full list of what was contaminated by the 04:57:36 UTC event, now all confirmed fixed except
+one**: `DATABASE_URL`, `AAFC_API_BASE` (both frontend services), `ENVIRONMENT`,
+`CORS_ALLOWED_ORIGINS`, `PLANNING_WORKSPACE_URL`. **Still open**: `JWT_SECRET`/`SECRET_KEY` (see
+§28/§29 and task #161) -- blocked for this session, needs the user to rotate via the Railway
+dashboard directly.
