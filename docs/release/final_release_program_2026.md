@@ -2045,3 +2045,84 @@ and now the full calendar surface. The one remaining, already-disclosed
 gap from §48 stands: `WeeklyProgram.tsx`'s `/weekly-program` route has no
 reachable path in any deployed environment (module-mode-only deployment
 topology, not a code defect).
+
+## 52. Gap register accuracy pass + CLASS-11 (rollover carries Training Classes forward), staging-verified
+
+Prompted by a plain `continue` with no further specification. Rather than
+inventing new scope, re-read the program's own gap register end to end
+first — it revealed two genuine, well-scoped pieces of unfinished work
+already on record, not new ideas.
+
+**Gap register accuracy pass**: the original discovery-phase rows
+`CLASS-01`, `CLASS-03`, `CLASS-04`, `CLASS-05`, `CLASS-06`, `CLASS-07`
+(added at the very start of this program, before any implementation) still
+read `OPEN -- blocked` or `frontend does not render`, even though every one
+of them has since been fully implemented and staging-verified — the later
+`CLASS-15` through `CLASS-24` rows document the actual build-out, but
+nobody had gone back and corrected the original summary rows. Left as-is,
+a reader skimming the register top-to-bottom would see contradictory
+status for the same feature depending which row they read. Corrected all
+six status cells to point at the real current state and the rows that
+prove it. No code change — this is a register-integrity fix, the same "no
+false closure" discipline this program applies everywhere else, just
+applied in the direction of *under*-reporting rather than over-reporting
+(both are equally real accuracy problems).
+
+**CLASS-11 — rollover carries Training Classes forward**: reading the
+register turned up a genuinely open, concrete gap. Confirmed via code
+read (not assumed from the gap register's own description, which predates
+`TrainingClass` existing at all) that `rollover_year()`
+(`POST /api/planning/years/{id}/rollover`, `planning.py`) copies holidays
+and parade dates into the new Training Year but never touches
+`TrainingClass` — a squadron with, say, Senior 1 and Senior 2 set up loses
+that structure entirely the moment they roll over to next year, and has to
+manually recreate every class from scratch before Weekly Program, Mission
+Backlog, or the dashboard chart can show anything class-specific again.
+
+**What changed**: added `copy_training_classes` to `RolloverIn` (default
+`true`, matching `copy_holidays`'s own pattern exactly). Each active class
+is recreated scoped to the new `PlanningYear`, preserving
+`training_stage_id`/`display_name`/`sequence`/`expected_count`/`notes`.
+`start_date`/`end_date` are **deliberately not copied** — they're specific
+calendar dates within the source year's own season and would simply be
+wrong (stale) in the new year, unlike holidays, which this same function
+already explicitly year-shifts by a computed `year_delta`. Archived classes
+are excluded (an intentionally-retired class shouldn't silently reappear).
+The response and the rollover's own audit record both gain
+`training_classes_copied`.
+
+**Checked both frontends' rollover UI before assuming a control was
+needed**: neither exposes `copy_holidays` or `carry_incomplete_sessions`
+as a toggle at all — `GuidedYearSetupModal.tsx` calls `rolloverYear()`
+with a bare empty body, relying entirely on backend defaults, and no
+rollover summary screen shows any of the three existing `*_copied`/
+`*_noted` counts anywhere. Since the new flag follows the exact same
+default-true, no-UI-control shape, nothing needed to be added to either
+frontend beyond a type-signature update for accuracy (`rolloverYear`'s
+TypeScript body/response types in `api/index.ts`).
+
+**Verification**: 5 new tests
+(`backend/tests/test_rollover_training_classes.py`) — default-on copy of
+active classes, archived classes excluded, `copy_training_classes=false`
+skips them, a year with zero classes reports `0` cleanly rather than
+erroring, and the copy is proven to be a genuinely independent row
+(editing the new year's class does not touch the source year's). Full
+backend suite: 1319 passed, 5 skipped (up from 1314/5, zero regressions).
+Capability manifest unchanged (268 routes, 60 tables). `tsc --noEmit`,
+`vitest` (22/22), `npm run build` all clean.
+
+**Staging deployment and live verification**: deployed to `aafc-tms-backend`
+staging (Railway, `SUCCESS`). Verified live via direct HTTPS calls against
+the deployed staging URL — created a real `TrainingClass` against the live
+Postgres-backed staging database, rolled the year over, and confirmed both
+the response (`training_classes_copied: 1`) and the new year's class list
+matched exactly what the unit tests assert (stage/name/sequence/
+expected_count preserved, `start_date`/`end_date` null as designed). Test
+fixtures cleaned up immediately after.
+
+**Residual, honestly disclosed**: no UI surfaces
+`training_classes_copied` anywhere — but that's consistent with this
+endpoint's existing behaviour (`holidays_copied`/`parade_dates_copied`/
+`incomplete_sessions_noted` aren't shown either), not a new gap this task
+introduced. A future pass could add a rollover summary screen surfacing
+everything that was copied at once, across all four counts.
