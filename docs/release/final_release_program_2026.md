@@ -1366,3 +1366,45 @@ that's a separate, not-yet-built feature, not a defect in this pass.
 Next concrete step: CLASS-05 (Mission Backlog class-awareness) or CLASS-07
 (dashboard integration of this new aggregate) — the first UI-facing
 consumers of the Training Class work so far.
+
+## 43. CLASS-07 (dashboard integration) implemented and staging-verified
+
+Continuing directly from §42 (CLASS-04). Wired the new class-specific
+curriculum progress data into the actual Squadron dashboard — see commit
+`8108482` for full detail.
+
+- New `class_curriculum_progress` chart added to `GET /api/dashboard/charts`,
+  reusing CLASS-04's derivation function rather than a second calculation.
+  The existing `curriculum_progress` chart (blended per Stage) is left
+  completely unchanged in shape — kept as a separate chart specifically to
+  protect connected-frontend's existing fixed-shape consumer from a
+  capability regression, per `.claude/rules/capability-preservation.md`.
+- Flags any class more than 15 percentage points behind its own stage's
+  aggregate — addendum §75's explicit requirement that an aggregate must
+  never hide a struggling class behind a healthy blended number.
+- 4 new regression tests following the governing program's §51 discipline
+  (verify displayed chart values against source records, not "chart
+  rendered"), full suite 1292 passed / 5 skipped / 0 regressions.
+- Deployed to staging (no migration). Confirmed via live API that the
+  existing chart's shape is byte-for-byte unchanged, and the new chart
+  renders the correct real-world empty state when no Training Classes
+  exist. Live round-trip with real data proved the weighted aggregate and
+  the "behind" flag both work correctly on real Postgres data (100%/0%
+  per-class, 50% blended, one class correctly flagged). Archived
+  everything created for the test — left no visible artifact on staging.
+  Both frontends confirmed healthy; capability manifest counts unchanged
+  (268 routes, 60 tables — a pure response-shape addition, not a new
+  route).
+- `docs/remediation/master_gap_register.csv`'s CLASS-07 entry updated to
+  `IMPLEMENTED — staging-verified (backend only; frontend does not render
+  this chart key yet)`.
+
+**Program status after four Training Class features (CLASS-01, 03, 04, 07)**:
+the backend data model, linkage, per-class progress derivation, and a
+dashboard consumer all exist and are staging-verified. Still entirely
+API-only — neither `connected-frontend` nor Planning Workspace renders any
+of this yet, so no real Squadron can use Training Classes through the
+product today. CLASS-05 (Mission Backlog) and CLASS-06 (Weekly Program)
+remain unbuilt. The honest next milestone is a frontend consumer, not
+another backend read-model — flagging this so the program doesn't keep
+adding backend depth without ever reaching a user-visible feature.
