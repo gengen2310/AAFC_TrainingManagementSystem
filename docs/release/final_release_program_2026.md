@@ -1408,3 +1408,79 @@ product today. CLASS-05 (Mission Backlog) and CLASS-06 (Weekly Program)
 remain unbuilt. The honest next milestone is a frontend consumer, not
 another backend read-model — flagging this so the program doesn't keep
 adding backend depth without ever reaching a user-visible feature.
+
+## 44. CLASS-15/16: first Training Class frontend UI, plus a real security defect and a real self-caused regression found and fixed during its own verification
+
+Continuing directly from §43 (CLASS-07), and directly acting on that
+section's own honest flag — after four backend-only features, the program
+pivoted to the first user-facing surface rather than adding more backend
+depth.
+
+**CLASS-15 — the feature**: a "Training Classes" card added to
+connected-frontend's existing Activities page (alongside Planning Year/
+Parade Dates/Holidays — the year-scoped home a Training Officer already
+uses, not a new top-level nav item). List grouped by Training Stage,
+Add/Edit modals, archive-with-confirm, following the Holiday card's exact
+existing conventions. See commit `cb1c8d3`.
+
+**Real browser verification, honestly scoped**: the interactive
+Claude-in-Chrome extension was not available in this environment
+(`Browser extension is not connected`). Rather than skip live verification
+or falsely claim it, found and used this repo's own separate, pre-existing
+Playwright suite (`frontend/e2e-connected/`, with dedicated local and
+staging configs) — a genuinely different, real browser automation path.
+5 new tests, run against both local (after discovering and fixing a local
+env gap — the ad hoc dev DB had never been seeded) and live staging.
+
+**CLASS-16 — two real defects found during that same verification pass,
+both fixed before either reached a stable state**:
+
+1. **Security (XSS)**: an automated background security review (not asked
+   for, triggered automatically) correctly flagged that the Edit button's
+   `onclick='openEditTrainingClassModal(${JSON.stringify(c)})'` interpolated
+   a full JSON object into an HTML attribute with no attribute escaping —
+   `display_name` is fully user-controlled free text, so a crafted name
+   could break out of the attribute and inject markup. This pattern was
+   copied from `openEditHolidayModal`'s own pre-existing, identically
+   unescaped code — copying an existing pattern without re-examining
+   whether it was actually safe. Fixed per the reviewer's own suggested
+   approach: pass only the escaped ID through the attribute, look the row
+   up from a new `_tcById` map inside the handler.
+
+2. **Self-caused regression, caught by the program's own verify-before-commit
+   discipline**: the first fix attempt's explanatory comment literally
+   contained the text of a script-closing tag as an example of the exact
+   danger being described. HTML parsers terminate a `<script>` element on
+   that literal byte sequence appearing *anywhere* in its content — comments
+   and JS strings included, regardless of JS syntax. Deployed to staging,
+   this silently truncated the page's single inline script block at that
+   point, discarding every function defined after it. The training-classes
+   Playwright suite — which had just gone green — immediately failed with
+   `ReferenceError: closeMobileNav is not defined`. Root-caused with a real
+   fail-before/pass-after proof rather than assumption: reverted to the
+   prior commit and redeployed (test passed), redeployed the broken version
+   again (test failed again, ruling out flakiness), found and removed the
+   literal sequence from the comment, redeployed (all 5 training-classes +
+   all 17 main-tms.spec.ts tests passed cleanly against live staging, twice).
+
+Neither defect reached a committed, stable state before being caught — the
+XSS was caught before the feature commit was even finalized in this
+session, and the regression was introduced and fixed within the same
+verification pass, never separately deployed as a claimed-working state.
+Recording both in full anyway, per this program's own discipline: a mistake
+caught by the process is evidence the process works, not something to
+quietly fold away.
+
+**Known residual gap, disclosed not hidden**: `openEditHolidayModal` still
+has the identical unescaped-JSON-in-onclick pattern this fix moved away
+from, unfixed — out of this task's scope, flagged in CLASS-16's own
+`residual_limitation` as a real, live instance of the same vulnerability
+class elsewhere in the file, worth a dedicated sweep as follow-up.
+
+**Program status after this pass**: a Squadron Admin can now create, view,
+rename, and archive Training Classes through the actual product for the
+first time. Still not connected end-to-end — assigning a Training Class to
+a Session (CLASS-03's API) has no UI yet, class-specific progress (CLASS-04/07)
+isn't shown anywhere in this new card, and Mission Backlog/Weekly Program
+(CLASS-05/06) remain entirely unbuilt. Honestly partial, not silently
+declared complete.
