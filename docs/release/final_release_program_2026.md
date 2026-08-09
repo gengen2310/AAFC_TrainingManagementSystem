@@ -647,3 +647,35 @@ the ALREADY-LINKED main working directory (which has a proper `.railway` link) w
 `--service`/`--environment` from an unlinked directory to force targeting the existing project
 rather than silently offering to create a new one -- worth confirming which flag combination
 actually prevents this failure mode before attempting Gate 8 again.
+
+## 24. Live user bug reports resolved — REM-129 and REM-130
+
+User reported two live issues mid-session: (1) parade nights created in TMS not appearing in
+Planning Workspace, (2) Planning Workspace showing other units' data to squadron-level users.
+Both investigated to root cause and fixed, staging-deployed, and live-verified.
+
+**REM-129** (parade night sync): Planning Workspace's main canvas/command-centre view is built
+entirely around `ParadeDate` (joined via `planning_year_id`), never `ParadeNight` directly.
+`POST /api/parade-nights` (TMS's plain single-night creation) never created the matching
+`ParadeDate` row -- the night was fully correct and visible in TMS/`GET /api/parade-nights`, but
+invisible in Planning Workspace regardless of refresh. Fixed: `create_parade` now also
+creates/backfills the linking `ParadeDate` row when the squadron has an active Planning Year.
+Live-verified against real staging data.
+
+**REM-130** (cross-squadron leak, HIGH severity): confirmed via AskUserQuestion as "a squadron-
+level user saw another squadron's actual data." Root cause: `GET /api/planning/locations`'
+role-scoping chain had no branch at all for `sqn_general` -- the exact role Planning Workspace's
+canvas calls this endpoint as. Every unmatched role fell through unfiltered, returning every
+Training Area in the entire system. This is the same bug class as REM-120 (an earlier live IDOR
+this program found) and the same defect class the sibling `/api/planning/facilitators` endpoint
+already had fixed at an earlier point in this program -- this endpoint was missed in that pass.
+Systematically swept both `planning.py` and `training.py` for the same pattern; found no other
+live instance. Fail-before test failed with exactly the reported symptom. Live-verified with two
+real distinct squadron logins on staging: the leak is closed, own-squadron access preserved.
+
+**Both fixed and staging-verified only** -- neither has been deployed to production. REM-130
+especially is flagged as a strong candidate for prioritized production authorization given it's a
+genuine, currently-live cross-tenant data leak (production runs pre-fix code, last backend deploy
+predates this fix) -- but per the governing program's standing rule, production deployment is not
+inferred from a bug report's urgency; it requires a fresh explicit `AUTHORISE PRODUCTION
+DEPLOYMENT <SHA>` instruction.
