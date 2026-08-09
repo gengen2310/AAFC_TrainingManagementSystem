@@ -1725,24 +1725,133 @@ directory and login flow — the connected-frontend handoff suite — not this
 one, so a new config was the correct fix rather than overloading the
 existing one incorrectly).
 
-**Honestly incomplete**: running that config against staging hit
-`{"error": "locked_out"}` on **both** `ADMIN703` and the rate-limit-reset
-helper's own `SYSADMIN2026` login — this staging environment's 15-minute
-account lockout (`LOGIN_LOCKOUT_SEC=900`, `config.py`) was already active
-before this test's own run (confirmed: the very first login attempt this
-run made was rejected as already locked out, not locked out partway
-through), most likely from unrelated concurrent activity against this
-shared staging environment earlier the same session. This is standard
-account-lockout security behaviour working correctly, not a defect — but
-it means the final live-staging-**UI** round trip (as opposed to the
-already-completed live-staging-**API** round trip in §46, and the local
-UI verification above) was not completed this pass. Per this program's own
-"no false closure" discipline, this is disclosed rather than silently
-skipped or claimed done. The remaining evidence chain (deployed bundle
-contains the code; local UI verification against the identical component
-code and a real backend passes reliably; backend already independently
-staging-verified) is strong but is not a substitute for the live-staging-UI
-check specifically — retry once the lockout window has elapsed, using
-`playwright.planning.staging.native.config.ts` against
-`e2e/mission-backlog-classes.spec.ts`, before treating this feature as
-fully staging-verified end-to-end.
+**Initially incomplete, later resolved**: running that config against
+staging first hit `{"error": "locked_out"}` on **both** `ADMIN703` and the
+rate-limit-reset helper's own `SYSADMIN2026` login — this staging
+environment's 15-minute account lockout (`LOGIN_LOCKOUT_SEC=900`,
+`config.py`) was already active before this test's own run (confirmed: the
+very first login attempt this run made was rejected as already locked out,
+not locked out partway through), most likely from unrelated concurrent
+activity against this shared staging environment earlier the same session.
+This is standard account-lockout security behaviour working correctly, not
+a defect. Per this program's own "no false closure" discipline this was
+disclosed rather than silently skipped or claimed done at the time — and
+**retried once the lockout window had elapsed**, during CLASS-06 work
+later the same session: `npx playwright test
+e2e/mission-backlog-classes.spec.ts --config=playwright.planning.staging.native.config.ts`
+now passes (1/1) against the live deployed staging preview URL with a real
+staging-backend round trip. CLASS-05 is now fully staging-verified
+end-to-end, backend and frontend, live UI included.
+
+## 48. CLASS-06 (Weekly Program class-aware breakdown) — backend and all three frontend consumers, staging-verified
+
+User instruction: "continue with CLASS-06 Weekly Program." Discovery first,
+per the CLASS-18 lesson: Weekly Program turned out to have **two entirely
+separate backend serializers** for what looks like the same concept.
+`get_weekly_program()` (`GET /api/planning/parade-dates/{id}/weekly-program`,
+`planning.py`) backs the React Planning Workspace's own
+`ParadeNightGridView.tsx` (`planningApi.weeklyProgram(dateId)`, the "Night"
+view). `list_parades()` (`GET /api/parade-nights`, `training.py`) backs
+connected-frontend's real, live Weekly Program page — `renderWP()`, reached
+via `nav('weekly-program')`, which reads from `S.pns[].sessions`, itself
+populated entirely from this endpoint. A **third** consumer,
+`WeeklyProgram.tsx` (the standalone `/weekly-program` route, full-app
+mode), also reads from `list_parades()` via `trainingApi.paradeNights()`.
+
+**A second dead-code family found, matching CLASS-18's pattern exactly**:
+while tracing which endpoint connected-frontend's Weekly Program page
+actually uses, found a second, similarly-named code path —
+`loadWeeklyProgram()`/`loadPWDates()`, targeting
+`#pw-card`/`#pw-preview-section`/`#pw-date-sel`/`#pw-empty`/
+`#pw-header-row`/`#pw-body` — that calls `get_weekly_program()` directly.
+Grepped the whole file: every one of those six container IDs has **zero**
+matches anywhere in static or dynamically-generated HTML. Confirmed
+unreachable, documented, not built into or deleted (same discipline as
+CLASS-18's own finding).
+
+**What changed (backend)**: `training_classes[]` added to each session in
+both `get_weekly_program()` and `list_parades()`, each scoped to its own
+endpoint rather than folded into the shared `_real_session_out()` (8 other
+call sites) or `_sess_dict()` (8 other call sites) serializers — matching
+the additive-not-shared discipline used throughout CLASS-05/06. 6 new tests
+for the first (`test_weekly_program_class_awareness.py`), 4 for the second
+(`test_parade_nights_class_awareness.py`). Full backend suite: 1309 passed,
+5 skipped (up from 1299/5 after §46/47, zero regressions across both
+changes combined). Capability manifest unchanged (268 routes, 60 tables)
+across both.
+
+**What changed (frontend, all three consumers)**:
+- connected-frontend: `S.pns[].sessions` mapping gains `trainingClasses`;
+  `renderWP()`'s table gains a **Class** column (escaped via `esc()`,
+  matching every other user-controlled string in this file).
+- React `WeeklyProgram.tsx`: gains a **Class** column, reading the same
+  `training_classes` field via `trainingApi.paradeNights()`.
+- React `ParadeNightGridView.tsx`: each grid cell shows its class name(s)
+  inline, reading `planningApi.weeklyProgram(dateId)`'s `training_classes`.
+- `MissionItem`/`SessionRow`/`PlanningSession` types updated to match
+  (`PlanningSession.training_classes` made optional — the 7 other endpoints
+  that also return `_real_session_out`-shaped objects were deliberately not
+  extended, so this field cannot be guaranteed present on every session a
+  React component might encounter from those call sites).
+
+**Verification**: `tsc --noEmit`, `vitest` (22/22), `npm run build` all
+clean. New tests: `frontend/e2e-connected/weekly-program-classes.spec.ts`
+(connected-frontend, 3/3 local runs) and
+`frontend/e2e/weekly-program-classes.spec.ts` (`WeeklyProgram.tsx`, 3/3
+local runs). `ParadeNightGridView.tsx` was **not** given a dedicated e2e
+test this pass — reaching it requires Year view → click a specific date →
+"Night" view, a deeper multi-step path than the other two consumers;
+verified instead via `tsc`/`vitest`/build passing plus code review, with
+its underlying data already covered by the 6 `get_weekly_program()` backend
+tests. Recorded honestly as a residual gap (CLASS-22), not silently skipped.
+
+The full local `frontend/e2e/` suite showed 11 failures during this pass,
+none in files this change touches — traced to `409 duplicate_date`/
+`duplicate rollover` errors from fixed dates/years in `parade-nights.spec.ts`,
+`year-rollover.spec.ts`, and `facilitators.spec.ts` colliding with **their
+own** leftover data from many earlier runs against this long-lived local
+dev DB today (both this session's own repeated suite runs and direct
+`curl`/pytest activity). Confirmed by inspection — none of those three
+files were touched by any CLASS-05/06 commit. Not fixed this pass (test
+hygiene debt pre-dating this task, in files unrelated to it); the clean
+staging deployment is the authoritative regression signal instead.
+
+**Staging deployment and live verification**:
+- Backend deployed twice to staging (`aafc-tms-backend`), both `SUCCESS`.
+- connected-frontend deployed (`aafc-tms-frontend` staging, `SUCCESS`).
+  `weekly-program-classes.spec.ts` run against
+  `playwright.connected.staging.config.ts` (the live deployed URL, real
+  staging backend): **1/1 passed**.
+- React Planning Workspace deployed (`aafc-tms-planning-workspace-preview`
+  staging, `SUCCESS`).
+
+**A real deployment-topology discovery, not a defect**: attempting to
+live-staging-verify `WeeklyProgram.tsx` (`e2e/weekly-program-classes.spec.ts`
+against `playwright.planning.staging.native.config.ts`) timed out waiting
+for the "Weekly Program" heading — the app silently redirected to
+`/planning` instead. Root cause: the only deployed instance of the React
+app runs in **module mode** (`aafc-module-mode` meta tag `true`, confirmed
+directly via `curl`), and module mode's router (`App.tsx`'s `ModuleEntry`)
+redirects **every** path except `/planning` back to `/planning` — this is
+by design (`.claude/rules/architecture.md`'s two-frontend split: only
+`connected-frontend` and the module-mode Planning Workspace preview are
+ever deployed; there is no third "full app mode" service). `WeeklyProgram.tsx`
+therefore has **no reachable path in any currently-deployed environment** —
+it only renders in local dev (`npm run dev`, module mode off by default).
+This is a pre-existing characteristic of the deployment topology, not
+something this task broke or should silently work around by deploying a
+new service (that is an explicit architectural decision for the user to
+make, not a side effect of a feature task, per `architecture.md`). Flagged
+honestly in the gap register (CLASS-22) rather than either claiming false
+staging verification or quietly hiding the finding.
+
+**Program status**: Mission Backlog (CLASS-05, §46/47) and Weekly Program
+(CLASS-06, this section) are both now class-aware across every real,
+reachable frontend surface, fully staging-verified where a deployed path
+exists. Six Training Class frontend/backend feature pairs total across this
+program (CLASS-01/03/04/05/06/07). Two documented dead-code discoveries
+(CLASS-18 and this section's `loadWeeklyProgram()` family) recorded, not
+silently deleted. Still open: class-specific curriculum progress (CLASS-04)
+has no dedicated UI beyond the dashboard chart (CLASS-07); split/merge
+Training Class lifecycle (addendum §59.2) remains unbuilt; `ParadeNightGridView.tsx`
+needs a dedicated e2e test.
