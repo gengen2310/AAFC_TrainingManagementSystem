@@ -1065,6 +1065,23 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </div>
           <div id="py-holidays-body"></div>
         </div>
+
+        <!-- Training Classes card (shown when a year is selected) -- CLASS-01/03/04/07:
+             a Training Class is a local group (e.g. "Senior 1", "Senior 2") undertaking
+             a Training Stage. See Help > Training Stages and Training Classes. -->
+        <div class="card" id="py-classes-card" style="display:none;margin-top:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="ctitle" style="margin:0">Training Classes</div>
+            <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
+          </div>
+          <p class="muted" style="font-size:11.5px;margin:0 0 10px">
+            A Training Class is a local group completing a Training Stage — for example, Senior 1
+            and Senior 2 can both complete Senior training but undertake different lessons on the
+            same Parade Night. If you run only one class for a Stage, you can simply call it by
+            the Stage name.
+          </p>
+          <div id="py-classes-body"></div>
+        </div>
       </div>
 
       <!-- FACILITATORS -->
@@ -1846,6 +1863,42 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-edit-holiday')">Cancel</button>
       <button class="btn btn-primary" onclick="doEditHoliday()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Training Class Modal -->
+<div class="modal-bg" id="m-add-training-class">
+  <div class="modal">
+    <h2>Add Training Class</h2>
+    <div class="form-group"><label for="tc-stage-inp">Training Stage *</label>
+      <select id="tc-stage-inp" aria-label="Training Stage"></select>
+    </div>
+    <div class="form-group"><label>Display Name *</label><input type="text" id="tc-name-inp" placeholder="e.g. Senior 1"></div>
+    <div class="form-group"><label>Order (optional)</label><input type="number" id="tc-seq-inp" min="0" placeholder="0"></div>
+    <p id="tc-add-msg" style="color:var(--error)"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-add-training-class')">Cancel</button>
+      <button class="btn btn-primary" onclick="doAddTrainingClass()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Training Class Modal -->
+<div class="modal-bg" id="m-edit-training-class">
+  <div class="modal">
+    <h2>Edit Training Class</h2>
+    <input type="hidden" id="tc-edit-id">
+    <input type="hidden" id="tc-edit-version">
+    <div class="form-group"><label for="tc-edit-stage-inp">Training Stage *</label>
+      <select id="tc-edit-stage-inp" aria-label="Training Stage"></select>
+    </div>
+    <div class="form-group"><label>Display Name *</label><input type="text" id="tc-edit-name-inp"></div>
+    <div class="form-group"><label>Order (optional)</label><input type="number" id="tc-edit-seq-inp" min="0"></div>
+    <p id="tc-edit-msg" style="color:var(--error)"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-edit-training-class')">Cancel</button>
+      <button class="btn btn-primary" onclick="doEditTrainingClass()">Save</button>
     </div>
   </div>
 </div>
@@ -9264,10 +9317,11 @@ async function loadYearMap(yearId){
   const body = document.getElementById('py-map-body');
   const datesCard = document.getElementById('py-dates-card');
   const holCard = document.getElementById('py-holidays-card');
+  const classesCard = document.getElementById('py-classes-card');
   const ctxLbl = document.getElementById('py-ctx-label-sqn');
   if(!yearId){
     body.innerHTML='<p class="muted">Select a planning year above.</p>';
-    datesCard.style.display='none'; holCard.style.display='none';
+    datesCard.style.display='none'; holCard.style.display='none'; classesCard.style.display='none';
     if(ctxLbl) ctxLbl.textContent='';
     return;
   }
@@ -9299,8 +9353,8 @@ async function loadYearMap(yearId){
     }
     body.innerHTML = annualHtml;
     P.annualProgramLoaded = true;
-    datesCard.style.display=''; holCard.style.display='';
-    await Promise.all([_renderParadeDates(yearId), _renderHolidays(yearId)]);
+    datesCard.style.display=''; holCard.style.display=''; classesCard.style.display='';
+    await Promise.all([_renderParadeDates(yearId), _renderHolidays(yearId), _renderTrainingClasses(yearId)]);
     const wid=yr.wing_id||(S.session&&S.session.wing_id)||'';
     if(wid){const wingYear=yr.year||new Date().getFullYear();await _loadAndRenderWingEventsOverlay(wid,wingYear);}
   } catch(e){ body.innerHTML = `<p class="muted">Error loading year: ${esc(apiErr(e))}</p>`; }
@@ -9608,6 +9662,110 @@ async function doEditHoliday(){
 async function deleteHoliday(hId, yearId){
   if(!confirm('Remove this holiday period?')) return;
   try { await api(`/api/planning/holidays/${hId}`,{method:'DELETE'}); await _renderHolidays(yearId); }
+  catch(e){ alert(apiErr(e)); }
+}
+
+// ── Training Classes (CLASS-01/03/04/07) ─────────────────────────────────
+// A Training Class is a Squadron-specific local group undertaking a Training
+// Stage during a Training Year -- e.g. Senior 1 and Senior 2 both undertake
+// the Senior Stage but are tracked, scheduled and progressed independently.
+// First frontend surface for this backend capability -- list/create/edit/
+// archive only; assigning a Class to a Session (SessionAudience) is not yet
+// wired into the Parade Night Builder UI.
+
+async function _populateTrainingClassStageSelect(selectId, selectedId){
+  const sel=document.getElementById(selectId); if(!sel) return;
+  try{
+    const phases=await api('/api/curriculum/phases');
+    sel.innerHTML='';
+    (phases||[]).forEach(p=>{const o=new Option(p.display_name||p.name,p.phase_id);sel.appendChild(o);});
+  }catch(_){ sel.innerHTML='<option value="">Could not load Training Stages</option>'; }
+  if(selectedId && [...sel.options].some(o=>o.value===selectedId)) sel.value=selectedId;
+}
+
+async function _renderTrainingClasses(yearId){
+  const el=document.getElementById('py-classes-body'); if(!el) return;
+  try{
+    const rows=await api(`/api/training-classes?training_year_id=${encodeURIComponent(yearId)}`);
+    if(!rows.length){ el.innerHTML='<p class="muted">No Training Classes set up for this year yet.</p>'; return; }
+    // Group by Training Stage so parallel classes of the same Stage sit together --
+    // addendum's own "group by stage" guidance for exactly this kind of list.
+    const byStage={};
+    rows.forEach(c=>{ (byStage[c.training_stage_id]=byStage[c.training_stage_id]||[]).push(c); });
+    const canWrite=canWriteSquadron();
+    let html='';
+    Object.values(byStage).forEach(classes=>{
+      html+=`<table class="data-table" style="margin-bottom:10px"><thead><tr><th>Class</th><th>Order</th><th>Expected</th><th></th></tr></thead><tbody>`+
+        classes.sort((a,b)=>(a.sequence||0)-(b.sequence||0)).map(c=>`<tr>
+          <td>${esc(c.display_name)}</td>
+          <td>${c.sequence||0}</td>
+          <td>${c.expected_count!=null?esc(String(c.expected_count)):'—'}</td>
+          <td style="white-space:nowrap">${canWrite?`<button class="btn-xs" onclick='openEditTrainingClassModal(${JSON.stringify(c)})' style="margin-right:4px">Edit</button>`:''}${canWrite?`<button class="btn-xs btn-danger" onclick="archiveTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Archive</button>`:''}</td>
+        </tr>`).join('')+
+        `</tbody></table>`;
+    });
+    el.innerHTML=html;
+  } catch(e){ el.innerHTML='<p class="muted">Error loading Training Classes.</p>'; }
+}
+
+async function openAddTrainingClassModal(){
+  if(!P.currentYearId){ alert('Select a Training Year first.'); return; }
+  document.getElementById('tc-name-inp').value='';
+  document.getElementById('tc-seq-inp').value='';
+  document.getElementById('tc-add-msg').textContent='';
+  await _populateTrainingClassStageSelect('tc-stage-inp');
+  openModal('m-add-training-class');
+}
+async function doAddTrainingClass(){
+  const msg=document.getElementById('tc-add-msg');
+  if(!P.currentYearId){ msg.textContent='Select a Training Year first.'; return; }
+  const training_stage_id=document.getElementById('tc-stage-inp').value;
+  const display_name=document.getElementById('tc-name-inp').value.trim();
+  const seqVal=document.getElementById('tc-seq-inp').value;
+  if(!training_stage_id||!display_name){ msg.textContent='Training Stage and Display Name are required.'; return; }
+  try{
+    await api('/api/training-classes',{method:'POST',body:{
+      training_year_id:P.currentYearId, training_stage_id, display_name,
+      sequence: seqVal?parseInt(seqVal,10):0,
+    }});
+    closeModal('m-add-training-class');
+    await _renderTrainingClasses(P.currentYearId);
+    showToast('Training Class added.');
+  } catch(e){ msg.textContent=apiErr(e); }
+}
+
+async function openEditTrainingClassModal(c){
+  document.getElementById('tc-edit-id').value=c.training_class_id;
+  document.getElementById('tc-edit-version').value=c.version;
+  document.getElementById('tc-edit-name-inp').value=c.display_name||'';
+  document.getElementById('tc-edit-seq-inp').value=c.sequence||0;
+  document.getElementById('tc-edit-msg').textContent='';
+  await _populateTrainingClassStageSelect('tc-edit-stage-inp', c.training_stage_id);
+  openModal('m-edit-training-class');
+}
+async function doEditTrainingClass(){
+  const msg=document.getElementById('tc-edit-msg');
+  const cid=document.getElementById('tc-edit-id').value;
+  const training_stage_id=document.getElementById('tc-edit-stage-inp').value;
+  const display_name=document.getElementById('tc-edit-name-inp').value.trim();
+  const seqVal=document.getElementById('tc-edit-seq-inp').value;
+  const client_version=parseInt(document.getElementById('tc-edit-version').value,10);
+  if(!training_stage_id||!display_name){ msg.textContent='Training Stage and Display Name are required.'; return; }
+  try{
+    await api(`/api/training-classes/${cid}`,{method:'PATCH',body:{
+      training_stage_id, display_name, sequence: seqVal?parseInt(seqVal,10):0, client_version,
+    }});
+    closeModal('m-edit-training-class');
+    await _renderTrainingClasses(P.currentYearId);
+    showToast('Training Class updated.');
+  } catch(e){
+    if(e && e.status===409){ msg.textContent='This Training Class was changed elsewhere. Reopen it to see the latest version.'; }
+    else msg.textContent=apiErr(e);
+  }
+}
+async function archiveTrainingClass(cid, yearId){
+  if(!confirm('Archive this Training Class? It will no longer appear in active planning views, but its history is kept and it can be restored later.')) return;
+  try{ await api(`/api/training-classes/${cid}`,{method:'DELETE'}); await _renderTrainingClasses(yearId); showToast('Training Class archived.'); }
   catch(e){ alert(apiErr(e)); }
 }
 
