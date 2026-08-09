@@ -1645,14 +1645,104 @@ true`, `backlog_status: "planned"`, `scheduled_count: 1`) and
 against the real deployed service rather than only the local test DB. Test
 fixtures (the class, the planning year) were cleaned up immediately after.
 
-**Honestly still open**: this is backend-only. Planning Workspace's own
-React Mission Backlog UI does not yet render `class_breakdown` — exactly
-the same "API exists, no UI consumes it yet" gap CLASS-01–04 had before
-CLASS-15–17 built connected-frontend consumers for those. The natural next
-step is a Planning Workspace (React/TypeScript) consumer in
-`PlanningBottomDrawer.tsx`, which is a different tech stack (React Query,
-Vite, its own `frontend/e2e/` Playwright suite with different conventions
-than `frontend/e2e-connected/`) from everything built in this program so
-far and needs its own discovery pass before assuming any specific pattern
-applies — not done this pass. Weekly Program (CLASS-06) still has no
-Training Class awareness at all.
+**Honestly still open at the time this section was first written**: this
+was backend-only. Planning Workspace's own React Mission Backlog UI did not
+yet render `class_breakdown` — exactly the same "API exists, no UI consumes
+it yet" gap CLASS-01–04 had before CLASS-15–17 built connected-frontend
+consumers for those. Weekly Program (CLASS-06) still has no Training Class
+awareness at all. See §47 for the frontend consumer built immediately
+after.
+
+## 47. CLASS-05 frontend consumer: Planning Workspace's Mission Backlog now renders class_breakdown
+
+Task #172, direct continuation of §46. Discovery first, per the CLASS-18
+lesson: confirmed `PlanningBottomDrawer.tsx`'s `BacklogContent` is the real,
+live renderer for the Mission Backlog table (`queryKey: ["planning-missions",
+yearId, "backlog"]` → `planningApi.missions(yearId)` → the endpoint §46
+extended), and that `frontend/src/api/types.ts`'s `MissionItem` interface is
+its single source of truth for the shape React reads.
+
+**What changed**: added `class_breakdown`/`unassigned_session_count` to
+`MissionItem`, and a new **Classes** column to the Mission Backlog table —
+one small status chip per active Training Class belonging to that mission's
+own Stage, using a dedicated `CLASS_STATUS_STYLE`/`CLASS_STATUS_LABEL` map
+that reuses the same six-state colour language as the existing item-level
+Status column, but is kept deliberately separate rather than refactoring
+that column's own already-shipped, already-tested rendering — an additive
+feature isn't the moment to touch working code for a ~20-line dedupe.
+A Stage with no Classes yet renders a plain em dash, no error. A
+`+N unassigned` note appears when scheduled sessions exist with no Training
+Class audience at all (expected/normal — audience assignment is optional).
+
+**A real, reproducible test-isolation bug found and fixed while building
+the new `frontend/e2e/mission-backlog-classes.spec.ts`**: the same
+REM-129 "highest active `year` wins" auto-link behaviour that bit the
+backend tests in §46 bit this suite too, but in a subtly different way —
+`frontend/e2e/` runs against a long-lived local dev backend (not a fresh
+DB per run, confirmed via `playwright.config.ts`'s
+`reuseExistingServer: true`), so a **fixed** Planning Year `year` value
+used across repeated runs of the same test could exactly **tie** with a
+leftover active year from an earlier (e.g. previously-failed) run — and
+title-tied rows resolve unpredictably, not necessarily to the current run's
+own year. Confirmed directly: the new Session silently linked to a stale
+leftover year, and the Mission Backlog chip rendered "Unscheduled" instead
+of "Scheduled" even though the just-created Session had been marked
+delivered with the right audience. Fixed with a timestamp-derived unique
+`year` value per run and a `try/finally` cleanup that deactivates the
+created year even when the test itself fails — a bare "clean up at the end"
+call would not have covered the failure path that actually caused this.
+
+**A second real bug found while first attempting live-staging verification,
+this one in the test's own environment assumptions, not the app**: the
+initial version of the test's login flow (`page.goto("/")` then filling the
+on-page login form) hung waiting for a login form that never appeared —
+because `authHeader()`'s earlier `page.request.post(".../auth/login")` call
+had already set the `aafc_session` fallback cookie in the same browser
+context (`page.request` shares the context's cookie jar with `page`), so
+`goto("/")` auto-resumed the session exactly as `architecture.md` documents
+this handoff is designed to. Fixed by skipping straight to the authenticated
+page rather than trying to drive a login form that correctly wasn't shown.
+
+**Verification — local**: `tsc --noEmit` clean, `vitest` 22/22 passed (no
+regressions), `npm run build` clean. The new spec passed 4/4 consecutive
+local runs against a real local backend. The full local `frontend/e2e/`
+suite: 95/96 passed — the one failure
+(`accessibility.spec.ts`'s Command Dashboard/Safari check) is a
+pre-existing, unrelated Safari-only violation on a page this change never
+touches, confirmed by reading that spec and the component it targets.
+
+**Verification — staging deployment**: deployed to
+`aafc-tms-planning-workspace-preview` staging (Railway). Confirmed the
+*actually-deployed* JS bundle (not just the local build) contains the new
+code by fetching the live bundle and grepping for the new UI strings
+(`"unassigned"`, `"Not delivered"`) directly — both present. Wrote a new
+staging-targeting Playwright config
+(`playwright.planning.staging.native.config.ts`) to run
+`frontend/e2e/mission-backlog-classes.spec.ts` against the real deployed
+preview URL with API seeding pointed at the real staging backend (the
+existing `playwright.planning.staging.config.ts` targets a different test
+directory and login flow — the connected-frontend handoff suite — not this
+one, so a new config was the correct fix rather than overloading the
+existing one incorrectly).
+
+**Honestly incomplete**: running that config against staging hit
+`{"error": "locked_out"}` on **both** `ADMIN703` and the rate-limit-reset
+helper's own `SYSADMIN2026` login — this staging environment's 15-minute
+account lockout (`LOGIN_LOCKOUT_SEC=900`, `config.py`) was already active
+before this test's own run (confirmed: the very first login attempt this
+run made was rejected as already locked out, not locked out partway
+through), most likely from unrelated concurrent activity against this
+shared staging environment earlier the same session. This is standard
+account-lockout security behaviour working correctly, not a defect — but
+it means the final live-staging-**UI** round trip (as opposed to the
+already-completed live-staging-**API** round trip in §46, and the local
+UI verification above) was not completed this pass. Per this program's own
+"no false closure" discipline, this is disclosed rather than silently
+skipped or claimed done. The remaining evidence chain (deployed bundle
+contains the code; local UI verification against the identical component
+code and a real backend passes reliably; backend already independently
+staging-verified) is strong but is not a substitute for the live-staging-UI
+check specifically — retry once the lockout window has elapsed, using
+`playwright.planning.staging.native.config.ts` against
+`e2e/mission-backlog-classes.spec.ts`, before treating this feature as
+fully staging-verified end-to-end.

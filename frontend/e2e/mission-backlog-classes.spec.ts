@@ -19,14 +19,22 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 // block so it can't linger and steal the link from a future run even if
 // this test itself fails.
 
+// The deployed preview service (module mode) serves the SPA only -- its own
+// origin does not proxy /api/* to the backend the way the local Vite dev
+// server does. Seeding calls must therefore target the backend's own
+// absolute URL when running against staging (E2E_BACKEND_BASE_URL, set by
+// playwright.planning.staging.native.config.ts), same as the API_BASE
+// pattern already established in e2e-connected/*.spec.ts.
+const API_BASE = process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000";
+
 test.beforeAll(async () => {
-  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000");
+  await resetBackendRateLimits(API_BASE);
 });
 
 const ADMIN_CODE = "ADMIN703";
 
 async function authHeader(page: Page, code: string): Promise<Record<string, string>> {
-  const r = await page.request.post("/api/auth/login", { data: { code } });
+  const r = await page.request.post(`${API_BASE}/api/auth/login`, { data: { code } });
   const token = (await r.json()).token as string;
   return { Authorization: `Bearer ${token}` };
 }
@@ -35,7 +43,7 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   const hdr = await authHeader(page, ADMIN_CODE);
   const suffix = String(Date.now());
 
-  const meRes = await page.request.get("/api/auth/me", { headers: hdr });
+  const meRes = await page.request.get(`${API_BASE}/api/auth/me`, { headers: hdr });
   const me = await meRes.json();
   const sqnId = me.session.squadron_id as string;
   const wingId = me.session.wing_id as string;
@@ -52,7 +60,7 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   // per run, not just per test file.
   const uniqueYear = 2600 + (Date.now() % 5000);
   const yearName = `CLASS-05 PW Test ${suffix}`;
-  const yearRes = await page.request.post("/api/planning/years", {
+  const yearRes = await page.request.post(`${API_BASE}/api/planning/years`, {
     data: { year: uniqueYear, name: yearName }, headers: hdr,
   });
   expect(yearRes.ok()).toBe(true);
@@ -60,7 +68,7 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   const yearId = year.planning_year_id as string;
 
   const stageName = `CLASS-05-PW-${suffix}`;
-  const stageRes = await page.request.post("/api/curriculum/phases", {
+  const stageRes = await page.request.post(`${API_BASE}/api/curriculum/phases`, {
     data: { name: stageName, display_name: stageName, scope_level: "squadron", squadron_id: sqnId },
     headers: hdr,
   });
@@ -68,7 +76,7 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   const stageId = (await stageRes.json()).phase_id as string;
 
   const className = `PW Chip Class ${suffix}`;
-  const classRes = await page.request.post("/api/training-classes", {
+  const classRes = await page.request.post(`${API_BASE}/api/training-classes`, {
     data: { training_year_id: yearId, training_stage_id: stageId, display_name: className },
     headers: hdr,
   });
@@ -76,7 +84,7 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   const classId = (await classRes.json()).training_class_id as string;
 
   const code = `PW05${suffix.slice(-6)}`;
-  const ciRes = await page.request.post("/api/curriculum", {
+  const ciRes = await page.request.post(`${API_BASE}/api/curriculum`, {
     data: {
       code, title: "PW Chip Test Item", phase: stageName,
       learning_hub_url: "https://example.invalid/pw-chip-test",
@@ -92,21 +100,21 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   // date-uniqueness approach already used elsewhere in this program's own
   // test suites (e.g. e2e-connected/session-training-classes.spec.ts).
   const pnDate = new Date(2100, 3, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
-  const pnRes = await page.request.post("/api/parade-nights", {
+  const pnRes = await page.request.post(`${API_BASE}/api/parade-nights`, {
     data: { squadron_id: sqnId, wing_id: wingId, date: pnDate, parade_type: "normal" },
     headers: hdr,
   });
   expect(pnRes.ok()).toBe(true);
   const pnId = (await pnRes.json()).parade_night_id as string;
 
-  const sessRes = await page.request.post("/api/sessions", {
+  const sessRes = await page.request.post(`${API_BASE}/api/sessions`, {
     data: { parade_night_id: pnId, period_number: 1, cadet_group: "senior", curriculum_item_id: ciId },
     headers: hdr,
   });
   expect(sessRes.ok()).toBe(true);
   const sid = (await sessRes.json()).session_id as string;
 
-  const editRes = await page.request.put(`/api/sessions/${sid}`, {
+  const editRes = await page.request.put(`${API_BASE}/api/sessions/${sid}`, {
     data: {
       parade_night_id: pnId, period_number: 1, cadet_group: "senior",
       curriculum_item_id: ciId, status: "delivered",
@@ -115,7 +123,7 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   });
   expect(editRes.ok()).toBe(true);
 
-  const audRes = await page.request.put(`/api/sessions/${sid}/audience`, {
+  const audRes = await page.request.put(`${API_BASE}/api/sessions/${sid}/audience`, {
     data: { training_class_ids: [classId] }, headers: hdr,
   });
   expect(audRes.ok()).toBe(true);
@@ -126,8 +134,8 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   // failure, not only on the happy path.
   try {
     // ── Real UI verification ────────────────────────────────────────────
-    // authHeader()'s page.request.post("/api/auth/login") above already set
-    // the aafc_session fallback cookie in this page's own browser context
+    // authHeader()'s page.request.post(...) call above already set the
+    // aafc_session fallback cookie in this page's own browser context
     // (page.request shares the context's cookie jar with page) -- a plain
     // goto("/") auto-resumes that session via the cookie fallback and never
     // renders the login form at all (architecture.md's documented
@@ -155,10 +163,10 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   } finally {
     // Clean up -- archive the class and deactivate the year so nothing here
     // lingers as an active high-`year` PlanningYear for a future test run.
-    await page.request.delete(`/api/training-classes/${classId}`, { headers: hdr });
-    const curYearRes = await page.request.get(`/api/planning/years/${yearId}`, { headers: hdr });
+    await page.request.delete(`${API_BASE}/api/training-classes/${classId}`, { headers: hdr });
+    const curYearRes = await page.request.get(`${API_BASE}/api/planning/years/${yearId}`, { headers: hdr });
     const curYear = await curYearRes.json();
-    await page.request.patch(`/api/planning/years/${yearId}`, {
+    await page.request.patch(`${API_BASE}/api/planning/years/${yearId}`, {
       data: { active_status: false, version: curYear.version }, headers: hdr,
     });
   }
