@@ -329,6 +329,46 @@ def test_sqn_admin_can_delete_parade_date(client):
 
 
 # ─────────────────────────────────────────────────────────────
+# Parade night <-> ParadeDate linkage (REM-129)
+# ─────────────────────────────────────────────────────────────
+
+def test_plain_parade_night_create_links_to_active_planning_year(client):
+    """REM-129: connected-frontend's plain "add one parade night" flow
+    (POST /api/parade-nights, no year_id) previously created a ParadeNight
+    with no matching ParadeDate row. Planning Workspace's main canvas/
+    command-centre view is built entirely around ParadeDate
+    (joined via planning_year_id), so a night created this way was fully
+    visible in TMS and via GET /api/parade-nights, but invisible in Planning
+    Workspace -- reported live as "created in TMS, not showing in Planning
+    Workspace even after a refresh"."""
+    hdr = _sqn_admin_hdr(client)
+    # A unique, unambiguously-highest year value -- squadron 703 already has a
+    # seeded active planning year (and other tests in this file create more),
+    # and create_parade's auto-link picks the most recent active year by
+    # `year` number when several exist for the same squadron. Using a year far
+    # beyond anything else in this suite keeps the fix's own tie-break
+    # deterministic for this test, rather than assuming _make_year's fixed
+    # year=2026 is the only (or most recent) one for this squadron.
+    r = client.post("/api/planning/years", json={"year": 2099, "name": "REM-129 test year"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    year = r.json()
+    yr_id = year["planning_year_id"]
+    assert year["active_status"] is True
+
+    r = client.post("/api/parade-nights", json={"date": "2029-03-14", "term": "T2"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    pn_id = r.json()["parade_night_id"]
+
+    dates = client.get(f"/api/planning/years/{yr_id}/parade-dates", headers=hdr).json()
+    matching = [d for d in dates if d["parade_date"] == "2029-03-14"]
+    assert len(matching) == 1, f"expected exactly one ParadeDate for this date, got {matching}"
+    assert matching[0]["parade_night_id"] == pn_id, (
+        "the ParadeDate must link back to the newly created ParadeNight, "
+        "or Planning Workspace's command-centre still won't show it"
+    )
+
+
+# ─────────────────────────────────────────────────────────────
 # Holidays
 # ─────────────────────────────────────────────────────────────
 

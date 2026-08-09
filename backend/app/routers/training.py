@@ -304,7 +304,43 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
                      session_count=session_count, parade_type=body.parade_type or "normal",
                      timing_template_id=effective_tmpl.id if effective_tmpl else None,
                      created_by=p.user_id)
-    db.add(pn); db.commit()
+    db.add(pn); db.flush()
+
+    # REM-129: Planning Workspace's main canvas/command-centre view is built
+    # entirely around ParadeDate (joined via ParadeDate.planning_year_id), not
+    # ParadeNight directly -- a ParadeNight created through this plain endpoint
+    # (connected-frontend's manual "add one parade night" flow) had no matching
+    # ParadeDate row, so it was fully visible via GET /api/parade-nights (and
+    # therefore inside TMS itself) but invisible in Planning Workspace's main
+    # view, which only ever learns about a night through its ParadeDate link.
+    # generate_parade_dates() and the CSV import path already create this link
+    # correctly; this endpoint was the one gap. Only auto-links to a
+    # squadron-scoped active Planning Year (unit_id == this squadron) -- the
+    # same scope Planning Workspace's own `GET /api/planning/years?unit_id=...`
+    # resolves for a squadron-role session -- so this never silently reaches
+    # into a wing/national-scoped year.
+    from ..models.planning import ParadeDate, PlanningYear
+    active_year = (
+        db.query(PlanningYear)
+        .filter(PlanningYear.unit_id == s.id, PlanningYear.active_status == True)  # noqa: E712
+        .order_by(PlanningYear.year.desc())
+        .first()
+    )
+    if active_year:
+        existing_pd = db.query(ParadeDate).filter(
+            ParadeDate.planning_year_id == active_year.id,
+            ParadeDate.parade_date == body.date,
+        ).first()
+        if existing_pd:
+            if not existing_pd.parade_night_id:
+                existing_pd.parade_night_id = pn.id
+        else:
+            db.add(ParadeDate(
+                planning_year_id=active_year.id, unit_id=s.id, parade_date=body.date,
+                parade_type="standard", term=body.term, parade_night_id=pn.id,
+            ))
+
+    db.commit()
     meta = client_meta(request)
     audit(db, p, object_type="parade_night", object_id=pn.id, action="create",
           new={"date": body.date}, ip=meta["ip"], ua=meta["ua"])
