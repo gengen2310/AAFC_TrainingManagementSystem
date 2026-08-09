@@ -903,3 +903,37 @@ the stored variable value.
 
 **Incident status: RESOLVED except JWT_SECRET/SECRET_KEY rotation (task #161, still open, needs
 user action via the Railway dashboard).**
+
+## 32. Executive assessment update — production incident impact
+
+§18's classification was written before the §28-31 production incident. Updating it in place with
+that context, since a real SEV1 production outage occurring during this program is directly
+relevant to any release-readiness judgment, not a detail to leave buried in a progress log.
+
+**What the incident does and doesn't change:**
+
+- It does **not** indicate a defect in this program's own engineering work -- root cause was an
+  external variable-contamination event (§28), not a bug this program introduced, and this
+  program's own response caught, root-caused, and resolved the functional impact within the same
+  session (backend/both frontends down → fully restored, including the CORS/PLANNING_WORKSPACE_URL
+  issues that a shallow health check alone would have missed).
+- It **does** demonstrate a real gap this program had not previously tested: recovery from a live
+  production configuration incident. This was reactive (responding to a real event), not a planned
+  Gate 8 rehearsal (§25, still blocked/deferred) -- but it is real, live evidence that the
+  engineering response process works: root-caused correctly, fixed with explicit user
+  authorization at each production-write step, verified functionally (not just via health checks)
+  before declaring resolution, and documented honestly including the parts (CORS,
+  PLANNING_WORKSPACE_URL) initially missed on the first pass.
+- It **does** leave one genuine, currently-open item: `JWT_SECRET`/`SECRET_KEY` rotation (task
+  #161), blocked for this session's own tooling and requiring direct user action. This is a real,
+  disclosed, unresolved security gap as of this commit -- not fabricated as closed.
+- The incident's root cause (what actually overwrote production's variables at 04:57:36 UTC) is
+  still unknown (§28) -- an open question for the user's own Railway account activity review, not
+  something this program's own tooling has visibility into.
+
+**Revised classification**: still **TECHNICALLY READY FOR PUBLIC RELEASE — HUMAN APPROVALS
+PENDING**, unchanged from §18 -- but now with an additional, concrete pre-release action added to
+the human-approval list: confirm `JWT_SECRET`/`SECRET_KEY` rotation is complete, and get a credible
+answer on what caused the 04:57:36 UTC contamination event before treating production's
+configuration as trustworthy going forward (a recurrence with a future contamination event could
+be far more severe if it touched a variable this program's own checks didn't happen to catch).
