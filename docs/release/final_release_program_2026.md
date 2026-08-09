@@ -1484,3 +1484,72 @@ a Session (CLASS-03's API) has no UI yet, class-specific progress (CLASS-04/07)
 isn't shown anywhere in this new card, and Mission Backlog/Weekly Program
 (CLASS-05/06) remain entirely unbuilt. Honestly partial, not silently
 declared complete.
+
+## 45. CLASS-17/18/19: Session<->TrainingClass assignment wired into the real Quick Edit flow, a dead-code discovery, and a real display-bug fix
+
+Continuing directly from §44 (CLASS-15/16). Task #170 asked to wire CLASS-03's
+audience API into "the Parade Night Builder UI" — investigation found the
+UI matching that description by name is unreachable dead code, and the real
+integration point was somewhere else entirely.
+
+**CLASS-18 — a genuine dead-code discovery, recorded not silently
+"fixed" or silently ignored**: `#m-edit-session` / `doSaveSession()` /
+`openEditSessionModalPn()` and 3 sibling functions all target
+`document.getElementById('builder-card')` / `('builder-grid')` — neither ID
+exists anywhere in this file's static or dynamically-generated HTML. Any of
+these 6 functions would throw immediately if actually invoked. Confirmed via
+direct grep, not assumption. Building CLASS-03's UI into this dead code
+would have delivered zero real capability while looking complete on a diff.
+Left in place, undeleted — recorded in the gap register as a documented,
+low-risk maintenance hazard for a future pass, since removing it wasn't this
+task's job and deleting code without confirming it's truly never
+load-bearing deserves its own explicit check.
+
+**CLASS-17 — the real feature**: found the actual, live session-edit
+surface instead — `quickEdit()` / `saveSessEdit()` / `#m-sess-edit` (the
+"Quick Edit" modal), reached from `buildPNCard()`'s own Edit button on the
+Parade Nights page, confirmed reachable from 5 real call sites. Added a
+Training Classes checklist there: fetches every active class for the
+caller's squadron (deliberately not scoped to one Training Year, since a
+Squadron can have more than one active PlanningYear simultaneously with no
+auto-deactivation), pre-checks the Session's existing audience, and
+`saveSessEdit()` now PUTs the selection to `/api/sessions/{id}/audience`
+after the main Session save succeeds.
+
+**CLASS-19 — a real, unrelated, live display defect found and fixed along
+the way**: while writing tests, discovered `S.pns`'s frontend mapping read
+`notes:pn.parade_type||''` instead of `notes:pn.notes||''`. The actual
+notes text a user types into a Parade Night's Details panel saved correctly
+to the backend but was **never displayed anywhere that reads `S.pns`** — the
+card list, the notes search filter, two other display spots — and the
+Parade Night Type dropdown never pre-selected the saved type either, since
+it read `pn.parade_type` from the same object where that key was never
+populated at all. Fixed both fields properly. A real, live, multi-feature
+bug that had nothing to do with the task at hand, caught only because a test
+needed to locate a specific card reliably and the "obvious" way (matching on
+notes text) silently failed.
+
+**Verification, following an unexpected but honest turn**: writing
+Playwright tests for the new checklist surfaced two more real, live issues
+in quick succession — a race condition in my own new code (fixed by properly
+awaiting the populate call instead of fire-and-forget) and a test-authoring
+mistake (re-logging-in as a different role on the same page without clearing
+the prior session, which the app correctly auto-resumed instead of showing a
+fresh login form — fixed the test, not the app). Each of the 5 new tests
+passes reliably in isolation; running all of them back to back locally
+intermittently hits this test suite's own known, pre-existing rate-limit
+budget (already documented in `main-tms.spec.ts`'s comments) — confirmed
+this is not a defect in the change by running the **full combined suite (25
+tests across `main-tms.spec.ts` + `training-classes.spec.ts` +
+`session-training-classes.spec.ts`) directly against live staging: 25/25
+passed**, where the rate-limit reset has its full intended effect.
+
+**Program status**: five Training Class frontend/backend pairs now exist
+and are staging-verified (CLASS-01, 03, 04, 07, and now the Quick Edit
+assignment UI). A Squadron Admin can create classes, assign Sessions to
+them, and see the dashboard reflect it — a materially more complete,
+genuinely usable slice than at the end of §43. Still open: class-specific
+progress isn't shown in any UI yet (CLASS-04/07's data exists only via
+direct API/dashboard chart), Mission Backlog and Weekly Program remain
+unbuilt (CLASS-05/06), Planning Workspace has no Training Class UI at all,
+and CLASS-18's dead code remains undeleted.
