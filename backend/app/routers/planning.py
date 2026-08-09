@@ -1803,11 +1803,20 @@ def list_locations(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
+    # REM-130: this endpoint's role chain had no branch at all for sqn_general
+    # (only sqn_admin was scoped) -- live-reported as a sqn_general user seeing
+    # another squadron's data in Planning Workspace. sqn_general fell through
+    # every branch unfiltered, returning every TrainingArea in the system --
+    # the exact same class of gap already found and fixed once for the sibling
+    # /api/planning/facilitators endpoint (see that endpoint's own comment),
+    # just with sqn_general specifically missed here rather than a whole-role
+    # rewrite. Squadron-level roles (sqn_admin and sqn_general) both scope to
+    # their own squadron; wing/national behaviour is unchanged.
     q = db.query(TrainingArea).filter(
         TrainingArea.active_status == True,  # noqa: E712
         TrainingArea.is_archived == False,  # noqa: E712
     )
-    if p.role == "sqn_admin":
+    if p.role in ("sqn_admin", "sqn_general"):
         q = q.filter(TrainingArea.squadron_id == p.squadron_id)
     elif p.role in ("wing_admin", "wing_viewer"):
         sqn_ids = [s.id for s in db.query(Squadron).filter(

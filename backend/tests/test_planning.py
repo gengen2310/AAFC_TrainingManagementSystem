@@ -639,6 +639,34 @@ def test_locations_listed(client):
     assert "Gym" in names
 
 
+def test_sqn_general_only_sees_own_squadrons_locations(client):
+    """REM-130, live-reported: Planning Workspace showed a squadron-level user
+    another squadron's data. Root cause: list_locations' role-scoping chain
+    had no branch at all for sqn_general (only sqn_admin was scoped) -- every
+    other role fell through unfiltered, returning every TrainingArea in the
+    system. sqn_general is the role Planning Workspace's own canvas actually
+    calls this endpoint as (planningApi.locations(), no squadron_id param)."""
+    hdr_703_admin = _sqn_admin_hdr(client)
+    client.post("/api/planning/locations",
+                json={"name": "703-Only Room", "location_type": "indoor"}, headers=hdr_703_admin)
+
+    hdr_704_general = login(client, "704SQN2026")
+    r = client.get("/api/planning/locations", headers=hdr_704_general)
+    assert r.status_code == 200, r.text
+    names = [loc["name"] for loc in r.json()]
+    assert "703-Only Room" not in names, (
+        "a 704 sqn_general must never see 703's Training Area/Location -- "
+        f"got: {names}"
+    )
+
+    hdr_703_general = login(client, "703SQN2026")
+    r2 = client.get("/api/planning/locations", headers=hdr_703_general)
+    assert r2.status_code == 200, r2.text
+    assert "703-Only Room" in [loc["name"] for loc in r2.json()], (
+        "703's own sqn_general must still see 703's own Training Area/Location"
+    )
+
+
 def test_location_update(client):
     hdr = _sqn_admin_hdr(client)
     rl = client.post("/api/planning/locations",
