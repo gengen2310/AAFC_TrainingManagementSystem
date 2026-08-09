@@ -1080,3 +1080,67 @@ here.
 Not manufacturing further speculative work beyond this point without a new concrete lead (a fresh
 user report, a new test failure, or explicit direction) -- the program's own engineering-side work
 is substantively exhausted at HIGH-severity-and-above, with the honest exceptions listed above.
+
+## 38. Mobile Playwright project run (first this program) — found and fixed REM-131
+
+Ran `tools/playwright-staging`'s `mobile` project (Pixel 7 emulation) against live staging for the
+first time this program, closing one item from §37's open list. Result: 37 passed, 3 failed, 6
+skipped. Two failures were the already-known, self-resolving `SYSADMIN2026` account lockout (not
+new — recurs predictably under heavy test-suite volume, previously diagnosed, not re-litigated
+here). The third was new: `HOL-EDIT-01: Edit button on holiday row opens modal; PATCH saves
+successfully` failed with a real `PATCH → 422`.
+
+**Root cause** — same bug class as REM-128 (test-data accumulation without reset), a second,
+independent instance. Traced live via direct curl checks against staging (`ADMIN703` login → the
+squadron's planning year → its holidays):
+
+```
+114 'Labour Day 2026 (verified) (verified) (verified) (verified) (verified) (verified) (verified) (verified) (verified)'
+```
+
+`HOL-EDIT-01` edits whichever holiday row is first in the list — not a record it created itself —
+and unconditionally appends `" (verified)"` with no reset. Across 9 un-reset runs this program, a
+real seeded reference holiday ("Labour Day 2026") grew to 114 characters; REM-127's own
+`max_length=120` validation (added earlier this program, working exactly as designed) correctly
+rejected the 10th append, surfacing as a persistent 422 rather than silent unbounded growth.
+
+Checking the live data for this also surfaced a **second, independent instance** of the same class:
+`staging-verification.spec.ts`'s `"[Activities] Holiday create → verify → cleanup"` test creates a
+real `"PLAYWRIGHT TEST HOLIDAY"` record every run and — despite its own name promising cleanup —
+never actually deleted it. 11 duplicate rows had silently accumulated on squadron 703's real
+staging calendar across this program's repeated chromium/mobile runs. A working
+`DELETE /api/planning/holidays/{id}` endpoint already existed; the test simply never called it.
+
+**Fixes** (both in `tools/playwright-staging/tests/`, test infrastructure only — no application
+code changed):
+- `verify-fixes.spec.ts` (`HOL-EDIT-01`): cap the edited name at 120 chars as a safety guard, and
+  revert the name back to its original value after the PATCH assertions, so the test is idempotent
+  across repeated runs instead of leaving accumulated state on whatever record it happens to touch.
+- `staging-verification.spec.ts` (`"Holiday create → verify → cleanup"`): after verifying the
+  created holiday appears, poll `S.holidays` (bare page-scope identifier — same pattern established
+  by REM-128, since `S`/`api` are top-level `let`/`function` in connected-frontend's classic inline
+  `<script>` and never attach to `window`) for up to 3s for the just-created record, then DELETE it
+  via the real endpoint, asserting the cleanup actually found and removed something. The 3s poll
+  was needed after an initial version flaked once — `S.holidays` can lag one render tick behind the
+  DOM the visibility assertion already confirmed.
+
+**Data cleanup**: PATCHed "Labour Day 2026" back to its correct name (200 OK, confirmed via GET);
+DELETEd all 11 (a 12th appeared mid-cleanup from an in-flight verification run) accumulated
+`"PLAYWRIGHT TEST HOLIDAY"` rows via the real DELETE endpoint. Confirmed final state via a fresh
+GET: squadron 703's Planning Year shows exactly its 9 real holidays, zero test artifacts.
+
+**Verification**: 3 consecutive clean `HOL-EDIT-01` runs across both chromium and mobile with
+`--retries=0`; 4 consecutive clean `"Holiday create → verify → cleanup"` runs (3 chromium + 1
+mobile) with `--retries=0`. Then ran the full `staging-verification.spec.ts` + `verify-fixes.spec.ts`
+suite once more end-to-end on chromium to confirm no regressions: 20 passed, 2 failed (both the
+known `SYSADMIN2026` lockout — `F-FUNC-01` falls back to `SYS_ADMIN` when
+`STAGING_NATIONAL_VIEWER_CODE` isn't set, confirmed by reading the test's own fallback branch), 2
+flaky-then-passed-on-retry (my own `"Holiday create → verify → cleanup"` fix, plus the pre-existing
+REM-128 tag test — both recovered on Playwright's own retry, consistent with ordinary network
+jitter under full-suite load, not a correctness regression), 1 skipped. Recorded as REM-131 in
+`docs/remediation/master_gap_register.csv` (170 entries now, 51 open, still zero HIGH-or-above).
+
+This is the second time this program a test-hygiene bug was found only by inspecting live staging
+data directly rather than trusting green test output alone (REM-128 was the first). Worth a future
+standalone pass auditing every e2e test that creates a record for the same missing-cleanup pattern
+— not attempted exhaustively here, flagged as a lead for later, not manufactured into scope now.

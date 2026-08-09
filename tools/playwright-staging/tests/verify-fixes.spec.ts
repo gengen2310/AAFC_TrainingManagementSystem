@@ -214,10 +214,16 @@ test("HOL-EDIT-01: Edit button on holiday row opens modal; PATCH saves successfu
   await expect(modal, "#m-edit-holiday edit modal must open").toBeVisible({ timeout: 5000 });
   await expect(page.locator("#hol-edit-type"), "Type selector must exist in edit modal").toBeVisible();
 
-  // Modify name and save
+  // Modify name and save. This edits whatever holiday row happens to be
+  // first — often a real, long-lived seeded record (e.g. "Labour Day 2026"),
+  // not one this test created — so the suffix must never be left in place
+  // across runs. Same test-data-accumulation bug class as REM-128: repeated
+  // un-reset runs previously grew the name past REM-127's 120-char limit
+  // and turned this test into a permanent 422 failure.
   const nameField = page.locator("#hol-edit-name");
   const origName = await nameField.inputValue();
-  await nameField.fill(origName + " (verified)");
+  const editedName = `${origName} (verified)`.slice(0, 120);
+  await nameField.fill(editedName);
 
   const patchErrors: string[] = [];
   page.on("response", (r) => {
@@ -233,6 +239,15 @@ test("HOL-EDIT-01: Edit button on holiday row opens modal; PATCH saves successfu
   expect(await modal.isVisible(), "Edit modal must close after successful PATCH save").toBe(false);
 
   await page.screenshot({ path: "test-results/hol-edit-01.png", fullPage: false });
+
+  // Revert the name so this test is idempotent across repeated runs instead
+  // of accumulating " (verified)" onto the record indefinitely.
+  await editBtn.click();
+  await page.waitForTimeout(500);
+  await expect(modal, "#m-edit-holiday edit modal must reopen for cleanup").toBeVisible({ timeout: 5000 });
+  await nameField.fill(origName);
+  await modal.locator("button").filter({ hasText: /save/i }).click();
+  await page.waitForTimeout(1000);
 });
 
 // ── F-FUNC-01 ─────────────────────────────────────────────────────────────────

@@ -218,6 +218,31 @@ test("[Activities] Holiday create → verify → cleanup", async ({ page }) => {
   ).toBeVisible({ timeout: 8_000 });
 
   await screenshot(page, "activities-holiday-created");
+
+  // Cleanup: this test's own name promises "create -> verify -> cleanup", but
+  // until now it only ever created -- every run left a permanent
+  // "PLAYWRIGHT TEST HOLIDAY" row on staging (same test-data-accumulation bug
+  // class as REM-128/HOL-EDIT-01: 11 duplicates had piled up across repeated
+  // chromium/mobile project runs before this was caught). Delete the holiday
+  // this run just created via the real DELETE endpoint so the suite is
+  // idempotent across repeated runs. See REM-128's cleanup block above for why
+  // `S`/`api` must be referenced as bare identifiers, not `window.S`/`window.api`.
+  const cleanup = await page.evaluate(async () => {
+    declare const S: { holidays: Array<{ id: string; name: string }> };
+    declare function api(path: string, opts?: Record<string, unknown>): Promise<unknown>;
+    // S.holidays can lag one render tick behind the DOM (which the assertion
+    // above already confirmed updated) -- poll briefly rather than racing it.
+    let hol: { id: string; name: string } | undefined;
+    for (let i = 0; i < 10 && !hol; i++) {
+      hol = S.holidays.find((h) => h.name === "PLAYWRIGHT TEST HOLIDAY");
+      if (!hol) await new Promise((r) => setTimeout(r, 300));
+    }
+    if (hol) {
+      await api(`/api/planning/holidays/${hol.id}`, { method: "DELETE" });
+    }
+    return { deletedId: hol?.id ?? null };
+  });
+  expect(cleanup.deletedId, "Test must delete the holiday it created, not leave it accumulating on staging").not.toBeNull();
 });
 
 // ── Section 6: Generate Activities workflow ───────────────────────────────────
