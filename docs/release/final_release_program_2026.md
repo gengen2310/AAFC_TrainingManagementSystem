@@ -1889,3 +1889,79 @@ only remaining, honestly-disclosed gap is `WeeklyProgram.tsx`'s
 `/weekly-program` route having no reachable path in any currently-deployed
 environment (module-mode-only deployment topology, §48), which is a
 deployment-architecture characteristic, not a testing gap.
+
+## 50. CLASS-04 dedicated UI (per-class curriculum progress) — staging-verified
+
+User instruction: "continue with CLASS-04 dedicated UI." CLASS-04/07 had
+already built and staging-verified the per-class curriculum progress
+computation (`_class_curriculum_progress`, `training.py`) and two
+endpoints — `GET /api/training-classes/{id}/curriculum-progress` (one
+class's own requirement list) and `GET /api/curriculum/phases/{id}/class-progress`
+(a Stage's aggregate across all its classes) — plus a squadron-wide
+dashboard chart built on the second one. What was missing: no UI let a
+user drill from "this Stage is 62% covered" down to "this specific class
+has delivered these 5 items and not these other 3."
+
+**What changed**: the Training Classes card (Activities page,
+connected-frontend) gains a **Curriculum Progress** column — a
+coverage-percentage pill per class, colour-thresholded (green/amber/red)
+matching this file's existing chart-insight palette — and a **View
+Progress** button opening a new detail modal (`#m-training-class-progress`)
+listing every requirement in that class's Stage with its own status
+(delivered/planned/not delivered/cancelled/not started). The pill data is
+fetched **once per Stage group**, not once per class — reusing the
+existing stage-level aggregate endpoint's own per-class breakdown array
+rather than N separate calls — so a squadron with several classes under
+one Stage costs one extra request per Stage, not one per class. Neither
+endpoint's own computation changed; this is a pure read-only UI addition.
+
+**Verification**: 2 new Playwright tests
+(`frontend/e2e-connected/training-class-progress.spec.ts`) — a real
+1-of-2-delivered fixture confirms the pill shows exactly 50% and the modal
+lists both requirements with their correct real statuses; a second test
+confirms `sqn_general` can view progress but sees no Edit/Archive controls
+in the same row. Both pass reliably in isolation (9/9 across several
+repeated batches during development).
+
+**A real test-flakiness source found and fixed**, same underlying class of
+bug as CLASS-06's date-collision fixes but a new instance: this file's own
+two tests each seed a parade night a few seconds apart, and the
+`Date.now() % 300` date-offset pattern used elsewhere in this directory
+only has 300 possible values — collided in practice. Fixed with an
+in-process counter (guarantees uniqueness *within* one run) plus a widened
+~3000-value jitter range (makes collision with an *earlier* run's leftover
+data negligible, since the in-process counter resets to 0 on every fresh
+process invocation and can't help across separate runs).
+
+**A real investigation, concluded as pre-existing noise, not a
+regression**: running the full pre-existing `training-classes.spec.ts`
+file (5 tests, not touched by this change) showed 2 intermittent failures
+when run together with the rest of the suite. Investigated properly rather
+than assumed: `git stash`-reverted this entire change and re-ran the exact
+same file — the same 2 failures reproduced with **zero** lines of this
+change present. Confirmed pre-existing suite flakiness from today's heavy
+accumulated local-DB test volume (same class of issue CLASS-17 already
+documented for this suite), not something this task introduced. Restored
+the change afterward.
+
+Security greps: 2 matches, both the already-documented pre-existing false
+positives (an audit-log filter dropdown option containing the string
+`access_code`, a `pg_restore` example command containing the string
+`DATABASE_URL`) — confirmed neither line was touched by this change.
+
+**Staging deployment and live verification**: deployed to
+`aafc-tms-frontend` staging (Railway, `SUCCESS`).
+`training-class-progress.spec.ts` run against
+`playwright.connected.staging.config.ts` (the live deployed URL, real
+staging backend): **2/2 passed** — both the coverage pill and the full
+requirement-detail modal verified against real data seeded through the
+live staging API.
+
+**Residual limitation, honestly disclosed**: Planning Workspace (React)
+still has no Training Class UI of any kind, including this progress
+view — a separately-tracked, larger gap (Planning Workspace's Training
+Class support is currently zero across every CLASS-* feature, not specific
+to progress). The per-Stage batching approach is fine at current squadron
+scale (a handful of Stages) but would need pagination/lazy-loading if that
+scale changes substantially — not a concern worth solving speculatively
+now.
