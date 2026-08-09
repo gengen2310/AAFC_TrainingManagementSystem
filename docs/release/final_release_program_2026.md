@@ -1965,3 +1965,83 @@ to progress). The per-Stage batching approach is fine at current squadron
 scale (a handful of Stages) but would need pagination/lazy-loading if that
 scale changes substantially — not a concern worth solving speculatively
 now.
+
+## 51. CLASS-06 pt.3 — Planning Workspace's calendar views (Year/Term/2Week/8Week/List) made class-aware
+
+User instruction: "continue with CLASS-06 Planning Workspace UI." CLASS-06
+pt.1/2 had already made the single-night "Night" grid view
+(`ParadeNightGridView.tsx`) and connected-frontend's Weekly Program page
+class-aware — but Planning Workspace's **default landing view** (Year) and
+every other calendar-level view (Term, 2-week, 8-week, List) still showed
+zero Training Class information, because they're all powered by a
+**4th, entirely separate session serializer** discovered during this task:
+`get_annual_program()` (`GET /api/planning/years/{id}/annual-program`),
+distinct from `_real_session_out` (used by `get_weekly_program`/
+`list_missions`), `_sess_dict` (used by `list_parades`), and
+`list_missions`'s own `_sess_summary`. Four different code paths across
+this program independently re-serialize a `Session` row for different
+consumers — a real, if unsurprising, characteristic of a codebase built
+incrementally over many features, not something to consolidate as a side
+effect of this task.
+
+**What changed (backend)**: `training_classes[]` added to each session in
+`get_annual_program()`'s inline `sessions_summary`, via **one bulk query
+for the whole year** — matching this endpoint's own existing avoid-N+1
+discipline for parade nights, sessions, conflicts, and notices — rather
+than per-date or per-session calls.
+
+**What changed (frontend)**: `ParadeNightBlock.tsx` — the one component
+shared by `YearView`, `TermView`, `TwoWeekView`, `EightWeekView`, and
+`ListView` — renders each session's class name(s) inline in its standard
+(non-compact) grid cell, visible while browsing the calendar with **no
+click required**. The compact block variant deliberately does not show it
+(same design intent as its existing terseness — a truncated 24-character
+title already competes for space there). `NightSessionSummary`,
+`DisplaySession`, and both mapper functions (`fromNightSummary`,
+`fromPlanningSession`) updated to carry the field through end to end.
+
+**A real mistake caught before it reached a commit — same class of bug as
+before, worth restating because it happened again**: after editing the
+backend, the first Playwright run against the local dev server showed the
+class name simply never appearing, with no error. Rather than assuming the
+frontend code was wrong, checked the raw API response directly via a
+throwaway script first — it was missing the `training_classes` key
+entirely, proving the *backend* wasn't returning it, not that the frontend
+wasn't rendering it. Root cause: the local `uvicorn` process (started
+without `--reload` several tasks ago in this session) was still running
+the pre-edit code; it had been restarted once for an earlier CLASS-06
+commit but not again for this one. Restarted it, re-verified the raw API
+response directly, confirmed correct, *then* re-ran the Playwright test —
+which passed immediately. Worth naming explicitly: checking the actual
+data source before debugging the UI saved a wrong-turn "why doesn't my
+React code work" investigation into code that was never broken.
+
+**Verification**: 5 new backend tests
+(`test_annual_program_class_awareness.py`) — no-audience session has an
+empty array, a real single-class assignment round-trips, a session
+assigned to two classes shows both, sessions in different terms don't leak
+each other's classes (guards the bulk-query-once approach against a subtle
+cross-contamination bug), `sqn_general` can read it. Full backend suite:
+1314 passed, 5 skipped (up from 1309/5, zero regressions). Capability
+manifest unchanged (268 routes, 60 tables). `tsc --noEmit`, `vitest`
+(22/22), `npm run build` all clean. New `e2e/year-view-classes.spec.ts`:
+3/3 local runs, plus a regression check against the other 3 CLASS-05/06
+Playwright tests (all passed) and the full `navigation.spec.ts` suite
+(12/12 passed).
+
+**Staging deployment and live verification**: deployed to both
+`aafc-tms-backend` and `aafc-tms-planning-workspace-preview` staging
+(Railway, both `SUCCESS`). `year-view-classes.spec.ts` run against
+`playwright.planning.staging.native.config.ts` (the live deployed preview
+URL, real staging backend): **1/1 passed** — the class name renders
+directly in the Year view with real data seeded through the live staging
+API, no click into any deeper view required.
+
+**Program status**: Training Class awareness now spans every real,
+reachable session-display surface across both frontends and all four
+backend session serializers this program touched — Mission Backlog,
+Weekly Program (all three of its consumers), the single-night grid view,
+and now the full calendar surface. The one remaining, already-disclosed
+gap from §48 stands: `WeeklyProgram.tsx`'s `/weekly-program` route has no
+reachable path in any deployed environment (module-mode-only deployment
+topology, not a code defect).
