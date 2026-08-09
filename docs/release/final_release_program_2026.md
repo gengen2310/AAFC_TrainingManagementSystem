@@ -1275,3 +1275,41 @@ tested, and deployed to staging this pass.
 
 Next concrete step: CLASS-03 (Session↔TrainingClass audience linkage), since
 CLASS-04 through CLASS-13 all depend on it.
+
+## 41. CLASS-03 (Session<->TrainingClass audience linkage) implemented and staging-verified
+
+Continuing directly from §40 (CLASS-01). Built the SessionAudience many-to-many
+join table, migration (v49, `af4a8639bc3a`), and API (GET/PUT/PATCH/DELETE
+`.../sessions/{id}/audience...`) — see commit `3bfc2e3` for full detail.
+
+- 11 new regression tests, full suite 1280 passed / 5 skipped / 0
+  regressions.
+- Deployed to staging from `backend/` directly this time (no repeat of §40's
+  working-directory mistake).
+- Confirmed via live deployment logs that the migration applied against the
+  real Postgres staging database.
+- Live functional verification over real HTTP: created two real
+  TrainingClasses and a real Parade Night/Session, set both classes onto the
+  Session's audience, recorded a per-class outcome exception on one
+  (addendum §48's exact "combined Session, one class didn't attend"
+  scenario), removed that class from the audience (the split-Session
+  removal path, addendum §59.2), then archived everything created for the
+  test — left no visible artifact on staging.
+- Both frontends confirmed still healthy post-deploy; capability manifest
+  shows a pure addition (262→266 routes, 59→60 tables).
+- `docs/remediation/master_gap_register.csv`'s CLASS-03 entry updated to
+  `IMPLEMENTED — staging-verified (backend only; frontend consumption not
+  built)`.
+
+**Honest state of the Training Class program so far**: the data model and
+both linkage APIs exist and are staging-verified, but nothing consumes them
+yet. Mission Backlog, dashboards, and Weekly Program are all still reading
+the old `Session.cadet_group`/`Cadet.phase` free-text fields exclusively.
+Neither frontend has any UI to create a Training Class or set a Session's
+audience — everything so far is API-only. This is the correct sequencing per
+addendum §104 (backend before frontend, linkage before consumers), not a
+shortfall — but it means CLASS-04 through CLASS-13 remain genuinely open,
+not merely "blocked and about to cascade closed." Next concrete step:
+CLASS-04, class-specific curriculum progress — the first real consumer of
+this linkage, and the one dashboard-metric-dictionary.md already flagged as
+currently blended-per-Stage rather than per-Class.
