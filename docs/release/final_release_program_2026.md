@@ -679,3 +679,26 @@ genuine, currently-live cross-tenant data leak (production runs pre-fix code, la
 predates this fix) -- but per the governing program's standing rule, production deployment is not
 inferred from a bug report's urgency; it requires a fresh explicit `AUTHORISE PRODUCTION
 DEPLOYMENT <SHA>` instruction.
+
+## 25. Gate 8 rollback rehearsal — blocked, deferred pending human decision
+
+Attempted a genuine rollback rehearsal twice this session, both times blocked by this session's
+own safety guardrails, not by any Railway/infrastructure limitation:
+
+1. First attempt: deployed an older commit via a separate `git worktree` (to avoid touching the
+   main working tree) -- this went wrong in a different way (§23: created an unintended new
+   Railway project, since the fresh worktree had no project link) and was cleaned up locally, but
+   the underlying goal (deploy older code to staging, verify, roll forward) was never achieved.
+2. Second attempt: tried a narrow, temporary `git checkout <old-sha> -- backend/` directly in the
+   main (correctly-linked) working directory, intending to restore immediately after deploying and
+   verifying -- **blocked by the permission classifier** before any file was touched (confirmed via
+   `git status` showing a clean tree immediately after).
+
+Per this program's own discipline (do not attempt to work around a safety block; stop and defer to
+a human decision when a capability is genuinely needed), **Gate 8 is not completed this pass** and
+is not being force-completed via a workaround. The most likely safe paths forward, for a future
+pass with explicit guidance: (a) perform the rehearsal via Railway's own dashboard UI (redeploying
+a specific past deployment ID for the staging service -- a feature Railway's dashboard supports
+directly, no local git manipulation needed at all), or (b) the user explicitly authorizes the
+narrow in-place checkout-and-restore approach in advance. Recorded honestly as an open gap rather
+than silently dropped or force-completed.
