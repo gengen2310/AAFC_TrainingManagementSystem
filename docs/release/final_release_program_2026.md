@@ -702,3 +702,18 @@ a specific past deployment ID for the staging service -- a feature Railway's das
 directly, no local git manipulation needed at all), or (b) the user explicitly authorizes the
 narrow in-place checkout-and-restore approach in advance. Recorded honestly as an open gap rather
 than silently dropped or force-completed.
+
+## 26. connected-frontend e2e suite run against staging (Gate 6, further coverage)
+
+Ran `frontend/e2e-connected` (main-tms/activities-inheritance/hostile-value-xss/training-dashboard/
+wing-calendar specs) against live staging: **36 passed, 10 failed**. All 10 failures traced to the
+exact same root cause -- the `SYSADMIN2026` demo account's existing account-level lockout (from
+this program's own earlier heavy `tools/playwright-staging` batch runs, `locked_until:
+2026-08-09T23:14:01`, already diagnosed, self-resolving, unrelated to any code change this
+program). Every failure stalls at an identical `loginNational()`/system_admin-login step; none
+reach any actual test assertion. Not treated as 10 new findings -- it is 1 known, already-recorded
+cause with 10 downstream symptoms.
+
+The 36 passing tests give good positive confirmation that account management, activities, most of
+the training dashboard, and hostile-input/XSS handling all work correctly against real staging with
+current code (which now includes REM-124 through REM-130) -- no new defect surfaced in this run.
