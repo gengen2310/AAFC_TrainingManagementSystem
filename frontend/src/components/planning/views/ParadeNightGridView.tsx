@@ -362,6 +362,11 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
                           <div className="pn-cell-code">{session.curriculum_code}</div>
                         )}
                         <div className="pn-cell-title">{session.activity_title ?? "—"}</div>
+                        {!!session.training_classes?.length && (
+                          <div className="pn-cell-classes" style={{ fontSize: 10, color: "var(--aafc-dark-blue, #002f65)" }}>
+                            {session.training_classes.map(c => c.display_name).join(", ")}
+                          </div>
+                        )}
                         {session.location_name && (
                           <div className="pn-cell-room">{session.location_name}</div>
                         )}

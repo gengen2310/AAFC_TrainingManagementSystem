@@ -31,12 +31,13 @@ export function WeeklyProgram() {
           </div>
           <table>
             <caption>Sessions</caption>
-            <thead><tr><th>Period</th><th>Phase</th><th>Item</th><th>Facilitator</th><th>Status</th></tr></thead>
+            <thead><tr><th>Period</th><th>Phase</th><th>Item</th><th>Class</th><th>Facilitator</th><th>Status</th></tr></thead>
             <tbody>
-              {pn.sessions.length === 0 ? <tr><td colSpan={5}>No sessions.</td></tr> :
+              {pn.sessions.length === 0 ? <tr><td colSpan={6}>No sessions.</td></tr> :
                 pn.sessions.sort((a, b) => a.period_number - b.period_number).map((s) => (
                   <tr key={s.id}><td>{s.period_number}</td><td>{s.phase_at_time ?? "—"}</td>
                     <td>{s.curriculum_title_at_time ?? s.custom_title ?? "—"}</td>
+                    <td>{(s.training_classes ?? []).length ? s.training_classes.map((c) => c.display_name).join(", ") : "—"}</td>
                     <td>{s.facilitator_display_name_at_time ?? "—"}</td>
                     <td><StatusBadge status={s.status} /></td></tr>))}
             </tbody>

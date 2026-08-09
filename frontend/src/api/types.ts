@@ -45,6 +45,9 @@ export interface SessionRow {
   facilitator_display_name_at_time: string | null; training_area_id: string | null;
   expected_attendance: number | null; actual_attendance: number | null;
   not_delivered_reason: string | null; rescheduled_to_date: string | null;
+  // CLASS-06: which Training Class(es) this session targets (CLASS-03's
+  // SessionAudience linkage), additive on GET /api/parade-nights.
+  training_classes: { training_class_id: string; display_name: string }[];
   [k: string]: unknown;
 }
 export interface ParadeNight {
@@ -139,6 +142,9 @@ export interface PlanningSession {
   location_id: string | null; location_name: string | null;
   status: string; notes: string | null; is_combined: boolean;
   override_conflict: boolean; created_at: string | null;
+  // CLASS-06: which Training Class(es) this session targets (CLASS-03's
+  // SessionAudience linkage), additive on the weekly-program endpoint.
+  training_classes?: { training_class_id: string; display_name: string }[];
 }
 export interface TimingBlock {
   sequence: number; name: string; block_type: string;
