@@ -1657,6 +1657,30 @@ def get_weekly_program(
         ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
         real_sessions = [_real_session_out(s, db) for s in ts]
 
+        # CLASS-06: which Training Class(es) each session targets, additive
+        # to _real_session_out()'s own output. Attached here rather than
+        # inside _real_session_out() itself, which also serves 7 other
+        # endpoints (term planner, builder, session create/get/update,
+        # long-range, mission assignment) -- scoping this to the one
+        # endpoint this task covers keeps the change's blast radius to
+        # Weekly Program only, matching CLASS-05's own additive-not-shared
+        # approach in list_missions().
+        if ts:
+            from collections import defaultdict
+            aud_rows = (
+                db.query(SessionAudience, TrainingClass)
+                .join(TrainingClass, SessionAudience.training_class_id == TrainingClass.id)
+                .filter(SessionAudience.session_id.in_([s.id for s in ts]))
+                .all()
+            )
+            classes_by_session: dict[str, list[dict]] = defaultdict(list)
+            for aud, tc in aud_rows:
+                classes_by_session[aud.session_id].append({
+                    "training_class_id": tc.id, "display_name": tc.display_name,
+                })
+            for sess_out, s in zip(real_sessions, ts):
+                sess_out["training_classes"] = classes_by_session.get(s.id, [])
+
     # Timing template for time labels
     timing_blocks: list[dict] = []
     tmpl = None
