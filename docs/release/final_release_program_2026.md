@@ -832,3 +832,29 @@ visibility. Recorded honestly as unresolved, not guessed at.
   environment's service list during this investigation -- worth a human sanity check on whether
   that's an intentional shared resource or itself a sign of environment boundaries being blurred
   somewhere in this project's Railway configuration.
+
+## 29. Incident follow-up — CORS_ALLOWED_ORIGINS was ALSO contaminated (found after the outage was declared resolved)
+
+**Important correction to §28**: after declaring the outage resolved (all 3 services returning
+200), a further check found `CORS_ALLOWED_ORIGINS` on the production backend was ALSO part of the
+same contamination -- set to staging's two frontend origins, not production's. This is NOT a
+secret (it's public origin URLs), so its actual value was checked directly rather than only
+hash-compared.
+
+**Real, functional impact**: this was NOT caught by the earlier `curl`-based health checks,
+because `curl` does not send/enforce Origin-based CORS preflight the way a real browser does --
+`GET /api/health/ready` returning 200 said nothing about whether the production frontend's own
+*browser-originated* API calls would succeed. In practice, this meant production was still
+effectively broken for real users even after this program's own status checks showed "all
+healthy": every actual API call the production frontend's JavaScript made to the production
+backend would have been blocked by the browser's CORS enforcement.
+
+**Fixed**: `CORS_ALLOWED_ORIGINS` set to production's own two frontend origins. Verified directly
+(not just via variable value) with a real CORS preflight request
+(`OPTIONS /api/auth/login` with `Origin: https://aafc-tms-frontend-production.up.railway.app`) --
+confirmed the backend now returns the matching `Access-Control-Allow-Origin` header.
+
+This is a meaningful lesson for this program's own verification discipline going forward: a
+`curl`/health-check-based "is it up" check is not sufficient evidence that browser-based
+functionality actually works when CORS is in play -- recorded here rather than quietly folded into
+§28 as if it had been caught the first time.
