@@ -28,11 +28,11 @@ from ..dependencies import get_principal
 from ..models import (
     ParadeNight, Session, Facilitator, Squadron, Wing,
     CurriculumItem, Equipment, TrainingArea, PlanningFacilitatorLeave,
-    CurriculumPhase,
+    CurriculumPhase, TrainingClass,
 )
 from ..permissions import Principal, require_role, require_can_view_squadron, require_can_view_wing
 from ..services_readiness import parade_night_readiness, session_requirements
-from .training import _view_squadron_id
+from .training import _view_squadron_id, _class_curriculum_progress
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -320,6 +320,97 @@ def _curriculum_progress(sessions: list, curr_items: list, phases: list[str]) ->
         "insight": insight,
         "empty_state": "No curriculum sessions have been recorded yet.",
         "drill_down": {"route": "parade-nights", "filters": {"phase": "{{phase}}"}},
+        "permission_scope": "squadron",
+    }
+
+
+# Addendum §75's threshold: a class more than this many percentage points
+# below its own stage's aggregate is surfaced as an exception, so the
+# aggregate can never quietly hide one struggling class behind a healthy
+# blended number.
+_CLASS_BEHIND_THRESHOLD_PP = 15
+
+
+def _class_curriculum_progress_summary(db: DBSession, sq_id: str) -> dict:
+    """Curriculum progress per Training Class, grouped by Training Stage
+    (CLASS-07) -- the class-aware sibling of _curriculum_progress above,
+    which still shows one blended bar per Stage regardless of how many
+    parallel classes it has. Kept as a SEPARATE chart rather than changing
+    _curriculum_progress's own shape in place: connected-frontend already
+    renders charts.curriculum_progress via a fixed data shape
+    (index.html's _chartStackedBarH consumer) -- changing that shape would
+    be a capability regression for a chart real users already read, not an
+    improvement (.claude/rules/capability-preservation.md). This chart is
+    purely additive.
+
+    Derives everything from CLASS-01/03/04's existing data -- no new state,
+    per addendum §44."""
+    classes = db.query(TrainingClass).filter(
+        TrainingClass.squadron_id == sq_id, TrainingClass.is_archived == False,  # noqa: E712
+    ).order_by(TrainingClass.sequence, TrainingClass.display_name).all()
+
+    stages: dict[str, dict] = {}
+    for c in classes:
+        prog = _class_curriculum_progress(db, c)
+        stage_id = prog["training_stage_id"]
+        entry = stages.setdefault(stage_id, {
+            "stage_name": prog["stage_name"] or "Unnamed stage",
+            "classes": [],
+            "total_delivered": 0,
+            "total_applicable": 0,
+        })
+        delivered, total = prog["summary"]["delivered"], prog["summary"]["total"]
+        entry["classes"].append({
+            "training_class_id": c.id, "display_name": c.display_name,
+            "delivered": delivered, "total": total,
+            "coverage_pct": round(100 * delivered / total) if total else None,
+        })
+        entry["total_delivered"] += delivered
+        entry["total_applicable"] += total
+
+    data = []
+    behind_classes: list[dict] = []
+    for stage_id, entry in stages.items():
+        coverage_pct = (round(100 * entry["total_delivered"] / entry["total_applicable"])
+                        if entry["total_applicable"] else None)
+        if coverage_pct is not None:
+            for cls in entry["classes"]:
+                if cls["coverage_pct"] is not None and cls["coverage_pct"] <= coverage_pct - _CLASS_BEHIND_THRESHOLD_PP:
+                    behind_classes.append({
+                        "stage_name": entry["stage_name"], "display_name": cls["display_name"],
+                        "coverage_pct": cls["coverage_pct"], "stage_coverage_pct": coverage_pct,
+                    })
+        data.append({
+            "stage_id": stage_id, "stage": entry["stage_name"],
+            "class_count": len(entry["classes"]), "coverage_pct": coverage_pct,
+            "delivered": entry["total_delivered"], "total": entry["total_applicable"],
+            "classes": entry["classes"],
+        })
+    data.sort(key=lambda d: d["stage"])
+
+    insight = None
+    if behind_classes:
+        names = ", ".join(f"{b['display_name']} ({b['coverage_pct']}%)" for b in behind_classes[:3])
+        insight = f"{len(behind_classes)} class(es) significantly behind their stage average: {names}."
+    elif data:
+        insight = f"{len(data)} Training Stage(s) with active classes; no class is significantly behind its stage average."
+
+    return {
+        "chart_id": "class_curriculum_progress",
+        "title": "Curriculum progress by Training Class",
+        "explanation": ("Curriculum requirement coverage per Training Stage, broken down by "
+                        "Training Class -- each class's own progress is tracked independently, "
+                        "even when several classes share the same Stage."),
+        "question": "Which Training Classes are behind on their curriculum, even if their Stage looks healthy overall?",
+        "chart_type": "bar_with_drilldown",
+        "x_axis": "Training Stage",
+        "y_axis": "Coverage (%)",
+        "data": data,
+        "classes_behind": behind_classes,
+        "insight": insight,
+        "empty_state": ("No Training Classes have been set up yet. Set up Training Classes for a "
+                        "Training Stage before class-level curriculum progress can be shown."),
+        "drill_down": {"route": "training-classes", "filters": {"stage_id": "{{stage_id}}"}},
         "permission_scope": "squadron",
     }
 
@@ -1821,6 +1912,8 @@ def _full_squadron_charts(db: DBSession, sq_id: str, w_start: str, w_end: str) -
     # empty-looks-like-broken chart-trust problem this pass targets.
     charts["curriculum_progress"] = _safe_chart(
         "curriculum_progress", _curriculum_progress, all_sessions, curr_items, _phases_for_squadron(db, sq_id))
+    charts["class_curriculum_progress"] = _safe_chart(
+        "class_curriculum_progress", _class_curriculum_progress_summary, db, sq_id)
     charts["curriculum_backlog"] = _safe_chart("curriculum_backlog", _curriculum_backlog, all_sessions, all_pns)
     charts["cancellation_reasons"] = _safe_chart("cancellation_reasons", _cancellation_reasons, sessions, pns)
     charts["facilitator_workload"] = _safe_chart("facilitator_workload", _facilitator_workload, sessions)
