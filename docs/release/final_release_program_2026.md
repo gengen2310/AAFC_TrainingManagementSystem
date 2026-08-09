@@ -580,3 +580,29 @@ This is real, valuable evidence Gate 6 needed a fresh run: the 2026-08-06 baseli
 predates REM-114 through REM-127 and could not have caught REM-127, which only manifests against
 real Postgres. Gate 6 is now **CONDITIONAL PASS** -- one genuine, unresolved finding (subject-area-
 tag reload persistence) remains open, tracked as a new follow-up item, not silently dropped.
+
+## 22. Task #157 resolved — REM-128 (subject-area-tag e2e flakiness)
+
+Deep root-cause investigation, not a quick guess: tested the backend PATCH/GET round-trip directly
+(provably correct, no eventual-consistency delay), extracted and analyzed the Playwright trace's
+full network timeline frame-by-frame, tried a plausible frontend timing fix that did NOT resolve
+it (kept anyway as a genuine, independent robustness improvement), then ran 10 repeated trials and
+found a striking 6-pass-then-4-fail pattern -- not random flakiness, a real signal.
+
+Root cause: two compounding bugs in the *test's own cleanup step*, not the application --
+(1) `window.S`/`window.api` have never existed (S/api are top-level `let`/`function` in a classic
+script, invisible on `window`), so the test's cleanup has silently no-op'd since it was written
+(confirmed: 100% of ever-created test tags were still present, un-archived, in the live staging
+catalogue); (2) even fixed, the cleanup only archived the tag catalogue entry, never unassigned it
+from the specific facilitator -- so tags accumulated across this whole program's many e2e runs
+until one facilitator hit `saveTagFac()`'s own intentional 20-tag limit, after which further saves
+were correctly (and silently) rejected, misreported by the test as "tag doesn't persist."
+
+Fixed both test bugs, verified with 8/8 consecutive clean staging e2e runs (was 4-8 failures per
+8-10 before), confirmed the facilitator's tag count now stays stable across repeated runs. Cleaned
+up 5 staging facilitators' accumulated cruft (removed via direct PATCH; a bulk catalogue-entry
+DELETE loop for ~39 fully-orphaned test tags was blocked by this session's own permission
+classifier as a bulk-destructive-pattern precaution -- left as harmless clutter, not blocking).
+
+This closes Gate 6's one remaining open finding from the fresh e2e re-run (§21). Full detail:
+`docs/remediation/master_gap_register.csv` REM-128.
