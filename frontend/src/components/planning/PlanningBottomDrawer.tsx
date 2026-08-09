@@ -70,6 +70,30 @@ const PROG_TYPE_STYLE: Record<string, CSSProperties> = {
   optional:   { fontSize: 9, fontWeight: 700, color: "#6b7a87", background: "#f1f5f9", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
 };
 
+// CLASS-05: per-Training-Class chips in the backlog table, reusing the same
+// six-state palette as the existing item-level Status column (kept as a
+// separate style map rather than refactoring that column, to avoid touching
+// already-shipped, already-tested rendering for an additive feature).
+const CLASS_STATUS_STYLE: Record<string, CSSProperties> = {
+  resolved: { color: "#fff", background: "var(--success, #1A7F4B)" },
+  not_delivered_awaiting_reschedule: { color: "#fff", background: "#78909c" },
+  cancelled_awaiting_reschedule: { color: "#fff", background: "var(--aafc-red)" },
+  rescheduled: { color: "#fff", background: "var(--rescheduled, #7C3AED)" },
+  planned: { color: "var(--success, #1A7F4B)", background: "#d1fae5" },
+  unscheduled: { color: "var(--muted-text)", background: "var(--surface-2, #f1f5f9)" },
+};
+const CLASS_STATUS_LABEL: Record<string, string> = {
+  resolved: "Resolved", not_delivered_awaiting_reschedule: "Not delivered",
+  cancelled_awaiting_reschedule: "Cancelled", rescheduled: "Rescheduled",
+  planned: "Scheduled", unscheduled: "Unscheduled",
+};
+function classChipStyle(status: string): CSSProperties {
+  return {
+    ...(CLASS_STATUS_STYLE[status] ?? CLASS_STATUS_STYLE.unscheduled),
+    fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap",
+  };
+}
+
 const SUITABILITY_SHORT: Record<string, string> = {
   "Staff": "Staff",
   "Staff or Senior Cadet": "Staff / Sr Cdt",
@@ -293,6 +317,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                 <th style={{ minWidth: 110 }}>Facilitator</th>
                 <th style={{ minWidth: 90 }}>Room</th>
                 <th style={{ minWidth: 70 }}>Warnings</th>
+                <th style={{ minWidth: 110 }}>Classes</th>
                 <th style={{ minWidth: 80 }}></th>
               </tr>
             </thead>
@@ -386,6 +411,34 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                       {warnCoreUnsched && <span title="Foundation lesson not scheduled" style={{ color: "var(--aafc-red)", fontSize: 11 }}>⚠ Foundation</span>}
                       {warnNoFac && <span title="No facilitator assigned" style={{ color: "var(--warning, #d97706)", fontSize: 11 }}>⚠ Fac</span>}
                       {warnNoRoom && !warnCoreUnsched && <span title="No room assigned" style={{ color: "var(--muted-text)", fontSize: 11 }}>⚠ Room</span>}
+                    </td>
+                    {/* Classes — CLASS-05: per-Training-Class share of this mission's
+                        six-state status, empty when this item's Stage has no active
+                        Classes yet. */}
+                    <td>
+                      {m.class_breakdown.length === 0 ? (
+                        <span style={{ color: "var(--muted-text)", fontSize: 10 }}>—</span>
+                      ) : (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                          {m.class_breakdown.map(cb => (
+                            <span
+                              key={cb.training_class_id}
+                              title={`${cb.display_name}: ${CLASS_STATUS_LABEL[cb.backlog_status] ?? cb.backlog_status}${cb.scheduled_count ? ` (×${cb.scheduled_count})` : ""}`}
+                              style={classChipStyle(cb.backlog_status)}
+                            >
+                              {cb.display_name}
+                            </span>
+                          ))}
+                          {m.unassigned_session_count > 0 && (
+                            <span
+                              title={`${m.unassigned_session_count} scheduled session(s) with no Training Class assigned`}
+                              style={{ fontSize: 9, color: "var(--muted-text)", fontStyle: "italic", whiteSpace: "nowrap" }}
+                            >
+                              +{m.unassigned_session_count} unassigned
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
                     {/* Actions */}
                     <td style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>

@@ -214,6 +214,17 @@ export interface MissionItem {
   // not_delivered_awaiting_reschedule | rescheduled | resolved.
   backlog_status: string;
   scheduled_count: number; instructor_suitability: string | null;
+  // CLASS-05: per-Training-Class share of this same six-state model, one
+  // entry per active Class belonging to this item's own Stage (empty if the
+  // Stage has no Classes yet). unassigned_session_count counts this item's
+  // scheduled sessions that have no Training Class audience assigned at all
+  // -- expected/normal, since audience assignment is optional.
+  class_breakdown: {
+    training_class_id: string; display_name: string; scheduled_count: number;
+    is_scheduled: boolean; has_cancelled: boolean; has_not_delivered: boolean;
+    has_rescheduled: boolean; needs_reschedule: boolean; backlog_status: string;
+  }[];
+  unassigned_session_count: number;
   scheduled_sessions: {
     session_id: string; parade_date: string | null; parade_date_id: string | null; term: string | null;
     session_number: number; part_number: number | null; cadet_group: string | null;
