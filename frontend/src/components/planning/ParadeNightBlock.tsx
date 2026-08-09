@@ -27,6 +27,11 @@ export interface DisplaySession {
   assistant_facilitator?: string | null;
   conflict?: "room" | "fac" | "load" | null;
   source?: PlanningSession;
+  // CLASS-06: which Training Class(es) this session targets. Optional --
+  // fromPlanningSession()'s own source (PlanningSession) only carries this
+  // field on the one endpoint (weekly-program) that was extended for it;
+  // the other _real_session_out call sites were deliberately not touched.
+  training_classes?: { training_class_id: string; display_name: string }[];
 }
 
 export function fromNightSummary(sessions: NightSessionSummary[]): DisplaySession[] {
@@ -38,6 +43,7 @@ export function fromNightSummary(sessions: NightSessionSummary[]): DisplaySessio
     code: s.curriculum_code,
     location: s.location,
     facilitator: s.facilitator,
+    training_classes: s.training_classes,
   }));
 }
 
@@ -61,6 +67,7 @@ export function fromPlanningSession(
       assistant_facilitator: s.assistant_facilitator_name,
       conflict,
       source: s,
+      training_classes: s.training_classes,
     };
   });
 }
@@ -423,6 +430,11 @@ export function ParadeNightBlock({
                           )}
                           {cell.code && <div className="pw-nc-code">{cell.code}</div>}
                           <div className="pw-nc-title">{trunc(cell.title, 40)}</div>
+                          {!!cell.training_classes?.length && (
+                            <div className="pw-nc-detail pw-nc-classes">
+                              {cell.training_classes.map(c => c.display_name).join(", ")}
+                            </div>
+                          )}
                           {cell.location && <div className="pw-nc-detail">{cell.location}</div>}
                           <div className="pw-nc-detail">{cell.facilitator ?? "No facilitator"}</div>
                           <div className="pw-nc-equip">Equip: not set</div>

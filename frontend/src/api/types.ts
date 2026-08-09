@@ -281,6 +281,9 @@ export interface NightSessionSummary {
   curriculum_code: string | null;
   facilitator: string | null;
   location: string | null;
+  // CLASS-06: which Training Class(es) this session targets (CLASS-03's
+  // SessionAudience linkage), additive on the annual-program endpoint.
+  training_classes: { training_class_id: string; display_name: string }[];
 }
 export interface ParadeNotice {
   notice_id: string;
