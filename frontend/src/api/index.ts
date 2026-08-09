@@ -367,9 +367,15 @@ export const planningApi = {
   rolloverYear: (year_id: string, body: {
     target_year?: number; name?: string;
     copy_holidays?: boolean; carry_incomplete_sessions?: boolean;
+    // CLASS-11: defaults true on the backend, same as the other copy_* flags
+    // -- no UI toggle exists for any of them (GuidedYearSetupModal.tsx calls
+    // this with an empty body), so this is exposed for completeness/type
+    // accuracy rather than because a caller currently sets it.
+    copy_training_classes?: boolean;
   }) => api.post<{
     ok: boolean; new_planning_year_id: string; year: number; name: string;
     holidays_copied: number; parade_dates_copied: number; incomplete_sessions_noted: number;
+    training_classes_copied: number;
   }>(`/api/planning/years/${year_id}/rollover`, body),
   listTimingTemplates: (squadron_id?: string) =>
     api.get<import("./types").TimingTemplateFull[]>(`/api/timing-templates${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),

@@ -3067,6 +3067,10 @@ class RolloverIn(BaseModel):
     name: Optional[str] = None
     copy_holidays: bool = True
     carry_incomplete_sessions: bool = True
+    # CLASS-11: without this, a squadron's Training Classes (e.g. Senior 1,
+    # Senior 2) simply cease to exist in the new year -- TrainingClass is
+    # scoped per training_year_id, and nothing previously copied it forward.
+    copy_training_classes: bool = True
 
 
 @router.post("/years/{year_id}/rollover")
@@ -3130,6 +3134,32 @@ def rollover_year(
             db.add(nh)
             holidays_copied += 1
 
+    # CLASS-11: copy active Training Classes forward into the new year.
+    # Only the class *definitions* carry over (stage/name/sequence/expected
+    # count) -- no session or curriculum-progress data, since those are
+    # inherently new-year concepts computed fresh from that year's own
+    # Sessions. A class archived in the source year is deliberately not
+    # copied (an intentionally-retired class shouldn't reappear).
+    training_classes_copied = 0
+    if body.copy_training_classes:
+        old_classes = db.query(TrainingClass).filter(
+            TrainingClass.training_year_id == year_id,
+            TrainingClass.is_archived == False,  # noqa: E712
+        ).all()
+        for oc in old_classes:
+            db.add(TrainingClass(
+                squadron_id=oc.squadron_id, training_year_id=new_py.id,
+                training_stage_id=oc.training_stage_id, display_name=oc.display_name,
+                sequence=oc.sequence, expected_count=oc.expected_count, notes=oc.notes,
+                # start_date/end_date are deliberately NOT copied -- they're
+                # specific calendar dates within the source year's own
+                # season and would be wrong (stale) in the new year, unlike
+                # holidays above which are explicitly year-shifted. Left
+                # null for the admin to set for the new year if needed.
+                created_by=p.user_id, updated_by=p.user_id,
+            ))
+            training_classes_copied += 1
+
     # Copy parade dates (same weekday pattern, new year)
     dates_copied = 0
     old_dates = db.query(ParadeDate).filter(
@@ -3175,7 +3205,8 @@ def rollover_year(
     audit(db, p, object_type="planning_year", object_id=new_py.id, action="rollover",
           new={"source_year": py.year, "target_year": target_year,
                "holidays_copied": holidays_copied, "dates_copied": dates_copied,
-               "incomplete_sessions_noted": sessions_carried})
+               "incomplete_sessions_noted": sessions_carried,
+               "training_classes_copied": training_classes_copied})
 
     return {
         "ok": True,
@@ -3185,6 +3216,7 @@ def rollover_year(
         "holidays_copied": holidays_copied,
         "parade_dates_copied": dates_copied,
         "incomplete_sessions_noted": sessions_carried,
+        "training_classes_copied": training_classes_copied,
     }
 
 

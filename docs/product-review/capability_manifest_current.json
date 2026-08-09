@@ -1,6 +1,6 @@
 {
   "generated_from": "live introspection (app.routes + Base.metadata.tables), not regex",
-  "commit": "48bfb8c1a5597c1893aa720c4194f29709e2d8cd",
+  "commit": "914650c810254eec5cbb08b64ef2db60ebc5aacb",
   "note": "Route/table names are exhaustive (introspected from the running FastAPI app and SQLAlchemy metadata, not parsed from source text), so this will not miss a route hidden behind unusual formatting the way an earlier regex-based pass could. Per-role/per-scope button-and-action-level frontend detail is still a separate, manual pass -- not captured here.",
   "total_routes": 268,
   "routes": [
