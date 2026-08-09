@@ -426,3 +426,52 @@ class SessionAudience(Base, UUIDMixin, TimestampMixin):
     training_class_id: Mapped[str] = mapped_column(ForeignKey("training_classes.id"), index=True)
     outcome_override: Mapped[str | None] = mapped_column(String(30), nullable=True)
     outcome_override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class CadetClassMembership(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
+    """Which Training Class(es) a Cadet belongs to, currently or historically
+    (CLASS-09). Explicitly product-scope-confirmed by the user before this
+    was built -- the addendum (§38/§39) makes individual cadet-class tracking
+    conditional on an explicit product decision, not an engineering default,
+    since class-level planning (TrainingClass/SessionAudience) works without
+    it and this program's own data-minimisation principle warns against
+    collecting cadet-identifiable data speculatively.
+
+    Distinct from SessionAudience (CLASS-03, which Class a *Session*
+    targets): this is the Cadet side, and unlike SessionAudience it is a
+    genuine lifecycle record (start/end dates), not an idempotent current-set
+    membership a UI just replaces wholesale.
+
+    Enables the addendum's own "Foundation + Extension concurrent
+    membership" scenario -- a Cadet can hold an active membership in a
+    Foundation-stage class (e.g. Senior 1) and an Extension-stage class
+    (e.g. Bronze CLP) at the same time, which Cadet.phase's single free-text
+    column can never express. Cadet.phase is NOT dropped or replaced here --
+    kept in place as the existing compatibility field, per
+    capability-preservation and this program's own §86/§87 migration
+    discipline (every new planning surface is additive until every consumer
+    has migrated, not a forced cutover).
+
+    No DB-level unique constraint on (cadet_id, training_class_id) -- a
+    Cadet can legitimately hold more than one historical (archived) or
+    ended (active_status=False) membership in the same Class over time
+    (left and rejoined). "No duplicate *currently active* membership for
+    the same Cadet+Class pair" is enforced at the API layer instead, where
+    it can be checked against active_status/is_archived together rather
+    than needing a partial/conditional unique index.
+    """
+    __tablename__ = "cadet_class_memberships"
+    cadet_id: Mapped[str] = mapped_column(ForeignKey("cadets.id"), index=True)
+    training_class_id: Mapped[str] = mapped_column(ForeignKey("training_classes.id"), index=True)
+    start_date: Mapped[str | None] = mapped_column(String(10), nullable=True)  # ISO date
+    end_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    active_status: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Provenance -- "manual" (the only path this pass builds) vs a future
+    # import path, matching the same source-tagging pattern already used
+    # elsewhere in this codebase (e.g. CeaActivity.source).
+    source: Mapped[str] = mapped_column(String(20), default="manual", server_default="manual")
+    # Optimistic locking -- this is a real lifecycle record meant to be
+    # edited (closing out with an end_date), unlike SessionAudience's
+    # replace-the-whole-set model, so the same ParadeNight/PlanningYear/
+    # TrainingClass conflict-protection pattern applies here too.
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")

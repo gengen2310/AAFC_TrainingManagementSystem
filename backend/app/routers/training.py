@@ -11,7 +11,7 @@ from ..database import get_db, utcnow
 from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
                       Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, TrainingArea, Equipment,
                       Activity, Cadet, Squadron, TimingTemplate, TimingBlock, SystemSetting, TrainingClass, PlanningYear,
-                      SessionAudience)
+                      SessionAudience, CadetClassMembership)
 from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
@@ -1235,6 +1235,168 @@ def cadet_risk(db: DBSession = Depends(get_db), p: Principal = Depends(get_princ
         if reasons:
             flags.append({"cadet": f"{c.rank} {c.first_name} {c.last_name}", "reasons": reasons})
     return flags
+
+
+# ── CADET CLASS MEMBERSHIP (CLASS-09) ───────────────────────────────────────
+# Individual Cadet<->Training Class tracking, explicitly product-scope-
+# confirmed before being built (addendum §38/§39 -- see the model's own
+# docstring in models/training.py). Enables a Cadet to hold concurrent
+# Foundation (e.g. Senior 1) and Extension (e.g. Bronze CLP) membership,
+# which Cadet.phase's single free-text column cannot express. Cadet.phase
+# is untouched.
+
+class CadetClassMembershipIn(BaseModel):
+    training_class_id: str
+    start_date: Optional[str] = None
+    source: Optional[str] = "manual"
+
+
+class CadetClassMembershipUpdateIn(BaseModel):
+    end_date: Optional[str] = None
+    active_status: Optional[bool] = None
+    client_version: Optional[int] = None
+
+
+def _membership_dict(m: CadetClassMembership, tc: TrainingClass | None = None) -> dict:
+    return {
+        "membership_id": m.id, "cadet_id": m.cadet_id, "training_class_id": m.training_class_id,
+        "training_class_name": tc.display_name if tc else None,
+        "training_stage_id": tc.training_stage_id if tc else None,
+        "start_date": m.start_date, "end_date": m.end_date, "active_status": m.active_status,
+        "source": m.source, "version": m.version,
+        "created_at": m.created_at.isoformat() if m.created_at else None,
+    }
+
+
+def _require_cadet_and_squadron(db: DBSession, p: Principal, cadet_id: str, write: bool) -> Cadet:
+    cadet = db.get(Cadet, cadet_id)
+    if not cadet or cadet.is_archived:
+        raise HTTPException(404, detail={"error": "cadet_not_found"})
+    s = db.get(Squadron, cadet.squadron_id)
+    if write:
+        require_can_write_squadron(p, cadet.squadron_id, s.wing_id if s else None)
+    else:
+        require_can_view_squadron(p, cadet.squadron_id, s.wing_id if s else None)
+    return cadet
+
+
+@router.get("/cadets/{cadet_id}/class-memberships")
+def list_cadet_class_memberships(
+    cadet_id: str, include_archived: bool = False,
+    db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
+):
+    if p.role == "sqn_general":
+        raise HTTPException(403, detail={"error": "forbidden"})
+    _require_cadet_and_squadron(db, p, cadet_id, write=False)
+    q = db.query(CadetClassMembership).filter(CadetClassMembership.cadet_id == cadet_id)
+    if not include_archived:
+        q = q.filter(CadetClassMembership.is_archived == False)  # noqa: E712
+    rows = q.order_by(CadetClassMembership.created_at.desc()).all()
+    tc_ids = [m.training_class_id for m in rows]
+    tc_map = {tc.id: tc for tc in db.query(TrainingClass).filter(TrainingClass.id.in_(tc_ids)).all()} if tc_ids else {}
+    return [_membership_dict(m, tc_map.get(m.training_class_id)) for m in rows]
+
+
+@router.post("/cadets/{cadet_id}/class-memberships")
+def add_cadet_class_membership(
+    cadet_id: str, body: CadetClassMembershipIn,
+    db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
+):
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    cadet = _require_cadet_and_squadron(db, p, cadet_id, write=True)
+
+    tc = db.get(TrainingClass, body.training_class_id)
+    if not tc or tc.is_archived:
+        raise HTTPException(400, detail={"error": "invalid_training_class"})
+    if tc.squadron_id != cadet.squadron_id:
+        raise HTTPException(400, detail={"error": "training_class_wrong_squadron"})
+
+    existing = db.query(CadetClassMembership).filter(
+        CadetClassMembership.cadet_id == cadet_id,
+        CadetClassMembership.training_class_id == body.training_class_id,
+        CadetClassMembership.is_archived == False,  # noqa: E712
+        CadetClassMembership.active_status == True,  # noqa: E712
+    ).first()
+    if existing:
+        raise HTTPException(409, detail={"error": "already_a_member", "membership_id": existing.id})
+
+    m = CadetClassMembership(
+        cadet_id=cadet_id, training_class_id=body.training_class_id,
+        start_date=body.start_date, source=body.source or "manual",
+        created_by=p.user_id, updated_by=p.user_id,
+    )
+    db.add(m)
+    db.commit()
+    audit(db, p, object_type="cadet_class_membership", object_id=m.id, action="create",
+          new={"cadet_id": cadet_id, "training_class_id": body.training_class_id})
+    return _membership_dict(m, tc)
+
+
+@router.patch("/cadet-class-memberships/{membership_id}")
+def update_cadet_class_membership(
+    membership_id: str, body: CadetClassMembershipUpdateIn,
+    db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
+):
+    m = db.get(CadetClassMembership, membership_id)
+    if not m or m.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    _require_cadet_and_squadron(db, p, m.cadet_id, write=True)
+    _check_version(m, body.client_version)
+
+    if body.end_date is not None:
+        m.end_date = body.end_date
+    if body.active_status is not None:
+        m.active_status = body.active_status
+    m.version += 1
+    m.updated_by = p.user_id
+    db.commit()
+    audit(db, p, object_type="cadet_class_membership", object_id=m.id, action="update")
+    tc = db.get(TrainingClass, m.training_class_id)
+    return _membership_dict(m, tc)
+
+
+@router.delete("/cadet-class-memberships/{membership_id}")
+def archive_cadet_class_membership(
+    membership_id: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
+):
+    m = db.get(CadetClassMembership, membership_id)
+    if not m or m.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    _require_cadet_and_squadron(db, p, m.cadet_id, write=True)
+    m.is_archived = True
+    m.archived_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="cadet_class_membership", object_id=m.id, action="archive")
+    return {"ok": True}
+
+
+@router.get("/training-classes/{cid}/members")
+def list_training_class_members(
+    cid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal),
+):
+    if p.role == "sqn_general":
+        raise HTTPException(403, detail={"error": "forbidden"})
+    tc = db.get(TrainingClass, cid)
+    if not tc:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, tc.squadron_id)
+    require_can_view_squadron(p, tc.squadron_id, s.wing_id if s else None)
+
+    rows = db.query(CadetClassMembership, Cadet).join(Cadet, CadetClassMembership.cadet_id == Cadet.id).filter(
+        CadetClassMembership.training_class_id == cid,
+        CadetClassMembership.is_archived == False,  # noqa: E712
+        CadetClassMembership.active_status == True,  # noqa: E712
+        Cadet.is_archived == False,  # noqa: E712
+    ).all()
+    return [
+        {
+            "membership_id": m.id, "cadet_id": c.id,
+            "rank": c.rank, "first_name": c.first_name, "last_name": c.last_name,
+            "start_date": m.start_date,
+        }
+        for m, c in rows
+    ]
 
 
 # ── PARADE NIGHT BUILDER ────────────────────────────────────────────────────
