@@ -1853,5 +1853,39 @@ program (CLASS-01/03/04/05/06/07). Two documented dead-code discoveries
 (CLASS-18 and this section's `loadWeeklyProgram()` family) recorded, not
 silently deleted. Still open: class-specific curriculum progress (CLASS-04)
 has no dedicated UI beyond the dashboard chart (CLASS-07); split/merge
-Training Class lifecycle (addendum §59.2) remains unbuilt; `ParadeNightGridView.tsx`
-needs a dedicated e2e test.
+Training Class lifecycle (addendum §59.2) remains unbuilt.
+
+## 49. ParadeNightGridView.tsx e2e coverage added — CLASS-06's last residual gap closed
+
+Autonomous follow-up to §48's own disclosed residual item. Wrote
+`frontend/e2e/parade-night-grid-classes.spec.ts`: seeds a real Training
+Class + Session + audience via API, navigates Planning Workspace's Year
+view, clicks a parade date (`aria-label="Parade night {date}"` on
+`ParadeNightBlock.tsx`'s header — the same accessible name whether the
+populated or fallback block variant renders), and confirms the resulting
+"Night" grid cell shows the class name via `.pn-cell-classes`.
+
+**A real bug found while writing it, same class of issue as CLASS-05/06's
+earlier `year`-value lessons but a different symptom**: the first attempt
+reused the squadron's existing `years[0]` with a deliberately far-future
+literal date (`2140-...`) picked purely to avoid `duplicate_date`
+collisions. The date block never appeared — Year view computes each
+`ParadeDate`'s term/week position from its own `PlanningYear.year` field,
+so a date whose actual calendar year doesn't match `py.year` falls outside
+every rendered term row and is never a clickable block at all, silently.
+Fixed by creating a dedicated test-only `PlanningYear` whose `year` value
+matches the test date's own calendar year, and explicitly selecting it via
+its "Year:" chip (`PlanningWorkspace.tsx` auto-selects whichever active
+year the API happens to return first, not necessarily a freshly-created
+one) — cleaned up via `try`/`finally`, same discipline as every other
+CLASS-05/06 test this session.
+
+3/3 local runs passed. Also run against the live deployed staging Planning
+Workspace preview (`playwright.planning.staging.native.config.ts`): 1/1
+passed, since the underlying rendering code was already deployed in §48's
+own commit. CLASS-06 (gap register CLASS-22) is now fully staging-verified
+across backend and all three frontend consumers with a live path — the
+only remaining, honestly-disclosed gap is `WeeklyProgram.tsx`'s
+`/weekly-program` route having no reachable path in any currently-deployed
+environment (module-mode-only deployment topology, §48), which is a
+deployment-architecture characteristic, not a testing gap.
