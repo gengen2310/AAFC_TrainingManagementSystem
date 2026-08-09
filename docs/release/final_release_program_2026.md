@@ -885,3 +885,21 @@ one**: `DATABASE_URL`, `AAFC_API_BASE` (both frontend services), `ENVIRONMENT`,
 `CORS_ALLOWED_ORIGINS`, `PLANNING_WORKSPACE_URL`. **Still open**: `JWT_SECRET`/`SECRET_KEY` (see
 §28/§29 and task #161) -- blocked for this session, needs the user to rotate via the Railway
 dashboard directly.
+
+## 31. Incident follow-up — confirmed staging was never affected (one-directional contamination)
+
+Checked whether the contamination went both ways -- i.e. whether staging's own variables had been
+overwritten with production's (which would have been a severe concern given `CLAUDE.md`'s explicit
+rule that staging "never points at the production database"). **Confirmed staging retained all its
+own correct values throughout**: `ENVIRONMENT=staging`, `CORS_ALLOWED_ORIGINS`/
+`PLANNING_WORKSPACE_URL` both staging's own origins, `aafc-tms-frontend` staging's `AAFC_API_BASE`
+correctly points at staging's own backend. The contamination was one-directional -- staging's
+values were copied *into* production, not exchanged -- so staging's own operation and data were
+never at risk. Also independently confirmed end-to-end that production is now genuinely functional
+(not just passing health checks): a real `POST /api/auth/login` with the production frontend's
+actual `Origin` header returns the correct `Access-Control-Allow-Origin`, and
+`GET /api/health/ui-config` returns `environment: production` live from the running app, not just
+the stored variable value.
+
+**Incident status: RESOLVED except JWT_SECRET/SECRET_KEY rotation (task #161, still open, needs
+user action via the Railway dashboard).**
