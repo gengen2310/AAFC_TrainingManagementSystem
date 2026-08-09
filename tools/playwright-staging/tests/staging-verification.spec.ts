@@ -439,20 +439,49 @@ test("[Facilitators] Subject-area-tag: create → assign → reload → filter �
 
   await screenshot(page, "facilitators-filtered-by-tag");
 
-  // Archive the tag via direct API call (no UI delete button present in current design)
-  const tagId = await page.evaluate(async (name: string) => {
-    const w = window as unknown as Record<string, unknown>;
-    const tags = (w.S as Record<string, unknown>)?.subjectAreaTags as Array<{ tag_id: string; display_name: string }> | undefined;
-    return tags?.find((t) => t.display_name === name)?.tag_id ?? null;
+  // Cleanup: unassign the tag from this facilitator AND archive the tag catalogue
+  // entry. Root cause of this test's own historical flakiness (found investigating
+  // task #157): deleting only the catalogue entry leaves the tag name sitting in
+  // facilitator.subject_areas forever (it's a denormalized string list, not a real
+  // FK) -- since this test reuses the same long-lived staging facilitator every
+  // run, that name accumulates indefinitely across repeated runs until it hits
+  // saveTagFac()'s own 20-tag limit, after which saves are correctly (and
+  // silently, from this test's perspective) rejected -- misreported by this test
+  // as "tag doesn't persist" when the real story is "facilitator already at the
+  // tag ceiling because past runs never cleaned up after themselves."
+  //
+  // Also found in the same investigation: this cleanup previously read `window.S`
+  // and `window.api`, but `S`/`api` are declared with top-level `let`/`function` in
+  // a classic (non-module) inline <script>, which never attaches them to `window`
+  // -- so that lookup was ALWAYS undefined and this cleanup has silently no-op'd
+  // since the test was written (confirmed independently: 100% of ever-created
+  // catalogue tags on staging were still present, un-archived). Fixed by referencing
+  // the bare identifiers, which page.evaluate() *can* see -- Playwright's injected
+  // script runs in the same realm's shared top-level lexical scope as the page's
+  // own classic scripts.
+  const cleanup = await page.evaluate(async (name: string) => {
+    // S/api are the page's own script-scope globals (top-level `let`/`function` in
+    // a classic inline <script>, not attached to `window`) -- these `declare`s only
+    // satisfy the TypeScript compiler for this source file; they emit no runtime
+    // code, and the bare identifiers below resolve against the real page globals.
+    declare const S: { subjectAreaTags?: Array<{ tag_id: string; display_name: string }>; facs: Array<{ id: string; areas: string[] }> };
+    declare function api(path: string, opts?: Record<string, unknown>): Promise<unknown>;
+    const tagId = S.subjectAreaTags?.find((t) => t.display_name === name)?.tag_id ?? null;
+    const fac = S.facs.find((f) => f.areas?.includes(name));
+    if (fac) {
+      const remaining = fac.areas.filter((a) => a !== name);
+      await api(`/api/facilitators/${fac.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ subject_areas: remaining }),
+      });
+    }
+    if (tagId) {
+      await api(`/api/subject-area-tags/${tagId}`, { method: "DELETE" });
+    }
+    return { unassignedFrom: fac?.id ?? null, deletedTagId: tagId };
   }, tagName);
-
-  if (tagId) {
-    await page.evaluate(async (id: string) => {
-      const w = window as unknown as Record<string, (...a: unknown[]) => unknown>;
-      await w.api(`/api/subject-area-tags/${id}`, { method: "DELETE" });
-    }, tagId);
-    await page.waitForTimeout(500);
-  }
+  expect(cleanup.unassignedFrom, "Test must clean up its own tag assignment, not leave it accumulating on the facilitator").not.toBeNull();
+  await page.waitForTimeout(500);
 
   expect(errors, `Console/page errors on Facilitators/Tags: ${errors.join("; ")}`).toHaveLength(0);
 });

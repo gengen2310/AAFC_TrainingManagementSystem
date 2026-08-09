@@ -7705,8 +7705,18 @@ async function saveTagFac(){
   if(allTags.length>20){msg.textContent='Maximum 20 tags allowed.';return;}
   msg.textContent='Saving…';
   try{
-    await api('/api/facilitators/'+_tagFacId,{method:'PATCH',body:JSON.stringify({subject_areas:allTags})});
-    closeModal('m-tag-fac'); await reloadAndRender();
+    const r=await api('/api/facilitators/'+_tagFacId,{method:'PATCH',body:JSON.stringify({subject_areas:allTags})});
+    // Apply the PATCH's own authoritative response to local state immediately,
+    // rather than relying solely on reloadAndRender()'s full ~25-endpoint
+    // loadData() cycle to catch up before the modal might be reopened for the
+    // same facilitator -- under real network latency that full reload can take
+    // over a second, and a user (or an automated test) re-opening the Tags
+    // modal for this facilitator inside that window would see the pre-save
+    // tag state. This closes the race by construction: correctness no longer
+    // depends on loadData()'s timing for this specific save.
+    const fac=S.facs.find(x=>x.id===_tagFacId);
+    if(fac&&r&&Array.isArray(r.subject_areas)) fac.areas=r.subject_areas;
+    closeModal('m-tag-fac'); reloadAndRender();
   }catch(e){msg.textContent='Could not update: '+apiErr(e);}
 }
 function showFacProfile(id){
