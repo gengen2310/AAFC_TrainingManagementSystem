@@ -926,19 +926,24 @@ relevant to any release-readiness judgment, not a detail to leave buried in a pr
   authorization at each production-write step, verified functionally (not just via health checks)
   before declaring resolution, and documented honestly including the parts (CORS,
   PLANNING_WORKSPACE_URL) initially missed on the first pass.
-- It **does** leave one genuine, currently-open item: `JWT_SECRET`/`SECRET_KEY` rotation (task
-  #161), blocked for this session's own tooling and requiring direct user action. This is a real,
-  disclosed, unresolved security gap as of this commit -- not fabricated as closed.
+- **UPDATE (§36): `JWT_SECRET`/`SECRET_KEY` rotation is now CONFIRMED COMPLETE** -- the user
+  rotated both via the Railway CLI directly after dashboard attempts failed to actually persist,
+  and this session independently confirmed it via a definitive functional test (a real
+  staging-issued token now fails `invalid_or_expired` against production, not `invalid_user`).
+  This was the last open item from the incident. **The incident is now fully resolved, not merely
+  functionally recovered.**
 - The incident's root cause (what actually overwrote production's variables at 04:57:36 UTC) is
   still unknown (§28) -- an open question for the user's own Railway account activity review, not
-  something this program's own tooling has visibility into.
+  something this program's own tooling has visibility into. This remains the one genuinely open
+  question from the incident, though it's a forward-looking prevention concern, not a currently
+  active gap.
 
 **Revised classification**: still **TECHNICALLY READY FOR PUBLIC RELEASE — HUMAN APPROVALS
-PENDING**, unchanged from §18 -- but now with an additional, concrete pre-release action added to
-the human-approval list: confirm `JWT_SECRET`/`SECRET_KEY` rotation is complete, and get a credible
-answer on what caused the 04:57:36 UTC contamination event before treating production's
-configuration as trustworthy going forward (a recurrence with a future contamination event could
-be far more severe if it touched a variable this program's own checks didn't happen to catch).
+PENDING**, unchanged from §18 -- the incident's own technical fallout is now fully closed (§36), so
+it no longer adds a new item to the pre-release checklist beyond recommending the user get a
+credible answer on what caused the 04:57:36 UTC contamination event before treating production's
+configuration as trustworthy going forward -- a recurrence could be far more severe if it touched a
+variable this program's own checks didn't happen to catch.
 
 ## 33. Cross-origin auth handoff verified live (Gate 6, further coverage)
 
