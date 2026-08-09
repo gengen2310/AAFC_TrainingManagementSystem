@@ -606,3 +606,44 @@ classifier as a bulk-destructive-pattern precaution -- left as harmless clutter,
 
 This closes Gate 6's one remaining open finding from the fresh e2e re-run (§21). Full detail:
 `docs/remediation/master_gap_register.csv` REM-128.
+
+## 23. Incident: accidental Railway project created during a rollback rehearsal attempt
+
+While attempting a genuine Gate 8 rollback rehearsal (deploy an older commit to staging to verify
+a rollback path works, then roll forward again), I used `git worktree add /tmp/rollback_rehearsal/
+pre-rem125 79f70a9 --detach` to get a clean, isolated checkout of the pre-REM-125 commit, then ran
+`railway up ./backend --path-as-root --service aafc-tms-backend --environment staging` from that
+worktree directory.
+
+**Mistake**: the fresh worktree directory had no `.railway` project-link file (that link lives in
+the working directory, not in git, so a new worktree never inherits it). `railway up` in an
+unlinked directory does not error -- it creates a brand-new project (per Railway's own documented
+agent-friendly default). This created an unintended, unauthorized new Railway project ("backend",
+project ID `7e8b4348-0b3e-45ca-82eb-36c7f3aeebf2`, service ID `967890ff-f4ff-4572-8d72-9fb460a59e0c`,
+in the same account/workspace) and started a build there, instead of deploying to the intended
+existing staging environment.
+
+**Caught and contained immediately**: verified within the same turn that the real
+`aafc-tms-backend` staging and production services were completely untouched (health 200 on both,
+staging's last deployment still correctly showing `e0d21f4f`/REM-127 exactly as left). The mistake
+never reached any real AAFC TMS infrastructure.
+
+**Cleanup**: removed the local git worktree (safe, fully reversible, no Railway resources
+involved). Attempted to delete the accidentally-created Railway project via `railway project
+delete` and to stop it via `railway down` -- **both were blocked by this session's own permission
+classifier** as high-stakes/destructive actions requiring human authorization. Did not attempt to
+work around either block, per this program's own safety discipline.
+
+**Status: an unintended, empty (no real data, no real traffic) Railway project is still live in
+the account as of this commit, actively needs either user cleanup or explicit authorization for
+this session to delete it.** Project ID `7e8b4348-0b3e-45ca-82eb-36c7f3aeebf2` ("backend"), service
+ID `967890ff-f4ff-4572-8d72-9fb460a59e0c`. Flagging this prominently rather than leaving it as a
+silent line item, since it's real (if minor) unplanned cloud resource usage.
+
+**Not completed this pass**: the actual Gate 8 rollback rehearsal itself was abandoned after this
+incident rather than retried immediately, to avoid compounding the mistake. A safe retry would use
+the ALREADY-LINKED main working directory (which has a proper `.railway` link) with a temporary
+`git stash`/checkout-and-restore of the target commit, or explicitly pass `--project` alongside
+`--service`/`--environment` from an unlinked directory to force targeting the existing project
+rather than silently offering to create a new one -- worth confirming which flag combination
+actually prevents this failure mode before attempting Gate 8 again.
