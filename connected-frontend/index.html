@@ -9683,10 +9683,24 @@ async function _populateTrainingClassStageSelect(selectId, selectedId){
   if(selectedId && [...sel.options].some(o=>o.value===selectedId)) sel.value=selectedId;
 }
 
+// Keyed by training_class_id, refreshed on every render -- openEditTrainingClassModal
+// looks the row up here by ID rather than having a full JSON object round-tripped
+// through an inline onclick HTML attribute. JSON.stringify(c) embedded directly in
+// an attribute is not attribute-escaped: a display_name containing a quote or a
+// closing-tag-like sequence could break out of the attribute and inject markup --
+// display_name is fully user-controlled free text. (Do not literally type the
+// closing-script-tag sequence in this comment either -- an HTML parser ends a
+// <script> block on that raw byte sequence anywhere in its content, comments and
+// strings included, regardless of JS syntax; that exact mistake in an earlier
+// draft of this comment silently truncated everything after it in the browser.)
+let _tcById={};
+
 async function _renderTrainingClasses(yearId){
   const el=document.getElementById('py-classes-body'); if(!el) return;
   try{
     const rows=await api(`/api/training-classes?training_year_id=${encodeURIComponent(yearId)}`);
+    _tcById={};
+    rows.forEach(c=>{ _tcById[c.training_class_id]=c; });
     if(!rows.length){ el.innerHTML='<p class="muted">No Training Classes set up for this year yet.</p>'; return; }
     // Group by Training Stage so parallel classes of the same Stage sit together --
     // addendum's own "group by stage" guidance for exactly this kind of list.
@@ -9700,7 +9714,7 @@ async function _renderTrainingClasses(yearId){
           <td>${esc(c.display_name)}</td>
           <td>${c.sequence||0}</td>
           <td>${c.expected_count!=null?esc(String(c.expected_count)):'—'}</td>
-          <td style="white-space:nowrap">${canWrite?`<button class="btn-xs" onclick='openEditTrainingClassModal(${JSON.stringify(c)})' style="margin-right:4px">Edit</button>`:''}${canWrite?`<button class="btn-xs btn-danger" onclick="archiveTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Archive</button>`:''}</td>
+          <td style="white-space:nowrap">${canWrite?`<button class="btn-xs" onclick="openEditTrainingClassModal('${esc(c.training_class_id)}')" style="margin-right:4px">Edit</button>`:''}${canWrite?`<button class="btn-xs btn-danger" onclick="archiveTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Archive</button>`:''}</td>
         </tr>`).join('')+
         `</tbody></table>`;
     });
@@ -9734,7 +9748,9 @@ async function doAddTrainingClass(){
   } catch(e){ msg.textContent=apiErr(e); }
 }
 
-async function openEditTrainingClassModal(c){
+async function openEditTrainingClassModal(trainingClassId){
+  const c=_tcById[trainingClassId];
+  if(!c){ alert('Could not find that Training Class -- try refreshing.'); return; }
   document.getElementById('tc-edit-id').value=c.training_class_id;
   document.getElementById('tc-edit-version').value=c.version;
   document.getElementById('tc-edit-name-inp').value=c.display_name||'';
