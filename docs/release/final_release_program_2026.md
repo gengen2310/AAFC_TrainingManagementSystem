@@ -961,3 +961,24 @@ test-tooling/font-readiness-check flakiness issue specific to full-page screensh
 environment, not a live application defect. Not investigated further as an app-code bug given the
 functional evidence (the actual auth/routing behavior) already passed cleanly; flagged as a lower-
 priority test-infrastructure item if screenshot evidence generation becomes a recurring need.
+
+## 34. Fresh Gate 7 load test (25 users) — PASS
+
+Ran a modest 25-concurrent-user, 5-minute sustained load test against staging (per Section 24's
+"start low" guidance and this program's own established methodology) to get fresh evidence
+reflecting all fixes landed since the last load test earlier in this program (REM-124 request-size
+guard, REM-125 IP-detection hardening, REM-127 holiday validation, REM-129 parade-night/planning-
+year linking, REM-130 locations scoping) -- confirming none of them introduced a performance
+regression.
+
+**Result: PASS.** 3209 requests, 100% success (0 failed, 0 5xx), P95 latency 436ms (threshold
+2000ms), 100% login success rate (25/25). Per-endpoint P95: `/api/auth/login` 501ms,
+`/api/auth/me` 384ms, `/api/parade-nights` 489ms, `/api/planning/years` 362ms,
+`/api/reports/summary` 359ms -- all comfortably healthy. Zero unexpected status codes across all
+3209 requests.
+
+This is consistent with (not contradicting) the earlier-established ~1,000-user ceiling finding
+from the 2026-08-06 reconciliation (Gate 7 CONDITIONAL PASS) -- 25 users is a low-tier sanity
+check, not a re-test of the ceiling itself; the higher tiers (50/100+) already run earlier this
+program are still the relevant evidence for capacity, this run's purpose was confirming the
+*newest* code changes specifically don't regress latency/error-rate at a normal operating level.
