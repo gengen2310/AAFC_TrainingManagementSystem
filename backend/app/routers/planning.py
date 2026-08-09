@@ -2876,6 +2876,22 @@ def get_annual_program(
         for ts in ts_rows:
             ts_by_pn.setdefault(ts.parade_night_id, []).append(ts)
 
+    # CLASS-06: which Training Class(es) each session targets, additive to
+    # the inline sessions_summary built below. One bulk query for the whole
+    # year (matching this endpoint's own existing avoid-N+1 discipline)
+    # rather than per-date or per-session calls.
+    classes_by_session: dict[str, list[dict]] = {}
+    if all_pn_ids_pre and ts_rows:
+        aud_rows = (
+            db.query(SessionAudience, TrainingClass)
+            .join(TrainingClass, SessionAudience.training_class_id == TrainingClass.id)
+            .filter(SessionAudience.session_id.in_([s.id for s in ts_rows]))
+            .all()
+        )
+        for aud, tc in aud_rows:
+            classes_by_session.setdefault(aud.session_id, []).append(
+                {"training_class_id": tc.id, "display_name": tc.display_name})
+
     # Build per-date-id session index (eliminates need for a separate /night-summaries call)
     pn_to_date_id = {d.parade_night_id: d.id for d in all_dates if d.parade_night_id}
     ts_by_date_id: dict[str, list] = {}
@@ -2940,6 +2956,7 @@ def get_annual_program(
                     "curriculum_code": s.curriculum_code_at_time,
                     "facilitator": s.facilitator_display_name_at_time,
                     "location": s.training_area_name_at_time,
+                    "training_classes": classes_by_session.get(s.id, []),
                 }
                 for s in date_sessions
             ]
