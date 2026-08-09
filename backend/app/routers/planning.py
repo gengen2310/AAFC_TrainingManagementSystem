@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session as DBSession
 from ..database import get_db, utcnow
 from ..models import (
     Wing, Squadron, CurriculumItem, Facilitator, AuditLog, ParadeNight, TrainingArea,
+    TrainingClass, SessionAudience, CurriculumPhase,
 )
 from ..models import Session as TrainingSession
 from ..models.planning import (
@@ -2518,6 +2519,64 @@ def list_missions(
 
     items = q.order_by(CurriculumItem.phase, CurriculumItem.recommended_sequence, CurriculumItem.code).all()
 
+    # CLASS-05: per-class breakdown, additive to the existing item-level
+    # backlog_status/is_scheduled/etc fields below (none of which change).
+    # A Training Class's Stage is matched to a CurriculumItem's phase the
+    # same way _class_curriculum_progress (training.py) does -- by
+    # CurriculumPhase.name == CurriculumItem.phase -- so this reuses that
+    # resolution rather than inventing a second one (addendum §44). Classes
+    # are not filtered by training_year_id: the Session<->Class assignment
+    # UI (Quick Edit, CLASS-17) deliberately shows every active class for
+    # the squadron regardless of year, so a session's audience can name a
+    # class whose own training_year_id differs from this planning year.
+    classes_by_phase: dict[str, list[TrainingClass]] = defaultdict(list)
+    if py.unit_id:
+        class_rows = (
+            db.query(TrainingClass, CurriculumPhase)
+            .join(CurriculumPhase, TrainingClass.training_stage_id == CurriculumPhase.id)
+            .filter(TrainingClass.squadron_id == py.unit_id, TrainingClass.is_archived == False)  # noqa: E712
+            .order_by(TrainingClass.sequence, TrainingClass.display_name)
+            .all()
+        )
+        for tc, stage in class_rows:
+            classes_by_phase[stage.name].append(tc)
+
+    session_class_ids: dict[str, set[str]] = defaultdict(set)
+    if sessions_in_year:
+        aud_rows = db.query(SessionAudience).filter(
+            SessionAudience.session_id.in_([s.id for s in sessions_in_year])
+        ).all()
+        for aud in aud_rows:
+            session_class_ids[aud.session_id].add(aud.training_class_id)
+
+    def _backlog_status_for(sessions: list[TrainingSession]) -> dict:
+        """Same six-state model as the item-level computation below, applied
+        to an arbitrary session subset (here, one Training Class's share of
+        a mission's sessions)."""
+        is_scheduled = len(sessions) > 0
+        has_cancelled = any(s.status in ("cancelled", "cancelled_late") for s in sessions)
+        has_not_delivered = any(s.status == "not_delivered" for s in sessions)
+        has_rescheduled = any(s.status == "rescheduled" for s in sessions)
+        has_delivered = any(s.status in ("delivered", "delivered_with_issue") for s in sessions)
+        needs_reschedule = has_cancelled or has_not_delivered
+        if not is_scheduled:
+            backlog_status = "unscheduled"
+        elif needs_reschedule and has_delivered:
+            backlog_status = "resolved"
+        elif needs_reschedule and has_cancelled:
+            backlog_status = "cancelled_awaiting_reschedule"
+        elif needs_reschedule:
+            backlog_status = "not_delivered_awaiting_reschedule"
+        elif has_rescheduled:
+            backlog_status = "rescheduled"
+        else:
+            backlog_status = "planned"
+        return {
+            "is_scheduled": is_scheduled, "has_cancelled": has_cancelled,
+            "has_not_delivered": has_not_delivered, "has_rescheduled": has_rescheduled,
+            "needs_reschedule": needs_reschedule, "backlog_status": backlog_status,
+        }
+
     def _sess_summary(s: TrainingSession) -> dict:
         pd_obj = pn_to_pd.get(s.parade_night_id)
         room_name = s.training_area_name_at_time
@@ -2622,6 +2681,18 @@ def list_missions(
         if status == "planned" and backlog_status != "planned":
             continue
 
+        class_breakdown = []
+        for tc in classes_by_phase.get(ci.phase, []):
+            class_sessions = [s for s in scheduled if tc.id in session_class_ids.get(s.id, ())]
+            cb = _backlog_status_for(class_sessions)
+            class_breakdown.append({
+                "training_class_id": tc.id,
+                "display_name": tc.display_name,
+                "scheduled_count": len(class_sessions),
+                **cb,
+            })
+        unassigned_session_count = sum(1 for s in scheduled if not session_class_ids.get(s.id))
+
         result.append({
             "curriculum_id": ci.id,
             "code": ci.code,
@@ -2638,6 +2709,8 @@ def list_missions(
             "has_not_delivered": has_not_delivered,
             "has_rescheduled": has_rescheduled,
             "needs_reschedule": needs_reschedule,
+            "class_breakdown": class_breakdown,
+            "unassigned_session_count": unassigned_session_count,
             "backlog_status": backlog_status,
             "scheduled_sessions": [_sess_summary(s) for s in scheduled],
             "scheduled_count": len(scheduled),
