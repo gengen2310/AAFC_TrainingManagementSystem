@@ -397,3 +397,32 @@ class TrainingClass(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # rename/archive is exactly the kind of low-frequency-but-real-conflict
     # edit that pattern protects.
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+
+class SessionAudience(Base, UUIDMixin, TimestampMixin):
+    """Which Training Class(es) a Session was planned for/delivered to (CLASS-03).
+
+    A Session can target one or many Training Classes (e.g. a combined Drill
+    Session for Senior 1 + Senior 2). This is what Session.cadet_group's
+    single free-text string could never represent — see
+    docs/product-review/parallel-class-impact-analysis.md Finding 2.
+
+    outcome_override/outcome_override_reason support addendum §48: a Session
+    delivered jointly to several classes defaults to the Session's own
+    status for every class, but one class can be recorded as an exception
+    (e.g. delivered to Senior 1 and Senior 2, but Senior 3 didn't attend)
+    without needing three separate Sessions. NULL override means "use the
+    parent Session's own status" -- this row does not duplicate outcome data
+    that already lives on Session; it only stores the deviation.
+
+    No SoftDeleteMixin -- membership rows are removed via DELETE, not
+    archived, since "this class was never part of this session" has no
+    historical value once corrected (unlike TrainingClass/Session themselves,
+    which are never hard-deleted). A session/class pair may exist only once
+    (unique constraint) -- the API is idempotent create, not append.
+    """
+    __tablename__ = "session_audience"
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), index=True)
+    training_class_id: Mapped[str] = mapped_column(ForeignKey("training_classes.id"), index=True)
+    outcome_override: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    outcome_override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)

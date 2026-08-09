@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session as DBSession
 from ..database import get_db, utcnow
 from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
                       Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, TrainingArea, Equipment,
-                      Activity, Cadet, Squadron, TimingTemplate, TimingBlock, SystemSetting, TrainingClass, PlanningYear)
+                      Activity, Cadet, Squadron, TimingTemplate, TimingBlock, SystemSetting, TrainingClass, PlanningYear,
+                      SessionAudience)
 from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
@@ -1566,6 +1567,131 @@ def archive_training_class(cid: str, db: DBSession = Depends(get_db), p: Princip
     c.archived_at = utcnow()
     db.commit()
     audit(db, p, object_type="training_class", object_id=c.id, action="archive")
+    return {"ok": True}
+
+
+# ── SESSION AUDIENCE ─────────────────────────────────────────────────────────
+# CLASS-03: which Training Class(es) a Session was planned for/delivered to.
+# Session.cadet_group stays untouched as a free-text compatibility field
+# (addendum §86-87) -- this is the new, structured many-to-many alongside it.
+# Unblocks CLASS-04 (class-specific curriculum progress), CLASS-05 (Mission
+# Backlog), CLASS-06 (Weekly Program), CLASS-13 (combined-Session exceptions)
+# -- none of those consumers are built yet; this pass is the linkage itself.
+
+def _require_session_write(db: DBSession, p: Principal, sid: str) -> Session:
+    s = db.get(Session, sid)
+    if not s or s.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id)
+    require_can_write_squadron(p, s.squadron_id, pn.wing_id if pn else None)
+    return s
+
+
+def _session_audience_dict(row: SessionAudience) -> dict:
+    return {
+        "session_audience_id": row.id,
+        "session_id": row.session_id,
+        "training_class_id": row.training_class_id,
+        "outcome_override": row.outcome_override,
+        "outcome_override_reason": row.outcome_override_reason,
+    }
+
+
+class SessionAudienceSetIn(BaseModel):
+    training_class_ids: List[str]
+
+
+class SessionAudienceOutcomeIn(BaseModel):
+    outcome_override: str | None = None
+    outcome_override_reason: str | None = None
+
+
+@router.get("/sessions/{sid}/audience")
+def list_session_audience(sid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    s = db.get(Session, sid)
+    if not s or s.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id)
+    require_can_view_squadron(p, s.squadron_id, pn.wing_id if pn else None)
+    rows = db.query(SessionAudience).filter(SessionAudience.session_id == sid).all()
+    return [_session_audience_dict(r) for r in rows]
+
+
+@router.put("/sessions/{sid}/audience")
+def set_session_audience(sid: str, body: SessionAudienceSetIn, db: DBSession = Depends(get_db),
+                          p: Principal = Depends(get_principal)):
+    """Replace the full set of Training Classes this Session targets --
+    idempotent set, not append. Selecting Senior 1 + Senior 2 for one
+    Session (addendum §40 Example 2) is a single PUT with both IDs; a
+    "split Session" (addendum §59.2) is a second Session created via the
+    normal POST /sessions plus its own PUT .../audience with the remaining
+    class(es), not a special endpoint -- the audience relationship itself
+    doesn't need split-specific logic."""
+    s = _require_session_write(db, p, sid)
+    classes = []
+    for cid in body.training_class_ids:
+        c = db.get(TrainingClass, cid)
+        if not c or c.is_archived or c.squadron_id != s.squadron_id:
+            raise HTTPException(400, detail={"error": "invalid_training_class", "training_class_id": cid})
+        classes.append(c)
+
+    existing = {r.training_class_id: r for r in
+                db.query(SessionAudience).filter(SessionAudience.session_id == sid).all()}
+    keep_ids = {c.id for c in classes}
+    for cid, row in existing.items():
+        if cid not in keep_ids:
+            db.delete(row)
+    for c in classes:
+        if c.id not in existing:
+            db.add(SessionAudience(session_id=sid, training_class_id=c.id,
+                                   created_by=p.user_id, updated_by=p.user_id))
+    db.commit()
+    audit(db, p, object_type="session_audience", object_id=sid, action="set",
+          new={"training_class_ids": sorted(keep_ids)})
+    rows = db.query(SessionAudience).filter(SessionAudience.session_id == sid).all()
+    return [_session_audience_dict(r) for r in rows]
+
+
+@router.patch("/sessions/{sid}/audience/{cid}")
+def set_session_audience_outcome(sid: str, cid: str, body: SessionAudienceOutcomeIn,
+                                  db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Record a per-class outcome exception (addendum §48) -- e.g. a
+    Session delivered jointly to three classes where one class didn't
+    actually receive it. outcome_override=None means "use the parent
+    Session's own status", which is also how a caller clears a previously
+    recorded exception."""
+    _require_session_write(db, p, sid)
+    row = db.query(SessionAudience).filter(
+        SessionAudience.session_id == sid, SessionAudience.training_class_id == cid,
+    ).first()
+    if not row:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if body.outcome_override is not None and body.outcome_override not in VALID_STATUS:
+        raise HTTPException(400, detail={"error": "invalid_status"})
+    if (body.outcome_override in REASON_REQUIRED_STATUSES
+            and not (body.outcome_override_reason or "").strip()):
+        raise HTTPException(400, detail={"error": f"reason_required_{body.outcome_override}"})
+    row.outcome_override = body.outcome_override
+    row.outcome_override_reason = body.outcome_override_reason
+    row.updated_by = p.user_id
+    db.commit()
+    audit(db, p, object_type="session_audience", object_id=row.id, action="outcome_override",
+          new={"outcome_override": row.outcome_override})
+    return _session_audience_dict(row)
+
+
+@router.delete("/sessions/{sid}/audience/{cid}")
+def remove_session_audience_class(sid: str, cid: str, db: DBSession = Depends(get_db),
+                                   p: Principal = Depends(get_principal)):
+    _require_session_write(db, p, sid)
+    row = db.query(SessionAudience).filter(
+        SessionAudience.session_id == sid, SessionAudience.training_class_id == cid,
+    ).first()
+    if not row:
+        raise HTTPException(404, detail={"error": "not_found"})
+    db.delete(row)
+    db.commit()
+    audit(db, p, object_type="session_audience", object_id=row.id, action="remove")
     return {"ok": True}
 
 

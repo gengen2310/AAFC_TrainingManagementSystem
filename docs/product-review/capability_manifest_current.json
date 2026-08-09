@@ -1,8 +1,8 @@
 {
   "generated_from": "live introspection (app.routes + Base.metadata.tables), not regex",
-  "commit": "5b9bd3a7b855e873263ea64cadf67b7d16e7e5a3",
+  "commit": "7fa201ce890641957dfa1d409690f8851c519c17",
   "note": "Route/table names are exhaustive (introspected from the running FastAPI app and SQLAlchemy metadata, not parsed from source text), so this will not miss a route hidden behind unusual formatting the way an earlier regex-based pass could. Per-role/per-scope button-and-action-level frontend detail is still a separate, manual pass -- not captured here.",
-  "total_routes": 262,
+  "total_routes": 266,
   "routes": [
     "DELETE /api/accounts/{uid}",
     "DELETE /api/activities/{aid}",
@@ -18,6 +18,7 @@
     "DELETE /api/planning/parade-dates/{date_id}",
     "DELETE /api/planning/sessions/{session_id}",
     "DELETE /api/planning/years/{year_id}",
+    "DELETE /api/sessions/{sid}/audience/{cid}",
     "DELETE /api/squadrons/{squadron_id}",
     "DELETE /api/subject-area-tags/{tag_id}",
     "DELETE /api/training-areas/{rid}",
@@ -113,6 +114,7 @@
     "GET /api/reports/wing-overview",
     "GET /api/reports/wing-phase-coverage",
     "GET /api/resources/clashes",
+    "GET /api/sessions/{sid}/audience",
     "GET /api/sessions/{sid}/status-history",
     "GET /api/setup/status",
     "GET /api/squadrons",
@@ -153,6 +155,7 @@
     "PATCH /api/planning/notices/{notice_id}",
     "PATCH /api/planning/sessions/{session_id}",
     "PATCH /api/planning/years/{year_id}",
+    "PATCH /api/sessions/{sid}/audience/{cid}",
     "PATCH /api/squadrons/{squadron_id}",
     "PATCH /api/timing-templates/{tid}",
     "PATCH /api/training-areas/{rid}",
@@ -265,9 +268,10 @@
     "POST /api/wings/{wing_id}/archive",
     "POST /api/wings/{wing_id}/restore",
     "PUT /api/activities/getting-help",
-    "PUT /api/sessions/{sid}"
+    "PUT /api/sessions/{sid}",
+    "PUT /api/sessions/{sid}/audience"
   ],
-  "total_tables": 59,
+  "total_tables": 60,
   "tables": [
     "access_codes",
     "action_items",
@@ -312,6 +316,7 @@
     "promotion_requests",
     "proxy_sessions",
     "scheduled_sessions",
+    "session_audience",
     "session_status_history",
     "sessions",
     "source_conflicts",
