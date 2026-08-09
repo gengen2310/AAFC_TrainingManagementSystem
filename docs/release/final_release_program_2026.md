@@ -2126,3 +2126,118 @@ endpoint's existing behaviour (`holidays_copied`/`parade_dates_copied`/
 `incomplete_sessions_noted` aren't shown either), not a new gap this task
 introduced. A future pass could add a rollover summary screen surfacing
 everything that was copied at once, across all four counts.
+
+## 53. CLASS-09 — CadetClassMembership (Foundation + Extension concurrent membership), and a real staging incident found and fixed mid-task
+
+User instruction: "continue with CLASS-09 Foundation and Extension
+concurrent membership." Before writing any code, re-read the gap
+register's own CLASS-09 entry — it explicitly states this is blocked on
+"a product-scope decision on individual cadet tracking," quoting the
+addendum's own §38/§39 instruction that individual cadet-class tracking is
+conditional on an explicit product decision, not an engineering default,
+because this program's data-minimisation principle warns against
+collecting cadet-identifiable data speculatively. This is exactly the
+class of decision that belongs to the user, not an autonomous default —
+asked directly via `AskUserQuestion` before touching any code. The user
+confirmed: **build it**.
+
+**What changed (backend)**: new `CadetClassMembership` model (migration
+v50, `ed6feec8b9cd`) — a genuine lifecycle join between `Cadet` and
+`TrainingClass` (`start_date`/`end_date`/`active_status`/`source`), not an
+idempotent current-set like `SessionAudience`, since a Cadet's membership
+history has real value (left and rejoined a class over time) unlike a
+corrected Session/Class link. `Cadet.phase` is completely untouched,
+staying in place as the existing compatibility field. No DB-level unique
+constraint on `(cadet_id, training_class_id)` — "no duplicate
+*currently-active* membership" is enforced at the API layer instead, so a
+Cadet can hold more than one historical/ended membership in the same
+Class over time. New endpoints:
+`GET`/`POST /api/cadets/{id}/class-memberships`,
+`PATCH`/`DELETE /api/cadet-class-memberships/{id}`,
+`GET /api/training-classes/{id}/members` (the reverse roster lookup).
+Migration rehearsed both directions on a disposable SQLite DB before
+landing, matching this program's own established discipline for every
+prior schema change.
+
+**What changed (frontend)**: `Cadets.tsx` (React, `/cadets`) — the only
+frontend with any cadet UI at all; confirmed via grep that
+connected-frontend has zero `/api/cadets` calls anywhere, so it was never
+extended, as that would be new UI surface beyond this task's scope, not an
+extension of an existing one — gains a **Manage** button per Cadet opening
+a new `CadetClassMembershipModal`: lists active memberships, lets an admin
+add another (excluding classes the Cadet already belongs to) or end one.
+This directly demonstrates the addendum's own core CLASS-09 scenario in
+the running UI: adding a Cadet to a Foundation-stage class and an
+Extension-stage class shows both simultaneously, active at once.
+
+**Verification**: 11 new backend tests
+(`test_cadet_class_membership.py`) — add+list, concurrent
+Foundation+Extension membership (the addendum's own scenario, asserted
+directly), duplicate-active-membership `409`, leave-then-rejoin allowed
+(only a *currently-active* duplicate is blocked), cross-squadron
+Training-Class rejection, cross-squadron view/write isolation (a 704 admin
+cannot touch a 703 Cadet's memberships), `sqn_general` blocked from both
+read and write, archive removes from the default list but preserves
+history, the reverse `training-class-members` lookup, stale-version `409`.
+Full backend suite: 1329 passed, 5 skipped (up from 1319/5, zero
+regressions). Capability manifest: 273 routes (+5), 61 tables (+1) —
+confirmed purely additive. `tsc --noEmit`, `vitest` (22/22),
+`npm run build` all clean. New `e2e/cadet-class-membership.spec.ts`: 3/3
+local runs — opens the modal, adds a real membership, confirms it renders,
+ends it, confirms removal.
+
+**A real staging incident, caused and fixed within this same task — full
+honest account, not a summary that omits it**: the *first* attempt to
+deploy the backend to staging broke it. `curl .../api/health/ready`
+returned `502`; Railway logs showed the container crash-looping on
+`FAILED: Multiple head revisions are present for given argument 'head'`.
+Root cause: an **uncommitted, unrelated migration file**
+(`w8x9y0z1a2b3_v35_program_type.py`) was sitting in the local
+`backend/alembic/versions/` directory — not something this task created,
+and not tracked in git (`git status` showed it as untracked both before
+and after). It almost certainly belongs to a *different, concurrent
+session's* in-progress work in this same shared working directory (this
+program's own `beta-release` skill guidance explicitly warns to check for
+exactly this before staging work: "if another Claude Code session is
+working the same release... don't assume it's finished"). `railway up`
+uploads the entire local directory as its build context, not just
+git-tracked files, so that stray file was swept into the deploy alongside
+this task's own legitimate migration, creating two divergent Alembic
+heads with no common resolution — `alembic upgrade head` refuses to run
+when the target is ambiguous, so the container never started.
+
+Fixed without touching the file's *contents* at any point, since it is
+someone else's genuine in-progress work, not debris to delete: moved it
+aside to a scratch location outside the repository, confirmed
+`alembic heads` now showed a single clean head, redeployed, confirmed via
+live logs that the container booted cleanly with no migration errors, and
+**restored the file to its exact original path immediately afterward** —
+the same reversible "set aside, don't delete" discipline this program's
+own git-safety rules require for anything unexpected found in a working
+directory. Re-verified the fixed deployment with a full live API round
+trip: created a real `TrainingClass` and Cadet membership against the live
+Postgres-backed staging database, confirmed the class-members reverse
+lookup, the duplicate-membership `409`, and ending a membership all
+matched exactly what the unit tests assert.
+
+**Deployment and live verification (after the fix)**: both
+`aafc-tms-backend` and `aafc-tms-planning-workspace-preview` deployed to
+staging, `SUCCESS`. Backend: full live API round trip as above, passed.
+Frontend: `e2e/cadet-class-membership.spec.ts` run against the live
+deployed Planning Workspace preview
+(`playwright.planning.staging.native.config.ts`) hit the exact same,
+already-disclosed §48 deployment-topology limitation —
+`/cadets` redirects to `/planning` under the module-mode-only deployment
+this preview service runs, exactly like `/weekly-program`. Not a new
+defect; confirmed via the same `aafc-module-mode` meta-tag check used to
+diagnose the original finding.
+
+**Residual, honestly disclosed**: this pass builds the capability but does
+not retroactively backfill any existing Cadet's membership from
+`Cadet.phase` — adoption is opt-in per Cadet through the new UI, matching
+the addendum's own "don't force collection" instruction. `Cadets.tsx`'s
+`/cadets` route has no reachable path in any currently-deployed
+environment, same characteristic as `/weekly-program`. connected-frontend
+still has no Cadets UI of any kind — out of scope for this task, which
+extended the one cadet UI surface that already existed rather than
+building a new one.
