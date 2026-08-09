@@ -1570,6 +1570,132 @@ def archive_training_class(cid: str, db: DBSession = Depends(get_db), p: Princip
     return {"ok": True}
 
 
+# ── CLASS-SPECIFIC CURRICULUM PROGRESS ──────────────────────────────────────
+# CLASS-04: curriculum progress derived PER Training Class, not blended
+# across every class sharing a Training Stage. Derived entirely from
+# existing operational data (CurriculumItem, Session, SessionAudience) --
+# no second, manually-maintained progress database (addendum §44). One
+# recorded fact (a Session's status, or its per-class outcome_override)
+# drives this read model; nothing here is itself written to directly.
+_ITEM_STATUS_PRIORITY = ["delivered", "delivered_with_issue", "not_delivered",
+                         "cancelled", "planned", "rescheduled"]
+
+
+def _class_curriculum_progress(db: DBSession, c: TrainingClass) -> dict:
+    stage = db.get(CurriculumPhase, c.training_stage_id)
+    stage_name = stage.name if stage else None
+    s = db.get(Squadron, c.squadron_id)
+    wing_id = s.wing_id if s else None
+
+    from sqlalchemy import or_
+    conditions = [CurriculumItem.owning_level == "national"]
+    if wing_id:
+        conditions.append((CurriculumItem.owning_level == "wing") & (CurriculumItem.wing_id == wing_id))
+    conditions.append(CurriculumItem.squadron_id == c.squadron_id)
+    items = db.query(CurriculumItem).filter(
+        CurriculumItem.is_archived == False,  # noqa: E712
+        CurriculumItem.phase == stage_name,
+        or_(*conditions),
+    ).order_by(CurriculumItem.recommended_sequence).all()
+
+    # One query for every Session linked to this class via SessionAudience,
+    # joined back to the Session row for its curriculum_item_id/status.
+    linked = (
+        db.query(SessionAudience, Session)
+        .join(Session, SessionAudience.session_id == Session.id)
+        .filter(SessionAudience.training_class_id == c.id, Session.is_archived == False)  # noqa: E712
+        .all()
+    )
+    from collections import defaultdict
+    by_item: dict[str, list[dict]] = defaultdict(list)
+    for aud, sess in linked:
+        if not sess.curriculum_item_id:
+            continue
+        effective = aud.outcome_override or sess.status or "planned"
+        by_item[sess.curriculum_item_id].append({"session_id": sess.id, "status": effective})
+
+    requirements = []
+    summary = {"total": 0, "delivered": 0, "planned": 0, "not_delivered": 0, "cancelled": 0, "not_started": 0}
+    for item in items:
+        sessions = by_item.get(item.id, [])
+        if not sessions:
+            status = "not_started"
+        else:
+            present = {row["status"] for row in sessions}
+            status = next((cand for cand in _ITEM_STATUS_PRIORITY if cand in present), "planned")
+        bucket = "delivered" if status in ("delivered", "delivered_with_issue") else status
+        summary["total"] += 1
+        summary[bucket] = summary.get(bucket, 0) + 1
+        requirements.append({
+            "curriculum_id": item.id, "code": item.code, "title": item.title,
+            "status": status, "sessions": sessions,
+        })
+
+    return {
+        "training_class_id": c.id,
+        "training_stage_id": c.training_stage_id,
+        "stage_name": stage_name,
+        "requirements": requirements,
+        "summary": summary,
+    }
+
+
+@router.get("/training-classes/{cid}/curriculum-progress")
+def get_class_curriculum_progress(cid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    c = db.get(TrainingClass, cid)
+    if not c:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, c.squadron_id)
+    require_can_view_squadron(p, c.squadron_id, s.wing_id if s else None)
+    return _class_curriculum_progress(db, c)
+
+
+@router.get("/curriculum/phases/{stage_id}/class-progress")
+def get_stage_class_progress(stage_id: str, squadron_id: str, db: DBSession = Depends(get_db),
+                              p: Principal = Depends(get_principal)):
+    """Stage-level aggregate across every active class undertaking it, using
+    weighted requirement completion (sum of delivered / sum of applicable
+    across classes) -- NOT an average of each class's own percentage, which
+    addendum §74 explicitly warns can conceal a struggling class behind a
+    healthy-looking blended number. Also returns the per-class breakdown so
+    a Squadron dashboard can show both the aggregate and which class, if
+    any, needs attention (addendum §75)."""
+    sq_id = _view_squadron_id(p, squadron_id, db)
+    stage = db.get(CurriculumPhase, stage_id)
+    if not stage:
+        raise HTTPException(404, detail={"error": "training_stage_not_found"})
+    classes = db.query(TrainingClass).filter(
+        TrainingClass.squadron_id == sq_id, TrainingClass.training_stage_id == stage_id,
+        TrainingClass.is_archived == False,  # noqa: E712
+    ).order_by(TrainingClass.sequence, TrainingClass.display_name).all()
+
+    per_class = []
+    total_delivered = 0
+    total_applicable = 0
+    for c in classes:
+        prog = _class_curriculum_progress(db, c)
+        delivered = prog["summary"]["delivered"]
+        total = prog["summary"]["total"]
+        total_delivered += delivered
+        total_applicable += total
+        per_class.append({
+            "training_class_id": c.id, "display_name": c.display_name,
+            "delivered": delivered, "total": total,
+            "coverage_pct": round(100 * delivered / total) if total else None,
+        })
+
+    return {
+        "training_stage_id": stage_id,
+        "stage_name": stage.name,
+        "squadron_id": sq_id,
+        "class_count": len(classes),
+        "total_delivered": total_delivered,
+        "total_applicable": total_applicable,
+        "coverage_pct": round(100 * total_delivered / total_applicable) if total_applicable else None,
+        "classes": per_class,
+    }
+
+
 # ── SESSION AUDIENCE ─────────────────────────────────────────────────────────
 # CLASS-03: which Training Class(es) a Session was planned for/delivered to.
 # Session.cadet_group stays untouched as a free-text compatibility field

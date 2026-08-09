@@ -1,8 +1,8 @@
 {
   "generated_from": "live introspection (app.routes + Base.metadata.tables), not regex",
-  "commit": "7fa201ce890641957dfa1d409690f8851c519c17",
+  "commit": "a4e92f72ce6c5b18d14fa968f1467fb758eb590f",
   "note": "Route/table names are exhaustive (introspected from the running FastAPI app and SQLAlchemy metadata, not parsed from source text), so this will not miss a route hidden behind unusual formatting the way an earlier regex-based pass could. Per-role/per-scope button-and-action-level frontend detail is still a separate, manual pass -- not captured here.",
-  "total_routes": 266,
+  "total_routes": 268,
   "routes": [
     "DELETE /api/accounts/{uid}",
     "DELETE /api/activities/{aid}",
@@ -40,6 +40,7 @@
     "GET /api/curriculum/elements",
     "GET /api/curriculum/export.xlsx",
     "GET /api/curriculum/phases",
+    "GET /api/curriculum/phases/{stage_id}/class-progress",
     "GET /api/curriculum/{cid}/sessions",
     "GET /api/dashboard/charts",
     "GET /api/dashboard/charts/strategic",
@@ -135,6 +136,7 @@
     "GET /api/timing-templates/{tid}",
     "GET /api/training-areas",
     "GET /api/training-classes",
+    "GET /api/training-classes/{cid}/curriculum-progress",
     "GET /api/users",
     "GET /api/wing-calendar/events",
     "GET /api/wing-calendar/events/{event_id}",
