@@ -1553,3 +1553,106 @@ progress isn't shown in any UI yet (CLASS-04/07's data exists only via
 direct API/dashboard chart), Mission Backlog and Weekly Program remain
 unbuilt (CLASS-05/06), Planning Workspace has no Training Class UI at all,
 and CLASS-18's dead code remains undeleted.
+
+## 46. CLASS-05 (Mission Backlog class-aware breakdown) implemented and staging-verified — backend only
+
+Task #171. Mission Backlog is **not** part of `connected-frontend` — it is a
+Planning Workspace (React) concept, rendered by
+`frontend/src/components/planning/PlanningBottomDrawer.tsx`, backed by
+`GET /api/planning/years/{id}/missions` (`list_missions()`,
+`backend/app/routers/planning.py`). Confirmed this via `queryKey:
+["planning-missions", yearId, "backlog"]` → `planningApi.missions(yearId)`
+(`frontend/src/api/index.ts`) → the real backend endpoint, rather than
+assuming — per the CLASS-18 lesson, verify the real live path before
+building into it.
+
+`list_missions()` already computes a well-designed six-state
+`backlog_status` per curriculum item (`unscheduled` / `planned` /
+`cancelled_awaiting_reschedule` / `not_delivered_awaiting_reschedule` /
+`rescheduled` / `resolved`) from every `Session` scheduled against that item
+in the year — but blended across the whole item, with zero Training Class
+awareness, even though CLASS-03's `SessionAudience` linkage has existed
+since §41.
+
+**What changed**: two new, purely additive fields per mission item —
+`class_breakdown` (one entry per active Training Class belonging to that
+item's own Stage, each with the same `is_scheduled` /
+`has_cancelled` / `has_not_delivered` / `has_rescheduled` /
+`needs_reschedule` / `backlog_status` shape as the item level, computed from
+only that class's share of the item's sessions via `SessionAudience`) and
+`unassigned_session_count` (scheduled sessions with no Training Class
+audience at all — expected and normal, since audience assignment is
+optional/additive, not mandatory). Every existing top-level and item-level
+field is completely untouched — confirmed by the capability manifest
+(268 routes, 60 tables, unchanged from §43) and by the full backend suite
+(1299 passed, 5 skipped, up from the 1292/5 baseline with zero regressions).
+
+Stage-to-Class resolution reuses the exact `CurriculumPhase.name ==
+CurriculumItem.phase` match `training.py`'s `_class_curriculum_progress`
+(CLASS-04) already established, per addendum §44's "no new calculation"
+instruction — not a second lookup. The six-state logic itself is a small,
+deliberately duplicated local helper (`_backlog_status_for`) rather than a
+refactor of the existing item-level inline block: extracting a shared
+helper across both would have meant touching already-shipped, already-tested
+code for a one-file, ~20-line saving — not worth the regression risk for a
+feature addition, so the existing block was left alone entirely.
+
+**7 new regression tests** (`test_mission_backlog_class_awareness.py`) cover
+response shape/backward-compatibility, a Stage with zero Classes (empty
+breakdown, no error), a real per-class split driven by actual
+`SessionAudience` rows, six-state parity between the class level and the
+item level (a cancelled-then-delivered pair resolving to `resolved` at both
+levels), one Session serving two Classes at once (addendum's explicit
+combined-session use case) counted in both, Stage isolation (a Class from a
+different Stage never appears in another Stage's item), and `sqn_general`
+read access.
+
+**A real test-isolation bug found and fixed while writing these**: the
+first version of these tests failed only when run as part of the *full*
+suite, not in isolation or alongside just the other Training-Class test
+files. Root cause: `POST /api/parade-nights`'s plain-create path
+(`create_parade()`, REM-129) auto-links a new `ParadeNight` to whichever
+active `PlanningYear` has the *highest* `year` value for the squadron — a
+sensible default for the real app (one active year is normal), but a trap
+for a test suite where the DB is session-scoped and never rolled back
+between tests (confirmed via `conftest.py`: only rate-limiter/lockout state
+resets per test, not the database). My test years (initially 2075–2096,
+picked to look "clearly test-only") were routinely outranked by other
+files' own leftover active years (up to 2099, several already existing
+elsewhere in the suite) depending on alphabetical execution order — so my
+sessions silently linked to the wrong year and never appeared in *my*
+mission list. Fixed two ways: (1) moved this file's own years to 2401–2407,
+guaranteed higher than anything else in the repo, so they're reliably
+selected while a test is running; (2) added an explicit
+`_deactivate_year()` cleanup call at the end of every test (archives the
+year via `PATCH .../years/{id}` with `active_status=false`) so these years
+don't linger as active and steal the "highest active year" slot from any
+*future* test file, the way the leftover 2401–2407 years otherwise would
+have — this second fix is what surfaces as tests, not just documentation:
+it directly caused a real regression in
+`test_planning.py::test_plain_parade_night_create_links_to_active_planning_year`
+mid-way through this task, caught by the full-suite run before this was
+disclosed as done, not after.
+
+**Staging verification**: deployed to `aafc-tms-backend` staging (Railway
+deployment `275be547`, SUCCESS), then verified live via direct HTTPS calls
+against the deployed staging URL — created a real Training Year, Stage,
+Class, and Session against the live Postgres-backed staging database, set
+the Session's audience, delivered it, and confirmed
+`GET .../missions` returned the correct `class_breakdown` (`is_scheduled:
+true`, `backlog_status: "planned"`, `scheduled_count: 1`) and
+`unassigned_session_count: 0` — matching exactly what the unit tests assert,
+against the real deployed service rather than only the local test DB. Test
+fixtures (the class, the planning year) were cleaned up immediately after.
+
+**Honestly still open**: this is backend-only. Planning Workspace's own
+React Mission Backlog UI does not yet render `class_breakdown` — exactly
+the same "API exists, no UI consumes it yet" gap CLASS-01–04 had before
+CLASS-15–17 built connected-frontend consumers for those. The natural next
+step is a Planning Workspace (React/TypeScript) consumer in
+`PlanningBottomDrawer.tsx`, which is a different tech stack (React Query,
+Vite, its own `frontend/e2e/` Playwright suite with different conventions
+than `frontend/e2e-connected/`) from everything built in this program so
+far and needs its own discovery pass before assuming any specific pattern
+applies — not done this pass. Weekly Program (CLASS-06) still has no
+Training Class awareness at all.
