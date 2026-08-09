@@ -11,7 +11,7 @@ import type {
   WingHQEvent, CommandCentreData, PlanningConflict, HolidayPeriod,
   NightSummariesResponse, PlanningFacilitatorLeave, FacilitatorLeaveResult,
   FacilitatorWorkload, EquipmentItem, AnchorEvent, PlanningSession,
-  DashboardChartsResponse,
+  DashboardChartsResponse, CadetClassMembership, TrainingClassSummary,
 } from "./types";
 
 /** Handles both legacy array shape `[...]` and current `{"conflicts":[...]}` shape. */
@@ -183,6 +183,21 @@ export const trainingApi = {
   clashes: (date: string) => api.get<ClashResult>(`/api/resources/clashes?date=${date}`),
   cadets: () => api.get<Cadet[]>("/api/cadets"),
   cadetRisk: () => api.get<CadetRiskFlag[]>("/api/cadets/risk"),
+  // CLASS-09: individual Cadet<->Training Class membership.
+  cadetClassMemberships: (cadetId: string) =>
+    api.get<CadetClassMembership[]>(`/api/cadets/${cadetId}/class-memberships`),
+  addCadetClassMembership: (cadetId: string, body: { training_class_id: string; start_date?: string }) =>
+    api.post<CadetClassMembership>(`/api/cadets/${cadetId}/class-memberships`, body),
+  endCadetClassMembership: (membershipId: string, body: { end_date?: string; active_status?: boolean; client_version?: number }) =>
+    api.patch<CadetClassMembership>(`/api/cadet-class-memberships/${membershipId}`, body),
+  archiveCadetClassMembership: (membershipId: string) =>
+    api.delete<{ ok: boolean }>(`/api/cadet-class-memberships/${membershipId}`),
+  // Read-only list of active Training Classes for the caller's squadron --
+  // just enough to populate the membership-assignment picker in Cadets.tsx.
+  // Planning Workspace has no Training Class management UI of its own yet
+  // (a separate, larger, already-tracked gap) -- this is not that.
+  trainingClasses: (training_year_id?: string) =>
+    api.get<TrainingClassSummary[]>(`/api/training-classes${training_year_id ? `?training_year_id=${training_year_id}` : ""}`),
 };
 
 export const reportApi = {

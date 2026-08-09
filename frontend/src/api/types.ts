@@ -79,6 +79,23 @@ export interface Cadet {
   support_flag: boolean | null; support_notes?: string | null;
 }
 export interface CadetRiskFlag { cadet: string; reasons: string[]; }
+// CLASS-09: individual Cadet<->Training Class membership, explicitly
+// product-scope-confirmed before being built -- see the backend model's
+// own docstring (models/training.py) for why this is conditional rather
+// than a default. Enables a Cadet to hold concurrent Foundation (e.g.
+// Senior 1) and Extension (e.g. Bronze CLP) membership at once.
+export interface CadetClassMembership {
+  membership_id: string; cadet_id: string; training_class_id: string;
+  training_class_name: string | null; training_stage_id: string | null;
+  start_date: string | null; end_date: string | null; active_status: boolean;
+  source: string; version: number; created_at: string | null;
+}
+export interface TrainingClassSummary {
+  training_class_id: string; squadron_id: string; training_year_id: string;
+  training_stage_id: string; display_name: string; sequence: number;
+  start_date: string | null; end_date: string | null; expected_count: number | null;
+  notes: string | null; is_archived: boolean; version: number;
+}
 export interface AuditRow {
   audit_id: string; timestamp: string; role: string; action: string;
   object_type: string | null; object_id: string | null; reason: string | null; proxy_session_id: string | null;
