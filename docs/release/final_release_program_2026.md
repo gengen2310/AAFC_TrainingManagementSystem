@@ -717,3 +717,25 @@ cause with 10 downstream symptoms.
 The 36 passing tests give good positive confirmation that account management, activities, most of
 the training dashboard, and hostile-input/XSS handling all work correctly against real staging with
 current code (which now includes REM-124 through REM-130) -- no new defect surfaced in this run.
+
+## 27. REM-130 bug-class sweep, completed across all routers
+
+Extended the earlier planning.py/training.py sweep (§ REM-130 commit) to the remaining router
+files with role-branching logic: `accounts.py`, `organisations.py`, `program.py`,
+`wing_calendar.py` (16, 9, 6, 5 occurrences of `p.role ==`/`p.role in (` respectively). Checked
+every read/list endpoint's scoping chain for the same class of gap (a squadron-level role silently
+falling through unfiltered).
+
+**No additional live instance found.** Every other occurrence is safe by one of three patterns:
+(1) an upfront `require_role`/`_READ_ROLES` gate that excludes `sqn_general` *before* the ad hoc
+chain is ever reached (e.g. `organisations.py::list_users`) -- superficially similar to REM-130 but
+not exploitable, since the excluded role can never reach the unfiltered branch; (2) value-based
+scoping (`sq = p.acting_squadron_id or p.squadron_id`) rather than per-role enumeration (e.g.
+`program.py::list_packages`), which is correct for any role by construction; (3) a catch-all
+`else` clause rather than an enumerated allow-list (e.g. `accounts.py::list_flights`), which
+default-scopes any unmatched role to their own squadron rather than leaving them unfiltered.
+
+REM-130 (`planning.py::list_locations`) was an isolated instance -- the one place in the whole
+backend that combined an enumerated (not catch-all) role chain with no upfront role gate and no
+value-based fallback. Confirms this was not part of a broader systemic pattern still needing a
+sweep; no further action from this check.
