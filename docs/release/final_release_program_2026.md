@@ -1234,3 +1234,44 @@ and it has just started. Continuing systematically across subsequent
 autonomous-loop ticks, in the implementation order the governing instruction
 itself specifies (§54/§104), rather than attempting to compress a multi-week
 program into a false single-tick completion claim.
+
+## 40. CLASS-01 (TrainingClass backend model) implemented and staging-verified
+
+Continuing the whole-system hardening program's addendum work (§39 above),
+the TrainingClass backend model, migration, and CRUD API were implemented,
+tested, and deployed to staging this pass.
+
+- Model, migration (v48, `4a34b5517bd3`), and CRUD API added — see commit
+  `a14e464` for full detail. Migration rehearsed both directions against a
+  disposable SQLite copy before landing.
+- 11 new regression tests, full suite 1268 passed / 5 skipped / 0
+  regressions.
+- Deployed to staging. **Correction recorded**: the first `railway up`
+  attempt failed at the build step — it was run from the repo root, and
+  Railpack cannot determine which of this monorepo's several sub-projects to
+  build without being pointed at `backend/`'s own Dockerfile. The old
+  deployment stayed live throughout (zero downtime, confirmed via runtime
+  logs showing uninterrupted 200s). Re-ran from `backend/` and it deployed
+  cleanly — noting this so it isn't repeated.
+- Confirmed via live deployment logs that the migration applied against the
+  **real Postgres staging database** (not just the SQLite rehearsal):
+  `Running upgrade f6a7b8c9d0e1 -> 4a34b5517bd3, v48 add training_classes`.
+- Live functional verification over real HTTP (not just staging logs):
+  created a real TrainingClass as `ADMIN703`, confirmed it listed correctly,
+  archived it, confirmed it disappeared from the default list — then cleaned
+  up so no test artifact was left on staging (matching this program's own
+  established test-hygiene discipline from REM-128/REM-131).
+- Confirmed both frontends still return 200 post-deploy and
+  `capability_manifest_current.json` shows a pure addition (258→262 routes,
+  58→59 tables) — nothing removed.
+- `docs/remediation/master_gap_register.csv`'s CLASS-01 entry updated to
+  `IMPLEMENTED — staging-verified (backend only; frontend consumption not
+  built)`. CLASS-02 through CLASS-14 remain open — most were blocked on
+  CLASS-01 landing, which it now has, but none of the dependent work
+  (Session audience linkage, Mission Backlog/dashboard/Weekly Program
+  class-awareness, either frontend's UI) is built yet. A Squadron cannot
+  manage Training Classes through either frontend today, only via direct
+  API call — this is a real, honestly-stated limitation, not glossed over.
+
+Next concrete step: CLASS-03 (Session↔TrainingClass audience linkage), since
+CLASS-04 through CLASS-13 all depend on it.
