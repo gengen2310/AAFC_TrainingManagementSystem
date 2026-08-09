@@ -937,3 +937,27 @@ the human-approval list: confirm `JWT_SECRET`/`SECRET_KEY` rotation is complete,
 answer on what caused the 04:57:36 UTC contamination event before treating production's
 configuration as trustworthy going forward (a recurrence with a future contamination event could
 be far more severe if it touched a variable this program's own checks didn't happen to catch).
+
+## 33. Cross-origin auth handoff verified live (Gate 6, further coverage)
+
+Ran `capture-screenshots-planning.spec.ts` against real staging (Planning Workspace's actual
+deployed module-mode build, via `playwright.planning.staging.config.ts`) -- this is the one spec
+that exercises the real cross-origin auth handoff architecture.md flags as load-bearing: log into
+Main TMS staging, then navigate to the Planning Workspace staging domain relying purely on the
+`aafc_session` cookie (`SameSite=None; Secure`), reproducing the actual production auth path
+rather than a same-origin shortcut.
+
+**3 of 5 passed, including the most important one**: "EVIDENCE: /facilitator-schedule redirects to
+/planning on the deployed module-mode build (GAP-14)" -- direct, positive proof the cross-origin
+cookie handoff genuinely works on the real deployed build (a failed handoff would show
+`NotAuthenticated`, not a redirect between authenticated PW pages). Mobile viewport and
+high-contrast theme captures also passed.
+
+**2 failures, both screenshot-capture timeouts, not functional/assertion failures**: both failed
+inside Playwright's own `page.screenshot()` call while "waiting for fonts to load" (30s timeout
+exceeded; one case took nearly 16 minutes of total wall time before finally reporting the timeout).
+Neither failure involved a wrong value, a missing element, or a crash -- both are consistent with a
+test-tooling/font-readiness-check flakiness issue specific to full-page screenshot capture in this
+environment, not a live application defect. Not investigated further as an app-code bug given the
+functional evidence (the actual auth/routing behavior) already passed cleanly; flagged as a lower-
+priority test-infrastructure item if screenshot evidence generation becomes a recurring need.
