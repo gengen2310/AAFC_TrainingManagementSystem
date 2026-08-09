@@ -243,11 +243,43 @@ def list_parades(squadron_id: str | None = None, db: DBSession = Depends(get_db)
         require_can_view_squadron(p, s.id, s.wing_id)
     pns = db.query(ParadeNight).filter(ParadeNight.squadron_id == sq_id,
                                        ParadeNight.is_archived == False).order_by(ParadeNight.date).all()  # noqa: E712
+
+    from collections import defaultdict
+    pn_ids = [pn.id for pn in pns]
+    all_sess = db.query(Session).filter(
+        Session.parade_night_id.in_(pn_ids), Session.is_archived == False,  # noqa: E712
+    ).all() if pn_ids else []
+    sess_by_pn: dict[str, list[Session]] = defaultdict(list)
+    for x in all_sess:
+        sess_by_pn[x.parade_night_id].append(x)
+
+    # CLASS-06: attach each session's Training Class audience, additive to
+    # _sess_dict()'s output. _sess_dict() itself is a raw column reflection
+    # with no DB access of its own and 8 call sites across this file -- this
+    # is scoped to just this endpoint (the one connected-frontend's real,
+    # live Weekly Program page (renderWP(), populated from S.pns) actually
+    # reads sessions from) rather than adding a db param to that shared
+    # helper for every caller.
+    classes_by_session: dict[str, list[dict]] = defaultdict(list)
+    if all_sess:
+        aud_rows = (
+            db.query(SessionAudience, TrainingClass)
+            .join(TrainingClass, SessionAudience.training_class_id == TrainingClass.id)
+            .filter(SessionAudience.session_id.in_([x.id for x in all_sess]))
+            .all()
+        )
+        for aud, tc in aud_rows:
+            classes_by_session[aud.session_id].append(
+                {"training_class_id": tc.id, "display_name": tc.display_name})
+
     out = []
     for pn in pns:
-        sess = db.query(Session).filter(Session.parade_night_id == pn.id,
-                                        Session.is_archived == False).all()  # noqa: E712
-        out.append({**_pn_dict(pn), "sessions": [_sess_dict(x) for x in sess]})
+        sess_dicts = []
+        for x in sess_by_pn.get(pn.id, []):
+            d = _sess_dict(x)
+            d["training_classes"] = classes_by_session.get(x.id, [])
+            sess_dicts.append(d)
+        out.append({**_pn_dict(pn), "sessions": sess_dicts})
     return out
 
 
