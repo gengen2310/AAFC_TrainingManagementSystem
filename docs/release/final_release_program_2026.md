@@ -1045,3 +1045,38 @@ anything.
 
 **The cross-environment auth exposure identified in §28/§29 is now fully closed.** This was the
 last open item from the 2026-08-09 production incident. Incident status: **RESOLVED**.
+
+## 37. Program state check-in — what's genuinely left
+
+At this point the program has covered: mutation testing on the highest-blast-radius permission/
+auth modules, a full architecture/security/data-integrity review, concurrency testing, a systematic
+8-role permission-matrix sweep, an adversarial pass that found and fixed 3 previously-unknown live
+defects (REM-124 request-size guard, REM-125 the shared-login-lockout IP bug, REM-130 the
+cross-squadron data leak) plus 2 more from live user bug reports (REM-129, REM-130) and one from a
+fresh e2e run (REM-127), a full accessibility suite run (10/10 passed), fresh load testing (PASS),
+and a live production incident found, root-caused, and fully resolved end-to-end including a
+security-critical secret rotation.
+
+**Checked before writing this**: 50 open register items remain, and every one of them is P2/P3/
+MEDIUM/LOW severity -- zero HIGH-or-above severity engineering defects open anywhere. Sections
+30-31 (getting-started/onboarding) already have substantial pre-existing coverage from earlier
+program phases (`docs/next-stage/10_wing_onboarding_runbook.md`, a full governance-gated onboarding
+procedure; 15 Getting Started screenshots across all 8 roles at 2 viewports each) -- not duplicated
+here.
+
+**What's genuinely still open, honestly stated rather than papered over**:
+- Gate 8's full rehearsal (redeploy a specific prior *code* SHA end-to-end) still not executed,
+  only documented + partially mechanism-validated (§25, §32 update).
+- Gate 6's mobile Playwright project and local `frontend/e2e` suite not re-run this program.
+- REM-126 (SQLite migration replay gap) -- documented, deliberately not fixed, zero live impact.
+- The 04:57:36 UTC contamination event's root cause is still unknown -- a genuine open question
+  needing the user's own Railway account activity review, not something further engineering
+  investigation from this session can resolve.
+- Gate 10's human/organisational checklist -- unchanged, cannot be advanced by an engineering
+  session by definition.
+- 50 lower-severity register items (feature completeness, polish, product decisions) -- not
+  individually re-triaged in this check-in; none block release on their own severity.
+
+Not manufacturing further speculative work beyond this point without a new concrete lead (a fresh
+user report, a new test failure, or explicit direction) -- the program's own engineering-side work
+is substantively exhausted at HIGH-severity-and-above, with the honest exceptions listed above.
