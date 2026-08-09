@@ -984,3 +984,28 @@ from the 2026-08-06 reconciliation (Gate 7 CONDITIONAL PASS) -- 25 users is a lo
 check, not a re-test of the ceiling itself; the higher tiers (50/100+) already run earlier this
 program are still the relevant evidence for capacity, this run's purpose was confirming the
 *newest* code changes specifically don't regress latency/error-rate at a normal operating level.
+
+## 35. Accessibility (Section 29) — comprehensive suite already existed, run against live staging
+
+Found `tools/playwright-staging/tests/a11y-staging.spec.ts` (409 lines, 16 tests) already built at
+an earlier point in this program -- `axe-core` accessibility audits plus explicit keyboard-focus
+verification across Login, Dashboard, System Console, Account Management, Parade Nights, Weekly
+Program, Activities, and Facilitators. Not yet run against live staging this specific pass.
+
+**Result: 10/10 non-system_admin tests passed, 6 skipped** (all 6 skips are the `System Admin`
+role block, blocked by the same already-known, self-resolving `SYSADMIN2026` account lockout from
+earlier this program -- not a new finding, not attempted further).
+
+Passing evidence includes: `axe-core`-clean audits of Dashboard, Parade Nights (with term+status
+filters open), Weekly Program, Activities, and Facilitators for a real `sqn_admin` browser session;
+explicit keyboard-focus-reachability checks (`#pn-f-term`, `#dash-window` both confirmed keyboard-
+focusable with their `<label for>` present in the rendered DOM); and a direct, automated,
+now-passing confirmation of this program's own earlier REM-81 reverification finding -- the
+`#ca-flight` test independently reproduces the exact same result found by hand during REM-81
+(parent `aria-hidden: true`, `display: none`, `tabindex: -1`, not keyboard-focusable), now backed
+by a live, repeatable, automated check rather than a one-off manual read.
+
+This substantially closes Section 29 for the roles/pages covered. Not yet covered: a real screen
+reader pass (VoiceOver/NVDA -- no such tooling available to this session, matches Gate 10's G10-07
+human-gated item), and the `system_admin`-specific test block (blocked by the unrelated account
+lockout, not a coverage gap in the suite itself -- re-run once the lockout clears or is reset).
