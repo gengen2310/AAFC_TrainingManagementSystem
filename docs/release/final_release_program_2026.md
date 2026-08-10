@@ -2789,3 +2789,122 @@ already-documented flakiness, not something this fix introduced.
 
 **Not yet deployed to staging** — frontend-only change, queued for the
 normal next deploy alongside WRITE-04 and REM-85/87.
+
+## 59. REM-96/97/98 — facilitator duplicate-detection UX enriched, and a third stale finding corrected
+
+The last three items in the MEDIUM band, all facilitator-related.
+
+**REM-98 (rank change not fully audited) — stale, already resolved.**
+`update_fac()` (`app/routers/training.py`) already detects a rank change,
+writes a new `FacilitatorRankHistory` row, and calls `audit(...,
+action="update")` on every PATCH — confirmed via direct inspection, not
+assumption. An existing test already covered the `FacilitatorRankHistory`
+claim, but only indirectly (via the stats endpoint's rendered name
+string, not a direct DB query) — per this program's "no false closure"
+discipline (don't infer a claim is proven from a side effect when a
+direct check is cheap), added a precise new test that queries both
+`FacilitatorRankHistory` and `AuditLog` directly. This row's other
+symptom — leave, qualifications, availability, workload limits,
+supervision requirements not exposed in the edit modal — was correctly
+already scoped out by this row's own `proposed_correction`: those are
+separate API sub-resources with their own endpoints, and surfacing them
+in the UI would be a distinct, larger feature request, not part of "rank
+change not audited." No application code change; register corrected with
+direct evidence.
+
+**REM-96 (no rank shown in duplicate warning) and REM-97 (no profile
+detail) — both real, implemented together.** These are two views of the
+same gap: `add_fac()`'s duplicate-detection 409 only ever returned
+`existing_facilitator_id`, so both frontends' warning showed just the
+name and an "Add anyway" button (plus a "View existing" link that
+required navigating away from the form entirely to see anything more).
+
+Enriched the 409 detail with `existing_rank`, `existing_type`,
+`existing_subject_areas`, `existing_active_status`, and
+`existing_updated_at` — all already loaded on the `existing` row from the
+exact same query that found the duplicate, so this required no second
+database query. REM-96's specific ask (rank in the warning text itself)
+is satisfied by appending it directly into the message: `"...already
+exists in this squadron (rank: CUO)."`. This deliberately differs from
+REM-97's originally-proposed two-step approach ("fetch the existing
+facilitator's profile using `existing_facilitator_id`") — returning the
+data directly in the 409 avoids an entirely avoidable second network
+round-trip.
+
+Both frontends render a compact profile card inline in the duplicate
+warning: connected-frontend's `saveFac()` catch handler builds one
+directly; the React Planning Workspace gets a new `DuplicateProfileCard`
+component inside `AddFacModal` in `Facilitators.tsx`. Both show rank,
+type, subject areas, active/archived status, and last-updated date.
+`confirm_duplicate`'s "Add anyway" bypass is completely unchanged in
+behaviour — this was never about blocking creation, only about giving
+the person reviewing the warning enough information to make the
+same-vs-different-person call correctly.
+
+**A genuine backend gotcha caught during this pass's own verification,
+not a code defect.** The first e2e run of the new
+`facilitator-duplicate-profile-card.spec.ts` test failed: the profile
+card rendered, but every field showed its empty-state dash (`—`), as if
+the 409 detail carried none of the new fields at all. Rather than assume
+the frontend code was wrong, seeded the exact same "existing" facilitator
+directly via API and fetched it back — its `current_rank`/`type`/
+`subject_areas` were saved correctly. The real cause: the locally running
+`uvicorn` backend process has no `--reload` flag (documented several
+times earlier this session as a recurring gotcha) and had not been
+restarted since the `add_fac()` edit, so it was still serving the
+pre-enrichment 409 shape. Restarted the backend, re-ran the test — passed
+immediately with all fields populated correctly.
+
+**Tests.** Backend: `test_trgo_items.py::test_duplicate_409_includes_
+existing_profile_for_informed_decision` — creates a CUO/Senior
+Cadet/Drill facilitator, attempts a same-named CSGT one, asserts all five
+new 409 fields and the rank-in-message-text claim, then confirms
+`confirm_duplicate=true` still creates a second, distinct facilitator.
+`test_session_lifecycle.py::test_facilitator_patch_rank_change_writes_
+history_row_and_audit_event` (REM-98). Full backend suite: 1340 passed, 5
+skipped — the same 2 pre-existing, unrelated flaky failures already
+documented in §57/§58, confirmed unchanged. Frontend: new
+`e2e-connected/facilitator-duplicate-profile-card.spec.ts` and
+`facilitator-search-clears-on-add.spec.ts` (REM-99) both passing
+consistently, `tsc`/`vitest` (25/25)/`build` all clean. React's new
+`DuplicateProfileCard` has no dedicated component test — no existing test
+harness for this file to extend without new scaffolding — verified via
+typecheck/build/manual review only; low risk given it is a small, purely
+presentational component.
+
+**Two more environmental gotchas hit and root-caused during this pass's
+own verification — worth recording precisely since they cost real time
+chasing them, not because they reveal anything about the actual fix.**
+First, the exact same `PLANNING_WORKSPACE_URL`-unset issue documented in
+the test matrix report referenced above (§56 of this doc's own history,
+`docs/release/final_test_and_browser_matrix.md`) recurred: restarting the
+local backend to pick up the `add_fac()` edit (uvicorn has no `--reload`
+flag) dropped that env var, causing 5-16 unrelated-looking `#nav-pw-link`-
+adjacent test failures across files that have nothing to do with
+facilitators. Fixed by restarting with `PLANNING_WORKSPACE_URL` set
+explicitly. Second, after that fix, a full-suite run *still* showed a
+shifting, non-reproducible set of failures across totally unrelated areas
+— the login flow itself (`#auth-code` not becoming visible), Activities,
+Account Management, parade-night creation. Direct `curl` investigation
+found the actual cause: `GET /api/facilitators` returning
+`{"error":"rate_limited",...}` — this session's own cumulative request
+volume today (10+ full or partial e2e-suite invocations across CLASS-08,
+CLASS-14, WRITE-04, and this REM-85-through-99 stretch, on top of
+extensive direct `curl` debugging) had crossed the general API rate
+limiter's budget faster than each run's own reset could keep up with,
+exactly the known limitation `e2e-rate-limit-reset.ts`'s own comment
+documents ("a file's own request volume... can still cross the general
+limiter's 300 req/60s budget partway through"). Reset via
+`POST /api/system/reset-rate-limits`; the REM-96/97/99-specific tests
+then passed cleanly and repeatably in isolation every time re-run
+afterward. **Not claiming a clean full-57-test-suite run this pass** —
+given the volume of testing already done today, running the *entire*
+suite again risks re-triggering the same limiter issue and would not add
+real confidence beyond what the targeted, repeatedly-green REM-specific
+tests plus the isolated (and much less request-heavy) backend pytest
+suite already provide. A fresh session, or a suite run against a newly
+reseeded local dev database, would give a cleaner full-suite signal if
+one is specifically wanted before the next deploy.
+
+**Not yet deployed to staging** — queued for the normal next deploy
+alongside WRITE-04 and REM-85/87/99.
