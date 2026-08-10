@@ -900,11 +900,29 @@ def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends
             func.lower(func.coalesce(Facilitator.first_name, "")) == (body.first_name or "").strip().lower(),
         ).first()
         if existing:
+            # REM-96/REM-97: the caller needs enough of the existing facilitator's
+            # profile to actually tell "same person, re-added by accident" from
+            # "different person, same name" without a second round trip --
+            # everything here is already loaded on `existing` from the query
+            # above, so it's returned directly rather than requiring the
+            # frontend to make a separate GET to fetch a profile card's worth
+            # of detail. Rank is surfaced in the message text itself (REM-96's
+            # specific ask) since that's the single most likely distinguishing
+            # detail between two same-named facilitators.
+            msg = (f"A facilitator named {(body.first_name or '').strip()} "
+                   f"{body.last_name.strip()} already exists in this squadron").strip()
+            if existing.current_rank:
+                msg += f" (rank: {existing.current_rank})"
+            msg += "."
             raise HTTPException(409, detail={
                 "error": "possible_duplicate",
-                "message": (f"A facilitator named {(body.first_name or '').strip()} "
-                            f"{body.last_name.strip()} already exists in this squadron.").strip(),
+                "message": msg,
                 "existing_facilitator_id": existing.id,
+                "existing_rank": existing.current_rank,
+                "existing_type": existing.type,
+                "existing_subject_areas": _parse_json_list(existing.subject_areas),
+                "existing_active_status": existing.active_status,
+                "existing_updated_at": existing.updated_at.isoformat() if existing.updated_at else None,
             })
     f = Facilitator(squadron_id=s.id, wing_id=s.wing_id, first_name=body.first_name,
                     last_name=body.last_name, current_rank=body.current_rank, type=body.type or "Staff",

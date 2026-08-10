@@ -454,6 +454,42 @@ def test_facilitator_patch_rank_records_history(client):
     assert "SGT" in fac["name"]
 
 
+def test_facilitator_patch_rank_change_writes_history_row_and_audit_event(client):
+    """REM-98: precise, direct-DB regression test for the same claim
+    test_facilitator_patch_rank_records_history only checks indirectly (via
+    the stats endpoint's rendered name string). The application code
+    (update_fac in app/routers/training.py) already writes a
+    FacilitatorRankHistory row and calls audit() on every PATCH -- this
+    test proves that with a real, direct query against both tables rather
+    than trusting a stats-endpoint side effect, matching REM-98's own
+    stated test scenario exactly."""
+    from app.database import SessionLocal
+    from app.models import FacilitatorRankHistory
+    from app.models.operations import AuditLog
+
+    hdr = login(client, ADM703)
+    r = client.post("/api/facilitators", json={"last_name": "AuditRankTest", "current_rank": "CPL"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    fid = r.json()["facilitator_id"]
+
+    r2 = client.patch(f"/api/facilitators/{fid}", json={"current_rank": "SGT"}, headers=hdr)
+    assert r2.status_code == 200, r2.text
+
+    db = SessionLocal()
+    try:
+        history = db.query(FacilitatorRankHistory).filter(
+            FacilitatorRankHistory.facilitator_id == fid, FacilitatorRankHistory.rank == "SGT",
+        ).all()
+        assert len(history) == 1, "PATCH rank change must write exactly one new FacilitatorRankHistory row"
+
+        audit_rows = db.query(AuditLog).filter(
+            AuditLog.object_type == "facilitator", AuditLog.object_id == fid, AuditLog.action == "update",
+        ).all()
+        assert len(audit_rows) >= 1, "PATCH rank change must be recorded in the audit log"
+    finally:
+        db.close()
+
+
 def test_facilitator_patch_without_subject_areas_preserves_tags(client):
     """FAC-03: PATCH /facilitators/{fid} with no subject_areas field must not clear existing tags."""
     hdr = login(client, ADM703)

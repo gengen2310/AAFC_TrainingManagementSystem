@@ -158,11 +158,38 @@ function TagInput({ tags, onChange, id, placeholder = "Type and press Enter or ,
 // so a genuine same-name-different-person case was a dead end. TRGO-06 (React-
 // app parity): the Add button now shows "Adding…" while pending, matching the
 // save-in-progress feedback already present elsewhere (e.g. SessionForm).
+// REM-96/REM-97: shape of the enriched fields app/routers/training.py's
+// add_fac() 409 now returns alongside existing_facilitator_id -- everything
+// needed for an informed same-vs-different-person decision, loaded in the
+// same query that found the duplicate (no second fetch required).
+interface DuplicateFacilitatorDetail {
+  existing_rank?: string | null;
+  existing_type?: string | null;
+  existing_subject_areas?: string[];
+  existing_active_status?: boolean;
+  existing_updated_at?: string | null;
+}
+
+function DuplicateProfileCard({ detail }: { detail: DuplicateFacilitatorDetail }) {
+  const updated = detail.existing_updated_at ? new Date(detail.existing_updated_at).toLocaleDateString("en-AU") : "—";
+  const areas = detail.existing_subject_areas?.length ? detail.existing_subject_areas.join(", ") : "—";
+  return (
+    <div style={{ marginTop: 6, padding: "8px 10px", background: "var(--surface-2, #f0f5fa)", borderRadius: 6, fontSize: 11.5, display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 10px" }}>
+      <span style={{ color: "var(--muted-text, #6b7a87)" }}>Rank</span><span style={{ fontWeight: 700 }}>{detail.existing_rank || "—"}</span>
+      <span style={{ color: "var(--muted-text, #6b7a87)" }}>Type</span><span>{detail.existing_type || "—"}</span>
+      <span style={{ color: "var(--muted-text, #6b7a87)" }}>Subject areas</span><span>{areas}</span>
+      <span style={{ color: "var(--muted-text, #6b7a87)" }}>Status</span><span>{detail.existing_active_status === false ? "Archived" : "Active"}</span>
+      <span style={{ color: "var(--muted-text, #6b7a87)" }}>Last updated</span><span>{updated}</span>
+    </div>
+  );
+}
+
 function AddFacModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [first, setFirst] = useState(""); const [last, setLast] = useState("");
   const [rank, setRank] = useState(""); const [subjects, setSubjects] = useState<string[]>([]);
   const [err, setErr] = useState("");
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
+  const [duplicateDetail, setDuplicateDetail] = useState<DuplicateFacilitatorDetail | null>(null);
   const m = useMutation({
     mutationFn: (confirmDuplicate: boolean) => trainingApi.addFacilitator({
       first_name: first, last_name: last, current_rank: rank, subject_areas: subjects,
@@ -172,6 +199,7 @@ function AddFacModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
     onError: (e) => {
       if (e instanceof ApiError && e.code === "possible_duplicate") {
         setDuplicateWarning(e.friendly);
+        setDuplicateDetail((e.data?.detail as DuplicateFacilitatorDetail) ?? null);
         setErr("");
       } else {
         setErr(e instanceof ApiError ? e.friendly : "Could not add.");
@@ -193,6 +221,7 @@ function AddFacModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
         {duplicateWarning && (
           <div className="err" role="alert">
             {duplicateWarning} If this is a different person with the same name, you can add them anyway.
+            {duplicateDetail && <DuplicateProfileCard detail={duplicateDetail} />}
           </div>
         )}
         <div style={{ display: "flex", gap: 8 }}>
