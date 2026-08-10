@@ -1,3 +1,22 @@
+# AAFC TMS — Execution Checkpoint (SUPERSEDED)
+
+**Superseded 2026-08-10.** This checkpoint is from the `release/beta-2026-07-14`
+branch/RC cycle (rc1-rc3), a full month before the "Complete System Remediation" /
+"Final Remediation, Product Hardening and Public-Release Program" work tracked in
+`docs/release/final_release_program_2026.md` (now at §68) and
+`docs/remediation/master_gap_register.csv` (200+ rows, REM-01 through REM-115+,
+CLASS-01 through CLASS-24, QUAL-001 through QUAL-015, WRITE-01 through WRITE-07).
+That work happened on `main`, not this checkpoint's `release/beta-2026-07-14`
+branch — the two diverged and were never reconciled after this checkpoint was
+written. Do not treat this file's "NO-GO" recommendation, RC tags, deployment IDs,
+load-test results, or open-manual-actions list as reflecting current state; check
+`docs/release/final_release_program_2026.md` and the gap register first for ground
+truth. Kept below for historical/audit-trail provenance only, per this program's own
+"stale entries are worse than none" rule (see `docs/beta/00_release_state.md`'s
+identical treatment).
+
+---
+
 # AAFC TMS — Execution Checkpoint
 
 Phase 18–19 (Operational Release Gate). Durable checkpoint written 2026-07-16.
