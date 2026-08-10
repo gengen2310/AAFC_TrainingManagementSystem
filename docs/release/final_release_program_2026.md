@@ -2501,3 +2501,127 @@ register CLASS-14 is updated to `DESIGNED + REHEARSED — awaiting explicit
 user sign-off before any run against staging or production`, not to
 `IMPLEMENTED` or any status implying the real backfill has happened
 anywhere real users' data lives.
+
+## 56. WRITE-04 — technical language exposure to operational users: a systemic bug found across ~20 call sites, not a theoretical concern
+
+Addendum §7 (WRITE-04) asked whether raw technical errors — React error
+boundary messages, HTTP status codes, stack traces — were exposed to
+non-technical users anywhere in either frontend. This had never been
+investigated. It was investigated directly this pass, and the answer was
+yes, in a way significant enough to be the dominant, day-to-day error
+experience across most of the Planning Workspace, not an edge case.
+
+**The systemic finding.** `frontend/src/api/client.ts`'s `ApiError` class
+extends `Error`, and its own `.message` is set to a bare
+`` `API ${status}` `` string in its constructor (e.g. `"API 403"`,
+`"API 500"`) — a plumbing detail, never meant to be user-facing.
+`ApiError.friendly` is a separate, deliberately-built getter that turns
+that same error into curated text ("Access not permitted.", "Some fields
+are invalid.", "This action needs Proxy Mode..."). The problem: across
+roughly twenty form/modal error handlers spread over eight files
+(`CadetClassMembershipModal.tsx`, `ParadeNightBlock.tsx`, `SetupPanel.tsx`,
+`PlanningBottomDrawer.tsx` ×6, `PlanningRightDrawer.tsx` ×7,
+`EightWeekView.tsx`, `ParadeNightGridView.tsx`, and three of
+`Accounts.tsx`'s mutation `onError` handlers), the code used the idiom
+`e instanceof Error ? e.message : "<fallback>"`. Since `ApiError` **is** an
+`Error`, this idiom always took the `e.message` branch for an API failure
+— meaning a training officer trying to save a parade night and hitting a
+validation error, or a `wing_admin` blocked by a scope check, would see
+the literal text **"API 422"** or **"API 403"** where the app had already
+built the exact right message (`ApiError.friendly`) and simply never
+called it.
+
+**Fix**: added `friendlyMessage(e, fallback)` to `api/client.ts`, right
+next to `ApiError` — prefers `.friendly` for an `ApiError`, falls back to
+a plain `Error`'s own message for anything else, else the caller's
+fallback string. Replaced every one of the ~20 occurrences. A new
+regression test in `apiClient.test.ts` asserts this directly: constructs
+a real `ApiError(403, ...)`, confirms `.message` really is `"API 403"`
+(documenting the trap), and asserts `friendlyMessage()` never returns
+something matching `/^API \d/`.
+
+**Both React error boundaries had the same class of problem, independently
+of the above.** `App.tsx`'s `ModuleErrorBoundary` — the one that actually
+wraps `/planning`, the only route reachable in any currently-deployed
+Planning Workspace environment under the module-mode topology documented
+in §48 — rendered `{this.state.error.message}` in a monospace `<p>` for
+**any** uncaught render-time exception anywhere in the app: a real
+`TypeError: Cannot read properties of undefined (reading 'map')` from an
+actual bug would have been shown to the user verbatim, styled to look
+exactly like a raw technical dump because it was one. The separate,
+full-app-mode `ErrorBoundary` component (used only by routes with no
+reachable path in any deployed environment today, per §48/§53's own
+disclosed limitation, but still live in local dev) had the identical
+pattern. Both now show a generic "contact support" message; the full
+error and component stack are still logged via `componentDidCatch`'s
+`console.error` for actual debugging — nothing about this fix reduces
+what a developer can see, only what an operational user sees.
+
+**connected-frontend had two smaller instances of the same concern.**
+`apiErr()`'s fallback branch (for anything that isn't the app's own
+structured `{kind:'http', ...}` error shape) returned a caught `Error`'s
+raw `.message` unconditionally — including a failed `fetch()`'s raw
+`TypeError` (`"Failed to fetch"`, or Safari's differently-worded
+`"NetworkError when attempting to fetch resource."`). Added a narrow
+guard: a `TypeError` whose message matches `/fetch|network/i` now gets
+the same friendly network message already used for the equivalent case in
+the Planning Workspace (`ApiError.friendly`'s `isNetwork` branch) —
+deliberately narrow, so the many pre-existing `throw new Error("already
+human-readable text")` call sites elsewhere in this single-file app are
+untouched. Also fixed one direct bypass —
+`.catch(e=>alert('Export failed: '+e.message))` in the spreadsheet-export
+helper — to route through `apiErr()` like every other error path in the
+file.
+
+**What was deliberately left alone, and why.** A genuine non-network JS
+bug (a real coding mistake throwing a `TypeError` that isn't a fetch
+failure) still surfaces its raw `.message` in both fixes' generic
+"plain `Error`" fallback branch — not swallowed into a fully generic
+string. This is a deliberate, narrow scope decision: most `throw new
+Error(...)` call sites in both codebases already carry deliberately
+human-written text, and this is an internal operational tool (not a
+public product) where a training officer reporting "it said X" during a
+support request has real diagnostic value that a fully generic "Something
+went wrong" would destroy. The fix targets the two *confirmed, systemic*
+leaks (`ApiError.message` and error-boundary raw exceptions) precisely,
+rather than over-broadly suppressing every error string in either
+codebase.
+
+**Backend already compliant, verified not just assumed.** `.claude/rules/backend.md`
+already documents the 500 handler never returning stack traces in
+production; this pass's investigation was specifically the frontend half
+WRITE-04's own `residual_limitation` field called "the unverified half" —
+now verified, and closed with the fixes above rather than left open.
+
+**Tests and verification.** 3 new `friendlyMessage()` unit tests (see
+regression test above). Frontend `tsc --noEmit`, `vitest` (25/25 —
+22 pre-existing + 3 new), `npm run build` all clean. Security greps
+re-run against the modified `connected-frontend/index.html`: the two
+already-known, already-documented false positives (`access_code_reset`,
+an audit-log filter option; the `pg_restore ... "DATABASE_URL"` example
+command) reproduced unchanged and are nowhere near this fix's own diff —
+no new secret/access-code exposure. `apiErr()`'s new branch logic
+sanity-checked in isolation against 6 representative inputs — network
+`TypeError`, Safari-worded `NetworkError`, a deliberately-curated `Error`,
+an HTTP-shaped object, an unrelated app-bug `TypeError` (correctly *not*
+misclassified as a network error), and `null` — all classified as
+expected.
+
+**Full connected-frontend e2e suite run twice for an honest regression
+check, not just once and assumed clean.** First run (11 spec files, with
+this fix in place): 13 failures. Rather than either dismissing them or
+treating them as caused by this change, ran a direct comparison: `git
+stash` this fix entirely, re-ran the same four failing spec files against
+the identical (heavily test-polluted, months-of-accumulated-runs) local
+dev database, and got 12 of the same 13 failures back, unchanged — a
+`squadron_id` undefined-read in a test's own seeding helper, a "select
+first year" predicate timing out, and several screenshot-capture timing
+issues, none touching error-message rendering. Confirmed pre-existing
+flakiness in this local dev DB (the exact pattern this whole program has
+repeatedly documented and worked around), not a regression from this fix.
+Restored the fix from the stash afterward and re-verified `tsc`/`vitest`/
+`build` all clean.
+
+**Not yet deployed to staging** — this is a frontend-only change, queued
+for the normal next deploy of both frontends alongside other pending
+work, not deployed in isolation this pass.
