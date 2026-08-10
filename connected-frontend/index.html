@@ -6643,6 +6643,23 @@ function showPNDetail(ds){
   // phase's own display_name (a custom wing/squadron phase).
   const phOpts=(S.phases||[]).map(p=>`<option value="${esc(p.name)}">${esc(PH_S[p.name]||p.displayName)}</option>`).join('');
   let html=`<div class="alert a-info"><b>${esc(pn.term)}</b> · ${esc(pn.notes||'No notes')}</div>`;
+  // REM-34: Notices existed only in Planning Workspace (keyed to ParadeDate,
+  // not ParadeNight) -- /api/parade-nights/{id}/notices resolves/creates the
+  // ParadeDate link transparently, so this card never needs to know that
+  // concept exists, matching Planning Workspace's own normal/urgent priority
+  // vocabulary (ParadeNightGridView.tsx).
+  html+=`<div id="pn-notices-card" style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">
+    <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Notices</div>
+    <div id="pn-notices-list"><div class="muted" style="font-size:11.5px">Loading…</div></div>
+    ${canWriteSquadron()?`<div style="margin-top:8px;display:flex;gap:6px;align-items:flex-start">
+      <input id="pn-notice-text" placeholder="Notice text…" style="flex:1" maxlength="500" aria-label="New notice text">
+      <select id="pn-notice-priority" aria-label="Notice priority" style="width:auto">
+        <option value="normal">Normal</option>
+        <option value="urgent">Urgent</option>
+      </select>
+      <button class="btn btn-xs btn-sky" onclick="addPNNotice('${esc(pn.id)}')">Add</button>
+    </div>`:''}
+  </div>`;
   if(pn.closeout_status==='closed'){
     html+=`<div class="alert a-warn" style="margin-bottom:10px">This Parade Night is closed. Its date, term, timing and type can no longer be edited.</div>`;
   }else if(canWriteSquadron()){
@@ -6719,7 +6736,53 @@ function showPNDetail(ds){
       const rm=document.getElementById('d-rm-'+i);if(rm)rm.value=s.room||'';
     });
   },30);
+  loadPNNotices(pn.id);
   openModal('m-pn-detail');
+}
+// REM-34: Parade Night Notices. Kept deliberately simple (text + priority
+// only, no audience picker) -- matches this card's minimal-footprint intent;
+// audience targeting already exists in the API (NightNoticeIn.audience) for
+// a future pass if actually requested, not invented speculatively here.
+async function loadPNNotices(pnid){
+  const list=document.getElementById('pn-notices-list');
+  if(!list)return; // modal was closed before this resolved
+  try{
+    const notices=await api('/api/parade-nights/'+pnid+'/notices');
+    if(!notices.length){
+      list.innerHTML='<div class="muted" style="font-size:11.5px">No notices.</div>';
+      return;
+    }
+    list.innerHTML=notices.map(n=>`
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light)">
+        <div style="font-size:12px;flex:1">
+          ${n.priority==='urgent'?'<span class="badge b-red">Urgent</span> ':''}${esc(n.notice_text)}
+        </div>
+        ${canWriteSquadron()?`<button class="btn btn-xs btn-out no-print" onclick="archivePNNotice('${pnid}','${n.notice_id}')" aria-label="Remove notice">Remove</button>`:''}
+      </div>`).join('');
+  }catch(e){
+    list.innerHTML=`<div class="muted" style="font-size:11.5px;color:var(--red)">Could not load notices: ${esc(apiErr(e))}</div>`;
+  }
+}
+async function addPNNotice(pnid){
+  const textEl=document.getElementById('pn-notice-text');
+  const text=(textEl?.value||'').trim();
+  if(!text)return;
+  const priority=document.getElementById('pn-notice-priority')?.value||'normal';
+  try{
+    await api('/api/parade-nights/'+pnid+'/notices',{method:'POST',body:{notice_text:text,priority}});
+    if(textEl)textEl.value='';
+    loadPNNotices(pnid);
+  }catch(e){
+    alert(apiErr(e));
+  }
+}
+async function archivePNNotice(pnid,noticeId){
+  try{
+    await api('/api/planning/notices/'+noticeId+'/archive',{method:'POST'});
+    loadPNNotices(pnid);
+  }catch(e){
+    alert(apiErr(e));
+  }
 }
 // "Mark all delivered, then flag exceptions" bulk action (risk-register
 // data-entry UX ask): flag the few known exceptions individually first (via

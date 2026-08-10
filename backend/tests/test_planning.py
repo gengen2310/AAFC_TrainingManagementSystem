@@ -1843,6 +1843,124 @@ def test_notices_same_squadron_admin_allowed(client):
     assert r.status_code == 200, r.text
 
 
+# ─────────────────────────────────────────────────────────────
+# REM-34: parade-night-scoped Notices (GET/POST /api/parade-nights/{pnid}/
+# notices) -- lets connected-frontend attach a notice to a Parade Night
+# without ever needing to know ParadeDate exists. Reuses REM-129's find-or-
+# create-ParadeDate helper. Existing notice_id-based PATCH/archive endpoints
+# are exercised unchanged (no new logic there).
+# ─────────────────────────────────────────────────────────────
+
+def _create_plain_parade_night(client, hdr, date_str):
+    r = client.post("/api/parade-nights", json={"date": date_str}, headers=hdr)
+    assert r.status_code == 200, r.text
+    return r.json()["parade_night_id"]
+
+
+def test_night_notice_create_auto_links_parade_date(client):
+    """The core REM-34 fix: a notice can be attached to a plain connected-
+    frontend-created Parade Night even though it never explicitly created a
+    ParadeDate -- the endpoint resolves/creates one transparently."""
+    hdr = _sqn_admin_hdr(client)
+    _make_year(client, hdr)  # ensures squadron 703 has an active Training Year
+    pnid = _create_plain_parade_night(client, hdr, "2099-03-06")
+
+    r = client.post(f"/api/parade-nights/{pnid}/notices",
+                     json={"notice_text": "Bring wet-weather gear", "priority": "high"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    notice_id = r.json()["notice_id"]
+
+    r = client.get(f"/api/parade-nights/{pnid}/notices", headers=hdr)
+    assert r.status_code == 200
+    notices = r.json()
+    assert any(n["notice_id"] == notice_id for n in notices)
+    assert notices[0]["notice_text"] == "Bring wet-weather gear"
+    assert notices[0]["priority"] == "high"
+
+
+def test_night_notice_list_empty_for_night_with_no_notices(client):
+    hdr = _sqn_admin_hdr(client)
+    pnid = _create_plain_parade_night(client, hdr, "2099-03-13")
+    r = client.get(f"/api/parade-nights/{pnid}/notices", headers=hdr)
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_night_notice_create_without_active_planning_year_returns_actionable_400(client):
+    """ADMIN702 has no active Training Year seeded -- confirms the endpoint
+    surfaces a clear, actionable error rather than a raw 500 or a silently
+    orphaned notice."""
+    hdr = login(client, "ADMIN702")
+    pnid = _create_plain_parade_night(client, hdr, "2099-03-20")
+    r = client.post(f"/api/parade-nights/{pnid}/notices",
+                     json={"notice_text": "test"}, headers=hdr)
+    assert r.status_code == 400, r.text
+    d = r.json()["detail"]
+    assert d["error"] == "no_active_planning_year"
+    assert "Training Year" in d["message"]
+
+
+def test_night_notice_cross_squadron_denied(client):
+    hdr703 = _sqn_admin_hdr(client)
+    _make_year(client, hdr703)
+    pnid = _create_plain_parade_night(client, hdr703, "2099-03-27")
+    other_hdr = _other_sqn_admin_hdr(client)
+
+    r = client.get(f"/api/parade-nights/{pnid}/notices", headers=other_hdr)
+    assert r.status_code == 403, r.text
+    r = client.post(f"/api/parade-nights/{pnid}/notices", json={"notice_text": "x"}, headers=other_hdr)
+    assert r.status_code == 403, r.text
+
+
+def test_night_notice_edit_and_archive_via_existing_notice_id_endpoints(client):
+    """A notice created through the new parade-night-scoped endpoint must be
+    fully editable/archivable through the existing notice_id-based endpoints
+    Planning Workspace already uses -- same underlying record, no parallel
+    notice concept."""
+    hdr = _sqn_admin_hdr(client)
+    _make_year(client, hdr)
+    pnid = _create_plain_parade_night(client, hdr, "2099-04-03")
+    r = client.post(f"/api/parade-nights/{pnid}/notices",
+                     json={"notice_text": "original", "priority": "normal"}, headers=hdr)
+    notice_id = r.json()["notice_id"]
+
+    r = client.patch(f"/api/planning/notices/{notice_id}", json={"notice_text": "updated"}, headers=hdr)
+    assert r.status_code == 200, r.text
+
+    r = client.get(f"/api/parade-nights/{pnid}/notices", headers=hdr)
+    assert r.json()[0]["notice_text"] == "updated"
+
+    r = client.post(f"/api/planning/notices/{notice_id}/archive", headers=hdr)
+    assert r.status_code == 200, r.text
+
+    r = client.get(f"/api/parade-nights/{pnid}/notices", headers=hdr)
+    assert r.json() == []
+
+
+def test_night_notice_reuses_existing_parade_date_if_already_linked(client):
+    """A parade night created via the Planning module's own generation flow
+    already has a ParadeDate -- the new endpoint must reuse it, not create a
+    second, orphaned one for the same night."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.post(f"/api/planning/years/{yr_id}/parade-dates",
+                     json={"parade_date": "2099-04-10"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    date_id = r.json()["parade_date_id"]
+    pnid = r.json()["parade_night_id"]
+    assert pnid, "adding a ParadeDate must link/create a ParadeNight"
+
+    r = client.post(f"/api/parade-nights/{pnid}/notices", json={"notice_text": "x"}, headers=hdr)
+    assert r.status_code == 200, r.text
+
+    # Confirms via the ParadeDate-facing endpoint too -- same record, both
+    # entry points agree.
+    r = client.get(f"/api/planning/parade-dates/{date_id}/notices", headers=hdr)
+    assert r.status_code == 200
+    assert len(r.json()) == 1
+
+
 def test_cea_cross_squadron_list_activities_denied(client):
     hdr703 = _sqn_admin_hdr(client)
     year = _make_year(client, hdr703)
