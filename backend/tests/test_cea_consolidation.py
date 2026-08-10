@@ -115,6 +115,108 @@ def test_wing_admin_can_classify_wing_imported_cea_activity(client):
     assert r.status_code == 200, r.text
 
 
+# ── REM-12 (original_instruction.md Section 10): re-import must preserve ────
+# local decisions -- importance, target audiences, reviewed status, and
+# local notes (the ActivityLocalHide overlay) -- rather than overwriting
+# them from the CSV. Prior to these tests this was true only by code
+# inspection (import_cea_csv's field-update loop only ever touches
+# CEA-sourced columns, never the classify/local-hide columns) and was never
+# exercised end-to-end.
+
+def test_cea_reimport_preserves_classification_and_audience(client):
+    wing_hdr = _wing_admin(client)
+    sqn_hdr = _sqn_admin(client)
+    year_id = _wing_admin_year_for_squadron(client, sqn_hdr)
+
+    csv_v1 = b"ActivityID,Name,StartDate,Location\nREIMP-1,Original Name,2099-08-01,Hangar A\n"
+    r = client.post(
+        f"/api/planning/years/{year_id}/cea/import",
+        files={"file": ("v1.csv", io.BytesIO(csv_v1), "text/csv")},
+        headers=wing_hdr,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["created"] == 1
+
+    r = client.get(f"/api/planning/years/{year_id}/cea/activities", headers=wing_hdr)
+    activity_id = next(a["id"] for a in r.json()["activities"] if a["cea_activity_id"] == "REIMP-1")
+
+    r = client.patch(
+        f"/api/planning/cea/{activity_id}/classify",
+        json={"importance": "must_attend", "audience_seniors": True, "audience_staff_only": False},
+        headers=wing_hdr,
+    )
+    assert r.status_code == 200, r.text
+
+    r = client.get(f"/api/planning/years/{year_id}/cea/activities", headers=wing_hdr)
+    before = next(a for a in r.json()["activities"] if a["id"] == activity_id)
+    assert before["importance"] == "must_attend"
+    assert before["audience_seniors"] is True
+    assert before["classification_status"] == "classified"
+
+    # Re-import the SAME CEA row with a changed source field (location) --
+    # this must update the source-provided field but leave the classification
+    # decisions made above untouched.
+    csv_v2 = b"ActivityID,Name,StartDate,Location\nREIMP-1,Original Name,2099-08-01,Hangar B\n"
+    r = client.post(
+        f"/api/planning/years/{year_id}/cea/import",
+        files={"file": ("v2.csv", io.BytesIO(csv_v2), "text/csv")},
+        headers=wing_hdr,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["updated"] == 1
+
+    r = client.get(f"/api/planning/years/{year_id}/cea/activities", headers=wing_hdr)
+    after = next(a for a in r.json()["activities"] if a["id"] == activity_id)
+    assert after["location"] == "Hangar B", "source-provided field must reflect the re-import"
+    assert after["importance"] == "must_attend", "local classification must survive re-import"
+    assert after["audience_seniors"] is True, "local audience decision must survive re-import"
+    assert after["classification_status"] == "classified", "reviewed status must survive re-import"
+
+
+def test_cea_reimport_preserves_local_hide_note(client):
+    """A squadron's local-hide overlay (ActivityLocalHide) lives in a separate
+    table the import path never touches -- confirm the note/hidden state
+    genuinely survives a re-import of the same CEA row."""
+    wing_hdr = _wing_admin(client)
+    sqn_hdr = _sqn_admin(client)
+    year_id = _wing_admin_year_for_squadron(client, sqn_hdr)
+
+    csv_v1 = b"ActivityID,Name,StartDate\nREIMP-2,Hide Me,2099-08-08\n"
+    r = client.post(
+        f"/api/planning/years/{year_id}/cea/import",
+        files={"file": ("v1.csv", io.BytesIO(csv_v1), "text/csv")},
+        headers=wing_hdr,
+    )
+    assert r.status_code == 200, r.text
+
+    r = client.get(f"/api/planning/years/{year_id}/cea/activities", headers=sqn_hdr)
+    activity_id = next(a["id"] for a in r.json()["activities"] if a["cea_activity_id"] == "REIMP-2")
+
+    r = client.post(
+        f"/api/planning/cea/{activity_id}/local-hide",
+        json={"is_hidden": True, "local_note": "Not relevant to our squadron this term."},
+        headers=sqn_hdr,
+    )
+    assert r.status_code == 200, r.text
+
+    # Re-import the same row with a changed source field.
+    csv_v2 = b"ActivityID,Name,StartDate\nREIMP-2,Hide Me Renamed,2099-08-08\n"
+    r = client.post(
+        f"/api/planning/years/{year_id}/cea/import",
+        files={"file": ("v2.csv", io.BytesIO(csv_v2), "text/csv")},
+        headers=wing_hdr,
+    )
+    assert r.status_code == 200, r.text
+
+    r = client.get(f"/api/planning/years/{year_id}/cea/activities", headers=sqn_hdr)
+    after = next(a for a in r.json()["activities"] if a["id"] == activity_id)
+    assert after["activity_name"] == "Hide Me Renamed", "source field must reflect the re-import"
+    assert after["is_hidden_for_me"] is True, "local-hide state must survive re-import"
+    assert after["local_note"] == "Not relevant to our squadron this term.", (
+        "local note must survive re-import"
+    )
+
+
 def test_sqn_admin_can_still_classify_own_manual_cea_activity(client):
     """Regression guard: the unit_id-based check must not block a sqn_admin
     from classifying their own manually-created (squadron-owned) activity --
