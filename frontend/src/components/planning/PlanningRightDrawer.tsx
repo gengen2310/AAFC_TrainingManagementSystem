@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useId, type KeyboardEvent } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../api";
+import { friendlyMessage } from "../../api/client";
 import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent } from "../../api/types";
 import { ActivityFullDetail, anchorToDisplay } from "./ActivityDetailBlock";
 import { getProgramType } from "../../utils/planningFilters";
@@ -165,7 +166,7 @@ function SessionForm({
       }
       onClose();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Save failed");
+      setErr(friendlyMessage(e, "Save failed"));
     } finally {
       setSaving(false);
     }
@@ -182,7 +183,7 @@ function SessionForm({
       await qc.invalidateQueries({ queryKey: ["planning-annual"] });
       onClose();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Delete failed");
+      setErr(friendlyMessage(e, "Delete failed"));
     } finally {
       setDeleting(false);
     }
@@ -203,7 +204,7 @@ function SessionForm({
       setOverridingId(null);
       setOverrideReason("");
     } catch (e: unknown) {
-      setOverrideErr(e instanceof Error ? e.message : "Override failed");
+      setOverrideErr(friendlyMessage(e, "Override failed"));
     } finally {
       setOverrideSaving(false);
     }
@@ -400,7 +401,7 @@ function WingEventPanel({ event, onClose }: { event: WingHQEvent; onClose: () =>
       await qc.invalidateQueries({ queryKey: ["planning-cc"] });
       onClose();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Review failed");
+      setErr(friendlyMessage(e, "Review failed"));
     } finally {
       setSaving(false);
     }
@@ -504,7 +505,7 @@ function CreateAnchorForm({ yearId, onClose }: { yearId: string; onClose: () => 
       await qc.invalidateQueries({ queryKey: ["planning-long-range"] });
       onClose();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Save failed");
+      setErr(friendlyMessage(e, "Save failed"));
     } finally {
       setSaving(false);
     }
@@ -584,7 +585,7 @@ function LocationForm({ location, onClose }: {
       await qc.invalidateQueries({ queryKey: ["planning-locations"] });
       onClose();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Save failed");
+      setErr(friendlyMessage(e, "Save failed"));
     } finally {
       setSaving(false);
     }
@@ -681,7 +682,7 @@ function ScheduleFromBacklogPanel({
       await qc.invalidateQueries({ queryKey: ["planning-night-summaries", yearId] });
       setSuccess(true);
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Save failed");
+      setErr(friendlyMessage(e, "Save failed"));
     } finally {
       setSaving(false);
     }

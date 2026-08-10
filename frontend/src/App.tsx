@@ -78,16 +78,15 @@ function ModuleLoading() {
   );
 }
 
-function ModuleError({ error, onRetry }: { error: string; onRetry: () => void }) {
+function ModuleError({ onRetry }: { onRetry: () => void }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f4f8fc" }}>
       <div style={{ background: "white", border: "1px solid #d1dce8", borderRadius: 10, padding: "36px 40px", maxWidth: 480, textAlign: "center", boxShadow: "0 4px 16px rgba(0,47,101,.10)" }}>
         <div style={{ fontSize: 32, marginBottom: 16 }}>⚠️</div>
         <h1 style={{ fontSize: 17, fontWeight: 700, color: "#002f65", marginBottom: 10 }}>Planning Workspace could not load</h1>
-        <p style={{ fontSize: 13, color: "#455560", lineHeight: 1.6, marginBottom: 8 }}>
-          The system could not load planning data.
+        <p style={{ fontSize: 13, color: "#455560", lineHeight: 1.6, marginBottom: 24 }}>
+          The system could not load planning data. If this keeps happening, contact support.
         </p>
-        {error && <p style={{ fontSize: 11, color: "#888", fontFamily: "monospace", marginBottom: 24 }}>{error}</p>}
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
           <button onClick={onRetry} style={{ background: "#51b0e3", color: "white", fontWeight: 700, fontSize: 13, padding: "10px 20px", borderRadius: 6, border: 0, cursor: "pointer" }}>
             Retry
@@ -101,12 +100,20 @@ function ModuleError({ error, onRetry }: { error: string; onRetry: () => void })
   );
 }
 
-class ModuleErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
-  state = { error: null };
-  static getDerivedStateFromError(e: Error) { return { error: e.message }; }
+class ModuleErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  // WRITE-04: getDerivedStateFromError has no access to componentStack, so the
+  // full error (message + stack) is logged here in componentDidCatch for
+  // debugging -- the UI itself must never show operational users a raw JS
+  // exception message (e.g. "Cannot read properties of undefined"), which is
+  // what this previously rendered verbatim in a monospace <p>.
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error, info: { componentStack?: string | null }) {
+    console.error("[ModuleErrorBoundary]", error, info.componentStack);
+  }
   render() {
-    if (this.state.error) {
-      return <ModuleError error={this.state.error} onRetry={() => { this.setState({ error: null }); window.location.reload(); }} />;
+    if (this.state.hasError) {
+      return <ModuleError onRetry={() => { this.setState({ hasError: false }); window.location.reload(); }} />;
     }
     return this.props.children;
   }

@@ -3199,6 +3199,16 @@ async function api(path, opts={}){
 function apiErr(e){
   if(!e) return 'Something went wrong.';
   if(e.msg) return e.msg;
+  // WRITE-04: fetch() rejects with a TypeError for network-level failures
+  // (offline, backend unreachable, CORS) -- its raw message ("Failed to
+  // fetch" / "NetworkError when attempting to fetch resource.", wording
+  // varies by browser) is a technical detail, not something a non-technical
+  // operational user should see verbatim. Every other Error thrown in this
+  // file is a deliberate, already-human-readable message (e.g.
+  // _downloadExport's own curated Error) and is left untouched below --
+  // matches the friendly text already used for the equivalent case in the
+  // Planning Workspace (ApiError.friendly's isNetwork branch).
+  if(e instanceof TypeError && /fetch|network/i.test(e.message||'')) return 'Cannot reach the server. Check that the backend is running.';
   if(e instanceof Error) return e.message||'Unexpected error.';
   return 'Something went wrong.';
 }
@@ -10755,7 +10765,7 @@ function _downloadExport(url, filename){
       document.body.removeChild(a);
       URL.revokeObjectURL(a.href);
     })
-    .catch(e=>alert('Export failed: '+e.message));
+    .catch(e=>alert('Export failed: '+apiErr(e)));
 }
 
 function exportAnnualProgram(){

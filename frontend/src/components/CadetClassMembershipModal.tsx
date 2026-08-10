@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { trainingApi } from "../api";
+import { friendlyMessage } from "../api/client";
 import { Modal } from "./Modal";
 import { Loading, ErrorNote, Button } from "./ui";
 import type { Cadet } from "../api/types";
@@ -53,7 +54,7 @@ export function CadetClassMembershipModal({ cadet, onClose }: { cadet: Cadet; on
       setSelectedClassId("");
       await qc.invalidateQueries({ queryKey: ["cadet-class-memberships", cadet.cadet_id] });
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Could not add membership");
+      setErr(friendlyMessage(e, "Could not add membership"));
     } finally {
       setAdding(false);
     }
@@ -70,7 +71,7 @@ export function CadetClassMembershipModal({ cadet, onClose }: { cadet: Cadet; on
       });
       await qc.invalidateQueries({ queryKey: ["cadet-class-memberships", cadet.cadet_id] });
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Could not end membership");
+      setErr(friendlyMessage(e, "Could not end membership"));
     } finally {
       setEnding(null);
     }

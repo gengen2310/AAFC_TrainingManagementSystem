@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountApi, orgApi, trainingApi } from "../api";
 import type { TagRecord, PhaseRecord } from "../api";
+import { friendlyMessage } from "../api/client";
 import { Card, Empty, Loading, ErrorNote } from "../components/ui";
 import { useAuth } from "../auth/AuthProvider";
 import type { AccountRecord, Flight } from "../api/types";
@@ -131,7 +132,7 @@ export function Accounts() {
       setShowCreate(false);
       setNewCode({ code: data.new_code, forName: data.display_name });
     },
-    onError: (e: Error) => setCreateErr(e.message),
+    onError: (e: Error) => setCreateErr(friendlyMessage(e, "Request failed.")),
   });
   const resetMut = useMutation({
     mutationFn: ({ uid, code }: { uid: string; code?: string }) => accountApi.resetCode(uid, code),
@@ -167,7 +168,7 @@ export function Accounts() {
   const deleteMut = useMutation({
     mutationFn: accountApi.remove,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["accounts"] }); setDeleteUid(null); setDeleteErr(""); },
-    onError: (e: Error) => setDeleteErr(e.message),
+    onError: (e: Error) => setDeleteErr(friendlyMessage(e, "Request failed.")),
   });
   const unlockMut = useMutation({
     mutationFn: accountApi.unlock,
@@ -176,7 +177,7 @@ export function Accounts() {
   const changeRoleMut = useMutation({
     mutationFn: ({ uid, new_role }: { uid: string; new_role: string }) => accountApi.changeRole(uid, new_role),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["accounts"] }); setRoleUid(null); setRoleErr(""); },
-    onError: (e: Error) => setRoleErr(e.message),
+    onError: (e: Error) => setRoleErr(friendlyMessage(e, "Request failed.")),
   });
   const createFlightMut = useMutation({
     mutationFn: accountApi.createFlight,

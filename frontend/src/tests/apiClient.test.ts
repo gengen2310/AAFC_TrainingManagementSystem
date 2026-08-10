@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { api, ApiError } from "../api/client";
+import { api, ApiError, friendlyMessage } from "../api/client";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -79,5 +79,28 @@ describe("api client error handling", () => {
       expect(fe.date).toBe("invalid date");
       expect(fe.session_count).toBe("must be >= 1");
     }
+  });
+});
+
+describe("friendlyMessage (WRITE-04)", () => {
+  // Regression test: ApiError.message is just `API ${status}` (e.g. "API 403"),
+  // never the curated ApiError.friendly text -- the widespread
+  // `e instanceof Error ? e.message : fallback` idiom used across the app's
+  // form/modal error handlers matched ApiError too (it extends Error) and was
+  // showing that raw status string to operational users instead of a
+  // human-readable message. friendlyMessage() must always prefer .friendly
+  // for an ApiError, never its own .message.
+  it("uses ApiError.friendly, never ApiError.message, for an ApiError", () => {
+    const e = new ApiError(403, { detail: { error: "forbidden" } });
+    expect(e.message).toBe("API 403"); // sanity check on the trap this guards against
+    expect(friendlyMessage(e, "fallback")).toBe(e.friendly);
+    expect(friendlyMessage(e, "fallback")).not.toMatch(/^API \d/);
+  });
+  it("falls back to a plain Error's own message when it is not an ApiError", () => {
+    expect(friendlyMessage(new Error("disk full"), "fallback")).toBe("disk full");
+  });
+  it("uses the fallback string for a non-Error thrown value", () => {
+    expect(friendlyMessage("boom", "fallback")).toBe("fallback");
+    expect(friendlyMessage(undefined, "fallback")).toBe("fallback");
   });
 });

@@ -56,6 +56,18 @@ export class ApiError extends Error {
   }
 }
 
+// WRITE-04: the widespread `e instanceof Error ? e.message : fallback` idiom used
+// across form/modal error handlers matches ApiError too (it extends Error), but
+// ApiError.message is just `API ${status}` (e.g. "API 403") -- not the curated,
+// human-readable text ApiError.friendly already exists to provide. That idiom was
+// showing raw HTTP-status strings to operational users instead of the friendly
+// message the app already built for exactly this purpose. Use this helper instead.
+export function friendlyMessage(e: unknown, fallback: string): string {
+  if (e instanceof ApiError) return e.friendly;
+  if (e instanceof Error && e.message) return e.message;
+  return fallback;
+}
+
 const RETRYABLE_STATUS = new Set([502, 503, 504]);
 
 // Single-replica deployments (see .claude/rules/deployment.md) have no overlap

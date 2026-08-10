@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { planningApi } from "../../api";
+import { friendlyMessage } from "../../api/client";
 import type { NightSessionSummary, ParadeNotice, PlanningSession, PlanningFacilitator } from "../../api/types";
 
 // ─── Group / period constants ─────────────────────────────────────────────────
@@ -182,7 +183,7 @@ function AddNoticeForm({ dateId, onDone }: { dateId: string; onDone: () => void 
       await qc.invalidateQueries({ queryKey: ["planning-night-summaries"] });
       onDone();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Failed to save notice");
+      setErr(friendlyMessage(e, "Failed to save notice"));
     } finally {
       setSaving(false);
     }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { planningApi, orgApi } from "../../api";
+import { friendlyMessage } from "../../api/client";
 import type { SessionInfo } from "../../api/types";
 
 // Mon=0 .. Sun=6, matching connected-frontend's _DAY_NAME_TO_INT convention.
@@ -96,7 +97,7 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
       setStep("dates");
       onYearCreated();
     } catch (e: unknown) {
-      setYearErr(e instanceof Error ? e.message : "Failed to create planning year");
+      setYearErr(friendlyMessage(e, "Failed to create planning year"));
     } finally {
       setSavingYear(false);
     }
@@ -117,7 +118,7 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
       setDatesResult({ created: result.created, dates: result.dates });
       onYearCreated();
     } catch (e: unknown) {
-      setDatesErr(e instanceof Error ? e.message : "Failed to generate dates");
+      setDatesErr(friendlyMessage(e, "Failed to generate dates"));
     } finally {
       setSavingDates(false);
     }

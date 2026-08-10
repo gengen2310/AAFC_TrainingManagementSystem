@@ -20,7 +20,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="errnote" role="alert" style={{ margin: "32px 24px" }}>
           <strong>Something went wrong on this page.</strong>
           <p style={{ marginTop: 8, fontSize: 13, color: "var(--muted-text, #6b7a87)" }}>
-            {this.state.error.message}
+            If this keeps happening, contact support.
           </p>
           <button
             className="btn sm out"

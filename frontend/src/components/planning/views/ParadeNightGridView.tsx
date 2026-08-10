@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
+import { friendlyMessage } from "../../../api/client";
 import type { PlanningSession, PlanningFacilitator, PlanningConflict, TimingBlock, ParadeNotice } from "../../../api/types";
 import type { DrawerItem } from "../PlanningRightDrawer";
 
@@ -119,7 +120,7 @@ function AddNoticeForm({ dateId, onDone }: { dateId: string; onDone: () => void 
       await qc.invalidateQueries({ queryKey: ["pn-notices", dateId] });
       onDone();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Save failed");
+      setErr(friendlyMessage(e, "Save failed"));
     } finally {
       setSaving(false);
     }

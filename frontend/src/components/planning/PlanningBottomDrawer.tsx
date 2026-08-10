@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import type { CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { planningApi, trainingApi, dashboardApi } from "../../api";
-import { ApiError } from "../../api/client";
+import { ApiError, friendlyMessage } from "../../api/client";
 import { ImportFacilitatorsModal } from "./ImportFacilitatorsModal";
 import { FacilitatorTimeline, type ZoomPreset } from "../charts/FacilitatorTimeline";
 import { FacilitatorScheduleList } from "../charts/FacilitatorScheduleList";
@@ -557,7 +557,7 @@ function FacilitatorLeaveSection({
       setLeaveStart(""); setLeaveEnd(""); setLeaveReason(""); setLeaveNotes("");
       setAddingLeave(false);
     } catch (e: unknown) {
-      setLeaveErr(e instanceof Error ? e.message : "Failed to add leave");
+      setLeaveErr(friendlyMessage(e, "Failed to add leave"));
     } finally {
       setLeaveSaving(false);
     }
@@ -796,7 +796,7 @@ function FacilitatorsContent({
       if (e instanceof ApiError && e.code === "possible_duplicate") {
         setDupWarning(e.friendly);
       } else {
-        setErr(e instanceof Error ? e.message : "Failed to create facilitator");
+        setErr(friendlyMessage(e, "Failed to create facilitator"));
       }
     } finally {
       setSaving(false);
@@ -997,7 +997,7 @@ function EquipmentContent() {
       await qc.invalidateQueries({ queryKey: ["planning-equipment"] });
       resetForm();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Failed to add equipment");
+      setErr(friendlyMessage(e, "Failed to add equipment"));
     } finally {
       setSaving(false);
     }
@@ -1133,7 +1133,7 @@ function HolidaysContent({ yearId }: { yearId: string }) {
       await qc.invalidateQueries({ queryKey: ["planning-annual"] });
       resetForm();
     } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Failed to add holiday");
+      setErr(friendlyMessage(e, "Failed to add holiday"));
     } finally {
       setSaving(false);
     }
@@ -1381,7 +1381,7 @@ function ClassifyModal({
       onSave();
       onClose();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : "Failed to save");
+      setErr(friendlyMessage(e, "Failed to save"));
     } finally {
       setSaving(false);
     }
@@ -1735,7 +1735,7 @@ function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?
       await qc.invalidateQueries({ queryKey: ["cea-activities"] });
       await qc.invalidateQueries({ queryKey: ["cea-batches"] });
     } catch (ex) {
-      setImportErr(ex instanceof Error ? ex.message : "Import failed");
+      setImportErr(friendlyMessage(ex, "Import failed"));
     } finally {
       setUploading(false);
       e.target.value = "";

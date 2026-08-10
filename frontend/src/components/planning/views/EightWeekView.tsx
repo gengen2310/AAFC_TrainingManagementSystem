@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
+import { friendlyMessage } from "../../../api/client";
 import type { PlanningSession, PlanningFacilitator, AnchorEvent, NightSummary } from "../../../api/types";
 import { filterAnchors } from "../../../utils/planningFilters";
 import {
@@ -58,7 +59,7 @@ export function EightWeekView({
 
   if (isLoading) return <div className="pw-loading">Loading {weeks}-week programme…</div>;
   if (error || !data) {
-    const msg = error instanceof Error ? error.message : "Unknown error";
+    const msg = friendlyMessage(error, "Unknown error");
     return (
       <div className="pw-err" style={{ padding: 16 }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load planning data</div>
