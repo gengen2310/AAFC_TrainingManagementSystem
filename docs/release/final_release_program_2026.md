@@ -3123,3 +3123,75 @@ flaky failures, confirmed unchanged.
 
 **Not yet deployed to staging** — queued for the normal next deploy
 alongside WRITE-04 and REM-85/87/88/91/92/96/97/99/106.
+
+## 63. WRITE-03 (24-hour time) and WRITE-06 (Given/Family name labelling) — the two Defence Writing Manual copy items actionable without the full WRITE-02 inventory first
+
+WRITE-01 built the standard (`docs/standards/defence-writing-ui-standard.md`)
+in an earlier phase; WRITE-02 (the full interface-language-inventory sweep)
+and WRITE-05 (readability, which depends on WRITE-02) are correctly scoped
+as their own dedicated passes, not attempted here. WRITE-03 and WRITE-06
+were concrete and verifiable without that inventory, so both were
+investigated and closed this pass.
+
+**WRITE-03 — real for time, already correct for dates.** Direct
+verification (not assumption, per this row's own "record findings
+honestly whichever way they go" instruction): every date display already
+uses `toLocaleDateString('en-AU')`, rendering unambiguous `DD/MM/YYYY`
+(verified: `10/08/2026`) — correct, no change needed. Time display was
+genuinely wrong: all 3 `toLocaleTimeString('en-AU', {hour:'2-digit',
+minute:'2-digit'})` call sites (all "Saved at HH:MM" timestamps) omitted
+`hour12: false`, so JS's `en-AU` Intl default renders 12-hour with an
+am/pm suffix (verified: `03:30 pm`) — not the Manual's required 24-hour
+form. Fixed by adding `hour12: false` to all three; verified the fix
+handles the midnight edge case correctly (`00:05`, not `24:05` or blank).
+The React Planning Workspace has zero `Intl.DateTimeFormat`/
+`toLocaleTimeString` calls anywhere — it renders session `start_time`/
+`end_time` directly as raw backend `"HH:MM"` strings, already 24-hour,
+confirmed clean by inspection rather than assumed clean by absence of a
+search hit. Number/numeral-convention checking (the other half of this
+row's scope) was not separately swept this pass.
+
+**WRITE-06 — real, all 8 occurrences relabelled.** Direct grep of both
+frontends found exactly 4 occurrences each (8 total): connected-frontend's
+facilitator table header, the Add Facilitator modal's two field labels,
+and one validation alert (`'Last name required.'`); React's
+`Facilitators.tsx` `AddFacModal` and `PlanningBottomDrawer.tsx`'s inline
+quick-add-facilitator form. Confirmed via a broader search that no other
+user-facing personal-name field exists in either frontend — Cadets has no
+create/edit UI, Account Management uses a single Display Name field, not
+separate given/family fields — so this was the complete surface, not a
+partial sweep. Relabelled all 8 to Given Name/Family Name (and lowercase
+`Given name`/`Family name` where the original used sentence case),
+matching the Manual's own §3.34 convention already cited in the standard
+doc. Internal field names (`first_name`/`last_name`, `firstName`/
+`lastName`) are completely untouched, per the addendum's explicit
+backward-compatibility instruction for this specific item.
+
+**A repeat of the exact same gap-register-update bug from §57, caught the
+same way.** Writing both rows' updates in one Python loop with a `break`
+statement placed outside the `if`/`elif` chain (rather than inside each
+branch, or removed entirely in favour of independent loops) caused the
+loop to exit after the very first row checked — silently leaving WRITE-03
+and WRITE-06 both still marked `OPEN` despite the real fixes already being
+committed. Caught immediately by re-checking the open-items list
+afterward and finding both still listed, exactly the same verification
+habit that caught the identical mistake in §57. Fixed with fully
+independent single-purpose loops, no shared `break`, matching how §57's
+fix was ultimately done.
+
+**Tests, verified the same way as every other fix this pass.** Two new
+tests in `low-severity-fixes.spec.ts`: WRITE-03 adds a facilitator and
+asserts the resulting toast text matches `/added at \d{2}:\d{2}\./i` with
+no `am.`/`pm.` — the pre-fix failure log itself captured the real bug text
+verbatim (`"Facilitator added at 11:39 am."`), not a hypothetical.
+WRITE-06 asserts the table headers and Add Facilitator modal show the new
+labels and not the old ones. Both verified via `git stash` to fail
+without their respective fixes and pass with them restored. Confirmed no
+existing e2e test anywhere selects on the old "First Name"/"Last Name"
+label text — every existing test uses stable `#id` selectors, unaffected
+by the rename. Frontend `tsc`/`vitest` (25/25)/`build` all clean; security
+greps re-run against the modified file, both known false positives
+unchanged.
+
+**Not yet deployed to staging** — queued for the normal next deploy
+alongside WRITE-04 and REM-85/87/88/91/92/96/97/99/106/108.
