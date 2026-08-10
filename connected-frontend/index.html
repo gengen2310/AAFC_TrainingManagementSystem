@@ -226,7 +226,12 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .tw{overflow-x:auto;border-radius:8px;border:1px solid var(--border);}
 table,.data-table{width:100%;border-collapse:collapse;font-size:12.5px;}
 thead{background:var(--surface-2);}
-thead th{padding:9px 12px;color:var(--steel);font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--border);text-align:left;}
+/* REM-85: was font-size:9px -- effectively illegible at normal desktop viewing
+   distance (reported specifically on the Wing Overview readiness table, but this
+   is the global table-header rule, so every table in the app had the same issue).
+   10.5px keeps the compact uppercase-label look (still distinguished from body
+   text by weight/letter-spacing/colour) while being genuinely readable. */
+thead th{padding:9px 12px;color:var(--steel);font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--border);text-align:left;}
 tbody tr{border-bottom:1px solid var(--border-light);}
 tbody tr:last-child{border-bottom:none;}
 tbody tr:hover{background:#f0f7fc;}
@@ -507,10 +512,16 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 .sc-backup-item{display:flex;gap:12px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:12px;}
 .sc-backup-item .sc-filename{font-family:monospace;color:var(--dark);}
 .sc-backup-item .sc-bsize{color:var(--muted);}
+/* REM-87: skip-to-main-content link -- offscreen until keyboard-focused, matching the
+   established convention for a link that must exist for screen-reader/keyboard users
+   without being visible during normal mouse use. */
+.skip-link{position:absolute;left:-9999px;top:0;z-index:999;background:var(--dark);color:#fff;padding:10px 18px;border-radius:0 0 6px 0;font-weight:700;font-size:13px;text-decoration:none;}
+.skip-link:focus{left:0;}
 </style>
 </head>
 <body>
 
+<a href="#main-content" class="skip-link">Skip to main content</a>
 <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
 
 <!-- ═══ AUTH ═══ -->
@@ -647,7 +658,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <a class="nav-item-ext" id="nav-pw-link" href="#" target="_blank" rel="noopener" style="display:none">Planning Workspace ↗</a>
     </nav>
 
-    <main class="main">
+    <main class="main" id="main-content">
 
       <!-- GETTING STARTED (Phase 3.5) -->
       <div id="page-getting-started" class="page">
