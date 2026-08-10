@@ -183,6 +183,24 @@ class FacilitatorTypeTag(Base, UUIDMixin, TimestampMixin):
     created_by: Mapped[str | None] = mapped_column(String(36))
 
 
+class SessionStatusReasonTag(Base, UUIDMixin, TimestampMixin):
+    """Canonical session-status-change reason reference data; user-creatable,
+    scoped to squadron/wing/global -- mirrors SubjectAreaTag/FacilitatorTypeTag's
+    exact shape (REM-23 continuation). The #or-reason dropdown's reason text
+    stays free-text on the Session/SessionStatusHistory row (matches
+    Facilitator.type's own convention: reference tags are advisory/governed,
+    not a hard foreign key), so this table adds governance with zero
+    migration risk to existing history rows."""
+    __tablename__ = "session_status_reason_tags"
+    squadron_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
+    wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    scope: Mapped[str] = mapped_column(String(20), default="squadron")  # global / wing / squadron
+    display_name: Mapped[str] = mapped_column(String(80))
+    normalised_name: Mapped[str] = mapped_column(String(80), index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str | None] = mapped_column(String(36))
+
+
 class TrainingArea(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "training_areas"
     squadron_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), index=True)

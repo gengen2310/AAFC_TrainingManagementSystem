@@ -8,7 +8,7 @@ from ..security import hash_code
 from ..models import (NationalEntity, Wing, Squadron, Flight, User, AccessCode,
                       CurriculumItem, CurriculumElement, CurriculumPhase, Facilitator, FacilitatorRankHistory,
                       TrainingArea, Equipment, ParadeNight, Session, Cadet,
-                      TimingTemplate, TimingBlock, FacilitatorTypeTag)
+                      TimingTemplate, TimingBlock, FacilitatorTypeTag, SessionStatusReasonTag)
 
 _DEFAULT_ELEMENTS = [
     ("Air_Space",         "Air & Space",                "national"),
@@ -32,6 +32,21 @@ _DEFAULT_FACILITATOR_TYPES = [
     "NCO",
     "Senior Cadet",
     "Civilian",
+]
+
+# REM-23 continuation — same reasoning as _DEFAULT_FACILITATOR_TYPES above:
+# the 8 real reason values already hardcoded as #or-reason's <option> list
+# in connected-frontend, not invented text. "Other" is deliberately excluded
+# -- a genuine non-governed catch-all, not reference data.
+_DEFAULT_SESSION_STATUS_REASONS = [
+    "Facilitator unavailable",
+    "Venue unavailable",
+    "Equipment unavailable",
+    "Weather",
+    "Higher-priority activity",
+    "Program changed",
+    "Insufficient time",
+    "Safety concern",
 ]
 
 # Master transformation plan Block 10 — same names as dashboard.py's _PHASES
@@ -326,6 +341,16 @@ def seed_all():
         ).first():
             db.add(FacilitatorTypeTag(scope="global", display_name=name,
                                       normalised_name=norm, is_active=True))
+    # Seed default session-status-reason reference data (idempotent) — same
+    # reasoning as the facilitator-type seed above (REM-23 continuation).
+    for name in _DEFAULT_SESSION_STATUS_REASONS:
+        norm = " ".join(name.strip().lower().split())
+        if not db.query(SessionStatusReasonTag).filter(
+            SessionStatusReasonTag.normalised_name == norm,
+            SessionStatusReasonTag.scope == "global",
+        ).first():
+            db.add(SessionStatusReasonTag(scope="global", display_name=name,
+                                          normalised_name=norm, is_active=True))
     db.commit()
     db.close()
     print("Seeded: National HQ, 7 Wing, 16 squadrons, users/access codes, 13 core curriculum items, 703 demo data (incl. Alpha/Bravo flights, planning year, WA holidays).")

@@ -2194,17 +2194,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <p id="or-context" class="muted" style="font-size:12.5px;margin:0 0 12px"></p>
       <div class="ff">
         <label for="or-reason">Reason</label>
-        <select id="or-reason" aria-required="true">
+        <select id="or-reason" aria-required="true" onchange="_onReasonChange(this)">
           <option value="">— Select a reason —</option>
-          <option value="Facilitator unavailable">Facilitator unavailable</option>
-          <option value="Venue unavailable">Venue unavailable</option>
-          <option value="Equipment unavailable">Equipment unavailable</option>
-          <option value="Weather">Weather</option>
-          <option value="Higher-priority activity">Higher-priority activity</option>
-          <option value="Program changed">Program changed</option>
-          <option value="Insufficient time">Insufficient time</option>
-          <option value="Safety concern">Safety concern</option>
-          <option value="Other">Other</option>
         </select>
       </div>
       <div class="ff"><label for="or-note">Additional notes (optional)</label>
@@ -3646,6 +3637,7 @@ async function loadData(){
   const p_uicfg=fetch(API_BASE+'/api/health/ui-config').then(r=>r.json()).catch(()=>null);
   const p_tags=api('/api/subject-area-tags').catch(()=>[]);
   const p_factypes=api('/api/facilitator-type-tags').catch(()=>[]);
+  const p_reasontags=api('/api/session-status-reason-tags').catch(()=>[]);
   const p_pns=_apiT('/api/parade-nights'+_sqq,null,'Parade Nights');
   const p_facs=_apiT('/api/facilitators'+_sqq,null,'Facilitators');
   const p_cur=_apiT('/api/curriculum'+_sqq,null,'Curriculum');
@@ -3690,6 +3682,7 @@ async function loadData(){
     sqnData,timing,auditData,
     wov,wph,wcap,wsqns,
     nat,natov,natcap,wings,nsqns,
+    reasontags,
   ]=await Promise.all([
     p_uicfg,p_tags,p_factypes,
     p_pns,p_facs,p_cur,p_phases,p_ta,p_eq,p_ai,p_acts,p_holidays,p_proxy,
@@ -3697,6 +3690,7 @@ async function loadData(){
     p_sqnData,p_timing,p_audit,
     p_wov,p_wph,p_wcap,p_wsqns,
     p_nat,p_natov,p_natcap,p_wings,p_nsqns,
+    p_reasontags,
   ]);
 
   // Set state from resolved results
@@ -3744,6 +3738,8 @@ async function loadData(){
   S.subjectAreaTags=Array.isArray(tags)?tags.filter(t=>t.is_active):[];
   S.facilitatorTypeTags=Array.isArray(factypes)?factypes.filter(t=>t.is_active):[];
   _populateFacTypeSelect();
+  S.sessionStatusReasonTags=Array.isArray(reasontags)?reasontags.filter(t=>t.is_active):[];
+  _populateReasonSelect();
   S.reports={summary:repSum,readiness:repRead,coverage:repCov,facload:repFload,notdelivered:repNdel};
   S.cfg={day:'',start:'',end:'',sess:3,dur:35,addr:'',crestUrl:''};
   if(sqnData){
@@ -3819,10 +3815,44 @@ const OUTCOME_REASON_REQUIRED={
   delivered_with_issue:'This session was delivered, but with an issue to record.'
 };
 let _orResolve=null;
+// REM-23 continuation: #or-reason is now API-driven from
+// /api/session-status-reason-tags (same governed reference-data pattern as
+// #fac-type/Facilitator Type) instead of a hardcoded <option> list. "Other"
+// is always appended and is deliberately NOT part of the governed tag set
+// -- a genuine non-governed catch-all, matching how Facilitator Type has
+// no equivalent "Other" entry.
+function _populateReasonSelect(){
+  const sel=document.getElementById('or-reason'); if(!sel)return;
+  const prior=sel.value;
+  const tags=(S.sessionStatusReasonTags||[]);
+  const opts=tags.length
+    ? tags.map(t=>`<option value="${esc(t.display_name)}">${esc(t.display_name)}</option>`).join('')
+    : ['Facilitator unavailable','Venue unavailable','Equipment unavailable','Weather','Higher-priority activity','Program changed','Insufficient time','Safety concern']
+        .map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  const addOpt=canWriteSquadron()?'<option value="__add_new__">+ Add new reason…</option>':'';
+  sel.innerHTML='<option value="">— Select a reason —</option>'+opts+'<option value="Other">Other</option>'+addOpt;
+  if(prior && [...sel.options].some(o=>o.value===prior)) sel.value=prior;
+}
+async function _onReasonChange(sel){
+  if(sel.value!=='__add_new__')return;
+  const name=(prompt('New reason name:')||'').trim();
+  if(!name){ sel.value=''; return; }
+  try{
+    const t=await api('/api/session-status-reason-tags',{method:'POST',body:JSON.stringify({display_name:name})});
+    S.sessionStatusReasonTags=[...(S.sessionStatusReasonTags||[]),t];
+    _populateReasonSelect();
+    sel.value=t.display_name;
+    showToast('Reason "'+t.display_name+'" created.');
+  }catch(e){
+    showToast(e.code==='tag_already_exists'?'That reason already exists.':'Could not create reason: '+apiErr(e), true);
+    sel.value='';
+  }
+}
 function collectOutcomeReason(status){
   return new Promise(resolve=>{
     _orResolve=resolve;
     document.getElementById('or-context').textContent=OUTCOME_REASON_REQUIRED[status]||'Please provide a reason.';
+    _populateReasonSelect();
     document.getElementById('or-reason').value='';
     document.getElementById('or-note').value='';
     document.getElementById('or-err').textContent='';
@@ -3833,7 +3863,7 @@ function collectOutcomeReason(status){
 function _orSave(){
   const reason=document.getElementById('or-reason').value;
   const note=document.getElementById('or-note').value.trim();
-  if(!reason){ document.getElementById('or-err').textContent='Select a reason to continue.'; return; }
+  if(!reason||reason==='__add_new__'){ document.getElementById('or-err').textContent='Select a reason to continue.'; return; }
   closeModal('m-outcome-reason');
   const full=note?reason+' — '+note:reason;
   if(_orResolve)_orResolve(full);
@@ -4718,6 +4748,9 @@ const _REFDATA_TYPES=[
    idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
   {key:'subjarea',label:'Subject Areas',listUrl:'/api/subject-area-tags',createUrl:'/api/subject-area-tags',
    archiveUrl:id=>`/api/subject-area-tags/${id}`,archiveMethod:'DELETE',
+   idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
+  {key:'reason',label:'Session Status Reasons',listUrl:'/api/session-status-reason-tags',createUrl:'/api/session-status-reason-tags',
+   archiveUrl:id=>`/api/session-status-reason-tags/${id}`,archiveMethod:'DELETE',
    idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
 ];
 async function _renderRefData(){

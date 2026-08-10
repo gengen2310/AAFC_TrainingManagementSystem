@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
 from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
-                      Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, TrainingArea, Equipment,
+                      Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, SessionStatusReasonTag, TrainingArea, Equipment,
                       Activity, Cadet, Squadron, TimingTemplate, TimingBlock, SystemSetting, TrainingClass, PlanningYear,
                       SessionAudience, CadetClassMembership)
 from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS
@@ -4316,4 +4316,131 @@ def archive_facilitator_type_tag(
     tag.is_active = False
     db.commit()
     audit(db, p, object_type="FacilitatorTypeTag", object_id=tag_id, action="archive")
+    return {"ok": True}
+
+
+# ── Session Status Reason reference data — mirrors facilitator-type-tags
+# exactly (REM-23 continuation). The #or-reason dropdown's reason text
+# stays free-text on SessionStatusHistory; this is advisory/governed
+# reference data, not a hard foreign key. ──
+
+def _reason_out(t: SessionStatusReasonTag) -> dict:
+    return {
+        "tag_id": t.id,
+        "display_name": t.display_name,
+        "normalised_name": t.normalised_name,
+        "scope": t.scope,
+        "squadron_id": t.squadron_id,
+        "wing_id": t.wing_id,
+        "is_active": t.is_active,
+        "created_by": t.created_by,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+    }
+
+
+class SessionStatusReasonTagIn(BaseModel):
+    display_name: str
+    scope: str = "squadron"
+    wing_id: str | None = None
+    squadron_id: str | None = None
+
+
+@router.get("/session-status-reason-tags")
+def list_session_status_reason_tags(
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Return all active session-status reason tags visible to the caller's squadron and wing."""
+    wing_id, sq_id = _visible_tag_scope(p)
+    require_can_view_squadron(p, sq_id or "", wing_id)
+    conditions = [SessionStatusReasonTag.scope == "global"]
+    if wing_id:
+        conditions.append((SessionStatusReasonTag.scope == "wing") & (SessionStatusReasonTag.wing_id == wing_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(SessionStatusReasonTag.scope == "wing")
+    if sq_id:
+        conditions.append((SessionStatusReasonTag.scope == "squadron") & (SessionStatusReasonTag.squadron_id == sq_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(SessionStatusReasonTag.scope == "squadron")
+    from sqlalchemy import or_ as _or_reason
+    rows = (
+        db.query(SessionStatusReasonTag)
+        .filter(SessionStatusReasonTag.is_active == True, _or_reason(*conditions))  # noqa: E712
+        .order_by(SessionStatusReasonTag.display_name)
+        .all()
+    )
+    return [_reason_out(t) for t in rows]
+
+
+@router.post("/session-status-reason-tags", status_code=201)
+def create_session_status_reason_tag(
+    body: SessionStatusReasonTagIn,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Create a new session-status reason tag at the requested scope (sqn_admin: squadron
+    only; wing_admin/national_admin/system_admin: their own wing/global, or a
+    squadron scope while Proxy/Delegated Intervention is active)."""
+    scope = body.scope if body.scope in ("global", "wing", "squadron") else "squadron"
+    _can_create_tag(p, scope, body.wing_id, body.squadron_id)
+
+    display = body.display_name.strip()
+    if not display:
+        raise HTTPException(400, detail={"error": "tag_name_blank"})
+    if len(display) > 80:
+        raise HTTPException(400, detail={"error": "tag_name_too_long", "max": 80})
+
+    norm = _normalise_tag(display)
+
+    wing_id = body.wing_id or ((p.acting_wing_id or p.wing_id) if scope in ("wing", "squadron") else None)
+    squadron_id = body.squadron_id or ((p.acting_squadron_id or p.squadron_id) if scope == "squadron" else None)
+
+    existing = (
+        db.query(SessionStatusReasonTag)
+        .filter(
+            SessionStatusReasonTag.normalised_name == norm,
+            SessionStatusReasonTag.is_active == True,  # noqa: E712
+            (
+                (SessionStatusReasonTag.squadron_id == squadron_id) |
+                (SessionStatusReasonTag.wing_id == wing_id) |
+                (SessionStatusReasonTag.scope == "global")
+            ),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(409, detail={"error": "tag_already_exists", "existing_id": existing.id})
+
+    tag = SessionStatusReasonTag(
+        squadron_id=squadron_id,
+        wing_id=wing_id,
+        scope=scope,
+        display_name=display,
+        normalised_name=norm,
+        is_active=True,
+        created_by=p.user_id,
+    )
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    audit(db, p, object_type="SessionStatusReasonTag", object_id=tag.id, action="create",
+          new={"display_name": tag.display_name, "scope": tag.scope})
+    return _reason_out(tag)
+
+
+@router.delete("/session-status-reason-tags/{tag_id}", status_code=200)
+def archive_session_status_reason_tag(
+    tag_id: str,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Archive a session-status reason tag (does not remove existing history rows).
+    Scope-checked the same way as creation."""
+    tag = db.get(SessionStatusReasonTag, tag_id)
+    if not tag:
+        raise HTTPException(404, detail={"error": "tag_not_found"})
+    _can_create_tag(p, tag.scope, tag.wing_id, tag.squadron_id)
+    tag.is_active = False
+    db.commit()
+    audit(db, p, object_type="SessionStatusReasonTag", object_id=tag_id, action="archive")
     return {"ok": True}
