@@ -3482,3 +3482,74 @@ national rollup returns both with correct `wing_code` tags, confirmed
 seeing "All Wings". No Claude-in-Chrome browser was available this
 session — gap register status reflects this (staging-verified via API,
 pending a human visual pass), not claimed as fully closed.
+
+## 67. REM-23 continuation — Session Status Reason becomes the 3rd governed reference-data category, and a real regression caught before it shipped
+
+With REM-13 Phase A shipped, the severity sweep continued into REM-23
+(Reference-data architecture), already `IMPLEMENTING` with two of six
+categories done (Subject Area, Facilitator Type) and four remaining
+(Training Stage — deliberately deferred pending REM-26's product decision
+— Session Status Reason, Notice Type, Training Area Capability). Asked
+which of the three unblocked categories to do next; user picked Session
+Status Reason.
+
+**A genuinely mechanical, low-risk replication — and it stayed that way.**
+`SessionStatusReasonTag` mirrors `FacilitatorTypeTag`'s exact shape:
+same model fields, same three GET/POST/DELETE endpoints, and — critically
+— the same shared `_can_create_tag`/`_visible_tag_scope`/`_normalise_tag`
+helper functions, reused completely unchanged rather than duplicated. The
+8 seed values are the real reason strings already hardcoded in
+`#or-reason`'s `<option>` list (Facilitator unavailable, Venue
+unavailable, Equipment unavailable, Weather, Higher-priority activity,
+Program changed, Insufficient time, Safety concern) — not invented text,
+matching the same care Facilitator Type's own seed took. `"Other"` stays
+a fixed, non-governed catch-all rather than becoming reference data, for
+the same reason Facilitator Type has no equivalent: it represents "none
+of the above," not a real category.
+
+**connected-frontend.** `#or-reason` converted from a hardcoded list to
+API-driven with a "+ Add new reason…" affordance, mirroring `#fac-type`'s
+`_populateFacTypeSelect`/`_onFacTypeChange` pattern exactly (new
+`_populateReasonSelect`/`_onReasonChange`). The one existing piece of
+infrastructure this pass leaned on hardest: `_REFDATA_TYPES`, a fully
+generic, table-driven config array already backing the "Program and
+Reference Data" admin page (built for Subject Area/Facilitator Type) —
+adding Session Status Reason to that admin surface took exactly one array
+entry, zero new rendering code.
+
+**A real defect, caught before it ever shipped.** The new migration
+initially omitted `updated_by` from its `create_table()` call — invisible
+locally (SQLite's schema comes straight from the SQLAlchemy model via
+`create_all()`, so the column "exists" there regardless of what any
+migration does), but this is the *exact* recurring bug class that has
+already broken `curriculum_phases` and `facilitator_type_tags` in
+production twice (documented in this repo's own
+`test_migration_schema_integrity.py`, added specifically because of that
+history: "found live on staging... crashing with
+`psycopg2.errors.UndefinedColumn`"). Both dedicated integrity tests
+(`test_migration_schema_integrity.py`,
+`test_migration_schema_drift.py`) caught it immediately on the first test
+run — verified genuinely by temporarily removing the column again and
+confirming both tests fail with the exact same message, then restoring
+it. This is the value of those tests working as designed: a defect that
+would only have surfaced as a live crash on a from-scratch Postgres
+environment was caught in under a second, locally, before a single commit.
+
+**Verification.** 24 new backend tests (mirrors
+`test_facilitator_type_tags.py` exactly) + 2 new e2e tests against the
+real rendered Quick Edit → reason-modal flow. Full backend suite: 1390
+passed, 5 skipped, the same 2 pre-existing unrelated failures as every
+other pass this session. Deployed to staging 2026-08-10 (backend
+deployment `b147944b`, connected-frontend deployment `ae404fc9`) — the
+migration applied cleanly against real staging Postgres on boot (health
+check green immediately, no `UndefinedColumn` crash, confirming the
+`updated_by` fix actually worked where it matters, not just against
+SQLite). Live API round-trip via `ADMIN703`: all 8 global reasons
+present, duplicate-of-seeded-global correctly rejected (409), custom
+reason created and archived. No Claude-in-Chrome browser available this
+session — gap register records this precisely rather than claiming a
+full visual pass.
+
+REM-23 is now 3 of 6 categories done. Notice Type and Training Area
+Capability remain, ready to replicate on request via the identical
+pattern; Training Stage stays deliberately blocked on REM-26.
