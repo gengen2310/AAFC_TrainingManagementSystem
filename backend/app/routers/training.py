@@ -161,6 +161,48 @@ def _progress(statuses: list[str]) -> str:
     return "planned"
 
 
+def _lh_last_segment(url: str) -> str:
+    """The final non-empty path segment of a URL, ignoring query string and
+    trailing slash -- used only to compare against a curriculum item's
+    identifier, never to construct/guess a URL."""
+    from urllib.parse import urlsplit
+    path = urlsplit(url).path.rstrip("/")
+    return path.rsplit("/", 1)[-1] if path else ""
+
+
+@router.get("/curriculum/learning-hub/validation")
+def learning_hub_validation_report(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """REM-19 (original_instruction.md Section 20): a read-only report flagging
+    curriculum items whose stored learning_hub_url doesn't match their own
+    identifier, and items missing a link entirely -- surfaced for admin
+    review via the existing single-item PATCH /curriculum/{cid} or the bulk
+    CSV/XLSX re-import (import_curriculum). This never invents or corrects a
+    URL itself -- point 4 of Section 20 explicitly prohibits guessing -- it
+    only flags for a human to check against the real Learning Hub site.
+    """
+    require_role(p, "wing_admin", "national_admin", "system_admin")
+    items = db.query(CurriculumItem).filter(CurriculumItem.is_archived == False).all()  # noqa: E712
+    flagged = []
+    for i in items:
+        if not i.learning_hub_url:
+            flagged.append({
+                "curriculum_id": i.id, "code": i.code, "identifier": i.identifier,
+                "title": i.title, "owning_level": i.owning_level,
+                "learning_hub_url": None, "issue": "missing_link",
+            })
+            continue
+        if not i.identifier:
+            continue
+        last_segment = _lh_last_segment(i.learning_hub_url)
+        if last_segment.lower() != i.identifier.lower():
+            flagged.append({
+                "curriculum_id": i.id, "code": i.code, "identifier": i.identifier,
+                "title": i.title, "owning_level": i.owning_level,
+                "learning_hub_url": i.learning_hub_url, "issue": "identifier_mismatch",
+            })
+    return {"checked": len(items), "flagged_count": len(flagged), "flagged": flagged}
+
+
 @router.get("/curriculum/export.xlsx")
 def export_curriculum_xlsx(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     """Export the visible curriculum catalogue as XLSX."""
