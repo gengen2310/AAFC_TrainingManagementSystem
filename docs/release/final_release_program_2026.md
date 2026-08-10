@@ -2354,3 +2354,150 @@ per finding. The two explicitly-excluded candidate findings (the
 non-reproducible 21-second load anomaly, and the leftover-PlanningYear
 test-data volume) remain unaddressed by design — neither is a confirmed
 product defect.
+
+## 55. CLASS-14 — legacy Session.cadet_group / Cadet.phase backfill script: designed, built, rehearsed — NOT run against any real environment
+
+Gap register CLASS-14 was the highest-severity (P1) open item in the CLASS
+program and the last one blocked purely on prerequisite work (CLASS-01
+existing). Its own entry carried an explicit flag from when it was first
+written: *"this is the item most likely to need explicit user sign-off
+before execution, given it touches historical training records across
+every squadron."* That flag stands. This section documents design, build,
+and rehearsal — not execution against staging or production, which this
+pass deliberately did not do and does not have authorisation to do.
+
+**What the script does.** `backend/scripts/migrate_legacy_class_data.py`
+reads the two free-text columns that predate CLASS-01 —
+`Session.cadet_group` (a single string like `senior`, one per Session) and
+`Cadet.phase` (a single string like `Junior`, one per Cadet) — and creates
+the `TrainingClass`/`SessionAudience`/`CadetClassMembership` rows they
+imply, so existing squadrons' history becomes visible through every
+class-aware surface this program has built (Weekly Program, Mission
+Backlog, Planning Workspace calendars, the Cadets page) without anyone
+re-entering it by hand. It **never** modifies or clears `Session.cadet_group`
+or `Cadet.phase` — those stay in place as the read-compatibility path
+`.claude/rules/capability-preservation.md` requires. Pure additive backfill.
+
+**Safety model, by design, not by afterthought:**
+- Defaults to `--dry-run` (zero writes). Real writes require `--commit`.
+- Idempotent — safe to re-run; a second `--commit` after a first produces
+  zero new rows.
+- **Never guesses.** Three specific cases are reported as `SKIPPED`, not
+  auto-resolved: no matching `PlanningYear` for a historical Session's
+  `training_year`; no matching `CurriculumPhase` for a `cadet_group`/`phase`
+  value (label normalization handles `'A. Orientation'` / `'orientation'` /
+  `'Orientation'` all meaning the same thing, but does not fuzzy-match
+  anything it isn't certain of); and — the case that matters most for data
+  safety — a squadron that has **already manually created its own
+  TrainingClass** for the exact (year, stage) a historical Session/Cadet
+  would resolve to. That squadron may have since split into "Senior 1" /
+  "Senior 2"; there is no signal in the old flat data to say which one a
+  historical record belongs to, so the script reports
+  `AMBIGUOUS_EXISTING_CLASS` and leaves it for manual review rather than
+  guessing.
+- Rows the script creates are tagged for identification and safe rollback:
+  `TrainingClass`/`SessionAudience.created_by = 'legacy-migration'`;
+  `CadetClassMembership.source = 'legacy_phase_migration'` (its own
+  dedicated field, per CLASS-09's design, for exactly this purpose).
+- `--rollback` deletes only rows the script created, and **refuses** (reports,
+  does not delete) to remove a migration-created `TrainingClass` that has
+  since gained a real, non-migration `SessionAudience`/`CadetClassMembership`
+  link — deleting it would destroy a real user's subsequent work, not just
+  undo this script's own output.
+
+**Two real bugs found by rehearsing against a disposable copy of real data
+— not by unit tests in isolation.** The first manual dry-run against a copy
+of the actual accumulated local dev database (122 historical Sessions
+carrying `cadet_group` values across 5 stages, 3 Cadets with `phase`
+values — real usage data, not synthetic) reported *"Would create 8
+TrainingClass row(s), 0 SessionAudience row(s), 0 CadetClassMembership
+row(s)"* — an output that was actively misleading on both counts:
+
+1. **Dry-run under-reported linked rows to zero.** For a brand-new class,
+   the dry-run path returned `None` (documented as "never returned for
+   linking"), so every caller's `if tclass is None: continue` silently
+   skipped counting the very sessions/cadets that class existed to serve —
+   a real `--commit` run would have created 122 `SessionAudience` rows: the
+   dry-run said 0.
+2. **Dry-run over-counted classes.** With no way to remember "I already
+   said I'd create this class" within one dry-run pass, two different
+   cadets (or a cadet and a session group) sharing the same not-yet-real
+   stage each independently reported their own "would create" — 8 reported
+   when a real run would create 5 (later corrected to 7 once a genuine
+   local-dev-DB data-quality issue was also accounted for, see below).
+
+Fixed with a per-pass placeholder-id cache on the report object: the first
+call for a given (year, stage) combo in a dry run gets a placeholder id and
+is recorded once; every subsequent call for the same combo reuses the
+placeholder rather than reporting again, and callers use the placeholder
+exactly like a real id for their own "does this link already exist"
+checks (which, for a placeholder, correctly always find nothing). A new
+regression test, `test_dry_run_report_matches_what_a_real_commit_would_do`,
+asserts a dry-run's counts equal what an immediately-following real commit
+actually produces.
+
+**A second, more serious bug surfaced only once rollback was rehearsed
+end-to-end**, not just the create path: `SessionAudience` rows the script
+created were never tagged with `created_by='legacy-migration'` — only
+`TrainingClass` was tagged. `--rollback`'s own safety check ("does this
+class have a link that isn't mine?") queries for audience rows whose
+`created_by != MIGRATION_TAG`; since **every** audience row the script had
+ever created had `created_by = None`, every single one looked "foreign" to
+that check, and rollback refused to delete anything at all — a completely
+silent, total rollback failure that would not have been visible without
+specifically rehearsing rollback, not just the forward path. Fixed by
+tagging `created_by=MIGRATION_TAG` on `SessionAudience` at creation time.
+Two new tests lock this in: `test_rollback_removes_only_migration_created_rows`
+and `test_rollback_refuses_to_delete_class_with_foreign_link_added_since`
+(which specifically adds a real, non-migration-tagged audience row to a
+migration-created class afterward and asserts rollback refuses it, then
+succeeds once that foreign link is removed).
+
+**A genuine local-dev-DB data-quality finding, correctly not treated as a
+script defect.** During rehearsal, the Cadet.phase backfill pass resolved
+squadron 703's "current active PlanningYear" (highest `year` among
+`active_status=True` rows — the exact same resolution rule already used
+elsewhere in this codebase, `training.py:358`/`planning.py:2235`, not
+invented for this script) to a leftover test year (`year=2700`,
+"verify-yearview") rather than the real 2026 demo year, because this
+session's own months of accumulated E2E testing had left **five**
+simultaneously-`active_status=True` PlanningYear rows for that one
+squadron. The script handled this exactly as it should: no crash, no
+wrong merge, just two additional distinct TrainingClass rows tied to that
+leftover year instead of reusing the ones already created from the 2026
+cadet_group data. This is disclosed as a demonstrated safe-under-messy-
+real-world-data outcome, not a defect to fix — a real production squadron
+should not (and, per normal operational use, would not) have five
+simultaneously active Training Years, but if one somehow did, this shows
+the script would not silently merge or corrupt anything as a result.
+
+**Full rehearsal evidence (disposable copy only — a fresh `cp` of the local
+dev SQLite file, pointed at via `DATABASE_URL`, never the working file
+Claude Code itself was using).** In order: dry-run (7 classes / 122
+audiences / 3 memberships reported) → commit (created exactly those counts,
+verified via direct SQL) → dry-run again (all zero — idempotent) → commit
+again (all zero — idempotent) → rollback dry-run (would delete the same
+7/122/3) → rollback commit (deleted exactly that) → final verification:
+`training_classes` table back to its exact pre-migration baseline count,
+`Session.cadet_group`/`Cadet.phase` non-null counts unchanged throughout
+(122 and 3 respectively, at every single step). 9 new tests in
+`tests/test_migrate_legacy_class_data.py` (happy path, idempotency,
+dry-run/commit parity, both skip reasons, ambiguous-existing-class skip,
+cadet-phase membership creation, both rollback tests) all passing. Full
+backend suite: 1338 passed, 5 skipped — 2 pre-existing, unrelated failures
+(`test_facilitator_schedule.py`, `test_session_audience.py`) confirmed via
+exclusion (re-ran the full suite with this task's two new files entirely
+removed; identical two failures reproduced) to be pre-existing flakiness,
+not a regression from this work.
+
+**Explicitly NOT done, and not to be done without a fresh explicit
+instruction**: this script has not been run — not even `--dry-run` —
+against staging or production. `--dry-run` is zero-risk and could be run
+there to produce a real report for review at any time; `--commit` against
+either environment requires the user to explicitly name that environment
+in a fresh instruction before it happens, per this row's own long-standing
+flag and this program's capability-preservation/data-safety rules. Gap
+register CLASS-14 is updated to `DESIGNED + REHEARSED — awaiting explicit
+user sign-off before any run against staging or production`, not to
+`IMPLEMENTED` or any status implying the real backfill has happened
+anywhere real users' data lives.
