@@ -52,8 +52,10 @@ def test_sqn_general_can_list_tags(client):
 
 
 def test_seeded_global_reasons_appear_in_list(client):
-    """The 8 seeded global reasons -- the exact reason strings #or-reason's
-    <select> already used as option values -- must be visible to every
+    """The 10 seeded global reasons -- REM-14 (original_instruction.md
+    Section 12): "Insufficient numbers" and "Administrative requirement"
+    were added, and "Insufficient time" renamed to "Time lost", to match
+    the instruction's exact preset-reason list -- must be visible to every
     squadron by default. "Other" is deliberately not seeded (a non-governed
     catch-all, not reference data)."""
     h = _sqn_admin(client)
@@ -64,9 +66,13 @@ def test_seeded_global_reasons_appear_in_list(client):
     assert "Venue unavailable" in names
     assert "Weather" in names
     assert "Safety concern" in names
+    assert "Insufficient numbers" in names
+    assert "Administrative requirement" in names
+    assert "Time lost" in names
+    assert "Insufficient time" not in names, "must be renamed, not left as a duplicate"
     assert "Other" not in names
     globals_only = [t for t in r.json() if t["scope"] == "global"]
-    assert len(globals_only) == 8
+    assert len(globals_only) == 10
 
 
 # ── create ────────────────────────────────────────────────────────────────────

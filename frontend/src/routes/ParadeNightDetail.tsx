@@ -118,7 +118,8 @@ const REASON_REQUIRED_STATUSES = new Set(["not_delivered", "cancelled", "cancell
 // both frontends so the same operational vocabulary is used everywhere.
 const OUTCOME_REASONS = [
   "Facilitator unavailable", "Venue unavailable", "Equipment unavailable", "Weather",
-  "Higher-priority activity", "Program changed", "Insufficient time", "Safety concern", "Other",
+  "Insufficient numbers", "Higher-priority activity", "Program changed", "Time lost",
+  "Safety concern", "Administrative requirement", "Other",
 ];
 
 function SetStatusForm({ session, onClose, onDone }: { session: SessionRow; onClose: () => void; onDone: () => void }) {

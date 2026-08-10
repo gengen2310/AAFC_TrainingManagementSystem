@@ -34,19 +34,25 @@ _DEFAULT_FACILITATOR_TYPES = [
     "Civilian",
 ]
 
-# REM-23 continuation — same reasoning as _DEFAULT_FACILITATOR_TYPES above:
-# the 8 real reason values already hardcoded as #or-reason's <option> list
-# in connected-frontend, not invented text. "Other" is deliberately excluded
+# REM-23 continuation — same reasoning as _DEFAULT_FACILITATOR_TYPES above.
+# REM-14 (original_instruction.md Section 12) added "Insufficient numbers"
+# and "Administrative requirement" (both named explicitly in the
+# instruction's preset-reason list but previously missing) and renamed
+# "Insufficient time" to "Time lost" (the instruction's exact wording) --
+# see migration v47 for the equivalent additive/rename change applied to
+# already-seeded Postgres environments. "Other" is deliberately excluded
 # -- a genuine non-governed catch-all, not reference data.
 _DEFAULT_SESSION_STATUS_REASONS = [
     "Facilitator unavailable",
     "Venue unavailable",
     "Equipment unavailable",
     "Weather",
+    "Insufficient numbers",
     "Higher-priority activity",
     "Program changed",
-    "Insufficient time",
+    "Time lost",
     "Safety concern",
+    "Administrative requirement",
 ]
 
 # Master transformation plan Block 10 — same names as dashboard.py's _PHASES

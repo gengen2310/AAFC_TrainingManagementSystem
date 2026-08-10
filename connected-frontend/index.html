@@ -3831,7 +3831,7 @@ function _populateReasonSelect(){
   const tags=(S.sessionStatusReasonTags||[]);
   const opts=tags.length
     ? tags.map(t=>`<option value="${esc(t.display_name)}">${esc(t.display_name)}</option>`).join('')
-    : ['Facilitator unavailable','Venue unavailable','Equipment unavailable','Weather','Higher-priority activity','Program changed','Insufficient time','Safety concern']
+    : ['Facilitator unavailable','Venue unavailable','Equipment unavailable','Weather','Insufficient numbers','Higher-priority activity','Program changed','Time lost','Safety concern','Administrative requirement']
         .map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
   const addOpt=canWriteSquadron()?'<option value="__add_new__">+ Add new reason…</option>':'';
   sel.innerHTML='<option value="">— Select a reason —</option>'+opts+'<option value="Other">Other</option>'+addOpt;
