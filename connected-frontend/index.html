@@ -656,6 +656,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-item" id="nav-system-console" style="display:none" onclick="nav('system-console')">System Console</div>
       <div class="nav-lbl" id="nav-lbl-pw" style="display:none">Workspace</div>
       <a class="nav-item-ext" id="nav-pw-link" href="#" target="_blank" rel="noopener" style="display:none">Planning Workspace ↗</a>
+      <div class="nav-item-ext" id="nav-pw-unconfigured" style="display:none;opacity:.55;cursor:default" title="Planning Workspace is not configured for this environment. Contact your system administrator.">Planning Workspace (unavailable)</div>
     </nav>
 
     <main class="main" id="main-content">
@@ -3988,10 +3989,20 @@ function bootApp(){
   applyNavScope();
   // Planning Workspace link — visible for squadron/wing/national if URL is configured via API.
   const pwLink=document.getElementById('nav-pw-link'), pwLbl=document.getElementById('nav-lbl-pw');
+  const pwUnconfigured=document.getElementById('nav-pw-unconfigured');
   const pwUrl=S.pwUrl;
   if(pwLink&&pwUrl)pwLink.href=pwUrl;
-  const showPW=!!pwUrl&&['squadron','wing','national','system_admin'].includes(scope);
-  if(pwLink)pwLink.style.display=showPW?'flex':'none'; if(pwLbl)pwLbl.style.display=showPW?'block':'none';
+  const pwEligibleScope=['squadron','wing','national','system_admin'].includes(scope);
+  const showPW=!!pwUrl&&pwEligibleScope;
+  // REM-88: when PLANNING_WORKSPACE_URL isn't configured for this environment,
+  // an eligible-scope user previously saw no trace of Planning Workspace at
+  // all -- nothing to indicate it exists, let alone that it's just not set up
+  // here. Show a non-interactive placeholder explaining that instead, rather
+  // than silently omitting the nav item.
+  const showPWUnconfigured=!pwUrl&&pwEligibleScope;
+  if(pwLink)pwLink.style.display=showPW?'flex':'none';
+  if(pwUnconfigured)pwUnconfigured.style.display=showPWUnconfigured?'flex':'none';
+  if(pwLbl)pwLbl.style.display=(showPW||showPWUnconfigured)?'block':'none';
   // Write controls: visible only where this role/scope can currently write; auditor/viewers read-only.
   const canWrite = scope==='squadron' ? canWriteSquadron() : false; // wing/national write only via proxy into a squadron
   document.querySelectorAll('.admin-el').forEach(el=>{el.style.display=(canWrite||(scope!=='squadron'&&proxyActive()))?'inline-flex':'none';});
@@ -4141,9 +4152,18 @@ function _renderGsSections(d){
 
 function loadSystemConsole(){
   if(S.role!=='system_admin') return;
-  // Populate build fingerprint from meta tag injected by docker-entrypoint.sh
+  // Populate build fingerprint from meta tag injected by docker-entrypoint.sh.
+  // REM-91: local dev (python3 -m http.server) has no build/entrypoint step at
+  // all, so this meta tag's content is always the raw, unresolved
+  // "__APP_BUILD__" placeholder there -- a real, non-empty string, so the old
+  // `sha||'(local build)'` fallback never triggered (it only catches an empty
+  // string, not a truthy placeholder). Deployed environments (staging,
+  // production) are unaffected -- confirmed via direct inspection of
+  // docker-entrypoint.sh, which always substitutes this tag on container
+  // start regardless of environment.
   const buildMeta=(document.querySelector('meta[name="app-build"]')||{}).content||'';
-  const [sha,built]=(buildMeta||'|').split('|');
+  const isUnresolved=!buildMeta||buildMeta.includes('__APP_BUILD__');
+  const [sha,built]=isUnresolved?['','']:buildMeta.split('|');
   const commitEl=document.getElementById('sc-build-commit');
   const builtEl=document.getElementById('sc-build-time');
   if(commitEl) commitEl.textContent=sha||'(local build)';
@@ -6992,7 +7012,22 @@ function populateWPDD(){
 function renderWP(){
   const ds=document.getElementById('wp-sel').value;
   const el=document.getElementById('wp-content');
-  if(!ds){el.innerHTML='';return;}
+  // REM-92: a bare blank area gave no indication of what to do next --
+  // distinguish "no parade nights exist yet" (needs one created first) from
+  // "parade nights exist, just none picked yet" (needs a selection), since
+  // the right next action differs.
+  if(!ds){
+    el.innerHTML=(S.pns&&S.pns.length)
+      ? `<div class="card no-print" style="text-align:center;padding:32px 20px;color:var(--muted)">
+           <div style="font-size:14px;font-weight:700;color:var(--dark);margin-bottom:6px">Choose a parade night above</div>
+           <div style="font-size:12.5px">Select a date from the dropdown to generate its printable weekly program.</div>
+         </div>`
+      : `<div class="card no-print" style="text-align:center;padding:32px 20px;color:var(--muted)">
+           <div style="font-size:14px;font-weight:700;color:var(--dark);margin-bottom:6px">No parade nights yet</div>
+           <div style="font-size:12.5px">Create a parade night on the <a href="#" onclick="nav('parade-nights');return false">Parade Nights</a> page, then come back here to generate its weekly program.</div>
+         </div>`;
+    return;
+  }
   const pn=S.pns.find(p=>p.date===ds);if(!pn){el.innerHTML='';return;}
   const info=getCurrentUnitInfo();
   const wpQ=(document.getElementById('wp-search')||{value:''}).value.trim().toLowerCase();

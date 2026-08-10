@@ -72,6 +72,11 @@ test.describe("Planning Workspace restoration", () => {
     );
     await loginSquadron(page, "ADMIN703");
     await expect(page.locator("#nav-pw-link")).toBeHidden();
+    // REM-88: an eligible-scope user (sqn_admin) must not see no trace of
+    // Planning Workspace at all when it's just not configured for this
+    // environment -- a non-interactive placeholder explains that instead.
+    await expect(page.locator("#nav-pw-unconfigured")).toBeVisible();
+    await expect(page.locator("#nav-pw-unconfigured")).toHaveText(/unavailable/i);
   });
 });
 
