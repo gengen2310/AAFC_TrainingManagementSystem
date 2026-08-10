@@ -502,3 +502,127 @@ class TestAnnualProgramOverlay:
         assert "wing_events" in d
         # wing_events should include our test event (if the planning year's wing matches)
         # This is a best-effort check — passes if wing_id is properly resolved
+
+
+# ─────────────────────────────────────────────────────────────
+# REM-13 Phase A: cross-wing National aggregation (wing_id omitted)
+# ─────────────────────────────────────────────────────────────
+
+def _make_second_wing(client, code="9WG"):
+    hdr = login(client, "ADMINNATIONAL")
+    r = client.post("/api/wings", json={"code": code, "name": f"{code} Test Wing"}, headers=hdr)
+    if r.status_code == 409:
+        # Already exists from a prior test run in this same DB — look it up.
+        db = SessionLocal()
+        try:
+            w = db.query(Wing).filter(Wing.code == code).first()
+            assert w, f"409 on create but {code} not found"
+            return w.id
+        finally:
+            db.close()
+    assert r.status_code == 200, r.text
+    return r.json()["wing_id"]
+
+
+def test_national_admin_omitting_wing_id_gets_events_from_multiple_wings(client):
+    other_wing_id = _make_second_wing(client, "9WG")
+    hdr_nat = login(client, "ADMINNATIONAL")
+
+    # 7WG event (system_admin can write to any wing).
+    hdr_sys = login(client, "SYSADMIN2026")
+    db = SessionLocal()
+    try:
+        wing_7wg_id = db.query(Wing).filter(Wing.code == "7WG").first().id
+    finally:
+        db.close()
+    r1 = _create_event(client, wing_7wg_id, hdr_sys, title="REM-13 7WG Event", start_date="2026-04-01")
+    assert r1.status_code == 200, r1.text
+
+    # New wing's event.
+    r2 = _create_event(client, other_wing_id, hdr_sys, title="REM-13 9WG Event", start_date="2026-04-02")
+    assert r2.status_code == 200, r2.text
+
+    listed = client.get("/api/wing-calendar/events", headers=hdr_nat)
+    assert listed.status_code == 200, listed.text
+    rows = listed.json()
+    titles = {row["title"] for row in rows}
+    assert "REM-13 7WG Event" in titles
+    assert "REM-13 9WG Event" in titles
+
+    by_title = {row["title"]: row for row in rows}
+    assert by_title["REM-13 7WG Event"]["wing_code"] == "7WG"
+    assert by_title["REM-13 9WG Event"]["wing_code"] == "9WG"
+    assert by_title["REM-13 7WG Event"]["wing_id"] == wing_7wg_id
+    assert by_title["REM-13 9WG Event"]["wing_id"] == other_wing_id
+
+
+def test_wing_admin_omitting_wing_id_gets_400_not_all_wings(client):
+    hdr = login(client, "ADMIN7WG")
+    r = client.get("/api/wing-calendar/events", headers=hdr)
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"]["error"] == "wing_id_required"
+
+
+def test_sqn_admin_omitting_wing_id_gets_400(client):
+    hdr = login(client, "ADMIN703")
+    r = client.get("/api/wing-calendar/events", headers=hdr)
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"]["error"] == "wing_id_required"
+
+
+def test_auditor_role_is_in_national_level_for_the_rollup_check(client):
+    """auditor is read-only across the whole app and must be able to see
+    the cross-wing rollup like other national-level roles -- there's no
+    seeded auditor login code in this test DB to drive an end-to-end HTTP
+    check, so this asserts directly against the NATIONAL_LEVEL constant the
+    endpoint's authorization check actually keys off."""
+    from app.permissions import NATIONAL_LEVEL
+    assert "auditor" in NATIONAL_LEVEL
+
+
+def test_existing_single_wing_call_unaffected_by_optional_wing_id(client):
+    """Regression guard: supplying wing_id explicitly must behave exactly as
+    before -- same filter/pagination semantics, no accidental cross-wing
+    leakage into a single-wing request."""
+    other_wing_id = _make_second_wing(client, "9WG")
+    hdr_sys = login(client, "SYSADMIN2026")
+    db = SessionLocal()
+    try:
+        wing_7wg_id = db.query(Wing).filter(Wing.code == "7WG").first().id
+    finally:
+        db.close()
+    _create_event(client, wing_7wg_id, hdr_sys, title="REM-13 Isolation 7WG", start_date="2026-04-05")
+    _create_event(client, other_wing_id, hdr_sys, title="REM-13 Isolation 9WG", start_date="2026-04-06")
+
+    hdr_wing = login(client, "ADMIN7WG")
+    r = client.get(f"/api/wing-calendar/events?wing_id={wing_7wg_id}", headers=hdr_wing)
+    assert r.status_code == 200, r.text
+    titles = {row["title"] for row in r.json()}
+    assert "REM-13 Isolation 7WG" in titles
+    assert "REM-13 Isolation 9WG" not in titles
+
+
+def test_national_rollup_pagination_applies_to_combined_set(client):
+    other_wing_id = _make_second_wing(client, "9WG")
+    hdr_sys = login(client, "SYSADMIN2026")
+    hdr_nat = login(client, "ADMINNATIONAL")
+    db = SessionLocal()
+    try:
+        wing_7wg_id = db.query(Wing).filter(Wing.code == "7WG").first().id
+    finally:
+        db.close()
+    suffix = uuid.uuid4().hex[:8]
+    for i in range(3):
+        _create_event(client, wing_7wg_id, hdr_sys, title=f"REM-13 Page {suffix} A{i}",
+                       start_date=f"2026-05-{10+i:02d}")
+    for i in range(3):
+        _create_event(client, other_wing_id, hdr_sys, title=f"REM-13 Page {suffix} B{i}",
+                       start_date=f"2026-05-{20+i:02d}")
+
+    page1 = client.get("/api/wing-calendar/events?limit=2&offset=0", headers=hdr_nat)
+    assert page1.status_code == 200
+    assert len(page1.json()) == 2
+
+    page_all = client.get(f"/api/wing-calendar/events?limit=500&offset=0", headers=hdr_nat)
+    combined_titles = {row["title"] for row in page_all.json() if suffix in row["title"]}
+    assert combined_titles == {f"REM-13 Page {suffix} A{i}" for i in range(3)} | {f"REM-13 Page {suffix} B{i}" for i in range(3)}

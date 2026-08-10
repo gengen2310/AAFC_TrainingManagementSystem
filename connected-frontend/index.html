@@ -11207,17 +11207,25 @@ async function loadWingCalendar(){
   const btn=document.getElementById('wc-create-btn');
   if(btn) btn.style.display=isWingWrite?'':'none';
 
-  // Populate wing selector for national/system_admin, hide for wing_admin
+  // Populate wing selector for national/system_admin, hide for wing_admin.
+  // REM-13 Phase A: national_admin/system_admin also get an "All Wings" entry
+  // -- previously they could only inspect one wing's calendar at a time, with
+  // no true cross-wing rollup anywhere in the app.
   const wingSel=document.getElementById('wc-wing-sel');
   if(wingSel){
     const isNatOrSys=['national_admin','system_admin'].includes(S.role);
     wingSel.style.display=isNatOrSys?'':'none';
     if(isNatOrSys && wingSel.options.length<=1 && S.wings){
+      wingSel.appendChild(new Option('All Wings','__all__'));
       S.wings.forEach(w=>{ const o=new Option(w.code||w.name,w.wing_id); wingSel.appendChild(o); });
     }
   }
   // Get wing_id from session (wing_admin has it in session; national/sys use selector)
   const wid=(S.session&&S.session.wing_id)||wingSel?.value||'';
+  const allWings=wid==='__all__';
+  // "+ New Event" needs one specific wing to attach the event to -- ambiguous
+  // (and rejected server-side) while "All Wings" is selected.
+  if(btn && allWings) btn.style.display='none';
   if(!wid){
     body.innerHTML='<p class="muted">No wing scope. Select a wing or log in as Wing Admin.</p>';
     return;
@@ -11225,7 +11233,25 @@ async function loadWingCalendar(){
   _wingCalWingId=wid;
   body.innerHTML='<p class="muted">Loading…</p>';
   try{
-    _wingCalEvents=await api(`/api/wing-calendar/events?wing_id=${wid}&year=${year}`);
+    const eventsUrl=allWings?`/api/wing-calendar/events?year=${year}`:`/api/wing-calendar/events?wing_id=${wid}&year=${year}`;
+    const actsUrl=allWings?'/api/activities?scope_type=national':`/api/activities?scope_type=wing&scope_id=${wid}`;
+    const [wingEvents,actsResp]=await Promise.all([
+      api(eventsUrl),
+      api(actsUrl).catch(()=>({items:[]})),
+    ]);
+    // Activities already have their own full national/wing scope-aware
+    // backend (CEA + holiday merging, inheritance) -- previously never
+    // wired into this page at all, so they were entirely invisible here.
+    // Normalized into the same {id,title,start_date,end_date} shape
+    // renderWingCalendarGrid() already expects, tagged source:'activity'
+    // so the grid can render/click-handle them distinctly from real Wing
+    // Events (different backing table -- see renderWingCalendarGrid()).
+    const acts=(actsResp&&actsResp.items||[]).map(a=>({
+      id:a.activity_id, title:a.activity_name,
+      start_date:a.date_start, end_date:a.date_end||a.date_start,
+      source:'activity', owning_org_label:a.owning_org_label, activity_type:a.activity_type,
+    }));
+    _wingCalEvents=wingEvents.map(e=>({...e,source:'wing_event'})).concat(acts);
     renderWingCalendar();
   }catch(e){ body.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
 }
@@ -11289,9 +11315,19 @@ function renderWingCalendarGrid(){
       const isToday=key===todayKey;
       const shown=evts.slice(0,3);
       const extra=evts.length-shown.length;
+      // REM-13 Phase A: merged Activity chips (e.source==='activity') are a
+      // different backing table than WingHQEvent -- their id would 404
+      // against openWingEventDetail(), so they get no click handler at all
+      // (same "info-only chip" convention renderCal()'s squadron grid
+      // already uses for Activities) and a visually distinct dashed style
+      // plus a wing label in the tooltip so a national "All Wings" view can
+      // tell which wing/source each chip is from at a glance.
       return `<td class="cal-grid-cell${outside?' outside':''}${isToday?' today':''}">
         <div class="cal-grid-daynum">${d.getDate()}</div>
-        ${shown.map(e=>`<span class="cal-grid-evt" style="background:${_WC_IMP_COLOR[e.planning_importance]||'#7a8590'}" title="${esc(e.title)}" onclick="openWingEventDetail('${esc(e.id)}')">${esc(e.title)}</span>`).join('')}
+        ${shown.map(e=>e.source==='activity'
+          ?`<span class="cal-grid-evt" style="background:#eef1f4;color:#455560;border:1px dashed #9aa5ad" title="${esc(e.title)}${e.owning_org_label?' — '+esc(e.owning_org_label):''} (Activity)">${esc(e.title)}</span>`
+          :`<span class="cal-grid-evt" style="background:${_WC_IMP_COLOR[e.planning_importance]||'#7a8590'}" title="${esc(e.title)}${e.wing_code?' — '+esc(e.wing_code):''}" onclick="openWingEventDetail('${esc(e.id)}')">${esc(e.title)}</span>`
+        ).join('')}
         ${extra>0?`<span class="cal-grid-more">+${extra} more</span>`:''}
       </td>`;
     }).join('')}</tr>`).join('')}</tbody>
@@ -11329,15 +11365,21 @@ function renderWingCalendar(){
   rows.map(e=>{
     const dateStr=e.start_date+(e.end_date&&e.end_date!==e.start_date?' – '+e.end_date:'');
     const aud=(e.audience||[]).join(', ')||'—';
-    return `<tr style="cursor:pointer" onclick="openWingEventDetail('${esc(e.id)}')">
+    // REM-13 Phase A: merged Activity rows (e.source==='activity') are a
+    // different backing table than WingHQEvent -- no click-through, no
+    // Edit/Archive (those act on a wing-calendar event id), and the
+    // WingHQEvent-only columns (type/importance/action-needed) degrade to
+    // '—' instead of leaking the literal string "undefined" into the DOM.
+    const isAct=e.source==='activity';
+    return `<tr${isAct?'':' style="cursor:pointer" onclick="openWingEventDetail(\''+esc(e.id)+'\')"'}>
       <td>${esc(dateStr)}</td>
-      <td><strong>${esc(e.title)}</strong>${e.location?`<br><span class="muted" style="font-size:10px">${esc(e.location)}</span>`:''}</td>
-      <td><span class="badge b-grey" style="font-size:9px">${esc(_WC_TYPE_LABEL[e.event_type]||e.event_type)}</span></td>
-      <td><span class="badge ${_WC_IMP_BADGE[e.planning_importance]||'b-grey'}">${esc(_WC_IMP_LABEL[e.planning_importance]||e.planning_importance)}</span></td>
+      <td><strong>${esc(e.title)}</strong>${isAct?' <span class="badge b-grey" style="font-size:9px">Activity</span>':''}${e.location?`<br><span class="muted" style="font-size:10px">${esc(e.location)}</span>`:''}</td>
+      <td>${isAct?'—':`<span class="badge b-grey" style="font-size:9px">${esc(_WC_TYPE_LABEL[e.event_type]||e.event_type)}</span>`}</td>
+      <td>${isAct?'—':`<span class="badge ${_WC_IMP_BADGE[e.planning_importance]||'b-grey'}">${esc(_WC_IMP_LABEL[e.planning_importance]||e.planning_importance)}</span>`}</td>
       <td style="font-size:10px">${esc(aud)}</td>
-      <td>${e.requires_squadron_action?'<span class="badge b-amber">Action needed</span>':''}</td>
-      ${isWingWrite?`<td><button class="btn-xs btn-secondary" onclick="event.stopPropagation();editWingEvent('${esc(e.id)}')">Edit</button>
-        <button class="btn-xs btn-danger" onclick="event.stopPropagation();archiveWingEvent('${esc(e.id)}')">Archive</button></td>`:''}
+      <td>${(!isAct&&e.requires_squadron_action)?'<span class="badge b-amber">Action needed</span>':''}</td>
+      ${isWingWrite?`<td>${isAct?'':`<button class="btn-xs btn-secondary" onclick="event.stopPropagation();editWingEvent('${esc(e.id)}')">Edit</button>
+        <button class="btn-xs btn-danger" onclick="event.stopPropagation();archiveWingEvent('${esc(e.id)}')">Archive</button>`}</td>`:''}
     </tr>`;
   }).join('')+
   `</tbody></table>`;

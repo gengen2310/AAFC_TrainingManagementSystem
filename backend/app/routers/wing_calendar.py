@@ -27,7 +27,7 @@ from ..models.wing_calendar import (
     WING_EVENT_TYPES, PLANNING_IMPORTANCE_LEVELS, WING_EVENT_STATUS, SQN_STATUS_VALUES,
 )
 from ..dependencies import get_principal
-from ..permissions import Principal
+from ..permissions import Principal, NATIONAL_LEVEL
 from ..services import audit
 
 router = APIRouter(prefix="/api/wing-calendar", tags=["wing-calendar"])
@@ -98,10 +98,14 @@ def _event_out(
     e: WingHQEvent,
     curriculum_links: list | None = None,
     sqn_status: dict | None = None,
+    wing_code: str | None = None,
+    wing_name: str | None = None,
 ) -> dict:
     return {
         "id": e.id,
         "wing_id": e.wing_id,
+        "wing_code": wing_code,
+        "wing_name": wing_name,
         "year": e.year,
         "title": e.title,
         "description": e.description,
@@ -292,7 +296,7 @@ class SqnStatusIn(BaseModel):
 
 @router.get("/events")
 def list_wing_events(
-    wing_id: str = Query(...),
+    wing_id: Optional[str] = Query(default=None),
     year: Optional[int] = Query(default=None),
     event_type: Optional[str] = Query(default=None),
     planning_importance: Optional[str] = Query(default=None),
@@ -303,11 +307,24 @@ def list_wing_events(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    """List Wing HQ events. Accessible to any user within the wing's scope."""
-    _require_read(p, wing_id)
+    """List Wing HQ events. Accessible to any user within the wing's scope.
+
+    REM-13 Phase A: wing_id is now optional. Omitting it requests a true
+    cross-wing National rollup (national_admin/national_viewer/system_admin/
+    auditor only) -- previously the only way to see events from more than
+    one wing was to fetch them one wing at a time client-side. A single
+    wing_id.in_(...) query keeps pagination/filter semantics identical to
+    the single-wing path (no N+1 loop needed for a flat list like this)."""
+    if wing_id is None:
+        if p.role not in NATIONAL_LEVEL:
+            raise HTTPException(400, detail={"error": "wing_id_required"})
+        wing_ids = [w.id for w in db.query(Wing).filter(Wing.is_archived == False).all()]  # noqa: E712
+    else:
+        _require_read(p, wing_id)
+        wing_ids = [wing_id]
 
     q = db.query(WingHQEvent).filter(
-        WingHQEvent.wing_id == wing_id,
+        WingHQEvent.wing_id.in_(wing_ids),
         WingHQEvent.is_archived == False,  # noqa: E712
     )
     if year:
@@ -332,16 +349,20 @@ def list_wing_events(
 
     sqn_id = p.squadron_id
     links_map = _load_links_for_events([e.id for e in events], db)
+    wing_map = {w.id: w for w in db.query(Wing).filter(Wing.id.in_(wing_ids)).all()}
     result = []
     for e in events:
         if audience:
             aud = e.audience or []
             if audience not in aud and "all_personnel" not in aud and "all_cadets" not in aud:
                 continue
+        w = wing_map.get(e.wing_id)
         result.append(_event_out(
             e,
             curriculum_links=links_map.get(e.id, []),
             sqn_status=_load_sqn_status(e.id, sqn_id, db),
+            wing_code=w.code if w else None,
+            wing_name=w.name if w else None,
         ))
     return result
 
