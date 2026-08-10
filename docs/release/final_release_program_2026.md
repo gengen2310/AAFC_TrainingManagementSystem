@@ -3195,3 +3195,134 @@ unchanged.
 
 **Not yet deployed to staging** — queued for the normal next deploy
 alongside WRITE-04 and REM-85/87/88/91/92/96/97/99/106/108.
+
+## 64. CLASS-10 — Training Class split/merge lifecycle, designed before any code was written (user's explicit choice), with a deliberately-rejected shortcut recorded
+
+The remaining open items after §63 were all either design-decision-blocked,
+infrastructure/monitoring items, or explicitly-deferred large sweeps
+(WRITE-02/05) — except CLASS-10 (addendum §62-63), which was unblocked
+(CLASS-01's base `TrainingClass` model already exists) but a genuine new
+feature build, not a scoped bug fix. Given the choice, the user asked for
+the design to be written up and reviewed *before* any implementation code,
+rather than built straight away — the plan below is what was approved
+before a single line of `training.py` was touched.
+
+**The design decision that mattered most: rejecting the Facilitator
+`absorb()` pattern as a template.** `training.py` already has a working
+Facilitator merge (`absorb_fac`) that blindly reassigns every child row
+(Session's `facilitator_id`/`assistant_facilitator_id`/
+`backup_facilitator_id`, `PlanningFacilitatorLeave`) from source to target,
+then archives the source. Copying that shape for Training Class merge would
+have been the fast path — and would have been wrong. `SessionAudience`
+(which class(es) a `Session` was actually delivered to) has no "at-time"
+snapshot field, unlike Session's own facilitator snapshot fields — so
+reassigning `SessionAudience.training_class_id` on merge would silently
+rewrite which class a past, already-delivered session belonged to,
+directly violating addendum §62/§63's explicit "historical classes must
+survive, not be hard-deleted" requirement. `CadetClassMembership`
+(CLASS-09) was built earlier this program specifically as "a lifecycle
+join (start_date/end_date/active_status), not an idempotent current-set" —
+exactly so a cadet can move between classes via end-old+create-new rather
+than in-place FK reassignment. That existing design is what makes a safe
+merge possible: the correct scope of "merge" is cadet enrollment, never
+delivered-session history.
+
+**What was built, backend (`backend/app/routers/training.py`):**
+- `POST /training-classes/{from_id}/reassign-members` — the one primitive
+  both split and merge use. Validates same squadron/stage/year, ends each
+  named cadet's active `CadetClassMembership` in the source class
+  (`end_date`/`active_status=false`) and starts a new one in the target,
+  skips (not fails) cadets with no active membership to move, returns
+  `{moved, skipped}` for honest partial-success reporting, one batch audit
+  entry. Never touches `SessionAudience`.
+- `POST /training-classes/{source_id}/merge-into` — thin wrapper: moves
+  every active member of source into target via the primitive above, then
+  archives source. Two audit entries, mirroring `absorb_fac`'s dual-audit
+  shape (one for the move, one for the archive).
+- `POST /training-classes/{cid}/restore` — modelled directly on
+  `restore_flight` (REM-108, §62) and `restore_squadron`
+  (`organisations.py`), since merge makes archiving a routine outcome, not
+  a rare edge case, so an accidental merge needs an undo path.
+- No dedicated split endpoint — split is composed from the existing
+  `POST /training-classes` (create) plus `reassign-members`.
+
+**What was built, connected-frontend (`connected-frontend/index.html`):**
+"Split" and "Merge into…" row actions added to the existing
+`_renderTrainingClasses` table, a "Show archived"/Restore toggle mirroring
+the exact REM-108 Flight pattern, and merge's confirmation routed through
+`confirmAction()` (§60) with `danger=true` rather than native `confirm()`.
+**React Planning Workspace's Training Class UI is explicitly left
+unchanged** — it was already documented as a minimal read-only list, not a
+management surface, and `.claude/rules/architecture.md`'s two-frontend
+split means that scoping decision gets flagged here rather than silently
+assumed either way.
+
+**The regression test that would have caught the wrong design.**
+`backend/tests/test_class_split_merge.py::test_merge_does_not_rewrite_session_audience`
+creates a `Session`, links it to a class via `SessionAudience`, merges that
+class away, and asserts the `SessionAudience` row's `training_class_id` is
+completely unchanged. Verified this test actually catches the mistake it's
+named for: temporarily reintroduced the rejected Facilitator-style blind
+FK reassignment (`db.query(SessionAudience)...update({"training_class_id":
+target.id})`) into `merge_training_class`, re-ran the test, confirmed it
+failed with exactly the expected assertion message, then reverted and
+re-confirmed it passes. 16 backend tests total (reassign-members happy
+path/skip-on-missing-membership/cross-stage/cross-year/cross-squadron/
+unauthenticated; merge-into happy path with dual-audit-entry
+verification/self-merge/cross-stage/cross-squadron; restore happy
+path/409/403/unauthenticated). Full backend suite:
+1359 passed, 5 skipped, 2 pre-existing failures unrelated to this change
+(`test_facilitator_schedule.py::test_squadron_admin_sees_own_facilitators_and_session_items`,
+`test_session_audience.py::test_split_session_removes_one_class_without_losing_the_others`)
+— confirmed present on `main` before any CLASS-10 change via `git stash`,
+not a regression introduced here.
+
+**e2e, `frontend/e2e-connected/training-class-split-merge.spec.ts`** (3
+tests, all passing standalone and together): split end-to-end through the
+real modal (roster loads from `GET .../members`, moving a cadet creates
+the new class and the roster reflects it); merge end-to-end including the
+real `confirmAction()` modal, source shows Archived via Show archived, and
+Restore brings it back; and the SessionAudience-preservation guarantee
+reached through the real rendered Merge button rather than a direct API
+call. One genuine finding during this pass, not a CLASS-10 regression:
+`_populateQuickEditClasses` (the Session Quick Edit audience picker) only
+lists non-archived classes, so a merged-away class's historical Session
+assignment is preserved in the data/audit log but has no dedicated display
+surface in the UI to view post-merge — the same was already true for any
+class archived the ordinary way before CLASS-10 existed, so this is
+recorded as a residual limitation in the gap register rather than expanded
+into this pass's scope without a fresh ask.
+
+**A second finding, environmental not code:** running this suite's new
+spec file alongside other e2e files repeatedly tripped the general API
+rate limiter mid-run (documented pattern from earlier this program,
+§58/§61) — traced one layer deeper this time: a 429 response from
+`api_rate_limit` short-circuits before `call_next`, and because
+`CORSMiddleware` is registered before (and therefore ends up *inside*, not
+wrapping) the later `@app.middleware("http")` decorators in `main.py`, a
+short-circuited 429 never gets CORS headers added, so the browser reports
+it to JS as an opaque CORS failure instead of a readable 429. This affects
+real cross-origin production traffic identically, not just tests — noted
+here as a candidate follow-up (not fixed in this pass, since it's outside
+CLASS-10's approved scope), alongside the existing DEFECT-004 fix for the
+same middleware's OPTIONS-counting bug. Worked around here the same way
+§58 established: `test.beforeEach` (not just `beforeAll`) resetting rate
+limits, matching the pattern already used by
+`activities-inheritance.spec.ts`/`training-dashboard.spec.ts`.
+
+**Live-browser verification: API-level, not Claude-in-Chrome.** No browser
+extension was connected in this session, so the "visually verify in a
+rendered browser" step used direct API calls replicating exactly what the
+UI's own handlers call (create two classes, seed a membership, merge,
+confirm archived + roster + dual audit entries via `GET /audit`, restore,
+confirm visible again) plus HTML-id cross-checks confirming every
+`getElementById`/`querySelector` the new JS uses has a matching element
+with no typos. The 3 Playwright e2e tests above exercise the real rendered
+UI in actual Chromium, which is a stronger check than a manual click-through
+would have been for this specific flow — but is not a substitute for a
+human-eyes staging check before release, which is called out explicitly
+here rather than implied.
+
+**Not yet deployed to staging** — queued for the normal next deploy.
+Gap register: CLASS-10 moved from `OPEN -- blocked on CLASS-01` to
+`FIXED -- pending staging deploy + human visual verification`.
