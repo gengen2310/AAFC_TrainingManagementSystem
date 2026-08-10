@@ -142,11 +142,28 @@ export function LineChart({ chart }: { chart: DashboardChart }) {
   const rows = rowsOf(chart);
   if (rows.length < 2) return <EmptyState chart={chart} />;
   const W = 420, H = 120, PAD = 24;
-  const values = rows.map(r => numOf(r, "reliability_pct"));
+  // REM-17 (original_instruction.md Section 15): a week with no scheduled
+  // training must render as a gap in the line, not a misleading 0% point --
+  // the backend sends reliability_pct: null for those weeks specifically so
+  // this distinction survives; numOf()'s generic null->0 coercion (correct
+  // for count-style charts) was silently flattening that null to a real 0%
+  // here, the one call site where it matters.
+  const values = rows.map(r => (typeof r.reliability_pct === "number" ? r.reliability_pct : null));
   const maxV = 100, minV = 0;
   const stepX = (W - PAD * 2) / (rows.length - 1);
   const yFor = (v: number) => H - PAD - ((v - minV) / (maxV - minV)) * (H - PAD * 2);
-  const points = values.map((v, i) => `${PAD + i * stepX},${yFor(v)}`).join(" ");
+  // Build a separate polyline per contiguous run of real values so a gap week
+  // breaks the line instead of interpolating straight through a false 0.
+  const segments: string[] = [];
+  let current: string[] = [];
+  values.forEach((v, i) => {
+    if (v == null) {
+      if (current.length) { segments.push(current.join(" ")); current = []; }
+      return;
+    }
+    current.push(`${PAD + i * stepX},${yFor(v)}`);
+  });
+  if (current.length) segments.push(current.join(" "));
   const th = chart.thresholds;
   return (
     <div style={{ overflowX: "auto" }}>
@@ -161,8 +178,8 @@ export function LineChart({ chart }: { chart: DashboardChart }) {
           <line x1={PAD} x2={W - PAD} y1={yFor(th.amber)} y2={yFor(th.amber)} stroke="var(--warning, #C97A00)" strokeDasharray="3,3" strokeWidth={1} />
           <text x={W - PAD} y={yFor(th.amber) - 3} textAnchor="end" fontSize={8} fill="var(--warning, #C97A00)">Warning {th.amber}%</text>
         </>}
-        <polyline points={points} fill="none" stroke="var(--aafc-royal-blue, #004B8D)" strokeWidth={2} />
-        {values.map((v, i) => <circle key={i} cx={PAD + i * stepX} cy={yFor(v)} r={2.5} fill="var(--aafc-royal-blue, #004B8D)" />)}
+        {segments.map((pts, i) => <polyline key={i} points={pts} fill="none" stroke="var(--aafc-royal-blue, #004B8D)" strokeWidth={2} />)}
+        {values.map((v, i) => v == null ? null : <circle key={i} cx={PAD + i * stepX} cy={yFor(v)} r={2.5} fill="var(--aafc-royal-blue, #004B8D)" />)}
       </svg>
     </div>
   );

@@ -58,6 +58,15 @@ export interface ParadeNight {
 export interface ParadeNightWithSessions extends ParadeNight { sessions: SessionRow[]; }
 export interface ParadeNightDetail extends ParadeNightWithSessions {
   readiness: { score: number; band: string; deductions: { reason: string; points: number }[] };
+  // REM-17 (original_instruction.md Section 15): the authoritative readiness
+  // computation -- `readiness` above is the legacy score/band shape, hard-coded
+  // to score=100 for a zero-session night by design (see services_readiness.py),
+  // so it must never be shown unguarded. planning_status is the field that
+  // actually distinguishes "not_planned" from a genuinely ready night.
+  readiness_v2: {
+    planning_status: "not_planned" | "partly_planned" | "planned" | "at_risk" | "blocked";
+    sessions_total: number; sessions_ready: number; requirements_summary: string;
+  };
   publish_blockers: string[];
 }
 export interface Facilitator {

@@ -35,7 +35,11 @@ export function ParadeNights() {
               <tr key={p.parade_night_id}>
                 <td>{p.date}</td><td>{p.term ?? "—"}</td><td>{p.parade_type}</td><td>{p.sessions.length}</td>
                 <td><StatusBadge status={p.published_status ? "published" : "draft"} /></td>
-                <td>{p.readiness_score ?? "—"}</td>
+                {/* REM-17 (original_instruction.md Section 15): zero scheduled
+                    sessions must read "Not planned", never a bare readiness
+                    percentage (p.readiness_score is hard-coded to 100 for an
+                    empty night by design -- see services_readiness.py). */}
+                <td>{p.sessions.length === 0 ? "Not planned" : (p.readiness_score ?? "—")}</td>
                 <td><button className="btn out sm" onClick={() => setOpenId(p.parade_night_id)}>Open</button></td>
               </tr>))}</tbody>
           </table>

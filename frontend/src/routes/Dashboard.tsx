@@ -193,7 +193,10 @@ export function Dashboard() {
               <tbody>{upcoming.map((p) => (
                 <tr key={p.parade_night_id}><td>{p.date}</td><td>{p.term ?? "—"}</td><td>{p.sessions.length}</td>
                   <td><StatusBadge status={p.published_status ? "published" : "draft"} /></td>
-                  <td>{p.readiness_score ?? "—"}</td></tr>))}</tbody>
+                  {/* REM-17 (original_instruction.md Section 15): zero scheduled
+                      sessions must read "Not planned", never a bare readiness
+                      percentage. */}
+                  <td>{p.sessions.length === 0 ? "Not planned" : (p.readiness_score ?? "—")}</td></tr>))}</tbody>
             </table>
           )}
         </Card>

@@ -31,7 +31,14 @@ export function ParadeNightDetailView({ id, canWrite }: { id: string; canWrite: 
   return (
     <div>
       <p><strong>{pn.date}</strong> · Term {pn.term ?? "—"} · {pn.start_time}–{pn.end_time} · <StatusBadge status={pn.published_status ? "published" : "draft"} /></p>
-      <p className="muted">Readiness {pn.readiness.score} ({pn.readiness.band})</p>
+      {/* REM-17 (original_instruction.md Section 15): zero required sessions
+          means "Not planned", never a percentage/score -- pn.readiness.score
+          is hard-coded to 100 for an empty night by design. */}
+      <p className="muted">
+        {pn.readiness_v2.planning_status === "not_planned"
+          ? "Readiness — Not planned"
+          : `Readiness ${pn.readiness.score} (${pn.readiness.band})`}
+      </p>
       {pn.publish_blockers.length > 0 && (
         <div className="errnote" role="alert">Publish blockers: {pn.publish_blockers.join("; ")}</div>
       )}
