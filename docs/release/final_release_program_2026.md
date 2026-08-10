@@ -2715,3 +2715,77 @@ a login/authentication flow is exactly the kind of architectural decision
 `.claude/rules/architecture.md` says to surface rather than decide
 unilaterally as a side effect of working down a severity-ordered list —
 flagged for the user rather than resolved either direction this pass.
+
+## 58. REM-99 — "newly created facilitator sometimes not immediately visible" root-caused precisely, and proven with a test that actually catches the bug
+
+REM-99's own `root_cause` field listed five candidate explanations without
+having investigated which (if any) was real. Went through them
+systematically rather than guessing at a fix:
+
+- **`active_status` default** — `True` on the `Facilitator` model. Ruled
+  out; a fresh row is never excluded by this.
+- **`archived` default** — `False` via `SoftDeleteMixin`. Ruled out, same
+  reason.
+- **connected-frontend's `loadData()` silently swallowing a transient GET
+  failure** — already fixed by an earlier, unrelated pass: `_apiT()` now
+  tracks `S._loadFailures` and `loadData()` surfaces a toast ("Some data
+  failed to load... Refresh to try again.") when any background fetch
+  fails. Confirmed present and wired through to a real user-visible
+  warning, not just a comment describing an intent.
+- **React Query cache invalidation in `Facilitators.tsx`'s
+  `AddFacModal`** — already correct (`onSuccess: onDone` →
+  `qc.invalidateQueries({queryKey:["facilitators"]})`). Checked further:
+  the React Planning Workspace's Facilitators page has **no search or
+  filter input at all** — this row's `affected_frontend: both` was
+  inaccurate; the bug this row actually reproduces cannot happen there.
+- **Filter state persisting after close-and-reopen of the Add modal** —
+  this was it. `renderFacs()` (`connected-frontend/index.html`)
+  unconditionally applies `#fac-search`'s current text as a client-side
+  name/rank filter on every render, including the render `reloadAndRender()`
+  triggers right after a successful create. `#fac-search`'s DOM value is
+  never reset by anything — not on modal open, not on modal close, not on
+  navigating away and back (the containing `<div class="page">` toggles a
+  CSS class; the `<input>` itself is never recreated). A user who typed a
+  name into the search box to check for an existing duplicate before
+  adding a *different* person would have that leftover text silently
+  filter their newly created facilitator straight out of the list. A hard
+  refresh "fixes" it purely because a fresh page load resets the input to
+  empty — exactly the reported symptom and exactly the reported
+  workaround.
+
+**Fix**: clear `#fac-search`'s value in the facilitator-create success
+handler, immediately before `reloadAndRender()`. Deliberately left the
+subject-area filter dropdown (`S.facFilter`) alone — unlike the free-text
+search box, it's a visible, deliberate selection the user can see is
+still active, and a brand-new facilitator legitimately not matching an
+active subject-area filter (it has no tags yet) is correct behaviour, not
+a bug; auto-resetting a user's deliberate filter selection would itself
+be a surprising, unwanted change.
+
+**A regression test that was actually verified to catch the bug, not just
+written and assumed to work.** New
+`frontend/e2e-connected/facilitator-search-clears-on-add.spec.ts`: types
+an unrelated search term into `#fac-search`, confirms the list correctly
+filters to empty, creates a new facilitator through the real Add
+Facilitator UI flow, and asserts both that the search box is cleared and
+the new facilitator is immediately visible — no manual refresh, no
+manual filter-clearing. Then, rather than trusting the test passed for
+the right reason, `git stash`ed the fix entirely and re-ran the exact
+same test: it failed, with the assertion output showing `#fac-search`
+still holding the leftover value — proof this test would have caught the
+original bug, not just a tautology that happens to pass. Restored the fix
+from the stash, re-ran, confirmed green. The one leftover test
+facilitator created during that intentionally-failing run was cleaned up
+via a direct API call afterward.
+
+**Regression check on the wider suite**: ran the new test alongside
+`main-tms.spec.ts`'s existing facilitator tests (18 tests total) — 15
+passed, 3 failed. All 3 failures
+(`main-tms.spec.ts:79/139/207`) are the same specific tests that have now
+been observed failing and passing inconsistently across at least three
+separate runs earlier in this same session's REM-85/86/87 work, against
+this same heavily-used, cross-session-polluted local dev database —
+already-documented flakiness, not something this fix introduced.
+
+**Not yet deployed to staging** — frontend-only change, queued for the
+normal next deploy alongside WRITE-04 and REM-85/87.
