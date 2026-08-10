@@ -2625,3 +2625,93 @@ Restored the fix from the stash afterward and re-verified `tsc`/`vitest`/
 **Not yet deployed to staging** — this is a frontend-only change, queued
 for the normal next deploy of both frontends alongside other pending
 work, not deployed in isolation this pass.
+
+## 57. REM-85/86/87 — Wing Overview table legibility, and two stale accessibility findings corrected with direct evidence
+
+Continuing down the open gap register by severity after WRITE-04, this
+batch covers three UI/UX-audit findings (all reported 2026-08-06, all
+`connected-frontend`). Two turned out to already be resolved; the third
+was real but not quite as originally described.
+
+**REM-86 (no `<h1>` anywhere in Main TMS) — stale, already resolved.**
+Checked all 19 `page-{id}` containers in `connected-frontend/index.html`
+directly: every single one already has a real `<h1 class="ph-title">`
+element (Getting Started, Dashboard, Calendar, Parade Nights, Weekly
+Program, Curriculum, Activities, Facilitators, Resources, Needs
+Attention, Settings, Accounts, Wing Overview, Wing Activities, Wing HQ
+Calendar, National, National Activities, Audit, System Console — all 19
+confirmed, not just spot-checked). This must have been fixed in an
+earlier pass without the gap register being updated — the same stale-
+status pattern already found and corrected for CLASS-02/CLASS-13 earlier
+in this program. No code change; register corrected with direct
+evidence, matching this program's own "no false closure" discipline in
+reverse — don't leave an already-fixed item marked open either.
+
+**REM-87 (no landmark regions) — mostly stale.** `<nav class="sidenav">`
+(already a real `<nav>` element, not a `<div>` with a CSS class as the
+original finding assumed) and `<main class="main">` both already exist;
+`<div class="topbar" role="banner">` already carries an explicit landmark
+role. The one genuinely missing piece from this row's own
+`proposed_correction` was the skip-to-main-content link. Added one:
+offscreen until keyboard-focused (a standard `.skip-link` CSS pattern —
+`position:absolute;left:-9999px` until `:focus`), as the first element in
+`<body>`, targeting a new `id="main-content"` on the existing `<main>`.
+
+**REM-85 (dense readiness table at 1440px) — real, root-caused precisely.**
+The original finding described "sub-11px effective font size" on the
+Wing Overview table specifically. Direct CSS inspection found the actual
+rule: `thead th{font-size:9px;...}` — but this is a **global** table-
+header rule applying to every table in the entire app, not something
+specific to Wing Overview; table *body* text
+(`table,.data-table{font-size:12.5px}`) was already a reasonable size.
+The reported "barely legible" symptom matches the 9px column-header text
+exactly. Increased it to 10.5px — the "increase minimum font-size"
+option from this row's own `proposed_correction`, chosen over a
+pagination/row-collapse redesign since the actual symptom is legibility,
+not row count (16 squadrons max in this pilot's largest Wing, well within
+normal scroll range; `.tw{overflow-x:auto}` already handles column
+overflow via horizontal scroll). Slightly reduced letter-spacing (`.09em`
+→ `.07em`) to compensate for the larger character width. This is a
+single global rule — every table's header in the app benefits, not just
+Wing Overview's.
+
+**Honest disclosure: no live-browser visual verification at 1440px.**
+This background session has no Chrome browser tool access this pass.
+REM-85's fix is a minimal, low-risk, single CSS value change (`9px` →
+`10.5px`) — verifiable by anyone loading the page, not a structural
+change that strictly requires a screenshot before trusting it improved
+legibility — but the actual rendered appearance at 1440px was not
+confirmed visually. Flagged honestly rather than claimed.
+
+**Regression verification, and an instructive flakiness data point.** Ran
+the full connected-frontend e2e suite (11 spec files, 57 tests) three
+times across this batch: once before any change (13 failures), once with
+this fix's changes fully `git stash`ed to directly compare against the
+unmodified baseline (12 of the same 13 failures reproduced identically),
+and once more after restoring the fix plus the REM-85/87 CSS/HTML changes
+(10 failures — a *different* set: some tests that failed in the first run
+passed this time, one different, unrelated test failed that hadn't
+before). None of the failures across any of the three runs reference
+error rendering, the skip-link, or table headers — they're `squadron_id`-
+undefined errors in test seeding helpers, a "select first year" predicate
+timeout, and screenshot-capture timing issues. Three different failure
+sets from the same test files against the same unmodified... and then
+modified... code is itself confirmation this is pre-existing local-dev-DB
+state flakiness (this database has accumulated months of this session's
+own — and possibly concurrent sessions' — test runs), not something
+either change caused. Frontend `tsc`/`vitest`/`build` all clean throughout.
+
+**Not yet deployed to staging** — frontend-only changes, queued for the
+normal next deploy alongside WRITE-04 and other pending work.
+
+**REM-84, the fourth item in this severity band, was explicitly not
+touched.** Its own gap register entry says a design decision is required
+before any code change — whether to simplify Main TMS's 5-step login flow
+to match Planning Workspace's single-field flow, or accept and document
+the difference as intentional (its own `root_cause` field already
+confirms it *is* intentional: Main TMS supports multi-step organisation
+selection; Planning Workspace sessions ride a shared cookie). Simplifying
+a login/authentication flow is exactly the kind of architectural decision
+`.claude/rules/architecture.md` says to surface rather than decide
+unilaterally as a side effect of working down a severity-ordered list —
+flagged for the user rather than resolved either direction this pass.
