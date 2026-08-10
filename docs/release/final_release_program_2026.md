@@ -2908,3 +2908,92 @@ one is specifically wanted before the next deploy.
 
 **Not yet deployed to staging** — queued for the normal next deploy
 alongside WRITE-04 and REM-85/87/99.
+
+## 60. REM-102 (dashboard charts investigated, does not currently reproduce) and REM-106 (SA console: two stale findings, one real fix — native confirm() replaced with a testable modal)
+
+**REM-102 — investigated directly against both local dev and live staging,
+does not currently reproduce for any role tested.** `_safe_chart()`
+(`dashboard.py:61`) already correctly isolates each individual chart
+builder's exceptions and returns a `{chart_id, error: true, empty_state:
+"This chart could not be loaded. Try refreshing."}` marker per failed
+chart — a near-exact match for this row's reported symptom text, meaning
+the real historical cause (if it happened as described) was multiple/all
+individual chart builders throwing, not the whole endpoint 500ing; that
+fault-isolation mechanism appears to already predate this row. Called
+`GET /api/dashboard/charts?window=term` directly with real logins —
+`sqn_admin` (ADMIN703), `wing_admin` (ADMIN7WG), `national_admin`
+(ADMINNATIONAL) — against **both** local dev and the live staging backend
+(`aafc-tms-backend-staging`): every combination returned HTTP 200 with
+zero `error:true` markers and real, populated chart data (15/3/2 charts
+respectively). No 5xx anywhere. **Not claiming this as fixed** — nothing
+was found broken to fix. Two plausible explanations recorded rather than
+guessed at: the original report may have been against a stale deployed
+build (this exact "stale build, needs redeploy" pattern is separately
+documented for a different symptom in
+`docs/beta/15_known_limitations.md`), or a since-fixed bug in one of the
+chart builders touched by later, unrelated work this session (CLASS-04
+through 07, REM-96 through 99 all touch chart-adjacent areas). Status set
+to `INVESTIGATED — does not currently reproduce`, not `RESOLVED` or
+`IMPLEMENTED` — the honest distinction matters here specifically because
+nothing was actually changed. A live-browser console/Network-tab check
+against staging (not just a direct API client) would give full closure
+confidence; not possible this pass (no Chrome browser tool access in this
+background session).
+
+**REM-106 — three sub-symptoms, two stale, one real and fixed.** Direct
+inspection found:
+
+1. *"Rank/title cannot be changed"* — stale. The `User` model has no
+   separate rank/title column; it's embedded in the single free-text
+   `display_name` field (e.g. `"FLTLT Smith"`), already editable via the
+   existing Edit Account modal. The underlying *capability* already
+   exists — adding a genuinely separate structured Rank field would be a
+   new schema column plus migration, a materially bigger change than this
+   row's own `proposed_correction` implied, and wasn't attempted.
+2. *"Role-change doesn't warn about session revocation"* — stale. The
+   Edit Account modal already shows *"Changing role within the same scope
+   level only. The account will need to sign in again for the new role to
+   take effect."* directly under the role selector. Another instance of
+   the same stale-finding pattern already corrected for REM-86/REM-87.
+3. *"Native confirm()/alert() dialogs block Playwright automation"* —
+   **real**, and already a *known, documented, accepted limitation*
+   before this fix: `.claude/rules/frontend.md`'s own "system_admin
+   scope" section describes the exact workaround test authors were using
+   (call the underlying `api(...)` directly instead of clicking through
+   the UI) rather than fixing the root cause.
+
+**The fix**: a reusable `confirmAction(message, onConfirm, danger)`
+helper backed by one shared modal (`#m-confirm`), replacing native
+`confirm()` at the 8 call sites this row's own `proposed_correction`
+actually named as "critical SA operations": Archive Wing, Archive
+Squadron, Disable Maintenance Mode, and account Disable / Reactivate /
+Delete / Restore / Unlock. Deliberately did **not** touch the other 18
+`confirm()` call sites elsewhere in the app (parade nights, curriculum
+items, activities, facilitators, training areas, equipment, training
+years, parade dates, holidays, training classes, anchor events, Wing HQ
+events) — replacing all 26 app-wide is a separate, much larger UI-
+consistency project outside this row's stated scope. Also deliberately
+left `doPermanentlyDeleteAccount`'s `prompt()`-based type-the-account-name
+flow untouched — that's a genuinely different, more cautious pattern
+appropriate for a truly irreversible action, and simplifying that
+friction away would remove a deliberate safety measure, not just
+modernise dialog styling.
+
+**Tests, verified to actually prove the fix, not just pass by
+construction.** New `e2e-connected/account-confirm-modal.spec.ts`: seeds
+a throwaway squadron-scope account via API, then drives Disable → Cancel
+(verifies no-op) → Disable → Confirm (verifies it takes effect) →
+Reactivate → Confirm, entirely through the real UI — with **no
+`page.on("dialog")` handler registered at all**. If a native `confirm()`
+fired anywhere in this flow, the test would hang and time out; passing is
+direct, structural proof the fix works. Verified the test actually
+catches the regression the same way every fix this pass has: `git
+stash`ed the fix, re-ran — failed exactly as expected (`#m-confirm` never
+appears, since the modal HTML doesn't exist in the unmodified file);
+restored the fix, re-ran, passed. Security greps re-run against the
+modified file: both previously-known false positives
+(`access_code_reset`, the `pg_restore` example) reproduced unchanged, no
+new matches.
+
+**Not yet deployed to staging** — queued for the normal next deploy
+alongside WRITE-04 and REM-85/87/96/97/99.
