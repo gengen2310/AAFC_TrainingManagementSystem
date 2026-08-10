@@ -17,7 +17,18 @@ tests, which happened not to isolate these two specific branches precisely
 enough to fail when they broke. These tests construct Principal directly (no
 HTTP, no DB) so they test the exact branch, nothing more.
 """
-from app.permissions import Principal
+import pytest
+from fastapi import HTTPException
+
+from app.permissions import (
+    Principal,
+    require_audit_access,
+    require_can_view_squadron,
+    require_can_view_wing,
+    require_role,
+    require_system_admin,
+    require_system_or_nat_admin,
+)
 
 
 def _principal(**overrides) -> Principal:
@@ -106,3 +117,68 @@ def test_can_view_wing_squadron_roles_cannot_view_any_wing():
         assert p.can_view_wing("WING-A") is False, (
             f"{role} has no wing-level view authority, even for their own wing"
         )
+
+
+# REM-04 (original_instruction.md Section 17): 403 responses must return an
+# actionable explanation, not a bare {"error": "forbidden"}. These helpers
+# previously raised HTTPException(403, detail={"error": "forbidden"}) with no
+# message field at all -- every one of the require_* helpers below must now
+# include a non-empty, role-specific "message".
+
+def _detail(exc_info) -> dict:
+    d = exc_info.value.detail
+    assert isinstance(d, dict), f"expected structured detail dict, got {d!r}"
+    assert d.get("message"), "403 detail must include a non-empty actionable message"
+    return d
+
+
+def test_require_can_view_squadron_wing_role_message_names_wing_mismatch():
+    p = _principal(role="wing_admin", wing_id="WING-A")
+    with pytest.raises(HTTPException) as exc_info:
+        require_can_view_squadron(p, "SQN-B", "WING-B")
+    d = _detail(exc_info)
+    assert "Wing" in d["message"]
+
+
+def test_require_can_view_squadron_sqn_role_message_names_squadron_mismatch():
+    p = _principal(role="sqn_admin", wing_id="WING-A", squadron_id="SQN-A")
+    with pytest.raises(HTTPException) as exc_info:
+        require_can_view_squadron(p, "SQN-B", "WING-A")
+    d = _detail(exc_info)
+    assert "Squadron" in d["message"]
+
+
+def test_require_can_view_wing_sqn_role_message_explains_no_wing_authority():
+    p = _principal(role="sqn_admin", wing_id="WING-A", squadron_id="SQN-A")
+    with pytest.raises(HTTPException) as exc_info:
+        require_can_view_wing(p, "WING-A")
+    _detail(exc_info)
+
+
+def test_require_role_message_lists_allowed_roles():
+    p = _principal(role="sqn_general", wing_id="WING-A", squadron_id="SQN-A")
+    with pytest.raises(HTTPException) as exc_info:
+        require_role(p, "sqn_admin", "wing_admin")
+    d = _detail(exc_info)
+    assert "sqn_admin" in d["message"] and "wing_admin" in d["message"]
+
+
+def test_require_system_admin_message_is_actionable():
+    p = _principal(role="national_admin", wing_id=None)
+    with pytest.raises(HTTPException) as exc_info:
+        require_system_admin(p)
+    _detail(exc_info)
+
+
+def test_require_system_or_nat_admin_message_is_actionable():
+    p = _principal(role="wing_admin", wing_id="WING-A")
+    with pytest.raises(HTTPException) as exc_info:
+        require_system_or_nat_admin(p)
+    _detail(exc_info)
+
+
+def test_require_audit_access_message_is_actionable():
+    p = _principal(role="sqn_admin", wing_id="WING-A", squadron_id="SQN-A")
+    with pytest.raises(HTTPException) as exc_info:
+        require_audit_access(p)
+    _detail(exc_info)

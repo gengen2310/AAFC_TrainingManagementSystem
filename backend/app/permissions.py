@@ -113,13 +113,27 @@ def require_can_write_squadron(p: Principal, squadron_id: str, wing_id: str | No
 
 
 def require_can_view_squadron(p: Principal, squadron_id: str, wing_id: str | None):
-    if not p.can_view_squadron(squadron_id, wing_id):
-        raise HTTPException(403, detail={"error": "forbidden"})
+    if p.can_view_squadron(squadron_id, wing_id):
+        return
+    if p.role in ("wing_viewer", "wing_admin"):
+        msg = "This squadron belongs to a different Wing than your account."
+    elif p.role in ("sqn_admin", "sqn_general"):
+        msg = "This record belongs to a different Squadron than your account."
+    else:
+        msg = "You do not have access to this squadron."
+    raise HTTPException(403, detail={"error": "forbidden", "message": msg})
 
 
 def require_can_view_wing(p: Principal, wing_id: str):
-    if not p.can_view_wing(wing_id):
-        raise HTTPException(403, detail={"error": "forbidden"})
+    if p.can_view_wing(wing_id):
+        return
+    if p.is_wing:
+        msg = "This Wing belongs to a different command than your account."
+    elif p.role in ("sqn_admin", "sqn_general"):
+        msg = "Squadron accounts cannot view Wing-level records."
+    else:
+        msg = "You do not have access to this Wing."
+    raise HTTPException(403, detail={"error": "forbidden", "message": msg})
 
 
 def require_can_write_activity(p: Principal, owning_level: str, wing_id: str | None, squadron_id: str | None):
@@ -142,20 +156,33 @@ def require_can_write_activity(p: Principal, owning_level: str, wing_id: str | N
 
 def require_role(p: Principal, *roles: str):
     if p.role not in roles:
-        raise HTTPException(403, detail={"error": "forbidden"})
+        allowed = ", ".join(sorted(roles))
+        raise HTTPException(403, detail={
+            "error": "forbidden",
+            "message": f"This action requires one of the following roles: {allowed}.",
+        })
 
 
 def require_system_admin(p: Principal):
     if not p.is_system_admin:
-        raise HTTPException(403, detail={"error": "forbidden"})
+        raise HTTPException(403, detail={
+            "error": "forbidden",
+            "message": "This action is restricted to System Administrators.",
+        })
 
 
 def require_system_or_nat_admin(p: Principal):
     if p.role not in ("system_admin", "national_admin"):
-        raise HTTPException(403, detail={"error": "forbidden"})
+        raise HTTPException(403, detail={
+            "error": "forbidden",
+            "message": "This action requires National Administrator or System Administrator access.",
+        })
 
 
 def require_audit_access(p: Principal):
     """Roles permitted to read audit logs."""
     if p.role not in ("system_admin", "national_admin", "auditor"):
-        raise HTTPException(403, detail={"error": "forbidden"})
+        raise HTTPException(403, detail={
+            "error": "forbidden",
+            "message": "Audit log access is restricted to System Administrator, National Administrator, or Auditor roles.",
+        })

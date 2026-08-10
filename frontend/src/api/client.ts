@@ -33,7 +33,10 @@ export class ApiError extends Error {
       case 403:
         if (this.code === "proxy_required") return "This action needs Proxy Mode. Enter proxy mode with a reason.";
         if (this.code === "intervention_required") return "This action needs Delegated Intervention. Enter it with a reason.";
-        return "Access not permitted.";
+        // REM-04: permissions.py's require_* helpers now return an actionable
+        // message for many forbidden cases -- fall back to the generic string
+        // only when the backend didn't supply one.
+        return d?.message ?? "Access not permitted.";
       case 422: return d?.message ?? "Some fields are invalid.";
       case 429: return "Too many attempts. Please wait and try again.";
       case 500: return "The server encountered an error. Please try again.";

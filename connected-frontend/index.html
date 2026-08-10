@@ -3234,8 +3234,12 @@ async function api(path, opts={}){
       else if(res.status>=500)  msg='Server error. Try again or contact support.';
       else                       msg='Request failed (HTTP '+res.status+').';
     }
-    // Named error codes — human-readable overrides
-    if(code==='forbidden'||code==='access_denied')       msg='Access not permitted.';
+    // Named error codes — human-readable overrides.
+    // 'forbidden'/'access_denied' fall back to a generic message only when the
+    // backend didn't already supply a specific one (REM-04: permissions.py's
+    // require_* helpers now return an actionable message for many forbidden
+    // cases -- unconditionally overwriting msg here was discarding it).
+    if(!msg&&(code==='forbidden'||code==='access_denied')) msg='Access not permitted.';
     if(code==='no_squadron_scope')                       msg='Squadron / Specialist Unit is required for this action.';
     if(code==='out_of_scope')                            msg='This record is outside your authorised scope.';
     if(code==='invalid_status')                          msg='The status value provided is not valid.';
