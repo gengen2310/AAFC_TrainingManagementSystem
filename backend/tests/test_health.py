@@ -25,6 +25,18 @@ def test_health_ready_unauthenticated_happy_path(client):
     assert isinstance(d["squadrons"], int)
 
 
+def test_health_ready_includes_build_commit(client):
+    """REM-112: a build fingerprint lets a freshness check compare deployed
+    staging against the latest backend/-touching commit on main, instead of a
+    REM-111-class gap (a merged endpoint 404ing on staging for ~24h) only
+    being caught by luck. Defaults to "local" outside Railway (RAILWAY_
+    GIT_COMMIT_SHA unset), matching the same fallback convention both
+    frontends already use for their own build fingerprints."""
+    r = client.get("/api/health/ready")
+    assert r.status_code == 200
+    assert r.json()["commit"] == "local"
+
+
 def test_health_db_failure_does_not_leak_raw_exception(client, monkeypatch):
     from sqlalchemy.orm import Session
 
@@ -52,4 +64,5 @@ def test_health_ready_failure_does_not_leak_raw_exception(client, monkeypatch):
     d = r.json()
     assert d["status"] == "not_ready"
     assert d["error"] == "error"
+    assert d["commit"] == "local"
     assert "railway.internal" not in r.text
