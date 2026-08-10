@@ -141,7 +141,16 @@ def test_split_session_removes_one_class_without_losing_the_others(client):
     stage_id = _senior_stage_id(client, hdr)
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
     c2 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 2")
-    sid = _make_session(client, hdr, days_ahead=29)
+    # days_ahead=29 previously collided with test_org_account_linking.py's
+    # test_sysadmin_enter_intervention_then_write_succeeds_and_is_audited,
+    # which hardcodes 703's parade night to the literal date "2026-09-08" --
+    # a relative today+N offset isn't collision-safe against another file's
+    # absolute literal (same class of issue test_class_curriculum_progress.py
+    # already hit and fixed by moving off the shared near-term date range
+    # entirely). 209 is well outside every other days_ahead value used in
+    # this file (20-47) and outside test_class_split_merge.py/
+    # test_readiness_contract.py's own days_ahead=200.
+    sid = _make_session(client, hdr, days_ahead=209)
     client.put(f"/api/sessions/{sid}/audience", json={"training_class_ids": [c1, c2]}, headers=hdr)
 
     r = client.delete(f"/api/sessions/{sid}/audience/{c1}", headers=hdr)

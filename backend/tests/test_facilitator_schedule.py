@@ -53,19 +53,36 @@ def test_squadron_admin_sees_own_facilitators_and_session_items(client):
     wing_id = client.get("/api/auth/me", headers=hdr).json()["session"]["wing_id"]
     fac_id = _seed_facilitator(client, hdr)
 
-    # Offset must stay within the current calendar year (the "year" window is
-    # calendar-year-bounded, see _date_window) while landing on a date that
+    # Must stay within the CURRENT calendar year (the "year" window is
+    # calendar-year-bounded, see _date_window: {today.year}-01-01..12-31,
+    # computed from date.today() at query time) while landing on a date that
     # collides with neither seed_all()'s baseline data nor another test's
     # parade night. seed_all() seeds a real ParadeNight for squadron 703 on
-    # EVERY Friday from 2026-01-30 through 2026-12-11 -- any today+N offset
-    # that lands on a Friday inside that range hits a 409 duplicate_date (this
-    # is what broke a prior +130 offset once the suite ran on 2026-07-27,
-    # since today's weekday made +130 land on a seeded Friday). +144 lands on
-    # 2026-12-18, a Friday just past the seeded range's end (and inside the
-    # Term 4/Summer Holidays period, which seed_all() explicitly skips when
-    # seeding Fridays) -- safe regardless of which weekday "today" falls on
-    # this year, as long as today+144 stays in-year.
-    future = (date.today() + timedelta(days=144)).isoformat()
+    # EVERY Friday from 2026-01-30 through 2026-12-11 -- any candidate date
+    # that lands on a Friday inside that range hits a 409 duplicate_date.
+    #
+    # A fixed today+N day-offset (previously +144, before that +130) is
+    # fundamentally the wrong shape for "stay in-year": today+144 only stays
+    # in-year for roughly the first 220 days of the year -- run this suite
+    # any day from ~August 20 onward and it silently crosses into next
+    # January, landing outside the year window and failing this exact
+    # assertion. (Confirmed: on 2026-08-10, today+144 = 2027-01-01.) Anchor
+    # to the end of *this* year instead, which is in-year by construction
+    # regardless of what today is, then dodge Fridays (the only collision
+    # risk, since seed_all() only ever seeds Fridays) and fall back to
+    # tomorrow if the year-end anchor has already passed (only possible in
+    # the last few days of December).
+    year_end_anchor = date(date.today().year, 12, 27)
+    if year_end_anchor > date.today():
+        candidate = year_end_anchor
+        if candidate.weekday() == 4:  # Friday -- step back, still safely > today
+            candidate -= timedelta(days=1)
+    else:
+        # Only reachable in the last few days of December.
+        candidate = date.today() + timedelta(days=1)
+        while candidate.weekday() == 4:
+            candidate += timedelta(days=1)
+    future = candidate.isoformat()
     _create_session_with_facilitator(client, hdr, sqn_id, wing_id, fac_id, future)
 
     r = client.get("/api/dashboard/facilitator-schedule", params={"window": "year"}, headers=hdr)
