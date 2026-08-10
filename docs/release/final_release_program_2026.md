@@ -3326,3 +3326,61 @@ here rather than implied.
 **Not yet deployed to staging** — queued for the normal next deploy.
 Gap register: CLASS-10 moved from `OPEN -- blocked on CLASS-01` to
 `FIXED -- pending staging deploy + human visual verification`.
+
+## 65. Staging deploy of the §57-64 backlog (REM-108, WRITE-03, WRITE-06, CLASS-10) — a known stray-migration landmine had reappeared, and was caught before it could break staging boot again
+
+Staging's `aafc-tms-backend` was still running the pre-§57 build (last
+deployed 2026-08-09, before REM-85 onward). Everything from §57 through §64
+was implemented, tested, and explicitly recorded as "queued for the normal
+next deploy" but never actually shipped. This section is that deploy.
+
+**Found and defused a repeat of a known landmine before deploying.**
+`backend/alembic/versions/w8x9y0z1a2b3_v35_program_type.py` — an untracked
+file, never committed — sat in the working directory with `alembic heads`
+reporting `Revision w8x9y0z1a2b3 is present more than once`. Its revision
+ID collides with the real, committed `w8x9y0z1a2b3_v35_planning_notices_
+updated_by.py`. This is the exact same class of problem a prior staging
+deploy (2026-08-09, commit message "Fix: exclude stray uncommitted
+migration file that broke staging boot") already hit once — the file had
+evidently reappeared on disk since then (from an earlier, uncommitted
+experiment; its own content is an abandoned `core_status` value-rename
+migration, superseded by the real v35 migration, never wired up). Deploying
+with it present would very likely have broken `alembic upgrade head` on
+staging boot again. Asked the user how to handle it rather than silently
+deleting or working around a tool-permission block encountered mid-attempt;
+user chose to have it moved aside. Moved to a job-scoped tmp directory
+(not deleted — no destructive action on unclear-provenance work), confirmed
+`alembic heads` returns the single real head afterward, then proceeded.
+
+**Deploy.** `railway up` for `aafc-tms-backend` (deployment `348d8b98`) and
+`aafc-tms-frontend` (deployment `9bac40f3`) on the `staging` environment,
+both from a git-clean working directory. Both reached `SUCCESS`.
+
+**Verification, live against the real staging Postgres:**
+- `GET /api/health/ready` → `{"status":"ready","squadrons":140}`.
+- New CLASS-10 routes exist and are auth-gated (401, not 404) for
+  `POST /training-classes/{id}/merge-into` and `.../restore`.
+- Full CLASS-10 round trip via `ADMIN703` against live staging: created two
+  Training Classes, seeded a real cadet's class membership, merged one class
+  into the other, confirmed the source archived, confirmed the target
+  roster picked up the moved cadet, confirmed both audit entries via
+  `GET /audit`, restored the source, confirmed it's back in the default
+  list. All passed against production-shaped infrastructure (real
+  Postgres, real Railway container), not just SQLite/local.
+- `REM-108`: `POST /flights/{id}/restore` returns 401 live (route shipped).
+- `WRITE-03`/`WRITE-06`/`REM-106`: served `index.html` fingerprinted for
+  `hour12:false` (3/3 call sites), `Given Name`/`Family Name` labelling
+  (3 occurrences), and `confirmAction()` (present) — confirming the actual
+  bytes serving from staging are the fixed build, not just that the deploy
+  succeeded.
+
+**What this is not.** No Claude-in-Chrome browser was available in this
+session, so there is still no human-eyes visual pass on staging for any of
+these items — the checks above are strong API/build-fingerprint evidence,
+not a substitute. Gap register statuses record this precisely (CLASS-10:
+`FIXED -- staging deploy verified (API round-trip); pending human visual
+verification`) rather than claiming full closure. REM-108/WRITE-03/WRITE-06
+staging_evidence fields updated to reflect the deploy and fingerprint
+check without over-claiming a fresh live-flow re-test on staging (the
+local pytest/e2e coverage recorded in §62/§63 already proved the rendered
+behaviour; this deploy ships that same, already-verified code).
