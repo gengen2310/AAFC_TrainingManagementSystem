@@ -2241,3 +2241,116 @@ environment, same characteristic as `/weekly-program`. connected-frontend
 still has no Cadets UI of any kind — out of scope for this task, which
 extended the one cadet UI surface that already existed rather than
 building a new one.
+
+## 54. CLASS-08 — Training Class picker scales to many parallel classes (Stage grouping + filter), and a real React key-collision bug found by the test that proves it
+
+Addendum §56-57 flagged that Planning Workspace's UI had never been checked
+against a squadron running many (10-20+) parallel Training Classes under one
+Stage, and named the expected UX pattern explicitly: group-by-stage, filter,
+collapse, pin, search. Gap register CLASS-08 was previously blocked on
+CLASS-01 existing before it was testable with real data — CLASS-01 has been
+live for several sections now, so this pass investigated it directly.
+
+**Investigation, with two candidate findings explicitly ruled out rather
+than silently folded in.** Seeded a dedicated `PlanningYear` ("CLASS-08
+Scale Test Year", year 2141) with one `CurriculumPhase` ("Senior (Scale
+Test)") and 15 `TrainingClass` rows under it, then exercised every UI
+surface that lists/renders Training Classes:
+
+1. **Confirmed real finding**: `CadetClassMembershipModal`'s Training Class
+   picker (the "Add to a Training Class" `<select>`, CLASS-09) rendered all
+   15 seeded classes as one flat, ungrouped list with no filter — exactly
+   the addendum's named gap. This is the one finding this task fixed.
+2. **Investigated and explicitly excluded — non-reproducible performance
+   anomaly**: an initial Playwright measurement showed a 21-second
+   `annual-program` API response with a blank calendar screenshot at 1
+   second. Direct `curl` timing of the same endpoint (both hitting the
+   backend on :8000 and through the Vite proxy on :5173) showed 10-30ms
+   responses. A full network-request-timeline capture on a clean re-run
+   showed the real end-to-end load completing in ~1.4 seconds. This did not
+   reproduce under controlled re-measurement and is **not reported as a
+   confirmed finding** — recorded here only so the anomaly isn't silently
+   dropped without explanation.
+3. **Investigated and explicitly excluded — test-data artifact, not a
+   product characteristic**: the local dev DB's PlanningYear chip row shows
+   dozens of leftover entries accumulated from months of this session's own
+   testing. A real squadron would never accumulate that; excluded from this
+   fix's scope as environment pollution, not a genuine CLASS-08 finding.
+
+**The fix**: added Stage-grouped `<optgroup>`s (keyed by
+`training_stage_id`, sourced from a new `trainingApi.phases()` query) plus
+a text filter input (`#ccm-class-filter`) to
+`CadetClassMembershipModal.tsx`'s Training Class picker. Substring,
+case-insensitive match against `display_name`.
+
+**A real bug found by writing the committed test for this fix, not just a
+smoke check.** The manual local verification (a throwaway, since-deleted
+Playwright script) looked correct on inspection. Writing a proper committed
+e2e test (`e2e/cadet-class-membership-picker-grouping.spec.ts`, seeding two
+distinct Stages with two Training Classes each) caught a real defect the
+manual check missed: the `<optgroup>` React `key` was derived from the
+Stage's *display name*, not its ID. Stage display names are not guaranteed
+unique — different scope levels, or two squadron-level Stages, can
+legitimately share a name — and this local dev DB already had exactly that
+situation by accident (two distinct `CurriculumPhase` rows, both named
+"Senior (Scale Test)", both from this task's own earlier seeding). With a
+name-keyed list, React's reconciliation reused a stale DOM node across
+re-renders when the filter text changed: the duplicate-named group's
+*old, unfiltered* 15-option content stayed visible no matter what was
+typed into the filter, while the correctly-named other group filtered as
+expected. Root-caused via direct DOM inspection (`innerHTML` dump of the
+`<select>` before/after filtering, confirming exactly one `<select>` and
+one dialog in the DOM — ruling out a duplicate-mount explanation before
+looking at the key) and confirmed against the actual duplicate-stage-name
+data in the dev DB (`GET /api/curriculum/phases`, grouped by
+`display_name`, found the exact pair). Fixed by keying `groupedByStage`'s
+map and the `<optgroup key={...}>` prop on `training_stage_id` instead of
+`stageName` — the same lesson as always keying list items on a stable
+unique ID, not a derived, possibly-duplicate label.
+
+**Tests**: new `e2e/cadet-class-membership-picker-grouping.spec.ts` seeds 2
+Stages × 2 Training Classes, asserts optgroup labels/membership are exactly
+right, asserts the filter narrows correctly (this is the assertion that
+caught the key-collision bug during development — re-verified failing
+before the fix and passing after), asserts add-after-filter still works
+end-to-end. 3/3 local runs. Regression: existing
+`e2e/cadet-class-membership.spec.ts` (CLASS-09) re-run 4 times total
+against this change, including sequentially alongside the new test — all
+passing. One run of the two files together under Playwright's default
+parallel workers did fail on a shared-cadet race (both files target "the
+first Manage button," i.e. the same seeded cadet, concurrently) — confirmed
+as a test-execution artifact, not a code regression, by re-running each
+file alone and both files sequentially (`--workers=1`), all green.
+Frontend `tsc --noEmit`, `vitest` (22/22), `npm run build` all clean before
+and after.
+
+**Deployment and live verification**: frontend-only change, no backend
+migration or deploy needed. Deployed `aafc-tms-planning-workspace-preview`
+to staging, `SUCCESS`. Live health check: HTTP 200, `aafc-module-mode`
+meta tag confirmed `true`. Running the new e2e test against the live
+deployed preview
+(`playwright.planning.staging.native.config.ts`) hit the same,
+already-disclosed §48 topology limitation documented in §53: `/cadets`
+redirects to `/planning` under this service's module-mode deployment, so
+neither this fix nor its test can be exercised through a real browser
+against any currently-deployed environment — same as CLASS-09's own
+`/cadets` verification. Not a new defect. Verified locally against the dev
+server instead (3/3 passing), matching CLASS-09's precedent for this exact
+limitation. The staging test run's own API-seeded fixture data (4 Training
+Classes, created before the run failed at the `/cadets` redirect) was
+cleaned up afterward via direct API calls against the staging backend.
+
+**Residual, honestly disclosed**: same `/cadets` deployment-topology
+limitation as CLASS-09 — this fix has never been exercised through a real
+browser against staging or production, only local dev. The two duplicate
+`CurriculumPhase` rows both named "Senior (Scale Test)" that exposed the
+key-collision bug were left in place in the local dev DB (no
+archive/delete endpoint exists for `CurriculumPhase`); they now carry zero
+active Training Classes after this task's own cleanup, so they're inert
+clutter rather than a functional problem — not touched further, since a
+local dev DB reset (`rm -f backend/aafc_tms.db`) is the established way to
+clear this kind of accumulated test state, not a one-off manual cleanup
+per finding. The two explicitly-excluded candidate findings (the
+non-reproducible 21-second load anomaly, and the leftover-PlanningYear
+test-data volume) remain unaddressed by design — neither is a confirmed
+product defect.
