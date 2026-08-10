@@ -1314,7 +1314,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="card" id="acct-flights-card" style="display:none">
           <div class="ctitle" style="display:flex;justify-content:space-between;align-items:center">
             <span>Local Squadron Flights (Sub-Squadron Groupings)</span>
-            <button class="btn btn-xs btn-sky acct-write-el" id="flight-create-btn" style="display:none" onclick="openCreateFlightModal()">+ Add Flight</button>
+            <div style="display:flex;align-items:center;gap:10px">
+              <label style="font-size:11px;font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="flights-show-archived" onchange="_flightsToggleShowArchived()"> Show archived</label>
+              <button class="btn btn-xs btn-sky acct-write-el" id="flight-create-btn" style="display:none" onclick="openCreateFlightModal()">+ Add Flight</button>
+            </div>
           </div>
           <div class="alert a-info" style="font-size:11px;margin:6px 0 10px">Flights are local squadron groupings only. They do not create separate tenancy or change permissions. A user assigned to a Flight still belongs entirely to the Squadron.</div>
           <div id="flight-table"></div>
@@ -4891,22 +4894,45 @@ function _acctToggleAll(checked){
 }
 function _acctClearSelection(){ S.acctSelected=new Set(); _renderAccountTable(); }
 
+// REM-108: Flight archive existed with no way to see or restore an archived
+// one -- follows the exact same "show archived" lazy-fetch pattern already
+// used for Wings/Squadrons (_orgToggleShowArchived/_orgArchivedWings above).
+let _archivedFlightList=null;
+async function _flightsToggleShowArchived(){
+  const checked=document.getElementById('flights-show-archived').checked;
+  if(!checked){ _renderFlightTable(); return; }
+  try{
+    _archivedFlightList=await api('/api/flights?include_archived=true');
+  }catch(e){ showToast('Could not load archived flights: '+apiErr(e), true); }
+  _renderFlightTable();
+}
+async function doRestoreFlight(flightId, name){
+  try{
+    await api(`/api/flights/${flightId}/restore`,{method:'POST'});
+    showToast(`Flight '${name}' restored.`);
+    S.flightList=await api('/api/flights');
+    _archivedFlightList=await api('/api/flights?include_archived=true');
+    _renderFlightTable();
+  }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
+}
 function _renderFlightTable(){
   const el=document.getElementById('flight-table'); if(!el)return;
   const canWrite=_ACCT_WRITE_ROLES.includes(S.role);
-  const flights=(S.flightList||[]);
-  if(!flights.length){ el.innerHTML='<div style="color:var(--muted);font-size:11.5px;padding:8px 0">No flights defined.</div>'; return; }
+  const showArchived=(document.getElementById('flights-show-archived')||{}).checked;
+  const flights=showArchived?(_archivedFlightList||[]):(S.flightList||[]);
+  if(!flights.length){ el.innerHTML=`<div style="color:var(--muted);font-size:11.5px;padding:8px 0">No ${showArchived?'archived ':''}flights${showArchived?'':' defined'}.</div>`; return; }
 
-  const sqnName=fid=>{ const f=flights.find(x=>x.flight_id===fid); return f?f.squadron_name||'':''; };
   const renameBtn=f=>`<button class="btn btn-xs" onclick="openRenameFlightModal('${f.flight_id}','${_jsAttr(f.name||'')}')">Rename</button>`;
   const archiveBtn=f=>`<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doArchiveFlight('${f.flight_id}','${_jsAttr(f.name||'')}')">Archive</button>`;
+  const restoreBtn=f=>`<button class="btn btn-xs btn-ok" onclick="doRestoreFlight('${f.flight_id}','${_jsAttr(f.name||'')}')">Restore</button>`;
+  const actionsCell=f=>f.is_archived?restoreBtn(f):(renameBtn(f)+archiveBtn(f));
 
   el.innerHTML='<div class="tw"><table><thead><tr><th>Flight Name</th><th>Squadron</th><th>Members</th>'+(canWrite?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
-    flights.map(f=>`<tr>
-      <td style="font-weight:700">${esc(f.name)}</td>
+    flights.map(f=>`<tr${f.is_archived?' style="opacity:.6"':''}>
+      <td style="font-weight:700">${esc(f.name)}${f.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
       <td style="font-size:11.5px;color:var(--muted)">${esc(f.squadron_code||f.squadron_name||'—')}</td>
       <td style="font-size:11.5px">${f.member_count??'—'}</td>
-      ${canWrite?`<td class="no-print" style="display:flex;gap:4px">${renameBtn(f)}${archiveBtn(f)}</td>`:''}
+      ${canWrite?`<td class="no-print" style="display:flex;gap:4px">${actionsCell(f)}</td>`:''}
     </tr>`).join('')+
     '</tbody></table></div>';
 }

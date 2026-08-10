@@ -781,9 +781,12 @@ def _can_write_flight(p: Principal, sqn_id: str, db: DBSession) -> None:
 
 
 @router.get("/flights")
-def list_flights(squadron_id: str | None = None, db: DBSession = Depends(get_db),
+def list_flights(squadron_id: str | None = None, include_archived: bool = False,
+                 db: DBSession = Depends(get_db),
                  p: Principal = Depends(get_principal)):
-    q = db.query(Flight).filter(Flight.is_archived == False)  # noqa: E712
+    q = db.query(Flight)
+    if not include_archived:
+        q = q.filter(Flight.is_archived == False)  # noqa: E712
     if p.role in ("national_admin", "national_viewer", "system_admin", "auditor"):
         if squadron_id:
             q = q.filter(Flight.squadron_id == squadron_id)
@@ -844,6 +847,26 @@ def archive_flight(fid: str, db: DBSession = Depends(get_db), p: Principal = Dep
     return {"ok": True}
 
 
+@router.post("/flights/{fid}/restore")
+def restore_flight(fid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """REM-108: Flight archive existed with no restore counterpart -- following
+    the exact same dependency-gated archive/restore pattern already used for
+    Account/Wing/Squadron/PlanningYear (see restore_squadron in
+    organisations.py, this endpoint's direct template)."""
+    f = db.get(Flight, fid)
+    if not f:
+        raise HTTPException(404, detail={"error": "not_found"})
+    _can_write_flight(p, f.squadron_id, db)
+    if not f.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived"})
+    f.is_archived = False
+    f.archived_at = None
+    f.updated_by = p.user_id
+    db.commit()
+    audit(db, p, object_type="flight", object_id=f.id, action="flight_restored")
+    return {"ok": True}
+
+
 def _flight_out(f: Flight, db: DBSession | None = None) -> dict:
     sqn_code = sqn_name = None
     if db and f.squadron_id:
@@ -853,4 +876,5 @@ def _flight_out(f: Flight, db: DBSession | None = None) -> dict:
     return {"flight_id": f.id, "squadron_id": f.squadron_id,
             "squadron_code": sqn_code, "squadron_name": sqn_name,
             "name": f.name, "active_status": f.active_status,
+            "is_archived": f.is_archived,
             "created_at": f.created_at.isoformat() if f.created_at else None}

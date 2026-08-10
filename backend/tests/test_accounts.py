@@ -1054,3 +1054,55 @@ def test_sqn_admin_still_cannot_edit_another_squadrons_account(client):
     other_uid = client.get("/api/auth/me", headers=h704).json()["session"]["user_id"]
     r = client.patch(f"/api/accounts/{other_uid}", headers=h703, json={"display_name": "Should not work"})
     assert r.status_code == 403, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# REM-108: Flight archive existed with no restore counterpart, and archived
+# flights were entirely invisible (list_flights had no include_archived
+# param at all) -- follows the exact archive/restore pattern already proven
+# for Account/Wing/Squadron/PlanningYear.
+# ─────────────────────────────────────────────────────────────
+
+def test_flight_restore_reverses_archive_and_is_visible_via_include_archived(client):
+    h = login(client, "ADMIN703")
+    sqn_id = _get_sqn_id(client, h, "703")
+    fid = _create_flight(client, h, sqn_id, "REM-108 Restore Test")
+
+    archive_r = client.post(f"/api/flights/{fid}/archive", headers=h)
+    assert archive_r.status_code == 200, archive_r.text
+
+    # Archived flight must be absent from the default list...
+    default_list = client.get("/api/flights", headers=h).json()
+    assert not any(f["flight_id"] == fid for f in default_list)
+    # ...but visible with include_archived=true, and flagged as archived.
+    archived_list = client.get("/api/flights?include_archived=true", headers=h).json()
+    archived_entry = next((f for f in archived_list if f["flight_id"] == fid), None)
+    assert archived_entry is not None
+    assert archived_entry["is_archived"] is True
+
+    restore_r = client.post(f"/api/flights/{fid}/restore", headers=h)
+    assert restore_r.status_code == 200, restore_r.text
+
+    restored_list = client.get("/api/flights", headers=h).json()
+    restored_entry = next((f for f in restored_list if f["flight_id"] == fid), None)
+    assert restored_entry is not None
+    assert restored_entry["is_archived"] is False
+
+
+def test_flight_restore_rejects_already_active_flight(client):
+    h = login(client, "ADMIN703")
+    sqn_id = _get_sqn_id(client, h, "703")
+    fid = _create_flight(client, h, sqn_id, "REM-108 Not Archived Test")
+    r = client.post(f"/api/flights/{fid}/restore", headers=h)
+    assert r.status_code == 409, r.text
+
+
+def test_flight_restore_scoped_out_for_other_squadron_admin(client):
+    h703 = login(client, "ADMIN703")
+    sqn_id = _get_sqn_id(client, h703, "703")
+    fid = _create_flight(client, h703, sqn_id, "REM-108 Scope Test")
+    client.post(f"/api/flights/{fid}/archive", headers=h703)
+
+    h704 = login(client, "ADMIN704")
+    r = client.post(f"/api/flights/{fid}/restore", headers=h704)
+    assert r.status_code == 403, r.text
