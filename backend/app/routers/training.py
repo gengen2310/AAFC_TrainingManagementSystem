@@ -1782,6 +1782,166 @@ def archive_training_class(cid: str, db: DBSession = Depends(get_db), p: Princip
     return {"ok": True}
 
 
+@router.post("/training-classes/{cid}/restore")
+def restore_training_class(cid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """CLASS-10: direct counterpart to archive_training_class, following the
+    same archive/restore template as restore_flight (accounts.py) and
+    restore_squadron (organisations.py) -- needed because merge-into (below)
+    makes archiving a routine, expected outcome of a normal operation, not a
+    rare edge case, so an accidental merge needs an undo path."""
+    c = db.get(TrainingClass, cid)
+    if not c:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, c.squadron_id)
+    require_can_write_squadron(p, c.squadron_id, s.wing_id if s else None)
+    if not c.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived"})
+    c.is_archived = False
+    c.archived_at = None
+    c.updated_by = p.user_id
+    db.commit()
+    audit(db, p, object_type="training_class", object_id=c.id, action="restore")
+    return {"ok": True}
+
+
+# ── TRAINING CLASS SPLIT/MERGE (CLASS-10) ───────────────────────────────────
+# addendum §62/§63: split and merge must preserve historical delivered-session
+# data. reassign_class_members is the one primitive both split (compose with
+# the existing POST /training-classes create + this endpoint) and merge
+# (merge_training_class, below) build on. It only ever mutates
+# CadetClassMembership -- a lifecycle join (start_date/end_date/active_status)
+# designed for exactly this kind of move, see the model's own docstring --
+# and never touches SessionAudience (which class(es) a Session was actually
+# delivered to: a point-in-time historical fact with no "at-time" snapshot
+# field, unlike Session's facilitator snapshot fields). This is deliberately
+# NOT the Facilitator absorb() pattern (blind FK reassignment of every child
+# row onto the survivor) -- copying that here would silently rewrite which
+# class a past, already-delivered session belonged to.
+
+class ReassignClassMembersIn(BaseModel):
+    cadet_ids: list[str]
+    to_training_class_id: str
+    effective_date: Optional[str] = None
+    reason: Optional[str] = None
+
+
+def _require_same_squadron_stage_year(db: DBSession, p: Principal, from_c: TrainingClass,
+                                       to_c: TrainingClass) -> Squadron:
+    if from_c.squadron_id != to_c.squadron_id:
+        raise HTTPException(400, detail={"error": "cross_squadron",
+                                         "message": "Both classes must belong to the same squadron."})
+    if from_c.training_stage_id != to_c.training_stage_id:
+        raise HTTPException(400, detail={"error": "cross_stage",
+                                         "message": "Both classes must be undertaking the same Training Stage."})
+    if from_c.training_year_id != to_c.training_year_id:
+        raise HTTPException(400, detail={"error": "cross_year",
+                                         "message": "Both classes must belong to the same Training Year."})
+    s = db.get(Squadron, from_c.squadron_id)
+    require_can_write_squadron(p, from_c.squadron_id, s.wing_id if s else None)
+    return s
+
+
+def _reassign_members(db: DBSession, p: Principal, from_c: TrainingClass, to_c: TrainingClass,
+                       cadet_ids: list[str], effective_date: str | None,
+                       source_label: str) -> tuple[list[str], list[str]]:
+    moved, skipped = [], []
+    for cadet_id in cadet_ids:
+        m = db.query(CadetClassMembership).filter(
+            CadetClassMembership.cadet_id == cadet_id,
+            CadetClassMembership.training_class_id == from_c.id,
+            CadetClassMembership.is_archived == False,  # noqa: E712
+            CadetClassMembership.active_status == True,  # noqa: E712
+        ).first()
+        if not m:
+            skipped.append(cadet_id)
+            continue
+        m.end_date = effective_date
+        m.active_status = False
+        m.version += 1
+        m.updated_by = p.user_id
+        new_m = CadetClassMembership(
+            cadet_id=cadet_id, training_class_id=to_c.id,
+            start_date=effective_date, source=source_label,
+            created_by=p.user_id, updated_by=p.user_id,
+        )
+        db.add(new_m)
+        moved.append(cadet_id)
+    return moved, skipped
+
+
+@router.post("/training-classes/{from_id}/reassign-members")
+def reassign_class_members(from_id: str, body: ReassignClassMembersIn,
+                            db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Core split/move primitive: ends each named cadet's active membership in
+    from_id and starts a new one in to_training_class_id, effective
+    body.effective_date. Never touches SessionAudience."""
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    from_c = db.get(TrainingClass, from_id)
+    if not from_c:
+        raise HTTPException(404, detail={"error": "not_found"})
+    to_c = db.get(TrainingClass, body.to_training_class_id)
+    if not to_c or to_c.is_archived:
+        raise HTTPException(400, detail={"error": "invalid_target_class"})
+    if from_c.id == to_c.id:
+        raise HTTPException(400, detail={"error": "same_class",
+                                         "message": "Source and target must be different classes."})
+    _require_same_squadron_stage_year(db, p, from_c, to_c)
+    if not body.cadet_ids:
+        raise HTTPException(400, detail={"error": "no_cadets"})
+
+    moved, skipped = _reassign_members(db, p, from_c, to_c, body.cadet_ids, body.effective_date, "reassigned")
+    db.commit()
+    audit(db, p, object_type="training_class", object_id=to_c.id, action="reassign_members",
+          reason=body.reason,
+          new={"from_training_class_id": from_c.id, "to_training_class_id": to_c.id,
+               "moved": moved, "skipped": skipped})
+    return {"ok": True, "moved": moved, "skipped": skipped}
+
+
+class MergeTrainingClassIn(BaseModel):
+    target_training_class_id: str
+
+
+@router.post("/training-classes/{source_id}/merge-into")
+def merge_training_class(source_id: str, body: MergeTrainingClassIn,
+                          db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """Move every active member of source into target via the reassign-members
+    primitive, then archive source (restorable via restore_training_class
+    above). SessionAudience rows referencing source are left completely
+    untouched -- a past session's delivered-to class list is historical fact,
+    not something a later merge may rewrite (addendum §62/§63)."""
+    if p.role in _WRITE_BLOCKED:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    source = db.get(TrainingClass, source_id)
+    if not source or source.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    target = db.get(TrainingClass, body.target_training_class_id)
+    if not target or target.is_archived:
+        raise HTTPException(400, detail={"error": "invalid_target_class"})
+    if source.id == target.id:
+        raise HTTPException(400, detail={"error": "same_class",
+                                         "message": "Source and target must be different classes."})
+    _require_same_squadron_stage_year(db, p, source, target)
+
+    cadet_ids = [m.cadet_id for m in db.query(CadetClassMembership).filter(
+        CadetClassMembership.training_class_id == source.id,
+        CadetClassMembership.is_archived == False,  # noqa: E712
+        CadetClassMembership.active_status == True,  # noqa: E712
+    ).all()]
+    moved, skipped = _reassign_members(db, p, source, target, cadet_ids, None, "merged")
+
+    source.is_archived = True
+    source.archived_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="training_class", object_id=target.id, action="merge_members_in",
+          reason=f"merged source={source.id} cadets_moved={len(moved)}",
+          new={"source_training_class_id": source.id, "moved": moved, "skipped": skipped})
+    audit(db, p, object_type="training_class", object_id=source.id, action="archive",
+          reason=f"merged into target={target.id}")
+    return {"ok": True, "target_id": target.id, "source_id": source.id, "moved": moved, "skipped": skipped}
+
+
 # ── CLASS-SPECIFIC CURRICULUM PROGRESS ──────────────────────────────────────
 # CLASS-04: curriculum progress derived PER Training Class, not blended
 # across every class sharing a Training Stage. Derived entirely from

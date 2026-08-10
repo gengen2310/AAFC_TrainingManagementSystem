@@ -1084,7 +1084,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="card" id="py-classes-card" style="display:none;margin-top:12px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
             <div class="ctitle" style="margin:0">Training Classes</div>
-            <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
+            <div style="display:flex;align-items:center;gap:10px">
+              <label style="font-size:11px;font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="tc-show-archived" onchange="_tcToggleShowArchived(P.currentYearId)"> Show archived</label>
+              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
+            </div>
           </div>
           <p class="muted" style="font-size:11.5px;margin:0 0 10px">
             A Training Class is a local group completing a Training Stage — for example, Senior 1
@@ -1914,6 +1917,46 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-edit-training-class')">Cancel</button>
       <button class="btn btn-primary" onclick="doEditTrainingClass()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Split Training Class Modal (CLASS-10): moves selected cadets from the
+     source class into a newly-created class in the same Stage/Year. -->
+<div class="modal-bg" id="m-split-training-class">
+  <div class="modal">
+    <h2 id="tcsplit-title">Split Training Class</h2>
+    <input type="hidden" id="tcsplit-source-id">
+    <div class="form-group"><label>New Class Name *</label><input type="text" id="tcsplit-name-inp" placeholder="e.g. Senior 2"></div>
+    <div class="form-group"><label>Order (optional)</label><input type="number" id="tcsplit-seq-inp" min="0" placeholder="0"></div>
+    <div class="form-group">
+      <label>Cadets to move into the new class</label>
+      <div id="tcsplit-members" style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:6px;padding:8px"></div>
+    </div>
+    <p class="muted" style="font-size:11px">The unselected cadets stay in the original class. Past sessions and attendance history for every cadet are kept exactly as recorded.</p>
+    <p id="tcsplit-msg" style="color:var(--error)"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-split-training-class')">Cancel</button>
+      <button class="btn btn-primary" onclick="doSplitTrainingClass()">Split</button>
+    </div>
+  </div>
+</div>
+
+<!-- Merge Training Class Modal (CLASS-10): moves every active member of the
+     source class into an existing target class in the same Stage/Year, then
+     archives the source. SessionAudience history is never rewritten. -->
+<div class="modal-bg" id="m-merge-training-class">
+  <div class="modal">
+    <h2 id="tcmerge-title">Merge Training Class</h2>
+    <input type="hidden" id="tcmerge-source-id">
+    <div class="form-group"><label for="tcmerge-target-inp">Merge into *</label>
+      <select id="tcmerge-target-inp" aria-label="Merge into"></select>
+    </div>
+    <p class="muted" style="font-size:11px">Every cadet currently in this class will be moved into the class you choose, and this class will be archived (its history and past sessions are kept, and it can be restored later).</p>
+    <p id="tcmerge-msg" style="color:var(--error)"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-merge-training-class')">Cancel</button>
+      <button class="btn btn-primary" onclick="doMergeTrainingClass()">Continue…</button>
     </div>
   </div>
 </div>
@@ -9964,11 +10007,12 @@ function _tcCoveragePill(pct){
 
 async function _renderTrainingClasses(yearId){
   const el=document.getElementById('py-classes-body'); if(!el) return;
+  const showArchived=(document.getElementById('tc-show-archived')||{}).checked;
   try{
-    const rows=await api(`/api/training-classes?training_year_id=${encodeURIComponent(yearId)}`);
+    const rows=await api(`/api/training-classes?training_year_id=${encodeURIComponent(yearId)}${showArchived?'&include_archived=true':''}`);
     _tcById={};
     rows.forEach(c=>{ _tcById[c.training_class_id]=c; });
-    if(!rows.length){ el.innerHTML='<p class="muted">No Training Classes set up for this year yet.</p>'; return; }
+    if(!rows.length){ el.innerHTML=`<p class="muted">No ${showArchived?'archived ':''}Training Classes${showArchived?'':' set up for this year yet'}.</p>`; return; }
     // Group by Training Stage so parallel classes of the same Stage sit together --
     // addendum's own "group by stage" guidance for exactly this kind of list.
     const byStage={};
@@ -9978,10 +10022,12 @@ async function _renderTrainingClasses(yearId){
     // CLASS-04 dedicated UI: one call per Stage group (not per Class) via
     // the existing stage-level aggregate endpoint gives every class's own
     // coverage_pct in a single round trip, reusing CLASS-04/07's own
-    // _class_curriculum_progress computation rather than a new one.
+    // _class_curriculum_progress computation rather than a new one. Skipped
+    // entirely in the archived view -- progress on an archived class isn't
+    // actionable here, and it's the one extra round trip Restore doesn't need.
     const stageIds=Object.keys(byStage);
     const progressByStage={};
-    if(sqnId){
+    if(sqnId && !showArchived){
       await Promise.all(stageIds.map(async sid=>{
         try{ progressByStage[sid]=await api(`/api/curriculum/phases/${sid}/class-progress?squadron_id=${encodeURIComponent(sqnId)}`); }
         catch(_){ progressByStage[sid]=null; }
@@ -9992,18 +10038,44 @@ async function _renderTrainingClasses(yearId){
       const stageProgress=progressByStage[sid];
       const pctByClass={};
       (stageProgress&&stageProgress.classes||[]).forEach(cp=>{ pctByClass[cp.training_class_id]=cp.coverage_pct; });
-      html+=`<table class="data-table" style="margin-bottom:10px"><thead><tr><th>Class</th><th>Order</th><th>Expected</th><th>Curriculum Progress</th><th></th></tr></thead><tbody>`+
-        classes.sort((a,b)=>(a.sequence||0)-(b.sequence||0)).map(c=>`<tr>
-          <td>${esc(c.display_name)}</td>
+      // CLASS-10: Split/Merge are only offered on active classes with at
+      // least one sibling class in the same Stage to merge into -- merge's
+      // target picker has nothing to offer otherwise.
+      const hasMergeTarget=c=>classes.some(o=>o.training_class_id!==c.training_class_id);
+      const actionsCell=c=>{
+        if(c.is_archived) return canWrite?`<button class="btn-xs btn-ok" onclick="doRestoreTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Restore</button>`:'';
+        let out=`<button class="btn-xs" onclick="openTrainingClassProgressModal('${esc(c.training_class_id)}')" style="margin-right:4px">View Progress</button>`;
+        if(canWrite){
+          out+=`<button class="btn-xs" onclick="openEditTrainingClassModal('${esc(c.training_class_id)}')" style="margin-right:4px">Edit</button>`;
+          out+=`<button class="btn-xs" onclick="openSplitTrainingClassModal('${esc(c.training_class_id)}')" style="margin-right:4px">Split</button>`;
+          if(hasMergeTarget(c)) out+=`<button class="btn-xs" onclick="openMergeTrainingClassModal('${esc(c.training_class_id)}')" style="margin-right:4px">Merge into…</button>`;
+          out+=`<button class="btn-xs btn-danger" onclick="archiveTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Archive</button>`;
+        }
+        return out;
+      };
+      html+=`<table class="data-table" style="margin-bottom:10px"><thead><tr><th>Class</th><th>Order</th><th>Expected</th>${showArchived?'':'<th>Curriculum Progress</th>'}<th></th></tr></thead><tbody>`+
+        classes.sort((a,b)=>(a.sequence||0)-(b.sequence||0)).map(c=>`<tr${c.is_archived?' style="opacity:.6"':''}>
+          <td>${esc(c.display_name)}${c.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
           <td>${c.sequence||0}</td>
           <td>${c.expected_count!=null?esc(String(c.expected_count)):'—'}</td>
-          <td>${_tcCoveragePill(pctByClass[c.training_class_id])}</td>
-          <td style="white-space:nowrap"><button class="btn-xs" onclick="openTrainingClassProgressModal('${esc(c.training_class_id)}')" style="margin-right:4px">View Progress</button>${canWrite?`<button class="btn-xs" onclick="openEditTrainingClassModal('${esc(c.training_class_id)}')" style="margin-right:4px">Edit</button>`:''}${canWrite?`<button class="btn-xs btn-danger" onclick="archiveTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Archive</button>`:''}</td>
+          ${showArchived?'':`<td>${_tcCoveragePill(pctByClass[c.training_class_id])}</td>`}
+          <td style="white-space:nowrap">${actionsCell(c)}</td>
         </tr>`).join('')+
         `</tbody></table>`;
     });
     el.innerHTML=html;
   } catch(e){ el.innerHTML='<p class="muted">Error loading Training Classes.</p>'; }
+}
+
+async function _tcToggleShowArchived(yearId){
+  await _renderTrainingClasses(yearId);
+}
+async function doRestoreTrainingClass(cid, yearId){
+  try{
+    await api(`/api/training-classes/${cid}/restore`,{method:'POST'});
+    showToast('Training Class restored.');
+    await _renderTrainingClasses(yearId);
+  } catch(e){ showToast('Could not restore: '+apiErr(e), true); }
 }
 
 // CLASS-04 dedicated UI: which curriculum requirements this specific
@@ -10118,6 +10190,108 @@ async function archiveTrainingClass(cid, yearId){
   if(!confirm('Archive this Training Class? It will no longer appear in active planning views, but its history is kept and it can be restored later.')) return;
   try{ await api(`/api/training-classes/${cid}`,{method:'DELETE'}); await _renderTrainingClasses(yearId); showToast('Training Class archived.'); }
   catch(e){ alert(apiErr(e)); }
+}
+
+// ── CLASS-10: Training Class split/merge ────────────────────────────────
+// Split = create a new class (existing POST /training-classes) + move the
+// selected cadets into it (POST .../reassign-members). Merge = move every
+// active member of the source into an existing target
+// (POST .../merge-into), which also archives the source. Both only ever
+// move CadetClassMembership rows -- past Sessions/SessionAudience for every
+// cadet involved are left completely untouched (addendum §62/§63); see the
+// backend's own comment on reassign_class_members for why this deliberately
+// isn't the Facilitator absorb()-style blind FK reassignment.
+
+function _tcSameStageOptions(sourceId, stageId){
+  return Object.values(_tcById).filter(c=>c.training_stage_id===stageId && c.training_class_id!==sourceId && !c.is_archived);
+}
+
+async function openSplitTrainingClassModal(sourceId){
+  const c=_tcById[sourceId];
+  if(!c){ alert('Could not find that Training Class -- try refreshing.'); return; }
+  document.getElementById('tcsplit-source-id').value=sourceId;
+  document.getElementById('tcsplit-title').textContent=`Split "${c.display_name}"`;
+  document.getElementById('tcsplit-name-inp').value='';
+  document.getElementById('tcsplit-seq-inp').value='';
+  document.getElementById('tcsplit-msg').textContent='';
+  const membersEl=document.getElementById('tcsplit-members');
+  membersEl.innerHTML='<p class="muted">Loading roster…</p>';
+  openModal('m-split-training-class');
+  try{
+    const members=await api(`/api/training-classes/${sourceId}/members`);
+    if(!members.length){
+      membersEl.innerHTML='<p class="muted">This class has no cadets to move.</p>';
+      return;
+    }
+    membersEl.innerHTML=members.map(m=>`
+      <label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-weight:400">
+        <input type="checkbox" class="tcsplit-cadet-chk" value="${esc(m.cadet_id)}">
+        ${esc(m.rank||'')} ${esc(m.first_name)} ${esc(m.last_name)}
+      </label>`).join('');
+  } catch(e){
+    membersEl.innerHTML=`<p style="color:var(--error)">${esc(apiErr(e))}</p>`;
+  }
+}
+
+async function doSplitTrainingClass(){
+  const msg=document.getElementById('tcsplit-msg');
+  const sourceId=document.getElementById('tcsplit-source-id').value;
+  const source=_tcById[sourceId];
+  const display_name=document.getElementById('tcsplit-name-inp').value.trim();
+  const seqVal=document.getElementById('tcsplit-seq-inp').value;
+  const cadetIds=[...document.querySelectorAll('.tcsplit-cadet-chk:checked')].map(el=>el.value);
+  if(!display_name){ msg.textContent='New class name is required.'; return; }
+  if(!cadetIds.length){ msg.textContent='Select at least one cadet to move into the new class.'; return; }
+  try{
+    const created=await api('/api/training-classes',{method:'POST',body:{
+      training_year_id: source.training_year_id, training_stage_id: source.training_stage_id,
+      display_name, sequence: seqVal?parseInt(seqVal,10):0,
+    }});
+    const r=await api(`/api/training-classes/${sourceId}/reassign-members`,{method:'POST',body:{
+      cadet_ids:cadetIds, to_training_class_id:created.training_class_id,
+    }});
+    closeModal('m-split-training-class');
+    await _renderTrainingClasses(P.currentYearId);
+    const skippedNote=(r.skipped&&r.skipped.length)?` (${r.skipped.length} could not be moved -- refresh and retry.)`:'';
+    showToast(`Split complete: ${r.moved.length} cadet(s) moved to "${display_name}."${skippedNote}`);
+  } catch(e){ msg.textContent=apiErr(e); }
+}
+
+async function openMergeTrainingClassModal(sourceId){
+  const c=_tcById[sourceId];
+  if(!c){ alert('Could not find that Training Class -- try refreshing.'); return; }
+  document.getElementById('tcmerge-source-id').value=sourceId;
+  document.getElementById('tcmerge-title').textContent=`Merge "${c.display_name}" into…`;
+  document.getElementById('tcmerge-msg').textContent='';
+  const targets=_tcSameStageOptions(sourceId, c.training_stage_id);
+  const sel=document.getElementById('tcmerge-target-inp');
+  if(!targets.length){
+    sel.innerHTML='';
+    document.getElementById('tcmerge-msg').textContent='No other Training Class in the same Stage and Year to merge into.';
+  } else {
+    sel.innerHTML=targets.map(t=>`<option value="${esc(t.training_class_id)}">${esc(t.display_name)}</option>`).join('');
+  }
+  openModal('m-merge-training-class');
+}
+
+function doMergeTrainingClass(){
+  const sourceId=document.getElementById('tcmerge-source-id').value;
+  const targetId=document.getElementById('tcmerge-target-inp').value;
+  const source=_tcById[sourceId], target=_tcById[targetId];
+  if(!targetId){ document.getElementById('tcmerge-msg').textContent='Choose a Training Class to merge into.'; return; }
+  closeModal('m-merge-training-class');
+  confirmAction(
+    `Merge "${source.display_name}" into "${target.display_name}"? Every cadet currently in "${source.display_name}" will be moved into "${target.display_name}", and "${source.display_name}" will be archived (its history and past sessions are kept, and it can be restored later).`,
+    async ()=>{
+      try{
+        const r=await api(`/api/training-classes/${sourceId}/merge-into`,{method:'POST',body:{target_training_class_id:targetId}});
+        await _renderTrainingClasses(P.currentYearId);
+        const skippedNote=(r.skipped&&r.skipped.length)?` (${r.skipped.length} could not be moved.)`:'';
+        showToast(`Merged into "${target.display_name}": ${r.moved.length} cadet(s) moved.${skippedNote}`);
+      } catch(e){ showToast('Could not merge: '+apiErr(e), true); }
+    },
+    true,
+  );
 }
 
 // ═══════════════
