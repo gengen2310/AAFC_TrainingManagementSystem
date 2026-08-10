@@ -3070,3 +3070,56 @@ assertions green afterward, same resolution as before.
 
 **Not yet deployed to staging** — queued for the normal next deploy
 alongside WRITE-04 and REM-85/87/96/97/99/106.
+
+## 62. REM-108 — Flight archive existed with no restore counterpart, following the exact established Account/Wing/Squadron/PlanningYear pattern
+
+Continuing the LOW-severity batch. `POST /api/flights/{fid}/archive`
+already worked correctly, but two things were missing: `list_flights`
+had no `include_archived` parameter at all, so an archived flight was
+unconditionally invisible everywhere — no way to even find one to
+restore it — and `POST /api/flights/{fid}/restore` didn't exist.
+National-level organisation archive (the other half of this row's
+original symptom) remains genuinely out of scope — rare, exceptional,
+and this row's own text already said it should require an out-of-band
+process rather than SA-console self-service.
+
+**The fix follows the exact template `.claude/rules/capability-
+preservation.md` already names** for exactly this situation
+("the dependency-gated delete pattern already shipped for Account/Wing/
+Squadron/PlanningYear... as the template for any new entity that needs
+this"): added `include_archived: bool = False` to `list_flights`
+(matching `list_squadrons`/`list_wings`/`list_accounts` precisely), added
+the previously-missing `is_archived` field to `_flight_out`'s response
+shape, and added `restore_flight` modelled directly on `restore_squadron`
+— same permission check, same 409 `not_archived` guard, same `audit()`
+shape. Frontend: a "Show archived" checkbox on the SA console's Flights
+card, matching the existing Wings/Squadrons pattern exactly, plus a
+Restore button. No confirmation dialog on Restore — matching this
+codebase's own established precedent (`doRestoreWing` etc.) that a
+benign, reversible action doesn't need one, only archive/delete do.
+
+**Hit the "forgot to restart uvicorn" gotcha a third time this session
+while verifying this specific fix** — the local backend process (no
+`--reload` flag) hadn't picked up the `accounts.py` change, so a direct
+API check showed the newly-archived test flight simply absent from the
+`include_archived=true` response, looking exactly like a real bug.
+Caught the same way each time this recurred today: checked the running
+process's start timestamp against the edit timestamp before assuming
+the code itself was wrong. Restarted (preserving `PLANNING_WORKSPACE_URL`
+from the REM-88 restart earlier), re-verified clean.
+
+**Tests, verified to actually catch the regression at both layers.** 3
+new backend tests (`test_accounts.py`): restore reverses archive with the
+right visibility in both list views; restoring an already-active flight
+is rejected (409); a different squadron's `sqn_admin` cannot restore
+another squadron's flight (403). New `e2e-connected/flight-archive-
+restore.spec.ts`: archived-hidden-by-default, visible-and-flagged with
+Show archived checked, Restore brings it back — through the real UI, not
+a bypass. Verified via `git stash` that both the backend tests (404s,
+`None is not None`) and the e2e test (timeout waiting for the new
+checkbox) fail cleanly without the fix and pass with it restored. Full
+backend suite: 1343 passed, 5 skipped — same 2 pre-existing unrelated
+flaky failures, confirmed unchanged.
+
+**Not yet deployed to staging** — queued for the normal next deploy
+alongside WRITE-04 and REM-85/87/88/91/92/96/97/99/106.
