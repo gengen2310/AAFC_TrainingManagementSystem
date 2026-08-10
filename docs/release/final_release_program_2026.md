@@ -2997,3 +2997,76 @@ new matches.
 
 **Not yet deployed to staging** — queued for the normal next deploy
 alongside WRITE-04 and REM-85/87/96/97/99.
+
+## 61. REM-88, REM-91, REM-92, REM-93 — LOW-severity batch: two real fixes, one precise root-cause correction, one more stale finding
+
+Continuing down the severity-ordered list past the MEDIUM band (REM-84 and
+REM-103 remain explicitly flagged, blocked on product decisions only the
+user can make — see §57/§60). Four LOW items, two genuinely fixed, one
+where the register's own diagnosis was slightly wrong even though the
+symptom was real, one more stale finding.
+
+**REM-88 (asymmetric cross-app navigation) — real, fixed.** An eligible-
+scope user (`sqn_admin`/`sqn_general`/wing/national/`system_admin`) saw no
+trace of Planning Workspace at all when `PLANNING_WORKSPACE_URL` wasn't
+configured for that environment — not even an indication it exists. Added
+a non-interactive placeholder nav item ("Planning Workspace (unavailable)")
+shown for exactly the same eligible scopes whenever the real link is
+hidden, with a tooltip explaining why. Extended the existing
+`main-tms.spec.ts` regression test for this exact scenario with two new
+assertions.
+
+**REM-92 (Weekly Program empty state) — real, fixed.** `renderWP()` set
+`el.innerHTML=''` unconditionally whenever no parade night was selected —
+a genuinely bare area beyond a small page subtitle. Now renders a proper
+empty-state card, distinguishing "no parade nights exist yet" (links
+directly to the Parade Nights page) from "parade nights exist, none
+picked yet" (points at the dropdown above). New e2e test covers the
+common case (squadron 703 has seeded parade nights); the zero-parade-
+nights branch is verified by code review only — it shares the exact same
+data source as the tested branch, and setting up a genuinely-empty
+squadron fixture without disturbing other tests' shared data wasn't
+attempted this pass.
+
+**REM-91 (`__APP_BUILD__` placeholder) — real symptom, but the register's
+own diagnosis was half wrong; root-caused precisely instead of assumed.**
+Direct inspection of `connected-frontend/Dockerfile` and
+`docker-entrypoint.sh` confirms the build-fingerprint substitution
+correctly runs on **every** container start in every real deployed path —
+this row's own `residual_limitation` field ("production app-build meta
+tag IS resolved") was already correct. The actual bug was in the
+JavaScript meant to handle the *expected* unresolved case on bare local
+dev (`python3 -m http.server`, which has no build/entrypoint step at
+all): `commitEl.textContent = sha || '(local build)'` only falls back on
+an *empty* string, but an unresolved placeholder is a non-empty, truthy
+string (`"__APP_BUILD__"`) — so the intended friendly fallback silently
+never fired, and the raw template token leaked into the UI verbatim.
+Fixed by explicitly detecting the placeholder rather than relying on
+plain truthiness. No Dockerfile/entrypoint change needed — deployed
+environments were never the problem.
+
+**REM-93 (debug bar production visibility) — stale, and the actual
+mechanism is more robust than the register assumed.** `updateDebugBar()`
+gates visibility on `location.hostname` matching `localhost`/`127.0.0.1`
+— a real-browser-hostname check, not an `ENVIRONMENT` config-variable
+check as this row's `root_cause` guessed. This is *safer* than an
+env-var-based gate: it can't be fooled by a misconfigured environment
+variable on a real deployed domain, since the hostname itself is the
+ground truth. Verified correct via direct source inspection; register
+corrected, no code change.
+
+**Tests and verification, same discipline as every fix this pass.** New
+`e2e-connected/low-severity-fixes.spec.ts` (REM-91, REM-92) plus an
+extension to the existing REM-88-adjacent test in `main-tms.spec.ts`. All
+six touched/new assertions verified via `git stash` to actually fail
+without their respective fixes and pass with them restored — not just
+written and assumed correct. Security greps re-run against the modified
+file: both known false positives reproduced unchanged, no new matches.
+Hit the same API rate-limiter exhaustion documented in §59 partway
+through this batch's verification (this session's cumulative request
+volume across the whole day's work) — reset via
+`POST /api/system/reset-rate-limits` and re-confirmed all six
+assertions green afterward, same resolution as before.
+
+**Not yet deployed to staging** — queued for the normal next deploy
+alongside WRITE-04 and REM-85/87/96/97/99/106.
