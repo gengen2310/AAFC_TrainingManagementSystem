@@ -214,6 +214,10 @@ function CapabilityPanel({ data }: { data: NationalCapability }) {
 
 export function NationalOverview() {
   const [view, setView] = useState<"delivery" | "capability">("delivery");
+  // REM-72 residual: the Command Dashboard's own wingId prop and backend
+  // support already existed end-to-end -- only this selector was missing,
+  // matching connected-frontend's equivalent scope-bar wing picker.
+  const [commandWingId, setCommandWingId] = useState<string>("");
   const q = useQuery({ queryKey: ["national-overview"], queryFn: reportApi.nationalOverview });
   const capQ = useQuery({
     queryKey: ["national-capability"],
@@ -247,7 +251,24 @@ export function NationalOverview() {
       <h1>National Assurance</h1>
       <p className="scope-note">Viewing National-level assurance data. Unit of analysis: wing. Editing a squadron requires Delegated Intervention with a reason.</p>
 
-      <CommandDashboardSection window="term" />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <label htmlFor="command-wing-select" style={{ fontSize: 12, fontWeight: 700, color: "var(--muted-text)" }}>
+          Command Dashboard scope
+        </label>
+        <select
+          id="command-wing-select"
+          value={commandWingId}
+          onChange={(e) => setCommandWingId(e.target.value)}
+          style={{ fontSize: 12, padding: "4px 8px" }}
+        >
+          <option value="">All Wings (national)</option>
+          {rows.map((w) => (
+            <option key={w.wing_id} value={w.wing_id}>{w.code} — {w.name}</option>
+          ))}
+        </select>
+      </div>
+
+      <CommandDashboardSection window="term" wingId={commandWingId || undefined} />
 
       <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
         <button className={view === "delivery" ? "btn" : "btn out"} onClick={() => setView("delivery")}>Delivery</button>

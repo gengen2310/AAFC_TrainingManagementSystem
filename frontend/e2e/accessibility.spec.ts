@@ -249,7 +249,9 @@ test.describe("Accessibility — Wing/National Assurance (Command Dashboard)", (
     await page.getByLabel("Access code").fill("ADMINNATIONAL");
     await page.getByRole("button", { name: "Log in" }).click();
     await expect(page.getByRole("heading", { name: /national assurance/i })).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText(/Command Dashboard/i)).toBeVisible({ timeout: 10000 });
+    // .first() -- REM-72's wing-drill-down selector label also contains
+    // "Command Dashboard", making this text ambiguous on National Assurance.
+    await expect(page.getByText(/Command Dashboard/i).first()).toBeVisible({ timeout: 10000 });
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
     assertNoViolations(results.violations);
   });
