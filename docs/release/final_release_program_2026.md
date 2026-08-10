@@ -3604,3 +3604,135 @@ came through. Fixed by moving the offset to `209`, clear of every other
 passed, 5 skipped, 0 failed` both times — the first genuinely clean,
 no-caveat run of this entire session. No product code changed; both
 fixes are test-only.
+
+## 69. The original remediation instruction, recovered from this session's own
+chat transcript, and the REM-15..79 severity sweep it unblocked
+
+The user could not find the source document behind `master_remediation_plan.md`
+and `.claude/rules/capability-preservation.md` — "AAFC TMS — COMPLETE SYSTEM
+REMEDIATION, INTEGRATION AND WORKFLOW PROGRAM" — anywhere on GitHub. It had
+been pasted into chat on 2026-08-04, immediately before the remediation branch
+was created, but never committed to the repo. Because this exact background
+job has been running as one continuous session since before that point, its
+own raw transcript had never aged out — recovered the full 57,665-character
+text directly from the session's own JSONL history and saved it verbatim to
+`docs/remediation/original_instruction.md`, with a provenance note. This
+unblocked every gap-register item that had been sitting at "not yet audited
+against this instruction."
+
+Worked through the resulting REM-15..79 queue by severity — P2 first, then
+P3 — auditing each item against the real code (not the secondhand summary)
+before deciding whether and how to fix it:
+
+- **REM-04** (Section 17, API errors/403): found and fixed a real bug where
+  both frontends silently discarded any actionable 403 message the backend
+  supplied, whenever the error code was `forbidden` — added actionable
+  messages to `permissions.py`'s central helpers, fixed the clobbering bug in
+  both frontends.
+- **REM-10** (Section 9, parade-night generation): audited and found the
+  generation architecture already solid; the real gap was
+  `preview-parade-dates` silently dropping holiday-conflicting and
+  explicitly-skipped dates instead of classifying them — fixed with a
+  read-only classification function, write path untouched.
+- **REM-12** (Section 10, CEA re-import): confirmed local classification
+  decisions already survive re-import by code inspection, but nothing tested
+  it end-to-end — added 2 real HTTP-round-trip regression tests proving it.
+- **REM-14** (Section 12, Mission Backlog): audited as Large overall (three
+  uncoordinated session-status vocabularies) — scoped to the one safe,
+  concrete fix: completed the preset outcome-reason list to match the
+  instruction's exact wording (added "insufficient numbers"/"administrative
+  requirement", renamed "insufficient time"→"time lost"), via an additive
+  migration safe for already-seeded environments.
+- **REM-17** (Section 15, readiness): found the "zero sessions = 100% ready"
+  bug — the instruction's single most explicitly-flagged risk — still live in
+  three Planning Workspace views, plus a related null→0 coercion bug in the
+  delivery-trend chart. Fixed both.
+- **REM-19** (Section 20, Learning Hub links): built a read-only validation
+  report flagging identifier/URL mismatches, catching 3 real truncated URLs
+  in the production curriculum seed data (never invents or corrects a URL,
+  per the instruction's own explicit prohibition).
+- **REM-15** (Section 13, facilitator dashboards): audited as Large overall
+  (8 of 11 named statistics don't exist as dashboard KPIs) — found and fixed
+  one confirmed, isolated bug: national-scope users got a silently empty
+  strategic-charts dashboard with no error.
+- **REM-20** (Section 21, visual/accessibility): audited as Medium overall
+  (~15 native `confirm()`/`prompt()` calls still need converting to the
+  proven `confirmAction()` pattern, recorded as follow-on work) — fixed the
+  one precisely-named, contained defect: Mission Backlog's arbitrary
+  font-size overrides.
+- **REM-22** (Section 23, capacity): confirmed every prior load test this
+  program ran was at 100-1000+ users, never at the instruction's actual
+  12-25-user pilot scale. With explicit user approval, extended the
+  (gitignored, local) load-test script with the missing workflow coverage
+  and ran both scales against staging — both PASS (P95 295ms/262ms, 0 5xx).
+
+Every item's audit findings, fix (or explicit reason for not fixing further),
+and residual limitations are recorded in
+`docs/remediation/master_gap_register.csv` and in per-item commits on `main`.
+Nothing was marked closed without real test evidence; several items were
+explicitly scoped down from "Large" to "the one safe fix this pass," with the
+remaining scope recorded rather than silently dropped.
+
+## 70. REM-130 deployed to production (user-authorised) — and an honest
+account of a self-inflicted ~10-minute production outage during the deploy
+
+REM-130 (Section 6/18 territory: a confirmed, live, HIGH-severity
+cross-tenant IDOR — any `sqn_general` user could see every squadron's
+Training Areas/Locations via `GET /api/planning/locations`) had been fixed
+and staging-verified earlier this program, but explicitly not deployed to
+production — the register flagged it as "a strong candidate for prioritized
+production deployment authorization." Surfaced this to the user directly;
+they authorized deploying it.
+
+**Scope discipline applied**, matching REM-125's established pattern: rather
+than deploying current `main` HEAD (which would have brought along every
+other backend change accumulated since the last production deploy —
+REM-04/10/14/15/17/19, none of which had been individually authorized for
+production), created an isolated `git worktree` at the exact production
+baseline commit (`d476e5b`, confirmed via Railway's own deployment metadata,
+not just git log) and cherry-picked only `ce22078` (the REM-130 fix) on top.
+Verified the resulting diff touched exactly `backend/app/routers/planning.py`
++ `backend/tests/test_planning.py`, nothing else. Ran the full backend suite
+in that isolated tree: 1252 passed, 5 skipped, one unrelated failure
+(`test_facilitator_schedule.py`'s known date-arithmetic bug, already fixed
+later on `main` — see §68 — and irrelevant regardless since tests aren't part
+of what ships).
+
+**The incident.** The first deploy attempt ran `railway up` from the
+worktree's repo root instead of its `backend/` subdirectory. Railway
+silently fell back to Railpack auto-detection instead of the service's
+configured Dockerfile builder, and that deployment stuck in `INITIALIZING`.
+Running `railway down` to clean up the stuck bad deployment instead removed
+the service's previously-running *good* deployment — Railway's `down`
+removes "the most recent deployment," which was, by then, the broken one's
+own record, not the one still serving traffic. This left the production
+backend with **0 running replicas for approximately 10 minutes**, detected
+via `GET /api/health/ready` returning `404 Application not found`. Flagged
+this to the user immediately and transparently rather than attempting a
+silent recovery; a corrected redeploy (from `backend/`, explicit `--project`/
+`--environment`/`--service` IDs, confirmed `DOCKERFILE` builder) restored
+service. No data loss occurred — this is a stateless backend container
+restart, not a database action — and no other environment or service was
+affected.
+
+**Verification.** Production backend (`aafc-tms-backend`, deployment
+`44b1681e-b575-4c46-be0a-d9cb3ca07f10`, `SUCCESS`) confirmed running the
+fix: 1/1 replica, health check green, deployed commit confirmed to be
+exactly `d476e5b` + `ce22078` (`git rev-parse --short HEAD` = `8d31cc3` at
+deploy time). Deliberately did **not** run a live cross-squadron exploit-
+style test against production itself, consistent with this program's
+standing no-investigative-testing-against-production rule — verification is
+via confirmed deployed commit + isolated diff + passing test suite, not a
+live repro (the live repro was already done once, safely, on staging).
+
+**Lesson recorded for next time** (in the gap register's residual_limitation
+for REM-130, not just here): `railway up` must run from the exact
+subdirectory matching each service's configured root directory, never from a
+repo root that happens to also contain that subdirectory as a subfolder;
+`railway down` removes the most recent deployment record, which is not
+always the one that should be removed when a newer, broken deployment has
+already become "most recent" — prefer a corrected redeploy over `railway
+down` when a bad deploy is stuck, unless traffic is confirmed still routed
+to a known-good prior deployment.
+
+Full detail: `docs/remediation/master_gap_register.csv` REM-130.
