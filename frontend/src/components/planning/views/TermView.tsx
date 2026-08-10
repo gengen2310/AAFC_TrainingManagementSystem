@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
-import type { AnchorEvent, NightSummary } from "../../../api/types";
+import type { AnchorEvent, NightSummary, PlanningConflict } from "../../../api/types";
 import { filterAnchors } from "../../../utils/planningFilters";
 import { ParadeNightBlock, fromNightSummary } from "../ParadeNightBlock";
 import { ActivityDetailBlock, anchorToDisplay } from "../ActivityDetailBlock";
@@ -29,13 +29,17 @@ interface Props {
   layers?: { holidays?: boolean; wingHQEvents?: boolean };
   audience?: Set<string>;
   priority?: Set<string>;
+  /** REM-39 residual: already fetched once, year-scoped, by the caller -- passed
+   * through to fromNightSummary() so each session cell can show a real,
+   * canonical (not client-heuristic) conflict indicator without a second fetch. */
+  conflicts?: PlanningConflict[];
 }
 
 function anchorsOnDate(date: string, all: AnchorEvent[]): AnchorEvent[] {
   return all.filter(a => a.start_date <= date && date <= (a.end_date ?? a.start_date));
 }
 
-export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick, layers, audience, priority }: Props) {
+export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick, layers, audience, priority, conflicts = [] }: Props) {
   const showHolidays = layers?.holidays ?? true;
   const showAnchors  = layers?.wingHQEvents ?? true;
   const [termIndex, setTermIndex] = useState(0);
@@ -135,7 +139,7 @@ export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
                     weekNumber={night.week_number}
                     term={night.term}
                     notices={night.notices}
-                    sessions={fromNightSummary(night.sessions)}
+                    sessions={fromNightSummary(night.sessions, conflicts)}
                     sessionCount={pd.session_count}
                     filledSlots={pd.filled_count}
                     conflictCount={night.conflict_count}

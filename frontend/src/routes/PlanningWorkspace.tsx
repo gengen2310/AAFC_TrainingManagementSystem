@@ -265,6 +265,7 @@ export function PlanningWorkspace() {
           layers={layers}
           audience={audience}
           priority={priority}
+          conflicts={yearConflicts}
         />
       );
     }
@@ -279,6 +280,7 @@ export function PlanningWorkspace() {
           layers={layers}
           audience={audience}
           priority={priority}
+          conflicts={yearConflicts}
         />
       );
     }

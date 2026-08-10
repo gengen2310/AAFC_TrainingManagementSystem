@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { planningApi } from "../../api";
 import { friendlyMessage } from "../../api/client";
-import type { NightSessionSummary, ParadeNotice, PlanningSession, PlanningFacilitator } from "../../api/types";
+import type { NightSessionSummary, ParadeNotice, PlanningSession, PlanningFacilitator, PlanningConflict } from "../../api/types";
 
 // ─── Group / period constants ─────────────────────────────────────────────────
 
@@ -35,17 +35,37 @@ export interface DisplaySession {
   training_classes?: { training_class_id: string; display_name: string }[];
 }
 
-export function fromNightSummary(sessions: NightSessionSummary[]): DisplaySession[] {
-  return sessions.map(s => ({
-    session_id: s.session_id,
-    period: s.period,
-    cadet_group: s.cadet_group,
-    title: s.title,
-    code: s.curriculum_code,
-    location: s.location,
-    facilitator: s.facilitator,
-    training_classes: s.training_classes,
-  }));
+// REM-39 residual: real backend PlanningConflict.conflict_type values today
+// are "facilitator_double_booked" / "room_double_booked" / "empty_session" /
+// "holiday_conflict" (see backend/app/models/planning.py's CONFLICT_TYPES --
+// several other declared types are not yet emitted by any code path). Only
+// the first two are ever session-specific (carry a scheduled_session_id);
+// the others describe the night as a whole, not one cell, so they never
+// match here and correctly produce no per-cell dot.
+function sessionConflictCategory(conflictType: string): DisplaySession["conflict"] {
+  if (conflictType.includes("room")) return "room";
+  if (conflictType.includes("facilitator")) return "fac";
+  return null;
+}
+
+export function fromNightSummary(
+  sessions: NightSessionSummary[],
+  conflicts: PlanningConflict[] = [],
+): DisplaySession[] {
+  return sessions.map(s => {
+    const hit = conflicts.find(c => c.scheduled_session_id === s.session_id && !c.is_resolved);
+    return {
+      session_id: s.session_id,
+      period: s.period,
+      cadet_group: s.cadet_group,
+      title: s.title,
+      code: s.curriculum_code,
+      location: s.location,
+      facilitator: s.facilitator,
+      training_classes: s.training_classes,
+      conflict: hit ? sessionConflictCategory(hit.conflict_type) : null,
+    };
+  });
 }
 
 export interface CellConflict { room: boolean; fac: boolean; load: boolean; }
