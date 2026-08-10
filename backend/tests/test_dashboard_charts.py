@@ -365,6 +365,60 @@ def test_strategic_returns_long_term_trend(client):
     assert "thresholds" in lt
 
 
+# ── national scope (strategic) ───────────────────────────────────────────────
+#
+# REM-15 (original_instruction.md Section 13: "Wing, National and System
+# dashboards aggregate and compare it"): get_strategic_charts's if/elif chain
+# previously had no branch for scope=="national" with no wing_id query param
+# -- charts stayed {} silently, no error, for every national_admin/
+# national_viewer/system_admin/auditor viewing the strategic dashboard
+# without first drilling into one specific Wing.
+
+def test_national_strategic_charts_are_not_empty(client):
+    hdrs = _national(client)
+    r = client.get(STRATEGIC_URL, headers=hdrs)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["scope"] == "national"
+    charts = data.get("charts", {})
+    assert charts != {}, (
+        "national scope with no wing_id previously fell through every "
+        "branch and returned an empty chart set silently"
+    )
+
+def test_national_strategic_charts_include_facilitator_rollups(client):
+    hdrs = _national(client)
+    r = client.get(STRATEGIC_URL, headers=hdrs)
+    charts = _charts(r)
+    assert "subject_area_resilience" in charts
+    assert "facilitator_type_distribution" in charts
+    assert "long_term_delivery_trend" in charts
+
+def test_national_strategic_still_supports_explicit_wing_id(client):
+    """Regression guard: the pre-existing explicit-wing_id branch (a
+    national principal drilling into one Wing) must be unaffected by adding
+    the new default national branch."""
+    hdrs = _national(client)
+    r = client.get(CHARTS_URL, headers=hdrs)
+    # discover a real wing id via the tactical endpoint's own data if present,
+    # otherwise fall back to the seeded 7 Wing code used throughout this suite
+    wing_hdrs = _wing_admin(client)
+    me = client.get("/api/auth/me", headers=wing_hdrs).json()
+    wing_id = me["session"]["wing_id"]
+    r = client.get(STRATEGIC_URL + f"?wing_id={wing_id}", headers=hdrs)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["scope"] == "wing"
+    assert "subject_area_resilience" in data["charts"]
+
+def test_national_strategic_charts_auditor_can_view(client):
+    hdrs = _auditor(client)
+    r = client.get(STRATEGIC_URL, headers=hdrs)
+    assert r.status_code == 200
+    assert r.json()["scope"] == "national"
+    assert r.json()["charts"] != {}
+
+
 # ── wing scope ────────────────────────────────────────────────────────────────
 
 def test_wing_scope_returns_wing_charts(client):

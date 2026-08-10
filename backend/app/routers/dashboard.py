@@ -2149,6 +2149,25 @@ def _wing_strategic_charts(db: DBSession, wing_id: str) -> dict:
     return charts
 
 
+def _national_strategic_charts(db: DBSession) -> dict:
+    """REM-15 (original_instruction.md Section 13: "Wing, National and System
+    dashboards aggregate and compare it"): the national-scope rollup, mirroring
+    _wing_strategic_charts exactly but with no wing filter -- every active
+    Facilitator/ParadeNight/Session nationally, instead of one Wing's."""
+    charts: dict = {}
+    facs = db.query(Facilitator).filter(Facilitator.is_archived == False).all()  # noqa: E712
+    charts["subject_area_resilience"] = _safe_chart("subject_area_resilience", _subject_area_resilience, facs)
+    charts["facilitator_type_distribution"] = _safe_chart(
+        "facilitator_type_distribution", _facilitator_type_distribution, facs)
+    pns = db.query(ParadeNight).filter(ParadeNight.is_archived == False).all()  # noqa: E712
+    sessions = db.query(Session).filter(
+        Session.parade_night_id.in_([pn.id for pn in pns]),
+        Session.is_archived == False,  # noqa: E712
+    ).all() if pns else []
+    charts["long_term_delivery_trend"] = _safe_chart("long_term_delivery_trend", _long_term_delivery_trend, sessions, pns)
+    return charts
+
+
 @router.get("/charts/strategic")
 def get_strategic_charts(
     window: str = Query("year", pattern="^(term|year)$"),
@@ -2191,6 +2210,15 @@ def get_strategic_charts(
         require_can_view_wing(p, wing_id)
         scope = "wing"
         charts.update(_wing_strategic_charts(db, wing_id))
+
+    elif scope == "national":
+        # REM-15: a national-scope principal (national_admin/national_viewer/
+        # system_admin/auditor) with no wing_id selected previously fell
+        # through every branch above and got an empty {} silently -- no
+        # error, just a blank strategic dashboard. Aggregate across every
+        # wing instead, matching the instruction's "Wing, National and
+        # System dashboards aggregate and compare it" requirement.
+        charts.update(_national_strategic_charts(db))
 
     return {"scope": scope, "window": window, "charts": charts}
 
