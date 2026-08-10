@@ -1137,7 +1137,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
         <div class="tw">
           <table>
-            <thead><tr><th>#</th><th>Rank</th><th>First Name</th><th>Last Name</th><th>Type</th><th>Subject Areas</th><th>Sessions</th><th class="no-print"></th></tr></thead>
+            <thead><tr><th>#</th><th>Rank</th><th>Given Name</th><th>Family Name</th><th>Type</th><th>Subject Areas</th><th>Sessions</th><th class="no-print"></th></tr></thead>
             <tbody id="fac-tbody"></tbody>
           </table>
         </div>
@@ -2438,8 +2438,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
       </div>
       <div class="form-row">
-        <div class="ff"><label>First Name</label><input id="fac-first" oninput="_clearFacDupWarning();_markFacUnsaved()"></div>
-        <div class="ff"><label>Last Name</label><input id="fac-last" oninput="_clearFacDupWarning();_markFacUnsaved()"></div>
+        <div class="ff"><label>Given Name</label><input id="fac-first" oninput="_clearFacDupWarning();_markFacUnsaved()"></div>
+        <div class="ff"><label>Family Name</label><input id="fac-last" oninput="_clearFacDupWarning();_markFacUnsaved()"></div>
       </div>
       <div id="fa-areas-create" class="ff"><label>Subject Areas</label>
         <div class="chk-grp">
@@ -3761,7 +3761,7 @@ async function _pageRefresh(statusElId, loaderFn){
   if(el){ el.textContent='Refreshing…'; el.style.color='var(--muted)'; }
   try{
     await loaderFn();
-    if(el){ el.textContent='Updated at '+new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'}); el.style.color='var(--muted)'; }
+    if(el){ el.textContent='Updated at '+new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false}); el.style.color='var(--muted)'; }
   }catch(e){
     if(el){ el.textContent='Refresh failed — try again'; el.style.color='var(--red)'; }
     showToast('Refresh failed: '+apiErr(e), true);
@@ -8110,7 +8110,7 @@ function saveFac(confirmDuplicate){
   const rank=document.getElementById('fac-rank').value.trim();
   const first=document.getElementById('fac-first').value.trim();
   const last=document.getElementById('fac-last').value.trim();
-  if(!last){alert('Last name required.');return;}
+  if(!last){alert('Family name required.');return;}
   const areas=_readFacAreas();
   const type=document.getElementById('fac-type').value;
   const btn=document.getElementById('fac-save-btn');
@@ -8124,7 +8124,7 @@ function saveFac(confirmDuplicate){
     const fid=editFacId; editFacId=null;
     api('/api/facilitators/'+fid,{method:'PATCH',body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type})})
       .then(async()=>{
-        const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
+        const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false});
         _setFacSaveState('Saved at '+savedAt,'var(--ok)');
         await reloadAndRender(); loadFacilitatorStats(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
         showToast('Facilitator profile saved at '+savedAt+'.', false);
@@ -8142,7 +8142,7 @@ function saveFac(confirmDuplicate){
   if(!_facIdemKey){ _facIdemKey=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():('fac-'+Date.now()+'-'+Math.random().toString(36).slice(2)); }
   api('/api/facilitators',{method:'POST',headers:{'Idempotency-Key':_facIdemKey},body:JSON.stringify({first_name:first,last_name:last,current_rank:rank,type,subject_areas:areas,confirm_duplicate:!!confirmDuplicate})})
     .then(async()=>{
-      const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
+      const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false});
       _setFacSaveState('Saved at '+savedAt,'var(--ok)');
       // REM-99: a leftover search term in #fac-search (e.g. typed while checking
       // for an existing duplicate before adding) silently filtered the just-

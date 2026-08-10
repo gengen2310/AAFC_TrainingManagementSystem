@@ -824,11 +824,11 @@ function FacilitatorsContent({
         <div style={{ padding: "10px 14px", background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
             <label style={labelSx}>
-              First name *
+              Given name *
               <input value={firstName} onChange={e => { setFirstName(e.target.value); setDupWarning(null); }} style={inputSx} />
             </label>
             <label style={labelSx}>
-              Last name *
+              Family name *
               <input value={lastName} onChange={e => { setLastName(e.target.value); setDupWarning(null); }} style={inputSx} />
             </label>
             <label style={labelSx}>

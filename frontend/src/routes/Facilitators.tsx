@@ -209,8 +209,8 @@ function AddFacModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   return (
     <Modal title="Add facilitator" onClose={onClose}>
       <div className="form">
-        <label htmlFor="f-first">First name</label><input id="f-first" value={first} onChange={(e) => { setFirst(e.target.value); setDuplicateWarning(null); }} />
-        <label htmlFor="f-last">Last name</label><input id="f-last" value={last} onChange={(e) => { setLast(e.target.value); setDuplicateWarning(null); }} />
+        <label htmlFor="f-first">Given name</label><input id="f-first" value={first} onChange={(e) => { setFirst(e.target.value); setDuplicateWarning(null); }} />
+        <label htmlFor="f-last">Family name</label><input id="f-last" value={last} onChange={(e) => { setLast(e.target.value); setDuplicateWarning(null); }} />
         <label htmlFor="f-rank">Current rank</label><input id="f-rank" value={rank} onChange={(e) => setRank(e.target.value)} />
         <label htmlFor="add-fac-subjects">Subject areas</label>
         <TagInput id="add-fac-subjects" tags={subjects} onChange={setSubjects} />

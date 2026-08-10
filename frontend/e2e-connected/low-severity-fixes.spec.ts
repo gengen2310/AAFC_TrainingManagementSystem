@@ -57,3 +57,50 @@ test("REM-91: System Console shows a friendly build label, not the literal unres
   await expect(commitEl).not.toContainText("__APP_BUILD__");
   await expect(commitEl).toContainText("(local build)");
 });
+
+test("WRITE-06: facilitator name fields use Defence Writing Manual's Given/Family name labelling", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await page.evaluate(() => (window as any).nav("facilitators"));
+  await expect(page.locator("#fac-tbody tr").first()).toBeVisible();
+  // Table header labels.
+  await expect(page.locator("thead").getByRole("columnheader", { name: "Given Name" })).toBeVisible();
+  await expect(page.locator("thead").getByRole("columnheader", { name: "Family Name" })).toBeVisible();
+  // Add Facilitator modal labels.
+  await page.locator("button.btn.btn-dk.admin-el").filter({ hasText: "+ Add Facilitator" }).click();
+  await expect(page.locator("#m-add-fac")).toBeVisible();
+  await expect(page.locator("#m-add-fac")).toContainText("Given Name");
+  await expect(page.locator("#m-add-fac")).toContainText("Family Name");
+  await expect(page.locator("#m-add-fac")).not.toContainText("First Name");
+  await expect(page.locator("#m-add-fac")).not.toContainText("Last Name");
+});
+
+test("WRITE-03: 'Saved at' timestamps use 24-hour time, not 12-hour am/pm", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await page.evaluate(() => (window as any).nav("facilitators"));
+  await expect(page.locator("#fac-tbody tr").first()).toBeVisible();
+  await page.locator("button.btn.btn-dk.admin-el").filter({ hasText: "+ Add Facilitator" }).click();
+  await expect(page.locator("#m-add-fac")).toBeVisible();
+  const suffix = String(Date.now());
+  await page.locator("#fac-first").fill(`WRITE03-${suffix}`);
+  await page.locator("#fac-last").fill(`Time-${suffix}`);
+  await page.locator("#fac-save-btn").click();
+  await expect(page.locator("#m-add-fac")).toBeHidden({ timeout: 8000 });
+  // #fac-save-state was set to "Saved at HH:MM" just before the modal closed --
+  // read it from the toast instead, which carries the same "Facilitator added
+  // at HH:MM." text and survives after the modal itself is gone.
+  const toast = page.locator(".toast-region");
+  await expect(toast).toContainText(/added at \d{2}:\d{2}\./i, { timeout: 5000 });
+  await expect(toast).not.toContainText(/am\.|pm\./i);
+
+  // Cleanup.
+  const facs = await page.evaluate(async () => {
+    const r = await (window as any).api("/api/facilitators");
+    return r;
+  });
+  const created = facs.find((f: { last_name?: string }) => f.last_name === `Time-${suffix}`);
+  if (created) {
+    await page.request.delete(`${LOCAL_API_BASE || "http://localhost:8000"}/api/facilitators/${created.facilitator_id}`, {
+      headers: { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem("aafc_token"))}` },
+    });
+  }
+});
