@@ -8058,6 +8058,14 @@ function saveFac(confirmDuplicate){
     .then(async()=>{
       const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit'});
       _setFacSaveState('Saved at '+savedAt,'var(--ok)');
+      // REM-99: a leftover search term in #fac-search (e.g. typed while checking
+      // for an existing duplicate before adding) silently filtered the just-
+      // created facilitator out of the re-rendered list -- renderFacs() applies
+      // it unconditionally -- reproducing "created but not visible until hard
+      // refresh" exactly (a refresh clears the input; the DOM value otherwise
+      // persists indefinitely, since nothing else ever resets it). Clear it so
+      // the new facilitator is guaranteed visible immediately.
+      const facSearch=document.getElementById('fac-search'); if(facSearch)facSearch.value='';
       await reloadAndRender(); loadFacilitatorStats(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
       showToast('Facilitator added at '+savedAt+'.', false);
     })
