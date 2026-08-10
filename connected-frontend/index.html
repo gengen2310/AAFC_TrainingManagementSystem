@@ -2693,6 +2693,23 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   </div>
 </div>
 
+<!-- REM-106: shared confirmation modal replacing native confirm() for critical
+     SA/org-management operations -- native confirm()/alert()/prompt() dialogs
+     block the page entirely under browser automation (see .claude/rules/
+     frontend.md's "system_admin scope" note), so every call site converted to
+     this modal also becomes directly testable via Playwright without the
+     api(...)-bypass workaround that note describes. -->
+<div class="modal-bg" id="m-confirm">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-hdr"><div class="modal-title" id="confirm-title">Confirm</div><button class="modal-x" aria-label="Close" onclick="_confirmNo()">×</button></div>
+    <div class="modal-body"><p id="confirm-msg" style="white-space:pre-line;margin:0"></p></div>
+    <div class="modal-foot">
+      <button class="btn btn-out" onclick="_confirmNo()">Cancel</button>
+      <button class="btn btn-dk" id="confirm-yes-btn" onclick="_confirmYes()">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <!-- ACCOUNTS: Edit Account Modal -->
 <div class="modal-bg" id="m-edit-account">
   <div class="modal" style="max-width:380px">
@@ -4224,14 +4241,15 @@ async function scLoadScopeMap(){
   } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
 }
 
-async function scArchiveWing(wingId, wingCode){
-  if(!confirm(`Archive Wing '${wingCode}'?\n\nThis cannot be undone. All squadrons in this Wing must already be archived.`)) return;
-  try {
-    await api(`/api/wings/${wingId}/archive`,{method:'POST'});
-    alert(`Wing '${wingCode}' has been archived.`);
-    await _refreshOrgCache();
-    scLoadScopeMap();
-  } catch(e){ alert('Archive failed: '+(apiErr(e))); }
+function scArchiveWing(wingId, wingCode){
+  confirmAction(`Archive Wing '${wingCode}'?\n\nThis cannot be undone. All squadrons in this Wing must already be archived.`, async()=>{
+    try {
+      await api(`/api/wings/${wingId}/archive`,{method:'POST'});
+      alert(`Wing '${wingCode}' has been archived.`);
+      await _refreshOrgCache();
+      scLoadScopeMap();
+    } catch(e){ alert('Archive failed: '+(apiErr(e))); }
+  }, true);
 }
 
 async function scRestoreWing(wingId, wingCode){
@@ -4243,14 +4261,15 @@ async function scRestoreWing(wingId, wingCode){
   } catch(e){ alert('Restore failed: '+(apiErr(e))); }
 }
 
-async function scArchiveSquadron(sqnId, sqnName){
-  if(!confirm(`Archive unit '${sqnName}'?\n\nThis cannot be undone and will remove this unit from all active views.`)) return;
-  try {
-    await api(`/api/squadrons/${sqnId}/archive`,{method:'POST'});
-    alert(`Unit '${sqnName}' has been archived.`);
-    await _refreshOrgCache();
-    scLoadScopeMap();
-  } catch(e){ alert('Archive failed: '+(apiErr(e))); }
+function scArchiveSquadron(sqnId, sqnName){
+  confirmAction(`Archive unit '${sqnName}'?\n\nThis cannot be undone and will remove this unit from all active views.`, async()=>{
+    try {
+      await api(`/api/squadrons/${sqnId}/archive`,{method:'POST'});
+      alert(`Unit '${sqnName}' has been archived.`);
+      await _refreshOrgCache();
+      scLoadScopeMap();
+    } catch(e){ alert('Archive failed: '+(apiErr(e))); }
+  }, true);
 }
 
 async function scRestoreSquadron(sqnId, sqnName){
@@ -4340,13 +4359,14 @@ async function scEnableMaint(){
   } catch(e){ alert('Could not enable maintenance mode: '+(apiErr(e))); }
 }
 
-async function scDisableMaint(){
-  if(!confirm('Disable maintenance mode and restore normal access?')) return;
-  try {
-    await api('/api/system/maintenance/disable',{method:'POST'});
-    scLoadMaintenance();
-    scLoadOverview();
-  } catch(e){ alert('Could not disable maintenance mode: '+(apiErr(e))); }
+function scDisableMaint(){
+  confirmAction('Disable maintenance mode and restore normal access?', async()=>{
+    try {
+      await api('/api/system/maintenance/disable',{method:'POST'});
+      scLoadMaintenance();
+      scLoadOverview();
+    } catch(e){ alert('Could not disable maintenance mode: '+(apiErr(e))); }
+  });
 }
 
 async function scLoadBackups(){
@@ -5242,27 +5262,30 @@ async function doAccountResetCode(){
 }
 
 // ── Disable / Reactivate ──────────────────────────────────
-async function doDisableAccount(userId, displayName){
-  if(!confirm('Disable account for '+displayName+'? They will not be able to sign in.'))return;
-  try{
-    await api('/api/accounts/'+userId+'/disable',{method:'POST'});
-    S.accountList=null; renderAccounts();
-  }catch(e){ alert('Could not disable: '+apiErr(e)); }
+function doDisableAccount(userId, displayName){
+  confirmAction('Disable account for '+displayName+'? They will not be able to sign in.', async()=>{
+    try{
+      await api('/api/accounts/'+userId+'/disable',{method:'POST'});
+      S.accountList=null; renderAccounts();
+    }catch(e){ alert('Could not disable: '+apiErr(e)); }
+  }, true);
 }
-async function doReactivateAccount(userId, displayName){
-  if(!confirm('Reactivate account for '+displayName+'?'))return;
-  try{
-    await api('/api/accounts/'+userId+'/reactivate',{method:'POST'});
-    S.accountList=null; renderAccounts();
-  }catch(e){ alert('Could not reactivate: '+apiErr(e)); }
+function doReactivateAccount(userId, displayName){
+  confirmAction('Reactivate account for '+displayName+'?', async()=>{
+    try{
+      await api('/api/accounts/'+userId+'/reactivate',{method:'POST'});
+      S.accountList=null; renderAccounts();
+    }catch(e){ alert('Could not reactivate: '+apiErr(e)); }
+  });
 }
-async function doDeleteAccount(userId, displayName){
-  if(!confirm('Delete account for '+displayName+'?\n\nThis archives the account: access is revoked immediately and it is removed from active views. It is reversible — use "Show archived" + Restore to undo.'))return;
-  try{
-    await api('/api/accounts/'+userId+'/archive',{method:'POST'});
-    S.accountList=null; renderAccounts();
-    showToast('Deleted (archived) '+displayName+'.');
-  }catch(e){ showToast('Could not delete: '+apiErr(e), true); }
+function doDeleteAccount(userId, displayName){
+  confirmAction('Delete account for '+displayName+'?\n\nThis archives the account: access is revoked immediately and it is removed from active views. It is reversible — use "Show archived" + Restore to undo.', async()=>{
+    try{
+      await api('/api/accounts/'+userId+'/archive',{method:'POST'});
+      S.accountList=null; renderAccounts();
+      showToast('Deleted (archived) '+displayName+'.');
+    }catch(e){ showToast('Could not delete: '+apiErr(e), true); }
+  }, true);
 }
 async function doPermanentlyDeleteAccount(userId, displayName){
   const typed=prompt(`This permanently deletes the account for "${displayName}" — this cannot be undone. It will only succeed if the account has never logged in and has no audit history of its own actions; otherwise it stays archived.\n\nType the account's name to confirm:`);
@@ -5279,20 +5302,22 @@ async function doPermanentlyDeleteAccount(userId, displayName){
     } else { showToast('Could not delete: '+apiErr(e), true); }
   }
 }
-async function doRestoreAccount(userId, displayName){
-  if(!confirm('Restore account for '+displayName+'? It will become active again immediately.'))return;
-  try{
-    await api('/api/accounts/'+userId+'/restore',{method:'POST'});
-    S.accountList=null; renderAccounts();
-    showToast('Restored '+displayName+'.');
-  }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
+function doRestoreAccount(userId, displayName){
+  confirmAction('Restore account for '+displayName+'? It will become active again immediately.', async()=>{
+    try{
+      await api('/api/accounts/'+userId+'/restore',{method:'POST'});
+      S.accountList=null; renderAccounts();
+      showToast('Restored '+displayName+'.');
+    }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
+  });
 }
-async function doUnlockAccount(userId, displayName){
-  if(!confirm('Unlock account for '+displayName+'? This will clear the login lockout so they can sign in again.'))return;
-  try{
-    await api('/api/accounts/'+userId+'/unlock',{method:'POST'});
-    S.accountList=null; renderAccounts();
-  }catch(e){ alert('Could not unlock: '+apiErr(e)); }
+function doUnlockAccount(userId, displayName){
+  confirmAction('Unlock account for '+displayName+'? This will clear the login lockout so they can sign in again.', async()=>{
+    try{
+      await api('/api/accounts/'+userId+'/unlock',{method:'POST'});
+      S.accountList=null; renderAccounts();
+    }catch(e){ alert('Could not unlock: '+apiErr(e)); }
+  });
 }
 
 // ── Bulk Archive Wizard (5-step: Selection Review → Impact Assessment →
@@ -9039,6 +9064,30 @@ async function exitMode(){
 // ═══════════════════════════════════════════════════════════
 function openModal(id){document.getElementById(id).classList.add('active');}
 function closeModal(id){document.getElementById(id).classList.remove('active');}
+// REM-106: confirmAction() replaces native confirm() for critical SA/org-
+// management operations (archive Wing/Squadron, maintenance mode, account
+// disable/reactivate/delete/restore/unlock) -- native confirm() blocks the
+// page entirely under browser automation (see .claude/rules/frontend.md).
+// Usage: confirmAction('message', () => { ...the code that used to run after
+// `if(!confirm(...))return;` ... }). Cancelling simply never calls onConfirm,
+// matching confirm()'s own early-return-on-Cancel behaviour exactly.
+let _confirmCb=null;
+function confirmAction(message, onConfirm, danger){
+  document.getElementById('confirm-msg').textContent=message;
+  const yesBtn=document.getElementById('confirm-yes-btn');
+  yesBtn.className='btn '+(danger?'btn-red':'btn-dk');
+  _confirmCb=onConfirm;
+  openModal('m-confirm');
+}
+function _confirmYes(){
+  closeModal('m-confirm');
+  const cb=_confirmCb; _confirmCb=null;
+  if(cb)cb();
+}
+function _confirmNo(){
+  closeModal('m-confirm');
+  _confirmCb=null;
+}
 document.querySelectorAll('.modal-bg').forEach(bg=>{bg.addEventListener('click',function(e){if(e.target===this)this.classList.remove('active');});});
 document.getElementById('m-add-pn').addEventListener('click',function(e){if(e.target===this)return;if(!document.getElementById('pn-slots').innerHTML)buildSlots();});
 window.addEventListener('DOMContentLoaded',()=>{calYear=new Date().getFullYear();calMonth=new Date().getMonth();});
