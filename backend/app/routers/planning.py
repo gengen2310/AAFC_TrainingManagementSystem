@@ -704,6 +704,90 @@ def _compute_candidate_dates(body: GenerateParadeDatesIn, holidays: list) -> lis
     return candidates
 
 
+def _compute_candidate_dates_classified(body: GenerateParadeDatesIn, holidays: list) -> list[dict]:
+    """Like _compute_candidate_dates, but returns every date the recurrence
+    pattern touches (not just the ones that would be created), each tagged
+    with why it would or would not be created.
+
+    original_instruction.md Section 9 requires the preview to classify each
+    candidate rather than silently dropping holiday-conflicting and
+    explicitly-skipped dates from the list with no explanation. This is a
+    read-only, additive sibling of _compute_candidate_dates -- the write path
+    (generate_parade_dates) still calls the original function unchanged, so
+    this cannot alter what actually gets created.
+    """
+    try:
+        start = date.fromisoformat(body.start_date)
+    except ValueError:
+        raise HTTPException(400, detail={"error": "invalid_date_format"})
+
+    end: date | None = None
+    if body.end_date:
+        try:
+            end = date.fromisoformat(body.end_date)
+        except ValueError:
+            raise HTTPException(400, detail={"error": "invalid_date_format"})
+
+    if end is None and body.max_repeats is None:
+        raise HTTPException(400, detail={
+            "error": "end_date_or_max_repeats_required",
+            "message": "Provide either end_date or max_repeats.",
+        })
+
+    excluded_set = set(body.excluded_dates or [])
+
+    def in_holiday(d: date) -> bool:
+        ds = d.isoformat()
+        return any(h.start_date <= ds <= h.end_date for h in holidays)
+
+    freq = (body.frequency or "weekly").lower()
+    rows: list[dict] = []
+    included_count = 0
+    d = start
+    last_occurrence: date | None = None
+
+    while True:
+        if end and d > end:
+            break
+        if body.max_repeats is not None and included_count >= body.max_repeats:
+            break
+
+        include = False
+        if freq == "daily":
+            include = True
+        elif freq in ("weekly", "fortnightly"):
+            if d.weekday() == body.weekday:
+                if freq == "weekly":
+                    include = True
+                else:
+                    if last_occurrence is None or (d - last_occurrence).days >= 14:
+                        include = True
+        elif freq == "monthly":
+            if d.weekday() == body.weekday and d.day <= 7:
+                include = True
+        elif freq == "yearly":
+            if d.month == start.month and d.day == start.day:
+                include = True
+        else:
+            if d.weekday() == body.weekday:
+                include = True
+
+        if include:
+            ds = d.isoformat()
+            if ds in excluded_set:
+                rows.append({"date": ds, "status": "explicitly_skipped"})
+            elif body.exclude_holidays and in_holiday(d):
+                rows.append({"date": ds, "status": "holiday_conflict"})
+            else:
+                rows.append({"date": ds, "status": "will_create"})
+                included_count += 1
+                last_occurrence = d
+
+        d += timedelta(days=1)
+
+    return rows
+
+
 @router.post("/years/{year_id}/preview-parade-dates")
 def preview_parade_dates(
     year_id: str,
@@ -711,7 +795,8 @@ def preview_parade_dates(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    """Return candidate dates without creating them. Marks which already exist."""
+    """Return every candidate date the pattern touches, classified (not just
+    which already exist) -- see _compute_candidate_dates_classified."""
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py)
     holidays = db.query(HolidayPeriod).filter(
@@ -722,9 +807,21 @@ def preview_parade_dates(
         pd.parade_date for pd in
         db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).all()
     }
-    candidates = _compute_candidate_dates(body, holidays)
-    rows = [{"date": ds, "new": ds not in existing} for ds in candidates]
-    return {"dates": rows, "new_count": sum(1 for r in rows if r["new"]), "total": len(rows)}
+    classified = _compute_candidate_dates_classified(body, holidays)
+    rows = []
+    for row in classified:
+        status = row["status"]
+        if status == "will_create" and row["date"] in existing:
+            status = "already_exists"
+        # "new" is kept for backward compatibility with existing callers that
+        # only check r.new; it is true only for dates that will actually be
+        # created by generate-parade-dates.
+        rows.append({"date": row["date"], "status": status, "new": status == "will_create"})
+    return {
+        "dates": rows,
+        "new_count": sum(1 for r in rows if r["new"]),
+        "total": len(rows),
+    }
 
 
 @router.post("/years/{year_id}/generate-parade-dates")

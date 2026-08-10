@@ -9927,9 +9927,14 @@ async function previewGenerateDates(){
   area.style.display='none';
   try{
     const r=await api(`/api/planning/years/${P.currentYearId}/preview-parade-dates`,{method:'POST',body:b});
-    msg.textContent=`${r.new_count} new date${r.new_count!==1?'s':''} of ${r.total} total.`;
+    msg.textContent=`${r.new_count} new date${r.new_count!==1?'s':''} of ${r.total} in range.`;
+    // REM-10: preview-parade-dates now classifies every date the recurrence
+    // pattern touches, not just the ones that would be created, so holiday
+    // conflicts and explicit skips are visible instead of silently vanishing.
+    const _STATUS_LABEL={will_create:'New',already_exists:'Exists',holiday_conflict:'Holiday conflict — skipped',explicitly_skipped:'Explicitly skipped'};
+    const _STATUS_BADGE={will_create:'b-ok',already_exists:'b-grey',holiday_conflict:'b-amber',explicitly_skipped:'b-grey'};
     area.innerHTML='<table style="width:100%;font-size:12px"><thead><tr><th>Date</th><th>Status</th></tr></thead><tbody>'+
-      (r.dates||[]).map(d=>`<tr><td>${esc(d.date)}</td><td><span class="badge ${d.new?'b-ok':'b-grey'}">${d.new?'New':'Exists'}</span></td></tr>`).join('')+
+      (r.dates||[]).map(d=>`<tr><td>${esc(d.date)}</td><td><span class="badge ${_STATUS_BADGE[d.status]||'b-grey'}">${esc(_STATUS_LABEL[d.status]||d.status)}</span></td></tr>`).join('')+
       '</tbody></table>';
     area.style.display='block';
   }catch(e){ msg.textContent=apiErr(e); }

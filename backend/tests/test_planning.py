@@ -305,6 +305,91 @@ def test_generate_parade_dates_yearly_frequency(client):
     assert d["dates"] == ["2026-04-25", "2027-04-25", "2028-04-25"]
 
 
+# ─────────────────────────────────────────────────────────────
+# REM-10 (original_instruction.md Section 9): preview-parade-dates must
+# classify every candidate date the recurrence touches (will_create /
+# already_exists / holiday_conflict / explicitly_skipped), not silently
+# drop holiday-conflicting or explicitly-skipped dates from the response.
+# ─────────────────────────────────────────────────────────────
+
+def test_preview_parade_dates_classifies_explicitly_skipped(client):
+    hdr = login(client, "ADMIN704")  # 704 has no pre-seeded parade nights
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    r = client.post(
+        f"/api/planning/years/{yr_id}/preview-parade-dates",
+        json={
+            "weekday": 4, "start_date": "2026-08-07", "end_date": "2026-08-21",
+            "exclude_holidays": False, "excluded_dates": ["2026-08-14"],
+        },
+        headers=hdr,
+    )
+    assert r.status_code == 200
+    d = r.json()
+    by_date = {row["date"]: row for row in d["dates"]}
+    assert by_date["2026-08-07"]["status"] == "will_create"
+    assert by_date["2026-08-14"]["status"] == "explicitly_skipped"
+    assert by_date["2026-08-21"]["status"] == "will_create"
+    # The skipped date must still be visible in the response, not silently
+    # dropped -- this is the exact defect REM-10 fixed.
+    assert d["total"] == 3
+    assert d["new_count"] == 2
+
+
+def test_preview_parade_dates_classifies_holiday_conflict(client):
+    hdr = login(client, "ADMIN704")
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    client.post(f"/api/planning/years/{yr_id}/holidays", json={
+        "name": "Term Break", "start_date": "2026-08-10", "end_date": "2026-08-16",
+        "holiday_type": "school_holiday", "affects_parade": True,
+    }, headers=hdr)
+    r = client.post(
+        f"/api/planning/years/{yr_id}/preview-parade-dates",
+        json={
+            "weekday": 4, "start_date": "2026-08-07", "end_date": "2026-08-21",
+            "exclude_holidays": True,
+        },
+        headers=hdr,
+    )
+    assert r.status_code == 200
+    d = r.json()
+    by_date = {row["date"]: row for row in d["dates"]}
+    assert by_date["2026-08-07"]["status"] == "will_create"
+    assert by_date["2026-08-14"]["status"] == "holiday_conflict"
+    assert by_date["2026-08-21"]["status"] == "will_create"
+    assert d["total"] == 3
+    assert d["new_count"] == 2
+
+
+def test_preview_parade_dates_classifies_already_exists(client):
+    hdr = login(client, "ADMIN704")
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    gen = client.post(
+        f"/api/planning/years/{yr_id}/generate-parade-dates",
+        json={
+            "weekday": 4, "start_date": "2026-08-07", "end_date": "2026-08-07",
+            "exclude_holidays": False,
+        },
+        headers=hdr,
+    )
+    assert gen.status_code == 200 and gen.json()["created"] == 1
+    r = client.post(
+        f"/api/planning/years/{yr_id}/preview-parade-dates",
+        json={
+            "weekday": 4, "start_date": "2026-08-07", "end_date": "2026-08-07",
+            "exclude_holidays": False,
+        },
+        headers=hdr,
+    )
+    assert r.status_code == 200
+    d = r.json()
+    assert d["dates"][0]["status"] == "already_exists"
+    assert d["dates"][0]["new"] is False
+    assert d["new_count"] == 0
+
+
 def test_general_cannot_delete_parade_date(client):
     sqn_hdr = _sqn_admin_hdr(client)
     year = _make_year(client, sqn_hdr)
