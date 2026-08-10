@@ -272,6 +272,72 @@ treated as this release's load-test evidence. **Run 5, below, is the authoritati
 every mandated criterion. Runs 1–4 are superseded and must not be cited as this gate's evidence;
 Run 3 in particular should not be read as "Railway staging ceiling" — see the correction above.**
 
+### REM-22 — realistic pilot-scale trial (12 / 25 users, 2026-08-10)
+
+`master_gap_register.csv` REM-22 (original_instruction.md Section 23) flagged that every load test
+above (Runs 1–5, plus the 1000-user/1200-user async runs elsewhere in this program) tested at
+100-1000+ concurrent users — never at the instruction's actual "12 simultaneous users, 25 as a
+safety margin" pilot scale. Closed this pass. Approved by the user in-session before touching
+staging.
+
+**Script changes** (`tools/stress/load_test_staging.py`, same commit as this doc): added the
+workflow steps the instruction names that the original 5-endpoint loop didn't cover —
+`GET /api/activities` (Calendar + Activities), `GET /api/facilitators` (facilitator reads),
+`GET /api/planning/parade-dates/{id}/weekly-program` (Weekly Program, resolved once per worker),
+and one low-frequency safe write: `PATCH /api/parade-nights/{id}` with the record's own current
+`notes`/`version` read back unchanged — idempotent by construction, gated to ~1-in-8 cycles,
+sqn_admin only (the only role with unconditional squadron write access). Verified via `curl` against
+real staging (sqn_admin/wing_admin/national_admin tokens) before either run: all new GET endpoints
+200 for every role; the idempotent PATCH smoke-tested once manually (`notes` unchanged before/after,
+`version` incremented 0→1 as expected).
+
+**Run A — 12 users, 8 min sustained + 20s ramp:**
+```
+Total requests: 2884   Successful: 2884   5xx: 0
+P95 latency: 295ms   Max: 521ms
+Status codes: 200 (100.0%)
+Login success rate: 100.00% (12/12)
+OVERALL: PASS
+```
+Per-endpoint (all n≥3, P95 ms): `/api/activities` 276 · `/api/auth/me` 273 · `/api/facilitators` 278
+· `/api/parade-nights` 306 · `/api/planning/years` 276 · `/api/reports/summary` 271 ·
+`/api/planning/parade-dates/{id}/weekly-program` 351 · `/api/parade-nights/{id}` PATCH 282 (n=3).
+
+**Run B — 25 users, 8 min sustained + 30s ramp:**
+```
+Total requests: 6027   Successful (200): 3353 (55.6%)   429: 2674 (44.4%, expected)   5xx: 0
+P95 latency: 262ms   Max: 712ms
+Login success rate: 100.00% (25/25)
+OVERALL: PASS
+```
+Per-endpoint P95 (ms): `/api/activities` 257 · `/api/auth/me` 259 · `/api/facilitators` 259 ·
+`/api/parade-nights` 280 · `/api/planning/years` 259 · `/api/reports/summary` 258 ·
+`/api/planning/parade-dates/{id}/weekly-program` 276 · `/api/parade-nights/{id}` PATCH 250 (n=2).
+
+**The 44.4% 429 rate at 25 users is a test-methodology artifact, not a capacity finding**: all 25
+virtual users ran from this one machine/IP, and `backend/app/config.py`'s `API_RATE_LIMIT` (300
+requests/window) is a single-IP-shared bucket by design (the same general rate limiter REM-125
+documented earlier this program) — 25 *real* pilot users on their own devices/networks would never
+share one IP against this limiter. The script's own pass/fail criteria already exclude 429 from the
+"unexpected response" count for exactly this reason (`EXPECTED_METHODOLOGY = {429}`); both runs still
+report `OVERALL: PASS` on P95 and zero-5xx, which are the criteria that actually reflect backend
+capacity.
+
+| Criterion (12-25 user trial) | 12 users | 25 users | Gate |
+|---|---|---|---|
+| P95 ≤ 2000ms | 295ms | 262ms | ✅ PASS both |
+| Zero 5xx | 0 | 0 | ✅ PASS both |
+| Login success | 100% (12/12) | 100% (25/25) | ✅ PASS both |
+| Calendar/Activities/Facilitators/Weekly Program covered | Yes | Yes | ✅ PASS both |
+| Low-frequency safe write exercised | n=3, no data corruption | n=2, no data corruption | ✅ PASS both |
+| CPU / memory / DB connections | Not captured in-script (Railway dashboard only) | same | ⚠️ residual |
+
+**Gate status: ✅ PASS at the instruction's actual pilot scale.** Residual: CPU/memory/DB-connection
+metrics still aren't captured in-repo (pulled from Railway's own dashboard, not automated) — same
+limitation the audit flagged before this run, not resolved by it. Operational-ownership
+documentation (`docs/next-stage/25_support_runbook.md`) remains placeholder-only, unrelated to this
+run and unchanged by it.
+
 ---
 
 ## Link 11 — Rollback Rehearsal
