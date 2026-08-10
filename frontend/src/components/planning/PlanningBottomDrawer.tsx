@@ -340,11 +340,11 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                     {/* Title */}
                     <td style={{ maxWidth: 240 }}>{m.title}</td>
                     {/* Phase */}
-                    <td style={{ fontSize: 10, color: "var(--muted-text)" }}>{m.phase}</td>
+                    <td style={{ color: "var(--muted-text)" }}>{m.phase}</td>
                     {/* Element */}
-                    <td style={{ fontSize: 10 }}>{m.element ? m.element.replace(/_/g, " ") : "—"}</td>
+                    <td>{m.element ? m.element.replace(/_/g, " ") : "—"}</td>
                     {/* Instructor suitability */}
-                    <td style={{ fontSize: 10 }}>{m.instructor_suitability ? (SUITABILITY_SHORT[m.instructor_suitability] ?? m.instructor_suitability) : "—"}</td>
+                    <td>{m.instructor_suitability ? (SUITABILITY_SHORT[m.instructor_suitability] ?? m.instructor_suitability) : "—"}</td>
                     {/* Duration */}
                     <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{m.duration_minutes}m</td>
                     {/* Rec. Term */}
@@ -417,7 +417,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                         Classes yet. */}
                     <td>
                       {m.class_breakdown.length === 0 ? (
-                        <span style={{ color: "var(--muted-text)", fontSize: 10 }}>—</span>
+                        <span style={{ color: "var(--muted-text)" }}>—</span>
                       ) : (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                           {m.class_breakdown.map(cb => (
@@ -657,7 +657,7 @@ function FacilitatorLeaveSection({
                 <input value={leaveNotes} onChange={e => setLeaveNotes(e.target.value)} placeholder="Optional additional notes" style={inputSx} />
               </label>
             </div>
-            {leaveErr && <div style={{ color: "var(--aafc-red)", fontSize: 12, marginBottom: 6 }}>{leaveErr}</div>}
+            {leaveErr && <div style={{ color: "var(--aafc-red)", fontSize: 11, marginBottom: 6 }}>{leaveErr}</div>}
             <div style={{ display: "flex", gap: 8 }}>
               <button className="btn sm primary" onClick={handleAddLeave} disabled={leaveSaving}>
                 {leaveSaving ? "Saving…" : "Add leave"}
