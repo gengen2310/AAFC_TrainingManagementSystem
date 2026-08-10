@@ -4,6 +4,15 @@ Durable source of context for the "Complete System Remediation, Integration and
 Workflow Program" instruction. Update this continuously so a future session can
 resume without relying on chat history.
 
+**The full original instruction text is recovered and saved verbatim at
+[`docs/remediation/original_instruction.md`](original_instruction.md)** — its
+real title is "AAFC TMS — COMPLETE SYSTEM REMEDIATION, INTEGRATION AND WORKFLOW
+PROGRAM", 27 numbered sections. It was pasted into chat on 2026-08-04, was never
+committed to the repo at the time, and was recovered on 2026-08-10 from that
+chat session's own transcript after it could no longer be found on GitHub. Use
+that file directly (not this summary) when auditing a gap-register item against
+"this instruction."
+
 ## Branch / baseline
 
 - Branch: `remediation/2026-08-04-complete-system-remediation`, created from `main` @
