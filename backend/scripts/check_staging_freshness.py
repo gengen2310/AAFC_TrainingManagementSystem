@@ -6,8 +6,23 @@ redeployed promptly after a merge to main touches backend/ -- REM-111 found a
 merged endpoint 404ing on staging for ~24h because nothing had redeployed,
 caught only because a regression test happened to exercise that exact route.
 This gives an explicit check instead. Relies on GET /api/health/ready's
-`commit` field (RAILWAY_GIT_COMMIT_SHA, injected by Railway at runtime; see
-backend/app/routers/health.py).
+`commit` field (see backend/app/routers/health.py).
+
+IMPORTANT -- this only works if the deploy step sets APP_BUILD_COMMIT first.
+RAILWAY_GIT_COMMIT_SHA does NOT reliably reflect what a `railway up` CLI
+upload actually deployed (confirmed live, 2026-08-10: it stayed 5 days stale
+across a real CLI deploy) -- this project's services are all deployed via
+`railway up` from a local working tree, not GitHub-integration-triggered
+builds, so that variable only ever reflects the latter. Set the real value
+explicitly as part of every deploy:
+
+    railway variable set APP_BUILD_COMMIT="$(git rev-parse HEAD)" \\
+        --project <id> --environment <id> --service <id>
+    railway up --project <id> --environment <id> --service <id> ...
+
+Skipping the `variable set` step means the freshness check will report a
+stale/wrong commit (or "local") even for a fresh deploy -- it is not
+optional.
 
 Deliberately does not import requests/SQLAlchemy — only the standard library,
 so it runs in a bare CI container or a quick local pre-deploy check with

@@ -14,10 +14,22 @@ router = APIRouter(prefix="/api/health", tags=["health"])
 # equivalent). The backend had no equivalent at all, so a staging redeploy gap
 # like REM-111/REM-112 (a merged endpoint 404ing on staging for ~24h because
 # nothing had redeployed) could only be caught by a regression test happening
-# to exercise the missing route, not by a direct check. Railway sets this env
-# var automatically at runtime; "local" is the same fallback convention the
-# frontends already use for local dev where it's unset.
-_BUILD_COMMIT = os.environ.get("RAILWAY_GIT_COMMIT_SHA", "local")
+# to exercise the missing route, not by a direct check.
+#
+# RAILWAY_GIT_COMMIT_SHA is NOT reliable for this project's actual deploy
+# method: confirmed live (2026-08-10) that it stays stale across `railway up`
+# CLI uploads (this repo's real deployment mechanism for all 3 services, see
+# docs/beta/00_release_state.md's own prior finding: "meta.commitSha: null...
+# there is no git commit on record for what is actually running in
+# production" for CLI-pushed deploys) -- it only reflects a GitHub-
+# integration-triggered build, which this project's services don't use.
+# APP_BUILD_COMMIT is a project-controlled variable instead: set explicitly
+# via `railway variable set APP_BUILD_COMMIT=$(git rev-parse HEAD) ...`
+# immediately before each `railway up` (see
+# backend/scripts/check_staging_freshness.py's own docstring for the full
+# deploy-step sequence). Falls back to RAILWAY_GIT_COMMIT_SHA in case a
+# future deploy method DOES populate it correctly, then "local" for dev.
+_BUILD_COMMIT = os.environ.get("APP_BUILD_COMMIT") or os.environ.get("RAILWAY_GIT_COMMIT_SHA", "local")
 
 
 @router.get("")
