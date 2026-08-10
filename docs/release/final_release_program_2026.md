@@ -3384,3 +3384,101 @@ staging_evidence fields updated to reflect the deploy and fingerprint
 check without over-claiming a fresh live-flow re-test on staging (the
 local pytest/e2e coverage recorded in §62/§63 already proved the rendered
 behaviour; this deploy ships that same, already-verified code).
+
+## 66. REM-13 Phase A — true cross-wing National calendar rollup, and wiring the already-built scope-aware Activities API into Wing HQ Calendar for the first time
+
+With §57-65's backlog cleared, the next unblocked large item from the
+REM-01..79 severity sweep was REM-13 ("Unified Training Calendar"), chosen
+by the user from three candidates over REM-26 (dormant ProgramPackage
+subsystem) and REM-01 (5-pair model consolidation audit). Given the choice
+between building straight away or designing first, and given this was a
+genuine feature build rather than a scoped bug fix, this went through
+Plan Mode the same way CLASS-10 did — researched via a dedicated Explore
+pass before any code was written.
+
+**What research found reshaped the scope.** The gap register's own text
+implied a large, mostly-unbuilt feature. In fact:
+- The backend Activities API (`GET /api/activities`) already has full
+  national/wing/squadron `scope_type` support, CEA-import merging, holiday
+  merging, and visibility inheritance — built during an earlier stage, but
+  connected-frontend's Wing HQ Calendar never called it with `scope_type`
+  at all, so Activities were completely invisible on that page.
+- A real month-grid calendar already exists for single-wing view
+  (`renderWingCalendarGrid()`, added under REM-73) — the "no real grid,
+  only a table" premise in the register's older text was stale.
+- What was genuinely, completely missing: a true cross-wing National
+  rollup. `national_admin`/`system_admin` could only inspect one wing at a
+  time via a picker — REM-73's own residual-limitation note already named
+  this precisely ("the backend has no endpoint that aggregates WingHQEvent
+  across all wings").
+
+Given the full "unified calendar across 4 scopes + Notices overlay" ask is
+much larger than one pass, this pass (Phase A) targeted exactly the two
+concretely-missing, highest-value, lowest-risk pieces — reusing existing
+infrastructure rather than building a new calendar system — and explicitly
+named everything else as deferred rather than silently dropped: the
+Notices/deadlines overlay (that's REM-34's own scope — `PlanningNotice` has
+no wing/national query capability today, and zero connected-frontend UI
+exists for it at all); the squadron calendar (`renderCal()`) migrating onto
+the same scope-aware Activities path (a real, separate finding — it
+currently uses a legacy fetch that doesn't get CEA/holiday merging — but a
+squadron-daily-use-page change deserves its own review, not a side effect
+here); and one shared calendar component across all 4 scopes (kept
+`renderCal()` and `renderWingCalendarGrid()` as two separate, working
+components rather than a risky merge).
+
+**Backend (`backend/app/routers/wing_calendar.py`).** `GET
+/api/wing-calendar/events`'s `wing_id` is now optional. Supplied → byte-
+identical behaviour to before (same query, same response shape — zero
+regression risk for every existing caller). Omitted → requires a
+`NATIONAL_LEVEL` role (400 `wing_id_required` otherwise, a caller mistake,
+not a scope violation) and switches the query's `WingHQEvent.wing_id ==
+wing_id` filter to `.in_(all_active_wing_ids)` — one SQL query, not an
+N+1 loop, so pagination/filter semantics stay identical to the single-wing
+path. `_event_out()` gained `wing_code`/`wing_name` (batched Wing lookup)
+so a merged/aggregated response lets the caller label which wing each
+event came from.
+
+**connected-frontend.** An "All Wings" option in the existing `wc-wing-sel`
+picker (national_admin/system_admin only — wing_admin's own view is
+completely unaffected, still driven by their session's own `wing_id`).
+`loadWingCalendar()` now also calls `/api/activities?scope_type=wing|
+national` in parallel and merges the results in, normalized into the same
+shape the grid already renders, tagged `source:'activity'`. Since an
+Activity's id is a different table than `WingHQEvent`'s, merged chips get
+no click handler (clicking would 404 against `openWingEventDetail()`) and
+a visually distinct dashed style — matching this codebase's own existing
+convention of Activities being info-only, non-click-through chips on the
+squadron calendar grid. The table view got the same treatment (WingHQEvent-
+only columns degrade to `—` instead of leaking the literal string
+`"undefined"` into the DOM for a merged Activity row). "+ New Event" is
+hidden while "All Wings" is selected (which specific wing a new event
+belongs to is ambiguous in that view, and the backend would reject it).
+
+**A real, useful test-writing detour, not a distraction.** The e2e file
+initially failed in a confusing way: events were created successfully
+(confirmed via a direct API check) but never appeared as visible chips.
+Root cause: the grid caps each day cell at 3 visible chips before
+collapsing into "+N more" overflow, and repeated earlier debug runs
+(mine, this same session) had piled over a dozen leftover same-day test
+events into the local dev DB, pushing the test's own new chips out of the
+visible 3. Not a product bug — a test-data hygiene gap. Fixed by spreading
+each test run's event dates across the month (derived from the run's own
+timestamp) instead of always using "today", and by cleaning out the
+accumulated stray events. Documented here rather than silently reverted,
+since it's a real, reusable lesson for future date-based e2e tests in this
+suite (matching this program's own "record findings, don't just fix and
+move on" discipline).
+
+**Verification.** 6 new backend tests + 3 new e2e tests (full detail in
+the gap register). Full backend suite: 1365 passed, 5 skipped, the same 2
+pre-existing unrelated failures as every other pass this session (verified
+via `git stash` before this change). Deployed to staging 2026-08-10
+(backend deployment `f1593a38`, connected-frontend deployment `9966a9cb`)
+and live-verified via a real API round-trip against staging Postgres as
+`national_admin`: created events in two different wings, confirmed the
+national rollup returns both with correct `wing_code` tags, confirmed
+`wing_admin` omitting `wing_id` gets a clean 400 rather than silently
+seeing "All Wings". No Claude-in-Chrome browser was available this
+session — gap register status reflects this (staging-verified via API,
+pending a human visual pass), not claimed as fully closed.
