@@ -9045,7 +9045,7 @@ function _renderPareto(chart){
 async function loadCommandDashboard(scope){
   const containerId=scope==='wing'?'cmd-dash-wing':'cmd-dash-national';
   const host=document.getElementById(containerId); if(!host)return;
-  host.innerHTML='<div class="card"><div class="ph-title" style="font-size:15px">Training Dashboard</div><div class="muted" style="font-size:12px">Loading…</div></div>';
+  host.innerHTML='<div class="card"><h1 class="ph-title" style="font-size:15px">Training Dashboard</h1><div class="muted" style="font-size:12px">Loading…</div></div>';
   const win=S.cmdWindow||'term';
   const wingId=(S.role==='system_admin')?saBrowseWingId():null;
   let url='/api/dashboard/command?window='+encodeURIComponent(win);
@@ -9059,7 +9059,7 @@ async function loadCommandDashboard(scope){
 
   const proxyBanner=proxyActive()?`<div style="font-size:11px;color:var(--warn);background:var(--warn-bg);border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block">Delegated Intervention active — protected writes enabled.</div>`:'';
   let html=`<div class="ph" style="margin-bottom:6px">
-    <div class="ph-title">Training Dashboard</div>
+    <h1 class="ph-title">Training Dashboard</h1>
     <div class="ph-sub">
       Viewing as: ${esc(S.role||'')} · Scope: ${esc(d.scope==='wing'?'Wing':'National')}${d.wing_name?' — '+esc(d.wing_name):''} ·
       Period: <select id="cmd-window-sel" onchange="S.cmdWindow=this.value;loadCommandDashboard('${scope}')" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px" aria-label="Reporting period">
@@ -9071,12 +9071,12 @@ async function loadCommandDashboard(scope){
     ${proxyBanner}
   </div>`;
 
-  html+=`<div style="font-size:11.5px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 6px">A — Immediate Training Readiness</div>`;
+  html+=`<h2 style="font-size:11.5px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 6px">A — Immediate Training Readiness</h2>`;
   html+=_cmdCard(d.sections.A.readiness_matrix,_renderReadinessMatrix(d.sections.A.readiness_matrix,scope));
   html+=_cmdCard(d.sections.A.risk_forecast,_renderRiskTimeline(d.sections.A.risk_forecast));
   html+=_cmdCard(d.sections.A.immediate_issues,_chartStackedBarH(d.sections.A.immediate_issues));
 
-  html+=`<div style="font-size:11.5px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.03em;margin:18px 0 6px">B — Training Delivery Performance</div>`;
+  html+=`<h2 style="font-size:11.5px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.03em;margin:18px 0 6px">B — Training Delivery Performance</h2>`;
   html+=_cmdCard(d.sections.B.weekly_delivered,_chartStackedBar(d.sections.B.weekly_delivered));
   html+=_cmdCard(d.sections.B.reliability_trend,_chartLine(d.sections.B.reliability_trend));
   html+=_cmdCard(d.sections.B.outcomes_by_unit,_chartStackedBar100(d.sections.B.outcomes_by_unit));
@@ -9099,7 +9099,7 @@ function renderWing(){
   const medRead=reads.length?(reads.length%2?reads[(reads.length-1)/2]:Math.round((reads[reads.length/2-1]+reads[reads.length/2])/2)):null;
   const highRisk=rows.filter(r=>r.no_published_plan||r.no_future_plan||(+r.not_delivered||0)>2||(+r.coverage_pct||0)<34).length;
   const noData=rows.filter(r=>(+r.nights||0)===0||(+r.sessions||0)===0).length;
-  let html=`<div class="ph"><div class="ph-title">${S.scopeName||'Wing'} — Training Assurance</div><div class="ph-sub">Oversight across ${rows.length} squadrons</div></div>`;
+  let html=`<div class="ph"><h2 class="ph-title">${S.scopeName||'Wing'} — Training Assurance</h2><div class="ph-sub">Oversight across ${rows.length} squadrons</div></div>`;
   html+=`<div class="stats-grid">
     <div class="stat"><div class="sval">${rows.length}</div><div class="slbl">Total SQNs</div></div>
     <div class="stat ${medRead==null?'':(medRead>=67?'s-ok':medRead>=34?'s-warn':'s-red')}"><div class="sval">${medRead==null?'—':medRead}</div><div class="slbl">Median Readiness</div></div>
@@ -9177,7 +9177,7 @@ function renderNational(){
   const delPct=sessions?Math.round(delivered/sessions*100):0;
   const avgCov=wings.length?Math.round(wings.reduce((a,w)=>a+(+w.coverage_pct||0),0)/wings.length):0;
   const atRisk=wings.filter(w=>(+w.not_delivered||0)>2||(+w.coverage_pct||0)<34).length;
-  let html=`<div class="ph"><div class="ph-title">National HQ — Assurance Overview</div><div class="ph-sub">${wings.length} wings · ${sqs} squadrons</div></div>`;
+  let html=`<div class="ph"><h2 class="ph-title">National HQ — Assurance Overview</h2><div class="ph-sub">${wings.length} wings · ${sqs} squadrons</div></div>`;
   html+=`<div class="stats-grid">
     <div class="stat s-purple"><div class="sval">${wings.length}</div><div class="slbl">Wings</div></div>
     <div class="stat"><div class="sval">${sqs}</div><div class="slbl">Squadrons</div></div>

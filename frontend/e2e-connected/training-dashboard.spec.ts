@@ -75,6 +75,34 @@ test("System Administrator opens the National Training Dashboard", async ({ page
   await expect(page.getByText("National HQ — Assurance Overview")).toBeVisible();
 });
 
+// REM-115 residual: Wing/National Overview previously had zero real headings
+// (the .ph-title page title and the A/B section labels were all plain divs),
+// unlike the 14 other pages REM-115's main pass already converted. Each of
+// these two pages now has exactly one <h1> ("Training Dashboard", the page's
+// primary heading) with the pre-existing "A —"/"B —" section labels and the
+// page's own "{scope} — Training/Assurance ..." sub-heading demoted to <h2>
+// siblings -- not left as unlabelled divs, and not given a second competing
+// <h1>.
+test("National Overview has exactly one h1, and its section headings are real headings not divs", async ({ page }) => {
+  await loginNational(page, "SYSADMIN2026");
+  const page1 = page.locator("#page-national");
+  await expect(page1.locator("h1")).toHaveCount(1);
+  await expect(page1.locator("h1")).toHaveText("Training Dashboard");
+  await expect(page1.locator("h2", { hasText: "A — Immediate Training Readiness" })).toBeVisible();
+  await expect(page1.locator("h2", { hasText: "B — Training Delivery Performance" })).toBeVisible();
+  await expect(page1.locator("h2", { hasText: "National HQ — Assurance Overview" })).toBeVisible();
+});
+
+test("Wing Overview has exactly one h1, and its section headings are real headings not divs", async ({ page }) => {
+  await loginWing(page, "ADMIN7WG");
+  const page1 = page.locator("#page-wing-overview");
+  await expect(page1.locator("h1")).toHaveCount(1);
+  await expect(page1.locator("h1")).toHaveText("Training Dashboard");
+  await expect(page1.locator("h2", { hasText: "A — Immediate Training Readiness" })).toBeVisible();
+  await expect(page1.locator("h2", { hasText: "B — Training Delivery Performance" })).toBeVisible();
+  await expect(page1.locator("h2", { hasText: "Training Assurance" })).toBeVisible();
+});
+
 // 2. System Administrator selects 7 Wing.
 test("System Administrator drills into 7 Wing via the scope selector", async ({ page }) => {
   await loginNational(page, "SYSADMIN2026");
