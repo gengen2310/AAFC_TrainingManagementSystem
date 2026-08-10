@@ -3553,3 +3553,54 @@ full visual pass.
 REM-23 is now 3 of 6 categories done. Notice Type and Training Area
 Capability remain, ready to replicate on request via the identical
 pattern; Training Stage stays deliberately blocked on REM-26.
+
+## 68. The two pre-existing flaky backend tests, root-caused and fixed — first fully clean full-suite run all session
+
+With the REM-15..79 severity sweep genuinely blocked on a missing original
+spec document (see the user's own note to paste it once found) and every
+other quickly-actionable item exhausted, this pass used the time to
+finally root-cause the two test failures that had shown up, identically,
+in *every single* full-suite run this entire session — each time
+independently confirmed via `git stash` to be unrelated to whatever
+feature was being worked, and each time just re-noted rather than fixed,
+since the actual cause hadn't been chased down. Beta-release gate #1
+("backend tests pass") had never actually been fully green this session;
+it always shipped with a caveat. This pass closes that gap for real.
+
+**`test_facilitator_schedule.py::test_squadron_admin_sees_own_facilitators_and_session_items`.**
+The test's own date arithmetic was the bug: a fixed `today + 144 days`
+offset, chosen specifically to land just past `seed_all()`'s seeded Friday
+range while staying inside the current calendar year (`window=year`'s
+query bound). That reasoning only holds for roughly the first 220 days of
+the year — run the suite any day from ~August 20 onward and `today+144`
+silently crosses into next January, landing outside the query window it's
+supposed to stay inside. Confirmed directly: on `2026-08-10`, `today+144`
+= `2027-01-01`. Replaced with a year-end anchor (`date(today.year, 12,
+27)`) that is in-year by construction regardless of what day the suite
+runs, keeping the original's Friday-avoidance logic and adding a fallback
+for the (rare) case where the suite itself runs in the last few days of
+December.
+
+**`test_session_audience.py::test_split_session_removes_one_class_without_losing_the_others`.**
+A relative `days_ahead=29` offset happened, today, to land on `2026-09-08`
+— the exact literal date
+`test_org_account_linking.py::test_sysadmin_enter_intervention_then_write_succeeds_and_is_audited`
+hardcodes for the same squadron's parade night. A relative date is not
+collision-safe against another file's absolute literal — the same class
+of issue `test_class_curriculum_progress.py`'s own comment already
+documents having hit and fixed once, in a different file, differently.
+Neither the obvious insertion path (`POST /parade-nights`) nor the
+Planning-module's auto-sync (`_find_or_create_parade_night`) showed the
+target date when traced individually — the actual source only surfaced
+by attaching a SQLAlchemy `before_insert` event listener to the
+`ParadeNight` model and correlating against `PYTEST_CURRENT_TEST` (which
+pytest sets automatically during test execution), catching every
+insertion path in one shot regardless of which router or code path it
+came through. Fixed by moving the offset to `209`, clear of every other
+`days_ahead` value used across the file and the two other files that use
+`days_ahead=200`.
+
+**Verification.** Full suite run twice in a row after both fixes: `1392
+passed, 5 skipped, 0 failed` both times — the first genuinely clean,
+no-caveat run of this entire session. No product code changed; both
+fixes are test-only.
