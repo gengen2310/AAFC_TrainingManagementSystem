@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+import { loginPW } from "../e2e-login-helper";
 
 // DEFECT-004: playwright-global-setup.ts resets rate limits once per full
 // suite invocation, which is not always enough for a large suite -- a
@@ -17,8 +18,7 @@ test.beforeAll(async () => {
 
 test("wing admin can enter and exit proxy mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Access code").fill("ADMIN7WG");
-  await page.getByRole("button", { name: "Log in" }).click();
+  await loginPW(page, "ADMIN7WG");
   // WingOverview renders <h1>Wing Assurance</h1>
   await expect(page.getByRole("heading", { name: /wing assurance/i })).toBeVisible({ timeout: 10000 });
   // Select a squadron and enter proxy. Exact match: Block 8 added a second,
@@ -36,8 +36,7 @@ test("wing admin can enter and exit proxy mode", async ({ page }) => {
 
 test("wing viewer cannot enter proxy mode", async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Access code").fill("7WG2026");
-  await page.getByRole("button", { name: "Log in" }).click();
+  await loginPW(page, "7WG2026");
   // WingOverview renders <h1>Wing Assurance</h1>
   await expect(page.getByRole("heading", { name: /wing assurance/i })).toBeVisible({ timeout: 10000 });
   // Wing viewer sees the proxy entry button but it must be disabled (not clickable)

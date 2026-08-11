@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+import { loginPW } from "../e2e-login-helper";
 
 // DEFECT-004: playwright-global-setup.ts resets rate limits once per full
 // suite invocation, which is not always enough for a large suite -- a
@@ -16,8 +17,7 @@ test.beforeAll(async () => {
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Access code").fill("ADMIN703");
-  await page.getByRole("button", { name: "Log in" }).click();
+  await loginPW(page, "ADMIN703");
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
 });
 
@@ -50,9 +50,10 @@ test("dashboard shows all curriculum phases including zero-value ones", async ({
   // chart is zero-value — confirms phases are never hidden for having no data.
   // beforeEach already logged in as ADMIN703; sign out before switching users.
   await page.getByRole("button", { name: /sign out/i }).click();
-  await expect(page.getByLabel("Access code")).toBeVisible({ timeout: 10000 });
-  await page.getByLabel("Access code").fill("ADMIN704");
-  await page.getByRole("button", { name: "Log in" }).click();
+  // REM-84: the Access code field is no longer the first thing shown after
+  // sign-out -- login now starts at unit-type selection.
+  await expect(page.getByLabel("Login as")).toBeVisible({ timeout: 10000 });
+  await loginPW(page, "ADMIN704");
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
   for (const phase of ["A. Orientation", "B. Initial", "C. Junior", "D. Intermediate", "E. Senior", "I. Bronze", "J. Silver", "K. Gold"]) {
     await expect(page.getByText(phase, { exact: true })).toBeVisible();

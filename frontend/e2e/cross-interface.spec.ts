@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+import { loginPW } from "../e2e-login-helper";
 
 // DEFECT-004: playwright-global-setup.ts resets rate limits once per full
 // suite invocation, which is not always enough for a large suite -- a
@@ -19,8 +20,7 @@ test.beforeAll(async () => {
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Access code").fill("ADMIN703");
-  await page.getByRole("button", { name: "Log in" }).click();
+  await loginPW(page, "ADMIN703");
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
 });
 

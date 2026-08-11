@@ -23,14 +23,14 @@ test.beforeAll(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000");
 });
 import AxeBuilder from "@axe-core/playwright";
+import { loginPW } from "../e2e-login-helper";
 
 const SQN_ADMIN = "ADMIN703";
 const SQN_GENERAL = "703SQN2026";
 
 async function loginAs(page: import("@playwright/test").Page, code: string) {
   await page.goto("/");
-  await page.getByLabel("Access code").fill(code);
-  await page.getByRole("button", { name: "Log in" }).click();
+  await loginPW(page, code);
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
 }
 
@@ -236,8 +236,7 @@ test.describe("Accessibility — Settings", () => {
 test.describe("Accessibility — Wing/National Assurance (Command Dashboard)", () => {
   test("wing assurance has no critical/serious/moderate violations", async ({ page }) => {
     await page.goto("/");
-    await page.getByLabel("Access code").fill("ADMIN7WG");
-    await page.getByRole("button", { name: "Log in" }).click();
+    await loginPW(page, "ADMIN7WG");
     await expect(page.getByRole("heading", { name: /wing assurance/i })).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(/Command Dashboard/i)).toBeVisible({ timeout: 10000 });
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
@@ -246,8 +245,7 @@ test.describe("Accessibility — Wing/National Assurance (Command Dashboard)", (
 
   test("national assurance has no critical/serious/moderate violations", async ({ page }) => {
     await page.goto("/");
-    await page.getByLabel("Access code").fill("ADMINNATIONAL");
-    await page.getByRole("button", { name: "Log in" }).click();
+    await loginPW(page, "ADMINNATIONAL");
     await expect(page.getByRole("heading", { name: /national assurance/i })).toBeVisible({ timeout: 10000 });
     // .first() -- REM-72's wing-drill-down selector label also contains
     // "Command Dashboard", making this text ambiguous on National Assurance.

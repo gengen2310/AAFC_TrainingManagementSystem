@@ -20,7 +20,7 @@
 .empty{text-align:center;color:var(--muted-text);padding:30px;}
 .login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--background);}
 .login-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:32px;width:360px;}
-.login-box input{width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:12px;}
+.login-box input,.login-box select{width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:12px;background:var(--surface);color:var(--text);}
 .login-box label{font-size:12px;font-weight:700;display:block;margin-bottom:5px;}
 .err{color:var(--aafc-red);font-size:12px;font-weight:700;margin-bottom:10px;}
 .bar{height:8px;background:var(--border);border-radius:5px;overflow:hidden;}

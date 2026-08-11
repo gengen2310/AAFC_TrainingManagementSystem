@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+import { loginPW } from "../e2e-login-helper";
 
 // DEFECT-004: playwright-global-setup.ts resets rate limits once per full
 // suite invocation, which is not always enough for a large suite -- a
@@ -36,8 +37,7 @@ const GENERAL_CODE = "703SQN2026";
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/");
-  await page.getByLabel("Access code").fill(ADMIN_CODE);
-  await page.getByRole("button", { name: "Log in" }).click();
+  await loginPW(page, ADMIN_CODE);
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
 });
 
@@ -185,8 +185,7 @@ test("sqn_general can access the reports page", async ({ page }) => {
   await page.getByRole("button", { name: /sign out/i }).click();
   await expect(page.getByRole("button", { name: "Log in" })).toBeVisible({ timeout: 5000 });
 
-  await page.getByLabel("Access code").fill(GENERAL_CODE);
-  await page.getByRole("button", { name: "Log in" }).click();
+  await loginPW(page, GENERAL_CODE);
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
 
   await page.goto("/reports");

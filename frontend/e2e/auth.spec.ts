@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+import { loginPW } from "../e2e-login-helper";
 
 // DEFECT-004: playwright-global-setup.ts resets rate limits once per full
 // suite invocation, which is not always enough for a large suite -- a
@@ -19,13 +20,21 @@ test.beforeAll(async () => {
 test.describe("Login", () => {
   test("valid sqn_admin login reaches dashboard", async ({ page }) => {
     await page.goto("/");
-    await page.getByLabel("Access code").fill("ADMIN703");
-    await page.getByRole("button", { name: "Log in" }).click();
+    await loginPW(page, "ADMIN703");
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
   });
 
+  // REM-84: an invalid CODE for an otherwise-correctly-resolved account (not
+  // an unmapped/unknown code -- that's a different, ordinary "no such
+  // combination" case at the lookup step, not what this test is about) --
+  // exercises the same error path the old single-field flow tested, just
+  // reached via unit/wing/squadron/role selection first.
   test("invalid code shows error alert and stays on login page", async ({ page }) => {
     await page.goto("/");
+    await page.getByLabel("Login as").selectOption("squadron");
+    await page.getByLabel("Wing", { exact: true }).selectOption("7WG");
+    await page.getByLabel("Squadron / Unit").selectOption("703");
+    await page.getByLabel("Role", { exact: true }).selectOption("sqn_admin");
     await page.getByLabel("Access code").fill("NOTACODE");
     await page.getByRole("button", { name: "Log in" }).click();
     await expect(page.getByRole("alert")).toBeVisible({ timeout: 5000 });
@@ -40,8 +49,7 @@ test.describe("Login", () => {
 
   test("logout clears session and returns to login", async ({ page }) => {
     await page.goto("/");
-    await page.getByLabel("Access code").fill("ADMIN703");
-    await page.getByRole("button", { name: "Log in" }).click();
+    await loginPW(page, "ADMIN703");
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
     // Find and click logout (could be in a menu or nav)
     await page.getByRole("button", { name: /log out|sign out/i }).click();
@@ -57,8 +65,7 @@ test.describe("Login", () => {
 
   test("session expiry forces re-login", async ({ page }) => {
     await page.goto("/");
-    await page.getByLabel("Access code").fill("ADMIN703");
-    await page.getByRole("button", { name: "Log in" }).click();
+    await loginPW(page, "ADMIN703");
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
     // Simulate session expiry: use the Sign out button (which calls the backend logout
     // endpoint AND clears the HttpOnly session cookie). Clearing sessionStorage alone
@@ -73,31 +80,27 @@ test.describe("Login", () => {
 test.describe("Role-based landing", () => {
   test("sqn_general user reaches dashboard", async ({ page }) => {
     await page.goto("/");
-    await page.getByLabel("Access code").fill("703SQN2026");
-    await page.getByRole("button", { name: "Log in" }).click();
+    await loginPW(page, "703SQN2026");
     await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
   });
 
   test("wing_admin user reaches wing overview", async ({ page }) => {
     await page.goto("/");
-    await page.getByLabel("Access code").fill("ADMIN7WG");
-    await page.getByRole("button", { name: "Log in" }).click();
+    await loginPW(page, "ADMIN7WG");
     // WingOverview renders <h1>Wing Assurance</h1>
     await expect(page.getByRole("heading", { name: /wing assurance/i })).toBeVisible({ timeout: 10000 });
   });
 
   test("national_admin user reaches national overview", async ({ page }) => {
     await page.goto("/");
-    await page.getByLabel("Access code").fill("ADMINNATIONAL");
-    await page.getByRole("button", { name: "Log in" }).click();
+    await loginPW(page, "ADMINNATIONAL");
     // NationalOverview renders <h1>National Assurance</h1>
     await expect(page.getByRole("heading", { name: /national assurance/i })).toBeVisible({ timeout: 10000 });
   });
 
   test("auditor user reaches audit log", async ({ page }) => {
     await page.goto("/");
-    await page.getByLabel("Access code").fill("AUDITOR2026");
-    await page.getByRole("button", { name: "Log in" }).click();
+    await loginPW(page, "AUDITOR2026");
     await expect(page.getByRole("heading", { name: /audit/i })).toBeVisible({ timeout: 10000 });
   });
 });

@@ -7,7 +7,7 @@ import type { SessionInfo } from "../api/types";
 interface AuthCtx {
   session: SessionInfo | null;
   loading: boolean;
-  login: (code: string) => Promise<void>;
+  login: (code: string, user_id?: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   exitProxy: () => Promise<void>;
@@ -35,9 +35,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // (e.g. when opened in a new tab from the connected-frontend).
   useEffect(() => { (async () => { await refresh(); setLoading(false); })(); }, [refresh]);
 
-  const login = async (code: string) => {
+  const login = async (code: string, user_id?: string) => {
     queryClient.clear();
-    const r = await authApi.login(code);
+    const r = await authApi.login(code, user_id);
     tokenStore.set(r.token);
     setSession(r.session);
   };

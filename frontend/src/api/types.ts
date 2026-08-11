@@ -11,6 +11,14 @@ export interface Squadron {
   default_start_time: string | null; default_end_time: string | null; default_session_count: number | null;
 }
 export interface Wing { wing_id: string; code: string; name: string; }
+// REM-84: public pre-login org list (GET /api/auth/organisations) and the
+// unit+role -> user_id resolver (POST /api/auth/lookup) that the real,
+// secure production login path requires -- see auth.py's own LoginIn/lookup
+// comments ("production always provides user_id via /lookup").
+export interface LoginOrgSquadron { code: string; name: string; unit_type: string; }
+export interface LoginOrgWing { code: string; name: string; squadrons: LoginOrgSquadron[]; }
+export interface LoginOrganisations { wings: LoginOrgWing[]; }
+export type LoginUnitType = "squadron" | "wing" | "national";
 export interface UserRecord {
   user_id: string; display_name: string; role: string;
   wing_id: string | null; squadron_id: string | null; national_id: string | null;

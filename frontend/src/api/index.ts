@@ -12,6 +12,7 @@ import type {
   NightSummariesResponse, PlanningFacilitatorLeave, FacilitatorLeaveResult,
   FacilitatorWorkload, EquipmentItem, AnchorEvent, PlanningSession,
   DashboardChartsResponse, CadetClassMembership, TrainingClassSummary,
+  LoginOrganisations, LoginUnitType,
 } from "./types";
 
 /** Handles both legacy array shape `[...]` and current `{"conflicts":[...]}` shape. */
@@ -24,7 +25,16 @@ export function parseConflictsList(raw: unknown): PlanningConflict[] {
 }
 
 export const authApi = {
-  login: (code: string) => api.post<{ token: string; session: SessionInfo }>("/api/auth/login", { code }),
+  // REM-84: user_id is optional for backward compatibility (Login Page tests /
+  // any future direct-code callers), but every real login now supplies it via
+  // lookup() first -- see auth.py's LoginIn/login(): omitting it hits the
+  // "legacy scan-all path (used by tests; production always provides user_id
+  // via /lookup)", which skips per-account lockout tracking entirely.
+  login: (code: string, user_id?: string) =>
+    api.post<{ token: string; session: SessionInfo }>("/api/auth/login", user_id ? { code, user_id } : { code }),
+  lookup: (unit_type: LoginUnitType, identifier: string | undefined, role: string) =>
+    api.post<{ user_id: string; display_name: string }>("/api/auth/lookup", { unit_type, identifier, role }),
+  organisations: () => api.get<LoginOrganisations>("/api/auth/organisations"),
   me: () => api.get<{ session: SessionInfo }>("/api/auth/me"),
   logout: () => api.post<{ ok: boolean }>("/api/auth/logout"),
   refresh: () => api.post<{ token: string; session: SessionInfo }>("/api/auth/refresh"),
