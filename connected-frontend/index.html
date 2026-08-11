@@ -1007,6 +1007,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--steel);white-space:nowrap">
             <input type="checkbox" id="curr-f-nolh" onchange="renderCurr()"> Missing Learning Hub link
           </label>
+          <label class="admin-el" style="display:none;font-size:11px;font-weight:400;align-items:center;gap:4px;margin-right:8px"><input type="checkbox" id="curr-show-archived" onchange="_currToggleShowArchived()"> Show archived</label>
         </div>
         <div id="curr-list"></div>
         <div id="curr-drill" class="drill-panel">
@@ -3835,7 +3836,7 @@ async function loadData(){
   }));
   const _parseAreas=a=>{if(!a)return[];if(Array.isArray(a))return a;if(typeof a==='string'){try{const r=JSON.parse(a);return Array.isArray(r)?r:[];}catch(_){return[];}}return[];};
   S.facs=(facs||[]).map(f=>({id:f.facilitator_id,rank:f.current_rank||'',first:f.first_name||'',last:f.last_name||'',type:f.type||'',areas:_parseAreas(f.subject_areas),leave:(f.upcoming_leave||[])}));
-  S.curr=((cur&&cur.items)||[]).map(i=>({id:i.curriculum_id,code:i.code,identifier:i.identifier,partNumber:i.part_number,title:i.title,phase:i.phase,el:i.element,term:i.recommended_term,hours:Math.round((i.duration_minutes||0)/60),type:i.core_status,lh:i.learning_hub_url,progress:i.progress,sessions:i.session_count,owningLevel:i.owning_level,wingId:i.wing_id,owned:i.owning_level==='squadron'}));
+  S.curr=((cur&&cur.items)||[]).map(_mapCurrItem);
   // Governed phase catalogue (master transformation plan Block 10) — falls
   // back to the 8 built-in names if the endpoint is unreachable, same
   // fallback _populateCurrPhases() uses for the curriculum-item form.
@@ -4007,6 +4008,12 @@ async function apiExitProxy(){ return api('/api/proxy/exit',{method:'POST'}); }
 
 function key(k){return 'aafc_'+S.sqn+'_'+k;} // retained for any stray reference; no longer used for storage
 function allCurr(){return S.curr||[];}
+// REM-133: shared field mapping from the raw /api/curriculum response shape --
+// used both for the normal (active-only) load and the archived-list fetch, so
+// the two never drift apart the way S.facs/archived-facilitator mapping once did.
+function _mapCurrItem(i){
+  return {id:i.curriculum_id,code:i.code,identifier:i.identifier,partNumber:i.part_number,title:i.title,phase:i.phase,el:i.element,term:i.recommended_term,hours:Math.round((i.duration_minutes||0)/60),type:i.core_status,lh:i.learning_hub_url,progress:i.progress,sessions:i.session_count,owningLevel:i.owning_level,wingId:i.wing_id,owned:i.owning_level==='squadron',isArchived:!!i.is_archived};
+}
 function facById(id){return (S.facs||[]).find(f=>f.id===id);}
 function facDisplay(f){if(!f)return '—';return [f.rank,f.first,f.last].filter(Boolean).join(' ');}
 function roomById(id){return (S.rooms||[]).find(r=>r.id===id);}
@@ -4705,7 +4712,7 @@ async function scImportCurriculum(){
         failed.map(x=>`${esc(x.identifier||x.code)}: ${esc(x.error)}`).join('<br>')+'</div>';
     }
     // Reload curriculum in state
-    try{const cur=await api('/api/curriculum');S.curr=((cur&&cur.items)||[]).map(i=>({id:i.curriculum_id,code:i.code,identifier:i.identifier,partNumber:i.part_number,title:i.title,phase:i.phase,el:i.element,term:i.recommended_term,hours:Math.round((i.duration_minutes||0)/60),type:i.core_status,lh:i.learning_hub_url,progress:i.progress,sessions:i.session_count,owningLevel:i.owning_level,wingId:i.wing_id,owned:i.owning_level==='squadron'}));}catch(_){}
+    try{const cur=await api('/api/curriculum');S.curr=((cur&&cur.items)||[]).map(_mapCurrItem);}catch(_){}
   }catch(e){
     msg.textContent='Upload error: '+apiErr(e); msg.style.color='var(--red)';
   } finally {
@@ -7487,10 +7494,45 @@ function canEditCurr(e){
   if(e.owningLevel==='wing')return ['national_admin','system_admin','wing_admin'].includes(role);
   return canWriteSquadron()&&e.owned;
 }
+// REM-133: archive existed with no way to see or restore an archived
+// curriculum item -- follows the same "show archived" lazy-fetch pattern
+// already used for Facilitators (_facsToggleShowArchived/doRestoreFacilitator).
+let _archivedCurrList=null;
+async function _currToggleShowArchived(){
+  const checked=(document.getElementById('curr-show-archived')||{}).checked;
+  if(!checked){ renderCurr(); return; }
+  try{
+    _archivedCurrList=(await api('/api/curriculum?include_archived=true')).items.filter(i=>i.is_archived).map(_mapCurrItem);
+  }catch(e){ showToast('Could not load archived curriculum items: '+apiErr(e), true); }
+  renderCurr();
+}
+async function doRestoreCurrItem(id, title){
+  try{
+    await api(`/api/curriculum/${id}/restore`,{method:'POST'});
+    showToast(`'${title}' restored.`);
+    await reloadAndRender();
+    _archivedCurrList=(await api('/api/curriculum?include_archived=true')).items.filter(i=>i.is_archived).map(_mapCurrItem);
+    renderCurr();
+  }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
+}
 function renderCurr(){
+  const showArchived=(document.getElementById('curr-show-archived')||{}).checked;
+  const q=(document.getElementById('curr-search').value||'').toLowerCase();
+  if(showArchived){
+    const list=document.getElementById('curr-list');
+    const items=(_archivedCurrList||[]).filter(e=>!q||e.title.toLowerCase().includes(q)||e.code.toLowerCase().includes(q));
+    list.innerHTML=items.length?`<div class="tw"><table><thead><tr><th>Code</th><th>Title</th><th>Phase</th><th></th></tr></thead><tbody>${
+      items.map(e=>`<tr>
+        <td style="font-weight:700">${esc(e.code)} <span class="badge b-grey">Archived</span></td>
+        <td>${esc(e.title)}</td>
+        <td>${phBadge(e.phase)}</td>
+        <td style="text-align:right">${canEditCurr(e)?`<button class="btn btn-xs btn-ok" onclick="doRestoreCurrItem('${e.id}','${_jsAttr(e.title)}')">Restore</button>`:''}</td>
+      </tr>`).join('')
+    }</tbody></table></div>`:`<div class="empty"><div class="et">No archived curriculum items</div><div class="es">${q?'No archived items match your search.':'Nothing has been archived yet.'}</div></div>`;
+    return;
+  }
   const elF=document.getElementById('curr-f-el').value;
   const pgF=document.getElementById('curr-f-prog').value;
-  const q=(document.getElementById('curr-search').value||'').toLowerCase();
   // TRGO-04: let an admin audit which curriculum items have no Learning
   // Hub link, instead of finding out one at a time while browsing.
   const noLhF=(document.getElementById('curr-f-nolh')||{}).checked;

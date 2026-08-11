@@ -369,6 +369,10 @@ export const planningApi = {
   }) => api.patch<Record<string, unknown>>(`/api/planning/sessions/${session_id}`, body),
   deleteSession: (session_id: string) =>
     api.delete<{ ok: boolean }>(`/api/planning/sessions/${session_id}`),
+  restoreSession: (session_id: string) =>
+    api.post<{ ok: boolean }>(`/api/planning/sessions/${session_id}/restore`, {}),
+  archivedSessions: (date_id: string) =>
+    api.get<{ sessions: PlanningSession[] }>(`/api/planning/parade-dates/${date_id}/archived-sessions`),
   overrideConflict: (conflict_id: string, override_reason: string) =>
     api.post<{ ok: boolean }>(`/api/planning/conflicts/${conflict_id}/override`, { override_reason }),
   wingEvents: (wing_id: string, year: number, squadron_id?: string) => {
@@ -439,12 +443,14 @@ export const planningApi = {
     api.get<NightSummariesResponse>(`/api/planning/years/${year_id}/night-summaries`),
 
   // ── Facilitator Leave ───────────────────────────────────────────────────────
-  facilitatorLeave: (fac_id: string) =>
-    api.get<{ leave: PlanningFacilitatorLeave[] }>(`/api/planning/facilitators/${fac_id}/leave`),
+  facilitatorLeave: (fac_id: string, includeArchived = false) =>
+    api.get<{ leave: PlanningFacilitatorLeave[] }>(`/api/planning/facilitators/${fac_id}/leave${includeArchived ? "?include_archived=true" : ""}`),
   addFacilitatorLeave: (fac_id: string, body: { start_date: string; end_date: string; reason?: string; notes?: string }) =>
     api.post<FacilitatorLeaveResult>(`/api/planning/facilitators/${fac_id}/leave`, body),
   deleteFacilitatorLeave: (leave_id: string) =>
     api.delete<{ ok: boolean }>(`/api/planning/facilitator-leave/${leave_id}`),
+  restoreFacilitatorLeave: (leave_id: string) =>
+    api.post<{ ok: boolean }>(`/api/planning/facilitator-leave/${leave_id}/restore`, {}),
 
   // ── Facilitator Workload ────────────────────────────────────────────────────
   facilitatorWorkload: (year_id: string, fac_id: string) =>

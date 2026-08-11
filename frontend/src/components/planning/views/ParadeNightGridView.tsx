@@ -194,6 +194,10 @@ interface Props {
 
 export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props) {
   const [addingNotice, setAddingNotice] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [restoreErr, setRestoreErr] = useState<string | null>(null);
+  const qc = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["planning-weekly", dateId],
@@ -205,6 +209,31 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
     queryFn: () => planningApi.listNotices(dateId),
     staleTime: 60 * 1000,
   });
+
+  // REM-133: session delete existed with no way to see or restore an
+  // archived session -- lazy-fetched only once "Show archived sessions" is
+  // opened, matching this codebase's established show-archived pattern.
+  const { data: archivedData, refetch: refetchArchived } = useQuery({
+    queryKey: ["planning-archived-sessions", dateId],
+    queryFn: () => planningApi.archivedSessions(dateId),
+    enabled: showArchived,
+  });
+
+  async function doRestoreSession(sessionId: string) {
+    setRestoringId(sessionId);
+    setRestoreErr(null);
+    try {
+      await planningApi.restoreSession(sessionId);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["planning-weekly", dateId] }),
+        refetchArchived(),
+      ]);
+    } catch (e: unknown) {
+      setRestoreErr(friendlyMessage(e, "Could not restore this session"));
+    } finally {
+      setRestoringId(null);
+    }
+  }
 
   if (isLoading) return <div className="pw-loading">Loading parade night…</div>;
   if (error || !data) {
@@ -394,6 +423,59 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* ── Archived sessions ──────────────────────────────────────────────── */}
+      <div style={{ marginTop: 14 }}>
+        <button
+          type="button"
+          className="btn sm out"
+          style={{ fontSize: 11 }}
+          onClick={() => setShowArchived(v => !v)}
+        >
+          {showArchived ? "Hide archived sessions" : "Show archived sessions"}
+        </button>
+        {showArchived && (
+          <div style={{ marginTop: 8 }}>
+            {restoreErr && <div className="pw-err" style={{ marginBottom: 6 }}>{restoreErr}</div>}
+            {!archivedData ? (
+              <div className="pw-loading">Loading archived sessions…</div>
+            ) : archivedData.sessions.length === 0 ? (
+              <div style={{ fontSize: 12, color: "var(--muted-text)" }}>No archived sessions for this parade night.</div>
+            ) : (
+              <table className="pw-lv-table">
+                <thead>
+                  <tr>
+                    <th className="pw-lv-th">Title</th>
+                    <th className="pw-lv-th">Group</th>
+                    <th className="pw-lv-th">Facilitator</th>
+                    <th className="pw-lv-th" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {archivedData.sessions.map(s => (
+                    <tr key={s.session_id}>
+                      <td>{s.activity_title ?? "—"}</td>
+                      <td>{s.cadet_group ?? "—"}</td>
+                      <td>{s.facilitator_name ?? "—"}</td>
+                      <td style={{ textAlign: "right" }}>
+                        <button
+                          type="button"
+                          className="btn sm out"
+                          style={{ fontSize: 11 }}
+                          disabled={restoringId === s.session_id}
+                          onClick={() => doRestoreSession(s.session_id)}
+                        >
+                          {restoringId === s.session_id ? "Restoring…" : "Restore"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

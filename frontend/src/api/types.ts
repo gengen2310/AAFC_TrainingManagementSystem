@@ -392,6 +392,7 @@ export interface PlanningFacilitatorLeave {
   notes: string | null;
   created_by: string | null;
   created_at: string | null;
+  is_archived?: boolean;
 }
 
 export interface FacilitatorLeaveResult {

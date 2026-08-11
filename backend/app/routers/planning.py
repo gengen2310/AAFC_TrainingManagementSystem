@@ -1728,9 +1728,57 @@ def delete_session(
     return {"ok": True}
 
 
+@router.post("/sessions/{session_id}/restore")
+def restore_session(
+    session_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """REM-133: session delete existed with no restore counterpart -- same
+    pattern as restore_fac (training.py), the direct template for this gap."""
+    s = db.get(TrainingSession, session_id)
+    if not s:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id) if s.parade_night_id else None
+    if pn:
+        require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    if not s.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived"})
+    s.is_archived = False
+    db.commit()
+    audit(db, p, object_type="session", object_id=s.id, action="restore")
+    return {"ok": True}
+
+
 # ─────────────────────────────────────────────────────────────
 # Weekly Program
 # ─────────────────────────────────────────────────────────────
+
+@router.get("/parade-dates/{date_id}/archived-sessions")
+def list_archived_sessions(
+    date_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """REM-133: archived sessions were reachable in the database but had no
+    way to be seen or restored through the product -- a dedicated endpoint
+    rather than an include_archived param on get_weekly_program(), since that
+    endpoint's `sessions` list is consumed directly as grid cells and mixing
+    archived rows into it would risk them rendering as live schedule slots."""
+    pd = db.get(ParadeDate, date_id)
+    if not pd:
+        raise HTTPException(404, detail={"error": "not_found"})
+    py = _get_year_or_404(pd.planning_year_id, db)
+    _require_year_access(p, py)
+
+    if not pd.parade_night_id:
+        return {"sessions": []}
+    ts = db.query(TrainingSession).filter(
+        TrainingSession.parade_night_id == pd.parade_night_id,
+        TrainingSession.is_archived == True,  # noqa: E712
+    ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
+    return {"sessions": [_real_session_out(s, db) for s in ts]}
+
 
 @router.get("/parade-dates/{date_id}/weekly-program")
 def get_weekly_program(
@@ -3870,6 +3918,7 @@ class FacilitatorLeaveIn(BaseModel):
 @router.get("/facilitators/{fac_id}/leave")
 def list_facilitator_leave(
     fac_id: str,
+    include_archived: bool = False,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -3878,15 +3927,12 @@ def list_facilitator_leave(
     if not fac:
         raise HTTPException(404, detail={"error": "facilitator_not_found"})
     require_can_view_squadron(p, fac.squadron_id, fac.wing_id)
-    rows = (
-        db.query(PlanningFacilitatorLeave)
-        .filter(
-            PlanningFacilitatorLeave.facilitator_id == fac_id,
-            PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
-        )
-        .order_by(PlanningFacilitatorLeave.start_date)
-        .all()
+    query = db.query(PlanningFacilitatorLeave).filter(
+        PlanningFacilitatorLeave.facilitator_id == fac_id,
     )
+    if not include_archived:
+        query = query.filter(PlanningFacilitatorLeave.is_archived == False)  # noqa: E712
+    rows = query.order_by(PlanningFacilitatorLeave.start_date).all()
     return {
         "leave": [
             {
@@ -3896,6 +3942,7 @@ def list_facilitator_leave(
                 "reason": r.reason, "notes": r.notes,
                 "created_by": r.created_by,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
+                "is_archived": r.is_archived,
             }
             for r in rows
         ]
@@ -4002,6 +4049,30 @@ def delete_facilitator_leave(
     leave.is_archived = True
     db.commit()
     audit(db, p, object_type="facilitator_leave", object_id=leave_id, action="archive")
+    return {"ok": True}
+
+
+@router.post("/facilitator-leave/{leave_id}/restore")
+def restore_facilitator_leave(
+    leave_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """REM-133: facilitator-leave removal existed with no restore counterpart
+    -- same pattern as restore_fac (training.py), the direct template for
+    this gap."""
+    leave = db.get(PlanningFacilitatorLeave, leave_id)
+    if not leave:
+        raise HTTPException(404, detail={"error": "not_found"})
+    fac = db.get(Facilitator, leave.facilitator_id)
+    if not fac:
+        raise HTTPException(404, detail={"error": "facilitator_not_found"})
+    require_can_write_squadron(p, fac.squadron_id, fac.wing_id)
+    if not leave.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived"})
+    leave.is_archived = False
+    db.commit()
+    audit(db, p, object_type="facilitator_leave", object_id=leave_id, action="restore")
     return {"ok": True}
 
 

@@ -538,10 +538,22 @@ function FacilitatorLeaveSection({
   const [leaveErr, setLeaveErr] = useState<string | null>(null);
   const [leaveWarning, setLeaveWarning] = useState<string | null>(null);
   const [deletingLeaveId, setDeletingLeaveId] = useState<string | null>(null);
+  const [showArchivedLeave, setShowArchivedLeave] = useState(false);
+  const [restoringLeaveId, setRestoringLeaveId] = useState<string | null>(null);
+  const [restoreLeaveErr, setRestoreLeaveErr] = useState<string | null>(null);
 
   const { data: leaveData, isLoading: leaveLoading } = useQuery({
     queryKey: ["fac-leave", fac_id],
     queryFn: () => planningApi.facilitatorLeave(fac_id),
+  });
+
+  // REM-133: leave removal existed with no way to see or restore an
+  // archived leave period -- lazy-fetched only once "Show archived" is
+  // opened, matching this codebase's established show-archived pattern.
+  const { data: archivedLeaveData, refetch: refetchArchivedLeave } = useQuery({
+    queryKey: ["fac-leave-archived", fac_id],
+    queryFn: () => planningApi.facilitatorLeave(fac_id, true),
+    enabled: showArchivedLeave,
   });
 
   const { data: workload, isLoading: workloadLoading } = useQuery({
@@ -582,6 +594,22 @@ function FacilitatorLeaveSection({
       await qc.invalidateQueries({ queryKey: ["fac-leave", fac_id] });
     } finally {
       setDeletingLeaveId(null);
+    }
+  }
+
+  async function handleRestoreLeave(leave_id: string) {
+    setRestoringLeaveId(leave_id);
+    setRestoreLeaveErr(null);
+    try {
+      await planningApi.restoreFacilitatorLeave(leave_id);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["fac-leave", fac_id] }),
+        refetchArchivedLeave(),
+      ]);
+    } catch (e: unknown) {
+      setRestoreLeaveErr(friendlyMessage(e, "Could not restore this leave period"));
+    } finally {
+      setRestoringLeaveId(null);
     }
   }
 
@@ -635,11 +663,20 @@ function FacilitatorLeaveSection({
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "var(--aafc-dark-blue)" }}>Leave / Unavailability</div>
-          {!addingLeave && (
-            <button className="btn sm out" style={{ fontSize: 11, padding: "2px 8px" }} onClick={() => setAddingLeave(true)}>
-              + Add Leave
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              className="btn sm out"
+              style={{ fontSize: 11, padding: "2px 8px" }}
+              onClick={() => setShowArchivedLeave(v => !v)}
+            >
+              {showArchivedLeave ? "Hide archived" : "Show archived"}
             </button>
-          )}
+            {!addingLeave && (
+              <button className="btn sm out" style={{ fontSize: 11, padding: "2px 8px" }} onClick={() => setAddingLeave(true)}>
+                + Add Leave
+              </button>
+            )}
+          </div>
         </div>
 
         {leaveWarning && (
@@ -700,6 +737,37 @@ function FacilitatorLeaveSection({
                 </button>
               </div>
             ))}
+          </div>
+        )}
+
+        {showArchivedLeave && (
+          <div style={{ marginTop: 8 }}>
+            {restoreLeaveErr && <div style={{ color: "var(--aafc-red)", fontSize: 11, marginBottom: 6 }}>{restoreLeaveErr}</div>}
+            {!archivedLeaveData ? (
+              <div style={{ fontSize: 11, color: "var(--muted-text)" }}>Loading archived leave…</div>
+            ) : archivedLeaveData.leave.filter(l => l.is_archived).length === 0 ? (
+              <div style={{ fontSize: 11, color: "var(--muted-text)" }}>No archived leave periods.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {archivedLeaveData.leave.filter(l => l.is_archived).map(l => (
+                  <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, background: "var(--surface-2, #eef2f7)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 10px", opacity: .75 }}>
+                    <span style={{ fontWeight: 600, color: "var(--aafc-dark-blue)" }}>
+                      {l.start_date}{l.end_date !== l.start_date ? ` → ${l.end_date}` : ""}
+                    </span>
+                    {l.reason && <span style={{ color: "var(--muted-text)" }}>{l.reason}</span>}
+                    <span className="badge muted" style={{ fontSize: 10 }}>Archived</span>
+                    <button
+                      className="btn sm out"
+                      style={{ marginLeft: "auto", fontSize: 10, padding: "2px 7px" }}
+                      onClick={() => handleRestoreLeave(l.id)}
+                      disabled={restoringLeaveId === l.id}
+                    >
+                      {restoringLeaveId === l.id ? "…" : "Restore"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

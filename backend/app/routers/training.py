@@ -97,7 +97,8 @@ def _sess_dict(s: Session) -> dict:
 
 # ── CURRICULUM ──
 @router.get("/curriculum")
-def list_curriculum(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def list_curriculum(squadron_id: str | None = None, include_archived: bool = False,
+                    db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     sq_id = _view_squadron_id(p, squadron_id, db)
     # Resolve the wing for the acting scope
     wing_id: str | None = p.acting_wing_id or p.wing_id
@@ -117,10 +118,10 @@ def list_curriculum(squadron_id: str | None = None, db: DBSession = Depends(get_
     if sq_id:
         conditions.append(CurriculumItem.squadron_id == sq_id)
 
-    items = db.query(CurriculumItem).filter(
-        CurriculumItem.is_archived == False,  # noqa: E712
-        or_(*conditions)
-    ).order_by(CurriculumItem.recommended_sequence).all()
+    query = db.query(CurriculumItem).filter(or_(*conditions))
+    if not include_archived:
+        query = query.filter(CurriculumItem.is_archived == False)  # noqa: E712
+    items = query.order_by(CurriculumItem.recommended_sequence).all()
 
     # Preload all sessions for this squadron in one query, then group by curriculum_item_id.
     item_ids = [i.id for i in items]
@@ -144,7 +145,8 @@ def list_curriculum(squadron_id: str | None = None, db: DBSession = Depends(get_
                     "core_status": i.core_status, "learning_hub_url": i.learning_hub_url,
                     "recommended_term": i.recommended_term, "owning_level": i.owning_level,
                     "wing_id": i.wing_id, "squadron_id": i.squadron_id,
-                    "session_count": len(statuses), "progress": _progress(statuses)})
+                    "session_count": len(statuses), "progress": _progress(statuses),
+                    "is_archived": i.is_archived})
     return {"items": out}
 
 
@@ -3834,6 +3836,37 @@ def delete_curriculum(cid: str, db: DBSession = Depends(get_db), p: Principal = 
     ci.archived_at = utcnow()
     db.commit()
     audit(db, p, object_type="curriculum_item", object_id=ci.id, action="archive")
+    return {"ok": True}
+
+
+@router.post("/curriculum/{cid}/restore")
+def restore_curriculum(cid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """REM-133: curriculum-item archive existed with no restore counterpart --
+    same pattern as restore_fac, same ownership-level permission checks as
+    this item's own delete_curriculum."""
+    ci = db.get(CurriculumItem, cid)
+    if not ci:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if ci.owning_level == "national":
+        if p.role not in _NAT_ADMIN_ROLES:
+            raise HTTPException(403, detail={"error": "cannot_edit_national_curriculum"})
+    elif ci.owning_level == "wing":
+        if p.role not in _WING_WRITE_ROLES:
+            raise HTTPException(403, detail={"error": "cannot_edit_wing_curriculum"})
+        if p.role not in _NAT_ADMIN_ROLES:
+            actor_wing = p.acting_wing_id or p.wing_id
+            if ci.wing_id != actor_wing:
+                raise HTTPException(403, detail={"error": "out_of_scope"})
+    else:
+        sq_id = _active_squadron(p)
+        if ci.squadron_id != sq_id:
+            raise HTTPException(403, detail={"error": "forbidden"})
+    if not ci.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived"})
+    ci.is_archived = False
+    ci.archived_at = None
+    db.commit()
+    audit(db, p, object_type="curriculum_item", object_id=ci.id, action="restore")
     return {"ok": True}
 
 
