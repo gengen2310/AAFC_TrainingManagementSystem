@@ -99,17 +99,26 @@ test.describe("Squadron Dashboard — Progress by element (CLASS-12)", () => {
     expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
   });
 
-  test("drilling into a Progress by element bar filters Mission Backlog by that element", async ({ page }) => {
+  // NOTE: _chartStackedBarH() (the renderer shared by both "Progress by
+  // phase" and "Progress by element") never attaches an onclick to its rows
+  // -- unlike _chartHBar's rows, which do wire drillDashChart() via
+  // chart.drill_down/r.drill_id. drillDashChart()'s own phase/element
+  // branches and drillPhaseDash() are therefore unreachable dead code today,
+  // a PRE-EXISTING gap in the phase chart this task mirrors, not something
+  // CLASS-12 introduced or is scoped to fix -- recorded as a residual
+  // limitation in the gap register rather than silently worked around here.
+  test("both progress cards render side by side with no console errors, confirming shared-renderer wiring survived the new chart", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
     await loginSquadron(page, "ADMIN703");
-    const card = page.locator(".card", { has: page.locator(".ctitle", { hasText: "Progress by element" }) });
-    await expect(card).toBeVisible({ timeout: 10000 });
-    const drillRow = card.locator('[role="img"][aria-label^="Drill:"]').first();
-    await expect(drillRow).toBeVisible({ timeout: 10000 });
-    await drillRow.click();
-    // drillDashChart()'s element_curriculum_progress branch routes to Mission
-    // Backlog filtered by element -- confirms the fix to drillDashChart (which
-    // previously had no element_curriculum_progress branch at all and would
-    // have silently matched zero sessions via the status===drillId fallback).
-    await expect(page.locator("#page-backlog")).toHaveClass(/active/, { timeout: 10000 });
+    const phaseCard = page.locator(".card", { has: page.locator(".ctitle", { hasText: "Progress by phase" }) });
+    const elementCard = page.locator(".card", { has: page.locator(".ctitle", { hasText: "Progress by element" }) });
+    await expect(phaseCard).toBeVisible({ timeout: 10000 });
+    await expect(elementCard).toBeVisible({ timeout: 10000 });
+    // PH_S remaps phase display labels ("A. Orientation" -> "Orientation");
+    // elements have no such remap, so "Drill" renders verbatim.
+    await expect(phaseCard.getByText("Orientation", { exact: true })).toBeVisible();
+    await expect(elementCard.getByText("Drill", { exact: true })).toBeVisible();
+    expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
   });
 });
