@@ -5939,7 +5939,7 @@ async function doCreateFlight(){
   }catch(e){ msg.textContent=apiErr(e); msg.style.color='var(--red)'; }
 }
 async function doArchiveFlight(flightId, name){
-  if(!confirm('Archive flight "'+name+'"? Users assigned to it will be unassigned.'))return;
+  if(!confirm('Archive flight "'+name+'"? Users assigned to it will be unassigned, but this can be undone from "Show archived".'))return;
   try{
     await api('/api/flights/'+flightId+'/archive',{method:'POST'});
     S.flightList=null; renderAccounts();
@@ -7821,7 +7821,7 @@ async function saveCurr(){
   }
 }
 async function deleteCurrItem(id){
-  if(!confirm('Archive this curriculum item? Sessions already linked are not affected.'))return;
+  if(!confirm('Archive this curriculum item? Sessions already linked are not affected, and this can be undone from "Show archived".'))return;
   try{ await api('/api/curriculum/'+id,{method:'DELETE'}); await reloadAndRender(); }
   catch(e){ alert(apiErr(e)); }
 }
@@ -7999,7 +7999,7 @@ async function _actSaveEdit(){
 }
 
 async function _actArchive(containerId, activityId){
-  if(!confirm('Archive this activity? It will be removed from active views but preserved for history.'))return;
+  if(!confirm('Archive this activity? It will be removed from active views but preserved for history, and can be restored later.'))return;
   try{
     await api('/api/activities/'+activityId,{method:'DELETE'});
     showToast('Activity archived.', false);
