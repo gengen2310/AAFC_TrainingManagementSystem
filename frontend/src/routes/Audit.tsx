@@ -34,7 +34,7 @@ export function Audit() {
               <thead><tr><th>Time</th><th>Role</th><th>Action</th><th>Object</th><th>Reason</th><th>Proxy</th></tr></thead>
               <tbody>{(q.data ?? []).map((a) => (
                 <tr key={a.audit_id}>
-                  <td>{new Date(a.timestamp).toLocaleString()}</td><td>{a.role}</td><td>{a.action}</td>
+                  <td>{new Date(a.timestamp).toLocaleString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })}</td><td>{a.role}</td><td>{a.action}</td>
                   <td>{a.object_type ?? "—"}{a.object_id ? ` (${a.object_id.slice(0, 8)})` : ""}</td>
                   <td>{a.reason ?? "—"}</td><td>{a.proxy_session_id ? "yes" : "—"}</td>
                 </tr>))}</tbody>

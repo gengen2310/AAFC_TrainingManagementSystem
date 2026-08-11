@@ -1140,7 +1140,7 @@ function HolidaysContent({ yearId }: { yearId: string }) {
   }
 
   async function handleDelete(holiday_id: string) {
-    if (!window.confirm("Delete this holiday period?")) return;
+    if (!window.confirm("Delete this holiday period? This cannot be undone.")) return;
     setDeletingId(holiday_id);
     try {
       await planningApi.deleteHoliday(holiday_id);

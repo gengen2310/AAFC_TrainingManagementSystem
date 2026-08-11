@@ -171,7 +171,7 @@ interface DuplicateFacilitatorDetail {
 }
 
 function DuplicateProfileCard({ detail }: { detail: DuplicateFacilitatorDetail }) {
-  const updated = detail.existing_updated_at ? new Date(detail.existing_updated_at).toLocaleDateString("en-AU") : "—";
+  const updated = detail.existing_updated_at ? new Date(detail.existing_updated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" }) : "—";
   const areas = detail.existing_subject_areas?.length ? detail.existing_subject_areas.join(", ") : "—";
   return (
     <div style={{ marginTop: 6, padding: "8px 10px", background: "var(--surface-2, #f0f5fa)", borderRadius: 6, fontSize: 11.5, display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 10px" }}>

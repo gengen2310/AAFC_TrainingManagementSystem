@@ -271,7 +271,7 @@ export function Accounts() {
                       {isLocked(a) && <span className="badge warn" style={{ marginLeft: 4 }}>Locked</span>}
                     </td>
                     <td style={{ fontSize: 11 }}>
-                      {a.last_login_at ? new Date(a.last_login_at).toLocaleDateString("en-AU") : "Never"}
+                      {a.last_login_at ? new Date(a.last_login_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" }) : "Never"}
                     </td>
                     {canWrite && (
                       <td style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>

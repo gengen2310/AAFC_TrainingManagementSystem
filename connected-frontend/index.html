@@ -6756,7 +6756,7 @@ async function qkSt(date,i,st){
 async function delPN(date){
   const pn=S.pns.find(p=>p.date===date);
   if(!pn||!pn.id){alert('Parade night ID missing.');return;}
-  if(!confirm('Archive this parade night and all its sessions?'))return;
+  if(!confirm('Archive this parade night and all its sessions? They will no longer appear in active views, but records are preserved.'))return;
   try{ await api('/api/parade-nights/'+pn.id,{method:'DELETE'}); await reloadAndRender(); }
   catch(e){ alert(apiErr(e)); }
 }
@@ -7437,7 +7437,7 @@ function renderWP(){
         </table>
       </div>
       ${(wpQ||wpSt!=='all')?`<div class="no-print" style="font-size:11px;color:var(--muted);margin-top:4px">Showing ${shownSessions.length} of ${allSessions.length} sessions.</div>`:''}
-      <div style="margin-top:12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);padding-top:9px">AAFC Training System · 7 Wing WA · ${new Date().toLocaleDateString('en-AU')} · INSPIRING TODAY — LEADING TOMORROW</div>
+      <div style="margin-top:12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);padding-top:9px">AAFC Training System · 7 Wing WA · ${new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})} · INSPIRING TODAY — LEADING TOMORROW</div>
     </div>
     <div class="no-print" style="margin-top:8px;display:flex;gap:8px">
       <button class="btn btn-dk" onclick="printReport()">Print This Program</button>
@@ -8209,7 +8209,7 @@ function editAct(id){
   openModal('m-add-act');
 }
 async function delAct(id){
-  if(!confirm('Remove this activity?'))return;
+  if(!confirm('Remove this activity? It will no longer appear in active views, but the record is preserved.'))return;
   try{ await api('/api/activities/'+id,{method:'DELETE'}); await reloadAndRender(); }
   catch(e){ alert(apiErr(e)); }
 }
@@ -8579,7 +8579,7 @@ function saveFac(confirmDuplicate){
         const existingId=detail.existing_facilitator_id||'';
         const viewBtn=existingId?` <button class="btn-lnk" style="font-size:11px;margin-left:4px" onclick="closeModal('m-add-fac');showFacProfile('${existingId}')">View existing ↗</button>`:'';
         const areas=(detail.existing_subject_areas||[]).length?detail.existing_subject_areas.map(esc).join(', '):'—';
-        const updated=detail.existing_updated_at?new Date(detail.existing_updated_at).toLocaleDateString('en-AU'):'—';
+        const updated=detail.existing_updated_at?new Date(detail.existing_updated_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'—';
         const card=`<div style="margin-top:6px;padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:11.5px;display:grid;grid-template-columns:auto 1fr;gap:2px 10px">
           <span style="color:var(--muted)">Rank</span><span style="font-weight:700">${esc(detail.existing_rank||'—')}</span>
           <span style="color:var(--muted)">Type</span><span>${esc(detail.existing_type||'—')}</span>
@@ -8723,7 +8723,7 @@ function editRoom(id){
   openModal('m-add-room');
 }
 async function delRoom(id){
-  if(!confirm('Archive this training area?'))return;
+  if(!confirm('Archive this training area? It will no longer appear in active lists, but existing records are unaffected.'))return;
   try{ await api('/api/training-areas/'+id,{method:'DELETE'}); await reloadAndRender(); }
   catch(e){ alert(apiErr(e)); }
 }
@@ -8745,7 +8745,7 @@ function editEquip(id){
   document.getElementById('equip-notes').value=eq.notes||'';openModal('m-add-equip');
 }
 async function delEquip(id){
-  if(!confirm('Archive this equipment item?'))return;
+  if(!confirm('Archive this equipment item? It will no longer appear in active lists, but existing records are unaffected.'))return;
   try{ await api('/api/equipment/'+id,{method:'DELETE'}); await reloadAndRender(); }
   catch(e){ alert(apiErr(e)); }
 }
@@ -10216,7 +10216,7 @@ async function doAddParadeDate(){
   } catch(e){ document.getElementById('pd-msg').textContent=apiErr(e); }
 }
 async function deleteParadeDate(pdId, yearId){
-  if(!confirm('Remove this parade date?')) return;
+  if(!confirm('Remove this parade date? This cannot be undone.')) return;
   try { await api(`/api/planning/parade-dates/${pdId}`,{method:'DELETE'}); await _renderParadeDates(yearId); }
   catch(e){ alert(apiErr(e)); }
 }
@@ -10334,7 +10334,7 @@ async function doEditHoliday(){
   } catch(e){ hm.textContent=apiErr(e); }
 }
 async function deleteHoliday(hId, yearId){
-  if(!confirm('Remove this holiday period?')) return;
+  if(!confirm('Remove this holiday period? This cannot be undone.')) return;
   try { await api(`/api/planning/holidays/${hId}`,{method:'DELETE'}); await _renderHolidays(yearId); }
   catch(e){ alert(apiErr(e)); }
 }
