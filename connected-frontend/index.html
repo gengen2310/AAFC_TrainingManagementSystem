@@ -3649,7 +3649,19 @@ async function loadData(){
   const p_ta=_apiT('/api/training-areas',null,'Training Areas');
   const p_eq=_apiT('/api/equipment',null,'Equipment');
   const p_ai=_apiT('/api/action-items',null,'Action Items');
-  const p_acts=_apiT('/api/activities',null,'Activities');
+  // REM-13: the squadron Training Calendar previously used the legacy
+  // no-scope-type /api/activities call, which returns only this squadron's
+  // own local Activity rows -- no CEA imports, no inherited Wing/National
+  // activities (the Wing HQ Calendar has had both via its own scope-aware
+  // call since REM-13 Phase A). scope_type=squadron is a strict superset of
+  // the legacy result (same local rows, via the same OR-branched visibility
+  // filter used everywhere else) plus those two sources -- sources=activity,cea
+  // deliberately excludes 'holiday' since holidays are already merged into
+  // this page from a separate, dedicated fetch (S.holidays, Stage 6); merging
+  // them again here would double-render every holiday as two overlapping chips.
+  const p_acts=_sqnId
+    ?_apiT('/api/activities?scope_type=squadron&scope_id='+encodeURIComponent(_sqnId)+'&sources=activity,cea',null,'Activities')
+    :_apiT('/api/activities',null,'Activities');
   // Holidays for the Training Calendar overlay -- active planning year(s) for
   // this squadron, flattened across years (usually just one).
   const p_holidays=_sqnId?(async()=>{
@@ -3734,7 +3746,10 @@ async function loadData(){
   S.rooms=(ta||[]).map(r=>({id:r.training_area_id||r.id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||''}));
   S.equip=(eq||[]).map(x=>({id:x.equipment_id||x.id,name:x.name,qty:x.quantity||x.qty,notes:x.notes||''}));
   S.actionItems=(ai||[]).map(a=>({id:a.action_id,title:a.title,description:a.description,owner:a.owner,due:a.due_date,status:a.status,severity:a.severity,source:a.source}));
-  S.acts=(acts||[]).map(a=>({id:a.activity_id,name:a.activity_name,date:a.date_start,dateEnd:a.date_end,timeStart:a.time_start,timeEnd:a.time_end,type:a.activity_type||'Optional',location:a.location||'',audience:a.audience||[],notes:a.notes||'',ceaSeqNr:a.cea_seq_nr||''}));
+  // REM-13: scope_type=squadron responses are {items:[...]}; the legacy
+  // no-scope-type fallback (only reached if _sqnId is unset) is a bare array.
+  const _actsList=Array.isArray(acts)?acts:((acts&&acts.items)||[]);
+  S.acts=_actsList.map(a=>({id:a.activity_id,name:a.activity_name,date:a.date_start,dateEnd:a.date_end,timeStart:a.time_start,timeEnd:a.time_end,type:a.activity_type||'Optional',location:a.location||'',audience:a.audience||[],notes:a.notes||'',ceaSeqNr:a.cea_seq_nr||'',owningOrgLabel:a.owning_org_label||''}));
   S.holidays=(holidays||[]).map(h=>({id:h.holiday_id,name:h.name,start:h.start_date,end:h.end_date}));
   S.proxy=proxy||{active:false};
   S.pwUrl=(uicfg&&uicfg.planning_workspace_url)||null;
@@ -6485,7 +6500,7 @@ function renderCal(){
       const icon=_ST_ICON[s.status]||'';
       chips+=`<span class="cal-chip ${stCls(s.status)}" title="${esc(stLabel(s.status))}">${icon?icon+' ':''}${PH_S[s.phase]||s.phase}</span>`;
     });
-    acts.slice(0,1).forEach(a=>chips+=`<span class="cal-chip act">${esc(a.name.substring(0,16))}</span>`);
+    acts.slice(0,1).forEach(a=>chips+=`<span class="cal-chip act" title="${esc(a.name)}${a.owningOrgLabel?' — '+esc(a.owningOrgLabel):''}">${esc(a.name.substring(0,16))}</span>`);
     const oc=pn?`onclick="showPNDetail('${ds}')"`:canWriteSquadron()?`onclick="openWithDate('${ds}')"`:'';
     cells+=`<div class="${cls}" ${oc}><div class="cal-dt">${d}</div>${chips}</div>`;
   }
