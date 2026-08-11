@@ -8979,6 +8979,9 @@ async function changeMyCode(){
 //  TIMING TEMPLATES
 // ═══════════════════════════════════════════════════════════
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+// Capitalise a raw lowercase enum value for display (e.g. severity "high" -> "High") --
+// never use on a value that's already a proper label (e.g. from a *_LABEL map).
+function _cap(s){s=String(s||'');return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
 let _ttEditId=null, _ttBlocks=[], _pnOverridePnId=null;
 
 const _TT_BLOCK_TYPES=['arrival','administration','roll_call','parade','flight_period',
@@ -9346,7 +9349,7 @@ function _renderRiskTimeline(chart){
   }
   if(items.length){
     html+=`<div class="tw" style="margin-top:10px"><table><thead><tr><th>Date</th><th>Unit</th><th>Category</th><th style="text-align:center">Sessions</th><th>Severity</th></tr></thead><tbody>`+
-      items.slice(0,20).map(it=>`<tr><td style="font-size:11px">${esc(it.date)}</td><td style="font-weight:700">${esc(it.unit_label)}</td><td style="font-size:11px">${esc(it.category_label)}</td><td style="text-align:center">${it.affected_sessions}</td><td><span class="badge ${it.severity==='high'?'b-red':'b-amber'}">${esc(it.severity)}</span></td></tr>`).join('')+
+      items.slice(0,20).map(it=>`<tr><td style="font-size:11px">${esc(it.date)}</td><td style="font-weight:700">${esc(it.unit_label)}</td><td style="font-size:11px">${esc(it.category_label)}</td><td style="text-align:center">${it.affected_sessions}</td><td><span class="badge ${it.severity==='high'?'b-red':'b-amber'}">${esc(_cap(it.severity))}</span></td></tr>`).join('')+
       `</tbody></table></div>`;
     if(items.length>20)html+=`<div style="font-size:10.5px;color:var(--muted);margin-top:4px">Showing 20 of ${items.length} items — refine using Parade Nights for the full list.</div>`;
   }
@@ -10939,7 +10942,7 @@ async function loadBuilderFromPn(pnId){
         if(s){
           const title=esc(s.activity_title||s.curriculum_title||'—');
           const fac=s.facilitator_name?`<div style="font-size:0.75rem;color:var(--muted)">${esc(s.facilitator_name)}</div>`:'';
-          html+=`<td style="cursor:pointer" onclick="openEditSessionModalPn('${esc(s.session_id)}','${esc(pnId)}')">${title}${fac}<span class="badge ${_statusBadge(s.status)}">${esc(s.status)}</span></td>`;
+          html+=`<td style="cursor:pointer" onclick="openEditSessionModalPn('${esc(s.session_id)}','${esc(pnId)}')">${title}${fac}${stBadge(s.status)}</td>`;
         } else {
           html+=`<td style="cursor:pointer;color:var(--muted)" onclick="openNewSessionCellPn('${esc(grp)}',${sn},'${esc(pnId)}')">+ Add</td>`;
         }
@@ -11037,7 +11040,7 @@ async function loadBuilderGrid(dateId){
         if(s){
           const title = esc(s.activity_title||s.curriculum_title||'—');
           const fac = s.facilitator_name ? `<div style="font-size:0.75rem;color:var(--muted)">${esc(s.facilitator_name)}</div>` : '';
-          html+=`<td style="cursor:pointer" onclick="openEditSessionModal('${esc(s.session_id||'')}','${esc(dateId)}')">${title}${fac}<span class="badge ${_statusBadge(s.status)}">${esc(s.status)}</span></td>`;
+          html+=`<td style="cursor:pointer" onclick="openEditSessionModal('${esc(s.session_id||'')}','${esc(dateId)}')">${title}${fac}${stBadge(s.status)}</td>`;
         } else {
           html+=`<td style="cursor:pointer;color:var(--muted)" onclick="openNewSessionCell('${esc(grp)}',${sn},'${esc(dateId)}')">+ Add</td>`;
         }
@@ -11053,8 +11056,6 @@ async function loadBuilderGrid(dateId){
     loadWeeklyProgram(dateId);
   } catch(e){ empty.innerHTML=`<div class="empty"><div class="et">Error loading builder</div><div class="es">${esc(apiErr(e))}</div></div>`; card.style.display='none'; empty.style.display=''; }
 }
-
-function _statusBadge(st){ return st==='published'?'badge-green':st==='confirmed'?'badge-blue':'badge-grey'; }
 
 // Render weekly program preview from data already held in the builder
 function _renderBuilderWeeklyPreview(sessions, timingBlocks, dateStr){
@@ -11436,7 +11437,7 @@ function _renderConflicts(conflicts, yearId){
   if(!conflicts.length){ el.innerHTML='<p class="muted">No unresolved conflicts.</p>'; return; }
   el.innerHTML=`<table class="data-table"><thead><tr><th>Severity</th><th>Type</th><th>Message</th><th></th></tr></thead><tbody>`+
     conflicts.map(c=>`<tr>
-      <td><span class="badge ${c.severity==='critical'?'badge-red':'badge-yellow'}">${esc(c.severity)}</span></td>
+      <td><span class="badge ${c.severity==='critical'?'badge-red':'badge-yellow'}">${esc(_cap(c.severity))}</span></td>
       <td>${esc(c.conflict_type.replace(/_/g,' '))}</td>
       <td>${esc(c.message)}</td>
       <td><button class="btn-xs btn-secondary" onclick="promptOverrideConflict('${esc(c.conflict_id)}','${esc(yearId)}')">Override</button></td>
