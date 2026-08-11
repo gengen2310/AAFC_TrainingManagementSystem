@@ -4403,7 +4403,7 @@ async function scLoadOverview(){
       <dt>Maintenance mode</dt><dd>${d.maintenance_mode?'<span class="sc-status-warn">ENABLED</span>':'<span class="sc-status-ok">Off</span>'}</dd>
       <dt>Last backup</dt><dd>${d.last_backup_at?esc(d.last_backup_at):'<span class="muted">No backup recorded</span>'}</dd>
     </dl>`;
-  } catch(e){ clearTimeout(coldTimer); if(warn) warn.style.display='none'; el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
+  } catch(e){ clearTimeout(coldTimer); if(warn) warn.style.display='none'; el.innerHTML=`<div class="sc-status-err">Could not load System Overview: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scLoadHealth(){
@@ -4418,7 +4418,7 @@ async function scLoadHealth(){
       <dt>Cookie secure</dt><dd>${d.cookie_secure?'<span class="sc-status-ok">Yes</span>':'<span class="sc-status-warn">No (dev/staging only)</span>'}</dd>
       <dt>CORS origins</dt><dd style="font-family:monospace;font-size:11px">${(d.cors_origins||[]).map(o=>esc(o)).join('<br>')}</dd>
     </dl>`;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Could not load Health status: ${esc(apiErr(e))}</div>`; }
 }
 
 async function _refreshOrgCache(){
@@ -4463,7 +4463,7 @@ async function scLoadScopeMap(){
       </div>`;
     }
     el.innerHTML=h;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Could not load the Scope Map: ${esc(apiErr(e))}</div>`; }
 }
 
 function scArchiveWing(wingId, wingCode){
@@ -4569,7 +4569,7 @@ async function scLoadMaintenance(){
       h+=`<button class="btn btn-secondary" onclick="document.getElementById('sc-maint-form').style.display='block';this.style.display='none'">Enable Maintenance Mode…</button>`;
     }
     el.innerHTML=h;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Could not load Maintenance status: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scEnableMaint(){
@@ -4619,7 +4619,7 @@ async function scLoadBackups(){
       }
       if(acts) acts.innerHTML='<button class="btn btn-secondary" onclick="scCreateBackup()">Create Backup Now</button>';
     }
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Could not load Backups: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scCreateBackup(){
@@ -4676,7 +4676,7 @@ async function scLoadAudit(){
     }
     h+='</div>';
     el.innerHTML=h;
-  } catch(e){ el.innerHTML=`<div class="sc-status-err">Error: ${esc(apiErr(e))}</div>`; }
+  } catch(e){ el.innerHTML=`<div class="sc-status-err">Could not load the Audit summary: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scImportCurriculum(){
@@ -11927,7 +11927,7 @@ async function openWingEventDetail(eventId){
     const isSqnAdmin=['sqn_admin'].includes(S.role);
     if(markBtn) markBtn.style.display=isSqnAdmin&&(!e.squadron_status||e.squadron_status.status==='not_reviewed')?'':'none';
     if(planBtn) planBtn.style.display=isSqnAdmin?'':'none';
-  }catch(ex){ body.innerHTML=`<p class="muted">Error: ${esc(apiErr(ex))}</p>`; }
+  }catch(ex){ body.innerHTML=`<p class="muted">Could not load this event's details: ${esc(apiErr(ex))}</p>`; }
 }
 
 async function markWingEventReviewed(){
