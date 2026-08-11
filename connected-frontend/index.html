@@ -1281,12 +1281,12 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </div>
           <button class="btn btn-dk admin-el" onclick="changeMyCode()">Change My Access Code</button>
           <div id="cc-msg" style="font-size:11.5px;margin-top:10px;font-weight:700"></div>
-          <div style="font-size:10.5px;color:var(--muted);margin-top:10px">To reset another user's code, use the User Directory section below (admin only). All resets are audited by the backend.</div>
+          <div style="font-size:10.5px;color:var(--muted);margin-top:10px">To reset another user's code, use the User Directory section below (admin only). All resets are recorded in the audit log.</div>
         </div>
         <!-- Admin: user directory for code resets -->
         <div class="card admin-el" id="user-dir-card" style="display:none">
           <div class="ctitle">🗂️ User Directory — Admin Code Reset</div>
-          <div class="alert a-info" style="margin-bottom:10px;font-size:11px">Select a user to reset their access code. The backend enforces scope; you can only reset users within your authorised unit. The old code is not recoverable.</div>
+          <div class="alert a-info" style="margin-bottom:10px;font-size:11px">Select a user to reset their access code. You can only reset users within your authorised unit. The old code cannot be recovered.</div>
           <div class="ff" style="max-width:340px;margin-bottom:10px"><input id="user-dir-filter" placeholder="Filter by name, role, or unit…" oninput="renderUserDir()" autocomplete="off"></div>
           <div id="user-dir-table"></div>
         </div>
@@ -1440,7 +1440,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div id="page-audit" class="page">
         <div class="ph">
           <h1 class="ph-title">Audit Log</h1>
-          <div class="ph-sub">Immutable record of actions — backend authoritative</div>
+          <div class="ph-sub">Permanent record of actions. It cannot be edited or deleted.</div>
           <div class="ph-actions no-print">
             <span id="audit-refresh-status" style="font-size:10px;color:var(--muted)"></span>
             <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('audit-refresh-status',async()=>{await loadData();renderAudit();})">Refresh</button>
@@ -1559,7 +1559,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <!-- Curriculum import card — upload workbook or paste JSON to import curriculum items -->
         <div class="card sc-card" id="sc-curriculum-import-card">
           <div class="sc-section-hdr">Curriculum Import</div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Upload the AAFC training schedule workbook (.xlsm) to import all curriculum items from <em>zz - Program backend</em>. Idempotent — safe to run multiple times.</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Upload the AAFC training schedule workbook (.xlsm) to import all curriculum items from <em>zz - Program backend</em>. Safe to run multiple times without creating duplicates.</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <label class="btn" style="cursor:pointer;background:#0891b2;color:#fff;border:none">
               Select Workbook (.xlsm)
@@ -3279,7 +3279,7 @@ async function api(path, opts={}){
       }
       // Any other fetch() throw is a true network failure or CORS preflight block.
       if(attempt>=maxAttempts){
-        throw {kind:'network', msg:'Cannot reach the backend at '+(API_BASE||location.origin)+'. Check the backend is running and try again.'};
+        throw {kind:'network', msg:'Cannot reach the training system. Check your internet connection and try again.'};
       }
       await new Promise(r=>setTimeout(r,attempt*400));
     }
@@ -3367,7 +3367,7 @@ function apiErr(e){
   // _downloadExport's own curated Error) and is left untouched below --
   // matches the friendly text already used for the equivalent case in the
   // Planning Workspace (ApiError.friendly's isNetwork branch).
-  if(e instanceof TypeError && /fetch|network/i.test(e.message||'')) return 'Cannot reach the server. Check that the backend is running.';
+  if(e instanceof TypeError && /fetch|network/i.test(e.message||'')) return 'Cannot reach the training system. Check your internet connection and try again.';
   if(e instanceof Error) return e.message||'Unexpected error.';
   return 'Something went wrong.';
 }
@@ -5648,7 +5648,7 @@ function _wizRender(){
 
   if(w.step===1){
     title.textContent='Step 1 of 5 — Selection Review';
-    body.innerHTML=`<p style="font-size:12px;color:var(--muted);margin:0 0 10px">Confirm the accounts to archive. Remove any that shouldn't be included before continuing.</p>
+    body.innerHTML=`<p style="font-size:12px;color:var(--muted);margin:0 0 10px">Confirm the accounts to archive. Remove any that should not be included before continuing.</p>
       <div class="tw" style="max-height:280px;overflow:auto"><table><thead><tr><th>Name</th><th>Role</th><th>Unit</th><th class="no-print"></th></tr></thead><tbody>
       ${w.accounts.map(u=>`<tr>
         <td style="font-weight:700">${esc(u.display_name||'—')}</td>
@@ -9478,7 +9478,7 @@ function nationalDrill(wid){
     <div class="tw"><table><thead><tr><th>Squadron</th><th>Parade Day</th><th>Address</th></tr></thead><tbody>
     ${sqs.length?sqs.map(s=>`<tr><td style="font-weight:800">${esc(s.short_name||s.code)}</td><td>${esc(s.default_parade_day||'—')}</td><td style="font-size:11px">${esc((s.address||'').split(',')[0])}</td></tr>`).join(''):'<tr><td colspan="3" style="color:var(--muted)">No squadrons returned</td></tr>'}
     </tbody></table></div>
-    <div style="font-size:11px;color:var(--muted);margin-top:10px">Read-only national oversight. ${['national_admin','system_admin'].includes(S.role)?'Deeper squadron changes require Delegated Intervention Mode where the backend permits.':'National viewers are read-only.'}</div>`;
+    <div style="font-size:11px;color:var(--muted);margin-top:10px">Read-only national oversight. ${['national_admin','system_admin'].includes(S.role)?'Deeper squadron changes require Delegated Intervention Mode, where permitted.':'National viewers are read-only.'}</div>`;
 }
 
 // ═══ AUDIT LOG ═══

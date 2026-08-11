@@ -26,7 +26,7 @@ export class ApiError extends Error {
   get friendly(): string {
     if (this.isCancelled) return "Request cancelled.";
     if (this.isInvalidResponse) return "The server returned an unreadable response. Try again.";
-    if (this.isNetwork) return "Cannot reach the server. Check that the backend is running.";
+    if (this.isNetwork) return "Cannot reach the training system. Check your internet connection and try again.";
     const d = this.data?.detail as { message?: string; error?: string } | undefined;
     switch (this.status) {
       case 401: return "Your session has expired. Please log in again.";

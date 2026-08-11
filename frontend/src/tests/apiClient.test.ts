@@ -18,7 +18,7 @@ describe("api client error handling", () => {
   it("flags network errors", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("down")));
     try { await api.get("/api/x"); expect.fail("should throw"); }
-    catch (e) { expect((e as ApiError).isNetwork).toBe(true); expect((e as ApiError).friendly).toMatch(/Cannot reach the server/i); }
+    catch (e) { expect((e as ApiError).isNetwork).toBe(true); expect((e as ApiError).friendly).toMatch(/Cannot reach the training system/i); }
   });
 
   it("retries a GET on 503 and succeeds once the backend recovers", async () => {
