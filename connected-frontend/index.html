@@ -4467,7 +4467,7 @@ async function scLoadScopeMap(){
 }
 
 function scArchiveWing(wingId, wingCode){
-  confirmAction(`Archive Wing '${wingCode}'?\n\nThis cannot be undone. All squadrons in this Wing must already be archived.`, async()=>{
+  confirmAction(`Archive Wing '${wingCode}'?\n\nAll squadrons in this Wing must already be archived. The Wing can be restored later from the Scope Map.`, async()=>{
     try {
       await api(`/api/wings/${wingId}/archive`,{method:'POST'});
       alert(`Wing '${wingCode}' has been archived.`);
@@ -4487,7 +4487,7 @@ async function scRestoreWing(wingId, wingCode){
 }
 
 function scArchiveSquadron(sqnId, sqnName){
-  confirmAction(`Archive unit '${sqnName}'?\n\nThis cannot be undone and will remove this unit from all active views.`, async()=>{
+  confirmAction(`Archive unit '${sqnName}'?\n\nThis will remove the unit from all active views. It can be restored later from the Scope Map.`, async()=>{
     try {
       await api(`/api/squadrons/${sqnId}/archive`,{method:'POST'});
       alert(`Unit '${sqnName}' has been archived.`);

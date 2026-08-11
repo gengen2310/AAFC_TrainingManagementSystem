@@ -174,7 +174,7 @@ function SessionForm({
 
   async function handleDelete() {
     if (!existing) return;
-    if (!window.confirm("Delete this session?")) return;
+    if (!window.confirm("Delete this session? It can be restored later from \"Show archived sessions\" on the parade night grid.")) return;
     setDeleting(true);
     try {
       await planningApi.deleteSession(existing.session_id);

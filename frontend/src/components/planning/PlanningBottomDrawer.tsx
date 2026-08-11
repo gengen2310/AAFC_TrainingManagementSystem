@@ -587,7 +587,7 @@ function FacilitatorLeaveSection({
   }
 
   async function handleDeleteLeave(leave_id: string) {
-    if (!window.confirm("Remove this leave period?")) return;
+    if (!window.confirm("Remove this leave period? It can be restored later from \"Show archived\".")) return;
     setDeletingLeaveId(leave_id);
     try {
       await planningApi.deleteFacilitatorLeave(leave_id);
