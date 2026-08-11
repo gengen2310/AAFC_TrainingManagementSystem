@@ -9050,7 +9050,7 @@ function _ttDur(b){
 }
 
 function _ttBlockRow(b,i){
-  const typeOpts=_TT_BLOCK_TYPES.map(t=>`<option value="${t}"${b.block_type===t?' selected':''}>${t.replace(/_/g,' ')}</option>`).join('');
+  const typeOpts=_TT_BLOCK_TYPES.map(t=>`<option value="${t}"${b.block_type===t?' selected':''}>${_cap(t.replace(/_/g,' '))}</option>`).join('');
   const dur=_ttDur(b);
   return `<tr>
     <td style="padding:3px 4px;color:var(--muted);white-space:nowrap">${i+1}</td>
@@ -9785,7 +9785,7 @@ async function doDeletePlanningYear(){
   }catch(e){
     if(e && e.kind==='http' && e.status===409 && e.body && e.body.detail && e.body.detail.dependents){
       const dep=e.body.detail.dependents;
-      const depList=Object.entries(dep).map(([k,v])=>`${k.replace(/_/g,' ')}: ${v}`).join(', ');
+      const depList=Object.entries(dep).map(([k,v])=>`${_cap(k.replace(/_/g,' '))}: ${v}`).join(', ');
       if(confirm(`Cannot permanently delete — this Training Year has linked records (${depList}). Archive it instead? (reversible, keeps history)`)){
         doArchivePlanningYear();
       }
@@ -11438,7 +11438,7 @@ function _renderConflicts(conflicts, yearId){
   el.innerHTML=`<table class="data-table"><thead><tr><th>Severity</th><th>Type</th><th>Message</th><th></th></tr></thead><tbody>`+
     conflicts.map(c=>`<tr>
       <td><span class="badge ${c.severity==='critical'?'badge-red':'badge-yellow'}">${esc(_cap(c.severity))}</span></td>
-      <td>${esc(c.conflict_type.replace(/_/g,' '))}</td>
+      <td>${esc(_cap(c.conflict_type.replace(/_/g,' ')))}</td>
       <td>${esc(c.message)}</td>
       <td><button class="btn-xs btn-secondary" onclick="promptOverrideConflict('${esc(c.conflict_id)}','${esc(yearId)}')">Override</button></td>
     </tr>`).join('')+
@@ -11891,7 +11891,7 @@ async function openWingEventDetail(eventId){
       const ssCol={'reviewed':'badge-green','preparation_planned':'badge-green','not_applicable':'b-grey'}[ss.status]||'b-grey';
       sqnStatus=`<div style="margin-top:10px;padding:8px;background:var(--bg);border-radius:6px">
         <div style="font-size:11px;font-weight:700;margin-bottom:4px">Your Squadron's Status</div>
-        <span class="badge ${ssCol}">${esc(ss.status.replace(/_/g,' '))}</span>
+        <span class="badge ${ssCol}">${esc(_cap(ss.status.replace(/_/g,' ')))}</span>
         ${ss.notes?`<span style="font-size:11px;margin-left:6px">${esc(ss.notes)}</span>`:''}
       </div>`;
     }
@@ -12072,7 +12072,7 @@ function _renderWingEventsOverlay(){
   rows.map(e=>{
     const ds=e.start_date+(e.end_date&&e.end_date!==e.start_date?' – '+e.end_date:'');
     const ss=e.squadron_status;
-    const ssLabel=ss?ss.status.replace(/_/g,' '):'not reviewed';
+    const ssLabel=ss?_cap(ss.status.replace(/_/g,' ')):'Not reviewed';
     const ssCls={'reviewed':'badge-green','preparation_planned':'badge-green','not_applicable':'b-grey'}[ss?.status]||'b-grey';
     return `<tr>
       <td>${esc(ds)}</td>
