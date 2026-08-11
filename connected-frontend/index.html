@@ -915,6 +915,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <h1 class="ph-title">Parade Nights</h1>
           <div class="ph-sub">Parade nights and session status</div>
           <div class="ph-actions no-print">
+            <span id="pn-refresh-status" style="font-size:10px;color:var(--muted)"></span>
+            <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('pn-refresh-status',async()=>{await loadData();renderPN();})">Refresh</button>
             <button class="btn btn-dk" onclick="openModal('m-add-pn')">+ Add Parade Night</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openGenerateDatesModal()">Generate Parade Nights</button>
             <button class="btn btn-out" onclick="nav('calendar')">Calendar</button>
@@ -964,6 +966,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ph">
           <h1 class="ph-title">Curriculum</h1>
           <div class="ph-actions no-print">
+            <span id="curr-refresh-status" style="font-size:10px;color:var(--muted)"></span>
+            <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('curr-refresh-status',async()=>{await loadData();renderCurr();})">Refresh</button>
             <button class="btn btn-dk admin-el" id="btn-add-curr-sqn" style="display:none" onclick="openAddCurr()">+ Add Squadron Curriculum</button>
             <button class="btn btn-dk admin-el" id="btn-add-curr-wing" style="display:none" onclick="openAddCurrWing()">+ Add Wing Curriculum</button>
             <button class="btn btn-dk admin-el" id="btn-add-curr-nat" style="display:none" onclick="openAddCurrNat()">+ Add National Curriculum</button>
@@ -1125,6 +1129,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ph">
           <h1 class="ph-title">Facilitators</h1>
           <div class="ph-actions no-print">
+            <span id="fac-refresh-status" style="font-size:10px;color:var(--muted)"></span>
+            <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('fac-refresh-status',async()=>{await loadData();renderFacs();await loadFacilitatorStats();})">Refresh</button>
             <input id="fac-search" placeholder="Search name or rank…" oninput="renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px;min-width:160px">
             <select id="fac-filter" aria-label="Filter facilitators by subject area" onchange="S.facFilter=this.value;renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px">
               <option value="">All subject areas</option>
@@ -1172,6 +1178,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div class="ph">
           <h1 class="ph-title">Resources &amp; Training Areas</h1>
           <div class="ph-actions no-print">
+            <span id="res-refresh-status" style="font-size:10px;color:var(--muted)"></span>
+            <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('res-refresh-status',async()=>{await loadData();renderRooms();})">Refresh</button>
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-room')">+ Add Room</button>
             <button class="btn btn-out admin-el" style="display:none" onclick="openModal('m-add-equip')">+ Add Equipment</button>
           </div>
@@ -1430,7 +1438,14 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       </div>
 
       <div id="page-audit" class="page">
-        <div class="ph"><h1 class="ph-title">Audit Log</h1><div class="ph-sub">Immutable record of actions — backend authoritative</div></div>
+        <div class="ph">
+          <h1 class="ph-title">Audit Log</h1>
+          <div class="ph-sub">Immutable record of actions — backend authoritative</div>
+          <div class="ph-actions no-print">
+            <span id="audit-refresh-status" style="font-size:10px;color:var(--muted)"></span>
+            <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('audit-refresh-status',async()=>{await loadData();renderAudit();})">Refresh</button>
+          </div>
+        </div>
         <div class="card"><div class="tw"><table>
           <thead><tr><th>Time</th><th>Role</th><th>Action</th><th>Object</th><th>Reason</th></tr></thead>
           <tbody id="audit-tbody"></tbody>
