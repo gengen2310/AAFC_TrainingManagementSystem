@@ -209,6 +209,25 @@ def test_list_squadrons_includes_unit_type(client):
         assert "unit_type" in s, f"Squadron {s.get('code')} missing unit_type"
 
 
+def test_create_squadron_returns_unit_number(client):
+    """REM-107: unit_number was accepted on create and stored, but never
+    echoed back by _sqn() -- so it never round-tripped to any UI. Regression
+    guard for both the create response and the list endpoint."""
+    h_nat = login(client, "ADMINNATIONAL")
+    h_wg = login(client, "ADMIN7WG")
+    wid = _get_wing_id(client, h_wg)
+    r = client.post("/api/squadrons", headers=h_nat, json={
+        "wing_id": wid, "code": "UNITNO01", "name": "Unit Number Test Sqn",
+        "unit_type": "specialist_flight", "unit_number": "12A"
+    })
+    assert r.status_code == 200, r.text
+    assert r.json()["unit_number"] == "12A"
+    sqns = client.get("/api/squadrons", headers=h_wg).json()
+    s = next((x for x in sqns if x["code"] == "UNITNO01"), None)
+    assert s is not None
+    assert s["unit_number"] == "12A"
+
+
 def test_patch_squadron_unit_type(client):
     h = login(client, "ADMIN703")
     sqn_id = _get_sqn_id(client, h)

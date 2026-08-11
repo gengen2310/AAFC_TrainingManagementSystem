@@ -555,6 +555,7 @@ def _user(u: User, db: DBSession) -> dict:
 def _sqn(s: Squadron) -> dict:
     return {"squadron_id": s.id, "wing_id": s.wing_id, "code": s.code, "name": s.name,
             "short_name": s.short_name, "unit_type": getattr(s, "unit_type", "standard_squadron"),
+            "unit_number": s.unit_number,
             "address": s.address, "default_parade_day": s.default_parade_day,
             "default_start_time": s.default_start_time, "default_end_time": s.default_end_time,
             "default_session_count": s.default_session_count, "active_status": s.active_status,
