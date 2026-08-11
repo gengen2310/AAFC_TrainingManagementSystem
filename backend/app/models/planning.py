@@ -5,7 +5,7 @@ planning years, parade dates, holidays, anchor events, term planner,
 parade night builder, scheduled sessions, planning locations, and
 conflict detection.
 """
-from sqlalchemy import String, Integer, Boolean, Text, Date, ForeignKey, JSON
+from sqlalchemy import String, Integer, Boolean, Text, Date, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..database import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
@@ -258,3 +258,31 @@ class ActivityLocalHide(Base, UUIDMixin, TimestampMixin):
     is_hidden: Mapped[bool] = mapped_column(Boolean, default=True)
     local_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     hidden_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+
+class ActivityLocalOverride(Base, UUIDMixin, TimestampMixin):
+    """REM-103: squadron-local adjustments to a Wing/National-owned inherited
+    Activity -- mirrors ActivityLocalHide's pattern (one squadron-scoped
+    annotation row per source record, source record itself never modified,
+    inheritance integrity preserved) but for the general Activity model
+    (not CEA-only) and carries date/time/notes overrides plus a relevance
+    flag instead of just hide+note. One row per (activity_id, squadron_id).
+    Only ever created for an Activity the squadron does NOT own (owning_level
+    != 'squadron' or squadron_id != this squadron) -- overriding your own
+    record makes no sense, you'd edit it directly; enforced in the router,
+    not the model, matching this codebase's existing convention of keeping
+    ownership/scope validation in the endpoint layer."""
+    __tablename__ = "activity_local_overrides"
+    __table_args__ = (UniqueConstraint("activity_id", "squadron_id", name="uq_activity_local_override_activity_squadron"),)
+    activity_id: Mapped[str] = mapped_column(ForeignKey("activities.id"), nullable=False, index=True)
+    squadron_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), nullable=False, index=True)
+    local_date_start: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    local_date_end: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    local_time_start: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    local_time_end: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    local_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_hidden: Mapped[bool] = mapped_column(Boolean, default=False)
+    # created_by/updated_by are already provided by TimestampMixin -- do not
+    # redeclare them here (this codebase's migration-drift tests enforce that
+    # every TimestampMixin table's migration includes both columns).
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")

@@ -12,6 +12,7 @@ from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, Parade
                       Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, SessionStatusReasonTag, TrainingArea, Equipment,
                       Activity, Cadet, Squadron, TimingTemplate, TimingBlock, SystemSetting, TrainingClass, PlanningYear,
                       SessionAudience, CadetClassMembership)
+from ..models.planning import ActivityLocalOverride
 from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
@@ -2443,13 +2444,27 @@ class ActivityWingIn(ActivityIn):
     wing_id: str | None = None
 
 
+def _local_override_out(o: ActivityLocalOverride) -> dict:
+    return {
+        "override_id": o.id, "local_date_start": o.local_date_start, "local_date_end": o.local_date_end,
+        "local_time_start": o.local_time_start, "local_time_end": o.local_time_end,
+        "local_notes": o.local_notes, "is_hidden": o.is_hidden,
+        "updated_by": o.updated_by, "version": o.version,
+    }
+
+
 def _activity_out(a: Activity, p: Principal, view_scope_type: str | None,
-                  org_names: dict[str, str] | None = None) -> dict:
+                  org_names: dict[str, str] | None = None,
+                  local_override: ActivityLocalOverride | None = None) -> dict:
     org_names = org_names or {}
     owning_scope_id = (a.national_id if a.owning_level == "national"
                        else a.wing_id if a.owning_level == "wing" else a.squadron_id)
     is_inherited = (view_scope_type == "squadron" and a.owning_level != "squadron") or \
                    (view_scope_type == "wing" and a.owning_level == "national")
+    # REM-103: a local override is only ever meaningful for an inherited row
+    # (see the local-override endpoints below, which enforce this at write
+    # time too) -- source values are always returned unchanged alongside it,
+    # per the addendum's own "display source vs local value side-by-side" ask.
     return {
         "activity_id": a.id, "source": a.owning_level, "owning_level": a.owning_level,
         "owning_scope_id": owning_scope_id,
@@ -2463,6 +2478,7 @@ def _activity_out(a: Activity, p: Principal, view_scope_type: str | None,
         "cea_seq_nr": a.cea_seq_nr, "is_archived": a.is_archived,
         "is_inherited": is_inherited,
         "read_only": not p.can_write_activity(a.owning_level, a.wing_id, a.squadron_id),
+        "local_override": _local_override_out(local_override) if local_override else None,
     }
 
 
@@ -2684,7 +2700,27 @@ def list_activities(
         for s in db.query(Squadron).filter(Squadron.id.in_(sqn_ids)).all():
             org_names[s.id] = s.name
 
-    items = [_activity_out(a, p, scope_type, org_names) for a in activity_rows] if "activity" in src_set else []
+    # REM-103: batch-fetch this viewing squadron's own local overrides for
+    # the activities in this page -- only meaningful at squadron scope (a
+    # local override always belongs to exactly one squadron's view).
+    overrides_by_activity: dict[str, ActivityLocalOverride] = {}
+    if scope_type == "squadron" and resolved_squadron_id and activity_rows:
+        for o in db.query(ActivityLocalOverride).filter(
+            ActivityLocalOverride.squadron_id == resolved_squadron_id,
+            ActivityLocalOverride.activity_id.in_([a.id for a in activity_rows]),
+        ).all():
+            overrides_by_activity[o.activity_id] = o
+
+    # Deliberately NOT hard-filtering is_hidden rows out of the list here,
+    # unlike _cea_source_items' own is_hidden handling above -- that CEA hide
+    # mechanism has no "show hidden / unhide" surface anywhere in either
+    # frontend today (confirmed: zero references to ActivityLocalHide outside
+    # the backend), so a hidden CEA item is permanently invisible with no way
+    # back. Returning is_hidden as a flag here instead lets the frontend
+    # de-emphasise a locally-irrelevant activity while keeping it
+    # discoverable and reversible.
+    items = [_activity_out(a, p, scope_type, org_names, overrides_by_activity.get(a.id))
+             for a in activity_rows] if "activity" in src_set else []
     if "cea" in src_set and not show_archived:
         items += _cea_source_items(db, wing_id_of_scope, resolved_squadron_id, date_from, date_end,
                                    resolved_squadron_id or _active_squadron(p))
@@ -2708,10 +2744,23 @@ def get_activity(aid: str, db: DBSession = Depends(get_db), p: Principal = Depen
     if not a:
         raise HTTPException(404, detail={"error": "not_found"})
     if a.owning_level == "national":
-        require_role(p, *NATIONAL_LEVEL)
+        # REM-103 fix: national activities are always visible to every
+        # authenticated principal, matching _activities_visibility_filter's
+        # own "National activities are always visible" rule (list_activities,
+        # above) -- previously gated to NATIONAL_LEVEL roles only here, so a
+        # wing/squadron user could see a national activity in their list but
+        # get a 403 viewing that exact same activity by ID. This blocked the
+        # inherited-view case a squadron admin needs before they can create a
+        # local override on it.
         view_scope = "national"
     elif a.owning_level == "wing":
-        require_can_view_wing(p, a.wing_id)
+        # REM-103 fix: visible to that wing AND every squadron under it
+        # (inherited) -- previously required require_can_view_wing, which
+        # every squadron role always fails (can_view_wing has no squadron
+        # branch at all), for the same reason as the national case above.
+        viewer_wing_id = p.wing_id if p.role in ("sqn_admin", "sqn_general") else None
+        if not (p.can_view_wing(a.wing_id) or (viewer_wing_id and viewer_wing_id == a.wing_id)):
+            require_can_view_wing(p, a.wing_id)  # always raises here; reuses its exact error message
         view_scope = "wing"
     else:
         s = db.get(Squadron, a.squadron_id) if a.squadron_id else None
@@ -2727,7 +2776,109 @@ def get_activity(aid: str, db: DBSession = Depends(get_db), p: Principal = Depen
         s = db.get(Squadron, a.squadron_id)
         if s:
             org_names[s.id] = s.name
-    return _activity_out(a, p, view_scope, org_names)
+    # REM-103: a squadron-scope caller viewing an inherited (wing/national)
+    # activity may have their own local override for it -- view_scope above
+    # reflects the ACTIVITY's own owning_level, not the viewer's squadron, so
+    # this is resolved separately via the caller's active squadron.
+    local_override = None
+    viewer_sq_id = _active_squadron(p)
+    if viewer_sq_id and a.owning_level != "squadron":
+        local_override = db.query(ActivityLocalOverride).filter(
+            ActivityLocalOverride.activity_id == a.id,
+            ActivityLocalOverride.squadron_id == viewer_sq_id,
+        ).first()
+    return _activity_out(a, p, view_scope, org_names, local_override)
+
+
+class ActivityLocalOverrideIn(BaseModel):
+    local_date_start: str | None = None
+    local_date_end: str | None = None
+    local_time_start: str | None = None
+    local_time_end: str | None = None
+    local_notes: str | None = None
+    is_hidden: bool = False
+    version: int | None = None  # required on update, ignored on first create
+
+
+@router.put("/activities/{aid}/local-override")
+def upsert_activity_local_override(aid: str, body: ActivityLocalOverrideIn,
+                                   db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """REM-103: create or update the caller's own squadron's local
+    date/time/notes/relevance adjustment to a Wing/National-owned inherited
+    Activity. The source Activity row is never modified -- this is purely a
+    per-squadron annotation, upserted (one row per activity+squadron, see
+    the model's unique constraint)."""
+    a = db.get(Activity, aid)
+    if not a:
+        raise HTTPException(404, detail={"error": "not_found"})
+    sq_id = _active_squadron(p)
+    if not sq_id:
+        require_can_write_squadron(p, "none", None)
+    s = db.get(Squadron, sq_id)
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    require_can_write_squadron(p, s.id, s.wing_id)
+    if a.owning_level == "squadron" and a.squadron_id == sq_id:
+        raise HTTPException(400, detail={
+            "error": "cannot_override_own_activity",
+            "message": "A squadron cannot create a local override on its own activity -- edit it directly instead.",
+        })
+
+    existing = db.query(ActivityLocalOverride).filter(
+        ActivityLocalOverride.activity_id == aid, ActivityLocalOverride.squadron_id == sq_id,
+    ).first()
+    if existing:
+        _check_version(existing, body.version)
+        existing.local_date_start = body.local_date_start
+        existing.local_date_end = body.local_date_end
+        existing.local_time_start = body.local_time_start
+        existing.local_time_end = body.local_time_end
+        existing.local_notes = body.local_notes
+        existing.is_hidden = body.is_hidden
+        existing.updated_by = p.user_id
+        existing.version += 1
+        override = existing
+        action = "update"
+    else:
+        override = ActivityLocalOverride(
+            activity_id=aid, squadron_id=sq_id,
+            local_date_start=body.local_date_start, local_date_end=body.local_date_end,
+            local_time_start=body.local_time_start, local_time_end=body.local_time_end,
+            local_notes=body.local_notes, is_hidden=body.is_hidden,
+            created_by=p.user_id, updated_by=p.user_id,
+        )
+        db.add(override)
+        action = "create"
+    db.commit()
+    audit(db, p, object_type="activity_local_override", object_id=override.id, action=action,
+         new={"activity_id": aid, "squadron_id": sq_id, "is_hidden": body.is_hidden})
+    return {"ok": True, **_local_override_out(override)}
+
+
+@router.delete("/activities/{aid}/local-override")
+def delete_activity_local_override(aid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """REM-103: revert to the source Activity's own values -- removes this
+    squadron's override row entirely rather than soft-clearing fields, so a
+    later GET/list simply shows the unmodified source data again."""
+    sq_id = _active_squadron(p)
+    if not sq_id:
+        require_can_write_squadron(p, "none", None)
+    s = db.get(Squadron, sq_id)
+    if not s:
+        raise HTTPException(400, detail={"error": "no_squadron_scope"})
+    require_can_write_squadron(p, s.id, s.wing_id)
+
+    existing = db.query(ActivityLocalOverride).filter(
+        ActivityLocalOverride.activity_id == aid, ActivityLocalOverride.squadron_id == sq_id,
+    ).first()
+    if not existing:
+        raise HTTPException(404, detail={"error": "not_found"})
+    override_id = existing.id
+    db.delete(existing)
+    db.commit()
+    audit(db, p, object_type="activity_local_override", object_id=override_id, action="delete",
+         old={"activity_id": aid, "squadron_id": sq_id})
+    return {"ok": True}
 
 
 @router.post("/activities")

@@ -4,7 +4,7 @@ from .planning import (
     PlanningYear, ParadeDate, HolidayPeriod, AnchorEvent, AnchorPrepRule,
     AnchorPrepPlan, ScheduledSession, PlanningLocation, PlanningConflict,
     PlanningFacilitatorLeave, PlanningNotice,
-    CeaImportBatch, CeaActivity, ActivityLocalHide,
+    CeaImportBatch, CeaActivity, ActivityLocalHide, ActivityLocalOverride,
 )
 from .organisations import (
     NationalEntity, Wing, Squadron, Flight, User, AccessCode, ProxySession, IpLoginAttempt,
@@ -35,6 +35,6 @@ __all__ = [
     "PlanningYear", "ParadeDate", "HolidayPeriod", "AnchorEvent", "AnchorPrepRule",
     "AnchorPrepPlan", "ScheduledSession", "PlanningLocation", "PlanningConflict",
     "PlanningFacilitatorLeave", "PlanningNotice",
-    "CeaImportBatch", "CeaActivity", "ActivityLocalHide",
+    "CeaImportBatch", "CeaActivity", "ActivityLocalHide", "ActivityLocalOverride",
     "WingHQEvent", "SquadronEventStatus", "WingEventCurriculumLink",
 ]
