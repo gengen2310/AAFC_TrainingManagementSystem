@@ -196,6 +196,54 @@ class TestUpdate:
         r3 = client.get(f"/api/wing-calendar/events/{eid}", headers=hdrs)
         assert r3.status_code == 404
 
+    def test_restore_reverses_archive_and_is_visible_via_include_archived(self, client):
+        """REM-133: archive existed with no restore counterpart, and archived
+        events were entirely invisible (list_wing_events had no
+        include_archived param)."""
+        hdrs = _headers(client, "ADMIN7WG")
+        db = SessionLocal()
+        wid = _wing_id(db); db.close()
+        r = _create_event(client, wid, hdrs, title="Restore Me", start_date="2026-09-04")
+        eid = r.json()["id"]
+        assert client.post(f"/api/wing-calendar/events/{eid}/archive", headers=hdrs).status_code == 200
+
+        default_list = client.get(f"/api/wing-calendar/events?wing_id={wid}", headers=hdrs).json()
+        assert not any(e["id"] == eid for e in default_list)
+        archived_list = client.get(
+            f"/api/wing-calendar/events?wing_id={wid}&include_archived=true", headers=hdrs
+        ).json()
+        entry = next((e for e in archived_list if e["id"] == eid), None)
+        assert entry is not None
+        assert entry["is_archived"] is True
+
+        r2 = client.post(f"/api/wing-calendar/events/{eid}/restore", headers=hdrs)
+        assert r2.status_code == 200, r2.text
+
+        restored_list = client.get(f"/api/wing-calendar/events?wing_id={wid}", headers=hdrs).json()
+        restored_entry = next((e for e in restored_list if e["id"] == eid), None)
+        assert restored_entry is not None
+        assert restored_entry["is_archived"] is False
+
+    def test_restore_rejects_already_active_event(self, client):
+        hdrs = _headers(client, "ADMIN7WG")
+        db = SessionLocal()
+        wid = _wing_id(db); db.close()
+        r = _create_event(client, wid, hdrs, title="Not Archived", start_date="2026-09-05")
+        eid = r.json()["id"]
+        r2 = client.post(f"/api/wing-calendar/events/{eid}/restore", headers=hdrs)
+        assert r2.status_code == 409, r2.text
+
+    def test_sqn_admin_cannot_restore_wing_event(self, client):
+        hdrs_admin = _headers(client, "ADMIN7WG")
+        hdrs_sqn = _headers(client, "ADMIN703")
+        db = SessionLocal()
+        wid = _wing_id(db); db.close()
+        r = _create_event(client, wid, hdrs_admin, title="No Restore For SQN", start_date="2026-09-06")
+        eid = r.json()["id"]
+        assert client.post(f"/api/wing-calendar/events/{eid}/archive", headers=hdrs_admin).status_code == 200
+        r2 = client.post(f"/api/wing-calendar/events/{eid}/restore", headers=hdrs_sqn)
+        assert r2.status_code == 403
+
 
 # ─────────────────────────────────────────────────────────────
 # Curriculum links

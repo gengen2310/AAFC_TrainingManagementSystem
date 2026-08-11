@@ -991,12 +991,15 @@ class FacIn(BaseModel):
 
 
 @router.get("/facilitators")
-def list_facs(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def list_facs(squadron_id: str | None = None, include_archived: bool = False,
+              db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     from datetime import date, timedelta
     from ..models.planning import PlanningFacilitatorLeave
     sq_id = _view_squadron_id(p, squadron_id, db)
-    facs = db.query(Facilitator).filter(Facilitator.squadron_id == sq_id,
-                                        Facilitator.is_archived == False).all()  # noqa: E712
+    q = db.query(Facilitator).filter(Facilitator.squadron_id == sq_id)
+    if not include_archived:
+        q = q.filter(Facilitator.is_archived == False)  # noqa: E712
+    facs = q.all()
     today = date.today().isoformat()
     horizon = (date.today() + timedelta(days=90)).isoformat()
     out = []
@@ -1009,7 +1012,7 @@ def list_facs(squadron_id: str | None = None, db: DBSession = Depends(get_db), p
                  .order_by(PlanningFacilitatorLeave.start_date).all())
         out.append({"facilitator_id": f.id, "first_name": f.first_name, "last_name": f.last_name,
                     "current_rank": f.current_rank, "type": f.type,
-                    "subject_areas": _parse_json_list(f.subject_areas),
+                    "subject_areas": _parse_json_list(f.subject_areas), "is_archived": f.is_archived,
                     "upcoming_leave": [{"id": lv.id, "start_date": lv.start_date, "end_date": lv.end_date,
                                         "reason": lv.reason} for lv in leave]})
     return out
@@ -1647,6 +1650,24 @@ def delete_fac(fid: str, db: DBSession = Depends(get_db), p: Principal = Depends
     f.archived_at = utcnow()
     db.commit()
     audit(db, p, object_type="facilitator", object_id=f.id, action="archive")
+    return {"ok": True}
+
+
+@router.post("/facilitators/{fid}/restore")
+def restore_fac(fid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """REM-133: facilitator archive existed with no restore counterpart --
+    same pattern as restore_flight (accounts.py), the direct template for
+    this exact gap."""
+    f = db.get(Facilitator, fid)
+    if not f:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, f.squadron_id, f.wing_id)
+    if not f.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived"})
+    f.is_archived = False
+    f.archived_at = None
+    db.commit()
+    audit(db, p, object_type="facilitator", object_id=f.id, action="restore")
     return {"ok": True}
 
 

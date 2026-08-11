@@ -124,6 +124,7 @@ def _event_out(
         "status": e.status,
         "requires_squadron_action": e.requires_squadron_action,
         "is_planning_anchor": e.is_planning_anchor,
+        "is_archived": e.is_archived,
         "notes": e.notes,
         "curriculum_links": curriculum_links or [],
         "squadron_status": sqn_status,
@@ -302,6 +303,7 @@ def list_wing_events(
     planning_importance: Optional[str] = Query(default=None),
     audience: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
+    include_archived: bool = Query(default=False),
     limit: int = Query(default=200, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: DBSession = Depends(get_db),
@@ -323,10 +325,9 @@ def list_wing_events(
         _require_read(p, wing_id)
         wing_ids = [wing_id]
 
-    q = db.query(WingHQEvent).filter(
-        WingHQEvent.wing_id.in_(wing_ids),
-        WingHQEvent.is_archived == False,  # noqa: E712
-    )
+    q = db.query(WingHQEvent).filter(WingHQEvent.wing_id.in_(wing_ids))
+    if not include_archived:
+        q = q.filter(WingHQEvent.is_archived == False)  # noqa: E712
     if year:
         q = q.filter(WingHQEvent.year == year)
     if event_type:
@@ -509,6 +510,31 @@ def archive_wing_event(
     e.updated_by = p.user_id
     db.commit()
     audit(db, p, object_type="wing_hq_event", object_id=e.id, action="archive",
+          new={"title": e.title})
+    return {"ok": True}
+
+
+@router.post("/events/{event_id}/restore")
+def restore_wing_event(
+    event_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """REM-133: Wing HQ Event archive existed with no restore counterpart.
+    Cannot use _get_event_or_404 -- it excludes archived events by design
+    (see its own is_archived check), which is exactly the row this endpoint
+    needs to find."""
+    e = db.get(WingHQEvent, event_id)
+    if not e:
+        raise HTTPException(404, detail={"error": "event_not_found"})
+    _require_write(p, e.wing_id)
+    if not e.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived"})
+    e.is_archived = False
+    e.archived_at = None
+    e.updated_by = p.user_id
+    db.commit()
+    audit(db, p, object_type="wing_hq_event", object_id=e.id, action="restore",
           new={"title": e.title})
     return {"ok": True}
 
