@@ -29,8 +29,8 @@ export function Admin() {
           )}
       </Card>
       <Card title="Access codes">
-        <p className="muted">Access codes are never displayed. Authorised admins reset a user's code via a backend
-          workflow (change-code); the value is hashed server-side and is never returned to the UI.</p>
+        <p className="muted">Access codes are never displayed. Authorised admins can reset a user's code, but
+          cannot view the existing code — resetting is the only way to issue a new one.</p>
       </Card>
     </div>
   );

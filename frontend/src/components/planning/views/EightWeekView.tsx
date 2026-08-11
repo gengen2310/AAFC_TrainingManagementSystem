@@ -65,7 +65,7 @@ export function EightWeekView({
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load planning data</div>
         <div style={{ fontSize: 12, opacity: .8 }}>{msg}</div>
         <div style={{ fontSize: 11, marginTop: 6, color: "var(--muted-text)" }}>
-          Check that the backend is running and the date range is valid.
+          Check that the date range is valid, and that you have an internet connection.
         </div>
       </div>
     );

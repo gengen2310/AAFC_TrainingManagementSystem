@@ -138,8 +138,8 @@ export function Settings() {
           <Card title="User directory">
             <p className="muted" style={{ marginBottom: 12 }}>
               Select a user to reset their access code. Codes are write-only — the system hashes and
-              stores the new value; the previous code is not recoverable. You may only reset users
-              within your authorised scope; the backend enforces this.
+              stores the new value; the previous code cannot be recovered. You may only reset users
+              within your authorised scope.
             </p>
             <div className="filter-bar" style={{ marginBottom: 10 }}>
               <input

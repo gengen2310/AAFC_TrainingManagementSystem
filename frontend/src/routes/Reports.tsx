@@ -49,8 +49,8 @@ export function Reports() {
 
       {(isWing(session) || isNational(session)) && <p className="muted">Wing and National rollups are on the Wing Overview / National Overview pages.</p>}
       <Card title="Other reports">
-        <p className="muted">Additional Cadet Program reports from the catalogue are implemented incrementally on the same
-          backend-query + drill-down pattern. Reports that are not yet implemented are not shown here and never display fabricated data.</p>
+        <p className="muted">More Cadet Program reports are being added over time. A report is only shown here once it is
+          fully built — nothing on this page is estimated or made up.</p>
       </Card>
     </div>
   );
