@@ -1135,6 +1135,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <select id="fac-filter" aria-label="Filter facilitators by subject area" onchange="S.facFilter=this.value;renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;margin-right:8px">
               <option value="">All subject areas</option>
             </select>
+            <label class="admin-el" style="display:none;font-size:11px;font-weight:400;align-items:center;gap:4px;margin-right:8px"><input type="checkbox" id="fac-show-archived" onchange="_facsToggleShowArchived()"> Show archived</label>
             <button class="btn btn-dk admin-el" style="display:none" onclick="editFacId=null;document.getElementById('fac-rank').value='';document.getElementById('fac-first').value='';document.getElementById('fac-last').value='';document.getElementById('fac-modal-title').textContent='+ Add Facilitator';document.getElementById('fa-areas-create').style.display='';document.getElementById('fa-areas-edit').style.display='none';_clearFacDupWarning();_resetFacSaveState();openModal('m-add-fac')">+ Add Facilitator</button>
           </div>
         </div>
@@ -1421,6 +1422,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <option value="optional">Optional</option>
               <option value="noting">Noting</option>
             </select>
+            <label id="wc-show-archived-row" style="display:none;font-size:11px;font-weight:400;align-items:center;gap:4px"><input type="checkbox" id="wc-show-archived" onchange="_wcToggleShowArchived()"> Show archived</label>
             <div class="seg" role="group" aria-label="View">
               <button class="seg-btn active" id="wc-view-grid-btn" onclick="_wcSetView('grid')">Grid</button>
               <button class="seg-btn" id="wc-view-table-btn" onclick="_wcSetView('table')">Table</button>
@@ -8282,38 +8284,73 @@ function _populateFacFilter(){
   }
   if(cur)sel.value=cur;
 }
+// REM-133: archive existed with no way to see or restore an archived
+// facilitator -- follows the same "show archived" lazy-fetch pattern
+// already used for Flights (_flightsToggleShowArchived/doRestoreFlight).
+let _archivedFacList=null;
+async function _facsToggleShowArchived(){
+  const checked=(document.getElementById('fac-show-archived')||{}).checked;
+  if(!checked){ renderFacs(); return; }
+  try{
+    // Same field mapping loadData() uses to build S.facs (id/rank/first/last/
+    // type/areas) -- the raw API response uses facilitator_id/current_rank/
+    // first_name/last_name/subject_areas, which renderFacs() does not read.
+    _archivedFacList=(await api('/api/facilitators?include_archived=true')).filter(f=>f.is_archived).map(_mapArchivedFac);
+  }catch(e){ showToast('Could not load archived facilitators: '+apiErr(e), true); }
+  renderFacs();
+}
+function _mapArchivedFac(f){
+  return {id:f.facilitator_id,rank:f.current_rank||'',first:f.first_name||'',last:f.last_name||'',type:f.type||'',areas:(f.subject_areas||[])};
+}
+async function doRestoreFacilitator(id, name){
+  try{
+    await api(`/api/facilitators/${id}/restore`,{method:'POST'});
+    showToast(`'${name}' restored.`);
+    await loadData();
+    _archivedFacList=(await api('/api/facilitators?include_archived=true')).filter(f=>f.is_archived).map(_mapArchivedFac);
+    renderFacs();
+    loadFacilitatorStats();
+  }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
+}
 function renderFacs(){
   _populateFacFilter();
   const counts={};
   allSess().forEach(s=>{const k=s.facId||s.facName;if(!k)return;counts[k]=(counts[k]||0)+1;});
+  const showArchived=(document.getElementById('fac-show-archived')||{}).checked;
+  const source=showArchived?(_archivedFacList||[]):S.facs;
   const flt=S.facFilter||'';
   let list;
-  if(!flt){list=S.facs;}
+  if(!flt||showArchived){list=source;}
   else if(flt.startsWith('tag:')){
     const tagId=flt.slice(4);
     const tagName=(S.subjectAreaTags||[]).find(t=>t.tag_id===tagId);
     const matchName=tagName?tagName.display_name.toLowerCase():'';
-    list=S.facs.filter(f=>(f.areas||[]).some(a=>a.toLowerCase()===matchName));
+    list=source.filter(f=>(f.areas||[]).some(a=>a.toLowerCase()===matchName));
   } else {
-    list=S.facs.filter(f=>(f.areas||[]).some(a=>subjectOf(a)===flt));
+    list=source.filter(f=>(f.areas||[]).some(a=>subjectOf(a)===flt));
   }
   const q=(document.getElementById('fac-search')||{value:''}).value.trim().toLowerCase();
   if(q) list=list.filter(f=>(f.first||'').toLowerCase().includes(q)||(f.last||'').toLowerCase().includes(q)||(f.rank||'').toLowerCase().includes(q));
   document.getElementById('fac-tbody').innerHTML=list.length?list.map((f,i)=>{
     const k=f.id;const tot=counts[k]||0;
-    return `<tr class="clk-row" onclick="showFacProfile('${f.id}')">
+    const nameFor=`${f.first||''} ${f.last||''}`.trim()||'this facilitator';
+    const rowAttrs=showArchived?' style="opacity:.6"':'';
+    const clickAttr=showArchived?'':` onclick="showFacProfile('${f.id}')"`;
+    return `<tr class="${showArchived?'':'clk-row'}"${rowAttrs}${clickAttr}>
       <td style="color:var(--muted);font-size:11px">${i+1}</td>
-      <td style="font-weight:700">${f.rank||'—'}</td>
+      <td style="font-weight:700">${f.rank||'—'}${showArchived?' <span class="badge b-grey">Archived</span>':''}</td>
       <td>${f.first||'—'}</td>
       <td style="font-weight:700">${f.last||'—'}</td>
       <td><span class="badge b-grey">${{Officer:'Officer',NCO:'WO/NCO','Senior Cadet':'Sr Cadet',Civilian:'Civilian',Staff:'Staff'}[f.type]||f.type||'—'}</span></td>
       <td>${(f.areas||[]).map(a=>elBadge(a)).join(' ')||'<span style="color:var(--muted);font-size:11px">untagged</span>'}</td>
-      <td style="text-align:center"><button class="btn-lnk" onclick="event.stopPropagation();showFacProfile('${f.id}')">${tot}</button></td>
+      <td style="text-align:center">${showArchived?'—':`<button class="btn-lnk" onclick="event.stopPropagation();showFacProfile('${f.id}')">${tot}</button>`}</td>
       <td class="no-print" onclick="event.stopPropagation()">
-        ${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="tagFac('${f.id}')">Tags</button> <button class="btn btn-xs btn-sky" onclick="editFac('${f.id}')">Edit</button> <button class="btn btn-xs btn-out" onclick="openMergeFac('${f.id}')">Merge</button> <button class="btn btn-xs btn-red" onclick="delFac('${f.id}')">×</button>`:''}
+        ${showArchived
+          ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreFacilitator('${f.id}','${_jsAttr(nameFor)}')">Restore</button>`:'')
+          :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="tagFac('${f.id}')">Tags</button> <button class="btn btn-xs btn-sky" onclick="editFac('${f.id}')">Edit</button> <button class="btn btn-xs btn-out" onclick="openMergeFac('${f.id}')">Merge</button> <button class="btn btn-xs btn-red" onclick="delFac('${f.id}')">×</button>`:'')}
       </td>
     </tr>`;
-  }).join(''):`<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px">No facilitators${flt?' tagged in this subject area':''}${q?' match your search':''}.</td></tr>`;
+  }).join(''):`<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px">No ${showArchived?'archived ':''}facilitators${(!showArchived&&flt)?' tagged in this subject area':''}${q?' match your search':''}.</td></tr>`;
 }
 // Backend-backed subject-area tagging (PATCH /api/facilitators/{id}; audited server-side).
 const FAC_TAG_VOCAB=['Service Knowledge','Drill and Ceremonial','Field Skills','PDL','Community Engagement','Air & Space','Aviation','Space','Cyber','RPAS'];
@@ -8651,7 +8688,7 @@ function editFac(id){
   openModal('m-add-fac');
 }
 async function delFac(id){
-  if(!confirm('Archive this facilitator? Past session records are preserved.'))return;
+  if(!confirm('Archive this facilitator? Past session records are preserved, and this can be undone from "Show archived".'))return;
   try{ await api('/api/facilitators/'+id,{method:'DELETE'}); await reloadAndRender(); loadFacilitatorStats(); }
   catch(e){ alert(apiErr(e)); }
 }
@@ -11549,6 +11586,12 @@ async function commitSchedImport(){
 // State
 let _wingCalEvents=[];
 let _wingCalWingId=null;
+// REM-133: archive existed with no way to see or restore an archived Wing HQ
+// event -- separate lazily-fetched list, kept apart from _wingCalEvents
+// (which also carries source:'activity' rows the grid view renders) so this
+// only ever affects the table view, matching "+ New Event"'s own
+// single-wing-only restriction.
+let _wcArchivedEvents=[];
 let _wcDetailEventId=null;
 let _wcView='grid';
 let _wcGridDate=new Date();
@@ -11601,6 +11644,14 @@ async function loadWingCalendar(){
   // "+ New Event" needs one specific wing to attach the event to -- ambiguous
   // (and rejected server-side) while "All Wings" is selected.
   if(btn && allWings) btn.style.display='none';
+  // REM-133: "Show archived" is scoped to a single wing (same restriction as
+  // "+ New Event" above) -- restoring while "All Wings" is selected is
+  // ambiguous about which wing's write authority applies.
+  const showArchivedRow=document.getElementById('wc-show-archived-row');
+  if(showArchivedRow) showArchivedRow.style.display=(isWingWrite&&!allWings)?'flex':'none';
+  _wcArchivedEvents=[];
+  const archivedChk=document.getElementById('wc-show-archived');
+  if(archivedChk) archivedChk.checked=false;
   if(!wid){
     body.innerHTML='<p class="muted">No wing scope. Select a wing or log in as Wing Admin.</p>';
     return;
@@ -11631,13 +11682,15 @@ async function loadWingCalendar(){
   }catch(e){ body.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
 }
 
-function _wcFilteredRows(){
+function _wcApplyTypeImpFilters(rows){
   const typeF=document.getElementById('wc-type-filter')?.value||'';
   const impF=document.getElementById('wc-imp-filter')?.value||'';
-  let rows=_wingCalEvents;
   if(typeF) rows=rows.filter(e=>e.event_type===typeF);
   if(impF)  rows=rows.filter(e=>e.planning_importance===impF);
   return rows;
+}
+function _wcFilteredRows(){
+  return _wcApplyTypeImpFilters(_wingCalEvents);
 }
 function _wcSetView(mode){
   _wcView=mode;
@@ -11727,7 +11780,8 @@ function renderWingCalendar(){
     body.innerHTML='<p class="muted">No Wing HQ events for this year. Use <strong>+ New Event</strong> to add one, or import from your Wing Master Schedule.</p>';
     return;
   }
-  const rows=_wcFilteredRows();
+  const showingArchived=(document.getElementById('wc-show-archived')||{}).checked;
+  const rows=_wcFilteredRows().concat(showingArchived?_wcApplyTypeImpFilters(_wcArchivedEvents):[]);
   if(!rows.length){
     body.innerHTML='<p class="muted">No events match the current filters.</p>';
     return;
@@ -11746,15 +11800,22 @@ function renderWingCalendar(){
     // WingHQEvent-only columns (type/importance/action-needed) degrade to
     // '—' instead of leaking the literal string "undefined" into the DOM.
     const isAct=e.source==='activity';
-    return `<tr${isAct?'':' style="cursor:pointer" onclick="openWingEventDetail(\''+esc(e.id)+'\')"'}>
+    // REM-133: an archived event is unreachable via _get_event_or_404 (see
+    // that helper's own is_archived check backend-side), so it gets no
+    // click-through either -- same convention as Activity rows above.
+    const isArchived=!!e.is_archived;
+    const clickable=!isAct&&!isArchived;
+    return `<tr${clickable?' style="cursor:pointer" onclick="openWingEventDetail(\''+esc(e.id)+'\')"':(isArchived?' style="opacity:.6"':'')}>
       <td>${esc(dateStr)}</td>
-      <td><strong>${esc(e.title)}</strong>${isAct?' <span class="badge b-grey" style="font-size:9px">Activity</span>':''}${e.location?`<br><span class="muted" style="font-size:10px">${esc(e.location)}</span>`:''}</td>
+      <td><strong>${esc(e.title)}</strong>${isAct?' <span class="badge b-grey" style="font-size:9px">Activity</span>':''}${isArchived?' <span class="badge b-grey" style="font-size:9px">Archived</span>':''}${e.location?`<br><span class="muted" style="font-size:10px">${esc(e.location)}</span>`:''}</td>
       <td>${isAct?'—':`<span class="badge b-grey" style="font-size:9px">${esc(_WC_TYPE_LABEL[e.event_type]||e.event_type)}</span>`}</td>
       <td>${isAct?'—':`<span class="badge ${_WC_IMP_BADGE[e.planning_importance]||'b-grey'}">${esc(_WC_IMP_LABEL[e.planning_importance]||e.planning_importance)}</span>`}</td>
       <td style="font-size:10px">${esc(aud)}</td>
-      <td>${(!isAct&&e.requires_squadron_action)?'<span class="badge b-amber">Action needed</span>':''}</td>
-      ${isWingWrite?`<td>${isAct?'':`<button class="btn-xs btn-secondary" onclick="event.stopPropagation();editWingEvent('${esc(e.id)}')">Edit</button>
-        <button class="btn-xs btn-danger" onclick="event.stopPropagation();archiveWingEvent('${esc(e.id)}')">Archive</button>`}</td>`:''}
+      <td>${(!isAct&&!isArchived&&e.requires_squadron_action)?'<span class="badge b-amber">Action needed</span>':''}</td>
+      ${isWingWrite?`<td>${isAct?'':(isArchived
+        ?`<button class="btn-xs btn-ok" onclick="event.stopPropagation();doRestoreWingEvent('${esc(e.id)}','${_jsAttr(e.title||'')}')">Restore</button>`
+        :`<button class="btn-xs btn-secondary" onclick="event.stopPropagation();editWingEvent('${esc(e.id)}')">Edit</button>
+        <button class="btn-xs btn-danger" onclick="event.stopPropagation();archiveWingEvent('${esc(e.id)}')">Archive</button>`)}</td>`:''}
     </tr>`;
   }).join('')+
   `</tbody></table>`;
@@ -11899,11 +11960,39 @@ async function saveWingEvent(){
 }
 
 async function archiveWingEvent(eventId){
-  if(!confirm('Archive this Wing HQ event? It will no longer appear in squadron overlays.')) return;
+  if(!confirm('Archive this Wing HQ event? It will no longer appear in squadron overlays, but this can be undone from "Show archived".')) return;
   try{
     await api(`/api/wing-calendar/events/${eventId}/archive`,{method:'POST',body:{}});
     await loadWingCalendar();
   }catch(e){ alert(apiErr(e)); }
+}
+async function _wcToggleShowArchived(){
+  const checked=(document.getElementById('wc-show-archived')||{}).checked;
+  if(!checked){ _wcArchivedEvents=[]; renderWingCalendar(); return; }
+  if(!_wingCalWingId || _wingCalWingId==='__all__'){ renderWingCalendar(); return; }
+  const year=document.getElementById('wc-year-sel')?.value||'2026';
+  try{
+    const all=await api(`/api/wing-calendar/events?wing_id=${_wingCalWingId}&year=${year}&include_archived=true`);
+    _wcArchivedEvents=all.filter(e=>e.is_archived).map(e=>({...e,source:'wing_event'}));
+  }catch(e){ showToast('Could not load archived events: '+apiErr(e), true); }
+  renderWingCalendar();
+}
+async function doRestoreWingEvent(eventId, title){
+  try{
+    await api(`/api/wing-calendar/events/${eventId}/restore`,{method:'POST'});
+    showToast(`'${title}' restored.`);
+    // Refresh both lists directly rather than via loadWingCalendar() -- that
+    // would reset the "Show archived" checkbox and lose the user's place.
+    const year=document.getElementById('wc-year-sel')?.value||'2026';
+    const [activeEvents,allEvents]=await Promise.all([
+      api(`/api/wing-calendar/events?wing_id=${_wingCalWingId}&year=${year}`),
+      api(`/api/wing-calendar/events?wing_id=${_wingCalWingId}&year=${year}&include_archived=true`),
+    ]);
+    const acts=_wingCalEvents.filter(e=>e.source==='activity');
+    _wingCalEvents=activeEvents.map(e=>({...e,source:'wing_event'})).concat(acts);
+    _wcArchivedEvents=allEvents.filter(e=>e.is_archived).map(e=>({...e,source:'wing_event'}));
+    renderWingCalendar();
+  }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
 }
 
 // ─── Annual Program Wing HQ Events overlay ────────────────────────────────────
