@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
-import type { AnchorEvent, NightSummary } from "../../../api/types";
+import type { AnchorEvent, NightSummary, PlanningConflict } from "../../../api/types";
 import { BLOCK_GROUPS, BLOCK_PERIODS, fromNightSummary } from "../ParadeNightBlock";
 import type { DisplaySession } from "../ParadeNightBlock";
 import { ActivityDetailBlock, anchorToDisplay } from "../ActivityDetailBlock";
@@ -25,6 +25,7 @@ interface Props {
   viewRange: ViewRange;
   customStart?: string;
   customEnd?: string;
+  conflicts?: PlanningConflict[];
   onDateClick: (dateId: string, date: string) => void;
   onAnchorClick?: (anchor: AnchorEvent) => void;
 }
@@ -93,7 +94,7 @@ function filterActivitiesByRange(
   });
 }
 
-export function ListView({ yearId, viewRange, customStart, customEnd, onDateClick, onAnchorClick }: Props) {
+export function ListView({ yearId, viewRange, customStart, customEnd, conflicts = [], onDateClick, onAnchorClick }: Props) {
   const today = new Date().toISOString().slice(0, 10);
 
   const { data: nightData, isLoading: nightLoading } = useQuery({
@@ -198,7 +199,7 @@ export function ListView({ yearId, viewRange, customStart, customEnd, onDateClic
             </thead>
             <tbody>
               {summaries.map(s => {
-                const displaySessions = fromNightSummary(s.sessions);
+                const displaySessions = fromNightSummary(s.sessions, conflicts);
                 const isStandDown = s.parade_type === "cancelled" || s.parade_type === "stand_down";
 
                 return (
@@ -258,7 +259,11 @@ export function ListView({ yearId, viewRange, customStart, customEnd, onDateClic
                               <span className="pw-lv-p-num">P{period}</span>
                               {cell ? (
                                 <div className="pw-lv-p-content">
-                                  <span className="pw-lv-p-title">{cell.title ?? "—"}</span>
+                                  <span className="pw-lv-p-title">
+                                    {cell.conflict === "room" && <span className="pn-conflict-dot room" style={{ marginRight: 4 }} title="Room double-booked" />}
+                                    {cell.conflict === "fac" && <span className="pn-conflict-dot fac" style={{ marginRight: 4 }} title="Facilitator double-booked" />}
+                                    {cell.title ?? "—"}
+                                  </span>
                                   {(cell.location || cell.facilitator) && (
                                     <span className="pw-lv-p-detail">
                                       {[cell.location, cell.facilitator].filter(Boolean).join(" · ")}

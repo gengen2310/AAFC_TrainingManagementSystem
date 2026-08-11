@@ -153,3 +153,29 @@ test("Custom range view (same component as 8-Week/2-Week) shows the canonical-da
     await deactivateYear(page, hdr, yearId);
   }
 });
+
+// REM-39 residual (continued, 2026-08-11, found during the 8-Week/2-Week/
+// custom fix above): ListView.tsx -- the "List" display-mode toggle
+// available from Year/Term/8-Week/2-Week/custom -- called
+// fromNightSummary(s.sessions) with NO conflicts argument at all, so it
+// showed zero per-cell indicators in every case (List view never had any
+// per-cell indicator rendering at this level to begin with, unlike the
+// other views which at least had the heuristic). The night-level "⚠ N"
+// Warnings column badge (real conflict_count) was unaffected and already
+// correct.
+test("List view shows a per-cell conflict dot too, not just the Warnings column badge", async ({ page }) => {
+  const hdr = await authHeader(page, ADMIN_CODE);
+  const { yearId, yearName } = await seedRoomConflict(page, hdr);
+
+  try {
+    await page.goto("/planning");
+    await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
+    await page.getByRole("button", { name: yearName }).click();
+    await page.getByRole("button", { name: "List", exact: true }).click();
+
+    const dot = page.locator(".pn-conflict-dot.room").first();
+    await expect(dot).toBeVisible({ timeout: 10000 });
+  } finally {
+    await deactivateYear(page, hdr, yearId);
+  }
+});

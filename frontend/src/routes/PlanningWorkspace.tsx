@@ -248,6 +248,7 @@ export function PlanningWorkspace() {
           viewRange={viewRange}
           customStart={customStart}
           customEnd={customEnd}
+          conflicts={yearConflicts}
           onDateClick={handleDateClick}
           onAnchorClick={handleAnchorClick}
         />
