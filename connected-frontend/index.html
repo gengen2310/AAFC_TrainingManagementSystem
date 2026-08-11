@@ -1335,6 +1335,13 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="ctitle" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
             <span>Squadrons / Specialist Units</span>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <select id="units-type-filter" aria-label="Filter by unit type" onchange="_renderUnitsTable()" style="font-size:11px;padding:3px 6px">
+                <option value="all">All Types</option>
+                <option value="standard_squadron">Standard Squadron</option>
+                <option value="specialist_squadron">Specialist Squadron</option>
+                <option value="specialist_flight">Specialist Flight</option>
+                <option value="support_unit">Support Unit</option>
+              </select>
               <label style="font-size:11px;font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="units-show-archived" onchange="_orgToggleShowArchived('squadron')"> Show archived</label>
               <button class="btn btn-xs btn-sky" id="wing-create-btn" style="display:none" onclick="openCreateWingModal()">+ Add Wing</button>
               <button class="btn btn-xs btn-sky" id="sqn-create-btn" style="display:none" onclick="openCreateSqnModal()">+ Add Squadron / Specialist Unit</button>
@@ -5185,7 +5192,9 @@ const _UNIT_TYPE_LABELS={standard_squadron:'Standard Squadron',specialist_squadr
 function _renderUnitsTable(){
   const el=document.getElementById('units-table'); if(!el)return;
   const showArchived=(document.getElementById('units-show-archived')||{}).checked;
-  const sqns=showArchived?(_orgArchivedSqns||[]):(S.squadrons||[]);
+  const typeFilter=(document.getElementById('units-type-filter')||{}).value||'all';
+  let sqns=showArchived?(_orgArchivedSqns||[]):(S.squadrons||[]);
+  if(typeFilter!=='all') sqns=sqns.filter(s=>s.unit_type===typeFilter);
   const wings=S.wings||[];
   const isNatAdmin=['national_admin','system_admin'].includes(S.role);
   const isWingAdmin=S.role==='wing_admin';
