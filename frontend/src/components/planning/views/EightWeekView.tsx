@@ -7,7 +7,7 @@ import { filterAnchors } from "../../../utils/planningFilters";
 import {
   ParadeNightBlock,
   fromPlanningSession,
-  computeConflicts,
+  conflictMapFromPlanningConflicts,
   type DisplaySession,
 } from "../ParadeNightBlock";
 import { ActivityDetailBlock, anchorToDisplay } from "../ActivityDetailBlock";
@@ -104,8 +104,11 @@ export function EightWeekView({
         const pd = row.parade_date;
         const night = nightSummaryMap.get(pd.parade_date_id);
 
+        // REM-39 residual: canonical backend conflict data (row.conflicts,
+        // already used below for unresolvedCount), not the client-side
+        // heuristic -- matches YearView/TermView's own fromNightSummary path.
         const conflictMap = showConflicts
-          ? computeConflicts(row.sessions, facilitators)
+          ? conflictMapFromPlanningConflicts(row.conflicts)
           : undefined;
         const displaySessions = fromPlanningSession(row.sessions, conflictMap);
         const unresolvedCount = row.conflicts.filter(c => !c.is_resolved).length;

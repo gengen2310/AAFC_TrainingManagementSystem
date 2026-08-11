@@ -70,6 +70,33 @@ export function fromNightSummary(
 
 export interface CellConflict { room: boolean; fac: boolean; load: boolean; }
 
+// REM-39 residual: EightWeekView (and TwoWeekView/the custom-range view,
+// which are the same component with different props) built its per-cell dot
+// from computeConflicts() below -- a client-side heuristic re-derived from
+// the currently-loaded session list -- instead of the canonical backend
+// PlanningConflict/is_resolved data already available to it as row.conflicts
+// (used correctly for the header's unresolved-count badge on the same row).
+// The two can disagree: a conflict already overridden/resolved server-side
+// could still show a heuristic dot, or a real conflict the heuristic doesn't
+// model (e.g. cross-period) could go unshown. This mirrors fromNightSummary's
+// own conflict lookup (YearView/TermView), just producing the CellConflict
+// map shape fromPlanningSession expects instead of a flat array scan.
+export function conflictMapFromPlanningConflicts(
+  conflicts: PlanningConflict[],
+): Map<string, CellConflict> {
+  const result = new Map<string, CellConflict>();
+  for (const c of conflicts) {
+    if (c.is_resolved || !c.scheduled_session_id) continue;
+    const cat = sessionConflictCategory(c.conflict_type);
+    if (!cat) continue;
+    const entry = result.get(c.scheduled_session_id) ?? { room: false, fac: false, load: false };
+    if (cat === "room") entry.room = true;
+    if (cat === "fac") entry.fac = true;
+    result.set(c.scheduled_session_id, entry);
+  }
+  return result;
+}
+
 export function fromPlanningSession(
   sessions: PlanningSession[],
   conflictMap?: Map<string, CellConflict>,
@@ -93,6 +120,14 @@ export function fromPlanningSession(
   });
 }
 
+// No longer called from src/ as of the REM-39 residual fix above (its last
+// caller, EightWeekView, switched to conflictMapFromPlanningConflicts) --
+// kept rather than deleted because its "load" (facilitator-overload)
+// detection has no backend/canonical equivalent (see REM-39's own residual
+// note: the backend has never emitted a 'load' conflict_type at all), so
+// this is the only place that logic exists. Room/fac double-booking
+// detection here is now fully superseded by canonical data and should not
+// be reintroduced as a source of truth if this function is revived.
 export function computeConflicts(
   sessions: PlanningSession[],
   facilitators: PlanningFacilitator[],

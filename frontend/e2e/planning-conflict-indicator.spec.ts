@@ -70,7 +70,7 @@ async function seedRoomConflict(page: Page, hdr: Record<string, string>) {
   const types = (conflicts.conflicts ?? conflicts).map((c: { conflict_type: string }) => c.conflict_type);
   expect(types, "seeding must actually produce a real room_double_booked conflict").toContain("room_double_booked");
 
-  return { yearId, yearName };
+  return { yearId, yearName, pnDate };
 }
 
 async function deactivateYear(page: Page, hdr: Record<string, string>, yearId: string) {
@@ -114,6 +114,38 @@ test("Term view shows the same per-cell conflict dot", async ({ page }) => {
     // TermView defaults to term index 0 (T1), so the right tab must be
     // selected explicitly before the block for this date renders at all.
     await page.getByRole("button", { name: "T3", exact: true }).click();
+
+    const dot = page.locator(".pn-conflict-dot.room").first();
+    await expect(dot).toBeVisible({ timeout: 10000 });
+  } finally {
+    await deactivateYear(page, hdr, yearId);
+  }
+});
+
+// REM-39 residual (continued, 2026-08-11): 8-Week/2-Week/custom-range view
+// (all the same EightWeekView.tsx component, just different weeks/date
+// props) previously built its per-cell dot from a client-side heuristic
+// (computeConflicts(), re-derived from the currently-loaded session list)
+// instead of this same canonical PlanningConflict data -- the two could
+// disagree, e.g. an already-overridden/resolved conflict could still show a
+// heuristic dot. Exercised via Custom range (not "8 wks") so the seeded
+// far-future test date doesn't depend on real "today" -- Custom, 8-Week, and
+// 2-Week all render through the identical component/logic this fix changed.
+test("Custom range view (same component as 8-Week/2-Week) shows the canonical-data conflict dot, not the heuristic", async ({ page }) => {
+  const hdr = await authHeader(page, ADMIN_CODE);
+  const { yearId, yearName, pnDate } = await seedRoomConflict(page, hdr);
+  const [rangeYear, rangeMonth] = pnDate.split("-");
+  const rangeStart = `${rangeYear}-${rangeMonth}-01`;
+  const rangeEnd = `${rangeYear}-${rangeMonth}-28`;
+
+  try {
+    await page.goto("/planning");
+    await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
+    await page.getByRole("button", { name: yearName }).click();
+    await page.getByRole("button", { name: "Custom", exact: true }).click();
+
+    await page.getByLabel("Custom range start date").fill(rangeStart);
+    await page.getByLabel("Custom range end date").fill(rangeEnd);
 
     const dot = page.locator(".pn-conflict-dot.room").first();
     await expect(dot).toBeVisible({ timeout: 10000 });
