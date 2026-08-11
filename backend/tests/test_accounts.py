@@ -1021,6 +1021,368 @@ def test_change_role_never_drives_active_admin_count_below_one(client):
 
 
 # ─────────────────────────────────────────────────────────────
+# 11. Org-scope change (REM-05) — move an account to a different Squadron/Wing.
+# Deliberately separate from change-role: role stays fixed, only squadron_id/
+# wing_id moves. Every other model with a squadron_id/wing_id stores its OWN
+# independent tenancy (never derived from the creating user's squadron_id at
+# creation time), and AuditLog snapshots the actor's scope with no FK to
+# User -- so this never retroactively changes the meaning of any historical
+# record, only the account's own future write/view scope.
+# ─────────────────────────────────────────────────────────────
+
+def _ensure_second_wing(client, headers, code="9WGSCOPE", name="9 Wing Scope Change Test"):
+    r = client.get("/api/wings", headers=headers)
+    for w in r.json():
+        if w["code"] == code:
+            return w["wing_id"]
+    r = client.post("/api/wings", headers=headers, json={"code": code, "name": name})
+    assert r.status_code == 200, r.text
+    return r.json()["wing_id"]
+
+
+def test_change_scope_squadron_happy_path(client):
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_703 = _get_sqn_id(client, h7wg, "703")
+    sqn_704 = _get_sqn_id(client, h7wg, "704")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Scope Change Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_703,
+    })
+    uid = create_r.json()["user_id"]
+
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h_nat,
+                     json={"new_squadron_id": sqn_704})
+    assert r.status_code == 200, r.text
+
+    got = client.get(f"/api/accounts/{uid}", headers=h_nat).json()
+    assert got["squadron_id"] == sqn_704
+    # wing_id stays 7WG (both squadrons are in the same wing in this seed) --
+    # the real assertion is that it's still correctly populated, not stale/null.
+    wing_id = _get_wing_id(client, h7wg, "7WG")
+    assert got["wing_id"] == wing_id
+
+
+def test_change_scope_wing_happy_path(client):
+    h_nat = login(client, "ADMINNATIONAL")
+    wing9_id = _ensure_second_wing(client, h_nat)
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Wing Scope Change Target",
+        "role": "wing_viewer",
+        "wing_id": _get_wing_id(client, h_nat, "7WG"),
+    })
+    uid = create_r.json()["user_id"]
+
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h_nat,
+                     json={"new_wing_id": wing9_id})
+    assert r.status_code == 200, r.text
+
+    got = client.get(f"/api/accounts/{uid}", headers=h_nat).json()
+    assert got["wing_id"] == wing9_id
+
+
+def test_change_scope_squadron_syncs_wing_id_when_moving_across_wings(client):
+    """The one case in this seed data where the destination Squadron is in a
+    DIFFERENT wing from the source: create a Squadron in the second wing,
+    move the account there, and confirm User.wing_id (the denormalised field
+    wing-calendar scope checks read directly) is kept in sync, not left
+    pointing at the old wing."""
+    h_nat = login(client, "ADMINNATIONAL")
+    wing9_id = _ensure_second_wing(client, h_nat)
+    sqn9_r = client.post("/api/squadrons", headers=h_nat, json={
+        "code": "9SQNSCT", "name": "9 Wing Scope Change Test Squadron", "wing_id": wing9_id,
+    })
+    assert sqn9_r.status_code == 200, sqn9_r.text
+    sqn9_id = sqn9_r.json()["squadron_id"]
+
+    h7wg = login(client, "ADMIN7WG")
+    sqn_703 = _get_sqn_id(client, h7wg, "703")
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Cross-Wing Scope Change Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_703,
+    })
+    uid = create_r.json()["user_id"]
+
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h_nat,
+                     json={"new_squadron_id": sqn9_id})
+    assert r.status_code == 200, r.text
+
+    got = client.get(f"/api/accounts/{uid}", headers=h_nat).json()
+    assert got["squadron_id"] == sqn9_id
+    assert got["wing_id"] == wing9_id
+
+
+def test_change_scope_clears_flight(client):
+    """Flight is squadron-local -- an account's existing flight almost
+    certainly doesn't belong to the destination Squadron, so it must be
+    cleared, not silently left pointing at a Flight in the old Squadron."""
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_703 = _get_sqn_id(client, h7wg, "703")
+    sqn_704 = _get_sqn_id(client, h7wg, "704")
+    flight_id = _create_flight(client, h_nat, sqn_703, "Scope Change Flight")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Flight Clear Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_703,
+        "flight_id": flight_id,
+    })
+    uid = create_r.json()["user_id"]
+    assert client.get(f"/api/accounts/{uid}", headers=h_nat).json()["flight_id"] == flight_id
+
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h_nat,
+                     json={"new_squadron_id": sqn_704})
+    assert r.status_code == 200, r.text
+    assert client.get(f"/api/accounts/{uid}", headers=h_nat).json()["flight_id"] is None
+
+
+def test_change_scope_revokes_the_target_users_existing_session(client):
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_703 = _get_sqn_id(client, h7wg, "703")
+    sqn_704 = _get_sqn_id(client, h7wg, "704")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Scope Session Revocation Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_703,
+        "new_code": "SCOPEREVOKE1",
+    })
+    uid = create_r.json()["user_id"]
+
+    target_hdr = login(client, "SCOPEREVOKE1")
+    pre_change = client.get("/api/auth/me", headers=target_hdr)
+    assert pre_change.status_code == 200
+
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h_nat,
+                     json={"new_squadron_id": sqn_704})
+    assert r.status_code == 200, r.text
+
+    post_change = client.get("/api/auth/me", headers=target_hdr)
+    assert post_change.status_code == 401
+    assert post_change.json()["detail"]["error"] == "session_revoked"
+
+    fresh_hdr = login(client, "SCOPEREVOKE1")
+    fresh = client.get("/api/auth/me", headers=fresh_hdr)
+    assert fresh.status_code == 200
+    assert fresh.json()["session"]["squadron_id"] == sqn_704
+
+
+def test_change_scope_is_audited(client):
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_703 = _get_sqn_id(client, h7wg, "703")
+    sqn_704 = _get_sqn_id(client, h7wg, "704")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Scope Change Audit Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_703,
+    })
+    uid = create_r.json()["user_id"]
+    client.post(f"/api/accounts/{uid}/change-scope", headers=h_nat, json={"new_squadron_id": sqn_704})
+
+    audit = client.get("/api/audit", headers=h_nat).json()
+    entry = next((a for a in audit if a.get("object_id") == uid and a.get("action") == "scope_changed"), None)
+    assert entry is not None, "scope_changed action not found in audit log"
+
+
+def test_change_scope_forbidden_for_read_only_role(client):
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_703 = _get_sqn_id(client, h7wg, "703")
+    sqn_704 = _get_sqn_id(client, h7wg, "704")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Scope Change Forbidden Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_703,
+    })
+    uid = create_r.json()["user_id"]
+
+    h_sqn = login(client, "ADMIN703")
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h_sqn,
+                     json={"new_squadron_id": sqn_704})
+    assert r.status_code == 403, r.text
+
+
+def test_change_scope_unauthenticated(client):
+    r = client.post("/api/accounts/some-id/change-scope", json={"new_squadron_id": "x"})
+    assert r.status_code == 401, r.text
+
+
+def test_cannot_change_own_scope(client):
+    h_nat = login(client, "ADMINNATIONAL")
+    me = client.get("/api/auth/me", headers=h_nat).json()["session"]
+    r = client.post(f"/api/accounts/{me['user_id']}/change-scope", headers=h_nat,
+                     json={"new_wing_id": _get_wing_id(client, h_nat, "7WG")})
+    assert r.status_code == 400, r.text
+
+
+def test_change_scope_national_scope_account_rejected(client):
+    """system_admin/national_admin/auditor accounts have no Squadron/Wing to
+    move -- this must be a clean 422, not attempt anything."""
+    h_sa = login(client, "SYSADMIN2026")
+    create_r = client.post("/api/accounts", headers=h_sa, json={
+        "display_name": "National Scope Target", "role": "national_viewer",
+    })
+    uid = create_r.json()["user_id"]
+
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h_sa, json={"new_wing_id": "x"})
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]["error"] == "scope_change_not_applicable"
+
+
+def test_change_scope_unchanged_rejected(client):
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_703 = _get_sqn_id(client, h7wg, "703")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Scope Unchanged Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_703,
+    })
+    uid = create_r.json()["user_id"]
+
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h_nat,
+                     json={"new_squadron_id": sqn_703})
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"]["error"] == "scope_unchanged"
+
+
+def test_change_scope_squadron_not_found_rejected(client):
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_703 = _get_sqn_id(client, h7wg, "703")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Scope Not Found Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_703,
+    })
+    uid = create_r.json()["user_id"]
+
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h_nat,
+                     json={"new_squadron_id": "does-not-exist"})
+    assert r.status_code == 404, r.text
+    assert r.json()["detail"]["error"] == "squadron_not_found"
+
+
+def test_change_scope_wrong_field_for_squadron_scope_rejected(client):
+    """A Squadron-scoped account's change-scope call must use new_squadron_id,
+    not new_wing_id -- passing the wrong field for the account's own scope
+    level must be a clear 422, not silently ignored or misapplied."""
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_703 = _get_sqn_id(client, h7wg, "703")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Wrong Field Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_703,
+    })
+    uid = create_r.json()["user_id"]
+
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h_nat,
+                     json={"new_wing_id": _get_wing_id(client, h_nat, "7WG")})
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]["error"] == "unexpected_field"
+
+
+def test_change_scope_missing_squadron_id_rejected(client):
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_703 = _get_sqn_id(client, h7wg, "703")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Missing Field Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_703,
+    })
+    uid = create_r.json()["user_id"]
+
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h_nat, json={})
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"]["error"] == "squadron_id_required"
+
+
+def test_change_scope_wing_admin_can_move_account_within_own_wing(client):
+    """wing_admin has real, positive authority here -- moving an account
+    between two Squadrons that are BOTH in their own Wing must succeed."""
+    h7wg = login(client, "ADMIN7WG")
+    sqn_703 = _get_sqn_id(client, h7wg, "703")
+    sqn_704 = _get_sqn_id(client, h7wg, "704")
+
+    create_r = client.post("/api/accounts", headers=h7wg, json={
+        "display_name": "Wing Admin Move Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_703,
+    })
+    uid = create_r.json()["user_id"]
+
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h7wg,
+                     json={"new_squadron_id": sqn_704})
+    assert r.status_code == 200, r.text
+
+    got = client.get(f"/api/accounts/{uid}", headers=h7wg).json()
+    assert got["squadron_id"] == sqn_704
+
+
+def test_change_scope_wing_admin_cannot_move_account_to_another_wing(client):
+    h_nat = login(client, "ADMINNATIONAL")
+    wing9_id = _ensure_second_wing(client, h_nat)
+    sqn9_r = client.post("/api/squadrons", headers=h_nat, json={
+        "code": "9SQNWAX", "name": "9 Wing Admin Cross-Wing Test Squadron", "wing_id": wing9_id,
+    })
+    assert sqn9_r.status_code == 200, sqn9_r.text
+    sqn9_id = sqn9_r.json()["squadron_id"]
+
+    h7wg = login(client, "ADMIN7WG")
+    sqn_703 = _get_sqn_id(client, h7wg, "703")
+    create_r = client.post("/api/accounts", headers=h7wg, json={
+        "display_name": "Wing Admin Cross-Wing Blocked Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_703,
+    })
+    uid = create_r.json()["user_id"]
+
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h7wg,
+                     json={"new_squadron_id": sqn9_id})
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "out_of_scope"
+
+
+def test_change_scope_sqn_admin_cannot_move_anyone(client):
+    """sqn_admin has no valid destination Squadron under this endpoint --
+    reject explicitly rather than falling through to a check that always
+    fails, matching how create-account already blocks sqn_admin from
+    targeting any Squadron other than their own."""
+    h_nat = login(client, "ADMINNATIONAL")
+    h7wg = login(client, "ADMIN7WG")
+    sqn_703 = _get_sqn_id(client, h7wg, "703")
+    sqn_704 = _get_sqn_id(client, h7wg, "704")
+
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "Sqn Admin Blocked Target",
+        "role": "sqn_general",
+        "squadron_id": sqn_703,
+    })
+    uid = create_r.json()["user_id"]
+
+    h_sqn = login(client, "ADMIN703")
+    r = client.post(f"/api/accounts/{uid}/change-scope", headers=h_sqn,
+                     json={"new_squadron_id": sqn_704})
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "out_of_scope"
+
+
+# ─────────────────────────────────────────────────────────────
 # Self-edit (display name / flight only, no role field): must not 403.
 # _CREATE_AUTHORITY's wing_admin/sqn_admin entries deliberately exclude their
 # own role (so they can't mass-create peer-level accounts), but that map was

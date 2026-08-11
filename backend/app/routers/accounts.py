@@ -6,6 +6,7 @@ Accounts:
   GET    /api/accounts/{id}       — single account
   PATCH  /api/accounts/{id}       — update display_name / flight_id
   POST   /api/accounts/{id}/change-role — change role/access type (same scope level only)
+  POST   /api/accounts/{id}/change-scope — move account to a different Squadron/Wing (same scope level only)
   POST   /api/accounts/{id}/reset-code  — generate or set new code (returned once)
   POST   /api/accounts/{id}/disable     — deactivate user
   POST   /api/accounts/{id}/reactivate  — reactivate user
@@ -456,6 +457,112 @@ def change_role(uid: str, body: ChangeRoleIn, db: DBSession = Depends(get_db),
     db.commit()
     audit(db, p, object_type="account", object_id=u.id, action="role_changed",
           old={"role": old_role}, new={"role": new_role, "display_name": u.display_name})
+    return {"ok": True}
+
+
+class ChangeScopeIn(BaseModel):
+    new_squadron_id: str | None = None
+    new_wing_id: str | None = None
+
+
+@router.post("/accounts/{uid}/change-scope")
+def change_scope(uid: str, body: ChangeScopeIn, db: DBSession = Depends(get_db),
+                 p: Principal = Depends(get_principal)):
+    """REM-05: move a squadron-scoped account to a different Squadron, or a
+    wing-scoped account to a different Wing -- the org-membership move
+    change-role explicitly does not attempt (see its own docstring). Never
+    changes role or scope LEVEL (still squadron->squadron or wing->wing only)
+    -- to change scope level, archive and recreate the account with the
+    target role, same guidance change-role gives for cross-scope role changes.
+
+    Safe by construction: every other model with a squadron_id/wing_id stores
+    its OWN independent tenancy (a Session's squadron_id is the session's
+    squadron, never derived from the creating user's squadron_id at creation
+    time), and AuditLog snapshots the actor's scope at time of action with no
+    FK to User -- so this never retroactively changes the meaning of any
+    historical record. It only changes this account's future write/view scope,
+    which permissions.py already re-resolves live from the DB on every request.
+    """
+    _require_write_actor(p)
+    u = db.get(User, uid)
+    if not u or u.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if uid == p.user_id:
+        raise HTTPException(400, detail={"error": "cannot_change_own_scope"})
+    _require_manage_authority(p, u, db)
+
+    scope = _scope_type(u.role)
+    if scope == "national":
+        raise HTTPException(422, detail={"error": "scope_change_not_applicable",
+                                          "message": "National-scope accounts have no Squadron/Wing to move."})
+
+    if scope == "wing":
+        if body.new_squadron_id:
+            raise HTTPException(422, detail={"error": "unexpected_field",
+                                              "message": "This account is Wing-scoped; provide new_wing_id, not new_squadron_id."})
+        if not body.new_wing_id:
+            raise HTTPException(422, detail={"error": "wing_id_required"})
+        w = db.get(Wing, body.new_wing_id)
+        if not w or w.is_archived:
+            raise HTTPException(404, detail={"error": "wing_not_found"})
+        if body.new_wing_id == u.wing_id:
+            raise HTTPException(400, detail={"error": "scope_unchanged"})
+        # _require_manage_authority above already restricts which actors can
+        # even reach this branch: wing_admin cannot manage other wing_admin/
+        # wing_viewer accounts at all (not in its own _CREATE_AUTHORITY set),
+        # so only system_admin/national_admin ever get here -- no further
+        # destination-authority check is needed.
+        old_wing = db.get(Wing, u.wing_id) if u.wing_id else None
+        old = {"wing_id": u.wing_id, "wing_code": old_wing.code if old_wing else None}
+        u.wing_id = w.id
+        u.updated_by = p.user_id
+        # Same reasoning as change-role: not required for correctness (scope is
+        # read live from the DB every request), but forces a clean re-auth
+        # after a materially significant tenancy move, and clears any stale
+        # squadron/wing display the target's own already-open UI is holding.
+        u.token_version = (u.token_version or 0) + 1
+        db.commit()
+        audit(db, p, object_type="account", object_id=u.id, action="scope_changed",
+              old=old, new={"wing_id": w.id, "wing_code": w.code, "display_name": u.display_name})
+        return {"ok": True}
+
+    # scope == "squadron"
+    if body.new_wing_id:
+        raise HTTPException(422, detail={"error": "unexpected_field",
+                                          "message": "This account is Squadron-scoped; provide new_squadron_id, not new_wing_id."})
+    if not body.new_squadron_id:
+        raise HTTPException(422, detail={"error": "squadron_id_required"})
+    sqn = db.get(Squadron, body.new_squadron_id)
+    if not sqn or sqn.is_archived:
+        raise HTTPException(404, detail={"error": "squadron_not_found"})
+    if body.new_squadron_id == u.squadron_id:
+        raise HTTPException(400, detail={"error": "scope_unchanged"})
+    if p.role == "wing_admin" and sqn.wing_id != p.wing_id:
+        raise HTTPException(403, detail={"error": "out_of_scope",
+                                          "message": "Wing Admin can only move accounts to Squadrons in their own Wing."})
+    if p.role == "sqn_admin":
+        # sqn_admin's manage-authority already restricts them to accounts in
+        # their own Squadron, and they can never have a valid *different*
+        # destination Squadron -- reject explicitly rather than falling
+        # through to a check that would always fail anyway.
+        raise HTTPException(403, detail={"error": "out_of_scope",
+                                          "message": "Squadron Admin cannot move accounts to a different Squadron."})
+
+    old_sqn = db.get(Squadron, u.squadron_id) if u.squadron_id else None
+    old = {"squadron_id": u.squadron_id, "squadron_code": old_sqn.code if old_sqn else None,
+           "wing_id": u.wing_id, "flight_id": u.flight_id}
+    u.squadron_id = sqn.id
+    u.wing_id = sqn.wing_id  # keep denormalised wing_id in sync -- wing-calendar scope checks read User.wing_id directly
+    # Flight is squadron-local (Flight.squadron_id) -- the old flight almost
+    # certainly doesn't belong to the new Squadron. Clear it; the admin can
+    # reassign a new one afterward via the existing edit-account PATCH.
+    u.flight_id = None
+    u.updated_by = p.user_id
+    u.token_version = (u.token_version or 0) + 1
+    db.commit()
+    audit(db, p, object_type="account", object_id=u.id, action="scope_changed",
+          old=old, new={"squadron_id": sqn.id, "squadron_code": sqn.code, "wing_id": sqn.wing_id,
+                        "display_name": u.display_name})
     return {"ok": True}
 
 

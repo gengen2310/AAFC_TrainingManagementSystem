@@ -2770,6 +2770,32 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   </div>
 </div>
 
+<!-- ACCOUNTS: Change Scope (REM-05) -- moves an account to a different Squadron/Wing.
+     Deliberately a separate modal from Edit Account: this is a materially
+     different, riskier operation (org-membership move) than a display-name or
+     role change, so it gets its own explicit action rather than being folded
+     into the compound Edit save. -->
+<div class="modal-bg" id="m-change-scope">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr"><div class="modal-title" id="cs-title">Change Scope</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-change-scope')">×</button></div>
+    <div class="modal-body">
+      <div class="ff"><label>Current Unit</label><div id="cs-current" style="font-size:12px;font-weight:700;padding:6px 0"></div></div>
+      <div class="ff" id="cs-sqn-row" style="display:none"><label for="cs-sqn">New Squadron</label>
+        <select id="cs-sqn"><option value="">— select squadron —</option></select>
+      </div>
+      <div class="ff" id="cs-wing-row" style="display:none"><label for="cs-wing">New Wing</label>
+        <select id="cs-wing"><option value="">— select wing —</option></select>
+      </div>
+      <div class="muted" style="font-size:10.5px;margin-top:3px">Moving Squadron also clears any assigned Flight (Flights are Squadron-local). The account will need to sign in again for the new scope to take effect.</div>
+      <div id="cs-msg" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-out" onclick="closeModal('m-change-scope')">Cancel</button>
+      <button class="btn btn-dk" onclick="doChangeScope()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <!-- ACCOUNTS: Bulk Archive Wizard (5-step: Selection Review, Impact Assessment,
      Required Decisions, Confirmation, Result). Body/foot are rebuilt per step
      by _wizRender() rather than five separate modals, so step state (reason,
@@ -4929,8 +4955,15 @@ function _renderAccountTable(){
       ? `<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doDisableAccount('${u.user_id}','${dn}')">Disable</button>`
       : `<button class="btn btn-xs btn-ok" onclick="doReactivateAccount('${u.user_id}','${dn}')">Reactivate</button>`;
     const editBtn=`<button class="btn btn-xs" onclick="openEditAccountModal('${u.user_id}')">Edit</button>`;
+    // REM-05: only Squadron/Wing-scoped accounts have a scope to move (National-
+    // scope accounts 422 scope_change_not_applicable server-side). Hidden for
+    // sqn_admin actors and for self -- both are unconditionally rejected
+    // server-side too (out_of_scope / cannot_change_own_scope); hiding here is
+    // UI convenience only, same framing as the role picker's own authority map.
+    const changeScopeBtn=(u.scope_type!=='national'&&u.user_id!==myUid&&S.role!=='sqn_admin')
+      ? `<button class="btn btn-xs" onclick="openChangeScopeModal('${u.user_id}')">Change Scope</button>` : '';
     const deleteBtn=u.user_id===myUid?'':`<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doDeleteAccount('${u.user_id}','${dn}')" title="Archives the account — reversible via Restore">Delete</button>`;
-    return `<div style="display:flex;gap:4px;flex-wrap:wrap">${editBtn}${resetBtn}${unlockBtn}${toggleBtn}${deleteBtn}</div>`;
+    return `<div style="display:flex;gap:4px;flex-wrap:wrap">${editBtn}${changeScopeBtn}${resetBtn}${unlockBtn}${toggleBtn}${deleteBtn}</div>`;
   };
 
   const selCol=canBulk?`<th class="no-print" style="width:24px"><input type="checkbox" id="acct-select-all" ${allVisibleSelected?'checked':''} onchange="_acctToggleAll(this.checked)" aria-label="Select all accounts matching the current filter"></th>`:'';
@@ -5830,6 +5863,7 @@ async function doArchiveFlight(flightId, name){
 // ── Edit Account ──────────────────────────────────────────
 let _editAccountId=null;
 let _editAccountOrigRole=null;
+let _changeScopeAccountId=null;
 function openEditAccountModal(uid){
   const u=(S.accountList||[]).find(x=>x.user_id===uid);
   if(!u)return;
@@ -5891,6 +5925,77 @@ async function doEditAccount(){
     }
 
     closeModal('m-edit-account');
+    S.accountList=null; renderAccounts();
+  }catch(e){ msg.textContent=apiErr(e); msg.style.color='var(--red)'; }
+}
+
+// REM-05: move an account to a different Squadron (squadron-scoped roles) or
+// a different Wing (wing-scoped roles). Deliberately separate from
+// openEditAccountModal/doEditAccount above -- a materially different, riskier
+// operation than a display-name or role change, per the backend's own
+// change-scope docstring.
+function openChangeScopeModal(uid){
+  const u=(S.accountList||[]).find(x=>x.user_id===uid);
+  if(!u)return;
+  _changeScopeAccountId=uid;
+  document.getElementById('cs-title').textContent='Change Scope — '+(u.display_name||'');
+  document.getElementById('cs-msg').textContent='';
+
+  const sqnRow=document.getElementById('cs-sqn-row');
+  const wingRow=document.getElementById('cs-wing-row');
+  const sqnSel=document.getElementById('cs-sqn');
+  const wingSel=document.getElementById('cs-wing');
+
+  if(u.scope_type==='squadron'){
+    document.getElementById('cs-current').textContent=
+      (u.squadron_name||u.squadron_code||'—')+(u.wing_code?' ('+u.wing_code+')':'');
+    sqnRow.style.display=''; wingRow.style.display='none';
+    sqnSel.innerHTML='<option value="">— select squadron —</option>';
+    // Wing Admin can only move accounts within their own Wing (server-
+    // enforced too) -- filter the picker to match, same "UI convenience
+    // only" framing as the role picker's own authority map.
+    const src=(S.squadrons||[]).filter(s=>
+      s.squadron_id!==u.squadron_id && (S.role!=='wing_admin' || s.wing_id===S.session.wing_id));
+    src.forEach(s=>sqnSel.appendChild(new Option(s.code||s.short_name||s.name, s.squadron_id)));
+  } else if(u.scope_type==='wing'){
+    document.getElementById('cs-current').textContent=u.wing_name||u.wing_code||'—';
+    sqnRow.style.display='none'; wingRow.style.display='';
+    wingSel.innerHTML='<option value="">— select wing —</option>';
+    (S.wings||[]).filter(w=>w.wing_id!==u.wing_id).forEach(w=>wingSel.appendChild(new Option(w.code||w.name, w.wing_id)));
+  } else {
+    // National-scope accounts have nothing to move -- the Change Scope
+    // button is already hidden for these in _renderAccountTable(), this is
+    // a defensive fallback only.
+    document.getElementById('cs-msg').textContent='This account has no Squadron/Wing scope to change.';
+    sqnRow.style.display='none'; wingRow.style.display='none';
+  }
+
+  openModal('m-change-scope');
+}
+async function doChangeScope(){
+  const msg=document.getElementById('cs-msg');
+  if(!_changeScopeAccountId){msg.textContent='No account selected.';return;}
+  const u=(S.accountList||[]).find(x=>x.user_id===_changeScopeAccountId);
+  if(!u){msg.textContent='Account not found.';return;}
+
+  let body;
+  if(u.scope_type==='squadron'){
+    const val=document.getElementById('cs-sqn').value;
+    if(!val){msg.textContent='Select a destination Squadron.';return;}
+    body={new_squadron_id:val};
+  } else if(u.scope_type==='wing'){
+    const val=document.getElementById('cs-wing').value;
+    if(!val){msg.textContent='Select a destination Wing.';return;}
+    body={new_wing_id:val};
+  } else {
+    msg.textContent='This account has no Squadron/Wing scope to change.';
+    return;
+  }
+
+  msg.textContent='Saving…'; msg.style.color='var(--muted)';
+  try{
+    await api('/api/accounts/'+_changeScopeAccountId+'/change-scope',{method:'POST',body:JSON.stringify(body)});
+    closeModal('m-change-scope');
     S.accountList=null; renderAccounts();
   }catch(e){ msg.textContent=apiErr(e); msg.style.color='var(--red)'; }
 }
