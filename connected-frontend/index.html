@@ -629,20 +629,32 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="app-body">
     <!-- SIDENAV -->
     <nav class="sidenav no-print">
+      <!-- REM-25: reorganised around the Training Officer's actual planning
+           cycle (Overview -> Plan Training -> People and Resources -> Needs
+           Attention -> Settings) instead of the prior ad-hoc feature-area
+           grouping. Deliberately non-destructive: every nav-item below keeps
+           its exact original onclick="nav('id')" target and page id -- only
+           grouping/order/labels changed, nothing removed or merged, so
+           applyNavScope()'s onclick-regex visibility logic, nav()'s own
+           per-id data-loading side effects, and every existing internal
+           nav('id') call site and e2e test elsewhere in this codebase keep
+           working completely unchanged. See docs/remediation/master_gap_register.csv
+           REM-25 for the full before/after capability comparison. -->
       <div class="nav-lbl">Overview</div>
       <div class="nav-item" onclick="nav('getting-started')">Getting Started</div>
       <div class="nav-item active" onclick="nav('dashboard')">Dashboard</div>
-      <div class="nav-item" onclick="nav('calendar')">Calendar</div>
-      <div class="nav-lbl">Training</div>
-      <div class="nav-item" onclick="nav('parade-nights')">Parade Nights</div>
-      <div class="nav-item" onclick="nav('weekly-program')">Weekly Program</div>
+      <div class="nav-item" onclick="nav('calendar')">Training Calendar</div>
+      <div class="nav-lbl">Plan Training</div>
       <div class="nav-item" onclick="nav('curriculum')">Curriculum</div>
       <div class="nav-item" onclick="nav('activities')">Activities</div>
-      <div class="nav-item" onclick="nav('action-items')">Needs Attention</div>
-      <div class="nav-lbl">People &amp; Resources</div>
+      <div class="nav-item" onclick="nav('parade-nights')">Parade Nights</div>
+      <div class="nav-item" onclick="nav('weekly-program')">Weekly Program</div>
+      <div class="nav-lbl">People and Resources</div>
       <div class="nav-item" onclick="nav('facilitators')">Facilitators</div>
       <div class="nav-item" onclick="nav('resources')">Locations and Resources</div>
-      <div class="nav-lbl" id="admin-lbl" style="display:none">Admin</div>
+      <div class="nav-lbl">Needs Attention</div>
+      <div class="nav-item" onclick="nav('action-items')">Needs Attention</div>
+      <div class="nav-lbl" id="admin-lbl" style="display:none">Settings</div>
       <div class="nav-item admin-el" style="display:none" onclick="nav('settings')">Unit Settings</div>
       <div class="nav-item" id="nav-accounts" style="display:none" onclick="nav('accounts')">Account Management</div>
       <div class="nav-lbl nav-scope" id="hq-lbl" style="display:none">Command</div>
