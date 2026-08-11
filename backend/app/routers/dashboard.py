@@ -28,7 +28,7 @@ from ..dependencies import get_principal
 from ..models import (
     ParadeNight, Session, Facilitator, Squadron, Wing,
     CurriculumItem, Equipment, TrainingArea, PlanningFacilitatorLeave,
-    CurriculumPhase, TrainingClass,
+    CurriculumPhase, CurriculumElement, TrainingClass,
 )
 from ..permissions import Principal, require_role, require_can_view_squadron, require_can_view_wing
 from ..services_readiness import parade_night_readiness, session_requirements
@@ -267,6 +267,31 @@ def _phases_for_squadron(db: DBSession, sq_id: str | None) -> list[str]:
     return [ph.name for ph in rows] or _PHASES  # fall back if the catalogue is somehow empty
 
 
+def _elements_for_squadron(db: DBSession, sq_id: str | None) -> list[str]:
+    """CLASS-12: governed element names visible to a given squadron (national/
+    system + that squadron's own wing + the squadron's own custom elements).
+    Mirrors _phases_for_squadron exactly, for CurriculumElement instead of
+    CurriculumPhase -- same visibility rule (training.py's _visible_elements()),
+    resolved from a squadron_id rather than a Principal for the same reason.
+    Unlike phases, there is no fixed national element catalogue to fall back
+    to if the governed catalogue is empty -- elements are squadron-defined
+    category tags, not a fixed training-progression sequence, so an empty
+    catalogue here correctly means "no elements defined yet", not a bug."""
+    from sqlalchemy import or_
+    conditions = [CurriculumElement.scope_level.in_(["system", "national"])]
+    sq = db.get(Squadron, sq_id) if sq_id else None
+    if sq and sq.wing_id:
+        conditions.append((CurriculumElement.scope_level == "wing") & (CurriculumElement.wing_id == sq.wing_id))
+    if sq_id:
+        conditions.append((CurriculumElement.scope_level == "squadron") & (CurriculumElement.squadron_id == sq_id))
+    rows = db.query(CurriculumElement).filter(
+        CurriculumElement.is_archived == False,  # noqa: E712
+        CurriculumElement.active_status == True,  # noqa: E712
+        or_(*conditions),
+    ).order_by(CurriculumElement.scope_level, CurriculumElement.display_name).all()
+    return [el.name for el in rows]
+
+
 def _curriculum_progress(sessions: list, curr_items: list, phases: list[str]) -> dict:
     """Horizontal stacked bar: delivered vs not-delivered vs planned per phase.
 
@@ -320,6 +345,73 @@ def _curriculum_progress(sessions: list, curr_items: list, phases: list[str]) ->
         "insight": insight,
         "empty_state": "No curriculum sessions have been recorded yet.",
         "drill_down": {"route": "parade-nights", "filters": {"phase": "{{phase}}"}},
+        "permission_scope": "squadron",
+    }
+
+
+def _element_curriculum_progress(sessions: list, curr_items: list, elements: list[str]) -> dict:
+    """CLASS-12: the element-scoped sibling of _curriculum_progress above --
+    identical shape and logic, keyed by CurriculumItem.element/Session.
+    element_at_time instead of .phase/.phase_at_time. Answers "how much
+    Ground School (or any other element) have we delivered", which previously
+    had no direct answer -- element-level FILTERING already existed (Mission
+    Backlog's own element query param), but no AGGREGATION did.
+
+    Kept as a SEPARATE chart rather than changing _curriculum_progress's own
+    shape in place -- same capability-preservation reasoning as
+    _class_curriculum_progress_summary's own docstring: connected-frontend
+    already renders charts.curriculum_progress via a fixed data shape, so
+    this is purely additive, not a replacement.
+
+    `elements` is the governed element catalogue for the squadron being
+    viewed (see _elements_for_squadron) -- if empty (no elements defined for
+    this squadron/wing/national scope yet), returns a genuinely empty chart
+    rather than guessing at any default categories, since unlike phases
+    there is no fixed national element catalogue to fall back to."""
+    element_data: dict[str, dict] = {
+        el: {"element": el, "delivered": 0, "delivered_with_issue": 0,
+             "not_delivered": 0, "cancelled": 0, "planned": 0, "total_items": 0}
+        for el in elements
+    }
+    for s in sessions:
+        el = s.element_at_time
+        if el and el in element_data:
+            st = s.status or "planned"
+            if st in ("delivered", "delivered_with_issue", "not_delivered", "cancelled", "planned", "rescheduled"):
+                key = st if st in element_data[el] else "planned"
+                element_data[el][key] += 1
+
+    for ci in curr_items:
+        el = ci.element
+        if el and el in element_data:
+            element_data[el]["total_items"] += 1
+
+    data = [element_data[el] for el in elements]
+    total_del = sum(d["delivered"] + d["delivered_with_issue"] for d in data)
+    total_planned = sum(d["planned"] for d in data)
+    insight = None
+    if total_del > 0 and total_planned > 0:
+        insight = f"{total_del} sessions delivered; {total_planned} still planned."
+
+    return {
+        "chart_id": "element_curriculum_progress",
+        "title": "Curriculum progress by element",
+        "explanation": "Sessions recorded per curriculum element (subject/category) — delivered, planned, and not delivered.",
+        "question": "Which subject areas are progressing and which are behind?",
+        "chart_type": "stacked_bar_horizontal",
+        "x_axis": "Sessions",
+        "y_axis": "Element",
+        "series": [
+            {"key": "delivered", "label": "Delivered", "color": _STATUS_COLORS["delivered"]},
+            {"key": "delivered_with_issue", "label": "Delivered (issue)", "color": _STATUS_COLORS["delivered_with_issue"]},
+            {"key": "not_delivered", "label": "Not Delivered", "color": _STATUS_COLORS["not_delivered"]},
+            {"key": "cancelled", "label": "Cancelled", "color": _STATUS_COLORS["cancelled"]},
+            {"key": "planned", "label": "Planned", "color": _STATUS_COLORS["planned"]},
+        ],
+        "data": data,
+        "insight": insight,
+        "empty_state": "No curriculum elements have been defined for this squadron yet.",
+        "drill_down": {"route": "activities", "filters": {"element": "{{element}}"}},
         "permission_scope": "squadron",
     }
 
@@ -1912,6 +2004,9 @@ def _full_squadron_charts(db: DBSession, sq_id: str, w_start: str, w_end: str) -
     # empty-looks-like-broken chart-trust problem this pass targets.
     charts["curriculum_progress"] = _safe_chart(
         "curriculum_progress", _curriculum_progress, all_sessions, curr_items, _phases_for_squadron(db, sq_id))
+    charts["element_curriculum_progress"] = _safe_chart(
+        "element_curriculum_progress", _element_curriculum_progress, all_sessions, curr_items,
+        _elements_for_squadron(db, sq_id))
     charts["class_curriculum_progress"] = _safe_chart(
         "class_curriculum_progress", _class_curriculum_progress_summary, db, sq_id)
     charts["curriculum_backlog"] = _safe_chart("curriculum_backlog", _curriculum_backlog, all_sessions, all_pns)

@@ -161,6 +161,77 @@ def test_curriculum_progress_includes_custom_squadron_phase(client):
     # Still includes the national catalogue too
     assert "A. Orientation" in phases
 
+def test_squadron_returns_element_curriculum_progress(client):
+    """CLASS-12: the element-scoped sibling of curriculum_progress. All 7
+    seeded national elements present even with zero data, same shape as the
+    phase chart's own default-catalogue test above."""
+    hdrs = _sqn_admin(client)
+    r = client.get(CHARTS_URL + "?window=year", headers=hdrs)
+    charts = _charts(r)
+    assert "element_curriculum_progress" in charts
+    ep = charts["element_curriculum_progress"]
+    assert ep["chart_type"] == "stacked_bar_horizontal"
+    elements = [d["element"] for d in ep["data"]]
+    assert "Drill" in elements
+    assert "Personal_Dev" in elements
+    assert len(elements) >= 7
+
+
+def test_element_curriculum_progress_includes_custom_squadron_element(client):
+    """A squadron-scoped custom CurriculumElement must appear in the chart,
+    not be silently dropped -- mirrors test_curriculum_progress_includes_
+    custom_squadron_phase's own reasoning exactly. Uses 704 (not 703) so this
+    doesn't change 703's element count for other tests in this file."""
+    hdrs = login(client, "ADMIN704")
+    r = client.post("/api/curriculum/elements", json={
+        "name": "Z_Custom_Element", "display_name": "Custom Squadron Element",
+        "scope_level": "squadron",
+    }, headers=hdrs)
+    assert r.status_code == 200, r.text
+
+    charts = _charts(client.get(CHARTS_URL + "?window=year", headers=hdrs))
+    ep = charts["element_curriculum_progress"]
+    elements = [d["element"] for d in ep["data"]]
+    assert "Z_Custom_Element" in elements
+    # Still includes the national catalogue too
+    assert "Drill" in elements
+
+
+def test_element_curriculum_progress_counts_delivered_session(client):
+    """A delivered session against a CurriculumItem tagged with a given
+    element must be counted under that element's 'delivered' bucket --
+    proves the aggregation actually reads Session.element_at_time, not just
+    that the element name shows up in the catalogue list."""
+    hdrs = login(client, "ADMIN703")
+    ci_r = client.post("/api/curriculum", json={
+        "code": f"ELEMTEST-{__import__('uuid').uuid4().hex[:8]}", "title": "Element Progress Test Item",
+        "phase": "A. Orientation", "element": "Drill", "duration_minutes": 60,
+    }, headers=hdrs)
+    assert ci_r.status_code == 200, ci_r.text
+    ci_id = ci_r.json()["curriculum_id"]
+
+    pn_r = client.post("/api/parade-nights", json={"date": "2099-05-15"}, headers=hdrs)
+    assert pn_r.status_code == 200, pn_r.text
+    pn_id = pn_r.json()["parade_night_id"]
+    sess_r = client.post("/api/sessions", json={
+        "parade_night_id": pn_id, "period_number": 1, "cadet_group": "orientation",
+    }, headers=hdrs)
+    assert sess_r.status_code == 200, sess_r.text
+    sess_id = sess_r.json()["session_id"]
+
+    edit_r = client.put(f"/api/sessions/{sess_id}", json={
+        "parade_night_id": pn_id, "period_number": 1, "curriculum_item_id": ci_id,
+        "status": "delivered",
+    }, headers=hdrs)
+    assert edit_r.status_code == 200, edit_r.text
+
+    charts = _charts(client.get(CHARTS_URL + "?window=year", headers=hdrs))
+    ep = charts["element_curriculum_progress"]
+    drill_row = next(d for d in ep["data"] if d["element"] == "Drill")
+    assert drill_row["delivered"] >= 1
+    assert drill_row["total_items"] >= 1
+
+
 def test_one_broken_chart_builder_does_not_take_down_the_others(client):
     """Previously _full_squadron_charts had zero fault isolation -- one
     builder throwing 500'd the ENTIRE /api/dashboard/charts response, taking
@@ -179,6 +250,8 @@ def test_one_broken_chart_builder_does_not_take_down_the_others(client):
     # Every other chart in the same bundle survived untouched
     assert charts["curriculum_progress"]["chart_type"] == "stacked_bar_horizontal"
     assert "error" not in charts["curriculum_progress"]
+    assert charts["element_curriculum_progress"]["chart_type"] == "stacked_bar_horizontal"
+    assert "error" not in charts["element_curriculum_progress"]
     assert charts["tonight"]["chart_id"] == "tonight"
     assert "error" not in charts["tonight"]
 

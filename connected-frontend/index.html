@@ -764,6 +764,15 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <div id="chart-curriculum-progress"><div class="chart-skeleton" style="height:160px"></div></div>
             <div id="insight-curriculum-progress" class="chart-insight" style="display:none"></div>
           </div>
+          <!-- CLASS-12: element-scoped sibling of the phase chart above -- same
+               shape/renderer, answers "how much [element] have we delivered"
+               (previously only filterable in Mission Backlog, never aggregated). -->
+          <div class="card">
+            <div class="ctitle">Progress by element</div>
+            <div class="ssub" id="exp-element-curriculum-progress" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+            <div id="chart-element-curriculum-progress"><div class="chart-skeleton" style="height:160px"></div></div>
+            <div id="insight-element-curriculum-progress" class="chart-insight" style="display:none"></div>
+          </div>
           <div class="dash-grid">
             <div class="card">
               <div class="ctitle">Curriculum backlog — past sessions not delivered</div>
@@ -3764,7 +3773,7 @@ async function loadData(){
     published:!!pn.published_status, closeout:pn.closeout_status,
     readiness:pn.readiness_score, version:pn.version,
     sessions:(pn.sessions||[]).sort((a,b)=>(a.period_number||0)-(b.period_number||0)).map(s=>({
-      id:s.id, phase:s.phase_at_time||'', code:s.curriculum_code_at_time||'',
+      id:s.id, phase:s.phase_at_time||'', element:s.element_at_time||'', code:s.curriculum_code_at_time||'',
       exp:s.curriculum_title_at_time||s.custom_title||'', facId:s.facilitator_id||'',
       facName:_facName(s), room:s.training_area_name_at_time||'', status:s.status||'planned',
       period_number:s.period_number||1,
@@ -6251,7 +6260,7 @@ function _chartStackedBarH(chart){
     series.map(s=>`<span style="display:flex;align-items:center;gap:4px;font-size:10px"><span style="display:inline-block;width:10px;height:10px;background:${s.color};border-radius:2px"></span>${esc(s.label)}</span>`).join('')+`</div>`;
   rows.forEach(row=>{
     const total=series.reduce((a,s)=>a+(+(row[s.key])||0),0);
-    const name=row.phase?(PH_S[row.phase]||row.phase):(row.label||'—');
+    const name=row.phase?(PH_S[row.phase]||row.phase):(row.element||row.label||'—');
     const pctDel=total?Math.round((+(row.delivered)||0)/total*100):0;
     html+=`<div class="ph-row" style="margin-bottom:6px" role="img" aria-label="${esc(name)}: ${pctDel}% delivered">
       <div class="ph-name" style="min-width:84px;font-size:10.5px">${esc(name.substring(0,14))}</div>
@@ -6449,6 +6458,7 @@ const _DASH_CHART_IDS=[
   ['chart-session-outcomes','insight-session-outcomes'],
   ['chart-cancellation-reasons','insight-cancellation-reasons'],
   ['chart-curriculum-progress','insight-curriculum-progress'],
+  ['chart-element-curriculum-progress','insight-element-curriculum-progress'],
   ['chart-curriculum-backlog','insight-curriculum-backlog'],
   ['chart-facilitator-workload','insight-facilitator-workload'],
   ['chart-squadron-readiness','insight-squadron-readiness'],
@@ -6512,6 +6522,8 @@ async function loadDashCharts(){
   // C. Curriculum
   _dRenderChart('chart-curriculum-progress',charts.curriculum_progress,_chartStackedBarH,'insight-curriculum-progress');
   _dSetExp('exp-curriculum-progress',charts.curriculum_progress?.explanation);
+  _dRenderChart('chart-element-curriculum-progress',charts.element_curriculum_progress,_chartStackedBarH,'insight-element-curriculum-progress');
+  _dSetExp('exp-element-curriculum-progress',charts.element_curriculum_progress?.explanation);
   _dRenderChart('chart-curriculum-backlog',charts.curriculum_backlog,_chartHBar,'insight-curriculum-backlog');
   _dRenderChart('chart-facilitator-workload',charts.facilitator_workload,_chartHBar,'insight-facilitator-workload');
 
@@ -6574,6 +6586,7 @@ function drillDashChart(chartId,drillId){
   // Drill to sessions filtered by the chart's drill context (phase, status, week)
   const sess=allSess().filter(s=>{
     if(chartId==='curriculum_progress'||chartId==='curriculum_backlog')return s.phase===drillId;
+    if(chartId==='element_curriculum_progress')return s.element===drillId;
     if(chartId==='cancellation_reasons')return s.cancel_reason===drillId;
     return s.status===drillId;
   });
