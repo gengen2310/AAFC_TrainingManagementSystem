@@ -4275,9 +4275,10 @@ const _GS_LINK_LABEL={
 };
 function _gsStepRow(s){
   const badge=s.done?'<span class="badge b-ok">Done</span>':'<span class="badge b-grey">Pending</span>';
+  const optionalTag=s.optional?' <span class="badge b-blue" title="Recommended, not required for setup to be considered complete">Optional</span>':'';
   const countTxt=(s.count===null||s.count===undefined)?'':` <span style="color:var(--muted);font-size:11px">(${s.count}${s.key==='curriculum_coverage'?'%':''})</span>`;
-  return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
-    <div>${badge} <span style="font-weight:700;margin-left:6px">${esc(s.label)}</span>${countTxt}</div>
+  return `<div class="gs-step-row" data-step-key="${esc(s.key)}" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+    <div>${badge}${optionalTag} <span style="font-weight:700;margin-left:6px">${esc(s.label)}</span>${countTxt}</div>
     <button class="btn btn-xs btn-out" onclick="nav('${s.link_page}')">${_GS_LINK_LABEL[s.link_page]||'Go to page'}</button>
   </div>`;
 }
