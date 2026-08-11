@@ -18,7 +18,7 @@ export function ActionItems() {
   if (q.error) return <ErrorNote error={q.error} />;
   return (
     <div>
-      <h1>Action Items</h1>
+      <h1>Needs Attention</h1>
       <Card title="Open and closed items" action={<div className="row-actions"><Button variant="out" onClick={() => checks.mutate()} disabled={checks.isPending}>Run exception checks</Button><Button onClick={() => setAdding(true)}>New action item</Button></div>}>
         {msg && <div className="okmsg" role="status">{msg}</div>}
         {(q.data ?? []).length === 0 ? <Empty msg="No action items." /> : (

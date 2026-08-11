@@ -10,7 +10,7 @@ export function Admin() {
   const squadrons = useQuery({ queryKey: ["squadrons"], queryFn: orgApi.squadrons });
   return (
     <div>
-      <h1>Admin / Settings</h1>
+      <h1>Unit Settings</h1>
       <Card title="Your scope">
         <ul>
           <li>Role: <strong>{session?.role}</strong></li>

@@ -65,12 +65,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="nav-group">Assurance</div>
             <NavItem to="/reports" label="Reports" />
             <NavItem to="/report-catalogue" label="Report Catalogue" />
-            <NavItem to="/action-items" label="Action Items" />
+            <NavItem to="/action-items" label="Needs Attention" />
             {r.imports && <NavItem to="/imports" label="Imports" />}
             <NavItem to="/audit" label="Audit" />
             {isAdmin(session) && <><div className="nav-group">Admin</div>
               <NavItem to="/accounts" label="Account Management" />
-              <NavItem to="/admin" label="Admin / Settings" /></>}
+              <NavItem to="/admin" label="Unit Settings" /></>}
           </>}
 
           {/* WING — retains the full Squadron function set (master transformation plan
@@ -84,7 +84,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavItem to="/wing-overview" label="Wing Dashboard" />
             <NavItem to="/reports" label="Reports" />
             <NavItem to="/report-catalogue" label="Report Catalogue" />
-            <NavItem to="/action-items" label="Action Items" />
+            <NavItem to="/action-items" label="Needs Attention" />
             <NavItem to="/audit" label="Audit" />
             <NavItem to="/accounts" label="Account Management" />
             <div className="nav-group">Squadron Functions</div>
@@ -113,7 +113,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <NavItem to="/wing-overview" label="Wing Drill-down" />
             <NavItem to="/reports" label="Reports" />
             <NavItem to="/report-catalogue" label="Report Catalogue" />
-            <NavItem to="/action-items" label="Action Items" />
+            <NavItem to="/action-items" label="Needs Attention" />
             <NavItem to="/audit" label="Audit" />
             {canManageAccounts(session) && <NavItem to="/accounts" label="Account Management" />}
             <div className="nav-group">Squadron Functions</div>
@@ -130,7 +130,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {(session?.role === "national_admin" || isSystemAdmin(session)) &&
               <><div className="nav-group">Intervention (required to edit a squadron)</div><ProxyControls kind="intervention" /></>}
             {isSystemAdmin(session) && <><div className="nav-group">System</div>
-              <NavItem to="/admin" label="Admin / Settings" /></>}
+              <NavItem to="/admin" label="Unit Settings" /></>}
           </>}
 
           {/* AUDITOR — read-only assurance, no write tools */}

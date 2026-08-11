@@ -5,9 +5,14 @@
 .body{display:grid;grid-template-columns:230px 1fr;}
 @media (max-width:780px){ .body{grid-template-columns:1fr;} .sidenav{display:none;} }
 .sidenav{background:var(--surface);border-right:1px solid var(--border);padding:12px;}
-.nav-item{display:block;width:100%;text-align:left;border:0;background:none;color:var(--text);padding:9px 10px;border-radius:8px;font-size:13px;}
+/* REM-89: active-nav treatment aligned with connected-frontend's own pattern
+   (left accent border + accent-tinted text + light accent background) --
+   connected-frontend is the TMS root frontend users land on, Planning
+   Workspace is the preview app; each keeps its own token names/values, this
+   only aligns the shared visual convention, not the token source. */
+.nav-item{display:block;width:100%;text-align:left;border:0;border-left:3px solid transparent;background:none;color:var(--text);padding:9px 10px 9px 8px;border-radius:8px;font-size:13px;}
 .nav-item:hover{background:var(--background);}
-.nav-item.active{background:var(--aafc-dark-blue);color:#fff;}
+.nav-item.active{background:color-mix(in srgb, var(--accent) 15%, var(--surface));color:var(--primary);border-left-color:var(--accent);font-weight:700;}
 .nav-group{font-size:10px;text-transform:uppercase;color:var(--muted-text);margin:12px 6px 4px;letter-spacing:.05em;}
 .main{padding:24px;max-width:1200px;}
 .banner{padding:10px 18px;font-weight:700;font-size:12px;}

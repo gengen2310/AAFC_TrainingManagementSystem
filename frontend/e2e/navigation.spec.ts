@@ -33,9 +33,9 @@ test("Parade Nights page loads", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /parade night/i })).toBeVisible({ timeout: 8000 });
 });
 
-test("Mission Backlog (Action Items) page loads", async ({ page }) => {
+test("Mission Backlog (Needs Attention) page loads", async ({ page }) => {
   await page.goto("/action-items");
-  await expect(page.getByRole("heading", { name: /mission backlog|action item/i })).toBeVisible({ timeout: 8000 });
+  await expect(page.getByRole("heading", { name: /mission backlog|needs attention|action item/i })).toBeVisible({ timeout: 8000 });
 });
 
 test("Imports page loads", async ({ page }) => {

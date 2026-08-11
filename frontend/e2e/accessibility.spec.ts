@@ -184,7 +184,7 @@ test.describe("Accessibility — Cadets", () => {
 test.describe("Accessibility — Action Items", () => {
   test("action items has no critical/serious/moderate violations", async ({ page }) => {
     await loginAs(page, SQN_ADMIN);
-    await auditRoute(page, "Action Items", "/action-items");
+    await auditRoute(page, "Needs Attention", "/action-items");
   });
 });
 
@@ -219,7 +219,7 @@ test.describe("Accessibility — Account Management", () => {
 test.describe("Accessibility — Admin", () => {
   test("admin / settings has no critical/serious/moderate violations", async ({ page }) => {
     await loginAs(page, SQN_ADMIN);
-    await auditRoute(page, "Admin / Settings", "/admin");
+    await auditRoute(page, "Unit Settings", "/admin");
   });
 });
 

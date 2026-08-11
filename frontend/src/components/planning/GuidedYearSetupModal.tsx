@@ -220,7 +220,7 @@ function TimingStep({ onSkip, onDone }: { onSkip: () => void; onDone: () => void
       {loadingList && <p style={{ fontSize: 12 }}>Loading timing templates…</p>}
       {templates && templates.length === 0 && (
         <p style={{ fontSize: 12 }}>
-          No timing templates exist yet for this squadron. Create one from Admin / Settings,
+          No timing templates exist yet for this squadron. Create one from Unit Settings,
           then reopen this step — or skip and continue without one.
         </p>
       )}
