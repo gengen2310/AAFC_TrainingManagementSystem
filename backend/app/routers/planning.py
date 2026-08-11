@@ -1719,9 +1719,15 @@ def delete_session(
     s = db.get(TrainingSession, session_id)
     if not s or s.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
+    # parade_night_id is a required FK and ParadeNight rows are never hard-
+    # deleted, so pn should always be found for a real session -- but the
+    # permission check must not be skippable if that invariant is ever
+    # violated (fail closed, not fail open; see restore_session's identical
+    # fix, found by security review of that endpoint).
     pn = db.get(ParadeNight, s.parade_night_id) if s.parade_night_id else None
-    if pn:
-        require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    if not pn:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
     s.is_archived = True
     db.commit()
     audit(db, p, object_type="session", object_id=s.id, action="delete")
@@ -1739,9 +1745,16 @@ def restore_session(
     s = db.get(TrainingSession, session_id)
     if not s:
         raise HTTPException(404, detail={"error": "not_found"})
+    # Fail closed: a missing ParadeNight must reject the request, not skip
+    # the permission check. Security review flagged the original conditional
+    # form (`if pn: require_can_write_squadron(...)`) as fail-open -- in
+    # practice parade_night_id is a required FK and ParadeNight rows are
+    # never hard-deleted, so pn is always found for a real session today,
+    # but the check must not be silently bypassable if that ever changes.
     pn = db.get(ParadeNight, s.parade_night_id) if s.parade_night_id else None
-    if pn:
-        require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    if not pn:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
     if not s.is_archived:
         raise HTTPException(409, detail={"error": "not_archived"})
     s.is_archived = False
