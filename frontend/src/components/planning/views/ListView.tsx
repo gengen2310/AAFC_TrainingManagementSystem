@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
+import { friendlyMessage } from "../../../api/client";
 import type { AnchorEvent, NightSummary, PlanningConflict } from "../../../api/types";
 import { BLOCK_GROUPS, BLOCK_PERIODS, fromNightSummary } from "../ParadeNightBlock";
 import type { DisplaySession } from "../ParadeNightBlock";
@@ -97,13 +98,13 @@ function filterActivitiesByRange(
 export function ListView({ yearId, viewRange, customStart, customEnd, conflicts = [], onDateClick, onAnchorClick }: Props) {
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data: nightData, isLoading: nightLoading } = useQuery({
+  const { data: nightData, isLoading: nightLoading, error: nightError } = useQuery({
     queryKey: ["planning-night-summaries", yearId],
     queryFn: () => planningApi.nightSummaries(yearId),
     staleTime: 2 * 60 * 1000,
   });
 
-  const { data: anchorData, isLoading: anchorLoading } = useQuery({
+  const { data: anchorData, isLoading: anchorLoading, error: anchorError } = useQuery({
     queryKey: ["planning-anchors", yearId],
     queryFn: () => planningApi.listAnchors(yearId),
     staleTime: 2 * 60 * 1000,
@@ -136,6 +137,20 @@ export function ListView({ yearId, viewRange, customStart, customEnd, conflicts 
 
   const isLoading = nightLoading || anchorLoading;
   if (isLoading) return <div className="pw-loading">Loading…</div>;
+
+  const loadError = nightError || anchorError;
+  if (loadError) {
+    const msg = friendlyMessage(loadError, "Unknown error");
+    return (
+      <div className="pw-err" style={{ padding: 16 }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load the parade night list</div>
+        <div style={{ fontSize: 12, opacity: .8 }}>{msg}</div>
+        <div style={{ fontSize: 11, marginTop: 6, color: "var(--muted-text)" }}>
+          Check that you have an internet connection, then reload the page.
+        </div>
+      </div>
+    );
+  }
 
   const rangeLabel = viewRange === "custom" && customStart && customEnd
     ? fmtHumanRange(customStart, customEnd)

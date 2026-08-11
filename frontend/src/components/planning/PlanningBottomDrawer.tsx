@@ -218,7 +218,18 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
   };
 
   if (isLoading) return <div className="pw-loading" style={{ padding: "20px" }}>Loading missions…</div>;
-  if (error || !data) return <div className="pw-err" style={{ padding: 16 }}>Failed to load missions.</div>;
+  if (error || !data) {
+    const msg = friendlyMessage(error, "Unknown error");
+    return (
+      <div className="pw-err" style={{ padding: 16 }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load the mission backlog</div>
+        <div style={{ fontSize: 12, opacity: .8 }}>{msg}</div>
+        <div style={{ fontSize: 11, marginTop: 6, color: "var(--muted-text)" }}>
+          Check that you have an internet connection, then reload the page.
+        </div>
+      </div>
+    );
+  }
 
   const total = data.missions.length;
   const scheduledCount = data.scheduled_count;

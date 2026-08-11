@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
+import { friendlyMessage } from "../../../api/client";
 import type { AnchorEvent, NightSummary, PlanningConflict } from "../../../api/types";
 import { filterAnchors } from "../../../utils/planningFilters";
 import { ParadeNightBlock, fromNightSummary } from "../ParadeNightBlock";
@@ -74,7 +75,18 @@ export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
   }, [data]);
 
   if (isLoading) return <div className="pw-loading">Loading term view…</div>;
-  if (error || !data) return <div className="pw-err">Failed to load term data.</div>;
+  if (error || !data) {
+    const msg = friendlyMessage(error, "Unknown error");
+    return (
+      <div className="pw-err" style={{ padding: 16 }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load term data</div>
+        <div style={{ fontSize: 12, opacity: .8 }}>{msg}</div>
+        <div style={{ fontSize: 11, marginTop: 6, color: "var(--muted-text)" }}>
+          Check that you have an internet connection, then reload the page.
+        </div>
+      </div>
+    );
+  }
 
   const term = data.terms[termIndex];
   if (!term) return <div className="pw-empty">No terms found.</div>;

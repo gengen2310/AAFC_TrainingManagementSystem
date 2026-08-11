@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
+import { friendlyMessage } from "../../../api/client";
 import type { AnchorEvent, NightSummary, PlanningConflict } from "../../../api/types";
 import { filterAnchors } from "../../../utils/planningFilters";
 import { ParadeNightBlock, fromNightSummary } from "../ParadeNightBlock";
@@ -84,7 +85,18 @@ export function YearView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
   }
 
   if (isLoading) return <div className="pw-loading">Loading annual programme…</div>;
-  if (error || !data) return <div className="pw-err">Failed to load annual programme.</div>;
+  if (error || !data) {
+    const msg = friendlyMessage(error, "Unknown error");
+    return (
+      <div className="pw-err" style={{ padding: 16 }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load the annual programme</div>
+        <div style={{ fontSize: 12, opacity: .8 }}>{msg}</div>
+        <div style={{ fontSize: 11, marginTop: 6, color: "var(--muted-text)" }}>
+          Check that you have an internet connection, then reload the page.
+        </div>
+      </div>
+    );
+  }
 
   const totalActiveDates = data.terms.reduce(
     (sum, t) => sum + t.parade_dates.filter(pd => pd.is_active !== false).length,

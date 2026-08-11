@@ -207,7 +207,18 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
   });
 
   if (isLoading) return <div className="pw-loading">Loading parade night…</div>;
-  if (error || !data) return <div className="pw-err">Failed to load parade night data.</div>;
+  if (error || !data) {
+    const msg = friendlyMessage(error, "Unknown error");
+    return (
+      <div className="pw-err" style={{ padding: 16 }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load the parade night</div>
+        <div style={{ fontSize: 12, opacity: .8 }}>{msg}</div>
+        <div style={{ fontSize: 11, marginTop: 6, color: "var(--muted-text)" }}>
+          Check that you have an internet connection, then reload the page.
+        </div>
+      </div>
+    );
+  }
 
   const conflicts = computeConflicts(data.sessions, facilitators);
   const blocks = data.timing_blocks;
