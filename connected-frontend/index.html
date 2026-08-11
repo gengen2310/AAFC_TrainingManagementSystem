@@ -2627,6 +2627,33 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   </div>
 </div>
 
+<!-- REM-103: local override for an inherited Wing/National activity -->
+<div class="modal-bg" id="m-act-override">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="act-override-title">Adjust for our squadron</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-act-override')">×</button></div>
+    <div class="modal-body">
+      <div class="ssub" style="margin-bottom:10px">This adjustment only affects how your squadron sees this activity — the original record is unchanged for every other unit.</div>
+      <div id="act-override-source" class="ssub" style="font-size:11px;color:var(--muted);margin-bottom:10px;padding:8px;background:var(--surface-2);border-radius:6px"></div>
+      <div class="form-row">
+        <div class="ff"><label for="act-ov-date-start">Local Date</label><input type="date" id="act-ov-date-start"></div>
+        <div class="ff"><label for="act-ov-date-end">Local End Date</label><input type="date" id="act-ov-date-end"></div>
+      </div>
+      <div class="form-row">
+        <div class="ff"><label for="act-ov-time-start">Local Start Time</label><input type="time" id="act-ov-time-start"></div>
+        <div class="ff"><label for="act-ov-time-end">Local End Time</label><input type="time" id="act-ov-time-end"></div>
+      </div>
+      <div class="ff"><label for="act-ov-notes">Local Notes</label><input id="act-ov-notes" placeholder="Notes visible only to your squadron"></div>
+      <div class="ff"><label style="display:flex;align-items:center;gap:6px;font-weight:400"><input type="checkbox" id="act-ov-hidden" style="width:auto"> Not relevant to our squadron</label></div>
+      <div id="act-override-msg" class="ssub" style="color:var(--red);display:none;margin-top:6px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-out" id="act-override-clear-btn" style="display:none" onclick="clearActivityLocalOverride()">Clear Adjustment</button>
+      <button class="btn btn-out" onclick="closeModal('m-act-override')">Cancel</button>
+      <button class="btn btn-dk" onclick="saveActivityLocalOverride()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add Equipment -->
 <div class="modal-bg" id="m-add-equip">
   <div class="modal">
@@ -3811,7 +3838,11 @@ async function loadData(){
   // REM-13: scope_type=squadron responses are {items:[...]}; the legacy
   // no-scope-type fallback (only reached if _sqnId is unset) is a bare array.
   const _actsList=Array.isArray(acts)?acts:((acts&&acts.items)||[]);
-  S.acts=_actsList.map(a=>({id:a.activity_id,name:a.activity_name,date:a.date_start,dateEnd:a.date_end,timeStart:a.time_start,timeEnd:a.time_end,type:a.activity_type||'Optional',location:a.location||'',audience:a.audience||[],notes:a.notes||'',ceaSeqNr:a.cea_seq_nr||'',owningOrgLabel:a.owning_org_label||''}));
+  // REM-103: owningLevel/isInherited/localOverride/readOnly only ever come
+  // from real Activity rows (_activity_out()) -- CEA/holiday synthetic items
+  // (source:'cea'/'holiday') never carry them, correctly leaving these
+  // undefined/false for those rows.
+  S.acts=_actsList.map(a=>({id:a.activity_id,name:a.activity_name,date:a.date_start,dateEnd:a.date_end,timeStart:a.time_start,timeEnd:a.time_end,type:a.activity_type||'Optional',location:a.location||'',audience:a.audience||[],notes:a.notes||'',ceaSeqNr:a.cea_seq_nr||'',owningOrgLabel:a.owning_org_label||'',owningLevel:a.owning_level||null,isInherited:!!a.is_inherited,localOverride:a.local_override||null}));
   S.holidays=(holidays||[]).map(h=>({id:h.holiday_id,name:h.name,start:h.start_date,end:h.end_date}));
   S.proxy=proxy||{active:false};
   S.pwUrl=(uicfg&&uicfg.planning_workspace_url)||null;
@@ -8022,13 +8053,30 @@ function renderActs(){
   document.getElementById('act-tbody').innerHTML=list.length?list.map((act)=>{
     const past=new Date(act.date+'T00:00:00')<td;
     const tb=act.type==='Must Attend'?'<span class="badge b-red">Must Attend</span>':act.type==='Key Event'?'<span class="badge b-blue">Key Event</span>':act.type==='Holiday'?'<span class="badge b-amber">Holiday</span>':'<span class="badge b-grey">Optional</span>';
+    // REM-103: an inherited (Wing/National-owned) row may carry this
+    // squadron's own local override -- shown alongside the unchanged source
+    // values, never replacing them, matching "display source vs local value
+    // side-by-side" from the addendum this row implements.
+    const ov=act.localOverride;
+    const ovBadge=ov?(ov.is_hidden?' <span class="badge b-grey" title="Marked not relevant to our squadron">Hidden locally</span>':' <span class="badge b-blue" title="Locally adjusted for our squadron">Adjusted</span>'):'';
+    const effDate=(ov&&ov.local_date_start)||act.date;
+    const dateCell=fmtD(effDate,{day:'numeric',month:'short',year:'numeric'})
+      +(ov&&ov.local_date_start?` <span style="color:var(--muted);font-size:10px" title="Source date: ${esc(fmtD(act.date,{day:'numeric',month:'short',year:'numeric'}))}">(adjusted)</span>`:'');
+    let actionsCell;
+    if(act.isInherited){
+      actionsCell=canWriteSquadron()
+        ?`<button class="btn btn-xs btn-out" onclick="openActivityOverrideModal('${act.id}')">${ov?'Edit Adjustment':'Adjust'}</button>`
+        :(ov?'<span style="font-size:10.5px;color:var(--muted)">Locally adjusted</span>':'—');
+    } else {
+      actionsCell=canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editAct('${act.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delAct('${act.id}')">×</button>`:'—';
+    }
     return `<tr ${past?'style="opacity:.58"':''}>
-      <td style="font-weight:700">${esc(act.name)}</td>
-      <td style="white-space:nowrap">${fmtD(act.date,{day:'numeric',month:'short',year:'numeric'})}</td>
+      <td style="font-weight:700">${esc(act.name)}${ovBadge}</td>
+      <td style="white-space:nowrap">${dateCell}</td>
       <td>${tb}</td>
       <td style="font-size:11.5px">${esc((act.audience||[]).join(', '))}</td>
-      <td style="font-size:11.5px;color:var(--muted)">${esc(act.notes||'')}</td>
-      <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editAct('${act.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delAct('${act.id}')">×</button>`:'—'}</td>
+      <td style="font-size:11.5px;color:var(--muted)">${esc((ov&&ov.local_notes)||act.notes||'')}</td>
+      <td class="no-print">${actionsCell}</td>
     </tr>`;
   }).join(''):`<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:14px">No activities${typeFilter!=='all'?' of this type':''}${search?' matching "'+esc(search)+'"':''}.</td></tr>`;
 }
@@ -8155,6 +8203,58 @@ async function delAct(id){
   if(!confirm('Remove this activity?'))return;
   try{ await api('/api/activities/'+id,{method:'DELETE'}); await reloadAndRender(); }
   catch(e){ alert(apiErr(e)); }
+}
+
+// REM-103: squadron-local date/time/notes/relevance adjustment to an
+// inherited (Wing/National-owned) Activity -- the source record itself is
+// never touched, only PUT/DELETE /api/activities/{id}/local-override.
+let _actOverrideId=null;
+function openActivityOverrideModal(id){
+  const act=S.acts.find(a=>a.id===id); if(!act)return;
+  _actOverrideId=id;
+  const ov=act.localOverride;
+  document.getElementById('act-override-title').textContent=(ov?'Edit':'Adjust')+' for our squadron — '+act.name;
+  document.getElementById('act-override-source').textContent='Source (from '+(act.owningOrgLabel||act.owningLevel||'the owning unit')+'): '
+    +fmtD(act.date,{day:'numeric',month:'short',year:'numeric'})+(act.timeStart?' at '+act.timeStart:'')
+    +(act.notes?' — "'+act.notes+'"':'');
+  document.getElementById('act-ov-date-start').value=(ov&&ov.local_date_start)||'';
+  document.getElementById('act-ov-date-end').value=(ov&&ov.local_date_end)||'';
+  document.getElementById('act-ov-time-start').value=(ov&&ov.local_time_start)||'';
+  document.getElementById('act-ov-time-end').value=(ov&&ov.local_time_end)||'';
+  document.getElementById('act-ov-notes').value=(ov&&ov.local_notes)||'';
+  document.getElementById('act-ov-hidden').checked=!!(ov&&ov.is_hidden);
+  document.getElementById('act-override-clear-btn').style.display=ov?'':'none';
+  document.getElementById('act-override-msg').style.display='none';
+  openModal('m-act-override');
+}
+async function saveActivityLocalOverride(){
+  const act=S.acts.find(a=>a.id===_actOverrideId); if(!act)return;
+  const msg=document.getElementById('act-override-msg');
+  msg.style.display='none';
+  const body={
+    local_date_start:document.getElementById('act-ov-date-start').value||null,
+    local_date_end:document.getElementById('act-ov-date-end').value||null,
+    local_time_start:document.getElementById('act-ov-time-start').value||null,
+    local_time_end:document.getElementById('act-ov-time-end').value||null,
+    local_notes:document.getElementById('act-ov-notes').value.trim()||null,
+    is_hidden:document.getElementById('act-ov-hidden').checked,
+  };
+  if(act.localOverride)body.version=act.localOverride.version;
+  try{
+    await api('/api/activities/'+_actOverrideId+'/local-override',{method:'PUT',body});
+    closeModal('m-act-override');
+    await reloadAndRender();
+    showToast('Local adjustment saved.');
+  }catch(e){ msg.textContent=apiErr(e); msg.style.display=''; }
+}
+async function clearActivityLocalOverride(){
+  if(!confirm('Remove this local adjustment and revert to the source activity\'s own date/time/notes?'))return;
+  try{
+    await api('/api/activities/'+_actOverrideId+'/local-override',{method:'DELETE'});
+    closeModal('m-act-override');
+    await reloadAndRender();
+    showToast('Local adjustment cleared.');
+  }catch(e){ alert(apiErr(e)); }
 }
 
 // ═══════════════════════════════════════════════════════════
