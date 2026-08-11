@@ -725,7 +725,7 @@ function RefDataSection({ config, naturalScope, ownWingId, ownSquadronId }: {
           {createMut.isPending ? "Adding…" : "+ Add"}
         </button>
       </div>
-      {err != null && <ErrorNote error={err} />}
+      {err != null && <ErrorNote error={err} variant="action" />}
     </div>
   );
 }

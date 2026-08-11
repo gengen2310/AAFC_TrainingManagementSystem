@@ -61,7 +61,7 @@ export function Dashboard() {
 
   if (chartsQ.isLoading) return <Loading />;
   if (chartsQ.error) return <ErrorNote error={chartsQ.error} />;
-  if (!chartsQ.data) return <ErrorNote error={new Error("Dashboard data unavailable. Please refresh.")} />;
+  if (!chartsQ.data) return <ErrorNote error={new Error("The server returned no dashboard data.")} />;
 
   const scope = chartsQ.data.scope;
   const charts = chartsQ.data.charts;

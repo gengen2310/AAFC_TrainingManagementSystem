@@ -1567,7 +1567,7 @@ function GettingHelpSection() {
             Content
             <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={6} style={{ ...inputSx, resize: "vertical" }} />
           </label>
-          {err != null && <ErrorNote error={err} />}
+          {err != null && <ErrorNote error={err} variant="action" />}
           <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
             <button className="btn sm out" onClick={() => setEditing(false)} disabled={saving}>Cancel</button>
             <button className="btn sm primary" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</button>
