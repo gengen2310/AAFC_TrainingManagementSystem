@@ -6610,11 +6610,18 @@ async function loadDashCharts(){
 //  FACILITATORS — VISUAL STATISTICS
 // ═══════════════════════════════════════════════════════════
 async function loadFacilitatorStats(){
-  ['fac-chart-status','fac-chart-workload','fac-chart-spof','fac-chart-gaps','fac-chart-type'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="chart-skeleton"></div>';});
+  const chartIds=['fac-chart-status','fac-chart-workload','fac-chart-spof','fac-chart-gaps','fac-chart-type'];
+  chartIds.forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="chart-skeleton"></div>';});
   let data;
   const sqn=saBrowseSquadronId();
   try{data=await api('/api/dashboard/charts?window=term'+(sqn?'&squadron_id='+encodeURIComponent(sqn):''));}
-  catch(e){return;}
+  // Skeletons must not be left spinning forever on failure -- same
+  // fetch-failure-cleanup reasoning as loadDashCharts's own _DASH_CHART_IDS
+  // loop (see that function's comment).
+  catch(e){
+    chartIds.forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=_dEmptyChart('Could not load chart data. Try refreshing.');});
+    return;
+  }
   const charts=data.charts||{};
   _dRenderChart('fac-chart-status',charts.facilitator_status_distribution,_chartDonut,'fac-insight-status');
   _dRenderChart('fac-chart-workload',charts.facilitator_workload,_chartHBar,'fac-insight-workload');
@@ -10762,7 +10769,7 @@ async function loadAnchors(yearId){
   try {
     P.anchors = await api(`/api/planning/years/${yearId}/anchors`);
     renderAnchors();
-  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="muted">Could not load anchor events: ${esc(apiErr(e))}</p>`; }
 }
 
 function renderAnchors(){
@@ -10866,7 +10873,7 @@ async function loadTermPlanner(yearId, term){
         </div>
       </div>`;
     }).join('');
-  } catch(e){ body.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
+  } catch(e){ body.innerHTML=`<p class="muted">Could not load the term planner: ${esc(apiErr(e))}</p>`; }
 }
 
 // ═══════════════
@@ -10885,7 +10892,13 @@ async function loadBuilderDates(yearId){
       o.textContent=`${d.parade_date} (${_dayName(d.parade_date)})${d.parade_night_id?'':' ⚠️'}`;
       sel.appendChild(o);
     });
-  } catch(e){ console.warn('builder dates load failed',e); }
+  } catch(e){
+    console.warn('builder dates load failed',e);
+    // A <select> can't show a headline/reason block -- a disabled option
+    // naming the failure is the equivalent of this program's usual
+    // WHAT-HAPPENED/NEXT-STEP structure for this specific control type.
+    sel.innerHTML=`<option value="">Could not load parade nights — ${esc(apiErr(e))}</option>`;
+  }
 }
 
 async function _loadDirectPnSelector(){
@@ -11222,7 +11235,7 @@ async function loadPWDates(yearId){
       o.value=d.parade_date_id; o.textContent=`${d.parade_date} (${_dayName(d.parade_date)})`;
       sel.appendChild(o);
     });
-  } catch(e){}
+  } catch(e){ sel.innerHTML=`<option value="">Could not load parade nights — ${esc(apiErr(e))}</option>`; }
 }
 
 async function loadWeeklyProgram(dateId){
@@ -11316,7 +11329,7 @@ async function loadLongRange(yearId){
     });
     document.getElementById('lr-body').innerHTML=html;
     card.style.display=''; empty.style.display='none';
-  } catch(e){ empty.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; card.style.display='none'; empty.style.display=''; }
+  } catch(e){ empty.innerHTML=`<p class="muted">Could not load the long-range view: ${esc(apiErr(e))}</p>`; card.style.display='none'; empty.style.display=''; }
 }
 
 // ═══════════════
@@ -11341,12 +11354,12 @@ async function loadLocations(){
     el.innerHTML=`<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Capacity</th><th>Source</th></tr></thead><tbody>`+
       allLocs.map(l=>`<tr>
         <td>${esc(l.name)}</td>
-        <td>${esc(l.location_type||'—')}</td>
+        <td>${l.location_type?esc(_cap(l.location_type.replace(/-/g,' '))):'—'}</td>
         <td>${l.capacity!=null?l.capacity:'—'}</td>
         <td><span class="badge ${l.source==='real'?'badge-green':'badge-grey'}">${l.source==='real'?'Training Area':'Planning Only'}</span></td>
       </tr>`).join('')+
       `</tbody></table>`;
-  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="muted">Could not load locations: ${esc(apiErr(e))}</p>`; }
 }
 
 async function loadPlanningFacilitators(){
@@ -11375,7 +11388,7 @@ async function loadPlanningFacilitators(){
         <td>${f.max_sessions_per_night}</td>
       </tr>`).join('')+
       `</tbody></table>`;
-  } catch(e){ el.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
+  } catch(e){ el.innerHTML=`<p class="muted">Could not load facilitators: ${esc(apiErr(e))}</p>`; }
 }
 
 function openAddLocationModal(){
@@ -11416,7 +11429,7 @@ async function loadPlanningChecks(yearId){
     _renderDecisionGuide(guide.checks);
     _renderConflicts(conflicts, yearId);
     card.style.display=''; empty.style.display='none';
-  } catch(e){ empty.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; card.style.display='none'; empty.style.display=''; }
+  } catch(e){ empty.innerHTML=`<p class="muted">Could not load the decision guide and conflicts: ${esc(apiErr(e))}</p>`; card.style.display='none'; empty.style.display=''; }
 }
 
 function _renderDecisionGuide(checks){
@@ -11722,7 +11735,7 @@ async function loadWingCalendar(){
     }));
     _wingCalEvents=wingEvents.map(e=>({...e,source:'wing_event'})).concat(acts);
     renderWingCalendar();
-  }catch(e){ body.innerHTML=`<p class="muted">Error: ${esc(apiErr(e))}</p>`; }
+  }catch(e){ body.innerHTML=`<p class="muted">Could not load the Wing HQ Calendar: ${esc(apiErr(e))}</p>`; }
 }
 
 function _wcApplyTypeImpFilters(rows){
