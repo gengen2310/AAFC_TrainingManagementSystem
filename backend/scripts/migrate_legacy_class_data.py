@@ -70,7 +70,7 @@ from app.models import (
 )
 
 MIGRATION_TAG = "legacy-migration"
-MIGRATION_SOURCE = "legacy_phase_migration"
+MIGRATION_SOURCE = "legacy_migration"  # CadetClassMembership.source is VARCHAR(20) -- must fit
 
 _PREFIX_RE = re.compile(r"^[a-z]\.\s*")
 

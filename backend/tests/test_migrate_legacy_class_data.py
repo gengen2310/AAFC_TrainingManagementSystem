@@ -95,6 +95,22 @@ def _cleanup(db, *, planning_years=(), stages=(), parade_nights=(), sessions=(),
     db.commit()
 
 
+def test_migration_tag_constants_fit_their_target_columns():
+    """Real bug, found only when this script was finally run against real
+    Postgres on staging (2026-08-11): the original MIGRATION_SOURCE value
+    ("legacy_phase_migration", 23 chars) exceeded CadetClassMembership.source's
+    VARCHAR(20) column, raising StringDataRightTruncation and aborting the
+    whole transaction. SQLite (this test suite's own DB) never enforces
+    VARCHAR length at all, so no amount of local rehearsal against SQLite --
+    however thorough -- could ever have caught this; only a real Postgres
+    write does. This test encodes the actual constraint directly so a future
+    edit to either constant fails fast in CI, on SQLite, without needing a
+    real Postgres connection."""
+    assert len(MIGRATION_SOURCE) <= CadetClassMembership.source.property.columns[0].type.length
+    assert len(MIGRATION_TAG) <= TrainingClass.created_by.property.columns[0].type.length
+    assert len(MIGRATION_TAG) <= SessionAudience.created_by.property.columns[0].type.length
+
+
 def test_happy_path_creates_class_audience_and_reads_never_touch_source_field():
     db = SessionLocal()
     try:
