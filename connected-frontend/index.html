@@ -1237,7 +1237,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="muted" style="font-size:10.5px;margin:-4px 0 10px">
             This is the <b>default</b> used only when you <b>generate new</b> Parade Nights — it never
             changes nights that already exist. To move already-generated Parade Nights to a new day,
-            change this setting and save: you'll be offered a preview of exactly which nights would
+            change this setting and save: you will be offered a preview of exactly which nights would
             move before anything happens.
           </div>
           <div class="form-row">
@@ -1464,7 +1464,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <!-- SYSTEM CONSOLE -->
       <div id="page-system-console" class="page">
         <div id="sc-coldstart-warn" style="display:none;padding:10px 14px;background:#fffbeb;border:1px solid #f59e0b;border-radius:6px;font-size:13px;margin-bottom:12px;color:#92400e">
-          Staging server is starting — this can take up to 30 seconds on Render's free tier. Panels will load automatically.
+          Staging server is starting — this can take up to 30 seconds after a period of inactivity. Panels will load automatically.
         </div>
         <div class="ph">
           <div>
@@ -5241,7 +5241,7 @@ async function doPermanentlyDeleteWing(wingId, wingCode){
   }catch(e){
     if(e && e.kind==='http' && e.status===409 && e.body && e.body.detail && e.body.detail.dependents){
       const dep=Object.entries(e.body.detail.dependents).map(([k,v])=>`${k}: ${v}`).join(', ');
-      showToast(`Can't permanently delete — linked records exist (${dep}). It remains archived.`, true);
+      showToast(`Cannot permanently delete — linked records exist (${dep}). It remains archived.`, true);
     } else { showToast('Could not delete: '+apiErr(e), true); }
   }
 }
@@ -5266,7 +5266,7 @@ async function doPermanentlyDeleteSquadron(sqnId, sqnCode){
   }catch(e){
     if(e && e.kind==='http' && e.status===409 && e.body && e.body.detail && e.body.detail.dependents){
       const dep=Object.entries(e.body.detail.dependents).map(([k,v])=>`${k}: ${v}`).join(', ');
-      showToast(`Can't permanently delete — linked records exist (${dep}). It remains archived.`, true);
+      showToast(`Cannot permanently delete — linked records exist (${dep}). It remains archived.`, true);
     } else { showToast('Could not delete: '+apiErr(e), true); }
   }
 }
@@ -5551,7 +5551,7 @@ async function doPermanentlyDeleteAccount(userId, displayName){
   }catch(e){
     if(e && e.kind==='http' && e.status===409 && e.body && e.body.detail && e.body.detail.dependents){
       const dep=Object.entries(e.body.detail.dependents).map(([k,v])=>`${k}: ${v}`).join(', ');
-      showToast(`Can't permanently delete — history exists (${dep}). It remains archived.`, true);
+      showToast(`Cannot permanently delete — history exists (${dep}). It remains archived.`, true);
     } else { showToast('Could not delete: '+apiErr(e), true); }
   }
 }
@@ -9741,7 +9741,7 @@ async function doDeletePlanningYear(){
     if(e && e.kind==='http' && e.status===409 && e.body && e.body.detail && e.body.detail.dependents){
       const dep=e.body.detail.dependents;
       const depList=Object.entries(dep).map(([k,v])=>`${k.replace(/_/g,' ')}: ${v}`).join(', ');
-      if(confirm(`Can't permanently delete — this Training Year has linked records (${depList}). Archive it instead? (reversible, keeps history)`)){
+      if(confirm(`Cannot permanently delete — this Training Year has linked records (${depList}). Archive it instead? (reversible, keeps history)`)){
         doArchivePlanningYear();
       }
     } else {
