@@ -28,7 +28,7 @@ export function ActionItems() {
             <tbody>{(q.data ?? []).map((a) => (
               <tr key={a.action_id}>
                 <td>{a.title}</td><td>{a.owner ?? "—"}</td><td>{a.due_date ?? "—"}</td>
-                <td>{a.severity ?? "—"}</td><td><StatusBadge status={a.status} /></td><td>{a.source ?? "—"}</td>
+                <td>{a.severity ? a.severity.replace(/_/g, " ") : "—"}</td><td><StatusBadge status={a.status} /></td><td>{a.source ?? "—"}</td>
                 <td>{a.status !== "closed" && <button className="btn out sm" onClick={() => close.mutate(a.action_id)}>Close</button>}</td>
               </tr>))}</tbody>
           </table>

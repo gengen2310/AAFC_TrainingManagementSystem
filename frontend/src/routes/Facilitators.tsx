@@ -12,6 +12,8 @@ import { useScopedSquadron } from "../layout/SquadronViewContext";
 import { ImportFacilitatorsModal } from "../components/planning/ImportFacilitatorsModal";
 import type { Facilitator } from "../api/types";
 
+const RISK_LABEL: Record<string, string> = { ok: "OK", high: "High", overloaded: "Overloaded" };
+
 export function Facilitators() {
   const { session } = useAuth();
   const qc = useQueryClient();
@@ -72,7 +74,7 @@ export function Facilitators() {
                   <td>{f.name}</td>
                   <td>{f.sessions}</td>
                   <td>{f.delivered}</td>
-                  <td><span className={`badge ${f.risk === "ok" ? "ok" : f.risk === "high" ? "warn" : "red"}`}>{f.risk}</span></td>
+                  <td><span className={`badge ${f.risk === "ok" ? "ok" : f.risk === "high" ? "warn" : "red"}`}>{RISK_LABEL[f.risk] ?? f.risk}</span></td>
                 </tr>
               ))}</tbody>
             </table>

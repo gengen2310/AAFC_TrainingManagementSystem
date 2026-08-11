@@ -56,7 +56,7 @@ export function WingOverview() {
     { key: "delivered", label: "Del/Sess", align: "right", sortVal: (r) => r.sessions, render: (r) => `${r.delivered}/${r.sessions}` },
     { key: "published", label: "Published", align: "right", sortVal: (r) => r.published },
     { key: "risk", label: "Risk", align: "right", sortVal: (r) => squadronRisk(r), render: (r) => { const v = squadronRisk(r); const t = v >= 50 ? "red" : v >= 25 ? "warn" : "ok"; return <span className={`badge ${t}`}>{v}</span>; } },
-    { key: "flags", label: "Data", render: (r) => r.no_future_plan ? <span className="badge red">no future plan</span> : r.no_published_plan ? <span className="badge warn">unpublished</span> : <span className="badge ok">ok</span> },
+    { key: "flags", label: "Data", render: (r) => r.no_future_plan ? <span className="badge red">No future plan</span> : r.no_published_plan ? <span className="badge warn">Unpublished</span> : <span className="badge ok">OK</span> },
   ];
 
   return (

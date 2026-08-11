@@ -77,7 +77,7 @@ function CurriculumDrill({ item, onClose }: { item: CurriculumItem; onClose: () 
     <DrilldownPanel title={`${item.code} — sessions`} onClose={onClose}>
       {item.learning_hub_url && <p><a className="lh" href={item.learning_hub_url} target="_blank" rel="noopener">↗ Learning Hub resource</a></p>}
       {q.isLoading ? <Loading /> : ((q.data ?? []).length ? (
-        <table><thead><tr><th>Date item</th><th>Status</th></tr></thead>
+        <table><thead><tr><th>Item</th><th>Status</th></tr></thead>
           <tbody>{q.data!.map((s) => <tr key={s.id}><td>{s.curriculum_title_at_time ?? s.custom_title ?? "—"}</td><td><StatusBadge status={s.status} /></td></tr>)}</tbody></table>
       ) : <Empty msg="No sessions scheduled for this item yet." />)}
     </DrilldownPanel>

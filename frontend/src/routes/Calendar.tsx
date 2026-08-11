@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { trainingApi } from "../api";
 import { Card, Empty, Loading, ErrorNote } from "../components/ui";
-import { StatusBadge } from "../components/status/StatusBadge";
+import { StatusBadge, statusLabel } from "../components/status/StatusBadge";
 import { Modal } from "../components/Modal";
 import { ParadeNightDetailView } from "./ParadeNightDetail";
 import { useAuth } from "../auth/AuthProvider";
@@ -25,19 +25,21 @@ export function Calendar() {
     (byMonth[m] ||= []).push(p);
   }
   const months = Object.keys(byMonth).sort();
+  const monthLabel = (m: string) =>
+    m === "Undated" ? m : new Date(`${m}-01T00:00:00`).toLocaleDateString("en-AU", { month: "long", year: "numeric" });
 
   return (
     <div>
       <h1>Calendar</h1>
       {months.length === 0 ? <Empty msg="No parade nights to display." /> : months.map((m) => (
-        <Card key={m} title={m}>
+        <Card key={m} title={monthLabel(m)}>
           <div className="cal-grid">
             {byMonth[m]!.map((p) => (
               <button key={p.parade_night_id} className="cal-cell" onClick={() => setOpenId(p.parade_night_id)}>
                 <div className="cal-date">{p.date}</div>
                 <StatusBadge status={p.published_status ? "published" : "draft"} />
                 <div className="cal-sessions">{p.sessions.length} session{p.sessions.length === 1 ? "" : "s"}</div>
-                <div className="cal-chips">{p.sessions.slice(0, 4).map((s) => <span key={s.id} className={`chip chip-${s.status}`} title={s.status}>{s.period_number}</span>)}</div>
+                <div className="cal-chips">{p.sessions.slice(0, 4).map((s) => <span key={s.id} className={`chip chip-${s.status}`} title={statusLabel(s.status)}>{s.period_number}</span>)}</div>
               </button>))}
           </div>
         </Card>

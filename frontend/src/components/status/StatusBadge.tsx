@@ -14,6 +14,9 @@ const MAP: Record<string, { cls: string; icon: string; label: string }> = {
   open: { cls: "blue", icon: "•", label: "Open" },
   active_required: { cls: "red", icon: "▲", label: "Action required" },
 };
+export function statusLabel(status: string): string {
+  return MAP[status]?.label ?? status.replace(/_/g, " ");
+}
 export function StatusBadge({ status }: { status: string }) {
   const s = MAP[status] ?? { cls: "muted", icon: "•", label: status.replace(/_/g, " ") };
   return <span className={`badge ${s.cls}`} aria-label={`Status: ${s.label}`}>{s.icon} {s.label}</span>;
