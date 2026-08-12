@@ -140,7 +140,7 @@ def test_zero_session_parade_night_is_not_planned_on_every_surface(client):
     r = client.get("/api/auth/me", headers=hdr)
     session_info = r.json()["session"]
     sqn_id, wing_id = session_info.get("squadron_id"), session_info.get("wing_id")
-    far_future = (date.today() + timedelta(days=200)).isoformat()
+    far_future = "2099-03-15"  # hardcoded: test_class_split_merge days_ahead=200 lands here
 
     pn = client.post("/api/parade-nights", json={
         "squadron_id": sqn_id, "wing_id": wing_id, "date": far_future, "parade_type": "normal",

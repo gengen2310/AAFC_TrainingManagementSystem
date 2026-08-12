@@ -343,8 +343,8 @@ def test_update_future_parade_day_draft_only_still_includes_a_night_with_no_sess
     """Nothing to protect -- an empty night is always eligible regardless of scope."""
     hdr = _sqn_admin_hdr(client)
     year_id = _make_year(client, hdr, year=2088)
-    monday = _future_monday()
-    empty_date = (monday + timedelta(days=29)).isoformat()
+    # Hardcoded Thursday: test_session_audience days_ahead=41 = monday+29 for sqn 703.
+    empty_date = "2099-10-29"
     _seed_parade_dates(client, hdr, year_id, [empty_date])
 
     r = client.post(f"/api/planning/years/{year_id}/update-future-parade-day",
