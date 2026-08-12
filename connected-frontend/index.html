@@ -1188,14 +1188,18 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
         <div class="dash-grid">
           <div class="card">
-            <div class="ctitle">Rooms / Training Areas</div>
+            <div class="ctitle" style="display:flex;align-items:center;gap:8px">Rooms / Training Areas
+              <label class="admin-el" style="display:none;font-size:11px;font-weight:400;display:flex;align-items:center;gap:4px;margin-left:auto"><input type="checkbox" id="room-show-archived" onchange="_resToggleShowArchived('room')"> Show archived</label>
+            </div>
             <div class="tw"><table>
               <thead><tr><th>Name</th><th>Capacity</th><th>Type</th><th class="no-print">Actions</th></tr></thead>
               <tbody id="room-tbody"></tbody>
             </table></div>
           </div>
           <div class="card">
-            <div class="ctitle">Equipment</div>
+            <div class="ctitle" style="display:flex;align-items:center;gap:8px">Equipment
+              <label class="admin-el" style="display:none;font-size:11px;font-weight:400;display:flex;align-items:center;gap:4px;margin-left:auto"><input type="checkbox" id="equip-show-archived" onchange="_resToggleShowArchived('equip')"> Show archived</label>
+            </div>
             <div class="tw"><table>
               <thead><tr><th>Name</th><th>Qty</th><th>Notes</th><th class="no-print">Actions</th></tr></thead>
               <tbody id="equip-tbody"></tbody>
@@ -8776,19 +8780,63 @@ async function doMergeFac(){
 // ═══════════════════════════════════════════════════════════
 //  RESOURCES
 // ═══════════════════════════════════════════════════════════
+let _archivedRoomList=null, _archivedEquipList=null;
+async function _resToggleShowArchived(type){
+  const elId=type==='room'?'room-show-archived':'equip-show-archived';
+  const checked=(document.getElementById(elId)||{}).checked;
+  if(!checked){ renderRooms(); return; }
+  try{
+    if(type==='room'){
+      const rows=await api('/api/training-areas?include_archived=true');
+      _archivedRoomList=(rows||[]).filter(r=>r.is_archived).map(r=>({id:r.training_area_id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||''}));
+    } else {
+      const rows=await api('/api/equipment?include_archived=true');
+      _archivedEquipList=(rows||[]).filter(e=>e.is_archived).map(e=>({id:e.equipment_id,name:e.name,qty:e.quantity,notes:e.notes||''}));
+    }
+  }catch(ex){ showToast('Could not load archived items: '+apiErr(ex), true); }
+  renderRooms();
+}
+async function doRestoreRoom(id, name){
+  try{
+    await api(`/api/training-areas/${id}/restore`,{method:'POST'});
+    showToast(`'${name}' restored.`);
+    await loadData();
+    const rows=await api('/api/training-areas?include_archived=true');
+    _archivedRoomList=(rows||[]).filter(r=>r.is_archived).map(r=>({id:r.training_area_id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||''}));
+    renderRooms();
+  }catch(ex){ showToast('Could not restore: '+apiErr(ex), true); }
+}
+async function doRestoreEquip(id, name){
+  try{
+    await api(`/api/equipment/${id}/restore`,{method:'POST'});
+    showToast(`'${name}' restored.`);
+    await loadData();
+    const rows=await api('/api/equipment?include_archived=true');
+    _archivedEquipList=(rows||[]).filter(e=>e.is_archived).map(e=>({id:e.equipment_id,name:e.name,qty:e.quantity,notes:e.notes||''}));
+    renderRooms();
+  }catch(ex){ showToast('Could not restore: '+apiErr(ex), true); }
+}
 function renderRooms(){
-  document.getElementById('room-tbody').innerHTML=S.rooms.map((r,i)=>`<tr>
-    <td style="font-weight:700">${esc(r.name)}</td>
-    <td style="text-align:center">${r.capacity}</td>
-    <td><span class="badge b-blue" style="font-size:8.5px">${r.type}</span></td>
-    <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editRoom('${r.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delRoom('${r.id}')">×</button>`:'—'}</td>
-  </tr>`).join('');
-  document.getElementById('equip-tbody').innerHTML=S.equip.map((eq,i)=>`<tr>
-    <td style="font-weight:700">${esc(eq.name)}</td>
-    <td style="text-align:center">${eq.qty}</td>
+  const showRooms=(document.getElementById('room-show-archived')||{}).checked;
+  const roomSrc=showRooms?(_archivedRoomList||[]):S.rooms;
+  document.getElementById('room-tbody').innerHTML=roomSrc.map((r,i)=>`<tr${showRooms?' style="opacity:.6"':''}>
+    <td style="font-weight:700">${esc(r.name)}${showRooms?' <span class="badge b-grey">Archived</span>':''}</td>
+    <td style="text-align:center">${r.capacity||'—'}</td>
+    <td>${r.type?`<span class="badge b-blue" style="font-size:8.5px">${r.type}</span>`:'—'}</td>
+    <td class="no-print">${showRooms
+      ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreRoom('${r.id}','${_jsAttr(r.name)}')">Restore</button>`:'')
+      :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editRoom('${r.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delRoom('${r.id}')">×</button>`:'—')}</td>
+  </tr>`).join('')||`<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:14px">No ${showRooms?'archived ':''}training areas.</td></tr>`;
+  const showEquip=(document.getElementById('equip-show-archived')||{}).checked;
+  const equipSrc=showEquip?(_archivedEquipList||[]):S.equip;
+  document.getElementById('equip-tbody').innerHTML=equipSrc.map((eq,i)=>`<tr${showEquip?' style="opacity:.6"':''}>
+    <td style="font-weight:700">${esc(eq.name)}${showEquip?' <span class="badge b-grey">Archived</span>':''}</td>
+    <td style="text-align:center">${eq.qty||'—'}</td>
     <td style="font-size:11.5px;color:var(--muted)">${esc(eq.notes||'')}</td>
-    <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editEquip('${eq.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delEquip('${eq.id}')">×</button>`:'—'}</td>
-  </tr>`).join('');
+    <td class="no-print">${showEquip
+      ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreEquip('${eq.id}','${_jsAttr(eq.name)}')">Restore</button>`:'')
+      :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editEquip('${eq.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delEquip('${eq.id}')">×</button>`:'—')}</td>
+  </tr>`).join('')||`<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:14px">No ${showEquip?'archived ':''}equipment.</td></tr>`;
 }
 async function saveRoom(){
   const name=document.getElementById('room-name').value.trim();

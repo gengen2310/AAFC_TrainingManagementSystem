@@ -1327,21 +1327,27 @@ def fac_stats(fid: str, db: DBSession = Depends(get_db), p: Principal = Depends(
 
 # ── RESOURCES ──
 @router.get("/training-areas")
-def list_rooms(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def list_rooms(squadron_id: str | None = None, include_archived: bool = False,
+               db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     sq_id = _view_squadron_id(p, squadron_id, db)
-    rows = db.query(TrainingArea).filter(TrainingArea.squadron_id == sq_id,
-                                         TrainingArea.is_archived == False).all()  # noqa: E712
+    q = db.query(TrainingArea).filter(TrainingArea.squadron_id == sq_id)
+    if not include_archived:
+        q = q.filter(TrainingArea.is_archived == False)  # noqa: E712
+    rows = q.all()
     return [{"training_area_id": r.id, "name": r.name, "type": r.type, "capacity": r.capacity,
-             "indoor_outdoor": r.indoor_outdoor} for r in rows]
+             "indoor_outdoor": r.indoor_outdoor, "is_archived": r.is_archived} for r in rows]
 
 
 @router.get("/equipment")
-def list_equipment(squadron_id: str | None = None, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+def list_equipment(squadron_id: str | None = None, include_archived: bool = False,
+                   db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     sq_id = _view_squadron_id(p, squadron_id, db)
-    rows = db.query(Equipment).filter(Equipment.squadron_id == sq_id,
-                                      Equipment.is_archived == False).all()  # noqa: E712
+    q = db.query(Equipment).filter(Equipment.squadron_id == sq_id)
+    if not include_archived:
+        q = q.filter(Equipment.is_archived == False)  # noqa: E712
+    rows = q.all()
     return [{"equipment_id": e.id, "name": e.name, "type": e.type, "quantity": e.quantity,
-             "available_quantity": e.available_quantity} for e in rows]
+             "available_quantity": e.available_quantity, "is_archived": e.is_archived} for e in rows]
 
 
 @router.get("/resources/clashes")
@@ -1794,6 +1800,23 @@ def delete_room(rid: str, db: DBSession = Depends(get_db), p: Principal = Depend
     r.archived_at = utcnow()
     db.commit()
     audit(db, p, object_type="training_area", object_id=r.id, action="archive")
+    return {"ok": True}
+
+
+@router.post("/training-areas/{rid}/restore")
+def restore_room(rid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """REM-133: training area archive existed with no restore counterpart."""
+    r = db.get(TrainingArea, rid)
+    if not r:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, r.squadron_id)
+    require_can_write_squadron(p, r.squadron_id, s.wing_id if s else None)
+    if not r.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived"})
+    r.is_archived = False
+    r.archived_at = None
+    db.commit()
+    audit(db, p, object_type="training_area", object_id=r.id, action="restore")
     return {"ok": True}
 
 
@@ -2433,6 +2456,23 @@ def delete_equip(eid: str, db: DBSession = Depends(get_db), p: Principal = Depen
     e.archived_at = utcnow()
     db.commit()
     audit(db, p, object_type="equipment", object_id=e.id, action="archive")
+    return {"ok": True}
+
+
+@router.post("/equipment/{eid}/restore")
+def restore_equip(eid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    """REM-133: equipment archive existed with no restore counterpart."""
+    e = db.get(Equipment, eid)
+    if not e:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, e.squadron_id)
+    require_can_write_squadron(p, e.squadron_id, s.wing_id if s else None)
+    if not e.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived"})
+    e.is_archived = False
+    e.archived_at = None
+    db.commit()
+    audit(db, p, object_type="equipment", object_id=e.id, action="restore")
     return {"ok": True}
 
 
