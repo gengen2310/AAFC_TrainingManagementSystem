@@ -76,10 +76,18 @@ function SessionForm({
   const allMissions: MissionItem[] = missionsData?.missions ?? [];
   const linkedMission = curriculumId ? allMissions.find(m => m.curriculum_id === curriculumId) : null;
   const searchResults = currSearch.length >= 2
-    ? allMissions.filter(m =>
-        m.code.toLowerCase().includes(currSearch.toLowerCase()) ||
-        m.title.toLowerCase().includes(currSearch.toLowerCase()),
-      ).slice(0, 10)
+    ? allMissions
+        .filter(m =>
+          m.code.toLowerCase().includes(currSearch.toLowerCase()) ||
+          m.title.toLowerCase().includes(currSearch.toLowerCase()),
+        )
+        // Coverage-aware ranking: items that still need scheduling surface first
+        .sort((a, b) => {
+          const aNeeds = !a.is_scheduled || a.needs_reschedule ? 0 : 1;
+          const bNeeds = !b.is_scheduled || b.needs_reschedule ? 0 : 1;
+          return aNeeds - bNeeds;
+        })
+        .slice(0, 12)
     : [];
 
   useEffect(() => {
@@ -309,7 +317,12 @@ function SessionForm({
                     >
                       <span className="pw-curric-code">{m.code}</span>
                       <span style={{ flex: 1 }}>{m.title}</span>
-                      {m.is_scheduled && <span style={{ fontSize: 10, color: "var(--muted-text)" }}>scheduled</span>}
+                      {m.needs_reschedule
+                        ? <span style={{ fontSize: 10, color: "var(--warning)", fontWeight: 700 }}>reschedule needed</span>
+                        : !m.is_scheduled
+                        ? <span style={{ fontSize: 10, color: "var(--aafc-blue)", fontWeight: 600 }}>needs scheduling</span>
+                        : <span style={{ fontSize: 10, color: "var(--muted-text)" }}>scheduled</span>
+                      }
                     </div>
                   ))}
                 </div>

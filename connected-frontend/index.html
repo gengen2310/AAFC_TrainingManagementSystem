@@ -1137,6 +1137,45 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </p>
           <div id="py-classes-body"></div>
         </div>
+
+        <!-- Mission Backlog card (shown when a year is selected) — MBACK-02:
+             class-aware curriculum backlog with Training Class filter. -->
+        <div class="card" id="py-missions-card" style="display:none;margin-top:12px">
+          <div id="missions-empty" style="display:none">
+            <p class="muted">Select a planning year above to view the Mission Backlog.</p>
+          </div>
+          <div id="missions-filters-card" style="display:none">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+              <div class="ctitle" style="margin:0">Mission Backlog</div>
+              <span id="missions-count" style="font-size:11px;color:var(--muted)"></span>
+            </div>
+            <div class="fbar no-print" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">
+              <select id="mission-filter-class" aria-label="Filter by Training Class" onchange="renderMissions()" style="min-width:140px">
+                <option value="">All Classes</option>
+              </select>
+              <select id="mission-filter-phase" aria-label="Filter by Training Stage" onchange="loadMissions(P.currentYearId)" style="min-width:140px">
+                <option value="">All Stages</option>
+                <option value="A. Orientation">Orientation</option>
+                <option value="B. Initial">Initial</option>
+                <option value="C. Junior">Junior</option>
+                <option value="D. Intermediate">Intermediate</option>
+                <option value="E. Senior">Senior</option>
+                <option value="I. Bronze">Bronze CLP</option>
+                <option value="J. Silver">Silver CLP</option>
+                <option value="K. Gold">Gold CLP</option>
+              </select>
+              <select id="mission-filter-status" aria-label="Filter by status" onchange="renderMissions()" style="min-width:140px">
+                <option value="">All Status</option>
+                <option value="unscheduled">Unscheduled</option>
+                <option value="scheduled">Scheduled</option>
+              </select>
+              <input id="mission-search" placeholder="Search missions…" oninput="renderMissions()" style="min-width:180px">
+            </div>
+          </div>
+          <div id="missions-table-card" style="display:none">
+            <div id="missions-body"></div>
+          </div>
+        </div>
       </div>
 
       <!-- FACILITATORS -->
@@ -10268,6 +10307,18 @@ async function loadMissions(yearId) {
     _missionState.dates = (dates || []).filter(d=>d.is_active);
     document.getElementById('missions-count').textContent =
       `${data.scheduled_count} of ${data.total} scheduled`;
+    // Populate Training Class filter from class_breakdown data across all missions
+    const classSel = document.getElementById('mission-filter-class');
+    if(classSel){
+      const classMap={};
+      (_missionState.missions).forEach(m=>(m.class_breakdown||[]).forEach(c=>{
+        if(!classMap[c.training_class_id]) classMap[c.training_class_id]=c.display_name;
+      }));
+      const prevVal=classSel.value;
+      classSel.innerHTML='<option value="">All Classes</option>'+
+        Object.entries(classMap).map(([id,name])=>`<option value="${esc(id)}">${esc(name)}</option>`).join('');
+      if(prevVal && classMap[prevVal]) classSel.value=prevVal;
+    }
     renderMissions();
     _updateDebugPanel(null);
   } catch(e) {
@@ -10281,11 +10332,18 @@ function renderMissions() {
   const phase  = document.getElementById('mission-filter-phase').value;
   const status = document.getElementById('mission-filter-status').value;
   const search = (document.getElementById('mission-search').value||'').toLowerCase();
+  const classFilter = (document.getElementById('mission-filter-class')||{}).value||'';
   let rows = _missionState.missions.filter(m => {
     if(phase  && m.phase !== phase) return false;
     if(status === 'scheduled'   && !m.is_scheduled) return false;
     if(status === 'unscheduled' && m.is_scheduled)  return false;
     if(search && !m.code.toLowerCase().includes(search) && !m.title.toLowerCase().includes(search)) return false;
+    // MBACK-02: class filter — show only missions where the selected class
+    // is not resolved (either not in class_breakdown at all, or backlog_status !== 'resolved').
+    if(classFilter){
+      const bd=(m.class_breakdown||[]).find(c=>c.training_class_id===classFilter);
+      if(bd && bd.backlog_status==='resolved') return false;
+    }
     return true;
   });
   document.getElementById('missions-count').textContent =
@@ -10514,10 +10572,12 @@ async function loadYearMap(yearId){
   const datesCard = document.getElementById('py-dates-card');
   const holCard = document.getElementById('py-holidays-card');
   const classesCard = document.getElementById('py-classes-card');
+  const missionsCard = document.getElementById('py-missions-card');
   const ctxLbl = document.getElementById('py-ctx-label-sqn');
   if(!yearId){
     body.innerHTML='<p class="muted">Select a planning year above.</p>';
     datesCard.style.display='none'; holCard.style.display='none'; classesCard.style.display='none';
+    if(missionsCard) missionsCard.style.display='none';
     if(ctxLbl) ctxLbl.textContent='';
     return;
   }
@@ -10550,7 +10610,9 @@ async function loadYearMap(yearId){
     body.innerHTML = annualHtml;
     P.annualProgramLoaded = true;
     datesCard.style.display=''; holCard.style.display=''; classesCard.style.display='';
+    if(missionsCard) missionsCard.style.display='';
     await Promise.all([_renderParadeDates(yearId), _renderHolidays(yearId), _renderTrainingClasses(yearId)]);
+    loadMissions(yearId);
     const wid=yr.wing_id||(S.session&&S.session.wing_id)||'';
     if(wid){const wingYear=yr.year||new Date().getFullYear();await _loadAndRenderWingEventsOverlay(wid,wingYear);}
   } catch(e){ body.innerHTML = `<p class="muted">Error loading year: ${esc(apiErr(e))}</p>`; }
