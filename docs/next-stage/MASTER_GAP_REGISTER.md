@@ -24,16 +24,16 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 
 | Status | Count |
 |---|---|
-| CLOSED | 22 |
+| CLOSED | 24 |
 | STAGING VERIFIED | 5 |
-| FIXED LOCALLY | 11 |
+| FIXED LOCALLY | 12 |
 | IMPLEMENTING | 14 |
-| NOT STARTED | 51 |
+| NOT STARTED | 48 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **120** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 38 / 120 = 32%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 41 / 120 = 34%**
 
 ---
 
@@ -170,7 +170,7 @@ formally staging-verified as a separate post-deploy check. Source: 46-row
 | WRITE-01 | Defence Writing | MEDIUM | All jargon / software terms removed from normal-user copy — `backend`, `endpoint`, `payload`, `schema`, `UUID`, raw HTTP codes — across both frontends (Manual §2.13.g) | 36 strings reviewed; 29 fix-applied: network errors, audit log subtitle, account management banners, planning error messages, reports page explanation, scope bar footnote, access-codes card, load-error hints | FIXED LOCALLY |
 | WRITE-02 | Defence Writing | MEDIUM | Unambiguous date formats throughout — `DD Mon YYYY` or `DD Mon YY` only; numeric `DD/MM/YY` and `MM/DD/YY` forms prohibited (Manual §5.72) | 6 call sites fixed: Weekly Program footer, facilitator duplicate-warning card, Accounts last-login (Planning Workspace), Audit time column (Planning Workspace), facilitator card (Planning Workspace) | FIXED LOCALLY |
 | WRITE-03 | Defence Writing | MEDIUM | 24-hour time for all operational time display — `1830` not `6:30 PM`; explicit `hour12:false` in all `toLocaleString` calls (Manual §5.79–5.80) | Planning Workspace Audit time column corrected to explicit `hour12:false` and unambiguous date format; no other 12-hour violations found | FIXED LOCALLY |
-| WRITE-04 | Defence Writing | LOW | "Given name" / "Family name" — not "First name" / "Surname" — for all personal-name form fields in both frontends (Manual §3.34) | Manual §3.34 confirms this is required; full field-label sweep to verify application in both frontends not yet completed | NOT STARTED |
+| WRITE-04 | Defence Writing | LOW | "Given name" / "Family name" — not "First name" / "Surname" — for all personal-name form fields in both frontends (Manual §3.34) | Both frontends already use correct labels. One stale error message "First and last name are required" in `PlanningBottomDrawer.tsx:861` updated to "Given name and family name are required" | FIXED LOCALLY |
 | WRITE-05 | Defence Writing | LOW | No contractions in formal copy — `cannot` not `can't`; `will not` not `won't`; `you would` not `you'd` (Manual §2.13.h) | 6 instances fixed via multi-line Python sweep (archive confirmations, scope bar, unit settings, delete toasts, Getting Started subtitle, Unit Settings parade-day explanation); sweep confirmed no remaining instances | FIXED LOCALLY |
 | WRITE-06 | Defence Writing | LOW | Australian English spelling throughout — `organise`, `colour`, `program` (single m) (Manual §3.4, §3.15) | No violations found in targeted grep sweep; confirmed clean | FIXED LOCALLY |
 | WRITE-07 | Defence Writing | LOW | Active voice throughout — subject-verb-object; passive permitted only where a deliberate technical/objective register is required (Manual §2.53–2.58) | Applied in rewrites for error messages, confirmation dialogs, and network error copy | FIXED LOCALLY |
@@ -191,7 +191,7 @@ known. Firefox and the Planning Workspace 404 are uninvestigated — root causes
 |---|---|---|---|---|---|
 | DEF-01 | Defect | P0 | Firefox authentication — Planning Workspace cross-origin session handoff works in Firefox | Confirmed implemented: `index.html:4347-4354` — FF-01 fix already in place; uses `#t=<token>` hash fragment handoff bypassing SameSite=None cookie (which Firefox ETP blocks). `main.tsx` reads hash before React renders. Gap register was stale. | CLOSED |
 | DEF-02 | Defect | P0 | Planning Workspace unexpected 404 — specific navigation path causes an unhandled 404 | Not reproduced; not investigated; exact triggering route unknown | NOT STARTED |
-| DEF-03 | Defect | P1 | Planning Workspace "Your scope" card — displays raw Wing ID and Squadron ID UUIDs instead of Wing code / name | `SessionInfo` in `api/types.ts` lacks `wing_code` / `squadron_code`; backend response change or additional lookup required; confirmed by code inspection | NOT STARTED |
+| DEF-03 | Defect | P1 | Planning Workspace "Your scope" card — displays raw Wing ID and Squadron ID UUIDs instead of Wing code / name | `SessionInfo` in `api/types.ts` has `wing_code` / `squadron_code`; `Admin.tsx:17-18` uses `session.wing_code` / `session.squadron_code` directly — confirmed correct | CLOSED |
 | DEF-04 | Defect | P1 | Facilitator rank stored as uncontrolled free text (`Facilitator.rank` String) — no link to a canonical AAFC rank catalogue, no validation | Implemented commit `16f6bce`: `_AAFC_RANKS` catalogue in training.py; `GET /api/facilitators/ranks` endpoint; `_normalise_rank()` applied on create/update/import; frontend datalist populated from API. 8 regression tests added. | FIXED LOCALLY |
 | DEF-05 | Defect | MEDIUM | Legacy "Annual Program" stale text — `connected-frontend/index.html:6842` still says "Annual Program" linking to `nav('planning-year')`; functional redirect exists (`nav('planning-year')→'activities'`) but text misleads users | Confirmed resolved: `nav('planning-year')` as user-visible text no longer exists in index.html; all remaining references are code comments. Gap register was stale (original line number drifted). | CLOSED |
 | DEF-06 | Defect | MEDIUM | Wing-onboarding CLI-only — no HTTP API endpoint for Wing provisioning; requires direct server/DB access | `second_wing_seed.py` is CLI-only; no API path; appropriate for Level B staging, not National | NOT STARTED |

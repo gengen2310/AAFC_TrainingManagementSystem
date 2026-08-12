@@ -858,7 +858,7 @@ function FacilitatorsContent({
   // deployed in module mode, so the fix belongs here, not only on the standalone
   // route's own copy of this form.
   async function handleAddFac(confirmDuplicate = false) {
-    if (!firstName.trim() || !lastName.trim()) { setErr("First and last name are required."); return; }
+    if (!firstName.trim() || !lastName.trim()) { setErr("Given name and family name are required."); return; }
     setSaving(true); setErr(null);
     try {
       await planningApi.createFacilitator({
