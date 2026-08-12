@@ -222,3 +222,28 @@ test.describe("Mobile viewport", () => {
     expect(widths.scrollWidth).toBeLessThanOrEqual(widths.clientWidth + 4); // small tolerance for scrollbar rounding
   });
 });
+
+// T2-04 / T2-05 — wing-cancellation-trend and wing-not-delivered endpoints are
+// wired to Wing dashboard cards (renderWing()). Both endpoints always render a
+// card: either a data table (when sessions exist) or a green no-data state.
+test("wing_admin sees T2-04 Cancellation Trend card in #wing-dash", async ({ page }) => {
+  await loginWing(page, "ADMIN7WG");
+  // The card is rendered in #wing-dash (renderWing()), not #cmd-dash-wing.
+  // Its ctitle contains "Cancellation Trend" regardless of whether sessions
+  // were cancelled (data table) or not (green status line).
+  const wingDash = page.locator("#wing-dash");
+  await expect(wingDash.getByText("Cancellation Trend", { exact: false })).toBeVisible({ timeout: 5000 });
+  // Confirm either data or no-data state is rendered — not a blank container.
+  const hasTable = await wingDash.locator("table").count();
+  const hasNoDataMsg = await wingDash.getByText("No cancelled sessions", { exact: false }).count();
+  expect(hasTable + hasNoDataMsg, "T2-04 card must show a table or a no-data message").toBeGreaterThan(0);
+});
+
+test("wing_admin sees T2-05 Not-Delivered Sessions card in #wing-dash", async ({ page }) => {
+  await loginWing(page, "ADMIN7WG");
+  const wingDash = page.locator("#wing-dash");
+  await expect(wingDash.getByText("Not-Delivered Sessions", { exact: false })).toBeVisible({ timeout: 5000 });
+  const hasTable = await wingDash.locator("table").count();
+  const hasNoDataMsg = await wingDash.getByText("No not-delivered sessions", { exact: false }).count();
+  expect(hasTable + hasNoDataMsg, "T2-05 card must show a table or a no-data message").toBeGreaterThan(0);
+});
