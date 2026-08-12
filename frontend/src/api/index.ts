@@ -124,8 +124,10 @@ export const trainingApi = {
   facilitators: (squadron_id?: string) => api.get<Facilitator[]>(`/api/facilitators${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   addFacilitator: (b: { first_name: string; last_name: string; current_rank?: string; type?: string; subject_areas?: string[]; confirm_duplicate?: boolean }) =>
     api.post<{ ok: boolean; facilitator_id: string }>("/api/facilitators", b),
-  updateFacilitator: (id: string, b: { subject_areas?: string[]; type?: string; current_rank?: string }) =>
+  updateFacilitator: (id: string, b: { subject_areas?: string[]; type?: string; current_rank?: string; first_name?: string; last_name?: string }) =>
     api.patch<{ ok: boolean; facilitator_id: string; subject_areas: string[] }>(`/api/facilitators/${id}`, b),
+  deleteFacilitator: (id: string) => api.delete<{ ok: boolean }>(`/api/facilitators/${id}`),
+  restoreFacilitator: (id: string) => api.post<{ ok: boolean }>(`/api/facilitators/${id}/restore`, {}),
   facilitatorStats: (id: string) => api.get<FacilitatorStats>(`/api/facilitators/${id}/stats`),
   facilitatorImportTemplate: () => api.get<string>("/api/facilitators/import/template.csv"),
   importFacilitatorsCsv: (file: File, opts: { preview: boolean; confirmDuplicateRows?: number[] }) => {

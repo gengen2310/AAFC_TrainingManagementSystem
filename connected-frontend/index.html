@@ -8697,6 +8697,10 @@ function showFacProfile(id){
         <td style="font-size:11.5px">${esc(lv.reason||'—')}</td>
         ${canWriteSquadron()?`<td class="no-print"><button class="btn btn-xs btn-out" onclick="_deleteFacLeave('${lv.id}','${id}')">Remove</button></td>`:''}
       </tr>`).join('')}</tbody></table></div>`:'<div class="muted" style="font-size:11.5px">No upcoming leave recorded.</div>'}
+    <div style="margin-top:8px">
+      <button class="btn-lnk" style="font-size:11px" onclick="_showFacPastLeave('${id}', false)">Show past / removed leave</button>
+    </div>
+    <div id="fac-past-leave-section" style="display:none;margin-top:6px"></div>
     ${sess.length?`<div class="ctitle" style="margin-top:14px">Session History</div>
       <div class="tw"><table><thead><tr><th>Date</th><th>S</th><th>Phase</th><th>Curriculum Item</th><th>Room</th><th>Status</th><th class="no-print">Action</th></tr></thead>
       <tbody>${sess.map(s=>`<tr>
@@ -8725,6 +8729,9 @@ function _showAddFacLeaveForm(facId){
     <div class="ff"><label>To</label><input type="date" id="fl-end" value="${today}"></div>
     <div class="ff" style="flex:2"><label>Reason (optional)</label><input id="fl-reason" placeholder="e.g. Annual leave"></div>
   </div>
+  <div class="form-row" style="margin-top:4px">
+    <div class="ff"><label>Notes (optional)</label><input id="fl-notes" placeholder="Any additional notes"></div>
+  </div>
   <div id="fl-msg" style="font-size:11.5px;margin:4px 0"></div>
   <div class="modal-actions" style="justify-content:flex-start">
     <button class="btn btn-primary btn-sm" onclick="_submitFacLeave('${facId}')">Save Leave</button>
@@ -8735,12 +8742,13 @@ async function _submitFacLeave(facId){
   const start=document.getElementById('fl-start').value;
   const end=document.getElementById('fl-end').value;
   const reason=(document.getElementById('fl-reason').value||'').trim()||null;
+  const notes=(document.getElementById('fl-notes').value||'').trim()||null;
   const msg=document.getElementById('fl-msg');
   if(!start||!end){ msg.textContent='Both dates are required.'; msg.style.color='var(--red)'; return; }
   if(start>end){ msg.textContent='"From" must not be after "To".'; msg.style.color='var(--red)'; return; }
   msg.textContent='Saving…'; msg.style.color='var(--muted)';
   try{
-    const r=await api('/api/planning/facilitators/'+facId+'/leave',{method:'POST',body:JSON.stringify({start_date:start,end_date:end,reason})});
+    const r=await api('/api/planning/facilitators/'+facId+'/leave',{method:'POST',body:JSON.stringify({start_date:start,end_date:end,reason,notes})});
     document.getElementById('fac-leave-add-form').innerHTML='';
     await reloadAndRender();
     const affected=(r.affected_sessions||[]).length;
@@ -8757,6 +8765,36 @@ async function _deleteFacLeave(leaveId,facId){
     showToast('Leave removed.');
     showFacProfile(facId);
   }catch(e){ showToast('Could not remove leave: '+apiErr(e), true); }
+}
+async function _restoreFacLeave(leaveId,facId){
+  try{
+    await api('/api/planning/facilitator-leave/'+leaveId+'/restore',{method:'POST'});
+    showToast('Leave record restored.');
+    // Refresh the profile with archived view still visible
+    await _showFacPastLeave(facId, true);
+  }catch(e){ showToast('Could not restore leave: '+apiErr(e), true); }
+}
+let _facPastLeaveContainer=null;
+async function _showFacPastLeave(facId, forceRefresh){
+  const cont=document.getElementById('fac-past-leave-section');
+  if(!cont)return;
+  if(!forceRefresh&&cont.dataset.loaded){cont.style.display=cont.style.display==='none'?'block':'none';return;}
+  cont.style.display='block';
+  cont.dataset.loaded='1';
+  cont.innerHTML='<div class="muted" style="font-size:11.5px;padding:4px 0">Loading past leave…</div>';
+  try{
+    const all=await api('/api/planning/facilitators/'+facId+'/leave?include_archived=true');
+    const past=Array.isArray(all)?all.filter(lv=>lv.is_archived):[];
+    if(!past.length){ cont.innerHTML='<div class="muted" style="font-size:11.5px">No past or removed leave records.</div>'; return; }
+    cont.innerHTML='<div class="tw"><table><thead><tr><th>From</th><th>To</th><th>Reason</th>'+(canWriteSquadron()?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
+      past.map(lv=>`<tr style="opacity:.7">
+        <td>${fmtD(lv.start_date,{day:'numeric',month:'short'})}</td>
+        <td>${fmtD(lv.end_date,{day:'numeric',month:'short'})}</td>
+        <td style="font-size:11.5px">${esc(lv.reason||'—')}</td>
+        ${canWriteSquadron()?`<td class="no-print"><button class="btn btn-xs btn-ok" onclick="_restoreFacLeave('${lv.id}','${facId}')">Restore</button></td>`:''}
+      </tr>`).join('')+
+      '</tbody></table></div>';
+  }catch(e){ cont.innerHTML='<div style="color:var(--red);font-size:11.5px">'+esc(apiErr(e))+'</div>'; }
 }
 function _readFacAreas(){
   const areas=[];

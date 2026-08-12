@@ -23,8 +23,13 @@ export function Facilitators() {
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
   const [tagsFor, setTagsFor] = useState<Facilitator | null>(null);
+  const [editFor, setEditFor] = useState<Facilitator | null>(null);
   const [statsId, setStatsId] = useState<string | null>(null);
   const canWrite = canWriteSquadron(session);
+  const archiveMut = useMutation({
+    mutationFn: (id: string) => trainingApi.deleteFacilitator(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["facilitators"] }),
+  });
   if (needsSelection && !squadronId) return <Empty msg="Select a squadron above to view its facilitators." />;
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
@@ -53,7 +58,15 @@ export function Facilitators() {
                 </td>
                 <td style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {canWrite && (
-                    <button className="btn out sm" onClick={() => setTagsFor(f)}>Tags</button>
+                    <>
+                      <button className="btn out sm" onClick={() => setEditFor(f)}>Edit</button>
+                      <button className="btn out sm" onClick={() => setTagsFor(f)}>Tags</button>
+                      <button className="btn out sm danger" onClick={() => {
+                        if (window.confirm(`Archive ${f.first_name} ${f.last_name}? This can be reversed from the connected TMS.`)) {
+                          archiveMut.mutate(f.facilitator_id);
+                        }
+                      }}>Archive</button>
+                    </>
                   )}
                   <button className="btn out sm" onClick={() => setStatsId(f.facilitator_id)}>Stats</button>
                 </td>
@@ -84,6 +97,7 @@ export function Facilitators() {
       {adding && <AddFacModal onClose={() => setAdding(false)} onDone={() => { setAdding(false); qc.invalidateQueries({ queryKey: ["facilitators"] }); }} />}
       {importing && <ImportFacilitatorsModal onClose={() => setImporting(false)} onDone={() => { setImporting(false); qc.invalidateQueries({ queryKey: ["facilitators"] }); }} />}
       {tagsFor && <TagsModal fac={tagsFor} onClose={() => setTagsFor(null)} onDone={() => { setTagsFor(null); qc.invalidateQueries({ queryKey: ["facilitators"] }); }} />}
+      {editFor && <EditFacModal fac={editFor} onClose={() => setEditFor(null)} onDone={() => { setEditFor(null); qc.invalidateQueries({ queryKey: ["facilitators"] }); }} />}
       {statsId && <FacStats id={statsId} onClose={() => setStatsId(null)} />}
     </div>
   );
@@ -186,15 +200,18 @@ function DuplicateProfileCard({ detail }: { detail: DuplicateFacilitatorDetail }
   );
 }
 
+const FAC_TYPES = ["Staff", "Officer", "NCO", "Senior Cadet", "Civilian"];
+
 function AddFacModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [first, setFirst] = useState(""); const [last, setLast] = useState("");
-  const [rank, setRank] = useState(""); const [subjects, setSubjects] = useState<string[]>([]);
+  const [rank, setRank] = useState(""); const [type, setType] = useState("Staff");
+  const [subjects, setSubjects] = useState<string[]>([]);
   const [err, setErr] = useState("");
   const [duplicateWarning, setDuplicateWarning] = useState<string | null>(null);
   const [duplicateDetail, setDuplicateDetail] = useState<DuplicateFacilitatorDetail | null>(null);
   const m = useMutation({
     mutationFn: (confirmDuplicate: boolean) => trainingApi.addFacilitator({
-      first_name: first, last_name: last, current_rank: rank, subject_areas: subjects,
+      first_name: first, last_name: last, current_rank: rank, type, subject_areas: subjects,
       confirm_duplicate: confirmDuplicate,
     }),
     onSuccess: onDone,
@@ -214,6 +231,10 @@ function AddFacModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
         <label htmlFor="f-first">Given name</label><input id="f-first" value={first} onChange={(e) => { setFirst(e.target.value); setDuplicateWarning(null); }} />
         <label htmlFor="f-last">Family name</label><input id="f-last" value={last} onChange={(e) => { setLast(e.target.value); setDuplicateWarning(null); }} />
         <label htmlFor="f-rank">Current rank</label><input id="f-rank" value={rank} onChange={(e) => setRank(e.target.value)} />
+        <label htmlFor="f-type">Type</label>
+        <select id="f-type" value={type} onChange={(e) => setType(e.target.value)}>
+          {FAC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
         <label htmlFor="add-fac-subjects">Subject areas</label>
         <TagInput id="add-fac-subjects" tags={subjects} onChange={setSubjects} />
         <p className="muted" style={{ fontSize: 11, margin: "0 0 4px" }}>
@@ -235,6 +256,40 @@ function AddFacModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
               {m.isPending ? "Adding…" : "Add anyway"}
             </Button>
           )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ── Edit facilitator modal (name / rank / type) ────────────────────────────────
+function EditFacModal({ fac, onClose, onDone }: { fac: Facilitator; onClose: () => void; onDone: () => void }) {
+  const [first, setFirst] = useState(fac.first_name ?? "");
+  const [last, setLast] = useState(fac.last_name ?? "");
+  const [rank, setRank] = useState(fac.current_rank ?? "");
+  const [type, setType] = useState(fac.type ?? "Staff");
+  const [err, setErr] = useState("");
+  const m = useMutation({
+    mutationFn: () => trainingApi.updateFacilitator(fac.facilitator_id, { first_name: first, last_name: last, current_rank: rank, type }),
+    onSuccess: onDone,
+    onError: (e) => setErr(e instanceof ApiError ? e.friendly : "Could not save."),
+  });
+  return (
+    <Modal title="Edit facilitator" onClose={onClose}>
+      <div className="form">
+        <label htmlFor="ef-first">Given name</label><input id="ef-first" value={first} onChange={(e) => setFirst(e.target.value)} />
+        <label htmlFor="ef-last">Family name</label><input id="ef-last" value={last} onChange={(e) => setLast(e.target.value)} />
+        <label htmlFor="ef-rank">Current rank</label><input id="ef-rank" value={rank} onChange={(e) => setRank(e.target.value)} />
+        <label htmlFor="ef-type">Type</label>
+        <select id="ef-type" value={type} onChange={(e) => setType(e.target.value)}>
+          {FAC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        {err && <div className="err" role="alert">{err}</div>}
+        <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+          <Button onClick={() => m.mutate()} disabled={!first || !last || m.isPending}>
+            {m.isPending ? "Saving…" : "Save"}
+          </Button>
+          <Button variant="out" onClick={onClose}>Cancel</Button>
         </div>
       </div>
     </Modal>
