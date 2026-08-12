@@ -2,6 +2,7 @@ import { useState, useRef, type KeyboardEvent, type ChangeEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { trainingApi, reportApi } from "../api";
 import { useToast } from "../components/Toast";
+import { ranksForType, ALL_AAFC_RANKS } from "../constants/ranks";
 import { Card, Empty, Loading, ErrorNote, Button } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { DrilldownPanel } from "../components/DrilldownPanel";
@@ -169,6 +170,32 @@ function TagInput({ tags, onChange, id, placeholder = "Type and press Enter or ,
   );
 }
 
+// ── Rank combo input ───────────────────────────────────────────────────────────
+function RankInput({ id, value, onChange, ranks }: {
+  id?: string;
+  value: string;
+  onChange: (v: string) => void;
+  ranks: string[];
+}) {
+  const listId = id ? `${id}-list` : "rank-list";
+  return (
+    <>
+      <input
+        id={id}
+        list={listId}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Type or select rank…"
+        autoComplete="off"
+      />
+      <datalist id={listId}>
+        {ranks.map((r) => <option key={r} value={r} />)}
+      </datalist>
+    </>
+  );
+}
+
+
 // ── Add facilitator modal ──────────────────────────────────────────────────────
 // TRGO-07 (React-app parity): the backend blocks a same-name-in-squadron create
 // with 409 possible_duplicate once, then requires an explicit confirm_duplicate
@@ -232,7 +259,8 @@ function AddFacModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
       <div className="form">
         <label htmlFor="f-first">Given name</label><input id="f-first" value={first} onChange={(e) => { setFirst(e.target.value); setDuplicateWarning(null); }} />
         <label htmlFor="f-last">Family name</label><input id="f-last" value={last} onChange={(e) => { setLast(e.target.value); setDuplicateWarning(null); }} />
-        <label htmlFor="f-rank">Current rank</label><input id="f-rank" value={rank} onChange={(e) => setRank(e.target.value)} />
+        <label htmlFor="f-rank">Current rank</label>
+        <RankInput id="f-rank" value={rank} onChange={setRank} ranks={ranksForType(type)} />
         <label htmlFor="f-type">Type</label>
         <select id="f-type" value={type} onChange={(e) => setType(e.target.value)}>
           {FAC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -282,7 +310,8 @@ function EditFacModal({ fac, onClose, onDone }: { fac: Facilitator; onClose: () 
       <div className="form">
         <label htmlFor="ef-first">Given name</label><input id="ef-first" value={first} onChange={(e) => setFirst(e.target.value)} />
         <label htmlFor="ef-last">Family name</label><input id="ef-last" value={last} onChange={(e) => setLast(e.target.value)} />
-        <label htmlFor="ef-rank">Current rank</label><input id="ef-rank" value={rank} onChange={(e) => setRank(e.target.value)} />
+        <label htmlFor="ef-rank">Current rank</label>
+        <RankInput id="ef-rank" value={rank} onChange={setRank} ranks={ranksForType(type)} />
         <label htmlFor="ef-type">Type</label>
         <select id="ef-type" value={type} onChange={(e) => setType(e.target.value)}>
           {FAC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}

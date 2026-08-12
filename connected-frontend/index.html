@@ -2540,7 +2540,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="alert a-info">Rank is stored separately so historical records stay accurate when rank changes.</div>
       <div class="alert a-warn" id="fac-dup-warn" style="display:none"></div>
       <div class="form-row">
-        <div class="ff"><label>Current Rank</label><input id="fac-rank" placeholder="e.g. FLTLT(AAFC), CUO, CPL(AAFC)" oninput="_markFacUnsaved()"></div>
+        <div class="ff"><label>Current Rank</label><input id="fac-rank" list="fac-rank-list" placeholder="e.g. FLTLT(AAFC), CUO, CPL(AAFC)" oninput="_markFacUnsaved()" autocomplete="off"><datalist id="fac-rank-list"><option value="PLTOFF(AAFC)"><option value="FLGOFF(AAFC)"><option value="FLTLT(AAFC)"><option value="SQNLDR(AAFC)"><option value="WGCDR(AAFC)"><option value="GPCAPT(AAFC)"><option value="AIRCDRE(AAFC)"><option value="AVM(AAFC)"><option value="LAC(AAFC)"><option value="CPL(AAFC)"><option value="SGT(AAFC)"><option value="FSGT(AAFC)"><option value="WOFF(AAFC)"><option value="CCPL"><option value="CSGT"><option value="CFSGT"><option value="CWO"><option value="CUO"><option value="CIV"></datalist></div>
         <div class="ff"><label for="fac-type">Type</label>
           <select id="fac-type" aria-label="Facilitator type" onchange="_onFacTypeChange(this)"><option value="Staff">Staff</option><option value="Officer">Officer (AAFC)</option><option value="NCO">Warrant Officer / NCO (AAFC)</option><option value="Senior Cadet">Senior Cadet</option><option value="Civilian">Civilian Instructor</option></select>
         </div>
