@@ -1575,7 +1575,7 @@ function GettingHelpSection() {
         </div>
       ) : (
         <p style={{ whiteSpace: "pre-wrap", margin: 0 }}>
-          {data?.content || "No help content has been added yet."}
+          {data?.content || "No help content added yet."}
         </p>
       )}
     </div>

@@ -106,7 +106,7 @@ export function YearView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
   if (totalActiveDates === 0) {
     return (
       <div className="pw-empty">
-        <span>No parade nights have been set up for this planning year.</span>
+        <span>No parade nights set up for this planning year.</span>
         <span style={{ fontSize: 11 }}>
           Generate parade dates using the setup wizard, or add individual nights from the Year panel.
         </span>

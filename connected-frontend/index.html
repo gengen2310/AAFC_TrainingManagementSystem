@@ -3535,7 +3535,7 @@ async function doLookup(){
     if(e.status===404){
       const unitName=_authSqnName||ident;
       err.textContent=unitName
-        ?'No account has been created for '+unitName+' yet. Contact the system administrator to create one.'
+        ?'No account exists for '+unitName+' yet. Contact the system administrator to create one.'
         :'No account found for that selection.';
     } else { err.textContent=apiErr(e); }
   }
@@ -4470,7 +4470,7 @@ function scArchiveWing(wingId, wingCode){
   confirmAction(`Archive Wing '${wingCode}'?\n\nAll squadrons in this Wing must already be archived. The Wing can be restored later from the Scope Map.`, async()=>{
     try {
       await api(`/api/wings/${wingId}/archive`,{method:'POST'});
-      alert(`Wing '${wingCode}' has been archived.`);
+      alert(`Wing '${wingCode}' archived.`);
       await _refreshOrgCache();
       scLoadScopeMap();
     } catch(e){ alert('Archive failed: '+(apiErr(e))); }
@@ -4480,7 +4480,7 @@ function scArchiveWing(wingId, wingCode){
 async function scRestoreWing(wingId, wingCode){
   try {
     await api(`/api/wings/${wingId}/restore`,{method:'POST'});
-    alert(`Wing '${wingCode}' has been restored.`);
+    alert(`Wing '${wingCode}' restored.`);
     await _refreshOrgCache();
     scLoadScopeMap();
   } catch(e){ alert('Restore failed: '+(apiErr(e))); }
@@ -4490,7 +4490,7 @@ function scArchiveSquadron(sqnId, sqnName){
   confirmAction(`Archive unit '${sqnName}'?\n\nThis will remove the unit from all active views. It can be restored later from the Scope Map.`, async()=>{
     try {
       await api(`/api/squadrons/${sqnId}/archive`,{method:'POST'});
-      alert(`Unit '${sqnName}' has been archived.`);
+      alert(`Unit '${sqnName}' archived.`);
       await _refreshOrgCache();
       scLoadScopeMap();
     } catch(e){ alert('Archive failed: '+(apiErr(e))); }
@@ -4500,7 +4500,7 @@ function scArchiveSquadron(sqnId, sqnName){
 async function scRestoreSquadron(sqnId, sqnName){
   try {
     await api(`/api/squadrons/${sqnId}/restore`,{method:'POST'});
-    alert(`Unit '${sqnName}' has been restored.`);
+    alert(`Unit '${sqnName}' restored.`);
     await _refreshOrgCache();
     scLoadScopeMap();
   } catch(e){ alert('Restore failed: '+(apiErr(e))); }
@@ -4528,7 +4528,7 @@ async function scCreateWing(){
   msg.style.color='var(--muted)'; msg.textContent='Creating…';
   try {
     const d=await api('/api/wings',{method:'POST',body:JSON.stringify({code,name,short_name:short||null})});
-    msg.style.color='var(--ok)'; msg.textContent=`Wing '${d.code}' created successfully.`;
+    msg.style.color='var(--ok)'; msg.textContent=`Wing '${d.code}' created.`;
     document.getElementById('sc-wing-code').value='';
     document.getElementById('sc-wing-name').value='';
     document.getElementById('sc-wing-short').value='';
@@ -4547,7 +4547,7 @@ async function scCreateSquadron(){
   msg.style.color='var(--muted)'; msg.textContent='Creating…';
   try {
     const d=await api('/api/squadrons',{method:'POST',body:JSON.stringify({wing_id,code,name,unit_type})});
-    msg.style.color='var(--ok)'; msg.textContent=`Unit '${d.code}' created successfully.`;
+    msg.style.color='var(--ok)'; msg.textContent=`Unit '${d.code}' created.`;
     document.getElementById('sc-sqn-code').value='';
     document.getElementById('sc-sqn-name').value='';
     await _refreshOrgCache();
@@ -5297,7 +5297,7 @@ async function doCreateWing(){
     try{S.wings=await api('/api/wings');}catch(_){}
     closeModal('m-create-wing');
     await renderAccounts();
-    alert(`Wing ${code} created successfully.`);
+    alert(`Wing ${code} created.`);
   }catch(e){msg.textContent=apiErr(e);}
 }
 
@@ -5337,7 +5337,7 @@ async function doCreateSqn(){
     closeModal('m-create-sqn');
     await renderAccounts();
     const label=_UNIT_TYPE_LABELS[unitType]||'Unit';
-    if(confirm(`${label} ${code} created successfully.\n\nCreate an account for ${code} now?`)){
+    if(confirm(`${label} ${code} created.\n\nCreate an account for ${code} now?`)){
       openCreateAccountModal(newSqn&&newSqn.squadron_id);
     }
   }catch(e){msg.textContent=apiErr(e);}
@@ -5882,7 +5882,7 @@ function _owzRender(){
   } else if(w.step===5){
     title.textContent='Step 5 of 5 — Result';
     body.innerHTML=w.result==='ok'
-      ? `<div class="alert a-info" style="font-size:12px">${esc(kindLabel)} ${esc(w.label)} archived successfully.</div>`
+      ? `<div class="alert a-info" style="font-size:12px">${esc(kindLabel)} ${esc(w.label)} archived.</div>`
       : `<div class="alert a-warn" style="font-size:12px">Could not archive: ${esc(w.error||'unknown error')}</div>`;
   }
   _owzRenderFoot();
@@ -6728,7 +6728,7 @@ function renderPN(){
     return true;
   });
   const el=document.getElementById('pn-list');
-  if(!filtered.length){el.innerHTML=`<div class="empty"><div class="et">No parade nights</div><div class="es">${canWriteSquadron()?'Select "+ Add Parade Night" above to create one.':'No parade nights have been scheduled.'}</div></div>`;return;}
+  if(!filtered.length){el.innerHTML=`<div class="empty"><div class="et">No parade nights</div><div class="es">${canWriteSquadron()?'Select "+ Add Parade Night" above to create one.':'No parade nights scheduled.'}</div></div>`;return;}
   el.innerHTML=filtered.map(pn=>buildPNCard(pn)).join('');
 }
 function buildPNCard(pn){
@@ -7535,7 +7535,7 @@ function renderCurr(){
         <td>${phBadge(e.phase)}</td>
         <td style="text-align:right">${canEditCurr(e)?`<button class="btn btn-xs btn-ok" onclick="doRestoreCurrItem('${e.id}','${_jsAttr(e.title)}')">Restore</button>`:''}</td>
       </tr>`).join('')
-    }</tbody></table></div>`:`<div class="empty"><div class="et">No archived curriculum items</div><div class="es">${q?'No archived items match your search.':'Nothing has been archived yet.'}</div></div>`;
+    }</tbody></table></div>`:`<div class="empty"><div class="et">No archived curriculum items</div><div class="es">${q?'No archived items match your search.':'Nothing archived yet.'}</div></div>`;
     return;
   }
   const elF=document.getElementById('curr-f-el').value;
@@ -8083,14 +8083,14 @@ async function _loadGettingHelp(){
   if(editBtn)editBtn.style.display=(S.role==='system_admin')?'inline-flex':'none';
   try{
     const r=await api('/api/activities/getting-help');
-    document.getElementById('gh-content-display').textContent=(r&&r.content)||'No help content has been added yet.';
+    document.getElementById('gh-content-display').textContent=(r&&r.content)||'No help content added yet.';
   }catch(_){
     document.getElementById('gh-content-display').textContent='Could not load Getting Help content.';
   }
 }
 function openGettingHelpModal(){
   const current=document.getElementById('gh-content-display').textContent;
-  document.getElementById('gh-content-inp').value=(current==='No help content has been added yet.')?'':current;
+  document.getElementById('gh-content-inp').value=(current==='No help content added yet.')?'':current;
   document.getElementById('gh-msg').textContent='';
   openModal('m-getting-help');
 }

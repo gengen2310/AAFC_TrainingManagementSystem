@@ -309,7 +309,7 @@ export function ReadinessCard({ chart }: { chart: DashboardChart }) {
       <div>
         <div style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8 }}>{dateLabel}{d.term ? ` · Term ${d.term}` : ""}</div>
         <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted-text)" }}>Not planned</div>
-        <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 4 }}>No sessions are scheduled for this parade night yet.</div>
+        <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 4 }}>No sessions scheduled for this parade night yet.</div>
       </div>
     );
   }
