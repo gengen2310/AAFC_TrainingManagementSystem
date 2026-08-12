@@ -1,0 +1,145 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, "release/**", "next-stage/**"]
+  pull_request:
+    branches: [main, "release/**"]
+
+# One concurrent E2E run per branch — cancel older runs if a new commit
+# arrives before the previous run finishes.
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e-planning-workspace:
+    name: Planning Workspace E2E (Chromium)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Seed demo database
+        # Creates aafc_tms.db with the full 16-squadron demo dataset,
+        # which the E2E tests authenticate against (ADMIN703, ADMIN7WG, etc.).
+        working-directory: backend
+        run: python manage.py --seed
+
+      - name: Start backend
+        working-directory: backend
+        # ENVIRONMENT=development so fail-closed production checks don't fire.
+        # JWT_SECRET and SECRET_KEY use their defaults from config.py — fine for
+        # an ephemeral local SQLite test database, never for production.
+        run: uvicorn app.main:app --port 8000 &
+        env:
+          ENVIRONMENT: development
+
+      - name: Wait for backend to be ready
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/api/health/ready && echo " backend ready" && break
+            sleep 2
+          done
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        # Chromium only for the main CI run — Firefox/WebKit are Phase 8 work.
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Planning Workspace E2E
+        # playwright.config.ts: testDir=./e2e, webServer starts Vite on :5173.
+        # Covers: auth, nav, dashboard, session-lifecycle, cross-interface,
+        # accessibility (axe WCAG 2.1 AA), mission-backlog, training-classes,
+        # facilitators, reports, rollover, and more (21 spec files).
+        working-directory: frontend
+        run: npx playwright test --reporter=list,html
+        env:
+          CI: "true"
+
+      - name: Upload Planning Workspace test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pw-playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+  e2e-connected-frontend:
+    name: Connected Frontend (Main TMS) E2E (Chromium)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Seed demo database
+        working-directory: backend
+        run: python manage.py --seed
+
+      - name: Start backend
+        working-directory: backend
+        run: uvicorn app.main:app --port 8000 &
+        env:
+          ENVIRONMENT: development
+
+      - name: Wait for backend to be ready
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/api/health/ready && echo " backend ready" && break
+            sleep 2
+          done
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Connected Frontend (Main TMS) E2E
+        # playwright.connected.config.ts: testDir=./e2e-connected, webServer starts
+        # python3 -m http.server 8080 --directory ../connected-frontend.
+        # Covers: accounts, activities, curriculum, dashboard, facilitators,
+        # navigation, parade nights, training classes, reports, and more (30 spec files).
+        working-directory: frontend
+        run: npx playwright test --config playwright.connected.config.ts --reporter=list,html
+        env:
+          CI: "true"
+          CONNECTED_LOCAL_API_BASE: http://localhost:8000
+
+      - name: Upload Connected Frontend test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connected-playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7

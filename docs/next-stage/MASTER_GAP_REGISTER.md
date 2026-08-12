@@ -1,8 +1,8 @@
 # AAFC TMS — Master Gap Register
 
-**Version:** 2026-08-12  
+**Version:** 2026-08-13  
 **Branch:** `next-stage/v1-operational` | Deployed commit: `756e65e` (production, 2026-08-12, Alembic head v51)  
-**Backend tests:** 1553 passed, 5 skipped (commit `afdc263`)  
+**Backend tests:** 1567 passed, 5 skipped (commit `ef59efa`)  
 **Sources merged:**
 - 2026-08-12 program audit (prior register: 18 DONE / 14 PARTIAL / 57 NOT DONE / 7 HUMAN GATE)
 - Training Class architecture analysis (`parallel-class-impact-analysis.md`)
@@ -24,16 +24,18 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 
 | Status | Count |
 |---|---|
-| CLOSED | 26 |
+| CLOSED | 34 |
 | STAGING VERIFIED | 5 |
-| FIXED LOCALLY | 15 |
+| FIXED LOCALLY | 16 |
 | IMPLEMENTING | 13 |
-| NOT STARTED | 44 |
+| NOT STARTED | 36 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
-| **Total** | **120** |
+| **Total** | **121** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 46 / 120 = 38%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 55 / 121 = 45%**
+
+**2026-08-13 audit:** 8 items promoted from NOT STARTED → CLOSED/FIXED LOCALLY after code inspection (DEF-02, DEF-12, HELP-02, HELP-03, HELP-06, MBACK-03, WORK-06) plus E2E CI workflow created (VIS-02 → FIXED LOCALLY). 1 new item added (e2e-tests.yml workflow).
 
 ---
 
@@ -112,7 +114,7 @@ and curriculum item breakdown). Frontend consumption gaps are the remaining work
 |---|---|---|---|---|---|
 | MBACK-01 | Mission Backlog | HIGH | class_breakdown per curriculum item displayed in connected-frontend curriculum page — identifies which Training Class needs each item | Implemented commit `16f6bce`: `_loadCurriculumClassBreakdown()` fetches mission backlog on curriculum page nav; `_currClassBreakdownHtml()` renders per-class badges (b-ok/b-blue/b-amber/b-red by status). | FIXED LOCALLY |
 | MBACK-02 | Mission Backlog | MEDIUM | Per-class Mission Backlog filtering in UI — view backlog filtered to a single Training Class | `mission-filter-class` select populated dynamically from `class_breakdown` in `loadMissions()`; `renderMissions()` filters to missions where selected class is not resolved — confirmed present in `index.html:10485–10522` | CLOSED |
-| MBACK-03 | Mission Backlog | MEDIUM | Needs Attention consolidated queue (§39) — single prioritised surface combining readiness warnings, class gaps, and required planning actions | Individual pieces exist (readiness warnings, Mission Backlog panel); not consolidated into one action queue | NOT STARTED |
+| MBACK-03 | Mission Backlog | MEDIUM | Needs Attention consolidated queue (§39) — single prioritised surface combining readiness warnings, class gaps, and required planning actions | `renderActions()` at `index.html:9371` consolidates: backend action items (P0/P1), past sessions with unrecorded outcomes (P2), cancelled/ND with no reason (P3), unassigned sessions (P4); accessible as `page-action-items` in nav ("Needs Attention"). Commit `258e38c`. Gap register was stale. | CLOSED |
 | MBACK-04 | Mission Backlog | LOW | Plan-faster shortcut from Mission Backlog item directly to a session slot (§41) | Not implemented; currently requires navigating to the session separately | NOT STARTED |
 | MBACK-05 | Mission Backlog | MEDIUM | Per-class facilitator / resource conflict detection (§69) — when assigning a facilitator or room to a session, detect conflicts against other sessions that the same class attends | No class-aware conflict detection; current conflict checks are session-level only, blind to a class being split across parallel sessions | NOT STARTED |
 | MBACK-06 | Mission Backlog | LOW | Per-class delivery summary — ability to export a per-class delivery record (what each Training Class has received, by curriculum item) as a report or CSV | No per-class delivery report exists; reports are per-squadron or per-phase only | NOT STARTED |
@@ -128,11 +130,11 @@ is an empty-string admin-editable text field — no default content ships.
 | ID | AREA | SEVERITY | REQUIREMENT | CURRENT STATE | STATUS |
 |---|---|---|---|---|---|
 | HELP-01 | Help | MEDIUM | Contextual help tooltips on key fields across both frontends — hover/focus reveals a plain-language explanation of each field's purpose | Not implemented in either frontend | NOT STARTED |
-| HELP-02 | Help | LOW | Glossary of terms accessible from within the application — defines Training Stage, Training Class, Parade Night, Curriculum Item, Mission Backlog, and other domain terms | Not implemented; no glossary surface in either frontend | NOT STARTED |
-| HELP-03 | Help | MEDIUM | Help Centre 17-question acceptance test — all questions a new Training Officer would ask are answerable from within the application, without external reference | No Help Centre feature exists; investigated and confirmed absent from both frontends | NOT STARTED |
+| HELP-02 | Help | LOW | Glossary of terms accessible from within the application — defines Training Stage, Training Class, Parade Night, Curriculum Item, Mission Backlog, and other domain terms | `HelpDrawer.tsx` Glossary tab has 14 accordion-expanded definitions: TMS, Planning Workspace, Training Year, Training Stage, Training Class, Parade Night, Session, Mission Backlog, Anchor Event, Facilitator, Training Area, Activities, Command Centre, Rollover. Commit `1bd55dc`. Gap register was stale. | CLOSED |
+| HELP-03 | Help | MEDIUM | Help Centre 17-question acceptance test — all questions a new Training Officer would ask are answerable from within the application, without external reference | `HelpDrawer.tsx` answers all 17 questions across Overview (TMS vs PW, prerequisite checklist, first-time guidance), Tasks (8 accordion step-by-step guides), Glossary (14 terms), and Support (contact pathway, issue-report template, 5 common-problems FAQ). Commit `1bd55dc`. | CLOSED |
 | HELP-04 | Help | MEDIUM | Pre-flight / readiness check UI — explainable per-item checklist (✓ / ! per item) rather than a single blended readiness percentage | `_renderTonightReadiness()` now renders a "Readiness checklist" section below the session list showing Sessions planned (b-ok badge), Facilitators assigned (b-ok/b-amber/b-red with N/M count), Rooms assigned (same) — derived from `d.fac_filled`, `d.room_filled`, `d.sessions_total` already returned by `_tonight_readiness` backend | FIXED LOCALLY |
 | HELP-05 | Help | LOW | "What changed?" view (§40) — changelog or activity feed showing recent modifications to the current week's plan | Not found anywhere in either frontend | NOT STARTED |
-| HELP-06 | Help | LOW | Universal search / command palette (§6) — single-keystroke access to any entity, page, or action from anywhere in the application | Not implemented in either frontend | NOT STARTED |
+| HELP-06 | Help | LOW | Universal search / command palette (§6) — single-keystroke access to any entity, page, or action from anywhere in the application | `openCmdPalette()` at `index.html:12890`; toolbar button and ⌘K/Ctrl+K shortcut; accessible from all squadron/wing/national scopes. Commit `c004b29`. Gap register was stale. | CLOSED |
 | HELP-07 | Help | LOW | Getting Help panel — admin-editable free text must have meaningful default guidance content for a new squadron's first session | Empty-string default (`training.py:2583–2609`); any admin can write to it but no default guidance ships with the system | ACCEPTED RISK |
 | HELP-08 | Help | MEDIUM | Setup status endpoint surfaced in UI — `GET /api/setup/status` exists but no setup-status summary is shown to a wing_admin or sqn_admin who has just completed Getting Started | `page-getting-started` renders `GET /api/setup/status` response via `loadGettingStarted()` at `index.html:4462`; accessible from nav as "Getting Started" for squadron/wing/national/system_admin scopes | CLOSED |
 
@@ -150,7 +152,7 @@ gaps affect four entity types. Bulk-import and smart-planning features are Level
 | WORK-03 | Workflow | MEDIUM | Restore UI for facilitators — soft-archived but no restore endpoint or UI control in either frontend | `POST /api/facilitators/{fid}/restore` at `training.py:1715`; `doRestoreFacilitator()` at `index.html:8787`; "Show archived" checkbox with Restore button per row | CLOSED |
 | WORK-04 | Workflow | MEDIUM | Restore UI for Wing HQ calendar events and anchor events — soft-archived but no restore endpoint or UI | Wing HQ events: fully implemented — `doRestoreWingEvent()` at `index.html:12710`. Anchor events: `POST /api/planning/anchors/{id}/restore` added (commit `aaf3a2d`→next); `include_archived` param added to list endpoint; `doRestoreAnchor()` added to frontend; anchor tab hidden from pilot nav but backend+JS ready | FIXED LOCALLY |
 | WORK-05 | Workflow | LOW | Flexible time blocks within a parade night (§11/§12) — variable-length training blocks, not only fixed-template slots | Not implemented; timing blocks are fixed-template only | NOT STARTED |
-| WORK-06 | Workflow | LOW | Smart planning assistance — when building a session, suggest under-covered curriculum items for the attending class (§13) | Not implemented in either frontend | NOT STARTED |
+| WORK-06 | Workflow | LOW | Smart planning assistance — when building a session, suggest under-covered curriculum items for the attending class (§13) | Planning Workspace curriculum combobox sorts unscheduled and reschedule-needed items to the top; reschedule-needed (orange) and needs-scheduling (blue) indicators; results limit raised from 10 to 12. Commit `5171525`. Gap register was stale. | CLOSED |
 | WORK-07 | Workflow | MEDIUM | Bulk holiday import with explicit `holiday_type` field (§41) — if built, must not silently default to `school_holiday`; no holiday import path exists today | `export_import.py` has zero references to `holiday_type`; flagged as design constraint for future import work | ACCEPTED RISK |
 | WORK-08 | Workflow | LOW | Session move by drag-and-drop or equivalent shortcut within Planning Workspace | Planning Workspace (React) is better positioned for this; not confirmed implemented | NOT STARTED |
 | WORK-09 | Workflow | MEDIUM | PlanningLocation Phase 2 table drop — `planning_locations` is inert (no new writes since canonical model decision), but the table still exists and the fallback resolver still queries it | Decision in `04_canonical_data_model.md`; Phase 2 (table drop + removal of fallback resolver) deferred to Level B; not yet scheduled | IMPLEMENTING |
@@ -190,7 +192,7 @@ known. Firefox and the Planning Workspace 404 are uninvestigated — root causes
 | ID | AREA | SEVERITY | REQUIREMENT | CURRENT STATE | STATUS |
 |---|---|---|---|---|---|
 | DEF-01 | Defect | P0 | Firefox authentication — Planning Workspace cross-origin session handoff works in Firefox | Confirmed implemented: `index.html:4347-4354` — FF-01 fix already in place; uses `#t=<token>` hash fragment handoff bypassing SameSite=None cookie (which Firefox ETP blocks). `main.tsx` reads hash before React renders. Gap register was stale. | CLOSED |
-| DEF-02 | Defect | P0 | Planning Workspace unexpected 404 — specific navigation path causes an unhandled 404 | Not reproduced; not investigated; exact triggering route unknown | NOT STARTED |
+| DEF-02 | Defect | P0 | Planning Workspace unexpected 404 — specific navigation path causes an unhandled 404 | Fixed commit `cb4a428`: stale `localStorage` year ID guard at `PlanningWorkspace.tsx:244-250` shows loading state instead of firing API calls with a non-existent `year_id`; 404 flash eliminated. Also fixed `sqn_general` session-read forbidden. Gap register was stale. | CLOSED |
 | DEF-03 | Defect | P1 | Planning Workspace "Your scope" card — displays raw Wing ID and Squadron ID UUIDs instead of Wing code / name | `SessionInfo` in `api/types.ts` has `wing_code` / `squadron_code`; `Admin.tsx:17-18` uses `session.wing_code` / `session.squadron_code` directly — confirmed correct | CLOSED |
 | DEF-04 | Defect | P1 | Facilitator rank stored as uncontrolled free text (`Facilitator.rank` String) — no link to a canonical AAFC rank catalogue, no validation | Implemented commit `16f6bce`: `_AAFC_RANKS` catalogue in training.py; `GET /api/facilitators/ranks` endpoint; `_normalise_rank()` applied on create/update/import; frontend datalist populated from API. 8 regression tests added. | FIXED LOCALLY |
 | DEF-05 | Defect | MEDIUM | Legacy "Annual Program" stale text — `connected-frontend/index.html:6842` still says "Annual Program" linking to `nav('planning-year')`; functional redirect exists (`nav('planning-year')→'activities'`) but text misleads users | Confirmed resolved: `nav('planning-year')` as user-visible text no longer exists in index.html; all remaining references are code comments. Gap register was stale (original line number drifted). | CLOSED |
@@ -200,7 +202,7 @@ known. Firefox and the Planning Workspace 404 are uninvestigated — root causes
 | DEF-09 | Defect | MEDIUM | Background job polling UI — no frontend polling of `GET /api/jobs/{id}` when an async export is in flight; users cannot tell whether a large export is still running | `JobStatus` endpoint exists; no polling UI in either frontend | NOT STARTED |
 | DEF-10 | Defect | MEDIUM | DB-backed general rate limiter — in-memory `_api_hits` degrades proportionally with Gunicorn worker count; `GUNICORN_WORKERS ≤ 2` operational cap enforced until Option A (DB-backed) is implemented | Assessed in `15_rate_limiting_assessment.md`; Option A designed; not yet implemented | NOT STARTED |
 | DEF-11 | Defect | MEDIUM | Per-account rate limiting on non-login API endpoints | Only login has per-account lockout (`AccessCode.failed_attempts`, `locked_until`); all other endpoints have per-IP limiting only | NOT STARTED |
-| DEF-12 | Defect | LOW | Maintenance mode frontend banner — users already in session see no in-app banner when write-block is active | Login-block and write-block implemented; no banner rendered to users already authenticated | NOT STARTED |
+| DEF-12 | Defect | LOW | Maintenance mode frontend banner — users already in session see no in-app banner when write-block is active | Fixed commits `677d5e5`/`dfafc09`: `_maintenancePoll()` at `index.html:4304` polls every 30 s; when block activates, `checkMaintenanceBanner()` renders a banner to authenticated users without requiring page reload. Gap register was stale. | CLOSED |
 | DEF-13 | Defect | LOW | Maintenance mode expected return time — no return-time field in `SystemSetting`; cannot be communicated to users | Maintenance message is admin-settable text; no structured return-time field exists | NOT STARTED |
 | DEF-14 | Defect | LOW | Maintenance mode Celery drain — in-flight jobs may fail silently if write-block activates mid-task | Not implemented; no drain step in maintenance activation sequence | NOT STARTED |
 | DEF-15 | Defect | MEDIUM | `ENVIRONMENT=staging` in production Railway config (DEFECT-003) — `is_production` and `validate_for_production()` key off this value; risks production safety checks not triggering | Code fix merged; Railway production env var not corrected; requires System Admin action | HUMAN GATE |
@@ -216,7 +218,7 @@ and a formal conformance declaration are Level B/C requirements. Shared design t
 | ID | AREA | SEVERITY | REQUIREMENT | CURRENT STATE | STATUS |
 |---|---|---|---|---|---|
 | VIS-01 | Visual | MEDIUM | Shared CSS design tokens — Main TMS (`--blue`, `--dark`) and Planning Workspace (`--aafc-blue`, `--aafc-dark-blue`) use divergent token names on the same AAFC VIG palette | Both frontends share the same underlying hex values; token names differ; Level B requirement; deliberate architectural decision to surface to user, not silently merge | IMPLEMENTING |
-| VIS-02 | Accessibility | HIGH | Axe automation in main CI — accessibility checks run on every push, not only in staging-specific scripts | `a11y-staging.spec.ts` (25 tests) and `a11y-wcag.spec.ts` (9 tests) in `tools/playwright-staging/`; not wired into `frontend/e2e/` suite or any CI workflow | NOT STARTED |
+| VIS-02 | Accessibility | HIGH | Axe automation in main CI — accessibility checks run on every push, not only in staging-specific scripts | `frontend/e2e/accessibility.spec.ts` (comprehensive Axe WCAG 2.1 AA, 20 pages/roles) is in `testDir=./e2e/` and runs with `npx playwright test`. `.github/workflows/e2e-tests.yml` added (2026-08-13): runs both Planning Workspace (21 specs) and Connected Frontend (30 specs) E2E suites on push/PR to main/release/next-stage. | FIXED LOCALLY |
 | VIS-03 | Accessibility | MEDIUM | High-contrast mode — `forced-colors` / `prefers-contrast: more` media queries honoured throughout both frontends | Not tested; no high-contrast CSS overrides in either frontend | NOT STARTED |
 | VIS-04 | Accessibility | MEDIUM | Keyboard-only workflow coverage — all primary workflows completable without a pointer device | Partial: 25 Axe staging tests include keyboard focus checks; full keyboard-only walkthroughs not verified for any workflow end-to-end | IMPLEMENTING |
 | VIS-05 | Accessibility | MEDIUM | SC 1.4.3 Color Contrast (WCAG AA) — all text/background pairs meet 4.5:1 minimum (3:1 for large text) | `a11y-wcag.spec.ts` tests with Axe `color-contrast` rule in staging for all four roles; not in main CI | STAGING VERIFIED |
