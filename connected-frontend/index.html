@@ -11441,7 +11441,9 @@ async function loadAnchors(yearId){
   const el = document.getElementById('anchors-body');
   if(!yearId){ el.innerHTML='<p class="muted">Select a planning year above.</p>'; return; }
   try {
-    P.anchors = await api(`/api/planning/years/${yearId}/anchors`);
+    const showArchived=(document.getElementById('anch-show-archived')||{}).checked;
+    const url=`/api/planning/years/${yearId}/anchors`+(showArchived?'?include_archived=true':'');
+    P.anchors = await api(url);
     renderAnchors();
   } catch(e){ el.innerHTML=`<p class="muted">Could not load anchor events: ${esc(apiErr(e))}</p>`; }
 }
@@ -11450,23 +11452,35 @@ function renderAnchors(){
   const el = document.getElementById('anchors-body');
   const imp = document.getElementById('anch-filter-importance').value;
   const typ = document.getElementById('anch-filter-type').value;
+  const showArchived=(document.getElementById('anch-show-archived')||{}).checked;
   let rows = P.anchors;
+  if(!showArchived) rows = rows.filter(a=>!a.is_archived);
   if(imp) rows = rows.filter(a=>a.importance===imp);
   if(typ) rows = rows.filter(a=>a.event_type===typ);
-  if(!rows.length){ el.innerHTML='<p class="muted">No anchor events found.</p>'; return; }
+  if(!rows.length){ el.innerHTML=`<p class="muted">No ${showArchived?'archived ':''}anchor events found.</p>`; return; }
   el.innerHTML = `<table class="data-table"><thead><tr><th>Event</th><th>Type</th><th>Importance</th><th>Start Date</th><th>End Date</th><th>Audience</th><th></th></tr></thead><tbody>`+
-    rows.map(a=>`<tr>
-      <td><strong>${esc(a.event_name)}</strong></td>
+    rows.map(a=>`<tr${a.is_archived?' style="opacity:.6"':''}>
+      <td><strong>${esc(a.event_name)}</strong>${a.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
       <td>${esc(_EVENT_TYPE_LABELS[a.event_type]||a.event_type)}</td>
       <td><span class="badge ${_importanceBadge(a.importance)}">${esc(_IMPORTANCE_LABELS[a.importance]||a.importance)}</span></td>
       <td>${esc(a.start_date)}</td>
       <td>${esc(a.end_date||'—')}</td>
       <td>${_audienceBadges(a.audience)}</td>
       <td>
-        <button class="btn-xs btn-danger" onclick="deleteAnchor('${esc(a.anchor_event_id)}')">Archive</button>
+        ${a.is_archived
+          ?`<button class="btn btn-xs btn-ok" onclick="doRestoreAnchor('${esc(a.anchor_event_id)}','${_jsAttr(a.event_name)}')">Restore</button>`
+          :`<button class="btn-xs btn-danger" onclick="deleteAnchor('${esc(a.anchor_event_id)}')">Archive</button>`}
       </td>
     </tr>`).join('')+
     `</tbody></table>`;
+}
+
+async function doRestoreAnchor(anchorId, name){
+  try{
+    await api(`/api/planning/anchors/${anchorId}/restore`,{method:'POST'});
+    showToast(`'${name}' restored.`);
+    await loadAnchors(P.currentYearId);
+  }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
 }
 
 function _importanceBadge(imp){ return imp==='must_attend'?'badge-red':imp==='key_event'?'badge-blue':'badge-grey'; }

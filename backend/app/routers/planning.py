@@ -1242,15 +1242,15 @@ def list_anchors(
     year_id: str,
     importance: Optional[str] = None,
     event_type: Optional[str] = None,
+    include_archived: bool = False,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py)
-    q = db.query(AnchorEvent).filter(
-        AnchorEvent.planning_year_id == year_id,
-        AnchorEvent.is_archived == False,  # noqa: E712
-    )
+    q = db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id)
+    if not include_archived:
+        q = q.filter(AnchorEvent.is_archived == False)  # noqa: E712
     if importance:
         q = q.filter(AnchorEvent.importance == importance)
     if event_type:
@@ -1332,6 +1332,25 @@ def archive_anchor(
     a.is_archived = True; a.updated_at = utcnow()
     db.commit()
     audit(db, p, object_type="anchor_event", object_id=a.id, action="archive")
+    return {"ok": True}
+
+
+@router.post("/anchors/{anchor_id}/restore")
+def restore_anchor(
+    anchor_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    a = db.get(AnchorEvent, anchor_id)
+    if not a:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if not a.is_archived:
+        raise HTTPException(409, detail={"error": "not_archived"})
+    py = _get_year_or_404(a.planning_year_id, db)
+    _require_year_access(p, py, write=True)
+    a.is_archived = False; a.updated_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="anchor_event", object_id=a.id, action="restore")
     return {"ok": True}
 
 

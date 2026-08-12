@@ -24,16 +24,16 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 
 | Status | Count |
 |---|---|
-| CLOSED | 20 |
+| CLOSED | 22 |
 | STAGING VERIFIED | 5 |
-| FIXED LOCALLY | 10 |
+| FIXED LOCALLY | 11 |
 | IMPLEMENTING | 14 |
-| NOT STARTED | 54 |
+| NOT STARTED | 51 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **120** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 35 / 120 = 29%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 38 / 120 = 32%**
 
 ---
 
@@ -146,9 +146,9 @@ gaps affect four entity types. Bulk-import and smart-planning features are Level
 | ID | AREA | SEVERITY | REQUIREMENT | CURRENT STATE | STATUS |
 |---|---|---|---|---|---|
 | WORK-01 | Workflow | LOW | Click/field count baseline measured for all 12 high-frequency workflows (§37) so improvements can be measured | `workflow-map.md` scaffold exists with workflow names; no click counts measured for any workflow | NOT STARTED |
-| WORK-02 | Workflow | MEDIUM | Restore UI for curriculum items — soft-archived via `is_archived=True` but no restore endpoint or UI control exists in either frontend | Confirmed in `interface-language-inventory.csv` rows 26 and 40; archive confirmation copy is already accurate (does not overclaim restorability) | NOT STARTED |
-| WORK-03 | Workflow | MEDIUM | Restore UI for facilitators — soft-archived but no restore endpoint or UI control in either frontend | Same pattern as WORK-02; archive has no restore path | NOT STARTED |
-| WORK-04 | Workflow | MEDIUM | Restore UI for Wing HQ calendar events and anchor events — soft-archived but no restore endpoint or UI | Four entity types share this gap: curriculum items, facilitators, Wing HQ events, anchor events | NOT STARTED |
+| WORK-02 | Workflow | MEDIUM | Restore UI for curriculum items — soft-archived via `is_archived=True` but no restore endpoint or UI control exists in either frontend | `POST /api/curriculum/{cid}/restore` at `training.py:3933`; `doRestoreCurrItem()` at `index.html:7819` shows Restore button in archived rows | CLOSED |
+| WORK-03 | Workflow | MEDIUM | Restore UI for facilitators — soft-archived but no restore endpoint or UI control in either frontend | `POST /api/facilitators/{fid}/restore` at `training.py:1715`; `doRestoreFacilitator()` at `index.html:8787`; "Show archived" checkbox with Restore button per row | CLOSED |
+| WORK-04 | Workflow | MEDIUM | Restore UI for Wing HQ calendar events and anchor events — soft-archived but no restore endpoint or UI | Wing HQ events: fully implemented — `doRestoreWingEvent()` at `index.html:12710`. Anchor events: `POST /api/planning/anchors/{id}/restore` added (commit `aaf3a2d`→next); `include_archived` param added to list endpoint; `doRestoreAnchor()` added to frontend; anchor tab hidden from pilot nav but backend+JS ready | FIXED LOCALLY |
 | WORK-05 | Workflow | LOW | Flexible time blocks within a parade night (§11/§12) — variable-length training blocks, not only fixed-template slots | Not implemented; timing blocks are fixed-template only | NOT STARTED |
 | WORK-06 | Workflow | LOW | Smart planning assistance — when building a session, suggest under-covered curriculum items for the attending class (§13) | Not implemented in either frontend | NOT STARTED |
 | WORK-07 | Workflow | MEDIUM | Bulk holiday import with explicit `holiday_type` field (§41) — if built, must not silently default to `school_holiday`; no holiday import path exists today | `export_import.py` has zero references to `holiday_type`; flagged as design constraint for future import work | ACCEPTED RISK |
