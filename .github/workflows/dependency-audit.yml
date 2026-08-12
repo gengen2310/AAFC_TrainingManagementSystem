@@ -1,0 +1,47 @@
+name: Dependency audit
+
+on:
+  push:
+    branches: [main, "release/**", "next-stage/**"]
+  pull_request:
+    branches: [main, "release/**"]
+  schedule:
+    # Weekly on Monday at 09:00 UTC so known vulnerabilities are caught
+    # between releases, not only when new code lands.
+    - cron: "0 9 * * 1"
+
+jobs:
+  backend-pip-audit:
+    name: pip-audit (backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Audit backend dependencies
+        # pip-audit scans requirements.txt and its transitive dependencies.
+        # --require-hashes is not used here because requirements.txt is not
+        # hash-pinned; the goal is vulnerability detection, not reproducibility
+        # (separate concerns). --strict exits non-zero on any vulnerability.
+        run: pip-audit -r backend/requirements.txt --strict
+
+  frontend-npm-audit:
+    name: npm audit (Planning Workspace)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Audit frontend dependencies
+        # --audit-level=high exits non-zero only for High/Critical findings.
+        # Moderate and Low advisories produce output but do not fail the build.
+        # Adjust to --audit-level=moderate once the initial triage is done.
+        working-directory: frontend
+        run: npm audit --audit-level=high

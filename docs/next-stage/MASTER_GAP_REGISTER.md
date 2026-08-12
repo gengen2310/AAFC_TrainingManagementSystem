@@ -24,16 +24,16 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 
 | Status | Count |
 |---|---|
-| CLOSED | 24 |
+| CLOSED | 26 |
 | STAGING VERIFIED | 5 |
-| FIXED LOCALLY | 13 |
+| FIXED LOCALLY | 14 |
 | IMPLEMENTING | 14 |
-| NOT STARTED | 47 |
+| NOT STARTED | 44 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **120** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 42 / 120 = 35%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 45 / 120 = 38%**
 
 ---
 
@@ -97,7 +97,7 @@ frontend consumption.
 | DASH-04 | Dashboard | MEDIUM | Per-chart fault isolation in backend — each chart builder in `_full_squadron_charts` wrapped in its own try/except so one failure cannot 500 the whole `/api/dashboard/charts` response | `_run_chart_builder()` at `dashboard.py:62` wraps each builder in try/except, returning `chart_type="error"` on failure; confirmed implemented | CLOSED |
 | DASH-05 | Dashboard | MEDIUM | Frontend chart error handling — catch handler resets all chart containers on failure, not just 2 of 7+ (noted at `index.html:5793`) | `_DASH_CHART_IDS` at `index.html:6797` now covers all 14 chart/insight pairs; both skeleton reset and fetch-failure cleanup use the shared list — implemented and commented at lines 6789–6796 | CLOSED |
 | DASH-06 | Dashboard | LOW | Cancellation reasons "Unknown" / "Reason not recorded" — UI must surface an actionable prompt when this Pareto category is non-trivial, not display it as an inert bar | `loadDashCharts()` now appends a `a-warn` alert beneath the cancellation chart when the top reason is a `data_quality_gap` row and accounts for ≥15% of cancellations, explaining how to fix it | FIXED LOCALLY |
-| DASH-07 | Dashboard | MEDIUM | Accessible chart alternatives — data tables or text summaries alongside every chart element for screen-reader access | No accessible data-table alternatives alongside charts in either frontend | NOT STARTED |
+| DASH-07 | Dashboard | MEDIUM | Accessible chart alternatives — data tables or text summaries alongside every chart element for screen-reader access | `_chartAccessibleTable()` at `index.html:6758` generates a collapsible `<details>/<summary>` data table for every chart; called by `_dRenderChart()` at line 6774 — already applied to all 14 dashboard charts | CLOSED |
 | DASH-08 | Dashboard | LOW | National/Wing readiness matrix (`_readiness_matrix`), risk forecast (`_risk_forecast`), and command metrics — frontend drill-down fully wired and verified end-to-end | Backend builders exist and are inventoried; whether all national/wing drill-down paths are rendered in connected-frontend is not confirmed this pass | IMPLEMENTING |
 | DASH-09 | Dashboard | MEDIUM | Curriculum progress per phase computed using governed CurriculumPhase catalogue (not hardcoded 8-phase list) | `_phases_for_squadron()` confirmed to read governed `CurriculumPhase` catalogue after earlier fix; hardcoded 8-phase list removed | CLOSED |
 
@@ -244,7 +244,7 @@ Four gaps require System Admin action as Human Gates.
 | SEC-05 | Security | MEDIUM | Alerting on failed-login spike — active notification when login failure rate exceeds threshold in a rolling window | Structured JSON access log with `X-Request-ID` exists; no alert rule wired to any monitoring channel | NOT STARTED |
 | SEC-06 | Security | MEDIUM | Alerting on 5xx error rate above threshold | Same gap; structured logs exist; no external alert rule configured | NOT STARTED |
 | SEC-07 | Security | LOW | Alerting on daily backup workflow failure — active channel beyond GitHub Actions default email | GitHub Actions emails on failure; no Slack/PagerDuty/Teams alert channel configured | NOT STARTED |
-| SEC-08 | Security | MEDIUM | Dependency vulnerability scanning in CI — `pip-audit` (backend) and `npm audit --audit-level=high` (React frontend) in an automated workflow before each release | Manual pre-release only; not in any CI workflow; A06 gap identified in security hardening review | NOT STARTED |
+| SEC-08 | Security | MEDIUM | Dependency vulnerability scanning in CI — `pip-audit` (backend) and `npm audit --audit-level=high` (React frontend) in an automated workflow before each release | `.github/workflows/dependency-audit.yml` added: runs on push/PR to main/release branches and weekly Monday 09:00 UTC; `pip-audit --strict` for backend, `npm audit --audit-level=high` for Planning Workspace | FIXED LOCALLY |
 | SEC-09 | Security | MEDIUM | CSP `connect-src` runtime injection verified in deployed connected-frontend nginx response | `nginx.conf` and `docker-entrypoint.sh` updated in Phase 15 security hardening; staging verification post-deploy not recorded | IMPLEMENTING |
 | SEC-10 | Security | LOW | `Permissions-Policy` header confirmed in production connected-frontend nginx HTTP response | Added in Phase 15; not verified by live HTTP check in production post-deploy 2026-08-12 | IMPLEMENTING |
 | SEC-11 | Security | MEDIUM | Token version revocation triggered automatically on account disable or role change — not only on code reset | Revocation mechanism exists (increment `token_version`); no automated hook on disable/role-change; documented as a manual operator step in support runbook | IMPLEMENTING |
@@ -274,7 +274,7 @@ are not yet started. The support runbook and year rollover procedure are CLOSED 
 | DOC-10 | Docs | HIGH | Wing onboarding runbook §0 governance gate — organisational approval obtained before activating any Wing beyond 7WG in production | `10_wing_onboarding_runbook.md` complete; governance gate not yet passed for any second Wing | HUMAN GATE |
 | DOC-11 | Docs | MEDIUM | Report catalogue Tier 3 — National-level reports defined, implemented, and verified with multi-Wing data | Tier 1 (5 sqn) implemented; Tier 2 (5 wing) wired; Tier 3 requires Level B multi-Wing staging data | NOT STARTED |
 | DOC-12 | Docs | MEDIUM | Wing onboarding HTTP API — endpoint equivalent of `second_wing_seed.py` for provisioning a Wing without direct server/DB access | CLI seed only; no API path; Level B requirement | NOT STARTED |
-| DOC-13 | Docs | LOW | Capability manifest regenerated after Training Class model additions (v48–v50) — diff confirms no route or table removed | 1553 tests pass; `capability_manifest_current.json` not regenerated post-v48–v50; regeneration is a one-command step | NOT STARTED |
+| DOC-13 | Docs | LOW | Capability manifest regenerated after Training Class model additions (v48–v50) — diff confirms no route or table removed | Regenerated 2026-08-13: 299 routes / 63 tables (was 273); new routes include `/api/facilitators/ranks`, `/api/planning/anchors/{id}/restore`, and 24 others added since last generation; no routes removed | CLOSED |
 | DOC-14 | Docs | MEDIUM | CEA import / CEA relationship documentation — `export_import.py` handles CEA imports; how CEA activities relate to curriculum items and Training Classes under the new model is not yet documented for operators | CEA import router exists; relationship to TrainingClass/SessionAudience not yet described in any operator-facing runbook | NOT STARTED |
 | DOC-15 | Docs | LOW | Role matrix updated to include Training Class operations — who can create, archive, split, and merge a TrainingClass; whether wing_admin can act cross-squadron | `docs/role_matrix.md` predates Training Class model; no Training Class rows exist | NOT STARTED |
 
