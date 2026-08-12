@@ -458,6 +458,10 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .mode-banner.intervention{background:#ffe0e0;color:#7a1010;border-bottom-color:#c25;}
 .mode-banner.show{display:flex;}
 .mode-banner button{font:inherit;font-size:10px;border:1px solid currentColor;background:transparent;color:inherit;border-radius:6px;padding:3px 11px;cursor:pointer;text-transform:uppercase;font-weight:800;}
+.maint-banner{display:none;align-items:center;gap:10px;padding:8px 22px;font-size:12px;font-weight:700;background:#e51937;color:#fff;border-bottom:2px solid #b5002b;}
+.maint-banner.show{display:flex;}
+.maint-banner .maint-icon{font-size:15px;flex-shrink:0;}
+.maint-banner .maint-msg{flex:1;}
 
 /* ── MISC CONNECTED-CLIENT ── */
 .mini{height:8px;border-radius:6px;background:#e6edf5;overflow:hidden;min-width:60px;}
@@ -609,6 +613,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="wing-banner" id="wing-banner" style="display:none"></div>
   <div class="scope-banner" id="scope-banner" style="display:none"><span class="sb-tag" id="sb-tag">SQN</span><span id="sb-text"></span></div>
   <div class="mode-banner" id="mode-banner"><span id="mode-text"></span><button onclick="exitMode()">Exit mode</button></div>
+  <div class="maint-banner" id="maint-banner"><span class="maint-icon">🔒</span><span class="maint-msg" id="maint-msg">System under maintenance.</span></div>
   <!-- System Administrator scope selector: browse National (default) / a Wing / a Squadron.
        Viewing never requires Proxy/Intervention Mode (view is broad by design — the backend's
        can_view_squadron/can_view_wing already grant system_admin unconditional read access).
@@ -3288,6 +3293,15 @@ async function api(path, opts={}){
     try{
       res=await fetch(API_BASE+path,fetchOpts);
       if(RETRYABLE_STATUS.has(res.status)&&attempt<maxAttempts){
+        // MM-01: 503 with maintenance_mode error code is not transient -- skip retry
+        // and show a persistent banner immediately so the user understands why actions fail.
+        if(res.status===503){
+          let pb=null;try{pb=await res.clone().json();}catch(_){}
+          if(pb&&pb.error==='maintenance_mode'){
+            _showMaintenanceBanner(pb.message||'System under maintenance.');
+            break;
+          }
+        }
         await new Promise(r=>setTimeout(r,attempt*400));
         continue;
       }
@@ -3351,6 +3365,10 @@ async function api(path, opts={}){
     // backend didn't already supply a specific one (REM-04: permissions.py's
     // require_* helpers now return an actionable message for many forbidden
     // cases -- unconditionally overwriting msg here was discarding it).
+    if(code==='maintenance_mode'){
+      const maintMsg=msg||'System under maintenance. Please try again later.';
+      _showMaintenanceBanner(maintMsg); msg=maintMsg;
+    }
     if(!msg&&(code==='forbidden'||code==='access_denied')) msg='Access not permitted.';
     if(code==='no_squadron_scope')                       msg='Squadron / Specialist Unit is required for this action.';
     if(code==='out_of_scope')                            msg='This record is outside your authorised scope.';
@@ -3376,6 +3394,8 @@ async function api(path, opts={}){
     // kind/status/code/msg and are unaffected by this additive field.
     throw {kind:'http', status:res.status, code, msg, body};
   }
+  // Successful response — maintenance mode has ended; hide the banner.
+  _hideMaintenanceBanner();
   return body;
 }
 function apiErr(e){
@@ -4185,6 +4205,15 @@ function updateModeBanner(){
     const reason=S.proxyReason?(' · reason: '+S.proxyReason):'';
     document.getElementById('mode-text').textContent=`${label} — ${who} viewing ${where}${reason}`;
   } else { mb.className='mode-banner'; }
+}
+
+function _showMaintenanceBanner(msg){
+  const b=document.getElementById('maint-banner'),m=document.getElementById('maint-msg');
+  if(b){b.className='maint-banner show';}
+  if(m)m.textContent=msg||'System under maintenance. Please try again later.';
+}
+function _hideMaintenanceBanner(){
+  const b=document.getElementById('maint-banner'); if(b)b.className='maint-banner';
 }
 
 function updateDebugBar(){
