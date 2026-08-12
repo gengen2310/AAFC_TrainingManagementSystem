@@ -7358,7 +7358,7 @@ async function _toggleSessHistory(sessId,idx){
     const rows=await api('/api/sessions/'+sessId+'/status-history');
     if(!rows.length){ el.textContent='No status changes recorded yet.'; return; }
     el.innerHTML=rows.map(r=>{
-      const when=new Date(r.timestamp).toLocaleString();
+      const when=new Date(r.timestamp).toLocaleString('en-AU',{day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
       const change=r.old_status?`${r.old_status} → ${r.new_status}`:`Set to ${r.new_status}`;
       return `<div style="padding:3px 0;border-bottom:1px solid var(--border-light)"><b>${esc(change)}</b> · ${esc(when)}${r.reason?' · '+esc(r.reason):''}</div>`;
     }).join('');
@@ -9694,7 +9694,7 @@ function cmdDrillReadiness(unitId,scope){
     <div class="tw"><table><tbody>
     ${cols.map(c=>`<tr><td style="font-weight:700">${esc(colLabels[c])}</td><td>${_cmdCell(r[c])}</td><td style="font-size:11px;color:var(--muted)">${esc((r[c]&&r[c].exception_reason)||'')}</td></tr>`).join('')}
     </tbody></table></div>
-    <div style="font-size:11px;color:var(--muted);margin-top:10px">Trend vs previous parade night: ${_CMD_TREND_SYMBOL[r.trend]||'—'}. Last updated: ${r.last_update?new Date(r.last_update).toLocaleString():'—'}.</div>`;
+    <div style="font-size:11px;color:var(--muted);margin-top:10px">Trend vs previous parade night: ${_CMD_TREND_SYMBOL[r.trend]||'—'}. Last updated: ${r.last_update?new Date(r.last_update).toLocaleString('en-AU',{day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}):'—'}.</div>`;
   p.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
@@ -9795,7 +9795,7 @@ async function loadCommandDashboard(scope){
       Period: <select id="cmd-window-sel" onchange="S.cmdWindow=this.value;loadCommandDashboard('${scope}')" style="font-size:11px;padding:2px 4px;border:1px solid var(--border);border-radius:4px" aria-label="Reporting period">
         ${Object.entries(_CMD_WINDOW_LABELS).map(([k,l])=>`<option value="${k}"${k===win?' selected':''}>${l}</option>`).join('')}
       </select>
-      · Data current as at ${new Date(d.generated_at).toLocaleString()}
+      · Data current as at ${new Date(d.generated_at).toLocaleString('en-AU',{day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})}
       · Data confidence: ${d.data_confidence.units_reporting}/${d.data_confidence.units_expected} unit(s) reporting
     </div>
     ${proxyBanner}

@@ -332,7 +332,7 @@ def test_wing_viewer_cannot_use_wing_id_param_to_view_another_wing(client):
 def test_sysadmin_cannot_write_squadron_without_intervention(client):
     hdr = _sysadmin(client)
     sqn_id = _sqn_id_by_code(client, hdr, "703")
-    r = client.post("/api/parade-nights", json={"date": "2026-09-01", "term": "T3", "session_count": 3}, headers=hdr)
+    r = client.post("/api/parade-nights", json={"date": "2091-09-01", "term": "T3", "session_count": 3}, headers=hdr)
     # No active squadron scope and no DI session — must not silently succeed.
     assert r.status_code in (400, 403)
 
@@ -344,7 +344,7 @@ def test_sysadmin_enter_intervention_then_write_succeeds_and_is_audited(client):
     assert enter.status_code == 200, enter.text
     assert enter.json()["proxy"]["mode"] == "delegated_intervention"
 
-    create = client.post("/api/parade-nights", json={"date": "2026-09-08", "term": "T3", "session_count": 3}, headers=hdr)
+    create = client.post("/api/parade-nights", json={"date": "2091-09-08", "term": "T3", "session_count": 3}, headers=hdr)
     assert create.status_code == 200, create.text
 
     audit = client.get("/api/system/audit-summary", params={"action": "intervention_enter"}, headers=hdr)
