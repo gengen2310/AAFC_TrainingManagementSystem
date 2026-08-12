@@ -4077,3 +4077,51 @@ deferred (dead code — no live archive UI in either frontend; fresh ask require
 **Gap register:** REM-23 updated to SUBSTANTIALLY COMPLETE.
 
 **Commit:** `fd86003`
+
+---
+
+## §77 — Phase 7: Optimistic Locking Complete (2026-08-12)
+
+**Scope:** All priority models confirmed to have optimistic locking. TimingTemplate was the one remaining gap.
+
+**Pre-existing coverage (v37/v46):** `PlanningYear`, `AnchorEvent`, `ScheduledSession`, `PlanningNotice`, `Session`, `ParadeNight` — all had `version` fields and `_check_version` calls in their write endpoints. `ParadeDate` has no update endpoint (create/delete only); no version needed.
+
+**New (this pass):** `TimingTemplate` — the only model with a PATCH update endpoint (`PATCH /api/timing-templates/{tid}`) that lacked a version field.
+
+**Changes:**
+- `TimingTemplate` model: `version: Mapped[int]` field added
+- `timing.py` router: `_check_version` helper; `TemplatePatch.version: int | None`; version check + increment in `update_timing_template`; `version` in `_template_dict` response
+- Migration `d3e4f5a6b7c8` (v51): additive, idempotent column add, batch_alter_table for SQLite compat
+- 4 new concurrency tests + `test_compute_alembic_head` updated to new head
+
+**Suite:** 1543 passed, 5 skipped.
+
+**Commit:** `4d08c5e`
+
+---
+
+## §78 — Phase 8: Year Rollover E2E Tests + Procedure Doc (2026-08-12)
+
+**Scope:** End-to-end test coverage for the year rollover workflow, plus a fully rewritten procedure document for operators.
+
+**Background:** The rollover endpoint itself was implemented and staging-verified in a prior pass (REM-09, CLASS-11). Phase 8 adds the E2E proof layer: 10 tests that exercise the complete operator workflow from year creation through rollover to verified new-year operability, exactly as an admin would perform the annual transition.
+
+**New (`backend/tests/test_year_rollover_e2e.py`, 10 tests):**
+- `test_rollover_full_round_trip_creates_new_year` — core round-trip, correct year number and ID
+- `test_rollover_date_shifts_parade_dates_by_one_year` — each new date is exactly 1 year after old
+- `test_rollover_date_shifts_holidays_by_one_year` — holiday periods date-shifted correctly
+- `test_rollover_old_year_data_intact_after_rollover` — rollover is non-destructive
+- `test_rollover_anchor_events_not_copied` — anchor events deliberately NOT carried (design assertion)
+- `test_rollover_parade_dates_create_linked_parade_nights` — rolled dates have parade_night_id
+- `test_rollover_idempotency_second_attempt_returns_409` — second rollover to same year blocked
+- `test_rollover_response_counts_match_actual_data` — summary counts match retrievable data
+- `test_rollover_new_year_is_operational_sessions_can_be_added` — new year's parade nights reachable
+- `test_rollover_blocked_for_viewer_role` — RBAC: 403 for sqn_general
+
+**Year partitioning:** Tests use years 2161–2179 (odd source, even target) to avoid collisions with `test_concurrency.py` (2088–2099), `test_planner_v14.py` (2028–2062), and with each other under alphabetical execution order. Single-date range bug fixed: parade date generation now uses a full month so at least one Thursday falls in range, regardless of which day of the week a specific date falls in year 2177.
+
+**Updated (`docs/next-stage/08_year_rollover_procedure.md`):** Rewrote from the original stub (dated 2026-07-16, predating the UI wiring and CLASS-11) into a complete operator procedure with: pre-rollover checklist, step-by-step walkthrough, what carries over / what does not, post-rollover verification steps, troubleshooting guide, and a rollback note.
+
+**Suite:** 1553 passed, 5 skipped (10 new E2E tests, 0 regressions).
+
+**Gap register:** REM-09 retains CLOSED; E2E test file noted.
