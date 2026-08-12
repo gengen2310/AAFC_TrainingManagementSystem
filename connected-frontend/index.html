@@ -307,6 +307,8 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .dash-sec-sub{font-size:11.5px;color:var(--muted);margin-bottom:12px;}
 .chart-insight{font-size:11.5px;color:var(--royal);font-weight:600;padding:6px 10px;background:var(--accent-light);border-radius:5px;margin-top:8px;border-left:3px solid var(--blue);}
 .chart-skeleton{background:linear-gradient(90deg,#f0f4f8 25%,#e4eaf0 50%,#f0f4f8 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;height:80px;}
+.chart-data-toggle{margin-top:6px;font-size:10.5px;color:var(--muted);}
+.chart-data-toggle summary{cursor:pointer;display:inline;user-select:none;}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .pbar{background:var(--border);border-radius:3px;height:14px;overflow:hidden;}
 .readiness-donut{display:flex;align-items:center;gap:20px;}
@@ -604,6 +606,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="tb-unit" id="tb-unit">Training System</div>
     </div>
     <div class="tb-right">
+      <button class="tb-btn no-print" onclick="openCmdPalette()" title="Search — or press ⌘K / Ctrl+K" aria-label="Open command palette" style="display:flex;align-items:center;gap:4px">
+        <span aria-hidden="true">🔍</span> Search <kbd style="font-size:9px;background:rgba(255,255,255,.18);padding:1px 5px;border-radius:3px;border:1px solid rgba(255,255,255,.3)">⌘K</kbd>
+      </button>
       <button id="btn-print-program" class="tb-btn no-print" onclick="nav('weekly-program')" title="Quick print weekly program">Print Program</button>
       <span class="sqn-chip" id="tb-chip">SQN</span>
       <button class="tb-btn no-print" onclick="doLogout()">Sign Out</button>
@@ -6718,9 +6723,23 @@ function _chartGroupedBar(chart){
 }
 
 // Internal: render a chart into a container div
+function _chartAccessibleTable(chart){
+  const rows=chart.data||[];if(!rows.length)return'';
+  const skip=new Set(['drill_id','data_quality_gap','color','classes']);
+  const keys=Object.keys(rows[0]||{}).filter(k=>!skip.has(k));if(!keys.length)return'';
+  const title=esc(chart.title||'Chart data');
+  const thead='<tr>'+keys.map(k=>`<th scope="col">${esc(k.replace(/_/g,' '))}</th>`).join('')+'</tr>';
+  const tbody=rows.map(r=>'<tr>'+keys.map(k=>`<td>${esc(String(r[k]??'—'))}</td>`).join('')+'</tr>').join('');
+  return`<details class="chart-data-toggle">
+    <summary>Show data table — ${title}</summary>
+    <div class="tw" style="margin-top:6px;font-size:11px">
+      <table aria-label="${title} data table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>
+    </div>
+  </details>`;
+}
 function _dRenderChart(containerId,chart,renderFn,insightId){
   const el=document.getElementById(containerId);if(!el||!chart)return;
-  el.innerHTML=renderFn(chart);
+  el.innerHTML=renderFn(chart)+_chartAccessibleTable(chart);
   if(insightId&&chart.insight)_dSetInsight(insightId,chart.insight);
 }
 
@@ -12758,6 +12777,135 @@ document.addEventListener('keydown',function(e){
     if(sidenav&&sidenav.classList.contains('nav-open'))closeMobileNav();
   }
 });
+
+// ═══════════════════════════════════════════════════════════
+//  CMD+K COMMAND PALETTE (HELP-06)
+// ═══════════════════════════════════════════════════════════
+(function(){
+  // Pages available for navigation — friendly names for each nav destination.
+  const PAGE_LABELS={
+    'dashboard':'Dashboard — overview and charts',
+    'parade-nights':'Parade Nights — schedule and outcomes',
+    'calendar':'Calendar — visual month view',
+    'weekly-program':'Weekly Program — publish parade night plan',
+    'curriculum':'Curriculum — mission items',
+    'activities':'Activities — annual program and missions',
+    'facilitators':'Facilitators — staff management',
+    'resources':'Resources — rooms and equipment',
+    'action-items':'Needs Attention — planning gaps and alerts',
+    'settings':'Unit Settings — squadron configuration',
+    'accounts':'Accounts — access management',
+    'getting-started':'Getting Started — setup checklist',
+    'wing-overview':'Wing Overview — squadron comparison',
+    'national':'National — Wing comparison',
+    'audit':'Audit Log',
+    'system-console':'System Console',
+  };
+
+  let _open=false,_idx=0,_results=[];
+
+  function _overlay(){return document.getElementById('cmd-palette-overlay');}
+  function _input(){return document.getElementById('cmd-palette-input');}
+
+  function openPalette(){
+    const o=_overlay();if(!o||_open)return;
+    _open=true;_idx=0;_results=[];
+    o.style.display='flex';
+    _input().value='';
+    document.getElementById('cmd-palette-results').innerHTML='<div class="cp-hint">Start typing to search pages, curriculum, parade nights, and facilitators…</div>';
+    setTimeout(()=>_input().focus(),20);
+  }
+  function closePalette(){
+    const o=_overlay();if(!o||!_open)return;
+    _open=false;o.style.display='none';
+  }
+  function _run(r){
+    closePalette();
+    if(r.action==='nav')nav(r.target);
+    else if(r.action==='curr')showCurrDetail(r.target);
+    else if(r.action==='pn'){nav('parade-nights');setTimeout(()=>{const inp=document.getElementById('pn-date-filter');if(inp){inp.value=r.target;renderPN();}},100);}
+    else if(r.action==='fac'){nav('facilitators');}
+  }
+  function _score(text,q){
+    const t=text.toLowerCase(),qL=q.toLowerCase();
+    if(t===qL)return 3;if(t.startsWith(qL))return 2;if(t.includes(qL))return 1;return 0;
+  }
+  function _search(q){
+    if(q.length<1){_results=[];return'<div class="cp-hint">Start typing to search…</div>';}
+    const res=[];
+    // Pages
+    const scopePages=NAV_BY_SCOPE[effectiveScope()]||[];
+    Object.entries(PAGE_LABELS).forEach(([id,label])=>{
+      if(!scopePages.includes(id))return;
+      const sc=_score(label,q);if(sc>0)res.push({score:sc,cat:'Page',label:label.split('—')[0].trim(),sub:label.split('—')[1]?.trim()||'',action:'nav',target:id});
+    });
+    // Curriculum
+    (allCurr()||[]).forEach(e=>{
+      const sc=Math.max(_score(e.code||'',q),_score(e.title||'',q));
+      if(sc>0)res.push({score:sc,cat:'Curriculum',label:`${e.code} — ${e.title}`,sub:`Phase: ${e.phase||'—'}`,action:'curr',target:e.code});
+    });
+    // Facilitators
+    (S.facs||[]).forEach(f=>{
+      const name=`${f.first_name||''} ${f.last_name||''}`.trim();
+      const sc=_score(name,q);if(sc>0)res.push({score:sc,cat:'Facilitator',label:name,sub:f.role||'',action:'fac',target:f.id});
+    });
+    // Parade nights
+    (S.pns||[]).slice(-60).forEach(pn=>{
+      const sc=_score(pn.date||'',q)||_score(pn.label||pn.date||'',q);
+      if(sc>0)res.push({score:sc,cat:'Parade Night',label:fmtD(pn.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'}),sub:`${(pn.sessions||[]).length} session(s)`,action:'pn',target:pn.date});
+    });
+    _results=res.sort((a,b)=>b.score-a.score||a.cat.localeCompare(b.cat)).slice(0,12);
+    if(!_results.length)return`<div class="cp-hint">No results for "${esc(q)}"</div>`;
+    return _results.map((r,i)=>`<div class="cp-result${i===_idx?' cp-sel':''}" onclick="_cpRun(${i})" onmouseover="_cpHover(${i})" role="option" aria-selected="${i===_idx}">
+      <span class="badge b-grey" style="font-size:8.5px;margin-right:6px">${esc(r.cat)}</span>
+      <span style="font-weight:700;font-size:12.5px">${esc(r.label)}</span>
+      ${r.sub?`<span style="font-size:11px;color:var(--muted);margin-left:6px">${esc(r.sub)}</span>`:''}
+    </div>`).join('');
+  }
+  window._cpRun=function(i){_run(_results[i]);};
+  window._cpHover=function(i){_idx=i;document.querySelectorAll('.cp-result').forEach((el,j)=>el.classList.toggle('cp-sel',j===i));};
+
+  document.addEventListener('keydown',function(e){
+    if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();_open?closePalette():openPalette();return;}
+    if(!_open)return;
+    if(e.key==='Escape'){closePalette();}
+    else if(e.key==='ArrowDown'){e.preventDefault();_idx=Math.min(_idx+1,_results.length-1);document.querySelectorAll('.cp-result').forEach((el,j)=>el.classList.toggle('cp-sel',j===_idx));}
+    else if(e.key==='ArrowUp'){e.preventDefault();_idx=Math.max(_idx-1,0);document.querySelectorAll('.cp-result').forEach((el,j)=>el.classList.toggle('cp-sel',j===_idx));}
+    else if(e.key==='Enter'){e.preventDefault();if(_results[_idx])_run(_results[_idx]);}
+  });
+
+  document.addEventListener('DOMContentLoaded',function(){
+    const inp=document.getElementById('cmd-palette-input');
+    if(inp)inp.addEventListener('input',function(){
+      _idx=0;document.getElementById('cmd-palette-results').innerHTML=_search(this.value);
+    });
+    const o=document.getElementById('cmd-palette-overlay');
+    if(o)o.addEventListener('click',function(e){if(e.target===this)closePalette();});
+  });
+  // expose openPalette for the nav button
+  window.openCmdPalette=openPalette;
+})();
 </script>
+
+<!-- Command palette overlay (HELP-06) -->
+<div id="cmd-palette-overlay" role="dialog" aria-modal="true" aria-label="Command palette" style="display:none;position:fixed;inset:0;z-index:2000;background:rgba(0,30,60,.45);align-items:flex-start;justify-content:center;padding-top:10vh">
+  <div style="background:var(--surface);border-radius:12px;box-shadow:0 8px 32px rgba(0,30,60,.28);width:min(560px,94vw);overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)">
+      <span style="color:var(--muted);font-size:14px">🔍</span>
+      <input id="cmd-palette-input" type="search" placeholder="Search pages, curriculum, facilitators, parade nights…"
+        autocomplete="off" spellcheck="false"
+        style="flex:1;border:none;outline:none;font-size:14px;background:transparent;color:var(--text)" aria-label="Search">
+      <kbd style="font-size:10px;background:var(--bg);padding:2px 6px;border-radius:4px;color:var(--muted);border:1px solid var(--border)">Esc</kbd>
+    </div>
+    <div id="cmd-palette-results" role="listbox" style="max-height:60vh;overflow-y:auto;padding:6px 0">
+      <div class="cp-hint">Start typing to search pages, curriculum, parade nights, and facilitators…</div>
+    </div>
+  </div>
+</div>
+<style>
+.cp-hint{padding:14px 16px;font-size:12px;color:var(--muted);}
+.cp-result{display:flex;align-items:center;padding:9px 16px;cursor:pointer;font-size:13px;}
+.cp-result.cp-sel,.cp-result:hover{background:var(--accent-light);}
+</style>
 </body>
 </html>
