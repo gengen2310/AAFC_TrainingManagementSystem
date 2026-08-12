@@ -28,6 +28,15 @@ from ..dependencies import get_principal, client_meta
 from ..permissions import Principal, require_can_view_squadron, require_can_write_squadron
 from ..services import audit
 
+
+def _check_version(obj, client_version: int | None) -> None:
+    """Raise 409 if the client's version is stale (optimistic locking)."""
+    if client_version is not None and obj.version != client_version:
+        raise HTTPException(409, detail={
+            "error": "version_conflict",
+            "current_version": obj.version,
+        })
+
 router = APIRouter(prefix="/api", tags=["timing"])
 
 _WRITE_BLOCKED = frozenset({"sqn_general", "wing_viewer", "national_viewer", "auditor"})
@@ -82,6 +91,7 @@ def _template_dict(t: TimingTemplate, include_blocks: bool = True) -> dict:
         "active_status": t.active_status,
         "notes": t.notes,
         "instructional_period_count": sum(1 for b in blocks if b.is_instructional_period),
+        "version": t.version,
         "created_at": t.created_at.isoformat() if t.created_at else None,
         "updated_at": t.updated_at.isoformat() if t.updated_at else None,
     }
@@ -219,6 +229,7 @@ class TemplatePatch(BaseModel):
     is_default: bool | None = None
     notes: str | None = None
     blocks: list[BlockIn] | None = None
+    version: int | None = None
 
 
 class ApplyFromIn(BaseModel):
@@ -375,6 +386,7 @@ def update_timing_template(
     if s:
         require_can_write_squadron(p, s.id, s.wing_id)
 
+    _check_version(t, body.version)
     old = {"name": t.name, "effective_from": t.effective_from}
     warnings: list[str] = []
     if body.name is not None:
@@ -391,6 +403,7 @@ def update_timing_template(
         warnings = _validate_block_times(body.blocks)
         _replace_blocks(db, t, body.blocks, p.user_id)
     t.updated_by = p.user_id
+    t.version += 1
     db.commit()
     db.refresh(t)
 

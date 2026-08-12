@@ -289,6 +289,7 @@ class TimingTemplate(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     blocks: Mapped[list["TimingBlock"]] = relationship(
         back_populates="template",
         order_by="TimingBlock.display_order",

@@ -313,6 +313,63 @@ def test_parade_night_update_without_version_succeeds(client):
     assert r.json()["notes"] == "No version sent"
 
 
+# ─────────────────────────────────────────────────────────────
+# TimingTemplate — optimistic locking (Phase 7, v51 migration)
+# ─────────────────────────────────────────────────────────────
+
+def _make_timing_template(client, hdr, name="Lock Test Template"):
+    r = client.post("/api/timing-templates", json={
+        "name": name,
+        "effective_from": "2099-01-01",
+        "blocks": [],
+    }, headers=hdr)
+    assert r.status_code in (200, 201), r.text
+    return r.json()
+
+
+def test_timing_template_version_starts_at_zero(client):
+    hdr = _sqn_admin(client)
+    t = _make_timing_template(client, hdr, "Version Zero Test")
+    assert t["version"] == 0
+
+
+def test_timing_template_version_increments_on_update(client):
+    hdr = _sqn_admin(client)
+    t = _make_timing_template(client, hdr, "Increment Test")
+    tid = t["timing_template_id"]
+
+    r = client.patch(f"/api/timing-templates/{tid}", json={"name": "Updated Name"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    assert r.json()["version"] == 1
+
+
+def test_timing_template_stale_version_returns_409(client):
+    hdr = _sqn_admin(client)
+    t = _make_timing_template(client, hdr, "Stale Version Test")
+    tid = t["timing_template_id"]
+
+    r1 = client.patch(f"/api/timing-templates/{tid}",
+                      json={"name": "First Write", "version": 0}, headers=hdr)
+    assert r1.status_code == 200, r1.text
+    assert r1.json()["version"] == 1
+
+    r2 = client.patch(f"/api/timing-templates/{tid}",
+                      json={"name": "Stale Write", "version": 0}, headers=hdr)
+    assert r2.status_code == 409, r2.text
+    assert r2.json()["detail"]["error"] == "version_conflict"
+    assert r2.json()["detail"]["current_version"] == 1
+
+
+def test_timing_template_update_without_version_succeeds(client):
+    """Backward compatibility: omitting version skips the check."""
+    hdr = _sqn_admin(client)
+    t = _make_timing_template(client, hdr, "Compat Test")
+    tid = t["timing_template_id"]
+
+    r = client.patch(f"/api/timing-templates/{tid}", json={"name": "No Version"}, headers=hdr)
+    assert r.status_code == 200, r.text
+
+
 def test_notice_stale_version_returns_409(client):
     hdr = _sqn_admin(client)
     try:
