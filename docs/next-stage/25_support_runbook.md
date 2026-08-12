@@ -245,6 +245,32 @@ staging deployments.
 
 ---
 
+## Part 6A — Scaling Constraints (read before changing Railway env vars)
+
+### GUNICORN_WORKERS cap
+
+**Do not raise `GUNICORN_WORKERS` beyond 2 in production without first implementing a
+DB-backed general API rate limiter** (Option A in `docs/next-stage/15_rate_limiting_assessment.md`).
+
+**Why:** The general API rate limiter (`check_api_rate` in `security.py`) uses an in-memory
+dict that is per-worker, not shared across gunicorn workers. At `GUNICORN_WORKERS=2`, the
+effective per-IP limit is ~600 req/60 s (2× the configured 300). At `GUNICORN_WORKERS=4`
+it degrades to ~1 200 req/60 s — insufficient to throttle automated enumeration.
+
+The **login rate limiter** (`IpLoginAttempt` table) is DB-backed and is NOT affected by
+worker count — it enforces exactly 5 attempts per 300 s per IP regardless of how many
+workers are running.
+
+**Current production default:** `GUNICORN_WORKERS` is unset → defaults to 2 (set in
+`docker-entrypoint-staging.sh`). To change it in Railway: Railway dashboard → production
+environment → `aafc-tms-backend` service → Variables → set `GUNICORN_WORKERS`.
+
+**Before raising above 2:** implement the DB-backed rate limiter or Redis counter and
+document the new effective limit in this runbook. See `15_rate_limiting_assessment.md`
+for implementation options and effort estimates.
+
+---
+
 ## Part 7 — Routine Maintenance Schedule
 
 | Task | Frequency | Who | Where |
@@ -278,3 +304,4 @@ state and can be used to log in and obtain a token via the network tab.
 | Date | Change | Author |
 |---|---|---|
 | 2026-07-16 | Initial version (Phase 25) | Next-Stage Program |
+| 2026-08-12 | Added Part 6A: GUNICORN_WORKERS cap + rate limiting constraint | Next-Stage Program |

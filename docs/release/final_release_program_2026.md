@@ -4326,3 +4326,62 @@ deferred (dead code — no live archive UI in either frontend; fresh ask require
 **Remaining for Gap 13:** Zoom/contrast tests; Axe not yet in main `frontend/e2e/` CI suite; these staging tests require manual env var setup.
 
 **Gap 13 status:** Remains PARTIALLY COMPLETE — all four authenticated role scopes now have Axe and keyboard coverage in staging, but CI integration and zoom/contrast tests are still missing.
+
+---
+
+## §84 — Gap 13: Zoom/Reflow + Color-Contrast WCAG tests (2026-08-12)
+
+**Gap:** 13 (Accessibility automation) — PARTIALLY COMPLETE
+
+**Work done:** Created `tools/playwright-staging/tests/a11y-wcag.spec.ts` — 9 new WCAG-specific tests:
+
+**SC 1.4.10 Reflow (3 tests, 320 px viewport):**
+- Login form: `scrollWidth ≤ clientWidth + 4` at 320 px CSS-pixel width
+- Dashboard (system_admin): main.main no horizontal overflow
+- Parade Nights (sqn_admin): main.main no horizontal overflow
+
+**SC 1.4.4 Resize Text (2 tests, 640 px = 200% zoom simulation):**
+- Login form: all key controls visible at 640 px
+- Dashboard: `.ph-title` not clipped; no horizontal overflow in main content
+
+**SC 1.4.3 Color Contrast (4 tests, Axe `color-contrast` rule, hard-assert WCAG AA):**
+- Login form
+- Dashboard (system_admin)
+- System Console (system_admin)
+- Wing Overview (wing_admin)
+
+The color-contrast tests assert zero Axe violations — appropriate because the design
+already has deliberate WCAG AA work: `--muted` was darkened from `#6b7a87` (failed
+4.13:1) to `#657380` (≥4.5:1), and `--muted-text-on-light` was computed against both
+`--surface` and `--bg`. If a future CSS change introduces a new violation, these tests
+will catch it.
+
+**`--list` count:** 9 chromium + 9 mobile = 18 new test entries.
+
+**Gap 13 remaining:** High-contrast mode; Axe not in main `frontend/e2e/` CI.
+
+---
+
+## §85 — Gap 15: Rate Limiting Multi-Replica Assessment (2026-08-12)
+
+**Gap:** 15 (Distributed rate limiting) — PARTIALLY COMPLETE
+
+**Work done:**
+1. Written `docs/next-stage/15_rate_limiting_assessment.md` — full assessment of current rate limiting behaviour across multiple gunicorn workers/replicas.
+
+**Key finding:** `check_api_rate` (`security.py:104`) uses an in-memory `_api_hits` dict
+that is per-worker. At `GUNICORN_WORKERS=2` (current Railway default), the effective
+per-IP limit is ~600 req/60 s (2×). Login limiter (`IpLoginAttempt` table) is DB-backed
+and exact regardless of worker count.
+
+**Verdict:**
+- Level A (7WG, ≤2 workers): ADEQUATE — 600 req/60 s still throttles naive enumeration
+- Level B: adequate if `GUNICORN_WORKERS ≤ 2`; degraded if workers are raised
+- Level C: implement Option A (DB-backed) or Option B (Redis) before National rollout
+
+**Operational cap documented:**
+- `docs/next-stage/25_support_runbook.md` Part 6A: explicit instruction not to raise
+  `GUNICORN_WORKERS` beyond 2 until DB-backed limiter is implemented
+- Gap matrix evidence updated with cap statement
+
+**Gap 15 remaining:** DB-backed general limiter not yet implemented (Option A); per-account limiting not implemented. Gap remains PARTIALLY COMPLETE.
