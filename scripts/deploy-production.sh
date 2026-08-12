@@ -601,8 +601,8 @@ _capture_and_report() {
   rest="${rest#*|}"
   local active="${rest%%|*}"
   local active_created="${rest#*|}"
-  printf "  %-12s LATEST=%-44s (%s)\n" "$label" "$latest" "$lat_status"
-  printf "  %-12s ACTIVE=%-44s (%s)\n" ""        "$active"  "$active_created"
+  printf "  %-12s LATEST=%-44s (%s)\n" "$label" "$latest" "$lat_status" >&2
+  printf "  %-12s ACTIVE=%-44s (%s)\n" ""        "$active"  "$active_created" >&2
   echo "${latest}|${active}"
 }
 
@@ -675,10 +675,18 @@ railway up ./backend --path-as-root \
   --project "$EXPECTED_PROJECT_ID" \
   --service "$ACTUAL_BACKEND_SVC_ID" \
   --environment "$ACTUAL_TARGET_ENV_ID" \
-  --detach 2>&1
+  --detach 2>&1 || die "Backend: railway up command failed — HARD FAIL."
 
 echo
-echo "  ── Backend gate 1/4: health/ready ───────────────────────────────────"
+echo "  ── Backend gate 1/4: new deployment ID ──────────────────────────────"
+wait_for_new_deploy \
+  "$ACTUAL_BACKEND_SVC_ID" "$PRE_BACKEND_LATEST" "$PRE_BACKEND_ACTIVE" \
+  "$BACKEND_GATE_TIMEOUT" "Backend"
+BACKEND_NEW_DEPLOY_ID="$VERIFIED_NEW_DEPLOY_ID"
+info "Backend: new=$BACKEND_NEW_DEPLOY_ID"
+
+echo
+echo "  ── Backend gate 2/4: health/ready (new container) ───────────────────"
 poll_health \
   "https://$EXPECTED_PRODUCTION_BACKEND_DOMAIN/api/health/ready" \
   "$BACKEND_GATE_TIMEOUT" "Backend /api/health/ready"
@@ -689,14 +697,6 @@ echo "$READY_JSON" | python3 -c "
 import json,sys; d=json.load(sys.stdin); assert d.get('status')=='ready'" 2>/dev/null \
   && ok "Readiness: status=ready" \
   || die "Backend /api/health/ready did not return status:ready — HARD FAIL."
-
-echo
-echo "  ── Backend gate 2/4: new deployment ID ──────────────────────────────"
-wait_for_new_deploy \
-  "$ACTUAL_BACKEND_SVC_ID" "$PRE_BACKEND_LATEST" "$PRE_BACKEND_ACTIVE" \
-  "$BACKEND_GATE_TIMEOUT" "Backend"
-BACKEND_NEW_DEPLOY_ID="$VERIFIED_NEW_DEPLOY_ID"
-info "Backend: new=$BACKEND_NEW_DEPLOY_ID"
 
 echo
 echo "  ── Backend gate 3/4: database revision ──────────────────────────────"
@@ -734,19 +734,19 @@ railway up ./connected-frontend --path-as-root \
   --project "$EXPECTED_PROJECT_ID" \
   --service "$ACTUAL_FRONTEND_SVC_ID" \
   --environment "$ACTUAL_TARGET_ENV_ID" \
-  --detach 2>&1
+  --detach 2>&1 || die "Frontend: railway up command failed — HARD FAIL."
 
 echo
-echo "  ── Frontend gate 1/3: HTTP 200 ──────────────────────────────────────"
-poll_health "https://$EXPECTED_PRODUCTION_FRONTEND_DOMAIN/" "$FRONTEND_GATE_TIMEOUT" "Frontend /"
-
-echo
-echo "  ── Frontend gate 2/3: new deployment ID ─────────────────────────────"
+echo "  ── Frontend gate 1/3: new deployment ID ─────────────────────────────"
 wait_for_new_deploy \
   "$ACTUAL_FRONTEND_SVC_ID" "$PRE_FRONTEND_LATEST" "$PRE_FRONTEND_ACTIVE" \
   "$FRONTEND_GATE_TIMEOUT" "Frontend"
 FRONTEND_NEW_DEPLOY_ID="$VERIFIED_NEW_DEPLOY_ID"
 info "Frontend: new=$FRONTEND_NEW_DEPLOY_ID"
+
+echo
+echo "  ── Frontend gate 2/3: HTTP 200 (new container) ──────────────────────"
+poll_health "https://$EXPECTED_PRODUCTION_FRONTEND_DOMAIN/" "$FRONTEND_GATE_TIMEOUT" "Frontend /"
 
 echo
 echo "  ── Frontend gate 3/3: build fingerprint ─────────────────────────────"
@@ -782,19 +782,19 @@ railway up ./frontend --path-as-root \
   --project "$EXPECTED_PROJECT_ID" \
   --service "$ACTUAL_PW_SVC_ID" \
   --environment "$ACTUAL_TARGET_ENV_ID" \
-  --detach 2>&1
+  --detach 2>&1 || die "PW: railway up command failed — HARD FAIL."
 
 echo
-echo "  ── PW gate 1/3: HTTP 200 ────────────────────────────────────────────"
-poll_health "https://$EXPECTED_PRODUCTION_PW_DOMAIN/" "$PW_GATE_TIMEOUT" "PW /"
-
-echo
-echo "  ── PW gate 2/3: new deployment ID ───────────────────────────────────"
+echo "  ── PW gate 1/3: new deployment ID ───────────────────────────────────"
 wait_for_new_deploy \
   "$ACTUAL_PW_SVC_ID" "$PRE_PW_LATEST" "$PRE_PW_ACTIVE" \
   "$PW_GATE_TIMEOUT" "PW"
 PW_NEW_DEPLOY_ID="$VERIFIED_NEW_DEPLOY_ID"
 info "PW: new=$PW_NEW_DEPLOY_ID"
+
+echo
+echo "  ── PW gate 2/3: HTTP 200 (new container) ────────────────────────────"
+poll_health "https://$EXPECTED_PRODUCTION_PW_DOMAIN/" "$PW_GATE_TIMEOUT" "PW /"
 
 echo
 echo "  ── PW gate 3/3: React markers ───────────────────────────────────────"

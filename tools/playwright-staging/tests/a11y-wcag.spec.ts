@@ -23,6 +23,7 @@ import { test, expect, Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
 const STAGING_URL = process.env.STAGING_URL ?? "https://aafc-tms-frontend-staging.up.railway.app";
+const STAGING_WING_ID = process.env.STAGING_WING_ID ?? "7WG";
 
 // Disable x-test-run header so staging CORS doesn't reject real-browser flows
 test.use({ extraHTTPHeaders: {} });
@@ -51,7 +52,6 @@ async function loginSysAdmin(page: Page) {
 
 async function navTo(page: Page, pageId: string) {
   await page.evaluate((id) => { (window as any).nav(id); }, pageId);
-  await page.waitForTimeout(800);
 }
 
 // ── SC 1.4.10 Reflow (320 px viewport) ───────────────────────────────────
@@ -82,13 +82,10 @@ test.describe("[A11Y-WCAG] SC 1.4.10 Reflow — 320 px viewport", () => {
     await page.waitForSelector("#page-dashboard.active", { timeout: 10000 });
 
     const overflow = await page.evaluate(() => {
-      const main = document.querySelector("main.main") as HTMLElement;
-      if (!main) return { scrollWidth: 0, clientWidth: 320, missing: true };
-      return { scrollWidth: main.scrollWidth, clientWidth: main.clientWidth, missing: false };
+      const main = document.querySelector("main.main") as HTMLElement | null;
+      if (!main) throw new Error("main.main not found — page may not have rendered");
+      return { scrollWidth: main.scrollWidth, clientWidth: main.clientWidth };
     });
-    if ((overflow as any).missing) {
-      console.log("  ⚠ main.main not found — checking document.body");
-    }
     expect(
       overflow.scrollWidth,
       `Dashboard main content scrolls horizontally at 320 px: scrollWidth=${overflow.scrollWidth}`
@@ -107,7 +104,7 @@ test.describe("[A11Y-WCAG] SC 1.4.10 Reflow — 320 px viewport", () => {
       const sel = document.querySelector<HTMLSelectElement>("#auth-wing-select");
       return sel && sel.options.length > 1;
     }, { timeout: 10000 });
-    await page.selectOption("#auth-wing-select", "7WG");
+    await page.selectOption("#auth-wing-select", STAGING_WING_ID);
     await page.waitForFunction(() => {
       const sel = document.querySelector<HTMLSelectElement>("#auth-sqn-select");
       return sel && sel.options.length > 1;
@@ -134,8 +131,8 @@ test.describe("[A11Y-WCAG] SC 1.4.10 Reflow — 320 px viewport", () => {
     await page.waitForSelector("#page-parade-nights.active", { timeout: 10000 });
 
     const overflow = await page.evaluate(() => {
-      const main = document.querySelector("main.main") as HTMLElement;
-      if (!main) return { scrollWidth: 0, clientWidth: 320 };
+      const main = document.querySelector("main.main") as HTMLElement | null;
+      if (!main) throw new Error("main.main not found — page may not have rendered");
       return { scrollWidth: main.scrollWidth, clientWidth: main.clientWidth };
     });
     expect(
@@ -184,8 +181,8 @@ test.describe("[A11Y-WCAG] SC 1.4.4 Resize Text — 200% zoom (640 px)", () => {
 
     // No horizontal overflow in main content
     const overflow = await page.evaluate(() => {
-      const main = document.querySelector("main.main") as HTMLElement;
-      if (!main) return { scrollWidth: 0, clientWidth: 640 };
+      const main = document.querySelector("main.main") as HTMLElement | null;
+      if (!main) throw new Error("main.main not found — page may not have rendered");
       return { scrollWidth: main.scrollWidth, clientWidth: main.clientWidth };
     });
     expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 4);
@@ -288,7 +285,7 @@ test.describe("[A11Y-WCAG] SC 1.4.3 Color Contrast", () => {
       const sel = document.querySelector<HTMLSelectElement>("#auth-wing-select");
       return sel && sel.options.length > 1;
     }, { timeout: 10000 });
-    await page.selectOption("#auth-wing-select", "7WG");
+    await page.selectOption("#auth-wing-select", STAGING_WING_ID);
     await page.waitForFunction(() => {
       const sel = document.querySelector<HTMLSelectElement>("#auth-role");
       return sel && sel.options.length > 1;

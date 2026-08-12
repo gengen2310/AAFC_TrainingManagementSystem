@@ -87,7 +87,7 @@ Name: _______________________________ Role: _________________________ Date: ____
   - ☐ `BACKUP_GPG_PRIVATE_KEY`
   - ☐ `BACKUP_GPG_PASSPHRASE`
   - ☐ `PROD_DATABASE_BACKUP_URL` (Railway production Postgres public proxy URL)
-  - ☐ `SUPABASE_DB_URL` (Railway staging Postgres public proxy URL)
+  - ☐ `SUPABASE_DB_URL` (Railway staging Postgres public proxy URL — despite the name, this points to the Railway staging PostgreSQL proxy, not a Supabase service; the name is a historical artifact)
 
   If any secret is missing: follow `deployment/backup-dr.md § Step 4` to add it.
 
@@ -204,8 +204,9 @@ All sections above must be signed before completing this section.
 
 **Pre-declaration checks:**
 - ☐ Sections A–F are all signed
+- ☐ A fresh production database backup has been taken within the last 2 hours and the artifact confirmed in GitHub Actions (record the run ID: _________)
 - ☐ Developer on-call has confirmed: test suite passes (1553+ tests), staging deploy is current, no known regressions
-- ☐ The production AAFC TMS frontend and backend are confirmed running (`/api/health/ready` returns `{"status":"ready","squadrons":16}`)
+- ☐ The production AAFC TMS frontend and backend are confirmed running (`/api/health/ready` returns `{"status":"ready"}` with `squadrons` matching the expected production org count — confirm the expected count with the developer on-call before checking)
 - ☐ A final D7 smoke test has been completed against production (see `docs/beta/D7_smoke_test_checklist.md`)
 
 **Declaration:**

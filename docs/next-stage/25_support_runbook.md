@@ -204,7 +204,7 @@ This section covers the operator's actions, not the developer's.
 ### 6.2 Before any production deployment
 
 The developer must provide:
-- [ ] Passing test suite (552+ tests, 0 failures)
+- [ ] Passing test suite (1553+ tests, 0 failures)
 - [ ] Migrations tested on staging with rollback plan
 - [ ] Security grep results showing 0 matches for known violations
 - [ ] Changelog entry describing the change
@@ -261,9 +261,17 @@ The **login rate limiter** (`IpLoginAttempt` table) is DB-backed and is NOT affe
 worker count — it enforces exactly 5 attempts per 300 s per IP regardless of how many
 workers are running.
 
-**Current production default:** `GUNICORN_WORKERS` is unset → defaults to 2 (set in
-`docker-entrypoint-staging.sh`). To change it in Railway: Railway dashboard → production
-environment → `aafc-tms-backend` service → Variables → set `GUNICORN_WORKERS`.
+**Current production default:** `GUNICORN_WORKERS` is unset → defaults to 2. Both the staging
+and production Railway services use `docker-entrypoint-staging.sh` as the container entrypoint
+(the filename is historical — it is not staging-only). To confirm the current value: Railway
+dashboard → production environment → `aafc-tms-backend` service → Variables tab → search
+`GUNICORN_WORKERS`. If the variable is absent, the default of 2 is active. To change it:
+Variables → set `GUNICORN_WORKERS`.
+
+**Important — horizontal scaling also degrades the limit:** If Railway horizontal scaling is
+enabled (more than one backend replica), the effective per-IP limit degrades by an additional
+factor equal to the replica count (e.g., 2 replicas × 2 workers = ~1 200 req/60 s). Contact
+the developer on-call before enabling horizontal scaling.
 
 **Before raising above 2:** implement the DB-backed rate limiter or Redis counter and
 document the new effective limit in this runbook. See `15_rate_limiting_assessment.md`

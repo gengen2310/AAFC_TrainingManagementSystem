@@ -94,11 +94,13 @@ The architecture relies on CORS + Bearer token for CSRF protection. The test mus
 
 ### Cross-Site Scripting (XSS)
 
+**Session architecture note for the vendor:** The application uses `Authorization: Bearer <JWT>` stored in `sessionStorage` as the primary session mechanism. The HttpOnly `aafc_session` cookie is a cross-origin fallback only. **The primary XSS impact is theft of the Bearer token from `sessionStorage` (key: `aafc_token`)** — not the HttpOnly cookie. An attacker who retrieves this token can make fully authenticated API calls for the duration of the token's validity. Tests should specifically attempt to exfiltrate `sessionStorage.getItem('aafc_token')` rather than `document.cookie`.
+
 | Area | Specific tests |
 |---|---|
 | Legacy TMS frontend | All user-controlled text rendered via `innerHTML` must use `esc()` — test all visible fields (facilitator names, squadron names, parade night notes, training session titles, notice content) |
 | Planning Workspace (React) | React auto-escapes most content; focus on `dangerouslySetInnerHTML` if any, and user-controlled URLs in link elements |
-| Stored XSS | Text stored in the database and re-rendered to other users (e.g. training notices visible to all sqn_general users) |
+| Stored XSS | Text stored in the database and re-rendered to other users (e.g. training notices visible to all sqn_general users) — primary goal: exfiltrate `sessionStorage` Bearer token |
 | Reflected XSS | URL parameters rendered in error messages or page state |
 
 ### Import Abuse
@@ -122,11 +124,11 @@ The architecture relies on CORS + Bearer token for CSRF protection. The test mus
 
 | Area | Specific tests |
 |---|---|
-| API information exposure | `/api/docs` (Swagger) should not expose system-admin or internal endpoints publicly; test in unauthenticated state |
+| API information exposure | `/api/docs` (Swagger UI), `/api/redoc`, and `/api/openapi.json` should not expose system-admin or internal endpoints publicly; test all three paths in unauthenticated state |
 | Error messages | Unhandled exceptions must return 500 without stack traces in production equivalents |
 | HTTP headers | Presence of `Strict-Transport-Security`, `X-Frame-Options`/`frame-ancestors`, `X-Content-Type-Options`, `Content-Security-Policy`; absence of `Server` detail |
 | Dependency scan | Known CVEs in Python packages (`requirements.txt`), npm packages (`package.json`); CVSS ≥ 7.0 must be reported |
-| Rate limiting | Effectiveness of per-IP API rate limit (300 req/60s per worker); test against sustained automated traffic |
+| Rate limiting | Effectiveness of per-IP API rate limit. **Important for the vendor:** the general API limiter (`check_api_rate`) is per-worker in-memory; at the current default of 2 workers the effective limit is ~600 req/60 s. The login limiter (`IpLoginAttempt` DB-backed) is exact regardless of worker count — test these two limiters separately. Also verify that the IP source is extracted from Railway's trusted proxy header only, not from a client-supplied `X-Forwarded-For` (rotation bypass). |
 | Maintenance mode bypass | Confirm write endpoints are blocked in maintenance mode; confirm login block (when enabled) is enforced |
 
 ---
