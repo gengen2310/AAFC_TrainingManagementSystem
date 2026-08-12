@@ -4284,3 +4284,16 @@ deferred (dead code — no live archive UI in either frontend; fresh ask require
 **Note (gate 3 label):** Backend gate 3 output reads "exact match (v47)" — this label is the migration file's embedded version marker, not the deploy script's REQUIRED_ALEMBIC_HEAD label. The revision hash `d3e4f5a6b7c8` is the authoritative match; the embedded label is cosmetic and predates the v48–v51 sequence. The hash match is the gate criterion.
 
 **Staging state after this deploy:** All code from the whole-session remediation program (Phases 1–8, gap reclassifications, T2-04/T2-05 wiring, Wing report cards, accessibility, year rollover E2E) is now deployed to Railway staging at commit `4d2f60c`.
+
+**Browser verification (2026-08-12, system_admin login):**
+
+| Check | Result |
+|---|---|
+| Build fingerprint in System Console | `458c7d507b82a87c01dc6e8ac77947470ccf29c7` built `2026-08-12T11:55:52Z` — exact match to deploy record | ✅ |
+| Environment / DB / Cookie | `staging`, PostgreSQL, Cookie secure=Yes, Backend/DB=ok | ✅ |
+| National Training Dashboard (Section A) | 14-wing readiness matrix rendered; 8-week risk forecast bar chart present; 7WG holiday conflict flagged | ✅ |
+| National Training Dashboard (Section B) | Delivery reliability trend card; Session Outcomes by Wing stacked bar chart; 703SQN showing 16 sessions | ✅ |
+| Wing Overview scope (7WG via sa-scope-wing) | Wing landing page loaded; squadron comparison and curriculum coverage cards rendered | ✅ |
+| T2-04 Cancellation Trend card | Rendered in #wing-dash — "No cancelled sessions or stand-downs recorded. Programme is on track." (green no-data state) | ✅ |
+| T2-05 Not-Delivered Sessions card | Rendered in #wing-dash — data table: 703SQN, count=2, sample INL-M08 (+1 more) | ✅ |
+| Console errors across session | Zero | ✅ |
