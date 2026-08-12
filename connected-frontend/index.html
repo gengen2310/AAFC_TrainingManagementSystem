@@ -6861,6 +6861,20 @@ async function loadDashCharts(){
   _dSetExp('exp-delivery-trend',charts.delivery_trend?.explanation);
   _dRenderChart('chart-session-outcomes',charts.session_outcomes,_chartDonut,'insight-session-outcomes');
   _dRenderChart('chart-cancellation-reasons',charts.cancellation_reasons,_chartHBar,'insight-cancellation-reasons');
+  // DASH-06: when the top cancellation reason is a data quality gap, surface an
+  // actionable prompt so staff know to update those sessions — not display it as
+  // an inert bar only a data analyst would notice.
+  (function(){
+    const cr=charts.cancellation_reasons;const rows=(cr&&cr.data)||[];
+    if(!rows.length||!rows[0].data_quality_gap)return;
+    const gapCount=rows[0].count||rows[0].value||0;
+    const total=rows.reduce((s,r)=>s+(+(r.count||r.value||0)),0);
+    if(!total||gapCount/total<0.15)return; // only prompt when ≥15% of reasons unknown
+    const el=document.getElementById('chart-cancellation-reasons');
+    if(!el)return;
+    const pct=Math.round(gapCount/total*100);
+    el.insertAdjacentHTML('beforeend',`<div class="alert a-warn" style="margin-top:8px;font-size:11.5px"><strong>${pct}% of cancellations have no reason recorded (${gapCount} of ${total}).</strong> Recording reasons helps identify patterns. Open each affected session and add a reason under Outcome.</div>`);
+  })();
 
   // C. Curriculum
   _dRenderChart('chart-curriculum-progress',charts.curriculum_progress,_chartStackedBarH,'insight-curriculum-progress');

@@ -26,14 +26,14 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 24 |
 | STAGING VERIFIED | 5 |
-| FIXED LOCALLY | 12 |
+| FIXED LOCALLY | 13 |
 | IMPLEMENTING | 14 |
-| NOT STARTED | 48 |
+| NOT STARTED | 47 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **120** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 41 / 120 = 34%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 42 / 120 = 35%**
 
 ---
 
@@ -96,7 +96,7 @@ frontend consumption.
 | DASH-03 | Dashboard | MEDIUM | Full §23 metric dictionary pass — all 22 inventoried chart functions documented (QUESTION / PURPOSE / POPULATION / PERIOD / NUMERATOR / DENOMINATOR / SOURCE / REFRESH / ACTION / DRILL-DOWN) | `dashboard-metric-dictionary.md` covers 2 charts fully; 20 inventoried with one-line purposes only | NOT STARTED |
 | DASH-04 | Dashboard | MEDIUM | Per-chart fault isolation in backend — each chart builder in `_full_squadron_charts` wrapped in its own try/except so one failure cannot 500 the whole `/api/dashboard/charts` response | `_run_chart_builder()` at `dashboard.py:62` wraps each builder in try/except, returning `chart_type="error"` on failure; confirmed implemented | CLOSED |
 | DASH-05 | Dashboard | MEDIUM | Frontend chart error handling — catch handler resets all chart containers on failure, not just 2 of 7+ (noted at `index.html:5793`) | `_DASH_CHART_IDS` at `index.html:6797` now covers all 14 chart/insight pairs; both skeleton reset and fetch-failure cleanup use the shared list — implemented and commented at lines 6789–6796 | CLOSED |
-| DASH-06 | Dashboard | LOW | Cancellation reasons "Unknown" / "Reason not recorded" — UI must surface an actionable prompt when this Pareto category is non-trivial, not display it as an inert bar | Whether the frontend prompts action when "Unknown" is the largest Pareto bar is not yet verified | NOT STARTED |
+| DASH-06 | Dashboard | LOW | Cancellation reasons "Unknown" / "Reason not recorded" — UI must surface an actionable prompt when this Pareto category is non-trivial, not display it as an inert bar | `loadDashCharts()` now appends a `a-warn` alert beneath the cancellation chart when the top reason is a `data_quality_gap` row and accounts for ≥15% of cancellations, explaining how to fix it | FIXED LOCALLY |
 | DASH-07 | Dashboard | MEDIUM | Accessible chart alternatives — data tables or text summaries alongside every chart element for screen-reader access | No accessible data-table alternatives alongside charts in either frontend | NOT STARTED |
 | DASH-08 | Dashboard | LOW | National/Wing readiness matrix (`_readiness_matrix`), risk forecast (`_risk_forecast`), and command metrics — frontend drill-down fully wired and verified end-to-end | Backend builders exist and are inventoried; whether all national/wing drill-down paths are rendered in connected-frontend is not confirmed this pass | IMPLEMENTING |
 | DASH-09 | Dashboard | MEDIUM | Curriculum progress per phase computed using governed CurriculumPhase catalogue (not hardcoded 8-phase list) | `_phases_for_squadron()` confirmed to read governed `CurriculumPhase` catalogue after earlier fix; hardcoded 8-phase list removed | CLOSED |
