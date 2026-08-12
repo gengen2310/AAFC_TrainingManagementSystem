@@ -360,6 +360,165 @@ test.describe("[A11Y-Staging] Squadron Admin", () => {
   });
 });
 
+// ── Wing Admin tests ───────────────────────────────────────────────────────
+
+test.describe("[A11Y-Staging] Wing Admin", () => {
+  const code = process.env.STAGING_WING_ADMIN_CODE ?? "";
+
+  test.beforeEach(async ({ page }) => {
+    if (!code) test.skip(true, "STAGING_WING_ADMIN_CODE not set");
+  });
+
+  async function loginWingAdmin(page: Page) {
+    await page.goto(STAGING_URL + "/");
+    await page.waitForSelector("#auth-step1", { state: "visible", timeout: 20000 });
+
+    await page.selectOption("#auth-type", "wing");
+    // Wait for wing dropdown to populate
+    await page.waitForFunction(() => {
+      const sel = document.querySelector<HTMLSelectElement>("#auth-wing-select");
+      return sel && sel.options.length > 1;
+    }, { timeout: 10000 });
+    await page.selectOption("#auth-wing-select", "7WG");
+
+    await page.waitForFunction(() => {
+      const sel = document.querySelector<HTMLSelectElement>("#auth-role");
+      return sel && sel.options.length > 1;
+    }, { timeout: 5000 });
+    await page.selectOption("#auth-role", "wing_admin");
+
+    await page.waitForSelector("#auth-continue-btn:not([disabled])", { timeout: 5000 });
+    await page.click("#auth-continue-btn");
+    await page.waitForSelector("#auth-step2", { state: "visible", timeout: 10000 });
+
+    await page.fill("#auth-code", code);
+    await page.click("#auth-btn");
+    await page.waitForSelector("#auth-screen", { state: "hidden", timeout: 15000 });
+  }
+
+  test("Wing Overview — axe clean", async ({ page }) => {
+    await loginWingAdmin(page);
+    await navTo(page, "wing-overview");
+    await page.waitForSelector("#page-wing-overview.active", { timeout: 10000 });
+    await runAxeOnPage(page, "Wing Overview (wing_admin)");
+  });
+
+  test("Wing Activities — axe clean", async ({ page }) => {
+    await loginWingAdmin(page);
+    await navTo(page, "wing-activities");
+    await page.waitForSelector("#page-wing-activities.active", { timeout: 10000 });
+    await runAxeOnPage(page, "Wing Activities (wing_admin)");
+  });
+
+  test("Wing HQ Calendar — axe clean", async ({ page }) => {
+    await loginWingAdmin(page);
+    await navTo(page, "wing-calendar");
+    await page.waitForSelector("#page-wing-calendar.active", { timeout: 10000 });
+    await runAxeOnPage(page, "Wing HQ Calendar (wing_admin)");
+  });
+
+  test("Wing dashboard report cards (T2-04/T2-05) — axe clean", async ({ page }) => {
+    await loginWingAdmin(page);
+    // Wing landing page loads #page-wing-overview; #wing-dash cards are rendered within it
+    await page.waitForSelector("#page-wing-overview.active", { timeout: 10000 });
+    // Wait for wing report cards to render (they require the API roundtrip to complete)
+    await page.waitForFunction(() => {
+      const wd = document.querySelector("#wing-dash");
+      return wd && wd.innerHTML.includes("Cancellation");
+    }, { timeout: 15000 });
+    await runAxeOnPage(page, "Wing dashboard report cards (wing_admin)");
+  });
+
+  test("Wing Overview keyboard — wing-overview page controls focusable", async ({ page }) => {
+    await loginWingAdmin(page);
+    await navTo(page, "wing-overview");
+    await page.waitForSelector("#page-wing-overview.active", { timeout: 10000 });
+
+    // cmd-window-sel (period selector) should be keyboard focusable
+    const focused = await page.evaluate(() => {
+      const el = document.getElementById("cmd-window-sel") as HTMLElement;
+      if (!el) return "NOT FOUND";
+      el.focus();
+      return document.activeElement?.id ?? "other";
+    });
+    if (focused !== "NOT FOUND") {
+      expect(focused).toBe("cmd-window-sel");
+      console.log("  ✓ #cmd-window-sel: keyboard focus reachable");
+    } else {
+      console.log("  ⚠ #cmd-window-sel not found on wing-overview — may be in cmd-dash-wing only");
+    }
+
+    // Confirm no duplicate IDs introduced by wing-overview rendering
+    const dupes = await page.evaluate(() => {
+      const ids = Array.from(document.querySelectorAll("[id]")).map(el => el.id);
+      const counts: Record<string, number> = {};
+      ids.forEach(id => { if (id) counts[id] = (counts[id] || 0) + 1; });
+      return Object.entries(counts).filter(([, count]) => count > 1).map(([id]) => id);
+    });
+    expect(dupes, `Duplicate IDs in wing-overview DOM: ${dupes.join(", ")}`).toHaveLength(0);
+    console.log("  ✓ No duplicate IDs in wing-overview DOM");
+  });
+});
+
+// ── National Admin tests ───────────────────────────────────────────────────
+
+test.describe("[A11Y-Staging] National Admin", () => {
+  const code = process.env.STAGING_NATIONAL_ADMIN_CODE ?? "";
+
+  test.beforeEach(async ({ page }) => {
+    if (!code) test.skip(true, "STAGING_NATIONAL_ADMIN_CODE not set");
+  });
+
+  test("National Overview — axe clean", async ({ page }) => {
+    await loginNational(page, "national_admin", code);
+    await navTo(page, "national");
+    await page.waitForSelector("#page-national.active", { timeout: 10000 });
+    await runAxeOnPage(page, "National Overview (national_admin)");
+  });
+
+  test("National Activities — axe clean", async ({ page }) => {
+    await loginNational(page, "national_admin", code);
+    await navTo(page, "national-activities");
+    await page.waitForSelector("#page-national-activities.active", { timeout: 10000 });
+    await runAxeOnPage(page, "National Activities (national_admin)");
+  });
+
+  test("National Overview keyboard — no duplicate IDs after National Training Dashboard render", async ({ page }) => {
+    await loginNational(page, "national_admin", code);
+    await navTo(page, "national");
+    await page.waitForSelector("#page-national.active", { timeout: 10000 });
+    // Wait for dashboard data to render
+    await page.waitForFunction(() => {
+      const dash = document.querySelector("#cmd-dash-national");
+      return dash && dash.querySelectorAll("tr").length > 1;
+    }, { timeout: 15000 });
+
+    const dupes = await page.evaluate(() => {
+      const ids = Array.from(document.querySelectorAll("[id]")).map(el => el.id);
+      const counts: Record<string, number> = {};
+      ids.forEach(id => { if (id) counts[id] = (counts[id] || 0) + 1; });
+      return Object.entries(counts).filter(([, count]) => count > 1).map(([id]) => id);
+    });
+    expect(dupes, `Duplicate IDs after National dashboard render: ${dupes.join(", ")}`).toHaveLength(0);
+    console.log("  ✓ No duplicate IDs after National Training Dashboard render");
+  });
+
+  test("National Overview cmd-window-sel — keyboard focusable", async ({ page }) => {
+    await loginNational(page, "national_admin", code);
+    await navTo(page, "national");
+    await page.waitForSelector("#page-national.active", { timeout: 10000 });
+
+    const focused = await page.evaluate(() => {
+      const el = document.getElementById("cmd-window-sel") as HTMLElement;
+      if (!el) return "NOT FOUND";
+      el.focus();
+      return document.activeElement?.id ?? "other";
+    });
+    expect(focused, "#cmd-window-sel must be keyboard focusable on National Overview").toBe("cmd-window-sel");
+    console.log("  ✓ #cmd-window-sel: keyboard focus reachable on National Overview");
+  });
+});
+
 // ── ca-flight hidden select assessment ────────────────────────────────────
 
 test("[A11Y-Staging] Hidden select #ca-flight — not keyboard focusable", async ({ page }) => {

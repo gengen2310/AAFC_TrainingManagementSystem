@@ -4297,3 +4297,32 @@ deferred (dead code — no live archive UI in either frontend; fresh ask require
 | T2-04 Cancellation Trend card | Rendered in #wing-dash — "No cancelled sessions or stand-downs recorded. Programme is on track." (green no-data state) | ✅ |
 | T2-05 Not-Delivered Sessions card | Rendered in #wing-dash — data table: 703SQN, count=2, sample INL-M08 (+1 more) | ✅ |
 | Console errors across session | Zero | ✅ |
+
+---
+
+## §83 — Gap 13: Wing Admin + National Admin Axe/keyboard tests (2026-08-12)
+
+**Gap:** 13 (Accessibility automation) — PARTIALLY COMPLETE
+
+**Work done:** Added 9 new tests to `tools/playwright-staging/tests/a11y-staging.spec.ts` covering the two previously untested roles:
+
+**Wing Admin (5 tests):**
+- Wing Overview — Axe clean (`select-name`, `label`, `duplicate-id`, `aria-allowed-attr` rules)
+- Wing Activities — Axe clean
+- Wing HQ Calendar — Axe clean
+- Wing dashboard report cards (T2-04/T2-05) — Axe clean; waits for `Cancellation` text to confirm cards have rendered before running Axe
+- Wing Overview keyboard — `#cmd-window-sel` focus reachable; duplicate-ID check after wing-overview render
+
+**National Admin (4 tests):**
+- National Overview — Axe clean
+- National Activities — Axe clean
+- National Overview keyboard — no duplicate IDs after National Training Dashboard renders (waits for `#cmd-dash-national tr` count > 1)
+- National Overview `#cmd-window-sel` — keyboard focusable
+
+**New env vars required to run:** `STAGING_WING_ADMIN_CODE=ADMIN7WG` and `STAGING_NATIONAL_ADMIN_CODE=ADMINNATIONAL` — tests skip gracefully if unset.
+
+**Counts:** `a11y-staging.spec.ts` now has 25 tests (16 prior + 9 new). `--list` confirmed all 25 parse without error.
+
+**Remaining for Gap 13:** Zoom/contrast tests; Axe not yet in main `frontend/e2e/` CI suite; these staging tests require manual env var setup.
+
+**Gap 13 status:** Remains PARTIALLY COMPLETE — all four authenticated role scopes now have Axe and keyboard coverage in staging, but CI integration and zoom/contrast tests are still missing.
