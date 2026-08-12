@@ -4385,3 +4385,41 @@ and exact regardless of worker count.
 - Gap matrix evidence updated with cap statement
 
 **Gap 15 remaining:** DB-backed general limiter not yet implemented (Option A); per-account limiting not implemented. Gap remains PARTIALLY COMPLETE.
+
+---
+
+## §86 — Gap 22: External Pen Test Scope of Work (2026-08-12)
+
+**Gap:** 22 (External penetration testing) — upgraded from NOT IMPLEMENTED → PARTIALLY COMPLETE
+
+**Work done:** Created `docs/next-stage/22_pen_test_scope.md` — complete scope of work document for a grey-box external penetration test:
+
+- **Engagement type:** Grey-box, 5 business days + 1 report day
+- **Access:** All 7 roles (staging access codes); API OpenAPI spec; no source code provided
+- **Areas:** Auth/lockout, JWT forgery, IDOR (all parameterized endpoints × all roles), Wing isolation,
+  Proxy/Delegated Intervention bypass, session revocation, CSRF, XSS (both frontends), import abuse
+  (CSV/ICS), audit log integrity, HTTP headers, dependency CVE scan
+- **Pass criteria:** All Critical/High findings remediated; Medium findings resolved or risk-accepted
+- **Report format:** Executive summary + findings register (CVSS v3.1) + dependency scan + evidence
+- **Remediation SLA:** Critical: 48h; High: 2 weeks; Medium: before National rollout
+
+Gap 22 gate: Level B = recommended; Level C = required. Vendor engagement and budget approval still needed from organisational authority.
+
+---
+
+## §87 — V1 Go/No-Go Pre-Flight Checklist (2026-08-12)
+
+**Purpose:** Consolidated single-document operator checklist for all human-gated V1 requirements
+
+**Work done:** Created `docs/next-stage/v1_go_no_go_checklist.md` — covers all human-action gates in a single place with checkboxes and sign-off lines:
+
+- **Section A (Gap 5):** Individual accountability decision — fill in Decision Record (Option C = defer acceptable for V1)
+- **Section B (Gap 20):** CSRF Railway env var verification — `COOKIE_SAMESITE=none`, `COOKIE_SECURE=true`, CORS no-wildcard, cross-origin session test
+- **Section C (Gap 21a):** Backup key custody — offline storage confirmation, 4 GitHub Secrets, manual backup run, restore test run
+- **Section D (Gap 21b):** DR rehearsal — Docker pg_restore against staging backup; result recorded in `19_disaster_recovery_rehearsal.md` Evidence Table
+- **Section E (Gap 23):** Data governance — all 9 decisions in `docs/beta/46_data_governance_and_approval.md`
+- **Section F (Gap 24):** Beta feedback register — all feedback classified; critical/high resolved or deferred
+- **Section G:** Final GO/NO-GO declaration with release authority sign-off
+- **Section H:** Post-release actions (7 days after go-live)
+
+Also updated gap matrix: Gap 22 promoted to PARTIALLY COMPLETE; V1 Gate Summary references the checklist; Gap counts corrected (PARTIALLY COMPLETE: 13, NOT IMPLEMENTED: 1).
