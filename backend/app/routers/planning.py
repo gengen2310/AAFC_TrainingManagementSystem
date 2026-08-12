@@ -1648,7 +1648,9 @@ def get_session(
         raise HTTPException(404, detail={"error": "not_found"})
     pn = db.get(ParadeNight, s.parade_night_id) if s.parade_night_id else None
     if pn:
-        require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+        # Read-only endpoint: view permission is sufficient; write check here
+        # previously caused sqn_general to receive 403 on session detail lookup.
+        require_can_view_squadron(p, pn.squadron_id, pn.wing_id)
     return _real_session_out(s, db)
 
 

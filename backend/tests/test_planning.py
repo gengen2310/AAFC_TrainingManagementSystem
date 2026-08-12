@@ -2370,3 +2370,45 @@ def test_schedule_export_cross_sqn_denied(client):
     other_gen = _other_sqn_general_hdr(client)
     r = client.get(f"/api/planning/years/{yr_id}/schedule/export.xlsx", headers=other_gen)
     assert r.status_code == 403, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# DEF-02: GET /api/planning/sessions/{id} used require_can_write_squadron
+# which returned 403 for sqn_general (a read-only role that should be able
+# to view session detail). Fixed to require_can_view_squadron for this
+# read-only endpoint.
+# ─────────────────────────────────────────────────────────────
+
+def test_sqn_general_can_read_planning_session(client):
+    """sqn_general must be able to GET their own squadron's planning session (was 403 before DEF-02 fix)."""
+    hdr_admin = _sqn_admin_hdr(client)
+    yr_id, pd_id = _setup_year_with_date(client, hdr_admin)
+    cr = client.post(
+        f"/api/planning/parade-dates/{pd_id}/sessions",
+        json={"cadet_group": "junior", "session_number": 1, "activity_title": "DEF-02 test session"},
+        headers=hdr_admin,
+    )
+    assert cr.status_code == 200, cr.text
+    sess_id = cr.json()["session_id"]
+
+    gen_hdr = _general_hdr(client)
+    r = client.get(f"/api/planning/sessions/{sess_id}", headers=gen_hdr)
+    assert r.status_code == 200, r.text
+    assert r.json()["session_id"] == sess_id
+
+
+def test_sqn_general_cannot_read_other_sqn_planning_session(client):
+    """sqn_general from 701 must not read a session belonging to 703."""
+    hdr_admin = _sqn_admin_hdr(client)
+    yr_id, pd_id = _setup_year_with_date(client, hdr_admin)
+    cr = client.post(
+        f"/api/planning/parade-dates/{pd_id}/sessions",
+        json={"cadet_group": "junior", "session_number": 1, "activity_title": "DEF-02 cross-sqn test"},
+        headers=hdr_admin,
+    )
+    assert cr.status_code == 200, cr.text
+    sess_id = cr.json()["session_id"]
+
+    other_gen = _other_sqn_general_hdr(client)
+    r = client.get(f"/api/planning/sessions/{sess_id}", headers=other_gen)
+    assert r.status_code == 403, r.text

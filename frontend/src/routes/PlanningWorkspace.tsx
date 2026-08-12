@@ -239,6 +239,14 @@ export function PlanningWorkspace() {
         </div>
       );
     }
+    // DEF-02: selectedYearId may be a stale localStorage value from a previous
+    // environment or database reset. If years have loaded and the cached id is
+    // not in the list, the useEffect above will pick the correct active year on
+    // the next render cycle. Show loading rather than firing API calls with a
+    // year_id that doesn't exist (which would return 404 and show an error flash).
+    if (years && !selectedYear) {
+      return <div className="pw-loading">Loading planning year…</div>;
+    }
 
     // List view applies across all range types
     if (displayMode === "list" && viewRange !== "parade-night") {
