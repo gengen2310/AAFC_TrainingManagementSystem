@@ -1263,10 +1263,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- NEEDS ACTION -->
       <div id="page-action-items" class="page">
-        <div class="ph"><h1 class="ph-title">Needs Attention</h1><div class="ph-sub">Curriculum items not yet scheduled, and sessions missing required details.</div></div>
-        <div class="alert a-warn">The items below require attention. Use the shortcut link to navigate directly to the session or schedule the curriculum item.</div>
+        <div class="ph"><h1 class="ph-title">Needs Attention</h1><div class="ph-sub">Consolidated list of planning gaps, missing outcomes, data quality issues, and action items.</div></div>
         <div class="tw"><table>
-          <thead><tr><th>Code</th><th>Title</th><th>Phase</th><th>Element</th><th>Term</th><th>Issue</th><th class="no-print">Shortcut</th></tr></thead>
+          <thead><tr><th style="width:80px">Category</th><th>Item</th><th style="width:90px">Date</th><th style="width:130px">Issue</th><th class="no-print" style="width:80px">Action</th></tr></thead>
           <tbody id="action-tbody"></tbody>
         </table></div>
       </div>
@@ -6892,10 +6891,18 @@ function drillDashChart(chartId,drillId){
   const sess=allSess().filter(s=>{
     if(chartId==='curriculum_progress'||chartId==='curriculum_backlog')return s.phase===drillId;
     if(chartId==='element_curriculum_progress')return s.element===drillId;
-    if(chartId==='cancellation_reasons')return s.cancel_reason===drillId;
+    if(chartId==='cancellation_reasons'||chartId==='cancellation_pareto'){
+      // Match the backend's 60-char truncation so reason labels align with session data
+      const raw=(s.status==='cancelled'?s.cancelled_reason||'':s.not_delivered_reason||'').trim();
+      if(drillId==='__no_reason__')
+        return (s.status==='cancelled'||s.status==='not_delivered')&&!raw;
+      const trunc=raw.length>60?raw.substring(0,60)+'…':raw;
+      return trunc===drillId;
+    }
     return s.status===drillId;
   });
-  showDrill('dash-drill','dash-drill-title','dash-drill-body',drillId,sess);
+  const title=drillId==='__no_reason__'?'Reason not recorded — review and update':drillId;
+  showDrill('dash-drill','dash-drill-title','dash-drill-body',title,sess);
 }
 
 function renderDash(){
@@ -9249,26 +9256,93 @@ async function delEquip(id){
 //  NEEDS ACTION
 // ═══════════════════════════════════════════════════════════
 function renderActions(){
+  const today=new Date().toISOString().substring(0,10);
   const items=[];
+
+  // Priority 0-1: Backend action items (manual + automation, open only)
+  (S.actionItems||[]).filter(a=>a.status==='open').forEach(a=>{
+    items.push({
+      pri: a.severity==='command_decision_required'?0:1,
+      cat: a.source==='automation'?'Alert':'Task',
+      title: a.title,
+      detail: a.description||'',
+      due: a.due||'',
+      issue: a.severity==='command_decision_required'?'Decision required':'Action required',
+      type: 'backend', id: a.id
+    });
+  });
+
+  // Priority 2: Past sessions with outcome not recorded (still "planned")
+  allSess().filter(s=>s.date<today&&s.status==='planned').forEach(s=>{
+    items.push({
+      pri: 2, cat: 'Outcome',
+      title: s.exp?`Outcome needed — ${s.exp}`:
+                   `Outcome needed — ${fmtD(s.date,{day:'numeric',month:'short'})} S${s.si+1}`,
+      detail: `${fmtD(s.date,{day:'numeric',month:'short'})} — record delivered, cancelled or not delivered.`,
+      due: s.date, issue: 'Outcome not recorded',
+      type: 'sess', date: s.date, si: s.si
+    });
+  });
+
+  // Priority 3: Cancelled/ND sessions with no reason
+  allSess().filter(s=>s.date<today&&(s.status==='cancelled'||s.status==='not_delivered')&&
+    !(s.cancelled_reason||s.not_delivered_reason||'').trim()).forEach(s=>{
+    items.push({
+      pri: 3, cat: 'Data',
+      title: `Reason needed — ${s.exp||'unassigned'} (${fmtD(s.date,{day:'numeric',month:'short'})})`,
+      detail: `${s.status==='cancelled'?'Cancelled':'Not delivered'} — no reason on record.`,
+      due: s.date, issue: 'Reason not recorded',
+      type: 'sess', date: s.date, si: s.si
+    });
+  });
+
+  // Priority 4: Sessions with no curriculum assigned
+  allSess().filter(s=>!s.exp).forEach(s=>{
+    items.push({
+      pri: 4, cat: 'Planning',
+      title: `Unassigned session — ${fmtD(s.date,{day:'numeric',month:'short'})} S${s.si+1}`,
+      detail: 'No curriculum item assigned.',
+      due: s.date, issue: 'No curriculum assigned',
+      type: 'sess', date: s.date, si: s.si
+    });
+  });
+
+  // Priority 5: Required curriculum items not scheduled
   const schCodes=new Set(allSess().filter(s=>s.code).map(s=>s.code));
-  allCurr().forEach(e=>{
-    if(!schCodes.has(e.code))items.push({code:e.code,title:e.title,phase:e.phase,el:e.el,term:e.term,issue:'Not scheduled',type:'curr'});
+  allCurr().filter(e=>!schCodes.has(e.code)).forEach(e=>{
+    items.push({
+      pri: 5, cat: 'Backlog',
+      title: e.title, detail: `${e.code} — ${e.phase||'—'}`,
+      due: '', issue: 'Not scheduled',
+      type: 'curr', code: e.code
+    });
   });
-  allSess().forEach(s=>{
-    if(!s.exp)items.push({code:`${s.date}-S${s.si+1}`,title:`Unassigned — ${fmtD(s.date,{day:'numeric',month:'short'})}`,phase:s.phase||'—',el:'—',term:'—',issue:'No curriculum item assigned',type:'sess',date:s.date,si:s.si});
-  });
-  document.getElementById('action-tbody').innerHTML=items.length?items.map(it=>`<tr style="background:#fffbf0">
-    <td><code style="font-size:10px">${it.code}</code></td>
-    <td style="font-weight:700">${esc(it.title)}</td>
-    <td>${it.phase!=='—'?phBadge(it.phase):'—'}</td>
-    <td>${it.el!=='—'?elBadge(it.el):'—'}</td>
-    <td>${it.term!=='—'?`<span class="badge b-blue" style="font-size:8.5px">${it.term}</span>`:'—'}</td>
-    <td><span class="badge b-amber">${it.issue}</span></td>
-    <td class="no-print">
-      ${it.type==='curr'?`<button class="btn btn-xs btn-sky" onclick="showCurrDetail('${it.code}')">View →</button>`:''}
-      ${it.type==='sess'&&canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${it.date}',${it.si})">Assign →</button>`:''}
-    </td>
-  </tr>`).join(''):`<tr><td colspan="7"><div class="empty" style="padding:18px"><div class="et">No items require attention.</div><div class="es">All curriculum items are scheduled.</div></div></td></tr>`;
+
+  items.sort((a,b)=>a.pri-b.pri||(a.due<b.due?-1:a.due>b.due?1:0));
+
+  const CAT_CLS={Alert:'b-red',Task:'b-amber',Outcome:'b-amber',Data:'b-amber',Planning:'b-blue',Backlog:'b-grey'};
+  document.getElementById('action-tbody').innerHTML=items.length
+    ?items.map(it=>`<tr>
+      <td><span class="badge ${CAT_CLS[it.cat]||'b-grey'}" style="font-size:9px">${esc(it.cat)}</span></td>
+      <td><div style="font-weight:700;font-size:12px">${esc(it.title)}</div>
+          <div style="font-size:10.5px;color:var(--muted)">${esc(it.detail)}</div></td>
+      <td style="font-size:11px;color:var(--muted);white-space:nowrap">${it.due?fmtD(it.due,{day:'numeric',month:'short',year:'numeric'}):'—'}</td>
+      <td><span class="badge b-amber" style="font-size:9px">${esc(it.issue)}</span></td>
+      <td class="no-print">
+        ${it.type==='curr'?`<button class="btn btn-xs btn-sky" onclick="showCurrDetail('${esc(it.code)}')">View</button>`:''}
+        ${it.type==='sess'&&canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${esc(it.date)}',${it.si})">Edit</button>`:''}
+        ${it.type==='backend'&&it.id&&canWriteSquadron()?`<button class="btn btn-xs" onclick="_closeActionItem('${esc(it.id)}')">Done</button>`:''}
+      </td>
+    </tr>`).join('')
+    :`<tr><td colspan="5"><div class="empty" style="padding:18px">
+        <div class="et">No items require attention.</div>
+        <div class="es">All curriculum items are scheduled and outcomes are recorded.</div>
+      </div></td></tr>`;
+}
+async function _closeActionItem(id){
+  if(!confirm('Mark this action item as done?'))return;
+  try{await apiCloseActionItem(id);await reloadAndRender();showToast('Item closed.');}
+  catch(e){showToast(apiErr(e),true);}
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -9803,7 +9877,8 @@ function _renderPareto(chart){
   return rows.map(r=>{
     const w=Math.round(r.count/maxV*100);
     const isGap=!!r.data_quality_gap;
-    return `<div class="ph-row" style="margin-bottom:5px" role="img" aria-label="${esc(r.label)}: ${r.count}, cumulative ${r.cumulative_pct}%">
+    const drill=r.drill_id?`onclick="drillDashChart('${esc(chart.chart_id)}','${esc(r.drill_id)}')" style="cursor:pointer"`:'';
+    return `<div class="ph-row" style="margin-bottom:5px" role="img" aria-label="${esc(r.label)}: ${r.count}, cumulative ${r.cumulative_pct}%" ${drill}>
       <div class="ph-name" style="min-width:130px;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isGap?'font-style:italic;color:var(--muted)':''}" title="${esc(r.label)}">${isGap?'ⓘ ':''}${esc(r.label.substring(0,40))}</div>
       <div class="ph-bar" style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${isGap?'var(--muted)':'var(--royal)'};border-radius:3px"></div></div></div>
       <div class="ph-cnt" style="min-width:96px;text-align:right;font-size:10.5px;color:var(--muted)">${r.count} · cum. ${r.cumulative_pct}%</div>

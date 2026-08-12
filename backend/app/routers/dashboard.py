@@ -595,7 +595,9 @@ def _cancellation_reasons(sessions: list, pns: list) -> dict:
             reason_cnt[reason] += 1
 
     data = sorted(
-        [{"label": r, "count": c, "data_quality_gap": r == _REASON_NOT_RECORDED_LABEL}
+        [{"label": r, "count": c,
+          "data_quality_gap": r == _REASON_NOT_RECORDED_LABEL,
+          "drill_id": "__no_reason__" if r == _REASON_NOT_RECORDED_LABEL else r}
          for r, c in reason_cnt.items()],
         key=lambda x: -x["count"],
     )[:12]  # top 12
@@ -1758,6 +1760,7 @@ def _cancellation_pareto(all_sessions: list) -> dict:
         data.append({
             "label": label, "count": count,
             "data_quality_gap": label == _REASON_NOT_RECORDED_LABEL,
+            "drill_id": "__no_reason__" if label == _REASON_NOT_RECORDED_LABEL else label,
             "cumulative_pct": round(running / total * 100) if total else 0,
         })
 
