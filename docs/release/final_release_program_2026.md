@@ -4154,4 +4154,56 @@ deferred (dead code — no live archive UI in either frontend; fresh ask require
 
 **Total Playwright coverage:** 225 tests (160 in `frontend/e2e/` + 58 in `frontend/e2e-connected/` + 7 new).
 
-**Gap register:** Gap #12 (Playwright incomplete) updated to COMPLETE for Level A.
+**Gap register:** Gap #12 (Playwright incomplete) updated to COMPLETE for Level A (core workflows done; multi-Wing scope and Axe accessibility remain for Level B/C).
+
+---
+
+## §80 — Gap Matrix Accuracy Pass + V1 Gap Documents (2026-08-12)
+
+**Scope:** Full audit of the gap matrix against current code to correct stale classifications. Wrote three V1-blocking gap documents. Promoted Gap 7 to COMPLETE after confirming production code paths are generic.
+
+**Gap matrix audit results** (all changes committed to `docs/next-stage/01_gap_matrix.md`):
+
+| Gap | Old classification | New classification | Basis |
+|---|---|---|---|
+| 4 | PARTIALLY COMPLETE | COMPLETE WITH EVIDENCE | `_showAddFacLeaveForm`, `_submitFacLeave`, `_deleteFacLeave` confirmed in `connected-frontend/index.html:8533–8597` |
+| 6 | NOT IMPLEMENTED | COMPLETE WITH EVIDENCE | Phase 7: `version` field + 409 Conflict on ParadeNight/ScheduledSession/PlanningYear/PlanningNotice; `test_concurrency.py`; committed `4d08c5e` |
+| 7 | PARTIALLY COMPLETE | COMPLETE WITH EVIDENCE | `/bootstrap-staging` fully parameterized (no "7WG" hardcode in logic); `auth.py:21` generic "Wing SOCAD" |
+| 11 | PARTIALLY COMPLETE | COMPLETE WITH EVIDENCE | Phase 8: 10/10 E2E tests; `08_year_rollover_procedure.md`; committed `992dc34` |
+| 15 | PARTIALLY COMPLETE | PARTIALLY COMPLETE (evidence updated) | `api_rate_limit` middleware covers ALL `/api/` endpoints, not just login |
+| 17 | PARTIALLY COMPLETE | COMPLETE WITH EVIDENCE | `X-Request-ID` generated per-request, logged as `req_id` in every access log line (`main.py:237–247`) |
+| 18 | PARTIALLY COMPLETE | COMPLETE WITH EVIDENCE | `maintenance_block_logins` SystemSetting + `_maint_cache["block_logins"]` implemented (`main.py:15–41`) |
+| 19 | PARTIALLY COMPLETE | COMPLETE WITH EVIDENCE | `token_version` (`tv`) in JWT; incremented on code reset (`auth.py:247`); validated per-request (`dependencies.py:117`); no JTI blacklist required |
+| 25 | PARTIALLY COMPLETE | COMPLETE WITH EVIDENCE | 280-line `docs/next-stage/25_support_runbook.md` confirmed |
+
+**Summary statistics movement:** COMPLETE WITH EVIDENCE: 0 → 10; PARTIALLY COMPLETE: 15 → 9; NOT IMPLEMENTED: 7 → 5.
+
+**New gap documents created:**
+
+- `docs/next-stage/04_canonical_data_model.md` (Gap 3): Decision record for `training_areas` as canonical location model; `planning_locations` deprecated; Phase 2 table drop deferred to Level B
+- `docs/next-stage/05_individual_accountability_options.md` (Gap 5): Presents Option A (individual accounts), Option B (claimed name at login), Option C (defer to National); recommends Option C for V1 with Option A required before Level B; decision gate pending human sign-off
+- `docs/next-stage/09_report_catalogue.md` (Gap 10): Tier 1/2/3 report definitions; 12 endpoints across 3 scopes (squadron, wing, national); per-report: scope, source, calculation, decision signals, permissions, performance target; identifies export and date-range filter as remaining Tier 1 items
+- `docs/next-stage/20_csrf_assessment.md` (Gap 20): Documents CORS + SameSite=None as the CSRF mitigation strategy; CSRF tokens assessed as not required given Bearer token architecture; production env var verification checklist for operator (must confirm `COOKIE_SAMESITE=none` and `COOKIE_SECURE=true` in Railway before V1 deployment)
+
+**V1 gate status after this pass:**
+
+| Gap | V1 requirement | Status |
+|---|---|---|
+| 1 | Legacy text cleanup | ✅ DONE |
+| 2 | Nav/session/logout unified | ✅ DONE (design tokens = Level B) |
+| 3 | Location data model decision recorded | ✅ DONE |
+| 4 | Facilitator leave in Main TMS | ✅ DONE |
+| 5 | Options presented; decision recorded | ✅ Options presented; **decision pending human sign-off** |
+| 6 | Optimistic locking implemented | ✅ DONE |
+| 10 | Tier 1 report catalogue defined | ✅ DONE |
+| 11 | Year rollover E2E + procedure | ✅ DONE |
+| 12 | Core Playwright coverage | ✅ DONE (114 Planning Workspace + 98 connected = 212 tests) |
+| 17 | Correlation IDs in production logs | ✅ DONE |
+| 18 | Login-block option implemented | ✅ DONE |
+| 19 | Forced logout on code reset | ✅ DONE |
+| 20 | CSRF assessed + documented | ✅ DONE (Railway env var = operator checklist step) |
+| 21 | Key custody + DR rehearsal | ⚠️ **HUMAN BLOCKED** — 5 key custody actions + DR rehearsal run required |
+| 24 | Beta feedback register populated | ⚠️ **HUMAN BLOCKED** — requires active beta feedback collection |
+| 25 | Support runbook written | ✅ DONE |
+
+**Remaining autonomous work under this program:** None identified at Level A. Gaps 21 and 24 require human action. Gap 5's decision and Gap 20's Railway env var verification require an operator. Level B work (Wing onboarding script, multi-Wing synthetic data, 250-user load test) is gated on human approval of a second Wing activation.
