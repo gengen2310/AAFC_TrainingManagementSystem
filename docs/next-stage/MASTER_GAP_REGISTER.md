@@ -24,16 +24,16 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 
 | Status | Count |
 |---|---|
-| CLOSED | 15 |
+| CLOSED | 20 |
 | STAGING VERIFIED | 5 |
 | FIXED LOCALLY | 10 |
 | IMPLEMENTING | 14 |
-| NOT STARTED | 59 |
+| NOT STARTED | 54 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **120** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 30 / 120 = 25%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 35 / 120 = 29%**
 
 ---
 
@@ -74,7 +74,7 @@ to formally confirm this (see DOC-12).
 | CLASS-10 | Core Domain | HIGH | Mission Backlog `class_breakdown` field — backend returns per-curriculum-item breakdown of which Training Class needs action | `planning.py` Mission Backlog API returns `class_breakdown` | CLOSED |
 | CLASS-11 | Core Domain | MEDIUM | Class behind-threshold detection: backend flags classes >15 pp below their stage average | Backend detects and returns flag; 1553 tests passing including class-specific tests | CLOSED |
 | CLASS-12 | Core Domain | HIGH | class_curriculum_progress chart in connected-frontend — chart container rendering per-class curriculum progress from `charts.class_curriculum_progress` | Confirmed implemented: `chart-class-curriculum-progress` container at index.html:792; rendered at index.html:6857 via `_dRenderChart`; insight at 6858. Gap register was stale. | CLOSED |
-| CLASS-13 | Core Domain | HIGH | class_breakdown field rendered in connected-frontend curriculum page — per-item indication of which Training Class needs each curriculum item | connected-frontend curriculum page rendering ignores `class_breakdown` field from Mission Backlog response entirely | NOT STARTED |
+| CLASS-13 | Core Domain | HIGH | class_breakdown field rendered in connected-frontend curriculum page — per-item indication of which Training Class needs each curriculum item | Implemented as MBACK-01 (commit `16f6bce`): `_loadCurriculumClassBreakdown()` + `_currClassBreakdownHtml()` render per-class badges in curriculum page | CLOSED |
 | CLASS-14 | Core Domain | MEDIUM | Training Classes step in the Getting Started checklist onboarding wizard | Confirmed implemented: `setup.py` lines 79-84 query TrainingClass count; lines 139-141 emit `training_classes_created` step. Gap register was stale. | CLOSED |
 | CLASS-15 | Core Domain | LOW | CustomPhase → CurriculumPhase migration and cleanup — CustomPhase is a narrower, older squadron-scoped phase-name table that predates CurriculumPhase | CustomPhase still live; migration surface identified in `parallel-class-impact-analysis.md` as CLASS-14; not acted on | IMPLEMENTING |
 | CLASS-16 | Core Domain | LOW | Session.cadet_group / Cadet.phase formal deprecation — single-string fields replaced structurally by SessionAudience; all consumers (Mission Backlog, Weekly Program, dashboards, both frontends) must migrate before fields are removed | Old fields retained as read-compatibility path per capability-preservation rules; no migration schedule; no consumer yet migrated to SessionAudience | IMPLEMENTING |
@@ -94,8 +94,8 @@ frontend consumption.
 | DASH-01 | Dashboard | HIGH | Wing T2-04 (wing-cancellation-trend) and T2-05 (wing-not-delivered) wired to Wing dashboard cards | All 5 wing report endpoints rendered in connected-frontend; confirmed by `01_gap_matrix.md` Gap 10 closure | CLOSED |
 | DASH-02 | Dashboard | HIGH | Zero-session parade night reports as `not_planned`, never as 100% ready | `dashboard.py` and `index.html:5672/:5713` correctly guard `sessions_total===0` / `planning_status==='not_planned'` | CLOSED |
 | DASH-03 | Dashboard | MEDIUM | Full §23 metric dictionary pass — all 22 inventoried chart functions documented (QUESTION / PURPOSE / POPULATION / PERIOD / NUMERATOR / DENOMINATOR / SOURCE / REFRESH / ACTION / DRILL-DOWN) | `dashboard-metric-dictionary.md` covers 2 charts fully; 20 inventoried with one-line purposes only | NOT STARTED |
-| DASH-04 | Dashboard | MEDIUM | Per-chart fault isolation in backend — each chart builder in `_full_squadron_charts` wrapped in its own try/except so one failure cannot 500 the whole `/api/dashboard/charts` response | Not verified against current code; flagged in `dashboard-metric-dictionary.md` as unconfirmed; code may have moved since analysis | NOT STARTED |
-| DASH-05 | Dashboard | MEDIUM | Frontend chart error handling — catch handler resets all chart containers on failure, not just 2 of 7+ (noted at `index.html:5793`) | Not verified against current code; flagged as unconfirmed | NOT STARTED |
+| DASH-04 | Dashboard | MEDIUM | Per-chart fault isolation in backend — each chart builder in `_full_squadron_charts` wrapped in its own try/except so one failure cannot 500 the whole `/api/dashboard/charts` response | `_run_chart_builder()` at `dashboard.py:62` wraps each builder in try/except, returning `chart_type="error"` on failure; confirmed implemented | CLOSED |
+| DASH-05 | Dashboard | MEDIUM | Frontend chart error handling — catch handler resets all chart containers on failure, not just 2 of 7+ (noted at `index.html:5793`) | `_DASH_CHART_IDS` at `index.html:6797` now covers all 14 chart/insight pairs; both skeleton reset and fetch-failure cleanup use the shared list — implemented and commented at lines 6789–6796 | CLOSED |
 | DASH-06 | Dashboard | LOW | Cancellation reasons "Unknown" / "Reason not recorded" — UI must surface an actionable prompt when this Pareto category is non-trivial, not display it as an inert bar | Whether the frontend prompts action when "Unknown" is the largest Pareto bar is not yet verified | NOT STARTED |
 | DASH-07 | Dashboard | MEDIUM | Accessible chart alternatives — data tables or text summaries alongside every chart element for screen-reader access | No accessible data-table alternatives alongside charts in either frontend | NOT STARTED |
 | DASH-08 | Dashboard | LOW | National/Wing readiness matrix (`_readiness_matrix`), risk forecast (`_risk_forecast`), and command metrics — frontend drill-down fully wired and verified end-to-end | Backend builders exist and are inventoried; whether all national/wing drill-down paths are rendered in connected-frontend is not confirmed this pass | IMPLEMENTING |
@@ -111,7 +111,7 @@ and curriculum item breakdown). Frontend consumption gaps are the remaining work
 | ID | AREA | SEVERITY | REQUIREMENT | CURRENT STATE | STATUS |
 |---|---|---|---|---|---|
 | MBACK-01 | Mission Backlog | HIGH | class_breakdown per curriculum item displayed in connected-frontend curriculum page — identifies which Training Class needs each item | Implemented commit `16f6bce`: `_loadCurriculumClassBreakdown()` fetches mission backlog on curriculum page nav; `_currClassBreakdownHtml()` renders per-class badges (b-ok/b-blue/b-amber/b-red by status). | FIXED LOCALLY |
-| MBACK-02 | Mission Backlog | MEDIUM | Per-class Mission Backlog filtering in UI — view backlog filtered to a single Training Class | No class filter exists in either frontend's Mission Backlog / curriculum page | NOT STARTED |
+| MBACK-02 | Mission Backlog | MEDIUM | Per-class Mission Backlog filtering in UI — view backlog filtered to a single Training Class | `mission-filter-class` select populated dynamically from `class_breakdown` in `loadMissions()`; `renderMissions()` filters to missions where selected class is not resolved — confirmed present in `index.html:10485–10522` | CLOSED |
 | MBACK-03 | Mission Backlog | MEDIUM | Needs Attention consolidated queue (§39) — single prioritised surface combining readiness warnings, class gaps, and required planning actions | Individual pieces exist (readiness warnings, Mission Backlog panel); not consolidated into one action queue | NOT STARTED |
 | MBACK-04 | Mission Backlog | LOW | Plan-faster shortcut from Mission Backlog item directly to a session slot (§41) | Not implemented; currently requires navigating to the session separately | NOT STARTED |
 | MBACK-05 | Mission Backlog | MEDIUM | Per-class facilitator / resource conflict detection (§69) — when assigning a facilitator or room to a session, detect conflicts against other sessions that the same class attends | No class-aware conflict detection; current conflict checks are session-level only, blind to a class being split across parallel sessions | NOT STARTED |
@@ -134,7 +134,7 @@ is an empty-string admin-editable text field — no default content ships.
 | HELP-05 | Help | LOW | "What changed?" view (§40) — changelog or activity feed showing recent modifications to the current week's plan | Not found anywhere in either frontend | NOT STARTED |
 | HELP-06 | Help | LOW | Universal search / command palette (§6) — single-keystroke access to any entity, page, or action from anywhere in the application | Not implemented in either frontend | NOT STARTED |
 | HELP-07 | Help | LOW | Getting Help panel — admin-editable free text must have meaningful default guidance content for a new squadron's first session | Empty-string default (`training.py:2583–2609`); any admin can write to it but no default guidance ships with the system | ACCEPTED RISK |
-| HELP-08 | Help | MEDIUM | Setup status endpoint surfaced in UI — `GET /api/setup/status` exists but no setup-status summary is shown to a wing_admin or sqn_admin who has just completed Getting Started | `/api/setup/status` endpoint confirmed implemented; whether connected-frontend renders its response as a completion indicator is not confirmed this pass | NOT STARTED |
+| HELP-08 | Help | MEDIUM | Setup status endpoint surfaced in UI — `GET /api/setup/status` exists but no setup-status summary is shown to a wing_admin or sqn_admin who has just completed Getting Started | `page-getting-started` renders `GET /api/setup/status` response via `loadGettingStarted()` at `index.html:4462`; accessible from nav as "Getting Started" for squadron/wing/national/system_admin scopes | CLOSED |
 
 ---
 
