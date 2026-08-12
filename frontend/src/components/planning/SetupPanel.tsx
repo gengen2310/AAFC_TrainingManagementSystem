@@ -14,10 +14,25 @@ function previewDates(weekday: number, startDate: string, endDate: string, frequ
   if (!startDate || !endDate) return [];
   const targetDay = JS_DOW[weekday];
   const end = new Date(endDate + "T00:00:00");
+  const dates: string[] = [];
+
+  if (frequency === "monthly") {
+    // Mirror backend _compute_candidate_dates: daily iteration, include when
+    // d.weekday() == weekday AND d.day <= 7 (first occurrence each month).
+    const cur = new Date(startDate + "T00:00:00");
+    while (cur <= end && dates.length < 60) {
+      if (cur.getDay() === targetDay && cur.getDate() <= 7) {
+        dates.push(cur.toISOString().slice(0, 10));
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    return dates;
+  }
+
+  // weekly / fortnightly: advance to first matching weekday then step.
   const cur = new Date(startDate + "T00:00:00");
   while (cur.getDay() !== targetDay) cur.setDate(cur.getDate() + 1);
-  const step = frequency === "weekly" ? 7 : frequency === "fortnightly" ? 14 : 28;
-  const dates: string[] = [];
+  const step = frequency === "fortnightly" ? 14 : 7;
   while (cur <= end && dates.length < 60) {
     dates.push(cur.toISOString().slice(0, 10));
     cur.setDate(cur.getDate() + step);

@@ -364,7 +364,7 @@ export function Accounts() {
             {(wingScopeRoles.has(createRole) || sqnScopeRoles.has(createRole)) && (
               <label>Wing
                 <select value={createWing} onChange={e => { setCreateWing(e.target.value); setCreateSqn(""); }}
-                  disabled={session?.is_wing && !session?.is_national}>
+                  disabled={!session?.is_national}>
                   <option value="">— select wing —</option>
                   {(wings.data ?? []).map(w => <option key={w.wing_id} value={w.wing_id}>{w.code}</option>)}
                 </select>
