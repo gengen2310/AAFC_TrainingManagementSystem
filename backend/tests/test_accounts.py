@@ -522,6 +522,42 @@ def test_disable_and_reactivate_account(client):
     assert login_r2.status_code == 200, "Reactivated user must be able to log in with new code"
 
 
+def test_disable_invalidates_existing_jwt(client):
+    """SEC-11: disabling an account must immediately invalidate live JWTs via
+    token_version increment — not only block new logins via access_code.active_status."""
+    h = login(client, "ADMINNATIONAL")
+    hwg = login(client, "ADMIN7WG")
+    sqn_id = _get_sqn_id(client, hwg, "703")
+    create_r = client.post("/api/accounts", headers=h, json={
+        "display_name": "JWT Invalidation Test",
+        "role": "sqn_general",
+        "squadron_id": sqn_id,
+    })
+    assert create_r.status_code == 200, create_r.text
+    uid = create_r.json()["user_id"]
+    code = create_r.json()["new_code"]
+
+    # Obtain a valid JWT for the new account
+    login_r = client.post("/api/auth/login", json={"code": code})
+    assert login_r.status_code == 200, "New account must be able to log in"
+    user_token = {"Authorization": f"Bearer {login_r.json()['token']}"}
+
+    # Confirm the JWT works before disable
+    me_r = client.get("/api/auth/me", headers=user_token)
+    assert me_r.status_code == 200, "JWT must work before account is disabled"
+
+    # Disable the account
+    dis_r = client.post(f"/api/accounts/{uid}/disable", headers=h, json={})
+    assert dis_r.status_code == 200, dis_r.text
+
+    # The existing JWT must now be rejected (token_version mismatch)
+    post_dis_r = client.get("/api/auth/me", headers=user_token)
+    assert post_dis_r.status_code == 401, (
+        "Disabled account's existing JWT must be rejected immediately via token_version, "
+        f"got {post_dis_r.status_code}: {post_dis_r.text}"
+    )
+
+
 def test_cannot_disable_self(client):
     h = login(client, "ADMINNATIONAL")
     me = client.get("/api/auth/me", headers=h).json()["session"]

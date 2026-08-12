@@ -26,14 +26,14 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 26 |
 | STAGING VERIFIED | 5 |
-| FIXED LOCALLY | 14 |
-| IMPLEMENTING | 14 |
+| FIXED LOCALLY | 15 |
+| IMPLEMENTING | 13 |
 | NOT STARTED | 44 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **120** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 45 / 120 = 38%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 46 / 120 = 38%**
 
 ---
 
@@ -247,7 +247,7 @@ Four gaps require System Admin action as Human Gates.
 | SEC-08 | Security | MEDIUM | Dependency vulnerability scanning in CI — `pip-audit` (backend) and `npm audit --audit-level=high` (React frontend) in an automated workflow before each release | `.github/workflows/dependency-audit.yml` added: runs on push/PR to main/release branches and weekly Monday 09:00 UTC; `pip-audit --strict` for backend, `npm audit --audit-level=high` for Planning Workspace | FIXED LOCALLY |
 | SEC-09 | Security | MEDIUM | CSP `connect-src` runtime injection verified in deployed connected-frontend nginx response | `nginx.conf` and `docker-entrypoint.sh` updated in Phase 15 security hardening; staging verification post-deploy not recorded | IMPLEMENTING |
 | SEC-10 | Security | LOW | `Permissions-Policy` header confirmed in production connected-frontend nginx HTTP response | Added in Phase 15; not verified by live HTTP check in production post-deploy 2026-08-12 | IMPLEMENTING |
-| SEC-11 | Security | MEDIUM | Token version revocation triggered automatically on account disable or role change — not only on code reset | Revocation mechanism exists (increment `token_version`); no automated hook on disable/role-change; documented as a manual operator step in support runbook | IMPLEMENTING |
+| SEC-11 | Security | MEDIUM | Token version revocation triggered automatically on account disable or role change — not only on code reset | `disable_account()` at `accounts.py:628` now increments `token_version` before committing, immediately invalidating live JWTs; role change and scope change already incremented it. Regression test `test_disable_invalidates_existing_jwt` confirms 401 on reuse | FIXED LOCALLY |
 | SEC-12 | Security | LOW | Quarterly DR rehearsal schedule established — first rehearsal date set and rehearsal completed | Post-release action H4; not yet scheduled | NOT STARTED |
 | SEC-13 | Security | LOW | HSTS header confirmed in production backend HTTP response — injected by `security_headers` middleware when `is_production=True` | Code gate exists; not verified by live HTTP check post-production deploy | IMPLEMENTING |
 | SEC-14 | Security | LOW | `/docs`, `/redoc`, `/openapi.json` confirmed absent from production via live HTTP request | Code gate (`is_production` check) exists; not verified by live HTTP request post-deploy | IMPLEMENTING |

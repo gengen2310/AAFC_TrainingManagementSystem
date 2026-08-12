@@ -627,6 +627,10 @@ def disable_account(uid: str, db: DBSession = Depends(get_db), p: Principal = De
     _require_manage_authority(p, u, db)
     u.active_status = False
     u.updated_by = p.user_id
+    # Invalidate any live JWTs immediately by incrementing token_version — without
+    # this, a disabled account's existing token remains valid until its natural
+    # expiry (typically 8 h), leaving the session live after the disable.
+    u.token_version = (u.token_version or 0) + 1
     # Also deactivate the access code so login is blocked immediately
     for ac in db.query(AccessCode).filter(AccessCode.user_id == u.id).all():
         ac.active_status = False
