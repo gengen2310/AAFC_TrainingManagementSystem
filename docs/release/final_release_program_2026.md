@@ -4436,12 +4436,12 @@ Also updated gap matrix: Gap 22 promoted to PARTIALLY COMPLETE; V1 Gate Summary 
 
 | Service | New Deployment ID |
 |---|---|
-| `aafc-tms-backend` | _(to be recorded)_ |
-| `aafc-tms-frontend` | _(to be recorded)_ |
-| `aafc-tms-planning-workspace-preview` | _(to be recorded)_ |
+| `aafc-tms-backend` | `44b1681e-b575-4c46-be0a-d9cb3ca07f10` |
+| `aafc-tms-frontend` | `5f8396fc-01c1-483e-8acf-e33bfcffa398` |
+| `aafc-tms-planning-workspace-preview` | `16efd4a2-8c71-4af1-afbc-178966cbf918` |
 
 **Gates passed:** 11-step preflight PASS → authorization phrase accepted → backend 4/4 gates (new deploy ID, health/ready, DB revision `d3e4f5a6b7c8`, CRUD smoke) → frontend 3/3 gates → PW 3/3 gates
 
 **Alembic head confirmed:** `d3e4f5a6b7c8` (v51)
 
-> Deployment IDs to be filled in once terminal output is available.
+> Deployment IDs confirmed from Railway dashboard (2026-08-12).
