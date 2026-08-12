@@ -215,6 +215,12 @@ def _scoped_fallback_scan(primary_user_id: str, code: str, db: DBSession) -> "Ac
                 continue
         if verify_code(code, sib_ac.code_hash):
             return sib_ac
+        # Mismatch: apply the same failure-counting and lockout logic as the primary
+        # path so sibling accounts cannot be brute-forced via the fallback scan.
+        sib_ac.failed_attempts = (sib_ac.failed_attempts or 0) + 1
+        if sib_ac.failed_attempts >= _LOCKOUT_THRESHOLD:
+            sib_ac.locked_until = utcnow() + timedelta(hours=_LOCKOUT_HOURS)
+        db.commit()
     return None
 
 
