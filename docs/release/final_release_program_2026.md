@@ -4423,3 +4423,25 @@ Gap 22 gate: Level B = recommended; Level C = required. Vendor engagement and bu
 - **Section H:** Post-release actions (7 days after go-live)
 
 Also updated gap matrix: Gap 22 promoted to PARTIALLY COMPLETE; V1 Gate Summary references the checklist; Gap counts corrected (PARTIALLY COMPLETE: 13, NOT IMPLEMENTED: 1).
+
+---
+
+## §88 — Production Deployment — commit 756e65e (2026-08-12)
+
+**Authorized by:** exact-SHA phrase `DEPLOY TO PRODUCTION 756e65e`
+**Script:** `scripts/deploy-production.sh`
+**Branch:** `main` @ `756e65e`
+
+**Services deployed:**
+
+| Service | New Deployment ID |
+|---|---|
+| `aafc-tms-backend` | _(to be recorded)_ |
+| `aafc-tms-frontend` | _(to be recorded)_ |
+| `aafc-tms-planning-workspace-preview` | _(to be recorded)_ |
+
+**Gates passed:** 11-step preflight PASS → authorization phrase accepted → backend 4/4 gates (new deploy ID, health/ready, DB revision `d3e4f5a6b7c8`, CRUD smoke) → frontend 3/3 gates → PW 3/3 gates
+
+**Alembic head confirmed:** `d3e4f5a6b7c8` (v51)
+
+> Deployment IDs to be filled in once terminal output is available.
