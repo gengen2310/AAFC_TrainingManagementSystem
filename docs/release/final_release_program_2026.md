@@ -4001,3 +4001,50 @@ Accuracy (§2.14) — passes 1–3; Brevity (§2.16) — passes 16, 18 residual;
 Empathy (§2.17) — pass 15; Relevance (§2.18) — passes 1–3; Logic (§2.20) — pass 17;
 Completeness (§2.21) — pass 18 (clean); Timeliness (§2.22) — pass 18 (clean).
 Status: **SUBSTANTIALLY COMPLETE**.
+
+---
+
+## §75 — REM-133: Training Area and Equipment Restore
+
+**Date:** 2026-08-12
+**Gap:** Training area and equipment archive (soft-delete) existed with no restore
+counterpart and no `include_archived` list param — once archived, records were
+retained in the database but permanently unreachable through the product.
+
+**Parade date correction**
+
+The gap register's pass-14 entry listed "parade dates" as a ninth instance of this
+pattern. Investigation revealed `delete_parade_date` uses `db.delete()` — a genuine
+hard delete. No restore is possible or needed. The pass-17 confirm dialog fix
+("Permanently remove this parade date?") already communicates this correctly. Gap
+register updated to reflect 8 genuine soft-archive instances, not 9.
+
+**Training areas** — `POST /api/training-areas/{rid}/restore`
+
+- `GET /api/training-areas`: `include_archived=false` param added; `is_archived` field
+  added to response
+- New `restore_room` endpoint: 404-not-found / 409-already-active / permission checks
+  / audit log — exact pattern as all prior restore endpoints
+- Frontend: "Show archived" toggle + dimmed "Archived" badge rows + Restore button
+  on the Resources page (`_resToggleShowArchived`, `doRestoreRoom`)
+
+**Equipment** — `POST /api/equipment/{eid}/restore`
+
+- `GET /api/equipment`: same `include_archived` and `is_archived` additions
+- New `restore_equip` endpoint: same pattern
+- Frontend: "Show archived" toggle + Restore button on the Resources page Equipment
+  card (`doRestoreEquip`)
+
+**Tests:** `test_resources_archive_restore.py` (12 tests, 6 per entity):
+round-trip restore, 409-already-active, 403-cross-scope, 401-unauthenticated,
+404-not-found, default-list-regression-guard.
+
+**Verification:**
+- Full suite: 1521 passed, 5 skipped.
+- JS syntax check: clean.
+- `.local-dev/index.html` mirror: only API base URL differs.
+
+**Status:** REM-133 now 7 of 8 genuine instances fixed. Anchor Events remains
+deferred (dead code — no live archive UI in either frontend; fresh ask required).
+
+**Commit:** `6a6f8e0`
