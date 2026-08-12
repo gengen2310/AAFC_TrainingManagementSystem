@@ -2592,7 +2592,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="alert a-info">Rank is stored separately so historical records stay accurate when rank changes.</div>
       <div class="alert a-warn" id="fac-dup-warn" style="display:none"></div>
       <div class="form-row">
-        <div class="ff"><label>Current Rank</label><input id="fac-rank" list="fac-rank-list" placeholder="e.g. FLTLT(AAFC), CUO, CPL(AAFC)" oninput="_markFacUnsaved()" autocomplete="off"><datalist id="fac-rank-list"><option value="PLTOFF(AAFC)"><option value="FLGOFF(AAFC)"><option value="FLTLT(AAFC)"><option value="SQNLDR(AAFC)"><option value="WGCDR(AAFC)"><option value="GPCAPT(AAFC)"><option value="AIRCDRE(AAFC)"><option value="AVM(AAFC)"><option value="LAC(AAFC)"><option value="CPL(AAFC)"><option value="SGT(AAFC)"><option value="FSGT(AAFC)"><option value="WOFF(AAFC)"><option value="CCPL"><option value="CSGT"><option value="CFSGT"><option value="CWO"><option value="CUO"><option value="CIV"></datalist></div>
+        <div class="ff"><label>Current Rank</label><input id="fac-rank" list="fac-rank-list" placeholder="e.g. FLTLT(AAFC), CUO, CPL(AAFC)" oninput="_markFacUnsaved()" autocomplete="off"><datalist id="fac-rank-list"></datalist></div>
         <div class="ff"><label for="fac-type">Type</label>
           <select id="fac-type" aria-label="Facilitator type" onchange="_onFacTypeChange(this)"><option value="Staff">Staff</option><option value="Officer">Officer (AAFC)</option><option value="NCO">Warrant Officer / NCO (AAFC)</option><option value="Senior Cadet">Senior Cadet</option><option value="Civilian">Civilian Instructor</option></select>
         </div>
@@ -4446,6 +4446,7 @@ function nav(id){
   if(id==='weekly-program'){populateWPDD();renderWP();}
   if(id==='activities'){_loadActivitiesPage();}
   if(id==='facilitators')loadFacilitatorStats();
+  if(id==='curriculum')_loadCurriculumClassBreakdown();
   if(id==='dashboard')renderDash();
   if(id==='wing-overview'){renderWing();loadCommandDashboard('wing');}
   if(id==='national'){renderNational();loadCommandDashboard('national');}
@@ -6875,7 +6876,19 @@ async function loadDashCharts(){
 // ═══════════════════════════════════════════════════════════
 //  FACILITATORS — VISUAL STATISTICS
 // ═══════════════════════════════════════════════════════════
+async function _populateFacRankList(){
+  // DEF-04: load canonical AAFC rank catalogue from backend single source of truth.
+  // Called once on facilitator page load; gracefully falls back to empty datalist
+  // (user can still type a rank freely) if the endpoint is unavailable.
+  const dl=document.getElementById('fac-rank-list');
+  if(!dl||dl.childElementCount>0)return; // already populated
+  try{
+    const d=await api('/api/facilitators/ranks');
+    dl.innerHTML=(d.ranks||[]).map(r=>`<option value="${esc(r.code)}">${esc(r.label)}</option>`).join('');
+  }catch(_){}
+}
 async function loadFacilitatorStats(){
+  _populateFacRankList();
   const chartIds=['fac-chart-status','fac-chart-workload','fac-chart-spof','fac-chart-gaps','fac-chart-type'];
   chartIds.forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='<div class="chart-skeleton"></div>';});
   let data;
@@ -7851,6 +7864,7 @@ function renderCurr(){
                 ${stBadge(dp)}
                 ${e.lh?`<a href="${e.lh}" target="_blank" class="lh-btn" onclick="event.stopPropagation()">Learning Hub</a>`:''}
               </div>
+              ${_currClassBreakdownHtml((S.classByCode||{})[e.code])}
             </div>
             <div class="exp-right">
               ${sc>0?`<button class="btn-lnk" style="font-size:10px" onclick="event.stopPropagation();drillCurr('${esc(e.code)}')">${sc} sess.</button>`:''}
@@ -7862,6 +7876,41 @@ function renderCurr(){
     </div>`).join('');
 }
 function toggleCC(hdr){const b=hdr.nextElementSibling;b.classList.toggle('open');hdr.querySelector('span:last-child').textContent=b.classList.contains('open')?'▾':'▸';}
+
+// MBACK-01/CLASS-13: class breakdown per curriculum item — which Training
+// Classes still need each module. Loaded on-demand when the curriculum page
+// is visited; re-renders the page once data arrives.
+function _currClassBreakdownHtml(bd){
+  if(!bd||!bd.length) return '';
+  return '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:5px">'+bd.map(c=>{
+    const s=c.backlog_status||'';
+    const cl=s==='resolved'?'b-ok':
+              (s==='not_delivered')?'b-red':
+              (s==='unscheduled'||s==='cancelled')?'b-amber':'b-blue';
+    const label=s==='resolved'?'✓ ':s==='not_delivered'?'✕ ':s==='unscheduled'?'– ':'';
+    return `<span class="badge ${cl}" style="font-size:8px" title="${esc(c.display_name)}: ${esc(s)}">${label}${esc(c.display_name)}</span>`;
+  }).join('')+'</div>';
+}
+async function _loadCurriculumClassBreakdown(){
+  const sqnId=(S.session&&S.session.squadron_id)||(typeof saBrowseSquadronId==='function'?saBrowseSquadronId():null);
+  if(!sqnId) return;
+  try{
+    let yearId=P&&P.currentYearId;
+    if(!yearId){
+      const years=await api('/api/planning/years?unit_id='+encodeURIComponent(sqnId)).catch(()=>[]);
+      const active=(years||[]).find(y=>y.active_status);
+      if(!active) return;
+      yearId=active.planning_year_id;
+    }
+    const data=await api('/api/planning/years/'+yearId+'/missions').catch(()=>null);
+    if(!data) return;
+    const byCode={};
+    (data.missions||[]).forEach(m=>{if(m.class_breakdown&&m.class_breakdown.length)byCode[m.code]=m.class_breakdown;});
+    if(!Object.keys(byCode).length) return;
+    S.classByCode=byCode;
+    renderCurr();
+  }catch(_){}
+}
 
 function showCurrDetail(code){
   const e=allCurr().find(x=>x.code===code);if(!e)return;

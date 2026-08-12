@@ -959,6 +959,47 @@ def close(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get
 _MAX_TAGS = 20
 _MAX_TAG_LEN = 80
 
+# Canonical AAFC rank list (DEF-04) — exposed via GET /api/facilitators/ranks
+# so the frontend datalist is populated from a single authoritative source.
+# This is advisory: the API accepts non-catalogue values so existing/edge-case
+# data (e.g. "External Guest", "Civilian Instructor") is never rejected.
+_AAFC_RANKS: list[dict] = [
+    # Officer ranks (AAFC)
+    {"code": "PLTOFF(AAFC)", "label": "Pilot Officer (AAFC)", "category": "Officer"},
+    {"code": "FLGOFF(AAFC)", "label": "Flying Officer (AAFC)", "category": "Officer"},
+    {"code": "FLTLT(AAFC)",  "label": "Flight Lieutenant (AAFC)", "category": "Officer"},
+    {"code": "SQNLDR(AAFC)", "label": "Squadron Leader (AAFC)", "category": "Officer"},
+    {"code": "WGCDR(AAFC)",  "label": "Wing Commander (AAFC)", "category": "Officer"},
+    {"code": "GPCAPT(AAFC)", "label": "Group Captain (AAFC)", "category": "Officer"},
+    {"code": "AIRCDRE(AAFC)","label": "Air Commodore (AAFC)", "category": "Officer"},
+    {"code": "AVM(AAFC)",    "label": "Air Vice-Marshal (AAFC)", "category": "Officer"},
+    # Airmen/SNCO ranks (AAFC)
+    {"code": "LAC(AAFC)",    "label": "Leading Aircraftman (AAFC)", "category": "Airmen"},
+    {"code": "CPL(AAFC)",    "label": "Corporal (AAFC)", "category": "Airmen"},
+    {"code": "SGT(AAFC)",    "label": "Sergeant (AAFC)", "category": "Airmen"},
+    {"code": "FSGT(AAFC)",   "label": "Flight Sergeant (AAFC)", "category": "Airmen"},
+    {"code": "WOFF(AAFC)",   "label": "Warrant Officer (AAFC)", "category": "Airmen"},
+    # Senior cadet ranks
+    {"code": "CCPL",  "label": "Cadet Corporal", "category": "Senior Cadet"},
+    {"code": "CSGT",  "label": "Cadet Sergeant", "category": "Senior Cadet"},
+    {"code": "CFSGT", "label": "Cadet Flight Sergeant", "category": "Senior Cadet"},
+    {"code": "CWO",   "label": "Cadet Warrant Officer", "category": "Senior Cadet"},
+    {"code": "CUO",   "label": "Cadet Under Officer", "category": "Senior Cadet"},
+    # Civilian / other
+    {"code": "CIV",   "label": "Civilian", "category": "Civilian"},
+]
+_AAFC_RANK_CODES: frozenset[str] = frozenset(r["code"] for r in _AAFC_RANKS)
+
+
+def _normalise_rank(rank: str | None) -> str | None:
+    """Strip whitespace; truncate to DB column limit. Does NOT reject non-catalogue values."""
+    if rank is None:
+        return None
+    rank = rank.strip()
+    if not rank:
+        return None
+    return rank[:40]  # matches Facilitator.current_rank String(40)
+
 
 def _validate_subject_areas(raw: list[str] | None) -> list[str]:
     """Trim, deduplicate (case-insensitive), and enforce limits on tag list."""
@@ -990,6 +1031,13 @@ class FacIn(BaseModel):
     type: str | None = "Staff"
     subject_areas: list[str] | None = None
     confirm_duplicate: bool = False
+
+
+@router.get("/facilitators/ranks")
+def list_ranks(p: Principal = Depends(get_principal)):
+    """Return the canonical AAFC rank catalogue (DEF-04).
+    Authenticated; used to populate rank pickers in both frontends."""
+    return {"ranks": _AAFC_RANKS}
 
 
 @router.get("/facilitators")
@@ -1079,11 +1127,12 @@ def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends
                 "existing_active_status": existing.active_status,
                 "existing_updated_at": existing.updated_at.isoformat() if existing.updated_at else None,
             })
+    rank = _normalise_rank(body.current_rank)
     f = Facilitator(squadron_id=s.id, wing_id=s.wing_id, first_name=body.first_name,
-                    last_name=body.last_name, current_rank=body.current_rank, type=body.type or "Staff",
+                    last_name=body.last_name, current_rank=rank, type=body.type or "Staff",
                     subject_areas=_validate_subject_areas(body.subject_areas))
     db.add(f); db.commit()
-    db.add(FacilitatorRankHistory(facilitator_id=f.id, rank=body.current_rank, effective_from=str(utcnow().date())))
+    db.add(FacilitatorRankHistory(facilitator_id=f.id, rank=rank, effective_from=str(utcnow().date())))
     db.commit()
     audit(db, p, object_type="facilitator", object_id=f.id, action="create")
     result = {"ok": True, "facilitator_id": f.id}
@@ -1251,15 +1300,16 @@ async def import_facilitators_csv(
         if r["action"] in ("duplicate", "duplicate_in_file") and r["row"] not in confirm_idx:
             skipped += 1
             continue
+        csv_rank = _normalise_rank(r["current_rank"])
         f = Facilitator(
             squadron_id=s.id, wing_id=s.wing_id,
             first_name=r["first_name"], last_name=r["last_name"],
-            current_rank=r["current_rank"], type=r["type"] or "Staff",
+            current_rank=csv_rank, type=r["type"] or "Staff",
             subject_areas=_validate_subject_areas(r["subject_areas"]),
             active_status=r["active_status"],
         )
         db.add(f); db.flush()
-        db.add(FacilitatorRankHistory(facilitator_id=f.id, rank=r["current_rank"], effective_from=str(utcnow().date())))
+        db.add(FacilitatorRankHistory(facilitator_id=f.id, rank=csv_rank, effective_from=str(utcnow().date())))
         created += 1
         created_ids.append(f.id)
     db.commit()
@@ -1291,16 +1341,17 @@ def update_fac(fid: str, body: FacUpdateIn, db: DBSession = Depends(get_db),
         f.subject_areas = _validate_subject_areas(body.subject_areas)
     if body.type is not None:
         f.type = body.type
-    rank_changed = body.current_rank is not None and body.current_rank != f.current_rank
-    if body.current_rank is not None:
-        f.current_rank = body.current_rank
+    new_rank = _normalise_rank(body.current_rank) if body.current_rank is not None else None
+    rank_changed = new_rank is not None and new_rank != f.current_rank
+    if new_rank is not None:
+        f.current_rank = new_rank
     if body.first_name is not None:
         f.first_name = body.first_name
     if body.last_name is not None:
         f.last_name = body.last_name
     db.commit()
     if rank_changed:
-        db.add(FacilitatorRankHistory(facilitator_id=f.id, rank=body.current_rank,
+        db.add(FacilitatorRankHistory(facilitator_id=f.id, rank=new_rank,
                                       effective_from=str(utcnow().date())))
         db.commit()
     audit(db, p, object_type="facilitator", object_id=f.id, action="update",
