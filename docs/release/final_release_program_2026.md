@@ -3736,3 +3736,72 @@ down` when a bad deploy is stuck, unless traffic is confirmed still routed
 to a known-good prior deployment.
 
 Full detail: `docs/remediation/master_gap_register.csv` REM-130.
+
+## 71. WRITE-02 pass 15 — Empathy audit (§2.17): developer jargon removed from user-facing copy
+
+**Category audited:** Empathy (Manual §2.17) — "Write with the actual reader in mind — a
+Training Officer, not a developer."
+
+**Five defect classes fixed — 15 instances total across both frontends and the backend:**
+
+**1. Raw UUID display in Planning Workspace Unit Settings (`Admin.tsx`)**
+
+The "Your scope" card in the Planning Workspace `/admin` page was displaying
+`session.wing_id` and `session.squadron_id` — raw UUID strings — as the Wing and
+Squadron labels. A Training Officer would see `7f3a9c2b-1234-5678-abcd-ef0123456789`
+instead of `7WG`. The backend's `_me()` function already returned `wing_code` (via a
+`db.get(Wing, user.wing_id)` lookup), but `squadron_code` was absent — and the
+`SessionInfo` TypeScript type declared neither field. Fix: backend extended to also
+return `squadron_code` (same DB-get pattern); `SessionInfo` updated with both fields;
+`Admin.tsx` now renders `wing_code` / `squadron_code`.
+
+Also updated `permissions.test.tsx` fixture `mk()` to supply the two new required
+fields — the TypeScript build confirmed this by failing immediately on the type gap.
+
+**2. "hashed" / "write-only" jargon — 5 instances**
+
+| Location | Old | New |
+|---|---|---|
+| `Settings.tsx:73` (reset success msg) | "The new code is hashed and not shown." | "Share the new code directly with the user." |
+| `Settings.tsx:101` (self-change help) | "The new code is hashed immediately — there is no way to recover the old value." | "The previous code cannot be recovered once changed." |
+| `Settings.tsx:140` (admin reset help) | "Codes are write-only — the system hashes and stores the new value; the previous code cannot be recovered." | "The previous code cannot be recovered once a reset is applied." |
+| `index.html:1279` (Access Code card) | "Existing codes are never shown and are hashed on the server." | "Existing codes cannot be viewed. The previous code cannot be recovered once changed." |
+| `index.html:2607` (Reset Code modal) | "The old code is not recoverable. The new code is hashed immediately." | "The previous code cannot be recovered. Share the new code directly with the user once set." |
+
+**3. "HTTP `<status>`" in error fallback messages — 2 instances**
+
+The generic error fallback in the connected-frontend's `api()` helper (line 3334) and
+the backup download handler (line 4642) exposed HTTP status codes to users:
+`"Request failed (HTTP 409)."` / `"Backup failed (HTTP 503)."`. A Training Officer
+has no concept of what HTTP status codes mean. Replaced with plain-language fallbacks:
+`"Request failed. Try again, or contact your administrator."` and
+`"Backup failed. Check the server status and try again."` respectively.
+
+**4. `JSON.stringify(d.detail)` fallback in error displays — 5 instances**
+
+Five import/schedule endpoints used `d.detail?.message || d.detail?.error || JSON.stringify(d.detail)`
+as a last-resort error display. If neither `message` nor `error` was present in the
+response, raw JSON like `{"loc":["body","squadron_id"],"type":"value_error.uuid"}` would
+be shown to the user. All five fallbacks replaced with plain-language strings:
+- 422 validation array: `JSON.stringify(d)` → `'Field error'` (in the `.map()` used to
+  build the "Validation failed: ..." list — Pydantic v2 always supplies `.msg`, so this
+  fallback never triggered in practice, but is now safe if it ever does)
+- Curriculum CSV import: → `'An error occurred. Check the file format.'`
+- Schedule import (preview and commit) ×2: → `'Request failed.'`
+- Activity import: → `'Request failed.'`
+
+**5. Brevity — "Session scheduled successfully." (1 instance)**
+
+`PlanningRightDrawer.tsx` success state: "Session scheduled successfully." →
+"Session scheduled." — "successfully" is redundant in a success message (the state
+itself conveys success per Manual §2.16 Brevity).
+
+**Verification:**
+- Backend: 1509 passed, 5 skipped (full suite).
+- Planning Workspace vitest: 38 passed (8 files).
+- TypeScript: `tsc -b && vite build --mode single` clean (no type errors).
+- Deployed bundle verification: pending next staging deploy; local `dist-single/index.html`
+  confirms the build output is correct.
+
+**Commit:** `d1db95c`
+**Gap register:** `docs/remediation/master_gap_register.csv` WRITE-02 (now 15 passes).
