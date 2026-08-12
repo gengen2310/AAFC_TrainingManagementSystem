@@ -3787,6 +3787,8 @@ async function loadData(){
   const p_wov=scope==='wing'?api('/api/reports/wing-overview'+_wgq).catch(()=>null):Promise.resolve(null);
   const p_wph=scope==='wing'?api('/api/reports/wing-phase-coverage'+_wgq).catch(()=>null):Promise.resolve(null);
   const p_wcap=scope==='wing'?api('/api/reports/wing-capability'+_wgq).catch(()=>null):Promise.resolve(null);
+  const p_wcancel=scope==='wing'?api('/api/reports/wing-cancellation-trend').catch(()=>null):Promise.resolve(null);
+  const p_wndel=scope==='wing'?api('/api/reports/wing-not-delivered').catch(()=>null):Promise.resolve(null);
   const p_wsqns=scope==='wing'?api('/api/squadrons'+_wgq).catch(()=>[]):Promise.resolve([]);
   const p_nat=(scope==='national'||scope==='system_admin')?api('/api/national/overview').catch(()=>null):Promise.resolve(null);
   const p_natov=(scope==='national'||scope==='system_admin')?api('/api/reports/national-overview').catch(()=>null):Promise.resolve(null);
@@ -3799,7 +3801,7 @@ async function loadData(){
     pns,facs,cur,phases,ta,eq,ai,acts,holidays,proxy,
     repSum,repRead,repCov,repFload,repNdel,
     sqnData,timing,auditData,
-    wov,wph,wcap,wsqns,
+    wov,wph,wcap,wcancel,wndel,wsqns,
     nat,natov,natcap,wings,nsqns,
     reasontags,
   ]=await Promise.all([
@@ -3807,7 +3809,7 @@ async function loadData(){
     p_pns,p_facs,p_cur,p_phases,p_ta,p_eq,p_ai,p_acts,p_holidays,p_proxy,
     p_sum,p_read,p_cov,p_fload,p_ndel,
     p_sqnData,p_timing,p_audit,
-    p_wov,p_wph,p_wcap,p_wsqns,
+    p_wov,p_wph,p_wcap,p_wcancel,p_wndel,p_wsqns,
     p_nat,p_natov,p_natcap,p_wings,p_nsqns,
     p_reasontags,
   ]);
@@ -3878,6 +3880,8 @@ async function loadData(){
     S.wing={squadrons:(wov&&wov.squadrons)||[]};
     S.wingPhase=wph||null;
     S.cap=wcap||null;
+    S.wingCancel=wcancel||null;
+    S.wingNdel=wndel||null;
     S.squadrons=wsqns||[];
   }
   if(scope==='national'||scope==='system_admin'){
@@ -9577,6 +9581,47 @@ function renderWing(){
         return `<td style="text-align:center">${n===0?'<span class="badge b-red">0</span>':`<span class="badge b-ok">${n}</span>`}</td>`;
       }).join('')}</tr>`).join('')+
       `</tbody></table></div><div style="font-size:10px;color:var(--muted);margin-top:8px">Red = no facilitator in this Squadron tagged for that subject area.</div></div>`;
+  }
+  // T2-04 — Cancellation trend
+  if(S.wingCancel){
+    const wc=S.wingCancel;
+    const hasData=wc.squadrons&&wc.squadrons.length&&(wc.total_cancelled_sessions+wc.total_cancelled_nights)>0;
+    html+=`<div class="card"><div class="ctitle">Cancellation Trend${wc.total_cancelled_sessions||wc.total_cancelled_nights?` — <span class="badge b-amber">${wc.total_cancelled_sessions} cancelled sessions · ${wc.total_cancelled_nights} stand-downs</span>`:' — No cancellations this period'}</div>`;
+    if(hasData){
+      html+=`<div class="tw"><table><thead><tr><th>Squadron</th><th style="text-align:center">Cancelled sessions</th><th style="text-align:center">Stand-downs</th><th>Top reason</th></tr></thead><tbody>`;
+      wc.squadrons.forEach(s=>{
+        if(!s.cancelled_sessions&&!s.cancelled_nights)return;
+        const top=s.reasons&&s.reasons[0];
+        html+=`<tr><td style="font-weight:800">${esc(s.short_name||s.code)}</td>
+          <td style="text-align:center"><span class="badge ${s.cancelled_sessions?'b-amber':'b-ok'}">${s.cancelled_sessions}</span></td>
+          <td style="text-align:center"><span class="badge ${s.cancelled_nights?'b-red':'b-ok'}">${s.cancelled_nights}</span></td>
+          <td style="font-size:11px">${top?esc(top.reason+' (×'+top.count+')'):'—'}</td></tr>`;
+      });
+      html+=`</tbody></table></div>`;
+    } else {
+      html+=`<div style="color:var(--ok);font-size:12px;padding:8px 0">No cancelled sessions or stand-downs recorded. Programme is on track.</div>`;
+    }
+    html+=`</div>`;
+  }
+  // T2-05 — Wing not-delivered
+  if(S.wingNdel){
+    const wn=S.wingNdel;
+    const hasData=wn.squadrons&&wn.squadrons.length>0;
+    html+=`<div class="card"><div class="ctitle">Not-Delivered Sessions — Wing Summary${wn.total_not_delivered?` <span class="badge b-red">${wn.total_not_delivered} total</span>`:''}</div>`;
+    if(hasData){
+      html+=`<div class="tw"><table><thead><tr><th>Squadron</th><th style="text-align:center">Count</th><th>Sample</th></tr></thead><tbody>`;
+      wn.squadrons.forEach(s=>{
+        const sample=s.sessions&&s.sessions[0];
+        const sampleText=sample?(sample.curriculum_code_at_time||'—')+(sample.not_delivered_reason?' — '+sample.not_delivered_reason:''):'—';
+        html+=`<tr><td style="font-weight:800">${esc(s.short_name||s.code)}</td>
+          <td style="text-align:center"><span class="badge b-red">${s.not_delivered_count}</span></td>
+          <td style="font-size:11px;color:var(--text-2)">${esc(sampleText)}${s.sessions&&s.sessions.length>1?` <span class="muted">(+${s.sessions.length-1} more)</span>`:''}</td></tr>`;
+      });
+      html+=`</tbody></table></div><div style="font-size:10px;color:var(--muted);margin-top:6px">Enter Proxy Mode for a squadron to review and resolve not-delivered sessions.</div>`;
+    } else {
+      html+=`<div style="color:var(--ok);font-size:12px;padding:8px 0">No not-delivered sessions recorded across the Wing.</div>`;
+    }
+    html+=`</div>`;
   }
   host.innerHTML=html;
 }

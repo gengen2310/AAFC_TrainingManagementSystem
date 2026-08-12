@@ -4207,3 +4207,33 @@ deferred (dead code — no live archive UI in either frontend; fresh ask require
 | 25 | Support runbook written | ✅ DONE |
 
 **Remaining autonomous work under this program:** None identified at Level A. Gaps 21 and 24 require human action. Gap 5's decision and Gap 20's Railway env var verification require an operator. Level B work (Wing onboarding script, multi-Wing synthetic data, 250-user load test) is gated on human approval of a second Wing activation.
+
+---
+
+## §81 — Gap 16 commit + test baseline update + Wing rollback procedure + T2-04/T2-05 wiring (2026-08-12)
+
+**Scope:** Four autonomous follow-up items identified at end of §80 session.
+
+**Changes:**
+
+1. **Gap 16 gap matrix update committed** (`afdc263`) — prior session left the edit uncommitted. Evidence updated to reflect dispatcher pattern is more complete than the prior description: `POST /api/jobs/export` → `JobStatus` → Celery fallback → sync; streaming CSV/XLSX/PDF exports functional; < 1s at V1 scale. Gap remains PARTIALLY COMPLETE (Celery task stub, no object storage, no frontend polling UI).
+
+2. **Test baseline corrected** (`4931bea`) — `CLAUDE.md` and `.claude/rules/testing.md` both referenced the stale count "1231 passed" from commit `5a6932b`. Corrected to "1553 passed" (commit `afdc263`), reflecting 322 tests added by Phases 7–12.
+
+3. **Wing onboarding runbook expanded** (`58576c2`):
+   - §2.4 updated to document `DRY_RUN=1` preview mode and full optional env var set for `second_wing_seed.py`
+   - §7 added: Wing rollback procedure (staging full-reset vs production archive-only; re-onboarding constraints; rollback audit record)
+   - §8 added: Troubleshooting guide for five common onboarding failure modes
+   - Gap 8 evidence updated: "Rollback procedure not yet documented" → now documented in §7
+
+4. **T2-04 and T2-05 Wing report cards wired to frontend** (this session):
+   - `wing-cancellation-trend` (T2-04) and `wing-not-delivered` (T2-05) endpoints existed in `backend/app/routers/ops.py` but were never called from the frontend.
+   - Added `p_wcancel` / `p_wndel` fetch to `loadData()` parallel fetch block; added to `Promise.all` destructure; stored as `S.wingCancel` / `S.wingNdel`.
+   - Added two new Wing dashboard cards in `renderWing()` — cancellation trend table with top-reason column, and not-delivered cross-squadron table with sample curriculum code and proxy-mode action prompt.
+   - Gap 10 evidence updated: "2 wing endpoints not yet wired to UI cards" → now all 5 Tier 2 endpoints wired.
+
+5. **Gap 24 reclassified** — NOT IMPLEMENTED → PARTIALLY COMPLETE. `02_beta_feedback_register.md` was created earlier in the program; the gap was incorrectly left at NOT IMPLEMENTED. Register template with classification guide, priority definitions, and item table now confirmed present. Gap count: NOT IMPLEMENTED: 4 → 3; PARTIALLY COMPLETE: 10 → 11.
+
+**Test suite:** 1553 passed, 5 skipped (confirmed before and during this session — frontend-only changes do not affect backend tests).
+
+**Level A V1 gate status:** Unchanged. 14 items done, 2 human-blocked (Gap 21 key custody, Gap 24 beta feedback population).
