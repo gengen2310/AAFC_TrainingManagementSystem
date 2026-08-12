@@ -250,9 +250,18 @@ def logout(response: Response, request: Request, db: DBSession = Depends(get_db)
 def me(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     user = db.get(User, p.user_id)
     data = _me(user, db)
-    data["proxy"] = ({"mode": p.proxy_mode, "acting_squadron_id": p.acting_squadron_id,
-                      "acting_wing_id": p.acting_wing_id, "proxy_session_id": p.proxy_session_id}
-                     if p.proxy_session_id else None)
+    if p.proxy_session_id:
+        sq = db.get(Squadron, p.acting_squadron_id) if p.acting_squadron_id else None
+        data["proxy"] = {
+            "mode": p.proxy_mode,
+            "acting_squadron_id": p.acting_squadron_id,
+            "acting_squadron_code": sq.code if sq else None,
+            "acting_squadron_name": (sq.short_name or sq.name) if sq else None,
+            "acting_wing_id": p.acting_wing_id,
+            "proxy_session_id": p.proxy_session_id,
+        }
+    else:
+        data["proxy"] = None
     return {"session": data}
 
 

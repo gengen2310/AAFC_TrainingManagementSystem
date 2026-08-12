@@ -42,7 +42,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {proxy && (
         <div className={`banner ${proxy.mode === "proxy" ? "proxy" : "intervention"}`} role="status" aria-live="polite">
           {proxy.mode === "proxy" ? "⚠ PROXY MODE ACTIVE" : "⚠ DELEGATED INTERVENTION ACTIVE"} —
-          acting on squadron {proxy.acting_squadron_id}. All actions are audited.
+          acting on behalf of {proxy.acting_squadron_code ?? proxy.acting_squadron_name ?? proxy.acting_squadron_id}. All actions are audited.
         </div>
       )}
 

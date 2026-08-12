@@ -61,10 +61,16 @@ def ready(db: DBSession = Depends(get_db)):
 
 
 @router.get("/ui-config")
-def ui_config():
-    """Return public, non-secret frontend configuration values."""
+def ui_config(db: DBSession = Depends(get_db)):
+    """Return public, non-secret frontend configuration values, including maintenance state."""
+    from ..models import SystemSetting
+    maint_row = db.get(SystemSetting, "maintenance_mode")
+    maint_active = (maint_row is not None and maint_row.value == "maintenance_enabled")
+    maint_msg_row = db.get(SystemSetting, "maintenance_message")
     return {
         "planning_workspace_url": settings.PLANNING_WORKSPACE_URL or None,
         "training_year": settings.TRAINING_YEAR,
         "environment": settings.ENVIRONMENT,
+        "maintenance_active": maint_active,
+        "maintenance_message": (maint_msg_row.value if maint_msg_row else None) or "System under maintenance. Please try again later.",
     }

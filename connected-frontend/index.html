@@ -4301,6 +4301,21 @@ function _showMaintenanceBanner(msg){
 function _hideMaintenanceBanner(){
   const b=document.getElementById('maint-banner'); if(b)b.className='maint-banner';
 }
+// DEF-12: proactively check maintenance mode so users already in session see the
+// banner when write-block activates — not only when they attempt a write.
+async function _pollMaintenanceStatus(){
+  if(!S.session)return; // not logged in
+  try{
+    const r=await fetch((API_BASE||'')+'/api/health/ui-config');
+    if(!r.ok)return;
+    const d=await r.json();
+    if(d.maintenance_active)_showMaintenanceBanner(d.maintenance_message||undefined);
+    else _hideMaintenanceBanner();
+  }catch(_){}
+}
+// Poll every 90 seconds and whenever the tab regains visibility.
+setInterval(_pollMaintenanceStatus,90000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)_pollMaintenanceStatus();});
 
 function updateDebugBar(){
   const d=document.getElementById('debug-bar'); if(!d)return;
