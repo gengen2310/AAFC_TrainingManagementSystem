@@ -6404,7 +6404,7 @@ function _renderTonightReadiness(chart){
     return `<div class="card">
       <div class="ctitle">Tonight — <span style="font-weight:400">${fmtD(d.date,{weekday:'long',day:'numeric',month:'long'})}</span></div>
       <div style="font-size:13px;font-weight:700;color:var(--muted)">Not planned</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px">No sessions are scheduled for this parade night yet.</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">No sessions scheduled for this parade night yet.</div>
     </div>`;
   }
   const pct=d.overall_pct||0;const rdC=pct>=80?'var(--ok)':pct>=60?'var(--warn)':'var(--red)';

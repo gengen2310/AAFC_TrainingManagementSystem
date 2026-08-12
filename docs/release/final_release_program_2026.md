@@ -3947,3 +3947,57 @@ violations found.
 - `.local-dev/index.html` mirror confirmed: only API base URL differs from main.
 
 **Gap register:** WRITE-02 (now 17 passes). Remaining: Completeness (§2.21), Timeliness (§2.22).
+
+---
+
+## §74 — WRITE-02 Pass 18: Completeness (§2.21) + Timeliness (§2.22) + Pass 16 Residual
+
+**Date:** 2026-08-12
+**Standard:** WRITE-01 §2.21 (Completeness), §2.22 (Timeliness)
+**Surfaces:** both frontends.
+
+**Completeness (§2.21) — survey result: no violations**
+
+Systematic review of all transaction-context messages, empty states, and
+wizard-completion messages across both frontends. The standard requires every
+message to include enough information for the user to take the next step.
+
+Prior passes that pre-emptively closed these gaps:
+- Pass 7 (load-error structure): all Planning Workspace error states now include
+  WHAT FAILED + WHAT TO DO NEXT
+- Pass 13 (error-message structure): all connected-frontend load-error states
+  upgraded to SECTION LABEL + SPECIFIC REASON + RELOAD INSTRUCTION
+- Passes 1–3 (empty states): most empty states already include or are adjacent to
+  the action that resolves them
+
+Nothing new found. No changes applied under §2.21.
+
+**Timeliness (§2.22) — survey result: no violations**
+
+Systematic check for stale content: hardcoded year references in user-facing copy,
+"coming soon" placeholders, references to deprecated infrastructure (the "Render
+free tier" cold-start banner was fixed in pass 4), and TODO/FIXME strings in
+rendered copy.
+
+Nothing found. No changes applied under §2.22.
+
+**Pass 16 Brevity residual — 1 fix**
+
+Connected-frontend's Dashboard "Tonight" card (line 6407) still had:
+
+> "No sessions are scheduled for this parade night yet."
+
+The corresponding `DashboardCharts.tsx` instance was fixed in pass 16, but the
+connected-frontend twin was missed. Fixed to match:
+
+> "No sessions scheduled for this parade night yet."
+
+**Verification:**
+- Backend: 1509 passed, 5 skipped.
+- `.local-dev/index.html` mirror confirmed: only API base URL differs.
+
+**Gap register:** WRITE-02 — all seven WRITE-01 standard categories now surveyed.
+Accuracy (§2.14) — passes 1–3; Brevity (§2.16) — passes 16, 18 residual;
+Empathy (§2.17) — pass 15; Relevance (§2.18) — passes 1–3; Logic (§2.20) — pass 17;
+Completeness (§2.21) — pass 18 (clean); Timeliness (§2.22) — pass 18 (clean).
+Status: **SUBSTANTIALLY COMPLETE**.
