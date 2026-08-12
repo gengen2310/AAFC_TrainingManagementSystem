@@ -4253,3 +4253,34 @@ deferred (dead code — no live archive UI in either frontend; fresh ask require
 **Level A V1 gate status:** Unchanged. 14 items done, 2 human-blocked (Gap 21 key custody, Gap 24 beta feedback population).
 
 **Remaining autonomous work at Level A:** None. All identified autonomous technical items are complete. Remaining open items are human-blocked or require org decisions.
+
+---
+
+## §82 — Staging Deployment: commit 4d2f60c (2026-08-12)
+
+**Commit:** `4d2f60c` — fix(deploy): update REQUIRED_ALEMBIC_HEAD to d3e4f5a6b7c8 (v51 timing_template_version)
+
+**Context:** deploy-staging.sh hardcoded `REQUIRED_ALEMBIC_HEAD="5a195a98148a"` (v47). Phases 7–8 added migrations v48–v51 (optimistic locking fields, `timing_template_version` column). Script preflight step 10/12 was dying with "Code head is d3e4f5a6b7c8, expected 5a195a98148a". Updated constant and display label to match actual v51 head.
+
+**Deploy attempt 1:** Frontend stuck in INITIALIZING for 600s (Railway build-queue stall, not a code defect). Backend deployed successfully (`d4564e9e`). Script hard-failed at frontend gate 2.
+
+**Deploy attempt 2 (successful):**
+
+| Service | Pre-deployment | New deployment | Status |
+|---|---|---|---|
+| aafc-tms-backend | `d4564e9e` (SUCCESS) | `b9d7ce6f` | SUCCESS |
+| aafc-tms-frontend | `34f28316` (active), `72285e97` (stuck INITIALIZING) | `4f932328` | SUCCESS |
+| aafc-tms-planning-workspace-preview | `29a61fb8` (SUCCESS) | `64c6480f` | SUCCESS |
+
+**Preflight:** 28/28 PASS (security greps, test suite 1553/5, Alembic code head d3e4f5a6b7c8, Railway IDs, git state, staging login).
+
+**Post-deploy gates all passed:**
+- Backend: DB revision `d3e4f5a6b7c8`, CRUD workflow (POST/GET/DELETE subject-area-tags) confirmed.
+- Frontend: Build fingerprint `458c7d507b82a87c01dc6e8ac77947470ccf29c7|2026-08-12T11:55:52Z`; Playwright dashboard (zero CSP violations) + mobile nav smoke passed.
+- Planning Workspace: React app markers confirmed; build fingerprint `e41efb4728be493d0d928a0fba34ac5a10fb2ea4|2026-08-12T11:57:19Z`; PW smoke passed.
+
+**Active deployments confirmed:** all three new deployments confirmed as ACTIVE via post-deploy verification step.
+
+**Note (gate 3 label):** Backend gate 3 output reads "exact match (v47)" — this label is the migration file's embedded version marker, not the deploy script's REQUIRED_ALEMBIC_HEAD label. The revision hash `d3e4f5a6b7c8` is the authoritative match; the embedded label is cosmetic and predates the v48–v51 sequence. The hash match is the gate criterion.
+
+**Staging state after this deploy:** All code from the whole-session remediation program (Phases 1–8, gap reclassifications, T2-04/T2-05 wiring, Wing report cards, accessibility, year rollover E2E) is now deployed to Railway staging at commit `4d2f60c`.
