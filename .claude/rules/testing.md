@@ -10,7 +10,7 @@ python -m pytest tests/ -v        # verbose
 python -m pytest tests/test_system_admin.py -q  # single file
 ```
 
-Current baseline (2026-08-09, commit 5a6932b): 1231 passed, 5 skipped.
+Current baseline (2026-08-12, commit afdc263): 1553 passed, 5 skipped.
 
 ## Test patterns
 
