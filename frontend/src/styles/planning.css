@@ -969,3 +969,279 @@ body.pw-active .main {
   }
 }
 .pw-section-toggle-icon { font-size: 9px; opacity: .6; }
+
+/* ═══════════════════════════════════════════════════════════════
+   HELP BUTTON — context bar
+   ════════════════════════════════════════════════════════════ */
+.pw-help-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,.4);
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all .12s;
+  margin-left: 6px;
+}
+.pw-help-btn:hover {
+  background: rgba(255,255,255,.25);
+  border-color: rgba(255,255,255,.75);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HELP DRAWER — slide-in panel
+   ════════════════════════════════════════════════════════════ */
+.pw-help-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: 100vw;
+  background: var(--surface);
+  border-left: 2px solid var(--border);
+  box-shadow: -4px 0 20px rgba(0,47,101,.14);
+  z-index: 350;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pw-help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--aafc-dark-blue);
+  color: #fff;
+  flex-shrink: 0;
+}
+.pw-help-title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+.pw-help-close {
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 3px 8px;
+  transition: background .1s;
+}
+.pw-help-close:hover { background: rgba(255,255,255,.3); }
+
+.pw-help-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.pw-help-tab {
+  flex: 1;
+  padding: 9px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  background: none;
+  color: var(--muted-text);
+  cursor: pointer;
+  transition: all .1s;
+  white-space: nowrap;
+}
+.pw-help-tab:hover { color: var(--text); }
+.pw-help-tab.active { color: var(--aafc-dark-blue); border-bottom-color: var(--aafc-dark-blue); }
+
+.pw-help-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.pw-help-section {
+  padding: 16px;
+}
+.pw-help-section h3 {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--aafc-dark-blue);
+  margin: 18px 0 6px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+.pw-help-section h3:first-child { margin-top: 0; }
+.pw-help-section p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+.pw-help-section ul, .pw-help-section ol {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+.pw-help-section li { margin-bottom: 3px; }
+.pw-help-intro {
+  font-size: 12px;
+  color: var(--muted-text);
+  margin: 0 0 12px;
+}
+.pw-help-note {
+  font-size: 11px !important;
+  color: var(--muted-text) !important;
+  background: var(--background);
+  border-radius: 5px;
+  padding: 6px 8px;
+  margin-top: 8px !important;
+}
+
+/* Two-column compare */
+.pw-help-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 10px 0 14px;
+}
+.pw-help-compare-col {
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--background);
+}
+.pw-help-compare-head {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--aafc-dark-blue);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 6px;
+  padding-bottom: 5px;
+  border-bottom: 2px solid var(--aafc-dark-blue);
+}
+.pw-help-compare-col p, .pw-help-compare-col ul { font-size: 11px; margin-bottom: 4px; }
+.pw-help-compare-col ul { padding-left: 16px; }
+.pw-help-compare-col li { margin-bottom: 2px; }
+
+/* Setup checklist */
+.pw-help-checklist {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text);
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+.pw-help-checklist li::marker {
+  content: "✓ ";
+  color: var(--success);
+  font-weight: 700;
+}
+
+/* Accordion */
+.pw-help-accordion { display: flex; flex-direction: column; gap: 4px; }
+.pw-help-accordion-item {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.pw-help-accordion-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background .1s;
+}
+.pw-help-accordion-btn:hover { background: var(--background); }
+.pw-help-accordion-btn.open { background: rgba(0,47,101,.04); color: var(--aafc-dark-blue); }
+.pw-help-accordion-chevron { font-size: 9px; opacity: .5; flex-shrink: 0; }
+.pw-help-accordion-body {
+  padding: 8px 14px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--background);
+}
+.pw-help-accordion-body p,
+.pw-help-accordion-body ol,
+.pw-help-accordion-body ul {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 0 0 6px;
+  padding-left: 18px;
+}
+.pw-help-accordion-body ol { list-style-type: decimal; }
+.pw-help-accordion-body li { margin-bottom: 4px; }
+
+/* FAQ */
+.pw-help-faq { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.pw-help-faq-item {
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.pw-help-faq-q {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--aafc-dark-blue);
+  background: rgba(0,47,101,.04);
+}
+.pw-help-faq-a {
+  padding: 7px 12px;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.55;
+  border-top: 1px solid var(--border);
+}
+
+/* Report template */
+.pw-help-report-template {
+  border: 1.5px solid var(--aafc-blue);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: rgba(81,176,227,.06);
+  margin: 8px 0 12px;
+}
+.pw-help-report-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--aafc-dark-blue);
+  margin-bottom: 6px;
+}
+.pw-help-report-template ul {
+  font-size: 12px;
+  line-height: 1.6;
+  padding-left: 18px;
+  margin: 0;
+}
+.pw-help-report-template li { margin-bottom: 3px; }
+
+@media (max-width: 768px) {
+  .pw-help-drawer { width: 100%; }
+}

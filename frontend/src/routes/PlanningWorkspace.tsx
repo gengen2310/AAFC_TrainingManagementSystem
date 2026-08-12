@@ -20,6 +20,7 @@ import { GuidedYearSetupModal } from "../components/planning/GuidedYearSetupModa
 import { canWriteSquadron } from "../auth/permissions";
 import { useScopedSquadron } from "../layout/SquadronViewContext";
 import { SquadronSelector } from "../layout/SquadronSelector";
+import { HelpDrawer } from "../components/HelpDrawer";
 import type { PlanningSession, AnchorEvent } from "../api/types";
 
 
@@ -69,6 +70,7 @@ export function PlanningWorkspace() {
   // Mobile-only: left filter/backlog panel is off-canvas below 768px, toggled via the
   // hamburger button in the context bar. Ignored (has no visual effect) above that width.
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
     if (!leftPanelOpen) return;
@@ -390,6 +392,7 @@ export function PlanningWorkspace() {
         onCustomStartChange={setCustomStart}
         onCustomEndChange={setCustomEnd}
         onToggleLeftPanel={() => setLeftPanelOpen(o => !o)}
+        onHelpOpen={() => setHelpOpen(true)}
       />
 
       {/* Year selector + quick actions */}
@@ -511,6 +514,11 @@ export function PlanningWorkspace() {
           />
         )}
       </div>
+
+      {/* Help drawer */}
+      {helpOpen && (
+        <HelpDrawer onClose={() => setHelpOpen(false)} />
+      )}
 
       {/* Bottom drawer */}
       {bottomOpen && (

@@ -19,6 +19,7 @@ interface Props {
   onCustomStartChange: (v: string) => void;
   onCustomEndChange: (v: string) => void;
   onToggleLeftPanel?: () => void;
+  onHelpOpen?: () => void;
 }
 
 const RANGES: { key: ViewRange; label: string }[] = [
@@ -34,7 +35,7 @@ export function PlanningContextBar({
   session, year,
   viewRange, displayMode, customStart, customEnd,
   onRangeChange, onDisplayModeChange, onCustomStartChange, onCustomEndChange,
-  onToggleLeftPanel,
+  onToggleLeftPanel, onHelpOpen,
 }: Props) {
   const scopeLabel = session?.is_national
     ? "National HQ"
@@ -125,6 +126,16 @@ export function PlanningContextBar({
         )}
       </div>
 
+      {onHelpOpen && (
+        <button
+          className="pw-help-btn"
+          aria-label="Open help panel"
+          title="Help & Reference"
+          onClick={onHelpOpen}
+        >
+          ?
+        </button>
+      )}
     </div>
   );
 }

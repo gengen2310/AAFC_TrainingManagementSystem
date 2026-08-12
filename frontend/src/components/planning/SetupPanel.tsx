@@ -143,7 +143,14 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
     <div className="pw-setup-panel">
       <div className="pw-setup-header">
         <h2>Set Up Planning Workspace</h2>
-        <p>No planning year exists yet. Complete the steps below to get started.</p>
+        <p>
+          Planning Workspace is where you schedule parade nights, assign curriculum, and track training delivery.
+          Before you can schedule training, you need a <strong>Training Year</strong>.
+        </p>
+        <p style={{ marginTop: 6 }}>
+          A <strong>Training Year</strong> is a container for all your parade nights and training records for one academic year — typically July to June.
+          Once you create one and generate your parade dates, the planning calendar appears.
+        </p>
       </div>
 
       <div className="pw-setup-steps">
@@ -151,9 +158,13 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
         <div className={`pw-setup-step${step === "year" ? " active" : step === "dates" ? " done" : ""}`}>
           <div className="pw-setup-step-num">{step === "dates" || datesResult ? "✓" : "1"}</div>
           <div className="pw-setup-step-body">
-            <div className="pw-setup-step-title">Create Planning Year</div>
+            <div className="pw-setup-step-title">Create Training Year</div>
             {step === "year" && (
               <div className="pw-drawer-form" style={{ maxWidth: 480 }}>
+                <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "0 0 12px" }}>
+                  Name the training year. The name will appear on all reports and in the year selector.
+                  Use a format like <em>2025–2026 Training Year</em>.
+                </p>
                 <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 10 }}>
                   <label>
                     Year
@@ -198,11 +209,16 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
         <div className={`pw-setup-step${step === "dates" && !datesResult ? " active" : datesResult ? " done" : ""}`}>
           <div className="pw-setup-step-num">{datesResult ? "✓" : "2"}</div>
           <div className="pw-setup-step-body">
-            <div className="pw-setup-step-title">Generate Parade Dates</div>
+            <div className="pw-setup-step-title">Generate Parade Nights</div>
             {step === "dates" && !datesResult && (() => {
               const preview = previewDates(weekday, startDate, endDate, frequency);
               return (
                 <div className="pw-drawer-form" style={{ maxWidth: 520 }}>
+                  <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "0 0 12px" }}>
+                    Parade nights are the individual training evenings that make up your Training Year.
+                    Choose your regular parade weekday, the dates your training runs between, and how often parades occur.
+                    A preview of the dates appears below before you confirm.
+                  </p>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     <label>
                       Parade weekday
@@ -274,8 +290,12 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
       {datesResult && (
         <div style={{ marginTop: 20, padding: "14px 18px", background: "var(--surface)", borderRadius: 10, border: "1.5px solid var(--border)" }}>
           <div style={{ fontWeight: 700, marginBottom: 6, color: "var(--success)" }}>Setup complete!</div>
-          <div style={{ fontSize: 13, color: "var(--muted-text)" }}>
-            Reload the workspace to begin planning. You can add anchor events and sessions from the Year view.
+          <div style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.6 }}>
+            Your Training Year and parade nights are ready. The planning calendar will now show.
+          </div>
+          <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 8, lineHeight: 1.6 }}>
+            <strong>What to do next in TMS:</strong> add Facilitators, Training Areas, and Training Classes — then come back here to schedule curriculum sessions.
+            Use the <strong>?</strong> button at the top of this page for step-by-step instructions.
           </div>
         </div>
       )}

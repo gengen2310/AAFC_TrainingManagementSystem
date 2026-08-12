@@ -8272,19 +8272,113 @@ async function _loadActivitiesPage(){
   await _loadPlanningYears();
   if(P.currentYearId)loadYearMap(P.currentYearId);
 }
+const _GH_DEFAULT=`AAFC TRAINING MANAGEMENT SYSTEM — HELP GUIDE
+
+═══════════════════════════════════════════════
+WHAT IS TMS?
+═══════════════════════════════════════════════
+TMS (Training Management System) is the AAFC system for managing your squadron's records. Use TMS to:
+
+  • Create and manage accounts
+  • Manage facilitators
+  • Manage training areas and equipment
+  • View reports and dashboards
+  • Configure squadron settings
+  • Manage curriculum and activities
+
+═══════════════════════════════════════════════
+WHAT IS PLANNING WORKSPACE?
+═══════════════════════════════════════════════
+Planning Workspace is the AAFC training planner. It is a separate screen (accessed via the Planning link in the navigation bar) where you:
+
+  • Create a Training Year
+  • Generate parade night dates
+  • Schedule curriculum sessions
+  • Assign facilitators and rooms
+  • Record training outcomes
+  • Review Mission Backlog
+
+When to use TMS: to manage your organisation — accounts, facilities, activities.
+When to use Planning Workspace: to do the planning — schedule nights, assign curriculum, track delivery.
+
+═══════════════════════════════════════════════
+KEY TERMS
+═══════════════════════════════════════════════
+Training Year
+  A container for all parade nights and training records for one academic year (typically July to June). A Training Year must exist before you can schedule parade nights.
+
+Training Stage
+  A defined AAFC curriculum level — Initial, Junior, Intermediate, Senior, Bronze, Silver, or Gold. Each stage has a national set of required modules.
+
+Training Class
+  A squadron-specific group of cadets undertaking a Training Stage in a given Training Year. A squadron with 30 senior cadets might have two classes: Senior 1 and Senior 2. Each class has independent progress records.
+
+Parade Night
+  A scheduled training evening. Each parade night can hold multiple sessions across different time periods.
+
+Session
+  One training block within a parade night — a specific curriculum item, time period, Training Class, facilitator, and room.
+
+Mission Backlog
+  A list of curriculum modules required for your active Training Classes but not yet scheduled. The backlog tells you what still needs to be planned and for which classes.
+
+═══════════════════════════════════════════════
+HOW TO GET STARTED — FIRST TIME
+═══════════════════════════════════════════════
+Before using Planning Workspace, set up the following in TMS:
+
+  1. Squadron details (name, parade day, parade location)
+  2. At least one facilitator
+  3. At least one training area
+  4. Training Classes for each active Training Stage
+
+Then open Planning Workspace. If no Training Year exists, the setup panel appears automatically.
+
+═══════════════════════════════════════════════
+COMMON TASKS
+═══════════════════════════════════════════════
+Add a Facilitator
+  In TMS → Facilitators → Add facilitator. Enter name, rank, and type. Save.
+
+Add a Training Area
+  In TMS → Training Areas & Equipment → Add training area. Enter name, type, and capacity. Save.
+
+Generate Parade Nights
+  In Planning Workspace: select a Training Year, then use "Guided year setup…" in the toolbar. Choose your parade weekday, start date, end date, and frequency. Select Generate.
+
+Schedule a session
+  In Planning Workspace: click any empty cell on a parade night. Select the curriculum item, Training Class, facilitator, and room. Save.
+
+Record a training outcome
+  In Planning Workspace: click the session after the parade night. Change status to Delivered, Cancelled, or Not Delivered. Add notes. Save.
+
+═══════════════════════════════════════════════
+GETTING SUPPORT
+═══════════════════════════════════════════════
+For help with TMS or Planning Workspace, contact your Wing SOCAD (Squadron Organisation and Cadet Administration) officer.
+
+To report a technical issue, include:
+  • Squadron name and number
+  • Your role
+  • What you were trying to do
+  • What happened (exact error message if any)
+  • Approximate time
+  • Browser used (Chrome, Firefox, Safari, etc.)`;
+
 async function _loadGettingHelp(){
   const editBtn=document.getElementById('gh-edit-btn');
   if(editBtn)editBtn.style.display=(S.role==='system_admin')?'inline-flex':'none';
   try{
     const r=await api('/api/activities/getting-help');
-    document.getElementById('gh-content-display').textContent=(r&&r.content)||'No help content added yet.';
+    document.getElementById('gh-content-display').textContent=(r&&r.content)||_GH_DEFAULT;
   }catch(_){
-    document.getElementById('gh-content-display').textContent='Could not load Getting Help content.';
+    document.getElementById('gh-content-display').textContent=_GH_DEFAULT;
   }
 }
 function openGettingHelpModal(){
   const current=document.getElementById('gh-content-display').textContent;
-  document.getElementById('gh-content-inp').value=(current==='No help content added yet.')?'':current;
+  const isDefault=(current===_GH_DEFAULT);
+  document.getElementById('gh-content-inp').value=isDefault?'':current;
   document.getElementById('gh-msg').textContent='';
   openModal('m-getting-help');
 }
