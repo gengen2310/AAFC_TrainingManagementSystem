@@ -352,3 +352,110 @@ def test_lockout_message_is_generic_not_7wg_specific(client):
         assert "Wing SOCAD" in msg or "SOCAD" in msg, f"Expected SOCAD contact hint in: {msg!r}"
     finally:
         _clear_account_lock("703SQN2026")
+
+
+# ── DEF-03: Account immediate access (lookup ambiguity with multiple same-role accounts) ─────────
+
+def _get_sqn_id_703(client):
+    """Return the squadron_id for squadron 703 using the wing_admin credentials."""
+    h_wg = login(client, "ADMIN7WG")
+    sqns = client.get("/api/squadrons", headers=h_wg).json()
+    for s in sqns:
+        if s["code"] == "703":
+            return s["squadron_id"]
+    raise ValueError("Squadron 703 not found in seeded data")
+
+
+def test_new_account_usable_immediately_via_lookup_login(client):
+    """Newly created account must be usable immediately via lookup→login even when
+    an older account with the same role exists in the same squadron.
+
+    Root cause: lookup used .first() with no ORDER BY on a non-unique
+    (squadron_id, role) filter — could return the older account's user_id, causing
+    the new holder's code to fail (401) against the wrong AccessCode.
+
+    Fix: lookup orders by created_at DESC (newest wins) + login falls back to a
+    bounded sibling scan when the primary user_id's code fails.
+    """
+    h_nat = login(client, "ADMINNATIONAL")
+    sqn_id = _get_sqn_id_703(client)
+
+    # Create a second sqn_admin for squadron 703 (an older account already exists)
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "DEF-03 New Admin",
+        "role": "sqn_admin",
+        "squadron_id": sqn_id,
+    })
+    assert create_r.status_code == 200, create_r.text
+    new_code = create_r.json()["new_code"]
+    assert new_code, "Create response must include the one-time initial code"
+
+    # Lookup must now return a user_id that succeeds with the new code.
+    # (Returning the old account's user_id would cause 401 here — the regression.)
+    lookup_r = client.post("/api/auth/lookup", json={
+        "unit_type": "squadron",
+        "identifier": "703",
+        "role": "sqn_admin",
+    })
+    assert lookup_r.status_code == 200, lookup_r.text
+    uid = lookup_r.json()["user_id"]
+
+    login_r = client.post("/api/auth/login", json={"user_id": uid, "code": new_code})
+    assert login_r.status_code == 200, (
+        f"New account login must succeed immediately via lookup→login "
+        f"(got {login_r.status_code}: {login_r.text})"
+    )
+    assert "token" in login_r.json(), "Successful login must return a token"
+
+
+def test_existing_account_still_usable_after_new_sibling_created(client):
+    """The original account must remain usable after a newer sibling is created.
+
+    The newer account wins the lookup, but the older account holder can still log
+    in via the scoped fallback scan in the login endpoint.
+    """
+    h_nat = login(client, "ADMINNATIONAL")
+    sqn_id = _get_sqn_id_703(client)
+
+    # Create a second sqn_admin (so lookup returns the newest one)
+    create_r = client.post("/api/accounts", headers=h_nat, json={
+        "display_name": "DEF-03 Sibling Admin",
+        "role": "sqn_admin",
+        "squadron_id": sqn_id,
+    })
+    assert create_r.status_code == 200, create_r.text
+
+    # The original seeded admin code must still work via lookup→login
+    # (the fallback scan in login picks it up even if lookup returns a sibling uid)
+    lookup_r = client.post("/api/auth/lookup", json={
+        "unit_type": "squadron",
+        "identifier": "703",
+        "role": "sqn_admin",
+    })
+    assert lookup_r.status_code == 200
+    uid = lookup_r.json()["user_id"]
+
+    original_login_r = client.post("/api/auth/login", json={"user_id": uid, "code": "ADMIN703"})
+    assert original_login_r.status_code == 200, (
+        f"Original account must remain usable after a newer sibling is created "
+        f"(got {original_login_r.status_code}: {original_login_r.text})"
+    )
+
+
+def test_lookup_user_id_scope_still_prevents_cross_role_code(client):
+    """Fallback scan must not allow a sqn_general code to succeed against sqn_admin uid.
+
+    The sibling scan is bounded by role — it must only search users with the same
+    role as the primary user_id. A viewer's code must not grant admin access.
+    """
+    lookup_r = client.post("/api/auth/lookup", json={
+        "unit_type": "squadron",
+        "identifier": "703",
+        "role": "sqn_admin",
+    })
+    uid = lookup_r.json()["user_id"]
+    # "703SQN2026" is the sqn_general code; entering it against sqn_admin uid must fail
+    r = client.post("/api/auth/login", json={"user_id": uid, "code": "703SQN2026"})
+    assert r.status_code == 401, (
+        f"Cross-role fallback must not succeed: got {r.status_code}"
+    )

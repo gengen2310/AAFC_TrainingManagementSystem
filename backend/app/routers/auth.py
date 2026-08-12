@@ -60,7 +60,7 @@ def lookup(body: LookupIn, db: DBSession = Depends(get_db)):
             User.squadron_id == sqn.id,
             User.role == role,
             User.active_status == True  # noqa: E712
-        ).first()
+        ).order_by(User.created_at.desc()).first()
     elif unit_type == "wing":
         wing = db.query(Wing).filter(
             func.upper(Wing.code) == ident.upper()
@@ -71,14 +71,14 @@ def lookup(body: LookupIn, db: DBSession = Depends(get_db)):
             User.wing_id == wing.id,
             User.role == role,
             User.active_status == True  # noqa: E712
-        ).first()
+        ).order_by(User.created_at.desc()).first()
     elif unit_type == "national":
         if role not in _NATIONAL_ROLES:
             raise _NOT_FOUND
         user = db.query(User).filter(
             User.role == role,
             User.active_status == True  # noqa: E712
-        ).first()
+        ).order_by(User.created_at.desc()).first()
     else:
         raise _NOT_FOUND
 
@@ -114,8 +114,15 @@ def login(body: LoginIn, request: Request, response: Response, db: DBSession = D
                 if ac.failed_attempts >= _LOCKOUT_THRESHOLD:
                     ac.locked_until = utcnow() + timedelta(hours=_LOCKOUT_HOURS)
                 db.commit()
-            raise HTTPException(401, detail={"error": "invalid_code"})
-        matched = ac
+            # Fallback: /lookup uses .first() which may return an older sibling
+            # account when multiple active accounts share the same role in a
+            # squadron. Scan bounded to the same unit+role scope so no
+            # cross-scope escalation is possible.
+            matched = _scoped_fallback_scan(body.user_id, code, db)
+            if matched is None:
+                raise HTTPException(401, detail={"error": "invalid_code"})
+        else:
+            matched = ac
     else:
         # Legacy scan-all path (used by tests; production always provides user_id via /lookup).
         matched = None
@@ -155,6 +162,60 @@ def _raise_if_locked(ac: AccessCode):
     locked_naive = locked.replace(tzinfo=None) if locked.tzinfo else locked
     if locked_naive > now:
         raise HTTPException(429, detail={"error": "locked_out", "message": _LOCKOUT_MSG})
+
+
+def _scoped_fallback_scan(primary_user_id: str, code: str, db: DBSession) -> "AccessCode | None":
+    """Try sibling accounts when /lookup returned the wrong user_id.
+
+    /lookup uses .first() on a non-unique (squadron, role) filter, so when a
+    squadron has multiple active accounts with the same role the returned user_id
+    may not match the caller's code. Scan the other active accounts in the same
+    unit+role scope and return the matching AccessCode, or None.
+
+    Scope is intentionally narrow: only users sharing the primary user's exact
+    (squadron_id OR wing_id OR national role) AND role are scanned. Cross-scope
+    access is never possible via this path.
+    """
+    primary = db.get(User, primary_user_id)
+    if not primary:
+        return None
+    role = primary.role
+    if primary.squadron_id:
+        siblings = db.query(User).filter(
+            User.squadron_id == primary.squadron_id,
+            User.role == role,
+            User.active_status == True,  # noqa: E712
+            User.id != primary_user_id,
+        ).all()
+    elif primary.wing_id:
+        siblings = db.query(User).filter(
+            User.wing_id == primary.wing_id,
+            User.role == role,
+            User.active_status == True,  # noqa: E712
+            User.id != primary_user_id,
+        ).all()
+    else:
+        siblings = db.query(User).filter(
+            User.role == role,
+            User.active_status == True,  # noqa: E712
+            User.id != primary_user_id,
+        ).all()
+    for sibling in siblings:
+        sib_ac = db.query(AccessCode).filter(
+            AccessCode.user_id == sibling.id,
+            AccessCode.active_status == True,  # noqa: E712
+        ).first()
+        if not sib_ac:
+            continue
+        locked = sib_ac.locked_until
+        if locked is not None:
+            now = utcnow().replace(tzinfo=None)
+            locked_naive = locked.replace(tzinfo=None) if locked.tzinfo else locked
+            if locked_naive > now:
+                continue
+        if verify_code(code, sib_ac.code_hash):
+            return sib_ac
+    return None
 
 
 @router.post("/logout")
