@@ -3863,3 +3863,87 @@ meaningful, not redundant.
 
 **Commit:** `f2240b1`
 **Gap register:** WRITE-02 (now 16 passes). Remaining: Logic (§2.20), Completeness (§2.21), Timeliness (§2.22).
+
+---
+
+## §73 — WRITE-02 Pass 17: Logic (§2.20)
+
+**Date:** 2026-08-12
+**Standard:** WRITE-01 §2.20 — "present information in the order the user needs it."
+**Surfaces:** both frontends.
+
+**Violations found and fixed: 5**
+
+All five were severity-at-end patterns — warnings or confirm dialogs that described
+the action or its consequences before stating whether the action was permanent.
+The user's most urgent need when deciding whether to confirm a destructive action
+is to know its reversibility; everything else is detail.
+
+**1. Facilitator merge warning — `connected-frontend/index.html` (modal alert)**
+
+The warning inside the Merge Facilitator modal described the full consequence
+first, then appended "This cannot be undone." at the end:
+
+> "The duplicate will be archived. All their sessions, leave records, and
+> assistant/backup assignments will be re-attributed to the selected facilitator.
+> This cannot be undone."
+
+Fix: severity moved to the front, two sentences merged into one consequence clause:
+
+> "This cannot be undone. The duplicate will be archived, and all their sessions,
+> leave records, and assistant/backup assignments will be re-attributed to the
+> selected facilitator."
+
+**2. Add Account modal info banner — `connected-frontend/index.html`**
+
+A two-sentence info alert led with a jargon sentence not caught in pass 15 (Empathy):
+
+> "Backend validates your authority. You can only create accounts within your
+> permitted scope."
+
+The first sentence is both jargon ("Backend validates") and a Logic violation
+(mechanism before constraint). The second sentence already states the complete
+rule. Fix: first sentence dropped entirely.
+
+> "You can only create accounts within your permitted scope."
+
+**3–4. Parade date / holiday period delete confirms — `connected-frontend/index.html`**
+
+Two confirm dialogs used the `[action]? This cannot be undone.` pattern:
+- `'Remove this parade date? This cannot be undone.'`
+- `'Remove this holiday period? This cannot be undone.'`
+
+Appending a severity clause after the question means the user reads the action
+description before learning it is permanent. Fix: permanence embedded in the
+action verb, removing the trailing clause entirely:
+- `'Permanently remove this parade date?'`
+- `'Permanently remove this holiday period?'`
+
+**5. Holiday period delete confirm — `PlanningBottomDrawer.tsx`**
+
+Same pattern in the Planning Workspace:
+
+`"Delete this holiday period? This cannot be undone."` →
+`"Permanently delete this holiday period?"`
+
+**Rationale for embedding permanence in the verb**
+
+`'Permanently remove …?'` is shorter than `'Remove …? This cannot be undone.'`
+and puts the severity signal (the adverb) where the user's eye lands first — in
+the action description itself, not a trailing qualifier. This follows §2.20's
+ordering principle and §2.16's brevity principle simultaneously.
+
+**Confirm dialogs reviewed and left unchanged**
+
+The full confirm dialog inventory (established in pass 14) was re-checked. All
+other dialogs in both frontends already lead with the consequence and correctly
+distinguish reversible archives from permanent deletes. No further Logic-ordering
+violations found.
+
+**Verification:**
+- Backend: 1509 passed, 5 skipped.
+- Vitest: 38 passed (8 files).
+- TypeScript: `vite build` clean.
+- `.local-dev/index.html` mirror confirmed: only API base URL differs from main.
+
+**Gap register:** WRITE-02 (now 17 passes). Remaining: Completeness (§2.21), Timeliness (§2.22).

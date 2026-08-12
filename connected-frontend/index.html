@@ -2560,7 +2560,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title">Merge Facilitator</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-fac-merge')">×</button></div>
     <div class="modal-body">
-      <div class="alert a-warn" style="margin-bottom:12px">The duplicate will be archived. All their sessions, leave records, and assistant/backup assignments will be re-attributed to the selected facilitator. This cannot be undone.</div>
+      <div class="alert a-warn" style="margin-bottom:12px">This cannot be undone. The duplicate will be archived, and all their sessions, leave records, and assistant/backup assignments will be re-attributed to the selected facilitator.</div>
       <div id="fac-merge-info" style="font-size:12px;margin-bottom:12px"></div>
       <div class="ff">
         <label for="fac-merge-target">Keep this facilitator instead</label>
@@ -2687,7 +2687,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="modal" style="max-width:540px">
     <div class="modal-hdr"><div class="modal-title">Add Account</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-create-account')">×</button></div>
     <div class="modal-body">
-      <div class="alert a-info" style="font-size:11px;margin-bottom:10px">Backend validates your authority. You can only create accounts within your permitted scope.</div>
+      <div class="alert a-info" style="font-size:11px;margin-bottom:10px">You can only create accounts within your permitted scope.</div>
       <div class="ff"><label>Display Name</label><input id="ca-name" placeholder="e.g. Smith, J — 703 SQN Admin"></div>
       <div class="form-row">
         <div class="ff"><label for="ca-role">Role</label>
@@ -10305,7 +10305,7 @@ async function doAddParadeDate(){
   } catch(e){ document.getElementById('pd-msg').textContent=apiErr(e); }
 }
 async function deleteParadeDate(pdId, yearId){
-  if(!confirm('Remove this parade date? This cannot be undone.')) return;
+  if(!confirm('Permanently remove this parade date?')) return;
   try { await api(`/api/planning/parade-dates/${pdId}`,{method:'DELETE'}); await _renderParadeDates(yearId); }
   catch(e){ alert(apiErr(e)); }
 }
@@ -10423,7 +10423,7 @@ async function doEditHoliday(){
   } catch(e){ hm.textContent=apiErr(e); }
 }
 async function deleteHoliday(hId, yearId){
-  if(!confirm('Remove this holiday period? This cannot be undone.')) return;
+  if(!confirm('Permanently remove this holiday period?')) return;
   try { await api(`/api/planning/holidays/${hId}`,{method:'DELETE'}); await _renderHolidays(yearId); }
   catch(e){ alert(apiErr(e)); }
 }
