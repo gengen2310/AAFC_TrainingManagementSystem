@@ -14,7 +14,7 @@ from ..database import get_db
 from ..models import (
     Wing, Squadron, Facilitator, TrainingArea, TimingTemplate, CurriculumItem,
     ParadeNight, Session as TrainingSession, CeaActivity, PlanningYear, HolidayPeriod,
-    Equipment, Cadet, Activity, AnchorEvent, Flight,
+    Equipment, Cadet, Activity, AnchorEvent, Flight, TrainingClass,
 )
 from ..dependencies import get_principal
 from ..permissions import Principal
@@ -72,6 +72,16 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
                 ParadeNight.published_status == True).count() > 0  # noqa: E712
             flights_created = db.query(Flight).filter(
                 Flight.squadron_id == sq_id, Flight.is_archived == False).count()  # noqa: E712
+            # Training Classes: count of active classes across all active Planning Years.
+            # A squadron may run without classes (using the legacy cadet_group free-text
+            # field) -- this step is "optional" in the checklist so it doesn't block
+            # setup completion for existing configurations, but we surface it as guidance.
+            training_classes_created = 0
+            if active_year_ids:
+                training_classes_created = db.query(TrainingClass).filter(
+                    TrainingClass.squadron_id == sq_id,
+                    TrainingClass.training_year_id.in_(active_year_ids),
+                    TrainingClass.is_archived == False).count()  # noqa: E712
 
             # Curriculum coverage: % of items visible to this squadron (national +
             # this wing + this squadron -- same visibility rule as GET /curriculum)
@@ -106,6 +116,7 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
                 "anchor_events_reviewed": anchor_events_reviewed,
                 "parade_night_published": parade_night_published,
                 "flights_created": flights_created,
+                "training_classes_created": training_classes_created,
             }
 
     steps = []
@@ -121,6 +132,14 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
         # is a genuine prerequisite, not just an arbitrary ordering choice.
         steps.append({"key": "planning_year_active", "label": "Set Up Active Planning Year",
                       "done": squadron["planning_year_active"], "count": None, "link_page": "settings"})
+        # Training Classes: optional because a single-class squadron running one group per Stage
+        # does not need to create named classes -- the legacy cadet_group field handles that.
+        # Surfaced as guidance so squadrons running multiple parallel groups are prompted to set
+        # them up, which unlocks class-aware curriculum progress and Mission Backlog tracking.
+        steps.append({"key": "training_classes_created", "label": "Create Training Classes",
+                      "done": squadron["training_classes_created"] > 0,
+                      "count": squadron["training_classes_created"],
+                      "link_page": "settings", "optional": True})
         steps.append({"key": "facilitators_added", "label": "Add Facilitators",
                       "done": squadron["facilitators_added"] > 0, "count": squadron["facilitators_added"],
                       "link_page": "facilitators"})

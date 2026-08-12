@@ -276,3 +276,42 @@ test("F-FUNC-01: national_viewer GET /api/audit returns 200 (not 403)", async ({
   const resp = await page.request.get(`${API}/api/audit`);
   expect(resp.status(), "national_viewer must get HTTP 200 from /api/audit (was 403 before fix)").toBe(200);
 });
+
+// ── FF-01: Hash-fragment token handoff for Firefox (cross-origin tab auth) ────
+
+/**
+ * Simulates the hash-fragment handoff that the main TMS uses when opening the
+ * Planning Workspace in a new tab. The main TMS appends #t=<token> to the PW
+ * URL so Firefox (which blocks SameSite=None cookies via ETP) can still
+ * authenticate. The PW reads the fragment on mount, stores it, and clears it.
+ *
+ * This test verifies the entire round-trip:
+ *   1. Navigate to PW_BASE with a valid token in the URL hash.
+ *   2. The PW must store the token in sessionStorage.
+ *   3. The hash must be cleared (not visible in location.hash).
+ *   4. An authenticated /api/auth/me call must succeed (not 401).
+ */
+test("[FF-01] Planning Workspace authenticates via hash-fragment token handoff", async ({ page }) => {
+  const { getToken } = await import("./helpers/auth");
+  const token = await getToken(SQN_ADMIN);
+
+  // Navigate directly to PW with token in hash, as the main TMS nav-pw-link click handler does.
+  await page.goto(`${PW_BASE}#t=${encodeURIComponent(token)}`);
+
+  // Wait for React to mount and the hash-reading code to run.
+  await page.waitForLoadState("domcontentloaded");
+
+  // Verify token was extracted and stored.
+  const stored = await page.evaluate(() => sessionStorage.getItem("aafc_token"));
+  expect(stored, "Token must be stored in sessionStorage from hash fragment").toBe(token);
+
+  // Verify hash was cleared so it doesn't persist in browser history.
+  const hash = await page.evaluate(() => window.location.hash);
+  expect(hash, "Hash must be cleared after token extraction").toBe("");
+
+  // Verify the token is usable: authenticated API call must return 200.
+  const meResp = await page.request.get(`${API}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(meResp.status(), "/api/auth/me must return 200 with hash-handoff token").toBe(200);
+});

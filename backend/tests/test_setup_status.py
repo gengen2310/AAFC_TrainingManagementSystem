@@ -64,9 +64,9 @@ def test_squadron_block_timing_template_confirmed_true_for_seeded_703(client):
 
 
 _SQUADRON_STEP_KEYS = {
-    "planning_year_active", "facilitators_added", "training_areas_added", "equipment_added",
-    "timing_template_confirmed", "crest_set", "cadets_added", "holidays_configured", "cea_imported",
-    "activities_classified", "anchor_events_reviewed", "parade_nights_generated",
+    "planning_year_active", "training_classes_created", "facilitators_added", "training_areas_added",
+    "equipment_added", "timing_template_confirmed", "crest_set", "cadets_added", "holidays_configured",
+    "cea_imported", "activities_classified", "anchor_events_reviewed", "parade_nights_generated",
     "parade_night_published", "curriculum_coverage", "flights_created",
 }
 
@@ -77,7 +77,7 @@ def test_steps_list_scoped_to_squadron_only_for_sqn_admin(client):
     d = r.json()
     step_keys = {s["key"] for s in d["steps"]}
     assert step_keys == _SQUADRON_STEP_KEYS
-    assert len(d["steps"]) == 15
+    assert len(d["steps"]) == 16  # 15 original + training_classes_created (optional)
 
 
 def test_flights_created_step_is_marked_optional(client):

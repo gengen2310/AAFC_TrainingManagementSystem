@@ -37,10 +37,10 @@ export function PlanningContextBar({
   onToggleLeftPanel,
 }: Props) {
   const scopeLabel = session?.is_national
-    ? "NATHQ"
+    ? "National HQ"
     : session?.is_wing
-    ? `Wing ${session.wing_id ?? ""}`.trim()
-    : session?.display_name ?? "Squadron";
+    ? `Wing ${session.wing_code ?? session.wing_id ?? ""}`.trim()
+    : session?.squadron_code ?? session?.display_name ?? "Squadron";
   const roleLabel = session?.role
     ? session.role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     : "—";

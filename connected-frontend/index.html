@@ -773,6 +773,15 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <div id="chart-element-curriculum-progress"><div class="chart-skeleton" style="height:160px"></div></div>
             <div id="insight-element-curriculum-progress" class="chart-insight" style="display:none"></div>
           </div>
+          <!-- CLASS-07: class-level progress — only visible when Training Classes exist for this squadron/year;
+               the backend returns charts.class_curriculum_progress with an empty data array (no chart) when no
+               classes are configured, so the card is hidden until classes exist. -->
+          <div class="card" id="card-class-curriculum-progress" style="display:none">
+            <div class="ctitle">Progress by Training Class</div>
+            <div class="ssub" id="exp-class-curriculum-progress" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+            <div id="chart-class-curriculum-progress"><div class="chart-skeleton" style="height:120px"></div></div>
+            <div id="insight-class-curriculum-progress" class="chart-insight" style="display:none"></div>
+          </div>
           <div class="dash-grid">
             <div class="card">
               <div class="ctitle">Curriculum backlog — past sessions not delivered</div>
@@ -4203,7 +4212,17 @@ function bootApp(){
   const pwLink=document.getElementById('nav-pw-link'), pwLbl=document.getElementById('nav-lbl-pw');
   const pwUnconfigured=document.getElementById('nav-pw-unconfigured');
   const pwUrl=S.pwUrl;
-  if(pwLink&&pwUrl)pwLink.href=pwUrl;
+  if(pwLink&&pwUrl){
+    pwLink.href=pwUrl;
+    // FF-01: Firefox ETP blocks SameSite=None cookie cross-origin so the PW
+    // tab can't fall back to cookie auth. Pass the Bearer token in the URL
+    // hash fragment instead — fragments are never sent to the server and are
+    // cleared by the PW before any navigation so they don't persist in history.
+    pwLink.addEventListener('click',function(e){
+      const tok=sessionStorage.getItem('aafc_token');
+      if(tok){e.preventDefault();window.open(pwUrl+'#t='+encodeURIComponent(tok),'_blank','noopener');}
+    },{once:false});
+  }
   const pwEligibleScope=['squadron','wing','national','system_admin'].includes(scope);
   const showPW=!!pwUrl&&pwEligibleScope;
   // REM-88: when PLANNING_WORKSPACE_URL isn't configured for this environment,
@@ -6320,6 +6339,41 @@ function _chartHBar(chart){
   }).join('');
 }
 
+// CLASS-07: Training Class curriculum progress — stage aggregate with per-class breakdown.
+// data rows: {stage, stage_id, class_count, coverage_pct, delivered, total, classes:[{display_name,delivered,total,coverage_pct}]}
+// Classes whose coverage_pct is ≥15pp below the stage aggregate are flagged NEEDS ATTENTION.
+function _chartClassProgress(chart){
+  const rows=chart.data||[];
+  if(!rows.length)return _dEmptyChart('No Training Classes configured for this squadron and Training Year.');
+  let html='';
+  rows.forEach(row=>{
+    const agg=row.coverage_pct!=null?row.coverage_pct:null;
+    const aggW=agg!=null?Math.round(agg)+'%':'—';
+    const aggColor=agg==null?'var(--muted)':agg>=80?'var(--ok)':agg>=60?'var(--warn)':'var(--red)';
+    // Stage header row
+    html+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 0 3px;border-top:1px solid var(--b2);margin-top:4px">
+      <div style="font-size:11px;font-weight:800;color:var(--text);min-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(row.stage||'')}">
+        ${esc(row.stage||'Unnamed stage')}</div>
+      <div style="flex:1"><div class="pbar"><div style="height:100%;width:${agg!=null?Math.round(agg):0}%;background:${aggColor};border-radius:3px"></div></div></div>
+      <div style="min-width:48px;text-align:right;font-size:11px;font-weight:700;color:${aggColor}">${aggW}</div>
+    </div>`;
+    // Per-class rows
+    (row.classes||[]).forEach(cls=>{
+      const p=cls.coverage_pct;
+      const behind=agg!=null&&p!=null&&p<=agg-15;
+      const clsColor=p==null?'var(--muted)':p>=80?'var(--ok)':p>=60?'var(--warn)':'var(--red)';
+      const w=p!=null?Math.round(p):0;
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:3px 0 3px 16px" role="img" aria-label="${esc(cls.display_name)}: ${p!=null?p+'%':'no data'}">
+        <div style="font-size:11px;color:var(--text-2);min-width:114px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(cls.display_name)}">${esc(cls.display_name)}</div>
+        <div style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${clsColor};border-radius:3px"></div></div></div>
+        <div style="min-width:48px;text-align:right;font-size:11px;color:${clsColor}">${p!=null?p+'%':'—'}</div>
+        ${behind?`<span style="font-size:9.5px;font-weight:800;color:var(--red);white-space:nowrap">NEEDS ATTENTION</span>`:''}
+      </div>`;
+    });
+  });
+  return html;
+}
+
 // Stacked vertical bar — chart.data rows have per-series keys; chart.series=[{key,label,color}]
 function _chartStackedBar(chart){
   const rows=chart.data||[];const series=chart.series||[];
@@ -6550,6 +6604,7 @@ const _DASH_CHART_IDS=[
   ['chart-cancellation-reasons','insight-cancellation-reasons'],
   ['chart-curriculum-progress','insight-curriculum-progress'],
   ['chart-element-curriculum-progress','insight-element-curriculum-progress'],
+  ['chart-class-curriculum-progress','insight-class-curriculum-progress'],
   ['chart-curriculum-backlog','insight-curriculum-backlog'],
   ['chart-facilitator-workload','insight-facilitator-workload'],
   ['chart-squadron-readiness','insight-squadron-readiness'],
@@ -6615,6 +6670,11 @@ async function loadDashCharts(){
   _dSetExp('exp-curriculum-progress',charts.curriculum_progress?.explanation);
   _dRenderChart('chart-element-curriculum-progress',charts.element_curriculum_progress,_chartStackedBarH,'insight-element-curriculum-progress');
   _dSetExp('exp-element-curriculum-progress',charts.element_curriculum_progress?.explanation);
+  // CLASS-07: show/hide the class-progress card based on whether classes exist.
+  const clsCard=document.getElementById('card-class-curriculum-progress');
+  if(clsCard){const hasClasses=(charts.class_curriculum_progress?.data||[]).length>0;clsCard.style.display=hasClasses?'':'none';}
+  _dRenderChart('chart-class-curriculum-progress',charts.class_curriculum_progress,_chartClassProgress,'insight-class-curriculum-progress');
+  _dSetExp('exp-class-curriculum-progress',charts.class_curriculum_progress?.explanation);
   _dRenderChart('chart-curriculum-backlog',charts.curriculum_backlog,_chartHBar,'insight-curriculum-backlog');
   _dRenderChart('chart-facilitator-workload',charts.facilitator_workload,_chartHBar,'insight-facilitator-workload');
 
@@ -9994,11 +10054,15 @@ function renderMissions() {
     return;
   }
   const canWrite = _canWrite();
-  body.innerHTML = `<div style="overflow-x:auto"><table class="data-table" style="min-width:900px">
+  // CLASS-06: whether to show the Training Class breakdown column (only when any mission
+  // has class_breakdown data, i.e. Training Classes are configured for this squadron/year).
+  const hasClassData = rows.some(m => (m.class_breakdown||[]).length > 0);
+  body.innerHTML = `<div style="overflow-x:auto"><table class="data-table" style="min-width:${hasClassData?'980px':'900px'}">
     <thead><tr>
       <th>Code</th><th>Mission Title</th><th>Level</th><th>Subject</th>
       <th>Suitability</th><th>Parts</th><th>Rec. Term</th>
       <th>Scheduled</th><th>Facilitator</th><th>Location</th><th>Status</th>
+      ${hasClassData ? '<th>Training Classes</th>' : ''}
       ${canWrite ? '<th></th>' : ''}
     </tr></thead><tbody>` +
     rows.map(m => {
@@ -10013,6 +10077,27 @@ function renderMissions() {
       const extraRows = m.scheduled_sessions.length > 1
         ? `<br><span class="muted" style="font-size:0.75rem">+${m.scheduled_sessions.length-1} more</span>`
         : '';
+      // CLASS-06: compact Training Class status summary.
+      // backlog_status values: scheduled, unscheduled, cancelled, not_delivered, resolved.
+      let classTd = '';
+      if(hasClassData){
+        const bd = m.class_breakdown||[];
+        if(!bd.length){
+          classTd = '<td><span class="muted" style="font-size:0.78rem">—</span></td>';
+        } else {
+          const needsAction = bd.filter(c=>c.backlog_status==='unscheduled'||c.backlog_status==='cancelled'||c.backlog_status==='not_delivered');
+          const dots = bd.map(c=>{
+            const s=c.backlog_status;
+            const col=s==='scheduled'||s==='resolved'?'var(--ok)':s==='unscheduled'?'var(--muted)':'var(--red)';
+            const sym=s==='scheduled'||s==='resolved'?'✓':s==='unscheduled'?'·':'✗';
+            return `<span title="${esc(c.display_name)}: ${esc(s||'unknown')}" style="color:${col};font-size:11px;font-weight:700;margin-right:2px">${sym}</span>`;
+          }).join('');
+          const summary = needsAction.length
+            ? `<div style="font-size:9.5px;color:var(--red);font-weight:700">${needsAction.length} class${needsAction.length===1?'':'es'} need action</div>`
+            : '';
+          classTd = `<td style="white-space:nowrap">${dots}${summary}</td>`;
+        }
+      }
       return `<tr>
         <td><code>${esc(m.code)}</code></td>
         <td>${esc(m.title)}</td>
@@ -10025,6 +10110,7 @@ function renderMissions() {
         <td style="font-size:0.82rem">${esc(facName)}</td>
         <td style="font-size:0.82rem">${esc(locName)}</td>
         <td>${badge}</td>
+        ${classTd}
         ${canWrite ? `<td><button class="btn-xs" onclick="openAssignModal('${esc(m.curriculum_id)}','${esc(m.title)}','${esc(m.code)}',${m.part_count||1})">Assign</button></td>` : ''}
       </tr>`;
     }).join('') +
