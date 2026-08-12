@@ -4,7 +4,8 @@ import { visibleRoutes } from "../auth/roleGuards";
 import type { SessionInfo } from "../api/types";
 
 const mk = (role: string, proxy?: SessionInfo["proxy"]): SessionInfo => ({
-  user_id: "u", display_name: "x", role, wing_id: null, squadron_id: null,
+  user_id: "u", display_name: "x", role, wing_id: null, wing_code: null,
+  squadron_id: null, squadron_code: null,
   national_id: null, is_wing: false, is_national: false, proxy: proxy ?? null,
 });
 

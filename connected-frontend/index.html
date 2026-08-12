@@ -1276,7 +1276,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
         <div class="card">
           <div class="ctitle">🔑 Access Code</div>
-          <div class="alert a-info">Change your own sign-in code. Existing codes are never shown and are hashed on the server.</div>
+          <div class="alert a-info">Change your own sign-in code. Existing codes cannot be viewed. The previous code cannot be recovered once changed.</div>
           <div class="form-row">
             <div class="ff"><label>New access code</label><input id="cc-new" type="password" autocomplete="new-password" placeholder="Enter new code"></div>
             <div class="ff"><label>Confirm new code</label><input id="cc-confirm" type="password" autocomplete="new-password" placeholder="Re-enter new code"></div>
@@ -2604,7 +2604,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title" id="m-reset-title">Reset Access Code</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-reset-code')">×</button></div>
     <div class="modal-body">
-      <div class="alert a-info" style="margin-bottom:10px">The old code is not recoverable. The new code is hashed immediately.</div>
+      <div class="alert a-info" style="margin-bottom:10px">The previous code cannot be recovered. Share the new code directly with the user once set.</div>
       <div class="ff"><label>New access code</label><input id="m-reset-new" type="password" autocomplete="new-password" placeholder="Enter new code"></div>
       <div class="ff"><label>Confirm new code</label><input id="m-reset-confirm" type="password" autocomplete="new-password" placeholder="Re-enter new code"></div>
       <div id="m-reset-msg" style="font-size:11.5px;margin-top:8px;font-weight:700"></div>
@@ -3321,7 +3321,7 @@ async function api(path, opts={}){
       ||'';
     // 422 validation array → readable field-error list
     if(res.status===422&&body&&body.detail&&Array.isArray(body.detail)){
-      msg='Validation failed: '+body.detail.map(d=>d.msg||d.message||JSON.stringify(d)).join('; ');
+      msg='Validation failed: '+body.detail.map(d=>d.msg||d.message||'Field error').join('; ');
     }
     // Status-specific fallbacks when the backend provides no message
     if(!msg){
@@ -3331,7 +3331,7 @@ async function api(path, opts={}){
       else if(res.status===422) msg='Some fields are invalid.';
       else if(res.status===429) msg='Too many attempts. Please wait and try again.';
       else if(res.status>=500)  msg='Server error. Try again or contact support.';
-      else                       msg='Request failed (HTTP '+res.status+').';
+      else                       msg='Request failed. Try again, or contact your administrator.';
     }
     // Named error codes — human-readable overrides.
     // 'forbidden'/'access_denied' fall back to a generic message only when the
@@ -4639,7 +4639,7 @@ async function scDownloadPgDump(){
     const res=await fetch(API_BASE+'/api/system/backups/pg-dump',{headers,credentials:'include'});
     if(!res.ok){
       const body=await res.json().catch(()=>({}));
-      const msg=(body&&body.detail&&body.detail.message)||(body&&body.detail)||('Backup failed (HTTP '+res.status+').');
+      const msg=(body&&body.detail&&body.detail.message)||(typeof body.detail==='string'&&body.detail)||'Backup failed. Check the server status and try again.';
       alert('Backup download failed: '+msg);
       return;
     }
@@ -4701,7 +4701,7 @@ async function scImportCurriculum(){
     });
     const d=await r.json();
     if(!r.ok){
-      msg.textContent='Import failed: '+esc((d.detail?.message||d.detail?.error||JSON.stringify(d.detail)));
+      msg.textContent='Import failed: '+(d.detail?.message||d.detail?.error||'An error occurred. Check the file format.');
       msg.style.color='var(--red)'; return;
     }
     msg.textContent=`Import complete — created: ${d.created}, updated: ${d.updated}, skipped: ${d.skipped}, failed: ${d.failed} of ${d.total}`;
@@ -11504,7 +11504,7 @@ async function _csvCurrRequest(preview){
     body:form,
   });
   const d=await res.json();
-  if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||JSON.stringify(d.detail); return null; }
+  if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||'Request failed.'; return null; }
   msg.textContent='';
   return d;
 }
@@ -11594,7 +11594,7 @@ async function previewSchedImport(){
       body:form,
     });
     const d=await res.json();
-    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||JSON.stringify(d.detail); return; }
+    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||'Request failed.'; return; }
     msg.textContent='';
     const updateRows=d.rows.filter(r=>r.action==='update');
     const summary=`${updateRows.length} change(s) to apply · ${d.rows.filter(r=>r.action==='unchanged').length} unchanged · ${d.not_found} not found`;
@@ -11629,7 +11629,7 @@ async function commitSchedImport(){
       body:form,
     });
     const d=await res.json();
-    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||JSON.stringify(d.detail); return; }
+    if(!res.ok){ msg.textContent=d.detail?.message||d.detail?.error||'Request failed.'; return; }
     msg.textContent=`Done: ${d.updated} session(s) updated, ${d.skipped} unchanged, ${d.not_found} not found.`;
     document.getElementById('sched-import-commit-btn').style.display='none';
   }catch(e){ msg.textContent=apiErr(e); }

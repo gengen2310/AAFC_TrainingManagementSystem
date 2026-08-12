@@ -14,8 +14,8 @@ export function Admin() {
       <Card title="Your scope">
         <ul>
           <li>Role: <strong>{session?.role}</strong></li>
-          <li>Wing: {session?.wing_id ?? "—"}</li>
-          <li>Squadron: {session?.squadron_id ?? "—"}</li>
+          <li>Wing: {session?.wing_code ?? "—"}</li>
+          <li>Squadron: {session?.squadron_code ?? "—"}</li>
         </ul>
       </Card>
       <Card title="Squadrons in scope">

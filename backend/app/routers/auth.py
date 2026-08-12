@@ -286,8 +286,14 @@ def _me(user: User, db: DBSession | None = None) -> dict:
         w = db.get(Wing, user.wing_id)
         if w:
             wing_code = w.code
+    squadron_code = None
+    if user.squadron_id and db:
+        s = db.get(Squadron, user.squadron_id)
+        if s:
+            squadron_code = s.code
     return {"user_id": user.id, "display_name": user.display_name, "role": user.role,
             "wing_id": user.wing_id, "wing_code": wing_code,
-            "squadron_id": user.squadron_id, "national_id": user.national_id,
+            "squadron_id": user.squadron_id, "squadron_code": squadron_code,
+            "national_id": user.national_id,
             "is_wing": user.role in ("wing_viewer", "wing_admin"),
             "is_national": user.role in ("national_viewer", "national_admin", "system_admin", "auditor")}

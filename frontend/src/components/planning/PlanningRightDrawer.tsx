@@ -692,7 +692,7 @@ function ScheduleFromBacklogPanel({
     return (
       <div>
         <div style={{ color: "var(--success)", fontWeight: 700, fontSize: 14, marginBottom: 10 }}>
-          Session scheduled successfully.
+          Session scheduled.
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className="btn sm primary" onClick={() => { setSuccess(false); setDateId(""); }}>Schedule again</button>

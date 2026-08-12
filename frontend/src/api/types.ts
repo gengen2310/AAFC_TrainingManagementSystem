@@ -1,7 +1,9 @@
 // Types mirror the backend response shapes exactly (read from the route handlers).
 export interface SessionInfo {
   user_id: string; display_name: string; role: string;
-  wing_id: string | null; squadron_id: string | null; national_id: string | null;
+  wing_id: string | null; wing_code: string | null;
+  squadron_id: string | null; squadron_code: string | null;
+  national_id: string | null;
   is_wing: boolean; is_national: boolean;
   proxy?: { mode: string; acting_squadron_id: string | null; acting_wing_id: string | null; proxy_session_id: string } | null;
 }

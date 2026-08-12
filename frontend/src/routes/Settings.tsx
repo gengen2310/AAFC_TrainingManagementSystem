@@ -70,7 +70,7 @@ export function Settings() {
     mutationFn: () => authApi.changeCode(selected!.user_id, newCode),
     onSuccess: () => {
       setErr("");
-      setMsg(`Access code reset for ${selected!.display_name}. The new code is hashed and not shown.`);
+      setMsg(`Access code reset for ${selected!.display_name}. Share the new code directly with the user.`);
       setNewCode("");
       setSelected(null);
     },
@@ -98,8 +98,8 @@ export function Settings() {
       {/* ── Self-service card ── always visible ── */}
       <Card title="Change my access code">
         <p className="muted" style={{ marginBottom: 12 }}>
-          Change your own access code. The current code is not required. The new code is hashed
-          immediately — there is no way to recover the old value.
+          Change your own access code. The current code is not required. The previous code cannot
+          be recovered once changed.
         </p>
         <div className="form" style={{ maxWidth: 340 }}>
           <label htmlFor="sc-new">New access code</label>
@@ -137,9 +137,8 @@ export function Settings() {
         <>
           <Card title="User directory">
             <p className="muted" style={{ marginBottom: 12 }}>
-              Select a user to reset their access code. Codes are write-only — the system hashes and
-              stores the new value; the previous code cannot be recovered. You may only reset users
-              within your authorised scope.
+              Select a user to reset their access code. The previous code cannot be recovered once
+              a reset is applied. You may only reset users within your authorised scope.
             </p>
             <div className="filter-bar" style={{ marginBottom: 10 }}>
               <input
