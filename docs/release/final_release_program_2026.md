@@ -4445,3 +4445,50 @@ Also updated gap matrix: Gap 22 promoted to PARTIALLY COMPLETE; V1 Gate Summary 
 **Alembic head confirmed:** `d3e4f5a6b7c8` (v51)
 
 > Deployment IDs confirmed from Railway dashboard (2026-08-12).
+
+---
+
+## §89 — 7 Wing Operational V1 — Programme Complete (2026-08-12)
+
+**Status: LIVE IN PRODUCTION**
+
+All non-human-gated technical work under the Next-Stage Development Program is complete as of this entry. The AAFC TMS v17.1 is running in production at commit `756e65e`.
+
+### Technical deliverables this programme (Phases 0–8 + security hardening + review cycle)
+
+| Area | Commits / Evidence |
+|---|---|
+| Gap matrix + current state docs | `docs/next-stage/00_current_state.md`, `01_gap_matrix.md` |
+| Optimistic locking (Phase 7) | `version` field on 5 models; 22 concurrency tests; `d3e4f5a6b7c8` migration |
+| Year rollover E2E (Phase 8) | 10 tests in `test_year_rollover_e2e.py`; `08_year_rollover_procedure.md` |
+| Multi-Wing hardcode removal | Bootstrap fully parameterised; `auth.py` generic error |
+| Session revocation | `token_version` / `tv` claim; forced logout on code reset |
+| Maintenance mode login-block | `maintenance_block_logins` SystemSetting; audited |
+| Accessibility (Axe + keyboard) | `test_a11y_wcag.spec.ts`, `test_accessibility.spec.ts`; WCAG AA palette audit |
+| WCAG SC 1.4.10 / 1.4.4 / 1.4.3 | `a11y-wcag.spec.ts` (9 tests) |
+| Rate limiting assessment | `15_rate_limiting_assessment.md`; runbook Part 6A; GUNICORN_WORKERS cap |
+| Disaster recovery | `19_disaster_recovery_rehearsal.md`; GPG backup key committed |
+| Pen test scope of work | `22_pen_test_scope.md` (grey-box 5-day SOW) |
+| V1 go/no-go checklist | `v1_go_no_go_checklist.md` (Sections A–H) |
+| Production deploy script | `scripts/deploy-production.sh` (11-step preflight; 3-service gates) |
+| CodeRabbit + design review | All critical/high/medium findings applied (`756e65e`) |
+| Test suite | 1553 passed, 5 skipped |
+
+### Human-gated items remaining (set aside — not blockers for technical programme close)
+
+These require organisational authority and are tracked in `v1_go_no_go_checklist.md`:
+
+- Gap 5: Individual accountability decision (CO/SOCAD)
+- Gap 20: CSRF env var verification (System Admin — Railway dashboard)
+- Gap 21: Backup key custody + DR rehearsal (System Admin)
+- Gap 22: External pen test (vendor engagement + budget)
+- Gap 23: Data governance decisions (9 items — CO/data authority)
+- Gap 24: Beta feedback register (beta testers)
+
+### Post-release actions due within 7 days
+
+See `v1_go_no_go_checklist.md §H` for the full list. Key items:
+- Fill in named ownership table in `25_support_runbook.md` Part 1
+- Confirm weekly restore test passed in first production week
+- Schedule first quarterly DR rehearsal
+- Communicate V1 go-live to 7WG beta testers

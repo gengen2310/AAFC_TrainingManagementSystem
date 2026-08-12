@@ -91,6 +91,24 @@ Gaps that must be **closed or formally deferred with risk acceptance** before 7 
 | 24 | Beta feedback | Register populated; all critical/high items resolved |
 | 25 | Support runbook | Written and reviewed by a non-developer |
 
+### V1 Production Deployment Record
+
+**Status: DEPLOYED** — commit `756e65e` to production on 2026-08-12
+
+| Service | Deployment ID |
+|---|---|
+| `aafc-tms-backend` | `44b1681e-b575-4c46-be0a-d9cb3ca07f10` |
+| `aafc-tms-frontend` | `5f8396fc-01c1-483e-8acf-e33bfcffa398` |
+| `aafc-tms-planning-workspace-preview` | `16efd4a2-8c71-4af1-afbc-178966cbf918` |
+
+Deployment script: `scripts/deploy-production.sh`. All 11 preflight steps, 3-service deploy, and per-service gates passed. Alembic head confirmed: `d3e4f5a6b7c8` (v51). Full record in `docs/release/final_release_program_2026.md §88`.
+
+**Post-release actions due within 7 days** (see `v1_go_no_go_checklist.md §H`):
+- H2: Fill in named ownership table in `25_support_runbook.md` Part 1
+- H3: Confirm weekly restore test GitHub Action passed in first week
+- H4: Schedule first quarterly DR rehearsal
+- H5: Communicate V1 go-live to 7WG beta testers
+
 ---
 
 ## Level B Gate Summary (Second Wing Pilot)
