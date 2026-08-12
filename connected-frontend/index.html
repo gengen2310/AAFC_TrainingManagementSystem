@@ -1584,6 +1584,15 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <label>Expected return time (optional, ISO format)</label>
               <input id="sc-maint-until" type="text" placeholder="e.g. 2026-12-01T08:00:00Z" style="width:100%;max-width:300px">
             </div>
+            <div class="form-group" style="margin-top:10px">
+              <div style="font-size:12px;font-weight:700;margin-bottom:6px">Access restrictions</div>
+              <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;margin-bottom:4px">
+                <input type="checkbox" id="sc-maint-block-logins"> Block new logins (drain phase — current sessions still work)
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer">
+                <input type="checkbox" id="sc-maint-block-reads"> Block all read access (full lockdown — only system endpoints remain)
+              </label>
+            </div>
             <div class="form-group">
               <label>Confirmation — type exactly: <strong>ENABLE MAINTENANCE</strong></label>
               <input id="sc-maint-confirm" type="text" placeholder="ENABLE MAINTENANCE" style="width:100%;max-width:300px">
@@ -4652,11 +4661,16 @@ async function scLoadMaintenance(){
     let h='';
     if(d.enabled){
       h+=`<div class="sc-maint-on">Maintenance mode is ON${d.message?' — '+esc(d.message):''}</div>`;
-      if(d.until) h+=`<div class="muted" style="font-size:12px;margin-bottom:8px">Expected return: ${esc(d.until)}</div>`;
+      if(d.until) h+=`<div class="muted" style="font-size:12px;margin-bottom:4px">Expected return: ${esc(d.until)}</div>`;
+      h+=`<div style="font-size:11.5px;margin:6px 0 10px;display:flex;gap:10px;flex-wrap:wrap">`;
+      h+=`<span class="${d.block_logins?'sc-status-warn':'sc-status-ok'}">Logins: ${d.block_logins?'Blocked':'Allowed'}</span>`;
+      h+=`<span class="${d.block_reads?'sc-status-warn':'sc-status-ok'}">Reads: ${d.block_reads?'Blocked':'Allowed'}</span>`;
+      h+=`<span class="sc-status-warn">Writes: Blocked</span>`;
+      h+=`</div>`;
       h+=`<button class="btn btn-secondary" onclick="scDisableMaint()">Disable Maintenance Mode</button>`;
     } else {
       h+=`<div style="font-size:12.5px;color:var(--ok);margin-bottom:10px">Maintenance mode is off. System is operating normally.</div>`;
-      h+=`<button class="btn btn-secondary" onclick="document.getElementById('sc-maint-form').style.display='block';this.style.display='none'">Enable Maintenance Mode…</button>`;
+      h+=`<button class="btn btn-secondary" onclick="document.getElementById('sc-maint-block-logins').checked=false;document.getElementById('sc-maint-block-reads').checked=false;document.getElementById('sc-maint-form').style.display='block';this.style.display='none'">Enable Maintenance Mode…</button>`;
     }
     el.innerHTML=h;
   } catch(e){ el.innerHTML=`<div class="sc-status-err">Could not load Maintenance status: ${esc(apiErr(e))}</div>`; }
@@ -4666,8 +4680,10 @@ async function scEnableMaint(){
   const msg=document.getElementById('sc-maint-msg').value.trim();
   const until=document.getElementById('sc-maint-until').value.trim();
   const confirm=document.getElementById('sc-maint-confirm').value.trim();
+  const blockLogins=document.getElementById('sc-maint-block-logins').checked;
+  const blockReads=document.getElementById('sc-maint-block-reads').checked;
   try {
-    await api('/api/system/maintenance/enable',{method:'POST',body:JSON.stringify({message:msg||null,until:until||null,confirm})});
+    await api('/api/system/maintenance/enable',{method:'POST',body:JSON.stringify({message:msg||null,until:until||null,confirm,block_logins:blockLogins,block_reads:blockReads})});
     document.getElementById('sc-maint-form').style.display='none';
     scLoadMaintenance();
     scLoadOverview();
