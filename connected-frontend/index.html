@@ -1242,6 +1242,16 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <div class="ff"><label>Address</label><input id="s-addr"></div>
           </div>
           <div class="form-row">
+            <div class="ff"><label for="s-unit-type">Unit Type</label>
+              <select id="s-unit-type" aria-label="Unit type">
+                <option value="standard_squadron">Standard Squadron</option>
+                <option value="specialist_squadron">Specialist Squadron</option>
+                <option value="specialist_flight">Specialist Flight</option>
+                <option value="support_unit">Support Unit</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
             <div class="ff"><label for="s-pday">Parade Day</label>
               <select id="s-pday" aria-label="Parade day of week">
                 <option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
@@ -2979,6 +2989,30 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   </div>
 </div>
 
+<!-- ── Edit Unit Type Modal ──────────────────────────────────────────────── -->
+<div class="modal-bg" id="m-edit-unit-type">
+  <div class="modal" style="max-width:420px;width:96%">
+    <div class="modal-hdr"><div class="modal-title">Change Unit Type</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-edit-unit-type')">×</button></div>
+    <div class="modal-body">
+      <p id="edit-unit-type-name" style="font-weight:700;margin-bottom:12px"></p>
+      <div class="ff">
+        <label for="edit-unit-type-sel">Unit Type</label>
+        <select id="edit-unit-type-sel" aria-label="Unit type">
+          <option value="standard_squadron">Standard Squadron</option>
+          <option value="specialist_squadron">Specialist Squadron</option>
+          <option value="specialist_flight">Specialist Flight</option>
+          <option value="support_unit">Support Unit</option>
+        </select>
+      </div>
+      <div id="edit-unit-type-msg" style="font-size:11.5px;margin-top:10px;font-weight:700"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-out" onclick="closeModal('m-edit-unit-type')">Cancel</button>
+      <button class="btn btn-dk" onclick="_saveUnitType()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Timing Template Editor Modal ─────────────────────────────────────── -->
 <div class="modal-bg" id="m-timing">
   <div class="modal" style="max-width:720px;width:96%">
@@ -3900,7 +3934,7 @@ async function loadData(){
   S.reports={summary:repSum,readiness:repRead,coverage:repCov,facload:repFload,notdelivered:repNdel};
   S.cfg={day:'',start:'',end:'',sess:3,dur:35,addr:'',crestUrl:''};
   if(sqnData){
-    S.cfg={day:sqnData.default_parade_day||'',start:sqnData.default_start_time||'',end:sqnData.default_end_time||'',sess:sqnData.default_session_count||3,dur:35,addr:sqnData.address||'',crestUrl:sqnData.crest_url||''};
+    S.cfg={day:sqnData.default_parade_day||'',start:sqnData.default_start_time||'',end:sqnData.default_end_time||'',sess:sqnData.default_session_count||3,dur:35,addr:sqnData.address||'',crestUrl:sqnData.crest_url||'',unitType:sqnData.unit_type||'standard_squadron'};
     S.currentSqnId=sqnData.squadron_id;
   }
   S.timingTemplates=timing||[];
@@ -4305,7 +4339,7 @@ function bootApp(){
   const setVal=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v;};
   setVal('s-sqn',S.scopeName||info.name); setVal('s-addr',S.cfg.addr||''); setVal('s-pday',S.cfg.day||'');
   setVal('s-start',S.cfg.start||''); setVal('s-end',S.cfg.end||''); setVal('s-sess',S.cfg.sess||3);
-  setVal('s-crest',S.cfg.crestUrl||''); _renderCrestPreview();
+  setVal('s-crest',S.cfg.crestUrl||''); setVal('s-unit-type',S.cfg.unitType||'standard_squadron'); _renderCrestPreview();
   renderTimingTemplates();
   const ccMsg=document.getElementById('cc-msg'); if(ccMsg)ccMsg.textContent='';
   calYear=new Date().getFullYear();calMonth=new Date().getMonth();
@@ -5288,7 +5322,8 @@ function _renderUnitsTable(){
     if(!canArchive(s)) return '';
     if(s.is_archived) return `<button class="btn btn-xs btn-ok" onclick="doRestoreSquadron('${s.squadron_id}','${_jsAttr(s.code)}')">Restore</button> `+
       `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteSquadron('${s.squadron_id}','${_jsAttr(s.code)}')">Delete Permanently…</button>`;
-    return `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="_orgOpenWizard('squadron','${s.squadron_id}','${_jsAttr(s.code)}')" title="Archives the unit — reversible">Delete</button>`;
+    return `<button class="btn btn-xs btn-dk" onclick="_openEditUnitTypeModal('${s.squadron_id}','${_jsAttr(s.unit_type||'standard_squadron')}','${_jsAttr(s.name||s.code)}')">Edit Type</button> `+
+      `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="_orgOpenWizard('squadron','${s.squadron_id}','${_jsAttr(s.code)}')" title="Archives the unit — reversible">Delete</button>`;
   };
   el.innerHTML='<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Wing</th>'+((isNatAdmin||isWingAdmin)?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
     sqns.map(s=>`<tr${s.is_archived?' style="opacity:.6"':''}>
@@ -5299,6 +5334,34 @@ function _renderUnitsTable(){
       ${(isNatAdmin||isWingAdmin)?`<td class="no-print" style="display:flex;gap:4px;flex-wrap:wrap">${actionsCell(s)}</td>`:''}
     </tr>`).join('')+
     '</tbody></table></div>';
+}
+
+let _editUnitTypeSqnId=null;
+function _openEditUnitTypeModal(sqnId, currentType, name){
+  _editUnitTypeSqnId=sqnId;
+  const nameEl=document.getElementById('edit-unit-type-name');
+  if(nameEl) nameEl.textContent=name||sqnId;
+  const sel=document.getElementById('edit-unit-type-sel');
+  if(sel) sel.value=currentType||'standard_squadron';
+  const msg=document.getElementById('edit-unit-type-msg');
+  if(msg) msg.textContent='';
+  openModal('m-edit-unit-type');
+}
+async function _saveUnitType(){
+  if(!_editUnitTypeSqnId) return;
+  const sel=document.getElementById('edit-unit-type-sel');
+  const msg=document.getElementById('edit-unit-type-msg');
+  const unitType=(sel&&sel.value)||'standard_squadron';
+  if(msg){msg.textContent='Saving…';msg.style.color='var(--muted)';}
+  try{
+    await api('/api/squadrons/'+_editUnitTypeSqnId,{method:'PATCH',body:JSON.stringify({unit_type:unitType})});
+    closeModal('m-edit-unit-type');
+    await _refreshOrgCache();
+    _renderUnitsTable();
+    showToast('Unit type updated.');
+  }catch(e){
+    if(msg){msg.textContent=apiErr(e);msg.style.color='var(--red)';}
+  }
 }
 
 async function doRestoreWing(wingId, wingCode){
@@ -9048,7 +9111,8 @@ async function saveSettings(){
     default_start_time:document.getElementById('s-start').value||null,
     default_end_time:document.getElementById('s-end').value||null,
     default_session_count:+document.getElementById('s-sess').value||3,
-    crest_url:document.getElementById('s-crest').value||''
+    crest_url:document.getElementById('s-crest').value||'',
+    unit_type:document.getElementById('s-unit-type').value||null
   };
   try{
     await api('/api/squadrons/'+sqnId,{method:'PATCH',body:JSON.stringify(payload)});
