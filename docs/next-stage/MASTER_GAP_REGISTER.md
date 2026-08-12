@@ -26,14 +26,14 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 15 |
 | STAGING VERIFIED | 5 |
-| FIXED LOCALLY | 9 |
+| FIXED LOCALLY | 10 |
 | IMPLEMENTING | 14 |
-| NOT STARTED | 60 |
+| NOT STARTED | 59 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **120** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 29 / 120 = 24%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 30 / 120 = 25%**
 
 ---
 
@@ -73,9 +73,9 @@ to formally confirm this (see DOC-12).
 | CLASS-09 | Core Domain | HIGH | Phase-level class progress — `GET /api/curriculum/phases/{id}/class-progress` | Implemented in `training.py` | CLOSED |
 | CLASS-10 | Core Domain | HIGH | Mission Backlog `class_breakdown` field — backend returns per-curriculum-item breakdown of which Training Class needs action | `planning.py` Mission Backlog API returns `class_breakdown` | CLOSED |
 | CLASS-11 | Core Domain | MEDIUM | Class behind-threshold detection: backend flags classes >15 pp below their stage average | Backend detects and returns flag; 1553 tests passing including class-specific tests | CLOSED |
-| CLASS-12 | Core Domain | HIGH | class_curriculum_progress chart in connected-frontend — chart container rendering per-class curriculum progress from `charts.class_curriculum_progress` | Backend returns `charts.class_curriculum_progress` in dashboard response; connected-frontend has only `chart-curriculum-progress` and `chart-element-curriculum-progress` divs; no per-class chart container exists in `index.html` | NOT STARTED |
+| CLASS-12 | Core Domain | HIGH | class_curriculum_progress chart in connected-frontend — chart container rendering per-class curriculum progress from `charts.class_curriculum_progress` | Confirmed implemented: `chart-class-curriculum-progress` container at index.html:792; rendered at index.html:6857 via `_dRenderChart`; insight at 6858. Gap register was stale. | CLOSED |
 | CLASS-13 | Core Domain | HIGH | class_breakdown field rendered in connected-frontend curriculum page — per-item indication of which Training Class needs each curriculum item | connected-frontend curriculum page rendering ignores `class_breakdown` field from Mission Backlog response entirely | NOT STARTED |
-| CLASS-14 | Core Domain | MEDIUM | Training Classes step in the Getting Started checklist onboarding wizard | `setup.py` onboarding steps do not include Training Classes; users have no guided first-run path to create their first class after initial account setup | NOT STARTED |
+| CLASS-14 | Core Domain | MEDIUM | Training Classes step in the Getting Started checklist onboarding wizard | Confirmed implemented: `setup.py` lines 79-84 query TrainingClass count; lines 139-141 emit `training_classes_created` step. Gap register was stale. | CLOSED |
 | CLASS-15 | Core Domain | LOW | CustomPhase → CurriculumPhase migration and cleanup — CustomPhase is a narrower, older squadron-scoped phase-name table that predates CurriculumPhase | CustomPhase still live; migration surface identified in `parallel-class-impact-analysis.md` as CLASS-14; not acted on | IMPLEMENTING |
 | CLASS-16 | Core Domain | LOW | Session.cadet_group / Cadet.phase formal deprecation — single-string fields replaced structurally by SessionAudience; all consumers (Mission Backlog, Weekly Program, dashboards, both frontends) must migrate before fields are removed | Old fields retained as read-compatibility path per capability-preservation rules; no migration schedule; no consumer yet migrated to SessionAudience | IMPLEMENTING |
 
@@ -110,7 +110,7 @@ and curriculum item breakdown). Frontend consumption gaps are the remaining work
 
 | ID | AREA | SEVERITY | REQUIREMENT | CURRENT STATE | STATUS |
 |---|---|---|---|---|---|
-| MBACK-01 | Mission Backlog | HIGH | class_breakdown per curriculum item displayed in connected-frontend curriculum page — identifies which Training Class needs each item | Backend returns `class_breakdown`; connected-frontend curriculum page ignores field (overlaps CLASS-13) | NOT STARTED |
+| MBACK-01 | Mission Backlog | HIGH | class_breakdown per curriculum item displayed in connected-frontend curriculum page — identifies which Training Class needs each item | Implemented commit `16f6bce`: `_loadCurriculumClassBreakdown()` fetches mission backlog on curriculum page nav; `_currClassBreakdownHtml()` renders per-class badges (b-ok/b-blue/b-amber/b-red by status). | FIXED LOCALLY |
 | MBACK-02 | Mission Backlog | MEDIUM | Per-class Mission Backlog filtering in UI — view backlog filtered to a single Training Class | No class filter exists in either frontend's Mission Backlog / curriculum page | NOT STARTED |
 | MBACK-03 | Mission Backlog | MEDIUM | Needs Attention consolidated queue (§39) — single prioritised surface combining readiness warnings, class gaps, and required planning actions | Individual pieces exist (readiness warnings, Mission Backlog panel); not consolidated into one action queue | NOT STARTED |
 | MBACK-04 | Mission Backlog | LOW | Plan-faster shortcut from Mission Backlog item directly to a session slot (§41) | Not implemented; currently requires navigating to the session separately | NOT STARTED |
@@ -130,7 +130,7 @@ is an empty-string admin-editable text field — no default content ships.
 | HELP-01 | Help | MEDIUM | Contextual help tooltips on key fields across both frontends — hover/focus reveals a plain-language explanation of each field's purpose | Not implemented in either frontend | NOT STARTED |
 | HELP-02 | Help | LOW | Glossary of terms accessible from within the application — defines Training Stage, Training Class, Parade Night, Curriculum Item, Mission Backlog, and other domain terms | Not implemented; no glossary surface in either frontend | NOT STARTED |
 | HELP-03 | Help | MEDIUM | Help Centre 17-question acceptance test — all questions a new Training Officer would ask are answerable from within the application, without external reference | No Help Centre feature exists; investigated and confirmed absent from both frontends | NOT STARTED |
-| HELP-04 | Help | MEDIUM | Pre-flight / readiness check UI — explainable per-item checklist (✓ / ! per item) rather than a single blended readiness percentage | Backend has per-item readiness data; whether frontend renders as an item-level checklist vs a single percentage not confirmed this pass | NOT STARTED |
+| HELP-04 | Help | MEDIUM | Pre-flight / readiness check UI — explainable per-item checklist (✓ / ! per item) rather than a single blended readiness percentage | `_renderTonightReadiness()` now renders a "Readiness checklist" section below the session list showing Sessions planned (b-ok badge), Facilitators assigned (b-ok/b-amber/b-red with N/M count), Rooms assigned (same) — derived from `d.fac_filled`, `d.room_filled`, `d.sessions_total` already returned by `_tonight_readiness` backend | FIXED LOCALLY |
 | HELP-05 | Help | LOW | "What changed?" view (§40) — changelog or activity feed showing recent modifications to the current week's plan | Not found anywhere in either frontend | NOT STARTED |
 | HELP-06 | Help | LOW | Universal search / command palette (§6) — single-keystroke access to any entity, page, or action from anywhere in the application | Not implemented in either frontend | NOT STARTED |
 | HELP-07 | Help | LOW | Getting Help panel — admin-editable free text must have meaningful default guidance content for a new squadron's first session | Empty-string default (`training.py:2583–2609`); any admin can write to it but no default guidance ships with the system | ACCEPTED RISK |
@@ -189,11 +189,11 @@ known. Firefox and the Planning Workspace 404 are uninvestigated — root causes
 
 | ID | AREA | SEVERITY | REQUIREMENT | CURRENT STATE | STATUS |
 |---|---|---|---|---|---|
-| DEF-01 | Defect | P0 | Firefox authentication — Planning Workspace cross-origin session handoff works in Firefox | Not investigated; no Playwright Firefox tests exist; root cause and scope entirely unknown | NOT STARTED |
+| DEF-01 | Defect | P0 | Firefox authentication — Planning Workspace cross-origin session handoff works in Firefox | Confirmed implemented: `index.html:4347-4354` — FF-01 fix already in place; uses `#t=<token>` hash fragment handoff bypassing SameSite=None cookie (which Firefox ETP blocks). `main.tsx` reads hash before React renders. Gap register was stale. | CLOSED |
 | DEF-02 | Defect | P0 | Planning Workspace unexpected 404 — specific navigation path causes an unhandled 404 | Not reproduced; not investigated; exact triggering route unknown | NOT STARTED |
 | DEF-03 | Defect | P1 | Planning Workspace "Your scope" card — displays raw Wing ID and Squadron ID UUIDs instead of Wing code / name | `SessionInfo` in `api/types.ts` lacks `wing_code` / `squadron_code`; backend response change or additional lookup required; confirmed by code inspection | NOT STARTED |
-| DEF-04 | Defect | P1 | Facilitator rank stored as uncontrolled free text (`Facilitator.rank` String) — no link to a canonical AAFC rank catalogue, no validation | `FacilitatorRankHistory` tracks rank history but the entry field is a plain String with no lookup or validation | NOT STARTED |
-| DEF-05 | Defect | MEDIUM | Legacy "Annual Program" stale text — `connected-frontend/index.html:6842` still says "Annual Program" linking to `nav('planning-year')`; functional redirect exists (`nav('planning-year')→'activities'`) but text misleads users | Redirect works; stale label remains and would confuse a first-time user looking for Activities | NOT STARTED |
+| DEF-04 | Defect | P1 | Facilitator rank stored as uncontrolled free text (`Facilitator.rank` String) — no link to a canonical AAFC rank catalogue, no validation | Implemented commit `16f6bce`: `_AAFC_RANKS` catalogue in training.py; `GET /api/facilitators/ranks` endpoint; `_normalise_rank()` applied on create/update/import; frontend datalist populated from API. 8 regression tests added. | FIXED LOCALLY |
+| DEF-05 | Defect | MEDIUM | Legacy "Annual Program" stale text — `connected-frontend/index.html:6842` still says "Annual Program" linking to `nav('planning-year')`; functional redirect exists (`nav('planning-year')→'activities'`) but text misleads users | Confirmed resolved: `nav('planning-year')` as user-visible text no longer exists in index.html; all remaining references are code comments. Gap register was stale (original line number drifted). | CLOSED |
 | DEF-06 | Defect | MEDIUM | Wing-onboarding CLI-only — no HTTP API endpoint for Wing provisioning; requires direct server/DB access | `second_wing_seed.py` is CLI-only; no API path; appropriate for Level B staging, not National | NOT STARTED |
 | DEF-07 | Defect | MEDIUM | Multi-Wing report cross-scope verification — Wing reports show only their Wing's data; National aggregates all Wings; no cross-Wing data leak | No synthetic second Wing in staging; multi-Wing aggregation path unproven; blocked on Level B Wing activation | NOT STARTED |
 | DEF-08 | Defect | MEDIUM | Celery export task (`generate_export`) is a stub — sync fallback records success without writing a real file; no object-storage or presigned-URL path | `dispatcher.py` tries Celery; falls back to sync stub; Redis not provisioned | IMPLEMENTING |

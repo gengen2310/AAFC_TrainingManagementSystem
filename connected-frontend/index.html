@@ -6662,6 +6662,21 @@ function _renderTonightReadiness(chart){
     <span style="font-size:11.5px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title||'No curriculum item')}</span>
     <span style="font-size:10.5px;color:${s.facilitator?'var(--muted)':'var(--red)'}">${esc(s.facilitator||'No facilitator assigned')}</span>
   </div>`).join('');
+  // HELP-04: per-item readiness checklist — each preparation category shown
+  // as ✓ / ! / ✗ so users can see exactly what is and is not ready, rather
+  // than inferring it from a blended percentage.
+  const sessTotal=d.sessions_total||0;
+  const facFill=d.fac_filled||0;const roomFill=d.room_filled||0;
+  function _rdItem(label,filled,total){
+    if(!total)return '';
+    const ok=filled>=total,none=filled===0;
+    const cls=ok?'b-ok':none?'b-red':'b-amber';
+    const sym=ok?'✓':none?'✗':'!';
+    const detail=ok?`${total}/${total}`:`${filled}/${total}`;
+    return `<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span class="badge ${cls}" style="width:16px;text-align:center;padding:1px 0;font-size:10px">${sym}</span><span style="font-size:11px">${esc(label)}</span><span style="font-size:10px;color:var(--muted)">${detail}</span></div>`;
+  }
+  const sessCheck=sessTotal>0?`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span class="badge b-ok" style="width:16px;text-align:center;padding:1px 0;font-size:10px">✓</span><span style="font-size:11px">Sessions planned</span><span style="font-size:10px;color:var(--muted)">${sessTotal}</span></div>`:`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span class="badge b-grey" style="width:16px;text-align:center;padding:1px 0;font-size:10px">–</span><span style="font-size:11px;color:var(--muted)">No sessions planned</span></div>`;
+  const checklistHtml=`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light)"><div style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Readiness checklist</div>${sessCheck}${_rdItem('Facilitators assigned',facFill,sessTotal)}${_rdItem('Rooms assigned',roomFill,sessTotal)}</div>`;
   return `<div class="card">
     <div class="ctitle">Tonight — <span style="font-weight:400">${fmtD(d.date,{weekday:'long',day:'numeric',month:'long'})}</span></div>
     <div class="readiness-donut" style="align-items:flex-start">
@@ -6674,6 +6689,7 @@ function _renderTonightReadiness(chart){
       <div style="flex:1">
         <div style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Session Plan</div>
         ${sessHtml||'<div style="font-size:11px;color:var(--muted)">No sessions scheduled</div>'}
+        ${checklistHtml}
         ${d.insight?`<div class="chart-insight" style="margin-top:10px">${esc(d.insight)}</div>`:''}
       </div>
     </div>
