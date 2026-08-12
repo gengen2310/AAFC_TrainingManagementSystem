@@ -119,6 +119,8 @@ the bootstrap endpoint (which is rejected in production).
 
 For a more complete staging pilot with two squadrons and multiple role accounts:
 
+**Step 2.4a — Dry-run preview (recommended first)**
+
 ```bash
 cd backend
 source .venv/bin/activate
@@ -126,8 +128,35 @@ ENVIRONMENT=staging DATABASE_URL=<staging-db-url> \
   WING2_CODE=1WG WING2_NAME="1 Wing HQ" \
   SQN2A_CODE=101 SQN2A_NAME="101 Squadron AAFC" \
   SQN2B_CODE=102 SQN2B_NAME="102 Squadron AAFC" \
+  DRY_RUN=1 \
   python -m app.seeds.second_wing_seed
 ```
+
+The dry-run prints what would be created (Wing, squadrons, accounts, planning year, holidays)
+without writing anything to the database. Verify the planned output before continuing.
+
+**Step 2.4b — Actual creation**
+
+Remove `DRY_RUN=1` and re-run the same command. The script is idempotent — if the Wing or
+squadrons already exist, it skips creation and only adds missing records:
+
+```bash
+ENVIRONMENT=staging DATABASE_URL=<staging-db-url> \
+  WING2_CODE=1WG WING2_NAME="1 Wing HQ" \
+  SQN2A_CODE=101 SQN2A_NAME="101 Squadron AAFC" \
+  SQN2B_CODE=102 SQN2B_NAME="102 Squadron AAFC" \
+  python -m app.seeds.second_wing_seed
+```
+
+The script prints a structured JSON onboarding report on completion, including generated
+access codes. **Record the access codes immediately — they are shown once and not retrievable.**
+
+Additional env vars (all optional):
+- `WING2_SHORT` — wing short name (default: `WING2_CODE`)
+- `SQN2A_PARADE_DAY` / `SQN2B_PARADE_DAY` — `monday`…`sunday` (default: `wednesday` / `thursday`)
+- `SQN2A_START_TIME` / `SQN2B_START_TIME` — parade start time HH:MM (default: `18:00`)
+- `SQN2A_END_TIME` / `SQN2B_END_TIME` — parade end time HH:MM (default: `21:30`)
+- `PLANNING_YEAR` — training year start (YYYY, default: current year)
 
 ---
 
@@ -260,8 +289,147 @@ The Wing Admin must acknowledge receipt of the onboarding package before product
 
 ---
 
+## §7 — Wing Rollback Procedure
+
+Rollback is required if staging onboarding fails acceptance criteria (§4) or if a
+production activation must be reversed.
+
+**Important constraint:** Audit log records are immutable. Wing, Squadron, and Account
+records that triggered audit entries cannot be deleted — only deactivated.
+The rollback procedure below archives records; it does not purge them.
+
+---
+
+### 7.1 When to use rollback
+
+Use rollback when:
+- §4 acceptance criteria fail and the Wing data cannot be salvaged
+- An incorrect Wing code was used and cannot be corrected in place
+- A production activation is reversed by governance authority
+
+Do NOT use rollback to address a configuration error (wrong parade day, wrong Squadron
+name) — those are editable in place via System Console. Rollback is for structural
+failures only.
+
+---
+
+### 7.2 Staging rollback — full reset
+
+For staging, the cleanest rollback is to restore from the pre-onboarding staging DB
+backup (or re-run the base staging seed). Only do this if NO existing 7WG data has
+been entered since the new Wing was created — otherwise treat staging rollback the
+same as production rollback (§7.3).
+
+```bash
+# Option A — re-bootstrap staging from scratch (loses all staging data)
+curl -X POST "<staging-url>/api/system/bootstrap-staging" \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN" \
+  -H "Content-Type: application/json"
+
+# Option B — archive the Wing only (preserves existing staging data)
+# Proceed to §7.3 steps using the staging URL
+```
+
+---
+
+### 7.3 Production (and surgical staging) rollback
+
+Step-by-step via System Console or API:
+
+**Step 7.3.1 — Block Wing access immediately**
+
+Disable all accounts for the Wing being rolled back:
+
+1. System Console → Account Management → filter by Wing Code → **Archive** each account.
+2. This invalidates their JWTs via `token_version` increment on next login attempt.
+   Active sessions will expire within the JWT lifetime (default 8 hours).
+
+**Step 7.3.2 — Archive all Squadrons under the Wing**
+
+1. System Console → Scope Map → find the Wing → expand squadrons.
+2. Archive each squadron.
+
+Via API (repeat for each squadron ID):
+```bash
+curl -X PATCH "<url>/api/system/squadron/<sqn-id>/archive" \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN"
+```
+
+**Step 7.3.3 — Archive the Wing**
+
+1. System Console → Scope Map → find the Wing → **Archive Wing**.
+2. The Wing remains in the database but `active_status = false`; it is invisible to
+   all operational endpoints.
+
+Via API:
+```bash
+curl -X PATCH "<url>/api/system/wing/<wing-id>/archive" \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN"
+```
+
+**Step 7.3.4 — Verify rollback**
+
+```bash
+# Confirm Wing is no longer in scope-map
+curl "<url>/api/system/scope-map" -H "Authorization: Bearer $SYSADMIN_TOKEN" \
+  | python3 -m json.tool | grep -i "<wing-code>"
+# Must return no matches.
+
+# Confirm no active accounts for the Wing
+curl "<url>/api/system/accounts?wing_code=<wing-code>" \
+  -H "Authorization: Bearer $SYSADMIN_TOKEN"
+# Must return empty list or 404.
+```
+
+**Step 7.3.5 — Record audit entry**
+
+Rollback must be recorded in the program's decision log and in the support runbook
+incident record. Include:
+
+| Field | Value |
+|---|---|
+| Date | — |
+| Reason for rollback | — |
+| Wing code affected | — |
+| Steps taken | §7.3.1–7.3.4 |
+| Data impact | Records archived; audit log entries preserved |
+| Authorised by | — |
+
+---
+
+### 7.4 Re-onboarding after rollback
+
+If the Wing is re-onboarded with the same Wing code, the idempotent `second_wing_seed.py`
+will find the archived Wing and fail to match it (it queries for `active_status=true`),
+so it will attempt to create a new Wing with the same code, which will fail on a UNIQUE
+constraint.
+
+**Resolution for re-onboarding with the same Wing code:**
+1. System Admin permanently deletes the archived Wing record (only permissible because
+   the Wing was never used in production and has no operational data).
+2. OR use a new Wing code and update all references.
+
+If the Wing had operational data (parade nights, planning records), permanent deletion
+is NOT permitted. The Wing must use a new code, or the archived record must be
+restored to active.
+
+---
+
+## §8 — Troubleshooting Common Onboarding Issues
+
+| Symptom | Likely cause | Resolution |
+|---|---|---|
+| `second_wing_seed.py` exits: "No NationalEntity found" | DB not migrated | `alembic upgrade head` then re-run |
+| Bootstrap endpoint returns 409 on Wing creation | Wing code already exists | Check scope-map; use a different code or archive the existing Wing first |
+| Wing Admin cannot see their squadrons | Account `wing_id` FK not set correctly | Check Account Management → verify `wing_id` matches the new Wing |
+| 1WG wing_admin can see 7WG data | RBAC query missing wing_id filter | Raise as a bug — do not proceed to production |
+| `second_wing_seed.py` `crest_url column` error | DB schema is behind migrations | `alembic upgrade head` from the `backend/` directory |
+
+---
+
 ## Revision History
 
 | Date | Change | Author |
 |---|---|---|
 | 2026-07-17 | Initial version (Phase 10) | Next-Stage Program |
+| 2026-08-12 | §2.4 updated for dry-run mode; §7 rollback procedure added; §8 troubleshooting added | Next-Stage Program |
