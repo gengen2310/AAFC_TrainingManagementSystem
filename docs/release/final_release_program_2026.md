@@ -4048,3 +4048,32 @@ round-trip restore, 409-already-active, 403-cross-scope, 401-unauthenticated,
 deferred (dead code — no live archive UI in either frontend; fresh ask required).
 
 **Commit:** `6a6f8e0`
+
+---
+
+## §76 — REM-23 Tag Archive/Restore (2026-08-12)
+
+**Scope:** Complete archive/restore cycle for all three governed tag types — Subject Area, Facilitator Type, Session Status Reason.
+
+**Backend changes (`backend/app/routers/training.py`):**
+- `list_subject_area_tags`, `list_facilitator_type_tags`, `list_session_status_reason_tags`: added `include_archived: bool = False`; `is_active == True` filter is now conditional
+- `restore_subject_area_tag` POST `/{id}/restore`: 404 if not found, 409 if already active, 403 via `_can_create_tag`, audit `restore` action
+- `restore_facilitator_type_tag` POST `/{id}/restore`: same pattern
+- `restore_session_status_reason_tag` POST `/{id}/restore`: same pattern
+
+**Frontend changes (`connected-frontend/index.html`):**
+- `_REFDATA_TYPES`: added `restoreUrl` field to factype, subjarea, reason entries
+- `_renderRefData()`: Show archived checkbox in section title for restorable types; calls `_loadRefByKey(key)` on change
+- `_loadRefList()`: detects toggle; fetches `?include_archived=true` when active; renders archived items dimmed (opacity .55), with "Archived" badge and a Restore (↩) button for own-scope items
+- `_loadRefByKey(key)`: thin key→type helper for checkbox onchange
+- `_restoreRefItem(key, id)`: confirm → POST restore → reload list
+
+**Note on field name:** Tags use `is_active` (not `is_archived`) for soft deletion. Tests check `it.is_active === false` not `it.is_archived`. This is structurally identical to the Training Area/Equipment `SoftDeleteMixin` (`is_archived`) but uses a different field name due to organic growth — both patterns are now fully supported.
+
+**Tests (`backend/tests/test_tag_archive_restore.py`):** 18 new tests — 6 per type: round-trip archive→list-hidden→include-archived-visible→restore→list-visible, 409-already-active, 403-cross-squadron, 401-unauthenticated, 404-not-found, default-list regression guard.
+
+**Suite:** 1539 passed, 5 skipped.
+
+**Gap register:** REM-23 updated to SUBSTANTIALLY COMPLETE.
+
+**Commit:** `fd86003`
