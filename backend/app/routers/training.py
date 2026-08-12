@@ -4484,10 +4484,11 @@ class SubjectAreaTagIn(BaseModel):
 
 @router.get("/subject-area-tags")
 def list_subject_area_tags(
+    include_archived: bool = False,
     p: Principal = Depends(get_principal),
     db: DBSession = Depends(get_db),
 ):
-    """Return all active tags visible to the caller's squadron and wing."""
+    """Return active (or all, when include_archived=true) tags visible to the caller."""
     wing_id, sq_id = _visible_tag_scope(p)
     require_can_view_squadron(p, sq_id or "", wing_id)
     conditions = [SubjectAreaTag.scope == "global"]
@@ -4500,12 +4501,10 @@ def list_subject_area_tags(
     elif p.role in _NAT_ADMIN_ROLES:
         conditions.append(SubjectAreaTag.scope == "squadron")
     from sqlalchemy import or_ as _or_tags
-    rows = (
-        db.query(SubjectAreaTag)
-        .filter(SubjectAreaTag.is_active == True, _or_tags(*conditions))  # noqa: E712
-        .order_by(SubjectAreaTag.display_name)
-        .all()
-    )
+    q = db.query(SubjectAreaTag).filter(_or_tags(*conditions))
+    if not include_archived:
+        q = q.filter(SubjectAreaTag.is_active == True)  # noqa: E712
+    rows = q.order_by(SubjectAreaTag.display_name).all()
     return [_tag_out(t) for t in rows]
 
 
@@ -4585,6 +4584,25 @@ def archive_subject_area_tag(
     return {"ok": True}
 
 
+@router.post("/subject-area-tags/{tag_id}/restore", status_code=200)
+def restore_subject_area_tag(
+    tag_id: str,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """REM-23: restore an archived subject-area tag."""
+    tag = db.get(SubjectAreaTag, tag_id)
+    if not tag:
+        raise HTTPException(404, detail={"error": "tag_not_found"})
+    _can_create_tag(p, tag.scope, tag.wing_id, tag.squadron_id)
+    if tag.is_active:
+        raise HTTPException(409, detail={"error": "tag_already_active"})
+    tag.is_active = True
+    db.commit()
+    audit(db, p, object_type="SubjectAreaTag", object_id=tag_id, action="restore")
+    return {"ok": True}
+
+
 # ── Facilitator Type reference data — mirrors subject-area-tags exactly
 # (remediation program Section 6, Stage 3). Facilitator.type stays free-text;
 # this is advisory/governed reference data, not a hard foreign key. ──
@@ -4612,10 +4630,11 @@ class FacilitatorTypeTagIn(BaseModel):
 
 @router.get("/facilitator-type-tags")
 def list_facilitator_type_tags(
+    include_archived: bool = False,
     p: Principal = Depends(get_principal),
     db: DBSession = Depends(get_db),
 ):
-    """Return all active facilitator-type tags visible to the caller's squadron and wing."""
+    """Return active (or all, when include_archived=true) facilitator-type tags."""
     wing_id, sq_id = _visible_tag_scope(p)
     require_can_view_squadron(p, sq_id or "", wing_id)
     conditions = [FacilitatorTypeTag.scope == "global"]
@@ -4628,12 +4647,10 @@ def list_facilitator_type_tags(
     elif p.role in _NAT_ADMIN_ROLES:
         conditions.append(FacilitatorTypeTag.scope == "squadron")
     from sqlalchemy import or_ as _or_factype
-    rows = (
-        db.query(FacilitatorTypeTag)
-        .filter(FacilitatorTypeTag.is_active == True, _or_factype(*conditions))  # noqa: E712
-        .order_by(FacilitatorTypeTag.display_name)
-        .all()
-    )
+    q = db.query(FacilitatorTypeTag).filter(_or_factype(*conditions))
+    if not include_archived:
+        q = q.filter(FacilitatorTypeTag.is_active == True)  # noqa: E712
+    rows = q.order_by(FacilitatorTypeTag.display_name).all()
     return [_fac_type_out(t) for t in rows]
 
 
@@ -4713,6 +4730,25 @@ def archive_facilitator_type_tag(
     return {"ok": True}
 
 
+@router.post("/facilitator-type-tags/{tag_id}/restore", status_code=200)
+def restore_facilitator_type_tag(
+    tag_id: str,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """REM-23: restore an archived facilitator-type tag."""
+    tag = db.get(FacilitatorTypeTag, tag_id)
+    if not tag:
+        raise HTTPException(404, detail={"error": "tag_not_found"})
+    _can_create_tag(p, tag.scope, tag.wing_id, tag.squadron_id)
+    if tag.is_active:
+        raise HTTPException(409, detail={"error": "tag_already_active"})
+    tag.is_active = True
+    db.commit()
+    audit(db, p, object_type="FacilitatorTypeTag", object_id=tag_id, action="restore")
+    return {"ok": True}
+
+
 # ── Session Status Reason reference data — mirrors facilitator-type-tags
 # exactly (REM-23 continuation). The #or-reason dropdown's reason text
 # stays free-text on SessionStatusHistory; this is advisory/governed
@@ -4741,10 +4777,11 @@ class SessionStatusReasonTagIn(BaseModel):
 
 @router.get("/session-status-reason-tags")
 def list_session_status_reason_tags(
+    include_archived: bool = False,
     p: Principal = Depends(get_principal),
     db: DBSession = Depends(get_db),
 ):
-    """Return all active session-status reason tags visible to the caller's squadron and wing."""
+    """Return active (or all, when include_archived=true) session-status reason tags."""
     wing_id, sq_id = _visible_tag_scope(p)
     require_can_view_squadron(p, sq_id or "", wing_id)
     conditions = [SessionStatusReasonTag.scope == "global"]
@@ -4757,12 +4794,10 @@ def list_session_status_reason_tags(
     elif p.role in _NAT_ADMIN_ROLES:
         conditions.append(SessionStatusReasonTag.scope == "squadron")
     from sqlalchemy import or_ as _or_reason
-    rows = (
-        db.query(SessionStatusReasonTag)
-        .filter(SessionStatusReasonTag.is_active == True, _or_reason(*conditions))  # noqa: E712
-        .order_by(SessionStatusReasonTag.display_name)
-        .all()
-    )
+    q = db.query(SessionStatusReasonTag).filter(_or_reason(*conditions))
+    if not include_archived:
+        q = q.filter(SessionStatusReasonTag.is_active == True)  # noqa: E712
+    rows = q.order_by(SessionStatusReasonTag.display_name).all()
     return [_reason_out(t) for t in rows]
 
 
@@ -4837,4 +4872,23 @@ def archive_session_status_reason_tag(
     tag.is_active = False
     db.commit()
     audit(db, p, object_type="SessionStatusReasonTag", object_id=tag_id, action="archive")
+    return {"ok": True}
+
+
+@router.post("/session-status-reason-tags/{tag_id}/restore", status_code=200)
+def restore_session_status_reason_tag(
+    tag_id: str,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """REM-23: restore an archived session-status reason tag."""
+    tag = db.get(SessionStatusReasonTag, tag_id)
+    if not tag:
+        raise HTTPException(404, detail={"error": "tag_not_found"})
+    _can_create_tag(p, tag.scope, tag.wing_id, tag.squadron_id)
+    if tag.is_active:
+        raise HTTPException(409, detail={"error": "tag_already_active"})
+    tag.is_active = True
+    db.commit()
+    audit(db, p, object_type="SessionStatusReasonTag", object_id=tag_id, action="restore")
     return {"ok": True}

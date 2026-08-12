@@ -4878,12 +4878,15 @@ const _REFDATA_TYPES=[
    idField:'phase_id',nameField:'display_name',scopeField:'scope_level',ownScopeName:s=>s==='global'?'national':s},
   {key:'factype',label:'Facilitator Types',listUrl:'/api/facilitator-type-tags',createUrl:'/api/facilitator-type-tags',
    archiveUrl:id=>`/api/facilitator-type-tags/${id}`,archiveMethod:'DELETE',
+   restoreUrl:id=>`/api/facilitator-type-tags/${id}/restore`,
    idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
   {key:'subjarea',label:'Subject Areas',listUrl:'/api/subject-area-tags',createUrl:'/api/subject-area-tags',
    archiveUrl:id=>`/api/subject-area-tags/${id}`,archiveMethod:'DELETE',
+   restoreUrl:id=>`/api/subject-area-tags/${id}/restore`,
    idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
   {key:'reason',label:'Session Status Reasons',listUrl:'/api/session-status-reason-tags',createUrl:'/api/session-status-reason-tags',
    archiveUrl:id=>`/api/session-status-reason-tags/${id}`,archiveMethod:'DELETE',
+   restoreUrl:id=>`/api/session-status-reason-tags/${id}/restore`,
    idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
 ];
 async function _renderRefData(){
@@ -4895,7 +4898,7 @@ async function _renderRefData(){
   if(!wrap)return;
   wrap.innerHTML=_REFDATA_TYPES.map(t=>`
     <div>
-      <div style="font-size:11px;font-weight:800;color:var(--steel);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${esc(t.label)}</div>
+      <div style="font-size:11px;font-weight:800;color:var(--steel);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;align-items:center">${esc(t.label)}${t.restoreUrl?`<label style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0;display:flex;align-items:center;gap:4px;margin-left:auto;cursor:pointer"><input type="checkbox" id="refdata-show-archived-${t.key}" onchange="_loadRefByKey('${t.key}')"> Show archived</label>`:''}</div>
       <div id="refdata-list-${t.key}" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"><span class="muted" style="font-size:11px">Loading…</span></div>
       <div style="display:flex;gap:6px">
         <input id="refdata-new-${t.key}" placeholder="New ${esc(t.label.replace(/s$/,''))} name…" style="flex:1;min-width:160px;padding:6px 9px;border:1px solid var(--border);border-radius:7px;font-size:12px">
@@ -4909,8 +4912,10 @@ async function _loadRefList(t){
   const el=document.getElementById(`refdata-list-${t.key}`);
   if(!el)return;
   const natScope=_naturalRefScope();
+  const showArchived=t.restoreUrl&&(document.getElementById(`refdata-show-archived-${t.key}`)?.checked);
+  const url=showArchived?`${t.listUrl}?include_archived=true`:t.listUrl;
   try{
-    const items=await api(t.listUrl);
+    const items=await api(url);
     if(!items.length){ el.innerHTML='<span class="muted" style="font-size:11px">None yet.</span>'; return; }
     el.innerHTML=items.map(it=>{
       const scope=it[t.scopeField];
@@ -4920,10 +4925,15 @@ async function _loadRefList(t){
         (natScope==='wing' && it.wing_id===((S.session||{}).wing_id)) ||
         (natScope==='squadron' && it.squadron_id===((S.session||{}).squadron_id))
       );
+      const isArchived=t.restoreUrl&&it.is_active===false;
+      if(isArchived){
+        return `<span class="badge b-grey" style="display:inline-flex;align-items:center;gap:5px;opacity:.55">${esc(it[t.nameField])} <em style="font-style:normal;opacity:.6;font-size:9px">${esc(scopeName)}</em><em style="font-style:normal;font-size:9px;color:var(--steel)">Archived</em>${mine?` <button onclick="_restoreRefItem('${t.key}','${it[t.idField]}')" style="border:none;background:none;cursor:pointer;color:var(--ok);font-size:11px;padding:0" title="Restore">↩</button>`:''}</span>`;
+      }
       return `<span class="badge b-grey" style="display:inline-flex;align-items:center;gap:5px">${esc(it[t.nameField])} <em style="font-style:normal;opacity:.6;font-size:9px">${esc(scopeName)}</em>${mine?` <button onclick="_archiveRefItem('${t.key}','${it[t.idField]}')" style="border:none;background:none;cursor:pointer;color:var(--error);font-size:11px;padding:0" title="Archive">×</button>`:''}</span>`;
     }).join('');
   }catch(_){ el.innerHTML='<span class="muted" style="font-size:11px">Could not load.</span>'; }
 }
+function _loadRefByKey(key){ const t=_REFDATA_TYPES.find(x=>x.key===key); if(t)_loadRefList(t); }
 async function _addRefItem(key){
   const t=_REFDATA_TYPES.find(x=>x.key===key); if(!t)return;
   const input=document.getElementById(`refdata-new-${key}`);
@@ -4946,6 +4956,14 @@ async function _archiveRefItem(key,id){
   if(!confirm('Archive this item? It will no longer appear in pickers, but existing records are unaffected.'))return;
   try{
     await api(t.archiveUrl(id),{method:t.archiveMethod});
+    await _loadRefList(t);
+  }catch(e){ alert(apiErr(e)); }
+}
+async function _restoreRefItem(key,id){
+  const t=_REFDATA_TYPES.find(x=>x.key===key); if(!t||!t.restoreUrl)return;
+  if(!confirm('Restore this item? It will appear in pickers again.'))return;
+  try{
+    await api(t.restoreUrl(id),{method:'POST'});
     await _loadRefList(t);
   }catch(e){ alert(apiErr(e)); }
 }
