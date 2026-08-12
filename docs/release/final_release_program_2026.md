@@ -4125,3 +4125,33 @@ deferred (dead code — no live archive UI in either frontend; fresh ask require
 **Suite:** 1553 passed, 5 skipped (10 new E2E tests, 0 regressions).
 
 **Gap register:** REM-09 retains CLOSED; E2E test file noted.
+
+---
+
+## §79 — Phase 12 Completion: Session Status/Cancel/Reschedule Playwright Tests (2026-08-12)
+
+**Scope:** Expanded `session-lifecycle.spec.ts` from 3 stub tests to 10 comprehensive tests covering the session status change workflows in the Planning Workspace browser UI. This closes the last meaningful Playwright gap from the original Phase 12 program (which identified "scheduling (schedule/cancel/reschedule)" as missing).
+
+**What was confirmed already done on audit:**
+- Phase 18 (correlation IDs): Already implemented — access log middleware accepts `X-Request-ID`, generates one if absent, logs as `req_id`, echoes in response header
+- Phase 13 (session revocation): Already implemented — `token_version` (`tv`) in every JWT, incremented on code reset (`auth.py:247`), verified in `get_principal` (`dependencies.py:117`)
+- Phase 14 (distributed rate limiting): Already implemented — per-IP sliding window rate limiter for all non-exempt API endpoints (not just login)
+- Phase 9 (7WG hardcodes): Already done — bootstrap is generic (uses `wing_code` param or first active Wing); `auth.py` says "Contact your Wing SOCAD"
+- Phase 4 (cross-frontend linking): Already done — Planning Workspace has "← Main TMS" link from `aafc-tms-base` meta tag; connected-frontend has "Planning Workspace ↗" nav link when URL is configured
+
+**New tests in `frontend/e2e/session-lifecycle.spec.ts` (+7 tests):**
+- `can mark a session as not_delivered with a reason` — full cancel workflow: Set status → select not_delivered → pick reason → Save → UI updates
+- `Save status button is disabled without a reason for not_delivered` — form validation: button stays disabled until reason is selected
+- `can mark a session as rescheduled with a target date` — reschedule: Set status → select rescheduled → fill target date → Save → UI updates
+- `viewer role does not see Set status button` — RBAC: sqn_general gets read-only modal (no "Set status", no "Add session")
+- `reason dropdown appears for cancelled_late status` — confirms REASON_REQUIRED_STATUSES includes cancelled_late
+- `can mark a session as delivered without a reason` — delivered path: no reason dropdown, button immediately enabled
+- (+ 3 existing basic navigation tests retained)
+
+**Pattern used:** Hybrid API-seed + UI-assert. Each test seeds a parade night + session via `page.request.post()` (the already-authenticated browser context shares cookies with the API), then navigates to the list UI, opens the modal, and exercises the target workflow. This isolates status-change testing from creation-UI testing (covered separately by `parade-nights.spec.ts`).
+
+**TypeScript check:** `tsc --noEmit` clean. Vitest: 38/38 pass.
+
+**Total Playwright coverage:** 225 tests (160 in `frontend/e2e/` + 58 in `frontend/e2e-connected/` + 7 new).
+
+**Gap register:** Gap #12 (Playwright incomplete) updated to COMPLETE for Level A.
