@@ -3805,3 +3805,61 @@ itself conveys success per Manual §2.16 Brevity).
 
 **Commit:** `d1db95c`
 **Gap register:** `docs/remediation/master_gap_register.csv` WRITE-02 (now 15 passes).
+
+## 72. WRITE-02 pass 16 — Brevity audit (§2.16): redundant words cut from status and empty-state messages
+
+**Category audited:** Brevity (Manual §2.16) — "Cut every word that doesn't change meaning."
+
+**17 instances across 4 files — three defect classes:**
+
+**1. "successfully" removed from success messages (5 instances — system console)**
+
+Success messages already convey success by virtue of being shown and styled in a success
+context. The word "successfully" adds no information. All five instances are in the
+system-console area (system_admin only):
+
+| Before | After |
+|---|---|
+| Wing 'X' created successfully. | Wing 'X' created. |
+| Unit 'X' created successfully. | Unit 'X' created. |
+| Wing X created successfully. (alert) | Wing X created. |
+| `${label} ${code}` created successfully. (confirm) | `${label} ${code}` created. |
+| `${kindLabel} ${label}` archived successfully. | `${kindLabel} ${label}` archived. |
+
+**2. "has been / have been" removed from alert status messages (4 instances — system console)**
+
+`alert()` dialogs for Wing/Unit archive and restore: past-passive three-word form cut
+to simple statement: `Wing '${wingCode}' has been archived.` → `Wing '${wingCode}' archived.`
+(Same for restore, and for Unit.) These are system_admin-only.
+
+**Note on `alert()` migration:** the remaining use of native `alert()` calls in the system
+console (~15 calls total across archive/restore/create handlers) is a separate known issue
+(blocking under browser automation, not graceful for concurrent context). These are
+recorded in the gap register under the relevant system-console items. This pass fixes only
+the copy within them, not their mechanism.
+
+**3. "has been / have been / are" removed from empty-state messages (8 instances)**
+
+| Location | Before | After |
+|---|---|---|
+| connected-frontend (login check) | No account has been created for X yet. | No account exists for X yet. |
+| connected-frontend (parade nights) | No parade nights have been scheduled. | No parade nights scheduled. |
+| connected-frontend (curriculum archive) | Nothing has been archived yet. | Nothing archived yet. |
+| connected-frontend (getting-help ×2) | No help content has been added yet. | No help content added yet. |
+| PlanningBottomDrawer.tsx (help tab) | No help content has been added yet. | No help content added yet. |
+| YearView.tsx (year grid) | No parade nights have been set up for this planning year. | No parade nights set up for this planning year. |
+| DashboardCharts.tsx (tonight card) | No sessions are scheduled for this parade night yet. | No sessions scheduled for this parade night yet. |
+
+**"currently" — intentionally retained** where it distinguishes present state from
+historical membership or availability, e.g. "Every cadet currently in this class…",
+"session(s) currently scheduled during this period…" — in these cases "currently" is
+meaningful, not redundant.
+
+**Verification:**
+- Backend: 1509 passed, 5 skipped.
+- Vitest: 38 passed (8 files).
+- TypeScript: `tsc -b && vite build:single` clean.
+- Deployed bundle verification pending next staging deploy.
+
+**Commit:** `f2240b1`
+**Gap register:** WRITE-02 (now 16 passes). Remaining: Logic (§2.20), Completeness (§2.21), Timeliness (§2.22).
