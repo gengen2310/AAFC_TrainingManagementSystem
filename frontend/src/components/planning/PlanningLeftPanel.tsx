@@ -58,12 +58,20 @@ export function PlanningLeftPanel({
   cc, onBacklogItemClick, className,
 }: Props) {
   const [legendOpen, setLegendOpen] = useState(true);
+  const [backlogClassFilter, setBacklogClassFilter] = useState<string | null>(null);
 
   const prepGaps        = cc?.prep_gaps ?? [];
-  const unscheduled     = cc?.unscheduled_required ?? [];
+  const allUnscheduled  = cc?.unscheduled_required ?? [];
+  const trainingClasses = cc?.training_classes ?? [];
   const activeConflicts = cc?.active_conflicts ?? [];
   const unreviewed      = cc?.unreviewed_wing ?? [];
-  const totalBacklog    = prepGaps.length + unscheduled.length + activeConflicts.length + unreviewed.length;
+
+  // Filter unscheduled curriculum items by selected training class
+  const unscheduled = backlogClassFilter
+    ? allUnscheduled.filter(u => u.needs_class_ids.includes(backlogClassFilter))
+    : allUnscheduled;
+
+  const totalBacklog    = prepGaps.length + allUnscheduled.length + activeConflicts.length + unreviewed.length;
 
   return (
     <div className={`pw-left${className ? ` ${className}` : ""}`} aria-label="Planning filters and backlog">
@@ -204,11 +212,36 @@ export function PlanningLeftPanel({
           </>
         )}
 
-        {unscheduled.length > 0 && (
+        {allUnscheduled.length > 0 && (
           <>
             <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted-text)", padding: "4px 2px 2px" }}>
               UNSCHEDULED CURRICULUM
             </div>
+            {trainingClasses.length > 1 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginBottom: 4 }}>
+                <button
+                  className={`pw-chip${backlogClassFilter === null ? " on" : ""}`}
+                  style={{ fontSize: 10, padding: "1px 6px" }}
+                  onClick={() => setBacklogClassFilter(null)}
+                  aria-pressed={backlogClassFilter === null}
+                >
+                  All
+                </button>
+                {trainingClasses.map(tc => (
+                  <button
+                    key={tc.training_class_id}
+                    className={`pw-chip${backlogClassFilter === tc.training_class_id ? " on" : ""}`}
+                    style={{ fontSize: 10, padding: "1px 6px" }}
+                    onClick={() => setBacklogClassFilter(
+                      backlogClassFilter === tc.training_class_id ? null : tc.training_class_id
+                    )}
+                    aria-pressed={backlogClassFilter === tc.training_class_id}
+                  >
+                    {tc.display_name}
+                  </button>
+                ))}
+              </div>
+            )}
             {unscheduled.slice(0, 5).map((u) => (
               <div
                 key={u.curriculum_id}
@@ -225,6 +258,11 @@ export function PlanningLeftPanel({
                 </div>
               </div>
             ))}
+            {unscheduled.length === 0 && backlogClassFilter && (
+              <div style={{ fontSize: 10, color: "var(--muted-text)", padding: "2px 4px" }}>
+                No unscheduled curriculum for this class
+              </div>
+            )}
             {unscheduled.length > 5 && (
               <div style={{ fontSize: 10, color: "var(--muted-text)", padding: "2px 4px" }}>
                 +{unscheduled.length - 5} more — open Mission Backlog below

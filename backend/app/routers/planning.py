@@ -2525,8 +2525,27 @@ def get_command_centre(
     pn_to_pd_cc: dict[str, ParadeDate] = {
         pd_obj.parade_night_id: pd_obj for pd_obj in pd_rows_cc if pd_obj.parade_night_id
     }
+    # Active training classes for this planning year
+    active_classes = (
+        db.query(TrainingClass)
+        .filter(
+            TrainingClass.training_year_id == py.id,
+            TrainingClass.is_archived == False,  # noqa: E712
+        )
+        .order_by(TrainingClass.sequence, TrainingClass.display_name)
+        .all()
+    )
+    active_class_ids = {tc.id for tc in active_classes}
+    training_classes_out = [
+        {"training_class_id": tc.id, "display_name": tc.display_name}
+        for tc in active_classes
+    ]
+
     scheduled_curriculum_ids: set[str] = set()
     nights_missing_fac_ids: set[str] = set()
+    # Maps curriculum_item_id -> set of class_ids that have it scheduled
+    class_coverage: dict[str, set[str]] = {}
+    cc_sessions: list = []
     if pn_to_pd_cc:
         cc_sessions = (
             db.query(TrainingSession)
@@ -2544,20 +2563,44 @@ def get_command_centre(
             for s in cc_sessions
             if s.facilitator_id is None
         }
+        # Build per-class curriculum coverage using SessionAudience
+        if cc_sessions and active_class_ids:
+            session_ids = [s.id for s in cc_sessions if s.curriculum_item_id]
+            aud_rows = (
+                db.query(SessionAudience)
+                .filter(SessionAudience.session_id.in_(session_ids))
+                .all()
+            ) if session_ids else []
+            # Map session_id -> curriculum_item_id
+            sess_to_ci = {s.id: s.curriculum_item_id for s in cc_sessions if s.curriculum_item_id}
+            for aud in aud_rows:
+                ci_id = sess_to_ci.get(aud.session_id)
+                if ci_id and aud.training_class_id in active_class_ids:
+                    class_coverage.setdefault(ci_id, set()).add(aud.training_class_id)
 
     curriculum_q = _curriculum_scope_query(db, p).filter(
         CurriculumItem.core_status == "core",
     )
-    unscheduled_required = [
-        {
+    unscheduled_required = []
+    for ci in curriculum_q.limit(200).all():
+        if active_classes:
+            # Class-aware: show item if at least one active class has not scheduled it
+            covered = class_coverage.get(ci.id, set())
+            needs_class_ids = [tc.id for tc in active_classes if tc.id not in covered]
+            if not needs_class_ids:
+                continue  # all classes have it scheduled
+        else:
+            # No classes configured — fall back to simple scheduled check
+            if ci.id in scheduled_curriculum_ids:
+                continue
+            needs_class_ids = []
+        unscheduled_required.append({
             "curriculum_id": ci.id,
             "code": ci.code,
             "title": ci.title,
             "phase": ci.phase,
-        }
-        for ci in curriculum_q.limit(200).all()
-        if ci.id not in scheduled_curriculum_ids
-    ]
+            "needs_class_ids": needs_class_ids,
+        })
 
     nights_missing_fac = len(nights_missing_fac_ids)
 
@@ -2569,6 +2612,7 @@ def get_command_centre(
         "unreviewed_wing": unreviewed_wing,
         "active_conflicts": active_conflicts,
         "unscheduled_required": unscheduled_required,
+        "training_classes": training_classes_out,
         "recent_imports": [],
         "nights_missing_facilitator": nights_missing_fac,
     }
