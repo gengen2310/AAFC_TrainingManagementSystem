@@ -26,6 +26,7 @@ import { ReportCatalogue } from "./routes/ReportCatalogue";
 import { WingOverview, NationalOverview } from "./routes/Overviews";
 import { PlanningWorkspace } from "./routes/PlanningWorkspace";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ToastProvider } from "./components/Toast";
 
 // refetchOnWindowFocus/refetchOnReconnect: stale data (e.g. a Parade Night
 // edited in the other frontend, or in another tab) should surface when the
@@ -151,17 +152,20 @@ export default function App() {
   if (MODULE_MODE) {
     return (
       <QueryClientProvider client={qc}>
-        <AuthProvider>
-          <BrowserRouter basename={BASENAME}>
-            <ModuleEntry />
-          </BrowserRouter>
-        </AuthProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <BrowserRouter basename={BASENAME}>
+              <ModuleEntry />
+            </BrowserRouter>
+          </AuthProvider>
+        </ToastProvider>
       </QueryClientProvider>
     );
   }
 
   return (
     <QueryClientProvider client={qc}>
+      <ToastProvider>
       <AuthProvider>
         <Router basename={BASENAME}>
           <RequireAuth>
@@ -198,6 +202,7 @@ export default function App() {
           </RequireAuth>
         </Router>
       </AuthProvider>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { planningApi } from "../../api";
 import { friendlyMessage } from "../../api/client";
+import { useToast } from "../Toast";
 import type { NightSessionSummary, ParadeNotice, PlanningSession, PlanningFacilitator, PlanningConflict } from "../../api/types";
 
 // ─── Group / period constants ─────────────────────────────────────────────────
@@ -225,6 +226,7 @@ function trunc(text: string | null, max: number): string {
 
 function AddNoticeForm({ dateId, onDone }: { dateId: string; onDone: () => void }) {
   const qc = useQueryClient();
+  const { toast } = useToast();
   const [text, setText] = useState("");
   const [priority, setPriority] = useState("normal");
   const [saving, setSaving] = useState(false);
@@ -237,6 +239,7 @@ function AddNoticeForm({ dateId, onDone }: { dateId: string; onDone: () => void 
       await planningApi.createNotice(dateId, { notice_text: text.trim(), priority });
       await qc.invalidateQueries({ queryKey: ["planning-night-summaries"] });
       onDone();
+      toast("Notice saved.");
     } catch (e: unknown) {
       setErr(friendlyMessage(e, "Failed to save notice"));
     } finally {

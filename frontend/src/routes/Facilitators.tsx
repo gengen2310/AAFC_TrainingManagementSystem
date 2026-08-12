@@ -1,6 +1,7 @@
 import { useState, useRef, type KeyboardEvent, type ChangeEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { trainingApi, reportApi } from "../api";
+import { useToast } from "../components/Toast";
 import { Card, Empty, Loading, ErrorNote, Button } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { DrilldownPanel } from "../components/DrilldownPanel";
@@ -26,9 +27,10 @@ export function Facilitators() {
   const [editFor, setEditFor] = useState<Facilitator | null>(null);
   const [statsId, setStatsId] = useState<string | null>(null);
   const canWrite = canWriteSquadron(session);
+  const { toast } = useToast();
   const archiveMut = useMutation({
     mutationFn: (id: string) => trainingApi.deleteFacilitator(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["facilitators"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["facilitators"] }); toast("Facilitator archived."); },
   });
   if (needsSelection && !squadronId) return <Empty msg="Select a squadron above to view its facilitators." />;
   if (q.isLoading) return <Loading />;
@@ -269,9 +271,10 @@ function EditFacModal({ fac, onClose, onDone }: { fac: Facilitator; onClose: () 
   const [rank, setRank] = useState(fac.current_rank ?? "");
   const [type, setType] = useState(fac.type ?? "Staff");
   const [err, setErr] = useState("");
+  const { toast } = useToast();
   const m = useMutation({
     mutationFn: () => trainingApi.updateFacilitator(fac.facilitator_id, { first_name: first, last_name: last, current_rank: rank, type }),
-    onSuccess: onDone,
+    onSuccess: () => { onDone(); toast("Facilitator updated."); },
     onError: (e) => setErr(e instanceof ApiError ? e.friendly : "Could not save."),
   });
   return (
