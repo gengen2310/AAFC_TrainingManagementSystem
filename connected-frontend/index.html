@@ -10664,7 +10664,7 @@ function renderMissions() {
         <td style="font-size:0.82rem">${esc(m.instructor_suitability||'')}</td>
         <td style="text-align:center">${m.part_count||1}</td>
         <td>${esc(m.recommended_term||'')}</td>
-        <td>${esc(schedDate)} ${esc(schedSess)}${extraRows}</td>
+        <td>${esc(schedDate)} ${esc(schedSess)}${extraRows}${schedDate?`<br><button class="btn-xs btn-out no-print" style="font-size:9px;margin-top:3px;padding:1px 5px" onclick="navToScheduledPN('${esc(schedDate)}')" title="Go to this parade night">↗ View PN</button>`:''}</td>
         <td style="font-size:0.82rem">${esc(facName)}</td>
         <td style="font-size:0.82rem">${esc(locName)}</td>
         <td>${badge}</td>
@@ -10673,6 +10673,16 @@ function renderMissions() {
       </tr>`;
     }).join('') +
     `</tbody></table></div>`;
+}
+
+// MBACK-04: jump directly from a Mission Backlog scheduled-date cell to the
+// matching Parade Night — pre-fills the search filter and navigates.
+function navToScheduledPN(date) {
+  nav('parade-nights');
+  setTimeout(() => {
+    const inp = document.getElementById('pn-search');
+    if (inp) { inp.value = date; renderPN(); }
+  }, 100);
 }
 
 function _phaseShort(phase) {
@@ -13002,7 +13012,7 @@ document.addEventListener('keydown',function(e){
     closePalette();
     if(r.action==='nav')nav(r.target);
     else if(r.action==='curr')showCurrDetail(r.target);
-    else if(r.action==='pn'){nav('parade-nights');setTimeout(()=>{const inp=document.getElementById('pn-date-filter');if(inp){inp.value=r.target;renderPN();}},100);}
+    else if(r.action==='pn'){navToScheduledPN(r.target);}
     else if(r.action==='fac'){nav('facilitators');}
   }
   function _score(text,q){
