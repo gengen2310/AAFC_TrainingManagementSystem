@@ -3707,7 +3707,7 @@ function apiErr(e){
   return 'Something went wrong.';
 }
 // gate() is retained for any residual call sites; normal SQN admin work should not reach this.
-function gate(n){ alert((n||'This action')+' is not available in this pilot build. If you see this message, please report which action triggered it.'); }
+function gate(n){ showToast((n||'This action')+' is not available in this build. If you see this message, please report which action triggered it.', true); }
 
 // ═══════════════════════════════════════════════════════════
 //  AUTH  (two-step: identify account → enter access code)
@@ -6023,7 +6023,7 @@ function doDisableAccount(userId, displayName){
     try{
       await api('/api/accounts/'+userId+'/disable',{method:'POST'});
       S.accountList=null; renderAccounts();
-    }catch(e){ alert('Could not disable: '+apiErr(e)); }
+    }catch(e){ showToast('Could not disable: '+apiErr(e), true); }
   }, true);
 }
 function doReactivateAccount(userId, displayName){
@@ -6031,7 +6031,7 @@ function doReactivateAccount(userId, displayName){
     try{
       await api('/api/accounts/'+userId+'/reactivate',{method:'POST'});
       S.accountList=null; renderAccounts();
-    }catch(e){ alert('Could not reactivate: '+apiErr(e)); }
+    }catch(e){ showToast('Could not reactivate: '+apiErr(e), true); }
   });
 }
 function doDeleteAccount(userId, displayName){
@@ -6076,7 +6076,7 @@ function doUnlockAccount(userId, displayName){
     try{
       await api('/api/accounts/'+userId+'/unlock',{method:'POST'});
       S.accountList=null; renderAccounts();
-    }catch(e){ alert('Could not unlock: '+apiErr(e)); }
+    }catch(e){ showToast('Could not unlock: '+apiErr(e), true); }
   });
 }
 
@@ -7386,7 +7386,7 @@ function buildPNCard(pn){
     </div>`).join('');
   return `<div class="pn-card">
     <div class="pn-hdr">
-      <div><div class="pn-date">${fmtDL(pn.date)}</div><div class="pn-meta">${pn.term} · ${(pn.sessions||[]).length} sessions${pn.notes?' · '+esc(pn.notes):''}</div></div>
+      <div><div class="pn-date">${fmtDL(pn.date)}</div><div class="pn-meta">${esc(pn.term)} · ${(pn.sessions||[]).length} sessions${pn.notes?' · '+esc(pn.notes):''}</div></div>
       <div style="display:flex;gap:6px;align-items:center" class="no-print">
         ${allDel?stBadge('delivered'):stBadge('planned')}
         ${pn.published?'<span class="badge b-ok" title="Weekly Program published">Published</span>':''}
@@ -7937,7 +7937,7 @@ function _sessOpenMoveTo(date,idx){
   _sessMoveToRef={date,idx};
   const sel=document.getElementById('smt-pn');
   const others=[...S.pns].filter(p=>p.date!==date).sort((x,y)=>x.date.localeCompare(y.date));
-  sel.innerHTML=others.map(p=>`<option value="${p.date}">${fmtDL(p.date)} (${p.term})</option>`).join('');
+  sel.innerHTML=others.map(p=>`<option value="${p.date}">${fmtDL(p.date)} (${esc(p.term)})</option>`).join('');
   document.getElementById('smt-period').value=s.period_number||idx+1;
   document.getElementById('smt-err').textContent='';
   openModal('m-sess-move-to');
@@ -8179,7 +8179,7 @@ async function saveSessEdit(){
 function populateWPDD(){
   const sel=document.getElementById('wp-sel');
   const sorted=[...S.pns].sort((a,b)=>a.date.localeCompare(b.date));
-  sel.innerHTML='<option value="">— Choose a parade night —</option>'+sorted.map(pn=>`<option value="${pn.date}">${fmtD(pn.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})} (${pn.term})</option>`).join('');
+  sel.innerHTML='<option value="">— Choose a parade night —</option>'+sorted.map(pn=>`<option value="${pn.date}">${fmtD(pn.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})} (${esc(pn.term)})</option>`).join('');
 }
 function renderWP(){
   const ds=document.getElementById('wp-sel').value;
@@ -9340,10 +9340,10 @@ function renderFacs(){
     const clickAttr=showArchived?'':` onclick="showFacProfile('${f.id}')"`;
     return `<tr class="${showArchived?'':'clk-row'}"${rowAttrs}${clickAttr}>
       <td style="color:var(--muted);font-size:11px">${i+1}</td>
-      <td style="font-weight:700">${f.rank||'—'}${showArchived?' <span class="badge b-grey">Archived</span>':''}</td>
-      <td>${f.first||'—'}</td>
-      <td style="font-weight:700">${f.last||'—'}</td>
-      <td><span class="badge b-grey">${{Officer:'Officer',NCO:'WO/NCO','Senior Cadet':'Sr Cadet',Civilian:'Civilian',Staff:'Staff'}[f.type]||f.type||'—'}</span></td>
+      <td style="font-weight:700">${esc(f.rank||'—')}${showArchived?' <span class="badge b-grey">Archived</span>':''}</td>
+      <td>${esc(f.first||'—')}</td>
+      <td style="font-weight:700">${esc(f.last||'—')}</td>
+      <td><span class="badge b-grey">${esc({Officer:'Officer',NCO:'WO/NCO','Senior Cadet':'Sr Cadet',Civilian:'Civilian',Staff:'Staff'}[f.type]||f.type||'—')}</span></td>
       <td>${(f.areas||[]).map(a=>elBadge(a)).join(' ')||'<span style="color:var(--muted);font-size:11px">untagged</span>'}</td>
       <td style="text-align:center">${showArchived?'—':`<button class="btn-lnk" onclick="event.stopPropagation();showFacProfile('${f.id}')">${tot}</button>`}</td>
       <td class="no-print" onclick="event.stopPropagation()">
@@ -9810,7 +9810,7 @@ function renderRooms(){
   document.getElementById('room-tbody').innerHTML=roomSrc.map((r,i)=>`<tr${showRooms?' style="opacity:.6"':''}>
     <td style="font-weight:700">${esc(r.name)}${showRooms?' <span class="badge b-grey">Archived</span>':''}</td>
     <td style="text-align:center">${r.capacity||'—'}</td>
-    <td>${r.type?`<span class="badge b-blue" style="font-size:10px">${r.type}</span>`:'—'}</td>
+    <td>${r.type?`<span class="badge b-blue" style="font-size:10px">${esc(r.type)}</span>`:'—'}</td>
     <td class="no-print">${showRooms
       ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreRoom('${r.id}','${_jsAttr(r.name)}')">Restore</button>`:'')
       :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editRoom('${r.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delRoom('${r.id}')">×</button>`:'—')}</td>
