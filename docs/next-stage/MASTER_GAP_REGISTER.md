@@ -26,14 +26,14 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 36 |
 | STAGING VERIFIED | 9 |
-| FIXED LOCALLY | 23 |
-| IMPLEMENTING | 9 |
-| NOT STARTED | 27 |
+| FIXED LOCALLY | 25 |
+| IMPLEMENTING | 8 |
+| NOT STARTED | 26 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **121** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 68 / 121 = 56%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 70 / 121 = 58%**
 
 **2026-08-13 audit:** 8 items promoted from NOT STARTED → CLOSED/FIXED LOCALLY after code inspection (DEF-02, DEF-12, HELP-02, HELP-03, HELP-06, MBACK-03, WORK-06) plus E2E CI workflow created (VIS-02 → FIXED LOCALLY). 1 new item added (e2e-tests.yml workflow). DASH-08 promoted IMPLEMENTING → FIXED LOCALLY after confirmed code inspection of all command-dashboard drill-down paths. SEC-09, SEC-10, SEC-13, SEC-14 promoted IMPLEMENTING → STAGING VERIFIED after live HTTP checks against staging and production. SEC-05 (login spike alerting) and SEC-06 (5xx spike alerting) implemented in `security.py`/`main.py` with tests. DOC-14 (CEA operator guide) and DOC-15 (role matrix §V17 Training Class) written.
 
@@ -78,7 +78,7 @@ to formally confirm this (see DOC-12).
 | CLASS-12 | Core Domain | HIGH | class_curriculum_progress chart in connected-frontend — chart container rendering per-class curriculum progress from `charts.class_curriculum_progress` | Confirmed implemented: `chart-class-curriculum-progress` container at index.html:792; rendered at index.html:6857 via `_dRenderChart`; insight at 6858. Gap register was stale. | CLOSED |
 | CLASS-13 | Core Domain | HIGH | class_breakdown field rendered in connected-frontend curriculum page — per-item indication of which Training Class needs each curriculum item | Implemented as MBACK-01 (commit `16f6bce`): `_loadCurriculumClassBreakdown()` + `_currClassBreakdownHtml()` render per-class badges in curriculum page | CLOSED |
 | CLASS-14 | Core Domain | MEDIUM | Training Classes step in the Getting Started checklist onboarding wizard | Confirmed implemented: `setup.py` lines 79-84 query TrainingClass count; lines 139-141 emit `training_classes_created` step. Gap register was stale. | CLOSED |
-| CLASS-15 | Core Domain | LOW | CustomPhase → CurriculumPhase migration and cleanup — CustomPhase is a narrower, older squadron-scoped phase-name table that predates CurriculumPhase | CustomPhase still live; migration surface identified in `parallel-class-impact-analysis.md` as CLASS-14; not acted on | IMPLEMENTING |
+| CLASS-15 | Core Domain | LOW | CustomPhase → CurriculumPhase migration and cleanup — CustomPhase is a narrower, older squadron-scoped phase-name table that predates CurriculumPhase | Migration v40 (`5cf6d7e8f9a0`) written to DROP TABLE custom_phases; model class and `__init__.py` export removed; test updated; awaits operator `alembic upgrade head` to apply DROP TABLE on production | FIXED LOCALLY |
 | CLASS-16 | Core Domain | LOW | Session.cadet_group / Cadet.phase formal deprecation — single-string fields replaced structurally by SessionAudience; all consumers (Mission Backlog, Weekly Program, dashboards, both frontends) must migrate before fields are removed | Old fields retained as read-compatibility path per capability-preservation rules; no migration schedule; no consumer yet migrated to SessionAudience | IMPLEMENTING |
 
 ---
