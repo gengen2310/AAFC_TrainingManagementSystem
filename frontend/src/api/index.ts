@@ -395,6 +395,7 @@ export const planningApi = {
     weekday: number; start_date: string; end_date?: string;
     parade_type?: string; exclude_holidays?: boolean;
     frequency?: string; max_repeats?: number; excluded_dates?: string[];
+    parade_start_time?: string; parade_end_time?: string;
   }) => api.post<{ ok: boolean; created: number; linked: number; dates: string[] }>(
     `/api/planning/years/${year_id}/generate-parade-dates`, body,
   ),

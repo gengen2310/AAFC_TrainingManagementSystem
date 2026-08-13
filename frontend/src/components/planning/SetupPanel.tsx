@@ -82,6 +82,8 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
   const [endDate, setEndDate] = useState("");
   const [frequency, setFrequency] = useState("weekly");
   const [excludeHolidays, setExcludeHolidays] = useState(true);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [savingDates, setSavingDates] = useState(false);
   const [datesErr, setDatesErr] = useState<string | null>(null);
   const [datesResult, setDatesResult] = useState<{ created: number; dates: string[] } | null>(null);
@@ -129,6 +131,8 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
         end_date: endDate,
         frequency,
         exclude_holidays: excludeHolidays,
+        ...(startTime ? { parade_start_time: startTime } : {}),
+        ...(endTime ? { parade_end_time: endTime } : {}),
       });
       setDatesResult({ created: result.created, dates: result.dates });
       onYearCreated();
@@ -239,6 +243,16 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
                     <label>
                       End date
                       <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    </label>
+                    <label>
+                      Parade start time <span style={{ fontWeight: 400, color: "var(--muted-text)", fontSize: 11 }}>(optional)</span>
+                      <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
+                        title="Overrides the squadron default parade start time" />
+                    </label>
+                    <label>
+                      Parade end time <span style={{ fontWeight: 400, color: "var(--muted-text)", fontSize: 11 }}>(optional)</span>
+                      <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
+                        title="Overrides the squadron default parade end time" />
                     </label>
                   </div>
                   <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400, marginTop: 6 }}>

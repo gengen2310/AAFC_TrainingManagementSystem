@@ -278,6 +278,8 @@ function DatesStep({ yearId, squadronId, alreadyDone, onSkip, onDone }: {
   const [endDate, setEndDate] = useState("");
   const [frequency, setFrequency] = useState("weekly");
   const [excludeHolidays, setExcludeHolidays] = useState(true);
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [result, setResult] = useState<{ created: number } | null>(null);
@@ -302,6 +304,8 @@ function DatesStep({ yearId, squadronId, alreadyDone, onSkip, onDone }: {
     try {
       const r = await planningApi.generateParadeDates(yearId, {
         weekday, start_date: startDate, end_date: endDate, frequency, exclude_holidays: excludeHolidays,
+        ...(startTime ? { parade_start_time: startTime } : {}),
+        ...(endTime ? { parade_end_time: endTime } : {}),
       });
       setResult({ created: r.created });
     } catch (e) {
@@ -349,6 +353,14 @@ function DatesStep({ yearId, squadronId, alreadyDone, onSkip, onDone }: {
             </label>
             <label>End date
               <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </label>
+            <label>Parade start time <span className="muted" style={{ fontWeight: 400 }}>(optional)</span>
+              <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
+                placeholder="HH:MM" title="Overrides the squadron default parade start time" />
+            </label>
+            <label>Parade end time <span className="muted" style={{ fontWeight: 400 }}>(optional)</span>
+              <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
+                placeholder="HH:MM" title="Overrides the squadron default parade end time" />
             </label>
           </div>
           <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400, marginTop: 6 }}>
