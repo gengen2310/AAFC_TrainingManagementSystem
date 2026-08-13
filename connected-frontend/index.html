@@ -10705,7 +10705,8 @@ function exportPerClassDeliveryCSV() {
         m.recommended_term || '', cb.backlog_status || 'unscheduled', String(cb.scheduled_count || 0)]);
     });
   });
-  const q = f => '"' + String(f).replace(/"/g, '""') + '"';
+  // Prefix formula-starting chars (=+-@) so spreadsheets can't execute injection.
+  const q = f => { const s = String(f); return '"' + (/^[=+\-@\t\r]/.test(s) ? "'" + s : s).replace(/"/g, '""') + '"'; };
   const csv = rows.map(r => r.map(q).join(',')).join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'}));
