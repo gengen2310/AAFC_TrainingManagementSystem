@@ -82,6 +82,73 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 }
 .print-only{display:none;}
 
+/* ── HIGH-CONTRAST MODE (VIS-03) ── */
+/* prefers-contrast: more — user has asked for stronger contrast; we increase
+   token values rather than deferring to the OS colour scheme. */
+@media (prefers-contrast: more) {
+  :root {
+    --bg:       #ffffff;
+    --surface:  #ffffff;
+    --surface-2:#f0f0f0;
+    --border:   #555555;
+    --border-light: #777777;
+    --text:     #000000;
+    --text-2:   #111111;
+    --muted:    #404040;
+    --muted-text-on-light: #3a3a3a;
+    --text-on-dark-muted:  #e0e0e0;
+    --link-on-light: #003399;
+    --ok:       #004d24;
+    --ok-bg:    #c0f0d8;
+    --ok-text:  #003318;
+    --warn:     #6a3800;
+    --warn-bg:  #ffe090;
+    --red:      #cc0011;
+    --status-text-danger: #b00010;
+    --accent-light: #c8e6ff;
+    --sh:  0 1px 4px rgba(0,0,0,.25);
+    --sh2: 0 4px 16px rgba(0,0,0,.35);
+  }
+  /* Ensure all interactive elements have visible borders */
+  .btn, button, input, select, textarea {
+    border: 1.5px solid var(--border) !important;
+  }
+  /* Stronger focus ring */
+  :focus-visible {
+    outline: 3px solid #000000 !important;
+    outline-offset: 2px !important;
+  }
+  /* Nav active state uses bolder indicator */
+  .nav-item.active {
+    border-left-width: 4px !important;
+    border-left-color: var(--dark) !important;
+  }
+  /* Remove subtle box shadows that reduce perceived contrast */
+  .card, .stat, .pn-card {
+    box-shadow: none !important;
+    border: 1.5px solid var(--border) !important;
+  }
+  /* Badges must be readable — darken muted variant */
+  .badge.b-grey { color: #222 !important; background: #d0d0d0 !important; }
+}
+
+/* forced-colors: active — Windows High Contrast Mode; the OS enforces its own
+   palette. We keep shape structure and add borders where colour was previously
+   the only visual differentiator. */
+@media (forced-colors: active) {
+  /* Let the OS recolour most elements; preserve structural borders */
+  .nav-item        { border-left: 3px solid transparent; }
+  .nav-item.active { border-left: 3px solid Highlight; color: Highlight; }
+  .btn, button     { border: 2px solid ButtonText !important; forced-color-adjust: none; }
+  .card, .stat, .pn-card, .tw table { border: 1px solid ButtonText !important; }
+  /* Status badges — replace colour with border differentiation */
+  .badge, .dot { border: 1px solid ButtonText; forced-color-adjust: none; }
+  /* Toast messages need outline so they don't vanish against the OS background */
+  .toast { border: 2px solid Highlight !important; forced-color-adjust: none; }
+  /* Preserve focus visibility */
+  :focus-visible { outline: 3px solid Highlight !important; outline-offset: 2px !important; }
+}
+
 /* ── AUTH ── */
 #auth-screen{min-height:100vh;background:linear-gradient(160deg,var(--dark) 0%,#001428 100%);display:flex;align-items:center;justify-content:center;padding:20px;}
 .auth-wrap{background:#fff;border-radius:10px;padding:40px 36px 32px;width:400px;max-width:96vw;box-shadow:0 20px 56px rgba(0,0,0,.40);}

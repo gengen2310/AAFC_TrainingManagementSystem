@@ -33,9 +33,27 @@ html[data-theme="dark"]{
   --navy:#51B0E3; --ok:var(--success); --warn:var(--warning); --danger:var(--red);
 }
 html[data-theme="hc"]{
-  --surface:#FFFFFF; --background:#FFFFFF; --text:#000000; --muted-text:#000000;
-  --border:#000000; --primary:#000000; --accent:#000000;
-  --surface-2:#FFFFFF; --line:#000000; --ink-2:#000000;
-  --navy:#000000; --ok:#000000; --warn:#000000; --danger:#000000;
+  --surface:#FFFFFF; --background:#FFFFFF; --text:#000000; --muted-text:#303030;
+  --border:#555555; --primary:#000044; --accent:#000099;
+  --surface-2:#F0F0F0; --line:#555555; --ink-2:#111111;
+  --navy:#000044; --ok:#004d24; --warn:#6a3800; --danger:#cc0011;
+  --success:#004d24; --warning:#6a3800; --rescheduled:#44007a;
+}
+/* prefers-contrast: more — strengthen tokens for users who prefer higher contrast
+   without switching to the full high-contrast theme manually. */
+@media (prefers-contrast: more) {
+  :root {
+    --surface:#FFFFFF; --background:#FFFFFF; --text:#000000; --muted-text:#3a3a3a;
+    --border:#555555; --primary:#000044; --accent:#000099;
+    --surface-2:#F0F0F0; --line:#555555; --ink-2:#111111;
+    --navy:#000044; --ok:#004d24; --warn:#6a3800; --danger:#cc0011;
+    --success:#004d24; --warning:#6a3800;
+  }
+}
+/* forced-colors: active — Windows High Contrast Mode. */
+@media (forced-colors: active) {
+  :root { forced-color-adjust: auto; }
+  button, [role="button"] { border: 2px solid ButtonText !important; forced-color-adjust: none; }
+  :focus-visible { outline: 3px solid Highlight !important; outline-offset: 2px; }
 }
 @media (prefers-reduced-motion: reduce){ *{animation:none!important; transition:none!important;} }
