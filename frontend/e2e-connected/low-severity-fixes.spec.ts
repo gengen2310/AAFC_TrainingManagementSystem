@@ -104,3 +104,42 @@ test("WRITE-03: 'Saved at' timestamps use 24-hour time, not 12-hour am/pm", asyn
     });
   }
 });
+
+test("MBACK-06: Per-Class CSV export button is visible in Mission Backlog for sqn_admin", async ({ page }) => {
+  // MBACK-06: exportPerClassDeliveryCSV() — sqn_admin must be able to download
+  // a per-class delivery summary from the Mission Backlog filter bar.
+  await loginSquadron(page, "ADMIN703");
+  await page.evaluate(() => (window as any).nav("activities"));
+  // Wait for the missions filters card to appear — this requires loadMissions()
+  // to complete, which in turn requires _loadPlanningYears() to return a year ID.
+  await expect(page.locator("#missions-filters-card")).toBeVisible({ timeout: 12000 });
+  await expect(page.locator("button", { hasText: "Per-Class CSV" })).toBeVisible({ timeout: 5000 });
+});
+
+test("HELP-01: Contextual tooltip buttons are present with descriptive data-tip text", async ({ page }) => {
+  // HELP-01: .ht buttons use data-tip for contextual help — present on the
+  // Mission Backlog header and the Training Class add/edit forms.
+  await loginSquadron(page, "ADMIN703");
+  await page.evaluate(() => (window as any).nav("activities"));
+  await expect(page.locator("#missions-filters-card")).toBeVisible({ timeout: 12000 });
+  // The Mission Backlog section header has a .ht button with data-tip text.
+  const htBtn = page.locator("#missions-filters-card .ht").first();
+  await expect(htBtn).toBeVisible();
+  const tip = await htBtn.getAttribute("data-tip");
+  expect(tip).toBeTruthy();
+  expect(tip!.length).toBeGreaterThan(20);
+});
+
+test("HELP-05: 'What Changed?' activity feed card is present on the Needs Attention page", async ({ page }) => {
+  // HELP-05: GET /api/recent-changes — the card with the day-range selector and
+  // refresh button must be present and the rc-feed div must exist.
+  await loginSquadron(page, "ADMIN703");
+  await page.evaluate(() => (window as any).nav("action-items"));
+  // The Needs Attention page header must be visible first.
+  await expect(page.locator(".ph-title", { hasText: "Needs Attention" })).toBeVisible({ timeout: 8000 });
+  // The What Changed? card must be present.
+  await expect(page.locator(".ctitle", { hasText: "What Changed?" })).toBeVisible({ timeout: 5000 });
+  // The activity feed div and day-range selector must both be in the DOM.
+  await expect(page.locator("#rc-feed")).toBeVisible();
+  await expect(page.locator("#rc-days")).toBeVisible();
+});
