@@ -24,16 +24,16 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 
 | Status | Count |
 |---|---|
-| CLOSED | 34 |
+| CLOSED | 36 |
 | STAGING VERIFIED | 5 |
 | FIXED LOCALLY | 17 |
 | IMPLEMENTING | 13 |
-| NOT STARTED | 35 |
+| NOT STARTED | 33 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **121** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 56 / 121 = 46%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 58 / 121 = 48%**
 
 **2026-08-13 audit:** 8 items promoted from NOT STARTED → CLOSED/FIXED LOCALLY after code inspection (DEF-02, DEF-12, HELP-02, HELP-03, HELP-06, MBACK-03, WORK-06) plus E2E CI workflow created (VIS-02 → FIXED LOCALLY). 1 new item added (e2e-tests.yml workflow).
 
@@ -116,7 +116,7 @@ and curriculum item breakdown). Frontend consumption gaps are the remaining work
 | MBACK-02 | Mission Backlog | MEDIUM | Per-class Mission Backlog filtering in UI — view backlog filtered to a single Training Class | `mission-filter-class` select populated dynamically from `class_breakdown` in `loadMissions()`; `renderMissions()` filters to missions where selected class is not resolved — confirmed present in `index.html:10485–10522` | CLOSED |
 | MBACK-03 | Mission Backlog | MEDIUM | Needs Attention consolidated queue (§39) — single prioritised surface combining readiness warnings, class gaps, and required planning actions | `renderActions()` at `index.html:9371` consolidates: backend action items (P0/P1), past sessions with unrecorded outcomes (P2), cancelled/ND with no reason (P3), unassigned sessions (P4); accessible as `page-action-items` in nav ("Needs Attention"). Commit `258e38c`. Gap register was stale. | CLOSED |
 | MBACK-04 | Mission Backlog | LOW | Plan-faster shortcut from Mission Backlog item directly to a session slot (§41) | Not implemented; currently requires navigating to the session separately | NOT STARTED |
-| MBACK-05 | Mission Backlog | MEDIUM | Per-class facilitator / resource conflict detection (§69) — when assigning a facilitator or room to a session, detect conflicts against other sessions that the same class attends | No class-aware conflict detection; current conflict checks are session-level only, blind to a class being split across parallel sessions | NOT STARTED |
+| MBACK-05 | Mission Backlog | MEDIUM | Per-class conflict detection — when assigning a Training Class to a session audience, detect class-schedule clashes (same class in two concurrent sessions at the same parade night + period) | Implemented commit `51a8a43`: `SessionAudienceSetIn.override_conflict: bool = False`; `set_session_audience()` checks sibling sessions at same `parade_night_id` + `period_number`; raises 409 `{"error":"class_conflict","conflicts":[{"type":"class_clash",...}]}`. 3 regression tests added to `test_session_audience.py`. Frontend wiring not yet done. | FIXED LOCALLY |
 | MBACK-06 | Mission Backlog | LOW | Per-class delivery summary — ability to export a per-class delivery record (what each Training Class has received, by curriculum item) as a report or CSV | No per-class delivery report exists; reports are per-squadron or per-phase only | NOT STARTED |
 
 ---
@@ -199,11 +199,11 @@ known. Firefox and the Planning Workspace 404 are uninvestigated — root causes
 | DEF-06 | Defect | MEDIUM | Wing-onboarding CLI-only — no HTTP API endpoint for Wing provisioning; requires direct server/DB access | `second_wing_seed.py` is CLI-only; no API path; appropriate for Level B staging, not National | NOT STARTED |
 | DEF-07 | Defect | MEDIUM | Multi-Wing report cross-scope verification — Wing reports show only their Wing's data; National aggregates all Wings; no cross-Wing data leak | No synthetic second Wing in staging; multi-Wing aggregation path unproven; blocked on Level B Wing activation | NOT STARTED |
 | DEF-08 | Defect | MEDIUM | Celery export task (`generate_export`) is a stub — sync fallback records success without writing a real file; no object-storage or presigned-URL path | `dispatcher.py` tries Celery; falls back to sync stub; Redis not provisioned | IMPLEMENTING |
-| DEF-09 | Defect | MEDIUM | Background job polling UI — no frontend polling of `GET /api/jobs/{id}` when an async export is in flight; users cannot tell whether a large export is still running | `JobStatus` endpoint exists; no polling UI in either frontend | NOT STARTED |
+| DEF-09 | Defect | MEDIUM | Background job polling UI — no frontend polling of `GET /api/jobs/{id}` when an async export is in flight; users cannot tell whether a large export is still running | `_jobPollToast(label, jobId)` added to connected-frontend: shows persistent toast with spinner; polls every 2 s; transitions to ok/err on terminal state; `exportProgramItemsCSV()` triggers `POST /api/jobs/export` and wires the toast. "Export CSV" button added to Curriculum page. DEF-08 (real file generation) still blocked on Celery/Redis provisioning. | FIXED LOCALLY |
 | DEF-10 | Defect | MEDIUM | DB-backed general rate limiter — in-memory `_api_hits` degrades proportionally with Gunicorn worker count; `GUNICORN_WORKERS ≤ 2` operational cap enforced until Option A (DB-backed) is implemented | Assessed in `15_rate_limiting_assessment.md`; Option A designed; not yet implemented | NOT STARTED |
 | DEF-11 | Defect | MEDIUM | Per-account rate limiting on non-login API endpoints | Only login has per-account lockout (`AccessCode.failed_attempts`, `locked_until`); all other endpoints have per-IP limiting only | NOT STARTED |
 | DEF-12 | Defect | LOW | Maintenance mode frontend banner — users already in session see no in-app banner when write-block is active | Fixed commits `677d5e5`/`dfafc09`: `_maintenancePoll()` at `index.html:4304` polls every 30 s; when block activates, `checkMaintenanceBanner()` renders a banner to authenticated users without requiring page reload. Gap register was stale. | CLOSED |
-| DEF-13 | Defect | LOW | Maintenance mode expected return time — no return-time field in `SystemSetting`; cannot be communicated to users | Maintenance message is admin-settable text; no structured return-time field exists | NOT STARTED |
+| DEF-13 | Defect | LOW | Maintenance mode expected return time — no return-time field in `SystemSetting`; cannot be communicated to users | `maintenance_until` key stored via `_set_setting()`; System Console input at `index.html:1640` ("Expected return time"); maintenance banner at `index.html:4736` renders `Expected return: ${d.until}` when set. Gap register was stale. | CLOSED |
 | DEF-14 | Defect | LOW | Maintenance mode Celery drain — in-flight jobs may fail silently if write-block activates mid-task | Not implemented; no drain step in maintenance activation sequence | NOT STARTED |
 | DEF-15 | Defect | MEDIUM | `ENVIRONMENT=staging` in production Railway config (DEFECT-003) — `is_production` and `validate_for_production()` key off this value; risks production safety checks not triggering | Code fix merged; Railway production env var not corrected; requires System Admin action | HUMAN GATE |
 

@@ -401,6 +401,9 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .toast{background:white;border:1.5px solid var(--border);border-left:4px solid var(--steel);border-radius:8px;padding:10px 14px;font-size:12.5px;font-weight:600;box-shadow:var(--sh2);color:var(--text);}
 .toast.err{border-left-color:var(--red);color:#8b1a1a;}
 .toast.ok{border-left-color:var(--ok);color:#145f38;}
+@keyframes _spin{to{transform:rotate(360deg)}}
+.job-spin{display:inline-block;width:11px;height:11px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:_spin .7s linear infinite;vertical-align:middle;margin-right:7px;flex-shrink:0}
+.toast.job{border-left-color:var(--blue);color:var(--text);display:flex;align-items:center;}
 
 /* ── WEEKLY PROGRAM ── */
 .wp-tbl{width:100%;border-collapse:collapse;font-size:12px;}
@@ -1005,6 +1008,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <button class="btn btn-dk admin-el" id="btn-add-curr-nat" style="display:none" onclick="openAddCurrNat()">+ Add National Curriculum</button>
             <button class="btn btn-out nat-admin-el" style="display:none" onclick="openCsvCurrImport()">Import CSV</button>
             <button class="btn btn-out" onclick="exportCurriculum()" title="Export curriculum to Excel">Export XLSX</button>
+            <button class="btn btn-out" onclick="exportProgramItemsCSV()" title="Export programme items as CSV (background job — progress shown in the notification area)">Export CSV</button>
             <a href="https://airforcecadets.net.au/lh/home" target="_blank" class="btn btn-sky no-print">Learning Hub</a>
           </div>
         </div>
@@ -4045,6 +4049,60 @@ function showToast(msg, isErr){
   t.textContent=msg;
   region.appendChild(t);
   setTimeout(()=>t.remove(),isErr?7000:4000);
+}
+
+// ── Background-job polling toast (DEF-09) ─────────────────────────────
+// Shows a persistent progress toast while a background job runs.
+// Polls GET /api/jobs/{jobId} every 2 s until the job reaches a terminal
+// state (succeeded / failed), then auto-dismisses.
+function _jobPollToast(label, jobId) {
+  const region = document.getElementById('toast-region');
+  const t = document.createElement('div');
+  t.className = 'toast job';
+  t.setAttribute('role', 'status');
+  t.setAttribute('aria-live', 'polite');
+  function _setText(spin, text) {
+    t.innerHTML = (spin ? '<span class="job-spin" aria-hidden="true"></span>' : '') + esc(text);
+  }
+  _setText(true, label);
+  region.appendChild(t);
+  let done = false;
+  function _poll() {
+    if (done) return;
+    api('/api/jobs/' + encodeURIComponent(jobId))
+      .then(j => {
+        if (j.status === 'succeeded') {
+          done = true;
+          t.className = 'toast ok'; t.setAttribute('role', 'alert');
+          _setText(false, 'Export complete.');
+          setTimeout(() => t.remove(), 5000);
+        } else if (j.status === 'failed') {
+          done = true;
+          t.className = 'toast err'; t.setAttribute('role', 'alert');
+          _setText(false, 'Export failed: ' + (j.error_message || 'unknown error'));
+          setTimeout(() => t.remove(), 9000);
+        } else {
+          const pct = j.progress_percentage || 0;
+          _setText(true, label + (pct > 0 ? ' — ' + pct + '%' : ''));
+          setTimeout(_poll, 2000);
+        }
+      })
+      .catch(() => { if (!done) setTimeout(_poll, 3000); });
+  }
+  // Poll immediately — sync fallback is already terminal on first call.
+  _poll();
+}
+
+async function exportProgramItemsCSV() {
+  try {
+    const r = await api('/api/jobs/export', {
+      method: 'POST',
+      body: JSON.stringify({ export_type: 'program-items', format: 'csv' }),
+    });
+    _jobPollToast('Preparing programme items export…', r.job_id);
+  } catch (e) {
+    showToast('Export failed: ' + apiErr(e), true);
+  }
 }
 
 // Shared manual-refresh pattern for primary pages (Training Dashboard,
