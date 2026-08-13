@@ -3157,15 +3157,45 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 </div>
 
 <!-- ── Parade Night Timing Override Modal ────────────────────────────────── -->
+<!-- WORK-05: flexible one-night timing override — pick existing template OR define custom blocks -->
 <div class="modal-bg" id="m-pn-timing-override">
-  <div class="modal" style="max-width:480px">
+  <div class="modal" style="max-width:700px;width:96%">
     <div class="modal-hdr"><div class="modal-title">Override Parade Night Timing</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-timing-override')">×</button></div>
     <div class="modal-body">
-      <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Applies a different timing template to this one parade night only. Does not change future parade nights.</div>
-      <div class="form-row">
-        <div class="ff"><label for="pn-override-tid">Template</label><select id="pn-override-tid" aria-label="Timing template"></select></div>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Change the timing for this parade night only. Does not affect future parade nights.</div>
+      <!-- Mode toggle -->
+      <div style="display:flex;gap:0;margin-bottom:12px;border:1px solid var(--border);border-radius:5px;overflow:hidden;width:fit-content">
+        <button id="pn-or-mode-tpl" class="btn" style="border-radius:0;padding:4px 14px;font-size:12px;background:var(--dark);color:#fff" onclick="_pnOrMode('template')">Use existing template</button>
+        <button id="pn-or-mode-cus" class="btn" style="border-radius:0;padding:4px 14px;font-size:12px;background:var(--surface);color:var(--text)" onclick="_pnOrMode('custom')">Custom blocks for this night</button>
       </div>
-      <div class="form-row">
+      <!-- Existing template section -->
+      <div id="pn-or-tpl-section">
+        <div class="form-row">
+          <div class="ff"><label for="pn-override-tid">Template</label><select id="pn-override-tid" aria-label="Timing template"></select></div>
+        </div>
+      </div>
+      <!-- Custom blocks section (WORK-05) -->
+      <div id="pn-or-cus-section" style="display:none">
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Define the blocks for this parade night. A timing template named "Custom — {date}" will be created automatically.</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+            <thead><tr style="background:var(--bg2);border-bottom:1px solid var(--border)">
+              <th style="padding:4px 4px;text-align:left">#</th>
+              <th style="padding:4px 6px;text-align:left;min-width:110px">Block Name</th>
+              <th style="padding:4px 6px;text-align:left;min-width:110px">Type</th>
+              <th style="padding:4px 4px;text-align:left">Start</th>
+              <th style="padding:4px 4px;text-align:left">End</th>
+              <th style="padding:4px 4px;text-align:center">Min</th>
+              <th style="padding:4px 4px;text-align:center">IP</th>
+              <th style="padding:4px 4px;text-align:center">Opt</th>
+              <th style="padding:4px 4px;text-align:center">Del</th>
+            </tr></thead>
+            <tbody id="pn-cb-body"></tbody>
+          </table>
+        </div>
+        <button class="btn" style="margin-top:6px;font-size:11.5px" onclick="pnCbAddBlock()">+ Add Block</button>
+      </div>
+      <div class="form-row" style="margin-top:10px">
         <div class="ff"><label>Reason (required)</label><input id="pn-override-reason" type="text" placeholder="e.g. Shortened ANZAC night"></div>
       </div>
       <div id="pn-override-msg" style="font-size:11.5px;margin-top:8px;font-weight:700"></div>
@@ -9901,10 +9931,56 @@ async function ttApplyFromDate(){
   }catch(e){ setMsg(apiErr(e),false); }
 }
 
+// ── WORK-05: custom blocks for a one-night timing override ───────────────────
+let _pnCbBlocks = [];
+let _pnOrCurrentMode = 'template';
+function _pnOrMode(mode) {
+  _pnOrCurrentMode = mode;
+  const isTpl = mode === 'template';
+  document.getElementById('pn-or-tpl-section').style.display = isTpl ? '' : 'none';
+  document.getElementById('pn-or-cus-section').style.display = isTpl ? 'none' : '';
+  document.getElementById('pn-or-mode-tpl').style.background = isTpl ? 'var(--dark)' : 'var(--surface)';
+  document.getElementById('pn-or-mode-tpl').style.color = isTpl ? '#fff' : 'var(--text)';
+  document.getElementById('pn-or-mode-cus').style.background = isTpl ? 'var(--surface)' : 'var(--dark)';
+  document.getElementById('pn-or-mode-cus').style.color = isTpl ? 'var(--text)' : '#fff';
+}
+function _pnCbBlockRow(b, i) {
+  const types = [['instructional_period','Instructional Period'],['break','Break'],['admin','Admin'],['other','Other']];
+  const typeOpts = types.map(([v,l])=>`<option value="${v}"${b.block_type===v?' selected':''}>${l}</option>`).join('');
+  const sh = b.start_time && b.end_time ? (() => {
+    const [sh,sm]=b.start_time.split(':').map(Number), [eh,em]=b.end_time.split(':').map(Number);
+    const d=(eh*60+em)-(sh*60+sm); return d>0?String(d):'';
+  })() : '';
+  return `<tr>
+    <td style="padding:2px 4px;color:var(--muted);font-size:11px">${i+1}</td>
+    <td style="padding:2px 3px"><input value="${esc(b.block_name)}" oninput="_pnCbSet(${i},'block_name',this.value)" style="width:100px;font-size:11.5px"></td>
+    <td style="padding:2px 3px"><select style="font-size:11.5px" onchange="_pnCbSet(${i},'block_type',this.value);_pnCbSet(${i},'is_instructional_period',this.value==='instructional_period');renderPNCbBlocks()">${typeOpts}</select></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_pnCbSet(${i},'start_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:11.5px"></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_pnCbSet(${i},'end_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:11.5px"></td>
+    <td style="padding:2px 4px;text-align:center;font-size:11px;color:var(--muted)">${sh}</td>
+    <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_instructional_period?' checked':''} onchange="_pnCbSet(${i},'is_instructional_period',this.checked)"></td>
+    <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_optional?' checked':''} onchange="_pnCbSet(${i},'is_optional',this.checked)"></td>
+    <td style="padding:2px 4px;text-align:center"><button class="btn" style="font-size:10px;padding:1px 6px;color:var(--red)" onclick="_pnCbDel(${i})">✕</button></td>
+  </tr>`;
+}
+function renderPNCbBlocks() {
+  const tb = document.getElementById('pn-cb-body');
+  if (tb) tb.innerHTML = _pnCbBlocks.map((b,i)=>_pnCbBlockRow(b,i)).join('');
+}
+function _pnCbSet(i,f,v){ if(_pnCbBlocks[i]) _pnCbBlocks[i][f]=v; }
+function _pnCbDel(i){ _pnCbBlocks.splice(i,1); renderPNCbBlocks(); }
+function pnCbAddBlock(){
+  _pnCbBlocks.push({block_name:'',block_type:'instructional_period',is_instructional_period:true,is_optional:false,start_time:'',end_time:''});
+  renderPNCbBlocks();
+}
+
 async function openPNTimingOverrideModal(pnid){
   _pnOverridePnId=pnid;
   const msgEl=document.getElementById('pn-override-msg'); if(msgEl) msgEl.textContent='';
   document.getElementById('pn-override-reason').value='';
+  _pnCbBlocks=[];
+  renderPNCbBlocks();
+  _pnOrMode('template');
   const sel=document.getElementById('pn-override-tid');
   sel.innerHTML='';
   (S.timingTemplates||[]).forEach(t=>{
@@ -9916,14 +9992,27 @@ async function openPNTimingOverrideModal(pnid){
 
 async function savePNTimingOverride(){
   if(!_pnOverridePnId) return;
-  const tid=document.getElementById('pn-override-tid').value;
   const reason=(document.getElementById('pn-override-reason').value||'').trim();
   const msgEl=document.getElementById('pn-override-msg');
   const setMsg=(t,ok)=>{ if(msgEl){ msgEl.textContent=t; msgEl.style.color=ok?'var(--ok)':'var(--red)'; } };
   if(!reason){ setMsg('Reason is required.',false); return; }
   setMsg('Saving…',true);
   try{
-    await api('/api/parade-nights/'+_pnOverridePnId+'/timing-override',{method:'POST',body:JSON.stringify({timing_template_id:tid||null,reason})});
+    if(_pnOrCurrentMode==='custom'){
+      // WORK-05: create a one-off template then apply it as override
+      if(!_pnCbBlocks.length){ setMsg('Add at least one block.',false); return; }
+      const pn=(S.paradeNights||[]).find(x=>x.id===_pnOverridePnId);
+      const dateLbl=pn?pn.date:'custom';
+      const tpl=await api('/api/timing-templates',{method:'POST',body:JSON.stringify({
+        name:'Custom — '+dateLbl, effective_from:dateLbl, notes:'Auto-created for one-night override (WORK-05)',
+        blocks:_pnCbBlocks.map((b,i)=>({...b, sort_order:i})),
+      })});
+      await api('/api/parade-nights/'+_pnOverridePnId+'/timing-override',{method:'POST',body:JSON.stringify({timing_template_id:tpl.timing_template_id,reason})});
+      await reloadTimingTemplates();
+    } else {
+      const tid=document.getElementById('pn-override-tid').value;
+      await api('/api/parade-nights/'+_pnOverridePnId+'/timing-override',{method:'POST',body:JSON.stringify({timing_template_id:tid||null,reason})});
+    }
     setMsg('✅ Override applied.',true);
     setTimeout(()=>closeModal('m-pn-timing-override'),1300);
   }catch(e){ setMsg(apiErr(e),false); }
