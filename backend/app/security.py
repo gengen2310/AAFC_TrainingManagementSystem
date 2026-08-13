@@ -198,3 +198,40 @@ def record_login_success_db(key: str, db: "DBSession") -> None:
         row.attempt_count = 0
         row.locked_until = None
         db.commit()
+
+
+# ── DB-backed general API rate limiter (DEF-10) ────────────────────────────
+# Replaces the in-memory _api_hits for non-development environments so the
+# 300 req/60 s limit is accurate across all gunicorn workers.
+
+def check_api_rate_db(ip: str, db: "DBSession") -> bool:
+    """Return True if the IP has exceeded the API rate limit (caller must 429).
+
+    Uses a sliding window: counts how many seconds have elapsed since
+    window_start; resets the counter when the window expires.
+    """
+    from .models import IpApiRequest
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    window = settings.API_RATE_WINDOW_SEC
+    row = db.get(IpApiRequest, ip)
+    if not row:
+        row = IpApiRequest(ip=ip, request_count=0, window_start=now)
+        db.add(row)
+    ws = row.window_start
+    if ws and ws.tzinfo:
+        ws = ws.replace(tzinfo=None)
+    elapsed = (now - ws).total_seconds() if ws else window + 1
+    if elapsed > window:
+        row.request_count = 0
+        row.window_start = now
+    row.request_count += 1
+    over_limit = row.request_count > settings.API_RATE_LIMIT
+    db.commit()
+    return over_limit
+
+
+def reset_api_rate_limiter_db(db: "DBSession") -> None:
+    """Clear all DB-backed API rate-limit rows (used by system_admin reset endpoint)."""
+    from .models import IpApiRequest
+    db.query(IpApiRequest).delete()
+    db.commit()

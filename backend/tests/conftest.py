@@ -13,9 +13,9 @@ os.environ["SECRET_KEY"] = "test-secret"
 from fastapi.testclient import TestClient  # noqa: E402
 from app.main import app                    # noqa: E402
 from app.seeds.seed_all import seed_all     # noqa: E402
-from app.security import reset_rate_limiter, reset_api_rate_limiter # noqa: E402
+from app.security import reset_rate_limiter, reset_api_rate_limiter, reset_api_rate_limiter_db # noqa: E402
 from app.database import SessionLocal, engine  # noqa: E402
-from app.models import IpLoginAttempt, AccessCode  # noqa: E402
+from app.models import IpLoginAttempt, IpApiRequest, AccessCode  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -32,6 +32,7 @@ def client():
     db = SessionLocal()
     try:
         db.query(IpLoginAttempt).delete()
+        reset_api_rate_limiter_db(db)  # DEF-10: clear DB-backed API rate limit rows
         # Reset per-account lockout fields on all access codes
         for ac in db.query(AccessCode).all():
             ac.failed_attempts = 0

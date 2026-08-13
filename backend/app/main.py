@@ -216,10 +216,23 @@ async def api_rate_limit(request: Request, call_next):
     """
     if (request.method != "OPTIONS" and request.url.path not in _RATE_LIMIT_EXEMPT
             and request.url.path.startswith("/api/")):
-        from .security import check_api_rate
         from .dependencies import real_client_ip
         ip = real_client_ip(request)
-        if check_api_rate(ip):
+        # DEF-10: use DB-backed rate limiter in production/staging so the limit
+        # is shared across all gunicorn workers.  In development the in-memory
+        # dict is faster and avoids DB overhead during the test suite.
+        if settings.ENVIRONMENT.lower() in ("production", "prod", "staging"):
+            from .security import check_api_rate_db
+            from .database import SessionLocal
+            db = SessionLocal()
+            try:
+                over = check_api_rate_db(ip, db)
+            finally:
+                db.close()
+        else:
+            from .security import check_api_rate
+            over = check_api_rate(ip)
+        if over:
             return JSONResponse(
                 status_code=429,
                 content={"error": "rate_limited",

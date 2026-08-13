@@ -111,6 +111,20 @@ class IpLoginAttempt(Base):
     locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
+class IpApiRequest(Base):
+    """DB-backed per-IP general API rate-limit state (DEF-10).
+
+    Replaces the in-memory _api_hits dict in security.py for non-development
+    environments, making the 300 req/60 s limit accurate across all gunicorn
+    workers.  One row per unique client IP — upserted on each non-exempt API
+    request and reset by the system_admin reset-rate-limits endpoint.
+    """
+    __tablename__ = "ip_api_requests"
+    ip: Mapped[str] = mapped_column(String(45), primary_key=True)
+    request_count: Mapped[int] = mapped_column(Integer, default=0)
+    window_start: Mapped[datetime] = mapped_column(DateTime)
+
+
 class ProxySession(Base, UUIDMixin, TimestampMixin):
     """Records a Wing→Squadron Proxy or National→(Wing/Squadron) Delegated Intervention."""
     __tablename__ = "proxy_sessions"

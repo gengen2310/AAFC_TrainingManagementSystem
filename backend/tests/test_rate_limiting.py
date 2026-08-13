@@ -116,3 +116,77 @@ def test_rate_limit_options_does_not_advance_the_counter(client):
     hdr = login(client, "ADMIN703")
     r = client.get("/api/auth/me", headers=hdr)
     assert r.status_code == 200
+
+
+# ─────────────────────────────────────────────────────────────
+# DEF-10: DB-backed rate limiter (check_api_rate_db)
+# ─────────────────────────────────────────────────────────────
+
+def _db():
+    from app.database import SessionLocal
+    return SessionLocal()
+
+
+def test_db_rate_limiter_unit_check():
+    """DEF-10: check_api_rate_db counts correctly and blocks over the limit."""
+    from app.security import check_api_rate_db, reset_api_rate_limiter_db
+    db = _db()
+    try:
+        reset_api_rate_limiter_db(db)
+        ip = "10.0.0.20"
+        limit = settings.API_RATE_LIMIT
+        for _ in range(limit):
+            assert check_api_rate_db(ip, db) is False
+        assert check_api_rate_db(ip, db) is True
+    finally:
+        db.close()
+
+
+def test_db_rate_limiter_window_reset():
+    """DEF-10: check_api_rate_db resets the counter after the window expires."""
+    import datetime
+    from app.security import check_api_rate_db, reset_api_rate_limiter_db
+    from app.models import IpApiRequest
+    db = _db()
+    try:
+        reset_api_rate_limiter_db(db)
+        ip = "10.0.0.21"
+        past = datetime.datetime.utcnow() - datetime.timedelta(
+            seconds=settings.API_RATE_WINDOW_SEC + 5)
+        row = IpApiRequest(ip=ip, request_count=settings.API_RATE_LIMIT + 50, window_start=past)
+        db.add(row)
+        db.commit()
+        assert check_api_rate_db(ip, db) is False
+    finally:
+        db.close()
+
+
+def test_db_rate_limiter_different_ips_independent():
+    """DEF-10: exceeding the limit for one IP must not block a different IP."""
+    from app.security import check_api_rate_db, reset_api_rate_limiter_db
+    db = _db()
+    try:
+        reset_api_rate_limiter_db(db)
+        ip_a, ip_b = "10.0.0.22", "10.0.0.23"
+        for _ in range(settings.API_RATE_LIMIT + 1):
+            check_api_rate_db(ip_a, db)
+        assert check_api_rate_db(ip_a, db) is True
+        assert check_api_rate_db(ip_b, db) is False
+    finally:
+        db.close()
+
+
+def test_db_rate_limiter_reset_clears_table():
+    """DEF-10: reset_api_rate_limiter_db deletes all rows so requests are allowed again."""
+    from app.security import check_api_rate_db, reset_api_rate_limiter_db
+    db = _db()
+    try:
+        reset_api_rate_limiter_db(db)
+        ip = "10.0.0.24"
+        for _ in range(settings.API_RATE_LIMIT + 1):
+            check_api_rate_db(ip, db)
+        assert check_api_rate_db(ip, db) is True
+        reset_api_rate_limiter_db(db)
+        assert check_api_rate_db(ip, db) is False
+    finally:
+        db.close()
