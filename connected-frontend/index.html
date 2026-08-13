@@ -5680,7 +5680,7 @@ function _renderUnitsTable(){
     sqns.map(s=>`<tr${s.is_archived?' style="opacity:.6"':''}>
       <td style="font-weight:700">${esc(s.code)}${s.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
       <td style="font-size:11.5px">${esc(s.name||s.short_name||'')}</td>
-      <td style="font-size:11px"><span class="badge b-blue" style="font-size:10.5px">${_UNIT_TYPE_LABELS[s.unit_type]||s.unit_type||'Squadron'}</span></td>
+      <td style="font-size:11px"><span class="badge b-blue" style="font-size:10.5px">${esc(_UNIT_TYPE_LABELS[s.unit_type]||s.unit_type||'Squadron')}</span></td>
       <td style="font-size:11.5px;color:var(--muted)">${esc(wName(s.wing_id))}</td>
       ${(isNatAdmin||isWingAdmin)?`<td class="no-print" style="display:flex;gap:4px;flex-wrap:wrap">${actionsCell(s)}</td>`:''}
     </tr>`).join('')+
@@ -6686,8 +6686,8 @@ const EL_C={Drill:'b-red',Air_Space:'b-blue',Field:'b-ok',Personal_Dev:'b-purple
 const PH_S={'A. Orientation':'Orientation','B. Initial':'Initial','C. Junior':'Junior','D. Intermediate':'Intermediate','E. Senior':'Senior','I. Bronze':'Bronze CLP','J. Silver':'Silver CLP','K. Gold':'Gold CLP'};
 const PH_C={'A. Orientation':'ph-ori','B. Initial':'ph-ini','C. Junior':'ph-jun','D. Intermediate':'ph-int','E. Senior':'ph-sen','I. Bronze':'ph-bro','J. Silver':'ph-sil','K. Gold':'ph-gld'};
 
-function elBadge(el){return `<span class="badge ${EL_C[el]||'b-grey'}">${EL_L[el]||el}</span>`;}
-function phBadge(ph){return `<span class="badge ${PH_C[ph]||'b-grey'}">${PH_S[ph]||ph}</span>`;}
+function elBadge(el){return `<span class="badge ${EL_C[el]||'b-grey'}">${esc(EL_L[el]||el)}</span>`;}
+function phBadge(ph){return `<span class="badge ${PH_C[ph]||'b-grey'}">${esc(PH_S[ph]||ph)}</span>`;}
 // Foundation/Extension/Optional derives from the phase letter prefix, not the
 // ambiguous 2-valued core_status field -- mirrors frontend/src/utils/planningFilters.ts's
 // getProgramType() so both apps classify the same curriculum item identically.
@@ -7306,7 +7306,7 @@ function renderCal(){
       // matches Planning Workspace's StatusBadge.tsx icon set (Stage 11
       // follow-up, 2026-08-05).
       const icon=_ST_ICON[s.status]||'';
-      chips+=`<span class="cal-chip ${stCls(s.status)}" title="${esc(stLabel(s.status))}">${icon?icon+' ':''}${PH_S[s.phase]||s.phase}</span>`;
+      chips+=`<span class="cal-chip ${stCls(s.status)}" title="${esc(stLabel(s.status))}">${icon?icon+' ':''}${esc(PH_S[s.phase]||s.phase)}</span>`;
     });
     acts.slice(0,1).forEach(a=>chips+=`<span class="cal-chip act" title="${esc(a.name)}${a.owningOrgLabel?' — '+esc(a.owningOrgLabel):''}">${esc(a.name.substring(0,16))}</span>`);
     const oc=pn?`onclick="showPNDetail('${ds}')"`:canWriteSquadron()?`onclick="openWithDate('${ds}')"`:'';
@@ -8382,7 +8382,7 @@ function renderCurr(){
               <div class="exp-title">${esc(e.title)}</div>
               <div class="exp-meta">
                 ${elBadge(e.el)}
-                <span class="badge b-blue" style="font-size:10px">${e.term||'—'}</span>
+                <span class="badge b-blue" style="font-size:10px">${esc(e.term||'—')}</span>
                 ${stBadge(dp)}
                 ${e.lh?`<a href="${safeUrl(e.lh)}" target="_blank" class="lh-btn" onclick="event.stopPropagation()">Learning Hub</a>`:''}
               </div>
@@ -8439,7 +8439,7 @@ function showCurrDetail(code){
   const sess=allSess().filter(s=>s.code===code);
   document.getElementById('cd-title').textContent=e.title;
   document.getElementById('cd-body').innerHTML=`
-    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${phBadge(e.phase)} ${elBadge(e.el)} <span class="badge b-blue">${e.term}</span> <span class="badge b-grey">${e.hours}h</span> <span class="badge ${_PROGRAM_TYPE_CLASS[getProgramType(e.phase)]}">${getProgramType(e.phase)}</span></div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${phBadge(e.phase)} ${elBadge(e.el)} <span class="badge b-blue">${esc(e.term||'—')}</span> <span class="badge b-grey">${e.hours}h</span> <span class="badge ${_PROGRAM_TYPE_CLASS[getProgramType(e.phase)]}">${getProgramType(e.phase)}</span></div>
     ${e.lh?`<div style="margin-bottom:12px"><a href="${safeUrl(e.lh)}" target="_blank" class="lh-btn" style="font-size:12px">View on Learning Hub ↗</a></div>`:''}
     <div style="font-size:11.5px;margin-bottom:12px"><b>Instructor:</b> ${esc(e.instr||'—')}</div>
     ${sess.length?`
@@ -9443,7 +9443,7 @@ function showFacProfile(id){
   document.getElementById('fp-body').innerHTML=`
     <div class="fac-ph">
       <div class="fac-av"></div>
-      <div><h3>${facDisplay(f)}</h3><p>${f.type} · ${(f.areas||[]).map(a=>EL_L[a]||a).join(', ')}</p></div>
+      <div><h3>${esc(facDisplay(f))}</h3><p>${esc(f.type||'—')} · ${(f.areas||[]).map(a=>esc(EL_L[a]||a)).join(', ')}</p></div>
     </div>
     <div class="fac-sg">
       <div class="fac-st"><div class="fac-sv" style="color:var(--ok)">${sts.delivered}</div><div class="fac-sl">Delivered</div></div>
@@ -10896,9 +10896,9 @@ function renderAudit(){
   const rows=S.audit||[];
   tb.innerHTML=rows.length?rows.map(a=>`<tr>
     <td style="font-size:11px;white-space:nowrap">${(a.timestamp||'').replace('T',' ').slice(0,16)}</td>
-    <td><span class="badge b-blue">${a.role||'—'}</span></td>
-    <td style="font-weight:700">${a.action||''}</td>
-    <td style="font-size:11px">${a.object_type||''}</td>
+    <td><span class="badge b-blue">${esc(a.role||'—')}</span></td>
+    <td style="font-weight:700">${esc(a.action||'')}</td>
+    <td style="font-size:11px">${esc(a.object_type||'')}</td>
     <td style="font-size:11px;color:var(--muted)">${esc(a.reason||'')}</td></tr>`).join('')
     :'<tr><td colspan="5" style="color:var(--muted)">No audit entries.</td></tr>';
 }
