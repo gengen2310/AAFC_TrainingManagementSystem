@@ -25,17 +25,17 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 | Status | Count |
 |---|---|
 | CLOSED | 36 |
-| STAGING VERIFIED | 5 |
-| FIXED LOCALLY | 17 |
-| IMPLEMENTING | 13 |
+| STAGING VERIFIED | 9 |
+| FIXED LOCALLY | 18 |
+| IMPLEMENTING | 8 |
 | NOT STARTED | 33 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **121** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 58 / 121 = 48%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 63 / 121 = 52%**
 
-**2026-08-13 audit:** 8 items promoted from NOT STARTED → CLOSED/FIXED LOCALLY after code inspection (DEF-02, DEF-12, HELP-02, HELP-03, HELP-06, MBACK-03, WORK-06) plus E2E CI workflow created (VIS-02 → FIXED LOCALLY). 1 new item added (e2e-tests.yml workflow).
+**2026-08-13 audit:** 8 items promoted from NOT STARTED → CLOSED/FIXED LOCALLY after code inspection (DEF-02, DEF-12, HELP-02, HELP-03, HELP-06, MBACK-03, WORK-06) plus E2E CI workflow created (VIS-02 → FIXED LOCALLY). 1 new item added (e2e-tests.yml workflow). DASH-08 promoted IMPLEMENTING → FIXED LOCALLY after confirmed code inspection of all command-dashboard drill-down paths. SEC-09, SEC-10, SEC-13, SEC-14 promoted IMPLEMENTING → STAGING VERIFIED after live HTTP checks against staging and production (2026-08-13).
 
 ---
 
@@ -100,7 +100,7 @@ frontend consumption.
 | DASH-05 | Dashboard | MEDIUM | Frontend chart error handling — catch handler resets all chart containers on failure, not just 2 of 7+ (noted at `index.html:5793`) | `_DASH_CHART_IDS` at `index.html:6797` now covers all 14 chart/insight pairs; both skeleton reset and fetch-failure cleanup use the shared list — implemented and commented at lines 6789–6796 | CLOSED |
 | DASH-06 | Dashboard | LOW | Cancellation reasons "Unknown" / "Reason not recorded" — UI must surface an actionable prompt when this Pareto category is non-trivial, not display it as an inert bar | `loadDashCharts()` now appends a `a-warn` alert beneath the cancellation chart when the top reason is a `data_quality_gap` row and accounts for ≥15% of cancellations, explaining how to fix it | FIXED LOCALLY |
 | DASH-07 | Dashboard | MEDIUM | Accessible chart alternatives — data tables or text summaries alongside every chart element for screen-reader access | `_chartAccessibleTable()` at `index.html:6758` generates a collapsible `<details>/<summary>` data table for every chart; called by `_dRenderChart()` at line 6774 — already applied to all 14 dashboard charts | CLOSED |
-| DASH-08 | Dashboard | LOW | National/Wing readiness matrix (`_readiness_matrix`), risk forecast (`_risk_forecast`), and command metrics — frontend drill-down fully wired and verified end-to-end | Backend builders exist and are inventoried; whether all national/wing drill-down paths are rendered in connected-frontend is not confirmed this pass | IMPLEMENTING |
+| DASH-08 | Dashboard | LOW | National/Wing readiness matrix (`_readiness_matrix`), risk forecast (`_risk_forecast`), and command metrics — frontend drill-down fully wired and verified end-to-end | Code-inspected 2026-08-13: `cmdDrillReadiness()` (line 10203) wired via onclick in `_renderReadinessMatrix()` — expands `cmd-drill-{scope}` panel with per-column breakdown; `_renderRiskTimeline()` has inline detail table (no separate drill needed); `_renderPareto()` wires `drillDashChart()` for cancellation reason drill-down; `_chartStackedBarH()` (immediate_issues) is informational only. All drill paths confirmed present. | FIXED LOCALLY |
 | DASH-09 | Dashboard | MEDIUM | Curriculum progress per phase computed using governed CurriculumPhase catalogue (not hardcoded 8-phase list) | `_phases_for_squadron()` confirmed to read governed `CurriculumPhase` catalogue after earlier fix; hardcoded 8-phase list removed | CLOSED |
 
 ---
@@ -247,12 +247,12 @@ Four gaps require System Admin action as Human Gates.
 | SEC-06 | Security | MEDIUM | Alerting on 5xx error rate above threshold | Same gap; structured logs exist; no external alert rule configured | NOT STARTED |
 | SEC-07 | Security | LOW | Alerting on daily backup workflow failure — active channel beyond GitHub Actions default email | GitHub Actions emails on failure; no Slack/PagerDuty/Teams alert channel configured | NOT STARTED |
 | SEC-08 | Security | MEDIUM | Dependency vulnerability scanning in CI — `pip-audit` (backend) and `npm audit --audit-level=high` (React frontend) in an automated workflow before each release | `.github/workflows/dependency-audit.yml` added: runs on push/PR to main/release branches and weekly Monday 09:00 UTC; `pip-audit --strict` for backend, `npm audit --audit-level=high` for Planning Workspace | FIXED LOCALLY |
-| SEC-09 | Security | MEDIUM | CSP `connect-src` runtime injection verified in deployed connected-frontend nginx response | `nginx.conf` and `docker-entrypoint.sh` updated in Phase 15 security hardening; staging verification post-deploy not recorded | IMPLEMENTING |
-| SEC-10 | Security | LOW | `Permissions-Policy` header confirmed in production connected-frontend nginx HTTP response | Added in Phase 15; not verified by live HTTP check in production post-deploy 2026-08-12 | IMPLEMENTING |
+| SEC-09 | Security | MEDIUM | CSP `connect-src` runtime injection verified in deployed connected-frontend nginx response | Live HTTP check 2026-08-13: staging response includes `connect-src 'self' https://aafc-tms-backend-staging.up.railway.app`; production response includes `connect-src 'self' https://aafc-tms-backend-production.up.railway.app` — per-environment injection confirmed working. | STAGING VERIFIED |
+| SEC-10 | Security | LOW | `Permissions-Policy` header confirmed in production connected-frontend nginx HTTP response | Live HTTP check 2026-08-13: production frontend returns `permissions-policy: geolocation=(), microphone=(), camera=()`. Staging also confirmed. | STAGING VERIFIED |
 | SEC-11 | Security | MEDIUM | Token version revocation triggered automatically on account disable or role change — not only on code reset | `disable_account()` at `accounts.py:628` now increments `token_version` before committing, immediately invalidating live JWTs; role change and scope change already incremented it. Regression test `test_disable_invalidates_existing_jwt` confirms 401 on reuse | FIXED LOCALLY |
 | SEC-12 | Security | LOW | Quarterly DR rehearsal schedule established — first rehearsal date set and rehearsal completed | Post-release action H4; not yet scheduled | NOT STARTED |
-| SEC-13 | Security | LOW | HSTS header confirmed in production backend HTTP response — injected by `security_headers` middleware when `is_production=True` | Code gate exists; not verified by live HTTP check post-production deploy | IMPLEMENTING |
-| SEC-14 | Security | LOW | `/docs`, `/redoc`, `/openapi.json` confirmed absent from production via live HTTP request | Code gate (`is_production` check) exists; not verified by live HTTP request post-deploy | IMPLEMENTING |
+| SEC-13 | Security | LOW | HSTS header confirmed in production backend HTTP response — injected by `security_headers` middleware when `is_production=True` | Live HTTP check 2026-08-13: production backend returns `strict-transport-security: max-age=63072000; includeSubDomains` on `/api/health/ready`. | STAGING VERIFIED |
+| SEC-14 | Security | LOW | `/docs`, `/redoc`, `/openapi.json` confirmed absent from production via live HTTP request | Live HTTP check 2026-08-13: `GET /docs` on production backend returns HTTP/2 404. Gate confirmed working. | STAGING VERIFIED |
 
 ---
 
