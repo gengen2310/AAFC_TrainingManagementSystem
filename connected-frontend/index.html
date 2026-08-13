@@ -523,6 +523,19 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
    without being visible during normal mouse use. */
 .skip-link{position:absolute;left:-9999px;top:0;z-index:999;background:var(--dark);color:#fff;padding:10px 18px;border-radius:0 0 6px 0;font-weight:700;font-size:13px;text-decoration:none;}
 .skip-link:focus{left:0;}
+/* HELP-01: contextual help tips — small circular ? badge next to a label;
+   tooltip appears on hover or keyboard focus. Uses data-tip attribute for text.
+   z-index 9000 ensures it floats above modal content (modals are 8000). */
+.ht{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;
+  border-radius:50%;background:var(--border);color:var(--steel);font-size:9px;font-weight:700;
+  cursor:help;position:relative;margin-left:4px;vertical-align:middle;flex-shrink:0;
+  text-decoration:none;line-height:1;border:none;padding:0;}
+.ht::after{content:attr(data-tip);display:none;position:absolute;left:20px;top:50%;
+  transform:translateY(-50%);background:#1e2d3d;color:#fff;padding:7px 11px;
+  border-radius:5px;font-size:11px;font-weight:400;width:220px;line-height:1.45;
+  z-index:9000;pointer-events:none;white-space:normal;box-shadow:0 3px 10px rgba(0,0,0,.25);}
+.ht:hover::after,.ht:focus::after{display:block;}
+.ht:focus{outline:2px solid var(--blue);outline-offset:2px;}
 </style>
 </head>
 <body>
@@ -744,7 +757,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <div id="insight-weekly-outcomes" class="chart-insight" style="display:none"></div>
             </div>
             <div class="card">
-              <div class="ctitle">Delivery reliability — 12 weeks <span id="trend-thresholds" style="font-weight:400;color:var(--muted);font-size:9px;text-transform:none;letter-spacing:0"> · green ≥80% · amber ≥60%</span></div>
+              <div class="ctitle">Delivery reliability — 12 weeks <span id="trend-thresholds" style="font-weight:400;color:var(--muted);font-size:9px;text-transform:none;letter-spacing:0"> · green ≥80% · amber ≥60%</span><button class="ht" tabindex="0" aria-label="About Delivery reliability" data-tip="Delivered sessions ÷ total scheduled sessions over the past 12 parade nights. 100% means every planned session ran. Cancelled and not-delivered sessions reduce this figure.">?</button></div>
               <div class="ssub" id="exp-delivery-trend" style="font-size:11px;color:var(--muted);margin-bottom:8px"></div>
               <div id="chart-delivery-trend"><div class="chart-skeleton"></div></div>
               <div id="insight-delivery-trend" class="chart-insight" style="display:none"></div>
@@ -1151,7 +1164,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </div>
           <div id="missions-filters-card" style="display:none">
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-              <div class="ctitle" style="margin:0">Mission Backlog</div>
+              <div class="ctitle" style="margin:0">Mission Backlog<button class="ht" tabindex="0" aria-label="About Mission Backlog" data-tip="Curriculum modules required for your active Training Classes that have not yet been scheduled. Use this list to identify what still needs to be planned and for which class.">?</button></div>
               <span id="missions-count" style="font-size:11px;color:var(--muted)"></span>
             </div>
             <div class="fbar no-print" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">
@@ -2015,11 +2028,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <div class="modal-bg" id="m-add-training-class">
   <div class="modal">
     <h2>Add Training Class</h2>
-    <div class="form-group"><label for="tc-stage-inp">Training Stage *</label>
+    <div class="form-group"><label for="tc-stage-inp">Training Stage *<button class="ht" tabindex="0" aria-label="About Training Stage" data-tip="The national curriculum level — e.g. Senior, Junior, Initial. One stage can have several classes: Senior 1 and Senior 2 are both the Senior stage.">?</button></label>
       <select id="tc-stage-inp" aria-label="Training Stage"></select>
     </div>
-    <div class="form-group"><label>Display Name *</label><input type="text" id="tc-name-inp" placeholder="e.g. Senior 1"></div>
-    <div class="form-group"><label>Order (optional)</label><input type="number" id="tc-seq-inp" min="0" placeholder="0"></div>
+    <div class="form-group"><label>Display Name *<button class="ht" tabindex="0" aria-label="About Display Name" data-tip="A short, clear name for this group — e.g. Senior 1, Senior 2, Bronze A. This is how the class appears in planning and reports.">?</button></label><input type="text" id="tc-name-inp" placeholder="e.g. Senior 1"></div>
+    <div class="form-group"><label>Order (optional)<button class="ht" tabindex="0" aria-label="About Order" data-tip="Controls display order when several classes share the same Training Stage. Lower numbers appear first. Leave blank to use the default order.">?</button></label><input type="number" id="tc-seq-inp" min="0" placeholder="0"></div>
     <p id="tc-add-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-add-training-class')">Cancel</button>
@@ -2034,11 +2047,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <h2>Edit Training Class</h2>
     <input type="hidden" id="tc-edit-id">
     <input type="hidden" id="tc-edit-version">
-    <div class="form-group"><label for="tc-edit-stage-inp">Training Stage *</label>
+    <div class="form-group"><label for="tc-edit-stage-inp">Training Stage *<button class="ht" tabindex="0" aria-label="About Training Stage" data-tip="The national curriculum level — e.g. Senior, Junior, Initial. One stage can have several classes: Senior 1 and Senior 2 are both the Senior stage.">?</button></label>
       <select id="tc-edit-stage-inp" aria-label="Training Stage"></select>
     </div>
-    <div class="form-group"><label>Display Name *</label><input type="text" id="tc-edit-name-inp"></div>
-    <div class="form-group"><label>Order (optional)</label><input type="number" id="tc-edit-seq-inp" min="0"></div>
+    <div class="form-group"><label>Display Name *<button class="ht" tabindex="0" aria-label="About Display Name" data-tip="A short, clear name for this group — e.g. Senior 1, Senior 2, Bronze A. This is how the class appears in planning and reports.">?</button></label><input type="text" id="tc-edit-name-inp"></div>
+    <div class="form-group"><label>Order (optional)<button class="ht" tabindex="0" aria-label="About Order" data-tip="Controls display order when several classes share the same Training Stage. Lower numbers appear first.">?</button></label><input type="number" id="tc-edit-seq-inp" min="0"></div>
     <p id="tc-edit-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-edit-training-class')">Cancel</button>
@@ -2592,8 +2605,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="alert a-info">Rank is stored separately so historical records stay accurate when rank changes.</div>
       <div class="alert a-warn" id="fac-dup-warn" style="display:none"></div>
       <div class="form-row">
-        <div class="ff"><label>Current Rank</label><input id="fac-rank" list="fac-rank-list" placeholder="e.g. FLTLT(AAFC), CUO, CPL(AAFC)" oninput="_markFacUnsaved()" autocomplete="off"><datalist id="fac-rank-list"></datalist></div>
-        <div class="ff"><label for="fac-type">Type</label>
+        <div class="ff"><label>Current Rank<button class="ht" tabindex="0" aria-label="About Current Rank" data-tip="The facilitator's current AAFC rank — e.g. FLTLT(AAFC), WO(AAFC), SGT(AAFC), CUO. Rank is stored separately from name so that historical session records remain accurate when rank changes.">?</button></label><input id="fac-rank" list="fac-rank-list" placeholder="e.g. FLTLT(AAFC), CUO, CPL(AAFC)" oninput="_markFacUnsaved()" autocomplete="off"><datalist id="fac-rank-list"></datalist></div>
+        <div class="ff"><label for="fac-type">Type<button class="ht" tabindex="0" aria-label="About Type" data-tip="Staff: squadron staff not holding an AAFC rank. Officer / NCO: uniformed AAFC members. Senior Cadet: a cadet delivering elements of training. Civilian: non-uniformed instructor. Affects which sessions they can lead.">?</button></label>
           <select id="fac-type" aria-label="Facilitator type" onchange="_onFacTypeChange(this)"><option value="Staff">Staff</option><option value="Officer">Officer (AAFC)</option><option value="NCO">Warrant Officer / NCO (AAFC)</option><option value="Senior Cadet">Senior Cadet</option><option value="Civilian">Civilian Instructor</option></select>
         </div>
       </div>
@@ -2770,7 +2783,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="alert a-info" style="font-size:11px;margin-bottom:10px">You can only create accounts within your permitted scope.</div>
       <div class="ff"><label>Display Name</label><input id="ca-name" placeholder="e.g. Smith, J — 703 SQN Admin"></div>
       <div class="form-row">
-        <div class="ff"><label for="ca-role">Role</label>
+        <div class="ff"><label for="ca-role">Role<button class="ht" tabindex="0" aria-label="About Role" data-tip="Sqn General: read-only access to their squadron. Sqn Admin: manages the squadron, creates accounts, records outcomes. Wing Admin: manages all squadrons in the wing. National Admin: manages all wings and squadrons.">?</button></label>
           <select id="ca-role" aria-label="Account role" onchange="onCreateAccountRoleChange()">
             <option value="">— select role —</option>
           </select>

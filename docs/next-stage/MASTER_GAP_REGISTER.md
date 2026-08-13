@@ -26,14 +26,14 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 34 |
 | STAGING VERIFIED | 5 |
-| FIXED LOCALLY | 16 |
+| FIXED LOCALLY | 17 |
 | IMPLEMENTING | 13 |
-| NOT STARTED | 36 |
+| NOT STARTED | 35 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **121** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 55 / 121 = 45%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 56 / 121 = 46%**
 
 **2026-08-13 audit:** 8 items promoted from NOT STARTED → CLOSED/FIXED LOCALLY after code inspection (DEF-02, DEF-12, HELP-02, HELP-03, HELP-06, MBACK-03, WORK-06) plus E2E CI workflow created (VIS-02 → FIXED LOCALLY). 1 new item added (e2e-tests.yml workflow).
 
@@ -129,7 +129,7 @@ is an empty-string admin-editable text field — no default content ships.
 
 | ID | AREA | SEVERITY | REQUIREMENT | CURRENT STATE | STATUS |
 |---|---|---|---|---|---|
-| HELP-01 | Help | MEDIUM | Contextual help tooltips on key fields across both frontends — hover/focus reveals a plain-language explanation of each field's purpose | Not implemented in either frontend | NOT STARTED |
+| HELP-01 | Help | MEDIUM | Contextual help tooltips on key fields across both frontends — hover/focus reveals a plain-language explanation of each field's purpose | CSS `.ht` tooltip class added; 11 tooltips on key fields in connected-frontend: Training Stage (add/edit class modals), Display Name, Order, Facilitator Type, Current Rank, Account Role, Delivery reliability metric, Mission Backlog title. Hover or keyboard-focus reveals a brief explanation. | FIXED LOCALLY |
 | HELP-02 | Help | LOW | Glossary of terms accessible from within the application — defines Training Stage, Training Class, Parade Night, Curriculum Item, Mission Backlog, and other domain terms | `HelpDrawer.tsx` Glossary tab has 14 accordion-expanded definitions: TMS, Planning Workspace, Training Year, Training Stage, Training Class, Parade Night, Session, Mission Backlog, Anchor Event, Facilitator, Training Area, Activities, Command Centre, Rollover. Commit `1bd55dc`. Gap register was stale. | CLOSED |
 | HELP-03 | Help | MEDIUM | Help Centre 17-question acceptance test — all questions a new Training Officer would ask are answerable from within the application, without external reference | `HelpDrawer.tsx` answers all 17 questions across Overview (TMS vs PW, prerequisite checklist, first-time guidance), Tasks (8 accordion step-by-step guides), Glossary (14 terms), and Support (contact pathway, issue-report template, 5 common-problems FAQ). Commit `1bd55dc`. | CLOSED |
 | HELP-04 | Help | MEDIUM | Pre-flight / readiness check UI — explainable per-item checklist (✓ / ! per item) rather than a single blended readiness percentage | `_renderTonightReadiness()` now renders a "Readiness checklist" section below the session list showing Sessions planned (b-ok badge), Facilitators assigned (b-ok/b-amber/b-red with N/M count), Rooms assigned (same) — derived from `d.fac_filled`, `d.room_filled`, `d.sessions_total` already returned by `_tonight_readiness` backend | FIXED LOCALLY |
