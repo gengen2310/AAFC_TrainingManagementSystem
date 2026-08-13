@@ -6739,9 +6739,9 @@ function showDrill(panelId,titleId,bodyId,title,sess){
     <td>${fmtD(s.date,{day:'numeric',month:'short'})}</td>
     <td style="color:var(--muted)">S${s.si+1}</td>
     <td>${phBadge(s.phase)}</td>
-    <td style="font-weight:700;font-size:12px">${s.exp||'—'}</td>
-    <td style="font-size:11.5px">${s.facName||'—'}</td>
-    <td style="font-size:11.5px">${s.room||'—'}</td>
+    <td style="font-weight:700;font-size:12px">${esc(s.exp||'—')}</td>
+    <td style="font-size:11.5px">${esc(s.facName||'—')}</td>
+    <td style="font-size:11.5px">${esc(s.room||'—')}</td>
     <td>${stBadge(s.status)}</td>
     <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${s.date}',${s.si})">Edit</button>`:''}</td>
   </tr>`).join(''):`<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:16px">No sessions</td></tr>`;
@@ -7375,8 +7375,8 @@ function buildPNCard(pn){
   const sessCards=(pn.sessions||[]).map((s,i)=>`
     <div class="sess-card ${stCls(s.status)||(!s.exp?'unassigned':'')}" onclick="showPNDetail('${pn.date}')">
       <div class="sess-hdr"><span class="sess-num">Sess ${i+1}</span>${stBadge(s.status||'planned')}</div>
-      <div class="sess-title">${s.exp||'<em style="color:var(--muted)">Lesson: Unassigned</em>'}</div>
-      <div class="sess-info">${s.phase?phBadge(s.phase)+' ':''} ${s.facName?''+s.facName:''} ${s.room?'· '+s.room:''} ${s.trainingClasses&&s.trainingClasses.length?'· '+esc(s.trainingClasses.map(c=>c.display_name).join(', ')):''}</div>
+      <div class="sess-title">${s.exp?esc(s.exp):'<em style="color:var(--muted)">Lesson: Unassigned</em>'}</div>
+      <div class="sess-info">${s.phase?phBadge(s.phase)+' ':''} ${s.facName?esc(s.facName):''} ${s.room?'· '+esc(s.room):''} ${s.trainingClasses&&s.trainingClasses.length?'· '+esc(s.trainingClasses.map(c=>c.display_name).join(', ')):''}</div>
       ${canWriteSquadron()?`<div class="sess-acts no-print" onclick="event.stopPropagation()">
         <button class="btn btn-xs btn-ok" onclick="qkSt('${pn.date}',${i},'delivered')" aria-label="Mark Session ${i+1} delivered">✓</button>
         <button class="btn btn-xs" style="background:#eef0f2;color:var(--steel)" onclick="qkSt('${pn.date}',${i},'not_delivered')" aria-label="Mark Session ${i+1} not delivered"></button>
@@ -8230,10 +8230,10 @@ function renderWP(){
           <tbody>${shownSessions.length?shownSessions.map(s=>`<tr>
             <td style="font-weight:800;color:var(--dark)">Sess ${allSessions.indexOf(s)+1}</td>
             <td>${phBadge(s.phase||'B. Initial')}</td>
-            <td style="font-weight:700">${s.exp||'<em style="color:var(--muted)">Lesson: Unassigned</em>'}</td>
+            <td style="font-weight:700">${s.exp?esc(s.exp):'<em style="color:var(--muted)">Lesson: Unassigned</em>'}</td>
             <td style="font-size:11.5px">${(s.trainingClasses||[]).length?esc((s.trainingClasses||[]).map(c=>c.display_name).join(', ')):'<span style="color:var(--muted)">—</span>'}</td>
-            <td style="font-size:11.5px">${s.facName||'—'}</td>
-            <td style="font-size:11.5px">${s.room||'—'}</td>
+            <td style="font-size:11.5px">${esc(s.facName||'—')}</td>
+            <td style="font-size:11.5px">${esc(s.room||'—')}</td>
             <td>${stBadge(s.status||'planned')}</td>
           </tr>`).join(''):`<tr class="no-print"><td colspan="7" style="color:var(--muted);text-align:center;padding:14px">No sessions match the filter.</td></tr>`}</tbody>
         </table>
@@ -8384,7 +8384,7 @@ function renderCurr(){
                 ${elBadge(e.el)}
                 <span class="badge b-blue" style="font-size:10px">${e.term||'—'}</span>
                 ${stBadge(dp)}
-                ${e.lh?`<a href="${e.lh}" target="_blank" class="lh-btn" onclick="event.stopPropagation()">Learning Hub</a>`:''}
+                ${e.lh?`<a href="${safeUrl(e.lh)}" target="_blank" class="lh-btn" onclick="event.stopPropagation()">Learning Hub</a>`:''}
               </div>
               ${_currClassBreakdownHtml((S.classByCode||{})[e.code])}
             </div>
@@ -8440,16 +8440,16 @@ function showCurrDetail(code){
   document.getElementById('cd-title').textContent=e.title;
   document.getElementById('cd-body').innerHTML=`
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${phBadge(e.phase)} ${elBadge(e.el)} <span class="badge b-blue">${e.term}</span> <span class="badge b-grey">${e.hours}h</span> <span class="badge ${_PROGRAM_TYPE_CLASS[getProgramType(e.phase)]}">${getProgramType(e.phase)}</span></div>
-    ${e.lh?`<div style="margin-bottom:12px"><a href="${e.lh}" target="_blank" class="lh-btn" style="font-size:12px">View on Learning Hub ↗</a></div>`:''}
-    <div style="font-size:11.5px;margin-bottom:12px"><b>Instructor:</b> ${e.instr||'—'}</div>
+    ${e.lh?`<div style="margin-bottom:12px"><a href="${safeUrl(e.lh)}" target="_blank" class="lh-btn" style="font-size:12px">View on Learning Hub ↗</a></div>`:''}
+    <div style="font-size:11.5px;margin-bottom:12px"><b>Instructor:</b> ${esc(e.instr||'—')}</div>
     ${sess.length?`
       <div style="font-size:10px;font-weight:800;color:var(--steel);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Scheduled Sessions (${sess.length})</div>
       <div class="tw"><table><thead><tr><th>Date</th><th>Phase</th><th>Facilitator</th><th>Room</th><th>Status</th><th class="no-print">Action</th></tr></thead>
       <tbody>${sess.map(s=>`<tr>
         <td>${fmtD(s.date,{day:'numeric',month:'short'})}</td>
         <td>${phBadge(s.phase)}</td>
-        <td style="font-size:11px">${s.facName||'—'}</td>
-        <td style="font-size:11px">${s.room||'—'}</td>
+        <td style="font-size:11px">${esc(s.facName||'—')}</td>
+        <td style="font-size:11px">${esc(s.room||'—')}</td>
         <td>${stBadge(s.status)}</td>
         <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${s.date}',${s.si});closeModal('m-curr-detail')">Edit</button>`:'—'}</td>
       </tr>`).join('')}</tbody></table></div>`
@@ -9482,8 +9482,8 @@ function showFacProfile(id){
         <td>${fmtD(s.date,{day:'numeric',month:'short'})}</td>
         <td style="color:var(--muted)">${s.si+1}</td>
         <td>${phBadge(s.phase)}</td>
-        <td style="font-weight:700;font-size:12px">${s.exp||'—'}</td>
-        <td style="font-size:11px">${s.room||'—'}</td>
+        <td style="font-weight:700;font-size:12px">${esc(s.exp||'—')}</td>
+        <td style="font-size:11px">${esc(s.room||'—')}</td>
         <td>${stBadge(s.status)}</td>
         <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${s.date}',${s.si});closeModal('m-fac-profile')">Edit</button>`:'—'}</td>
       </tr>`).join('')}</tbody></table></div>`
@@ -10139,6 +10139,7 @@ async function changeMyCode(){
 //  TIMING TEMPLATES
 // ═══════════════════════════════════════════════════════════
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function safeUrl(u){try{const p=new URL(String(u||''),location.href).protocol;return(p==='https:'||p==='http:')?String(u):'#';}catch(e){return '#';}}
 // Capitalise a raw lowercase enum value for display (e.g. severity "high" -> "High") --
 // never use on a value that's already a proper label (e.g. from a *_LABEL map).
 function _cap(s){s=String(s||'');return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
