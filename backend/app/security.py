@@ -3,6 +3,7 @@
 Hashing uses PBKDF2-SHA256 via passlib (no external C deps). For production
 consider argon2. Tokens are signed JWTs delivered in an HTTP-only cookie.
 """
+import logging
 import secrets
 import time
 import uuid
@@ -12,6 +13,8 @@ from passlib.context import CryptContext
 from typing import TYPE_CHECKING
 
 from .config import settings
+
+_sec_log = logging.getLogger("security")
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session as DBSession
@@ -188,6 +191,15 @@ def record_login_failure_db(key: str, db: "DBSession") -> None:
     row.attempt_count += 1
     if row.attempt_count >= settings.LOGIN_MAX_ATTEMPTS:
         row.locked_until = now + timedelta(seconds=settings.LOGIN_LOCKOUT_SEC)
+    # SEC-05: emit a structured security alert on the first lockout and on every
+    # 5th failure thereafter, so sustained attacks surface in log aggregation.
+    if row.attempt_count == settings.LOGIN_MAX_ATTEMPTS or (
+            row.attempt_count > settings.LOGIN_MAX_ATTEMPTS and
+            (row.attempt_count - settings.LOGIN_MAX_ATTEMPTS) % 5 == 0):
+        _sec_log.warning(
+            '{"event":"security_alert","type":"login_spike","ip":"%s",'
+            '"failures_in_window":%d,"window_sec":%d}',
+            key, row.attempt_count, settings.LOGIN_WINDOW_SEC)
     db.commit()
 
 

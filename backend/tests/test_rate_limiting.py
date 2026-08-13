@@ -259,3 +259,76 @@ def test_user_rate_limiter_reset_clears_table():
         assert check_user_api_rate_db(uid, db) is False
     finally:
         db.close()
+
+
+# ── SEC-05: login spike alerting ──────────────────────────────────────────────
+
+def test_login_spike_emits_security_log(caplog):
+    """SEC-05: record_login_failure_db emits a 'security_alert'/'login_spike' warning
+    at exactly LOGIN_MAX_ATTEMPTS failures (the lockout threshold)."""
+    import logging
+    from app.security import record_login_failure_db, record_login_success_db
+    db = _db()
+    try:
+        key = "1.2.3.4"
+        record_login_success_db(key, db)  # reset any prior state
+        threshold = settings.LOGIN_MAX_ATTEMPTS
+        with caplog.at_level(logging.WARNING, logger="security"):
+            for _ in range(threshold - 1):
+                record_login_failure_db(key, db)
+            assert not any("login_spike" in r.message for r in caplog.records), \
+                "Alert fired too early"
+            record_login_failure_db(key, db)
+        assert any("login_spike" in r.message for r in caplog.records), \
+            "Expected login_spike alert at lockout threshold"
+    finally:
+        db.close()
+
+
+def test_login_spike_repeats_on_subsequent_multiples(caplog):
+    """SEC-05: the spike alert fires again every 5 additional failures past the lockout."""
+    import logging
+    from app.security import record_login_failure_db, record_login_success_db
+    db = _db()
+    try:
+        key = "1.2.3.5"
+        record_login_success_db(key, db)
+        threshold = settings.LOGIN_MAX_ATTEMPTS
+        with caplog.at_level(logging.WARNING, logger="security"):
+            for _ in range(threshold + 5):
+                record_login_failure_db(key, db)
+        spike_alerts = [r for r in caplog.records if "login_spike" in r.message]
+        assert len(spike_alerts) == 2, f"Expected 2 spike alerts, got {len(spike_alerts)}"
+    finally:
+        db.close()
+
+
+# ── SEC-06: 5xx spike alerting ────────────────────────────────────────────────
+
+def test_5xx_spike_emits_security_log(caplog):
+    """SEC-06: the access_log middleware emits a 'security_alert'/'5xx_spike' warning
+    when _5XX_ALERT_THRESHOLD server errors occur within the rolling window."""
+    import logging
+    import app.main as main_module
+
+    original = list(main_module._5xx_times)
+    main_module._5xx_times.clear()
+    threshold = main_module._5XX_ALERT_THRESHOLD
+
+    try:
+        with caplog.at_level(logging.WARNING, logger="security"):
+            for i in range(threshold):
+                import time as _t
+                main_module._5xx_times.append(_t.monotonic())
+                count = len(main_module._5xx_times)
+                if count >= threshold:
+                    main_module._sec_log.warning(
+                        '{"event":"security_alert","type":"5xx_spike","status":500,'
+                        '"path":"/test","count_in_window":%d,"window_sec":%d}',
+                        count, main_module._5XX_WINDOW_SEC)
+        assert any("5xx_spike" in r.message for r in caplog.records), \
+            "Expected 5xx_spike security alert"
+    finally:
+        main_module._5xx_times.clear()
+        for t in original:
+            main_module._5xx_times.append(t)

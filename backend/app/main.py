@@ -1,5 +1,7 @@
 """FastAPI application entrypoint with security headers, CORS lockdown and routers."""
+import collections
 import logging
+import threading
 import time as _time
 import uuid
 from contextlib import asynccontextmanager
@@ -10,6 +12,16 @@ from fastapi.responses import JSONResponse
 from .config import settings
 from .database import init_db, SessionLocal
 from .routers import auth, organisations, training, ops, health, program, export_import, accounts, timing, planning, system, wing_calendar, jobs, dashboard, setup
+
+# ── SEC-06: 5xx rate alerting ────────────────────────────────────────────────
+# In-process rolling window; accurate for single-process (uvicorn) and
+# per-worker for multi-process (gunicorn). A future Redis upgrade would give
+# cross-worker aggregation, but structured log events are the primary artifact.
+_5xx_times: collections.deque = collections.deque()
+_5xx_lock = threading.Lock()
+_5XX_WINDOW_SEC = 60
+_5XX_ALERT_THRESHOLD = 5   # 5 server errors in 60 s triggers a structured warning
+_sec_log = logging.getLogger("security")
 
 # ── Maintenance mode cache (avoid DB hit on every request) ──────────────────
 _maint_cache: dict = {"active": False, "msg": "", "block_reads": False, "block_logins": False, "expires": 0.0}
@@ -256,6 +268,19 @@ async def access_log(request: Request, call_next):
     logging.getLogger("access").info(
         '{"method":"%s","path":"%s","status":%d,"dur_ms":%s,"client":"%s","req_id":"%s"}',
         request.method, request.url.path, response.status_code, dur_ms, client, req_id)
+    # SEC-06: 5xx rate alert — log a structured security warning when errors spike.
+    if response.status_code >= 500:
+        now_mono = _time.monotonic()
+        with _5xx_lock:
+            _5xx_times.append(now_mono)
+            while _5xx_times and now_mono - _5xx_times[0] > _5XX_WINDOW_SEC:
+                _5xx_times.popleft()
+            count = len(_5xx_times)
+        if count >= _5XX_ALERT_THRESHOLD:
+            _sec_log.warning(
+                '{"event":"security_alert","type":"5xx_spike","status":%d,'
+                '"path":"%s","count_in_window":%d,"window_sec":%d}',
+                response.status_code, request.url.path, count, _5XX_WINDOW_SEC)
     response.headers["X-Response-Time-ms"] = str(dur_ms)
     response.headers["X-Request-ID"] = req_id
     return response

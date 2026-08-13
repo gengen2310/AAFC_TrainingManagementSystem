@@ -79,3 +79,32 @@ All override actions require a non-empty reason and are audited.
 | Create national curriculum (`POST /api/curriculum/national`) | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ |
 | Night Builder — view (`GET /api/parade-nights/{id}/builder`) | ✗ | own unit | via Proxy | via Proxy | ✗ | via Intervention | via Intervention | ✗ |
 | Night Builder — schedule session (real `Session`) | ✗ | own unit | ✗ | via Proxy | ✗ | via Intervention | via Intervention | ✗ |
+
+---
+
+## V17 — Training Class operations (DOC-15, 2026-08-13)
+
+A **Training Class** is a squadron-scoped, year-scoped group of cadets undertaking a specific Training Stage. Scope enforcement is backend-authoritative; wing_admin and above act via Proxy or Delegated Intervention as documented in V11.
+
+| Action | sqn_general | sqn_admin | wing_viewer | wing_admin | national_viewer | national_admin | system_admin | auditor |
+|--------|-------------|-----------|-------------|------------|-----------------|----------------|--------------|---------|
+| View Training Classes | ✗ | own sqn | wing only | own wing | all | all | all | all |
+| Create Training Class | ✗ | own sqn | ✗ | via Proxy | ✗ | via Intervention | via Intervention | ✗ |
+| Rename Training Class | ✗ | own sqn | ✗ | via Proxy | ✗ | via Intervention | via Intervention | ✗ |
+| Archive Training Class | ✗ | own sqn | ✗ | via Proxy | ✗ | via Intervention | via Intervention | ✗ |
+| Restore archived Training Class | ✗ | own sqn | ✗ | via Proxy | ✗ | via Intervention | via Intervention | ✗ |
+| Split class (reassign members to new class) | ✗ | own sqn only | ✗ | via Proxy (same sqn only) | ✗ | via Intervention | via Intervention | ✗ |
+| Merge class into another | ✗ | own sqn only | ✗ | via Proxy (same sqn only) | ✗ | via Intervention | via Intervention | ✗ |
+| View curriculum progress per class | ✗ | own sqn | wing only | own wing | all | all | all | all |
+
+**Notes:**
+
+1. **Cross-squadron restriction.** Split and merge operations require both Training Classes to belong to the same Squadron, the same Training Stage, and the same Training Year. Wing admins acting via Proxy cannot move cadets between classes in different squadrons.
+
+2. **History preservation.** Archiving a Training Class does not delete historical Session Audience records. A merged class's past session attendance is preserved exactly as delivered; the merge only affects current and future membership.
+
+3. **Year rollover.** Training Classes are year-scoped. When a new Planning Year is created, new Training Classes must be created for that year. Progress carry-forward (if any) is an explicit decision by the sqn_admin at rollover time.
+
+4. **Session Audience.** A Session can be targeted at one or more Training Classes via the Session Audience table. Any role that can create or edit a Session may also set its Training Class audience. Wing admins acting via Proxy may set session audiences for any squadron in their wing.
+
+5. **Audit.** All Training Class create, rename, archive, restore, split, and merge actions are audited with the acting role and timestamp.

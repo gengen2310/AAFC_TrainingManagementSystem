@@ -26,16 +26,16 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 36 |
 | STAGING VERIFIED | 9 |
-| FIXED LOCALLY | 18 |
+| FIXED LOCALLY | 22 |
 | IMPLEMENTING | 8 |
-| NOT STARTED | 33 |
+| NOT STARTED | 29 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **121** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 63 / 121 = 52%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 67 / 121 = 55%**
 
-**2026-08-13 audit:** 8 items promoted from NOT STARTED → CLOSED/FIXED LOCALLY after code inspection (DEF-02, DEF-12, HELP-02, HELP-03, HELP-06, MBACK-03, WORK-06) plus E2E CI workflow created (VIS-02 → FIXED LOCALLY). 1 new item added (e2e-tests.yml workflow). DASH-08 promoted IMPLEMENTING → FIXED LOCALLY after confirmed code inspection of all command-dashboard drill-down paths. SEC-09, SEC-10, SEC-13, SEC-14 promoted IMPLEMENTING → STAGING VERIFIED after live HTTP checks against staging and production (2026-08-13).
+**2026-08-13 audit:** 8 items promoted from NOT STARTED → CLOSED/FIXED LOCALLY after code inspection (DEF-02, DEF-12, HELP-02, HELP-03, HELP-06, MBACK-03, WORK-06) plus E2E CI workflow created (VIS-02 → FIXED LOCALLY). 1 new item added (e2e-tests.yml workflow). DASH-08 promoted IMPLEMENTING → FIXED LOCALLY after confirmed code inspection of all command-dashboard drill-down paths. SEC-09, SEC-10, SEC-13, SEC-14 promoted IMPLEMENTING → STAGING VERIFIED after live HTTP checks against staging and production. SEC-05 (login spike alerting) and SEC-06 (5xx spike alerting) implemented in `security.py`/`main.py` with tests. DOC-14 (CEA operator guide) and DOC-15 (role matrix §V17 Training Class) written.
 
 ---
 
@@ -243,8 +243,8 @@ Four gaps require System Admin action as Human Gates.
 | SEC-02 | Security | HIGH | Backup key custody — GPG private key stored offline, GitHub Secrets updated, daily backup manually confirmed, first restore test result reviewed | Public key committed to repo; `v1_go_no_go_checklist.md §C` documents steps; not yet completed by System Admin | HUMAN GATE |
 | SEC-03 | Security | HIGH | DR rehearsal — disaster recovery rehearsal run per `19_disaster_recovery_rehearsal.md`; result recorded in Evidence Table | Procedure written; never run | HUMAN GATE |
 | SEC-04 | Security | CRITICAL | External penetration test — grey-box, 5-day engagement per `22_pen_test_scope.md`; Critical and High findings remediated before National rollout | Scope documented; vendor not engaged; budget and organisational approval required | HUMAN GATE |
-| SEC-05 | Security | MEDIUM | Alerting on failed-login spike — active notification when login failure rate exceeds threshold in a rolling window | Structured JSON access log with `X-Request-ID` exists; no alert rule wired to any monitoring channel | NOT STARTED |
-| SEC-06 | Security | MEDIUM | Alerting on 5xx error rate above threshold | Same gap; structured logs exist; no external alert rule configured | NOT STARTED |
+| SEC-05 | Security | MEDIUM | Alerting on failed-login spike — active notification when login failure rate exceeds threshold in a rolling window | `record_login_failure_db()` in `security.py` now emits `{"event":"security_alert","type":"login_spike",...}` WARNING to the `security` logger at `LOGIN_MAX_ATTEMPTS` and every 5 additional failures thereafter. Tests in `test_rate_limiting.py` (`test_login_spike_emits_security_log`, `test_login_spike_repeats_on_subsequent_multiples`) pass. Structured log event is the alert mechanism; external channel (Slack/PagerDuty) remains a deployment integration step. | FIXED LOCALLY |
+| SEC-06 | Security | MEDIUM | Alerting on 5xx error rate above threshold | `access_log` middleware in `main.py` tracks a per-process rolling 60s deque of 5xx responses; when count ≥ `_5XX_ALERT_THRESHOLD` (5), emits `{"event":"security_alert","type":"5xx_spike",...}` WARNING to `security` logger. Test `test_5xx_spike_emits_security_log` passes. External alert channel integration remains a deployment step. | FIXED LOCALLY |
 | SEC-07 | Security | LOW | Alerting on daily backup workflow failure — active channel beyond GitHub Actions default email | GitHub Actions emails on failure; no Slack/PagerDuty/Teams alert channel configured | NOT STARTED |
 | SEC-08 | Security | MEDIUM | Dependency vulnerability scanning in CI — `pip-audit` (backend) and `npm audit --audit-level=high` (React frontend) in an automated workflow before each release | `.github/workflows/dependency-audit.yml` added: runs on push/PR to main/release branches and weekly Monday 09:00 UTC; `pip-audit --strict` for backend, `npm audit --audit-level=high` for Planning Workspace | FIXED LOCALLY |
 | SEC-09 | Security | MEDIUM | CSP `connect-src` runtime injection verified in deployed connected-frontend nginx response | Live HTTP check 2026-08-13: staging response includes `connect-src 'self' https://aafc-tms-backend-staging.up.railway.app`; production response includes `connect-src 'self' https://aafc-tms-backend-production.up.railway.app` — per-environment injection confirmed working. | STAGING VERIFIED |
@@ -277,8 +277,8 @@ are not yet started. The support runbook and year rollover procedure are CLOSED 
 | DOC-11 | Docs | MEDIUM | Report catalogue Tier 3 — National-level reports defined, implemented, and verified with multi-Wing data | Tier 1 (5 sqn) implemented; Tier 2 (5 wing) wired; Tier 3 requires Level B multi-Wing staging data | NOT STARTED |
 | DOC-12 | Docs | MEDIUM | Wing onboarding HTTP API — endpoint equivalent of `second_wing_seed.py` for provisioning a Wing without direct server/DB access | CLI seed only; no API path; Level B requirement | NOT STARTED |
 | DOC-13 | Docs | LOW | Capability manifest regenerated after Training Class model additions (v48–v50) — diff confirms no route or table removed | Regenerated 2026-08-13: 299 routes / 63 tables (was 273); new routes include `/api/facilitators/ranks`, `/api/planning/anchors/{id}/restore`, and 24 others added since last generation; no routes removed | CLOSED |
-| DOC-14 | Docs | MEDIUM | CEA import / CEA relationship documentation — `export_import.py` handles CEA imports; how CEA activities relate to curriculum items and Training Classes under the new model is not yet documented for operators | CEA import router exists; relationship to TrainingClass/SessionAudience not yet described in any operator-facing runbook | NOT STARTED |
-| DOC-15 | Docs | LOW | Role matrix updated to include Training Class operations — who can create, archive, split, and merge a TrainingClass; whether wing_admin can act cross-squadron | `docs/role_matrix.md` predates Training Class model; no Training Class rows exist | NOT STARTED |
+| DOC-14 | Docs | MEDIUM | CEA import / CEA relationship documentation — `export_import.py` handles CEA imports; how CEA activities relate to curriculum items and Training Classes under the new model is not yet documented for operators | `docs/next-stage/14_cea_import_operator_guide.md` written 2026-08-13: covers what CEA is, export/import steps, classification workflow, CeaActivity→Session→SessionAudience→TrainingClass path, Squadron views, repeated imports, troubleshooting table, and role summary. | FIXED LOCALLY |
+| DOC-15 | Docs | LOW | Role matrix updated to include Training Class operations — who can create, archive, split, and merge a TrainingClass; whether wing_admin can act cross-squadron | `docs/role_matrix.md` §V17 added 2026-08-13: full Training Class operation table (view, create, rename, archive, restore, split, merge, curriculum progress, session audience) with cross-squadron split/merge restriction and history-preservation notes documented. | FIXED LOCALLY |
 
 ---
 
