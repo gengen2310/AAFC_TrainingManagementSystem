@@ -49,12 +49,87 @@ Confirm before starting:
 
 ---
 
-## §2 — Create Wing Structure (Staging)
+## §2 — Create Wing Structure
 
-All steps below use the staging backend URL. Replace `<staging-url>` with the
-staging backend Railway URL.
+All steps below use the target environment URL. Replace `<url>` with the staging
+or production backend Railway URL as appropriate.
 
-### Step 2.1 — Create the Wing
+### Step 2.0 — Recommended: One-call Wing Provisioning (staging and production)
+
+The `POST /api/system/provision-wing` endpoint creates a Wing, its Squadrons, and
+initial accounts in a single idempotent call. This is the recommended path for both
+staging validation and production activation — it does not require SSH, CLI access,
+or a separate bootstrap step, and works in any environment.
+
+```bash
+TOKEN="<system-admin-bearer-token>"
+curl -X POST "<url>/api/system/provision-wing" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "wing_code": "1WG",
+    "wing_name": "1 Wing HQ",
+    "wing_short": "1WG",
+    "squadrons": [
+      {
+        "code": "101",
+        "name": "101 Squadron AAFC",
+        "short_name": "101 SQN",
+        "parade_day": "Wednesday",
+        "start_time": "18:00",
+        "end_time": "21:30"
+      },
+      {
+        "code": "102",
+        "name": "102 Squadron AAFC",
+        "short_name": "102 SQN",
+        "parade_day": "Thursday",
+        "start_time": "18:00",
+        "end_time": "21:30"
+      }
+    ],
+    "create_accounts": true
+  }'
+```
+
+**Important:** The response includes generated access codes for `wing_admin`,
+`sqn_admin`, and `sqn_general` per squadron.
+**Record these codes immediately — they are shown once and not retrievable.**
+
+The endpoint is idempotent: calling it again with the same Wing and Squadron codes
+returns the existing records without creating duplicates or revealing codes again.
+If you need to issue new codes, use Account Management → Reset Code instead.
+
+Expected response shape:
+```json
+{
+  "wing": {"id": "...", "code": "1WG", "name": "1 Wing HQ"},
+  "results": [
+    {"type": "wing", "code": "1WG", "created": true},
+    {"type": "squadron", "code": "101", "created": true},
+    {"type": "account", "code": "101", "role": "wing_admin", "created": true},
+    ...
+  ],
+  "accounts_created": [
+    {"role": "wing_admin", "display_name": "1WG Wing Admin", "new_code": "..."},
+    {"role": "sqn_admin", "display_name": "101 SQN Admin", "new_code": "..."},
+    ...
+  ],
+  "notice": "Codes shown here will NOT be retrievable again. Record each code now."
+}
+```
+
+To provision without creating accounts (when accounts already exist or will be
+created separately): set `"create_accounts": false`.
+
+> **Alternative: Manual steps (Steps 2.1–2.3 below)**
+> Use the manual steps only if you need to create a Wing with no initial squadrons,
+> or if you need finer control over each operation. The provision-wing endpoint
+> covers the common onboarding case.
+
+---
+
+### Step 2.1 — Create the Wing (manual alternative)
 
 Via System Console (UI):
 1. Log into staging frontend as system_admin.
@@ -65,7 +140,7 @@ Via System Console (UI):
 Via API (curl):
 ```bash
 TOKEN="<system-admin-bearer-token>"
-curl -X POST "<staging-url>/api/system/create-wing" \
+curl -X POST "<url>/api/system/create-wing" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -78,13 +153,13 @@ curl -X POST "<staging-url>/api/system/create-wing" \
 
 Expected: `{"ok": true, "wing_id": "..."}`.
 
-### Step 2.2 — Create Squadrons
+### Step 2.2 — Create Squadrons (manual alternative)
 
 For each squadron in the new Wing, via System Console → Scope Map → Create Squadron.
 
 Or via API:
 ```bash
-curl -X POST "<staging-url>/api/system/create-squadron" \
+curl -X POST "<url>/api/system/create-squadron" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -98,12 +173,14 @@ curl -X POST "<staging-url>/api/system/create-squadron" \
 
 Repeat for each squadron.
 
-### Step 2.3 — Bootstrap initial accounts (Staging only)
+### Step 2.3 — Bootstrap initial accounts (staging only — manual alternative)
 
-Use the generic bootstrap endpoint to create initial accounts for the new Wing:
+Use the generic bootstrap endpoint to create initial accounts for the new Wing.
+This endpoint is rejected in production — use `provision-wing` (Step 2.0) for
+production account creation.
 
 ```bash
-curl -X POST "<staging-url>/api/system/bootstrap-staging" \
+curl -X POST "<url>/api/system/bootstrap-staging" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"wing_code": "1WG", "sqn_code": "101"}'
@@ -111,9 +188,6 @@ curl -X POST "<staging-url>/api/system/bootstrap-staging" \
 
 Expected response includes generated access codes for `wing_admin` and `sqn_admin`.
 **Record these codes immediately — they are shown once and not retrievable.**
-
-For production, accounts are created via System Console → Account Management, not
-the bootstrap endpoint (which is rejected in production).
 
 ### Step 2.4 — Run the second-wing synthetic seed (Staging only)
 
@@ -240,7 +314,7 @@ curl "<staging-url>/api/reports/curriculum-coverage" \
 
 ### 4.4 Audit log entries present
 
-After §2.1–3.3, the audit log must contain entries for:
+After §2 (provision-wing or manual steps) and §3, the audit log must contain entries for:
 - `squadron.create` for both new squadrons
 - `account_created` for wing_admin and sqn_admin accounts
 
@@ -261,15 +335,21 @@ curl "<staging-url>/api/system/audit-summary?limit=100" \
 
 **Do not proceed with §5 until all §0 gates are signed off.**
 
-Production activation follows the same steps as §2–§3, but:
+Production activation uses `POST /api/system/provision-wing` (Step 2.0) against the
+production backend URL. The bootstrap-staging endpoint is rejected in production.
 
-1. Wing and Squadron are created via System Console in production (not bootstrap-staging).
-2. Account codes are issued via Account Management → Generate Code (one-time display, operator records).
-3. The new Wing Admin resets their code on first login.
-4. The new Wing receives a Wing Onboarding Information Package (see §6).
-5. A DR backup of production is taken before activation begins.
-6. After activation, the Wing Admin completes §3.4 (squadron initialisation) for real.
-7. National Admin confirms tenancy isolation in production using checks from §4.
+Production activation checklist:
+
+1. Take a DR backup of production before starting.
+2. Run `POST /api/system/provision-wing` against the production backend with the Wing's
+   final codes, names, and squadrons. Record all generated access codes immediately.
+3. Confirm the response shows `"created": true` for wing and each squadron.
+4. Provide wing_admin code to the incoming Wing Admin — see §6 for the full package.
+5. Wing Admin resets their code on first login (Settings → Access Codes → Generate New Code).
+6. National Admin confirms tenancy isolation in production using checks from §4.
+7. Wing Admin completes §3.4 (squadron initialisation) for real: create planning year,
+   generate parade dates, add holidays.
+8. National Admin signs off production activation in the governance record.
 
 ---
 
@@ -399,10 +479,15 @@ incident record. Include:
 
 ### 7.4 Re-onboarding after rollback
 
-If the Wing is re-onboarded with the same Wing code, the idempotent `second_wing_seed.py`
-will find the archived Wing and fail to match it (it queries for `active_status=true`),
-so it will attempt to create a new Wing with the same code, which will fail on a UNIQUE
-constraint.
+If the Wing is re-onboarded with the same Wing code, the idempotent
+`POST /api/system/provision-wing` endpoint checks for an existing Wing by code regardless
+of `active_status`. If the Wing is archived, the endpoint returns it as existing (not
+created) and does not create accounts. Restore the Wing first via System Console →
+Scope Map → Restore Wing, then call provision-wing again with `"create_accounts": true`.
+
+For `second_wing_seed.py` (CLI alternative): it queries `active_status=true` only, so
+it will fail to find the archived Wing and attempt to create a new one with the same code,
+which will fail on a UNIQUE constraint.
 
 **Resolution for re-onboarding with the same Wing code:**
 1. System Admin permanently deletes the archived Wing record (only permissible because
@@ -419,10 +504,12 @@ restored to active.
 
 | Symptom | Likely cause | Resolution |
 |---|---|---|
-| `second_wing_seed.py` exits: "No NationalEntity found" | DB not migrated | `alembic upgrade head` then re-run |
+| `provision-wing` returns 403 | Token is not for a system_admin account | Re-authenticate as system_admin |
+| `provision-wing` returns existing Wing but `created: false` | Wing with that code already exists (possibly archived) | Restore Wing via System Console → Scope Map first, then re-call with `create_accounts: true` |
 | Bootstrap endpoint returns 409 on Wing creation | Wing code already exists | Check scope-map; use a different code or archive the existing Wing first |
 | Wing Admin cannot see their squadrons | Account `wing_id` FK not set correctly | Check Account Management → verify `wing_id` matches the new Wing |
 | 1WG wing_admin can see 7WG data | RBAC query missing wing_id filter | Raise as a bug — do not proceed to production |
+| `second_wing_seed.py` exits: "No NationalEntity found" | DB not migrated | `alembic upgrade head` then re-run |
 | `second_wing_seed.py` `crest_url column` error | DB schema is behind migrations | `alembic upgrade head` from the `backend/` directory |
 
 ---
@@ -433,3 +520,4 @@ restored to active.
 |---|---|---|
 | 2026-07-17 | Initial version (Phase 10) | Next-Stage Program |
 | 2026-08-12 | §2.4 updated for dry-run mode; §7 rollback procedure added; §8 troubleshooting added | Next-Stage Program |
+| 2026-08-13 | §2.0 added: `POST /api/system/provision-wing` one-call endpoint (replaces separate create-wing/create-squadron/bootstrap-staging calls for both staging and production); §5 updated to use provision-wing for production; §7.4 and §8 updated to reflect new endpoint's idempotency behaviour | Next-Stage Program |
