@@ -11097,7 +11097,10 @@ function _renderPyActionBtns(){
   const el=document.getElementById('py-action-btns'); if(!el)return;
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
   if(!y){ el.innerHTML=''; return; }
-  el.innerHTML=`<button class="btn btn-out btn-xs plan-write-el" style="display:none" onclick="doRenamePlanningYear()">Rename</button>`+
+  el.innerHTML=
+    `<button class="btn btn-out btn-xs" onclick="exportAnnualProgram()" title="Export annual program to Excel">Export Annual</button>`+
+    `<button class="btn btn-out btn-xs" onclick="exportSchedule()" title="Export schedule to Excel">Export Schedule</button>`+
+    `<button class="btn btn-out btn-xs plan-write-el" style="display:none" onclick="doRenamePlanningYear()">Rename</button>`+
     (y.active_status
       ? `<button class="btn btn-out btn-xs plan-write-el" style="display:none;border-color:var(--red);color:var(--status-text-danger)" onclick="doArchivePlanningYear()">Archive</button>`
       : `<button class="btn btn-ok btn-xs plan-write-el" style="display:none" onclick="doRestorePlanningYear()">Restore</button>`)+

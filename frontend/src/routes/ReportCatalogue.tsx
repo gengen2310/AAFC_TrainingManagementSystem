@@ -16,7 +16,7 @@ const ROWS: Row[] = [
   { name: "Wing phase-coverage heatmap",   backend: "yes",     frontend: "yes", priority: "must",   value: "Squadron × phase coverage matrix",          role: "Wing+" },
   { name: "Wing capability",               backend: "yes",     frontend: "yes", priority: "must",   value: "Facilitator subject-balance per squadron",  role: "Wing+" },
   { name: "National overview",             backend: "yes",     frontend: "yes", priority: "must",   value: "Wing rollup for HQ",                        role: "National" },
-  { name: "National capability",           backend: "yes",     frontend: "no",  priority: "must",   value: "Wing-level facilitator capability summary", role: "National" },
+  { name: "National capability",           backend: "yes",     frontend: "yes", priority: "must",   value: "Wing-level facilitator capability summary (Overviews → Capability tab)", role: "National" },
   { name: "Program coverage (sqn/wing)",   backend: "yes",     frontend: "yes", priority: "should", value: "Cadet Program foundation vs extension",     role: "Squadron+" },
   { name: "Learning Hub missing-link",     backend: "yes",     frontend: "yes", priority: "should", value: "Find items with no LH link",                role: "Squadron+" },
   { name: "Cross-squadron not-delivered",  backend: "yes",     frontend: "no",  priority: "should", value: "Wing-wide delivery gaps",                   role: "Wing+" },
