@@ -3,7 +3,7 @@ from __future__ import annotations
 import json as _json
 
 from fastapi import APIRouter, Depends, Request, HTTPException, UploadFile, File, Header
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Literal, Optional
 from sqlalchemy.orm import Session as DBSession
 
@@ -37,6 +37,17 @@ def _check_version(obj, client_version: int | None) -> None:
 VALID_STATUS = {"draft", "planned", "published", "delivered", "delivered_with_issue",
                 "cancelled", "cancelled_late", "rescheduled", "not_delivered",
                 "requires_review", "blocked", "closed"}
+
+
+def _check_http_url(v: str | None) -> str | None:
+    """Raise ValueError if v is a non-http/https URL (blocks javascript: URIs)."""
+    if v is None:
+        return v
+    from urllib.parse import urlsplit
+    scheme = urlsplit(str(v)).scheme.lower()
+    if scheme not in ("http", "https"):
+        raise ValueError("URL must use http or https scheme")
+    return v
 
 
 def _parse_json_list(val) -> list:
@@ -528,8 +539,8 @@ def update_parade_night(pnid: str, body: ParadeNightUpdateIn, db: DBSession = De
 
 class NightNoticeIn(BaseModel):
     notice_text: str
-    priority: str = "normal"
-    audience: str | None = None
+    priority: str = Field(default="normal", max_length=20)
+    audience: str | None = Field(default=None, max_length=60)
 
 
 @router.get("/parade-nights/{pnid}/notices")
@@ -2051,7 +2062,7 @@ def _require_own_year(db: DBSession, sq_id: str, training_year_id: str) -> Plann
 class TrainingClassIn(BaseModel):
     training_year_id: str
     training_stage_id: str
-    display_name: str
+    display_name: str = Field(max_length=80)
     sequence: int = 0
     start_date: str | None = None
     end_date: str | None = None
@@ -2060,7 +2071,7 @@ class TrainingClassIn(BaseModel):
 
 
 class TrainingClassUpdateIn(BaseModel):
-    display_name: str | None = None
+    display_name: str | None = Field(default=None, max_length=80)
     training_stage_id: str | None = None
     sequence: int | None = None
     start_date: str | None = None
@@ -3831,8 +3842,8 @@ def archive_phase(phid: str, db: DBSession = Depends(get_db),
 
 # ── CURRICULUM WRITE (SQN-owned items only) ──────────────────────────────────
 class CurriculumIn(BaseModel):
-    code: str
-    title: str
+    code: str = Field(max_length=40)
+    title: str = Field(max_length=200)
     identifier: str | None = None  # globally unique mission key, e.g. "ORI-M01-01(2)"
     part_number: int = 1
     phase: str = "B. Initial"
@@ -3844,9 +3855,13 @@ class CurriculumIn(BaseModel):
     learning_hub_url: str | None = None
     wing_id: str | None = None  # NAT admins pass this for wing-owned curriculum
 
+    @field_validator("learning_hub_url")
+    @classmethod
+    def validate_url(cls, v): return _check_http_url(v)
+
 
 class CurriculumUpdateIn(BaseModel):
-    title: str | None = None
+    title: str | None = Field(default=None, max_length=200)
     identifier: str | None = None
     part_number: int | None = None
     phase: str | None = None
@@ -3857,12 +3872,16 @@ class CurriculumUpdateIn(BaseModel):
     instructor_suitability: str | None = None
     learning_hub_url: str | None = None
 
+    @field_validator("learning_hub_url")
+    @classmethod
+    def validate_url(cls, v): return _check_http_url(v)
+
 
 class CurriculumImportItem(BaseModel):
     identifier: str | None = None    # primary unique key
-    code: str                         # Module_Code (may repeat across parts)
+    code: str = Field(max_length=40)  # Module_Code (may repeat across parts)
     part_number: int = 1
-    title: str
+    title: str = Field(max_length=200)
     phase: str = "B. Initial"
     element: str | None = None
     duration_minutes: int = 60
@@ -3870,6 +3889,10 @@ class CurriculumImportItem(BaseModel):
     instructor_suitability: str | None = None
     learning_hub_url: str | None = None
     recommended_term: str | None = Field(default=None, max_length=10)
+
+    @field_validator("learning_hub_url")
+    @classmethod
+    def validate_url(cls, v): return _check_http_url(v)
     core_status: str | None = None    # "core" | "additional" -- None means "not specified by caller"
     # Scheduling fields — used to link to existing parade night sessions
     scheduled_date: str | None = None  # ISO date string e.g. "2026-02-13"

@@ -4379,8 +4379,8 @@ def night_summaries(
 
 class NoticeIn(BaseModel):
     notice_text: str
-    priority: str = "normal"
-    audience: str | None = None
+    priority: str = Field(default="normal", max_length=20)
+    audience: str | None = Field(default=None, max_length=60)
 
 
 @router.get("/parade-dates/{date_id}/notices")
@@ -4434,8 +4434,8 @@ def create_notice(
 
 class NoticeUpdateIn(BaseModel):
     notice_text: str | None = None
-    priority: str | None = None
-    audience: str | None = None
+    priority: str | None = Field(default=None, max_length=20)
+    audience: str | None = Field(default=None, max_length=60)
     version: int | None = None
 
 

@@ -123,6 +123,106 @@ def test_curriculum_recommended_term_too_long_rejected(client):
     assert r.status_code == 422, r.text
 
 
+# ── Curriculum code/title length ─────────────────────────────────────────
+
+def test_curriculum_code_too_long_rejected(client):
+    h = _sqn(client)
+    me = client.get("/api/auth/me", headers=h).json()
+    sqn_id = me["session"]["squadron_id"]
+    r = client.post("/api/curriculum", json={
+        "code": "C" * 41, "title": "Valid title", "squadron_id": sqn_id,
+    }, headers=h)
+    assert r.status_code == 422, r.text
+
+
+def test_curriculum_title_too_long_rejected(client):
+    h = _sqn(client)
+    me = client.get("/api/auth/me", headers=h).json()
+    sqn_id = me["session"]["squadron_id"]
+    r = client.post("/api/curriculum", json={
+        "code": "VAL-01", "title": "T" * 201, "squadron_id": sqn_id,
+    }, headers=h)
+    assert r.status_code == 422, r.text
+
+
+def test_curriculum_javascript_url_rejected(client):
+    h = _sqn(client)
+    me = client.get("/api/auth/me", headers=h).json()
+    sqn_id = me["session"]["squadron_id"]
+    r = client.post("/api/curriculum", json={
+        "code": "VAL-02", "title": "XSS test", "squadron_id": sqn_id,
+        "learning_hub_url": "javascript:alert(1)",
+    }, headers=h)
+    assert r.status_code == 422, r.text
+
+
+def test_curriculum_https_url_accepted(client):
+    h = _sqn(client)
+    me = client.get("/api/auth/me", headers=h).json()
+    sqn_id = me["session"]["squadron_id"]
+    r = client.post("/api/curriculum", json={
+        "code": "VAL-HTTPS", "title": "HTTPS test", "squadron_id": sqn_id,
+        "learning_hub_url": "https://example.com/resource",
+    }, headers=h)
+    assert r.status_code == 200, r.text
+
+
+# ── Notice priority/audience length ───────────────────────────────────────
+
+def test_notice_priority_too_long_rejected(client):
+    h = _sqn(client)
+    years = client.get("/api/planning/years", headers=h).json()
+    if not years:
+        pytest.skip("No planning year in test DB")
+    year_id = years[0]["planning_year_id"]
+    pds = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=h).json()
+    if not pds:
+        pytest.skip("No parade dates")
+    date_id = pds[0]["parade_date_id"]
+    r = client.post(f"/api/planning/parade-dates/{date_id}/notices", json={
+        "notice_text": "Test notice", "priority": "P" * 21,
+    }, headers=h)
+    assert r.status_code == 422, r.text
+
+
+def test_notice_audience_too_long_rejected(client):
+    h = _sqn(client)
+    years = client.get("/api/planning/years", headers=h).json()
+    if not years:
+        pytest.skip("No planning year in test DB")
+    year_id = years[0]["planning_year_id"]
+    pds = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=h).json()
+    if not pds:
+        pytest.skip("No parade dates")
+    date_id = pds[0]["parade_date_id"]
+    r = client.post(f"/api/planning/parade-dates/{date_id}/notices", json={
+        "notice_text": "Test notice", "priority": "normal", "audience": "A" * 61,
+    }, headers=h)
+    assert r.status_code == 422, r.text
+
+
+# ── TrainingClass display_name length ─────────────────────────────────────
+
+def test_training_class_display_name_too_long_rejected(client):
+    h = _sqn(client)
+    me = client.get("/api/auth/me", headers=h).json()
+    sqn_id = me["session"]["squadron_id"]
+    years_r = client.get("/api/training/years", headers=h)
+    if years_r.status_code != 200 or not years_r.json():
+        pytest.skip("No training years available")
+    year_id = years_r.json()[0]["training_year_id"]
+    stages_r = client.get("/api/training/stages", headers=h)
+    if stages_r.status_code != 200 or not stages_r.json():
+        pytest.skip("No training stages available")
+    stage_id = stages_r.json()[0]["training_stage_id"]
+    r = client.post("/api/training/classes", json={
+        "training_year_id": year_id,
+        "training_stage_id": stage_id,
+        "display_name": "N" * 81,
+    }, headers=h)
+    assert r.status_code == 422, r.text
+
+
 # ── Planning session status enum ──────────────────────────────────────────
 
 def test_planning_session_invalid_status_rejected(client):
