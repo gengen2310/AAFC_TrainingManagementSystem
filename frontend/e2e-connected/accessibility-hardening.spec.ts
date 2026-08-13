@@ -219,6 +219,49 @@ test("HARD-09: Escape key cancels the promptText() modal and resolves null", asy
   expect(result).toBeNull();
 });
 
+// ── VIS-04: Keyboard navigation of sidebar nav items ─────────────────────────
+
+test("VIS-04: visible nav items have tabindex=0 after login", async ({ page }) => {
+  // VIS-04 fix: applyNavScope() sets shown nav items to tabindex="0" and hidden
+  // items to tabindex="-1". This prevents keyboard users reaching hidden items.
+  await loginSquadron(page);
+  const visibleNavItems = page.locator(".nav-item:visible");
+  const count = await visibleNavItems.count();
+  expect(count).toBeGreaterThan(0);
+  for (let i = 0; i < count; i++) {
+    const tab = await visibleNavItems.nth(i).getAttribute("tabindex");
+    expect(tab).toBe("0");
+  }
+});
+
+test("VIS-04: pressing Enter on a nav item navigates to that page", async ({ page }) => {
+  // VIS-04 fix: delegated keydown listener on .sidenav triggers click() on
+  // Enter/Space, so keyboard-only users can navigate without a pointer device.
+  await loginSquadron(page);
+  // Find the "Parade Nights" nav item (sqn_admin scope always includes it).
+  const pnNavItem = page.locator(".nav-item[data-page='parade-nights']");
+  await expect(pnNavItem).toBeVisible({ timeout: 8000 });
+  // Focus it and press Enter.
+  await pnNavItem.focus();
+  await page.keyboard.press("Enter");
+  // The parade-nights page should become active.
+  await expect(page.locator("#page-parade-nights")).toBeVisible({ timeout: 8000 });
+});
+
+test("VIS-04: pressing Space on a nav item navigates to that page", async ({ page }) => {
+  // Same keyboard wiring — Space should behave identically to Enter on nav items.
+  await loginSquadron(page);
+  const dashNavItem = page.locator(".nav-item[data-page='dashboard']");
+  await expect(dashNavItem).toBeVisible({ timeout: 8000 });
+  // First navigate away so we can confirm Space brings us back.
+  await page.evaluate(() => (window as any).nav("parade-nights"));
+  await expect(page.locator("#page-parade-nights")).toBeVisible({ timeout: 5000 });
+  // Now focus the dashboard nav item and press Space.
+  await dashNavItem.focus();
+  await page.keyboard.press("Space");
+  await expect(page.locator("#page-dashboard")).toBeVisible({ timeout: 8000 });
+});
+
 test("HARD-09: validate param blocks submission when check fails", async ({ page }) => {
   await loginSquadron(page);
   void page.evaluate(() => {
