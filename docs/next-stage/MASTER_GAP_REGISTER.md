@@ -2,7 +2,7 @@
 
 **Version:** 2026-08-13  
 **Branch:** `next-stage/v1-operational` | Deployed commit: `756e65e` (production, 2026-08-12, Alembic head v51)  
-**Backend tests:** 1618 passed, 5 skipped, 2680 warnings (2026-08-13 post-sweep)  
+**Backend tests:** 1628 passed, 5 skipped (2026-08-13, post DEF-06/DOC-12/wing-name)  
 **Sources merged:**
 - 2026-08-12 program audit (prior register: 18 DONE / 14 PARTIAL / 57 NOT DONE / 7 HUMAN GATE)
 - Training Class architecture analysis (`parallel-class-impact-analysis.md`)
@@ -26,14 +26,14 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 38 |
 | STAGING VERIFIED | 9 |
-| FIXED LOCALLY | 73 |
+| FIXED LOCALLY | 75 |
 | IMPLEMENTING | 7 |
-| NOT STARTED | 9 |
+| NOT STARTED | 7 |
 | HUMAN GATE | 20 |
 | ACCEPTED RISK | 1 |
 | **Total** | **157** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 120 / 157 = 76%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 122 / 157 = 78%**
 
 > Counts are from rows matching `^\| [A-Z]+-[0-9]` in this file. Excludes cross-reference summary rows (numbered `1–25`) and GAP-prefixed decision rows (GAP-03, GAP-05, GAP-20, GAP-22, GAP-23) which duplicate existing HG-/SEC- items. Totals increased from 138 → 152 across sessions as new gaps were identified and added to the register; the completion rate decreased from 80% → 76% because new items were added faster than they were closed.
 
@@ -214,7 +214,7 @@ known. Firefox and the Planning Workspace 404 are uninvestigated — root causes
 | DEF-03 | Defect | P1 | Planning Workspace "Your scope" card — displays raw Wing ID and Squadron ID UUIDs instead of Wing code / name | `SessionInfo` in `api/types.ts` has `wing_code` / `squadron_code`; `Admin.tsx:17-18` uses `session.wing_code` / `session.squadron_code` directly — confirmed correct | CLOSED |
 | DEF-04 | Defect | P1 | Facilitator rank stored as uncontrolled free text (`Facilitator.rank` String) — no link to a canonical AAFC rank catalogue, no validation | Implemented commit `16f6bce`: `_AAFC_RANKS` catalogue in training.py; `GET /api/facilitators/ranks` endpoint; `_normalise_rank()` applied on create/update/import; frontend datalist populated from API. 8 regression tests added. | FIXED LOCALLY |
 | DEF-05 | Defect | MEDIUM | Legacy "Annual Program" stale text — `connected-frontend/index.html:6842` still says "Annual Program" linking to `nav('planning-year')`; functional redirect exists (`nav('planning-year')→'activities'`) but text misleads users | Confirmed resolved: `nav('planning-year')` as user-visible text no longer exists in index.html; all remaining references are code comments. Gap register was stale (original line number drifted). | CLOSED |
-| DEF-06 | Defect | MEDIUM | Wing-onboarding CLI-only — no HTTP API endpoint for Wing provisioning; requires direct server/DB access | `second_wing_seed.py` is CLI-only; no API path; appropriate for Level B staging, not National | NOT STARTED |
+| DEF-06 | Defect | MEDIUM | Wing-onboarding CLI-only — no HTTP API endpoint for Wing provisioning; requires direct server/DB access | FIXED LOCALLY 2026-08-13: `POST /api/system/provision-wing` added to `system.py` — idempotent, system_admin only, creates Wing + Squadrons + initial accounts (wing_admin, sqn_admin, sqn_general) in one HTTP call; returns one-time codes; usable in any environment including production; 10 tests in `test_wing_provision.py` pass (auth, 403, happy path, accounts, no-accounts flag, idempotency, audit log, default-squadron, notice). | FIXED LOCALLY |
 | DEF-07 | Defect | MEDIUM | Multi-Wing report cross-scope verification — Wing reports show only their Wing's data; National aggregates all Wings; no cross-Wing data leak | No synthetic second Wing in staging; multi-Wing aggregation path unproven; blocked on Level B Wing activation | NOT STARTED |
 | DEF-08 | Defect | MEDIUM | Celery export task (`generate_export`) is a stub — sync fallback records success without writing a real file; no object-storage or presigned-URL path | FIXED 2026-08-13: `exportProgramItemsCSV()` in connected-frontend switched from job-based path to direct streaming download via `GET /api/export/program-items.csv`. Uses fetch + Blob URL + programmatic `<a>` click pattern; includes Authorization header from `tokenGet()`; handles non-OK responses with actionable toast. Streaming endpoint was already fully implemented in `export_import.py` (generates CSV, logs export, audits action). Job-based path (`POST /api/jobs/export`) remains available for future Celery/Redis integration when exports exceed synchronous timeout. Button tooltip updated to remove "background job" description. | FIXED LOCALLY |
 | DEF-09 | Defect | MEDIUM | Background job polling UI — no frontend polling of `GET /api/jobs/{id}` when an async export is in flight; users cannot tell whether a large export is still running | `_jobPollToast(label, jobId)` added to connected-frontend: shows persistent toast with spinner; polls every 2 s; transitions to ok/err on terminal state; `exportProgramItemsCSV()` triggers `POST /api/jobs/export` and wires the toast. "Export CSV" button added to Curriculum page. DEF-08 (real file generation) still blocked on Celery/Redis provisioning. | FIXED LOCALLY |
@@ -303,7 +303,7 @@ are not yet started. The support runbook and year rollover procedure are CLOSED 
 | DOC-09 | Docs | LOW | Defence Writing Manual Chapters 4/6/14/23/24 paragraph-level citation pass applied to all TMS UI copy | FIXED 2026-08-13: see WRITE-11 — same work; active-voice pass applied to confirmation dialogs and empty-state messages; all §§2.53–2.58 / §2.13 / §2.14 rules applied across connected-frontend | FIXED LOCALLY |
 | DOC-10 | Docs | HIGH | Wing onboarding runbook §0 governance gate — organisational approval obtained before activating any Wing beyond 7WG in production | `10_wing_onboarding_runbook.md` complete; governance gate not yet passed for any second Wing | HUMAN GATE |
 | DOC-11 | Docs | MEDIUM | Report catalogue Tier 3 — National-level reports defined, implemented, and verified with multi-Wing data | Tier 1 (5 sqn) implemented; Tier 2 (5 wing) wired; Tier 3 requires Level B multi-Wing staging data | NOT STARTED |
-| DOC-12 | Docs | MEDIUM | Wing onboarding HTTP API — endpoint equivalent of `second_wing_seed.py` for provisioning a Wing without direct server/DB access | CLI seed only; no API path; Level B requirement | NOT STARTED |
+| DOC-12 | Docs | MEDIUM | Wing onboarding HTTP API — endpoint equivalent of `second_wing_seed.py` for provisioning a Wing without direct server/DB access | FIXED LOCALLY 2026-08-13: see DEF-06 — `POST /api/system/provision-wing` implements the HTTP equivalent. | FIXED LOCALLY |
 | DOC-13 | Docs | LOW | Capability manifest regenerated after Training Class model additions (v48–v50) — diff confirms no route or table removed | Regenerated 2026-08-13: 299 routes / 63 tables (was 273); new routes include `/api/facilitators/ranks`, `/api/planning/anchors/{id}/restore`, and 24 others added since last generation; no routes removed | CLOSED |
 | DOC-14 | Docs | MEDIUM | CEA import / CEA relationship documentation — `export_import.py` handles CEA imports; how CEA activities relate to curriculum items and Training Classes under the new model is not yet documented for operators | `docs/next-stage/14_cea_import_operator_guide.md` written 2026-08-13: covers what CEA is, export/import steps, classification workflow, CeaActivity→Session→SessionAudience→TrainingClass path, Squadron views, repeated imports, troubleshooting table, and role summary. | FIXED LOCALLY |
 | DOC-15 | Docs | LOW | Role matrix updated to include Training Class operations — who can create, archive, split, and merge a TrainingClass; whether wing_admin can act cross-squadron | `docs/role_matrix.md` §V17 added 2026-08-13: full Training Class operation table (view, create, rename, archive, restore, split, merge, curriculum progress, session audience) with cross-squadron split/merge restriction and history-preservation notes documented. | FIXED LOCALLY |
@@ -352,7 +352,7 @@ Human gates HG-01 (individual accountability decision), HG-03 (CSRF env vars), H
 
 | Gaps | Description | Status |
 |---|---|---|
-| DEF-06, DOC-12 | Wing onboarding API (not CLI-only) | NOT STARTED |
+| DEF-06, DOC-12 | Wing onboarding API (not CLI-only) | FIXED LOCALLY |
 | DEF-07, DOC-11 | Multi-Wing reports cross-scope verified | NOT STARTED |
 | HG-01 | Individual accountability model implemented | HUMAN GATE |
 | HG-02 | 250-user multi-Wing load test | HUMAN GATE |
@@ -400,7 +400,7 @@ Human gates HG-01 (individual accountability decision), HG-03 (CSRF env vars), H
 | 5 | Individual accountability | HG-01 | HUMAN GATE |
 | 6 | Optimistic locking | (Phase 7 complete; all critical models) | CLOSED |
 | 7 | 7WG hardcodes | (Bootstrap parameterised) | CLOSED |
-| 8 | Multi-Wing onboarding | DEF-06, DOC-12 | NOT STARTED |
+| 8 | Multi-Wing onboarding | DEF-06, DOC-12 | FIXED LOCALLY |
 | 9 | Multi-Wing reports | DEF-07 | NOT STARTED |
 | 10 | Report catalogue | DASH-01 (CLOSED), DASH-02 (CLOSED), DOC-11 (NOT STARTED — Level B) | PARTIAL |
 | 11 | Year rollover | DOC-02 | STAGING VERIFIED |

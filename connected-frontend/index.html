@@ -8213,13 +8213,13 @@ function renderWP(){
   el.innerHTML=`
     <div class="card">
       <div style="background:var(--dark);color:white;padding:14px 18px;border-radius:8px;margin-bottom:14px;" class="print-only" style="display:block">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:3px">7 Wing Australian Air Force Cadets</div>
+        <div style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:3px">${esc((S.session&&S.session.wing_name)||'Australian Air Force Cadets')}</div>
         <div style="font-size:17px;font-weight:900">${esc(info.name)}</div>
         <div style="font-size:12px;opacity:.75;margin-top:2px">Weekly Training Program — ${fmtDL(ds)}</div>
         <div style="font-size:10px;opacity:.58;margin-top:2px">${esc(info.start)}–${esc(info.end)} · ${esc(pn.term)}${pn.notes?' · '+esc(pn.notes):''}</div>
       </div>
       <div style="background:var(--dark);color:white;padding:14px 18px;border-radius:8px;margin-bottom:14px" class="no-print">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:3px">7 Wing Australian Air Force Cadets</div>
+        <div style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:3px">${esc((S.session&&S.session.wing_name)||'Australian Air Force Cadets')}</div>
         <div style="font-size:17px;font-weight:900">${esc(info.name)}</div>
         <div style="font-size:12px;opacity:.75;margin-top:2px">Weekly Training Program — ${fmtDL(ds)}</div>
         <div style="font-size:10px;opacity:.58;margin-top:2px">${esc(info.start)}–${esc(info.end)} · ${esc(pn.term)}${pn.notes?' · '+esc(pn.notes):''}</div>
@@ -8239,7 +8239,7 @@ function renderWP(){
         </table>
       </div>
       ${(wpQ||wpSt!=='all')?`<div class="no-print" style="font-size:11px;color:var(--muted);margin-top:4px">Showing ${shownSessions.length} of ${allSessions.length} sessions.</div>`:''}
-      <div style="margin-top:12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);padding-top:9px">AAFC Training System · 7 Wing WA · ${new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})} · INSPIRING TODAY — LEADING TOMORROW</div>
+      <div style="margin-top:12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);padding-top:9px">AAFC Training System · ${esc((S.session&&S.session.wing_code)||'Wing')} · ${new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})}</div>
     </div>
     <div class="no-print" style="margin-top:8px;display:flex;gap:8px">
       <button class="btn btn-dk" onclick="printReport()">Print This Program</button>

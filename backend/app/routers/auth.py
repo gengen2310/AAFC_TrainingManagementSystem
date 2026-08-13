@@ -358,17 +358,19 @@ def list_organisations(db: DBSession = Depends(get_db)):
 
 def _me(user: User, db: DBSession | None = None) -> dict:
     wing_code = None
+    wing_name = None
     if user.wing_id and db:
         w = db.get(Wing, user.wing_id)
         if w:
             wing_code = w.code
+            wing_name = w.name
     squadron_code = None
     if user.squadron_id and db:
         s = db.get(Squadron, user.squadron_id)
         if s:
             squadron_code = s.code
     return {"user_id": user.id, "display_name": user.display_name, "role": user.role,
-            "wing_id": user.wing_id, "wing_code": wing_code,
+            "wing_id": user.wing_id, "wing_code": wing_code, "wing_name": wing_name,
             "squadron_id": user.squadron_id, "squadron_code": squadron_code,
             "national_id": user.national_id,
             "is_wing": user.role in ("wing_viewer", "wing_admin"),

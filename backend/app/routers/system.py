@@ -569,6 +569,164 @@ def bootstrap_staging(body: BootstrapIn | None = None,
     }
 
 
+# ── POST /api/system/provision-wing ──────────────────────────────────────────
+
+class SquadronProvisionSpec(BaseModel):
+    code: str
+    name: str
+    short_name: str | None = None
+    parade_day: str = "Thursday"
+    start_time: str = "18:30"
+    end_time: str = "21:30"
+
+
+class WingProvisionIn(BaseModel):
+    wing_code: str
+    wing_name: str
+    wing_short: str | None = None
+    squadrons: list[SquadronProvisionSpec] | None = None
+    create_accounts: bool = True
+
+
+@router.post("/provision-wing")
+def provision_wing(body: WingProvisionIn, db: DBSession = Depends(get_db),
+                   p: Principal = Depends(get_principal)):
+    """Provision a new Wing with initial squadrons and accounts.
+
+    HTTP equivalent of second_wing_seed.py. Idempotent — entities that already
+    exist are returned without modification. Usable in any environment (including
+    production for National rollout). Requires system_admin.
+
+    Returns one-time plaintext codes for created accounts. Codes are never stored;
+    they cannot be retrieved after this response.
+    """
+    require_system_admin(p)
+
+    nat = db.query(NationalEntity).first()
+    if not nat:
+        raise HTTPException(422, detail={
+            "error": "national_entity_missing",
+            "message": "No NationalEntity found. Run migrations and initial seed first.",
+        })
+
+    wing_short = body.wing_short or body.wing_code
+    existing_wing = db.query(Wing).filter(Wing.code == body.wing_code).first()
+    wing_created = False
+    if not existing_wing:
+        existing_wing = Wing(
+            national_id=nat.id, code=body.wing_code, name=body.wing_name,
+            short_name=wing_short, active_status=True, created_by=p.user_id,
+        )
+        db.add(existing_wing)
+        db.flush()
+        audit(db, p, object_type="wing", object_id=existing_wing.id, action="create",
+              new={"code": body.wing_code, "name": body.wing_name, "source": "provision_wing"})
+        wing_created = True
+
+    wing = existing_wing
+
+    squadron_specs = body.squadrons or [
+        SquadronProvisionSpec(
+            code=f"{body.wing_code.rstrip('WGwg')}01",
+            name=f"{body.wing_code.rstrip('WGwg')}01 Squadron AAFC",
+        )
+    ]
+
+    results: list[dict] = [{"type": "wing", "code": wing.code, "name": wing.name, "created": wing_created}]
+    created_accounts: list[dict] = []
+
+    wing_admin_created = False
+    if body.create_accounts:
+        existing_wadmin = db.query(User).filter(
+            User.role == "wing_admin", User.wing_id == wing.id, User.is_archived == False  # noqa: E712
+        ).first()
+        if not existing_wadmin:
+            wadmin = User(
+                display_name=f"{wing.code} Wing Admin", role="wing_admin",
+                wing_id=wing.id, active_status=True, created_by=p.user_id,
+            )
+            db.add(wadmin)
+            db.flush()
+            plain = generate_code()
+            db.add(AccessCode(user_id=wadmin.id, code_hash=hash_code(plain),
+                              active_status=True, created_by=p.user_id,
+                              updated_by=p.user_id, updated_at=utcnow()))
+            audit(db, p, object_type="account", object_id=wadmin.id, action="account_created",
+                  new={"role": "wing_admin", "wing": wing.code, "source": "provision_wing"})
+            audit(db, p, object_type="access_code", object_id=wadmin.id, action="code_generated",
+                  new={"source": "provision_wing"})
+            created_accounts.append({
+                "role": "wing_admin", "display_name": wadmin.display_name,
+                "scope": {"wing": wing.code}, "new_code": plain,
+            })
+            wing_admin_created = True
+        results.append({"type": "account", "role": "wing_admin",
+                        "wing": wing.code, "created": wing_admin_created})
+
+    for spec in squadron_specs:
+        existing_sqn = db.query(Squadron).filter(Squadron.code == spec.code).first()
+        sqn_created = False
+        if not existing_sqn:
+            existing_sqn = Squadron(
+                wing_id=wing.id, code=spec.code,
+                name=spec.name,
+                short_name=spec.short_name or f"{spec.code} SQN",
+                unit_type="standard_squadron",
+                default_parade_day=spec.parade_day,
+                default_start_time=spec.start_time,
+                default_end_time=spec.end_time,
+                active_status=True, created_by=p.user_id,
+            )
+            db.add(existing_sqn)
+            db.flush()
+            audit(db, p, object_type="squadron", object_id=existing_sqn.id, action="create",
+                  new={"code": spec.code, "name": spec.name, "wing": wing.code,
+                       "source": "provision_wing"})
+            sqn_created = True
+        sqn = existing_sqn
+        results.append({"type": "squadron", "code": sqn.code, "name": sqn.name, "created": sqn_created})
+
+        if body.create_accounts:
+            for role in ("sqn_admin", "sqn_general"):
+                existing_u = db.query(User).filter(
+                    User.role == role, User.squadron_id == sqn.id, User.is_archived == False  # noqa: E712
+                ).first()
+                acct_created = False
+                if not existing_u:
+                    dname = f"{sqn.code} SQN {'Admin' if role == 'sqn_admin' else 'Staff'}"
+                    u = User(
+                        display_name=dname, role=role,
+                        wing_id=wing.id, squadron_id=sqn.id,
+                        active_status=True, created_by=p.user_id,
+                    )
+                    db.add(u)
+                    db.flush()
+                    plain = generate_code()
+                    db.add(AccessCode(user_id=u.id, code_hash=hash_code(plain),
+                                      active_status=True, created_by=p.user_id,
+                                      updated_by=p.user_id, updated_at=utcnow()))
+                    audit(db, p, object_type="account", object_id=u.id, action="account_created",
+                          new={"role": role, "squadron": sqn.code, "source": "provision_wing"})
+                    audit(db, p, object_type="access_code", object_id=u.id, action="code_generated",
+                          new={"source": "provision_wing"})
+                    created_accounts.append({
+                        "role": role, "display_name": dname,
+                        "scope": {"wing": wing.code, "squadron": sqn.code}, "new_code": plain,
+                    })
+                    acct_created = True
+                results.append({"type": "account", "role": role,
+                                "squadron": sqn.code, "created": acct_created})
+
+    db.commit()
+    return {
+        "wing": {"id": wing.id, "code": wing.code, "name": wing.name},
+        "results": results,
+        "accounts_created": created_accounts,
+        "notice": "Codes shown here will NOT be retrievable again. Record each code now."
+        if created_accounts else "No new accounts created.",
+    }
+
+
 @router.post("/reset-rate-limits")
 def reset_rate_limits(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     """Test/staging-only: clear all rate-limit and login-lockout state.
