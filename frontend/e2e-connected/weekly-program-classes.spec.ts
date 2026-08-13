@@ -130,3 +130,46 @@ test("WORK-10: Publish Program button is visible to sqn_admin on the Weekly Prog
 
   expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
 });
+
+// ── DEF-06 / Weekly Program wing_name header ─────────────────────────────────
+// renderWP() must use session.wing_name (from /api/auth/me) in the parade night
+// header rather than the previously hardcoded "7 Wing Australian Air Force Cadets".
+// The wing_name for the 7WG seed is "7 Wing (Western Australia)".
+test("Weekly Program header shows the Wing's real name from the session (not hardcoded 7WG text)", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await loginSquadron(page, "ADMIN703");
+  const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
+  const base = await apiBase();
+  const auth = { Authorization: `Bearer ${token}` };
+
+  const me = await (await page.request.get(`${base}/api/auth/me`, { headers: auth })).json();
+  // Verify the session carries wing_name as expected by the frontend fix.
+  const wingName: string = me.session.wing_name;
+  expect(wingName).toBeTruthy();
+  expect(wingName).not.toBe("7 Wing Australian Air Force Cadets");
+
+  // Create a parade night at a unique far-future date so the dropdown has a selectable option.
+  const testDate = new Date(2072, 4, 21).toISOString().slice(0, 10); // 2072-05-21
+  const pnRes = await page.request.post(`${base}/api/parade-nights`, {
+    data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
+    headers: auth,
+  });
+  expect(pnRes.ok()).toBe(true);
+
+  await page.evaluate(() => (window as any).reloadAndRender());
+  await page.evaluate(() => (window as any).nav("weekly-program"));
+  await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });
+  await page.locator("#wp-sel").selectOption(testDate);
+
+  // The no-print header div (line 8222 of index.html) should render the real wing_name.
+  const header = page.locator("#wp-content .no-print").first();
+  await expect(header).toBeVisible({ timeout: 5000 });
+  await expect(header).toContainText(wingName);
+
+  // Guard: must NOT contain the old hardcoded string.
+  const headerText = await header.textContent();
+  expect(headerText).not.toContain("7 Wing Australian Air Force Cadets");
+
+  expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
+});
