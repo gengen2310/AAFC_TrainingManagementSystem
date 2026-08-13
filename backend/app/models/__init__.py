@@ -8,7 +8,7 @@ from .planning import (
 )
 from .organisations import (
     NationalEntity, Wing, Squadron, Flight, User, AccessCode, ProxySession, IpLoginAttempt,
-    IpApiRequest,
+    IpApiRequest, UserApiRequest,
 )
 from .training import (
     CurriculumItem, CurriculumElement, CurriculumPhase, CustomPhase, ParadeNight, Session, SessionStatusHistory,
@@ -25,7 +25,7 @@ from .program import (
 )
 
 __all__ = [
-    "NationalEntity", "Wing", "Squadron", "Flight", "User", "AccessCode", "ProxySession", "IpLoginAttempt", "IpApiRequest",
+    "NationalEntity", "Wing", "Squadron", "Flight", "User", "AccessCode", "ProxySession", "IpLoginAttempt", "IpApiRequest", "UserApiRequest",
     "CurriculumItem", "CurriculumElement", "CurriculumPhase", "CustomPhase", "ParadeNight", "Session", "SessionStatusHistory",
     "Facilitator", "FacilitatorRankHistory", "SubjectAreaTag", "FacilitatorTypeTag", "SessionStatusReasonTag", "TrainingArea", "Equipment", "Activity", "Cadet",
     "TimingTemplate", "TimingBlock", "ParadeNightTimingOverride", "TrainingClass", "SessionAudience",

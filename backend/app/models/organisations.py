@@ -125,6 +125,21 @@ class IpApiRequest(Base):
     window_start: Mapped[datetime] = mapped_column(DateTime)
 
 
+class UserApiRequest(Base):
+    """DB-backed per-account general API rate-limit state (DEF-11).
+
+    Complements IpApiRequest: where the per-IP check guards against large-scale
+    flooding from one source address, this check ensures a single authenticated
+    account cannot monopolise the service even when many accounts share the same
+    Railway edge IP.  One row per user_id — upserted inside get_principal after
+    the JWT is validated, so only authenticated requests count.
+    """
+    __tablename__ = "user_api_requests"
+    user_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    request_count: Mapped[int] = mapped_column(Integer, default=0)
+    window_start: Mapped[datetime] = mapped_column(DateTime)
+
+
 class ProxySession(Base, UUIDMixin, TimestampMixin):
     """Records a Wing→Squadron Proxy or National→(Wing/Squadron) Delegated Intervention."""
     __tablename__ = "proxy_sessions"

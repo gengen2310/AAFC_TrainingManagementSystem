@@ -26,7 +26,7 @@ from ..models import (
     PlanningYear, ParadeDate, Session, CurriculumItem, NationalEntity,
 )
 from ..permissions import Principal, require_system_admin, require_audit_access
-from ..security import generate_code, hash_code, reset_rate_limiter, reset_api_rate_limiter, reset_api_rate_limiter_db
+from ..security import generate_code, hash_code, reset_rate_limiter, reset_api_rate_limiter, reset_api_rate_limiter_db, reset_user_api_rate_limiter_db
 from ..services import audit
 
 router = APIRouter(prefix="/api/system", tags=["system"])
@@ -588,7 +588,8 @@ def reset_rate_limits(db: DBSession = Depends(get_db), p: Principal = Depends(ge
         })
     reset_rate_limiter()
     reset_api_rate_limiter()
-    reset_api_rate_limiter_db(db)  # DEF-10: clear DB-backed table as well
+    reset_api_rate_limiter_db(db)  # DEF-10: clear DB-backed per-IP table
+    reset_user_api_rate_limiter_db(db)  # DEF-11: clear DB-backed per-account table
     db.query(IpLoginAttempt).delete()
     for ac in db.query(AccessCode).all():
         ac.failed_attempts = 0

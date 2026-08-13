@@ -235,3 +235,38 @@ def reset_api_rate_limiter_db(db: "DBSession") -> None:
     from .models import IpApiRequest
     db.query(IpApiRequest).delete()
     db.commit()
+
+
+# ── DB-backed per-account API rate limiter (DEF-11) ───────────────────────────
+# Complements check_api_rate_db: where the per-IP check catches flooding from
+# one source address, this check prevents a single authenticated account from
+# monopolising the service regardless of IP (important when all users share the
+# same Railway edge IP, as confirmed by REM-125).
+
+def check_user_api_rate_db(user_id: str, db: "DBSession") -> bool:
+    """Return True if the user account has exceeded the API rate limit (caller must 429)."""
+    from .models import UserApiRequest
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    window = settings.API_RATE_WINDOW_SEC
+    row = db.get(UserApiRequest, user_id)
+    if not row:
+        row = UserApiRequest(user_id=user_id, request_count=0, window_start=now)
+        db.add(row)
+    ws = row.window_start
+    if ws and ws.tzinfo:
+        ws = ws.replace(tzinfo=None)
+    elapsed = (now - ws).total_seconds() if ws else window + 1
+    if elapsed > window:
+        row.request_count = 0
+        row.window_start = now
+    row.request_count += 1
+    over_limit = row.request_count > settings.API_RATE_LIMIT
+    db.commit()
+    return over_limit
+
+
+def reset_user_api_rate_limiter_db(db: "DBSession") -> None:
+    """Clear all DB-backed per-account API rate-limit rows."""
+    from .models import UserApiRequest
+    db.query(UserApiRequest).delete()
+    db.commit()

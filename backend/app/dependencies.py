@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from .database import get_db
 from .config import settings
-from .security import decode_token
+from .security import decode_token, check_user_api_rate_db
 from .permissions import Principal
 from .models import ProxySession, User
 
@@ -116,6 +116,15 @@ def get_principal(request: Request, db: DBSession = Depends(get_db)) -> Principa
         raise HTTPException(401, detail={"error": "invalid_user"})
     if payload.get("tv", 0) != user.token_version:
         raise HTTPException(401, detail={"error": "session_revoked"})
+    # DEF-11: per-account rate limiting in production/staging (complements per-IP check).
+    if settings.ENVIRONMENT.lower() in ("production", "prod", "staging"):
+        if check_user_api_rate_db(user.id, db):
+            raise HTTPException(
+                429,
+                detail={"error": "rate_limited",
+                        "message": "Too many requests. Please slow down and try again shortly."},
+                headers={"Retry-After": str(settings.API_RATE_WINDOW_SEC)},
+            )
     p = Principal(user_id=user.id, role=user.role, wing_id=user.wing_id,
                   squadron_id=user.squadron_id, national_id=user.national_id)
     # overlay active proxy/intervention

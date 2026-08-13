@@ -190,3 +190,72 @@ def test_db_rate_limiter_reset_clears_table():
         assert check_api_rate_db(ip, db) is False
     finally:
         db.close()
+
+
+# ─────────────────────────────────────────────────────────────
+# DEF-11: DB-backed per-account rate limiter (check_user_api_rate_db)
+# ─────────────────────────────────────────────────────────────
+
+def test_user_rate_limiter_unit_check():
+    """DEF-11: check_user_api_rate_db counts correctly and blocks over the limit."""
+    from app.security import check_user_api_rate_db, reset_user_api_rate_limiter_db
+    db = _db()
+    try:
+        reset_user_api_rate_limiter_db(db)
+        uid = "user-rate-test-001"
+        limit = settings.API_RATE_LIMIT
+        for _ in range(limit):
+            assert check_user_api_rate_db(uid, db) is False
+        assert check_user_api_rate_db(uid, db) is True
+    finally:
+        db.close()
+
+
+def test_user_rate_limiter_window_reset():
+    """DEF-11: check_user_api_rate_db resets the counter after the window expires."""
+    import datetime
+    from app.security import check_user_api_rate_db, reset_user_api_rate_limiter_db
+    from app.models import UserApiRequest
+    db = _db()
+    try:
+        reset_user_api_rate_limiter_db(db)
+        uid = "user-rate-test-002"
+        past = datetime.datetime.utcnow() - datetime.timedelta(
+            seconds=settings.API_RATE_WINDOW_SEC + 5)
+        row = UserApiRequest(user_id=uid, request_count=settings.API_RATE_LIMIT + 50, window_start=past)
+        db.add(row)
+        db.commit()
+        assert check_user_api_rate_db(uid, db) is False
+    finally:
+        db.close()
+
+
+def test_user_rate_limiter_different_users_independent():
+    """DEF-11: exceeding the limit for one user must not block a different user."""
+    from app.security import check_user_api_rate_db, reset_user_api_rate_limiter_db
+    db = _db()
+    try:
+        reset_user_api_rate_limiter_db(db)
+        uid_a, uid_b = "user-rate-test-003a", "user-rate-test-003b"
+        for _ in range(settings.API_RATE_LIMIT + 1):
+            check_user_api_rate_db(uid_a, db)
+        assert check_user_api_rate_db(uid_a, db) is True
+        assert check_user_api_rate_db(uid_b, db) is False
+    finally:
+        db.close()
+
+
+def test_user_rate_limiter_reset_clears_table():
+    """DEF-11: reset_user_api_rate_limiter_db deletes all rows so requests are allowed again."""
+    from app.security import check_user_api_rate_db, reset_user_api_rate_limiter_db
+    db = _db()
+    try:
+        reset_user_api_rate_limiter_db(db)
+        uid = "user-rate-test-004"
+        for _ in range(settings.API_RATE_LIMIT + 1):
+            check_user_api_rate_db(uid, db)
+        assert check_user_api_rate_db(uid, db) is True
+        reset_user_api_rate_limiter_db(db)
+        assert check_user_api_rate_db(uid, db) is False
+    finally:
+        db.close()
