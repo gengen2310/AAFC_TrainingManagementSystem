@@ -10,6 +10,7 @@ import { Loading, ErrorNote } from "../ui";
 import { getProgramType } from "../../utils/planningFilters";
 import { useAuth } from "../../auth/AuthProvider";
 import { isSystemAdmin } from "../../auth/permissions";
+import { useConfirm } from "../ConfirmDialog";
 import type {
   PlanningFacilitator, PlanningLocation,
   PlanningFacilitatorLeave, FacilitatorWorkload, EquipmentItem,
@@ -109,6 +110,7 @@ function fmtDate(iso: string | null): string {
 
 function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: (item: DrawerItem) => void }) {
   const queryClient = useQueryClient();
+  const { confirm } = useConfirm();
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sortCol, setSortCol] = useState("phase");
@@ -489,9 +491,10 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                           style={{ fontSize: 10, padding: "2px 7px", borderColor: "var(--aafc-red)", color: "var(--aafc-red)" }}
                           title={s0.cancelled_reason ?? s0.not_delivered_reason ?? ""}
                           onClick={async () => {
-                            if (!window.confirm(
+                            if (!await confirm(
                               `This session was ${m.has_not_delivered ? "not delivered" : "cancelled"} on ${fmtDate(s0.parade_date)}. ` +
-                              "Mark it as rescheduled and choose a new date now?"
+                              "Mark it as rescheduled and choose a new date now?",
+                              { confirmLabel: "Mark rescheduled" }
                             )) return;
                             setReschedulingId(s0.session_id);
                             try {
@@ -529,6 +532,7 @@ function FacilitatorLeaveSection({
   fac_id, yearId,
 }: { fac_id: string; yearId: string | null }) {
   const qc = useQueryClient();
+  const { confirm } = useConfirm();
   const [addingLeave, setAddingLeave] = useState(false);
   const [leaveStart, setLeaveStart] = useState("");
   const [leaveEnd, setLeaveEnd] = useState("");
@@ -587,7 +591,7 @@ function FacilitatorLeaveSection({
   }
 
   async function handleDeleteLeave(leave_id: string) {
-    if (!window.confirm("Remove this leave period? It can be restored later from \"Show archived\".")) return;
+    if (!await confirm("Remove this leave period? It can be restored later from 'Show archived'.", { confirmLabel: "Remove" })) return;
     setDeletingLeaveId(leave_id);
     try {
       await planningApi.deleteFacilitatorLeave(leave_id);
@@ -1175,6 +1179,7 @@ const HOLIDAY_TYPES = [
 
 function HolidaysContent({ yearId }: { yearId: string }) {
   const qc = useQueryClient();
+  const { confirm } = useConfirm();
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -1219,7 +1224,7 @@ function HolidaysContent({ yearId }: { yearId: string }) {
   }
 
   async function handleDelete(holiday_id: string) {
-    if (!window.confirm("Permanently delete this holiday period?")) return;
+    if (!await confirm("Permanently delete this holiday period?", { confirmLabel: "Delete", danger: true })) return;
     setDeletingId(holiday_id);
     try {
       await planningApi.deleteHoliday(holiday_id);

@@ -283,7 +283,7 @@ class ParadeIn(BaseModel):
 def list_parades(squadron_id: str | None = None, db: DBSession = Depends(get_db),
                  p: Principal = Depends(get_principal)):
     sq_id = squadron_id or _active_squadron(p)
-    s = db.get(Squadron, sq_id)
+    s = db.get(Squadron, sq_id) if sq_id else None
     if s:
         require_can_view_squadron(p, s.id, s.wing_id)
     pns = db.query(ParadeNight).filter(ParadeNight.squadron_id == sq_id,
@@ -935,6 +935,52 @@ def mark_remaining_delivered(pnid: str, db: DBSession = Depends(get_db), p: Prin
         _recompute(db, pn)
     audit(db, p, object_type="parade_night_bulk", object_id=batch_id, action="bulk_mark_remaining_delivered",
           new={"parade_night_id": pn.id, "sessions_updated": len(updated_ids)}, batch_id=batch_id)
+    return {"ok": True, "batch_id": batch_id, "sessions_updated": len(updated_ids), "session_ids": updated_ids}
+
+
+class CancelAllIn(BaseModel):
+    reason: str
+    notes: str | None = None
+
+
+@router.post("/parade-nights/{pnid}/cancel-all")
+def cancel_all_sessions(pnid: str, body: CancelAllIn, db: DBSession = Depends(get_db),
+                        p: Principal = Depends(get_principal)):
+    """Bulk-cancel all planned/published sessions in a parade night.
+
+    Marks every session in draft/planned/published state as 'cancelled' with the
+    supplied reason, leaving already-finalised sessions (delivered, not_delivered,
+    cancelled, rescheduled) untouched.  Mirrors mark_remaining_delivered in all
+    audit and history bookkeeping."""
+    import uuid as _uuid
+    pn = db.get(ParadeNight, pnid)
+    if not pn or pn.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    if not body.reason or not body.reason.strip():
+        raise HTTPException(422, detail={"error": "reason_required"})
+
+    batch_id = str(_uuid.uuid4())
+    sessions = db.query(Session).filter(
+        Session.parade_night_id == pn.id,
+        Session.is_archived == False,  # noqa: E712
+        Session.status.in_(("draft", "planned", "published")),
+    ).all()
+    updated_ids = []
+    for s in sessions:
+        old_status = _apply_status_transition(s, "cancelled", body.reason, body.notes, None)
+        db.add(SessionStatusHistory(session_id=s.id, old_status=old_status, new_status="cancelled",
+                                    changed_by=p.user_id, reason=body.reason))
+        audit(db, p, object_type="session", object_id=s.id, action="status_change",
+              old={"status": old_status}, new={"status": "cancelled", "reason": body.reason},
+              reason="bulk_cancel_all", batch_id=batch_id, commit=False)
+        db.commit()
+        updated_ids.append(s.id)
+
+    if updated_ids:
+        _recompute(db, pn)
+    audit(db, p, object_type="parade_night_bulk", object_id=batch_id, action="bulk_cancel_all",
+          new={"parade_night_id": pn.id, "sessions_updated": len(updated_ids)})
     return {"ok": True, "batch_id": batch_id, "sessions_updated": len(updated_ids), "session_ids": updated_ids}
 
 
@@ -1696,6 +1742,87 @@ def delete_parade(pnid: str, db: DBSession = Depends(get_db), p: Principal = Dep
     db.commit()
     audit(db, p, object_type="parade_night", object_id=pn.id, action="archive")
     return {"ok": True}
+
+
+@router.post("/parade-nights/{pnid}/copy-sessions-to/{target_pnid}")
+def copy_sessions_to_parade_night(
+    pnid: str, target_pnid: str,
+    db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)
+):
+    """Copy planning fields from all sessions in source PN to target PN.
+
+    Outcomes, publication state, and attendance data are not copied — only
+    the planning intent (curriculum item, facilitator, room, class audience,
+    period, custom title, cadet group). Sessions that already exist at the
+    same period in the target PN are skipped, not overwritten.
+    """
+    import uuid as _uuid
+    source = db.get(ParadeNight, pnid)
+    if not source or source.is_archived:
+        raise HTTPException(404, detail={"error": "source_not_found"})
+    require_can_write_squadron(p, source.squadron_id, source.wing_id)
+    target = db.get(ParadeNight, target_pnid)
+    if not target or target.is_archived:
+        raise HTTPException(404, detail={"error": "target_not_found"})
+    require_can_write_squadron(p, target.squadron_id, target.wing_id)
+    if source.squadron_id != target.squadron_id:
+        raise HTTPException(400, detail={"error": "cross_squadron_copy_not_permitted"})
+
+    source_sessions = (
+        db.query(Session)
+        .filter(Session.parade_night_id == pnid, Session.is_archived.is_(False))
+        .all()
+    )
+    existing_periods = {
+        s.period_number
+        for s in db.query(Session).filter(
+            Session.parade_night_id == target_pnid, Session.is_archived.is_(False)
+        )
+    }
+
+    copied, skipped = 0, 0
+    for src in source_sessions:
+        if src.period_number in existing_periods:
+            skipped += 1
+            continue
+        new_sess = Session(
+            id=str(_uuid.uuid4()),
+            parade_night_id=target_pnid,
+            squadron_id=target.squadron_id,
+            period_number=src.period_number,
+            curriculum_item_id=src.curriculum_item_id,
+            curriculum_code_at_time=src.curriculum_code_at_time,
+            curriculum_title_at_time=src.curriculum_title_at_time,
+            custom_title=src.custom_title,
+            phase_at_time=src.phase_at_time,
+            element_at_time=src.element_at_time,
+            facilitator_id=src.facilitator_id,
+            facilitator_rank_at_time=src.facilitator_rank_at_time,
+            facilitator_display_name_at_time=src.facilitator_display_name_at_time,
+            training_area_id=src.training_area_id,
+            training_area_name_at_time=src.training_area_name_at_time,
+            cadet_group=src.cadet_group,
+            status="planned",
+        )
+        db.add(new_sess)
+        db.flush()
+        # Copy class audience (SessionAudience rows)
+        src_audience = db.query(SessionAudience).filter(
+            SessionAudience.session_id == src.id
+        ).all()
+        for sa in src_audience:
+            db.add(SessionAudience(
+                id=str(_uuid.uuid4()),
+                session_id=new_sess.id,
+                training_class_id=sa.training_class_id,
+            ))
+        existing_periods.add(src.period_number)
+        copied += 1
+
+    db.commit()
+    audit(db, p, object_type="parade_night", object_id=target_pnid,
+          action="copy_sessions_from", new={"source_parade_night_id": pnid, "copied": copied})
+    return {"ok": True, "copied": copied, "skipped": skipped}
 
 
 # ── FACILITATOR DELETE ───────────────────────────────────────────────────────

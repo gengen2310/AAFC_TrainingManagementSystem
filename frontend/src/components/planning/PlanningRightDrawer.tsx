@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useId, type KeyboardEvent } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { planningApi } from "../../api";
+import { planningApi, trainingApi } from "../../api";
 import { friendlyMessage } from "../../api/client";
-import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent } from "../../api/types";
+import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent, NightSummary } from "../../api/types";
 import { ActivityFullDetail, anchorToDisplay } from "./ActivityDetailBlock";
 import { getProgramType } from "../../utils/planningFilters";
+import { useConfirm } from "../ConfirmDialog";
 
 // ─── Drawer item discriminated union ──────────────────────────────────────────
 export type DrawerItem =
@@ -38,6 +39,7 @@ function SessionForm({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const { confirm } = useConfirm();
   const isEdit = item.type === "session";
   const existing = isEdit ? item.session : null;
 
@@ -66,12 +68,27 @@ function SessionForm({
   const [overridingId, setOverridingId] = useState<string | null>(null);
   const [overrideErr, setOverrideErr] = useState<string | null>(null);
   const [overrideSaving, setOverrideSaving] = useState(false);
+  const [showMove, setShowMove] = useState(false);
+  const [moveTargetNightId, setMoveTargetNightId] = useState("");
+  const [moveTargetPeriod, setMoveTargetPeriod] = useState(1);
+  const [moving, setMoving] = useState(false);
+  const [moveErr, setMoveErr] = useState<string | null>(null);
 
   const { data: missionsData } = useQuery({
     queryKey: ["planning-missions", yearId],
     queryFn: () => planningApi.missions(yearId!),
     enabled: !!yearId,
   });
+
+  const { data: nightData } = useQuery({
+    queryKey: ["planning-night-summaries", yearId],
+    queryFn: () => planningApi.nightSummaries(yearId!),
+    enabled: !!yearId && isEdit && showMove,
+    staleTime: 2 * 60 * 1000,
+  });
+  const movableNights: NightSummary[] = (nightData?.summaries ?? []).filter(
+    (n: NightSummary) => n.parade_night_id !== null,
+  );
 
   const allMissions: MissionItem[] = missionsData?.missions ?? [];
   const linkedMission = curriculumId ? allMissions.find(m => m.curriculum_id === curriculumId) : null;
@@ -182,7 +199,7 @@ function SessionForm({
 
   async function handleDelete() {
     if (!existing) return;
-    if (!window.confirm("Delete this session? It can be restored later from \"Show archived sessions\" on the parade night grid.")) return;
+    if (!await confirm("Delete this session? It can be restored later from 'Show archived sessions' on the parade night grid.", { confirmLabel: "Delete" })) return;
     setDeleting(true);
     try {
       await planningApi.deleteSession(existing.session_id);
@@ -194,6 +211,35 @@ function SessionForm({
       setErr(friendlyMessage(e, "Delete failed"));
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleMove() {
+    if (!existing || !moveTargetNightId) { setMoveErr("Select a parade night to move to."); return; }
+    setMoving(true);
+    setMoveErr(null);
+    try {
+      await trainingApi.editSession(existing.session_id, {
+        parade_night_id: moveTargetNightId,
+        period_number: moveTargetPeriod,
+        curriculum_item_id: curriculumId ?? null,
+        cadet_group: cadetGroup || null,
+        facilitator_id: facilitatorId || null,
+        training_area_id: locationId || null,
+        custom_title: title || null,
+        status: existing.status,
+      });
+      await qc.invalidateQueries({ queryKey: ["planning-weekly"] });
+      await qc.invalidateQueries({ queryKey: ["planning-long-range"] });
+      await qc.invalidateQueries({ queryKey: ["planning-annual"] });
+      if (yearId) {
+        await qc.invalidateQueries({ queryKey: ["planning-cc", yearId] });
+      }
+      onClose();
+    } catch (e: unknown) {
+      setMoveErr(friendlyMessage(e, "Move failed. Try again."));
+    } finally {
+      setMoving(false);
     }
   }
 
@@ -380,6 +426,54 @@ function SessionForm({
           Notes
           <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional delivery notes" />
         </label>
+
+        {isEdit && (
+          <div style={{ marginTop: 10, borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+            <button
+              type="button"
+              className="btn sm out"
+              style={{ fontSize: 11, width: "100%", textAlign: "left" }}
+              onClick={() => setShowMove(v => !v)}
+            >
+              {showMove ? "▾" : "▸"} Move to another night
+            </button>
+            {showMove && (
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                <label style={{ fontSize: 12 }}>
+                  Parade night
+                  <select
+                    value={moveTargetNightId}
+                    onChange={e => setMoveTargetNightId(e.target.value)}
+                    style={{ fontSize: 12 }}
+                  >
+                    <option value="">— Select night —</option>
+                    {movableNights.map(n => (
+                      <option key={n.parade_night_id!} value={n.parade_night_id!}>
+                        {new Date(n.parade_date).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short", year: "2-digit" })}
+                        {n.term ? ` · ${n.term}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ fontSize: 12 }}>
+                  Session number
+                  <input
+                    type="number"
+                    min={1}
+                    max={4}
+                    value={moveTargetPeriod}
+                    onChange={e => setMoveTargetPeriod(Number(e.target.value))}
+                    style={{ fontSize: 12 }}
+                  />
+                </label>
+                {moveErr && <div className="pw-err">{moveErr}</div>}
+                <button className="btn sm primary" onClick={handleMove} disabled={moving}>
+                  {moving ? "Moving…" : "Move session"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {err && <div className="pw-err" style={{ marginTop: 8 }}>{err}</div>}

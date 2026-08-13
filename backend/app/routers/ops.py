@@ -1,5 +1,5 @@
 import io, csv, json, logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
@@ -623,7 +623,7 @@ def recent_changes(
     sqn_admin sees only their squadron, a wing_admin sees their whole wing, and
     national/system roles see everything within the window.
     """
-    since = datetime.utcnow() - timedelta(days=max(1, min(days, 90)))
+    since = datetime.now(timezone.utc) - timedelta(days=max(1, min(days, 90)))
     q = (db.query(AuditLog)
          .filter(AuditLog.timestamp >= since,
                  AuditLog.object_type.in_(_PLANNING_OBJECT_TYPES))

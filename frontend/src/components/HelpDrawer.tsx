@@ -30,7 +30,7 @@ const GLOSSARY: { term: string; definition: string }[] = [
   {
     term: "Training Class",
     definition:
-      "A squadron-specific group of cadets undertaking a Training Stage in a given Training Year. A squadron with 30 senior cadets might have two classes — Senior 1 and Senior 2 — each with its own progress records.",
+      "A squadron-specific group completing a Training Stage in a given Training Year. A squadron with 30 senior cadets might have two classes — Senior 1 and Senior 2 — each with its own independent progress record. The distinction matters because two classes at the same stage can be at different points in the curriculum: Senior 1 may have completed a module that Senior 2 still has planned. The system tracks them separately so you can see exactly what each class still needs.",
   },
   {
     term: "Parade Night",
@@ -40,7 +40,7 @@ const GLOSSARY: { term: string; definition: string }[] = [
   {
     term: "Session",
     definition:
-      "One training block within a parade night — a specific curriculum item, time period, Training Class, facilitator, and room. A parade night typically has six periods and may run several sessions in parallel.",
+      "One training block within a parade night — a specific curriculum item, time period, one or more Training Classes, facilitator, and room. A session can serve a single class or several classes at once (for example, Senior 1 and Senior 2 attending the same lesson together). A parade night typically has six periods and may run several sessions in parallel.",
   },
   {
     term: "Mission Backlog",
@@ -113,8 +113,18 @@ const TASKS: { title: string; steps: string[] }[] = [
     steps: [
       "In Planning Workspace, select a parade night date on the calendar.",
       "Click an empty time-period cell to open the session panel.",
-      "Select the curriculum item, Training Class, facilitator, and room.",
+      "Select the curriculum item, one or more Training Classes, facilitator, and room.",
       "Select 'Save'. The session appears on the parade night.",
+    ],
+  },
+  {
+    title: "Schedule one session for two or more Training Classes",
+    steps: [
+      "Click an empty time-period cell to open the session panel.",
+      "Select the curriculum item and then select all the Training Classes that will attend this session together — for example, Senior 1 and Senior 2.",
+      "Select the facilitator and room.",
+      "Select 'Save'. The system records the delivery against each selected class independently.",
+      "If one of the classes already has a session assigned to this period, a conflict warning appears. You can override it if the combined arrangement is correct.",
     ],
   },
   {

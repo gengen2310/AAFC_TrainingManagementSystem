@@ -30,21 +30,21 @@ describe("permission helpers", () => {
     });
     it("wing_admin cannot write without an active proxy session", () => {
       expect(canWriteSquadron(mk("wing_admin"))).toBe(false);
-      expect(canWriteSquadron(mk("wing_admin", { mode: "delegated_intervention", acting_squadron_id: "s1", acting_wing_id: null, proxy_session_id: "p1" }))).toBe(false);
+      expect(canWriteSquadron(mk("wing_admin", { mode: "delegated_intervention", acting_squadron_id: "s1", acting_squadron_code: null, acting_squadron_name: null, acting_wing_id: null, proxy_session_id: "p1" }))).toBe(false);
     });
     it("wing_admin can write once proxy mode is active", () => {
-      expect(canWriteSquadron(mk("wing_admin", { mode: "proxy", acting_squadron_id: "s1", acting_wing_id: null, proxy_session_id: "p1" }))).toBe(true);
+      expect(canWriteSquadron(mk("wing_admin", { mode: "proxy", acting_squadron_id: "s1", acting_squadron_code: null, acting_squadron_name: null, acting_wing_id: null, proxy_session_id: "p1" }))).toBe(true);
     });
     it("national_admin cannot write without delegated intervention", () => {
       expect(canWriteSquadron(mk("national_admin"))).toBe(false);
-      expect(canWriteSquadron(mk("national_admin", { mode: "proxy", acting_squadron_id: "s1", acting_wing_id: null, proxy_session_id: "p1" }))).toBe(false);
+      expect(canWriteSquadron(mk("national_admin", { mode: "proxy", acting_squadron_id: "s1", acting_squadron_code: null, acting_squadron_name: null, acting_wing_id: null, proxy_session_id: "p1" }))).toBe(false);
     });
     it("national_admin can write once delegated intervention is active", () => {
-      expect(canWriteSquadron(mk("national_admin", { mode: "delegated_intervention", acting_squadron_id: "s1", acting_wing_id: null, proxy_session_id: "p1" }))).toBe(true);
+      expect(canWriteSquadron(mk("national_admin", { mode: "delegated_intervention", acting_squadron_id: "s1", acting_squadron_code: null, acting_squadron_name: null, acting_wing_id: null, proxy_session_id: "p1" }))).toBe(true);
     });
     it("system_admin follows the same delegated-intervention rule as national_admin", () => {
       expect(canWriteSquadron(mk("system_admin"))).toBe(false);
-      expect(canWriteSquadron(mk("system_admin", { mode: "delegated_intervention", acting_squadron_id: "s1", acting_wing_id: null, proxy_session_id: "p1" }))).toBe(true);
+      expect(canWriteSquadron(mk("system_admin", { mode: "delegated_intervention", acting_squadron_id: "s1", acting_squadron_code: null, acting_squadron_name: null, acting_wing_id: null, proxy_session_id: "p1" }))).toBe(true);
     });
     it("sqn_general and viewer roles never gain write access regardless of proxy", () => {
       expect(canWriteSquadron(mk("sqn_general"))).toBe(false);

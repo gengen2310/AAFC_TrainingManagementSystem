@@ -66,7 +66,7 @@
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
-body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px;line-height:1.55;}
+body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6;}
 ::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--lgrey);border-radius:3px;}
 
 /* ── PRINT ── */
@@ -157,7 +157,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .auth-wm .r{color:var(--blue);}
 .auth-div{width:36px;height:3px;background:var(--blue);margin:10px auto 0;border-radius:2px;opacity:.5;}
 .fg{margin-bottom:14px;}
-.fg label{display:block;font-size:10px;font-weight:700;color:var(--steel);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;}
+.fg label{display:block;font-size:12px;font-weight:700;color:var(--steel);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;}
 .fg select,.fg input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;color:var(--text);background:white;transition:border-color .15s,box-shadow .15s;}
 .fg select:focus,.fg input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(81,176,227,.15);}
 .btn-auth{width:100%;padding:11px;background:var(--dark);color:white;border:none;border-radius:6px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.04em;transition:background .15s;margin-top:6px;}
@@ -179,7 +179,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .tb-sep{color:rgba(255,255,255,.25);}
 .tb-unit{font-size:11px;font-weight:400;color:var(--text-on-dark-muted);}
 .tb-right{display:flex;align-items:center;gap:8px;}
-.sqn-chip{background:var(--blue);color:var(--dark);border-radius:4px;padding:3px 10px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;}
+.sqn-chip{background:var(--blue);color:var(--dark);border-radius:4px;padding:3px 10px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;}
 .sqn-chip.admin{background:#ffd700;color:var(--dark);}
 .tb-btn{background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.18);border-radius:5px;padding:4px 12px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;transition:background .12s;}
 .tb-btn:hover{background:rgba(255,255,255,.18);color:white;}
@@ -188,15 +188,16 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 
 /* ── SIDENAV ── */
 .sidenav{width:210px;background:white;border-right:1px solid var(--border);flex-shrink:0;padding:12px 0;height:calc(100vh - 52px);position:sticky;top:52px;overflow-y:auto;}
-.nav-lbl{font-size:9px;font-weight:800;color:var(--muted-text-on-light);letter-spacing:.12em;text-transform:uppercase;padding:14px 16px 4px;}
+.nav-lbl{font-size:10.5px;font-weight:800;color:var(--muted-text-on-light);letter-spacing:.12em;text-transform:uppercase;padding:14px 16px 4px;}
 .nav-item{display:flex;align-items:center;padding:8px 18px;font-size:12.5px;font-weight:500;color:var(--steel);cursor:pointer;transition:background .1s,color .1s;border-left:3px solid transparent;gap:8px;user-select:none;}
 .nav-item:hover{background:var(--bg);color:var(--dark);}
+.nav-item:focus-visible{background:var(--bg);color:var(--dark);outline:2px solid var(--blue);outline-offset:-2px;}
 .nav-item.active{background:#deeefa;color:var(--dark);border-left-color:var(--blue);font-weight:700;}
 /* Planning sub-items — indented within Training section */
 .nav-subitem{padding-left:30px;font-size:12px;font-weight:500;color:var(--steel);}
 .nav-subitem:hover{background:var(--bg);color:var(--dark);}
 .nav-subitem.active{background:#deeefa;color:var(--dark);border-left-color:var(--blue);font-weight:700;}
-.nav-planning-hdr{font-size:9px;font-weight:700;color:var(--pale);letter-spacing:.10em;text-transform:uppercase;padding:10px 18px 4px 30px;}
+.nav-planning-hdr{font-size:10.5px;font-weight:700;color:var(--pale);letter-spacing:.10em;text-transform:uppercase;padding:10px 18px 4px 30px;}
 .nav-item-ext{display:flex;align-items:center;padding:8px 18px;font-size:12.5px;font-weight:500;color:var(--steel);cursor:pointer;transition:background .1s,color .1s;border-left:3px solid transparent;gap:8px;user-select:none;text-decoration:none;}
 .nav-item-ext:hover{background:var(--bg);color:var(--dark);}
 .nav-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0;opacity:.6;}
@@ -216,40 +217,45 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .stat.s-ok{border-top-color:var(--ok);}.stat.s-warn{border-top-color:var(--warn);}
 .stat.s-red{border-top-color:var(--red);}.stat.s-dark{border-top-color:var(--dark);}
 .stat.s-purple{border-top-color:#7c3aed;}
-.slbl{font-size:9.5px;font-weight:800;color:var(--muted);letter-spacing:.10em;text-transform:uppercase;margin-bottom:4px;}
+.slbl{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.10em;text-transform:uppercase;margin-bottom:4px;}
 .sval{font-size:27px;font-weight:900;color:var(--dark);line-height:1;}
 .sval.lnk{color:var(--royal);cursor:pointer;text-decoration:underline dotted;}
 .sval.lnk:hover{color:var(--blue);}
-.ssub{font-size:10px;color:var(--muted);margin-top:2px;}
+.ssub{font-size:11px;color:var(--muted);margin-top:2px;}
 
 /* ── CARD ── */
 .card{background:white;border-radius:8px;padding:18px 20px;box-shadow:var(--sh);margin-bottom:16px;}
-.ctitle{font-size:10px;font-weight:800;color:var(--steel);margin-bottom:12px;text-transform:uppercase;letter-spacing:.10em;display:flex;align-items:center;gap:7px;}
+.ctitle{font-size:11.5px;font-weight:800;color:var(--steel);margin-bottom:12px;text-transform:uppercase;letter-spacing:.10em;display:flex;align-items:center;gap:7px;}
 .card h3{font-size:15px;font-weight:700;color:var(--dark);margin-bottom:10px;}
 .muted{color:var(--muted);}
 
 /* ── BUTTONS ── */
-.btn{padding:7px 14px;border-radius:6px;font-family:inherit;font-size:11.5px;font-weight:700;cursor:pointer;border:none;letter-spacing:.04em;transition:all .13s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+.btn{padding:9px 16px;border-radius:6px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;border:none;letter-spacing:.04em;transition:all .13s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
 .btn-primary,.btn-dk{background:var(--dark);color:white;}
 .btn-primary:hover,.btn-dk:hover{background:var(--royal);}
 .btn-secondary,.btn-out{background:white;color:var(--dark);border:1.5px solid var(--dark);}
 .btn-secondary:hover,.btn-out:hover{background:var(--dark);color:white;}
+.btn-red-out{background:white;color:var(--red);border:1.5px solid var(--red);}
+.btn-red-out:hover{background:var(--red);color:white;}
 .btn-sky{background:var(--accent-light);color:var(--dark);border:1px solid var(--pale);}
 .btn-sky:hover{background:#c4e4f5;color:var(--dark);}
 .btn-danger,.btn-red{background:var(--red);color:white;}
 .btn-danger:hover,.btn-red:hover{background:#c01530;}
 .btn-ok{background:var(--ok);color:white;}
 .btn-ok:hover{background:#145f38;}
-.btn-sm{padding:5px 10px;font-size:10.5px;}
-.btn-xs{padding:3px 8px;font-size:10px;border-radius:5px;}
+.btn-sm{padding:6px 12px;font-size:11.5px;}
+.btn-xs{padding:4px 9px;font-size:11px;border-radius:5px;}
 .btn-lnk{background:none;border:none;color:var(--royal);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;padding:0;text-decoration:underline dotted;}
 .btn-lnk:hover{color:var(--blue);}
+.btn:focus-visible,.btn-auth:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+a:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:2px;}
 
 /* ── SEGMENTED TOGGLE (view switchers) ── */
 .seg{display:inline-flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
 .seg-btn{background:var(--surface);border:none;border-right:1.5px solid var(--border);padding:5px 12px;font-size:11px;font-weight:700;font-family:inherit;color:var(--steel);cursor:pointer}
 .seg-btn:last-child{border-right:none}
 .seg-btn.active{background:var(--dark);color:#fff}
+.seg-btn:focus-visible{outline:2px solid var(--blue);outline-offset:-2px;z-index:1;position:relative;}
 
 /* ── CALENDAR GRID (Wing HQ Calendar) ── */
 .cal-grid-table{width:100%;border-collapse:collapse;table-layout:fixed}
@@ -262,7 +268,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .cal-grid-more{font-size:9px;color:var(--muted);cursor:pointer}
 
 /* ── BADGES ── */
-.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:9.5px;font-weight:700;letter-spacing:.05em;white-space:nowrap;}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.05em;white-space:nowrap;}
 .badge-green,.b-ok{background:#d4f0e3;color:#1a5c35;}
 .badge-grey,.b-grey{background:#eef0f2;color:var(--steel);}
 .badge-red,.b-red{background:#fde8e8;color:#8b1a1a;}
@@ -308,12 +314,12 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 /* ── FILTER BAR ── */
 .fbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
 .fbar select,.fbar input{padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;color:var(--text);background:white;}
-.fbar select:focus,.fbar input:focus{outline:none;border-color:var(--blue);}
+.fbar select:focus,.fbar input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(81,176,227,.15);}
 
 /* ── FORMS ── */
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.form-group,.ff{margin-bottom:13px;}
-.form-group label,.ff label{display:block;font-size:10px;font-weight:800;color:var(--steel);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.form-group,.ff{margin-bottom:18px;}
+.form-group label,.ff label{display:block;font-size:12px;font-weight:800;color:var(--steel);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;}
 .form-group select,.form-group input,.form-group textarea,
 .ff select,.ff input,.ff textarea{width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12.5px;color:var(--text);background:white;transition:border-color .15s,box-shadow .15s;}
 .form-group select:focus,.form-group input:focus,.form-group textarea:focus,
@@ -326,9 +332,10 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 
 /* ── TABS ── */
 .tab-bar{display:flex;border-bottom:2px solid var(--border);margin-bottom:18px;overflow-x:auto;}
-.tab-btn{padding:8px 14px;font-family:inherit;font-size:10px;font-weight:800;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;margin-bottom:-2px;transition:color .12s;white-space:nowrap;}
+.tab-btn{padding:8px 14px;font-family:inherit;font-size:11.5px;font-weight:800;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;margin-bottom:-2px;transition:color .12s;white-space:nowrap;}
 .tab-btn:hover{color:var(--dark);}
 .tab-btn.active{color:var(--dark);border-bottom-color:var(--blue);font-weight:800;}
+.tab-btn:focus-visible{outline:2px solid var(--blue);outline-offset:-2px;}
 
 /* ── ALERTS ── */
 .alert{padding:10px 13px;border-radius:6px;font-size:12px;margin-bottom:12px;display:flex;gap:8px;align-items:flex-start;}
@@ -362,7 +369,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .ph-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .ph-name{width:108px;font-size:11px;font-weight:600;color:var(--text);flex-shrink:0;}
 .ph-bar{flex:1;}
-.ph-cnt{width:80px;text-align:right;font-size:10.5px;color:var(--muted);}
+.ph-cnt{width:80px;text-align:right;font-size:11.5px;color:var(--muted);}
 
 /* ── DRILL PANEL ── */
 .drill-panel{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:12px;display:none;}
@@ -370,11 +377,11 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 
 /* ── DASHBOARD CHART STYLES ── */
 .dash-section{margin-bottom:24px;}
-.dash-sec-hdr{font-size:10px;font-weight:800;color:var(--steel);letter-spacing:.14em;text-transform:uppercase;padding:10px 0 4px;border-top:2px solid var(--border);margin-bottom:4px;}
+.dash-sec-hdr{font-size:11px;font-weight:800;color:var(--steel);letter-spacing:.14em;text-transform:uppercase;padding:10px 0 4px;border-top:2px solid var(--border);margin-bottom:4px;}
 .dash-sec-sub{font-size:11.5px;color:var(--muted);margin-bottom:12px;}
 .chart-insight{font-size:11.5px;color:var(--royal);font-weight:600;padding:6px 10px;background:var(--accent-light);border-radius:5px;margin-top:8px;border-left:3px solid var(--blue);}
 .chart-skeleton{background:linear-gradient(90deg,#f0f4f8 25%,#e4eaf0 50%,#f0f4f8 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;height:80px;}
-.chart-data-toggle{margin-top:6px;font-size:10.5px;color:var(--muted);}
+.chart-data-toggle{margin-top:6px;font-size:11.5px;color:var(--muted);}
 .chart-data-toggle summary{cursor:pointer;display:inline;user-select:none;}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .pbar{background:var(--border);border-radius:3px;height:14px;overflow:hidden;}
@@ -394,7 +401,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .stacked-seg:last-child{border-radius:0 3px 3px 0;}
 .dash-filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:white;border-radius:8px;box-shadow:var(--sh);border:1px solid var(--border);}
 .dash-filter-bar select{padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:11.5px;color:var(--text);}
-.dash-filter-bar label{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+.dash-filter-bar label{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
 .drill-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .drill-title{font-size:12px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.04em;}
 
@@ -428,6 +435,8 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 
 /* ── PARADE NIGHT CARD ── */
 .pn-card{background:white;border-radius:8px;box-shadow:var(--sh);border-left:5px solid var(--blue);margin-bottom:12px;overflow:hidden;}
+.pn-term-group{margin-bottom:8px;}
+.pn-term-hdr{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:8px 0 6px;border-bottom:1px solid var(--border-light);margin-bottom:8px;}
 .pn-hdr{background:linear-gradient(90deg,var(--dark) 0%,var(--royal) 100%);color:white;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px;}
 .pn-date{font-size:14px;font-weight:800;}
 .pn-meta{font-size:10px;color:rgba(255,255,255,.6);margin-top:2px;}
@@ -441,7 +450,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .sess-card.not_delivered{border-color:var(--lgrey);background:#f8f9fa;}
 .sess-card.unassigned{border-color:var(--warn);background:#fffbf0;}
 .sess-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
-.sess-num{font-size:9px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;}
+.sess-num{font-size:10.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;}
 .sess-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
 .sess-info{font-size:10.5px;color:var(--muted);}
 .sess-acts{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;}
@@ -461,7 +470,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .modal-x{background:rgba(255,255,255,.12);border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:background .13s;}
 .modal-x:hover{background:rgba(255,255,255,.22);}
 .modal-body{padding:20px;}
-.modal-foot{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+.modal-foot{padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
 
 /* ── TOAST (non-blocking, accessible replacement for alert()) ── */
 .toast-region{position:fixed;top:16px;right:16px;z-index:900;display:flex;flex-direction:column;gap:8px;max-width:340px;}
@@ -474,14 +483,14 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 
 /* ── WEEKLY PROGRAM ── */
 .wp-tbl{width:100%;border-collapse:collapse;font-size:12px;}
-.wp-tbl th{background:var(--surface-2);color:var(--steel);padding:8px 12px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;border-bottom:1px solid var(--border);text-align:left;}
+.wp-tbl th{background:var(--surface-2);color:var(--steel);padding:8px 12px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;border-bottom:1px solid var(--border);text-align:left;}
 .wp-tbl td{border:1px solid var(--border);padding:9px 12px;vertical-align:top;}
 /* Weekly preview section within Parade Night Program */
 .wp-preview-section{margin-top:20px;border-top:2px solid var(--border);padding-top:18px;}
 .wp-preview-section h3{font-size:12px;font-weight:800;color:var(--steel);text-transform:uppercase;letter-spacing:.09em;margin-bottom:12px;}
 
 /* ── CLASH INDICATOR ── */
-.clash-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;background:#fde8e8;color:#8b1a1a;font-size:9.5px;font-weight:800;}
+.clash-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;background:#fde8e8;color:#8b1a1a;font-size:11px;font-weight:800;}
 
 /* ── FAC PROFILE ── */
 .fac-ph{background:var(--dark);color:white;border-radius:10px;padding:18px;margin-bottom:16px;display:flex;align-items:center;gap:14px;}
@@ -491,7 +500,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .fac-sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:16px;}
 .fac-st{background:white;border-radius:8px;padding:12px;box-shadow:var(--sh);text-align:center;}
 .fac-sv{font-size:22px;font-weight:700;color:var(--text);}
-.fac-sl{font-size:9px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
+.fac-sl{font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
 
 /* ── CURRICULUM CARD ── */
 .curr-card{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;}
@@ -501,11 +510,11 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .curr-body.open{display:block;}
 .exp-item{border:1px solid var(--border);border-radius:7px;padding:10px 12px;margin-bottom:7px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;transition:border-color .12s;cursor:pointer;}
 .exp-item:hover{border-color:var(--accent);background:#fafbff;}
-.exp-code{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.04em;margin-bottom:2px;}
+.exp-code{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.04em;margin-bottom:2px;}
 .exp-title{font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:3px;}
 .exp-meta{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
 .exp-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;}
-.lh-btn{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:5px;background:var(--accent-light);color:var(--link-on-light);font-size:10px;font-weight:600;text-decoration:none;transition:background .12s;}
+.lh-btn{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:5px;background:var(--accent-light);color:var(--link-on-light);font-size:11px;font-weight:600;text-decoration:none;transition:background .12s;}
 .lh-btn:hover{background:#cce0ff;}
 
 /* ── RESOURCE CHIPS ── */
@@ -529,7 +538,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .mode-banner{display:none;align-items:center;justify-content:space-between;gap:12px;padding:8px 22px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:#ffd700;color:#3a2e00;border-bottom:2px solid #c9a800;}
 .mode-banner.intervention{background:#ffe0e0;color:#7a1010;border-bottom-color:#c25;}
 .mode-banner.show{display:flex;}
-.mode-banner button{font:inherit;font-size:10px;border:1px solid currentColor;background:transparent;color:inherit;border-radius:6px;padding:3px 11px;cursor:pointer;text-transform:uppercase;font-weight:800;}
+.mode-banner button{font:inherit;font-size:11px;border:1px solid currentColor;background:transparent;color:inherit;border-radius:6px;padding:3px 11px;cursor:pointer;text-transform:uppercase;font-weight:800;}
 .maint-banner{display:none;align-items:center;gap:10px;padding:8px 22px;font-size:12px;font-weight:700;background:#e51937;color:#fff;border-bottom:2px solid #b5002b;}
 .maint-banner.show{display:flex;}
 .maint-banner .maint-icon{font-size:15px;flex-shrink:0;}
@@ -585,6 +594,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 .sc-sqn-chip.inactive{opacity:.5;text-decoration:line-through;}
 .sc-audit-row{display:grid;grid-template-columns:140px 70px 120px 1fr;gap:4px 10px;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:11.5px;}
 .sc-audit-row dt{color:var(--muted);}
+@media(max-width:600px){
+  .sc-audit-row{grid-template-columns:1fr 1fr;}
+  .sc-kv{grid-template-columns:1fr;}
+  .sc-kv dt{font-weight:700;margin-top:4px;}
+}
 .sc-backup-item{display:flex;gap:12px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:12px;}
 .sc-backup-item .sc-filename{font-family:monospace;color:var(--dark);}
 .sc-backup-item .sc-bsize{color:var(--muted);}
@@ -606,6 +620,14 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   z-index:9000;pointer-events:none;white-space:normal;box-shadow:0 3px 10px rgba(0,0,0,.25);}
 .ht:hover::after,.ht:focus::after{display:block;}
 .ht:focus{outline:2px solid var(--blue);outline-offset:2px;}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.01ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+    scroll-behavior:auto!important;
+  }
+}
 </style>
 </head>
 <body>
@@ -734,31 +756,31 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
            working completely unchanged. See docs/remediation/master_gap_register.csv
            REM-25 for the full before/after capability comparison. -->
       <div class="nav-lbl">Overview</div>
-      <div class="nav-item" onclick="nav('getting-started')">Getting Started</div>
-      <div class="nav-item active" onclick="nav('dashboard')">Dashboard</div>
-      <div class="nav-item" onclick="nav('calendar')">Training Calendar</div>
+      <div class="nav-item" tabindex="0" onclick="nav('getting-started')">Getting Started</div>
+      <div class="nav-item active" tabindex="0" onclick="nav('dashboard')">Dashboard</div>
+      <div class="nav-item" tabindex="0" onclick="nav('calendar')">Training Calendar</div>
       <div class="nav-lbl">Plan Training</div>
-      <div class="nav-item" onclick="nav('curriculum')">Curriculum</div>
-      <div class="nav-item" onclick="nav('activities')">Activities</div>
-      <div class="nav-item" onclick="nav('parade-nights')">Parade Nights</div>
-      <div class="nav-item" onclick="nav('weekly-program')">Weekly Program</div>
+      <div class="nav-item" tabindex="0" onclick="nav('curriculum')">Curriculum</div>
+      <div class="nav-item" tabindex="0" onclick="nav('activities')">Activities</div>
+      <div class="nav-item" tabindex="0" onclick="nav('parade-nights')">Parade Nights</div>
+      <div class="nav-item" tabindex="0" onclick="nav('weekly-program')">Weekly Program</div>
       <div class="nav-lbl">People and Resources</div>
-      <div class="nav-item" onclick="nav('facilitators')">Facilitators</div>
-      <div class="nav-item" onclick="nav('resources')">Locations and Resources</div>
+      <div class="nav-item" tabindex="0" onclick="nav('facilitators')">Facilitators</div>
+      <div class="nav-item" tabindex="0" onclick="nav('resources')">Locations and Resources</div>
       <div class="nav-lbl">Needs Attention</div>
-      <div class="nav-item" onclick="nav('action-items')">Needs Attention</div>
+      <div class="nav-item" tabindex="0" onclick="nav('action-items')">Needs Attention</div>
       <div class="nav-lbl" id="admin-lbl" style="display:none">Settings</div>
-      <div class="nav-item admin-el" style="display:none" onclick="nav('settings')">Unit Settings</div>
-      <div class="nav-item" id="nav-accounts" style="display:none" onclick="nav('accounts')">Account Management</div>
+      <div class="nav-item admin-el" tabindex="-1" style="display:none" onclick="nav('settings')">Unit Settings</div>
+      <div class="nav-item" id="nav-accounts" tabindex="-1" style="display:none" onclick="nav('accounts')">Account Management</div>
       <div class="nav-lbl nav-scope" id="hq-lbl" style="display:none">Command</div>
-      <div class="nav-item nav-scope" id="nav-wing" style="display:none" onclick="nav('wing-overview')">Wing Overview</div>
-      <div class="nav-item nav-scope" id="nav-wing-activities" style="display:none" onclick="nav('wing-activities')">Wing Activities</div>
-      <div class="nav-item nav-scope" id="nav-wing-calendar" style="display:none" onclick="nav('wing-calendar')">Wing HQ Calendar</div>
-      <div class="nav-item nav-scope" id="nav-national" style="display:none" onclick="nav('national')">National Overview</div>
-      <div class="nav-item nav-scope" id="nav-national-activities" style="display:none" onclick="nav('national-activities')">National Activities</div>
-      <div class="nav-item nav-scope" id="nav-audit" style="display:none" onclick="nav('audit')">Audit</div>
+      <div class="nav-item nav-scope" id="nav-wing" tabindex="-1" style="display:none" onclick="nav('wing-overview')">Wing Overview</div>
+      <div class="nav-item nav-scope" id="nav-wing-activities" tabindex="-1" style="display:none" onclick="nav('wing-activities')">Wing Activities</div>
+      <div class="nav-item nav-scope" id="nav-wing-calendar" tabindex="-1" style="display:none" onclick="nav('wing-calendar')">Wing HQ Calendar</div>
+      <div class="nav-item nav-scope" id="nav-national" tabindex="-1" style="display:none" onclick="nav('national')">National Overview</div>
+      <div class="nav-item nav-scope" id="nav-national-activities" tabindex="-1" style="display:none" onclick="nav('national-activities')">National Activities</div>
+      <div class="nav-item nav-scope" id="nav-audit" tabindex="-1" style="display:none" onclick="nav('audit')">Audit</div>
       <div class="nav-lbl" id="nav-system-lbl" style="display:none">System</div>
-      <div class="nav-item" id="nav-system-console" style="display:none" onclick="nav('system-console')">System Console</div>
+      <div class="nav-item" id="nav-system-console" tabindex="-1" style="display:none" onclick="nav('system-console')">System Console</div>
       <div class="nav-lbl" id="nav-lbl-pw" style="display:none">Workspace</div>
       <a class="nav-item-ext" id="nav-pw-link" href="#" target="_blank" rel="noopener" style="display:none">Planning Workspace ↗</a>
       <div class="nav-item-ext" id="nav-pw-unconfigured" style="display:none;opacity:.55;cursor:default" title="Planning Workspace is not configured for this environment. Contact your system administrator.">Planning Workspace (unavailable)</div>
@@ -1075,7 +1097,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <button class="btn btn-dk admin-el" id="btn-add-curr-nat" style="display:none" onclick="openAddCurrNat()">+ Add National Curriculum</button>
             <button class="btn btn-out nat-admin-el" style="display:none" onclick="openCsvCurrImport()">Import CSV</button>
             <button class="btn btn-out" onclick="exportCurriculum()" title="Export curriculum to Excel">Export XLSX</button>
-            <button class="btn btn-out" onclick="exportProgramItemsCSV()" title="Export programme items as CSV (background job — progress shown in the notification area)">Export CSV</button>
+            <button class="btn btn-out" onclick="exportProgramItemsCSV()" title="Download programme items as CSV">Export CSV</button>
             <a href="https://airforcecadets.net.au/lh/home" target="_blank" class="btn btn-sky no-print">Learning Hub</a>
           </div>
         </div>
@@ -1221,8 +1243,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <p class="muted" style="font-size:11.5px;margin:0 0 10px">
             A Training Class is a local group completing a Training Stage — for example, Senior 1
             and Senior 2 can both complete Senior training but undertake different lessons on the
-            same Parade Night. If you run only one class for a Stage, you can simply call it by
-            the Stage name.
+            same Parade Night. With only one class for a Stage, name it after the Stage.
           </p>
           <div id="py-classes-body"></div>
         </div>
@@ -1413,8 +1434,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="muted" style="font-size:10.5px;margin:-4px 0 10px">
             This is the <b>default</b> used only when you <b>generate new</b> Parade Nights — it never
             changes nights that already exist. To move already-generated Parade Nights to a new day,
-            change this setting and save: you will be offered a preview of exactly which nights would
-            move before anything happens.
+            change this setting and save: a preview of the affected nights appears before anything moves.
           </div>
           <div class="form-row">
             <div class="ff"><label>Squadron Crest URL (optional)</label>
@@ -1725,11 +1745,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div id="sc-maint-form" style="margin-top:14px;display:none">
             <div class="form-group">
               <label>Message shown to users</label>
-              <input id="sc-maint-msg" type="text" placeholder="System under maintenance. Please try again later." style="width:100%;max-width:480px">
+              <input id="sc-maint-msg" type="text" placeholder="System under maintenance. Try again later." style="width:100%;max-width:480px">
             </div>
             <div class="form-group">
               <label>Expected return time (optional, ISO format)</label>
-              <input id="sc-maint-until" type="text" placeholder="e.g. 2026-12-01T08:00:00Z" style="width:100%;max-width:300px">
+              <input id="sc-maint-until" type="text" placeholder="e.g. 2026-12-01 08:00 UTC (24-hour)" style="width:100%;max-width:300px">
             </div>
             <div class="form-group" style="margin-top:10px">
               <div style="font-size:12px;font-weight:700;margin-bottom:6px">Access restrictions</div>
@@ -2182,7 +2202,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="form-group"><label for="tcmerge-target-inp">Merge into *</label>
       <select id="tcmerge-target-inp" aria-label="Merge into"></select>
     </div>
-    <p class="muted" style="font-size:11px">Every cadet currently in this class will be moved into the class you choose, and this class will be archived (its history and past sessions are kept, and it can be restored later).</p>
+    <p class="muted" style="font-size:11px">All cadets in this class move to the class you select. This class archives — its history and past sessions are preserved and can be restored later.</p>
     <p id="tcmerge-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-merge-training-class')">Cancel</button>
@@ -2204,6 +2224,22 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-training-class-progress')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Copy Sessions to Another Parade Night Modal (WORK-11) -->
+<div class="modal-bg" id="m-pn-copy-sessions">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title">Copy sessions to another parade night</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-copy-sessions')">×</button></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Copies the planning details of each session (curriculum item, facilitator, room, Training Class audience) from this parade night to the selected night. Sessions already at the same period in the target are not changed.</p>
+      <div class="ff"><label for="pn-copy-target">Copy to</label><select id="pn-copy-target" aria-label="Target parade night"></select></div>
+      <div id="pn-copy-err" style="color:var(--red);font-size:12px;margin-top:6px;display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('m-pn-copy-sessions')">Cancel</button>
+      <button class="btn btn-primary" onclick="doCopyPNSessions()">Copy sessions</button>
     </div>
   </div>
 </div>
@@ -2744,7 +2780,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title">Merge Facilitator</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-fac-merge')">×</button></div>
     <div class="modal-body">
-      <div class="alert a-warn" style="margin-bottom:12px">This cannot be undone. The duplicate will be archived, and all their sessions, leave records, and assistant/backup assignments will be re-attributed to the selected facilitator.</div>
+      <div class="alert a-warn" style="margin-bottom:12px">This cannot be undone. The duplicate archives, and all sessions, leave records, and assistant/backup assignments transfer to the facilitator you keep.</div>
       <div id="fac-merge-info" style="font-size:12px;margin-bottom:12px"></div>
       <div class="ff">
         <label for="fac-merge-target">Keep this facilitator instead</label>
@@ -3001,6 +3037,25 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-foot">
       <button class="btn btn-out" onclick="_confirmNo()">Cancel</button>
       <button class="btn btn-dk" id="confirm-yes-btn" onclick="_confirmYes()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic text-input modal — replaces native prompt() dialogs (see promptText()) -->
+<div class="modal-bg" id="m-text-input" role="dialog" aria-modal="true" aria-labelledby="ti-title">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr"><div class="modal-title" id="ti-title">Enter value</div><button class="modal-x" type="button" onclick="_tiCancel()" aria-label="Cancel">×</button></div>
+    <div class="modal-body">
+      <p id="ti-context" style="margin:0 0 12px;font-size:13px;white-space:pre-line"></p>
+      <div class="ff">
+        <label for="ti-input" id="ti-label">Value</label>
+        <input id="ti-input" type="text" autocomplete="off" />
+      </div>
+      <div id="ti-err" role="alert" style="font-size:11.5px;font-weight:700;color:var(--red);min-height:14px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-out" type="button" onclick="_tiCancel()">Cancel</button>
+      <button class="btn btn-dk" type="button" id="ti-ok-btn" onclick="_tiSave()">OK</button>
     </div>
   </div>
 </div>
@@ -3545,7 +3600,7 @@ async function api(path, opts={}){
     tokenClear();
     let b401=null; try{b401=await res.json();}catch(_){}
     const c401=(b401&&b401.detail&&typeof b401.detail==='object'&&b401.detail.error)||'';
-    const msg401=c401==='invalid_user'?'Your account has been deactivated. Contact your Wing HQ.':'Your session has expired. Please sign in again.';
+    const msg401=c401==='invalid_user'?'Your account has been deactivated. Contact your Wing HQ.':'Your session has expired. Sign in again.';
     throw {kind:'auth', status:401, code:c401, msg:msg401};
   }
   let body=null, bodyParseFailed=false;
@@ -3576,7 +3631,7 @@ async function api(path, opts={}){
       else if(res.status===403) msg='Access not permitted.';
       else if(res.status===404) msg='Not found.';
       else if(res.status===422) msg='Some fields are invalid.';
-      else if(res.status===429) msg='Too many attempts. Please wait and try again.';
+      else if(res.status===429) msg='Too many attempts. Wait a moment and try again.';
       else if(res.status>=500)  msg='Server error. Try again or contact support.';
       else                       msg='Request failed. Try again, or contact your administrator.';
     }
@@ -3586,7 +3641,7 @@ async function api(path, opts={}){
     // require_* helpers now return an actionable message for many forbidden
     // cases -- unconditionally overwriting msg here was discarding it).
     if(code==='maintenance_mode'){
-      const maintMsg=msg||'System under maintenance. Please try again later.';
+      const maintMsg=msg||'System under maintenance. Try again later.';
       _showMaintenanceBanner(maintMsg); msg=maintMsg;
     }
     if(!msg&&(code==='forbidden'||code==='access_denied')) msg='Access not permitted.';
@@ -3606,8 +3661,25 @@ async function api(path, opts={}){
     if(res.status===422&&code==='wing_id_required')      msg='Wing is required.';
     if(res.status===409&&code==='code_exists'&&body&&body.detail&&body.detail.message) msg=body.detail.message;
     if(res.status===409&&code==='tag_already_exists') msg='A tag with that name already exists.';
-    if(res.status===429 && !msg) msg='Too many attempts. Please wait and try again.';
+    if(res.status===429 && !msg) msg='Too many attempts. Wait a moment and try again.';
     if(res.status===409&&code==='resource_conflict') msg='This facilitator or room is already booked for that period.';
+    if(code==='duplicate_date')                         msg='A Parade Night already exists on that date.';
+    if(code==='parade_night_closed')                    msg='This Parade Night is closed and cannot be modified.';
+    if(code==='already_archived')                       msg='This record has already been archived.';
+    if(code==='not_archived')                           msg='This record is not archived.';
+    if(code==='planning_year_already_exists')           msg='A Planning Year for this period already exists.';
+    if(code==='cross_squadron'||code==='cross_squadron_copy_not_permitted'||code==='cross_squadron_move_forbidden') msg='This record belongs to a different Squadron.';
+    if(code==='publish_blocked')                        msg='Cannot publish — some sessions are missing required information. Check facilitators and rooms before publishing.';
+    if(code==='close_blocked')                          msg='Cannot close this Parade Night — some sessions are still Planned. Record outcomes first.';
+    if(code==='invalid_training_class')                 msg='Training Class not found or does not belong to this Squadron.';
+    if(code==='training_class_wrong_squadron')          msg='That Training Class belongs to a different Squadron.';
+    if(code==='training_stage_not_found')               msg='Training Stage not found — it may have been archived.';
+    if(code==='training_year_not_found_for_squadron')   msg='No Training Year found for this Squadron. Create one in Getting Started.';
+    if(code==='reason_required')                        msg='A reason is required for this action.';
+    if(code==='name_required')                          msg='A name is required.';
+    if(code==='name_exists')                            msg='A record with that name already exists.';
+    if(code==='source_not_found')                       msg='Source Parade Night not found.';
+    if(code==='target_not_found'||code==='target_parade_night_not_found') msg='Target Parade Night not found.';
     // body is included (not just code/msg) so callers that need structured detail --
     // e.g. the scheduling conflict prompt's list of which facilitator/room clashed --
     // don't have to re-fetch or re-parse; existing callers only ever destructured
@@ -3815,7 +3887,7 @@ async function doLogin(){
   const bar=document.getElementById('auth-progress-bar');
 
   err.style.display='none';
-  if(!code){err.style.display='block';err.textContent='Please enter your access code.';return;}
+  if(!code){err.style.display='block';err.textContent='Enter your access code.';return;}
 
   btn.disabled=true; btn.textContent='Signing in…';
   prog.style.display='block'; bar.style.width='0%';
@@ -4141,13 +4213,14 @@ async function loadData(){
     S.squadrons=nsqns||[];
   }
   if(S._loadFailures&&S._loadFailures.length){
-    showToast('Some data failed to load ('+S._loadFailures.join(', ')+'). Refresh to try again.',true);
+    showToast('Some information could not load. Refresh the page to try again. If the problem continues, contact your administrator.',true);
   }
+  S._loadedAt=Date.now();
 }
 // Writes now go to the backend then re-load. save() is retained as a no-op so existing
 // handlers that call it do not break; real persistence happens via the API helpers below.
 function save(){ /* no-op: backend is the source of truth */ }
-async function reloadAndRender(){ try{ await loadData(); renderAll(); }catch(e){ alert(apiErr(e)); } }
+async function reloadAndRender(){ try{ await loadData(); renderAll(); }catch(e){ showToast(apiErr(e),true); } }
 
 // Backend write helpers (used by the wired handlers).
 async function apiSetSessionStatus(sessionId, status, reason){
@@ -4196,7 +4269,7 @@ function _jobPollToast(label, jobId) {
         } else if (j.status === 'failed') {
           done = true;
           t.className = 'toast err'; t.setAttribute('role', 'alert');
-          _setText(false, 'Export failed: ' + (j.error_message || 'unknown error'));
+          _setText(false, 'Export failed: ' + (j.error_message || 'Unexpected error — check your connection and try again.'));
           setTimeout(() => t.remove(), 9000);
         } else {
           const pct = j.progress_percentage || 0;
@@ -4210,16 +4283,8 @@ function _jobPollToast(label, jobId) {
   _poll();
 }
 
-async function exportProgramItemsCSV() {
-  try {
-    const r = await api('/api/jobs/export', {
-      method: 'POST',
-      body: JSON.stringify({ export_type: 'program-items', format: 'csv' }),
-    });
-    _jobPollToast('Preparing programme items export…', r.job_id);
-  } catch (e) {
-    showToast('Export failed: ' + apiErr(e), true);
-  }
+function exportProgramItemsCSV() {
+  _downloadExport('/api/export/program-items.csv','programme-items.csv');
 }
 
 // Shared manual-refresh pattern for primary pages (Training Dashboard,
@@ -4268,7 +4333,7 @@ function _populateReasonSelect(){
 }
 async function _onReasonChange(sel){
   if(sel.value!=='__add_new__')return;
-  const name=(prompt('New reason name:')||'').trim();
+  const name=await promptText('New reason','Reason name',{okLabel:'Create'});
   if(!name){ sel.value=''; return; }
   try{
     const t=await api('/api/session-status-reason-tags',{method:'POST',body:JSON.stringify({display_name:name})});
@@ -4284,7 +4349,7 @@ async function _onReasonChange(sel){
 function collectOutcomeReason(status){
   return new Promise(resolve=>{
     _orResolve=resolve;
-    document.getElementById('or-context').textContent=OUTCOME_REASON_REQUIRED[status]||'Please provide a reason.';
+    document.getElementById('or-context').textContent=OUTCOME_REASON_REQUIRED[status]||'Enter a reason.';
     _populateReasonSelect();
     document.getElementById('or-reason').value='';
     document.getElementById('or-note').value='';
@@ -4402,7 +4467,7 @@ function saRenderScopeBar(){
 async function saSelectWing(wingId){
   if(proxyActive())await exitMode();
   S.saScope={level:wingId?'wing':'national',wingId:wingId||null,squadronId:null};
-  try{ await loadData(); }catch(e){ alert(apiErr(e)); }
+  try{ await loadData(); }catch(e){ showToast(apiErr(e),true); }
   updateScopeBanner(); updateModeBanner(); updateDebugBar(); bootApp();
 }
 
@@ -4410,7 +4475,7 @@ async function saSelectSquadron(sqnId){
   if(proxyActive())await exitMode();
   S.saScope.level=sqnId?'squadron':'wing';
   S.saScope.squadronId=sqnId||null;
-  try{ await loadData(); }catch(e){ alert(apiErr(e)); }
+  try{ await loadData(); }catch(e){ showToast(apiErr(e),true); }
   updateScopeBanner(); updateModeBanner(); updateDebugBar(); bootApp();
 }
 
@@ -4436,6 +4501,7 @@ function applyNavScope(){
     // override like the others above).
     if(target==='system-console')show=(S.role==='system_admin');
     n.style.display=show?'flex':'none';
+    n.setAttribute('tabindex',show?'0':'-1');
   });
   saRenderScopeBar();
   // System Console section label
@@ -4452,6 +4518,11 @@ function applyNavScope(){
   });
 }
 
+document.addEventListener('keydown',function(e){
+  if((e.key==='Enter'||e.key===' ')&&e.target.classList.contains('nav-item')){
+    e.preventDefault(); e.target.click();
+  }
+});
 function updateScopeBanner(){
   const scope=getScopeType(), sb=document.getElementById('scope-banner');
   if(!sb)return;
@@ -4484,7 +4555,7 @@ function updateModeBanner(){
 function _showMaintenanceBanner(msg){
   const b=document.getElementById('maint-banner'),m=document.getElementById('maint-msg');
   if(b){b.className='maint-banner show';}
-  if(m)m.textContent=msg||'System under maintenance. Please try again later.';
+  if(m)m.textContent=msg||'System under maintenance. Try again later.';
 }
 function _hideMaintenanceBanner(){
   const b=document.getElementById('maint-banner'); if(b)b.className='maint-banner';
@@ -4503,7 +4574,19 @@ async function _pollMaintenanceStatus(){
 }
 // Poll every 90 seconds and whenever the tab regains visibility.
 setInterval(_pollMaintenanceStatus,90000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)_pollMaintenanceStatus();});
+// Stale-data refresh: when the tab returns to the foreground after ≥5 minutes
+// of inactivity, silently reload all operational data so users don't see stale
+// parade nights, sessions or reports from another role's changes made while
+// this tab was backgrounded. The toast is informational, not alarming.
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden)return;
+  _pollMaintenanceStatus();
+  if(!S.session)return; // not logged in — nothing to refresh
+  const STALE_MS=5*60*1000;
+  if(!S._loadedAt||Date.now()-S._loadedAt>=STALE_MS){
+    loadData().then(()=>{ renderAll(); showToast('Data refreshed.'); }).catch(()=>{});
+  }
+});
 
 function updateDebugBar(){
   const d=document.getElementById('debug-bar'); if(!d)return;
@@ -4599,6 +4682,8 @@ function bootApp(){
   const ccMsg=document.getElementById('cc-msg'); if(ccMsg)ccMsg.textContent='';
   calYear=new Date().getFullYear();calMonth=new Date().getMonth();
   populateWPDD();
+  _restorePNFilters();
+  _restoreMissionFilters();
   renderAll();
   nav(SCOPE_LANDING[scope]||'dashboard');
 }
@@ -4625,9 +4710,9 @@ function nav(id){
   if(id==='planning-year'||id==='planning-anchors'||id==='planning-term'||id==='planning-missions')id='activities';
   if(id==='planning-builder'||id==='planning-rooms')id='parade-nights';
   if(id==='planning-guide'||id==='planning-longrange'||id==='planning-checks')id='dashboard';
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>{p.classList.remove('active');p.setAttribute('aria-hidden','true');});
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  const pg=document.getElementById('page-'+id);if(pg)pg.classList.add('active');
+  const pg=document.getElementById('page-'+id);if(pg){pg.classList.add('active');pg.removeAttribute('aria-hidden');}
   document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes("'"+id+"'"))n.classList.add('active');});
   if(id==='getting-started')loadGettingStarted();
   if(id==='calendar')renderCal();
@@ -4693,7 +4778,7 @@ function _renderGsSections(d){
       '</div>';
   }
   if(!d.national&&!d.squadron){
-    html+='<div class="alert a-info">No organisation scope is currently selected to check setup status for.</div>';
+    html+='<div class="alert a-info">Select a Wing or Squadron to check setup status.</div>';
   }
   return html;
 }
@@ -4863,7 +4948,7 @@ async function scPopulateWingSelect(){
       o.value=w.wing_id; o.textContent=`${w.code||''} — ${w.name||w.wing_id}`;
       sel.appendChild(o);
     }
-  } catch(e){ sel.innerHTML='<option value="">Error loading wings</option>'; }
+  } catch(e){ sel.innerHTML='<option value="">Could not load wings — refresh the page</option>'; }
 }
 
 async function scCreateWing(){
@@ -5303,19 +5388,21 @@ async function _addRefItem(key){
 }
 async function _archiveRefItem(key,id){
   const t=_REFDATA_TYPES.find(x=>x.key===key); if(!t)return;
-  if(!confirm('Archive this item? It will no longer appear in pickers, but existing records are unaffected.'))return;
-  try{
-    await api(t.archiveUrl(id),{method:t.archiveMethod});
-    await _loadRefList(t);
-  }catch(e){ alert(apiErr(e)); }
+  confirmAction('Archive this item? It will no longer appear in pickers, but existing records are unaffected.',async()=>{
+    try{
+      await api(t.archiveUrl(id),{method:t.archiveMethod});
+      await _loadRefList(t);
+    }catch(e){ showToast(apiErr(e),true); }
+  });
 }
 async function _restoreRefItem(key,id){
   const t=_REFDATA_TYPES.find(x=>x.key===key); if(!t||!t.restoreUrl)return;
-  if(!confirm('Restore this item? It will appear in pickers again.'))return;
-  try{
-    await api(t.restoreUrl(id),{method:'POST'});
-    await _loadRefList(t);
-  }catch(e){ alert(apiErr(e)); }
+  confirmAction('Restore this item? It will appear in pickers again.',async()=>{
+    try{
+      await api(t.restoreUrl(id),{method:'POST'});
+      await _loadRefList(t);
+    }catch(e){ showToast(apiErr(e),true); }
+  });
 }
 
 // Bulk archive: wing_admin/national_admin/system_admin only (matches the
@@ -5593,7 +5680,7 @@ function _renderUnitsTable(){
     sqns.map(s=>`<tr${s.is_archived?' style="opacity:.6"':''}>
       <td style="font-weight:700">${esc(s.code)}${s.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
       <td style="font-size:11.5px">${esc(s.name||s.short_name||'')}</td>
-      <td style="font-size:11px"><span class="badge b-blue" style="font-size:9px">${_UNIT_TYPE_LABELS[s.unit_type]||s.unit_type||'Squadron'}</span></td>
+      <td style="font-size:11px"><span class="badge b-blue" style="font-size:10.5px">${_UNIT_TYPE_LABELS[s.unit_type]||s.unit_type||'Squadron'}</span></td>
       <td style="font-size:11.5px;color:var(--muted)">${esc(wName(s.wing_id))}</td>
       ${(isNatAdmin||isWingAdmin)?`<td class="no-print" style="display:flex;gap:4px;flex-wrap:wrap">${actionsCell(s)}</td>`:''}
     </tr>`).join('')+
@@ -5638,8 +5725,12 @@ async function doRestoreWing(wingId, wingCode){
   }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
 }
 async function doPermanentlyDeleteWing(wingId, wingCode){
-  const typed=prompt(`This permanently deletes Wing '${wingCode}' — this cannot be undone. It will only succeed if the Wing has no linked records; otherwise it stays archived.\n\nType the Wing's code to confirm:`);
-  if(typed===null)return;
+  const typed=await promptText('Permanently delete Wing',`Type the Wing code to confirm`,{
+    context:`This permanently deletes Wing '${wingCode}' — this cannot be undone. It will only succeed if the Wing has no linked records; otherwise it stays archived.`,
+    okLabel:'Delete permanently',danger:true,
+    validate:v=>v!==wingCode?`Type exactly: ${wingCode}`:'',
+  });
+  if(!typed)return;
   if(typed.trim()!==wingCode){ showToast('Code did not match — nothing was deleted.', true); return; }
   try{
     await api(`/api/wings/${wingId}`,{method:'DELETE'});
@@ -5663,8 +5754,12 @@ async function doRestoreSquadron(sqnId, sqnCode){
   }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
 }
 async function doPermanentlyDeleteSquadron(sqnId, sqnCode){
-  const typed=prompt(`This permanently deletes unit '${sqnCode}' — this cannot be undone. It will only succeed if the unit has no linked records; otherwise it stays archived.\n\nType the unit's code to confirm:`);
-  if(typed===null)return;
+  const typed=await promptText('Permanently delete unit',`Type the unit code to confirm`,{
+    context:`This permanently deletes unit '${sqnCode}' — this cannot be undone. It will only succeed if the unit has no linked records; otherwise it stays archived.`,
+    okLabel:'Delete permanently',danger:true,
+    validate:v=>v!==sqnCode?`Type exactly: ${sqnCode}`:'',
+  });
+  if(!typed)return;
   if(typed.trim()!==sqnCode){ showToast('Code did not match — nothing was deleted.', true); return; }
   try{
     await api(`/api/squadrons/${sqnId}`,{method:'DELETE'});
@@ -5738,9 +5833,9 @@ async function doCreateSqn(){
     closeModal('m-create-sqn');
     await renderAccounts();
     const label=_UNIT_TYPE_LABELS[unitType]||'Unit';
-    if(confirm(`${label} ${code} created.\n\nCreate an account for ${code} now?`)){
+    confirmAction(`${label} ${code} created. Create an account for ${code} now?`,()=>{
       openCreateAccountModal(newSqn&&newSqn.squadron_id);
-    }
+    });
   }catch(e){msg.textContent=apiErr(e);}
 }
 
@@ -5841,12 +5936,12 @@ async function doCreateAccount(){
   const payload={display_name:name, role};
   if(_ROLES_WING_SCOPE.includes(role)||_ROLES_SQN_SCOPE.includes(role)){
     const wid=document.getElementById('ca-wing').value||undefined;
-    if(!wid){ msg.textContent='Please select a Wing.'; return; }
+    if(!wid){ msg.textContent='Select a Wing.'; return; }
     payload.wing_id=wid;
   }
   if(_ROLES_SQN_SCOPE.includes(role)){
     const sid=document.getElementById('ca-sqn').value||undefined;
-    if(!sid){ msg.textContent='Please select a Squadron / Specialist Unit.'; return; }
+    if(!sid){ msg.textContent='Select a Squadron or Specialist Unit.'; return; }
     payload.squadron_id=sid;
   }
   const codeMode=document.querySelector('[name="ca-code-mode"]:checked').value;
@@ -5949,8 +6044,12 @@ function doDeleteAccount(userId, displayName){
   }, true);
 }
 async function doPermanentlyDeleteAccount(userId, displayName){
-  const typed=prompt(`This permanently deletes the account for "${displayName}" — this cannot be undone. It will only succeed if the account has never logged in and has no audit history of its own actions; otherwise it stays archived.\n\nType the account's name to confirm:`);
-  if(typed===null)return;
+  const typed=await promptText('Permanently delete account',`Type the account name to confirm`,{
+    context:`This permanently deletes the account for "${displayName}" — this cannot be undone. It will only succeed if the account has never logged in and has no audit history of its own actions; otherwise it stays archived.`,
+    okLabel:'Delete permanently',danger:true,
+    validate:v=>v!==displayName?`Type exactly: ${displayName}`:'',
+  });
+  if(!typed)return;
   if(typed.trim()!==displayName){ showToast('Name did not match — nothing was deleted.', true); return; }
   try{
     await api('/api/accounts/'+userId,{method:'DELETE'});
@@ -6284,7 +6383,7 @@ function _owzRender(){
     title.textContent='Step 5 of 5 — Result';
     body.innerHTML=w.result==='ok'
       ? `<div class="alert a-info" style="font-size:12px">${esc(kindLabel)} ${esc(w.label)} archived.</div>`
-      : `<div class="alert a-warn" style="font-size:12px">Could not archive: ${esc(w.error||'unknown error')}</div>`;
+      : `<div class="alert a-warn" style="font-size:12px">Could not archive. Refresh the page and try again, or contact your administrator.</div>`;
   }
   _owzRenderFoot();
 }
@@ -6340,11 +6439,12 @@ async function doCreateFlight(){
   }catch(e){ msg.textContent=apiErr(e); msg.style.color='var(--red)'; }
 }
 async function doArchiveFlight(flightId, name){
-  if(!confirm('Archive flight "'+name+'"? Users assigned to it will be unassigned, but this can be undone from "Show archived".'))return;
-  try{
-    await api('/api/flights/'+flightId+'/archive',{method:'POST'});
-    S.flightList=null; renderAccounts();
-  }catch(e){ alert('Could not archive: '+apiErr(e)); }
+  confirmAction('Archive flight "'+name+'"? Users assigned to it lose this assignment, but this can be undone from "Show archived".',async()=>{
+    try{
+      await api('/api/flights/'+flightId+'/archive',{method:'POST'});
+      S.flightList=null; renderAccounts();
+    }catch(e){ showToast(apiErr(e),true); }
+  });
 }
 
 // ── Edit Account ──────────────────────────────────────────
@@ -6665,7 +6765,7 @@ function _dSetExp(id,text){const el=document.getElementById(id);if(el&&text)el.t
 // Horizontal bar chart — handles multiple value-key conventions from the API
 function _chartHBar(chart){
   const rows=chart.data||[];
-  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data available for this chart.');
   const r0=rows[0];
   const valKey=chart.value_key||(r0.readiness_pct!==undefined?'readiness_pct':r0.delivered!==undefined?'delivered':r0.count!==undefined?'count':r0.value!==undefined?'value':'count');
   const maxV=Math.max(...rows.map(r=>+(r[valKey])||0),1);
@@ -6723,7 +6823,7 @@ function _chartClassProgress(chart){
         <div style="font-size:11px;color:var(--text-2);min-width:114px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(cls.display_name)}">${esc(cls.display_name)}</div>
         <div style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${clsColor};border-radius:3px"></div></div></div>
         <div style="min-width:48px;text-align:right;font-size:11px;color:${clsColor}">${p!=null?p+'%':'—'}</div>
-        ${behind?`<span style="font-size:9.5px;font-weight:800;color:var(--red);white-space:nowrap">NEEDS ATTENTION</span>`:''}
+        ${behind?`<span style="font-size:11px;font-weight:800;color:var(--red);white-space:nowrap">NEEDS ATTENTION</span>`:''}
       </div>`;
     });
   });
@@ -6733,7 +6833,7 @@ function _chartClassProgress(chart){
 // Stacked vertical bar — chart.data rows have per-series keys; chart.series=[{key,label,color}]
 function _chartStackedBar(chart){
   const rows=chart.data||[];const series=chart.series||[];
-  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data available for this chart.');
   const totals=rows.map(r=>series.reduce((s,se)=>s+(+(r[se.key])||0),0));
   const maxV=Math.max(...totals,1);const BAR_H=80;
   let html=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">`+
@@ -6755,7 +6855,7 @@ function _chartStackedBar(chart){
 function _chartStackedBarH(chart){
   const rows=chart.data||[];
   const series=chart.series||[{key:'delivered',label:'Delivered',color:'#2e7d32'},{key:'planned',label:'Planned',color:'#51b0e3'},{key:'not_delivered',label:'Not Delivered',color:'#78909c'},{key:'cancelled',label:'Cancelled',color:'#e51937'}];
-  if(!rows.length)return _dEmptyChart(chart.empty_state||'No curriculum data');
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No curriculum data yet. Add curriculum items and schedule sessions to see progress.');
   const maxV=Math.max(...rows.map(r=>series.reduce((a,s)=>a+(+(r[s.key])||0),0)),1);
   let html=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">`+
     series.map(s=>`<span style="display:flex;align-items:center;gap:4px;font-size:10px"><span style="display:inline-block;width:10px;height:10px;background:${s.color};border-radius:2px"></span>${esc(s.label)}</span>`).join('')+`</div>`;
@@ -6811,9 +6911,9 @@ function _chartLine(chart){
 
 // Donut chart — chart.data=[{status,label,count,color}]
 function _chartDonut(chart){
-  const rows=chart.data||[];if(!rows.length)return _dEmptyChart(chart.empty_state||'No session data');
+  const rows=chart.data||[];if(!rows.length)return _dEmptyChart(chart.empty_state||'No session data yet. Schedule sessions and record outcomes to see this chart.');
   const total=rows.reduce((s,r)=>s+(+(r.count)||0),0);
-  if(!total)return _dEmptyChart(chart.empty_state||'No sessions recorded');
+  if(!total)return _dEmptyChart(chart.empty_state||'No sessions recorded yet. Start recording session outcomes to see this chart.');
   const R=32;const circ=2*Math.PI*R;
   const ST_COL={delivered:'#2e7d32',delivered_with_issue:'#558b2f',not_delivered:'#78909c',cancelled:'#e51937',rescheduled:'#f57f17',planned:'#51b0e3'};
   const clr=r=>r.color||ST_COL[r.status]||'var(--muted)';
@@ -6897,7 +6997,7 @@ function _renderUpcomingReadiness(chart){
         return `<div style="border:1.5px solid var(--border);border-radius:8px;padding:10px" role="img" aria-label="${r.date}: not planned, no sessions scheduled">
           <div style="font-size:10.5px;font-weight:800;color:var(--dark)">${dateLabel}</div>
           <div style="font-size:10.5px;color:var(--muted);font-weight:700;margin-top:5px">Not planned</div>
-          <div style="font-size:9.5px;color:var(--muted)">No sessions scheduled</div>
+          <div style="font-size:11px;color:var(--muted)">No sessions scheduled</div>
         </div>`;
       }
       const pct=r.readiness_pct||0;const col=pct>=80?'var(--ok)':pct>=60?'var(--warn)':'var(--red)';
@@ -6905,8 +7005,8 @@ function _renderUpcomingReadiness(chart){
         <div style="font-size:10.5px;font-weight:800;color:var(--dark)">${dateLabel}</div>
         <div class="pbar" style="margin:5px 0"><div style="height:100%;width:${pct}%;background:${col};border-radius:3px"></div></div>
         <div style="font-size:10.5px;color:${col};font-weight:700">${pct}% ready</div>
-        ${r.unstaffed?`<div style="font-size:10px;color:var(--warn);font-weight:700" title="${r.unstaffed} session${r.unstaffed!==1?'s have':' has'} no facilitator assigned yet — open this parade night to assign one">⚠ ${r.unstaffed} unstaffed</div>`:''}
-        <div style="font-size:9.5px;color:var(--muted)">${r.sessions_total||0} sessions</div>
+        ${r.unstaffed?`<div style="font-size:11px;color:var(--warn);font-weight:700" title="${r.unstaffed} session${r.unstaffed!==1?'s have':' has'} no facilitator assigned yet — open this parade night to assign one">⚠ ${r.unstaffed} unstaffed</div>`:''}
+        <div style="font-size:11px;color:var(--muted)">${r.sessions_total||0} sessions</div>
       </div>`;
     }).join('')+`</div>`;
 }
@@ -6926,7 +7026,7 @@ function _renderHeatmap(chart){
 // Grouped bar — chart.data=[{label,<series_key>:n}], chart.series=[{key,label,color}]
 function _chartGroupedBar(chart){
   const rows=chart.data||[];const series=chart.series||[];
-  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data available for this chart.');
   const maxV=Math.max(...rows.flatMap(r=>series.map(s=>+(r[s.key])||0)),1);
   const BAR_H=60;const gW=series.length*14+8;const totW=Math.max(rows.length*(gW+8),280);
   let html=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">`+
@@ -7222,10 +7322,26 @@ function openWithDate(ds){document.getElementById('pn-date').value=ds;buildSlots
 // ═══════════════════════════════════════════════════════════
 //  PARADE NIGHTS
 // ═══════════════════════════════════════════════════════════
+function _savePNFilters(tf,sf,q){
+  try{ sessionStorage.setItem('aafc_pn_filters',JSON.stringify({tf,sf,q})); }catch(_){}
+}
+function _restorePNFilters(){
+  try{
+    const saved=JSON.parse(sessionStorage.getItem('aafc_pn_filters')||'null');
+    if(!saved)return;
+    const te=document.getElementById('pn-f-term');
+    const se=document.getElementById('pn-f-status');
+    const qe=document.getElementById('pn-search');
+    if(te&&saved.tf)te.value=saved.tf;
+    if(se&&saved.sf)se.value=saved.sf;
+    if(qe&&saved.q)qe.value=saved.q;
+  }catch(_){}
+}
 function renderPN(){
   const tf=document.getElementById('pn-f-term').value;
   const sf=document.getElementById('pn-f-status').value;
   const q=(document.getElementById('pn-search').value||'').toLowerCase();
+  _savePNFilters(tf,sf,q);
   const sorted=[...S.pns].sort((a,b)=>a.date.localeCompare(b.date));
   const filtered=sorted.filter(pn=>{
     if(tf!=='all'&&pn.term!==tf)return false;
@@ -7234,8 +7350,25 @@ function renderPN(){
     return true;
   });
   const el=document.getElementById('pn-list');
-  if(!filtered.length){el.innerHTML=`<div class="empty"><div class="et">No parade nights</div><div class="es">${canWriteSquadron()?'Select "+ Add Parade Night" above to create one.':'No parade nights scheduled.'}</div></div>`;return;}
-  el.innerHTML=filtered.map(pn=>buildPNCard(pn)).join('');
+  if(!filtered.length){
+    const isFiltered=tf!=='all'||sf!=='all'||q;
+    const emptyMsg=isFiltered
+      ?`No parade nights match the current filters. <button class="btn btn-xs btn-out" onclick="document.getElementById('pn-f-term').value='all';document.getElementById('pn-f-status').value='all';document.getElementById('pn-search').value='';try{sessionStorage.removeItem('aafc_pn_filters');}catch(_){}renderPN()">Clear filters</button>`
+      :(canWriteSquadron()?'Select "+ Add Parade Night" above to create one.':'No parade nights scheduled.');
+    el.innerHTML=`<div class="empty"><div class="et">No parade nights</div><div class="es">${emptyMsg}</div></div>`;
+    return;
+  }
+  if(tf==='all'){
+    const _TERM_LABELS={T1:'Term 1',T2:'Term 2',T3:'Term 3',T4:'Term 4'};
+    const byTerm={};
+    filtered.forEach(pn=>{const t=pn.term||'Other';(byTerm[t]=byTerm[t]||[]).push(pn);});
+    el.innerHTML=Object.keys(byTerm).sort().map(t=>
+      `<div class="pn-term-group"><div class="pn-term-hdr">${esc(_TERM_LABELS[t]||t)} <span class="muted" style="font-size:11px;font-weight:400">${byTerm[t].length} night${byTerm[t].length!==1?'s':''}</span></div>`+
+      byTerm[t].map(pn=>buildPNCard(pn)).join('')+`</div>`
+    ).join('');
+  } else {
+    el.innerHTML=filtered.map(pn=>buildPNCard(pn)).join('');
+  }
 }
 function buildPNCard(pn){
   const allDel=(pn.sessions||[]).length>0&&(pn.sessions||[]).every(s=>s.status==='delivered');
@@ -7243,7 +7376,7 @@ function buildPNCard(pn){
     <div class="sess-card ${stCls(s.status)||(!s.exp?'unassigned':'')}" onclick="showPNDetail('${pn.date}')">
       <div class="sess-hdr"><span class="sess-num">Sess ${i+1}</span>${stBadge(s.status||'planned')}</div>
       <div class="sess-title">${s.exp||'<em style="color:var(--muted)">Lesson: Unassigned</em>'}</div>
-      <div class="sess-info">${s.phase?phBadge(s.phase)+' ':''} ${s.facName?''+s.facName:''} ${s.room?'· '+s.room:''}</div>
+      <div class="sess-info">${s.phase?phBadge(s.phase)+' ':''} ${s.facName?''+s.facName:''} ${s.room?'· '+s.room:''} ${s.trainingClasses&&s.trainingClasses.length?'· '+esc(s.trainingClasses.map(c=>c.display_name).join(', ')):''}</div>
       ${canWriteSquadron()?`<div class="sess-acts no-print" onclick="event.stopPropagation()">
         <button class="btn btn-xs btn-ok" onclick="qkSt('${pn.date}',${i},'delivered')" aria-label="Mark Session ${i+1} delivered">✓</button>
         <button class="btn btn-xs" style="background:#eef0f2;color:var(--steel)" onclick="qkSt('${pn.date}',${i},'not_delivered')" aria-label="Mark Session ${i+1} not delivered"></button>
@@ -7256,7 +7389,9 @@ function buildPNCard(pn){
       <div><div class="pn-date">${fmtDL(pn.date)}</div><div class="pn-meta">${pn.term} · ${(pn.sessions||[]).length} sessions${pn.notes?' · '+esc(pn.notes):''}</div></div>
       <div style="display:flex;gap:6px;align-items:center" class="no-print">
         ${allDel?stBadge('delivered'):stBadge('planned')}
+        ${pn.published?'<span class="badge b-ok" title="Weekly Program published">Published</span>':''}
         <button class="btn btn-xs btn-sky" onclick="showPNDetail('${pn.date}')">Detail</button>
+        ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Copy sessions to another parade night" onclick="openCopyPNModal('${pn.date}')">Copy to…</button>`:''}
         ${canWriteSquadron()?`<button class="btn btn-xs btn-red" onclick="delPN('${pn.date}')">×</button>`:''}
       </div>
     </div>
@@ -7266,7 +7401,7 @@ function buildPNCard(pn){
 async function qkSt(date,i,st){
   const pn=S.pns.find(p=>p.date===date);
   const sess=pn&&pn.sessions[i];
-  if(!sess||!sess.id){showToast('Session not found.',true);return;}
+  if(!sess||!sess.id){showToast('Could not update — this session could not be found. Refresh the page and try again.',true);return;}
   let reason=null;
   if(OUTCOME_REASON_REQUIRED[st]){
     reason=await collectOutcomeReason(st);
@@ -7277,10 +7412,40 @@ async function qkSt(date,i,st){
 }
 async function delPN(date){
   const pn=S.pns.find(p=>p.date===date);
-  if(!pn||!pn.id){alert('Parade night ID missing.');return;}
-  if(!confirm('Archive this parade night and all its sessions? They will no longer appear in active views, but records are preserved.'))return;
-  try{ await api('/api/parade-nights/'+pn.id,{method:'DELETE'}); await reloadAndRender(); }
-  catch(e){ alert(apiErr(e)); }
+  if(!pn||!pn.id){showToast('This parade night could not be found. Refresh the page and try again.',true);return;}
+  confirmAction('Archive this parade night and all its sessions? They will no longer appear in active views, but records are preserved.',async()=>{
+    try{ await api('/api/parade-nights/'+pn.id,{method:'DELETE'}); await reloadAndRender(); }
+    catch(e){ showToast(apiErr(e),true); }
+  });
+}
+
+// ── Copy parade night sessions (WORK-11) ─────────────────────────────────────
+let _copyPNSourceId=null;
+function openCopyPNModal(sourceDate){
+  const src=S.pns.find(p=>p.date===sourceDate);
+  if(!src||!src.id){showToast('Parade night not found.',true);return;}
+  _copyPNSourceId=src.id;
+  const sel=document.getElementById('pn-copy-target');
+  const others=S.pns.filter(p=>p.id!==src.id&&!p.is_archived)
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  sel.innerHTML='<option value="">— Select a parade night —</option>'+
+    others.map(p=>`<option value="${esc(p.id)}">${fmtD(p.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})} (${esc(p.term)})</option>`).join('');
+  const errEl=document.getElementById('pn-copy-err');
+  errEl.style.display='none'; errEl.textContent='';
+  openModal('m-pn-copy-sessions');
+}
+async function doCopyPNSessions(){
+  const targetId=document.getElementById('pn-copy-target').value;
+  const errEl=document.getElementById('pn-copy-err');
+  if(!targetId){errEl.textContent='Select a parade night.';errEl.style.display='block';return;}
+  errEl.style.display='none';
+  try{
+    const r=await api(`/api/parade-nights/${_copyPNSourceId}/copy-sessions-to/${targetId}`,{method:'POST'});
+    closeModal('m-pn-copy-sessions');
+    const skippedNote=r.skipped>0?` (${r.skipped} period${r.skipped!==1?'s':''} already had sessions — not changed)`:'';
+    showToast(`${r.copied} session${r.copied!==1?'s':''} copied.${skippedNote}`);
+    await reloadAndRender();
+  }catch(e){ errEl.textContent=apiErr(e); errEl.style.display='block'; }
 }
 
 // ADD PARADE NIGHT
@@ -7295,7 +7460,7 @@ function buildSlots(){
   let html='';
   for(let i=0;i<n;i++){
     html+=`<div style="border:1px solid var(--border);border-radius:7px;padding:10px;margin-bottom:8px;">
-      <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Session ${i+1}</div>
+      <div style="font-size:11px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Session ${i+1}</div>
       <div class="form-row">
         <div class="ff"><label for="np-ph-${i}">Phase</label>
           <select id="np-ph-${i}" aria-label="Phase for session ${i+1}">${phaseOpts}</select>
@@ -7324,8 +7489,8 @@ function addPN(){
   const term=document.getElementById('pn-term').value;
   const nsess=parseInt(document.getElementById('pn-nsess').value);
   const notes=document.getElementById('pn-notes').value;
-  if(!date){alert('Please select a date.');return;}
-  if(S.pns.find(p=>p.date===date)){alert('A parade night already exists on this date.');return;}
+  if(!date){showToast('Select a date.',true);return;}
+  if(S.pns.find(p=>p.date===date)){showToast('A parade night already exists on this date.',true);return;}
   const sessions=[];
   const clashes=[];
   for(let i=0;i<nsess;i++){
@@ -7351,7 +7516,7 @@ function addPN(){
       await reloadAndRender(); closeModal('m-add-pn');
       document.getElementById('pn-date').value='';document.getElementById('pn-notes').value='';document.getElementById('pn-slots').innerHTML='';
     })
-    .catch(e=>alert(apiErr(e)));
+    .catch(e=>showToast(apiErr(e),true));
 }
 
 // PN DETAIL MODAL
@@ -7372,7 +7537,7 @@ function showPNDetail(ds){
   // concept exists, matching Planning Workspace's own normal/urgent priority
   // vocabulary (ParadeNightGridView.tsx).
   html+=`<div id="pn-notices-card" style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">
-    <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Notices</div>
+    <div style="font-size:11px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Notices</div>
     <div id="pn-notices-list"><div class="muted" style="font-size:11.5px">Loading…</div></div>
     ${canWriteSquadron()?`<div style="margin-top:8px;display:flex;gap:6px;align-items:flex-start">
       <input id="pn-notice-text" placeholder="Notice text…" style="flex:1" maxlength="500" aria-label="New notice text">
@@ -7388,7 +7553,7 @@ function showPNDetail(ds){
   }else if(canWriteSquadron()){
     const typeOpts=['normal','activity','ceremonial','admin','stand_down','cancelled'].map(v=>`<option value="${v}" ${pn.parade_type===v?'selected':''}>${v.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase())}</option>`).join('');
     html+=`<div style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">
-      <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Parade Night Details</div>
+      <div style="font-size:11px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Parade Night Details</div>
       <div class="form-row">
         <div class="ff"><label>Term</label><input id="pnd-term" value="${esc(pn.term||'')}"></div>
         <div class="ff"><label for="pnd-type">Type</label><select id="pnd-type" aria-label="Parade night type">${typeOpts}</select></div>
@@ -7408,7 +7573,7 @@ function showPNDetail(ds){
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div style="display:flex;align-items:center;gap:6px">
           ${canWriteSquadron()?`<span class="no-print sess-drag-handle" draggable="true" ondragstart="_sessDragStart(event,'${ds}',${i})" ondragend="_sessDragEnd(event)" title="Drag to reorder" aria-hidden="true">⠿</span>`:''}
-          <div style="font-size:9.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em">Session ${i+1} · Period ${s.period_number||1}</div>
+          <div style="font-size:11px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em">Session ${i+1} · Period ${s.period_number||1}</div>
         </div>
         <div class="no-print" style="display:flex;gap:4px">
           ${canWriteSquadron()?`<button class="btn btn-xs btn-out" ${(s.period_number||1)<=1?'disabled':''} onclick="_sessMoveUpDown('${ds}',${i},'up')" title="Move to the previous period" aria-label="Move Session ${i+1} to the previous period">↑</button>
@@ -7434,12 +7599,24 @@ function showPNDetail(ds){
           <select id="d-rm-${i}" aria-label="Room for session ${i+1}" ${!canWriteSquadron()?'disabled':''}><option value="">— None —</option>${roomOpts}</select>
         </div>
       </div>
+      ${canWriteSquadron()
+        ? `<div class="ff pnd-tc-group" id="d-tc-grp-${i}" style="margin-top:8px;display:none">
+             <label>Training Classes</label>
+             <div id="d-tc-${i}" style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:7px;font-size:12.5px">
+               <span class="muted">Loading…</span>
+             </div>
+           </div>`
+        : (s.trainingClasses&&s.trainingClasses.length
+             ? `<div class="ff" style="margin-top:8px"><label>Training Classes</label><div style="font-size:12.5px;padding:3px 0">${esc(s.trainingClasses.map(c=>c.display_name).join(', '))}</div></div>`
+             : '')
+      }
       </div>
     </div>`;
   });
   if(canWriteSquadron()&&(pn.sessions||[]).length>0){
     html+=`<button class="btn btn-dk" onclick="savePNDetail('${ds}',${(pn.sessions||[]).length})">Save Changes</button>
-    <button class="btn btn-out" style="margin-left:8px" onclick="doMarkRemainingDelivered('${ds}')" title="Marks every session still Planned/Published as Delivered. Flag any exceptions (cancelled, not delivered, rescheduled) individually first — this only fills in the rest.">Mark remaining delivered</button>`;
+    <button class="btn btn-out" style="margin-left:8px" onclick="doMarkRemainingDelivered('${ds}')" title="Marks every session still Planned/Published as Delivered. Flag any exceptions (cancelled, not delivered, rescheduled) individually first — this only fills in the rest.">Mark remaining delivered</button>
+    <button class="btn btn-red-out" style="margin-left:8px" onclick="doCancelAllSessions('${ds}')" title="Cancels every session still Planned/Published in this parade night. Records a reason.">Cancel all remaining</button>`;
   }
   document.getElementById('pn-det-body').innerHTML=html;
   setTimeout(()=>{
@@ -7461,6 +7638,7 @@ function showPNDetail(ds){
   },30);
   loadPNNotices(pn.id);
   openModal('m-pn-detail');
+  if(canWriteSquadron()) _populatePnDetailClasses(pn);
 }
 // REM-34: Parade Night Notices. Kept deliberately simple (text + priority
 // only, no audience picker) -- matches this card's minimal-footprint intent;
@@ -7496,7 +7674,7 @@ async function addPNNotice(pnid){
     if(textEl)textEl.value='';
     loadPNNotices(pnid);
   }catch(e){
-    alert(apiErr(e));
+    showToast(apiErr(e),true);
   }
 }
 async function archivePNNotice(pnid,noticeId){
@@ -7504,7 +7682,7 @@ async function archivePNNotice(pnid,noticeId){
     await api('/api/planning/notices/'+noticeId+'/archive',{method:'POST'});
     loadPNNotices(pnid);
   }catch(e){
-    alert(apiErr(e));
+    showToast(apiErr(e),true);
   }
 }
 // "Mark all delivered, then flag exceptions" bulk action (risk-register
@@ -7517,6 +7695,16 @@ async function doMarkRemainingDelivered(ds){
   try{
     const r=await api('/api/parade-nights/'+pn.id+'/mark-remaining-delivered',{method:'POST'});
     showToast(r.sessions_updated>0?`${r.sessions_updated} session${r.sessions_updated!==1?'s':''} marked delivered.`:'No remaining sessions to mark — everything already has a status.',false);
+    await reloadAndRender(); showPNDetail(ds);
+  }catch(e){ showToast(apiErr(e),true); }
+}
+async function doCancelAllSessions(ds){
+  const pn=S.pns.find(p=>p.date===ds);if(!pn)return;
+  const reason=await collectOutcomeReason('cancelled');
+  if(reason===null)return;
+  try{
+    const r=await api('/api/parade-nights/'+pn.id+'/cancel-all',{method:'POST',body:JSON.stringify({reason,notes:null})});
+    showToast(r.sessions_updated>0?`${r.sessions_updated} session${r.sessions_updated!==1?'s':''} cancelled.`:'No sessions to cancel — all sessions already have a final status.');
     await reloadAndRender(); showPNDetail(ds);
   }catch(e){ showToast(apiErr(e),true); }
 }
@@ -7545,11 +7733,52 @@ async function savePNCoreDetails(ds){
         errEl.innerHTML='Someone else updated this Parade Night while you were editing it. Your changes were <b>not</b> saved. Close and reopen this Parade Night to see the latest version before trying again.';
         errEl.style.color='var(--red)';
       }else{
-        showToast('This Parade Night was changed by someone else. Your changes were not saved -- reopen it to see the latest version.',true);
+        showToast('Another user updated this Parade Night while you were editing. Your changes were not saved — reopen it to see the latest version.',true);
       }
     }else if(errEl){errEl.textContent=apiErr(e);errEl.style.color='var(--red)';}else showToast(apiErr(e),true);
   }
 }
+
+// CLASS-03: Training Class pickers in the Parade Night detail modal — same
+// concept as _populateQuickEditClasses but covers every session in one pass.
+// Fetches available classes once (uses _tcById cache if already populated by
+// the Training Year page, else falls back to a live API call), then loads each
+// session's current audience (one request per session) and renders checkboxes.
+// Groups are hidden until classes exist so a squadron with no Training Classes
+// sees no extra blank rows.
+async function _populatePnDetailClasses(pn){
+  let classes=Object.values(_tcById).filter(c=>!c.is_archived);
+  if(!classes.length){
+    try{ classes=await api('/api/training-classes'); }
+    catch(_){ return; }
+  }
+  if(!classes.length) return; // no classes configured — leave pickers hidden
+  // Sort by sequence then display_name, same order as the quickEdit picker.
+  classes.sort((a,b)=>(a.sequence||0)-(b.sequence||0)||(a.display_name||'').localeCompare(b.display_name||''));
+  const sessions=pn.sessions||[];
+  await Promise.all(sessions.map(async(s,i)=>{
+    // Guard: if user closed the modal before audience fetches resolved, bail.
+    if(!document.getElementById('m-pn-detail').classList.contains('active')) return;
+    const grp=document.getElementById('d-tc-grp-'+i);
+    const list=document.getElementById('d-tc-'+i);
+    if(!grp||!list)return;
+    let checkedIds=new Set((s.trainingClasses||[]).map(c=>c.training_class_id||c.id));
+    if(s.id){
+      try{
+        const audience=await api(`/api/sessions/${s.id}/audience`);
+        checkedIds=new Set((audience||[]).map(a=>a.training_class_id));
+      }catch(_){}
+    }
+    if(!document.getElementById('m-pn-detail').classList.contains('active')) return;
+    list.innerHTML=classes.map(c=>`<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-weight:400">
+      <input type="checkbox" class="pnd-tc-chk" data-sess="${i}" value="${esc(c.training_class_id)}" ${checkedIds.has(c.training_class_id)?'checked':''}>
+      ${esc(c.display_name)}
+    </label>`).join('');
+    list.dataset.loaded='true';
+    grp.style.display='';
+  }));
+}
+
 async function savePNDetail(ds,cnt){
   const pn=S.pns.find(p=>p.date===ds);if(!pn)return;
   const errEl=document.getElementById('pn-det-err');
@@ -7585,6 +7814,31 @@ async function savePNDetail(ds,cnt){
       // Single atomic PUT: fields + status transition committed together server-side —
       // no partial-update window between a field save and a separate status save.
       await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify(body)});
+      // CLASS-03: save Training Class audience if the picker was loaded for this session.
+      const tcList=document.getElementById('d-tc-'+i);
+      if(tcList&&tcList.dataset.loaded==='true'){
+        const checked=[...tcList.querySelectorAll('.pnd-tc-chk:checked')].map(c=>c.value);
+        try{
+          await _saveSessionAudience(s.id,checked,false);
+        }catch(audienceErr){
+          const detail=audienceErr&&audienceErr.detail;
+          if(detail&&detail.error==='class_conflict'&&Array.isArray(detail.conflicts)&&detail.conflicts.length){
+            const names=detail.conflicts.map(c=>esc(c.training_class_name||c.training_class_id)).join(', ');
+            if(errEl){
+              errEl.innerHTML=`Session ${i+1}: scheduling conflict — ${names} `+
+                `${detail.conflicts.length===1?'is':'are'} already in another session at this period. `+
+                `<a href="#" style="font-weight:700;text-decoration:underline" `+
+                `onclick="event.preventDefault();this.parentElement.textContent='Overriding…';`+
+                `_saveSessionAudience('${esc(s.id)}',${JSON.stringify(checked)},true)`+
+                `.then(()=>{reloadAndRender();closeModal('m-pn-detail');})`+
+                `.catch(e2=>{this.parentElement.style.color='var(--red)';this.parentElement.textContent=apiErr(e2);})">Override</a>`;
+              errEl.style.color='var(--warn)';
+            }
+            return;
+          }
+          throw audienceErr;
+        }
+      }
     }
     if(errEl)errEl.textContent='';
     await reloadAndRender(); closeModal('m-pn-detail');
@@ -7785,8 +8039,7 @@ async function quickEdit(date,idx){
     <div class="ff" id="qe-classes-group" style="display:none">
       <label>Training Classes</label>
       <p class="muted" style="font-size:11px;margin:0 0 6px">
-        Select which Training Class(es) this Session is for. Leave all unchecked if you are not
-        yet using Training Classes for this Squadron.
+        Select the Training Class or classes for this Session. Leave all unchecked if Training Classes are not yet set up for this Squadron.
       </p>
       <div id="qe-classes-list" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px"></div>
     </div>`;
@@ -7845,11 +8098,18 @@ async function _populateQuickEditClasses(sessionId){
     </label>`).join('');
 }
 
+async function _saveSessionAudience(sessionId, classIds, override){
+  await api(`/api/sessions/${sessionId}/audience`,{
+    method:'PUT',
+    body:JSON.stringify({training_class_ids:classIds, override_conflict:!!override})
+  });
+}
+
 async function saveSessEdit(){
   if(!editSessRef)return;
   const pn=S.pns.find(p=>p.date===editSessRef.date);if(!pn)return;
   const s=pn.sessions[editSessRef.idx];
-  if(!s||!s.id){showToast('Session ID missing — cannot save.',true);return;}
+  if(!s||!s.id){showToast('Could not save — this session no longer exists. Refresh the page and try again.',true);return;}
   const newSt=document.getElementById('qe-st').value;
   const expTitle=document.getElementById('qe-ex').value;
   const facId=document.getElementById('qe-fa').value||null;
@@ -7884,7 +8144,26 @@ async function saveSessEdit(){
     const classesGroup=document.getElementById('qe-classes-group');
     if(classesGroup && classesGroup.style.display!=='none'){
       const checked=[...document.querySelectorAll('.qe-class-chk:checked')].map(c=>c.value);
-      await api(`/api/sessions/${s.id}/audience`,{method:'PUT',body:JSON.stringify({training_class_ids:checked})});
+      try{
+        await _saveSessionAudience(s.id,checked,false);
+      }catch(audienceErr){
+        const detail=audienceErr&&audienceErr.detail;
+        if(detail&&detail.error==='class_conflict'&&Array.isArray(detail.conflicts)&&detail.conflicts.length){
+          const names=detail.conflicts.map(c=>esc(c.training_class_name||c.training_class_id)).join(', ');
+          if(sessErrEl){
+            sessErrEl.innerHTML=`Scheduling conflict: ${names} `+
+              `${detail.conflicts.length===1?'is':'are'} already scheduled in another session at this period. `+
+              `<a href="#" style="font-weight:700;text-decoration:underline" `+
+              `onclick="event.preventDefault();this.parentElement.textContent='Overriding…';`+
+              `_saveSessionAudience('${esc(s.id)}',${JSON.stringify(checked)},true)`+
+              `.then(()=>{reloadAndRender();closeModal('m-sess-edit');editSessRef=null;})`+
+              `.catch(e2=>{this.parentElement.style.color='var(--red)';this.parentElement.textContent=apiErr(e2);})">Override</a>`;
+            sessErrEl.style.color='var(--warn)';
+          }
+          return;
+        }
+        throw audienceErr;
+      }
     }
     if(sessErrEl)sessErrEl.textContent='';
     await reloadAndRender(); closeModal('m-sess-edit'); editSessRef=null;
@@ -7933,13 +8212,13 @@ function renderWP(){
   el.innerHTML=`
     <div class="card">
       <div style="background:var(--dark);color:white;padding:14px 18px;border-radius:8px;margin-bottom:14px;" class="print-only" style="display:block">
-        <div style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:3px">7 Wing Australian Air Force Cadets</div>
+        <div style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:3px">7 Wing Australian Air Force Cadets</div>
         <div style="font-size:17px;font-weight:900">${esc(info.name)}</div>
         <div style="font-size:12px;opacity:.75;margin-top:2px">Weekly Training Program — ${fmtDL(ds)}</div>
         <div style="font-size:10px;opacity:.58;margin-top:2px">${esc(info.start)}–${esc(info.end)} · ${esc(pn.term)}${pn.notes?' · '+esc(pn.notes):''}</div>
       </div>
       <div style="background:var(--dark);color:white;padding:14px 18px;border-radius:8px;margin-bottom:14px" class="no-print">
-        <div style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:3px">7 Wing Australian Air Force Cadets</div>
+        <div style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:3px">7 Wing Australian Air Force Cadets</div>
         <div style="font-size:17px;font-weight:900">${esc(info.name)}</div>
         <div style="font-size:12px;opacity:.75;margin-top:2px">Weekly Training Program — ${fmtDL(ds)}</div>
         <div style="font-size:10px;opacity:.58;margin-top:2px">${esc(info.start)}–${esc(info.end)} · ${esc(pn.term)}${pn.notes?' · '+esc(pn.notes):''}</div>
@@ -7963,12 +8242,35 @@ function renderWP(){
     </div>
     <div class="no-print" style="margin-top:8px;display:flex;gap:8px">
       <button class="btn btn-dk" onclick="printReport()">Print This Program</button>
+      ${S.isAdmin?`<button class="btn ${pn.published?'btn-out':'btn-sky'}" onclick="publishWP()" title="${pn.published?'Program already published':'Publish this program — planned sessions move to Published status'}">${pn.published?'✓ Published':'Publish Program'}</button>`:''}
       <button class="btn btn-out" onclick="nav('parade-nights')">← Back to Parade Nights</button>
     </div>`;
 }
 function printReport(){
   // Hide all pages, show only active
   window.print();
+}
+async function publishWP(){
+  const ds=document.getElementById('wp-sel').value;
+  const pn=S.pns.find(p=>p.date===ds);
+  if(!pn||!pn.id){showToast('Select a parade night first.',true);return;}
+  if(pn.published){showToast('This program has already been published.');return;}
+  try{
+    await apiPublishPN(pn.id);
+    pn.published=true;
+    renderWP();
+    showToast('Weekly Program published. Planned sessions are now marked Published.');
+    reloadAndRender();
+  }catch(e){
+    const d=e&&e.detail;
+    if(d&&d.error==='publish_blocked'&&Array.isArray(d.blockers)&&d.blockers.length){
+      const first=d.blockers[0];
+      const more=d.blockers.length>1?' Plus '+(d.blockers.length-1)+' more issue'+(d.blockers.length>2?'s':'')+'.':'';
+      showToast('Cannot publish — '+first.reason+'.'+more,true);
+    }else{
+      showToast(apiErr(e)||'Publish failed. Try again.',true);
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -7993,11 +8295,11 @@ const PH_BG={'A. Orientation':'#fff0f0','B. Initial':'#fffbf0','C. Junior':'#f0f
 const PH_BD={'A. Orientation':'#e51937','B. Initial':'#c97a00','C. Junior':'#1a7f4b','D. Intermediate':'#004b8d','E. Senior':'#7c3aed','I. Bronze':'#c97a00','J. Silver':'#666','K. Gold':'#b8860b'};
 
 function sourceBadge(e){
-  if(e.owningLevel==='national')return '<span class="badge b-dark" style="font-size:8px">NAT HQ</span>';
+  if(e.owningLevel==='national')return '<span class="badge b-dark" style="font-size:10px">NAT HQ</span>';
   if(e.owningLevel==='wing'){
     // Look up wing code from S.wings (populated by loadData for all roles)
     const wg=(S.wings&&S.wings.find(w=>w.wing_id===e.wingId)||{code:'Wing'}).code;
-    return `<span class="badge b-purple" style="font-size:8px">${esc(wg)}</span>`;
+    return `<span class="badge b-purple" style="font-size:10px">${esc(wg)}</span>`;
   }
   return '<span class="badge b-teal" style="font-size:8px">SQN</span>';
 }
@@ -8079,7 +8381,7 @@ function renderCurr(){
               <div class="exp-title">${esc(e.title)}</div>
               <div class="exp-meta">
                 ${elBadge(e.el)}
-                <span class="badge b-blue" style="font-size:8.5px">${e.term||'—'}</span>
+                <span class="badge b-blue" style="font-size:10px">${e.term||'—'}</span>
                 ${stBadge(dp)}
                 ${e.lh?`<a href="${e.lh}" target="_blank" class="lh-btn" onclick="event.stopPropagation()">Learning Hub</a>`:''}
               </div>
@@ -8107,7 +8409,7 @@ function _currClassBreakdownHtml(bd){
               (s==='not_delivered')?'b-red':
               (s==='unscheduled'||s==='cancelled')?'b-amber':'b-blue';
     const label=s==='resolved'?'✓ ':s==='not_delivered'?'✕ ':s==='unscheduled'?'– ':'';
-    return `<span class="badge ${cl}" style="font-size:8px" title="${esc(c.display_name)}: ${esc(s)}">${label}${esc(c.display_name)}</span>`;
+    return `<span class="badge ${cl}" style="font-size:10px" title="${esc(c.display_name)}: ${esc(s)}">${label}${esc(c.display_name)}</span>`;
   }).join('')+'</div>';
 }
 async function _loadCurriculumClassBreakdown(){
@@ -8288,7 +8590,7 @@ function openAddCurrNat(){
   _resetCurrModal();_setCurrTermOptional(true);_populateCurrElements();_populateCurrPhases();openModal('m-add-curr');
 }
 async function editCurr(code){
-  const e=S.curr.find(x=>x.code===code&&canEditCurr(x));if(!e){alert('You do not have permission to edit this curriculum item.');return;}
+  const e=S.curr.find(x=>x.code===code&&canEditCurr(x));if(!e){showToast('You do not have permission to edit this curriculum item.',true);return;}
   editCurrCode=code;
   // Set the correct save endpoint for the owning level
   if(e.owningLevel==='national') _currSaveEndpoint='/api/curriculum/national';
@@ -8323,7 +8625,7 @@ async function saveCurr(){
   const identifier=identifierEl?identifierEl.value.trim()||null:null;
   const partEl=document.getElementById('c-part');
   const partNumber=partEl?parseInt(partEl.value||'1',10)||1:1;
-  if(!code||!title){alert('Code and title required.');return;}
+  if(!code||!title){showToast('Code and title required.',true);return;}
   const payload={title,phase:document.getElementById('c-phase').value,
     element:document.getElementById('c-el').value||null,
     recommended_term:document.getElementById('c-term').value||null,
@@ -8339,15 +8641,15 @@ async function saveCurr(){
   try{
     if(editCurrCode){
       const existing=S.curr.find(e=>e.code===editCurrCode&&canEditCurr(e));
-      if(!existing||!existing.id){alert('Cannot edit — curriculum item not found.');return;}
+      if(!existing||!existing.id){showToast('Curriculum item not found — refresh and try again.',true);return;}
       await api('/api/curriculum/'+existing.id,{method:'PATCH',body:JSON.stringify(payload)});
     } else {
       // Uniqueness is by identifier (if set) or (code, part_number) — NOT code alone.
       const dup=allCurr().find(e=>identifier?e.identifier===identifier:(e.code===code&&(e.partNumber||1)===partNumber));
-      if(dup){alert('A curriculum item with this identifier/code+part already exists.');return;}
+      if(dup){showToast('A curriculum item with this code already exists.',true);return;}
       if(_currSaveEndpoint==='/api/curriculum/wing'&&S.isNational){
         const wid=document.getElementById('c-wing-id').value;
-        if(!wid){alert('Select a Wing.');return;}
+        if(!wid){showToast('Select a Wing.',true);return;}
         payload.wing_id=wid;
       }
       await api(_currSaveEndpoint,{method:'POST',body:JSON.stringify({code,...payload})});
@@ -8357,15 +8659,16 @@ async function saveCurr(){
     document.getElementById('curr-modal-title').textContent='+ Add Curriculum Item';
   }catch(e){
     // Show human-readable error; 409 now includes a message field
-    alert(apiErr(e));
+    showToast(apiErr(e),true);
   }finally{
     if(btn){btn.disabled=false;btn.textContent=btnLabel;}
   }
 }
 async function deleteCurrItem(id){
-  if(!confirm('Archive this curriculum item? Sessions already linked are not affected, and this can be undone from "Show archived".'))return;
-  try{ await api('/api/curriculum/'+id,{method:'DELETE'}); await reloadAndRender(); }
-  catch(e){ alert(apiErr(e)); }
+  confirmAction('Archive this curriculum item? Sessions already linked are not affected, and this can be undone from "Show archived".',async()=>{
+    try{ await api('/api/curriculum/'+id,{method:'DELETE'}); await reloadAndRender(); }
+    catch(e){ showToast(apiErr(e),true); }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -8537,27 +8840,29 @@ async function _actSaveEdit(){
     showToast('Activity saved.', false);
     const st=_actTabState[c];
     await _actTabLoad(c, st.scopeType, st.scopeId);
-  }catch(e){ if(msg){msg.textContent=apiErr(e);msg.style.color='var(--red)';} else alert(apiErr(e)); }
+  }catch(e){ if(msg){msg.textContent=apiErr(e);msg.style.color='var(--red)';} else showToast(apiErr(e),true); }
 }
 
 async function _actArchive(containerId, activityId){
-  if(!confirm('Archive this activity? It will be removed from active views but preserved for history, and can be restored later.'))return;
-  try{
-    await api('/api/activities/'+activityId,{method:'DELETE'});
-    showToast('Activity archived.', false);
-    const st=_actTabState[containerId];
-    await _actTabLoad(containerId, st.scopeType, st.scopeId);
-  }catch(e){ alert(apiErr(e)); }
+  confirmAction('Archive this activity? It disappears from active views but is preserved in history, and can be restored later.',async()=>{
+    try{
+      await api('/api/activities/'+activityId,{method:'DELETE'});
+      showToast('Activity archived.', false);
+      const st=_actTabState[containerId];
+      await _actTabLoad(containerId, st.scopeType, st.scopeId);
+    }catch(e){ showToast(apiErr(e),true); }
+  });
 }
 
 async function _actRestore(containerId, activityId){
-  if(!confirm('Restore this activity? It will become active and visible again.'))return;
-  try{
-    await api('/api/activities/'+activityId+'/restore',{method:'POST'});
-    showToast('Activity restored.', false);
-    const st=_actTabState[containerId];
-    await _actTabLoad(containerId, st.scopeType, st.scopeId);
-  }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
+  confirmAction('Restore this activity? It will become active and visible again.',async()=>{
+    try{
+      await api('/api/activities/'+activityId+'/restore',{method:'POST'});
+      showToast('Activity restored.', false);
+      const st=_actTabState[containerId];
+      await _actTabLoad(containerId, st.scopeType, st.scopeId);
+    }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
+  });
 }
 
 function _actOpenCreate(containerId){
@@ -8604,7 +8909,7 @@ async function _actSaveCreate(containerId){
     await api(path,{method:'POST',body});
     showToast((st.scopeType==='national'?'National':'Wing')+' activity created.', false);
     await _actTabLoad(containerId, st.scopeType, st.scopeId);
-  }catch(e){ if(msg){msg.textContent=apiErr(e);} else alert(apiErr(e)); }
+  }catch(e){ if(msg){msg.textContent=apiErr(e);} else showToast(apiErr(e),true); }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -8653,22 +8958,28 @@ When to use Planning Workspace: to do the planning — schedule nights, assign c
 KEY TERMS
 ═══════════════════════════════════════════════
 Training Year
-  A container for all parade nights and training records for one academic year (typically July to June). A Training Year must exist before you can schedule parade nights.
+  A container for all parade nights and training records for one academic year (typically July to June). Create a Training Year before scheduling parade nights.
 
 Training Stage
-  A defined AAFC curriculum level — Initial, Junior, Intermediate, Senior, Bronze, Silver, or Gold. Each stage has a national set of required modules.
+  A national AAFC curriculum level — Initial, Junior, Intermediate, Senior, Bronze, Silver, or Gold. Each stage has a fixed set of required modules defined at the national level. Training Stages are the same for every squadron.
 
 Training Class
-  A squadron-specific group of cadets undertaking a Training Stage in a given Training Year. A squadron with 30 senior cadets might have two classes: Senior 1 and Senior 2. Each class has independent progress records.
+  A squadron-specific group of cadets completing a Training Stage during a Training Year. Where a squadron has enough cadets, one Training Stage can have several classes running at the same time.
+
+  Example: a squadron with 30 senior cadets might create Senior 1 (15 cadets) and Senior 2 (15 cadets). Both classes follow the Senior Training Stage, but each has its own independent progress record. Senior 1 may have completed SEN-04 while Senior 2 has it planned. The system tracks them separately.
+
+  Why the distinction matters: a single Training Stage can have multiple classes, each at a different point in the curriculum. If the system treated them as one group, it could not tell you which class still needs a module, or which class needs to be scheduled next.
 
 Parade Night
   A scheduled training evening. Each parade night can hold multiple sessions across different time periods.
 
 Session
-  One training block within a parade night — a specific curriculum item, time period, Training Class, facilitator, and room.
+  One training block within a parade night. Each session is linked to a curriculum item, time period, facilitator, room, and one or more Training Classes.
+
+  A session can serve more than one Training Class. If Senior 1 and Senior 2 are doing the same module together, assign both classes to one session — they share the session but the system records the delivery against each class separately.
 
 Mission Backlog
-  A list of curriculum modules required for your active Training Classes but not yet scheduled. The backlog tells you what still needs to be planned and for which classes.
+  A list of curriculum modules required for your active Training Classes that have not yet been scheduled. The backlog tells you what still needs to be planned and for which class. If a module is needed by Senior 1 but not Senior 2, the backlog shows that distinction.
 
 ═══════════════════════════════════════════════
 HOW TO GET STARTED — FIRST TIME
@@ -8678,7 +8989,7 @@ Before using Planning Workspace, set up the following in TMS:
   1. Squadron details (name, parade day, parade location)
   2. At least one facilitator
   3. At least one training area
-  4. Training Classes for each active Training Stage
+  4. A Training Class for each active Training Stage (e.g. Senior 1 for the Senior stage; add Senior 2 if you have two senior groups)
 
 Then open Planning Workspace. If no Training Year exists, the setup panel appears automatically.
 
@@ -8690,6 +9001,9 @@ Add a Facilitator
 
 Add a Training Area
   In TMS → Training Areas & Equipment → Add training area. Enter name, type, and capacity. Save.
+
+Set up Training Classes
+  In TMS → Training Year → Training Classes → Add Training Class. Choose the Training Stage and give the class a name (e.g. Senior 1). Repeat for each class. Each class tracks its own progress through the curriculum.
 
 Generate Parade Nights
   In Planning Workspace: select a Training Year, then use "Guided year setup…" in the toolbar. Choose your parade weekday, start date, end date, and frequency. Select Generate.
@@ -8861,7 +9175,7 @@ async function commitGenerateActivities(){
     const r=await api('/api/activities/generate',{method:'POST',body});
     closeModal('m-gen-acts');
     await reloadAndRender();
-    alert(`Done. ${r.created_count} activities created, ${r.skipped_count} skipped.`);
+    showToast(`Done. ${r.created_count} activities created, ${r.skipped_count} skipped.`);
   }catch(e){
     msg.textContent='Creation failed: '+apiErr(e);
     document.getElementById('ga-create-btn').disabled=false;
@@ -8872,7 +9186,7 @@ let _editActId=null;
 async function saveAct(){
   const name=document.getElementById('act-name').value.trim();
   const date=document.getElementById('act-date').value;
-  if(!name||!date){alert('Name and date required.');return;}
+  if(!name||!date){showToast('Name and date required.',true);return;}
   const aud=[];
   ['ori','ini','jun','int','sen'].forEach(k=>{if(document.getElementById('aa-'+k).checked)aud.push({ori:'Orientation',ini:'Initial',jun:'Junior',int:'Intermediate',sen:'Senior'}[k]);});
   const payload={activity_name:name,date_start:date,activity_type:document.getElementById('act-type').value,audience:aud,notes:document.getElementById('act-notes').value||null};
@@ -8881,7 +9195,7 @@ async function saveAct(){
     else { await api('/api/activities',{method:'POST',body:JSON.stringify(payload)}); }
     await reloadAndRender(); closeModal('m-add-act');
     document.getElementById('act-modal-title')&&(document.getElementById('act-modal-title').textContent='+ Add Activity');
-  }catch(e){ alert(apiErr(e)); }
+  }catch(e){ showToast(apiErr(e),true); }
 }
 function editAct(id){
   const act=S.acts.find(a=>a.id===id); if(!act)return;
@@ -8896,9 +9210,10 @@ function editAct(id){
   openModal('m-add-act');
 }
 async function delAct(id){
-  if(!confirm('Remove this activity? It will no longer appear in active views, but the record is preserved.'))return;
-  try{ await api('/api/activities/'+id,{method:'DELETE'}); await reloadAndRender(); }
-  catch(e){ alert(apiErr(e)); }
+  confirmAction('Remove this activity? It will no longer appear in active views, but the record is preserved.',async()=>{
+    try{ await api('/api/activities/'+id,{method:'DELETE'}); await reloadAndRender(); }
+    catch(e){ showToast(apiErr(e),true); }
+  });
 }
 
 // REM-103: squadron-local date/time/notes/relevance adjustment to an
@@ -8944,13 +9259,14 @@ async function saveActivityLocalOverride(){
   }catch(e){ msg.textContent=apiErr(e); msg.style.display=''; }
 }
 async function clearActivityLocalOverride(){
-  if(!confirm('Remove this local adjustment and revert to the source activity\'s own date/time/notes?'))return;
-  try{
-    await api('/api/activities/'+_actOverrideId+'/local-override',{method:'DELETE'});
-    closeModal('m-act-override');
-    await reloadAndRender();
-    showToast('Local adjustment cleared.');
-  }catch(e){ alert(apiErr(e)); }
+  confirmAction('Remove this local adjustment and revert to the source activity\'s own date/time/notes?',async()=>{
+    try{
+      await api('/api/activities/'+_actOverrideId+'/local-override',{method:'DELETE'});
+      closeModal('m-act-override');
+      await reloadAndRender();
+      showToast('Local adjustment cleared.');
+    }catch(e){ showToast(apiErr(e),true); }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -9203,7 +9519,7 @@ async function _submitFacLeave(facId){
   const notes=(document.getElementById('fl-notes').value||'').trim()||null;
   const msg=document.getElementById('fl-msg');
   if(!start||!end){ msg.textContent='Both dates are required.'; msg.style.color='var(--red)'; return; }
-  if(start>end){ msg.textContent='"From" must not be after "To".'; msg.style.color='var(--red)'; return; }
+  if(start>end){ msg.textContent='End date must be on or after the start date.'; msg.style.color='var(--red)'; return; }
   msg.textContent='Saving…'; msg.style.color='var(--muted)';
   try{
     const r=await api('/api/planning/facilitators/'+facId+'/leave',{method:'POST',body:JSON.stringify({start_date:start,end_date:end,reason,notes})});
@@ -9283,7 +9599,7 @@ function saveFac(confirmDuplicate){
   const rank=document.getElementById('fac-rank').value.trim();
   const first=document.getElementById('fac-first').value.trim();
   const last=document.getElementById('fac-last').value.trim();
-  if(!last){alert('Family name required.');return;}
+  if(!last){showToast('Family name required.',true);return;}
   const areas=_readFacAreas();
   const type=document.getElementById('fac-type').value;
   const btn=document.getElementById('fac-save-btn');
@@ -9300,7 +9616,7 @@ function saveFac(confirmDuplicate){
         const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false});
         _setFacSaveState('Saved at '+savedAt,'var(--ok)');
         await reloadAndRender(); loadFacilitatorStats(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
-        showToast('Facilitator profile saved at '+savedAt+'.', false);
+        showToast('Facilitator profile saved.', false);
       })
       .catch(e=>{
         _setFacSaveState('Failed to save — Retry','var(--red)');
@@ -9326,7 +9642,7 @@ function saveFac(confirmDuplicate){
       // the new facilitator is guaranteed visible immediately.
       const facSearch=document.getElementById('fac-search'); if(facSearch)facSearch.value='';
       await reloadAndRender(); loadFacilitatorStats(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
-      showToast('Facilitator added at '+savedAt+'.', false);
+      showToast('Facilitator added.', false);
     })
     .catch(e=>{
       if(e&&e.code==='possible_duplicate'&&!confirmDuplicate){
@@ -9348,7 +9664,7 @@ function saveFac(confirmDuplicate){
           <span style="color:var(--muted)">Last updated</span><span>${esc(updated)}</span>
         </div>`;
         const w=document.getElementById('fac-dup-warn');
-        w.innerHTML=esc(apiErr(e))+' If this is a different person with the same name, you can add them anyway.'+viewBtn+card;
+        w.innerHTML=esc(apiErr(e))+' If this is a different person with the same name, add them anyway.'+viewBtn+card;
         w.style.display='';
         if(anywayBtn)anywayBtn.style.display='';
         _setFacSaveState('Unsaved changes','var(--muted)');
@@ -9376,7 +9692,7 @@ function _populateFacTypeSelect(){
 }
 async function _onFacTypeChange(sel){
   if(sel.value!=='__add_new__'){ _markFacUnsaved(); return; }
-  const name=(prompt('New facilitator type name:')||'').trim();
+  const name=await promptText('New facilitator type','Type name',{okLabel:'Create'});
   if(!name){ sel.value=S.facilitatorTypeTags&&S.facilitatorTypeTags[0]?S.facilitatorTypeTags[0].display_name:'Staff'; return; }
   try{
     const t=await api('/api/facilitator-type-tags',{method:'POST',body:JSON.stringify({display_name:name})});
@@ -9411,9 +9727,10 @@ function editFac(id){
   openModal('m-add-fac');
 }
 async function delFac(id){
-  if(!confirm('Archive this facilitator? Past session records are preserved, and this can be undone from "Show archived".'))return;
-  try{ await api('/api/facilitators/'+id,{method:'DELETE'}); await reloadAndRender(); loadFacilitatorStats(); }
-  catch(e){ alert(apiErr(e)); }
+  confirmAction('Archive this facilitator? Past session records are preserved, and this can be undone from "Show archived".',async()=>{
+    try{ await api('/api/facilitators/'+id,{method:'DELETE'}); await reloadAndRender(); loadFacilitatorStats(); }
+    catch(e){ showToast(apiErr(e),true); }
+  });
 }
 
 let _mergeFacSourceId=null;
@@ -9492,7 +9809,7 @@ function renderRooms(){
   document.getElementById('room-tbody').innerHTML=roomSrc.map((r,i)=>`<tr${showRooms?' style="opacity:.6"':''}>
     <td style="font-weight:700">${esc(r.name)}${showRooms?' <span class="badge b-grey">Archived</span>':''}</td>
     <td style="text-align:center">${r.capacity||'—'}</td>
-    <td>${r.type?`<span class="badge b-blue" style="font-size:8.5px">${r.type}</span>`:'—'}</td>
+    <td>${r.type?`<span class="badge b-blue" style="font-size:10px">${r.type}</span>`:'—'}</td>
     <td class="no-print">${showRooms
       ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreRoom('${r.id}','${_jsAttr(r.name)}')">Restore</button>`:'')
       :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editRoom('${r.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delRoom('${r.id}')">×</button>`:'—')}</td>
@@ -9510,14 +9827,14 @@ function renderRooms(){
 }
 async function saveRoom(){
   const name=document.getElementById('room-name').value.trim();
-  if(!name){alert('Room name required.');return;}
+  if(!name){showToast('Room name required.',true);return;}
   const payload={name,capacity:+document.getElementById('room-cap').value||null,type:document.getElementById('room-type').value||null,notes:document.getElementById('room-notes').value||null};
   try{
     if(editRoomId){ await api('/api/training-areas/'+editRoomId,{method:'PATCH',body:JSON.stringify(payload)}); editRoomId=null; }
     else { await api('/api/training-areas',{method:'POST',body:JSON.stringify(payload)}); }
     await reloadAndRender(); closeModal('m-add-room');
     document.getElementById('room-modal-title').textContent='+ Add Room / Training Area';
-  }catch(e){ alert(apiErr(e)); }
+  }catch(e){ showToast(apiErr(e),true); }
 }
 function editRoom(id){
   const r=S.rooms.find(x=>x.id===id);if(!r)return;editRoomId=id;
@@ -9527,20 +9844,21 @@ function editRoom(id){
   openModal('m-add-room');
 }
 async function delRoom(id){
-  if(!confirm('Archive this training area? It will no longer appear in active lists, but existing records are unaffected.'))return;
-  try{ await api('/api/training-areas/'+id,{method:'DELETE'}); await reloadAndRender(); }
-  catch(e){ alert(apiErr(e)); }
+  confirmAction('Archive this training area? It will no longer appear in active lists, but existing records are unaffected.',async()=>{
+    try{ await api('/api/training-areas/'+id,{method:'DELETE'}); await reloadAndRender(); }
+    catch(e){ showToast(apiErr(e),true); }
+  });
 }
 async function saveEquip(){
   const name=document.getElementById('equip-name').value.trim();
-  if(!name){alert('Equipment name required.');return;}
+  if(!name){showToast('Equipment name required.',true);return;}
   const payload={name,quantity:+document.getElementById('equip-qty').value||1,notes:document.getElementById('equip-notes').value||null};
   try{
     if(editEquipId){ await api('/api/equipment/'+editEquipId,{method:'PATCH',body:JSON.stringify(payload)}); editEquipId=null; }
     else { await api('/api/equipment',{method:'POST',body:JSON.stringify(payload)}); }
     await reloadAndRender(); closeModal('m-add-equip');
     document.getElementById('equip-modal-title').textContent='+ Add Equipment';
-  }catch(e){ alert(apiErr(e)); }
+  }catch(e){ showToast(apiErr(e),true); }
 }
 function editEquip(id){
   const eq=S.equip.find(x=>x.id===id);if(!eq)return;editEquipId=id;
@@ -9549,9 +9867,10 @@ function editEquip(id){
   document.getElementById('equip-notes').value=eq.notes||'';openModal('m-add-equip');
 }
 async function delEquip(id){
-  if(!confirm('Archive this equipment item? It will no longer appear in active lists, but existing records are unaffected.'))return;
-  try{ await api('/api/equipment/'+id,{method:'DELETE'}); await reloadAndRender(); }
-  catch(e){ alert(apiErr(e)); }
+  confirmAction('Archive this equipment item? It will no longer appear in active lists, but existing records are unaffected.',async()=>{
+    try{ await api('/api/equipment/'+id,{method:'DELETE'}); await reloadAndRender(); }
+    catch(e){ showToast(apiErr(e),true); }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -9642,9 +9961,11 @@ function renderActions(){
       </div></td></tr>`;
 }
 async function _closeActionItem(id){
-  if(!confirm('Mark this action item as done?'))return;
-  try{await apiCloseActionItem(id);await reloadAndRender();showToast('Item closed.');}
-  catch(e){showToast(apiErr(e),true);}
+  confirmAction('Mark this action item as done?',async()=>{
+    try{await apiCloseActionItem(id);await reloadAndRender();showToast('Item closed.');}
+    catch(e){showToast(apiErr(e),true);}
+  });
+
 }
 
 // ─── HELP-05: What Changed? activity feed ────────────────────────────────────
@@ -9708,7 +10029,7 @@ function _renderCrestPreview(){
 }
 async function saveSettings(){
   const sqnId=S.currentSqnId||(S.session&&S.session.squadron_id);
-  if(!sqnId){alert('No squadron in scope — cannot save settings.');return;}
+  if(!sqnId){showToast('Select a squadron before saving settings.',true);return;}
   const msg=document.getElementById('settings-msg');
   if(msg){msg.textContent='Saving…';msg.style.color='var(--muted)';}
   const oldDay=(S.cfg&&S.cfg.day)||'';
@@ -9732,7 +10053,7 @@ async function saveSettings(){
     // always-previewed action rather than silently applying it.
     if(newDay && oldDay && newDay!==oldDay){ await _offerPdayPropagation(oldDay,newDay); }
   }catch(e){
-    if(msg){msg.textContent=apiErr(e);msg.style.color='var(--red)';}else alert(apiErr(e));
+    if(msg){msg.textContent=apiErr(e);msg.style.color='var(--red)';}else showToast(apiErr(e),true);
   }
 }
 
@@ -9785,7 +10106,7 @@ async function _pdayPropPreview(sessionScope){
 async function _pdayPropApply(sessionScope){
   const body=document.getElementById('pday-prop-body');
   const reason=(document.getElementById('pday-prop-reason').value||'').trim();
-  if(!reason){ alert('A reason is required.'); return; }
+  if(!reason){ showToast('A reason is required.',true); return; }
   body.innerHTML='<p style="color:var(--muted)">Applying…</p>';
   try{
     const r=await api(`/api/planning/years/${_pdayPropYearId}/update-future-parade-day`,{method:'POST',body:JSON.stringify({
@@ -10021,7 +10342,7 @@ function _pnCbBlockRow(b, i) {
   return `<tr>
     <td style="padding:2px 4px;color:var(--muted);font-size:11px">${i+1}</td>
     <td style="padding:2px 3px"><input value="${esc(b.block_name)}" oninput="_pnCbSet(${i},'block_name',this.value)" style="width:100px;font-size:11.5px"></td>
-    <td style="padding:2px 3px"><select style="font-size:11.5px" onchange="_pnCbSet(${i},'block_type',this.value);_pnCbSet(${i},'is_instructional_period',this.value==='instructional_period');renderPNCbBlocks()">${typeOpts}</select></td>
+    <td style="padding:2px 3px"><select aria-label="Block type" style="font-size:11.5px" onchange="_pnCbSet(${i},'block_type',this.value);_pnCbSet(${i},'is_instructional_period',this.value==='instructional_period');renderPNCbBlocks()">${typeOpts}</select></td>
     <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_pnCbSet(${i},'start_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:11.5px"></td>
     <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_pnCbSet(${i},'end_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:11.5px"></td>
     <td style="padding:2px 4px;text-align:center;font-size:11px;color:var(--muted)">${sh}</td>
@@ -10062,7 +10383,7 @@ async function savePNTimingOverride(){
   const reason=(document.getElementById('pn-override-reason').value||'').trim();
   const msgEl=document.getElementById('pn-override-msg');
   const setMsg=(t,ok)=>{ if(msgEl){ msgEl.textContent=t; msgEl.style.color=ok?'var(--ok)':'var(--red)'; } };
-  if(!reason){ setMsg('Reason is required.',false); return; }
+  if(!reason){ setMsg('Enter a reason for this override before saving.',false); return; }
   setMsg('Saving…',true);
   try{
     if(_pnOrCurrentMode==='custom'){
@@ -10181,7 +10502,7 @@ function _cmdCell(cell){
 // A1 — readiness matrix: Wing rows=Squadrons, National rows=Wings.
 function _renderReadinessMatrix(chart,scope){
   const rows=chart.data||[];
-  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data available for this chart.');
   const cols=chart.columns||[];
   const colLabels={sessions_planned:'Sessions planned',curriculum_allocated:'Curriculum',
     facilitator_confirmed:'Facilitator',facility_confirmed:'Facility',
@@ -10257,7 +10578,7 @@ function _renderRiskTimeline(chart){
 // which would let a low-volume unit's bar look artificially small).
 function _chartStackedBar100(chart){
   const rows=chart.data||[];const series=chart.series||[];
-  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data available for this chart.');
   let html=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">`+
     series.map(s=>`<span style="display:flex;align-items:center;gap:4px;font-size:10px"><span style="display:inline-block;width:10px;height:10px;background:${s.color||'var(--royal)'};border-radius:2px"></span>${esc(s.label)}</span>`).join('')+`</div>`;
   rows.forEach(row=>{
@@ -10278,7 +10599,7 @@ function _chartStackedBar100(chart){
 // B4 — cancellation/non-delivery Pareto: ranked bars + cumulative percentage.
 function _renderPareto(chart){
   const rows=chart.data||[];
-  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data');
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No data available for this chart.');
   const maxV=Math.max(...rows.map(r=>r.count),1);
   return rows.map(r=>{
     const w=Math.round(r.count/maxV*100);
@@ -10333,7 +10654,63 @@ async function loadCommandDashboard(scope){
   html+=_cmdCard(d.sections.B.cancellation_pareto,_renderPareto(d.sections.B.cancellation_pareto));
 
   html+=`<div class="drill-panel" id="cmd-drill-${scope}"></div>`;
+  html+=`<h2 style="font-size:11.5px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.03em;margin:18px 0 6px">C — System Adoption</h2>`;
+  html+=`<div class="card" style="padding:12px 16px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--muted)">Shows squadron-level system activity. Not a surveillance tool — aggregates only.</span>
+    <select id="adoption-period-sel-${scope}" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px" aria-label="Adoption period">
+      <option value="7d">Last 7 days</option>
+      <option value="30d" selected>Last 30 days</option>
+      <option value="term">This term (90 days)</option>
+      <option value="year">This year</option>
+    </select>
+    <button class="btn btn-out" style="font-size:11px;padding:4px 10px" onclick="_loadAdoptionData('${scope}')">Load Adoption Data ↓</button>
+  </div>
+  <div id="adoption-content-${scope}" style="margin-top:10px"></div></div>`;
   host.innerHTML=html;
+}
+
+async function _loadAdoptionData(scope){
+  const container=document.getElementById('adoption-content-'+scope); if(!container)return;
+  const periodSel=document.getElementById('adoption-period-sel-'+scope);
+  const period=periodSel?periodSel.value:'30d';
+  const wingId=(S.role==='system_admin')?saBrowseWingId():null;
+  let url='/api/dashboard/adoption?period='+encodeURIComponent(period);
+  if(wingId)url+='&wing_id='+encodeURIComponent(wingId);
+  container.innerHTML='<div class="muted" style="font-size:12px">Loading…</div>';
+  let d;
+  try{ d=await api(url); }
+  catch(e){ container.innerHTML=`<div class="sc-status-err" style="font-size:12px">Adoption data unavailable: ${esc(apiErr(e))}</div>`; return; }
+  if(!d.units||!d.units.length){ container.innerHTML='<div class="muted" style="font-size:12px">No squadron data for this period.</div>'; return; }
+  const since=d.since?'Since '+fmtD(d.since,{day:'numeric',month:'short',year:'numeric'}):'';
+  const maxActions=Math.max(...d.units.map(u=>u.total_meaningful_actions),1);
+  let html=`<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${esc(since)} · ${d.active_units}/${d.total_units} squadrons active</div>`;
+  html+=`<div class="tw"><table><thead><tr>
+    <th>Squadron</th><th style="text-align:center">Active Accounts</th><th style="text-align:center">Total Actions</th>
+    <th style="text-align:center">Sessions Scheduled</th><th style="text-align:center">Outcomes Recorded</th>
+    <th style="text-align:center">Programs Published</th><th style="text-align:center">Facilitators Managed</th><th>Last Activity</th>
+  </tr></thead><tbody>`;
+  for(const u of d.units){
+    const w=maxActions?Math.round(u.total_meaningful_actions/maxActions*100):0;
+    const last=u.last_activity?fmtD(u.last_activity.substring(0,10),{day:'numeric',month:'short',year:'2-digit'}):'—';
+    const active=u.total_meaningful_actions>0;
+    html+=`<tr>
+      <td style="font-weight:600">${esc(u.code)}<span style="font-weight:400;color:var(--muted);font-size:11px"> ${esc(u.name)}</span></td>
+      <td style="text-align:center">${u.active_users}</td>
+      <td style="text-align:center">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="flex:1;height:6px;background:var(--border);border-radius:3px"><div style="height:100%;width:${w}%;background:${active?'var(--blue)':'var(--lgrey)'};border-radius:3px"></div></div>
+          <span style="min-width:24px;font-size:11px">${u.total_meaningful_actions}</span>
+        </div>
+      </td>
+      <td style="text-align:center">${u.sessions_scheduled}</td>
+      <td style="text-align:center">${u.outcomes_recorded}</td>
+      <td style="text-align:center">${u.programs_published}</td>
+      <td style="text-align:center">${u.facilitators_maintained}</td>
+      <td style="font-size:11px;color:${active?'var(--text)':'var(--muted)'}">${last}</td>
+    </tr>`;
+  }
+  html+='</tbody></table></div>';
+  container.innerHTML=html;
 }
 
 function renderWing(){
@@ -10540,16 +10917,19 @@ function subjectOf(el){ if(!el)return null; const m=SUBJECTS.find(s=>s.els.some(
 async function enterMode(squadronId, label){
   const isNat=['national_admin','system_admin'].includes(S.role);
   const what=isNat?'Delegated Intervention':'Proxy Mode';
-  const reason=prompt(`Enter a reason to act on ${label||'this squadron'} in ${what} (required, audited):`);
+  const reason=await promptText(`Enter reason — ${what}`,'Reason (required, audited)',{
+    context:`Acting on ${label||'this squadron'} requires a reason. It will appear in the audit log.`,
+    okLabel:'Enter '+what,
+  });
   if(!reason)return;
   S.proxyReason=reason; S.proxyLabel=label||'';
   try{
     await api('/api/proxy/enter/'+squadronId,{method:'POST',body:JSON.stringify({reason})});
     await loadData(); renderAll(); updateScopeBanner(); updateModeBanner(); updateDebugBar(); bootApp();
-  }catch(e){ alert(apiErr(e)); }
+  }catch(e){ showToast(apiErr(e),true); }
 }
 async function exitMode(){
-  try{ await api('/api/proxy/exit',{method:'POST'}); }catch(e){ alert(apiErr(e)); }
+  try{ await api('/api/proxy/exit',{method:'POST'}); }catch(e){ showToast(apiErr(e),true); }
   try{ S.proxy=await api('/api/proxy/current'); }catch(_){ S.proxy={active:false}; }
   await loadData(); renderAll(); updateScopeBanner(); updateModeBanner(); updateDebugBar(); bootApp();
 }
@@ -10557,8 +10937,20 @@ async function exitMode(){
 // ═══════════════════════════════════════════════════════════
 //  MODALS
 // ═══════════════════════════════════════════════════════════
-function openModal(id){document.getElementById(id).classList.add('active');}
-function closeModal(id){document.getElementById(id).classList.remove('active');}
+let _modalReturnFocus=null;
+function openModal(id){
+  _modalReturnFocus=document.activeElement;
+  const bg=document.getElementById(id);
+  bg.classList.add('active');
+  // Move focus to first focusable element inside the modal for keyboard/AT users
+  const first=bg.querySelector('button,input,select,textarea,[tabindex]:not([tabindex="-1"]),[href]');
+  if(first)setTimeout(()=>first.focus(),40);
+}
+function closeModal(id){
+  document.getElementById(id).classList.remove('active');
+  if(_modalReturnFocus&&_modalReturnFocus.focus)try{_modalReturnFocus.focus();}catch(_){}
+  _modalReturnFocus=null;
+}
 // REM-106: confirmAction() replaces native confirm() for critical SA/org-
 // management operations (archive Wing/Squadron, maintenance mode, account
 // disable/reactivate/delete/restore/unlock) -- native confirm() blocks the
@@ -10583,6 +10975,46 @@ function _confirmNo(){
   closeModal('m-confirm');
   _confirmCb=null;
 }
+
+// ── promptText() — non-blocking replacement for native prompt() ──────────────
+// Returns a Promise<string|null>: resolves to the trimmed input string, or null if
+// the user cancels. Accepts an options object: { context, defaultValue, okLabel,
+// validate(val)->errorString|null, danger }. danger=true renders the confirm button red.
+let _tiResolve=null, _tiValidate=null;
+function promptText(title,label,{context='',defaultValue='',okLabel='OK',validate=null,danger=false}={}){
+  return new Promise(resolve=>{
+    _tiResolve=resolve; _tiValidate=validate;
+    document.getElementById('ti-title').textContent=title;
+    document.getElementById('ti-label').textContent=label;
+    const ctx=document.getElementById('ti-context');
+    ctx.textContent=context; ctx.style.display=context?'':'none';
+    const inp=document.getElementById('ti-input');
+    inp.value=defaultValue; inp.setAttribute('aria-label',label);
+    document.getElementById('ti-err').textContent='';
+    const okBtn=document.getElementById('ti-ok-btn');
+    okBtn.textContent=okLabel; okBtn.className='btn '+(danger?'btn-red':'btn-dk');
+    openModal('m-text-input');
+    setTimeout(()=>{inp.focus();inp.select();},40);
+  });
+}
+function _tiSave(){
+  const val=document.getElementById('ti-input').value.trim();
+  if(!val){document.getElementById('ti-err').textContent='This field is required.';return;}
+  if(_tiValidate){const err=_tiValidate(val);if(err){document.getElementById('ti-err').textContent=err;return;}}
+  closeModal('m-text-input');
+  const cb=_tiResolve; _tiResolve=null; _tiValidate=null;
+  if(cb)cb(val);
+}
+function _tiCancel(){
+  closeModal('m-text-input');
+  const cb=_tiResolve; _tiResolve=null; _tiValidate=null;
+  if(cb)cb(null);
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&document.getElementById('m-text-input').classList.contains('active')){
+    e.preventDefault(); _tiSave();
+  }
+});
 document.querySelectorAll('.modal-bg').forEach(bg=>{bg.addEventListener('click',function(e){if(e.target===this)this.classList.remove('active');});});
 document.getElementById('m-add-pn').addEventListener('click',function(e){if(e.target===this)return;if(!document.getElementById('pn-slots').innerHTML)buildSlots();});
 window.addEventListener('DOMContentLoaded',()=>{calYear=new Date().getFullYear();calMonth=new Date().getMonth();});
@@ -10674,8 +11106,8 @@ function _renderPyActionBtns(){
 async function doRenamePlanningYear(){
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
   if(!y)return;
-  const newName=prompt('Rename Training Year',y.name||String(y.year));
-  if(newName===null)return;
+  const newName=await promptText('Rename Training Year','New name',{defaultValue:y.name||String(y.year),okLabel:'Rename'});
+  if(!newName)return;
   const trimmed=newName.trim();
   if(!trimmed){ showToast('Name cannot be empty.', true); return; }
   try{
@@ -10687,12 +11119,13 @@ async function doRenamePlanningYear(){
 async function doArchivePlanningYear(){
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
   if(!y)return;
-  if(!confirm(`Archive the ${y.name||y.year} Training Year? It will be removed from active selectors. All historical records are preserved and it can be restored later.`))return;
-  try{
-    await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({active_status:false,version:y.version})});
-    showToast('Training Year archived.');
-    await _loadPlanningYears();
-  }catch(e){ showToast('Could not archive: '+apiErr(e), true); }
+  confirmAction(`Archive the ${y.name||y.year} Training Year? It disappears from active selectors. Historical records are preserved and it can be restored later.`,async()=>{
+    try{
+      await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({active_status:false,version:y.version})});
+      showToast('Training Year archived.');
+      await _loadPlanningYears();
+    }catch(e){ showToast('Could not archive: '+apiErr(e), true); }
+  });
 }
 async function doRestorePlanningYear(){
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
@@ -10712,8 +11145,12 @@ async function doDeletePlanningYear(){
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
   if(!y)return;
   const label=y.name||String(y.year);
-  const typed=prompt(`This permanently deletes "${label}" -- this cannot be undone. It will only succeed if the year has no linked records (parade dates, holidays, notices, etc.); otherwise use Archive instead.\n\nType the year's name to confirm:`);
-  if(typed===null)return;
+  const typed=await promptText('Permanently delete Training Year',`Type the year name to confirm`,{
+    context:`This permanently deletes "${label}" — this cannot be undone. It will only succeed if the year has no linked records (parade dates, holidays, notices, etc.); otherwise use Archive instead.`,
+    okLabel:'Delete permanently',danger:true,
+    validate:v=>v!==label?`Type exactly: ${label}`:'',
+  });
+  if(!typed)return;
   if(typed.trim()!==label){ showToast('Name did not match — nothing was deleted.', true); return; }
   try{
     await api('/api/planning/years/'+P.currentYearId,{method:'DELETE'});
@@ -10725,9 +11162,9 @@ async function doDeletePlanningYear(){
     if(e && e.kind==='http' && e.status===409 && e.body && e.body.detail && e.body.detail.dependents){
       const dep=e.body.detail.dependents;
       const depList=Object.entries(dep).map(([k,v])=>`${_cap(k.replace(/_/g,' '))}: ${v}`).join(', ');
-      if(confirm(`Cannot permanently delete — this Training Year has linked records (${depList}). Archive it instead? (reversible, keeps history)`)){
+      confirmAction(`Cannot permanently delete — this Training Year has linked records (${depList}). Archive it instead? (reversible, keeps history)`,()=>{
         doArchivePlanningYear();
-      }
+      });
     } else {
       showToast('Could not delete: '+apiErr(e), true);
     }
@@ -10808,12 +11245,30 @@ async function loadMissions(yearId) {
   }
 }
 
+function _saveMissionFilters(phase,status,search,classFilter){
+  try{ sessionStorage.setItem('aafc_mission_filters',JSON.stringify({phase,status,search,classFilter})); }catch(_){}
+}
+function _restoreMissionFilters(){
+  try{
+    const saved=JSON.parse(sessionStorage.getItem('aafc_mission_filters')||'null');
+    if(!saved)return;
+    const pe=document.getElementById('mission-filter-phase');
+    const se=document.getElementById('mission-filter-status');
+    const qe=document.getElementById('mission-search');
+    const ce=document.getElementById('mission-filter-class');
+    if(pe&&saved.phase)pe.value=saved.phase;
+    if(se&&saved.status)se.value=saved.status;
+    if(qe&&saved.search)qe.value=saved.search;
+    if(ce&&saved.classFilter)ce.value=saved.classFilter;
+  }catch(_){}
+}
 function renderMissions() {
   const body = document.getElementById('missions-body');
   const phase  = document.getElementById('mission-filter-phase').value;
   const status = document.getElementById('mission-filter-status').value;
   const search = (document.getElementById('mission-search').value||'').toLowerCase();
   const classFilter = (document.getElementById('mission-filter-class')||{}).value||'';
+  _saveMissionFilters(phase,status,search,classFilter);
   let rows = _missionState.missions.filter(m => {
     if(phase  && m.phase !== phase) return false;
     if(status === 'scheduled'   && !m.is_scheduled) return false;
@@ -10873,7 +11328,7 @@ function renderMissions() {
             return `<span title="${esc(c.display_name)}: ${esc(s||'unknown')}" style="color:${col};font-size:11px;font-weight:700;margin-right:2px">${sym}</span>`;
           }).join('');
           const summary = needsAction.length
-            ? `<div style="font-size:9.5px;color:var(--red);font-weight:700">${needsAction.length} class${needsAction.length===1?'':'es'} need action</div>`
+            ? `<div style="font-size:11px;color:var(--red);font-weight:700">${needsAction.length} class${needsAction.length===1?'':'es'} need action</div>`
             : '';
           classTd = `<td style="white-space:nowrap">${dots}${summary}</td>`;
         }
@@ -10902,7 +11357,7 @@ function renderMissions() {
 function exportPerClassDeliveryCSV() {
   const missions = _missionState && _missionState.missions;
   if (!missions || !missions.length) {
-    showToast('Load the Mission Backlog first.', true);
+    showToast('Open the Mission Backlog tab first, then try the export again.', true);
     return;
   }
   // Collect all unique Training Classes across all missions.
@@ -10913,7 +11368,7 @@ function exportPerClassDeliveryCSV() {
     });
   });
   if (!Object.keys(classMap).length) {
-    showToast('No Training Classes are assigned in this planning year.', true);
+    showToast('No Training Classes are set up for this planning year. Add Training Classes under the Training Classes tab before exporting.', true);
     return;
   }
   const header = ['Class', 'Code', 'Title', 'Stage', 'Element', 'Recommended Term', 'Delivery Status', 'Sessions Scheduled'];
@@ -11294,7 +11749,7 @@ async function _renderParadeDates(yearId){
         <td><button class="btn-xs btn-danger" onclick="deleteParadeDate('${esc(d.parade_date_id)}','${esc(yearId)}')">Remove</button></td>
       </tr>`).join('')+
       `</tbody></table>`;
-  } catch(e){ el.innerHTML='<p class="muted">Error loading dates.</p>'; }
+  } catch(e){ el.innerHTML='<p class="muted">Could not load parade dates. Refresh the page to try again.</p>'; }
 }
 
 async function _renderHolidays(yearId){
@@ -11313,7 +11768,7 @@ async function _renderHolidays(yearId){
         <td style="white-space:nowrap">${canWrite?`<button class="btn-xs" onclick='openEditHolidayModal(${JSON.stringify(h)})' style="margin-right:4px">Edit</button>`:''}${canWrite?`<button class="btn-xs btn-danger" onclick="deleteHoliday('${esc(h.holiday_id)}','${esc(yearId)}')">Remove</button>`:''}</td>
       </tr>`).join('')+
       `</tbody></table>`;
-  } catch(e){ el.innerHTML='<p class="muted">Error loading holidays.</p>'; }
+  } catch(e){ el.innerHTML='<p class="muted">Could not load holiday periods. Refresh the page to try again.</p>'; }
 }
 
 function _dayName(iso){ try{ const d=new Date(iso+'T00:00:00'); return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]; }catch(e){ return ''; } }
@@ -11337,9 +11792,10 @@ async function doAddParadeDate(){
   } catch(e){ document.getElementById('pd-msg').textContent=apiErr(e); }
 }
 async function deleteParadeDate(pdId, yearId){
-  if(!confirm('Permanently remove this parade date?')) return;
-  try { await api(`/api/planning/parade-dates/${pdId}`,{method:'DELETE'}); await _renderParadeDates(yearId); }
-  catch(e){ alert(apiErr(e)); }
+  confirmAction('Permanently remove this parade date? This cannot be undone.',async()=>{
+    try { await api(`/api/planning/parade-dates/${pdId}`,{method:'DELETE'}); await _renderParadeDates(yearId); }
+    catch(e){ showToast(apiErr(e),true); }
+  },true);
 }
 
 function openGenerateDatesModal(){
@@ -11373,7 +11829,7 @@ function _buildGenBody(){
 async function previewGenerateDates(){
   const msg=document.getElementById('gen-msg');
   const area=document.getElementById('gen-preview-area');
-  if(!P.currentYearId){ msg.textContent='Select a planning year first.'; return; }
+  if(!P.currentYearId){ msg.textContent='Select a Training Year from the dropdown above to continue.'; return; }
   const b=_buildGenBody();
   if(!b.start_date){ msg.textContent='Start date is required.'; return; }
   if(!b.end_date&&!b.max_repeats){ msg.textContent='Provide an end date or number of repeats.'; return; }
@@ -11395,14 +11851,14 @@ async function previewGenerateDates(){
 }
 async function doGenerateDates(){
   const msg=document.getElementById('gen-msg');
-  if(!P.currentYearId){ msg.textContent='Select a planning year first.'; return; }
+  if(!P.currentYearId){ msg.textContent='Select a Training Year from the dropdown above to continue.'; return; }
   const b=_buildGenBody();
   if(!b.start_date){ msg.textContent='Start date is required.'; return; }
   if(!b.end_date&&!b.max_repeats){ msg.textContent='Provide an end date or number of repeats.'; return; }
   try {
     const r = await api(`/api/planning/years/${P.currentYearId}/generate-parade-dates`,{method:'POST',body:b});
     closeModal('m-gen-dates');
-    alert(`Generated ${r.created} new parade date${r.created!==1?'s':''}.`);
+    showToast(`Generated ${r.created} new parade date${r.created!==1?'s':''}.`);
     await _renderParadeDates(P.currentYearId);
   } catch(e){ msg.textContent=apiErr(e); }
 }
@@ -11455,9 +11911,10 @@ async function doEditHoliday(){
   } catch(e){ hm.textContent=apiErr(e); }
 }
 async function deleteHoliday(hId, yearId){
-  if(!confirm('Permanently remove this holiday period?')) return;
-  try { await api(`/api/planning/holidays/${hId}`,{method:'DELETE'}); await _renderHolidays(yearId); }
-  catch(e){ alert(apiErr(e)); }
+  confirmAction('Permanently remove this holiday period? This cannot be undone.',async()=>{
+    try { await api(`/api/planning/holidays/${hId}`,{method:'DELETE'}); await _renderHolidays(yearId); }
+    catch(e){ showToast(apiErr(e),true); }
+  },true);
 }
 
 // ── Training Classes (CLASS-01/03/04/07) ─────────────────────────────────
@@ -11560,7 +12017,7 @@ async function _renderTrainingClasses(yearId){
         `</tbody></table>`;
     });
     el.innerHTML=html;
-  } catch(e){ el.innerHTML='<p class="muted">Error loading Training Classes.</p>'; }
+  } catch(e){ el.innerHTML='<p class="muted">Could not load Training Classes. Refresh the page to try again.</p>'; }
 }
 
 async function _tcToggleShowArchived(yearId){
@@ -11626,7 +12083,7 @@ async function openTrainingClassProgressModal(trainingClassId){
 }
 
 async function openAddTrainingClassModal(){
-  if(!P.currentYearId){ alert('Select a Training Year first.'); return; }
+  if(!P.currentYearId){ showToast('Select a Training Year from the dropdown above before continuing.',true); return; }
   document.getElementById('tc-name-inp').value='';
   document.getElementById('tc-seq-inp').value='';
   document.getElementById('tc-add-msg').textContent='';
@@ -11635,7 +12092,7 @@ async function openAddTrainingClassModal(){
 }
 async function doAddTrainingClass(){
   const msg=document.getElementById('tc-add-msg');
-  if(!P.currentYearId){ msg.textContent='Select a Training Year first.'; return; }
+  if(!P.currentYearId){ msg.textContent='Select a Training Year from the dropdown above to continue.'; return; }
   const training_stage_id=document.getElementById('tc-stage-inp').value;
   const display_name=document.getElementById('tc-name-inp').value.trim();
   const seqVal=document.getElementById('tc-seq-inp').value;
@@ -11653,7 +12110,7 @@ async function doAddTrainingClass(){
 
 async function openEditTrainingClassModal(trainingClassId){
   const c=_tcById[trainingClassId];
-  if(!c){ alert('Could not find that Training Class -- try refreshing.'); return; }
+  if(!c){ showToast('Could not find that Training Class — try refreshing.',true); return; }
   document.getElementById('tc-edit-id').value=c.training_class_id;
   document.getElementById('tc-edit-version').value=c.version;
   document.getElementById('tc-edit-name-inp').value=c.display_name||'';
@@ -11683,9 +12140,10 @@ async function doEditTrainingClass(){
   }
 }
 async function archiveTrainingClass(cid, yearId){
-  if(!confirm('Archive this Training Class? It will no longer appear in active planning views, but its history is kept and it can be restored later.')) return;
-  try{ await api(`/api/training-classes/${cid}`,{method:'DELETE'}); await _renderTrainingClasses(yearId); showToast('Training Class archived.'); }
-  catch(e){ alert(apiErr(e)); }
+  confirmAction('Archive this Training Class? It will no longer appear in active planning views, but its history is kept and it can be restored later.',async()=>{
+    try{ await api(`/api/training-classes/${cid}`,{method:'DELETE'}); await _renderTrainingClasses(yearId); showToast('Training Class archived.'); }
+    catch(e){ showToast(apiErr(e),true); }
+  });
 }
 
 // ── CLASS-10: Training Class split/merge ────────────────────────────────
@@ -11704,7 +12162,7 @@ function _tcSameStageOptions(sourceId, stageId){
 
 async function openSplitTrainingClassModal(sourceId){
   const c=_tcById[sourceId];
-  if(!c){ alert('Could not find that Training Class -- try refreshing.'); return; }
+  if(!c){ showToast('Could not find that Training Class — try refreshing.',true); return; }
   document.getElementById('tcsplit-source-id').value=sourceId;
   document.getElementById('tcsplit-title').textContent=`Split "${c.display_name}"`;
   document.getElementById('tcsplit-name-inp').value='';
@@ -11755,7 +12213,7 @@ async function doSplitTrainingClass(){
 
 async function openMergeTrainingClassModal(sourceId){
   const c=_tcById[sourceId];
-  if(!c){ alert('Could not find that Training Class -- try refreshing.'); return; }
+  if(!c){ showToast('Could not find that Training Class — try refreshing.',true); return; }
   document.getElementById('tcmerge-source-id').value=sourceId;
   document.getElementById('tcmerge-title').textContent=`Merge "${c.display_name}" into…`;
   document.getElementById('tcmerge-msg').textContent='';
@@ -11777,7 +12235,7 @@ function doMergeTrainingClass(){
   if(!targetId){ document.getElementById('tcmerge-msg').textContent='Choose a Training Class to merge into.'; return; }
   closeModal('m-merge-training-class');
   confirmAction(
-    `Merge "${source.display_name}" into "${target.display_name}"? Every cadet currently in "${source.display_name}" will be moved into "${target.display_name}", and "${source.display_name}" will be archived (its history and past sessions are kept, and it can be restored later).`,
+    `Merge "${source.display_name}" into "${target.display_name}"? All cadets in "${source.display_name}" move to "${target.display_name}". "${source.display_name}" then archives — its history and past sessions are kept and can be restored later.`,
     async ()=>{
       try{
         const r=await api(`/api/training-classes/${sourceId}/merge-into`,{method:'POST',body:{target_training_class_id:targetId}});
@@ -11848,7 +12306,7 @@ function _audienceBadges(aud){
 }
 
 function openAddAnchorModal(){
-  if(!P.currentYearId){ alert('Select a planning year first.'); return; }
+  if(!P.currentYearId){ showToast('Select a Training Year from the dropdown above before continuing.',true); return; }
   ['anch-name-inp','anch-start-inp','anch-end-inp','anch-impact-inp','anch-readiness-inp'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('anch-type-inp').value='other';
   document.getElementById('anch-imp-inp').value='key_event';
@@ -11876,9 +12334,10 @@ async function doAddAnchor(){
   } catch(e){ document.getElementById('anch-msg').textContent=apiErr(e); }
 }
 async function deleteAnchor(anchorId){
-  if(!confirm('Archive this anchor event? It will no longer appear in planning.')) return;
-  try { await api(`/api/planning/anchors/${anchorId}`,{method:'DELETE'}); await loadAnchors(P.currentYearId); }
-  catch(e){ alert(apiErr(e)); }
+  confirmAction('Archive this anchor event? It will no longer appear in planning.',async()=>{
+    try { await api(`/api/planning/anchors/${anchorId}`,{method:'DELETE'}); await loadAnchors(P.currentYearId); }
+    catch(e){ showToast(apiErr(e),true); }
+  });
 }
 
 // ═══════════════
@@ -12505,21 +12964,24 @@ function _renderConflicts(conflicts, yearId){
 }
 
 async function runAllChecks(){
-  if(!P.currentYearId){ alert('Select a planning year first.'); return; }
+  if(!P.currentYearId){ showToast('Select a Training Year from the dropdown above before continuing.',true); return; }
   try {
     const r=await api(`/api/planning/years/${P.currentYearId}/run-checks`,{method:'POST'});
     await loadPlanningChecks(P.currentYearId);
-    alert(`Checks complete. ${r.conflicts_detected} conflict${r.conflicts_detected!==1?'s':''} detected.`);
-  } catch(e){ alert(apiErr(e)); }
+    showToast(`Checks complete. ${r.conflicts_detected} conflict${r.conflicts_detected!==1?'s':''} detected.`);
+  } catch(e){ showToast(apiErr(e),true); }
 }
 
 async function promptOverrideConflict(cId, yearId){
-  const reason=prompt('Enter reason for override (required):');
-  if(!reason||!reason.trim()){ return; }
+  const reason=await promptText('Override conflict','Reason (required)',{
+    context:'State why this conflict is being overridden. This is recorded in the audit log.',
+    okLabel:'Override',
+  });
+  if(!reason)return;
   try {
     await api(`/api/planning/conflicts/${cId}/override`,{method:'POST',body:{override_reason:reason.trim()}});
     await loadPlanningChecks(yearId);
-  } catch(e){ alert(apiErr(e)); }
+  } catch(e){ showToast(apiErr(e),true); }
 }
 
 // ════════════════════════════
@@ -12597,11 +13059,11 @@ function _downloadExport(url, filename){
       document.body.removeChild(a);
       URL.revokeObjectURL(a.href);
     })
-    .catch(e=>alert('Export failed: '+apiErr(e)));
+    .catch(e=>showToast('Export failed: '+apiErr(e),true));
 }
 
 function exportAnnualProgram(){
-  if(!P.currentYearId){ alert('Select a planning year first.'); return; }
+  if(!P.currentYearId){ showToast('Select a Training Year from the dropdown above before continuing.',true); return; }
   _downloadExport(`/api/planning/years/${P.currentYearId}/export.xlsx`,`annual-program.xlsx`);
 }
 
@@ -12610,13 +13072,13 @@ function exportCurriculum(){
 }
 
 function exportSchedule(){
-  if(!P.currentYearId){ alert('Select a planning year first.'); return; }
+  if(!P.currentYearId){ showToast('Select a Training Year from the dropdown above before continuing.',true); return; }
   _downloadExport(`/api/planning/years/${P.currentYearId}/schedule/export.xlsx`,`schedule.xlsx`);
 }
 
 // ── Schedule XLSX Import ────────────────────────────────────
 function openSchedImport(){
-  if(!P.currentYearId){ alert('Select a planning year first.'); return; }
+  if(!P.currentYearId){ showToast('Select a Training Year from the dropdown above before continuing.',true); return; }
   document.getElementById('sched-import-file').value='';
   document.getElementById('sched-import-msg').textContent='';
   document.getElementById('sched-import-preview').style.display='none';
@@ -12629,7 +13091,7 @@ async function previewSchedImport(){
   const msg=document.getElementById('sched-import-msg');
   const fileEl=document.getElementById('sched-import-file');
   if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select an XLSX file first.'; return; }
-  if(!P.currentYearId){ msg.textContent='No planning year selected.'; return; }
+  if(!P.currentYearId){ msg.textContent='Select a Training Year from the dropdown above to continue.'; return; }
   msg.textContent='Parsing…';
   const form=new FormData();
   form.append('file',fileEl.files[0]);
@@ -12983,7 +13445,7 @@ async function markWingEventReviewed(){
       method:'PATCH', body:{status:'reviewed'},
     });
     openWingEventDetail(_wcDetailEventId);
-  }catch(e){ alert(apiErr(e)); }
+  }catch(e){ showToast(apiErr(e),true); }
 }
 async function markWingEventPlanned(){
   if(!_wcDetailEventId) return;
@@ -12992,7 +13454,7 @@ async function markWingEventPlanned(){
       method:'PATCH', body:{status:'preparation_planned'},
     });
     openWingEventDetail(_wcDetailEventId);
-  }catch(e){ alert(apiErr(e)); }
+  }catch(e){ showToast(apiErr(e),true); }
 }
 
 // ─── Create / Edit Wing Event (wing_admin only) ──────────────────────────────
@@ -13024,7 +13486,7 @@ async function editWingEvent(eventId){
   try{
     const e=await api(`/api/wing-calendar/events/${eventId}`);
     openWingEventModal(e);
-  }catch(ex){ alert(apiErr(ex)); }
+  }catch(ex){ showToast(apiErr(ex),true); }
 }
 
 async function saveWingEvent(){
@@ -13062,11 +13524,12 @@ async function saveWingEvent(){
 }
 
 async function archiveWingEvent(eventId){
-  if(!confirm('Archive this Wing HQ event? It will no longer appear in squadron overlays, but this can be undone from "Show archived".')) return;
-  try{
-    await api(`/api/wing-calendar/events/${eventId}/archive`,{method:'POST',body:{}});
-    await loadWingCalendar();
-  }catch(e){ alert(apiErr(e)); }
+  confirmAction('Archive this Wing HQ event? It will no longer appear in squadron overlays, but this can be undone from "Show archived".',async()=>{
+    try{
+      await api(`/api/wing-calendar/events/${eventId}/archive`,{method:'POST',body:{}});
+      await loadWingCalendar();
+    }catch(e){ showToast(apiErr(e),true); }
+  });
 }
 async function _wcToggleShowArchived(){
   const checked=(document.getElementById('wc-show-archived')||{}).checked;
@@ -13226,7 +13689,14 @@ function closeMobileNav(){
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
     const sidenav=document.querySelector('.sidenav');
-    if(sidenav&&sidenav.classList.contains('nav-open'))closeMobileNav();
+    if(sidenav&&sidenav.classList.contains('nav-open')){closeMobileNav();return;}
+    // Close the topmost active modal-bg (excluding the outcome-reason modal which has its own handler)
+    const activeModals=Array.from(document.querySelectorAll('.modal-bg.active:not(#m-outcome-reason)'));
+    if(activeModals.length){
+      const top=activeModals[activeModals.length-1];
+      const xBtn=top.querySelector('.modal-x');
+      if(xBtn){xBtn.click();}else{top.classList.remove('active');if(_modalReturnFocus&&_modalReturnFocus.focus)try{_modalReturnFocus.focus();}catch(_){}_modalReturnFocus=null;}
+    }
   }
 });
 
@@ -13309,7 +13779,7 @@ document.addEventListener('keydown',function(e){
     _results=res.sort((a,b)=>b.score-a.score||a.cat.localeCompare(b.cat)).slice(0,12);
     if(!_results.length)return`<div class="cp-hint">No results for "${esc(q)}"</div>`;
     return _results.map((r,i)=>`<div class="cp-result${i===_idx?' cp-sel':''}" onclick="_cpRun(${i})" onmouseover="_cpHover(${i})" role="option" aria-selected="${i===_idx}">
-      <span class="badge b-grey" style="font-size:8.5px;margin-right:6px">${esc(r.cat)}</span>
+      <span class="badge b-grey" style="font-size:10px;margin-right:6px">${esc(r.cat)}</span>
       <span style="font-weight:700;font-size:12.5px">${esc(r.label)}</span>
       ${r.sub?`<span style="font-size:11px;color:var(--muted);margin-left:6px">${esc(r.sub)}</span>`:''}
     </div>`).join('');

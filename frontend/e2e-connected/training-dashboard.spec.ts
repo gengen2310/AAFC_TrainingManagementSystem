@@ -247,3 +247,33 @@ test("wing_admin sees T2-05 Not-Delivered Sessions card in #wing-dash", async ({
   const hasNoDataMsg = await wingDash.getByText("No not-delivered sessions", { exact: false }).count();
   expect(hasTable + hasNoDataMsg, "T2-05 card must show a table or a no-data message").toBeGreaterThan(0);
 });
+
+// ── Section C — System Adoption Analytics (DASH-10) ─────────────────────────
+
+test("DASH-10: /api/dashboard/adoption returns correct shape for wing_admin", async ({ page }) => {
+  await loginWing(page, "ADMIN7WG");
+  const base = LOCAL_API_BASE || "http://localhost:8000";
+  const token = await page.evaluate(() => sessionStorage.getItem("aafc_token") ?? "");
+
+  const resp = await page.request.get(`${base}/api/dashboard/adoption?period=30d`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(resp.ok()).toBe(true);
+  const body = await resp.json();
+  expect(Array.isArray(body.squadrons)).toBe(true);
+  expect(typeof body.period).toBe("string");
+  if (body.squadrons.length > 0) {
+    const sq = body.squadrons[0];
+    for (const field of ["squadron_id", "squadron_code", "last_activity"]) {
+      expect(sq).toHaveProperty(field);
+    }
+  }
+});
+
+test("DASH-10: Section C appears in wing command dashboard", async ({ page }) => {
+  await loginWing(page, "ADMIN7WG");
+  const wingDash = page.locator("#wing-dash");
+  // Section C — System Adoption heading should appear after the command dashboard loads
+  const sectionC = wingDash.getByText(/system adoption/i);
+  await expect(sectionC).toBeVisible({ timeout: 10000 });
+});

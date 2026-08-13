@@ -201,9 +201,9 @@ def enable_maintenance(body: MaintenanceIn, db: DBSession = Depends(get_db),
     _set_setting(db, "maintenance_updated_at",
                  datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), p.user_id)
     # DEF-14: drain/cancel any in-flight background jobs before activating the
-    # write-block so they don't fail silently mid-task.  The Celery integration
-    # is currently a synchronous stub (see dispatcher.py / DEF-08), so no
-    # real jobs are queued; this check guards the future real-Celery path.
+    # write-block so they don't fail silently mid-task. Programme-items exports
+    # now use the streaming endpoint directly (DEF-08 fixed); this check guards
+    # future Celery/Redis jobs if they are added later.
     in_flight = (db.query(JobStatus)
                  .filter(JobStatus.status.in_(["queued", "running"]))
                  .all())

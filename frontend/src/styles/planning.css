@@ -78,7 +78,7 @@ body.pw-active .main {
 }
 .pw-section { padding: 0 12px; margin-bottom: 14px; }
 .pw-section-hdr {
-  font-size: 10px; font-weight: 800; text-transform: uppercase;
+  font-size: 11px; font-weight: 800; text-transform: uppercase;
   letter-spacing: .06em; color: var(--muted-text);
   padding: 6px 0 4px; margin-bottom: 4px;
   border-bottom: 1px solid var(--border);
@@ -104,7 +104,7 @@ body.pw-active .main {
 .pw-backlog-item:last-child { border-bottom: 0; }
 .pw-backlog-item:hover { background: var(--background); }
 .pw-backlog-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
-.pw-backlog-code { font-size: 10px; color: var(--muted-text); font-weight: 700; }
+.pw-backlog-code { font-size: 11px; color: var(--muted-text); font-weight: 700; }
 
 /* ── Main canvas ─────────────────────────────────────────── */
 .pw-canvas { overflow-y: auto; padding: 16px; position: relative; }
@@ -333,11 +333,11 @@ body.pw-active .main {
   background: var(--surface); cursor: pointer; transition: border-color .12s;
 }
 .pw-backlog-card:hover { border-color: var(--aafc-blue); }
-.pw-backlog-card-code { font-size: 10px; font-weight: 700; color: var(--aafc-royal-blue); margin-bottom: 3px; }
+.pw-backlog-card-code { font-size: 11px; font-weight: 700; color: var(--aafc-royal-blue); margin-bottom: 3px; }
 .pw-backlog-card-title { font-size: 12px; font-weight: 700; margin-bottom: 2px; }
-.pw-backlog-card-meta { font-size: 10px; color: var(--muted-text); }
+.pw-backlog-card-meta { font-size: 11px; color: var(--muted-text); }
 .pw-fac-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.pw-fac-table th { text-align: left; padding: 4px 8px; font-size: 10px; text-transform: uppercase; color: var(--muted-text); border-bottom: 1px solid var(--border); }
+.pw-fac-table th { text-align: left; padding: 4px 8px; font-size: 11px; text-transform: uppercase; color: var(--muted-text); border-bottom: 1px solid var(--border); }
 .pw-fac-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
 .pw-fac-load { display: flex; gap: 3px; }
 .pw-fac-load-dot { width: 10px; height: 10px; border-radius: 2px; }
@@ -471,7 +471,7 @@ body.pw-active .main {
   font-weight: 800;
   color: var(--aafc-dark-blue);
   min-width: 22px;
-  font-size: 10px;
+  font-size: 11px;
   padding-top: 1px;
   flex-shrink: 0;
 }
@@ -487,12 +487,12 @@ body.pw-active .main {
 
 .pw-lv-p-detail {
   color: var(--muted-text);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .pw-lv-empty-period {
   color: var(--muted-text);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 /* ═══════════════════════════════════════════════════════════════

@@ -11,6 +11,7 @@ import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 import { canWriteSquadron } from "../auth/permissions";
 import { useScopedSquadron } from "../layout/SquadronViewContext";
+import { useConfirm } from "../components/ConfirmDialog";
 import { ImportFacilitatorsModal } from "../components/planning/ImportFacilitatorsModal";
 import type { Facilitator } from "../api/types";
 
@@ -29,6 +30,7 @@ export function Facilitators() {
   const [statsId, setStatsId] = useState<string | null>(null);
   const canWrite = canWriteSquadron(session);
   const { toast } = useToast();
+  const { confirm } = useConfirm();
   const archiveMut = useMutation({
     mutationFn: (id: string) => trainingApi.deleteFacilitator(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["facilitators"] }); toast("Facilitator archived."); },
@@ -64,8 +66,8 @@ export function Facilitators() {
                     <>
                       <button className="btn out sm" onClick={() => setEditFor(f)}>Edit</button>
                       <button className="btn out sm" onClick={() => setTagsFor(f)}>Tags</button>
-                      <button className="btn out sm danger" onClick={() => {
-                        if (window.confirm(`Archive ${f.first_name} ${f.last_name}? This can be reversed from the connected TMS.`)) {
+                      <button className="btn out sm danger" onClick={async () => {
+                        if (await confirm(`Archive ${f.first_name} ${f.last_name}? This can be reversed from the connected TMS.`, { confirmLabel: "Archive" })) {
                           archiveMut.mutate(f.facilitator_id);
                         }
                       }}>Archive</button>

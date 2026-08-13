@@ -21,6 +21,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db
@@ -28,7 +29,7 @@ from ..dependencies import get_principal
 from ..models import (
     ParadeNight, Session, Facilitator, Squadron, Wing,
     CurriculumItem, Equipment, TrainingArea, PlanningFacilitatorLeave,
-    CurriculumPhase, CurriculumElement, TrainingClass,
+    CurriculumPhase, CurriculumElement, TrainingClass, AuditLog,
 )
 from ..permissions import Principal, require_role, require_can_view_squadron, require_can_view_wing
 from ..services_readiness import parade_night_readiness, session_requirements
@@ -2523,4 +2524,151 @@ def get_command_dashboard(
                 "cancellation_pareto": cancellation_pareto,
             },
         },
+    }
+
+
+# ── Adoption analytics ─────────────────────────────────────────────────────────
+
+_MEANINGFUL_OBJECT_TYPES = {
+    "session", "parade_night", "parade_night_bulk", "facilitator",
+    "training_area", "training_class", "session_audience",
+    "cadet_class_membership", "planning_year", "PlanningNotice",
+}
+_MEANINGFUL_ACTIONS = {
+    "create", "edit", "update", "publish", "close", "status_change",
+    "bulk_mark_remaining_delivered", "absorb", "set",
+}
+
+
+def _adoption_for_squadron(db: DBSession, squadron_id: str, since: datetime) -> dict:
+    rows = (
+        db.query(
+            AuditLog.user_id,
+            AuditLog.object_type,
+            AuditLog.action,
+            AuditLog.timestamp,
+        )
+        .filter(
+            AuditLog.squadron_id == squadron_id,
+            AuditLog.timestamp >= since,
+            AuditLog.object_type.in_(_MEANINGFUL_OBJECT_TYPES),
+            AuditLog.action.in_(_MEANINGFUL_ACTIONS),
+        )
+        .all()
+    )
+
+    active_user_ids: set[str] = set()
+    sessions_scheduled = 0
+    outcomes_recorded = 0
+    programs_published = 0
+    facilitators_maintained = 0
+    last_ts: datetime | None = None
+
+    for r in rows:
+        if r.user_id:
+            active_user_ids.add(r.user_id)
+        if r.timestamp and (last_ts is None or r.timestamp > last_ts):
+            last_ts = r.timestamp
+        ot = r.object_type or ""
+        ac = r.action or ""
+        if ot == "session" and ac == "create":
+            sessions_scheduled += 1
+        elif ot == "session" and ac == "status_change":
+            outcomes_recorded += 1
+        elif ot == "parade_night_bulk" and ac == "bulk_mark_remaining_delivered":
+            outcomes_recorded += 1
+        elif ot == "parade_night" and ac == "publish":
+            programs_published += 1
+        elif ot == "facilitator" and ac in ("create", "update", "absorb"):
+            facilitators_maintained += 1
+
+    return {
+        "active_users": len(active_user_ids),
+        "total_meaningful_actions": len(rows),
+        "sessions_scheduled": sessions_scheduled,
+        "outcomes_recorded": outcomes_recorded,
+        "programs_published": programs_published,
+        "facilitators_maintained": facilitators_maintained,
+        "last_activity": last_ts.isoformat() if last_ts else None,
+    }
+
+
+@router.get("/adoption")
+def get_adoption_dashboard(
+    period: str = Query("30d", pattern="^(7d|30d|term|year)$"),
+    wing_id: str | None = Query(None),
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Adoption analytics — per-squadron meaningful-activity summary.
+
+    Shows which squadrons are actively using the system based on audit log
+    entries for meaningful actions (planning, scheduling, outcomes, publishing).
+    Intended for Wing and National views only.
+
+    Period options: 7d (7 days), 30d (30 days), term (90 days), year (365 days).
+
+    Not a surveillance tool — reports squadron-level aggregates only,
+    never individual user activity or personal data.
+    """
+    scope = _scope(p)
+    if scope == "squadron":
+        raise HTTPException(400, detail={
+            "error": "not_applicable",
+            "message": "Adoption analytics is a Wing/National view.",
+        })
+
+    today = datetime.now(timezone.utc).date()
+    if period == "7d":
+        since = datetime.combine(today - timedelta(days=7), datetime.min.time()).replace(tzinfo=timezone.utc)
+    elif period == "30d":
+        since = datetime.combine(today - timedelta(days=30), datetime.min.time()).replace(tzinfo=timezone.utc)
+    elif period == "year":
+        since = datetime.combine(today - timedelta(days=365), datetime.min.time()).replace(tzinfo=timezone.utc)
+    else:
+        since = datetime.combine(today - timedelta(days=90), datetime.min.time()).replace(tzinfo=timezone.utc)
+
+    resolved_wing_id: str | None = None
+    resolved_wing_name: str | None = None
+    if scope == "wing":
+        resolved_wing_id = p.acting_wing_id or p.wing_id
+        if not resolved_wing_id:
+            return {"scope": scope, "period": period, "units": []}
+        w = db.get(Wing, resolved_wing_id)
+        resolved_wing_name = w.name if w else None
+    elif wing_id:
+        w = db.get(Wing, wing_id)
+        if not w:
+            raise HTTPException(404, detail={"error": "wing_not_found"})
+        require_can_view_wing(p, wing_id)
+        resolved_wing_id = wing_id
+        resolved_wing_name = w.name
+
+    squadrons = _command_child_units(db, "wing" if resolved_wing_id else "national", resolved_wing_id)
+    if not resolved_wing_id:
+        all_sqn_rows = db.query(Squadron).filter(Squadron.is_archived == False).all()  # noqa: E712
+        squadrons = [{"id": r.id, "code": r.code, "name": r.short_name or r.name, "kind": "squadron"} for r in all_sqn_rows]
+
+    units = []
+    for s in squadrons:
+        metrics = _adoption_for_squadron(db, s["id"], since)
+        units.append({
+            "squadron_id": s["id"],
+            "code": s["code"],
+            "name": s["name"],
+            **metrics,
+        })
+
+    units.sort(key=lambda u: -u["total_meaningful_actions"])
+
+    return {
+        "scope": scope,
+        "wing_id": resolved_wing_id,
+        "wing_name": resolved_wing_name,
+        "period": period,
+        "since": since.date().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "total_units": len(units),
+        "active_units": sum(1 for u in units if u["total_meaningful_actions"] > 0),
+        "units": units,
     }

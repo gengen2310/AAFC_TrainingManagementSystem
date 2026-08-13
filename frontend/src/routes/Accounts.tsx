@@ -6,6 +6,7 @@ import { friendlyMessage } from "../api/client";
 import { Card, Empty, Loading, ErrorNote } from "../components/ui";
 import { useAuth } from "../auth/AuthProvider";
 import type { AccountRecord, Flight } from "../api/types";
+import { useConfirm } from "../components/ConfirmDialog";
 
 const ROLE_LABELS: Record<string, string> = {
   sqn_general: "SQN General", sqn_admin: "SQN Admin",
@@ -65,6 +66,7 @@ function NewCodeModal({ code, forName, onClose }: { code: string; forName: strin
 export function Accounts() {
   const { session } = useAuth();
   const qc = useQueryClient();
+  const { confirm } = useConfirm();
   const canWrite = WRITE_ROLES.has(session?.role ?? "");
 
   // Filters
@@ -290,10 +292,10 @@ export function Accounts() {
                           <button className="btn sm" onClick={() => unlockMut.mutate(a.user_id)}>Unlock</button>
                         )}
                         {!a.is_archived && (a.active_status
-                          ? <button className="btn sm danger" onClick={() => { if (window.confirm(`Disable ${a.display_name}?`)) disableMut.mutate(a.user_id); }}>Disable</button>
+                          ? <button className="btn sm danger" onClick={async () => { if (await confirm(`Disable ${a.display_name}?`, { confirmLabel: "Disable", danger: true })) disableMut.mutate(a.user_id); }}>Disable</button>
                           : <button className="btn sm ok" onClick={() => reactivateMut.mutate(a.user_id)}>Reactivate</button>)}
                         {!a.is_archived && (
-                          <button className="btn sm danger" onClick={() => { if (window.confirm(`Archive ${a.display_name}? This can be undone via Restore.`)) archiveMut.mutate({ uid: a.user_id, reason: undefined }); }}>
+                          <button className="btn sm danger" onClick={async () => { if (await confirm(`Archive ${a.display_name}? This can be undone via Restore.`, { confirmLabel: "Archive" })) archiveMut.mutate({ uid: a.user_id, reason: undefined }); }}>
                             Archive
                           </button>
                         )}
@@ -334,8 +336,8 @@ export function Accounts() {
                     <td className="muted" style={{ fontSize: 11 }}>{f.squadron_code ?? f.squadron_name ?? "—"}</td>
                     <td style={{ display: "flex", gap: 4 }}>
                       <button className="btn sm" onClick={() => { setRenameFid(f.flight_id); setRenameName(f.name); }}>Rename</button>
-                      <button className="btn sm danger" onClick={() => {
-                        if (window.confirm(`Archive flight "${f.name}"? Users assigned to it will be unassigned.`))
+                      <button className="btn sm danger" onClick={async () => {
+                        if (await confirm(`Archive flight "${f.name}"? Users assigned to it lose this assignment.`, { confirmLabel: "Archive" }))
                           archiveFlightMut.mutate(f.flight_id);
                       }}>Archive</button>
                     </td>
@@ -667,6 +669,7 @@ function RefDataSection({ config, naturalScope, ownWingId, ownSquadronId }: {
   config: RefConfig; naturalScope: RefScope; ownWingId: string | null; ownSquadronId: string | null;
 }) {
   const qc = useQueryClient();
+  const { confirm } = useConfirm();
   const [name, setName] = useState("");
   const [err, setErr] = useState<unknown>(null);
   const q = useQuery({ queryKey: ["refdata", config.key], queryFn: config.list });
@@ -705,7 +708,7 @@ function RefDataSection({ config, naturalScope, ownWingId, ownSquadronId }: {
                 {label} <em className="muted" style={{ fontStyle: "normal", fontSize: 9 }}>{scope}</em>
                 {mine && (
                   <button
-                    onClick={() => { if (window.confirm("Archive this item? It will no longer appear in pickers, but existing records are unaffected.")) archiveMut.mutate(config.idOf(it)); }}
+                    onClick={async () => { if (await confirm("Archive this item? It will no longer appear in pickers, but existing records are unaffected.", { confirmLabel: "Archive" })) archiveMut.mutate(config.idOf(it)); }}
                     style={{ border: "none", background: "none", cursor: "pointer", color: "var(--danger)", fontSize: 11, padding: 0 }}
                     title="Archive"
                   >×</button>

@@ -151,7 +151,7 @@ def test_db_rate_limiter_window_reset():
     try:
         reset_api_rate_limiter_db(db)
         ip = "10.0.0.21"
-        past = datetime.datetime.utcnow() - datetime.timedelta(
+        past = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
             seconds=settings.API_RATE_WINDOW_SEC + 5)
         row = IpApiRequest(ip=ip, request_count=settings.API_RATE_LIMIT + 50, window_start=past)
         db.add(row)
@@ -220,7 +220,7 @@ def test_user_rate_limiter_window_reset():
     try:
         reset_user_api_rate_limiter_db(db)
         uid = "user-rate-test-002"
-        past = datetime.datetime.utcnow() - datetime.timedelta(
+        past = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
             seconds=settings.API_RATE_WINDOW_SEC + 5)
         row = UserApiRequest(user_id=uid, request_count=settings.API_RATE_LIMIT + 50, window_start=past)
         db.add(row)

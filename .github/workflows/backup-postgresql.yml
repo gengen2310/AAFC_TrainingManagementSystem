@@ -312,3 +312,46 @@ jobs:
         run: |
           rm -f "$DUMP_PATH" "$CHECKSUM_PATH" /tmp/_dump_helper.py 2>/dev/null || true
           echo "Plaintext dump and checksum removed."
+
+  # ── 12. Alert on failure (optional Slack webhook) ──────────────────────────
+  # If SLACK_BACKUP_ALERT_WEBHOOK is set in repo/environment Secrets, a brief
+  # alert is posted to the configured channel on any backup failure. The
+  # message contains only the workflow name, run ID (linkable), and timestamp —
+  # no credentials or database details are included.
+  # If the secret is not set, this job succeeds silently (GitHub Actions still
+  # sends its default failure email to the repository owner).
+  #
+  # To configure:
+  #   1. Create an incoming-webhook integration in your Slack workspace.
+  #   2. Store the webhook URL in Settings → Secrets → Actions as
+  #      SLACK_BACKUP_ALERT_WEBHOOK (repo or environment level).
+  notify-on-failure:
+    name: Alert on backup failure
+    runs-on: ubuntu-24.04
+    needs: [backup]
+    if: ${{ failure() }}
+    steps:
+      - name: Post Slack alert
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_BACKUP_ALERT_WEBHOOK }}
+          # Pass GitHub context via env vars rather than inline ${{ }} in run:
+          # — defence-in-depth best practice even for non-user-controlled values.
+          # github.run_id is always numeric; github.repository is owner/name.
+          # Both are already available as $GITHUB_RUN_ID / $GITHUB_REPOSITORY
+          # by default, but explicit env: makes the intent and source clear.
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_RUN_ID: ${{ github.run_id }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK" ]; then
+            echo "SLACK_BACKUP_ALERT_WEBHOOK is not configured — skipping Slack alert."
+            echo "GitHub Actions default failure email has been sent."
+            exit 0
+          fi
+          RUN_URL="https://github.com/${GH_REPOSITORY}/actions/runs/${GH_RUN_ID}"
+          PAYLOAD=$(printf '{"text":"🚨 *AAFC TMS — Production backup FAILED*\nRun: <%s|%s>\nTime: %s UTC\nCheck the run log and restore capability immediately."}' \
+            "$RUN_URL" "$GH_RUN_ID" "$(date -u '+%Y-%m-%d %H:%M')")
+          curl -s -X POST \
+            -H 'Content-type: application/json' \
+            --data "$PAYLOAD" \
+            "$SLACK_WEBHOOK"
+          echo "Slack alert sent."
