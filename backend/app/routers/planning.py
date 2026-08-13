@@ -45,6 +45,12 @@ from .timing import _effective_template
 
 router = APIRouter(prefix="/api/planning", tags=["planning"])
 
+_VALID_SESSION_STATUS = {
+    "draft", "planned", "published", "delivered", "delivered_with_issue",
+    "cancelled", "cancelled_late", "rescheduled", "not_delivered",
+    "requires_review", "blocked", "closed",
+}
+
 
 def _check_version(obj, client_version: int | None) -> None:
     """Raise 409 if the client's version is stale (optimistic locking)."""
@@ -1722,6 +1728,8 @@ def update_session(
             s.training_area_id = None
             s.training_area_name_at_time = None
     if body.status is not None:
+        if body.status not in _VALID_SESSION_STATUS:
+            raise HTTPException(400, detail={"error": "invalid_status"})
         s.status = body.status
     if body.notes is not None:
         s.delivery_notes = body.notes
@@ -4454,6 +4462,7 @@ def update_notice(
         notice.audience = body.audience
     notice.version += 1
     db.commit()
+    audit(db, p, object_type="PlanningNotice", object_id=notice.id, action="update")
     return {"ok": True}
 
 

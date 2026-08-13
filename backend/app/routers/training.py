@@ -3,8 +3,8 @@ from __future__ import annotations
 import json as _json
 
 from fastapi import APIRouter, Depends, Request, HTTPException, UploadFile, File, Header
-from pydantic import BaseModel
-from typing import List, Optional
+from pydantic import BaseModel, Field
+from typing import List, Literal, Optional
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
@@ -272,11 +272,13 @@ def curriculum_sessions(cid: str, db: DBSession = Depends(get_db), p: Principal 
 
 
 # ── PARADE NIGHTS ──
+_VALID_PARADE_TYPE = Literal["normal", "activity", "ceremonial", "admin", "stand_down", "cancelled"]
+
 class ParadeIn(BaseModel):
     date: str
-    term: str | None = "T1"
+    term: str | None = Field(default="T1", max_length=10)
     session_count: int | None = None  # None = use effective timing template or default
-    parade_type: str | None = "normal"
+    parade_type: _VALID_PARADE_TYPE | None = "normal"
 
 
 @router.get("/parade-nights")
@@ -459,11 +461,11 @@ def _pn_dict(pn: ParadeNight) -> dict:
 
 class ParadeNightUpdateIn(BaseModel):
     date: str | None = None
-    term: str | None = None
+    term: str | None = Field(default=None, max_length=10)
     start_time: str | None = None
     end_time: str | None = None
     session_count: int | None = None
-    parade_type: str | None = None
+    parade_type: _VALID_PARADE_TYPE | None = None
     notes: str | None = None
     version: int | None = None
 
@@ -1071,10 +1073,10 @@ def _validate_subject_areas(raw: list[str] | None) -> list[str]:
 
 
 class FacIn(BaseModel):
-    first_name: str | None = None
-    last_name: str
+    first_name: str | None = Field(default=None, max_length=80)
+    last_name: str = Field(max_length=80)
     current_rank: str | None = None
-    type: str | None = "Staff"
+    type: str | None = Field(default="Staff", max_length=30)
     subject_areas: list[str] | None = None
     confirm_duplicate: bool = False
 
@@ -1370,10 +1372,10 @@ async def import_facilitators_csv(
 
 class FacUpdateIn(BaseModel):
     subject_areas: list[str] | None = None
-    type: str | None = None
+    type: str | None = Field(default=None, max_length=30)
     current_rank: str | None = None
-    first_name: str | None = None
-    last_name: str | None = None
+    first_name: str | None = Field(default=None, max_length=80)
+    last_name: str | None = Field(default=None, max_length=80)
 
 
 @router.patch("/facilitators/{fid}")
@@ -3835,7 +3837,7 @@ class CurriculumIn(BaseModel):
     part_number: int = 1
     phase: str = "B. Initial"
     element: str | None = None
-    recommended_term: str | None = None
+    recommended_term: str | None = Field(default=None, max_length=10)
     duration_minutes: int = 60
     part_count: int = 1
     instructor_suitability: str | None = None
@@ -3849,7 +3851,7 @@ class CurriculumUpdateIn(BaseModel):
     part_number: int | None = None
     phase: str | None = None
     element: str | None = None
-    recommended_term: str | None = None
+    recommended_term: str | None = Field(default=None, max_length=10)
     duration_minutes: int | None = None
     part_count: int | None = None
     instructor_suitability: str | None = None
@@ -3867,7 +3869,7 @@ class CurriculumImportItem(BaseModel):
     part_count: int = 1
     instructor_suitability: str | None = None
     learning_hub_url: str | None = None
-    recommended_term: str | None = None
+    recommended_term: str | None = Field(default=None, max_length=10)
     core_status: str | None = None    # "core" | "additional" -- None means "not specified by caller"
     # Scheduling fields — used to link to existing parade night sessions
     scheduled_date: str | None = None  # ISO date string e.g. "2026-02-13"
