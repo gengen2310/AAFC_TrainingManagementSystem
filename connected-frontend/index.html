@@ -7391,6 +7391,7 @@ function buildPNCard(pn){
         ${allDel?stBadge('delivered'):stBadge('planned')}
         ${pn.published?'<span class="badge b-ok" title="Weekly Program published">Published</span>':''}
         <button class="btn btn-xs btn-sky" onclick="showPNDetail('${pn.date}')">Detail</button>
+        ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Override timing for this parade night" onclick="openPNTimingOverrideModal('${esc(pn.id)}')">Timing…</button>`:''}
         ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Copy sessions to another parade night" onclick="openCopyPNModal('${pn.date}')">Copy to…</button>`:''}
         ${canWriteSquadron()?`<button class="btn btn-xs btn-red" onclick="delPN('${pn.date}')">×</button>`:''}
       </div>

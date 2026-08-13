@@ -144,6 +144,36 @@ test("WORK-12: cancel-all API returns sessions_updated count", async ({ page }) 
   expect(body.session_ids).toHaveLength(2);
 });
 
+// ── WORK-05: Override Parade Night Timing modal ─────────────────────────────
+
+test("WORK-05: 'Timing…' button opens Override Parade Night Timing modal with mode toggle", async ({ page }) => {
+  // WORK-05 wires openPNTimingOverrideModal() to the parade night card.
+  // The modal must open and expose both the "Use existing template" and
+  // "Custom blocks for this night" mode buttons.
+  await loginSquadron(page);
+  const token = await getAdminToken(page);
+  const hdr = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
+  // Seed a parade night with a known date so we can find its card.
+  const pnDate = `2099-12-${String(1 + (Date.now() % 28)).padStart(2, "0")}`;
+  await page.request.post(`${BASE}/api/parade-nights`, { data: { date: pnDate }, headers: hdr });
+
+  await page.evaluate(() => (window as any).nav?.("parade-nights"));
+
+  // The "Timing…" button must appear on the seeded parade night's card.
+  const timingBtn = page.getByRole("button", { name: /^Timing…$/ }).first();
+  await expect(timingBtn).toBeVisible({ timeout: 10000 });
+  await timingBtn.click();
+
+  // Modal must open.
+  const modal = page.locator("#m-pn-timing-override");
+  await expect(modal).toBeVisible({ timeout: 5000 });
+
+  // Both mode toggle buttons must be present.
+  await expect(modal.getByRole("button", { name: /Use existing template/ })).toBeVisible();
+  await expect(modal.getByRole("button", { name: /Custom blocks for this night/ })).toBeVisible();
+});
+
 // ── DEF-08: Programme items CSV export ──────────────────────────────────────
 
 test("DEF-08: export CSV button calls streaming endpoint with auth header", async ({ page }) => {
