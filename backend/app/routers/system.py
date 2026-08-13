@@ -23,7 +23,7 @@ from ..dependencies import get_principal
 from ..database import utcnow
 from ..models import (
     User, Wing, Squadron, AuditLog, SystemSetting, AccessCode, IpLoginAttempt, IpApiRequest,
-    PlanningYear, ParadeDate, Session, CurriculumItem, NationalEntity,
+    PlanningYear, ParadeDate, Session, CurriculumItem, NationalEntity, JobStatus,
 )
 from ..permissions import Principal, require_system_admin, require_audit_access
 from ..security import generate_code, hash_code, reset_rate_limiter, reset_api_rate_limiter, reset_api_rate_limiter_db, reset_user_api_rate_limiter_db
@@ -200,14 +200,32 @@ def enable_maintenance(body: MaintenanceIn, db: DBSession = Depends(get_db),
     _set_setting(db, "maintenance_block_logins", "true" if body.block_logins else "false", p.user_id)
     _set_setting(db, "maintenance_updated_at",
                  datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), p.user_id)
+    # DEF-14: drain/cancel any in-flight background jobs before activating the
+    # write-block so they don't fail silently mid-task.  The Celery integration
+    # is currently a synchronous stub (see dispatcher.py / DEF-08), so no
+    # real jobs are queued; this check guards the future real-Celery path.
+    in_flight = (db.query(JobStatus)
+                 .filter(JobStatus.status.in_(["queued", "running"]))
+                 .all())
+    drained_count = 0
+    for j in in_flight:
+        j.status = "cancelled"
+        j.error_message = "Cancelled: maintenance mode activated."
+        j.completed_at = utcnow()
+        drained_count += 1
+    if drained_count:
+        db.commit()
+
     audit(db, p, object_type="system", object_id="maintenance",
           action="maintenance_enabled",
           new={"message": body.message, "until": body.until,
-               "block_reads": body.block_reads, "block_logins": body.block_logins})
+               "block_reads": body.block_reads, "block_logins": body.block_logins,
+               "drained_jobs": drained_count})
     from ..main import invalidate_maintenance_cache
     invalidate_maintenance_cache()
     return {"enabled": True, "message": body.message, "until": body.until,
-            "block_reads": body.block_reads, "block_logins": body.block_logins}
+            "block_reads": body.block_reads, "block_logins": body.block_logins,
+            "drained_jobs": drained_count}
 
 
 @router.post("/maintenance/disable")
