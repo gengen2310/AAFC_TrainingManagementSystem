@@ -204,7 +204,7 @@ known. Firefox and the Planning Workspace 404 are uninvestigated — root causes
 | DEF-11 | Defect | MEDIUM | Per-account rate limiting on non-login API endpoints | Implemented commit `111587d`: `UserApiRequest` model + v39 Alembic migration; `check_user_api_rate_db(user_id, db)` called inside `get_principal()` for production/staging after JWT validation; `reset_user_api_rate_limiter_db()` wired into reset_rate_limits endpoint and conftest fixture. 4 regression tests added. | FIXED LOCALLY |
 | DEF-12 | Defect | LOW | Maintenance mode frontend banner — users already in session see no in-app banner when write-block is active | Fixed commits `677d5e5`/`dfafc09`: `_maintenancePoll()` at `index.html:4304` polls every 30 s; when block activates, `checkMaintenanceBanner()` renders a banner to authenticated users without requiring page reload. Gap register was stale. | CLOSED |
 | DEF-13 | Defect | LOW | Maintenance mode expected return time — no return-time field in `SystemSetting`; cannot be communicated to users | `maintenance_until` key stored via `_set_setting()`; System Console input at `index.html:1640` ("Expected return time"); maintenance banner at `index.html:4736` renders `Expected return: ${d.until}` when set. Gap register was stale. | CLOSED |
-| DEF-14 | Defect | LOW | Maintenance mode Celery drain — in-flight jobs may fail silently if write-block activates mid-task | Not implemented; no drain step in maintenance activation sequence | NOT STARTED |
+| DEF-14 | Defect | LOW | Maintenance mode Celery drain — in-flight jobs may fail silently if write-block activates mid-task | Implemented commit `be8ff14`: `enable_maintenance` queries `JobStatus` for queued/running jobs, marks them cancelled (with reason), commits before the write-block activates. Returns `drained_jobs` count; recorded in audit log. Guards the real-Celery path (stub currently, DEF-08). | FIXED LOCALLY |
 | DEF-15 | Defect | MEDIUM | `ENVIRONMENT=staging` in production Railway config (DEFECT-003) — `is_production` and `validate_for_production()` key off this value; risks production safety checks not triggering | Code fix merged; Railway production env var not corrected; requires System Admin action | HUMAN GATE |
 
 ---
@@ -378,7 +378,7 @@ Human gates HG-01 (individual accountability decision), HG-03 (CSRF env vars), H
 | 15 | Distributed rate limiting | DEF-10, DEF-11 | FIXED LOCALLY |
 | 16 | Async imports/exports | DEF-08, DEF-09 | IMPLEMENTING |
 | 17 | Monitoring and alerting | SEC-05, SEC-06, SEC-07, SEC-13 | NOT STARTED |
-| 18 | Maintenance mode | DEF-12, DEF-13, DEF-14 | NOT STARTED |
+| 18 | Maintenance mode | DEF-12, DEF-13, DEF-14 | IMPLEMENTING |
 | 19 | Session revocation | SEC-11 | IMPLEMENTING |
 | 20 | CSRF controls | SEC-01, HG-03 | HUMAN GATE |
 | 21 | Backup and restore | SEC-02, SEC-03, HG-04, HG-05 | HUMAN GATE |
