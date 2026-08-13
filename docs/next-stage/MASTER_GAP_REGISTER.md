@@ -166,9 +166,9 @@ gaps affect four entity types. Bulk-import and smart-planning features are Level
 | WORK-08 | Workflow | LOW | Session move by drag-and-drop or equivalent shortcut within Planning Workspace | FIXED 2026-08-13: "Move to another night" collapsible section added to `SessionForm` in `PlanningRightDrawer.tsx`; uses `trainingApi.editSession()` (PUT `/api/sessions/{id}`) which accepts `parade_night_id` + `period_number`; parade night selector populated from `planningApi.nightSummaries()` filtered to nights with a `parade_night_id`; lazy-loads only when section is expanded; invalidates `planning-weekly`, `planning-long-range`, `planning-annual`, `planning-cc` queries on success | FIXED LOCALLY |
 | WORK-09 | Workflow | MEDIUM | PlanningLocation Phase 2 table drop — `planning_locations` is inert (no new writes since canonical model decision), but the table still exists and the fallback resolver still queries it | Decision in `04_canonical_data_model.md`; Phase 2 (table drop + removal of fallback resolver) deferred to Level B; not yet scheduled | IMPLEMENTING |
 | WORK-11 | Workflow | LOW | Copy parade night sessions — operator can reuse the planning structure of a previous parade night (curriculum items, facilitators, rooms, Training Class audiences) for a future night without re-entering each session | FIXED 2026-08-13: `POST /api/parade-nights/{pnid}/copy-sessions-to/{target_pnid}` in `training.py`; copies planning fields only (not outcomes, not publication state); skips periods already occupied in the target (returns {copied:N, skipped:N}); 8 tests in `test_pn_copy_sessions.py` pass. Frontend: "Copy to…" button on each parade night card opens a modal with a sorted target-night selector; `openCopyPNModal()`/`doCopyPNSessions()` in `index.html`; success toast shows copied count and skipped note. | FIXED LOCALLY |
-| WORK-10 | Workflow | MEDIUM | Publish Weekly Program parity — Planning Workspace has a Publish button; Main TMS had `apiPublishPN()` defined but wired to no UI control (dead code); operators using Main TMS could not publish | FIXED 2026-08-13: `publishWP()` function added to connected-frontend; Publish Program button added to renderWP() button bar (admin users only); handles publish-blockers 409 with actionable error message; `pn.published` already in S.pns state | FIXED LOCALLY |
+| WORK-10 | Workflow | MEDIUM | Publish Weekly Program parity — Planning Workspace has a Publish button; Main TMS had `apiPublishPN()` defined but wired to no UI control (dead code); operators using Main TMS could not publish | FIXED 2026-08-13: `publishWP()` function added to connected-frontend; Publish Program button added to renderWP() button bar (admin users only); handles publish-blockers 409 with actionable error message; `pn.published` already in S.pns state. E2E test added 2026-08-13: `weekly-program-classes.spec.ts` (WORK-10 test verifies button is visible to sqn_admin after selecting a parade night date) | FIXED LOCALLY |
 | WORK-12 | Workflow | LOW | Bulk cancel all remaining planned/published sessions in a parade night — operator needs a single action to cancel every in-flight session (with a reason) rather than clicking Save Changes on each one individually; mirrors mark-remaining-delivered for the cancellation use case | FIXED 2026-08-13: `POST /api/parade-nights/{pnid}/cancel-all` in `training.py` (`CancelAllIn` body with `reason`/`notes`; status filter `draft|planned|published`; per-session `_apply_status_transition()` + `SessionStatusHistory` + `audit()` with shared `batch_id`; returns `{ok, batch_id, sessions_updated, session_ids}`). Frontend: `btn-red-out` CSS class added; "Cancel all remaining" button in parade night detail header; `doCancelAllSessions()` calls `collectOutcomeReason('cancelled')` then POSTs and toasts result. 12 tests in `test_pn_cancel_all.py` all pass (auth, 403, 404, 422, empty pn, happy path, response shape, skips finalised, skips delivered, idempotency, status history, audit). Backend: 1618 passed, 5 skipped. | FIXED LOCALLY |
-| WORK-13 | Workflow | LOW | Filter persistence — parade night filters (term, status, search) and mission backlog filters (phase, status, search, class) reset to defaults on page refresh; operator must re-apply filters after every refresh or reboot | FIXED 2026-08-13: `_savePNFilters()`/`_restorePNFilters()` and `_saveMissionFilters()`/`_restoreMissionFilters()` in `index.html`; write current filter values to `sessionStorage`; `bootApp()` calls both restore functions before `renderAll()`; "Clear filters" also removes saved PN state. No operational data stored — UI preference strings only. | FIXED LOCALLY |
+| WORK-13 | Workflow | LOW | Filter persistence — parade night filters (term, status, search) and mission backlog filters (phase, status, search, class) reset to defaults on page refresh; operator must re-apply filters after every refresh or reboot | FIXED 2026-08-13: `_savePNFilters()`/`_restorePNFilters()` and `_saveMissionFilters()`/`_restoreMissionFilters()` in `index.html`; write current filter values to `sessionStorage`; `bootApp()` calls both restore functions before `renderAll()`; "Clear filters" also removes saved PN state. No operational data stored — UI preference strings only. E2E tests added 2026-08-13: `filter-persistence.spec.ts` — 2 tests verify pn-f-status and pn-f-term persist through `page.reload()` via the sessionStorage round-trip. | FIXED LOCALLY |
 | WRITE-12 | Defence Writing | MEDIUM | Error message and empty-state content — 60+ backend error codes untranslated; 15+ user-visible messages expose internal jargon ("Session ID", "in scope"), use passive voice, or give no actionable next step | FIXED 2026-08-13: (A) 18 new named-code translations in `api()` helper: `duplicate_date`, `parade_night_closed`, `already_archived`, `not_archived`, `planning_year_already_exists`, `cross_squadron`/`cross_squadron_copy_not_permitted`/`cross_squadron_move_forbidden`, `publish_blocked`, `close_blocked`, `invalid_training_class`, `training_class_wrong_squadron`, `training_stage_not_found`, `training_year_not_found_for_squadron`, `reason_required`, `name_required`, `name_exists`, `source_not_found`, `target_not_found`/`target_parade_night_not_found`. (B) 15 message rewrites: load-failure hides internal endpoint names; Session-ID-missing jargon removed; "in scope" → plain language; version conflict uses em dash; "Error loading X" → "Could not load X — Refresh the page"; "From"/"To" date validation → plain English; timing-override reason prompt; facilitator save toasts remove noisy timestamps; Mission Backlog export messages actionable; Training Year missing messages include dropdown context; wing-select error states actionable. | FIXED LOCALLY |
 
 ---
@@ -342,29 +342,32 @@ Human gates HG-01 (individual accountability decision), HG-03 (CSRF env vars), H
 
 ### Level B — Second Wing Pilot (additional requirements beyond Level A)
 
-| Gaps | Description |
-|---|---|
-| CLASS-12, CLASS-13, CLASS-14 | Training Class frontend gaps and Getting Started step |
-| DEF-06, DOC-12 | Wing onboarding API (not CLI-only) |
-| DEF-07, DOC-11 | Multi-Wing reports cross-scope verified |
-| DEF-10, DEF-11 | DB-backed rate limiter for higher GUNICORN_WORKERS |
-| HG-01 | Individual accountability model implemented |
-| HG-02 | 250-user multi-Wing load test |
-| HG-06 | External pen test (recommended before second Wing) |
-| HG-07 | Data governance decisions resolved |
-| VIS-01 | Shared design tokens complete |
-| VIS-10 | Multi-Wing E2E playwright tests |
+> ~~CLASS-12, CLASS-13, CLASS-14~~ — Training Class frontend gaps: all three CLOSED (2026-08-13).  
+> ~~DEF-10, DEF-11~~ — DB-backed rate limiter: FIXED LOCALLY (2026-08-13); no longer a Level B gate.
+
+| Gaps | Description | Status |
+|---|---|---|
+| DEF-06, DOC-12 | Wing onboarding API (not CLI-only) | NOT STARTED |
+| DEF-07, DOC-11 | Multi-Wing reports cross-scope verified | NOT STARTED |
+| HG-01 | Individual accountability model implemented | HUMAN GATE |
+| HG-02 | 250-user multi-Wing load test | HUMAN GATE |
+| HG-06 | External pen test (recommended before second Wing) | HUMAN GATE |
+| HG-07 | Data governance decisions resolved | HUMAN GATE |
+| VIS-01 | Shared design tokens complete | IMPLEMENTING |
+| VIS-10 | Multi-Wing E2E playwright tests | IMPLEMENTING |
 
 ### Level C — National Readiness (additional requirements beyond Level B)
 
-| Gaps | Description |
-|---|---|
-| VIS-02, VIS-09 | Axe automation in main CI; WCAG 2.1 AA formal declaration |
-| SEC-04 / HG-06 | External pen test REQUIRED (not only recommended) |
-| DOC-11 | Tier 3 National reports implemented and verified |
-| DEF-08, DEF-09 | Async export pipeline complete with frontend polling |
-| SEC-05, SEC-06 | Full alerting stack operational |
-| DASH-03 | Full metric dictionary documentation |
+> VIS-02, VIS-09, DEF-08, DEF-09, SEC-05, SEC-06, DASH-03 — all FIXED LOCALLY (codebase changes applied; require staging verification post-Level-B-deploy).
+
+| Gaps | Description | Status |
+|---|---|---|
+| SEC-04 / HG-06 | External pen test REQUIRED (not only recommended) | HUMAN GATE |
+| DOC-11 | Tier 3 National reports implemented and verified | NOT STARTED |
+| VIS-02, VIS-09 | Axe automation in main CI; WCAG 2.1 AA formal declaration | FIXED LOCALLY |
+| DEF-08, DEF-09 | Async export pipeline complete with frontend polling | FIXED LOCALLY |
+| SEC-05, SEC-06 | Full alerting stack operational | FIXED LOCALLY |
+| DASH-03 | Full metric dictionary documentation | FIXED LOCALLY |
 
 ---
 

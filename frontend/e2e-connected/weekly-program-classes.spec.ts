@@ -98,3 +98,35 @@ test("Weekly Program shows a session's real Training Class assignment in its own
 
   expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
 });
+
+test("WORK-10: Publish Program button is visible to sqn_admin on the Weekly Program page", async ({ page }) => {
+  // WORK-10: Main TMS publishWP() parity — sqn_admin must be able to publish
+  // a weekly program from connected-frontend without switching to Planning Workspace.
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await loginSquadron(page, "ADMIN703");
+  const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
+  const base = await apiBase();
+  const auth = { Authorization: `Bearer ${token}` };
+
+  // Create a parade night with a known date so we can select it in the Weekly Program picker.
+  const me = await (await page.request.get(`${base}/api/auth/me`, { headers: auth })).json();
+  const testDate = new Date(2068, 0, 15).toISOString().slice(0, 10); // 2068-01-15
+  const pnRes = await page.request.post(`${base}/api/parade-nights`, {
+    data: { squadron_id: me.session.squadron_id, wing_id: me.session.wing_id, date: testDate, parade_type: "normal" },
+    headers: auth,
+  });
+  expect(pnRes.ok()).toBe(true);
+
+  await page.evaluate(() => (window as any).reloadAndRender());
+  await page.evaluate(() => (window as any).nav("weekly-program"));
+  await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });
+  await page.locator("#wp-sel").selectOption(testDate);
+
+  // The Publish Program button is rendered by renderWP() for S.isAdmin users.
+  // It toggles to "✓ Published" style after publish completes.
+  const publishBtn = page.locator("button", { hasText: "Publish Program" });
+  await expect(publishBtn).toBeVisible({ timeout: 5000 });
+
+  expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
+});
