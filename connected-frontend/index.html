@@ -1192,6 +1192,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
                 <option value="scheduled">Scheduled</option>
               </select>
               <input id="mission-search" placeholder="Search missions…" oninput="renderMissions()" style="min-width:180px">
+              <button class="btn btn-out btn-sm no-print" onclick="exportPerClassDeliveryCSV()" title="Download per-class delivery summary as CSV">Per-Class CSV</button>
             </div>
           </div>
           <div id="missions-table-card" style="display:none">
@@ -10673,6 +10674,46 @@ function renderMissions() {
       </tr>`;
     }).join('') +
     `</tbody></table></div>`;
+}
+
+// MBACK-06: per-class delivery summary export — pivots loaded mission data
+// into one row per (Training Class × curriculum item), downloaded as CSV.
+function exportPerClassDeliveryCSV() {
+  const missions = _missionState && _missionState.missions;
+  if (!missions || !missions.length) {
+    showToast('Load the Mission Backlog first.', true);
+    return;
+  }
+  // Collect all unique Training Classes across all missions.
+  const classMap = {};
+  missions.forEach(m => {
+    (m.class_breakdown || []).forEach(c => {
+      classMap[c.training_class_id] = c.display_name;
+    });
+  });
+  if (!Object.keys(classMap).length) {
+    showToast('No Training Classes are assigned in this planning year.', true);
+    return;
+  }
+  const header = ['Class', 'Code', 'Title', 'Stage', 'Element', 'Recommended Term', 'Delivery Status', 'Sessions Scheduled'];
+  const rows = [header];
+  Object.entries(classMap).forEach(([classId, className]) => {
+    missions.forEach(m => {
+      const cb = (m.class_breakdown || []).find(c => c.training_class_id === classId);
+      if (!cb) return;
+      rows.push([className, m.code, m.title, m.phase || '', m.element || '',
+        m.recommended_term || '', cb.backlog_status || 'unscheduled', String(cb.scheduled_count || 0)]);
+    });
+  });
+  const q = f => '"' + String(f).replace(/"/g, '""') + '"';
+  const csv = rows.map(r => r.map(q).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type: 'text/csv'}));
+  a.download = 'per-class-delivery.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  showToast('Per-class delivery CSV downloaded.', false);
 }
 
 // MBACK-04: jump directly from a Mission Backlog scheduled-date cell to the
