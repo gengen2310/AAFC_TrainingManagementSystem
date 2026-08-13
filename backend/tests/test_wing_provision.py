@@ -24,6 +24,10 @@ def _sqn_admin(client):
     return login(client, "ADMIN703")
 
 
+def _national_admin(client):
+    return login(client, "ADMINNATIONAL")
+
+
 URL = "/api/system/provision-wing"
 
 
@@ -59,6 +63,12 @@ def test_provision_wing_forbidden_sqn_admin(client):
 def test_provision_wing_forbidden_wing_admin(client):
     hdrs = _wing_admin(client)
     r = client.post(URL, json=_body("PW3WG", "PW301"), headers=hdrs)
+    assert r.status_code == 403
+
+
+def test_provision_wing_forbidden_national_admin(client):
+    hdrs = _national_admin(client)
+    r = client.post(URL, json=_body("PW3BWG", "PW3B1"), headers=hdrs)
     assert r.status_code == 403
 
 
