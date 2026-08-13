@@ -27,8 +27,8 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 | CLOSED | 36 |
 | STAGING VERIFIED | 9 |
 | FIXED LOCALLY | 22 |
-| IMPLEMENTING | 8 |
-| NOT STARTED | 29 |
+| IMPLEMENTING | 9 |
+| NOT STARTED | 28 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **121** |
@@ -268,7 +268,7 @@ are not yet started. The support runbook and year rollover procedure are CLOSED 
 | DOC-02 | Docs | HIGH | Year rollover E2E procedure proven in staging — 10/10 tests pass; annual operator procedure documented | `test_year_rollover_e2e.py` 10/10 pass; `08_year_rollover_procedure.md` complete; not yet exercised in production | STAGING VERIFIED |
 | DOC-03 | Docs | MEDIUM | Playwright E2E — multi-Wing scope tests pass with a second Wing activated in staging | 266 E2E tests cover core single-Wing workflows; multi-Wing tests gated on Level B | IMPLEMENTING |
 | DOC-04 | Docs | HIGH | Named support ownership — `25_support_runbook.md` Part 1 ownership table completed with named contacts | Support runbook content complete; ownership table empty; post-release action H2 | HUMAN GATE |
-| DOC-05 | Docs | HIGH | Weekly restore test — first-week `test-restore-postgresql.yml` GitHub Actions pass confirmed after production deploy | Workflow exists and ran in staging; post-production first pass not yet confirmed; post-release action H3 | NOT STARTED |
+| DOC-05 | Docs | HIGH | Weekly restore test — first-week `test-restore-postgresql.yml` GitHub Actions pass confirmed after production deploy | 2026-08-09 run FAILED: `Migration HEAD mismatch: got 'f6a7b8c9d0e1', expected 'ed6feec8b9cd'` — the 2026-08-09 production backup was taken before the 2026-08-12 production deployment (which ran `alembic upgrade head` to bring DB forward). This is an expected pre/post-deployment ordering, not a data loss event. Next scheduled run (2026-08-16) should confirm the post-deployment state. REQUIRED_TABLES list updated 2026-08-13 to include training_classes, session_audiences, cadet_class_memberships, ip_api_requests, user_api_requests, facilitators, parade_nights, ip_login_attempts. | IMPLEMENTING |
 | DOC-06 | Docs | MEDIUM | First quarterly DR rehearsal run and result recorded in Evidence Table | Not yet run; post-release action H4 | NOT STARTED |
 | DOC-07 | Docs | MEDIUM | V1 go-live communicated to 7WG beta testers | Not yet done; post-release action H5 | NOT STARTED |
 | DOC-08 | Docs | HIGH | Beta feedback register populated — all 7WG beta-tester findings classified; critical/high items resolved | `02_beta_feedback_register.md` template exists; items not yet populated (requires beta testers) | HUMAN GATE |

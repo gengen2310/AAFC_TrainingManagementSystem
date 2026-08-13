@@ -306,10 +306,16 @@ jobs:
               failures.append(f"alembic_version table missing or unreadable: {e}")
 
           # 2. Required tables present and accessible
+          # Updated 2026-08-13: added tables introduced in v38–v51 migrations
+          # (training_classes, session_audiences, cadet_class_memberships,
+          # ip_api_requests, user_api_requests, facilitators, parade_nights).
           REQUIRED_TABLES = [
               'users', 'wings', 'squadrons', 'audit_logs', 'system_settings',
               'access_codes', 'proxy_sessions', 'phases', 'program_packages',
               'curriculum_items', 'planning_years', 'sessions',
+              'training_classes', 'session_audiences', 'cadet_class_memberships',
+              'ip_api_requests', 'user_api_requests',
+              'facilitators', 'parade_nights', 'ip_login_attempts',
           ]
           for table in REQUIRED_TABLES:
               try:
