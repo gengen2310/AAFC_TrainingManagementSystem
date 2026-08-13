@@ -26,14 +26,14 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 36 |
 | STAGING VERIFIED | 9 |
-| FIXED LOCALLY | 22 |
+| FIXED LOCALLY | 23 |
 | IMPLEMENTING | 9 |
-| NOT STARTED | 28 |
+| NOT STARTED | 27 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **121** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 67 / 121 = 55%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 68 / 121 = 56%**
 
 **2026-08-13 audit:** 8 items promoted from NOT STARTED → CLOSED/FIXED LOCALLY after code inspection (DEF-02, DEF-12, HELP-02, HELP-03, HELP-06, MBACK-03, WORK-06) plus E2E CI workflow created (VIS-02 → FIXED LOCALLY). 1 new item added (e2e-tests.yml workflow). DASH-08 promoted IMPLEMENTING → FIXED LOCALLY after confirmed code inspection of all command-dashboard drill-down paths. SEC-09, SEC-10, SEC-13, SEC-14 promoted IMPLEMENTING → STAGING VERIFIED after live HTTP checks against staging and production. SEC-05 (login spike alerting) and SEC-06 (5xx spike alerting) implemented in `security.py`/`main.py` with tests. DOC-14 (CEA operator guide) and DOC-15 (role matrix §V17 Training Class) written.
 
@@ -95,7 +95,7 @@ frontend consumption.
 |---|---|---|---|---|---|
 | DASH-01 | Dashboard | HIGH | Wing T2-04 (wing-cancellation-trend) and T2-05 (wing-not-delivered) wired to Wing dashboard cards | All 5 wing report endpoints rendered in connected-frontend; confirmed by `01_gap_matrix.md` Gap 10 closure | CLOSED |
 | DASH-02 | Dashboard | HIGH | Zero-session parade night reports as `not_planned`, never as 100% ready | `dashboard.py` and `index.html:5672/:5713` correctly guard `sessions_total===0` / `planning_status==='not_planned'` | CLOSED |
-| DASH-03 | Dashboard | MEDIUM | Full §23 metric dictionary pass — all 22 inventoried chart functions documented (QUESTION / PURPOSE / POPULATION / PERIOD / NUMERATOR / DENOMINATOR / SOURCE / REFRESH / ACTION / DRILL-DOWN) | `dashboard-metric-dictionary.md` covers 2 charts fully; 20 inventoried with one-line purposes only | NOT STARTED |
+| DASH-03 | Dashboard | MEDIUM | Full §23 metric dictionary pass — all 22 inventoried chart functions documented (QUESTION / PURPOSE / POPULATION / PERIOD / NUMERATOR / DENOMINATOR / SOURCE / REFRESH / ACTION / DRILL-DOWN) | Complete: `docs/product-review/dashboard-metric-dictionary.md` — 26 chart functions fully documented across Sections A–D; 5 issues identified including B2 `delivered_with_issue` exclusion (data integrity), equipment column always no_data, and "Reason not recorded" actionability gap | FIXED LOCALLY |
 | DASH-04 | Dashboard | MEDIUM | Per-chart fault isolation in backend — each chart builder in `_full_squadron_charts` wrapped in its own try/except so one failure cannot 500 the whole `/api/dashboard/charts` response | `_run_chart_builder()` at `dashboard.py:62` wraps each builder in try/except, returning `chart_type="error"` on failure; confirmed implemented | CLOSED |
 | DASH-05 | Dashboard | MEDIUM | Frontend chart error handling — catch handler resets all chart containers on failure, not just 2 of 7+ (noted at `index.html:5793`) | `_DASH_CHART_IDS` at `index.html:6797` now covers all 14 chart/insight pairs; both skeleton reset and fetch-failure cleanup use the shared list — implemented and commented at lines 6789–6796 | CLOSED |
 | DASH-06 | Dashboard | LOW | Cancellation reasons "Unknown" / "Reason not recorded" — UI must surface an actionable prompt when this Pareto category is non-trivial, not display it as an inert bar | `loadDashCharts()` now appends a `a-warn` alert beneath the cancellation chart when the top reason is a `data_quality_gap` row and accounts for ≥15% of cancellations, explaining how to fix it | FIXED LOCALLY |
@@ -225,7 +225,7 @@ and a formal conformance declaration are Level B/C requirements. Shared design t
 | VIS-06 | Accessibility | MEDIUM | SC 1.4.10 Reflow at 320 px — content usable without horizontal scrolling at 320 px viewport | `a11y-wcag.spec.ts` tests this in staging; not in main CI | STAGING VERIFIED |
 | VIS-07 | Accessibility | MEDIUM | SC 1.4.4 Resize Text — all content functional at 200% zoom (640 px simulation) | `a11y-wcag.spec.ts` tests this in staging; not in main CI | STAGING VERIFIED |
 | VIS-08 | Accessibility | LOW | No-duplicate-IDs and aria-label rules verified for all four roles (system_admin, sqn_admin, wing_admin, national_admin) | `a11y-staging.spec.ts` covers all four roles; not in main CI | STAGING VERIFIED |
-| VIS-09 | Accessibility | LOW | WCAG 2.1 AA formal conformance declaration for National rollout | Staging Axe tests provide technical evidence; formal declaration document not drafted | NOT STARTED |
+| VIS-09 | Accessibility | LOW | WCAG 2.1 AA formal conformance declaration for National rollout | Declaration written at `docs/next-stage/vis-09_wcag_conformance_declaration.md` — partial conformance; Planning Workspace passes (19/19 axe tests); connected-frontend has 3 known gaps: heading structure, landmark regions, ~83 unlabelled `<select>` elements | FIXED LOCALLY |
 | VIS-10 | Visual | LOW | Multi-Wing E2E playwright tests — visual and data-scope verification with a second Wing activated in staging | 266 E2E tests cover core single-Wing workflows; multi-Wing scope tests require Level B Wing activation | IMPLEMENTING |
 
 ---
