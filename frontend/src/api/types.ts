@@ -151,6 +151,27 @@ export interface NationalCapabilityWing {
   subject_distribution: Record<string, number>;
 }
 export interface NationalCapability { subjects: string[]; wings: NationalCapabilityWing[]; }
+
+export interface WingCancellationSqn {
+  squadron_id: string; code: string; short_name: string;
+  cancelled_sessions: number; cancelled_nights: number;
+  reasons: { reason: string; count: number }[];
+}
+export interface WingCancellationTrend {
+  title: string; decision: string;
+  total_cancelled_sessions: number; total_cancelled_nights: number;
+  squadrons: WingCancellationSqn[];
+}
+
+export interface WingNotDeliveredSqn {
+  squadron_id: string; code: string; short_name: string;
+  not_delivered_count: number;
+  sessions: { id: string; curriculum_code_at_time: string | null; not_delivered_reason: string | null }[];
+}
+export interface WingNotDeliveredReport {
+  title: string; decision: string; total_not_delivered: number;
+  squadrons: WingNotDeliveredSqn[];
+}
 // Imports
 export interface ImportPreview { headers: string[]; row_count: number; preview: Record<string, string>[]; detected: Record<string, string | null>; }
 export interface ImportCommitResult { ok: boolean; import_id: string; accepted: number; rejected: number; }

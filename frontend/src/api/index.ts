@@ -5,7 +5,8 @@ import type {
   SessionRow, Facilitator, FacilitatorStats, TrainingArea, Equipment, ClashResult, Cadet,
   CadetRiskFlag, AuditRow, ActionItem, SummaryReport, ReadinessReport, CoverageReport,
   FacLoadReport, NotDeliveredReport, WingOverview, NationalOverview, NationalCapability,
-  WingPhaseCoverage, WingCapability, ImportPreview, ImportCommitResult,
+  WingPhaseCoverage, WingCapability, WingCancellationTrend, WingNotDeliveredReport,
+  ImportPreview, ImportCommitResult,
   PlanningYear, AnnualProgram, LongRangeView, WeeklyProgramData,
   MissionItem, PlanningLocation, PlanningFacilitator, LocalLesson,
   WingHQEvent, CommandCentreData, PlanningConflict, HolidayPeriod,
@@ -227,6 +228,8 @@ export const reportApi = {
   // silently discarded the response, Planning Workspace never fetched it at
   // all. Stage 9, 2026-08-05.
   wingCapability: () => api.get<WingCapability>("/api/reports/wing-capability"),
+  wingCancellationTrend: () => api.get<WingCancellationTrend>("/api/reports/wing-cancellation-trend"),
+  wingNotDelivered: () => api.get<WingNotDeliveredReport>("/api/reports/wing-not-delivered"),
 };
 
 export const opsApi = {

@@ -4,8 +4,9 @@ import { reportApi } from "../api";
 import { Card, Empty, Loading, ErrorNote, Stat, Bar } from "../components/ui";
 import { ComparisonTable, RankBars, ReadinessPanel, HeatmapGrid, GapHeatmap, type Column } from "../components/assurance";
 import { DrilldownPanel } from "../components/DrilldownPanel";
+import { DecisionBadge } from "../components/status/StatusBadge";
 import { CommandDashboardSection } from "../components/charts/CommandDashboardSection";
-import type { NationalCapability } from "../api/types";
+import type { NationalCapability, WingCancellationTrend, WingNotDeliveredReport } from "../api/types";
 
 // Wing-overview row shape (from GET /api/reports/wing-overview).
 type SqnRow = {
@@ -32,6 +33,8 @@ export function WingOverview() {
   const q = useQuery({ queryKey: ["wing-overview"], queryFn: reportApi.wingOverview });
   const heat = useQuery({ queryKey: ["wing-phase-coverage"], queryFn: reportApi.wingPhaseCoverage });
   const cap = useQuery({ queryKey: ["wing-capability"], queryFn: reportApi.wingCapability });
+  const cancel = useQuery({ queryKey: ["wing-cancellation-trend"], queryFn: reportApi.wingCancellationTrend });
+  const wingNd = useQuery({ queryKey: ["wing-not-delivered"], queryFn: reportApi.wingNotDelivered });
   const [open, setOpen] = useState<SqnRow | null>(null);
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
@@ -112,6 +115,45 @@ export function WingOverview() {
           <ul className="risk-list">
             {missing.map((r) => <li key={r._id}><strong>{r.short_name}</strong> — {r.no_future_plan ? "no future parade nights planned" : "plan not published"}{r.readiness != null && `; readiness ${r.readiness}`}</li>)}
           </ul>
+        </Card>
+      )}
+
+      {wingNd.data && wingNd.data.total_not_delivered > 0 && (
+        <Card title={`Cross-squadron not-delivered (${wingNd.data.total_not_delivered})`} action={<DecisionBadge decision={wingNd.data.decision} />}>
+          <table>
+            <caption className="vis-hidden">Cross-squadron not-delivered sessions by squadron</caption>
+            <thead><tr><th>Squadron</th><th>Count</th><th>Items</th></tr></thead>
+            <tbody>
+              {wingNd.data.squadrons.map((s) => (
+                <tr key={s.squadron_id}>
+                  <td><strong>{s.short_name}</strong></td>
+                  <td><span className="badge warn">{s.not_delivered_count}</span></td>
+                  <td className="muted" style={{ fontSize: 12 }}>
+                    {s.sessions.map((x) => x.curriculum_code_at_time ?? "—").join(", ")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+
+      {cancel.data && cancel.data.total_cancelled_sessions + cancel.data.total_cancelled_nights > 0 && (
+        <Card title={`Cancelled / rescheduled trend (${cancel.data.total_cancelled_sessions} sessions · ${cancel.data.total_cancelled_nights} nights)`} action={<DecisionBadge decision={cancel.data.decision} />}>
+          <table>
+            <caption className="vis-hidden">Cancelled sessions and parade nights by squadron</caption>
+            <thead><tr><th>Squadron</th><th>Cancelled sessions</th><th>Cancelled nights</th><th>Top reason</th></tr></thead>
+            <tbody>
+              {cancel.data.squadrons.filter((s) => s.cancelled_sessions + s.cancelled_nights > 0).map((s) => (
+                <tr key={s.squadron_id}>
+                  <td><strong>{s.short_name}</strong></td>
+                  <td>{s.cancelled_sessions > 0 ? <span className="badge warn">{s.cancelled_sessions}</span> : "0"}</td>
+                  <td>{s.cancelled_nights > 0 ? <span className="badge warn">{s.cancelled_nights}</span> : "0"}</td>
+                  <td className="muted" style={{ fontSize: 12 }}>{s.reasons[0]?.reason ?? "—"}{s.reasons[0] && s.reasons[0].count > 1 ? ` ×${s.reasons[0].count}` : ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </Card>
       )}
 
