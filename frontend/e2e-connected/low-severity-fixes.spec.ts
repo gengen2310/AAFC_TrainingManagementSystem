@@ -130,6 +130,43 @@ test("HELP-01: Contextual tooltip buttons are present with descriptive data-tip 
   expect(tip!.length).toBeGreaterThan(20);
 });
 
+test("HELP-04: Readiness checklist section is visible on the dashboard when a parade night has sessions", async ({ page }) => {
+  // HELP-04: _renderTonightReadiness() renders a "Readiness checklist" section
+  // beneath the session list when sessions_total > 0.  With 0 sessions it
+  // returns the "Not planned" early-exit card instead.  The test seeds a parade
+  // night for today's date (earliest upcoming, so the dashboard picks it as
+  // "Tonight") plus one session, then navigates to the dashboard and confirms
+  // the checklist section is visible.
+  await loginSquadron(page, "ADMIN703");
+  const base = LOCAL_API_BASE || "http://localhost:8000";
+  const token = await page.evaluate(() => sessionStorage.getItem("aafc_token") ?? "");
+  const auth = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+
+  // Seed a parade night for today so _tonight_readiness picks it as the nearest upcoming.
+  const todayDate = new Date().toISOString().slice(0, 10);
+  const pnRes = await page.request.post(`${base}/api/parade-nights`, {
+    data: { date: todayDate, parade_type: "normal" },
+    headers: auth,
+  });
+  // Accept both 200 (created) and 409 (already exists — use existing).
+  const pnBody = await pnRes.json();
+  const pnId: string = pnRes.ok() ? pnBody.parade_night_id : pnBody.existing_id ?? pnBody.parade_night_id;
+
+  if (pnId) {
+    // Add one session so planning_status is not "not_planned".
+    await page.request.post(`${base}/api/sessions`, {
+      data: { parade_night_id: pnId, period_number: 99 },
+      headers: auth,
+    });
+  }
+
+  await page.evaluate(() => (window as any).loadData?.());
+  await page.evaluate(() => (window as any).nav?.("dashboard"));
+  const tonight = page.locator("#dash-tonight-section");
+  await expect(tonight).toBeVisible({ timeout: 10000 });
+  await expect(tonight).toContainText("Readiness checklist", { timeout: 8000 });
+});
+
 test("HELP-05: 'What Changed?' activity feed card is present on the Needs Attention page", async ({ page }) => {
   // HELP-05: GET /api/recent-changes — the card with the day-range selector and
   // refresh button must be present and the rc-feed div must exist.
@@ -142,4 +179,19 @@ test("HELP-05: 'What Changed?' activity feed card is present on the Needs Attent
   // The activity feed div and day-range selector must both be in the DOM.
   await expect(page.locator("#rc-feed")).toBeVisible();
   await expect(page.locator("#rc-days")).toBeVisible();
+});
+
+test("MBACK-04: '↗ View PN' button is visible in Mission Backlog for a scheduled mission", async ({ page }) => {
+  // MBACK-04: navToScheduledPN(date) is wired to an "↗ View PN" button rendered
+  // in the Scheduled column of the Mission Backlog table for any mission that has
+  // a scheduled session (parade_date is non-empty in the session summary).
+  // The seeded data for squadron 703 includes sessions on parade nights linked to
+  // the 2026 planning year, so at least one mission should have a schedDate and
+  // show this button.
+  await loginSquadron(page, "ADMIN703");
+  await page.evaluate(() => (window as any).nav("activities"));
+  // Wait for the missions filters card, then for the missions table body to have
+  // content (not just "Loading…") with a scheduled mission's button.
+  await expect(page.locator("#missions-filters-card")).toBeVisible({ timeout: 12000 });
+  await expect(page.locator("button[title='Go to this parade night']").first()).toBeVisible({ timeout: 15000 });
 });
