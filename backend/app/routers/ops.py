@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
 from ..models import (Session, ParadeNight, CurriculumItem, ActionItem, Exception as Exc,
-                      Squadron, Wing, ImportLog)
+                      Squadron, Wing, ImportLog, AuditLog)
 from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_view_squadron, require_can_view_wing
 from ..services import audit, score_parade
@@ -581,3 +581,76 @@ def _guess(headers, needles):
             if n.lower() in h.lower():
                 return h
     return None
+
+
+# ── GET /api/recent-changes (HELP-05) ─────────────────────────────────────────
+# Activity feed: recent audit-log events scoped to the requesting user's org
+# unit (squadron → squadron; wing_admin → all squadrons in their wing;
+# national/system_admin → everything within the date window).
+
+_PLANNING_OBJECT_TYPES = {
+    "parade_night", "session", "session_audience", "session_outcome",
+    "scheduled_session", "planning_notice", "planning_year",
+    "training_class", "class_membership",
+}
+
+_ACTION_LABELS = {
+    "create": "Created",
+    "update": "Updated",
+    "delete": "Deleted",
+    "archive": "Archived",
+    "restore": "Restored",
+    "record_outcome": "Outcome recorded",
+    "cancel": "Cancelled",
+    "reschedule": "Rescheduled",
+    "publish": "Published",
+    "unpublish": "Unpublished",
+    "set_audience": "Audience updated",
+    "close": "Closed",
+}
+
+
+@router.get("/recent-changes")
+def recent_changes(
+    days: int = 7,
+    limit: int = 50,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Recent audit-log entries for planning objects in the user's org unit.
+
+    Accessible to all authenticated roles; scope is enforced server-side — a
+    sqn_admin sees only their squadron, a wing_admin sees their whole wing, and
+    national/system roles see everything within the window.
+    """
+    since = datetime.utcnow() - timedelta(days=max(1, min(days, 90)))
+    q = (db.query(AuditLog)
+         .filter(AuditLog.timestamp >= since,
+                 AuditLog.object_type.in_(_PLANNING_OBJECT_TYPES))
+         .order_by(AuditLog.timestamp.desc()))
+
+    role = p.role
+    sq_id = p.acting_squadron_id or p.squadron_id
+    wi_id = p.acting_wing_id or p.wing_id
+
+    if role in ("sqn_admin", "sqn_viewer"):
+        q = q.filter(AuditLog.squadron_id == sq_id)
+    elif role in ("wing_admin", "wing_viewer"):
+        q = q.filter(AuditLog.wing_id == wi_id)
+    # national/auditor/system_admin: no additional filter — full scope
+
+    rows = q.limit(min(limit, 200)).all()
+    return {"count": len(rows), "since": since.isoformat(), "changes": [
+        {
+            "id": e.id,
+            "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+            "role": e.role,
+            "object_type": e.object_type,
+            "object_id": e.object_id,
+            "action": e.action,
+            "label": _ACTION_LABELS.get(e.action, e.action.replace("_", " ").capitalize()),
+            "squadron_id": e.squadron_id,
+            "wing_id": e.wing_id,
+        }
+        for e in rows
+    ]}

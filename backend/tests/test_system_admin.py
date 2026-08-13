@@ -583,3 +583,44 @@ def test_reset_rate_limits_audit_entry(client):
     d = r.json()
     assert d["count"] >= 1
     assert d["logs"][0]["object_type"] == "system"
+
+
+# ── HELP-05: /api/recent-changes ──────────────────────────────────────────────
+
+def test_recent_changes_requires_auth(client):
+    """Unauthenticated access must return 401."""
+    r = client.get("/api/recent-changes")
+    assert r.status_code == 401
+
+
+def test_recent_changes_sqn_admin_returns_200(client):
+    """sqn_admin can access the recent-changes feed."""
+    hdr = login(client, "ADMIN703")
+    r = client.get("/api/recent-changes?days=7&limit=20", headers=hdr)
+    assert r.status_code == 200
+    d = r.json()
+    assert "changes" in d
+    assert "count" in d
+    assert isinstance(d["changes"], list)
+
+
+def test_recent_changes_system_admin_returns_200(client):
+    """system_admin can access the recent-changes feed."""
+    hdr = _sysadmin(client)
+    r = client.get("/api/recent-changes?days=30&limit=50", headers=hdr)
+    assert r.status_code == 200
+    d = r.json()
+    assert "changes" in d
+
+
+def test_recent_changes_change_entry_has_required_fields(client):
+    """Each change entry exposes the fields the frontend needs."""
+    hdr = login(client, "ADMIN703")
+    r = client.get("/api/recent-changes?days=90&limit=10", headers=hdr)
+    assert r.status_code == 200
+    for entry in r.json()["changes"]:
+        assert "timestamp" in entry
+        assert "action" in entry
+        assert "label" in entry
+        assert "object_type" in entry
+        assert "object_id" in entry
