@@ -11,7 +11,7 @@ from .organisations import (
     IpApiRequest, UserApiRequest,
 )
 from .training import (
-    CurriculumItem, CurriculumElement, CurriculumPhase, CustomPhase, ParadeNight, Session, SessionStatusHistory,
+    CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
     Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, SessionStatusReasonTag, TrainingArea, Equipment, Activity, Cadet,
     TimingTemplate, TimingBlock, ParadeNightTimingOverride, TrainingClass, SessionAudience,
     CadetClassMembership,
@@ -26,7 +26,7 @@ from .program import (
 
 __all__ = [
     "NationalEntity", "Wing", "Squadron", "Flight", "User", "AccessCode", "ProxySession", "IpLoginAttempt", "IpApiRequest", "UserApiRequest",
-    "CurriculumItem", "CurriculumElement", "CurriculumPhase", "CustomPhase", "ParadeNight", "Session", "SessionStatusHistory",
+    "CurriculumItem", "CurriculumElement", "CurriculumPhase", "ParadeNight", "Session", "SessionStatusHistory",
     "Facilitator", "FacilitatorRankHistory", "SubjectAreaTag", "FacilitatorTypeTag", "SessionStatusReasonTag", "TrainingArea", "Equipment", "Activity", "Cadet",
     "TimingTemplate", "TimingBlock", "ParadeNightTimingOverride", "TrainingClass", "SessionAudience",
     "CadetClassMembership",

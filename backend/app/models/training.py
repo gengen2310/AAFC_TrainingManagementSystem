@@ -39,14 +39,6 @@ class CurriculumItem(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     internal_admin_notes: Mapped[str | None] = mapped_column(Text)
 
 
-class CustomPhase(Base, UUIDMixin, TimestampMixin):
-    __tablename__ = "custom_phases"
-    squadron_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), index=True)
-    phase_key: Mapped[str] = mapped_column(String(40))
-    name: Mapped[str] = mapped_column(String(80))
-    abbr: Mapped[str | None] = mapped_column(String(20))
-
-
 class ParadeNight(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "parade_nights"
     squadron_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), index=True)
