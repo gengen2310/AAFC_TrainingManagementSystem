@@ -2,7 +2,7 @@
 
 **Version:** 2026-08-13  
 **Branch:** `next-stage/v1-operational` | Deployed commit: `756e65e` (production, 2026-08-12, Alembic head v51)  
-**Backend tests:** 1628 passed, 5 skipped (2026-08-13, post DEF-06/DOC-12/wing-name)  
+**Backend tests:** 1629 passed, 5 skipped (2026-08-13, post DEF-06/national-admin-provision-wing test)  
 **Sources merged:**
 - 2026-08-12 program audit (prior register: 18 DONE / 14 PARTIAL / 57 NOT DONE / 7 HUMAN GATE)
 - Training Class architecture analysis (`parallel-class-impact-analysis.md`)
