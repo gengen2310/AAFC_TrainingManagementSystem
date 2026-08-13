@@ -2344,6 +2344,7 @@ def _session_audience_dict(row: SessionAudience) -> dict:
 
 class SessionAudienceSetIn(BaseModel):
     training_class_ids: List[str]
+    override_conflict: bool = False
 
 
 class SessionAudienceOutcomeIn(BaseModel):
@@ -2379,6 +2380,35 @@ def set_session_audience(sid: str, body: SessionAudienceSetIn, db: DBSession = D
         if not c or c.is_archived or c.squadron_id != s.squadron_id:
             raise HTTPException(400, detail={"error": "invalid_training_class", "training_class_id": cid})
         classes.append(c)
+
+    # MBACK-05: detect class-schedule clashes — a Training Class cannot be in
+    # two sessions at the same parade night and period simultaneously.  Follow
+    # the same override pattern as facilitator/room clash in create/edit_session.
+    if not body.override_conflict and classes and s.period_number is not None:
+        sibling_ids = [
+            sib.id for sib in db.query(Session).filter(
+                Session.parade_night_id == s.parade_night_id,
+                Session.period_number == s.period_number,
+                Session.id != sid,
+                Session.is_archived == False,  # noqa: E712
+            ).all()
+        ]
+        if sibling_ids:
+            sib_audiences = db.query(SessionAudience).filter(
+                SessionAudience.session_id.in_(sibling_ids)
+            ).all()
+            sib_class_sessions: dict[str, list[str]] = {}
+            for aud in sib_audiences:
+                sib_class_sessions.setdefault(aud.training_class_id, []).append(aud.session_id)
+            class_conflicts = [
+                {"type": "class_clash",
+                 "training_class_id": c.id,
+                 "training_class_name": c.display_name,
+                 "session_ids": sib_class_sessions[c.id]}
+                for c in classes if c.id in sib_class_sessions
+            ]
+            if class_conflicts:
+                raise HTTPException(409, detail={"error": "class_conflict", "conflicts": class_conflicts})
 
     existing = {r.training_class_id: r for r in
                 db.query(SessionAudience).filter(SessionAudience.session_id == sid).all()}

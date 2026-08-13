@@ -260,3 +260,93 @@ def test_cannot_link_a_nonexistent_class(client):
     r = client.put(f"/api/sessions/{sid}/audience", json={"training_class_ids": ["not-a-real-id"]}, headers=hdr)
     assert r.status_code == 400, r.text
     assert r.json()["detail"]["error"] == "invalid_training_class"
+
+
+# ─────────────────────────────────────────────────────────────
+# MBACK-05: class-clash detection across concurrent sessions
+# ─────────────────────────────────────────────────────────────
+
+def _make_two_sessions_same_pn(client, hdr, days_ahead):
+    """One parade night, two sessions with the same period_number — the
+    scenario that should trigger the MBACK-05 class-clash check."""
+    candidate = date.today() + timedelta(days=days_ahead)
+    if candidate.weekday() == 4:  # Friday
+        candidate += timedelta(days=1)
+    target_date = candidate.isoformat()
+    session_info = client.get("/api/auth/me", headers=hdr).json()["session"]
+    sqn_id, wing_id = session_info.get("squadron_id"), session_info.get("wing_id")
+
+    pn = client.post("/api/parade-nights", json={
+        "squadron_id": sqn_id, "wing_id": wing_id, "date": target_date, "parade_type": "normal",
+    }, headers=hdr)
+    assert pn.status_code in (200, 201), pn.text
+    pn_id = pn.json().get("parade_night_id") or pn.json().get("id")
+
+    sess_a = client.post("/api/sessions", json={
+        "parade_night_id": pn_id, "period_number": 1, "cadet_group": "senior",
+    }, headers=hdr)
+    assert sess_a.status_code in (200, 201), sess_a.text
+
+    sess_b = client.post("/api/sessions", json={
+        "parade_night_id": pn_id, "period_number": 1, "cadet_group": "junior",
+    }, headers=hdr)
+    assert sess_b.status_code in (200, 201), sess_b.text
+
+    return sess_a.json()["session_id"], sess_b.json()["session_id"]
+
+
+def test_class_clash_detected_when_same_class_in_concurrent_sessions(client):
+    """MBACK-05: assigning a Training Class to Session A then trying to PUT
+    the same class to a concurrent Session B (same parade night, same period)
+    must return 409 class_conflict."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr, 2079)
+    stage_id = _senior_stage_id(client, hdr)
+    class_id = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
+    sid_a, sid_b = _make_two_sessions_same_pn(client, hdr, days_ahead=250)
+
+    r = client.put(f"/api/sessions/{sid_a}/audience", json={"training_class_ids": [class_id]}, headers=hdr)
+    assert r.status_code == 200, r.text
+
+    r = client.put(f"/api/sessions/{sid_b}/audience", json={"training_class_ids": [class_id]}, headers=hdr)
+    assert r.status_code == 409, r.text
+    body = r.json()["detail"]
+    assert body["error"] == "class_conflict"
+    assert body["conflicts"][0]["type"] == "class_clash"
+    assert body["conflicts"][0]["training_class_id"] == class_id
+
+
+def test_class_clash_override_flag_allows_through(client):
+    """MBACK-05: override_conflict=True bypasses the 409 and assigns the
+    Training Class to both concurrent sessions."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr, 2078)
+    stage_id = _senior_stage_id(client, hdr)
+    class_id = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
+    sid_a, sid_b = _make_two_sessions_same_pn(client, hdr, days_ahead=253)
+
+    client.put(f"/api/sessions/{sid_a}/audience", json={"training_class_ids": [class_id]}, headers=hdr)
+
+    r = client.put(f"/api/sessions/{sid_b}/audience", json={
+        "training_class_ids": [class_id],
+        "override_conflict": True,
+    }, headers=hdr)
+    assert r.status_code == 200, r.text
+    assert any(row["training_class_id"] == class_id for row in r.json())
+
+
+def test_different_classes_in_concurrent_sessions_no_clash(client):
+    """MBACK-05: two concurrent sessions using *different* Training Classes
+    must not trigger any conflict."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr, 2077)
+    stage_id = _senior_stage_id(client, hdr)
+    c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
+    c2 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 2")
+    sid_a, sid_b = _make_two_sessions_same_pn(client, hdr, days_ahead=256)
+
+    r_a = client.put(f"/api/sessions/{sid_a}/audience", json={"training_class_ids": [c1]}, headers=hdr)
+    assert r_a.status_code == 200, r_a.text
+
+    r_b = client.put(f"/api/sessions/{sid_b}/audience", json={"training_class_ids": [c2]}, headers=hdr)
+    assert r_b.status_code == 200, r_b.text
