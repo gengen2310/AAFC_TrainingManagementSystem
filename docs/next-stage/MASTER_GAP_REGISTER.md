@@ -26,14 +26,14 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 36 |
 | STAGING VERIFIED | 9 |
-| FIXED LOCALLY | 25 |
-| IMPLEMENTING | 8 |
-| NOT STARTED | 26 |
+| FIXED LOCALLY | 27 |
+| IMPLEMENTING | 7 |
+| NOT STARTED | 25 |
 | HUMAN GATE | 15 |
 | ACCEPTED RISK | 2 |
 | **Total** | **121** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 70 / 121 = 58%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 72 / 121 = 60%**
 
 **2026-08-13 audit:** 8 items promoted from NOT STARTED → CLOSED/FIXED LOCALLY after code inspection (DEF-02, DEF-12, HELP-02, HELP-03, HELP-06, MBACK-03, WORK-06) plus E2E CI workflow created (VIS-02 → FIXED LOCALLY). 1 new item added (e2e-tests.yml workflow). DASH-08 promoted IMPLEMENTING → FIXED LOCALLY after confirmed code inspection of all command-dashboard drill-down paths. SEC-09, SEC-10, SEC-13, SEC-14 promoted IMPLEMENTING → STAGING VERIFIED after live HTTP checks against staging and production. SEC-05 (login spike alerting) and SEC-06 (5xx spike alerting) implemented in `security.py`/`main.py` with tests. DOC-14 (CEA operator guide) and DOC-15 (role matrix §V17 Training Class) written.
 
@@ -79,7 +79,7 @@ to formally confirm this (see DOC-12).
 | CLASS-13 | Core Domain | HIGH | class_breakdown field rendered in connected-frontend curriculum page — per-item indication of which Training Class needs each curriculum item | Implemented as MBACK-01 (commit `16f6bce`): `_loadCurriculumClassBreakdown()` + `_currClassBreakdownHtml()` render per-class badges in curriculum page | CLOSED |
 | CLASS-14 | Core Domain | MEDIUM | Training Classes step in the Getting Started checklist onboarding wizard | Confirmed implemented: `setup.py` lines 79-84 query TrainingClass count; lines 139-141 emit `training_classes_created` step. Gap register was stale. | CLOSED |
 | CLASS-15 | Core Domain | LOW | CustomPhase → CurriculumPhase migration and cleanup — CustomPhase is a narrower, older squadron-scoped phase-name table that predates CurriculumPhase | Migration v40 (`5cf6d7e8f9a0`) written to DROP TABLE custom_phases; model class and `__init__.py` export removed; test updated; awaits operator `alembic upgrade head` to apply DROP TABLE on production | FIXED LOCALLY |
-| CLASS-16 | Core Domain | LOW | Session.cadet_group / Cadet.phase formal deprecation — single-string fields replaced structurally by SessionAudience; all consumers (Mission Backlog, Weekly Program, dashboards, both frontends) must migrate before fields are removed | Old fields retained as read-compatibility path per capability-preservation rules; no migration schedule; no consumer yet migrated to SessionAudience | IMPLEMENTING |
+| CLASS-16 | Core Domain | LOW | Session.cadet_group / Cadet.phase formal deprecation — single-string fields replaced structurally by SessionAudience; all consumers (Mission Backlog, Weekly Program, dashboards, both frontends) must migrate before fields are removed | Deprecation plan at `docs/next-stage/28_cadet_group_deprecation_plan.md`: 73 total references across 4 files inventoried; 4-phase migration plan (dual-write → frontend selector → response deprecation → DB removal); Cadet.phase explicitly out of scope until individual cadet-class tracking is confirmed as a product decision | FIXED LOCALLY |
 
 ---
 
@@ -250,7 +250,7 @@ Four gaps require System Admin action as Human Gates.
 | SEC-09 | Security | MEDIUM | CSP `connect-src` runtime injection verified in deployed connected-frontend nginx response | Live HTTP check 2026-08-13: staging response includes `connect-src 'self' https://aafc-tms-backend-staging.up.railway.app`; production response includes `connect-src 'self' https://aafc-tms-backend-production.up.railway.app` — per-environment injection confirmed working. | STAGING VERIFIED |
 | SEC-10 | Security | LOW | `Permissions-Policy` header confirmed in production connected-frontend nginx HTTP response | Live HTTP check 2026-08-13: production frontend returns `permissions-policy: geolocation=(), microphone=(), camera=()`. Staging also confirmed. | STAGING VERIFIED |
 | SEC-11 | Security | MEDIUM | Token version revocation triggered automatically on account disable or role change — not only on code reset | `disable_account()` at `accounts.py:628` now increments `token_version` before committing, immediately invalidating live JWTs; role change and scope change already incremented it. Regression test `test_disable_invalidates_existing_jwt` confirms 401 on reuse | FIXED LOCALLY |
-| SEC-12 | Security | LOW | Quarterly DR rehearsal schedule established — first rehearsal date set and rehearsal completed | Post-release action H4; not yet scheduled | NOT STARTED |
+| SEC-12 | Security | LOW | Quarterly DR rehearsal schedule established — first rehearsal date set and rehearsal completed | Schedule written at `docs/next-stage/27_dr_rehearsal_schedule.md`: Q3 2026 rehearsal due 2026-08-27 (System Admin); quarterly cadence Jan/Apr/Jul/Oct thereafter. First rehearsal result (DOC-06) still pending. | FIXED LOCALLY |
 | SEC-13 | Security | LOW | HSTS header confirmed in production backend HTTP response — injected by `security_headers` middleware when `is_production=True` | Live HTTP check 2026-08-13: production backend returns `strict-transport-security: max-age=63072000; includeSubDomains` on `/api/health/ready`. | STAGING VERIFIED |
 | SEC-14 | Security | LOW | `/docs`, `/redoc`, `/openapi.json` confirmed absent from production via live HTTP request | Live HTTP check 2026-08-13: `GET /docs` on production backend returns HTTP/2 404. Gate confirmed working. | STAGING VERIFIED |
 
