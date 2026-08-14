@@ -11,7 +11,8 @@ from ..database import get_db, utcnow
 from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
                       Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, SessionStatusReasonTag, TrainingArea, Equipment,
                       Activity, Cadet, Squadron, TimingTemplate, TimingBlock, SystemSetting, TrainingClass, PlanningYear,
-                      SessionAudience, CadetClassMembership)
+                      SessionAudience, CadetClassMembership,
+                      ParadeNightTemplate, ParadeNightTemplateSession)
 from ..models.planning import ActivityLocalOverride
 from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS
 from .timing import _effective_template
@@ -5124,4 +5125,233 @@ def restore_session_status_reason_tag(
     tag.is_active = True
     db.commit()
     audit(db, p, object_type="SessionStatusReasonTag", object_id=tag_id, action="restore")
+    return {"ok": True}
+
+
+# ── Parade Night Templates (WORK-17) ──────────────────────────────────────────
+
+
+class TemplateIn(BaseModel):
+    name: str = Field(..., max_length=100)
+    description: str | None = Field(None, max_length=500)
+
+
+class TemplateSessionOut(BaseModel):
+    id: str
+    period_number: int
+    curriculum_item_id: str | None
+    custom_title: str | None
+    facilitator_id: str | None
+    training_area_id: str | None
+    cadet_group: str | None
+    notes: str | None
+
+
+class TemplateOut(BaseModel):
+    id: str
+    name: str
+    description: str | None
+    squadron_id: str
+    session_count: int
+    created_at: str
+    sessions: list[TemplateSessionOut] | None = None
+
+
+def _template_out(t: ParadeNightTemplate, include_sessions: bool = False) -> dict:
+    return {
+        "id": t.id,
+        "name": t.name,
+        "description": t.description,
+        "squadron_id": t.squadron_id,
+        "session_count": len(t.sessions) if t.sessions is not None else 0,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "sessions": [
+            {
+                "id": s.id,
+                "period_number": s.period_number,
+                "curriculum_item_id": s.curriculum_item_id,
+                "custom_title": s.custom_title,
+                "facilitator_id": s.facilitator_id,
+                "training_area_id": s.training_area_id,
+                "cadet_group": s.cadet_group,
+                "notes": s.notes,
+            }
+            for s in t.sessions
+        ] if include_sessions else None,
+    }
+
+
+@router.post("/parade-nights/{pnid}/save-as-template")
+def save_parade_night_as_template(
+    pnid: str,
+    body: TemplateIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """WORK-17: save a parade night's session structure as a reusable named template."""
+    pn = db.get(ParadeNight, pnid)
+    if not pn or pn.is_archived:
+        raise HTTPException(404, detail={"error": "source_not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+
+    sessions = (
+        db.query(Session)
+        .filter(Session.parade_night_id == pnid, Session.is_archived.is_(False))
+        .order_by(Session.period_number)
+        .all()
+    )
+    if not sessions:
+        raise HTTPException(400, detail={"error": "no_sessions", "msg": "This parade night has no sessions to save as a template."})
+
+    import uuid as _uuid
+    tmpl = ParadeNightTemplate(
+        id=str(_uuid.uuid4()),
+        squadron_id=pn.squadron_id,
+        name=body.name.strip(),
+        description=body.description.strip() if body.description else None,
+        created_by=p.user_id,
+    )
+    db.add(tmpl)
+    db.flush()
+
+    for s in sessions:
+        db.add(ParadeNightTemplateSession(
+            id=str(_uuid.uuid4()),
+            template_id=tmpl.id,
+            period_number=s.period_number,
+            curriculum_item_id=s.curriculum_item_id,
+            custom_title=s.custom_title,
+            facilitator_id=s.facilitator_id,
+            training_area_id=s.training_area_id,
+            cadet_group=s.cadet_group,
+            notes=None,
+        ))
+
+    db.commit()
+    db.refresh(tmpl)
+    audit(db, p, object_type="parade_night_template", object_id=tmpl.id,
+          action="create", new={"name": tmpl.name, "from_parade_night_id": pnid, "session_count": len(sessions)})
+    return _template_out(tmpl, include_sessions=True)
+
+
+@router.get("/parade-night-templates")
+def list_parade_night_templates(
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """WORK-17: list all non-archived templates for the current squadron."""
+    sqn_id = p.squadron_id
+    if not sqn_id:
+        raise HTTPException(400, detail={"error": "squadron_required"})
+    templates = (
+        db.query(ParadeNightTemplate)
+        .filter(
+            ParadeNightTemplate.squadron_id == sqn_id,
+            ParadeNightTemplate.is_archived.is_(False),
+        )
+        .order_by(ParadeNightTemplate.created_at.desc())
+        .all()
+    )
+    return [_template_out(t) for t in templates]
+
+
+@router.get("/parade-night-templates/{tid}")
+def get_parade_night_template(
+    tid: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """WORK-17: get a single template with its sessions."""
+    t = db.get(ParadeNightTemplate, tid)
+    if not t or t.is_archived:
+        raise HTTPException(404, detail={"error": "template_not_found"})
+    sqn = db.get(Squadron, t.squadron_id)
+    require_can_view_squadron(p, t.squadron_id, sqn.wing_id if sqn else None)
+    return _template_out(t, include_sessions=True)
+
+
+@router.post("/parade-night-templates/{tid}/apply/{pnid}")
+def apply_parade_night_template(
+    tid: str,
+    pnid: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """WORK-17: apply a template's session structure to a parade night.
+
+    Periods already occupied in the target are skipped, not overwritten.
+    Returns {ok, applied, skipped}.
+    """
+    import uuid as _uuid
+    t = db.get(ParadeNightTemplate, tid)
+    if not t or t.is_archived:
+        raise HTTPException(404, detail={"error": "template_not_found"})
+    pn = db.get(ParadeNight, pnid)
+    if not pn or pn.is_archived:
+        raise HTTPException(404, detail={"error": "target_not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    if t.squadron_id != pn.squadron_id:
+        raise HTTPException(400, detail={"error": "cross_squadron_copy_not_permitted"})
+
+    existing_periods = {
+        s.period_number
+        for s in db.query(Session).filter(
+            Session.parade_night_id == pnid, Session.is_archived.is_(False)
+        )
+    }
+
+    applied, skipped = 0, 0
+    for ts in sorted(t.sessions, key=lambda s: s.period_number):
+        if ts.period_number in existing_periods:
+            skipped += 1
+            continue
+        ci = db.get(CurriculumItem, ts.curriculum_item_id) if ts.curriculum_item_id else None
+        fac = db.get(Facilitator, ts.facilitator_id) if ts.facilitator_id else None
+        ta = db.get(TrainingArea, ts.training_area_id) if ts.training_area_id else None
+        new_sess = Session(
+            id=str(_uuid.uuid4()),
+            parade_night_id=pnid,
+            squadron_id=pn.squadron_id,
+            period_number=ts.period_number,
+            curriculum_item_id=ts.curriculum_item_id,
+            curriculum_code_at_time=ci.code if ci else None,
+            curriculum_title_at_time=ci.title if ci else None,
+            custom_title=ts.custom_title,
+            facilitator_id=ts.facilitator_id,
+            facilitator_rank_at_time=fac.current_rank if fac else None,
+            facilitator_display_name_at_time=(
+                f"{fac.current_rank or ''} {fac.last_name}".strip() if fac else None
+            ),
+            training_area_id=ts.training_area_id,
+            training_area_name_at_time=ta.name if ta else None,
+            cadet_group=ts.cadet_group,
+            status="planned",
+        )
+        db.add(new_sess)
+        existing_periods.add(ts.period_number)
+        applied += 1
+
+    db.commit()
+    audit(db, p, object_type="parade_night", object_id=pnid,
+          action="apply_template", new={"template_id": tid, "applied": applied})
+    return {"ok": True, "applied": applied, "skipped": skipped}
+
+
+@router.delete("/parade-night-templates/{tid}")
+def archive_parade_night_template(
+    tid: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """WORK-17: archive (soft-delete) a parade night template."""
+    t = db.get(ParadeNightTemplate, tid)
+    if not t:
+        raise HTTPException(404, detail={"error": "template_not_found"})
+    sqn = db.get(Squadron, t.squadron_id)
+    require_can_write_squadron(p, t.squadron_id, sqn.wing_id if sqn else None)
+    if t.is_archived:
+        raise HTTPException(409, detail={"error": "already_archived"})
+    t.is_archived = True
+    db.commit()
+    audit(db, p, object_type="parade_night_template", object_id=tid, action="archive")
     return {"ok": True}

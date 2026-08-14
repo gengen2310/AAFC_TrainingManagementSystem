@@ -486,3 +486,59 @@ class CadetClassMembership(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # replace-the-whole-set model, so the same ParadeNight/PlanningYear/
     # TrainingClass conflict-protection pattern applies here too.
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+
+class ParadeNightTemplate(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
+    """A named, reusable session structure that can be applied to any future
+    Parade Night without needing an existing night to copy from (WORK-17).
+
+    Captures planning intent only: curriculum items, facilitators, and rooms.
+    Does NOT capture SessionAudience (Training Class) rows because Training
+    Classes are year-specific — a template applied in a new Training Year must
+    have its audiences re-assigned to that year's classes.
+
+    Squadron-scoped. Not year-scoped — templates persist across Training Years
+    by design, which is the key value-add over WORK-11's copy-from-existing-
+    night approach.
+    """
+    __tablename__ = "parade_night_templates"
+    squadron_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+
+    sessions: Mapped[list["ParadeNightTemplateSession"]] = relationship(
+        "ParadeNightTemplateSession",
+        back_populates="template",
+        cascade="all, delete-orphan",
+        order_by="ParadeNightTemplateSession.period_number",
+    )
+
+
+class ParadeNightTemplateSession(Base, UUIDMixin):
+    """One session slot within a ParadeNightTemplate.
+
+    Mirrors the planning fields of Session (not outcome fields).
+    period_number matches Session.period_number.
+    """
+    __tablename__ = "parade_night_template_sessions"
+    template_id: Mapped[str] = mapped_column(
+        ForeignKey("parade_night_templates.id", ondelete="CASCADE"), index=True
+    )
+    period_number: Mapped[int] = mapped_column(Integer)
+    curriculum_item_id: Mapped[str | None] = mapped_column(
+        ForeignKey("curriculum_items.id"), nullable=True
+    )
+    custom_title: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    facilitator_id: Mapped[str | None] = mapped_column(
+        ForeignKey("facilitators.id"), nullable=True
+    )
+    training_area_id: Mapped[str | None] = mapped_column(
+        ForeignKey("training_areas.id"), nullable=True
+    )
+    cadet_group: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    template: Mapped["ParadeNightTemplate"] = relationship(
+        "ParadeNightTemplate", back_populates="sessions"
+    )

@@ -2260,6 +2260,22 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   </div>
 </div>
 
+<!-- Parade Night Templates — Apply modal (WORK-17) -->
+<div class="modal-bg" id="m-pn-apply-template">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title">Apply a session template</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-apply-template')">×</button></div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Applies the session structure of the selected template to this parade night. Training Class audiences are not copied — assign them after applying. Periods already occupied are not changed.</p>
+      <div id="pn-tpl-list" style="display:flex;flex-direction:column;gap:8px"></div>
+      <div id="pn-tpl-empty" style="display:none;color:var(--muted);font-size:12.5px;padding:8px 0">No templates saved yet. Open a parade night with sessions and choose "Save as Template".</div>
+      <div id="pn-tpl-err" style="color:var(--red);font-size:12px;margin-top:6px;display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('m-pn-apply-template')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Getting Help Edit Modal (system_admin only) -->
 <div class="modal-bg" id="m-getting-help">
   <div class="modal">
@@ -7456,6 +7472,8 @@ function buildPNCard(pn){
         <button class="btn btn-xs btn-sky" onclick="showPNDetail('${pn.date}')">Detail</button>
         ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Override timing for this parade night" onclick="openPNTimingOverrideModal('${esc(pn.id)}')">Timing…</button>`:''}
         ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Copy sessions to another parade night" onclick="openCopyPNModal('${pn.date}')">Copy to…</button>`:''}
+        ${canWriteSquadron()&&(pn.sessions||[]).length>0?`<button class="btn btn-xs btn-out" title="Save this night's sessions as a reusable template" onclick="doSaveAsTemplate('${esc(pn.id)}')">Save as Tpl</button>`:''}
+        ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Apply a saved session template to this parade night" onclick="openApplyTemplateModal('${esc(pn.id)}')">Apply Tpl…</button>`:''}
         ${canWriteSquadron()?`<button class="btn btn-xs btn-red" onclick="delPN('${pn.date}')">×</button>`:''}
       </div>
     </div>
@@ -7510,6 +7528,78 @@ async function doCopyPNSessions(){
     showToast(`${r.copied} session${r.copied!==1?'s':''} copied.${skippedNote}`);
     await reloadAndRender();
   }catch(e){ errEl.textContent=apiErr(e); errEl.style.display='block'; }
+}
+
+// ── Parade Night Templates (WORK-17) ─────────────────────────────────────────
+let _applyTplTargetId=null;
+
+async function doSaveAsTemplate(pnId){
+  const name=await promptText('Save as Template','Template name',{
+    okLabel:'Save',
+    context:'Give this session structure a name you can recognise next time (e.g. "Standard Wednesday Night").',
+    validate:v=>v.trim().length>0?null:'A name is required.',
+  });
+  if(name===null)return;
+  try{
+    await api('/api/parade-nights/'+pnId+'/save-as-template',{method:'POST',body:JSON.stringify({name:name.trim()})});
+    showToast('Template saved — use "Apply Tpl…" on any future night to reuse this structure.');
+  }catch(e){ showToast(apiErr(e),true); }
+}
+
+async function openApplyTemplateModal(pnId){
+  _applyTplTargetId=pnId;
+  const listEl=document.getElementById('pn-tpl-list');
+  const emptyEl=document.getElementById('pn-tpl-empty');
+  const errEl=document.getElementById('pn-tpl-err');
+  listEl.innerHTML='<div style="color:var(--muted);font-size:12.5px;padding:8px 0">Loading…</div>';
+  emptyEl.style.display='none';
+  errEl.style.display='none';
+  openModal('m-pn-apply-template');
+  try{
+    const templates=await api('/api/parade-night-templates');
+    if(!templates.length){
+      listEl.innerHTML='';
+      emptyEl.style.display='block';
+      return;
+    }
+    listEl.innerHTML=templates.map(t=>`
+      <div style="border:1px solid var(--border);border-radius:7px;padding:10px 12px;display:flex;align-items:center;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:13px;color:var(--dark)">${esc(t.name)}</div>
+          ${t.description?`<div style="font-size:11.5px;color:var(--muted);margin-top:2px">${esc(t.description)}</div>`:''}
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">${t.session_count} session${t.session_count!==1?'s':''} · Saved ${fmtD(t.created_at.substring(0,10))}</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn btn-xs btn-primary" onclick="doApplyTemplate('${esc(t.id)}')">Apply</button>
+          <button class="btn btn-xs btn-red-out" title="Delete this template" onclick="doArchiveTemplate('${esc(t.id)}',this)">×</button>
+        </div>
+      </div>`).join('');
+  }catch(e){ listEl.innerHTML=''; errEl.textContent=apiErr(e); errEl.style.display='block'; }
+}
+
+async function doApplyTemplate(tid){
+  if(!_applyTplTargetId)return;
+  try{
+    const r=await api(`/api/parade-night-templates/${tid}/apply/${_applyTplTargetId}`,{method:'POST'});
+    closeModal('m-pn-apply-template');
+    const skippedNote=r.skipped>0?` (${r.skipped} period${r.skipped!==1?'s':''} already had sessions — not changed)`:'';
+    showToast(`Template applied — ${r.applied} session${r.applied!==1?'s':''} added.${skippedNote}`);
+    await reloadAndRender();
+  }catch(e){
+    const errEl=document.getElementById('pn-tpl-err');
+    errEl.textContent=apiErr(e); errEl.style.display='block';
+  }
+}
+
+async function doArchiveTemplate(tid,btn){
+  confirmAction('Delete this template? It will no longer be available.',async()=>{
+    try{
+      await api(`/api/parade-night-templates/${tid}`,{method:'DELETE'});
+      btn.closest('div[style*="border:1px"]').remove();
+      const listEl=document.getElementById('pn-tpl-list');
+      if(!listEl.children.length) document.getElementById('pn-tpl-empty').style.display='block';
+    }catch(e){ showToast(apiErr(e),true); }
+  });
 }
 
 // ADD PARADE NIGHT
