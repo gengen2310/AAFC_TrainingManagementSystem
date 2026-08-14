@@ -36,13 +36,11 @@ export interface DisplaySession {
   training_classes?: { training_class_id: string; display_name: string }[];
 }
 
-// REM-39 residual: real backend PlanningConflict.conflict_type values today
-// are "facilitator_double_booked" / "room_double_booked" / "empty_session" /
-// "holiday_conflict" (see backend/app/models/planning.py's CONFLICT_TYPES --
-// several other declared types are not yet emitted by any code path). Only
-// the first two are ever session-specific (carry a scheduled_session_id);
-// the others describe the night as a whole, not one cell, so they never
-// match here and correctly produce no per-cell dot.
+// Session-specific conflict types (carry a scheduled_session_id and produce
+// a per-cell dot): "facilitator_double_booked", "room_double_booked",
+// "facilitator_on_leave" (DEF-17: leave detection wired 2026-08-14).
+// Night-level types (no session id, no dot): "empty_session",
+// "holiday_conflict". See backend/app/models/planning.py CONFLICT_TYPES.
 function sessionConflictCategory(conflictType: string): DisplaySession["conflict"] {
   if (conflictType.includes("room")) return "room";
   if (conflictType.includes("facilitator")) return "fac";
