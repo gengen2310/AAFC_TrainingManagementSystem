@@ -37,6 +37,7 @@ logs/
 # Node
 node_modules/
 frontend/dist/
+frontend/dist-single/
 *.tsbuildinfo
 
 # Local-dev-only patched copy served by RUN_TMS_CONNECTED_FRONTEND_MAC.sh
