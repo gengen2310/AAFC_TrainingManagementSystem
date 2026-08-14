@@ -26,14 +26,14 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 38 |
 | STAGING VERIFIED | 9 |
-| FIXED LOCALLY | 75 |
+| FIXED LOCALLY | 76 |
 | IMPLEMENTING | 7 |
 | NOT STARTED | 7 |
 | HUMAN GATE | 20 |
 | ACCEPTED RISK | 1 |
-| **Total** | **157** |
+| **Total** | **158** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 122 / 157 = 78%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 123 / 158 = 78%**
 
 > Counts are from rows matching `^\| [A-Z]+-[0-9]` in this file. Excludes cross-reference summary rows (numbered `1–25`) and GAP-prefixed decision rows (GAP-03, GAP-05, GAP-20, GAP-22, GAP-23) which duplicate existing HG-/SEC- items. Totals increased from 138 → 152 across sessions as new gaps were identified and added to the register; the completion rate decreased from 80% → 76% because new items were added faster than they were closed.
 
@@ -44,6 +44,8 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 **2026-08-13 session 3 (this session):** Wing Onboarding Runbook (`10_wing_onboarding_runbook.md`) updated (commit `edaee16`): §2.0 added for `POST /api/system/provision-wing` one-call endpoint, §5 production activation updated, §7.4 and §8 updated. Gap register DOC-12 updated with runbook evidence. Backend test count: 1629 (was 1628) — new `test_provision_wing_forbidden_national_admin` test added. E2E test added in `weekly-program-classes.spec.ts` for DEF-06 dynamic wing_name header. Security/XSS sweep: found and fixed 5 unescaped user-supplied fields in facilitator table (`rank`, `first`, `last`, `type`) and room type badge (stored XSS potential, commit `05887e0`); 3 unescaped `pn.term` values in buildPNCard/move-session/WP dropdowns. HARD-02 extended: `doDisableAccount`, `doReactivateAccount`, `doUnlockAccount` error-path `alert()` calls (multi-role, missed in prior sweep) converted to `showToast()`; `gate()` fallback also converted. Total: 122/157 = 78% complete (no status count changes — these were previously unregistered items now fixed at commit time rather than being tracked as new gaps).
 
 **2026-08-13 session 4 (this session):** XSS sweep completed — two rounds of stored XSS patching applied. Round 1 (commit `16a055d`): `s.exp`, `s.facName`, `s.room` (session fields across `buildPNCard`, `showDrill`, `renderWP`, `showCurrDetail`, `showFacProfile`), `e.instr` (curriculum detail modal), `e.lh` (Learning Hub URLs — `safeUrl()` helper added to block `javascript:` URI injection). Round 2 (commit `0ef96da`): `elBadge()` and `phBadge()` helper functions wrapped (cascading fix to 12+ innerHTML call sites each — calendar chips, curriculum list, session cards, modals, annual program); `facDisplay(f)` in facilitator profile modal; `f.type` in facilitator profile modal; subject-area tag fallback `EL_L[a]||a` in facilitator profile modal; `e.term` in curriculum list view and detail modal; unit type badge in organisations table; `a.role`, `a.action`, `a.object_type` in audit log table. Pattern documented: `${DICT[val]||val}` inside innerHTML must be `${esc(DICT[val]||val)}`. React Planning Workspace confirmed clean (no `dangerouslySetInnerHTML`). All remaining innerHTML patterns verified safe (hardcoded strings, server-generated ISO dates, numbers).
+
+**2026-08-14 session 8 (this session):** DEF-16 added and FIXED LOCALLY — `apiClosePN()` was dead code; `doClosePN()` function and "Close Parade Night" button wired in `showPNDetail()`; `close_blocked` error now surfaces per-session blocker descriptions from `e.body.detail.blockers` via toast (bug fixed: original draft used `e?.detail` instead of `e?.body?.detail`; api() helper normalises error shape as `{kind,status,code,msg,body}`). Backend test count: 1647 passed, 6 skipped (unchanged). Total: 123/158 = 78%.
 
 **2026-08-14 session 7 (this session):** Parade Night generation parity fix — `GuidedYearSetupModal.tsx` and `SetupPanel.tsx` in Planning Workspace now send `parade_start_time` and `parade_end_time` when entered (optional time inputs added to both UI forms); `index.ts` API type updated to include these fields. Previously the Planning Workspace generation path always used the squadron's configured default times regardless of operator input, while Main TMS presented explicit time pickers and forwarded the values. TypeScript: 0 errors. Registered as new gap PARITY-01, immediately FIXED LOCALLY. Sessions 5 and 6 merged into one as recorded audit (see below).
 
@@ -238,6 +240,7 @@ known. Firefox and the Planning Workspace 404 are uninvestigated — root causes
 | DEF-13 | Defect | LOW | Maintenance mode expected return time — no return-time field in `SystemSetting`; cannot be communicated to users | `maintenance_until` key stored via `_set_setting()`; System Console input at `index.html:1640` ("Expected return time"); maintenance banner at `index.html:4736` renders `Expected return: ${d.until}` when set. Gap register was stale. | CLOSED |
 | DEF-14 | Defect | LOW | Maintenance mode Celery drain — in-flight jobs may fail silently if write-block activates mid-task | Implemented commit `be8ff14`: `enable_maintenance` queries `JobStatus` for queued/running jobs, marks them cancelled (with reason), commits before the write-block activates. Returns `drained_jobs` count; recorded in audit log. Guards the real-Celery path (stub currently, DEF-08). | FIXED LOCALLY |
 | DEF-15 | Defect | MEDIUM | `ENVIRONMENT=staging` in production Railway config (DEFECT-003) — `is_production` and `validate_for_production()` key off this value; risks production safety checks not triggering | Code fix merged; Railway production env var not corrected; requires System Admin action | HUMAN GATE |
+| DEF-16 | Defect | HIGH | `apiClosePN()` was dead code — backend endpoint `POST /api/parade-nights/{pnid}/close` existed and was fully implemented (checks `close_blockers()`: all sessions in final status; sets `closeout_status='closed'`, records `closed_by`/`closed_at`, writes audit log) but no UI element ever called it. Parade Nights could not be closed from either frontend. | `doClosePN(pnId)` function added using `confirmAction()` pattern; "Close Parade Night" button wired in `showPNDetail()` (shown only when `canWriteSquadron() && pn.closeout_status !== 'closed'`); `close_blocked` error surfaces per-session blockers from `e.body.detail.blockers` via toast. Error handler also maps the generic `close_blocked` code to a readable fallback message (line 3673). | FIXED LOCALLY |
 
 ---
 

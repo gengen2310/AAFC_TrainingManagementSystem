@@ -7635,6 +7635,12 @@ function showPNDetail(ds){
     <button class="btn btn-out" style="margin-left:8px" onclick="doMarkRemainingDelivered('${ds}')" title="Marks every session still Planned/Published as Delivered. Flag any exceptions (cancelled, not delivered, rescheduled) individually first — this only fills in the rest.">Mark remaining delivered</button>
     <button class="btn btn-red-out" style="margin-left:8px" onclick="doCancelAllSessions('${ds}')" title="Cancels every session still Planned/Published in this parade night. Records a reason.">Cancel all remaining</button>`;
   }
+  if(canWriteSquadron()&&pn.closeout_status!=='closed'){
+    html+=`<div class="no-print" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border-light)">
+      <button class="btn btn-xs btn-red-out" onclick="doClosePN('${esc(pn.id)}')" title="Close this Parade Night after all sessions have been recorded. All sessions must be in a final status.">Close Parade Night</button>
+      <span style="font-size:11px;color:var(--muted);margin-left:8px">Locks the parade night once all outcomes are recorded.</span>
+    </div>`;
+  }
   document.getElementById('pn-det-body').innerHTML=html;
   setTimeout(()=>{
     (pn.sessions||[]).forEach((s,i)=>{
@@ -7707,6 +7713,29 @@ async function archivePNNotice(pnid,noticeId){
 // the per-session Status dropdown above), then bulk-clear everything else
 // still Planned/Published in one action instead of clicking through each
 // session's Save Changes flow one at a time.
+async function doClosePN(pnId){
+  confirmAction(
+    'Close this Parade Night?\n\nAll sessions must already be in a final status (Delivered, Cancelled, Not Delivered, etc.). Once closed, the date, term, timing and type cannot be changed.',
+    async()=>{
+      try{
+        await apiClosePN(pnId);
+        showToast('Parade Night closed.',false);
+        await reloadAndRender();
+        // Re-open the modal to show the closed banner
+        const pn=S.pns.find(p=>p.id===pnId);
+        if(pn) showPNDetail(pn.date);
+        else closeModal('m-pn-detail');
+      }catch(e){
+        const d=e?.body?.detail;
+        if(d?.error==='close_blocked'&&d?.blockers?.length){
+          showToast('Cannot close: '+d.blockers.join('; '),true);
+        }else{
+          showToast(apiErr(e),true);
+        }
+      }
+    }
+  );
+}
 function _qaApplyAll(n){
   const fac=document.getElementById('qa-fac')?.value||'';
   const room=document.getElementById('qa-room')?.value||'';
