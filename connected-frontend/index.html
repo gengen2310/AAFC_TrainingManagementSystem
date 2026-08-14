@@ -1061,6 +1061,22 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </select>
           <input id="pn-search" placeholder="Search sessions…" oninput="renderPN()" style="min-width:160px;">
         </div>
+        <div id="pn-bulk-bar" class="no-print" style="display:none;background:var(--surface-2);border:1.5px solid var(--blue);border-radius:8px;padding:10px 14px;margin-bottom:12px;align-items:center;gap:12px;flex-wrap:wrap">
+          <span id="pn-bulk-count" style="font-weight:700;font-size:13px;color:var(--dark)"></span>
+          <label style="font-size:13px;display:flex;align-items:center;gap:6px;font-weight:400">
+            Set term:
+            <select id="pn-bulk-term" aria-label="Term to set on selected parade nights" style="font-size:13px">
+              <option value="">— choose —</option>
+              <option value="T1">Term 1</option>
+              <option value="T2">Term 2</option>
+              <option value="T3">Term 3</option>
+              <option value="T4">Term 4</option>
+            </select>
+          </label>
+          <button class="btn btn-sm btn-out" onclick="_pnBulkSetTerm()">Apply term</button>
+          <button class="btn btn-sm btn-red-out" onclick="_pnBulkArchive()">Archive selected</button>
+          <button class="btn btn-sm" style="margin-left:auto" onclick="_pnClearSelection()">Clear selection</button>
+        </div>
         <div id="pn-list"></div>
       </div>
 
@@ -7337,6 +7353,52 @@ function _restorePNFilters(){
     if(qe&&saved.q)qe.value=saved.q;
   }catch(_){}
 }
+const _pnSelected=new Set();
+function _pnToggle(id){
+  if(_pnSelected.has(id))_pnSelected.delete(id);
+  else _pnSelected.add(id);
+  _pnBulkUpdate();
+}
+function _pnBulkUpdate(){
+  const bar=document.getElementById('pn-bulk-bar');
+  const n=_pnSelected.size;
+  bar.style.display=n>0?'flex':'none';
+  document.getElementById('pn-bulk-count').textContent=`${n} night${n!==1?'s':''} selected`;
+}
+function _pnClearSelection(){
+  _pnSelected.clear();
+  renderPN();
+}
+async function _pnBulkSetTerm(){
+  const term=document.getElementById('pn-bulk-term').value;
+  if(!term){showToast('Choose a term first.',true);return;}
+  const ids=[..._pnSelected];
+  if(!ids.length)return;
+  confirmAction(`Set term to "${term}" on ${ids.length} parade night${ids.length!==1?'s':''}?`,async()=>{
+    let ok=0,err=0;
+    await Promise.all(ids.map(id=>
+      api('/api/parade-nights/'+id,{method:'PATCH',body:JSON.stringify({term})})
+        .then(()=>ok++).catch(()=>err++)
+    ));
+    showToast(`Term set on ${ok} night${ok!==1?'s':''}${err?` (${err} failed)`:'.'}`,(err>0));
+    _pnSelected.clear();
+    await reloadAndRender();
+  });
+}
+async function _pnBulkArchive(){
+  const ids=[..._pnSelected];
+  if(!ids.length)return;
+  confirmAction(`Archive ${ids.length} parade night${ids.length!==1?'s':''} and all their sessions? Records are preserved.`,async()=>{
+    let ok=0,err=0;
+    await Promise.all(ids.map(id=>
+      api('/api/parade-nights/'+id,{method:'DELETE'})
+        .then(()=>ok++).catch(()=>err++)
+    ));
+    showToast(`Archived ${ok} night${ok!==1?'s':''}${err?` (${err} failed)`:''}.`,(err>0));
+    _pnSelected.clear();
+    await reloadAndRender();
+  });
+}
 function renderPN(){
   const tf=document.getElementById('pn-f-term').value;
   const sf=document.getElementById('pn-f-status').value;
@@ -7384,8 +7446,9 @@ function buildPNCard(pn){
         <button class="btn btn-xs btn-sky" onclick="quickEdit('${pn.date}',${i})" aria-label="Edit Session ${i+1}">✏</button>
       </div>`:''}
     </div>`).join('');
-  return `<div class="pn-card">
+  return `<div class="pn-card" id="pncard-${esc(pn.id)}">
     <div class="pn-hdr">
+      ${canWriteSquadron()?`<label class="no-print" style="display:flex;align-items:center;padding-right:10px;cursor:pointer" title="Select this parade night for bulk actions" onclick="event.stopPropagation()"><input type="checkbox" id="pnchk-${esc(pn.id)}" onchange="_pnToggle('${esc(pn.id)}')" style="width:16px;height:16px;cursor:pointer" ${_pnSelected.has(pn.id)?'checked':''}></label>`:''}
       <div><div class="pn-date">${fmtDL(pn.date)}</div><div class="pn-meta">${esc(pn.term)} · ${(pn.sessions||[]).length} sessions${pn.notes?' · '+esc(pn.notes):''}</div></div>
       <div style="display:flex;gap:6px;align-items:center" class="no-print">
         ${allDel?stBadge('delivered'):stBadge('planned')}
