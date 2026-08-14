@@ -3405,161 +3405,6 @@ const SQN_DATA={
 // Default codes (overridable per-squadron via settings)
 // Access codes are never defined or stored in the client. Authentication is performed by the backend.
 
-// ═══════════════════════════════════════════════════════════
-//  CORE CURRICULUM — national program, Learning Hub links only
-// ═══════════════════════════════════════════════════════════
-const CORE_CURR=[
-  // ORIENTATION
-  {code:"ORI-M01",title:"New Cadet Welcome",phase:"A. Orientation",el:"Service_Community",term:"T1",hours:2,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/orientation/new-cadet-welcome"},
-  {code:"ORI-M02",title:"Ensuring Readiness",phase:"A. Orientation",el:"Service_Community",term:"T1",hours:2,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/orientation/ensuring-readiness"},
-  {code:"ORI-M03",title:"Cyber Awareness",phase:"A. Orientation",el:"Personal_Dev",term:"T1",hours:3,type:"core",instr:"Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/orientation/cyber-awareness"},
-  {code:"ORI-M04",title:"Giant Games Night",phase:"A. Orientation",el:"Service_Community",term:"T1",hours:1,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/orientation/giant-games-night"},
-  // INITIAL
-  {code:"INL-M00",title:"PDL Critical Qualities",phase:"B. Initial",el:"Personal_Dev",term:"T1",hours:3,type:"core",instr:"Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/initial/pdl-critical-qualities"},
-  {code:"INL-M01",title:"ANZAC Day March",phase:"B. Initial",el:"Service_Community",term:"T1",hours:2.5,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/initial/anzac-day-march"},
-  {code:"INL-M02",title:"RAAF Aircraft Presentations",phase:"B. Initial",el:"Air_Space",term:"T1",hours:8,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/initial/raaf-aircraft-presentations"},
-  {code:"INL-M03",title:"Help Your Community",phase:"B. Initial",el:"Service_Community",term:"T2",hours:2.5,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/initial/help-your-community"},
-  {code:"INL-M04",title:"Bivouac Prep",phase:"B. Initial",el:"Field",term:"T2",hours:12,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/initial/bivouac-prep"},
-  {code:"INL-M05",title:"Practical Drone Flying",phase:"B. Initial",el:"Air_Space",term:"T2",hours:7.25,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/initial/practical-drone-flying"},
-  {code:"INL-M06",title:"Flight Fundamentals",phase:"B. Initial",el:"Air_Space",term:"T1",hours:7.2,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/initial/flight-fundamentals"},
-  {code:"INL-M07",title:"Remembrance Day",phase:"B. Initial",el:"Service_Community",term:"T4",hours:4,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/initial/remembrance-day"},
-  {code:"INL-M08",title:"Drill and Ceremonial",phase:"B. Initial",el:"Drill",term:"T1",hours:19,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/initial/drill-and-ceremonial"},
-  {code:"INL-M09",title:"Airfields",phase:"B. Initial",el:"Air_Space",term:"T4",hours:2,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/initial/airfields"},
-  {code:"INL-M10",title:"Open Day",phase:"B. Initial",el:"Personal_Dev",term:"T4",hours:4.5,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/initial/open-day"},
-  // JUNIOR
-  {code:"JNR-M01",title:"Drill and Ceremonial",phase:"C. Junior",el:"Drill",term:"T2",hours:7.5,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/junior/drill-and-ceremonial"},
-  {code:"JNR-M02",title:"Air and Space",phase:"C. Junior",el:"Air_Space",term:"T1",hours:7,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/junior/air-and-space"},
-  {code:"JNR-M03",title:"Field Skills",phase:"C. Junior",el:"Field",term:"T2",hours:6,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/junior/field-skills"},
-  // BRONZE CLP
-  {code:"BCLP-M01",title:"Bronze CLP",phase:"I. Bronze",el:"Personal_Dev",term:"T1",hours:21,type:"core",instr:"Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/bronze-clp"},
-  // INTERMEDIATE
-  {code:"INT-M01",title:"Drill and Ceremonial",phase:"D. Intermediate",el:"Drill",term:"T3",hours:2.5,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/intermediate/drill-and-ceremonial"},
-  {code:"INT-M02",title:"Air and Space",phase:"D. Intermediate",el:"Air_Space",term:"T4",hours:2.5,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/intermediate/air-and-space"},
-  {code:"INT-M03",title:"Field Skills",phase:"D. Intermediate",el:"Field",term:"T1",hours:5,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/intermediate/field-skills"},
-  {code:"INT-M04",title:"Intermediate Facilitation",phase:"D. Intermediate",el:"Personal_Dev",term:"T1",hours:10,type:"core",instr:"Senior Cadet OR Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/intermediate/facilitation"},
-  // SILVER CLP
-  {code:"SCLP-M01",title:"Silver CLP",phase:"J. Silver",el:"Personal_Dev",term:"T2",hours:25.5,type:"core",instr:"Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/silver-clp"},
-  // SENIOR
-  {code:"SNR-M01",title:"Senior Mission 1 — Defence",phase:"E. Senior",el:"Personal_Dev",term:"T3",hours:10,type:"core",instr:"Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/senior/mission-1-defence"},
-  {code:"SNR-M02",title:"Senior Mission 2 — Outreach",phase:"E. Senior",el:"Service_Community",term:"T3",hours:10,type:"core",instr:"Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/senior/mission-2-outreach"},
-  {code:"SNR-M03",title:"Senior Mission 3 — Entrepreneur",phase:"E. Senior",el:"Personal_Dev",term:"T4",hours:10,type:"core",instr:"Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/senior/mission-3-entrepreneur"},
-  {code:"SNR-M04",title:"Senior Mission 4 — Leadership",phase:"E. Senior",el:"Personal_Dev",term:"T4",hours:10,type:"core",instr:"Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/senior/mission-4-leadership"},
-  {code:"SNR-M05",title:"Senior Mission 5 — Transition",phase:"E. Senior",el:"Personal_Dev",term:"T4",hours:10,type:"core",instr:"Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/senior/mission-5-transition"},
-  // GOLD CLP
-  {code:"GCLP-M01",title:"Gold CLP Part 1",phase:"K. Gold",el:"Personal_Dev",term:"T1",hours:20,type:"core",instr:"Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/gold-clp/part-1"},
-  {code:"GCLP-M02",title:"Gold CLP Part 2",phase:"K. Gold",el:"Personal_Dev",term:"T4",hours:12,type:"core",instr:"Staff",lh:"https://airforcecadets.net.au/lh/index.php/cadet-program/gold-clp/part-2"},
-];
-
-const DEFAULT_ACTS=[
-  {name:"Orientation Training Weekend",date:"2026-03-21",type:"Must Attend",audience:["Orientation","Initial"],notes:"All ORI-M modules must be complete"},
-  {name:"ANZAC Day — Vigil, Dawn Service & Parade",date:"2026-04-25",type:"Must Attend",audience:["Initial","Junior","Intermediate","Senior"],notes:"Drill, ceremonial bearing, catafalque party"},
-  {name:"Fieldcraft Exercise (703/707/708/710)",date:"2026-05-22",type:"Must Attend",audience:["Junior","Intermediate","Senior"],notes:"Field skills, navigation, survival"},
-  {name:"7 Wing Fieldcraft Competition",date:"2026-07-31",type:"Key Event",audience:["Intermediate","Senior"],notes:"Advanced fieldcraft"},
-  {name:"Freedom of Entry — Perth CBD",date:"2026-09-13",type:"Must Attend",audience:["Initial","Junior","Intermediate","Senior"],notes:"Ceremonial drill"},
-  {name:"End of Year Parade",date:"2026-12-11",type:"Must Attend",audience:["Orientation","Initial","Junior","Intermediate","Senior"],notes:"Year wrap-up"},
-];
-
-const DEFAULT_FACS=[
-  {id:uid(),rank:"CIV",first:"",last:"Daniels",type:"Civilian",areas:["Air_Space"]},
-  {id:uid(),rank:"CPL(AAFC)",first:"",last:"Mitchell",type:"Staff",areas:["Drill"]},
-  {id:uid(),rank:"",first:"Field",last:"Team",type:"Staff",areas:["Field"]},
-  {id:uid(),rank:"LAC(AAFC)",first:"Brunet de",last:"Rochebrune",type:"Staff",areas:["Personal_Dev"]},
-  {id:uid(),rank:"PLTOFF(AAFC)",first:"",last:"Daley",type:"Staff",areas:["Service_Community","SQN_Affairs"]},
-  {id:uid(),rank:"FLTLT(AAFC)",first:"",last:"Figueiredo",type:"Staff",areas:["SQN_Affairs","Service_Community"]},
-  {id:uid(),rank:"CIV",first:"",last:"Flanders",type:"Civilian",areas:["Personal_Dev"]},
-  {id:uid(),rank:"FLTLT(AAFC)",first:"",last:"McGhie",type:"Staff",areas:["Service_Community","Drill"]},
-  {id:uid(),rank:"CSGT",first:"",last:"Milligen",type:"Senior Cadet",areas:["Drill"]},
-  {id:uid(),rank:"CUO",first:"",last:"Wallace",type:"Senior Cadet",areas:["Service_Community"]},
-  {id:uid(),rank:"CUO",first:"",last:"Sundaram",type:"Senior Cadet",areas:["Personal_Dev","SQN_Affairs"]},
-];
-
-const DEFAULT_ROOMS=[
-  {id:uid(),name:"Bravo",capacity:30,type:"Indoor",notes:"Main classroom"},
-  {id:uid(),name:"Charlie",capacity:20,type:"Indoor",notes:"Secondary classroom"},
-  {id:uid(),name:"Major Parade Ground",capacity:100,type:"Outdoor",notes:"Full parade"},
-  {id:uid(),name:"Minor Parade Ground",capacity:50,type:"Outdoor",notes:"Section drill"},
-  {id:uid(),name:"Aviation & Charlie",capacity:25,type:"Indoor",notes:"Drone / air & space"},
-  {id:uid(),name:"Field Room",capacity:20,type:"Indoor",notes:"Field skills prep"},
-  {id:uid(),name:"Briefing Area",capacity:40,type:"Indoor",notes:"Presentations"},
-  {id:uid(),name:"Seniors Working Room",capacity:15,type:"Indoor",notes:"CLP / facilitation"},
-  {id:uid(),name:"CLP Room",capacity:15,type:"Indoor",notes:"CLP small group"},
-  {id:uid(),name:"Camp / Activity Site",capacity:60,type:"Outdoor",notes:"Fieldcraft & camp"},
-];
-
-const DEFAULT_EQUIP=[
-  {id:uid(),name:"Drones (JOEY)",qty:4,notes:"Charged 1h before"},
-  {id:uid(),name:"Projector",qty:2,notes:"Check bulb before use"},
-  {id:uid(),name:"Radio Sets",qty:6,notes:"Channel 5 default"},
-  {id:uid(),name:"Navigation Kit",qty:10,notes:"Compass + map sets"},
-  {id:uid(),name:"Drill Rifles",qty:20,notes:"Stored in armoury"},
-];
-
-// 703 seed data
-const PN_703=[
-  {date:"2026-01-30",term:"T1",nsess:3,notes:"First parade of year",sessions:[
-    {phase:"A. Orientation",code:"ORI-M01",exp:"New Cadet Welcome",facId:null,facName:"PLTOFF(AAFC) Daley",room:"Briefing Area",status:"delivered"},
-    {phase:"B. Initial",code:"INL-M00",exp:"PDL Critical Qualities",facId:null,facName:"LAC(AAFC) Brunet de Rochebrune",room:"Bravo",status:"delivered"},
-    {phase:"D. Intermediate",code:"INT-M04",exp:"Intermediate Facilitation",facId:null,facName:"CIV Flanders",room:"Seniors Working Room",status:"delivered"},
-  ]},
-  {date:"2026-02-06",term:"T1",nsess:3,notes:"",sessions:[
-    {phase:"A. Orientation",code:"ORI-M02",exp:"Ensuring Readiness",facId:null,facName:"FLTLT(AAFC) Figueiredo",room:"Bravo",status:"delivered"},
-    {phase:"B. Initial",code:"INL-M01",exp:"ANZAC Day March",facId:null,facName:"FLTLT(AAFC) McGhie",room:"Briefing Area",status:"delivered"},
-    {phase:"C. Junior",code:"JNR-M02",exp:"Air and Space",facId:null,facName:"CIV Daniels",room:"Aviation & Charlie",status:"delivered"},
-  ]},
-  {date:"2026-02-13",term:"T1",nsess:3,notes:"",sessions:[
-    {phase:"A. Orientation",code:"ORI-M03",exp:"Cyber Awareness",facId:null,facName:"FLTLT(AAFC) McGhie",room:"Bravo",status:"delivered"},
-    {phase:"B. Initial",code:"INL-M02",exp:"RAAF Aircraft Presentations",facId:null,facName:"CIV Daniels",room:"Aviation & Charlie",status:"delivered"},
-    {phase:"I. Bronze",code:"BCLP-M01",exp:"Bronze CLP",facId:null,facName:"CIV Flanders",room:"CLP Room",status:"delivered"},
-  ]},
-  {date:"2026-02-20",term:"T1",nsess:3,notes:"",sessions:[
-    {phase:"A. Orientation",code:"ORI-M04",exp:"Giant Games Night",facId:null,facName:"CUO Wallace",room:"Bravo",status:"delivered"},
-    {phase:"B. Initial",code:"INL-M08",exp:"Drill and Ceremonial",facId:null,facName:"CPL(AAFC) Mitchell",room:"Minor Parade Ground",status:"delivered"},
-    {phase:"C. Junior",code:"JNR-M01",exp:"Drill and Ceremonial",facId:null,facName:"CSGT Milligen",room:"Major Parade Ground",status:"delivered"},
-  ]},
-  {date:"2026-02-27",term:"T1",nsess:3,notes:"",sessions:[
-    {phase:"B. Initial",code:"INL-M06",exp:"Flight Fundamentals",facId:null,facName:"CIV Daniels",room:"Aviation & Charlie",status:"delivered"},
-    {phase:"D. Intermediate",code:"INT-M04",exp:"Intermediate Facilitation",facId:null,facName:"CIV Flanders",room:"Seniors Working Room",status:"delivered"},
-    {phase:"J. Silver",code:"SCLP-M01",exp:"Silver CLP",facId:null,facName:"CIV Flanders",room:"Seniors Working Room",status:"delivered"},
-  ]},
-  {date:"2026-03-06",term:"T1",nsess:3,notes:"",sessions:[
-    {phase:"B. Initial",code:"INL-M02",exp:"RAAF Aircraft Presentations",facId:null,facName:"FLTLT(AAFC) McGhie",room:"Briefing Area",status:"delivered"},
-    {phase:"C. Junior",code:"JNR-M03",exp:"Field Skills",facId:null,facName:"Field Team",room:"Field Room",status:"delivered"},
-    {phase:"D. Intermediate",code:"INT-M03",exp:"Field Skills",facId:null,facName:"Field Team",room:"Camp / Activity Site",status:"delivered"},
-  ]},
-  {date:"2026-05-01",term:"T2",nsess:3,notes:"ANZAC prep",sessions:[
-    {phase:"B. Initial",code:"INL-M01",exp:"ANZAC Day March",facId:null,facName:"CPL(AAFC) Mitchell",room:"Minor Parade Ground",status:"delivered"},
-    {phase:"C. Junior",code:"JNR-M03",exp:"Field Skills",facId:null,facName:"Field Team",room:"Field Room",status:"delivered"},
-    {phase:"D. Intermediate",code:"INT-M03",exp:"Field Skills",facId:null,facName:"Field Team",room:"Field Room",status:"delivered"},
-  ]},
-  {date:"2026-05-08",term:"T2",nsess:3,notes:"",sessions:[
-    {phase:"B. Initial",code:"INL-M03",exp:"Help Your Community",facId:null,facName:"PLTOFF(AAFC) Daley",room:"Bravo",status:"delivered"},
-    {phase:"C. Junior",code:"JNR-M03",exp:"Field Skills",facId:null,facName:"Field Team",room:"Field Room",status:"delivered"},
-    {phase:"D. Intermediate",code:"INT-M03",exp:"Field Skills",facId:null,facName:"Field Team",room:"Camp / Activity Site",status:"not_delivered"},
-  ]},
-  {date:"2026-07-24",term:"T3",nsess:3,notes:"Term 3 start",sessions:[
-    {phase:"B. Initial",code:"INL-M02",exp:"RAAF Aircraft Presentations",facId:null,facName:"CIV Daniels",room:"Aviation & Charlie",status:"planned"},
-    {phase:"C. Junior",code:"JNR-M01",exp:"Drill and Ceremonial",facId:null,facName:"CSGT Milligen",room:"Major Parade Ground",status:"planned"},
-    {phase:"D. Intermediate",code:"INT-M04",exp:"Intermediate Facilitation",facId:null,facName:"CIV Flanders",room:"Seniors Working Room",status:"planned"},
-  ]},
-  {date:"2026-07-31",term:"T3",nsess:3,notes:"Fieldcraft Competition",sessions:[
-    {phase:"B. Initial",code:"INL-M06",exp:"Flight Fundamentals",facId:null,facName:"CIV Daniels",room:"Aviation & Charlie",status:"planned"},
-    {phase:"C. Junior",code:"JNR-M01",exp:"Drill and Ceremonial",facId:null,facName:"CSGT Milligen",room:"Major Parade Ground",status:"planned"},
-    {phase:"J. Silver",code:"SCLP-M01",exp:"Silver CLP",facId:null,facName:"CIV Flanders",room:"Seniors Working Room",status:"planned"},
-  ]},
-  {date:"2026-08-21",term:"T3",nsess:2,notes:"Freedom of Entry prep",sessions:[
-    {phase:"B. Initial",code:"INL-M08",exp:"Drill and Ceremonial",facId:null,facName:"CPL(AAFC) Mitchell",room:"Minor Parade Ground",status:"planned"},
-    {phase:"C. Junior",code:"JNR-M01",exp:"Drill and Ceremonial",facId:null,facName:"CSGT Milligen",room:"Major Parade Ground",status:"planned"},
-  ]},
-  {date:"2026-10-16",term:"T4",nsess:3,notes:"Term 4",sessions:[
-    {phase:"B. Initial",code:"INL-M10",exp:"Open Day",facId:null,facName:"CUO Sundaram",room:"Bravo",status:"planned"},
-    {phase:"C. Junior",code:"JNR-M01",exp:"Drill and Ceremonial",facId:null,facName:"CSGT Milligen",room:"Major Parade Ground",status:"planned"},
-    {phase:"I. Bronze",code:"BCLP-M01",exp:"Bronze CLP",facId:null,facName:"CUO Sundaram",room:"CLP Room",status:"planned"},
-  ]},
-  {date:"2026-11-27",term:"T4",nsess:2,notes:"End of Year Parade rehearsal",sessions:[
-    {phase:"B. Initial",code:"INL-M08",exp:"Drill and Ceremonial",facId:null,facName:"CPL(AAFC) Mitchell",room:"Minor Parade Ground",status:"planned"},
-    {phase:"C. Junior",code:"JNR-M01",exp:"Drill and Ceremonial",facId:null,facName:"CSGT Milligen",room:"Major Parade Ground",status:"planned"},
-  ]},
-];
 
 // ═══════════════════════════════════════════════════════════
 //  STATE
@@ -4038,15 +3883,20 @@ function getScopeType(){
   if(S.session.is_wing)return 'wing';
   return 'squadron';
 }
-// Never throws. Falls back to a session-derived object when SQN_DATA has no entry (e.g. UUID id).
+// S.cfg (from backend) takes precedence over SQN_DATA for operational time fields.
+// SQN_DATA provides display name/short and acts as fallback when S.cfg is unpopulated.
 function getCurrentUnitInfo(){
   const meta=(typeof SQN_DATA!=='undefined'&&S.sqn)?SQN_DATA[S.sqn]:null;
-  if(meta)return meta;
   const sc=getScopeType();
-  const short=sc==='national'?'NAT HQ':sc==='wing'?'WING':sc==='auditor'?'AUDIT':sc==='system_admin'?'SYS':'SQN';
-  const name=S.scopeName||(S.session&&S.session.display_name)||
+  const short=meta?meta.short:sc==='national'?'NAT HQ':sc==='wing'?'WING':sc==='auditor'?'AUDIT':sc==='system_admin'?'SYS':'SQN';
+  const name=meta?meta.name:S.scopeName||(S.session&&S.session.display_name)||
     (sc==='national'?'National HQ':sc==='wing'?'Wing HQ':sc==='auditor'?'Auditor (Read Only)':sc==='system_admin'?'System Admin':'AAFC Training System');
-  return {name, short, addr:'', day:(S.cfg&&S.cfg.day)||'', start:(S.cfg&&S.cfg.start)||'', end:(S.cfg&&S.cfg.end)||'', sess:(S.cfg&&S.cfg.sess)||''};
+  const day=(S.cfg&&S.cfg.day)||(meta&&meta.day)||'';
+  const start=(S.cfg&&S.cfg.start)||(meta&&meta.start)||'';
+  const end=(S.cfg&&S.cfg.end)||(meta&&meta.end)||'';
+  const sess=(S.cfg&&S.cfg.sess)||(meta&&meta.sess)||'';
+  const addr=(S.cfg&&S.cfg.addr)||(meta&&meta.addr)||'';
+  return {name, short, addr, day, start, end, sess};
 }
 function canRead(){ return !!S.session; }
 function isReadOnly(){ const r=S.role; return S.isAuditor || r==='wing_viewer' || r==='national_viewer' || r==='sqn_general'; }
