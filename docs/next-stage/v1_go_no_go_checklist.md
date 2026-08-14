@@ -6,7 +6,7 @@
 **Created:** 2026-08-12
 
 All technical gate items (tests, migrations, code changes) are already complete as of
-commit `61c32f5` (2026-08-14). The items below are the **human-action gates** that
+commit `f38cee6` (2026-08-14). The items below are the **human-action gates** that
 cannot be performed by the development team.
 
 ---
