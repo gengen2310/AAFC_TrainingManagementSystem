@@ -2,7 +2,7 @@
 from .wing_calendar import WingHQEvent, SquadronEventStatus, WingEventCurriculumLink
 from .planning import (
     PlanningYear, ParadeDate, HolidayPeriod, AnchorEvent, AnchorPrepRule,
-    AnchorPrepPlan, ScheduledSession, PlanningLocation, PlanningConflict,
+    AnchorPrepPlan, PlanningConflict,
     PlanningFacilitatorLeave, PlanningNotice,
     CeaImportBatch, CeaActivity, ActivityLocalHide, ActivityLocalOverride,
 )
@@ -34,7 +34,7 @@ __all__ = [
     "Phase", "ProgramPackage", "ProgramItem", "LearningHubResource", "ProgramItemDeployment",
     "SourceFile", "SourceConflict", "PromotionRequest", "JobStatus",
     "PlanningYear", "ParadeDate", "HolidayPeriod", "AnchorEvent", "AnchorPrepRule",
-    "AnchorPrepPlan", "ScheduledSession", "PlanningLocation", "PlanningConflict",
+    "AnchorPrepPlan", "PlanningConflict",
     "PlanningFacilitatorLeave", "PlanningNotice",
     "CeaImportBatch", "CeaActivity", "ActivityLocalHide", "ActivityLocalOverride",
     "WingHQEvent", "SquadronEventStatus", "WingEventCurriculumLink",

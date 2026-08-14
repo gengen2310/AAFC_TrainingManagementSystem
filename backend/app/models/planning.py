@@ -2,8 +2,10 @@
 
 Provides data models for the annual training planning workflow:
 planning years, parade dates, holidays, anchor events, term planner,
-parade night builder, scheduled sessions, planning locations, and
-conflict detection.
+parade night builder, and conflict detection.
+
+ScheduledSession and PlanningLocation were retired in migration v53
+(a1b2c3d4e5f6) — both superseded by TrainingSession and TrainingArea.
 """
 from sqlalchemy import String, Integer, Boolean, Text, Date, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
@@ -120,46 +122,12 @@ class AnchorPrepPlan(Base, UUIDMixin, TimestampMixin):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
-class ScheduledSession(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
-    """One instructional session in the parade night planning grid."""
-    __tablename__ = "scheduled_sessions"
-    parade_date_id: Mapped[str] = mapped_column(ForeignKey("parade_dates.id"), index=True)
-    unit_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), index=True)
-    cadet_group: Mapped[str] = mapped_column(String(30), nullable=False)
-    session_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    curriculum_id: Mapped[str | None] = mapped_column(ForeignKey("curriculum_items.id"), nullable=True)
-    activity_title: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    facilitator_id: Mapped[str | None] = mapped_column(ForeignKey("facilitators.id"), nullable=True)
-    location_id: Mapped[str | None] = mapped_column(ForeignKey("planning_locations.id"), nullable=True)
-    is_combined: Mapped[bool] = mapped_column(Boolean, default=False)
-    combined_groups: Mapped[list | None] = mapped_column(JSON, nullable=True)
-    override_conflict: Mapped[bool] = mapped_column(Boolean, default=False)
-    override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(String(20), default="draft")
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
-
-
-class PlanningLocation(Base, UUIDMixin, TimestampMixin):
-    """A room or outdoor area used for scheduling."""
-    __tablename__ = "planning_locations"
-    unit_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), index=True)
-    name: Mapped[str] = mapped_column(String(120), nullable=False)
-    location_type: Mapped[str] = mapped_column(String(30), default="indoor")
-    capacity: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    active_status: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
-
-
 class PlanningConflict(Base, UUIDMixin, TimestampMixin):
     """A detected planning conflict, with optional override."""
     __tablename__ = "planning_conflicts"
     planning_year_id: Mapped[str | None] = mapped_column(ForeignKey("planning_years.id"), nullable=True, index=True)
     parade_date_id: Mapped[str | None] = mapped_column(ForeignKey("parade_dates.id"), nullable=True)
-    scheduled_session_id: Mapped[str | None] = mapped_column(ForeignKey("scheduled_sessions.id"), nullable=True)
+    scheduled_session_id: Mapped[str | None] = mapped_column(String(36), nullable=True)  # stores TrainingSession.id
     conflict_type: Mapped[str] = mapped_column(String(60), nullable=False)
     severity: Mapped[str] = mapped_column(String(10), default="warning")
     message: Mapped[str] = mapped_column(String(400), nullable=False)
