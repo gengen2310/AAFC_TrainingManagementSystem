@@ -26,14 +26,15 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 38 |
 | STAGING VERIFIED | 9 |
-| FIXED LOCALLY | 90 |
+| FIXED LOCALLY | 91 |
 | IMPLEMENTING | 1 |
 | NOT STARTED | 2 |
-| HUMAN GATE | 19 |
+| HUMAN GATE | 20 |
 | ACCEPTED RISK | 1 |
+| MANUAL APPROVAL REQUIRED | 1 |
 | **Total** | **163** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 137 / 163 = 84%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 138 / 163 = 85%**
 
 > Counts are from rows matching `^\| [A-Z]+-[0-9]` in this file. Excludes cross-reference summary rows (numbered `1–25`) and GAP-prefixed decision rows (GAP-03, GAP-05, GAP-20, GAP-22, GAP-23) which duplicate existing HG-/SEC- items. Totals increased from 138 → 152 across sessions as new gaps were identified and added to the register; the completion rate decreased from 80% → 76% because new items were added faster than they were closed.
 
