@@ -26,14 +26,14 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 38 |
 | STAGING VERIFIED | 9 |
-| FIXED LOCALLY | 78 |
+| FIXED LOCALLY | 79 |
 | IMPLEMENTING | 7 |
 | NOT STARTED | 6 |
 | HUMAN GATE | 20 |
 | ACCEPTED RISK | 1 |
-| **Total** | **159** |
+| **Total** | **160** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 125 / 159 = 79%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 126 / 160 = 79%**
 
 > Counts are from rows matching `^\| [A-Z]+-[0-9]` in this file. Excludes cross-reference summary rows (numbered `1–25`) and GAP-prefixed decision rows (GAP-03, GAP-05, GAP-20, GAP-22, GAP-23) which duplicate existing HG-/SEC- items. Totals increased from 138 → 152 across sessions as new gaps were identified and added to the register; the completion rate decreased from 80% → 76% because new items were added faster than they were closed.
 
@@ -242,6 +242,7 @@ known. Firefox and the Planning Workspace 404 are uninvestigated — root causes
 | DEF-13 | Defect | LOW | Maintenance mode expected return time — no return-time field in `SystemSetting`; cannot be communicated to users | `maintenance_until` key stored via `_set_setting()`; System Console input at `index.html:1640` ("Expected return time"); maintenance banner at `index.html:4736` renders `Expected return: ${d.until}` when set. Gap register was stale. | CLOSED |
 | DEF-14 | Defect | LOW | Maintenance mode Celery drain — in-flight jobs may fail silently if write-block activates mid-task | Implemented commit `be8ff14`: `enable_maintenance` queries `JobStatus` for queued/running jobs, marks them cancelled (with reason), commits before the write-block activates. Returns `drained_jobs` count; recorded in audit log. Guards the real-Celery path (stub currently, DEF-08). | FIXED LOCALLY |
 | DEF-15 | Defect | MEDIUM | `ENVIRONMENT=staging` in production Railway config (DEFECT-003) — `is_production` and `validate_for_production()` key off this value; risks production safety checks not triggering | Code fix merged; Railway production env var not corrected; requires System Admin action | HUMAN GATE |
+| DEF-18 | Defect | HIGH | Training Class audience conflict override never surfaced — `savePNDetail()` and `saveSessEdit()` both caught `class_conflict` 409 from `_saveSessionAudience()` and checked `audienceErr.detail.error` to decide whether to show an inline Override link; but `api()` throws `{kind,status,code,msg,body}` not `{detail}`, so `audienceErr.detail` was always `undefined`, the condition never fired, and the override link was never shown — any class scheduling conflict produced a generic error instead of the "Override" action | Fixed both catch blocks: `audienceErr.detail` → `audienceErr.body?.detail` in `savePNDetail()` (line ~7951) and `saveSessEdit()` (line ~8277); override link now fires correctly when backend returns `class_conflict` with `conflicts[]` array | FIXED LOCALLY |
 | DEF-17 | Defect | MEDIUM | Facilitator leave not detected as a conflict — `_run_conflict_check` in `planning.py` checked facilitator double-booking and holiday conflicts but never queried `PlanningFacilitatorLeave`; assigning a facilitator who is on leave generated no conflict warning in either frontend | Added `facilitator_on_leave` to `CONFLICT_TYPES` in `models/planning.py`; added leave detection block to `_run_conflict_check`: queries all `PlanningFacilitatorLeave` records overlapping the parade date for assigned facilitators (one `.in_()` query, deduplicates by `warned_facs` set), creates `warning` severity conflict per affected facilitator with reason and session reference; 1 regression test added `test_facilitator_on_leave_generates_conflict` — PASSED | FIXED LOCALLY |
 | DEF-16 | Defect | HIGH | `apiClosePN()` was dead code — backend endpoint `POST /api/parade-nights/{pnid}/close` existed and was fully implemented (checks `close_blockers()`: all sessions in final status; sets `closeout_status='closed'`, records `closed_by`/`closed_at`, writes audit log) but no UI element ever called it. Parade Nights could not be closed from either frontend. | `doClosePN(pnId)` function added using `confirmAction()` pattern; "Close Parade Night" button wired in `showPNDetail()` (shown only when `canWriteSquadron() && pn.closeout_status !== 'closed'`); `close_blocked` error surfaces per-session blockers from `e.body.detail.blockers` via toast. Error handler also maps the generic `close_blocked` code to a readable fallback message (line 3673). | FIXED LOCALLY |
 

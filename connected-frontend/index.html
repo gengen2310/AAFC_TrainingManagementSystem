@@ -7948,7 +7948,7 @@ async function savePNDetail(ds,cnt){
         try{
           await _saveSessionAudience(s.id,checked,false);
         }catch(audienceErr){
-          const detail=audienceErr&&audienceErr.detail;
+          const detail=audienceErr&&audienceErr.body?.detail;
           if(detail&&detail.error==='class_conflict'&&Array.isArray(detail.conflicts)&&detail.conflicts.length){
             const names=detail.conflicts.map(c=>esc(c.training_class_name||c.training_class_id)).join(', ');
             if(errEl){
@@ -8274,7 +8274,7 @@ async function saveSessEdit(){
       try{
         await _saveSessionAudience(s.id,checked,false);
       }catch(audienceErr){
-        const detail=audienceErr&&audienceErr.detail;
+        const detail=audienceErr&&audienceErr.body?.detail;
         if(detail&&detail.error==='class_conflict'&&Array.isArray(detail.conflicts)&&detail.conflicts.length){
           const names=detail.conflicts.map(c=>esc(c.training_class_name||c.training_class_id)).join(', ');
           if(sessErrEl){
