@@ -681,7 +681,7 @@ source .venv/bin/activate 2>/dev/null || true
 ALEMBIC_CODE_HEAD=$(python -m alembic heads 2>/dev/null | grep -oE '[a-f0-9]{12}' | head -1 || echo "unknown")
 info "Alembic code head: $ALEMBIC_CODE_HEAD"
 [ "$ALEMBIC_CODE_HEAD" = "$REQUIRED_ALEMBIC_HEAD" ] \
-  && ok "Code head is $REQUIRED_ALEMBIC_HEAD (v51)" \
+  && ok "Code head is $REQUIRED_ALEMBIC_HEAD (v53)" \
   || die "Code head is $ALEMBIC_CODE_HEAD, expected $REQUIRED_ALEMBIC_HEAD."
 deactivate 2>/dev/null || true
 popd > /dev/null
@@ -786,7 +786,7 @@ if [ "${DRY_RUN:-0}" = "1" ]; then
   echo "               --environment $ACTUAL_STAGING_ENV_ID --detach"
   echo "    Gate 1: poll /api/health/ready HTTP 200 (${BACKEND_GATE_TIMEOUT}s)"
   echo "    Gate 2: wait for NEW deployment (newer than PRE_BACKEND_LATEST=$PRE_BACKEND_LATEST)"
-  echo "    Gate 3: /api/system/migrations revision == $REQUIRED_ALEMBIC_HEAD (v51)"
+  echo "    Gate 3: /api/system/migrations revision == $REQUIRED_ALEMBIC_HEAD (v53)"
   echo "    Gate 4: [reauth if session expired] → subject-area-tags CRUD (POST→GET→DELETE→GET)"
   echo "    [DRY RUN: gates 3-4 skipped; staging DB unchanged]"
   echo

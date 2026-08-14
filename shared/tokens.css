@@ -6,8 +6,9 @@
  * Usage:
  *   Planning Workspace  — @import '../../../shared/tokens.css' in tokens.css
  *   connected-frontend  — tokens are inlined in index.html between
- *       <!-- shared/tokens.css sync begin --> and <!-- sync end --> markers.
- *       Run `make sync-tokens` (or manual diff) after changing this file.
+ *       /* shared/tokens.css sync begin */ and /* shared/tokens.css sync end */
+ *       markers inside the <style> block.
+ *       Run `python scripts/check_token_sync.py` to verify the sync.
  *
  * This file defines light-theme tokens only. Dark / high-contrast themes are
  * Planning Workspace-specific and remain in frontend/src/styles/tokens.css
