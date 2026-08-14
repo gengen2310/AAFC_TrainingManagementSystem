@@ -3225,6 +3225,28 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 </div>
 
 <!-- ── Edit Unit Type Modal ──────────────────────────────────────────────── -->
+<!-- ── Rename Wing / Squadron Modal ─────────────────────────────────────── -->
+<div class="modal-bg" id="m-rename-org">
+  <div class="modal" style="max-width:420px;width:96%">
+    <div class="modal-hdr"><div class="modal-title" id="rename-org-title">Rename</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-rename-org')">×</button></div>
+    <div class="modal-body">
+      <div class="ff">
+        <label for="rename-org-name">Name</label>
+        <input id="rename-org-name" type="text" maxlength="150" placeholder="Full name" style="width:100%">
+      </div>
+      <div class="ff" style="margin-top:10px">
+        <label for="rename-org-short">Short name</label>
+        <input id="rename-org-short" type="text" maxlength="40" placeholder="Abbreviation (leave blank to keep current)" style="width:100%">
+      </div>
+      <div id="rename-org-msg" style="font-size:11.5px;margin-top:10px;font-weight:700"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-out" onclick="closeModal('m-rename-org')">Cancel</button>
+      <button class="btn btn-dk" onclick="_saveOrgRename()">Rename</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="m-edit-unit-type">
   <div class="modal" style="max-width:420px;width:96%">
     <div class="modal-hdr"><div class="modal-title">Change Unit Type</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-edit-unit-type')">×</button></div>
@@ -5666,7 +5688,8 @@ function _renderWingsTable(){
     if(!isNatAdmin) return '';
     if(w.is_archived) return `<button class="btn btn-xs btn-ok" onclick="doRestoreWing('${w.wing_id}','${_jsAttr(w.code)}')">Restore</button> `+
       `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteWing('${w.wing_id}','${_jsAttr(w.code)}')">Delete Permanently…</button>`;
-    return `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="_orgOpenWizard('wing','${w.wing_id}','${_jsAttr(w.code)}')" title="Archives the Wing — reversible">Delete</button>`;
+    return `<button class="btn btn-xs btn-dk" onclick="_openRenameOrgModal('wing','${w.wing_id}','${_jsAttr(w.name||w.code)}','${_jsAttr(w.short_name||'')}')">Rename</button> `+
+      `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="_orgOpenWizard('wing','${w.wing_id}','${_jsAttr(w.code)}')" title="Archives the Wing — reversible">Delete</button>`;
   };
   el.innerHTML='<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Squadrons</th>'+(isNatAdmin?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
     wings.map(w=>`<tr${w.is_archived?' style="opacity:.6"':''}>
@@ -5697,7 +5720,8 @@ function _renderUnitsTable(){
     if(!canArchive(s)) return '';
     if(s.is_archived) return `<button class="btn btn-xs btn-ok" onclick="doRestoreSquadron('${s.squadron_id}','${_jsAttr(s.code)}')">Restore</button> `+
       `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doPermanentlyDeleteSquadron('${s.squadron_id}','${_jsAttr(s.code)}')">Delete Permanently…</button>`;
-    return `<button class="btn btn-xs btn-dk" onclick="_openEditUnitTypeModal('${s.squadron_id}','${_jsAttr(s.unit_type||'standard_squadron')}','${_jsAttr(s.name||s.code)}')">Edit Type</button> `+
+    return `<button class="btn btn-xs btn-dk" onclick="_openRenameOrgModal('squadron','${s.squadron_id}','${_jsAttr(s.name||s.code)}','${_jsAttr(s.short_name||'')}')">Rename</button> `+
+      `<button class="btn btn-xs btn-dk" onclick="_openEditUnitTypeModal('${s.squadron_id}','${_jsAttr(s.unit_type||'standard_squadron')}','${_jsAttr(s.name||s.code)}')">Edit Type</button> `+
       `<button class="btn btn-xs btn-out" style="border-color:var(--red);color:var(--status-text-danger)" onclick="_orgOpenWizard('squadron','${s.squadron_id}','${_jsAttr(s.code)}')" title="Archives the unit — reversible">Delete</button>`;
   };
   el.innerHTML='<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Wing</th>'+((isNatAdmin||isWingAdmin)?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
@@ -5734,6 +5758,43 @@ async function _saveUnitType(){
     await _refreshOrgCache();
     _renderUnitsTable();
     showToast('Unit type updated.');
+  }catch(e){
+    if(msg){msg.textContent=apiErr(e);msg.style.color='var(--red)';}
+  }
+}
+
+// ── Rename Wing / Squadron ──────────────────────────────────────────────────
+let _renameOrgType=null, _renameOrgId=null;
+function _openRenameOrgModal(type, id, currentName, currentShort){
+  _renameOrgType=type; _renameOrgId=id;
+  const titleEl=document.getElementById('rename-org-title');
+  if(titleEl) titleEl.textContent='Rename '+(type==='wing'?'Wing':'Unit');
+  const nameEl=document.getElementById('rename-org-name');
+  if(nameEl){ nameEl.value=currentName||''; }
+  const shortEl=document.getElementById('rename-org-short');
+  if(shortEl){ shortEl.value=currentShort||''; shortEl.placeholder='Abbreviation (leave blank to keep current)'; }
+  const msg=document.getElementById('rename-org-msg');
+  if(msg) msg.textContent='';
+  openModal('m-rename-org');
+}
+async function _saveOrgRename(){
+  if(!_renameOrgId||!_renameOrgType) return;
+  const nameEl=document.getElementById('rename-org-name');
+  const shortEl=document.getElementById('rename-org-short');
+  const msg=document.getElementById('rename-org-msg');
+  const name=(nameEl&&nameEl.value.trim())||'';
+  const short=(shortEl&&shortEl.value.trim())||'';
+  if(!name){ if(msg){msg.textContent='Name is required.';msg.style.color='var(--red)';} return; }
+  if(msg){msg.textContent='Saving…';msg.style.color='var(--muted)';}
+  const path=_renameOrgType==='wing'?`/api/wings/${_renameOrgId}`:`/api/squadrons/${_renameOrgId}`;
+  const body={name};
+  if(short) body.short_name=short;
+  try{
+    await api(path,{method:'PATCH',body:JSON.stringify(body)});
+    closeModal('m-rename-org');
+    await _refreshOrgCache();
+    if(_renameOrgType==='wing') _renderWingsTable(); else _renderUnitsTable();
+    showToast('Renamed successfully.');
   }catch(e){
     if(msg){msg.textContent=apiErr(e);msg.style.color='var(--red)';}
   }

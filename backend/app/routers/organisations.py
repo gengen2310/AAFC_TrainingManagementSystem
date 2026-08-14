@@ -80,6 +80,45 @@ def create_wing(body: WingCreateIn, db: DBSession = Depends(get_db),
     return {"ok": True, "wing_id": w.id, "code": w.code, "name": w.name}
 
 
+class WingUpdateIn(BaseModel):
+    name: str | None = None
+    short_name: str | None = None
+
+
+@router.patch("/wings/{wing_id}")
+def update_wing(wing_id: str, body: WingUpdateIn, db: DBSession = Depends(get_db),
+                p: Principal = Depends(get_principal)):
+    """Rename a Wing (name / short_name). Code is immutable after creation.
+    Requires national_admin or system_admin."""
+    require_system_or_nat_admin(p)
+    w = db.get(Wing, wing_id)
+    if not w:
+        raise HTTPException(404, detail={"error": "not_found"})
+    old = {"name": w.name, "short_name": w.short_name}
+    if body.name is not None:
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(422, detail={"error": "name_required"})
+        if len(name) > 120:
+            raise HTTPException(422, detail={"error": "name_too_long", "max": 120})
+        dup = db.query(Wing).filter(
+            Wing.name.ilike(name), Wing.id != wing_id, Wing.is_archived == False  # noqa: E712
+        ).first()
+        if dup:
+            raise HTTPException(409, detail={"error": "name_exists",
+                                              "message": f"An active Wing named '{name}' already exists (code '{dup.code}')."})
+        w.name = name
+    if body.short_name is not None:
+        sn = body.short_name.strip()
+        if len(sn) > 40:
+            raise HTTPException(422, detail={"error": "short_name_too_long", "max": 40})
+        w.short_name = sn or w.code
+    db.commit()
+    audit(db, p, object_type="wing", object_id=w.id, action="rename",
+          old=old, new={"name": w.name, "short_name": w.short_name})
+    return {"ok": True, "wing_id": w.id, "name": w.name, "short_name": w.short_name}
+
+
 @router.get("/wings/{wing_id}/archive-impact")
 def wing_archive_impact(wing_id: str, db: DBSession = Depends(get_db),
                         p: Principal = Depends(get_principal)):
@@ -479,6 +518,8 @@ def get_squadron(squadron_id: str, db: DBSession = Depends(get_db), p: Principal
 
 
 class SquadronUpdateIn(BaseModel):
+    name: str | None = None
+    short_name: str | None = None
     address: str | None = None
     default_parade_day: str | None = None
     default_start_time: str | None = None
@@ -495,6 +536,18 @@ def update_squadron(squadron_id: str, body: SquadronUpdateIn, db: DBSession = De
     if not s:
         raise HTTPException(404, detail={"error": "not_found"})
     require_can_write_squadron(p, s.id, s.wing_id)
+    if body.name is not None:
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(422, detail={"error": "name_required"})
+        if len(name) > 150:
+            raise HTTPException(422, detail={"error": "name_too_long", "max": 150})
+        s.name = name
+    if body.short_name is not None:
+        sn = body.short_name.strip()
+        if len(sn) > 40:
+            raise HTTPException(422, detail={"error": "short_name_too_long", "max": 40})
+        s.short_name = sn or s.code
     if body.address is not None:
         s.address = body.address
     if body.default_parade_day is not None:

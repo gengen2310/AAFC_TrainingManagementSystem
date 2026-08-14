@@ -2,7 +2,7 @@
 
 **Version:** 2026-08-14  
 **Branch:** `next-stage/v1-operational` | Deployed commit: `756e65e` (production, 2026-08-12, Alembic head v51)  
-**Backend tests:** 1681 passed, 6 skipped (2026-08-14, commit `a5aae3f`)  
+**Backend tests:** 1689 passed, 6 skipped (2026-08-14, DEF-19/DEF-20 rename tests)  
 **Sources merged:**
 - 2026-08-12 program audit (prior register: 18 DONE / 14 PARTIAL / 57 NOT DONE / 7 HUMAN GATE)
 - Training Class architecture analysis (`parallel-class-impact-analysis.md`)
@@ -26,14 +26,14 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 38 |
 | STAGING VERIFIED | 9 |
-| FIXED LOCALLY | 87 |
+| FIXED LOCALLY | 89 |
 | IMPLEMENTING | 1 |
 | NOT STARTED | 2 |
 | HUMAN GATE | 19 |
 | ACCEPTED RISK | 1 |
-| **Total** | **160** |
+| **Total** | **162** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 134 / 160 = 84%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 136 / 162 = 84%**
 
 > Counts are from rows matching `^\| [A-Z]+-[0-9]` in this file. Excludes cross-reference summary rows (numbered `1–25`) and GAP-prefixed decision rows (GAP-03, GAP-05, GAP-20, GAP-22, GAP-23) which duplicate existing HG-/SEC- items. Totals increased from 138 → 152 across sessions as new gaps were identified and added to the register; the completion rate decreased from 80% → 76% because new items were added faster than they were closed.
 
@@ -249,6 +249,8 @@ known. Firefox and the Planning Workspace 404 are uninvestigated — root causes
 | DEF-18 | Defect | HIGH | Training Class audience conflict override never surfaced — `savePNDetail()` and `saveSessEdit()` both caught `class_conflict` 409 from `_saveSessionAudience()` and checked `audienceErr.detail.error` to decide whether to show an inline Override link; but `api()` throws `{kind,status,code,msg,body}` not `{detail}`, so `audienceErr.detail` was always `undefined`, the condition never fired, and the override link was never shown — any class scheduling conflict produced a generic error instead of the "Override" action | Fixed both catch blocks: `audienceErr.detail` → `audienceErr.body?.detail` in `savePNDetail()` (line ~7951) and `saveSessEdit()` (line ~8277); override link now fires correctly when backend returns `class_conflict` with `conflicts[]` array | FIXED LOCALLY |
 | DEF-17 | Defect | MEDIUM | Facilitator leave not detected as a conflict — `_run_conflict_check` in `planning.py` checked facilitator double-booking and holiday conflicts but never queried `PlanningFacilitatorLeave`; assigning a facilitator who is on leave generated no conflict warning in either frontend | Added `facilitator_on_leave` to `CONFLICT_TYPES` in `models/planning.py`; added leave detection block to `_run_conflict_check`: queries all `PlanningFacilitatorLeave` records overlapping the parade date for assigned facilitators (one `.in_()` query, deduplicates by `warned_facs` set), creates `warning` severity conflict per affected facilitator with reason and session reference; 1 regression test added `test_facilitator_on_leave_generates_conflict` — PASSED | FIXED LOCALLY |
 | DEF-16 | Defect | HIGH | `apiClosePN()` was dead code — backend endpoint `POST /api/parade-nights/{pnid}/close` existed and was fully implemented (checks `close_blockers()`: all sessions in final status; sets `closeout_status='closed'`, records `closed_by`/`closed_at`, writes audit log) but no UI element ever called it. Parade Nights could not be closed from either frontend. | `doClosePN(pnId)` function added using `confirmAction()` pattern; "Close Parade Night" button wired in `showPNDetail()` (shown only when `canWriteSquadron() && pn.closeout_status !== 'closed'`); `close_blocked` error surfaces per-session blockers from `e.body.detail.blockers` via toast. Error handler also maps the generic `close_blocked` code to a readable fallback message (line 3673). | FIXED LOCALLY |
+| DEF-19 | Defect | MEDIUM | Wing rename absent — `PATCH /api/wings/{id}` did not exist; `name` and `short_name` could not be changed after creation; only `code` (immutable) was settable at create time | New `WingUpdateIn` Pydantic model + `PATCH /api/wings/{wing_id}` endpoint in `organisations.py`; restricted to `national_admin`/`system_admin`; validates non-empty name (≤120 chars), rejects duplicate active Wing name (409), updates `short_name` (≤40 chars, falls back to code if blank); writes audit log with old/new values. Frontend: shared `m-rename-org` modal + `_openRenameOrgModal()` + `_saveOrgRename()` in `connected-frontend/index.html`; "Rename" button added to Wings table action cell. Tests: `test_nat_admin_can_rename_wing`, `test_wing_rename_requires_nat_admin`, `test_wing_rename_unauthenticated`, `test_wing_rename_empty_name_rejected`, `test_wing_rename_audited` — all passed. Backend: 1689 passed, 6 skipped. | FIXED LOCALLY |
+| DEF-20 | Defect | MEDIUM | Squadron name/short_name editing absent — `PATCH /api/squadrons/{id}` accepted `unit_type` and address fields but not `name` or `short_name`; Squadron display names could not be corrected after creation | Extended `SquadronUpdateIn` Pydantic model with `name: str | None` and `short_name: str | None`; added update logic in `update_squadron` (validates non-empty name ≤150 chars, `short_name` ≤40 chars, falls back to code if blank). Frontend: shared `m-rename-org` modal (same as DEF-19) + "Rename" button in Squadrons table action cell. Tests: `test_sqn_admin_can_rename_squadron`, `test_squadron_rename_empty_name_rejected`, `test_squadron_rename_unauthenticated` — all passed. | FIXED LOCALLY |
 
 ---
 

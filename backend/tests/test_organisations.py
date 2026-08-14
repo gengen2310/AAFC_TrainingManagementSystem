@@ -241,6 +241,78 @@ def test_patch_squadron_unit_type(client):
     client.patch(f"/api/squadrons/{sqn_id}", headers=h, json={"unit_type": "standard_squadron"})
 
 
+# ── Wing rename ──
+
+def test_nat_admin_can_rename_wing(client):
+    h = login(client, "ADMINNATIONAL")
+    wing_id = _get_wing_id(client, h)
+    original = client.get("/api/wings", headers=h).json()
+    orig_name = next(w["name"] for w in original if w["wing_id"] == wing_id)
+    r = client.patch(f"/api/wings/{wing_id}", headers=h, json={"name": "7 Wing AAFC (Renamed)"})
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "7 Wing AAFC (Renamed)"
+    # Restore
+    client.patch(f"/api/wings/{wing_id}", headers=h, json={"name": orig_name})
+
+
+def test_wing_rename_requires_nat_admin(client):
+    h = login(client, "ADMIN7WG")
+    wing_id = _get_wing_id(client, h)
+    r = client.patch(f"/api/wings/{wing_id}", headers=h, json={"name": "Attempt"})
+    assert r.status_code == 403
+
+
+def test_wing_rename_unauthenticated(client):
+    # Auth check fires before DB lookup — dummy ID is sufficient
+    r = client.patch("/api/wings/00000000-0000-0000-0000-000000000000", json={"name": "Attempt"})
+    assert r.status_code == 401
+
+
+def test_wing_rename_empty_name_rejected(client):
+    h = login(client, "ADMINNATIONAL")
+    wing_id = _get_wing_id(client, h)
+    r = client.patch(f"/api/wings/{wing_id}", headers=h, json={"name": "  "})
+    assert r.status_code == 422
+
+
+def test_wing_rename_audited(client):
+    h = login(client, "ADMINNATIONAL")
+    wing_id = _get_wing_id(client, h)
+    original = client.get("/api/wings", headers=h).json()
+    orig_name = next(w["name"] for w in original if w["wing_id"] == wing_id)
+    client.patch(f"/api/wings/{wing_id}", headers=h, json={"name": "7 Wing AAFC (Audit Test)"})
+    audit = client.get("/api/audit", headers=h).json()
+    assert any(e.get("action") == "rename" and e.get("object_type") == "wing" for e in audit)
+    # Restore
+    client.patch(f"/api/wings/{wing_id}", headers=h, json={"name": orig_name})
+
+
+# ── Squadron rename ──
+
+def test_sqn_admin_can_rename_squadron(client):
+    h = login(client, "ADMIN703")
+    sqn_id = _get_sqn_id(client, h)
+    r = client.patch(f"/api/squadrons/{sqn_id}", headers=h, json={"name": "703 Squadron AAFC (Renamed)"})
+    assert r.status_code == 200, r.text
+    sqns = client.get("/api/squadrons", headers=h).json()
+    s = next((x for x in sqns if x["squadron_id"] == sqn_id), None)
+    assert s["name"] == "703 Squadron AAFC (Renamed)"
+    # Restore
+    client.patch(f"/api/squadrons/{sqn_id}", headers=h, json={"name": "703 Squadron AAFC"})
+
+
+def test_squadron_rename_empty_name_rejected(client):
+    h = login(client, "ADMIN703")
+    sqn_id = _get_sqn_id(client, h)
+    r = client.patch(f"/api/squadrons/{sqn_id}", headers=h, json={"name": ""})
+    assert r.status_code == 422
+
+
+def test_squadron_rename_unauthenticated(client):
+    r = client.patch("/api/squadrons/00000000-0000-0000-0000-000000000000", json={"name": "Attempt"})
+    assert r.status_code == 401
+
+
 # ── Curriculum publication scope ──
 
 def test_wing_curriculum_visible_to_sqn_in_wing(client):
