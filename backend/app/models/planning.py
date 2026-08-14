@@ -20,6 +20,7 @@ CONFLICT_TYPES = (
     "facilitator_double_booked", "room_double_booked", "empty_session",
     "anchor_no_prep", "holiday_conflict", "outdoor_winter",
     "consecutive_classroom", "capacity_mismatch", "multi_part_gap",
+    "facilitator_on_leave",
 )
 SEVERITY = ("info", "warning", "critical")
 SESSION_STATUS = ("draft", "confirmed", "published")

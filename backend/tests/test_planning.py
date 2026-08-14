@@ -2316,6 +2316,47 @@ def test_facilitator_leave_flags_a_real_affected_session(client):
     )
 
 
+def test_facilitator_on_leave_generates_conflict(client):
+    """When a facilitator assigned to a session has a leave record covering the
+    parade date, _run_conflict_check must produce a facilitator_on_leave conflict.
+    Previously this conflict type did not exist — the check was never wired."""
+    hdr = _sqn_admin_hdr(client)
+    yr_id, pd_id = _setup_year_with_date(client, hdr)  # parade_date = 2026-09-04
+
+    facs = client.get("/api/planning/facilitators", headers=hdr).json()
+    if not facs:
+        import pytest
+        pytest.skip("No facilitators seeded for 703")
+    fac_id = facs[0]["facilitator_id"]
+
+    # Assign the facilitator to a session on that date
+    rs = client.post(f"/api/planning/parade-dates/{pd_id}/sessions",
+                     json={"cadet_group": "junior", "session_number": 1,
+                           "activity_title": "Leave Conflict Scan Test",
+                           "facilitator_id": fac_id},
+                     headers=hdr)
+    assert rs.status_code == 200, rs.text
+
+    # Record leave that spans the parade date (2026-09-04)
+    lv = client.post(f"/api/planning/facilitators/{fac_id}/leave",
+                     json={"start_date": "2026-09-01", "end_date": "2026-09-10",
+                           "reason": "Sick leave", "planning_year_id": yr_id},
+                     headers=hdr)
+    assert lv.status_code == 200, lv.text
+
+    # Trigger conflict scan
+    client.post(f"/api/planning/years/{yr_id}/run-checks", headers=hdr)
+
+    # Confirm facilitator_on_leave conflict was created
+    r = client.get(f"/api/planning/years/{yr_id}/conflicts", headers=hdr)
+    assert r.status_code == 200
+    types = [c["conflict_type"] for c in r.json()["conflicts"]]
+    assert "facilitator_on_leave" in types, (
+        "A facilitator assigned to a session while on leave must generate a "
+        "facilitator_on_leave conflict after run-checks"
+    )
+
+
 # ─────────────────────────────────────────────────────────────
 # Planning year Excel export
 # ─────────────────────────────────────────────────────────────

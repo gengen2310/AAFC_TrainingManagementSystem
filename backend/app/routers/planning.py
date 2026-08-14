@@ -2227,6 +2227,29 @@ def _run_conflict_check(year_id: str, date_id: str, db: DBSession) -> list[Plann
                           f"This parade date falls within the '{h.name}' holiday period.")
                 break
 
+    # Facilitator on leave
+    if pd_obj:
+        fac_ids = {s.facilitator_id for s in real_sessions if s.facilitator_id}
+        if fac_ids:
+            leave_records = db.query(PlanningFacilitatorLeave).filter(
+                PlanningFacilitatorLeave.facilitator_id.in_(fac_ids),
+                PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
+                PlanningFacilitatorLeave.start_date <= pd_obj.parade_date,
+                PlanningFacilitatorLeave.end_date >= pd_obj.parade_date,
+            ).all()
+            warned_facs: set[str] = set()
+            for lv in leave_records:
+                if lv.facilitator_id in warned_facs:
+                    continue
+                warned_facs.add(lv.facilitator_id)
+                fac = db.get(Facilitator, lv.facilitator_id)
+                name = f"{fac.current_rank or ''} {fac.last_name}".strip() if fac else lv.facilitator_id
+                reason_part = f" ({lv.reason})" if lv.reason else ""
+                affected = [s for s in real_sessions if s.facilitator_id == lv.facilitator_id]
+                _conflict("facilitator_on_leave", "warning",
+                          f"Facilitator {name} is on leave on this date{reason_part}.",
+                          affected[0].id if affected else None)
+
     db.commit()
     return conflicts
 
