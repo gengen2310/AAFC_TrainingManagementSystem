@@ -7567,6 +7567,22 @@ function showPNDetail(ds){
       <button class="btn btn-xs btn-sky" style="margin-top:6px" onclick="savePNCoreDetails('${ds}')">Save Details</button>
     </div>`;
   }
+  if(canWriteSquadron()&&(pn.sessions||[]).length>1){
+    html+=`<div class="no-print" style="border:1.5px solid var(--border-light);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--surface-2)">
+      <div style="font-size:11px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Quick Assign to All Sessions</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+        <div style="flex:1;min-width:180px"><label style="font-size:12px" for="qa-fac">Facilitator</label>
+          <select id="qa-fac" aria-label="Facilitator to assign to all sessions"><option value="">— No change —</option>${facOpts}</select>
+        </div>
+        <div style="flex:1;min-width:180px"><label style="font-size:12px" for="qa-room">Room</label>
+          <select id="qa-room" aria-label="Room to assign to all sessions"><option value="">— No change —</option>${roomOpts}</select>
+        </div>
+        <button class="btn btn-xs btn-sky" onclick="_qaApplyAll(${(pn.sessions||[]).length})">Apply to all</button>
+        <button class="btn btn-xs btn-out" onclick="_qaClearFacs()">Clear facilitators</button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:5px">Changes take effect when you click Save Changes below.</div>
+    </div>`;
+  }
   (pn.sessions||[]).forEach((s,i)=>{
     const stOpts=['planned','delivered','delivered_with_issue','cancelled','cancelled_late','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${s.status===v?'selected':''}>${{planned:'Planned',delivered:'Delivered',delivered_with_issue:'Delivered (issue)',cancelled:'Cancelled',cancelled_late:'Cancelled late',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
     const dragAttrs=canWriteSquadron()?`ondragover="_sessDragOver(event,'${ds}',${i})" ondragleave="_sessDragLeave(event)" ondrop="_sessDrop(event,'${ds}',${i})"`:'';
@@ -7691,6 +7707,24 @@ async function archivePNNotice(pnid,noticeId){
 // the per-session Status dropdown above), then bulk-clear everything else
 // still Planned/Published in one action instead of clicking through each
 // session's Save Changes flow one at a time.
+function _qaApplyAll(n){
+  const fac=document.getElementById('qa-fac')?.value||'';
+  const room=document.getElementById('qa-room')?.value||'';
+  if(!fac&&!room){showToast('Select a facilitator or room to assign.',true);return;}
+  for(let i=0;i<n;i++){
+    if(fac){const el=document.getElementById('d-fa-'+i);if(el)el.value=fac;}
+    if(room){const el=document.getElementById('d-rm-'+i);if(el)el.value=room;}
+  }
+  const parts=[];
+  if(fac)parts.push('facilitator');
+  if(room)parts.push('room');
+  showToast(`${parts.join(' and ')} set on all sessions — click Save Changes to commit.`);
+}
+function _qaClearFacs(){
+  let n=0;
+  while(document.getElementById('d-fa-'+n)){document.getElementById('d-fa-'+n).value='';n++;}
+  if(n>0)showToast(`Facilitator cleared from ${n} session${n!==1?'s':''} — click Save Changes to commit.`);
+}
 async function doMarkRemainingDelivered(ds){
   const pn=S.pns.find(p=>p.date===ds);if(!pn)return;
   try{
