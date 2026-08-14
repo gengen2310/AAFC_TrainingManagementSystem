@@ -2,7 +2,7 @@
 
 **Version:** 2026-08-14  
 **Branch:** `next-stage/v1-operational` | Deployed commit: `756e65e` (production, 2026-08-12, Alembic head v51)  
-**Backend tests:** 1681 passed, 6 skipped (2026-08-14, commit `858fac0`+test_multi_wing)  
+**Backend tests:** 1681 passed, 6 skipped (2026-08-14, commit `a5aae3f`)  
 **Sources merged:**
 - 2026-08-12 program audit (prior register: 18 DONE / 14 PARTIAL / 57 NOT DONE / 7 HUMAN GATE)
 - Training Class architecture analysis (`parallel-class-impact-analysis.md`)
@@ -27,9 +27,9 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 | CLOSED | 38 |
 | STAGING VERIFIED | 9 |
 | FIXED LOCALLY | 86 |
-| IMPLEMENTING | 5 |
-| NOT STARTED | 3 |
-| HUMAN GATE | 20 |
+| IMPLEMENTING | 2 |
+| NOT STARTED | 2 |
+| HUMAN GATE | 19 |
 | ACCEPTED RISK | 1 |
 | **Total** | **160** |
 
@@ -419,17 +419,17 @@ Human gates HG-01 (individual accountability decision), HG-03 (CSRF env vars), H
 | Original Gap | Title | Register IDs | Status |
 |---|---|---|---|
 | 1 | Legacy page retirement | DEF-05 | CLOSED |
-| 2 | Visual / session unification | VIS-01, VIS-10 | IMPLEMENTING |
+| 2 | Visual / session unification | VIS-01 (IMPLEMENTING), VIS-10 (FIXED LOCALLY) | IMPLEMENTING |
 | 3 | TrainingArea / PlanningLocation | Decision log | CLOSED |
 | 4 | Facilitator records | (Capability preserved; no open gap) | CLOSED |
 | 5 | Individual accountability | HG-01 | HUMAN GATE |
 | 6 | Optimistic locking | (Phase 7 complete; all critical models) | CLOSED |
 | 7 | 7WG hardcodes | (Bootstrap parameterised) | CLOSED |
 | 8 | Multi-Wing onboarding | DEF-06, DOC-12 | FIXED LOCALLY |
-| 9 | Multi-Wing reports | DEF-07 | NOT STARTED |
-| 10 | Report catalogue | DASH-01 (CLOSED), DASH-02 (CLOSED), DOC-11 (NOT STARTED — Level B) | PARTIAL |
+| 9 | Multi-Wing reports | DEF-07 | FIXED LOCALLY |
+| 10 | Report catalogue | DASH-01 (CLOSED), DASH-02 (CLOSED), DOC-11 (FIXED LOCALLY — Level B) | FIXED LOCALLY |
 | 11 | Year rollover | DOC-02 | STAGING VERIFIED |
-| 12 | Playwright E2E | DOC-03, VIS-10 | IMPLEMENTING |
+| 12 | Playwright E2E | DOC-03, VIS-10 | FIXED LOCALLY |
 | 13 | Accessibility automation | VIS-02–VIS-09 | FIXED LOCALLY |
 | 14 | Load testing | HG-02 | HUMAN GATE |
 | 15 | Distributed rate limiting | DEF-10, DEF-11 | FIXED LOCALLY |
