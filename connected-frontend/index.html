@@ -8389,7 +8389,7 @@ async function publishWP(){
     showToast('Weekly Program published. Planned sessions are now marked Published.');
     reloadAndRender();
   }catch(e){
-    const d=e&&e.detail;
+    const d=e&&e.body?.detail;
     if(d&&d.error==='publish_blocked'&&Array.isArray(d.blockers)&&d.blockers.length){
       const first=d.blockers[0];
       const more=d.blockers.length>1?' Plus '+(d.blockers.length-1)+' more issue'+(d.blockers.length>2?'s':'')+'.':'';
