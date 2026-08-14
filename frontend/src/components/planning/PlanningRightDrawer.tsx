@@ -6,6 +6,7 @@ import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningCo
 import { ActivityFullDetail, anchorToDisplay } from "./ActivityDetailBlock";
 import { getProgramType } from "../../utils/planningFilters";
 import { useConfirm } from "../ConfirmDialog";
+import { useToast } from "../Toast";
 
 // ─── Drawer item discriminated union ──────────────────────────────────────────
 export type DrawerItem =
@@ -40,6 +41,7 @@ function SessionForm({
 }) {
   const qc = useQueryClient();
   const { confirm } = useConfirm();
+  const { toast } = useToast();
   const isEdit = item.type === "session";
   const existing = isEdit ? item.session : null;
 
@@ -189,6 +191,7 @@ function SessionForm({
       if (yearId) {
         await qc.invalidateQueries({ queryKey: ["planning-cc", yearId] });
       }
+      toast(isEdit ? "Session updated." : "Session created.");
       onClose();
     } catch (e: unknown) {
       setErr(friendlyMessage(e, "Save failed"));
@@ -581,6 +584,7 @@ const AUDIENCE_FIELDS: { key: string; label: string }[] = [
 
 function CreateAnchorForm({ yearId, onClose }: { yearId: string; onClose: () => void }) {
   const qc = useQueryClient();
+  const { toast } = useToast();
   const [eventName, setEventName] = useState("");
   const [eventType, setEventType] = useState<string>("other");
   const [importance, setImportance] = useState<string>("key_event");
@@ -610,6 +614,7 @@ function CreateAnchorForm({ yearId, onClose }: { yearId: string; onClose: () => 
       await qc.invalidateQueries({ queryKey: ["planning-annual"] });
       await qc.invalidateQueries({ queryKey: ["planning-cc"] });
       await qc.invalidateQueries({ queryKey: ["planning-long-range"] });
+      toast("Anchor event created.");
       onClose();
     } catch (e: unknown) {
       setErr(friendlyMessage(e, "Save failed"));
@@ -666,6 +671,7 @@ function LocationForm({ location, onClose }: {
   onClose: () => void;
 }) {
   const qc = useQueryClient();
+  const { toast } = useToast();
   const [name, setName] = useState(location?.name ?? "");
   const [locType, setLocType] = useState(location?.location_type ?? "indoor");
   const [capacity, setCapacity] = useState(location?.capacity?.toString() ?? "");
@@ -690,6 +696,7 @@ function LocationForm({ location, onClose }: {
         });
       }
       await qc.invalidateQueries({ queryKey: ["planning-locations"] });
+      toast(location ? "Location updated." : "Location created.");
       onClose();
     } catch (e: unknown) {
       setErr(friendlyMessage(e, "Save failed"));
