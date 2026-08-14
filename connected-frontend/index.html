@@ -2524,7 +2524,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <div style="display:flex;gap:6px;align-items:center">
               <input id="c-phase-new-name" placeholder="Phase name (e.g. F. Advanced)" style="flex:1">
               <button type="button" class="btn btn-dk" style="font-size:11px;padding:4px 8px" onclick="doCreatePhaseInline()">Create</button>
-              <button type="button" class="btn btn-out" style="font-size:11px;padding:4px 8px" onclick="document.getElementById('c-phase-new').style.display='none'">×</button>
+              <button type="button" class="btn btn-out" aria-label="Cancel new phase" style="font-size:11px;padding:4px 8px" onclick="document.getElementById('c-phase-new').style.display='none'">×</button>
             </div>
             <div id="c-phase-new-msg" style="font-size:11px;margin-top:3px;color:var(--red)"></div>
           </div>
@@ -2539,7 +2539,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <div style="display:flex;gap:6px;align-items:center">
               <input id="c-el-new-name" placeholder="Element name (e.g. Leadership)" style="flex:1">
               <button type="button" class="btn btn-dk" style="font-size:11px;padding:4px 8px" onclick="doCreateElementInline()">Create</button>
-              <button type="button" class="btn btn-out" style="font-size:11px;padding:4px 8px" onclick="document.getElementById('c-el-new').style.display='none'">×</button>
+              <button type="button" class="btn btn-out" aria-label="Cancel new element" style="font-size:11px;padding:4px 8px" onclick="document.getElementById('c-el-new').style.display='none'">×</button>
             </div>
             <div id="c-el-new-msg" style="font-size:11px;margin-top:3px;color:var(--red)"></div>
           </div>
@@ -7527,7 +7527,7 @@ function buildPNCard(pn){
         ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Copy sessions to another parade night" onclick="openCopyPNModal('${pn.date}')">Copy to…</button>`:''}
         ${canWriteSquadron()&&(pn.sessions||[]).length>0?`<button class="btn btn-xs btn-out" title="Save this night's sessions as a reusable template" onclick="doSaveAsTemplate('${esc(pn.id)}')">Save as Tpl</button>`:''}
         ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Apply a saved session template to this parade night" onclick="openApplyTemplateModal('${esc(pn.id)}')">Apply Tpl…</button>`:''}
-        ${canWriteSquadron()?`<button class="btn btn-xs btn-red" onclick="delPN('${pn.date}')">×</button>`:''}
+        ${canWriteSquadron()?`<button class="btn btn-xs btn-red" aria-label="Delete parade night" onclick="delPN('${pn.date}')">×</button>`:''}
       </div>
     </div>
     <div class="pn-body"><div class="sess-grid">${sessCards}</div></div>
@@ -8659,7 +8659,7 @@ function renderCurr(){
             </div>
             <div class="exp-right">
               ${sc>0?`<button class="btn-lnk" style="font-size:10px" onclick="event.stopPropagation();drillCurr('${esc(e.code)}')">${sc} sess.</button>`:''}
-              ${editable?`<button class="btn btn-xs btn-out" onclick="event.stopPropagation();editCurr('${esc(e.code)}')">Edit</button> <button class="btn btn-xs btn-red" onclick="event.stopPropagation();deleteCurrItem('${e.id}')">×</button>`:''}
+              ${editable?`<button class="btn btn-xs btn-out" onclick="event.stopPropagation();editCurr('${esc(e.code)}')">Edit</button> <button class="btn btn-xs btn-red" aria-label="Delete curriculum item" onclick="event.stopPropagation();deleteCurrItem('${e.id}')">×</button>`:''}
             </div>
           </div>`;
         }).join('')}
@@ -9348,7 +9348,7 @@ function renderActs(){
         ?`<button class="btn btn-xs btn-out" onclick="openActivityOverrideModal('${act.id}')">${ov?'Edit Adjustment':'Adjust'}</button>`
         :(ov?'<span style="font-size:10.5px;color:var(--muted)">Locally adjusted</span>':'—');
     } else {
-      actionsCell=canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editAct('${act.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delAct('${act.id}')">×</button>`:'—';
+      actionsCell=canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editAct('${act.id}')">Edit</button> <button class="btn btn-xs btn-red" aria-label="Delete activity" onclick="delAct('${act.id}')">×</button>`:'—';
     }
     return `<tr ${past?'style="opacity:.58"':''}>
       <td style="font-weight:700">${esc(act.name)}${ovBadge}</td>
@@ -9618,7 +9618,7 @@ function renderFacs(){
       <td class="no-print" onclick="event.stopPropagation()">
         ${showArchived
           ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreFacilitator('${f.id}','${_jsAttr(nameFor)}')">Restore</button>`:'')
-          :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="tagFac('${f.id}')">Tags</button> <button class="btn btn-xs btn-sky" onclick="editFac('${f.id}')">Edit</button> <button class="btn btn-xs btn-out" onclick="openMergeFac('${f.id}')">Merge</button> <button class="btn btn-xs btn-red" onclick="delFac('${f.id}')">×</button>`:'')}
+          :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="tagFac('${f.id}')">Tags</button> <button class="btn btn-xs btn-sky" onclick="editFac('${f.id}')">Edit</button> <button class="btn btn-xs btn-out" onclick="openMergeFac('${f.id}')">Merge</button> <button class="btn btn-xs btn-red" aria-label="Archive facilitator" onclick="delFac('${f.id}')">×</button>`:'')}
       </td>
     </tr>`;
   }).join(''):`<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:14px">No ${showArchived?'archived ':''}facilitators${(!showArchived&&flt)?' tagged in this subject area':''}${q?' match your search':''}.</td></tr>`;
@@ -10082,7 +10082,7 @@ function renderRooms(){
     <td>${r.type?`<span class="badge b-blue" style="font-size:10px">${esc(r.type)}</span>`:'—'}</td>
     <td class="no-print">${showRooms
       ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreRoom('${r.id}','${_jsAttr(r.name)}')">Restore</button>`:'')
-      :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editRoom('${r.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delRoom('${r.id}')">×</button>`:'—')}</td>
+      :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editRoom('${r.id}')">Edit</button> <button class="btn btn-xs btn-red" aria-label="Archive training area" onclick="delRoom('${r.id}')">×</button>`:'—')}</td>
   </tr>`).join('')||`<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:14px">No ${showRooms?'archived ':''}training areas.</td></tr>`;
   const showEquip=(document.getElementById('equip-show-archived')||{}).checked;
   const equipSrc=showEquip?(_archivedEquipList||[]):S.equip;
@@ -10092,7 +10092,7 @@ function renderRooms(){
     <td style="font-size:11.5px;color:var(--muted)">${esc(eq.notes||'')}</td>
     <td class="no-print">${showEquip
       ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreEquip('${eq.id}','${_jsAttr(eq.name)}')">Restore</button>`:'')
-      :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editEquip('${eq.id}')">Edit</button> <button class="btn btn-xs btn-red" onclick="delEquip('${eq.id}')">×</button>`:'—')}</td>
+      :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editEquip('${eq.id}')">Edit</button> <button class="btn btn-xs btn-red" aria-label="Archive equipment" onclick="delEquip('${eq.id}')">×</button>`:'—')}</td>
   </tr>`).join('')||`<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:14px">No ${showEquip?'archived ':''}equipment.</td></tr>`;
 }
 async function saveRoom(){
