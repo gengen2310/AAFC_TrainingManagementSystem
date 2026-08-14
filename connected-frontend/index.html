@@ -1382,7 +1382,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
       <!-- NEEDS ACTION -->
       <div id="page-action-items" class="page">
-        <div class="ph"><h1 class="ph-title">Needs Attention</h1><div class="ph-sub">Consolidated list of planning gaps, missing outcomes, data quality issues, and action items.</div></div>
+        <div class="ph"><h1 class="ph-title">Needs Attention</h1><div class="ph-sub">Consolidated list of planning gaps, missing outcomes, data quality issues, and action items.</div>
+          <div class="ph-actions no-print"><span id="run-checks-btn-wrap" style="display:none"><button class="btn btn-out btn-sm" onclick="runExceptionChecks()" title="Check for sessions missing a facilitator or room in the next 7 days">Run checks</button></span></div>
+        </div>
         <div class="tw"><table>
           <thead><tr><th style="width:80px">Category</th><th>Item</th><th style="width:90px">Date</th><th style="width:130px">Issue</th><th class="no-print" style="width:80px">Action</th></tr></thead>
           <tbody id="action-tbody"></tbody>
@@ -10148,6 +10150,8 @@ async function delEquip(id){
 // ═══════════════════════════════════════════════════════════
 function renderActions(){
   const today=new Date().toISOString().substring(0,10);
+  const w=document.getElementById('run-checks-btn-wrap');
+  if(w) w.style.display=canWriteSquadron()?'':'none';
   const items=[];
 
   // Priority 0-1: Backend action items (manual + automation, open only)
@@ -10235,7 +10239,13 @@ async function _closeActionItem(id){
     try{await apiCloseActionItem(id);await reloadAndRender();showToast('Item closed.');}
     catch(e){showToast(apiErr(e),true);}
   });
-
+}
+async function runExceptionChecks(){
+  try{
+    const r=await api('/api/exceptions/run-checks',{method:'POST'});
+    await reloadAndRender();
+    showToast(r.created>0?`${r.created} alert${r.created===1?'':'s'} added.`:'No new alerts — all sessions are staffed and have rooms.');
+  }catch(e){showToast(apiErr(e),true);}
 }
 
 // ─── HELP-05: What Changed? activity feed ────────────────────────────────────

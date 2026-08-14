@@ -26,14 +26,14 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 38 |
 | STAGING VERIFIED | 9 |
-| FIXED LOCALLY | 89 |
+| FIXED LOCALLY | 90 |
 | IMPLEMENTING | 1 |
 | NOT STARTED | 2 |
 | HUMAN GATE | 19 |
 | ACCEPTED RISK | 1 |
-| **Total** | **162** |
+| **Total** | **163** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 136 / 162 = 84%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 137 / 163 = 84%**
 
 > Counts are from rows matching `^\| [A-Z]+-[0-9]` in this file. Excludes cross-reference summary rows (numbered `1–25`) and GAP-prefixed decision rows (GAP-03, GAP-05, GAP-20, GAP-22, GAP-23) which duplicate existing HG-/SEC- items. Totals increased from 138 → 152 across sessions as new gaps were identified and added to the register; the completion rate decreased from 80% → 76% because new items were added faster than they were closed.
 
@@ -44,6 +44,8 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 **2026-08-13 session 3 (this session):** Wing Onboarding Runbook (`10_wing_onboarding_runbook.md`) updated (commit `edaee16`): §2.0 added for `POST /api/system/provision-wing` one-call endpoint, §5 production activation updated, §7.4 and §8 updated. Gap register DOC-12 updated with runbook evidence. Backend test count: 1629 (was 1628) — new `test_provision_wing_forbidden_national_admin` test added. E2E test added in `weekly-program-classes.spec.ts` for DEF-06 dynamic wing_name header. Security/XSS sweep: found and fixed 5 unescaped user-supplied fields in facilitator table (`rank`, `first`, `last`, `type`) and room type badge (stored XSS potential, commit `05887e0`); 3 unescaped `pn.term` values in buildPNCard/move-session/WP dropdowns. HARD-02 extended: `doDisableAccount`, `doReactivateAccount`, `doUnlockAccount` error-path `alert()` calls (multi-role, missed in prior sweep) converted to `showToast()`; `gate()` fallback also converted. Total: 122/157 = 78% complete (no status count changes — these were previously unregistered items now fixed at commit time rather than being tracked as new gaps).
 
 **2026-08-13 session 4 (this session):** XSS sweep completed — two rounds of stored XSS patching applied. Round 1 (commit `16a055d`): `s.exp`, `s.facName`, `s.room` (session fields across `buildPNCard`, `showDrill`, `renderWP`, `showCurrDetail`, `showFacProfile`), `e.instr` (curriculum detail modal), `e.lh` (Learning Hub URLs — `safeUrl()` helper added to block `javascript:` URI injection). Round 2 (commit `0ef96da`): `elBadge()` and `phBadge()` helper functions wrapped (cascading fix to 12+ innerHTML call sites each — calendar chips, curriculum list, session cards, modals, annual program); `facDisplay(f)` in facilitator profile modal; `f.type` in facilitator profile modal; subject-area tag fallback `EL_L[a]||a` in facilitator profile modal; `e.term` in curriculum list view and detail modal; unit type badge in organisations table; `a.role`, `a.action`, `a.object_type` in audit log table. Pattern documented: `${DICT[val]||val}` inside innerHTML must be `${esc(DICT[val]||val)}`. React Planning Workspace confirmed clean (no `dangerouslySetInnerHTML`). All remaining innerHTML patterns verified safe (hardcoded strings, server-generated ISO dates, numbers).
+
+**2026-08-14 session 11 (this session):** PARITY-02 added and FIXED LOCALLY — "Run checks" button added to `page-action-items` page header in `connected-frontend/index.html`; `runExceptionChecks()` calls `POST /api/exceptions/run-checks`, shows result toast, then `reloadAndRender()`; visibility gated by `canWriteSquadron()` in `renderActions()`. Backend tests: 1689 passed, 6 skipped (unchanged). Totals: 137/163 = 84%.
 
 **2026-08-14 session 8 (this session):** DEF-16, DEF-17, WORK-18 FIXED LOCALLY. DEF-16: `apiClosePN()` dead code wired — `doClosePN()` + "Close Parade Night" button in `showPNDetail()`; `close_blocked` surfaces per-session blockers from `e.body.detail.blockers`. DEF-17: facilitator leave conflict detection added to `_run_conflict_check` in `planning.py`; `facilitator_on_leave` added to `CONFLICT_TYPES`; 1 regression test. WORK-18: multi-select checkbox pattern on parade night list — `_pnSelected` Set, `pn-bulk-bar`, bulk Set Term + Archive actions via `Promise.all`. Backend tests: 1648 passed, 6 skipped. Total 125/159 = 79%.
 
@@ -177,6 +179,7 @@ gaps affect four entity types. Bulk-import and smart-planning features are Level
 | ID | AREA | SEVERITY | REQUIREMENT | CURRENT STATE | STATUS |
 |---|---|---|---|---|---|
 | PARITY-01 | Parity | LOW | Parade Night generation — Planning Workspace `generate-parade-dates` call missing `parade_start_time` and `parade_end_time` vs Main TMS which collects and sends both fields | Fixed 2026-08-14: `index.ts` type extended; time inputs added to `GuidedYearSetupModal.tsx` (DatesStep) and `SetupPanel.tsx`; fields sent as optional overrides; omitted when blank, falling back to squadron default on the backend. TypeScript: 0 errors. | FIXED LOCALLY |
+| PARITY-02 | Parity | LOW | `POST /api/exceptions/run-checks` — Planning Workspace has an automated "Run checks" button (ActionItems.tsx:15) that scans upcoming sessions for missing facilitators/rooms and creates action items; Main TMS Needs Attention page had only manual add/close, no automated check trigger | Fixed 2026-08-14: "Run checks" button added to `page-action-items` page header in `connected-frontend/index.html`; `runExceptionChecks()` async function calls `POST /api/exceptions/run-checks`, shows result toast (count or all-clear message), then calls `reloadAndRender()`. Button visibility gated on `canWriteSquadron()` and revealed by `renderActions()`. | FIXED LOCALLY |
 | WORK-01 | Workflow | LOW | Click/field count baseline measured for all 12 high-frequency workflows (§37) so improvements can be measured | Fully measured 2026-08-13: `workflow-map.md` populated with steps/required fields/clicks for all 12 workflows; parity gaps and key findings documented | FIXED LOCALLY |
 | WORK-02 | Workflow | MEDIUM | Restore UI for curriculum items — soft-archived via `is_archived=True` but no restore endpoint or UI control exists in either frontend | `POST /api/curriculum/{cid}/restore` at `training.py:3933`; `doRestoreCurrItem()` at `index.html:7819` shows Restore button in archived rows | CLOSED |
 | WORK-03 | Workflow | MEDIUM | Restore UI for facilitators — soft-archived but no restore endpoint or UI control in either frontend | `POST /api/facilitators/{fid}/restore` at `training.py:1715`; `doRestoreFacilitator()` at `index.html:8787`; "Show archived" checkbox with Restore button per row | CLOSED |
