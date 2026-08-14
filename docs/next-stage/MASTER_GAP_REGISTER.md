@@ -26,14 +26,14 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 38 |
 | STAGING VERIFIED | 9 |
-| FIXED LOCALLY | 86 |
-| IMPLEMENTING | 2 |
+| FIXED LOCALLY | 87 |
+| IMPLEMENTING | 1 |
 | NOT STARTED | 2 |
 | HUMAN GATE | 19 |
 | ACCEPTED RISK | 1 |
 | **Total** | **160** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 133 / 160 = 83%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 134 / 160 = 84%**
 
 > Counts are from rows matching `^\| [A-Z]+-[0-9]` in this file. Excludes cross-reference summary rows (numbered `1–25`) and GAP-prefixed decision rows (GAP-03, GAP-05, GAP-20, GAP-22, GAP-23) which duplicate existing HG-/SEC- items. Totals increased from 138 → 152 across sessions as new gaps were identified and added to the register; the completion rate decreased from 80% → 76% because new items were added faster than they were closed.
 
@@ -260,7 +260,7 @@ and a formal conformance declaration are Level B/C requirements. Shared design t
 
 | ID | AREA | SEVERITY | REQUIREMENT | CURRENT STATE | STATUS |
 |---|---|---|---|---|---|
-| VIS-01 | Visual | MEDIUM | Shared CSS design tokens — Main TMS (`--blue`, `--dark`) and Planning Workspace (`--aafc-blue`, `--aafc-dark-blue`) use divergent token names on the same AAFC VIG palette | Both frontends share the same underlying hex values; token names differ; Level B requirement; deliberate architectural decision to surface to user, not silently merge | IMPLEMENTING |
+| VIS-01 | Visual | MEDIUM | Shared CSS design tokens — Main TMS (`--blue`, `--dark`) and Planning Workspace (`--aafc-blue`, `--aafc-dark-blue`) use divergent token names on the same AAFC VIG palette | `shared/tokens.css` created as canonical source (commit `vis01`). Planning Workspace `tokens.css` now `@import '../../../shared/tokens.css'` + adds backward-compat `--aafc-*` aliases so 146 existing component call sites work unchanged. Connected-frontend tokens kept inline (nginx serves a single HTML file) with sync markers. Vite build verified: canonical `--blue` and backward-compat `--aafc-blue: var(--blue)` both present in built CSS. | FIXED LOCALLY |
 | VIS-02 | Accessibility | HIGH | Axe automation in main CI — accessibility checks run on every push, not only in staging-specific scripts | `frontend/e2e/accessibility.spec.ts` (comprehensive Axe WCAG 2.1 AA, 20 pages/roles) is in `testDir=./e2e/` and runs with `npx playwright test`. `.github/workflows/e2e-tests.yml` added (2026-08-13): runs both Planning Workspace (21 specs) and Connected Frontend (30 specs) E2E suites on push/PR to main/release/next-stage. | FIXED LOCALLY |
 | VIS-03 | Accessibility | MEDIUM | High-contrast mode — `forced-colors` / `prefers-contrast: more` media queries honoured throughout both frontends | Implemented commit `0a56fa0`: connected-frontend has `@media (prefers-contrast: more)` (token strengthening, bolder borders/focus) + `@media (forced-colors: active)` (Highlight system colour, forced borders); Planning Workspace tokens.css improved `data-theme="hc"` + same two media queries added. | FIXED LOCALLY |
 | VIS-04 | Accessibility | MEDIUM | Keyboard-only workflow coverage — all primary workflows completable without a pointer device | FIXED 2026-08-13: connected-frontend nav items (`div.nav-item`) given `tabindex="0"` + delegated `keydown` handler (Enter/Space → `.click()`) + `applyNavScope()` tabindex management (shown=`0`, hidden=`-1`) + `:focus-visible` CSS. 1584 backend tests pass. Login (button elements), modals, tooltips already keyboard-accessible. E2E tests added 2026-08-13: `accessibility-hardening.spec.ts` — VIS-04 tests verify (1) all visible nav items have `tabindex="0"` after login, (2) Enter key on Parade Nights nav item activates that page, (3) Space key on Dashboard nav item activates that page. | FIXED LOCALLY |
@@ -383,7 +383,7 @@ Human gates HG-01 (individual accountability decision), HG-03 (CSRF env vars), H
 | HG-02 | 250-user multi-Wing load test | HUMAN GATE |
 | HG-06 | External pen test (recommended before second Wing) | HUMAN GATE |
 | HG-07 | Data governance decisions resolved | HUMAN GATE |
-| VIS-01 | Shared design tokens complete | IMPLEMENTING |
+| VIS-01 | Shared design tokens complete | FIXED LOCALLY |
 | VIS-10 | Multi-Wing E2E playwright tests | FIXED LOCALLY |
 
 ### Level C — National Readiness (additional requirements beyond Level B)
@@ -419,7 +419,7 @@ Human gates HG-01 (individual accountability decision), HG-03 (CSRF env vars), H
 | Original Gap | Title | Register IDs | Status |
 |---|---|---|---|
 | 1 | Legacy page retirement | DEF-05 | CLOSED |
-| 2 | Visual / session unification | VIS-01 (IMPLEMENTING), VIS-10 (FIXED LOCALLY) | IMPLEMENTING |
+| 2 | Visual / session unification | VIS-01, VIS-10 | FIXED LOCALLY |
 | 3 | TrainingArea / PlanningLocation | Decision log | CLOSED |
 | 4 | Facilitator records | (Capability preserved; no open gap) | CLOSED |
 | 5 | Individual accountability | HG-01 | HUMAN GATE |

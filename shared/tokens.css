@@ -1,0 +1,76 @@
+/* AAFC TMS — Canonical Design Tokens (shared/tokens.css)
+ *
+ * Single authoritative source for both frontends.
+ * Do not edit values only in one frontend — edit here first, then sync.
+ *
+ * Usage:
+ *   Planning Workspace  — @import '../../../shared/tokens.css' in tokens.css
+ *   connected-frontend  — tokens are inlined in index.html between
+ *       <!-- shared/tokens.css sync begin --> and <!-- sync end --> markers.
+ *       Run `make sync-tokens` (or manual diff) after changing this file.
+ *
+ * This file defines light-theme tokens only. Dark / high-contrast themes are
+ * Planning Workspace-specific and remain in frontend/src/styles/tokens.css
+ * because connected-frontend currently ships a single light theme.
+ */
+
+:root {
+  /* ── AAFC VIG brand palette ──────────────────────────────────────────── */
+  --blue:   #51b0e3;   /* AAFC blue — accent, active states, highlights */
+  --dark:   #002f65;   /* AAFC dark blue — header, nav structure */
+  --royal:  #004b8d;   /* Royal blue — secondary active states */
+  --steel:  #455560;   /* Gunmetal grey — body text, secondary surfaces */
+  --lgrey:  #b0b7bb;   /* Light grey — borders, table headers, quiet backgrounds */
+  --pale:   #7db2ce;   /* Pale blue — subtle information backgrounds */
+  --red:    #e51937;   /* Red — danger, errors, must-attend only */
+
+  /* ── Surface tokens ──────────────────────────────────────────────────── */
+  --bg:           #f4f8fc;   /* slight AAFC-blue tint on page background */
+  --surface:      #ffffff;
+  --surface-2:    #f0f5fa;
+  --border:       #d1dce8;
+  --border-light: #e4edf5;
+
+  /* ── Text tokens ─────────────────────────────────────────────────────── */
+  --text:   #1e2d3d;   /* deep navy-dark for primary text */
+  --text-2: #3a4a55;
+  --ink-2:  #44506a;
+  /* Computed WCAG AA 4.5:1+ against both --surface (#fff) and --bg (#f4f8fc). */
+  --muted:  #657380;
+
+  /* ── WCAG AA accessibility tokens (text foreground use only) ─────────── */
+  /* These exist for contexts where the raw brand colour does not reach 4.5:1.
+     The brand colours remain available and unchanged for decorative/background
+     use; these tokens provide AA-safe ink equivalents. */
+  --muted-text-on-light: #6e7275;   /* WCAG AA on --surface and --bg */
+  --text-on-dark-muted:  #7e9bbb;   /* on --dark background */
+  --link-on-light:       var(--royal);   /* --blue alone fails 4.5:1 as link text */
+  --status-text-danger:  #d41733;   /* --red alone fails on some backgrounds */
+
+  /* ── Status / semantic colours ───────────────────────────────────────── */
+  --ok:          #1a7f4b;
+  --ok-bg:       #d4f0e3;
+  --ok-text:     #145f38;
+  --warn:        #c97a00;
+  --warn-bg:     #fff3cd;
+  --rescheduled: #7c3aed;   /* purple — rescheduled/pending sessions */
+
+  /* ── Semantic shortcuts ──────────────────────────────────────────────── */
+  --accent:       var(--blue);
+  --accent-light: #e0f0fa;
+  --primary:      var(--dark);
+  --navy:         var(--dark);
+  --danger:       var(--red);
+  --line:         var(--border);
+
+  /* ── Elevation / shadow ──────────────────────────────────────────────── */
+  --sh:  0 1px 4px rgba(0,47,101,.10);
+  --sh2: 0 4px 16px rgba(0,47,101,.14);
+
+  /* ── Spacing / layout ────────────────────────────────────────────────── */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --radius:  10px;
+}

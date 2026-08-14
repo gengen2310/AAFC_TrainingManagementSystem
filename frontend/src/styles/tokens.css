@@ -1,59 +1,114 @@
-:root{
-  --aafc-blue:#51B0E3; --aafc-dark-blue:#002F65; --aafc-royal-blue:#004B8D;
-  --aafc-gunmetal:#455560; --aafc-light-grey:#B0B7BB; --aafc-red:#E51937;
-  /* Neutral/surface values aligned to connected-frontend's actual AAFC VIG hex
-     values (index.html's --bg/--surface-2/--border/--text/--muted -- see
-     .claude/rules/frontend.md) so both apps render the same palette, not just
-     the same brand intent under different-drifted values. Values only, not a
-     rename/merge of the two token systems (see .claude/rules/architecture.md:
-     that stays an explicit separate decision, not done here). */
-  /* --muted-text intentionally NOT set to connected-frontend's exact #6B7A87:
-     that value is only 4.41:1 on white, below WCAG AA's 4.5:1 for normal text
-     -- confirmed as a real regression by this app's own accessibility suite
-     (connected-frontend has no equivalent suite to catch the same latent
-     issue there). Kept at the original, AA-compliant value; every other
-     neutral token below is aligned to the exact hex value. */
-  --surface:#FFFFFF; --background:#F4F8FC; --text:#1E2D3D; --muted-text:#5A6E7F;
-  --success:#1A7F4B; --warning:#C97A00; --rescheduled:#7C3AED; --border:#D1DCE8;
-  --space-1:8px; --space-2:16px; --space-3:24px; --space-4:32px; --radius:10px;
-  --primary:var(--aafc-dark-blue); --accent:var(--aafc-blue);
-  /* Previously used as var(--name, #hardcoded-fallback) at each call site with
-     no definition here — every fallback silently won, drifted independently
-     (surface-2 alone had 4 slightly different hardcoded greys across call
-     sites), and never adapted to dark/hc theme. Defining them for real once,
-     here, is the fix — not a new design decision. */
-  --surface-2:#F0F5FA; --line:var(--border); --ink-2:#44506A;
-  --navy:var(--aafc-dark-blue); --ok:var(--success); --warn:var(--warning);
-  --danger:var(--aafc-red);
+/* Planning Workspace design tokens.
+ * Light-theme canonical values live in shared/tokens.css (the single source).
+ * This file: imports shared tokens, adds backward-compat aliases for the
+ * --aafc-* names used throughout PW component files, and defines the
+ * dark / high-contrast themes (PW-specific; connected-frontend is light only).
+ */
+
+@import '../../../shared/tokens.css';
+
+/* ── Backward-compat aliases: --aafc-* → canonical names ───────────────── *
+ * Component files reference --aafc-blue, --aafc-dark-blue, etc.            *
+ * These aliases let existing call sites keep working while the canonical    *
+ * names are authoritative in shared/tokens.css.  Migrate call sites to the *
+ * canonical names over time; remove aliases once no usages remain.         */
+:root {
+  --aafc-blue:       var(--blue);
+  --aafc-dark-blue:  var(--dark);
+  --aafc-royal-blue: var(--royal);
+  --aafc-gunmetal:   var(--steel);
+  --aafc-light-grey: var(--lgrey);
+  --aafc-red:        var(--red);
+
+  /* PW semantic names that differ from connected-frontend convention */
+  --background:  var(--bg);
+  --muted-text:  var(--muted);
+  --success:     var(--ok);
+  --warning:     var(--warn);
 }
-html[data-theme="dark"]{
-  --surface:#0F1C30; --background:#081426; --text:#E7EEF6; --muted-text:#9FB2C6;
-  --border:#1E3251; --primary:#51B0E3; --accent:#51B0E3; --red:#FF6B6B;
-  --surface-2:#16233A; --line:var(--border); --ink-2:#C7D4E3;
-  --navy:#51B0E3; --ok:var(--success); --warn:var(--warning); --danger:var(--red);
+
+/* ── Dark theme (PW-specific) ────────────────────────────────────────────── */
+html[data-theme="dark"] {
+  --surface:    #0f1c30;
+  --background: #081426;
+  --text:       #e7eef6;
+  --muted-text: #9fb2c6;
+  --muted:      #9fb2c6;
+  --border:     #1e3251;
+  --primary:    #51b0e3;
+  --accent:     #51b0e3;
+  --blue:       #51b0e3;
+  --red:        #ff6b6b;
+  --surface-2:  #16233a;
+  --line:       var(--border);
+  --ink-2:      #c7d4e3;
+  --navy:       #51b0e3;
+  --ok:         var(--success);
+  --warn:       var(--warning);
+  --danger:     var(--red);
+  --aafc-blue:  var(--blue);
+  --aafc-dark-blue: var(--primary);
+  --aafc-red:   var(--red);
 }
-html[data-theme="hc"]{
-  --surface:#FFFFFF; --background:#FFFFFF; --text:#000000; --muted-text:#303030;
-  --border:#555555; --primary:#000044; --accent:#000099;
-  --surface-2:#F0F0F0; --line:#555555; --ink-2:#111111;
-  --navy:#000044; --ok:#004d24; --warn:#6a3800; --danger:#cc0011;
-  --success:#004d24; --warning:#6a3800; --rescheduled:#44007a;
+
+/* ── High-contrast theme (PW-specific) ───────────────────────────────────── */
+html[data-theme="hc"] {
+  --surface:    #ffffff;
+  --background: #ffffff;
+  --text:       #000000;
+  --muted-text: #303030;
+  --muted:      #303030;
+  --border:     #555555;
+  --primary:    #000044;
+  --accent:     #000099;
+  --blue:       #000099;
+  --dark:       #000044;
+  --surface-2:  #f0f0f0;
+  --line:       #555555;
+  --ink-2:      #111111;
+  --navy:       #000044;
+  --ok:         #004d24;
+  --warn:       #6a3800;
+  --danger:     #cc0011;
+  --success:    #004d24;
+  --warning:    #6a3800;
+  --rescheduled: #44007a;
+  --aafc-blue:  var(--blue);
+  --aafc-dark-blue: var(--dark);
+  --aafc-red:   var(--danger);
 }
-/* prefers-contrast: more — strengthen tokens for users who prefer higher contrast
-   without switching to the full high-contrast theme manually. */
+
+/* ── prefers-contrast: more ───────────────────────────────────────────────── */
 @media (prefers-contrast: more) {
   :root {
-    --surface:#FFFFFF; --background:#FFFFFF; --text:#000000; --muted-text:#3a3a3a;
-    --border:#555555; --primary:#000044; --accent:#000099;
-    --surface-2:#F0F0F0; --line:#555555; --ink-2:#111111;
-    --navy:#000044; --ok:#004d24; --warn:#6a3800; --danger:#cc0011;
-    --success:#004d24; --warning:#6a3800;
+    --surface:    #ffffff;
+    --background: #ffffff;
+    --text:       #000000;
+    --muted-text: #3a3a3a;
+    --muted:      #3a3a3a;
+    --border:     #555555;
+    --primary:    #000044;
+    --accent:     #000099;
+    --surface-2:  #f0f0f0;
+    --line:       #555555;
+    --ink-2:      #111111;
+    --navy:       #000044;
+    --ok:         #004d24;
+    --warn:       #6a3800;
+    --danger:     #cc0011;
+    --success:    #004d24;
+    --warning:    #6a3800;
   }
 }
-/* forced-colors: active — Windows High Contrast Mode. */
+
+/* ── forced-colors (Windows High Contrast Mode) ──────────────────────────── */
 @media (forced-colors: active) {
   :root { forced-color-adjust: auto; }
   button, [role="button"] { border: 2px solid ButtonText !important; forced-color-adjust: none; }
   :focus-visible { outline: 3px solid Highlight !important; outline-offset: 2px; }
 }
-@media (prefers-reduced-motion: reduce){ *{animation:none!important; transition:none!important;} }
+
+/* ── prefers-reduced-motion ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

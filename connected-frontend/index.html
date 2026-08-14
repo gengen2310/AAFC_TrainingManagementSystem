@@ -10,9 +10,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-/* ── AAFC TMS Design System — V16.1 (AAFC Visual Identity Guide) ── */
+/* ── AAFC TMS Design System ── */
+/* shared/tokens.css sync begin — edit shared/tokens.css first, then update here */
 :root {
-  /* AAFC approved colour palette */
+  /* AAFC VIG brand palette */
   --blue:   #51b0e3;   /* AAFC blue — accent, active states, highlights */
   --dark:   #002f65;   /* AAFC dark blue — header, nav structure */
   --royal:  #004b8d;   /* Royal blue — secondary active states */
@@ -21,49 +22,40 @@
   --pale:   #7db2ce;   /* Pale blue — subtle information backgrounds */
   --red:    #e51937;   /* Red — danger, errors, must-attend only */
   /* Surface and layout */
-  --bg:       #f4f8fc; /* slight AAFC-blue tint on page background */
-  --surface:  #ffffff;
-  --surface-2:#f0f5fa;
-  --border:   #d1dce8;
+  --bg:           #f4f8fc;
+  --surface:      #ffffff;
+  --surface-2:    #f0f5fa;
+  --border:       #d1dce8;
   --border-light: #e4edf5;
   /* Text hierarchy */
-  --text:   #1e2d3d;   /* deep navy-dark for primary text */
+  --text:   #1e2d3d;
   --text-2: #3a4a55;
-  --muted:  #657380;   /* darkened from #6b7a87 -- the original failed WCAG AA
-                          (4.13-4.41:1 against --bg/--surface, needs 4.5:1); this
-                          value is >=4.5:1 against both, computed not guessed */
-  /* Accessible contextual text tokens (WCAG 2.2 AA) -- for contexts where the
-     AAFC brand colour itself does not meet 4.5:1 as a text/foreground colour.
-     The brand colour stays available unchanged for decorative/background use;
-     these exist only to give text an accessible ink on top of it. */
-  --muted-text-on-light: #6e7275; /* was --lgrey (#b0b7bb) used as text at 2.03:1 --
-                                      --lgrey itself is unchanged for its documented
-                                      border/background purpose. Computed against
-                                      both --surface (#fff, 4.85:1) and --bg
-                                      (#f4f8fc, 4.55:1) since this token is used on
-                                      both. */
-  --text-on-dark-muted: #7e9bbb;  /* was rgba(255,255,255,.45) on --dark at 3.83:1 */
-  --link-on-light: var(--royal);  /* was --accent/--blue (#51b0e3) as link text on
-                                      --accent-light at 2.07:1; --royal keeps the
-                                      same blue family, gives 7.53:1 */
-  --status-text-danger: #d41733;  /* was --red (#e51937) as text on --surface
-                                      (4.64:1), --bg (4.35:1), and a computed
-                                      table-row/button hover shade #efefef
-                                      (4.19:1) -- this value clears all three
-                                      (5.29/4.96/4.60). --red itself is unchanged
-                                      for badges/buttons with their own solid
-                                      background. */
-  /* Semantic */
-  --ok:     #1a7f4b;   --ok-bg:   #d4f0e3;
-  --warn:   #c97a00;   --warn-bg: #fff3cd;
-  --ok-text:#145f38;
-  /* Alias helpers */
+  --ink-2:  #44506a;
+  --muted:  #657380;   /* WCAG AA 4.5:1+ on both --surface and --bg */
+  /* WCAG AA accessibility tokens — text foreground use only */
+  --muted-text-on-light: #6e7275;
+  --text-on-dark-muted:  #7e9bbb;
+  --link-on-light:       var(--royal);
+  --status-text-danger:  #d41733;
+  /* Status / semantic */
+  --ok:          #1a7f4b;   --ok-bg:  #d4f0e3;   --ok-text: #145f38;
+  --warn:        #c97a00;   --warn-bg: #fff3cd;
+  --rescheduled: #7c3aed;
+  /* Semantic shortcuts */
   --accent:       var(--blue);
   --accent-light: #e0f0fa;
-  /* Shadows — restrained */
+  --primary:      var(--dark);
+  --navy:         var(--dark);
+  --danger:       var(--red);
+  --line:         var(--border);
+  /* Shadows */
   --sh:  0 1px 4px rgba(0,47,101,.10);
   --sh2: 0 4px 16px rgba(0,47,101,.14);
+  /* Spacing / layout */
+  --space-1: 8px; --space-2: 16px; --space-3: 24px; --space-4: 32px;
+  --radius: 10px;
 }
+/* shared/tokens.css sync end */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
 body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6;}
