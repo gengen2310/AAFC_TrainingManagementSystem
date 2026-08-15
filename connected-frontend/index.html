@@ -5838,8 +5838,8 @@ function openCreateAccountModal(preselectedSqnId){
 function _populateCreateWings(){
   const sel=document.getElementById('ca-wing'); sel.innerHTML='<option value="">— select wing —</option>';
   (S.wings||[]).forEach(w=>{ const o=new Option(w.code||w.name,w.wing_id); sel.appendChild(o); });
-  // Wing admin: pre-select own wing
-  if(S.isWing && S.session && S.session.wing_id){
+  // Wing admin and sqn_admin: pre-select and lock own wing
+  if((S.isWing || S.role==='sqn_admin') && S.session && S.session.wing_id){
     sel.value=S.session.wing_id; sel.disabled=true;
   } else { sel.disabled=false; }
 }
