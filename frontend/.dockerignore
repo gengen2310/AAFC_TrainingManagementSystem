@@ -2,5 +2,8 @@ node_modules
 dist
 dist-single
 e2e
+e2e-connected
+test-results
 *.local
 .env*
+*.tsbuildinfo
