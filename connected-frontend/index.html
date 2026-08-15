@@ -9552,6 +9552,7 @@ async function saveTagFac(){
     // depends on loadData()'s timing for this specific save.
     const fac=S.facs.find(x=>x.id===_tagFacId);
     if(fac&&r&&Array.isArray(r.subject_areas)) fac.areas=r.subject_areas;
+    showToast('Subject areas saved.');
     closeModal('m-tag-fac'); reloadAndRender();
   }catch(e){msg.textContent='Could not update: '+apiErr(e);}
 }

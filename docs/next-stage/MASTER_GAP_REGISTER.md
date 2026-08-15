@@ -1,8 +1,8 @@
 # AAFC TMS — Master Gap Register
 
-**Version:** 2026-08-14  
+**Version:** 2026-08-15  
 **Branch:** `next-stage/v1-operational` | Deployed commit: `756e65e` (production, 2026-08-12, Alembic head v51)  
-**Backend tests:** 1695 passed, 6 skipped (2026-08-15, post date-isolation fix)  
+**Backend tests:** 1695 passed, 6 skipped (2026-08-15, post date-isolation fix — no backend changes in DEF-26)  
 **Sources merged:**
 - 2026-08-12 program audit (prior register: 18 DONE / 14 PARTIAL / 57 NOT DONE / 7 HUMAN GATE)
 - Training Class architecture analysis (`parallel-class-impact-analysis.md`)
@@ -26,15 +26,15 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 38 |
 | STAGING VERIFIED | 9 |
-| FIXED LOCALLY | 97 |
+| FIXED LOCALLY | 98 |
 | IMPLEMENTING | 1 |
 | NOT STARTED | 2 |
 | HUMAN GATE | 20 |
 | ACCEPTED RISK | 1 |
 | MANUAL APPROVAL REQUIRED | 1 |
-| **Total** | **169** |
+| **Total** | **170** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 144 / 169 = 85%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 145 / 170 = 85%**
 
 > Counts are from rows matching `^\| [A-Z]+-[0-9]` in this file. Excludes cross-reference summary rows (numbered `1–25`) and GAP-prefixed decision rows (GAP-03, GAP-05, GAP-20, GAP-22, GAP-23) which duplicate existing HG-/SEC- items. Totals increased from 138 → 152 across sessions as new gaps were identified and added to the register; the completion rate decreased from 80% → 76% because new items were added faster than they were closed.
 
@@ -266,6 +266,7 @@ known. Firefox (DEF-01) and the Planning Workspace 404 (DEF-02) are both CLOSED 
 | DEF-23 | Defect/UX | LOW | Six save handlers in `connected-frontend/index.html` had no success feedback — modal closed silently on success while showing errors on failure. Affected: `saveSessEdit()` (quick-edit session), `doSaveGettingHelp()` (Getting Help content), `saveRoom()` (add/edit room), `saveEquip()` (add/edit equipment), `doSaveSession()` (Planning Workspace builder session modal), `saveWingEvent()` (Wing HQ calendar event). Users had no confirmation that the save succeeded vs closed via a background error — particularly confusing for `saveSessEdit` (high-frequency operation). By contrast, `saveSettings()`, `saveTimingTemplate()`, and `saveFac()` all showed explicit confirmation. | Added `showToast()` call on success path for all six handlers. `saveRoom` and `saveEquip` use distinct "added" vs "updated" messages based on whether `editRoomId`/`editEquipId` was set before the save (captured in `isEditRoom`/`isEditEquip` before `editRoomId=null` clears it). `saveWingEvent` uses "Event created." vs "Event updated." via `isEditEvent`. | FIXED LOCALLY |
 | DEF-24 | Defect/Reliability | LOW | `navigator.clipboard.writeText()` in `frontend/src/routes/Accounts.tsx` (line 43, `NewCodeModal.copy()`) had no `.catch()`. `clipboard.writeText` rejects when the document is not focused, the page is not served over HTTPS, or the user denies clipboard permission — in those cases the rejection was unhandled (unhandledRejection event in Chrome, console warning). The `setCopied` state update was silently skipped with no user feedback. | Added `.catch(()=>{})` to the `.then()` chain to silently suppress the rejection — the visual "Copied" indicator simply does not appear if the clipboard operation fails, which is correct behaviour. | FIXED LOCALLY |
 | DEF-25 | Test Coverage | LOW | `frontend/e2e/facilitators.spec.ts` had no UI tests for the Edit or Archive mutation flows. Only the "add" and "read" paths were exercised. The Edit modal (`role="dialog" name="Edit facilitator"`, fields `#ef-first`, `#ef-last`, `#ef-rank`, `#ef-type`, Save button) and Archive confirm flow (`role="alertdialog"` via `useConfirm()` hook, Archive confirm button) were untested. The "add" test also used a hardcoded last name ("TestFac") that triggered the 409 `possible_duplicate` flow on repeat runs, making the test non-idempotent. | Added section 3 (Edit test) and section 4 (Archive test) to `facilitators.spec.ts`. Both use `Date.now()` suffix for isolation. Edit test: adds unique facilitator, clicks Edit, fills `#ef-first`="UpdatedFirst" and `#ef-rank`="FLTLT", saves, asserts updated full name `UpdatedFirst EditTest${suffix}` is visible. Archive test: adds unique facilitator, clicks Archive, confirms `role="alertdialog"`, asserts facilitator no longer visible. Fixed "add" test to use `AddTest${suffix}` instead of hardcoded "TestFac". Fixed edit assertion to use full name string (avoids Playwright strict-mode error when multiple "UpdatedFirst" records accumulate from repeated runs). Commit `05435b6`. | FIXED LOCALLY |
+| DEF-26 | Defect/UX | LOW | Two residual save-feedback gaps found by autosave audit (2026-08-15): (1) `saveTagFac()` in `connected-frontend/index.html` (line 9555) called `closeModal('m-tag-fac')` immediately on success without any toast — the modal closed silently with no confirmation the tags were saved. This contrasts with all other save handlers that call `showToast()`. (2) Nine `useMutation` calls in `frontend/src/routes/Accounts.tsx` had no `onError` handler — `disableMut`, `reactivateMut`, `editMut`, `archiveMut`, `restoreMut`, `unlockMut`, `createFlightMut`, `renameFlightMut`, `archiveFlightMut`. On API failure the button re-enabled silently with no user-visible error; the table did not update because `invalidateQueries` is only in `onSuccess`. | (1) Added `showToast('Subject areas saved.')` before `closeModal('m-tag-fac')` in `saveTagFac()`. (2) Added `onError: (e: Error) => toast(friendlyMessage(e, "Could not ..."), true)` to all nine mutations, with action-specific messages ("Could not disable account.", "Could not archive flight.", etc.). Added `import { useToast } from "../components/Toast"` and `const { toast } = useToast()` to `Accounts.tsx`. TypeScript: 0 errors. | FIXED LOCALLY |
 
 ---
 

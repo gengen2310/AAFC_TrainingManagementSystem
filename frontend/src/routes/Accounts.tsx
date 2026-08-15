@@ -7,6 +7,7 @@ import { Card, Empty, Loading, ErrorNote } from "../components/ui";
 import { useAuth } from "../auth/AuthProvider";
 import type { AccountRecord, Flight } from "../api/types";
 import { useConfirm } from "../components/ConfirmDialog";
+import { useToast } from "../components/Toast";
 
 const ROLE_LABELS: Record<string, string> = {
   sqn_general: "SQN General", sqn_admin: "SQN Admin",
@@ -67,6 +68,7 @@ export function Accounts() {
   const { session } = useAuth();
   const qc = useQueryClient();
   const { confirm } = useConfirm();
+  const { toast } = useToast();
   const canWrite = WRITE_ROLES.has(session?.role ?? "");
 
   // Filters
@@ -148,24 +150,29 @@ export function Accounts() {
   const disableMut = useMutation({
     mutationFn: accountApi.disable,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+    onError: (e: Error) => toast(friendlyMessage(e, "Could not disable account."), true),
   });
   const reactivateMut = useMutation({
     mutationFn: accountApi.reactivate,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+    onError: (e: Error) => toast(friendlyMessage(e, "Could not reactivate account."), true),
   });
   const editMut = useMutation({
     mutationFn: ({ uid, body }: { uid: string; body: { display_name?: string; flight_id?: string } }) =>
       accountApi.update(uid, body),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["accounts"] }); setEditUid(null); },
+    onError: (e: Error) => toast(friendlyMessage(e, "Could not save changes."), true),
   });
   // REM-46: archive/restore/permanent-delete/change-role/unlock parity with connected-frontend
   const archiveMut = useMutation({
     mutationFn: ({ uid, reason }: { uid: string; reason?: string }) => accountApi.archive(uid, reason),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+    onError: (e: Error) => toast(friendlyMessage(e, "Could not archive account."), true),
   });
   const restoreMut = useMutation({
     mutationFn: accountApi.restore,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+    onError: (e: Error) => toast(friendlyMessage(e, "Could not restore account."), true),
   });
   const deleteMut = useMutation({
     mutationFn: accountApi.remove,
@@ -175,6 +182,7 @@ export function Accounts() {
   const unlockMut = useMutation({
     mutationFn: accountApi.unlock,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["accounts"] }),
+    onError: (e: Error) => toast(friendlyMessage(e, "Could not unlock account."), true),
   });
   const changeRoleMut = useMutation({
     mutationFn: ({ uid, new_role }: { uid: string; new_role: string }) => accountApi.changeRole(uid, new_role),
@@ -184,10 +192,12 @@ export function Accounts() {
   const createFlightMut = useMutation({
     mutationFn: accountApi.createFlight,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["flights"] }); setShowCreateFlight(false); },
+    onError: (e: Error) => toast(friendlyMessage(e, "Could not create flight."), true),
   });
   const renameFlightMut = useMutation({
     mutationFn: ({ fid, name }: { fid: string; name: string }) => accountApi.renameFlight(fid, { name }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["flights"] }); setRenameFid(null); },
+    onError: (e: Error) => toast(friendlyMessage(e, "Could not rename flight."), true),
   });
   const archiveFlightMut = useMutation({
     mutationFn: accountApi.archiveFlight,
@@ -195,6 +205,7 @@ export function Accounts() {
       qc.invalidateQueries({ queryKey: ["flights"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
     },
+    onError: (e: Error) => toast(friendlyMessage(e, "Could not archive flight."), true),
   });
 
   const filteredAccounts = (accounts.data ?? []).filter(a => {
