@@ -213,19 +213,31 @@ def _delivery_trend(sessions: list, pns: list, weeks: int = 12) -> dict:
     data = []
     for wk in sorted(recent):
         b = recent[wk]
+        not_del = b["total"] - b["delivered"]
         pct = round(b["delivered"] / b["total"] * 100) if b["total"] else None
-        data.append({"label": wk, "reliability_pct": pct, "delivered": b["delivered"], "total": b["total"]})
+        nd_pct = round(not_del / b["total"] * 100) if b["total"] else None
+        data.append({
+            "label": wk,
+            "reliability_pct": pct,
+            "not_delivered_pct": nd_pct,
+            "delivered": b["delivered"],
+            "not_delivered": not_del,
+            "total": b["total"],
+        })
 
-    # Insight: trend direction
+    # Insight: trend direction + N/D rate
     insight = None
     valid = [d for d in data if d["reliability_pct"] is not None]
     if len(valid) >= 4:
-        last4 = [v["reliability_pct"] for v in valid[-4:]]
-        first4 = [v["reliability_pct"] for v in valid[:4]]
-        if sum(last4) / 4 > sum(first4) / 4 + 5:
-            insight = "Delivery reliability has improved over the past four weeks."
-        elif sum(last4) / 4 < sum(first4) / 4 - 5:
-            insight = "Delivery reliability has declined recently — review causes."
+        last4_rel = [v["reliability_pct"] for v in valid[-4:]]
+        first4_rel = [v["reliability_pct"] for v in valid[:4]]
+        avg_nd = round(sum(v["not_delivered_pct"] or 0 for v in valid[-4:]) / 4)
+        if sum(last4_rel) / 4 > sum(first4_rel) / 4 + 5:
+            insight = f"Delivery reliability has improved over the past four weeks (non-delivery rate {avg_nd}%)."
+        elif sum(last4_rel) / 4 < sum(first4_rel) / 4 - 5:
+            insight = f"Delivery reliability has declined recently — non-delivery rate {avg_nd}% over the past four weeks. Review causes."
+        elif avg_nd >= 20:
+            insight = f"Delivery is stable but the non-delivery rate remains {avg_nd}% — review causes."
 
     return {
         "chart_id": "delivery_trend",
@@ -2079,6 +2091,86 @@ def _term_comparison_ytd(all_sessions: list, all_pns: list) -> dict:
     }
 
 
+def _delivery_forecast(all_sessions: list, all_pns: list) -> dict:
+    """Stat card: deterministic end-of-year delivery forecast.
+
+    Projects how many remaining planned sessions will be delivered based on
+    the year-to-date delivery rate. Fully explainable — no AI or opaque
+    scoring. Assumes future rate = historical rate (stated in insight).
+    """
+    today = date.today()
+    today_iso = today.isoformat()
+    year_prefix = str(today.year) + "-"
+    year_end = f"{today.year}-12-31"
+
+    pn_map = {pn.id: pn.date for pn in all_pns}
+
+    ytd_delivered = 0
+    ytd_nd = 0
+    remaining_planned = 0
+
+    for s in all_sessions:
+        pn_date = pn_map.get(s.parade_night_id)
+        if not pn_date:
+            continue
+        in_year = pn_date.startswith(year_prefix)
+        in_past = in_year and pn_date <= today_iso
+        in_future = in_year and pn_date > today_iso and pn_date <= year_end
+
+        if in_past and s.status in _TERMINAL:
+            if s.status in _DELIVERED:
+                ytd_delivered += 1
+            else:
+                ytd_nd += 1
+        elif in_future and s.status == "planned":
+            remaining_planned += 1
+
+    ytd_total = ytd_delivered + ytd_nd
+    rate = ytd_delivered / ytd_total if ytd_total else None
+
+    projected_delivered = round(remaining_planned * rate) if (rate is not None and remaining_planned > 0) else None
+    projected_missed = (remaining_planned - projected_delivered) if projected_delivered is not None else None
+
+    insight_parts = []
+    if rate is not None:
+        insight_parts.append(f"Year-to-date delivery rate: {round(rate * 100)}%.")
+    if projected_delivered is not None:
+        insight_parts.append(
+            f"At this rate, {projected_delivered} of {remaining_planned} remaining planned sessions "
+            f"are expected to be delivered by year end. "
+            f"{projected_missed} are at risk of not being delivered."
+        )
+        insight_parts.append("Forecast assumes the historical rate continues — review if circumstances have changed.")
+    elif remaining_planned > 0 and rate is None:
+        insight_parts.append(
+            f"{remaining_planned} sessions planned for the rest of the year. "
+            "No historical delivery data available to forecast against."
+        )
+
+    return {
+        "chart_id": "delivery_forecast",
+        "chart_type": "delivery_forecast",
+        "title": "Delivery forecast — end of year",
+        "explanation": (
+            "Projects remaining planned sessions against the year-to-date delivery rate. "
+            "Deterministic: forecast = remaining planned × historical rate. No AI scoring."
+        ),
+        "question": "At our current rate, how many planned sessions are at risk of not being delivered by year end?",
+        "data": {
+            "ytd_delivered": ytd_delivered,
+            "ytd_not_delivered": ytd_nd,
+            "ytd_total_terminal": ytd_total,
+            "delivery_rate_pct": round(rate * 100) if rate is not None else None,
+            "remaining_planned": remaining_planned,
+            "projected_delivered": projected_delivered,
+            "projected_missed": projected_missed,
+        },
+        "insight": " ".join(insight_parts) if insight_parts else None,
+        "empty_state": "Not enough data to forecast. Record outcomes on past Parade Nights to enable this view.",
+        "permission_scope": "squadron",
+    }
+
+
 def _long_term_delivery_trend(sessions: list, pns: list, terms: int = 4) -> dict:
     """Line: delivery reliability per term (long-range strategic view)."""
     pn_map = {pn.id: (pn.date, pn.term) for pn in pns}
@@ -2167,6 +2259,7 @@ def _full_squadron_charts(db: DBSession, sq_id: str, w_start: str, w_end: str) -
     charts["weekly_outcomes"] = _safe_chart("weekly_outcomes", _weekly_outcomes, sessions, pns)
     charts["delivery_trend"] = _safe_chart("delivery_trend", _delivery_trend, all_sessions, all_pns)
     charts["term_comparison_ytd"] = _safe_chart("term_comparison_ytd", _term_comparison_ytd, all_sessions, all_pns)
+    charts["delivery_forecast"] = _safe_chart("delivery_forecast", _delivery_forecast, all_sessions, all_pns)
     # all_sessions (not the window-filtered `sessions`) — curriculum phase
     # progress is a cumulative measure like its sibling curriculum_backlog
     # (already all_sessions below), not a windowed one. Using the window-

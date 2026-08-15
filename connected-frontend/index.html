@@ -859,6 +859,12 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <div id="insight-cancellation-reasons" class="chart-insight" style="display:none"></div>
             </div>
           </div>
+          <div class="card" id="card-delivery-forecast" style="display:none">
+            <div class="ctitle">Delivery forecast — end of year <button class="ht" tabindex="0" aria-label="About delivery forecast" data-tip="Projects remaining planned sessions against your year-to-date delivery rate. Deterministic: forecast = remaining planned × historical rate. No AI scoring.">?</button></div>
+            <div class="ssub" style="font-size:11px;color:var(--muted);margin-bottom:8px">At your current rate, how many planned sessions are at risk of not being delivered by year end?</div>
+            <div id="chart-delivery-forecast"><div class="chart-skeleton" style="height:60px"></div></div>
+            <div id="insight-delivery-forecast" class="chart-insight" style="display:none"></div>
+          </div>
         </div>
 
         <!-- ══════════ C. CURRICULUM ══════════ -->
@@ -7128,6 +7134,14 @@ async function loadDashCharts(){
   _dSetExp('exp-delivery-trend',charts.delivery_trend?.explanation);
   _dRenderChart('chart-session-outcomes',charts.session_outcomes,_chartDonut,'insight-session-outcomes');
   _dRenderChart('chart-cancellation-reasons',charts.cancellation_reasons,_chartHBar,'insight-cancellation-reasons');
+  // DASH-15: delivery forecast — hidden when no data
+  (function(){
+    const fc=charts.delivery_forecast;const d=fc?.data||{};
+    const hasData=(d.ytd_total_terminal>0||d.remaining_planned>0);
+    const card=document.getElementById('card-delivery-forecast');
+    if(card)card.style.display=hasData?'':'none';
+    if(hasData)_dRenderChart('chart-delivery-forecast',fc,_chartDeliveryForecast,'insight-delivery-forecast');
+  })();
   // DASH-06: when the top cancellation reason is a data quality gap, surface an
   // actionable prompt so staff know to update those sessions — not display it as
   // an inert bar only a data analyst would notice.
@@ -7208,6 +7222,59 @@ async function loadFacilitatorStats(){
   _dRenderChart('fac-chart-spof',charts.subject_area_resilience,_chartHBar,'fac-insight-spof');
   _dRenderChart('fac-chart-gaps',charts.facilitator_repeated_gaps,_chartHBar,'fac-insight-gaps');
   _dRenderChart('fac-chart-type',charts.facilitator_type_distribution,_chartHBar,'fac-insight-type');
+}
+
+function _chartDeliveryForecast(chart){
+  const d=chart.data||{};
+  const rate=d.delivery_rate_pct;
+  const remaining=d.remaining_planned;
+  const projDel=d.projected_delivered;
+  const projMiss=d.projected_missed;
+  const hasHistory=(d.ytd_total_terminal>0);
+  const hasForecast=(projDel!=null);
+
+  if(!hasHistory&&!remaining)return _dEmptyChart(chart.empty_state||'Not enough data to forecast.');
+
+  const rateColor=rate!=null?(rate>=80?'var(--ok)':rate>=60?'var(--warn)':'var(--red)'):'var(--muted)';
+  const missColor=hasForecast&&projMiss>0?'var(--warn)':'var(--ok)';
+
+  let html='<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">';
+
+  if(hasHistory){
+    html+=`<div style="flex:1;min-width:100px;text-align:center;padding:8px 4px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Current rate</div>
+      <div style="font-size:28px;font-weight:800;color:${rateColor};line-height:1.1">${rate!=null?rate+'%':'—'}</div>
+      <div style="font-size:10px;color:var(--muted)">${d.ytd_delivered} of ${d.ytd_total_terminal} sessions delivered YTD</div>
+    </div>`;
+  }
+
+  if(remaining>0){
+    html+=`<div style="flex:1;min-width:100px;text-align:center;padding:8px 4px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Remaining planned</div>
+      <div style="font-size:28px;font-weight:800;color:var(--text);line-height:1.1">${remaining}</div>
+      <div style="font-size:10px;color:var(--muted)">sessions still ahead</div>
+    </div>`;
+  }
+
+  if(hasForecast){
+    html+=`<div style="flex:1;min-width:100px;text-align:center;padding:8px 4px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Projected to deliver</div>
+      <div style="font-size:28px;font-weight:800;color:var(--ok);line-height:1.1">${projDel}</div>
+      <div style="font-size:10px;color:var(--muted)">of ${remaining} remaining</div>
+    </div>
+    <div style="flex:1;min-width:100px;text-align:center;padding:8px 4px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">At risk</div>
+      <div style="font-size:28px;font-weight:800;color:${missColor};line-height:1.1">${projMiss}</div>
+      <div style="font-size:10px;color:var(--muted)">projected non-delivery</div>
+    </div>`;
+  }else if(remaining>0&&!hasHistory){
+    html+=`<div style="flex:2;padding:8px 4px">
+      <div style="font-size:12px;color:var(--muted)">${remaining} sessions planned for the rest of the year. Record outcomes on past Parade Nights to enable the forecast.</div>
+    </div>`;
+  }
+
+  html+='</div>';
+  return html;
 }
 
 function _chartTermYtd(chart){
