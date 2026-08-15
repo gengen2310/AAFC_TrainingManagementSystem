@@ -233,7 +233,7 @@ formally staging-verified as a separate post-deploy check. Source: 46-row
 
 **Scope:** Confirmed defects or architectural gaps that block correct operation for real user journeys.
 Items marked P0 are potentially showstopping for V1 if their scope is confirmed wider than currently
-known. Firefox and the Planning Workspace 404 are uninvestigated — root causes unknown.
+known. Firefox (DEF-01) and the Planning Workspace 404 (DEF-02) are both CLOSED — fixes confirmed by code inspection.
 
 | ID | AREA | SEVERITY | REQUIREMENT | CURRENT STATE | STATUS |
 |---|---|---|---|---|---|

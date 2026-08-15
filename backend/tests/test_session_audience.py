@@ -268,8 +268,14 @@ def test_cannot_link_a_nonexistent_class(client):
 
 def _make_two_sessions_same_pn(client, hdr, days_ahead):
     """One parade night, two sessions with the same period_number — the
-    scenario that should trigger the MBACK-05 class-clash check."""
-    candidate = date.today() + timedelta(days=days_ahead)
+    scenario that should trigger the MBACK-05 class-clash check.
+
+    Uses a fixed far-future anchor (2040-01-01) so the computed date never
+    drifts into dates created by other test files as the calendar advances.
+    (date.today()+N previously collided with test_planning.py's yearly-frequency
+    generation, which creates 703 PNs on 2027-04-25.)
+    """
+    candidate = date(2040, 1, 1) + timedelta(days=days_ahead)
     if candidate.weekday() == 4:  # Friday
         candidate += timedelta(days=1)
     target_date = candidate.isoformat()
