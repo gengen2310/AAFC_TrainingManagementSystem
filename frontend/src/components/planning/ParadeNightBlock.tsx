@@ -320,6 +320,8 @@ export function ParadeNightBlock({
   onHeaderClick, onSessionClick, onEmptyCellClick,
 }: ParadeNightBlockProps) {
   const [addingNotice, setAddingNotice] = useState(false);
+  // CLASS-23: per-block collapsed state. Collapsed shows only the header bar.
+  const [collapsed, setCollapsed] = useState(false);
 
   const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("en-CA", {
     weekday: compact ? "short" : "long",
@@ -370,7 +372,21 @@ export function ParadeNightBlock({
             ⚠ {conflictCount}
           </span>
         )}
+        {/* CLASS-23: collapse toggle — stops propagation so header nav doesn't fire */}
+        <button
+          className="pw-block-collapse-btn"
+          onClick={e => { e.stopPropagation(); setCollapsed(v => !v); }}
+          onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setCollapsed(v => !v); } }}
+          aria-label={collapsed ? "Expand parade night" : "Collapse parade night"}
+          aria-expanded={!collapsed}
+          title={collapsed ? "Expand" : "Collapse"}
+        >
+          {collapsed ? "▶" : "▼"}
+        </button>
       </div>
+
+      {/* ── Collapsible body (CLASS-23) ─────────────────────────────────────── */}
+      {!collapsed && <>
 
       {/* ── Notices band ────────────────────────────────────────────────────── */}
       <div className="pw-block-band">
@@ -546,6 +562,8 @@ export function ParadeNightBlock({
           ⚠ {conflictCount} conflict{conflictCount !== 1 ? "s" : ""} — open night detail to resolve
         </div>
       )}
+
+      </>}{/* end CLASS-23 collapsible body */}
     </div>
   );
 }

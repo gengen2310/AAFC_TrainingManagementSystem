@@ -551,6 +551,20 @@ body.pw-active .main {
   white-space: nowrap;
   flex-shrink: 0;
 }
+/* CLASS-23: collapse/expand toggle in block header */
+.pw-block-collapse-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255,255,255,.7);
+  font-size: 9px;
+  padding: 2px 4px;
+  flex-shrink: 0;
+  line-height: 1;
+  border-radius: 3px;
+  margin-left: auto;
+}
+.pw-block-collapse-btn:hover { color: #fff; background: rgba(255,255,255,.12); }
 .pw-block-add-notice-btn {
   background: rgba(255,255,255,.1);
   border: 1px solid rgba(255,255,255,.25);
