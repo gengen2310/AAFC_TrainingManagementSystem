@@ -223,11 +223,24 @@ def _delivery_trend(sessions: list, pns: list, weeks: int = 12) -> dict:
             "delivered": b["delivered"],
             "not_delivered": not_del,
             "total": b["total"],
+            "is_anomaly": False,
         })
 
-    # Insight: trend direction + N/D rate
-    insight = None
+    # Anomaly detection: flag weeks with ≥4 sessions where delivery rate
+    # drops ≥20 pp below the window average. Min-session threshold avoids
+    # flagging a single cancelled session on a quiet night as an anomaly.
     valid = [d for d in data if d["reliability_pct"] is not None]
+    anomaly_weeks: list[str] = []
+    if len(valid) >= 3:
+        avg_pct = sum(v["reliability_pct"] for v in valid) / len(valid)
+        for row in data:
+            if row["reliability_pct"] is not None and row["total"] >= 4:
+                if row["reliability_pct"] < avg_pct - 20:
+                    row["is_anomaly"] = True
+                    anomaly_weeks.append(row["label"])
+
+    # Insight: trend direction + N/D rate + anomaly summary
+    insight = None
     if len(valid) >= 4:
         last4_rel = [v["reliability_pct"] for v in valid[-4:]]
         first4_rel = [v["reliability_pct"] for v in valid[:4]]
@@ -238,6 +251,9 @@ def _delivery_trend(sessions: list, pns: list, weeks: int = 12) -> dict:
             insight = f"Delivery reliability has declined recently — non-delivery rate {avg_nd}% over the past four weeks. Review causes."
         elif avg_nd >= 20:
             insight = f"Delivery is stable but the non-delivery rate remains {avg_nd}% — review causes."
+    if anomaly_weeks:
+        anomaly_note = f"Anomalous weeks detected (delivery ≥20 pp below average): {', '.join(anomaly_weeks)}. Review those parade nights."
+        insight = f"{insight} {anomaly_note}".strip() if insight else anomaly_note
 
     return {
         "chart_id": "delivery_trend",
