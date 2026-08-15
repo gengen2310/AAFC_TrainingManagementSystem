@@ -950,6 +950,12 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <div class="ctitle">Long-term delivery trend by term</div>
             <div id="chart-long-term-trend"><div class="chart-skeleton"></div></div>
           </div>
+          <div class="card" id="card-term-ytd" style="display:none">
+            <div class="ctitle">Delivery — term comparison and year to date</div>
+            <div class="ssub" style="font-size:11px;color:var(--muted);margin-bottom:8px">Year-to-date rate and current vs previous term. Set the training term on each Parade Night to enable this view.</div>
+            <div id="chart-term-ytd"><div class="chart-skeleton" style="height:60px"></div></div>
+            <div id="insight-term-ytd" class="chart-insight" style="display:none"></div>
+          </div>
         </div>
 
         <!-- ══════════ WING COMPARISON ══════════ -->
@@ -7204,6 +7210,34 @@ async function loadFacilitatorStats(){
   _dRenderChart('fac-chart-type',charts.facilitator_type_distribution,_chartHBar,'fac-insight-type');
 }
 
+function _chartTermYtd(chart){
+  const d=chart.data||{};
+  const hasTerm=(d.current_term!=null&&d.current_term_pct!=null);
+  const hasDelta=(hasTerm&&d.prev_term!=null&&d.delta_pct!=null);
+  const hasYtd=(d.ytd_total>0&&d.ytd_pct!=null);
+  if(!hasYtd&&!hasTerm)return _dEmptyChart(chart.empty_state||'No term data available. Set training term on Parade Nights to enable this view.');
+
+  function _statBox(label,pct,subLabel,delta){
+    const color=pct!=null?(pct>=80?'var(--ok)':pct>=60?'var(--warn)':'var(--red)'):'var(--muted)';
+    const deltaHtml=delta!=null
+      ?`<div style="font-size:11px;color:${delta>0?'var(--ok)':delta<0?'var(--red)':'var(--muted)'};">`+
+        `${delta>0?'▲':'▼'} ${Math.abs(delta)} pp vs ${esc(d.prev_term||'prior term')}</div>`:'';
+    return `<div style="flex:1;text-align:center;padding:8px 4px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:2px">${esc(label)}</div>
+      <div style="font-size:26px;font-weight:800;color:${color};line-height:1.1">${pct!=null?pct+'%':'—'}</div>
+      ${subLabel?`<div style="font-size:10px;color:var(--muted)">${esc(subLabel)}</div>`:''}
+      ${deltaHtml}
+    </div>`;
+  }
+
+  let boxes='';
+  if(hasYtd) boxes+=_statBox('Year to Date',d.ytd_pct,`${d.ytd_delivered} of ${d.ytd_total} sessions`);
+  if(hasTerm) boxes+=_statBox(esc(d.current_term||'Current term'),d.current_term_pct,'',hasDelta?d.delta_pct:null);
+  if(d.prev_term!=null&&d.prev_term_pct!=null) boxes+=_statBox(esc(d.prev_term||'Prior term'),d.prev_term_pct,'');
+
+  return `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start">${boxes}</div>`;
+}
+
 async function _loadDashStrategic(){
   const btn=document.getElementById('btn-load-strategic');
   if(btn){btn.textContent='Loading…';btn.disabled=true;}
@@ -7225,6 +7259,14 @@ async function _loadDashStrategic(){
   // never had a card for it at all.
   _dRenderChart('chart-facilitator-leave-impact',charts.facilitator_leave_impact,_chartHBar,'insight-facilitator-leave-impact');
   _dRenderChart('chart-long-term-trend',charts.long_term_delivery_trend,_chartLine);
+  const ytdCard=document.getElementById('card-term-ytd');
+  if(ytdCard){
+    const ytd=charts.term_comparison_ytd;
+    const d=ytd?.data||{};
+    const hasData=(d.ytd_total>0||d.current_term!=null);
+    ytdCard.style.display=hasData?'':'none';
+  }
+  _dRenderChart('chart-term-ytd',charts.term_comparison_ytd,_chartTermYtd,'insight-term-ytd');
   if(btn)btn.style.display='none';
 }
 

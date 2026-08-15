@@ -1991,6 +1991,94 @@ def _facilitator_type_distribution(facs: list) -> dict:
     }
 
 
+def _term_comparison_ytd(all_sessions: list, all_pns: list) -> dict:
+    """Stat card: YTD delivery rate + current-vs-prior term comparison."""
+    today = date.today()
+    today_iso = today.isoformat()
+    year_prefix = str(today.year) + "-"
+
+    pn_map = {pn.id: (pn.date, pn.term) for pn in all_pns}
+
+    # Bucket terminal sessions by term; track latest PN date per term for ordering.
+    term_buckets: dict[str, dict] = {}
+    ytd_delivered = 0
+    ytd_total = 0
+
+    for s in all_sessions:
+        if s.status not in _TERMINAL:
+            continue
+        info = pn_map.get(s.parade_night_id)
+        if not info:
+            continue
+        pn_date, term = info
+        if not pn_date:
+            continue
+
+        if pn_date.startswith(year_prefix) and pn_date <= today_iso:
+            ytd_total += 1
+            if s.status in _DELIVERED:
+                ytd_delivered += 1
+
+        if not term:
+            continue
+        if term not in term_buckets:
+            term_buckets[term] = {"delivered": 0, "total": 0, "latest": "0000-00-00"}
+        term_buckets[term]["total"] += 1
+        if s.status in _DELIVERED:
+            term_buckets[term]["delivered"] += 1
+        if pn_date > term_buckets[term]["latest"]:
+            term_buckets[term]["latest"] = pn_date
+
+    sorted_terms = sorted(term_buckets.items(), key=lambda x: x[1]["latest"], reverse=True)
+
+    def _pct(bucket: dict) -> int | None:
+        return round(bucket["delivered"] / bucket["total"] * 100) if bucket["total"] else None
+
+    ytd_pct = round(ytd_delivered / ytd_total * 100) if ytd_total else None
+    cur_label = sorted_terms[0][0] if len(sorted_terms) >= 1 else None
+    cur_pct = _pct(sorted_terms[0][1]) if len(sorted_terms) >= 1 else None
+    prv_label = sorted_terms[1][0] if len(sorted_terms) >= 2 else None
+    prv_pct = _pct(sorted_terms[1][1]) if len(sorted_terms) >= 2 else None
+    delta = (cur_pct - prv_pct) if (cur_pct is not None and prv_pct is not None) else None
+
+    insight_parts = []
+    if ytd_pct is not None:
+        insight_parts.append(
+            f"Year-to-date delivery rate is {ytd_pct}% "
+            f"({ytd_delivered} of {ytd_total} sessions delivered)."
+        )
+    if delta is not None:
+        direction = "up" if delta > 0 else "down" if delta < 0 else "unchanged"
+        insight_parts.append(
+            f"Delivery is {direction} {abs(delta)} percentage point(s) "
+            f"compared to {prv_label}."
+        )
+
+    return {
+        "chart_id": "term_comparison_ytd",
+        "chart_type": "term_comparison_ytd",
+        "title": "Delivery — term comparison and year to date",
+        "explanation": (
+            "Year-to-date delivery reliability and a comparison between the "
+            "current and previous training term."
+        ),
+        "question": "Is delivery improving between terms, and what is this year's overall rate?",
+        "data": {
+            "ytd_delivered": ytd_delivered,
+            "ytd_total": ytd_total,
+            "ytd_pct": ytd_pct,
+            "current_term": cur_label,
+            "current_term_pct": cur_pct,
+            "prev_term": prv_label,
+            "prev_term_pct": prv_pct,
+            "delta_pct": delta,
+        },
+        "insight": " ".join(insight_parts) if insight_parts else None,
+        "empty_state": "Not enough term data to compare. Record training term details on Parade Nights to enable this view.",
+        "permission_scope": "squadron",
+    }
+
+
 def _long_term_delivery_trend(sessions: list, pns: list, terms: int = 4) -> dict:
     """Line: delivery reliability per term (long-range strategic view)."""
     pn_map = {pn.id: (pn.date, pn.term) for pn in pns}
@@ -2078,6 +2166,7 @@ def _full_squadron_charts(db: DBSession, sq_id: str, w_start: str, w_end: str) -
     charts["session_outcomes"] = _safe_chart("session_outcomes", _session_outcomes_distribution, sessions)
     charts["weekly_outcomes"] = _safe_chart("weekly_outcomes", _weekly_outcomes, sessions, pns)
     charts["delivery_trend"] = _safe_chart("delivery_trend", _delivery_trend, all_sessions, all_pns)
+    charts["term_comparison_ytd"] = _safe_chart("term_comparison_ytd", _term_comparison_ytd, all_sessions, all_pns)
     # all_sessions (not the window-filtered `sessions`) — curriculum phase
     # progress is a cumulative measure like its sibling curriculum_backlog
     # (already all_sessions below), not a windowed one. Using the window-
@@ -2291,6 +2380,7 @@ def _full_squadron_strategic_charts(db: DBSession, sq_id: str) -> dict:
         "facilitator_type_distribution", _facilitator_type_distribution, facs)
     charts["long_term_delivery_trend"] = _safe_chart(
         "long_term_delivery_trend", _long_term_delivery_trend, all_sessions, all_pns)
+    charts["term_comparison_ytd"] = _safe_chart("term_comparison_ytd", _term_comparison_ytd, all_sessions, all_pns)
     fac_leave = db.query(PlanningFacilitatorLeave).filter(
         PlanningFacilitatorLeave.facilitator_id.in_([f.id for f in facs]),
         PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
@@ -2325,6 +2415,7 @@ def _wing_strategic_charts(db: DBSession, wing_id: str) -> dict:
         Session.is_archived == False,  # noqa: E712
     ).all() if pns else []
     charts["long_term_delivery_trend"] = _safe_chart("long_term_delivery_trend", _long_term_delivery_trend, sessions, pns)
+    charts["term_comparison_ytd"] = _safe_chart("term_comparison_ytd", _term_comparison_ytd, sessions, pns)
     return charts
 
 
@@ -2344,6 +2435,7 @@ def _national_strategic_charts(db: DBSession) -> dict:
         Session.is_archived == False,  # noqa: E712
     ).all() if pns else []
     charts["long_term_delivery_trend"] = _safe_chart("long_term_delivery_trend", _long_term_delivery_trend, sessions, pns)
+    charts["term_comparison_ytd"] = _safe_chart("term_comparison_ytd", _term_comparison_ytd, sessions, pns)
     return charts
 
 
