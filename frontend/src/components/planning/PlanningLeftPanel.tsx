@@ -50,6 +50,8 @@ interface Props {
   onPriorityToggle: (p: string) => void;
   focusClassId?: string | null;
   onClassFocus?: (classId: string | null) => void;
+  searchText?: string;
+  onSearchTextChange?: (text: string) => void;
   cc: CommandCentreData | null;
   onBacklogItemClick: (type: string, id: string) => void;
   className?: string;
@@ -57,7 +59,7 @@ interface Props {
 
 export function PlanningLeftPanel({
   layers, onLayerToggle, audience, onAudienceToggle, priority, onPriorityToggle,
-  focusClassId, onClassFocus,
+  focusClassId, onClassFocus, searchText, onSearchTextChange,
   cc, onBacklogItemClick, className,
 }: Props) {
   const [legendOpen, setLegendOpen] = useState(true);
@@ -94,6 +96,28 @@ export function PlanningLeftPanel({
             {label}
           </label>
         ))}
+      </div>
+
+      {/* ── Session search ───────────────────────────────── */}
+      <div className="pw-section">
+        <div className="pw-section-hdr">Session search</div>
+        <input
+          type="search"
+          placeholder="Title or curriculum code…"
+          value={searchText ?? ""}
+          onChange={e => onSearchTextChange?.(e.target.value)}
+          aria-label="Search sessions by title or curriculum code"
+          style={{ width: "100%", boxSizing: "border-box", padding: "5px 8px", fontSize: 12, border: "1px solid var(--border)", borderRadius: 5, background: "var(--surface)", color: "var(--text)", outline: "none" }}
+        />
+        {!!searchText && (
+          <button
+            style={{ marginTop: 4, fontSize: 11, background: "none", border: "none", cursor: "pointer", color: "var(--muted-text)", padding: 0 }}
+            onClick={() => onSearchTextChange?.("")}
+            aria-label="Clear search"
+          >
+            × Clear
+          </button>
+        )}
       </div>
 
       {/* ── Class focus (only shown when squadron has multiple classes) ───── */}

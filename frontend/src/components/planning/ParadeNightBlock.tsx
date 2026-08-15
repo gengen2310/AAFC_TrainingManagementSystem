@@ -295,6 +295,8 @@ interface ParadeNightBlockProps {
   blockSize?: "sm" | "md";
   /** When set, dims session cells that don't target this Training Class */
   focusClassId?: string | null;
+  /** When set, dims session cells whose title and code don't contain the search text */
+  searchText?: string | null;
   onHeaderClick: () => void;
   onSessionClick?: (session: DisplaySession) => void;
   onEmptyCellClick?: (cadetGroup: string, period: number) => void;
@@ -303,7 +305,7 @@ interface ParadeNightBlockProps {
 export function ParadeNightBlock({
   dateId, date, weekNumber, term, notices = [],
   sessions, sessionCount, filledSlots, conflictCount = 0,
-  inHoliday = false, compact = false, blockSize = "md", focusClassId,
+  inHoliday = false, compact = false, blockSize = "md", focusClassId, searchText,
   onHeaderClick, onSessionClick, onEmptyCellClick,
 }: ParadeNightBlockProps) {
   const [addingNotice, setAddingNotice] = useState(false);
@@ -467,11 +469,17 @@ export function ParadeNightBlock({
                     }
                     const classDimmed = focusClassId != null &&
                       !(cell.training_classes ?? []).some(c => c.training_class_id === focusClassId);
+                    const q = searchText?.trim().toLowerCase();
+                    const searchDimmed = !!q && !(
+                      cell.title?.toLowerCase().includes(q) ||
+                      cell.code?.toLowerCase().includes(q)
+                    );
+                    const isDimmed = classDimmed || searchDimmed;
                     return (
                       <td
                         key={period}
                         className={`pw-night-cell${cell.conflict === "room" ? " conflict-room" : cell.conflict === "fac" ? " conflict-fac" : ""}`}
-                        style={classDimmed ? { opacity: 0.22 } : undefined}
+                        style={isDimmed ? { opacity: 0.22 } : undefined}
                         onClick={onSessionClick ? e => { e.stopPropagation(); onSessionClick(cell); } : onHeaderClick}
                         role="button"
                         tabIndex={0}

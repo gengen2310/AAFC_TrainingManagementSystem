@@ -68,6 +68,7 @@ export function PlanningWorkspace() {
   const [audience, setAudience] = useState<Set<string>>(new Set());
   const [priority, setPriority] = useState<Set<string>>(new Set());
   const [focusClassId, setFocusClassId] = useState<string | null>(null);
+  const [searchText, setSearchText] = useState<string>("");
   // Mobile-only: left filter/backlog panel is off-canvas below 768px, toggled via the
   // hamburger button in the context bar. Ignored (has no visual effect) above that width.
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
@@ -297,6 +298,7 @@ export function PlanningWorkspace() {
           audience={audience}
           priority={priority}
           focusClassId={focusClassId}
+          searchText={searchText || null}
           conflicts={yearConflicts}
         />
       );
@@ -315,6 +317,7 @@ export function PlanningWorkspace() {
           audience={audience}
           priority={priority}
           focusClassId={focusClassId}
+          searchText={searchText || null}
         />
       );
     }
@@ -375,6 +378,7 @@ export function PlanningWorkspace() {
           audience={audience}
           priority={priority}
           focusClassId={focusClassId}
+          searchText={searchText || null}
         />
       );
     }
@@ -489,6 +493,8 @@ export function PlanningWorkspace() {
           onPriorityToggle={handlePriorityToggle}
           focusClassId={focusClassId}
           onClassFocus={handleClassFocus}
+          searchText={searchText}
+          onSearchTextChange={setSearchText}
           cc={cc ?? null}
           onBacklogItemClick={handleBacklogItemClick}
         />
