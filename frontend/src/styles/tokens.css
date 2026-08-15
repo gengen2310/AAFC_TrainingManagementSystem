@@ -1,11 +1,74 @@
 /* Planning Workspace design tokens.
- * Light-theme canonical values live in shared/tokens.css (the single source).
- * This file: imports shared tokens, adds backward-compat aliases for the
- * --aafc-* names used throughout PW component files, and defines the
- * dark / high-contrast themes (PW-specific; connected-frontend is light only).
+ * Light-theme canonical values are inlined below from shared/tokens.css (the
+ * single authoritative source). The @import was replaced with an inline copy
+ * because the Docker build context is limited to the frontend/ directory and
+ * cannot reach the project-root shared/ directory.
+ *
+ * SYNC NOTE: when editing light-theme token values, update shared/tokens.css
+ * AND connected-frontend/index.html (between the sync-begin/sync-end markers)
+ * AND this file. Run `python scripts/check_token_sync.py` to verify sync.
+ *
+ * Dark / high-contrast themes below are PW-specific; connected-frontend ships
+ * a single light theme only.
  */
 
-@import '../../../shared/tokens.css';
+/* ── Inlined from shared/tokens.css (light-theme canonical tokens) ────────── */
+:root {
+  /* ── AAFC VIG brand palette ──────────────────────────────────────────── */
+  --blue:   #51b0e3;   /* AAFC blue — accent, active states, highlights */
+  --dark:   #002f65;   /* AAFC dark blue — header, nav structure */
+  --royal:  #004b8d;   /* Royal blue — secondary active states */
+  --steel:  #455560;   /* Gunmetal grey — body text, secondary surfaces */
+  --lgrey:  #b0b7bb;   /* Light grey — borders, table headers, quiet backgrounds */
+  --pale:   #7db2ce;   /* Pale blue — subtle information backgrounds */
+  --red:    #e51937;   /* Red — danger, errors, must-attend only */
+
+  /* ── Surface tokens ──────────────────────────────────────────────────── */
+  --bg:           #f4f8fc;
+  --surface:      #ffffff;
+  --surface-2:    #f0f5fa;
+  --border:       #d1dce8;
+  --border-light: #e4edf5;
+
+  /* ── Text tokens ─────────────────────────────────────────────────────── */
+  --text:   #1e2d3d;
+  --text-2: #3a4a55;
+  --ink-2:  #44506a;
+  --muted:  #657380;
+
+  /* ── WCAG AA accessibility tokens ────────────────────────────────────── */
+  --muted-text-on-light: #6e7275;
+  --text-on-dark-muted:  #7e9bbb;
+  --link-on-light:       var(--royal);
+  --status-text-danger:  #d41733;
+
+  /* ── Status / semantic colours ───────────────────────────────────────── */
+  --ok:          #1a7f4b;
+  --ok-bg:       #d4f0e3;
+  --ok-text:     #145f38;
+  --warn:        #c97a00;
+  --warn-bg:     #fff3cd;
+  --rescheduled: #7c3aed;
+
+  /* ── Semantic shortcuts ──────────────────────────────────────────────── */
+  --accent:       var(--blue);
+  --accent-light: #e0f0fa;
+  --primary:      var(--dark);
+  --navy:         var(--dark);
+  --danger:       var(--red);
+  --line:         var(--border);
+
+  /* ── Elevation / shadow ──────────────────────────────────────────────── */
+  --sh:  0 1px 4px rgba(0,47,101,.10);
+  --sh2: 0 4px 16px rgba(0,47,101,.14);
+
+  /* ── Spacing / layout ────────────────────────────────────────────────── */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --radius:  10px;
+}
 
 /* ── Backward-compat aliases: --aafc-* → canonical names ───────────────── *
  * Component files reference --aafc-blue, --aafc-dark-blue, etc.            *
