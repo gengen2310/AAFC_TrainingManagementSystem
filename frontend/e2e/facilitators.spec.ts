@@ -66,22 +66,85 @@ test("sqn_admin can add a facilitator", async ({ page }) => {
   await page.goto("/facilitators");
   await expect(page.getByRole("heading", { name: "Facilitators" })).toBeVisible({ timeout: 8000 });
 
+  const suffix = Date.now();
   await page.getByRole("button", { name: "Add facilitator" }).click();
   const dialog = page.getByRole("dialog", { name: "Add facilitator" });
   await expect(dialog).toBeVisible({ timeout: 5000 });
 
   await dialog.locator("#f-first").fill("Playwright");
-  await dialog.locator("#f-last").fill("TestFac");
+  await dialog.locator("#f-last").fill(`AddTest${suffix}`);
   await dialog.locator("#f-rank").fill("CI");
 
-  // "Add" button is enabled only when first + last are filled
   await dialog.getByRole("button", { name: "Add" }).click();
 
   await expect(dialog).not.toBeVisible({ timeout: 8000 });
-  await expect(page.getByText("TestFac")).toBeVisible({ timeout: 8000 });
+  await expect(page.getByText(`AddTest${suffix}`)).toBeVisible({ timeout: 8000 });
 });
 
-// ── 3. Stats drilldown ────────────────────────────────────────────────────────
+// ── 3. Edit a facilitator ─────────────────────────────────────────────────────
+
+test("sqn_admin can edit a facilitator's name and rank", async ({ page }) => {
+  await page.goto("/facilitators");
+  await expect(page.getByRole("heading", { name: "Facilitators" })).toBeVisible({ timeout: 8000 });
+
+  // Add a facilitator to edit (isolated by unique name)
+  const suffix = Date.now();
+  await page.getByRole("button", { name: "Add facilitator" }).click();
+  const addDialog = page.getByRole("dialog", { name: "Add facilitator" });
+  await addDialog.locator("#f-first").fill("EditFirst");
+  await addDialog.locator("#f-last").fill(`EditTest${suffix}`);
+  await addDialog.locator("#f-rank").fill("CI");
+  await addDialog.getByRole("button", { name: "Add" }).click();
+  await expect(addDialog).not.toBeVisible({ timeout: 8000 });
+  await expect(page.getByText(`EditTest${suffix}`)).toBeVisible({ timeout: 8000 });
+
+  // Click Edit on the newly created row
+  const row = page.locator("tbody tr", { hasText: `EditTest${suffix}` });
+  await row.getByRole("button", { name: "Edit" }).click();
+  const editDialog = page.getByRole("dialog", { name: "Edit facilitator" });
+  await expect(editDialog).toBeVisible({ timeout: 5000 });
+
+  // Change the given name
+  await editDialog.locator("#ef-first").fill("UpdatedFirst");
+  await editDialog.locator("#ef-rank").fill("FLTLT");
+  await editDialog.getByRole("button", { name: "Save" }).click();
+  await expect(editDialog).not.toBeVisible({ timeout: 8000 });
+
+  // Updated name should appear in the list (full name cell is unique via suffix)
+  await expect(page.getByText(`UpdatedFirst EditTest${suffix}`)).toBeVisible({ timeout: 8000 });
+});
+
+// ── 4. Archive a facilitator ──────────────────────────────────────────────────
+
+test("sqn_admin can archive a facilitator via confirm dialog", async ({ page }) => {
+  await page.goto("/facilitators");
+  await expect(page.getByRole("heading", { name: "Facilitators" })).toBeVisible({ timeout: 8000 });
+
+  // Add a facilitator to archive (isolated by unique name)
+  const suffix = Date.now();
+  await page.getByRole("button", { name: "Add facilitator" }).click();
+  const addDialog = page.getByRole("dialog", { name: "Add facilitator" });
+  await addDialog.locator("#f-first").fill("ArchiveFirst");
+  await addDialog.locator("#f-last").fill(`ArchiveTest${suffix}`);
+  await addDialog.getByRole("button", { name: "Add" }).click();
+  await expect(addDialog).not.toBeVisible({ timeout: 8000 });
+  await expect(page.getByText(`ArchiveTest${suffix}`)).toBeVisible({ timeout: 8000 });
+
+  // Click Archive on the row
+  const row = page.locator("tbody tr", { hasText: `ArchiveTest${suffix}` });
+  await row.getByRole("button", { name: "Archive" }).click();
+
+  // Confirm in the custom confirm dialog (ConfirmDialog renders role="alertdialog")
+  const confirmDialog = page.getByRole("alertdialog");
+  await expect(confirmDialog).toBeVisible({ timeout: 5000 });
+  await confirmDialog.getByRole("button", { name: "Archive" }).click();
+  await expect(confirmDialog).not.toBeVisible({ timeout: 5000 });
+
+  // Facilitator no longer visible in the default (non-archived) list
+  await expect(page.getByText(`ArchiveTest${suffix}`)).not.toBeVisible({ timeout: 8000 });
+});
+
+// ── 5. Stats drilldown ────────────────────────────────────────────────────────
 
 test("clicking Stats opens the facilitator stats drilldown", async ({ page }) => {
   await page.goto("/facilitators");
@@ -92,7 +155,7 @@ test("clicking Stats opens the facilitator stats drilldown", async ({ page }) =>
   await expect(page.getByRole("dialog", { name: "Facilitator stats" })).toBeVisible({ timeout: 6000 });
 });
 
-// ── 4. Tags modal opens ───────────────────────────────────────────────────────
+// ── 6. Tags modal opens ───────────────────────────────────────────────────────
 
 test("sqn_admin can open the Tags modal for a facilitator", async ({ page }) => {
   await page.goto("/facilitators");
@@ -109,7 +172,7 @@ test("sqn_admin can open the Tags modal for a facilitator", async ({ page }) => 
   await expect(page.getByRole("button", { name: "Save tags" })).toBeVisible();
 });
 
-// ── 5. Leave conflict API proof ───────────────────────────────────────────────
+// ── 7. Leave conflict API proof ───────────────────────────────────────────────
 
 test("facilitator leave can be recorded via API", async ({ page }) => {
   const hdr = await authHeader(page, ADMIN_CODE);
@@ -141,7 +204,7 @@ test("facilitator leave can be recorded via API", async ({ page }) => {
   expect(body.leave).toHaveProperty("facilitator_id", facId);
 });
 
-// ── 6. Read-only for sqn_general ──────────────────────────────────────────────
+// ── 8. Read-only for sqn_general ──────────────────────────────────────────────
 
 test("sqn_general sees facilitators list but no Add facilitator button", async ({ page }) => {
   await page.goto("/");
