@@ -70,8 +70,10 @@ def _add_membership(client, hdr, cadet_id, class_id):
 
 def _make_session(client, hdr, days_ahead):
     """Same weekday-collision avoidance as test_session_audience.py's helper --
-    703's seeded demo data recurs weekly on its default parade day (Friday)."""
-    candidate = date.today() + timedelta(days=days_ahead)
+    703's seeded demo data recurs weekly on its default parade day (Friday).
+    Anchored at 2040-01-01 (not date.today()) for date-independence — avoids
+    time-bomb collisions as days_ahead values grow over calendar months."""
+    candidate = date(2040, 1, 1) + timedelta(days=days_ahead)
     if candidate.weekday() == 4:  # Friday
         candidate += timedelta(days=1)
     target_date = candidate.isoformat()

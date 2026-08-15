@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 // Connected-frontend (Main TMS) E2E config — targets the static single-file SPA,
 // not the React Planning Workspace. Backend must already be running/seeded on :8000
@@ -17,4 +17,9 @@ export default defineConfig({
     reuseExistingServer: true,
     timeout: 30000,
   },
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
+    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+  ],
 });

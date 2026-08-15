@@ -42,8 +42,12 @@ def _make_class(client, hdr, year_id, stage_id, name, sequence=0):
 
 def _make_session(client, hdr, days_ahead):
     """Same weekday-collision avoidance as test_readiness_contract.py's helper --
-    703's seeded demo data recurs weekly on its default parade day (Friday)."""
-    candidate = date.today() + timedelta(days=days_ahead)
+    703's seeded demo data recurs weekly on its default parade day (Friday).
+    Anchored at 2040-01-01 (not date.today()) to prevent time-bomb collisions
+    where large days_ahead values land on dates other tests create as fixtures
+    (e.g. days_ahead=209 from ~2026-09-28 would land on 2027-04-25, which
+    test_planning.py::test_generate_parade_dates_yearly_frequency creates)."""
+    candidate = date(2040, 1, 1) + timedelta(days=days_ahead)
     if candidate.weekday() == 4:  # Friday
         candidate += timedelta(days=1)
     target_date = candidate.isoformat()
