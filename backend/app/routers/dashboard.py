@@ -508,6 +508,85 @@ def _class_curriculum_progress_summary(db: DBSession, sq_id: str) -> dict:
     }
 
 
+def _class_enrollment_distribution(db: DBSession, sq_id: str) -> dict:
+    """Class size overview — shows expected_count per Training Class, grouped
+    by Training Stage. Answers 'How many cadets are in each class, and are
+    sizes balanced across parallel classes in the same Stage?'
+
+    Uses TrainingClass.expected_count (set by sqn_admin when creating or
+    editing a class). Where expected_count is NULL the class is flagged as
+    'not set' — a data quality prompt, not an error. No cadet-level tracking
+    is required; the chart is useful from day 1 of class setup.
+
+    Phase 6 analytics requirement: class distributions."""
+    classes = db.query(TrainingClass).filter(
+        TrainingClass.squadron_id == sq_id,
+        TrainingClass.is_archived == False,  # noqa: E712
+    ).order_by(TrainingClass.sequence, TrainingClass.display_name).all()
+
+    if not classes:
+        return {
+            "chart_id": "class_enrollment",
+            "chart_type": "class_enrollment",
+            "title": "Training Class sizes",
+            "data": [], "insight": None,
+            "empty_state": ("No Training Classes configured. Set up Training Classes to see class "
+                            "size information here."),
+            "permission_scope": "squadron",
+        }
+
+    stages: dict[str, dict] = {}
+    total_known = 0
+    missing_count = 0
+    for c in classes:
+        stage_id = c.training_stage_id
+        if stage_id not in stages:
+            phase = db.query(CurriculumPhase).filter(CurriculumPhase.id == stage_id).first()
+            stages[stage_id] = {
+                "stage": phase.display_name if phase else "Unnamed stage",
+                "stage_id": stage_id,
+                "classes": [],
+                "total_expected": 0,
+            }
+        entry = stages[stage_id]
+        count = c.expected_count
+        entry["classes"].append({
+            "display_name": c.display_name,
+            "training_class_id": c.id,
+            "expected_count": count,
+        })
+        if count is not None:
+            entry["total_expected"] += count
+            total_known += count
+        else:
+            missing_count += 1
+
+    data = sorted(stages.values(), key=lambda s: s["stage"])
+
+    if missing_count:
+        insight = (f"{missing_count} class(es) have no expected size set. "
+                   f"Edit each class to add an expected cadet count.")
+    elif total_known:
+        insight = (f"{sum(len(s['classes']) for s in data)} active Training Class(es) "
+                   f"with a total of {total_known} expected cadets.")
+    else:
+        insight = None
+
+    return {
+        "chart_id": "class_enrollment",
+        "chart_type": "class_enrollment",
+        "title": "Training Class sizes",
+        "explanation": ("Expected cadet count per Training Class, grouped by Training Stage. "
+                        "Use this to check whether parallel classes are roughly balanced in size "
+                        "and whether room capacity matches the largest class."),
+        "question": "How many cadets are in each Training Class, and are sizes balanced?",
+        "data": data,
+        "insight": insight,
+        "empty_state": "No Training Classes configured.",
+        "permission_scope": "squadron",
+    }
+
+
 _UNKNOWN_PHASE_LABEL = "Missing phase (needs information)"
 
 
@@ -2013,6 +2092,7 @@ def _full_squadron_charts(db: DBSession, sq_id: str, w_start: str, w_end: str) -
         _elements_for_squadron(db, sq_id))
     charts["class_curriculum_progress"] = _safe_chart(
         "class_curriculum_progress", _class_curriculum_progress_summary, db, sq_id)
+    charts["class_enrollment"] = _safe_chart("class_enrollment", _class_enrollment_distribution, db, sq_id)
     charts["curriculum_backlog"] = _safe_chart("curriculum_backlog", _curriculum_backlog, all_sessions, all_pns)
     charts["cancellation_reasons"] = _safe_chart("cancellation_reasons", _cancellation_reasons, sessions, pns)
     charts["facilitator_workload"] = _safe_chart("facilitator_workload", _facilitator_workload, sessions)

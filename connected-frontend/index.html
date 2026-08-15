@@ -889,6 +889,13 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <div id="chart-class-curriculum-progress"><div class="chart-skeleton" style="height:120px"></div></div>
             <div id="insight-class-curriculum-progress" class="chart-insight" style="display:none"></div>
           </div>
+          <!-- Phase 6 analytics: class size distribution — hidden until Training Classes exist -->
+          <div class="card" id="card-class-enrollment" style="display:none">
+            <div class="ctitle">Training Class sizes</div>
+            <div class="ssub" style="font-size:11px;color:var(--muted);margin-bottom:8px">Expected cadet count per class — use to check balance across parallel classes and match room capacity.</div>
+            <div id="chart-class-enrollment"><div class="chart-skeleton" style="height:80px"></div></div>
+            <div id="insight-class-enrollment" class="chart-insight" style="display:none"></div>
+          </div>
           <div class="dash-grid">
             <div class="card">
               <div class="ctitle">Curriculum backlog — past sessions not delivered</div>
@@ -6767,6 +6774,34 @@ function _chartClassProgress(chart){
   return html;
 }
 
+// Class enrollment distribution — chart.data=[{stage,stage_id,classes:[{display_name,expected_count}]}]
+function _chartClassEnrollment(chart){
+  const rows=chart.data||[];
+  if(!rows.length)return _dEmptyChart(chart.empty_state||'No Training Classes configured.');
+  const maxCount=Math.max(...rows.flatMap(r=>r.classes.map(c=>c.expected_count||0)),1);
+  let html='';
+  rows.forEach(row=>{
+    const stageTotal=row.total_expected||0;
+    html+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 0 3px;border-top:1px solid var(--b2);margin-top:4px">
+      <div style="font-size:11px;font-weight:800;color:var(--text);min-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(row.stage||'Unnamed stage')}</div>
+      <div style="flex:1"></div>
+      <div style="min-width:64px;text-align:right;font-size:11px;color:var(--muted)">${stageTotal?stageTotal+' cadets':''}</div>
+    </div>`;
+    (row.classes||[]).forEach(cls=>{
+      const n=cls.expected_count;
+      const w=n!=null?Math.round((n/maxCount)*100):0;
+      const label=n!=null?n+' cadets':'Not set';
+      const color=n!=null?'var(--royal)':'var(--lgrey)';
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:3px 0 3px 16px" role="img" aria-label="${esc(cls.display_name)}: ${label}">
+        <div style="font-size:11px;color:var(--text-2);min-width:114px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cls.display_name)}</div>
+        <div style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${color};border-radius:3px"></div></div></div>
+        <div style="min-width:64px;text-align:right;font-size:11px;color:${color}">${n!=null?n:'—'}</div>
+      </div>`;
+    });
+  });
+  return html;
+}
+
 // Stacked vertical bar — chart.data rows have per-series keys; chart.series=[{key,label,color}]
 function _chartStackedBar(chart){
   const rows=chart.data||[];const series=chart.series||[];
@@ -7112,6 +7147,10 @@ async function loadDashCharts(){
   if(clsCard){const hasClasses=(charts.class_curriculum_progress?.data||[]).length>0;clsCard.style.display=hasClasses?'':'none';}
   _dRenderChart('chart-class-curriculum-progress',charts.class_curriculum_progress,_chartClassProgress,'insight-class-curriculum-progress');
   _dSetExp('exp-class-curriculum-progress',charts.class_curriculum_progress?.explanation);
+  // Phase 6: class enrollment distribution — show card only when classes exist
+  const ceCard=document.getElementById('card-class-enrollment');
+  if(ceCard){const hasCE=(charts.class_enrollment?.data||[]).length>0;ceCard.style.display=hasCE?'':'none';}
+  _dRenderChart('chart-class-enrollment',charts.class_enrollment,_chartClassEnrollment,'insight-class-enrollment');
   _dRenderChart('chart-curriculum-backlog',charts.curriculum_backlog,_chartHBar,'insight-curriculum-backlog');
   _dRenderChart('chart-facilitator-workload',charts.facilitator_workload,_chartHBar,'insight-facilitator-workload');
 

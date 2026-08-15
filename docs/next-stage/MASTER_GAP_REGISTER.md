@@ -26,15 +26,15 @@ sweep, the UX/product gaps, and the security hardening additions merged here.
 |---|---|
 | CLOSED | 38 |
 | STAGING VERIFIED | 9 |
-| FIXED LOCALLY | 98 |
+| FIXED LOCALLY | 99 |
 | IMPLEMENTING | 1 |
 | NOT STARTED | 2 |
 | HUMAN GATE | 20 |
 | ACCEPTED RISK | 1 |
 | MANUAL APPROVAL REQUIRED | 1 |
-| **Total** | **170** |
+| **Total** | **171** |
 
-**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 145 / 170 = 85%**
+**Completion rate** (CLOSED + STAGING VERIFIED + FIXED LOCALLY) **= 146 / 171 = 85%**
 
 > Counts are from rows matching `^\| [A-Z]+-[0-9]` in this file. Excludes cross-reference summary rows (numbered `1–25`) and GAP-prefixed decision rows (GAP-03, GAP-05, GAP-20, GAP-22, GAP-23) which duplicate existing HG-/SEC- items. Totals increased from 138 → 152 across sessions as new gaps were identified and added to the register; the completion rate decreased from 80% → 76% because new items were added faster than they were closed.
 
@@ -140,6 +140,7 @@ frontend consumption.
 | DASH-10 | Dashboard | MEDIUM | Adoption analytics — per-squadron meaningful-activity summary for Wing/National view; shows active accounts, sessions scheduled, outcomes recorded, programs published, facilitators managed, last activity; period selector (7d/30d/term/year); bar chart for squadron comparison | FIXED 2026-08-13: `GET /api/dashboard/adoption` added to `dashboard.py`; aggregates `AuditLog` by squadron_id; 14 regression tests pass; "Section C — System Adoption" lazy-load table added to `loadCommandDashboard()` in connected-frontend with inline minibar chart; not a surveillance tool (squadron-level aggregates only, not per-user breakdown) | FIXED LOCALLY |
 | DASH-11 | Dashboard | MEDIUM | Wing Assurance — "Cross-squadron not-delivered" report — `GET /api/reports/wing-not-delivered` was backend-complete (ops.py) but had no Planning Workspace frontend card; Wing command had no view of delivery failures across squadrons from the PW | FIXED LOCALLY 2026-08-13: `wingNotDelivered` added to `reportApi` and `WingNotDeliveredReport`/`WingNotDeliveredSqn` types added in `api/types.ts`; card added to `WingOverview` in `Overviews.tsx` — renders only when `total_not_delivered > 0`, shows squadron / count / curriculum codes table with `DecisionBadge`. `ReportCatalogue.tsx` updated from `frontend:"no"` → `frontend:"yes"`. TypeScript: 0 errors. | FIXED LOCALLY |
 | DASH-12 | Dashboard | MEDIUM | Wing Assurance — "Cancelled / rescheduled trend" report — `GET /api/reports/wing-cancellation-trend` was backend-complete (ops.py, documented in ReportCatalogue) but had no Planning Workspace frontend; Wing command had no view of which squadrons had the most cancelled sessions/nights | FIXED LOCALLY 2026-08-13: `wingCancellationTrend` added to `reportApi` and `WingCancellationTrend`/`WingCancellationSqn` types added in `api/types.ts`; card added to `WingOverview` — renders only when total_cancelled_sessions + total_cancelled_nights > 0, shows squadron/cancelled-sessions/cancelled-nights/top-reason table. `ReportCatalogue.tsx` updated. TypeScript: 0 errors. | FIXED LOCALLY |
+| DASH-13 | Dashboard | LOW | Phase 6 analytics — class enrollment distribution chart absent; no visual summary of expected cadet count per Training Class, making it impossible to check class balance or match room capacity at a glance from the dashboard | FIXED 2026-08-15: `_class_enrollment_distribution()` added to `dashboard.py`; queries `TrainingClass.expected_count` grouped by `CurriculumPhase.display_name`; chart_id `class_enrollment`; flags NULL expected_count as data quality gap in insight; `_full_squadron_charts` calls it; `_chartClassEnrollment()` renderer added to connected-frontend; chart card (hidden when no classes) added to Section B of squadron dashboard; 4 regression tests in `test_dashboard_class_enrollment.py` all pass (1699 passed, 6 skipped after addition). | FIXED LOCALLY |
 
 ---
 
