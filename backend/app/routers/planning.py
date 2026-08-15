@@ -2459,6 +2459,7 @@ def get_command_centre(
     p: Principal = Depends(get_principal),
 ):
     from sqlalchemy import or_, func
+    from .dashboard import _data_freshness
 
     today = date.today().isoformat()
 
@@ -2693,6 +2694,11 @@ def get_command_centre(
 
     nights_missing_fac = len(nights_missing_fac_ids)
 
+    # Determine scope for data freshness (command-centre is squadron or wing scoped)
+    _cc_scope = "squadron" if p.role in ("sqn_admin", "sqn_general") else "wing"
+    _cc_sq_id = py.unit_id if _cc_scope == "squadron" else None
+    _cc_wing_id = (py.wing_id or p.wing_id) if _cc_scope == "wing" else None
+
     return {
         "planning_year_id": py.id,
         "year": py.year,
@@ -2704,7 +2710,147 @@ def get_command_centre(
         "training_classes": training_classes_out,
         "recent_imports": [],
         "nights_missing_facilitator": nights_missing_fac,
+        "data_freshness": _data_freshness(db, _cc_scope, _cc_sq_id, _cc_wing_id),
     }
+
+
+# ─────────────────────────────────────────────────────────────
+# CLASS-FORECAST-01 — Per-Training-Class planning forecast
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/class-forecasts")
+def get_class_forecasts(
+    year_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """CLASS-FORECAST-01: deterministic per-class planning forecast.
+
+    Status rule (documented):
+      available_time_blocks = ceil(remaining_parade_nights
+                                   * avg_sessions_per_night
+                                   / total_active_classes)
+      ON TRACK     — unplanned_requirements <= available_time_blocks
+      PLANNING RISK — unplanned_requirements > available_time_blocks (but nights remain)
+      CRITICAL     — remaining_parade_nights == 0 and unplanned_requirements > 0
+
+    avg_sessions_per_night is computed from sessions already created in this year
+    (across all nights with at least one session); defaults to 2 when no history.
+    """
+    from sqlalchemy import func, select as sa_select
+    import math
+    from .training import _class_curriculum_progress
+
+    py = db.get(PlanningYear, year_id)
+    if not py:
+        raise HTTPException(404, detail={"error": "planning_year_not_found"})
+    sq_id = py.unit_id
+    if not sq_id:
+        raise HTTPException(400, detail={"error": "year_not_squadron_scoped"})
+    sq = db.get(Squadron, sq_id)
+    require_can_view_squadron(p, sq_id, sq.wing_id if sq else None)
+
+    today_str = date.today().isoformat()
+
+    # Active Training Classes for this year
+    classes = db.query(TrainingClass).filter(
+        TrainingClass.training_year_id == year_id,
+        TrainingClass.is_archived == False,  # noqa: E712
+    ).order_by(TrainingClass.sequence, TrainingClass.display_name).all()
+
+    if not classes:
+        return []
+
+    total_classes = len(classes)
+
+    # Remaining parade nights for this squadron (future, not archived)
+    remaining_pns = db.query(func.count(ParadeNight.id)).filter(
+        ParadeNight.squadron_id == sq_id,
+        ParadeNight.date > today_str,
+        ParadeNight.is_archived == False,  # noqa: E712
+    ).scalar() or 0
+
+    # Average sessions per past parade night in this year
+    # "This year" scoped by ParadeDate.planning_year_id → ParadeNight
+    pdate_pn_ids = sa_select(ParadeDate.parade_night_id).where(
+        ParadeDate.planning_year_id == year_id,
+        ParadeDate.parade_night_id.isnot(None),
+    ).distinct()
+    past_pn_ids_in_year = sa_select(ParadeNight.id).where(
+        ParadeNight.id.in_(pdate_pn_ids), ParadeNight.date <= today_str
+    )
+    total_sessions_this_year = db.query(func.count(TrainingSession.id)).filter(
+        TrainingSession.parade_night_id.in_(past_pn_ids_in_year),
+        TrainingSession.is_archived == False,  # noqa: E712
+    ).scalar() or 0
+    nights_with_sessions = db.query(func.count(TrainingSession.parade_night_id.distinct())).filter(
+        TrainingSession.parade_night_id.in_(past_pn_ids_in_year),
+        TrainingSession.is_archived == False,  # noqa: E712
+    ).scalar() or 0
+    avg_sessions_per_night = (
+        total_sessions_this_year / nights_with_sessions
+        if nights_with_sessions > 0
+        else 2.0  # default: assume 2 sessions per night when no history
+    )
+
+    # Shared capacity per class (fractional)
+    available_per_class = math.ceil(
+        remaining_pns * avg_sessions_per_night / total_classes
+    ) if total_classes > 0 else 0
+
+    _DELIVERED_STATUSES = {"delivered", "delivered_with_issue"}
+    _PLANNED_STATUS = "planned"
+
+    forecasts = []
+    for c in classes:
+        prog = _class_curriculum_progress(db, c)
+        requirements = prog.get("requirements", [])
+        remaining = [r for r in requirements if r["status"] not in _DELIVERED_STATUSES]
+        planned = [r for r in remaining if r["status"] == _PLANNED_STATUS]
+        unplanned = [r for r in remaining if r["status"] not in (_PLANNED_STATUS, *_DELIVERED_STATUSES)]
+
+        remaining_count = len(remaining)
+        planned_count = len(planned)
+        unplanned_count = len(unplanned)
+
+        # Determine status
+        if remaining_count == 0:
+            status = "on_track"
+            message = "All requirements delivered."
+        elif remaining_pns == 0 and unplanned_count > 0:
+            status = "critical"
+            message = (
+                f"No remaining parade nights — {unplanned_count} requirement(s) "
+                "not yet planned."
+            )
+        elif unplanned_count <= available_per_class:
+            status = "on_track"
+            message = (
+                f"{unplanned_count} unplanned requirement(s) within estimated "
+                f"capacity ({available_per_class} slot(s) across {remaining_pns} remaining nights)."
+            )
+        else:
+            status = "planning_risk"
+            message = (
+                f"{unplanned_count} unplanned requirement(s) exceed estimated "
+                f"capacity ({available_per_class} slot(s) across {remaining_pns} remaining nights)."
+            )
+
+        stage = db.get(CurriculumPhase, c.training_stage_id)
+        forecasts.append({
+            "class_id": c.id,
+            "class_name": c.display_name,
+            "stage_name": stage.name if stage else None,
+            "remaining_requirements": remaining_count,
+            "planned_requirements": planned_count,
+            "unplanned_requirements": unplanned_count,
+            "remaining_parade_nights": remaining_pns,
+            "available_time_blocks": available_per_class,
+            "status": status,
+            "message": message,
+        })
+
+    return forecasts
 
 
 # ─────────────────────────────────────────────────────────────

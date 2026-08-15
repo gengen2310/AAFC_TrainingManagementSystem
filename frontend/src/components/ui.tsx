@@ -1,6 +1,35 @@
 import type { ReactNode } from "react";
 import { friendlyMessage } from "../api/client";
 
+// AUTO-01: save-state indicator. status values:
+//   'ready'  — no unsaved changes
+//   'dirty'  — user has typed; debounce pending
+//   'saving' — API call in flight
+//   'saved'  — last save succeeded
+//   'failed' — last save failed
+export type SaveStatus = 'ready' | 'dirty' | 'saving' | 'saved' | 'failed';
+
+export function SaveIndicator({ status }: { status: SaveStatus }) {
+  if (status === 'ready') return null;
+  const map: Record<SaveStatus, { label: string; color: string }> = {
+    ready:  { label: '',                         color: 'inherit'       },
+    dirty:  { label: 'Unsaved',                  color: 'var(--muted)'  },
+    saving: { label: 'Saving…',                  color: 'var(--muted)'  },
+    saved:  { label: 'Saved',                    color: 'var(--ok)'     },
+    failed: { label: 'Could not save — Try again', color: 'var(--red)'  },
+  };
+  const { label, color } = map[status];
+  return (
+    <span
+      style={{ fontSize: 11, fontWeight: 600, marginLeft: 8, color }}
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      {label}
+    </span>
+  );
+}
+
 export function Card({ title, action, children }: { title?: string; action?: ReactNode; children: ReactNode }) {
   return (
     <section className="card">

@@ -1,6 +1,6 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { planningApi } from "../../../api";
+import { useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { planningApi, trainingApi } from "../../../api";
 import { friendlyMessage } from "../../../api/client";
 import type { PlanningSession, PlanningFacilitator, AnchorEvent, NightSummary } from "../../../api/types";
 import { filterAnchors } from "../../../utils/planningFilters";
@@ -9,8 +9,10 @@ import {
   fromPlanningSession,
   conflictMapFromPlanningConflicts,
   type DisplaySession,
+  type DragSessionPayload,
 } from "../ParadeNightBlock";
 import { ActivityDetailBlock, anchorToDisplay } from "../ActivityDetailBlock";
+import { useToast } from "../../Toast";
 
 interface Props {
   yearId: string;
@@ -40,6 +42,30 @@ export function EightWeekView({
 }: Props) {
   const showConflicts = layers?.conflicts ?? true;
   const showAnchors = layers?.wingHQEvents ?? true;
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  // DND-01: move session handler — preserves all existing session fields and
+  // updates only parade_night_id and period_number on the target cell.
+  const handleMoveSession = useCallback(async (payload: DragSessionPayload, targetDateId: string, targetPeriod: number, _targetCadetGroup: string) => {
+    try {
+      await trainingApi.editSession(payload.session_id, {
+        parade_night_id: targetDateId,
+        period_number: targetPeriod,
+        curriculum_item_id: payload.curriculum_id ?? null,
+        cadet_group: payload.cadet_group ?? null,
+        facilitator_id: payload.facilitator_id ?? null,
+        training_area_id: payload.location_id ?? null,
+        custom_title: payload.curriculum_id ? null : (payload.activity_title ?? null),
+        status: payload.status,
+      });
+      await qc.invalidateQueries({ queryKey: ["planning-long-range"] });
+      await qc.invalidateQueries({ queryKey: ["planning-night-summaries"] });
+      toast("Session moved.");
+    } catch (e) {
+      toast(friendlyMessage(e, "Could not move session — it may have a conflict."));
+    }
+  }, [qc, toast]);
 
   const isCustom = !!(customStart && customEnd);
 
@@ -151,6 +177,7 @@ export function EightWeekView({
             onEmptyCellClick={onEmptyCellClick
               ? (cg, period) => onEmptyCellClick(pd.parade_date_id, pd.parade_date, cg, period)
               : undefined}
+            onMoveSession={handleMoveSession}
           />
         );
       })}

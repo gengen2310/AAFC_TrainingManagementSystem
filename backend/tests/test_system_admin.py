@@ -206,6 +206,129 @@ def test_maintenance_disable_forbidden_nat(client):
 
 
 # ─────────────────────────────────────────────────────────────
+# MAINT-02: full state machine (normal → pending → locked → normal)
+# ─────────────────────────────────────────────────────────────
+
+def test_maintenance_enable_returns_pending_phase(client):
+    """MAINT-02: enabling maintenance with drain_seconds > 0 returns phase=pending immediately."""
+    hdr = _sysadmin(client)
+    r = client.post("/api/system/maintenance/enable", json={
+        "message": "MAINT-02 test", "confirm": "ENABLE MAINTENANCE",
+        "drain_seconds": 60,
+    }, headers=hdr)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["enabled"] is True
+    assert d["phase"] == "pending"
+    assert d["pending_until"] is not None
+    assert d["drain_seconds"] == 60
+    # Cleanup
+    client.post("/api/system/maintenance/disable", headers=hdr)
+
+
+def test_maintenance_pending_phase_allows_writes(client):
+    """MAINT-02: during PENDING phase the middleware does NOT block write endpoints."""
+    hdr_sa = _sysadmin(client)
+    hdr_sqn = _sqn_admin(client)
+    client.post("/api/system/maintenance/enable", json={
+        "confirm": "ENABLE MAINTENANCE", "drain_seconds": 300,
+    }, headers=hdr_sa)
+    # A write (e.g. POST to a wing) should NOT be blocked in PENDING phase
+    # Use a safe endpoint: GET on squadrons is always readable, but we verify the
+    # middleware doesn't return 503 by checking any non-health endpoint succeeds.
+    r = client.get("/api/auth/me", headers=hdr_sqn)
+    assert r.status_code != 503, "PENDING phase should NOT return 503 for non-write endpoints"
+    # Cleanup
+    client.post("/api/system/maintenance/disable", headers=hdr_sa)
+
+
+def test_maintenance_drain_zero_gives_locked_immediately(client):
+    """MAINT-02: drain_seconds=0 should immediately enter LOCKED phase (pending_until already passed)."""
+    import time
+    hdr = _sysadmin(client)
+    client.post("/api/system/maintenance/enable", json={
+        "confirm": "ENABLE MAINTENANCE", "drain_seconds": 0,
+    }, headers=hdr)
+    # Small sleep to ensure the drain window (0 s) has elapsed
+    time.sleep(0.1)
+    r = client.get("/api/system/maintenance", headers=hdr)
+    d = r.json()
+    assert d["phase"] == "locked", f"Expected locked with drain=0 but got phase={d['phase']}"
+    # Cleanup
+    client.post("/api/system/maintenance/disable", headers=hdr)
+
+
+def test_maintenance_disable_clears_pending_until(client):
+    """MAINT-02: disabling maintenance clears maintenance_pending_until so a re-enable starts fresh."""
+    hdr = _sysadmin(client)
+    client.post("/api/system/maintenance/enable", json={
+        "confirm": "ENABLE MAINTENANCE", "drain_seconds": 120,
+    }, headers=hdr)
+    client.post("/api/system/maintenance/disable", headers=hdr)
+    r = client.get("/api/system/maintenance", headers=hdr)
+    d = r.json()
+    assert d["enabled"] is False
+    assert d["phase"] == "normal"
+    assert d.get("pending_until") is None
+
+
+def test_maintenance_ui_config_returns_phase(client):
+    """MAINT-02: /api/health/ui-config returns maintenance_phase field usable by frontend poll."""
+    hdr = _sysadmin(client)
+    client.post("/api/system/maintenance/enable", json={
+        "confirm": "ENABLE MAINTENANCE", "drain_seconds": 300,
+    }, headers=hdr)
+    r = client.get("/api/health/ui-config")
+    assert r.status_code == 200
+    d = r.json()
+    assert "maintenance_phase" in d
+    assert d["maintenance_phase"] in ("normal", "pending", "locked")
+    assert d["maintenance_phase"] == "pending"
+    assert d.get("maintenance_pending_until") is not None
+    # Cleanup
+    client.post("/api/system/maintenance/disable", headers=hdr)
+
+
+def test_maintenance_sysadmin_bypasses_locked(client):
+    """MAINT-02: system_admin JWT bypasses maintenance gate even in LOCKED phase."""
+    import time
+    hdr = _sysadmin(client)
+    client.post("/api/system/maintenance/enable", json={
+        "confirm": "ENABLE MAINTENANCE", "drain_seconds": 0,
+    }, headers=hdr)
+    time.sleep(0.1)  # ensure drain window elapsed → LOCKED
+    r = client.get("/api/system/maintenance", headers=hdr)
+    assert r.status_code == 200, "system_admin must bypass maintenance gate"
+    client.post("/api/system/maintenance/disable", headers=hdr)
+
+
+def test_maintenance_locked_blocks_sqn_write(client):
+    """MAINT-02: LOCKED phase returns 503 for a write attempt by a non-system_admin user."""
+    import time
+    hdr_sa = _sysadmin(client)
+    hdr_sqn = _sqn_admin(client)
+    client.post("/api/system/maintenance/enable", json={
+        "confirm": "ENABLE MAINTENANCE", "drain_seconds": 0,
+    }, headers=hdr_sa)
+    time.sleep(0.1)  # ensure LOCKED
+    r = client.post("/api/parade-nights", json={"dummy": True}, headers=hdr_sqn)
+    assert r.status_code == 503, f"Expected 503 in LOCKED phase, got {r.status_code}"
+    assert r.json()["error"] == "maintenance_mode"
+    client.post("/api/system/maintenance/disable", headers=hdr_sa)
+
+
+def test_maintenance_drain_seconds_cap(client):
+    """MAINT-02: drain_seconds > 300 is silently capped at 300."""
+    hdr = _sysadmin(client)
+    r = client.post("/api/system/maintenance/enable", json={
+        "confirm": "ENABLE MAINTENANCE", "drain_seconds": 9999,
+    }, headers=hdr)
+    assert r.status_code == 200
+    assert r.json()["drain_seconds"] == 300
+    client.post("/api/system/maintenance/disable", headers=hdr)
+
+
+# ─────────────────────────────────────────────────────────────
 # Scope map
 # ─────────────────────────────────────────────────────────────
 

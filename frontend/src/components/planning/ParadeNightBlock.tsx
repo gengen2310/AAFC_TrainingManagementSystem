@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { planningApi } from "../../api";
 import { friendlyMessage } from "../../api/client";
@@ -310,6 +310,19 @@ interface ParadeNightBlockProps {
   onHeaderClick: () => void;
   onSessionClick?: (session: DisplaySession) => void;
   onEmptyCellClick?: (cadetGroup: string, period: number) => void;
+  /** DND-01: called when a session is drag-dropped onto an empty cell */
+  onMoveSession?: (payload: DragSessionPayload, targetDateId: string, targetPeriod: number, targetCadetGroup: string) => Promise<void>;
+}
+
+/** DND-01: minimal data transferred via the HTML5 drag API across components */
+export interface DragSessionPayload {
+  session_id: string;
+  cadet_group: string | null;
+  curriculum_id: string | null;
+  facilitator_id: string | null;
+  location_id: string | null;
+  activity_title: string | null;
+  status: string;
 }
 
 export function ParadeNightBlock({
@@ -317,11 +330,15 @@ export function ParadeNightBlock({
   sessions, sessionCount, filledSlots, conflictCount = 0,
   inHoliday = false, compact = false, blockSize = "md", focusClassId, searchText, tierFilter,
   focusStageId, classStageMap,
-  onHeaderClick, onSessionClick, onEmptyCellClick,
+  onHeaderClick, onSessionClick, onEmptyCellClick, onMoveSession,
 }: ParadeNightBlockProps) {
   const [addingNotice, setAddingNotice] = useState(false);
   // CLASS-23: per-block collapsed state. Collapsed shows only the header bar.
   const [collapsed, setCollapsed] = useState(false);
+  // DND-01: drop target cell key (format "{period}-{cadetGroup}") while drag is over this block.
+  const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
+  // Count of live drop-enter events to avoid flicker from child elements triggering dragLeave.
+  const dropEnterCount = useRef(0);
 
   const dateLabel = new Date(date + "T00:00:00").toLocaleDateString("en-CA", {
     weekday: compact ? "short" : "long",
@@ -478,18 +495,34 @@ export function ParadeNightBlock({
                       const handleEmptyClick = onEmptyCellClick
                         ? () => onEmptyCellClick(g.cadetGroups[0], period)
                         : onHeaderClick;
+                      const cellKey = `${period}-${g.cadetGroups[0]}`;
+                      const isDropTarget = dropTargetKey === cellKey;
                       return (
                         <td
                           key={period}
-                          className="pw-night-cell empty"
+                          className={`pw-night-cell empty${isDropTarget ? " dnd-over" : ""}`}
+                          style={isDropTarget ? { outline: "2px dashed var(--aafc-blue, #51b0e3)", background: "var(--surface-2, #f0f5fa)" } : undefined}
                           onClick={handleEmptyClick}
                           role="button"
                           tabIndex={0}
                           onKeyDown={e => e.key === "Enter" && handleEmptyClick()}
                           aria-label={onEmptyCellClick ? "Click to add a session" : "No lesson — click to open night detail"}
+                          onDragEnter={onMoveSession ? e => { e.preventDefault(); dropEnterCount.current++; setDropTargetKey(cellKey); } : undefined}
+                          onDragLeave={onMoveSession ? () => { dropEnterCount.current = Math.max(0, dropEnterCount.current - 1); if (dropEnterCount.current === 0) setDropTargetKey(null); } : undefined}
+                          onDragOver={onMoveSession ? e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } : undefined}
+                          onDrop={onMoveSession ? e => {
+                            e.preventDefault();
+                            setDropTargetKey(null);
+                            dropEnterCount.current = 0;
+                            const raw = e.dataTransfer.getData("application/json");
+                            if (!raw) return;
+                            let payload: DragSessionPayload;
+                            try { payload = JSON.parse(raw) as DragSessionPayload; } catch { return; }
+                            onMoveSession(payload, dateId, period, g.cadetGroups[0]);
+                          } : undefined}
                         >
                           <div className="pw-night-cell-inner">
-                            <span className="pw-nc-empty">No lesson</span>
+                            <span className="pw-nc-empty">{isDropTarget ? "Drop here" : "No lesson"}</span>
                           </div>
                         </td>
                       );
@@ -512,11 +545,28 @@ export function ParadeNightBlock({
                       return false;
                     })();
                     const isDimmed = classDimmed || stageDimmed || searchDimmed || tierDimmed;
+                    const canDrag = !!onMoveSession && !!cell.source;
                     return (
                       <td
                         key={period}
                         className={`pw-night-cell${cell.conflict === "room" ? " conflict-room" : cell.conflict === "fac" ? " conflict-fac" : ""}`}
                         style={isDimmed ? { opacity: 0.22 } : undefined}
+                        draggable={canDrag}
+                        onDragStart={canDrag ? e => {
+                          e.stopPropagation();
+                          e.dataTransfer.effectAllowed = "move";
+                          const payload: DragSessionPayload = {
+                            session_id: cell.session_id,
+                            cadet_group: cell.cadet_group,
+                            curriculum_id: cell.source!.curriculum_id,
+                            facilitator_id: cell.source!.facilitator_id,
+                            location_id: cell.source!.location_id,
+                            activity_title: cell.source!.activity_title,
+                            status: cell.source!.status,
+                          };
+                          e.dataTransfer.setData("application/json", JSON.stringify(payload));
+                        } : undefined}
+                        onDragEnd={canDrag ? () => { setDropTargetKey(null); dropEnterCount.current = 0; } : undefined}
                         onClick={onSessionClick ? e => { e.stopPropagation(); onSessionClick(cell); } : onHeaderClick}
                         role="button"
                         tabIndex={0}

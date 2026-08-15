@@ -531,11 +531,89 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .mode-banner.intervention{background:#ffe0e0;color:#7a1010;border-bottom-color:#c25;}
 .mode-banner.show{display:flex;}
 .mode-banner button{font:inherit;font-size:11px;border:1px solid currentColor;background:transparent;color:inherit;border-radius:6px;padding:3px 11px;cursor:pointer;text-transform:uppercase;font-weight:800;}
+.save-ind{display:inline-block;font-size:11px;font-weight:600;margin-left:8px;color:var(--muted);vertical-align:middle;}
+.save-ind.saving{color:var(--steel);}
+.save-ind.saved{color:var(--ok);}
+.save-ind.failed{color:var(--red);}
+.data-conf-bar{display:flex;align-items:flex-start;flex-wrap:wrap;gap:6px;padding:6px 12px;margin:0 0 8px;border-radius:6px;font-size:11px;background:var(--warn-bg);border:1px solid var(--warn);color:var(--text-2);}
+.data-conf-bar .dcb-label{font-weight:700;color:var(--warn);white-space:nowrap;margin-right:4px;}
+.data-conf-bar .dcb-issue{background:rgba(0,0,0,.06);border-radius:4px;padding:1px 6px;}
+.data-conf-bar.ok{background:var(--ok-bg);border-color:var(--ok);}
+.data-conf-bar.ok .dcb-label{color:var(--ok);}
+/* CLASS-MATRIX-01 */
+#cm-table-wrap table{border-collapse:collapse;font-size:12px;min-width:max-content;}
+#cm-table-wrap th,#cm-table-wrap td{border:1px solid var(--border);padding:5px 8px;white-space:nowrap;}
+#cm-table-wrap th{background:var(--surface-2);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
+#cm-table-wrap tr:nth-child(even) td{background:var(--surface-2);}
+#cm-table-wrap .cm-sticky{position:sticky;left:0;background:var(--surface);z-index:2;min-width:220px;max-width:300px;white-space:normal;}
+#cm-table-wrap .cm-stage-row td{background:var(--accent-light);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding:4px 8px;}
+.cm-cell-delivered{background:#d4f0e3;color:#145f38;font-weight:700;}
+.cm-cell-planned{background:#e0f0fa;color:#004b8d;}
+.cm-cell-not_delivered{background:#f0f0f0;color:#455560;}
+.cm-cell-cancelled{background:#f8f0f0;color:#b5002b;}
+.cm-cell-not_started{color:var(--muted);}
+.cm-cell-delivered_with_issue{background:#d4f0e3;color:#c97a00;font-weight:700;}
+/* FAC-SUG-01 */
+.fac-sugg-panel{border:1px solid var(--border);border-radius:7px;background:var(--surface-2);padding:8px 10px;margin-bottom:8px;font-size:11.5px;}
+.fac-sugg-title{font-weight:700;color:var(--text-2);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+.fac-sugg-item{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-top:1px solid var(--border-light);}
+.fac-sugg-item:first-of-type{border-top:none;}
+.fac-sugg-pill{font-size:9.5px;font-weight:700;border-radius:10px;padding:1px 7px;white-space:nowrap;flex-shrink:0;margin-top:1px;}
+.fac-sugg-pill.suggested{background:var(--ok-bg);color:var(--ok-text);}
+.fac-sugg-pill.available{background:var(--accent-light);color:var(--dark);}
+.fac-sugg-pill.conflict{background:#fde8e8;color:var(--red);}
+.fac-sugg-pill.unavailable{background:#f0f0f0;color:var(--muted);}
+.fac-sugg-name{font-weight:700;color:var(--text);}
+.fac-sugg-reasons{color:var(--muted);margin-top:1px;line-height:1.4;}
+/* CLASS-FORECAST-01 */
+.fc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:4px;}
+.fc-card{border:1px solid var(--border);border-radius:8px;padding:14px 16px;background:var(--surface);display:flex;flex-direction:column;gap:8px;border-top:3px solid var(--border);}
+.fc-card.on-track{border-top-color:var(--ok);}
+.fc-card.planning-risk{border-top-color:var(--warn);}
+.fc-card.critical{border-top-color:var(--red);}
+.fc-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;}
+.fc-class-name{font-weight:700;font-size:13px;color:var(--text);line-height:1.3;}
+.fc-stage{font-size:10px;color:var(--muted);margin-top:1px;}
+.fc-pill{font-size:10px;font-weight:700;border-radius:12px;padding:2px 8px;white-space:nowrap;flex-shrink:0;}
+.fc-pill.on-track{background:var(--ok-bg);color:var(--ok-text);}
+.fc-pill.planning-risk{background:var(--warn-bg);color:var(--warn);}
+.fc-pill.critical{background:#fde8e8;color:var(--red);}
+.fc-stats{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:11px;}
+.fc-stat-label{color:var(--muted);}
+.fc-stat-val{font-weight:700;color:var(--text);}
+.fc-msg{font-size:10.5px;color:var(--text-2);border-top:1px solid var(--border-light);padding-top:6px;line-height:1.4;}
+/* PN-WIZ-01 */
+.wiz-dot{flex:1;height:5px;border-radius:3px;background:var(--border);}
+.wiz-dot.active,.wiz-dot.done{background:var(--blue);}
+.wiz-q{font-size:15px;font-weight:700;color:var(--dark);margin-bottom:4px;}
+.wiz-hint{font-size:12px;color:var(--muted);margin-bottom:10px;}
+.wiz-class-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:12.5px;cursor:pointer;}
+.wiz-class-item:last-child{border-bottom:none;}
+.wiz-curr-item{padding:6px 8px;border-radius:5px;cursor:pointer;font-size:12.5px;}
+.wiz-curr-item:hover,.wiz-curr-item.sel{background:var(--accent-light);}
+.wiz-curr-item.sel{font-weight:700;color:var(--dark);}
+.wiz-fac-pill-row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+.wiz-summary-row{display:flex;gap:6px;margin-bottom:6px;font-size:12.5px;align-items:flex-start;}
+.wiz-summary-label{color:var(--muted);min-width:110px;flex-shrink:0;}
+.wiz-summary-val{font-weight:600;color:var(--text);}
+.add-sess-bar{display:flex;gap:8px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed var(--border);}
+.qe-form{margin-top:8px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);}
 .maint-banner{display:none;align-items:center;gap:10px;padding:8px 22px;font-size:12px;font-weight:700;background:#e51937;color:#fff;border-bottom:2px solid #b5002b;}
 .maint-banner.show{display:flex;}
+.maint-banner.pending{background:#c97a00;border-bottom-color:#a06200;}
 .maint-banner .maint-icon{font-size:15px;flex-shrink:0;}
 .maint-banner .maint-msg{flex:1;}
 
+/* DENS-01: compact density overrides — only spacing, never text that would fall below accessible minimum */
+body[data-density="compact"] .ff{margin-bottom:8px;}
+body[data-density="compact"] .form-row{gap:8px;margin-bottom:6px;}
+body[data-density="compact"] .btn:not(.btn-xs):not(.btn-sm){padding:4px 10px;font-size:12.5px;}
+body[data-density="compact"] .card{padding:12px 14px;}
+body[data-density="compact"] .modal-body{padding:10px 14px;}
+body[data-density="compact"] .modal-hdr{padding:10px 16px 8px;}
+body[data-density="compact"] .modal-foot{padding:8px 16px 10px;}
+body[data-density="compact"] .nav-item{padding:5px 12px 5px 16px;font-size:12.5px;}
+body[data-density="compact"] .card+.card{margin-top:10px;}
 /* ── MISC CONNECTED-CLIENT ── */
 .mini{height:8px;border-radius:6px;background:#e6edf5;overflow:hidden;min-width:60px;}
 .mini>i{display:block;height:100%;border-radius:6px;background:var(--ok);}
@@ -715,7 +793,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="wing-banner" id="wing-banner" style="display:none"></div>
   <div class="scope-banner" id="scope-banner" style="display:none"><span class="sb-tag" id="sb-tag">SQN</span><span id="sb-text"></span></div>
   <div class="mode-banner" id="mode-banner"><span id="mode-text"></span><button onclick="exitMode()">Exit mode</button></div>
-  <div class="maint-banner" id="maint-banner"><span class="maint-icon">🔒</span><span class="maint-msg" id="maint-msg">System under maintenance.</span></div>
+  <div class="maint-banner" id="maint-banner"><span class="maint-icon" id="maint-icon">🔒</span><span class="maint-msg" id="maint-msg">System under maintenance.</span></div>
   <!-- System Administrator scope selector: browse National (default) / a Wing / a Squadron.
        Viewing never requires Proxy/Intervention Mode (view is broad by design — the backend's
        can_view_squadron/can_view_wing already grant system_admin unconditional read access).
@@ -808,6 +886,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <select id="dash-sqn-filter" aria-label="Filter Wing Dashboard by squadron" onchange="loadDashCharts()" style="display:none;padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px"><option value="">All Squadrons</option></select>
           </div>
         </div>
+
+        <!-- DATA-CONF-01: data freshness indicator bar -->
+        <div id="data-conf-bar" class="data-conf-bar" style="display:none" role="status" aria-live="polite"></div>
 
         <!-- Drill-down panel -->
         <div id="dash-drill" class="drill-panel">
@@ -1086,6 +1167,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           </label>
           <button class="btn btn-sm btn-out" onclick="_pnBulkSetTerm()">Apply term</button>
           <button class="btn btn-sm btn-red-out" onclick="_pnBulkArchive()">Archive selected</button>
+          <button class="btn btn-sm btn-out" id="pn-bulk-apply-btn" onclick="openBulkApplyModal()">Apply structure…</button>
           <button class="btn btn-sm" style="margin-left:auto" onclick="_pnClearSelection()">Clear selection</button>
         </div>
         <div id="pn-list"></div>
@@ -1138,8 +1220,23 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <button class="tab-btn" onclick="setCurrTab('I. Bronze',this)">Bronze CLP</button>
           <button class="tab-btn" onclick="setCurrTab('J. Silver',this)">Silver CLP</button>
           <button class="tab-btn" onclick="setCurrTab('K. Gold',this)">Gold CLP</button>
+          <button class="tab-btn sqn-el" id="tab-matrix" onclick="openCurrMatrix(this)" style="display:none">Matrix ↗</button>
         </div>
-        <div class="fbar no-print">
+        <!-- CLASS-MATRIX-01: matrix view container (toggled by Matrix tab) -->
+        <div id="curr-matrix-view" style="display:none">
+          <div class="fbar no-print" style="gap:8px;flex-wrap:wrap">
+            <select id="cm-stage-filter" aria-label="Filter matrix by stage" onchange="_renderCurrMatrix()">
+              <option value="all">All Stages</option>
+            </select>
+            <input id="cm-search" placeholder="Search items…" oninput="_renderCurrMatrix()" style="min-width:160px">
+            <label style="display:flex;align-items:center;gap:5px;font-size:12px;white-space:nowrap">
+              <input type="checkbox" id="cm-action-only" onchange="_renderCurrMatrix()"> Action required only
+            </label>
+            <span id="cm-load-status" style="font-size:11px;color:var(--muted)"></span>
+          </div>
+          <div id="cm-table-wrap" class="tw" style="overflow-x:auto;max-height:70vh;overflow-y:auto"></div>
+        </div>
+        <div class="fbar no-print" id="curr-fbar">
           <select id="curr-f-el" onchange="renderCurr()" aria-label="Filter curriculum by element">
             <option value="all">All Elements</option>
             <option value="Drill">Drill</option><option value="Air_Space">Air &amp; Space</option>
@@ -1313,6 +1410,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div id="missions-table-card" style="display:none">
             <div id="missions-body"></div>
           </div>
+        </div>
+        <!-- CLASS-FORECAST-01: per-class planning forecast cards -->
+        <div class="card" id="py-forecasts-card" style="display:none;margin-top:12px">
+          <div class="ctitle" style="margin-bottom:10px">Class Planning Forecasts<button class="ht" tabindex="0" aria-label="About Class Planning Forecasts" data-tip="How many unplanned curriculum requirements remain for each Training Class, and whether there is enough parade night capacity to deliver them.">?</button></div>
+          <div id="fc-cards-body" class="fc-grid"><p class="muted">Loading…</p></div>
         </div>
       </div>
 
@@ -1488,6 +1590,22 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <button class="btn btn-dk admin-el" onclick="saveSettings()">Save Settings</button>
             <span id="settings-msg" style="font-size:11.5px;font-weight:700"></span>
           </div>
+        </div>
+        <!-- DENS-01: Display size preference -->
+        <div class="card" id="dens-card">
+          <div class="ctitle">Display Size</div>
+          <p style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Adjust spacing to fit more content on screen. Both settings meet accessibility requirements at 200% zoom. Your preference is saved for this browser session.</p>
+          <div style="display:flex;gap:20px;align-items:center">
+            <label style="cursor:pointer;display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600">
+              <input type="radio" name="aafc-density" value="comfortable" id="dens-comfortable" onchange="_setDensity('comfortable')">
+              Comfortable
+            </label>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:7px;font-size:13px">
+              <input type="radio" name="aafc-density" value="compact" id="dens-compact" onchange="_setDensity('compact')">
+              Compact
+            </label>
+          </div>
+          <p style="font-size:10.5px;color:var(--muted);margin-top:8px">Comfortable is the default and recommended setting for most users.</p>
         </div>
         <div class="card">
           <div class="ctitle">Timing Templates</div>
@@ -1773,6 +1891,10 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div id="sc-maint-body"><div class="muted">Loading…</div></div>
           <div id="sc-maint-form" style="margin-top:14px;display:none">
             <div class="form-group">
+              <label>Title shown to users (optional)</label>
+              <input id="sc-maint-title" type="text" placeholder="Maintenance" style="width:100%;max-width:300px">
+            </div>
+            <div class="form-group">
               <label>Message shown to users</label>
               <input id="sc-maint-msg" type="text" placeholder="System under maintenance. Try again later." style="width:100%;max-width:480px">
             </div>
@@ -1780,10 +1902,14 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
               <label>Expected return time (optional, ISO format)</label>
               <input id="sc-maint-until" type="text" placeholder="e.g. 2026-12-01 08:00 UTC (24-hour)" style="width:100%;max-width:300px">
             </div>
+            <div class="form-group">
+              <label>Drain window — seconds before writes are blocked <span class="muted">(0–300, default 20)</span></label>
+              <input id="sc-maint-drain" type="number" min="0" max="300" value="20" style="width:90px">
+            </div>
             <div class="form-group" style="margin-top:10px">
-              <div style="font-size:12px;font-weight:700;margin-bottom:6px">Access restrictions</div>
+              <div style="font-size:12px;font-weight:700;margin-bottom:6px">Access restrictions (after drain window)</div>
               <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;margin-bottom:4px">
-                <input type="checkbox" id="sc-maint-block-logins"> Block new logins (drain phase — current sessions still work)
+                <input type="checkbox" id="sc-maint-block-logins"> Block new logins (current sessions still work)
               </label>
               <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer">
                 <input type="checkbox" id="sc-maint-block-reads"> Block all read access (full lockdown — only system endpoints remain)
@@ -2285,6 +2411,127 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('m-pn-apply-template')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- PN-WIZ-01: Guided Session Builder wizard -->
+<div class="modal-bg" id="m-sess-wizard">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-hdr">
+      <div>
+        <div class="modal-title">Guided Session Builder</div>
+        <div id="wiz-step-label" style="font-size:11px;color:var(--muted);margin-top:1px">Step 1 of 6</div>
+      </div>
+      <button class="modal-x" aria-label="Close wizard" onclick="_wizCancel()">×</button>
+    </div>
+    <div class="modal-body">
+      <!-- Progress bar -->
+      <div style="display:flex;gap:4px;margin-bottom:14px" id="wiz-progress" aria-hidden="true">
+        <div class="wiz-dot active" id="wdot-1"></div>
+        <div class="wiz-dot" id="wdot-2"></div>
+        <div class="wiz-dot" id="wdot-3"></div>
+        <div class="wiz-dot" id="wdot-4"></div>
+        <div class="wiz-dot" id="wdot-5"></div>
+        <div class="wiz-dot" id="wdot-6"></div>
+        <div class="wiz-dot" id="wdot-check"></div>
+      </div>
+      <!-- Step panels — only one visible at a time -->
+      <div id="wiz-step-1">
+        <div class="wiz-q">Who are the sessions for?</div>
+        <p class="wiz-hint">Select the Training Class or classes for this session. You can skip this if Training Classes aren't set up yet.</p>
+        <div id="wiz-classes-list" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px">
+          <span class="muted" style="font-size:12px">Loading…</span>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;cursor:pointer">
+          <input type="checkbox" id="wiz-skip-class"> Skip — no Training Class selected
+        </label>
+      </div>
+      <div id="wiz-step-2" style="display:none">
+        <div class="wiz-q">What curriculum item will be delivered?</div>
+        <p class="wiz-hint">Choose from the list or leave blank for a custom session.</p>
+        <input id="wiz-curr-search" placeholder="Search curriculum items…" oninput="_wizFilterCurr()" style="width:100%;margin-bottom:6px">
+        <div id="wiz-curr-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:6px"></div>
+        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;cursor:pointer">
+          <input type="checkbox" id="wiz-skip-curr" onchange="_wizSkipCurrChange()"> Custom title (type below)
+        </label>
+        <input id="wiz-custom-title" placeholder="Enter a custom session title…" style="width:100%;margin-top:6px;display:none">
+      </div>
+      <div id="wiz-step-3" style="display:none">
+        <div class="wiz-q">When in the parade night?</div>
+        <p class="wiz-hint">Which time block (period) should this session be in?</p>
+        <div class="ff">
+          <label for="wiz-period">Time Block (period number)</label>
+          <input type="number" id="wiz-period" value="1" min="1" max="20" step="1" style="max-width:100px">
+        </div>
+      </div>
+      <div id="wiz-step-4" style="display:none">
+        <div class="wiz-q">Who will deliver this session?</div>
+        <p class="wiz-hint">Select the facilitator who will run this session. Suggestions below are based on subject area match and availability.</p>
+        <div id="wiz-fac-sugg" style="display:none"></div>
+        <div class="ff" style="margin-top:6px">
+          <label for="wiz-fac-sel">Facilitator</label>
+          <select id="wiz-fac-sel" aria-label="Facilitator" style="width:100%"><option value="">— None —</option></select>
+        </div>
+      </div>
+      <div id="wiz-step-5" style="display:none">
+        <div class="wiz-q">Where will this session take place?</div>
+        <p class="wiz-hint">Select the room or training area. You can leave this blank and fill it in later.</p>
+        <div class="ff">
+          <label for="wiz-room-sel">Training Area / Room</label>
+          <select id="wiz-room-sel" aria-label="Training area" style="width:100%"><option value="">— None —</option></select>
+        </div>
+      </div>
+      <div id="wiz-step-6" style="display:none">
+        <div class="wiz-q">Anything else needed?</div>
+        <p class="wiz-hint">List any equipment, materials, or resources needed for this session.</p>
+        <div class="ff">
+          <label for="wiz-notes">Equipment / Notes (optional)</label>
+          <textarea id="wiz-notes" rows="3" placeholder="e.g. Projector, target practice equipment, whiteboard…" style="width:100%"></textarea>
+        </div>
+      </div>
+      <div id="wiz-step-check" style="display:none">
+        <div class="wiz-q">Check before saving</div>
+        <div id="wiz-summary" style="border:1px solid var(--border);border-radius:7px;padding:10px 14px;font-size:12.5px;margin-bottom:12px"></div>
+        <div id="wiz-conflicts" style="display:none"></div>
+      </div>
+      <div id="wiz-msg" style="color:var(--red);font-size:12px;min-height:14px;margin-top:6px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="_wizCancel()">Cancel</button>
+      <button class="btn btn-out" id="wiz-back-btn" style="display:none" onclick="_wizBack()">← Back</button>
+      <button class="btn btn-primary" id="wiz-next-btn" onclick="_wizNext()">Next →</button>
+      <button class="btn btn-dk" id="wiz-save-btn" style="display:none" onclick="_wizSave()">Save Session</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Apply Template Modal (BULK-01) -->
+<div class="modal-bg" id="m-bulk-apply-tpl">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-hdr"><div class="modal-title">Apply structure to selected nights</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-bulk-apply-tpl')">×</button></div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="bat-tpl-sel">Template</label>
+        <select id="bat-tpl-sel" aria-label="Select a parade night template" style="width:100%">
+          <option value="">— choose a template —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="bat-conflict-sel">If a night already has sessions</label>
+        <select id="bat-conflict-sel" aria-label="Conflict resolution" style="width:100%">
+          <option value="skip_night">Skip that night entirely</option>
+          <option value="alongside">Add template sessions alongside existing</option>
+          <option value="replace_draft">Replace draft (planned) sessions, keep delivered</option>
+        </select>
+      </div>
+      <div id="bat-preview" style="display:none;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-size:12px;margin-top:6px"></div>
+      <div id="bat-msg" style="color:var(--red);font-size:12px;margin-top:6px;display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('m-bulk-apply-tpl')">Cancel</button>
+      <button class="btn btn-out" id="bat-preview-btn" onclick="_bulkApplyPreview()">Preview</button>
+      <button class="btn btn-primary" id="bat-confirm-btn" style="display:none" onclick="_bulkApplyConfirm()">Apply to <span id="bat-confirm-count">0</span> nights</button>
     </div>
   </div>
 </div>
@@ -2805,6 +3052,24 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <button class="btn btn-out" onclick="closeModal('m-add-fac')">Cancel</button>
       <button class="btn btn-dk" id="fac-save-btn" onclick="saveFac()">Save Profile</button>
       <button class="btn btn-out" id="fac-save-anyway-btn" style="display:none" onclick="saveFac(true)">Add anyway</button>
+    </div>
+  </div>
+</div>
+
+<!-- Facilitator Duplicate Disambiguation (FAC-DUP-01) -->
+<div class="modal-bg" id="m-fac-dup" aria-modal="true" role="dialog" aria-labelledby="fac-dup-title">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="fac-dup-title">Possible Match</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-fac-dup')">×</button></div>
+    <div class="modal-body">
+      <div class="alert a-warn" style="margin-bottom:14px">We found another Facilitator with the same name in this squadron.</div>
+      <div id="fac-dup-existing-card"></div>
+      <div id="fac-dup-merge-panel" style="display:none"></div>
+    </div>
+    <div class="modal-foot" id="fac-dup-actions">
+      <button class="btn btn-out" onclick="closeModal('m-fac-dup')">Cancel</button>
+      <button class="btn btn-out" onclick="_facDupUseExisting()">Use Existing Facilitator</button>
+      <button class="btn btn-out" onclick="_facDupCreateDifferent()">Create a Different Person</button>
+      <button class="btn btn-warn" onclick="_facDupShowMergePreview()">Merge Records</button>
     </div>
   </div>
 </div>
@@ -4469,27 +4734,50 @@ function updateModeBanner(){
   } else { mb.className='mode-banner'; }
 }
 
-function _showMaintenanceBanner(msg){
-  const b=document.getElementById('maint-banner'),m=document.getElementById('maint-msg');
-  if(b){b.className='maint-banner show';}
-  if(m)m.textContent=msg||'System under maintenance. Try again later.';
+function _showMaintenanceBanner(phase,title,msg){
+  const b=document.getElementById('maint-banner');
+  const ic=document.getElementById('maint-icon');
+  const m=document.getElementById('maint-msg');
+  if(!b)return;
+  const isPending=phase==='pending';
+  b.className='maint-banner show'+(isPending?' pending':'');
+  if(ic)ic.textContent=isPending?'⚠️':'🔒';
+  if(m){
+    const t=title||(isPending?'Maintenance Starting':'Maintenance');
+    const body=msg||(isPending?'Maintenance will begin shortly.':'System under maintenance.');
+    m.textContent=t+' — '+body;
+  }
 }
 function _hideMaintenanceBanner(){
   const b=document.getElementById('maint-banner'); if(b)b.className='maint-banner';
 }
+let _maintPollTimer=null;
+function _scheduleMaintPoll(ms){
+  if(_maintPollTimer)clearTimeout(_maintPollTimer);
+  _maintPollTimer=setTimeout(_pollMaintenanceStatus,ms);
+}
 // DEF-12: proactively check maintenance mode so users already in session see the
 // banner when write-block activates — not only when they attempt a write.
+// MAINT-02: poll faster (5 s) during PENDING phase so users see the LOCKED
+// transition promptly; back off to 90 s in normal/locked states.
 async function _pollMaintenanceStatus(){
   if(!S.session)return; // not logged in
   try{
     const r=await fetch((API_BASE||'')+'/api/health/ui-config');
-    if(!r.ok)return;
+    if(!r.ok){_scheduleMaintPoll(90000);return;}
     const d=await r.json();
-    if(d.maintenance_active)_showMaintenanceBanner(d.maintenance_message||undefined);
-    else _hideMaintenanceBanner();
-  }catch(_){}
+    const phase=d.maintenance_phase||'normal';
+    if(phase==='pending'||phase==='locked'){
+      _showMaintenanceBanner(phase,d.maintenance_title,d.maintenance_message||undefined);
+      _scheduleMaintPoll(phase==='pending'?5000:90000);
+    }else{
+      _hideMaintenanceBanner();
+      _scheduleMaintPoll(90000);
+    }
+  }catch(_){_scheduleMaintPoll(90000);}
 }
-// Poll every 90 seconds and whenever the tab regains visibility.
+// Seed the first poll after login; subsequent polls are self-scheduling via _scheduleMaintPoll.
+// The setInterval below handles the background-tab case where setTimeout may drift.
 setInterval(_pollMaintenanceStatus,90000);
 // Stale-data refresh: when the tab returns to the foreground after ≥5 minutes
 // of inactivity, silently reload all operational data so users don't see stale
@@ -4636,7 +4924,12 @@ function nav(id){
   if(id==='weekly-program'){populateWPDD();renderWP();}
   if(id==='activities'){_loadActivitiesPage();}
   if(id==='facilitators')loadFacilitatorStats();
-  if(id==='curriculum')_loadCurriculumClassBreakdown();
+  if(id==='curriculum'){
+    _loadCurriculumClassBreakdown();
+    // Show Matrix tab for squadron scope (where Training Classes are defined)
+    const matTab=document.getElementById('tab-matrix');
+    if(matTab)matTab.style.display=(effectiveScope()==='squadron')?'':'none';
+  }
   if(id==='dashboard')renderDash();
   if(id==='wing-overview'){renderWing();loadCommandDashboard('wing');}
   if(id==='national'){renderNational();loadCommandDashboard('national');}
@@ -4910,33 +5203,47 @@ async function scLoadMaintenance(){
     const d=await api('/api/system/maintenance');
     let h='';
     if(d.enabled){
-      h+=`<div class="sc-maint-on">Maintenance mode is ON${d.message?' — '+esc(d.message):''}</div>`;
+      const phase=d.phase||'locked';
+      const isPending=phase==='pending';
+      const phaseLabel=isPending
+        ?'<span class="sc-status-warn">PENDING (drain window active — writes not yet blocked)</span>'
+        :'<span class="sc-status-err">LOCKED (write-block active)</span>';
+      h+=`<div class="sc-maint-on">Maintenance mode is ON — Phase: ${phaseLabel}</div>`;
+      if(isPending&&d.pending_until)h+=`<div class="muted" style="font-size:12px;margin-bottom:4px">Write-block starts: ${esc(d.pending_until)}</div>`;
+      if(d.message) h+=`<div class="muted" style="font-size:12px;margin-bottom:4px">Message: ${esc(d.message)}</div>`;
       if(d.until) h+=`<div class="muted" style="font-size:12px;margin-bottom:4px">Expected return: ${esc(d.until)}</div>`;
       h+=`<div style="font-size:11.5px;margin:6px 0 10px;display:flex;gap:10px;flex-wrap:wrap">`;
       h+=`<span class="${d.block_logins?'sc-status-warn':'sc-status-ok'}">Logins: ${d.block_logins?'Blocked':'Allowed'}</span>`;
       h+=`<span class="${d.block_reads?'sc-status-warn':'sc-status-ok'}">Reads: ${d.block_reads?'Blocked':'Allowed'}</span>`;
-      h+=`<span class="sc-status-warn">Writes: Blocked</span>`;
+      h+=`<span class="${isPending?'sc-status-ok':'sc-status-warn'}">Writes: ${isPending?'Allowed (pending)':'Blocked'}</span>`;
       h+=`</div>`;
       h+=`<button class="btn btn-secondary" onclick="scDisableMaint()">Disable Maintenance Mode</button>`;
     } else {
       h+=`<div style="font-size:12.5px;color:var(--ok);margin-bottom:10px">Maintenance mode is off. System is operating normally.</div>`;
-      h+=`<button class="btn btn-secondary" onclick="document.getElementById('sc-maint-block-logins').checked=false;document.getElementById('sc-maint-block-reads').checked=false;document.getElementById('sc-maint-form').style.display='block';this.style.display='none'">Enable Maintenance Mode…</button>`;
+      h+=`<button class="btn btn-secondary" onclick="document.getElementById('sc-maint-title').value='';document.getElementById('sc-maint-block-logins').checked=false;document.getElementById('sc-maint-block-reads').checked=false;document.getElementById('sc-maint-drain').value='20';document.getElementById('sc-maint-form').style.display='block';this.style.display='none'">Enable Maintenance Mode…</button>`;
     }
     el.innerHTML=h;
   } catch(e){ el.innerHTML=`<div class="sc-status-err">Could not load Maintenance status: ${esc(apiErr(e))}</div>`; }
 }
 
 async function scEnableMaint(){
+  const title=document.getElementById('sc-maint-title').value.trim();
   const msg=document.getElementById('sc-maint-msg').value.trim();
   const until=document.getElementById('sc-maint-until').value.trim();
   const confirm=document.getElementById('sc-maint-confirm').value.trim();
   const blockLogins=document.getElementById('sc-maint-block-logins').checked;
   const blockReads=document.getElementById('sc-maint-block-reads').checked;
+  const drainRaw=parseInt(document.getElementById('sc-maint-drain').value,10);
+  const drainSecs=isNaN(drainRaw)?20:Math.max(0,Math.min(drainRaw,300));
   try {
-    await api('/api/system/maintenance/enable',{method:'POST',body:JSON.stringify({message:msg||null,until:until||null,confirm,block_logins:blockLogins,block_reads:blockReads})});
+    await api('/api/system/maintenance/enable',{method:'POST',body:JSON.stringify({
+      title:title||null,message:msg||null,until:until||null,confirm,
+      block_logins:blockLogins,block_reads:blockReads,drain_seconds:drainSecs
+    })});
     document.getElementById('sc-maint-form').style.display='none';
     scLoadMaintenance();
     scLoadOverview();
+    _pollMaintenanceStatus();
   } catch(e){ alert('Could not enable maintenance mode: '+(apiErr(e))); }
 }
 
@@ -6565,9 +6872,23 @@ async function doRenameFlight(){
 }
 
 // ── Settings page: load user directory for admins ──────────────────────────
+// DENS-01: display density
+function _setDensity(val){
+  if(val==='compact') document.body.dataset.density='compact';
+  else delete document.body.dataset.density;
+  try{sessionStorage.setItem('displayDensity',val);}catch(_){}
+  // Sync radio buttons when called programmatically
+  const r=document.querySelector(`input[name="aafc-density"][value="${val}"]`);
+  if(r)r.checked=true;
+}
+// Apply stored preference early (runs when script parses, before any page render)
+(function(){_setDensity(sessionStorage.getItem('displayDensity')||'comfortable');})();
+
 async function renderSettings(){
   const card=document.getElementById('user-dir-card');
   if(!card)return;
+  // Sync display size radio buttons with current preference
+  _setDensity(sessionStorage.getItem('displayDensity')||'comfortable');
   // Only show for admin roles
   const adminRoles=['sqn_admin','wing_admin','national_admin','system_admin'];
   if(!adminRoles.includes(S.role)){ card.style.display='none'; return; }
@@ -7084,6 +7405,75 @@ const _DASH_CHART_IDS=[
   ['chart-wing-delivery',null],
 ];
 
+// DATA-CONF-01: render the data freshness indicator bar given an API data_freshness object.
+// Mutates the element at the given containerId. Pass null freshness to hide.
+function _renderDataConfBar(freshness, containerId){
+  const el=document.getElementById(containerId||'data-conf-bar');
+  if(!el)return;
+  if(!freshness){el.style.display='none';return;}
+  const issues=freshness.issues||[];
+  const hasCovPct=(freshness.coverage_pct!=null);
+  if(issues.length===0 && !hasCovPct){
+    // All clean — show a brief OK state then hide
+    el.className='data-conf-bar ok';
+    el.innerHTML='<span class="dcb-label">✓ Data up to date</span>';
+    el.style.display='flex';
+    setTimeout(()=>{el.style.display='none';},4000);
+    return;
+  }
+  const issueHtml=issues.map(i=>`<span class="dcb-issue">${esc(i)}</span>`).join('');
+  const covHtml=hasCovPct?`<span class="dcb-issue">Wing coverage: ${freshness.coverage_pct}%</span>`:'';
+  el.className='data-conf-bar';
+  el.innerHTML=`<span class="dcb-label">⚠ Data quality</span>${issueHtml}${covHtml}`;
+  el.style.display='flex';
+}
+
+// CLASS-FORECAST-01: fetch and render per-class planning forecasts on the Mission Backlog page.
+async function _loadClassForecasts(yearId){
+  const card=document.getElementById('py-forecasts-card');
+  const body=document.getElementById('fc-cards-body');
+  if(!card||!body)return;
+  if(!yearId){card.style.display='none';return;}
+  // Only squadron scope has classes to forecast; hide silently for wing/national
+  const scope=effectiveScope();
+  if(scope!=='squadron'){card.style.display='none';return;}
+  card.style.display='';
+  body.innerHTML='<p class="muted">Loading forecasts…</p>';
+  try{
+    const forecasts=await api(`/api/planning/class-forecasts?year_id=${encodeURIComponent(yearId)}`);
+    if(!forecasts||!forecasts.length){
+      card.style.display='none';
+      return;
+    }
+    const _pillLabel={'on_track':'On Track','planning_risk':'Planning Risk','critical':'Critical'};
+    const _cssClass={'on_track':'on-track','planning_risk':'planning-risk','critical':'critical'};
+    body.innerHTML=forecasts.map(fc=>{
+      const css=_cssClass[fc.status]||'';
+      const pill=_pillLabel[fc.status]||esc(fc.status||'');
+      return `<div class="fc-card ${css}">
+        <div class="fc-card-header">
+          <div>
+            <div class="fc-class-name">${esc(fc.class_name||'')}</div>
+            <div class="fc-stage">${esc(fc.stage_name||'')}</div>
+          </div>
+          <span class="fc-pill ${css}">${pill}</span>
+        </div>
+        <div class="fc-stats">
+          <span class="fc-stat-label">Unplanned</span><span class="fc-stat-val">${fc.unplanned_requirements??'—'}</span>
+          <span class="fc-stat-label">Planned</span><span class="fc-stat-val">${fc.planned_requirements??'—'}</span>
+          <span class="fc-stat-label">Nights left</span><span class="fc-stat-val">${fc.remaining_parade_nights??'—'}</span>
+          <span class="fc-stat-label">Time blocks</span><span class="fc-stat-val">${fc.available_time_blocks??'—'}</span>
+        </div>
+        ${fc.message?`<div class="fc-msg">${esc(fc.message)}</div>`:''}
+      </div>`;
+    }).join('');
+  }catch(e){
+    // 403 = scope not allowed; hide silently. Other errors show briefly.
+    if(e&&(e.status===403||String(e).includes('403'))){card.style.display='none';return;}
+    body.innerHTML=`<p class="muted">Could not load forecasts: ${esc(apiErr(e))}</p>`;
+  }
+}
+
 async function loadDashCharts(){
   const win=document.getElementById('dash-window')?.value||'term';
   const sqn=document.getElementById('dash-sqn-filter')?.value||saBrowseSquadronId()||'';
@@ -7104,6 +7494,7 @@ async function loadDashCharts(){
     return;
   }
   const charts=data.charts||{};const scope=data.scope||'squadron';
+  _renderDataConfBar(data.data_freshness||null,'data-conf-bar');
 
   // Scope label
   const scopeEl=document.getElementById('dash-scope-label');
@@ -7655,6 +8046,399 @@ async function doArchiveTemplate(tid,btn){
   });
 }
 
+// ── Facilitator Suggestions (FAC-SUG-01) ─────────────────────────────────────
+async function _loadFacSuggestions(sessId, date, period){
+  const panel=document.getElementById('fac-sugg-panel');
+  if(!panel||!sessId)return;
+  panel.style.display='none';
+  try{
+    const url=`/api/sessions/${encodeURIComponent(sessId)}/facilitator-suggestions?parade_date=${encodeURIComponent(date||'')}&period=${encodeURIComponent(period||'')}`;
+    const r=await api(url);
+    const suggestions=(r.suggestions||[]).filter(s=>s.rank_label!=='UNAVAILABLE').slice(0,5);
+    if(!suggestions.length||r.no_recommendation){
+      // No useful data — leave panel hidden rather than showing noise
+      return;
+    }
+    const _pillCls={'SUGGESTED':'suggested','AVAILABLE':'available','CONFLICT':'conflict','UNAVAILABLE':'unavailable'};
+    panel.className='fac-sugg-panel';
+    panel.innerHTML='<div class="fac-sugg-title">Facilitator suggestions</div>'+
+      suggestions.map(s=>{
+        const cls=_pillCls[s.rank_label]||'available';
+        const allReasons=[...(s.reasons||[]),...(s.conflicts||[])];
+        return `<div class="fac-sugg-item">
+          <span class="fac-sugg-pill ${cls}">${esc(s.rank_label)}</span>
+          <div>
+            <div class="fac-sugg-name">${esc(s.display_name)}</div>
+            <div class="fac-sugg-reasons">${allReasons.map(r=>esc(r)).join(' · ')}</div>
+          </div>
+        </div>`;
+      }).join('');
+    panel.style.display='block';
+  }catch(_){
+    // Non-critical — suggestion panel failure must not break session edit
+  }
+}
+
+// ── Quick Entry (PN-WIZ-01 — simple session add) ──────────────────────────────
+async function _qeSubmit(pnId, ds){
+  const msgEl=document.getElementById('qe-msg');
+  if(msgEl) msgEl.textContent='';
+  const period=parseInt(document.getElementById('qe-period').value,10)||1;
+  const currId=document.getElementById('qe-curr-sel').value;
+  const facId=document.getElementById('qe-fac-sel').value;
+  const roomId=document.getElementById('qe-room-sel').value;
+  try{
+    await api('/api/sessions',{method:'POST',body:JSON.stringify({
+      parade_night_id:pnId,
+      period_number:period,
+      curriculum_item_id:currId||null,
+      facilitator_id:facId||null,
+      training_area_id:roomId||null,
+    })});
+    await reloadAndRender();
+    showPNDetail(ds);
+  }catch(e){
+    if(msgEl) msgEl.textContent=apiErr(e);
+  }
+}
+
+// ── Guided Session Builder Wizard (PN-WIZ-01) ─────────────────────────────────
+let _wizState={pnId:null,date:null,step:1,classIds:[],currId:null,currTitle:null,period:1,facId:null,roomId:null,notes:''};
+
+function _wizOpen(pnId, date){
+  _wizState={pnId,date,step:1,classIds:[],currId:null,currTitle:null,period:1,facId:null,roomId:null,notes:''};
+  _wizStep(1);
+  openModal('m-sess-wizard');
+}
+
+function _wizCancel(){
+  closeModal('m-sess-wizard');
+}
+
+function _wizStep(n){
+  const MAX=6;
+  _wizState.step=n;
+  // Update step label and progress dots
+  const isCheck=(n==='check');
+  const stepNum=isCheck?MAX+1:n;
+  document.getElementById('wiz-step-label').textContent=isCheck?'Check before saving':`Step ${n} of ${MAX}`;
+  for(let i=1;i<=MAX;i++){
+    const dot=document.getElementById('wdot-'+i);
+    if(!dot)continue;
+    dot.className='wiz-dot'+(isCheck||i<n?' done':i===n?' active':'');
+  }
+  const ckDot=document.getElementById('wdot-check');
+  if(ckDot) ckDot.className='wiz-dot'+(isCheck?' active':'');
+  // Show/hide step panels
+  [1,2,3,4,5,6,'check'].forEach(s=>{
+    const el=document.getElementById('wiz-step-'+(s==='check'?'check':s));
+    if(el) el.style.display=(isCheck?s==='check':s===n)?'':'none';
+  });
+  // Back/Next/Save buttons
+  const backBtn=document.getElementById('wiz-back-btn');
+  const nextBtn=document.getElementById('wiz-next-btn');
+  const saveBtn=document.getElementById('wiz-save-btn');
+  if(backBtn) backBtn.style.display=(n===1&&!isCheck)?'none':'';
+  if(nextBtn) nextBtn.style.display=isCheck?'none':'';
+  if(saveBtn) saveBtn.style.display=isCheck?'':'none';
+  // Step-specific setup
+  if(n===1) _wizSetupStep1();
+  if(n===2) _wizSetupStep2();
+  if(n===4) _wizSetupStep4();
+  if(n===5) _wizSetupStep5();
+  if(isCheck) _wizSetupCheck();
+  const msgEl=document.getElementById('wiz-msg');
+  if(msgEl) msgEl.textContent='';
+}
+
+function _wizSetupStep1(){
+  const pn=S.pns.find(p=>p.id===_wizState.pnId);
+  const classes=pn?((pn.classes||[]).length?(pn.classes):(S.trainingClasses||[])):(S.trainingClasses||[]);
+  const list=document.getElementById('wiz-classes-list');
+  if(!list)return;
+  if(!classes.length){
+    list.innerHTML='<span class="muted" style="font-size:12px">No Training Classes configured — you can skip this step.</span>';
+    return;
+  }
+  list.innerHTML=classes.map(c=>{
+    const sel=_wizState.classIds.includes(c.id||c.class_id);
+    return `<label class="wiz-class-item"><input type="checkbox" value="${esc(c.id||c.class_id)}" ${sel?'checked':''} onchange="_wizToggleClass(this)"> <span>${esc(c.display_name||c.name||c.class_name||'')}</span></label>`;
+  }).join('');
+}
+
+function _wizToggleClass(el){
+  const id=el.value;
+  if(el.checked) _wizState.classIds=[..._wizState.classIds,id];
+  else _wizState.classIds=_wizState.classIds.filter(x=>x!==id);
+}
+
+function _wizSetupStep2(){
+  const search=(document.getElementById('wiz-curr-search')||{}).value||'';
+  _wizRenderCurrList(search);
+}
+
+function _wizFilterCurr(){
+  const search=(document.getElementById('wiz-curr-search')||{}).value||'';
+  _wizRenderCurrList(search);
+}
+
+function _wizRenderCurrList(q){
+  const list=document.getElementById('wiz-curr-list');
+  if(!list)return;
+  const items=(S.curr||[]).filter(c=>!q||c.title.toLowerCase().includes(q.toLowerCase())||c.code.toLowerCase().includes(q.toLowerCase()));
+  if(!items.length){list.innerHTML='<span class="muted" style="font-size:12px">No matching items.</span>';return;}
+  list.innerHTML=items.map(c=>{
+    const sel=_wizState.currId===c.id;
+    return `<div class="wiz-curr-item${sel?' sel':''}" onclick="_wizSelectCurr('${esc(c.id)}','${esc(c.title)}')">${esc(c.code)} — ${esc(c.title)}</div>`;
+  }).join('');
+}
+
+function _wizSelectCurr(id, title){
+  _wizState.currId=id; _wizState.currTitle=title;
+  _wizRenderCurrList((document.getElementById('wiz-curr-search')||{}).value||'');
+}
+
+function _wizSkipCurrChange(){
+  const cb=document.getElementById('wiz-skip-curr');
+  const inp=document.getElementById('wiz-custom-title');
+  const list=document.getElementById('wiz-curr-list');
+  const search=document.getElementById('wiz-curr-search');
+  const skip=cb&&cb.checked;
+  if(inp) inp.style.display=skip?'':'none';
+  if(list) list.style.display=skip?'none':'';
+  if(search) search.style.display=skip?'none':'';
+  if(!skip){_wizState.currId=null;_wizState.currTitle=null;}
+}
+
+function _wizSetupStep4(){
+  // Populate facilitator select
+  const sel=document.getElementById('wiz-fac-sel');
+  if(sel){
+    sel.innerHTML='<option value="">— None —</option>'+(S.facs||[]).map(f=>`<option value="${esc(f.id)}" ${f.id===_wizState.facId?'selected':''}>${esc(facDisplay(f))}</option>`).join('');
+  }
+  // Load FAC-SUG-01 suggestions into wizard panel
+  const panel=document.getElementById('wiz-fac-sugg');
+  if(!panel)return;
+  panel.style.display='none';
+  const {date,period}=_wizState;
+  if(!date)return;
+  // Use an existing session on this PN as scope context for suggestions
+  const pnForSugg=S.pns.find(p=>p.id===_wizState.pnId);
+  const existSess=(pnForSugg&&pnForSugg.sessions)||[];
+  const sidForSugg=existSess[0]?existSess[0].id||existSess[0].session_id:null;
+  if(!sidForSugg)return; // No existing session to anchor scope — skip suggestions
+  api(`/api/sessions/${encodeURIComponent(sidForSugg)}/facilitator-suggestions?parade_date=${encodeURIComponent(date||'')}&period=${encodeURIComponent(period||1)}`)
+    .then(r=>{
+      if(!r)return;
+      const _pillCls={'SUGGESTED':'suggested','AVAILABLE':'available','CONFLICT':'conflict','UNAVAILABLE':'unavailable'};
+      const suggs=(r.suggestions||[]).filter(s=>s.rank_label!=='UNAVAILABLE').slice(0,4);
+      if(!suggs.length||r.no_recommendation)return;
+      panel.innerHTML=`<div class="wiz-fac-sugg-title">Suggestions</div><div class="wiz-fac-pill-row">`+
+        suggs.map(s=>{
+          const cls=_pillCls[s.rank_label]||'available';
+          return `<span class="fac-sugg-item" style="cursor:pointer" onclick="_wizPickFac('${esc(s.facilitator_id)}')" title="${esc((s.reasons||[]).join('; '))}">
+            <span class="fac-sugg-pill ${cls}">${esc(s.rank_label)}</span>
+            <span class="fac-sugg-name" style="font-size:12px">${esc(s.display_name)}</span>
+          </span>`;
+        }).join('')+'</div>';
+      panel.style.display='block';
+    }).catch(()=>{});
+}
+
+function _wizPickFac(facId){
+  _wizState.facId=facId;
+  const sel=document.getElementById('wiz-fac-sel');
+  if(sel) sel.value=facId;
+}
+
+function _wizSetupStep5(){
+  const sel=document.getElementById('wiz-room-sel');
+  if(sel){
+    sel.innerHTML='<option value="">— None —</option>'+(S.rooms||[]).map(r=>`<option value="${esc(r.id)}" ${r.id===_wizState.roomId?'selected':''}>${esc(r.name)}</option>`).join('');
+  }
+}
+
+function _wizSetupCheck(){
+  // Collect any remaining edits from current step controls
+  const period=parseInt((document.getElementById('wiz-period')||{}).value||'1',10);
+  _wizState.period=period||1;
+  const facSel=document.getElementById('wiz-fac-sel');
+  if(facSel&&facSel.value) _wizState.facId=facSel.value;
+  const roomSel=document.getElementById('wiz-room-sel');
+  if(roomSel&&roomSel.value) _wizState.roomId=roomSel.value;
+  const notes=(document.getElementById('wiz-notes')||{}).value||'';
+  _wizState.notes=notes;
+  // Custom title override
+  const skipCurr=(document.getElementById('wiz-skip-curr')||{}).checked;
+  if(skipCurr){
+    const ct=(document.getElementById('wiz-custom-title')||{}).value||'';
+    _wizState.currId=null; _wizState.currTitle=ct||null;
+  }
+  // Build summary
+  const fac=_wizState.facId?((S.facs||[]).find(f=>f.id===_wizState.facId)):null;
+  const room=_wizState.roomId?((S.rooms||[]).find(r=>r.id===_wizState.roomId)):null;
+  const classNames=_wizState.classIds.map(id=>{
+    const pn=S.pns.find(p=>p.id===_wizState.pnId);
+    const allC=[...((pn&&pn.classes)||[]),...(S.trainingClasses||[])];
+    const c=allC.find(x=>(x.id||x.class_id)===id);
+    return c?(c.display_name||c.name||c.class_name||id):id;
+  });
+  const sumEl=document.getElementById('wiz-summary');
+  if(sumEl){
+    const rows=[
+      {l:'Period',v:_wizState.period},
+      {l:'Training Class',v:classNames.length?classNames.join(', '):'(none)'},
+      {l:'Curriculum item',v:_wizState.currTitle||'(none / custom)'},
+      {l:'Facilitator',v:fac?facDisplay(fac):'(none)'},
+      {l:'Room',v:room?room.name:'(none)'},
+      {l:'Notes',v:_wizState.notes||'(none)'},
+    ];
+    sumEl.innerHTML=rows.map(r=>`<div class="wiz-summary-row"><span class="wiz-summary-label">${esc(r.l)}</span><span class="wiz-summary-val">${esc(String(r.v))}</span></div>`).join('');
+  }
+  const conflEl=document.getElementById('wiz-conflicts');
+  if(conflEl) conflEl.style.display='none';
+}
+
+function _wizNext(){
+  const n=_wizState.step;
+  const msgEl=document.getElementById('wiz-msg');
+  if(msgEl) msgEl.textContent='';
+  // Collect data from current step
+  if(n===3){
+    const period=parseInt((document.getElementById('wiz-period')||{}).value||'1',10);
+    if(!period||period<1){if(msgEl)msgEl.textContent='Enter a valid period number.';return;}
+    _wizState.period=period;
+  }
+  if(n===4){
+    const facSel=document.getElementById('wiz-fac-sel');
+    _wizState.facId=(facSel&&facSel.value)||null;
+  }
+  if(n===5){
+    const roomSel=document.getElementById('wiz-room-sel');
+    _wizState.roomId=(roomSel&&roomSel.value)||null;
+  }
+  if(n===6){
+    const notes=(document.getElementById('wiz-notes')||{}).value||'';
+    _wizState.notes=notes;
+    _wizStep('check');
+  } else {
+    _wizStep(n+1);
+  }
+}
+
+function _wizBack(){
+  if(_wizState.step==='check'){_wizStep(6);return;}
+  const n=_wizState.step;
+  if(n>1) _wizStep(n-1);
+}
+
+async function _wizSave(){
+  const msgEl=document.getElementById('wiz-msg');
+  const saveBtn=document.getElementById('wiz-save-btn');
+  if(msgEl) msgEl.textContent='';
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='Saving…';}
+  const skipCurr=(document.getElementById('wiz-skip-curr')||{}).checked;
+  const customTitle=skipCurr?((document.getElementById('wiz-custom-title')||{}).value||null):null;
+  try{
+    const body={
+      parade_night_id:_wizState.pnId,
+      period_number:_wizState.period,
+      curriculum_item_id:_wizState.currId||null,
+      custom_title:customTitle||null,
+      facilitator_id:_wizState.facId||null,
+      training_area_id:_wizState.roomId||null,
+    };
+    const newSess=await api('/api/sessions',{method:'POST',body:JSON.stringify(body)});
+    // Assign training classes if selected
+    if(_wizState.classIds.length&&newSess){
+      const sid=newSess.id||newSess.session_id;
+      try{await api('/api/sessions/'+sid+'/audience',{method:'PUT',body:JSON.stringify({training_class_ids:_wizState.classIds})});}catch(_){}
+    }
+    closeModal('m-sess-wizard');
+    await reloadAndRender();
+    showPNDetail(_wizState.date);
+  }catch(e){
+    if(msgEl) msgEl.textContent=apiErr(e);
+    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='Save Session';}
+  }
+}
+
+// ── Bulk Apply Template (BULK-01) ────────────────────────────────────────────
+async function openBulkApplyModal(){
+  const ids=[..._pnSelected];
+  if(!ids.length){showToast('Select at least one parade night first.',true);return;}
+  const selEl=document.getElementById('bat-tpl-sel');
+  const prevEl=document.getElementById('bat-preview');
+  const msgEl=document.getElementById('bat-msg');
+  const confirmBtn=document.getElementById('bat-confirm-btn');
+  selEl.innerHTML='<option value="">— loading templates… —</option>';
+  prevEl.style.display='none';
+  msgEl.style.display='none';
+  confirmBtn.style.display='none';
+  openModal('m-bulk-apply-tpl');
+  try{
+    const templates=await api('/api/parade-night-templates');
+    if(!templates.length){
+      selEl.innerHTML='<option value="">— No templates saved yet —</option>';
+    } else {
+      selEl.innerHTML='<option value="">— choose a template —</option>'+
+        templates.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} (${t.session_count} session${t.session_count!==1?'s':''})</option>`).join('');
+    }
+  }catch(e){
+    selEl.innerHTML='<option value="">— Error loading templates —</option>';
+    msgEl.textContent=apiErr(e); msgEl.style.display='block';
+  }
+}
+
+async function _bulkApplyPreview(){
+  const tid=document.getElementById('bat-tpl-sel').value;
+  const conflict=document.getElementById('bat-conflict-sel').value;
+  const prevEl=document.getElementById('bat-preview');
+  const msgEl=document.getElementById('bat-msg');
+  const confirmBtn=document.getElementById('bat-confirm-btn');
+  const confirmCount=document.getElementById('bat-confirm-count');
+  msgEl.style.display='none';
+  prevEl.style.display='none';
+  confirmBtn.style.display='none';
+  if(!tid){msgEl.textContent='Select a template first.';msgEl.style.display='block';return;}
+  const ids=[..._pnSelected];
+  try{
+    const r=await api('/api/parade-nights/bulk-apply-template',{
+      method:'POST',
+      body:JSON.stringify({template_id:tid,parade_night_ids:ids,conflict_resolution:conflict,dry_run:true}),
+    });
+    prevEl.innerHTML=`<strong>Preview (${ids.length} night${ids.length!==1?'s':''} selected)</strong><br>`+
+      `Nights to process: <strong>${r.nights_processed}</strong>`+
+      (r.nights_skipped?` &middot; Nights skipped: <strong>${r.nights_skipped}</strong>`:'')+
+      (r.conflict_nights?` &middot; Nights with existing sessions: <strong>${r.conflict_nights}</strong>`:'')+
+      `<br>Sessions to add: <strong>${r.sessions_added}</strong>`+
+      (r.sessions_skipped?` &middot; Period slots skipped: <strong>${r.sessions_skipped}</strong>`:'');
+    prevEl.style.display='block';
+    if(r.nights_processed>0){
+      confirmCount.textContent=r.nights_processed;
+      confirmBtn.style.display='';
+    }
+  }catch(e){ msgEl.textContent=apiErr(e); msgEl.style.display='block'; }
+}
+
+async function _bulkApplyConfirm(){
+  const tid=document.getElementById('bat-tpl-sel').value;
+  const conflict=document.getElementById('bat-conflict-sel').value;
+  const msgEl=document.getElementById('bat-msg');
+  const ids=[..._pnSelected];
+  msgEl.style.display='none';
+  try{
+    const r=await api('/api/parade-nights/bulk-apply-template',{
+      method:'POST',
+      body:JSON.stringify({template_id:tid,parade_night_ids:ids,conflict_resolution:conflict,dry_run:false}),
+    });
+    closeModal('m-bulk-apply-tpl');
+    _pnClearSelection();
+    showToast(`Template applied — ${r.sessions_added} session${r.sessions_added!==1?'s':''} added across ${r.nights_processed} night${r.nights_processed!==1?'s':''}.`);
+    await reloadAndRender();
+  }catch(e){ msgEl.textContent=apiErr(e); msgEl.style.display='block'; }
+}
+
 // ADD PARADE NIGHT
 function buildSlots(){
   const n=parseInt(document.getElementById('pn-nsess').value);
@@ -7769,7 +8553,7 @@ function showPNDetail(ds){
         <div class="ff"><label>Start Time</label><input type="time" id="pnd-start" value="${esc(pn.start_time||'')}"></div>
         <div class="ff"><label>End Time</label><input type="time" id="pnd-end" value="${esc(pn.end_time||'')}"></div>
       </div>
-      <div class="ff"><label>Notes</label><input id="pnd-notes" value="${esc(pn.notes||'')}"></div>
+      <div class="ff"><label>Notes<span class="save-ind" id="pnd-notes-status"></span></label><input id="pnd-notes" value="${esc(pn.notes||'')}"></div>
       <button class="btn btn-xs btn-sky" style="margin-top:6px" onclick="savePNCoreDetails('${ds}')">Save Details</button>
     </div>`;
   }
@@ -7842,7 +8626,28 @@ function showPNDetail(ds){
     <button class="btn btn-red-out" style="margin-left:8px" onclick="doCancelAllSessions('${ds}')" title="Cancels every session still Planned/Published in this parade night. Records a reason.">Cancel all remaining</button>`;
   }
   if(canWriteSquadron()&&pn.closeout_status!=='closed'){
-    html+=`<div class="no-print" style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border-light)">
+    const qeCurrOpts=(S.curr||[]).map(c=>`<option value="${esc(c.id)}">${esc(c.code)} — ${esc(c.title)}</option>`).join('');
+    const qeFacOpts=(S.facs||[]).map(f=>`<option value="${esc(f.id)}">${esc(facDisplay(f))}</option>`).join('');
+    const qeRoomOpts=(S.rooms||[]).map(r=>`<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');
+    html+=`<div class="add-sess-bar no-print">
+      <span style="font-size:12px;color:var(--muted);font-weight:600">Add session:</span>
+      <button class="btn btn-xs btn-out" onclick="document.getElementById('pn-quick-entry').style.display=document.getElementById('pn-quick-entry').style.display==='none'?'block':'none'">Quick entry</button>
+      <button class="btn btn-xs btn-sky" onclick="_wizOpen('${esc(pn.id)}','${esc(pn.date)}')">Guided mode</button>
+    </div>
+    <div id="pn-quick-entry" class="qe-form no-print" style="display:none">
+      <div style="display:grid;grid-template-columns:70px 1fr 1fr 1fr;gap:8px;align-items:end">
+        <div><label style="font-size:11px;font-weight:600">Period</label><input type="number" id="qe-period" min="1" max="20" value="1" style="width:100%"></div>
+        <div><label style="font-size:11px;font-weight:600">Curriculum</label><select id="qe-curr-sel" style="width:100%"><option value="">— None —</option>${qeCurrOpts}</select></div>
+        <div><label style="font-size:11px;font-weight:600">Facilitator</label><select id="qe-fac-sel" style="width:100%"><option value="">— None —</option>${qeFacOpts}</select></div>
+        <div><label style="font-size:11px;font-weight:600">Room</label><select id="qe-room-sel" style="width:100%"><option value="">— None —</option>${qeRoomOpts}</select></div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+        <button class="btn btn-sm btn-primary" onclick="_qeSubmit('${esc(pn.id)}','${esc(pn.date)}')">Add Session</button>
+        <button class="btn btn-sm btn-secondary" onclick="document.getElementById('pn-quick-entry').style.display='none'">Cancel</button>
+        <span id="qe-msg" style="font-size:11px;color:var(--red)"></span>
+      </div>
+    </div>`;
+    html+=`<div class="no-print" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light)">
       <button class="btn btn-xs btn-red-out" onclick="doClosePN('${esc(pn.id)}')" title="Close this Parade Night after all sessions have been recorded. All sessions must be in a final status.">Close Parade Night</button>
       <span style="font-size:11px;color:var(--muted);margin-left:8px">Locks the parade night once all outcomes are recorded.</span>
     </div>`;
@@ -7864,6 +8669,17 @@ function showPNDetail(ds){
       const fa=document.getElementById('d-fa-'+i);if(fa)fa.value=s.facId||'';
       const rm=document.getElementById('d-rm-'+i);if(rm)rm.value=s.room||'';
     });
+    // AUTO-01 Class A: wire autosave to the parade night notes field.
+    const notesEl=document.getElementById('pnd-notes');
+    if(notesEl&&canWriteSquadron()){
+      notesEl.addEventListener('input',_mkAutoSave(async(val)=>{
+        const livePn=S.pns.find(p=>p.id===pn.id);
+        await api('/api/parade-nights/'+pn.id,{method:'PATCH',body:JSON.stringify({
+          notes:val, version:livePn?livePn.version:undefined
+        })});
+        if(livePn)livePn.notes=val;
+      },'pnd-notes-status'));
+    }
   },30);
   loadPNNotices(pn.id);
   openModal('m-pn-detail');
@@ -8304,7 +9120,7 @@ async function quickEdit(date,idx){
   document.getElementById('sess-edit-body').innerHTML=`
     <div class="ff"><label for="qe-st">Status</label><select id="qe-st" aria-label="Session status">${stOpts}</select></div>
     <div class="ff"><label for="qe-ex">Curriculum Item</label><select id="qe-ex"><option value="">— Unassigned —</option>${currOpts}</select></div>
-    <div class="ff"><label for="qe-fa">Facilitator</label><select id="qe-fa"><option value="">— None —</option>${facOpts}</select></div>
+    <div class="ff"><label for="qe-fa">Facilitator</label><div id="fac-sugg-panel" style="display:none"></div><select id="qe-fa"><option value="">— None —</option>${facOpts}</select></div>
     <div class="ff"><label for="qe-rm">Room</label><select id="qe-rm"><option value="">— None —</option>${roomOpts}</select></div>
     <div class="ff" id="qe-classes-group" style="display:none">
       <label>Training Classes</label>
@@ -8319,6 +9135,8 @@ async function quickEdit(date,idx){
   // an earlier, still-in-flight populate call resolve after a later one and
   // clobber it with stale data.
   await _populateQuickEditClasses(s.id);
+  // FAC-SUG-01: load suggestions non-blocking after modal is visible
+  _loadFacSuggestions(s.id, pn.date, s.period_number);
 }
 
 // ── Session <-> Training Class audience (CLASS-03) ───────────────────────────
@@ -8550,7 +9368,124 @@ function setCurrTab(ph,btn){
   currTabFilter=ph;
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
+  // Hide matrix view, show normal list view
+  const mv=document.getElementById('curr-matrix-view');
+  if(mv)mv.style.display='none';
+  const fbar=document.getElementById('curr-fbar');
+  if(fbar)fbar.style.display='';
+  const cl=document.getElementById('curr-list');
+  if(cl)cl.style.display='';
   renderCurr();
+}
+
+// CLASS-MATRIX-01: Training Class × Curriculum Item matrix
+let _cmData=null; // cached matrix API response
+
+async function openCurrMatrix(btn){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  // Show matrix, hide normal list view
+  const mv=document.getElementById('curr-matrix-view');if(mv)mv.style.display='';
+  const fbar=document.getElementById('curr-fbar');if(fbar)fbar.style.display='none';
+  const cl=document.getElementById('curr-list');if(cl)cl.style.display='none';
+  // Load if not already cached
+  if(_cmData){_renderCurrMatrix();return;}
+  const status=document.getElementById('cm-load-status');
+  if(status)status.textContent='Loading…';
+  try{
+    // Resolve planning year for current squadron
+    const sqnId=(S.session&&S.session.squadron_id)||(typeof saBrowseSquadronId==='function'?saBrowseSquadronId():null);
+    if(!sqnId){if(status)status.textContent='No squadron selected.';return;}
+    let yearId=null;
+    const years=await api('/api/planning/years?unit_id='+encodeURIComponent(sqnId)).catch(()=>[]);
+    const active=(years||[]).find(y=>y.active_status);
+    yearId=active?active.planning_year_id:(years&&years[0]?years[0].planning_year_id:null);
+    if(!yearId){if(status)status.textContent='No planning year found.';return;}
+    _cmData=await api('/api/curriculum/class-matrix?year_id='+encodeURIComponent(yearId));
+    // Populate stage filter
+    const sf=document.getElementById('cm-stage-filter');
+    if(sf){
+      sf.innerHTML='<option value="all">All Stages</option>';
+      (_cmData.stages||[]).forEach(s=>{
+        const opt=document.createElement('option');
+        opt.value=s.stage_id;opt.textContent=s.stage_name;
+        sf.appendChild(opt);
+      });
+    }
+    if(status)status.textContent='';
+    _renderCurrMatrix();
+  }catch(e){
+    if(status)status.textContent='Could not load matrix — '+apiErr(e);
+  }
+}
+
+const _CM_STATUS_LABEL={
+  delivered:'Delivered',delivered_with_issue:'Delivered (issue)',planned:'Planned',
+  not_delivered:'Not Delivered',cancelled:'Cancelled',not_started:'—',rescheduled:'Rescheduled'
+};
+
+function _renderCurrMatrix(){
+  const wrap=document.getElementById('cm-table-wrap');
+  if(!wrap||!_cmData)return;
+  const stageFilter=document.getElementById('cm-stage-filter')?.value||'all';
+  const search=(document.getElementById('cm-search')?.value||'').toLowerCase();
+  const actionOnly=document.getElementById('cm-action-only')?.checked||false;
+
+  const classes=_cmData.classes||[];
+  const stages=(_cmData.stages||[]).filter(s=>stageFilter==='all'||s.stage_id===stageFilter);
+
+  if(!classes.length){
+    wrap.innerHTML='<div class="empty"><div class="et">No Training Classes</div><div class="es">Create Training Classes in the Parade Nights section to use the matrix view.</div></div>';
+    return;
+  }
+
+  // Build header row — one TH per class
+  const hdrCells=classes.map(c=>`<th style="min-width:100px;text-align:center">${esc(c.display_name)}<br><span style="font-weight:400;font-size:10px;color:var(--muted)">${esc(c.stage_name)}</span></th>`).join('');
+
+  let rows='';
+  let totalShown=0;
+  for(const stage of stages){
+    const stageClasses=classes.filter(c=>stage.class_ids.includes(c.class_id));
+    let stageRows='';
+    for(const item of (stage.items||[])){
+      if(search&&!item.code.toLowerCase().includes(search)&&!item.title.toLowerCase().includes(search))continue;
+      const cells=stageClasses.map(tc=>{
+        const cell=item.cells[tc.class_id]||{status:'not_started',session_ids:[],elements_delivered:0,elements_total:0};
+        const cls='cm-cell-'+(cell.status||'not_started');
+        const label=_CM_STATUS_LABEL[cell.status]||cell.status||'—';
+        const tip=cell.elements_total?`${cell.elements_delivered}/${cell.elements_total} sessions`:'';
+        return `<td class="${cls}" style="text-align:center;font-size:11px" title="${esc(tip)}">${esc(label)}</td>`;
+      });
+      // Pad with empty cells for classes not in this stage
+      const padded=classes.map(tc=>{
+        if(stage.class_ids.includes(tc.class_id)){
+          const cell=item.cells[tc.class_id]||{status:'not_started',session_ids:[],elements_delivered:0,elements_total:0};
+          if(actionOnly&&cell.status!=='not_started'&&cell.status!=='not_delivered')return null;
+          const cls='cm-cell-'+(cell.status||'not_started');
+          const label=_CM_STATUS_LABEL[cell.status]||cell.status||'—';
+          const tip=cell.elements_total?`${cell.elements_delivered}/${cell.elements_total} sessions`:'';
+          return `<td class="${cls}" style="text-align:center;font-size:11px" title="${esc(tip)}">${esc(label)}</td>`;
+        }
+        return '<td style="background:var(--surface-2);color:var(--muted);text-align:center">—</td>';
+      });
+      if(actionOnly&&!padded.some(c=>c&&c.includes('not_started')||c&&c.includes('not_delivered')))continue;
+      stageRows+=`<tr><td class="cm-sticky"><span style="font-weight:700;font-size:11px">${esc(item.code)}</span><br><span style="font-size:11px;color:var(--text-2)">${esc(item.title)}</span></td>${padded.join('')}</tr>`;
+      totalShown++;
+    }
+    if(stageRows){
+      rows+=`<tr class="cm-stage-row"><td class="cm-sticky" colspan="${classes.length+1}">${esc(stage.stage_name)}</td></tr>${stageRows}`;
+    }
+  }
+
+  if(!totalShown){
+    wrap.innerHTML='<div class="empty"><div class="et">No items match your filters</div></div>';
+    return;
+  }
+
+  wrap.innerHTML=`<table role="grid" aria-label="Curriculum item × Training Class matrix">
+    <thead><tr><th class="cm-sticky">Curriculum Item</th>${hdrCells}</tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
 }
 function deriveProgress(code){
   const arr=allSess().filter(s=>s.code===code).map(s=>s.status);
@@ -9928,28 +10863,9 @@ function saveFac(confirmDuplicate){
     })
     .catch(e=>{
       if(e&&e.code==='possible_duplicate'&&!confirmDuplicate){
-        // REM-96/REM-97: the 409 already carries the existing facilitator's
-        // rank/type/subject areas/status/last-updated (added server-side in
-        // the same query that found the duplicate -- no second fetch needed)
-        // so a same-vs-different-person decision can be made from this
-        // warning alone, without first clicking away to "View existing".
         const detail=(e.body&&e.body.detail)||{};
-        const existingId=detail.existing_facilitator_id||'';
-        const viewBtn=existingId?` <button class="btn-lnk" style="font-size:11px;margin-left:4px" onclick="closeModal('m-add-fac');showFacProfile('${existingId}')">View existing ↗</button>`:'';
-        const areas=(detail.existing_subject_areas||[]).length?detail.existing_subject_areas.map(esc).join(', '):'—';
-        const updated=detail.existing_updated_at?new Date(detail.existing_updated_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'—';
-        const card=`<div style="margin-top:6px;padding:8px 10px;background:var(--surface-2);border-radius:6px;font-size:11.5px;display:grid;grid-template-columns:auto 1fr;gap:2px 10px">
-          <span style="color:var(--muted)">Rank</span><span style="font-weight:700">${esc(detail.existing_rank||'—')}</span>
-          <span style="color:var(--muted)">Type</span><span>${esc(detail.existing_type||'—')}</span>
-          <span style="color:var(--muted)">Subject areas</span><span>${areas}</span>
-          <span style="color:var(--muted)">Status</span><span>${detail.existing_active_status===false?'Archived':'Active'}</span>
-          <span style="color:var(--muted)">Last updated</span><span>${esc(updated)}</span>
-        </div>`;
-        const w=document.getElementById('fac-dup-warn');
-        w.innerHTML=esc(apiErr(e))+' If this is a different person with the same name, add them anyway.'+viewBtn+card;
-        w.style.display='';
-        if(anywayBtn)anywayBtn.style.display='';
-        _setFacSaveState('Unsaved changes','var(--muted)');
+        _setFacSaveState('Possible match — see dialog','var(--warn)');
+        _openFacDupModal(detail,{rank,first,last,type,areas});
       }else{
         _setFacSaveState('Failed to save — Retry','var(--red)');
         showToast('Could not save: '+apiErr(e), true);
@@ -9957,6 +10873,130 @@ function saveFac(confirmDuplicate){
     })
     .finally(done);
 }
+// ── FAC-DUP-01: Duplicate Facilitator Disambiguation Modal ───────────────────
+let _facDupDetail=null;  // 409 detail from backend (existing record info)
+let _facDupPending=null; // pending form data {rank,first,last,type,areas}
+
+function _openFacDupModal(detail,pending){
+  _facDupDetail=detail||{};
+  _facDupPending=pending||{};
+  const areas=(_facDupDetail.existing_subject_areas||[]).length
+    ?_facDupDetail.existing_subject_areas.map(esc).join(', '):'—';
+  const updated=_facDupDetail.existing_updated_at
+    ?new Date(_facDupDetail.existing_updated_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'—';
+  const status=_facDupDetail.existing_active_status===false?'Archived':'Active';
+  document.getElementById('fac-dup-existing-card').innerHTML=`
+    <div style="margin-bottom:6px;font-size:12.5px;font-weight:700;color:var(--dark)">Existing record</div>
+    <div style="padding:10px 12px;background:var(--surface-2);border-radius:6px;font-size:11.5px;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin-bottom:10px">
+      <span style="color:var(--muted)">Rank</span><span style="font-weight:700">${esc(_facDupDetail.existing_rank||'—')}</span>
+      <span style="color:var(--muted)">Type</span><span>${esc(_facDupDetail.existing_type||'—')}</span>
+      <span style="color:var(--muted)">Subject areas</span><span>${areas}</span>
+      <span style="color:var(--muted)">Status</span><span>${esc(status)}</span>
+      <span style="color:var(--muted)">Last updated</span><span>${esc(updated)}</span>
+    </div>
+    <div style="font-size:11.5px;color:var(--muted)">Rank does not determine identity — two people may share a name, and one person may change rank over time.</div>`;
+  document.getElementById('fac-dup-merge-panel').style.display='none';
+  document.getElementById('fac-dup-actions').style.display='';
+  openModal('m-fac-dup');
+}
+
+function _facDupUseExisting(){
+  const eid=_facDupDetail&&_facDupDetail.existing_facilitator_id;
+  closeModal('m-fac-dup');
+  closeModal('m-add-fac');
+  document.getElementById('fac-modal-title').textContent='+ Add Facilitator';
+  _clearFacDupWarning();
+  _facDupDetail=null; _facDupPending=null;
+  if(eid) showFacProfile(eid);
+}
+
+function _facDupCreateDifferent(){
+  closeModal('m-fac-dup');
+  _facDupDetail=null; _facDupPending=null;
+  saveFac(true);
+}
+
+function _facDupShowMergePreview(){
+  const eid=_facDupDetail&&_facDupDetail.existing_facilitator_id;
+  if(!eid){showToast('Cannot identify existing record.',true);return;}
+  const pending=_facDupPending||{};
+  const panel=document.getElementById('fac-dup-merge-panel');
+  panel.innerHTML=`
+    <div class="alert a-info" style="margin-top:10px;font-size:11.5px">
+      <strong>Merge preview</strong><br>
+      The existing record will be updated with the details you entered.<br>
+      Rank: <strong>${esc(pending.rank||'unchanged')}</strong> &nbsp; Type: <strong>${esc(pending.type||'unchanged')}</strong><br>
+      All historical sessions, outcomes, and leave records will remain linked to the existing record.<br>
+      No sessions will be moved. This action updates profile fields only.
+    </div>`;
+  const foot=document.createElement('div');
+  foot.style.cssText='display:flex;gap:8px;margin-top:10px';
+  foot.innerHTML=`<button class="btn btn-out" onclick="document.getElementById('fac-dup-merge-panel').style.display='none';document.getElementById('fac-dup-actions').style.display=''">Back</button>
+    <button class="btn btn-dk" onclick="_facDupConfirmMerge()">Confirm — Update existing record</button>`;
+  panel.appendChild(foot);
+  panel.style.display='';
+  document.getElementById('fac-dup-actions').style.display='none';
+}
+
+async function _facDupConfirmMerge(){
+  const eid=_facDupDetail&&_facDupDetail.existing_facilitator_id;
+  if(!eid) return;
+  const pending=_facDupPending||{};
+  try{
+    await api('/api/facilitators/'+eid,{method:'PATCH',body:JSON.stringify({
+      first_name:pending.first, last_name:pending.last,
+      current_rank:pending.rank||undefined, type:pending.type||undefined
+    })});
+    closeModal('m-fac-dup');
+    closeModal('m-add-fac');
+    document.getElementById('fac-modal-title').textContent='+ Add Facilitator';
+    _clearFacDupWarning();
+    _facDupDetail=null; _facDupPending=null;
+    await reloadAndRender(); loadFacilitatorStats();
+    showToast('Existing Facilitator record updated.');
+  }catch(e){showToast('Could not update: '+apiErr(e),true);}
+}
+
+// ── AUTO-01: Save-state model ─────────────────────────────────────────────
+// _mkAutoSave(saveFn, statusElId) returns an oninput handler that:
+//   1. Marks the field DIRTY immediately.
+//   2. Debounces 1400 ms (no write on every keystroke).
+//   3. On fire: sets SAVING, calls saveFn(currentValue), sets SAVED/FAILED.
+//   4. Prevents duplicate concurrent writes via an in-flight flag.
+//   5. Shows plain-English status in the element identified by statusElId.
+//
+// saveFn receives the current field value and must return a Promise.
+// Class A (autosave): low-risk text/notes with a clean partial-update endpoint.
+// Class B/C fields continue to use explicit Save buttons (unchanged).
+function _mkAutoSave(saveFn, statusElId){
+  let _timer=null;
+  let _inflight=false;
+  function _setStatus(cls,msg){
+    const el=document.getElementById(statusElId); if(!el)return;
+    el.className='save-ind'+(cls?' '+cls:'');
+    el.textContent=msg;
+  }
+  return function onInput(e){
+    _setStatus('','Unsaved');
+    if(_timer)clearTimeout(_timer);
+    _timer=setTimeout(async()=>{
+      if(_inflight)return; // skip — a save is already in flight
+      const val=e.target.value;
+      _inflight=true;
+      _setStatus('saving','Saving…');
+      try{
+        await saveFn(val);
+        _setStatus('saved','Saved');
+        setTimeout(()=>_setStatus('',''),3000);
+      }catch(_e){
+        _setStatus('failed','Could not save — Try again');
+      }finally{
+        _inflight=false;
+      }
+    },1400);
+  };
+}
+
 // Friendlier labels for the known seeded short codes -- custom types created
 // via manageFacilitatorTypes() have no such mapping and just show their own
 // display_name as-is, matching how Subject Area tags already behave.
@@ -11863,6 +12903,8 @@ async function loadYearMap(yearId){
     body.innerHTML='<p class="muted">Select a planning year above.</p>';
     datesCard.style.display='none'; holCard.style.display='none'; classesCard.style.display='none';
     if(missionsCard) missionsCard.style.display='none';
+    const fcCard=document.getElementById('py-forecasts-card');
+    if(fcCard) fcCard.style.display='none';
     if(ctxLbl) ctxLbl.textContent='';
     return;
   }
@@ -11898,6 +12940,7 @@ async function loadYearMap(yearId){
     if(missionsCard) missionsCard.style.display='';
     await Promise.all([_renderParadeDates(yearId), _renderHolidays(yearId), _renderTrainingClasses(yearId)]);
     loadMissions(yearId);
+    _loadClassForecasts(yearId);
     const wid=yr.wing_id||(S.session&&S.session.wing_id)||'';
     if(wid){const wingYear=yr.year||new Date().getFullYear();await _loadAndRenderWingEventsOverlay(wid,wingYear);}
   } catch(e){ body.innerHTML = `<p class="muted">Error loading year: ${esc(apiErr(e))}</p>`; }
@@ -12161,7 +13204,7 @@ async function doGenerateDates(){
   } catch(e){ msg.textContent=apiErr(e); }
 }
 
-const _HOL_TYPE_LABELS={'school_holiday':'School Holiday','public_holiday':'Public Holiday','squadron_stand_down':'Squadron Stand-Down','wing_stand_down':'Wing Stand-Down','national_stand_down':'National Stand-Down','local_closure':'Local Closure','training_pause':'Training Pause','other':'Other'};
+const _HOL_TYPE_LABELS={'school_holiday':'School Holiday','public_holiday':'Public Holiday','statutory_holiday':'Statutory Holiday','squadron_stand_down':'Squadron Stand-Down','wing_stand_down':'Wing Stand-Down','national_stand_down':'National Stand-Down','local_closure':'Local Closure','training_pause':'Training Pause','other':'Other'};
 function openAddHolidayModal(){
   ['hol-name-inp','hol-start-inp','hol-end-inp'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('hol-type-inp').value='school_holiday';

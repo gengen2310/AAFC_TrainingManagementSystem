@@ -20,6 +20,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>((localStorage.getItem("aafc_theme") as Theme) || "light");
   const applyTheme = (t: Theme) => { setTheme(t); localStorage.setItem("aafc_theme", t); document.documentElement.dataset.theme = t; };
   document.documentElement.dataset.theme = theme;
+  // DENS-01: display density preference stored in sessionStorage
+  const [density, setDensityState] = useState<"comfortable" | "compact">(
+    (sessionStorage.getItem("displayDensity") as "comfortable" | "compact") || "comfortable",
+  );
+  const applyDensity = (d: "comfortable" | "compact") => {
+    setDensityState(d);
+    try { sessionStorage.setItem("displayDensity", d); } catch (_) {}
+  };
   const r = visibleRoutes(session);
   const proxy = session?.proxy;
   const wing = isWing(session), national = isNational(session), auditor = isAuditor(session);
@@ -27,7 +35,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const scope = auditor ? "Auditor · read-only" : national ? "National HQ" : wing ? "Wing HQ" : "Squadron";
 
   return (
-    <div className="app">
+    <div className="app" data-density={density === "compact" ? "compact" : undefined}>
       <header className="topbar">
         <span className="brand">AAFC · Training Management System</span>
         <div className="right">
@@ -35,6 +43,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="role-pill">{session?.role}</span>
           <button className="btn out sm light" onClick={() => applyTheme(THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length])}
             aria-label={`Theme, currently ${theme}`}>Theme: {theme}</button>
+          <button className="btn out sm light" onClick={() => applyDensity(density === "compact" ? "comfortable" : "compact")}
+            aria-label={`Display density, currently ${density}`}>Size: {density}</button>
           <button className="btn out sm light" onClick={logout}>Sign out</button>
         </div>
       </header>

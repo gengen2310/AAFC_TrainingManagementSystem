@@ -18,3 +18,8 @@
 .banner{padding:10px 18px;font-weight:700;font-size:12px;}
 .banner.proxy{background:var(--warning);color:#1D2733;}
 .banner.intervention{background:var(--rescheduled);color:#fff;}
+
+/* DENS-01: compact display density overrides */
+.app[data-density="compact"] .main{padding:14px 18px;}
+.app[data-density="compact"] .nav-item{padding:5px 10px 5px 8px;font-size:12px;}
+.app[data-density="compact"] .nav-group{margin:8px 6px 3px;}

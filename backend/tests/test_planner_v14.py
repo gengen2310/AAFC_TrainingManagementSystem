@@ -146,6 +146,21 @@ def test_create_holiday_with_type(client):
     assert h["holiday_type"] == "exam_period"
 
 
+def test_statutory_holiday_type_round_trips(client):
+    """HOL-01 regression: statutory_holiday must be accepted and returned verbatim.
+    The second-wing seed uses this type; without the _HOL_TYPE_LABELS mapping in
+    connected-frontend it renders as raw snake_case to users.
+    """
+    hdr = _sqn_admin(client)
+    py = _make_year(client, hdr, year=2033, name="Statutory Holiday Test")
+    year_id = py["planning_year_id"]
+
+    h = _make_holiday(client, hdr, year_id, name="Remembrance Day",
+                      htype="statutory_holiday",
+                      start="2033-11-11", end="2033-11-11")
+    assert h["holiday_type"] == "statutory_holiday"
+
+
 def test_holiday_default_type_is_school_holiday(client):
     """A holiday created without holiday_type should default to school_holiday."""
     hdr = _sqn_admin(client)

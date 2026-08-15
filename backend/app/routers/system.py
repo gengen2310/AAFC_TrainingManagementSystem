@@ -8,7 +8,7 @@ import os
 import shutil
 import subprocess
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -168,10 +168,17 @@ def system_migrations(db: DBSession = Depends(get_db), p: Principal = Depends(ge
 @router.get("/maintenance")
 def get_maintenance(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     require_system_admin(p)
+    from ..main import _compute_phase
+    active = _get_setting(db, "maintenance_mode", "off") == "on"
+    pending_until = _get_setting(db, "maintenance_pending_until")
+    phase = _compute_phase(active, pending_until)
     return {
-        "enabled": _get_setting(db, "maintenance_mode", "off") == "on",
+        "enabled": active,
+        "phase": phase,
         "message": _get_setting(db, "maintenance_message"),
+        "title": _get_setting(db, "maintenance_title"),
         "until": _get_setting(db, "maintenance_until"),
+        "pending_until": pending_until,
         "updated_at": _get_setting(db, "maintenance_updated_at"),
         "block_reads": _get_setting(db, "maintenance_block_reads", "false") == "true",
         "block_logins": _get_setting(db, "maintenance_block_logins", "false") == "true",
@@ -179,11 +186,13 @@ def get_maintenance(db: DBSession = Depends(get_db), p: Principal = Depends(get_
 
 
 class MaintenanceIn(BaseModel):
-    message: str | None = None
-    until: str | None = None
-    confirm: str = ""
+    title: str | None = None          # shown in the pending-phase banner headline
+    message: str | None = None        # body text shown to users
+    until: str | None = None          # expected return time (display only, ISO or human string)
+    confirm: str = ""                  # must equal "ENABLE MAINTENANCE"
     block_reads: bool = False
     block_logins: bool = False
+    drain_seconds: int = 20            # seconds before writes are blocked (PENDING → LOCKED)
 
 
 @router.post("/maintenance/enable")
@@ -193,9 +202,14 @@ def enable_maintenance(body: MaintenanceIn, db: DBSession = Depends(get_db),
     if body.confirm != "ENABLE MAINTENANCE":
         raise HTTPException(400, detail={"error": "confirmation_required",
                                          "message": "Provide confirm='ENABLE MAINTENANCE' to proceed."})
+    drain = max(0, min(body.drain_seconds, 300))  # cap at 5 minutes
+    pending_until = (datetime.now(timezone.utc) +
+                     timedelta(seconds=drain)).strftime("%Y-%m-%dT%H:%M:%SZ")
     _set_setting(db, "maintenance_mode", "on", p.user_id)
+    _set_setting(db, "maintenance_title", body.title or "Maintenance", p.user_id)
     _set_setting(db, "maintenance_message", body.message or "System under maintenance. Please try again later.", p.user_id)
     _set_setting(db, "maintenance_until", body.until, p.user_id)
+    _set_setting(db, "maintenance_pending_until", pending_until, p.user_id)
     _set_setting(db, "maintenance_block_reads", "true" if body.block_reads else "false", p.user_id)
     _set_setting(db, "maintenance_block_logins", "true" if body.block_logins else "false", p.user_id)
     _set_setting(db, "maintenance_updated_at",
@@ -223,7 +237,8 @@ def enable_maintenance(body: MaintenanceIn, db: DBSession = Depends(get_db),
                "drained_jobs": drained_count})
     from ..main import invalidate_maintenance_cache
     invalidate_maintenance_cache()
-    return {"enabled": True, "message": body.message, "until": body.until,
+    return {"enabled": True, "phase": "pending", "message": body.message, "until": body.until,
+            "pending_until": pending_until, "drain_seconds": drain,
             "block_reads": body.block_reads, "block_logins": body.block_logins,
             "drained_jobs": drained_count}
 
@@ -232,6 +247,7 @@ def enable_maintenance(body: MaintenanceIn, db: DBSession = Depends(get_db),
 def disable_maintenance(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     require_system_admin(p)
     _set_setting(db, "maintenance_mode", "off", p.user_id)
+    _set_setting(db, "maintenance_pending_until", None, p.user_id)
     _set_setting(db, "maintenance_block_reads", "false", p.user_id)
     _set_setting(db, "maintenance_block_logins", "false", p.user_id)
     _set_setting(db, "maintenance_updated_at",

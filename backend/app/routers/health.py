@@ -62,15 +62,32 @@ def ready(db: DBSession = Depends(get_db)):
 
 @router.get("/ui-config")
 def ui_config(db: DBSession = Depends(get_db)):
-    """Return public, non-secret frontend configuration values, including maintenance state."""
+    """Return public, non-secret frontend configuration values, including maintenance state.
+
+    maintenance_phase: "normal" | "pending" | "locked"
+      normal  — no maintenance active
+      pending — maintenance enabled but drain window in progress; writes not yet blocked
+      locked  — maintenance fully active; writes blocked
+    maintenance_pending_until: ISO timestamp (or null) — when pending phase ends
+    maintenance_active: true when phase is "pending" OR "locked" (backward compat)
+    """
     from ..models import SystemSetting
+    from ..main import _compute_phase
     maint_row = db.get(SystemSetting, "maintenance_mode")
-    maint_active = (maint_row is not None and maint_row.value == "maintenance_enabled")
+    # "on" is the canonical value set by enable_maintenance; guard "maintenance_enabled" (legacy/stale string)
+    active = maint_row is not None and maint_row.value in ("on", "maintenance_enabled")
+    maint_title_row = db.get(SystemSetting, "maintenance_title")
     maint_msg_row = db.get(SystemSetting, "maintenance_message")
+    pu_row = db.get(SystemSetting, "maintenance_pending_until")
+    pending_until_iso = pu_row.value if pu_row else None
+    phase = _compute_phase(active, pending_until_iso)
     return {
         "planning_workspace_url": settings.PLANNING_WORKSPACE_URL or None,
         "training_year": settings.TRAINING_YEAR,
         "environment": settings.ENVIRONMENT,
-        "maintenance_active": maint_active,
+        "maintenance_active": active,
+        "maintenance_phase": phase,
+        "maintenance_pending_until": pending_until_iso,
+        "maintenance_title": (maint_title_row.value if maint_title_row else None) or "Maintenance",
         "maintenance_message": (maint_msg_row.value if maint_msg_row else None) or "System under maintenance. Please try again later.",
     }

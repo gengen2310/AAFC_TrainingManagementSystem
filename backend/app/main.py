@@ -24,14 +24,28 @@ _5XX_ALERT_THRESHOLD = 5   # 5 server errors in 60 s triggers a structured warni
 _sec_log = logging.getLogger("security")
 
 # ── Maintenance mode cache (avoid DB hit on every request) ──────────────────
-_maint_cache: dict = {"active": False, "msg": "", "block_reads": False, "block_logins": False, "expires": 0.0}
+_maint_cache: dict = {
+    "active": False, "msg": "", "block_reads": False, "block_logins": False,
+    "pending_until": None,  # ISO timestamp; None = no drain period / immediate lock
+    "expires": 0.0,
+}
 
-def _maintenance_active() -> tuple[bool, str, bool, bool]:
-    """Returns (is_active, message, block_reads, block_logins). Cached with 10-second TTL."""
+def _maintenance_active() -> tuple[bool, str, bool, bool, str, str | None]:
+    """Returns (is_active, message, block_reads, block_logins, phase, pending_until).
+
+    phase is one of:
+      "normal"  — maintenance not active
+      "pending" — maintenance enabled but still within the drain window; writes NOT yet blocked
+      "locked"  — maintenance active and drain window has passed; writes blocked
+    """
+    import datetime as _dt
     now = _time.monotonic()
     if now < _maint_cache["expires"]:
-        return (_maint_cache["active"], _maint_cache["msg"],
-                _maint_cache["block_reads"], _maint_cache["block_logins"])
+        active = _maint_cache["active"]
+        pending_until_iso = _maint_cache["pending_until"]
+        phase = _compute_phase(active, pending_until_iso)
+        return (active, _maint_cache["msg"], _maint_cache["block_reads"],
+                _maint_cache["block_logins"], phase, pending_until_iso)
     try:
         from .models.operations import SystemSetting
         with SessionLocal() as db:
@@ -39,18 +53,39 @@ def _maintenance_active() -> tuple[bool, str, bool, bool]:
             msg_row = db.get(SystemSetting, "maintenance_message")
             br_row = db.get(SystemSetting, "maintenance_block_reads")
             bl_row = db.get(SystemSetting, "maintenance_block_logins")
+            pu_row = db.get(SystemSetting, "maintenance_pending_until")
             active = (row.value == "on") if row else False
             msg = msg_row.value if msg_row else "System under maintenance. Please try again later."
             block_reads = (br_row.value == "true") if br_row else False
             block_logins = (bl_row.value == "true") if bl_row else False
+            pending_until_iso = pu_row.value if pu_row else None
         _maint_cache["active"] = active
         _maint_cache["msg"] = msg
         _maint_cache["block_reads"] = block_reads
         _maint_cache["block_logins"] = block_logins
+        _maint_cache["pending_until"] = pending_until_iso
         _maint_cache["expires"] = now + 10.0
     except Exception:
-        return False, "", False, False
-    return active, msg, block_reads, block_logins
+        return False, "", False, False, "normal", None
+    phase = _compute_phase(active, pending_until_iso)
+    return active, msg, block_reads, block_logins, phase, pending_until_iso
+
+
+def _compute_phase(active: bool, pending_until_iso: str | None) -> str:
+    """Compute maintenance phase from stored state and current wall-clock time."""
+    if not active:
+        return "normal"
+    if not pending_until_iso:
+        return "locked"
+    try:
+        import datetime as _dt
+        from datetime import timezone as _tz
+        pu = _dt.datetime.fromisoformat(pending_until_iso.replace("Z", "+00:00"))
+        if _dt.datetime.now(_tz.utc) < pu:
+            return "pending"
+    except Exception:
+        pass
+    return "locked"
 
 
 def invalidate_maintenance_cache() -> None:
@@ -148,14 +183,18 @@ def _extract_token(request: Request) -> str | None:
 async def maintenance_gate(request: Request, call_next):
     """Gate requests during maintenance mode.
 
+    Phases:
+      pending — drain window in progress; writes NOT blocked; users see warning banner.
+      locked  — drain window expired; writes blocked per existing rules.
+
     Default (block_reads=False, block_logins=False): blocks all write methods.
     With block_reads=True: also blocks GET requests.
     With block_logins=True: also blocks /api/auth/login.
     system_admin bypasses all maintenance gates.
     Always-exempt: health, maintenance management, logout, me, refresh.
     """
-    active, msg, block_reads, block_logins = _maintenance_active()
-    if not active:
+    active, msg, block_reads, block_logins, phase, _pending_until = _maintenance_active()
+    if not active or phase == "pending":
         return await call_next(request)
 
     path = request.url.path

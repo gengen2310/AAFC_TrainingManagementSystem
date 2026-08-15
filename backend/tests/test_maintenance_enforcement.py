@@ -30,9 +30,13 @@ def _wing_admin(client):
 
 
 def _enable_maintenance(client, sysadmin_hdr):
+    # drain_seconds=0 bypasses the PENDING phase and enters LOCKED immediately,
+    # which is what write-blocking tests require. MAINT-02 added the PENDING phase;
+    # tests that specifically test PENDING are in test_system_admin.py.
     r = client.post("/api/system/maintenance/enable", json={
         "confirm": "ENABLE MAINTENANCE",
         "message": "Test maintenance window",
+        "drain_seconds": 0,
     }, headers=sysadmin_hdr)
     assert r.status_code == 200, r.text
 
@@ -320,6 +324,7 @@ def _enable_maintenance_opts(client, sysadmin_hdr, block_reads=False, block_logi
         "message": "Test maintenance window",
         "block_reads": block_reads,
         "block_logins": block_logins,
+        "drain_seconds": 0,  # MAINT-02: skip PENDING phase so tests enter LOCKED immediately
     }, headers=sysadmin_hdr)
     assert r.status_code == 200, r.text
 

@@ -2410,6 +2410,147 @@ def get_class_curriculum_progress(cid: str, db: DBSession = Depends(get_db), p: 
     return _class_curriculum_progress(db, c)
 
 
+@router.get("/curriculum/class-matrix")
+def get_class_matrix(
+    year_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """CLASS-MATRIX-01: curriculum item × Training Class progress matrix.
+
+    Returns stages with their curriculum items, each item having a per-class cell
+    showing delivery status and contributing session IDs for the given planning year.
+    """
+    from sqlalchemy import or_
+    from collections import defaultdict
+
+    py = db.get(PlanningYear, year_id)
+    if not py:
+        raise HTTPException(404, detail={"error": "planning_year_not_found"})
+    sq_id = py.unit_id
+    if not sq_id:
+        raise HTTPException(400, detail={"error": "year_not_squadron_scoped"})
+    sq = db.get(Squadron, sq_id)
+    require_can_view_squadron(p, sq_id, sq.wing_id if sq else None)
+
+    # Load all active Training Classes for this year
+    classes = db.query(TrainingClass).filter(
+        TrainingClass.training_year_id == year_id,
+        TrainingClass.is_archived == False,  # noqa: E712
+    ).order_by(TrainingClass.sequence, TrainingClass.display_name).all()
+
+    if not classes:
+        return {"year_id": year_id, "year": py.year, "classes": [], "stages": []}
+
+    class_ids = [c.id for c in classes]
+
+    # Load stage info for each unique stage used by these classes
+    stage_ids = list({c.training_stage_id for c in classes})
+    stages_by_id = {
+        s.id: s
+        for s in db.query(CurriculumPhase).filter(CurriculumPhase.id.in_(stage_ids)).all()
+    }
+
+    # Load curriculum items for each relevant stage (same scope logic as _class_curriculum_progress)
+    wing_id = sq.wing_id if sq else None
+    conditions = [CurriculumItem.owning_level == "national"]
+    if wing_id:
+        conditions.append((CurriculumItem.owning_level == "wing") & (CurriculumItem.wing_id == wing_id))
+    conditions.append(CurriculumItem.squadron_id == sq_id)
+    stage_names = [s.name for s in stages_by_id.values() if s.name]
+    all_items = db.query(CurriculumItem).filter(
+        CurriculumItem.is_archived == False,  # noqa: E712
+        CurriculumItem.phase.in_(stage_names),
+        or_(*conditions),
+    ).order_by(CurriculumItem.recommended_sequence).all()
+
+    # Load all SessionAudience + Session rows for these classes in one joined query
+    linked = (
+        db.query(SessionAudience, Session)
+        .join(Session, SessionAudience.session_id == Session.id)
+        .filter(
+            SessionAudience.training_class_id.in_(class_ids),
+            Session.is_archived == False,  # noqa: E712
+        )
+        .all()
+    )
+
+    # Build lookup: (curriculum_item_id, class_id) -> list of {session_id, status}
+    cell_data: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for aud, sess in linked:
+        if not sess.curriculum_item_id:
+            continue
+        effective_status = aud.outcome_override or sess.status or "planned"
+        cell_data[(sess.curriculum_item_id, aud.training_class_id)].append({
+            "session_id": sess.id,
+            "status": effective_status,
+        })
+
+    # Map stage_name -> stage_id for grouping items
+    stage_name_to_id = {s.name: s.id for s in stages_by_id.values() if s.name}
+
+    # Build per-stage item lists
+    stages_out = []
+    for stage in sorted(stages_by_id.values(), key=lambda s: (s.name or "")):
+        stage_items = [item for item in all_items if item.phase == stage.name]
+        # Only include classes that use this stage
+        stage_classes = [c for c in classes if c.training_stage_id == stage.id]
+        stage_class_ids = {c.id for c in stage_classes}
+
+        items_out = []
+        for item in stage_items:
+            cells: dict[str, dict] = {}
+            for tc in stage_classes:
+                sessions = cell_data.get((item.id, tc.id), [])
+                if not sessions:
+                    status = "not_started"
+                else:
+                    present = {row["status"] for row in sessions}
+                    status = next(
+                        (cand for cand in _ITEM_STATUS_PRIORITY if cand in present),
+                        "planned",
+                    )
+                cells[tc.id] = {
+                    "status": status,
+                    "session_ids": [r["session_id"] for r in sessions],
+                    "elements_delivered": sum(
+                        1 for r in sessions
+                        if r["status"] in ("delivered", "delivered_with_issue")
+                    ),
+                    "elements_total": len(sessions),
+                }
+            items_out.append({
+                "curriculum_id": item.id,
+                "code": item.code or "",
+                "title": item.title,
+                "cells": cells,
+            })
+
+        stages_out.append({
+            "stage_id": stage.id,
+            "stage_name": stage.name or "",
+            "class_ids": [c.id for c in stage_classes],
+            "items": items_out,
+        })
+
+    classes_out = [
+        {
+            "class_id": c.id,
+            "display_name": c.display_name,
+            "stage_id": c.training_stage_id,
+            "stage_name": stages_by_id.get(c.training_stage_id, None) and stages_by_id[c.training_stage_id].name or "",
+        }
+        for c in classes
+    ]
+
+    return {
+        "year_id": year_id,
+        "year": py.year,
+        "classes": classes_out,
+        "stages": stages_out,
+    }
+
+
 @router.get("/curriculum/phases/{stage_id}/class-progress")
 def get_stage_class_progress(stage_id: str, squadron_id: str, db: DBSession = Depends(get_db),
                               p: Principal = Depends(get_principal)):
@@ -2491,6 +2632,182 @@ class SessionAudienceSetIn(BaseModel):
 class SessionAudienceOutcomeIn(BaseModel):
     outcome_override: str | None = None
     outcome_override_reason: str | None = None
+
+
+@router.get("/sessions/{sid}/facilitator-suggestions")
+def get_facilitator_suggestions(
+    sid: str,
+    parade_date: str | None = None,
+    period: int | None = None,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """FAC-SUG-01: ranked, explainable facilitator suggestions for a session.
+
+    Scoring (higher = better match):
+      +5  subject_area match with curriculum item
+      -1000  on leave for the parade date (shown as UNAVAILABLE)
+      -500   already assigned to the same night/period (CONFLICT)
+      -workload  sessions already allocated this term (prefer less-loaded)
+
+    Returns [] with a "no_recommendation" flag when no usable data is available.
+    """
+    from ..models.planning import PlanningFacilitatorLeave, ParadeDate
+    from sqlalchemy import func, and_
+
+    s = db.get(Session, sid)
+    if not s or s.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id)
+    require_can_view_squadron(p, s.squadron_id, pn.wing_id if pn else None)
+
+    sq_id = s.squadron_id
+    check_date = parade_date or (pn.date if pn else None)
+    check_period = period or s.period_number
+
+    # Curriculum item subject areas
+    ci = db.get(CurriculumItem, s.curriculum_item_id) if s.curriculum_item_id else None
+    ci_phase = ci.phase if ci else None  # phase name is the subject area category
+
+    # Active facilitators for the squadron
+    facs = (
+        db.query(Facilitator)
+        .filter(
+            Facilitator.squadron_id == sq_id,
+            Facilitator.active_status.is_(True),
+            Facilitator.is_archived.is_(False),
+        )
+        .all()
+    )
+    if not facs:
+        return {"suggestions": [], "no_recommendation": True, "reason": "No active facilitators found"}
+
+    # On-leave set for the check_date
+    on_leave_ids: set[str] = set()
+    if check_date:
+        leave_rows = (
+            db.query(PlanningFacilitatorLeave.facilitator_id)
+            .filter(
+                PlanningFacilitatorLeave.start_date <= check_date,
+                PlanningFacilitatorLeave.end_date >= check_date,
+            )
+            .all()
+        )
+        on_leave_ids = {r[0] for r in leave_rows}
+
+    # Conflict set: facilitators already assigned to this period on this night
+    conflict_ids: set[str] = set()
+    if pn and check_period is not None:
+        conflict_rows = (
+            db.query(Session.facilitator_id)
+            .filter(
+                Session.parade_night_id == pn.id,
+                Session.period_number == check_period,
+                Session.is_archived.is_(False),
+                Session.id != sid,
+                Session.facilitator_id.isnot(None),
+            )
+            .all()
+        )
+        conflict_ids = {r[0] for r in conflict_rows}
+
+    # Workload: sessions allocated this term per facilitator
+    term = pn.term if pn else None
+    workload: dict[str, int] = {}
+    if term and pn:
+        # All parade nights in same squadron + term
+        term_pn_ids = [
+            r[0]
+            for r in db.query(ParadeNight.id)
+            .filter(
+                ParadeNight.squadron_id == sq_id,
+                ParadeNight.term == term,
+                ParadeNight.is_archived.is_(False),
+            )
+            .all()
+        ]
+        if term_pn_ids:
+            wl_rows = (
+                db.query(Session.facilitator_id, func.count(Session.id))
+                .filter(
+                    Session.parade_night_id.in_(term_pn_ids),
+                    Session.facilitator_id.isnot(None),
+                    Session.is_archived.is_(False),
+                )
+                .group_by(Session.facilitator_id)
+                .all()
+            )
+            workload = {r[0]: r[1] for r in wl_rows}
+
+    suggestions = []
+    for f in facs:
+        score = 0
+        reasons: list[str] = []
+        conflicts: list[str] = []
+
+        # Subject area match
+        fac_areas = f.subject_areas or []
+        subject_match = bool(ci_phase and any(
+            ci_phase.lower() in (a or "").lower() or (a or "").lower() in ci_phase.lower()
+            for a in fac_areas
+        ))
+        if subject_match:
+            score += 5
+            matched = [a for a in fac_areas if ci_phase.lower() in a.lower() or a.lower() in ci_phase.lower()]
+            reasons.append(f"Suitable for {matched[0] if matched else ci_phase}")
+        elif fac_areas:
+            reasons.append(f"Subject areas: {', '.join(fac_areas)}")
+
+        # Leave check
+        on_leave = f.id in on_leave_ids
+        if on_leave:
+            score -= 1000
+            conflicts.append("On leave this date")
+
+        # Conflict check
+        has_conflict = f.id in conflict_ids
+        if has_conflict:
+            score -= 500
+            conflicts.append(f"Already assigned to period {check_period} on this night")
+
+        # Workload
+        wl = workload.get(f.id, 0)
+        score -= wl
+        reasons.append(f"{wl} session{'s' if wl != 1 else ''} allocated this term")
+
+        # Rank label
+        if on_leave:
+            rank_label = "UNAVAILABLE"
+        elif has_conflict:
+            rank_label = "CONFLICT"
+        elif subject_match and not on_leave and not has_conflict:
+            rank_label = "SUGGESTED"
+        else:
+            rank_label = "AVAILABLE"
+
+        display = (
+            f"{f.current_rank or ''} {f.last_name or ''}".strip()
+            if (f.last_name or f.current_rank)
+            else f.id
+        )
+
+        suggestions.append({
+            "facilitator_id": f.id,
+            "display_name": display,
+            "rank_label": rank_label,
+            "subject_areas": fac_areas,
+            "reasons": reasons,
+            "conflicts": conflicts,
+            "workload_sessions_this_term": wl,
+            "score": score,
+        })
+
+    suggestions.sort(key=lambda x: -x["score"])
+    # Remove internal score from output
+    for s_item in suggestions:
+        del s_item["score"]
+
+    return {"suggestions": suggestions, "no_recommendation": len(suggestions) == 0}
 
 
 @router.get("/sessions/{sid}/audience")
@@ -5355,3 +5672,127 @@ def archive_parade_night_template(
     db.commit()
     audit(db, p, object_type="parade_night_template", object_id=tid, action="archive")
     return {"ok": True}
+
+
+class _BulkApplyTemplateIn(BaseModel):
+    template_id: str
+    parade_night_ids: List[str]
+    conflict_resolution: Literal["skip_night", "alongside", "replace_draft"] = "skip_night"
+    dry_run: bool = False
+
+
+@router.post("/parade-nights/bulk-apply-template")
+def bulk_apply_template(
+    body: _BulkApplyTemplateIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """BULK-01: apply a saved template to multiple selected parade nights.
+
+    conflict_resolution:
+      skip_night    — skip the entire night if it has any existing sessions
+      alongside     — add template sessions even if the period is already occupied
+      replace_draft — remove planned/draft sessions first, then apply template
+
+    dry_run=true returns counts without writing; does NOT copy delivered outcomes.
+    """
+    import uuid as _uuid
+
+    t = db.get(ParadeNightTemplate, body.template_id)
+    if not t or t.is_archived:
+        raise HTTPException(404, detail={"error": "template_not_found"})
+
+    _DRAFT_STATUSES = {"planned", "rescheduled"}
+    batch_id = str(_uuid.uuid4())
+
+    nights_processed, nights_skipped = 0, 0
+    sessions_added, sessions_skipped = 0, 0
+    conflict_nights = 0
+
+    for pnid in body.parade_night_ids:
+        pn = db.get(ParadeNight, pnid)
+        if not pn or pn.is_archived:
+            nights_skipped += 1
+            continue
+        require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+        if t.squadron_id != pn.squadron_id:
+            nights_skipped += 1
+            continue
+
+        existing_sessions = db.query(Session).filter(
+            Session.parade_night_id == pnid,
+            Session.is_archived.is_(False),
+        ).all()
+        existing_periods = {s.period_number for s in existing_sessions}
+
+        has_conflict = bool(existing_sessions)
+        if has_conflict:
+            conflict_nights += 1
+
+        if body.conflict_resolution == "skip_night" and has_conflict:
+            nights_skipped += 1
+            sessions_skipped += len(t.sessions)
+            continue
+
+        if body.conflict_resolution == "replace_draft" and not body.dry_run:
+            for s in existing_sessions:
+                if s.status in _DRAFT_STATUSES:
+                    s.is_archived = True
+            existing_periods = {
+                s.period_number for s in existing_sessions
+                if s.status not in _DRAFT_STATUSES
+            }
+
+        nights_processed += 1
+        for ts in sorted(t.sessions, key=lambda s: s.period_number):
+            if body.conflict_resolution == "skip_night":
+                # already handled above
+                pass
+            if body.conflict_resolution != "alongside" and ts.period_number in existing_periods:
+                sessions_skipped += 1
+                continue
+            ci = db.get(CurriculumItem, ts.curriculum_item_id) if ts.curriculum_item_id else None
+            fac = db.get(Facilitator, ts.facilitator_id) if ts.facilitator_id else None
+            ta = db.get(TrainingArea, ts.training_area_id) if ts.training_area_id else None
+            if not body.dry_run:
+                new_sess = Session(
+                    id=str(_uuid.uuid4()),
+                    parade_night_id=pnid,
+                    squadron_id=pn.squadron_id,
+                    period_number=ts.period_number,
+                    curriculum_item_id=ts.curriculum_item_id,
+                    curriculum_code_at_time=ci.code if ci else None,
+                    curriculum_title_at_time=ci.title if ci else None,
+                    custom_title=ts.custom_title,
+                    facilitator_id=ts.facilitator_id,
+                    facilitator_rank_at_time=fac.current_rank if fac else None,
+                    facilitator_display_name_at_time=(
+                        f"{fac.current_rank or ''} {fac.last_name}".strip() if fac else None
+                    ),
+                    training_area_id=ts.training_area_id,
+                    training_area_name_at_time=ta.name if ta else None,
+                    cadet_group=ts.cadet_group,
+                    status="planned",
+                )
+                db.add(new_sess)
+            sessions_added += 1
+
+        if not body.dry_run:
+            audit(db, p, object_type="parade_night", object_id=pnid,
+                  action="bulk_apply_template",
+                  new={"template_id": body.template_id, "batch_id": batch_id,
+                       "conflict_resolution": body.conflict_resolution})
+
+    if not body.dry_run:
+        db.commit()
+
+    return {
+        "ok": True,
+        "dry_run": body.dry_run,
+        "batch_id": batch_id,
+        "nights_processed": nights_processed,
+        "nights_skipped": nights_skipped,
+        "conflict_nights": conflict_nights,
+        "sessions_added": sessions_added,
+        "sessions_skipped": sessions_skipped,
+    }

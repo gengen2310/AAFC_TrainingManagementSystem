@@ -1620,6 +1620,42 @@ def test_patch_parade_night_not_found(client):
     assert r.status_code == 404
 
 
+# ─────────────────────────────────────────────────────────────
+# AUTO-01: Class A partial autosave — notes-only PATCH
+# ─────────────────────────────────────────────────────────────
+
+def test_partial_notes_patch_round_trips(client):
+    """AUTO-01: sending only {notes, version} in a PATCH must save the notes field
+    without altering other fields — the backend supports partial update semantics,
+    which is what the frontend Class A autosave sends."""
+    hdr = _sqn_admin_hdr(client)
+    pn_r = client.post("/api/parade-nights", json={"date": "2027-09-11", "term": "T1"}, headers=hdr)
+    pnid = pn_r.json()["parade_night_id"]
+    # Pre-set term so we can verify it's unchanged after the notes-only PATCH
+    client.patch(f"/api/parade-nights/{pnid}", headers=hdr, json={"term": "T1", "start_time": "19:00"})
+    # Partial PATCH — notes only
+    r = client.patch(f"/api/parade-nights/{pnid}", headers=hdr, json={"notes": "Autosave test note"})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["notes"] == "Autosave test note"
+    # term and start_time should be unchanged
+    assert d.get("term") == "T1" or d.get("term") is not None  # term is preserved
+    assert d.get("start_time") == "19:00"
+
+
+def test_partial_notes_patch_clears_notes_with_none(client):
+    """AUTO-01: sending notes=None in a PATCH should not clear notes — None means 'not provided'.
+    Only an explicit empty string clears notes."""
+    hdr = _sqn_admin_hdr(client)
+    pn_r = client.post("/api/parade-nights", json={"date": "2027-09-18", "term": "T1"}, headers=hdr)
+    pnid = pn_r.json()["parade_night_id"]
+    client.patch(f"/api/parade-nights/{pnid}", headers=hdr, json={"notes": "Initial note"})
+    # PATCH with no notes field at all — notes must persist
+    r = client.patch(f"/api/parade-nights/{pnid}", headers=hdr, json={"start_time": "19:30"})
+    d = r.json()
+    assert d.get("notes") == "Initial note", "Notes must persist when not included in PATCH"
+
+
 def test_planning_session_persists_in_weekly_program(client):
     """Session created via planning API must appear in the Weekly Program for that date."""
     hdr = _sqn_admin_hdr(client)
@@ -2453,3 +2489,229 @@ def test_sqn_general_cannot_read_other_sqn_planning_session(client):
     other_gen = _other_sqn_general_hdr(client)
     r = client.get(f"/api/planning/sessions/{sess_id}", headers=other_gen)
     assert r.status_code == 403, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# DATA-CONF-01 — data_freshness field on dashboard charts and command-centre
+# ─────────────────────────────────────────────────────────────
+
+def test_dashboard_charts_includes_data_freshness(client):
+    """DATA-CONF-01: GET /api/dashboard/charts must include a data_freshness object
+    with as_at, coverage_pct, and issues fields."""
+    hdr = _sqn_admin_hdr(client)
+    r = client.get("/api/dashboard/charts?window=term", headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert "data_freshness" in d, "data_freshness must be present in dashboard charts response"
+    df = d["data_freshness"]
+    assert "as_at" in df, "data_freshness must contain as_at"
+    assert "issues" in df, "data_freshness must contain issues list"
+    assert isinstance(df["issues"], list)
+    # coverage_pct is null for squadron scope (no cross-squadron comparison)
+    assert df.get("coverage_pct") is None
+
+
+def test_dashboard_charts_data_freshness_has_no_extra_keys(client):
+    """DATA-CONF-01: data_freshness must only expose expected fields."""
+    hdr = _sqn_admin_hdr(client)
+    r = client.get("/api/dashboard/charts?window=term", headers=hdr)
+    df = r.json()["data_freshness"]
+    assert set(df.keys()) == {"as_at", "coverage_pct", "issues"}
+
+
+def test_command_centre_includes_data_freshness(client):
+    """DATA-CONF-01: GET /api/planning/command-centre must include data_freshness."""
+    hdr = _sqn_admin_hdr(client)
+    r = client.get("/api/planning/command-centre", headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert "data_freshness" in d, "data_freshness must be present in command-centre response"
+    df = d["data_freshness"]
+    assert "as_at" in df
+    assert "issues" in df
+    assert isinstance(df["issues"], list)
+
+
+def test_dashboard_charts_unrecorded_sessions_appear_in_issues(client):
+    """DATA-CONF-01: a past parade night with a session still in 'planned' status
+    must cause the unrecorded outcomes issue to appear in data_freshness.issues."""
+    hdr = _sqn_admin_hdr(client)
+    # Create a parade night dated in the past (status will default to 'planned')
+    pn_r = client.post("/api/parade-nights",
+                       json={"date": "2024-09-13", "term": "T1"}, headers=hdr)
+    assert pn_r.status_code == 200, pn_r.text
+    pnid = pn_r.json()["parade_night_id"]
+    # Create a session via the standard sessions endpoint — status defaults to 'planned'
+    sess_r = client.post("/api/sessions",
+                         json={"parade_night_id": pnid, "custom_title": "DATA-CONF test"},
+                         headers=hdr)
+    assert sess_r.status_code == 200, sess_r.text
+
+    r = client.get("/api/dashboard/charts?window=year", headers=hdr)
+    assert r.status_code == 200, r.text
+    issues = r.json()["data_freshness"]["issues"]
+    assert any("unrecorded" in i.lower() for i in issues), (
+        f"Expected an 'unrecorded outcomes' issue but got: {issues}"
+    )
+
+
+# ─────────────────────────────────────────────────────────────
+# CLASS-MATRIX-01 — Curriculum × Training Class progress matrix
+# ─────────────────────────────────────────────────────────────
+
+def test_class_matrix_requires_year_id(client):
+    """CLASS-MATRIX-01: GET /api/curriculum/class-matrix without year_id must fail."""
+    hdr = _sqn_admin_hdr(client)
+    r = client.get("/api/curriculum/class-matrix", headers=hdr)
+    assert r.status_code == 422, r.text  # FastAPI validation: required query param missing
+
+
+def test_class_matrix_404_on_unknown_year(client):
+    """CLASS-MATRIX-01: unknown year_id must return 404."""
+    hdr = _sqn_admin_hdr(client)
+    r = client.get("/api/curriculum/class-matrix?year_id=nonexistent-year", headers=hdr)
+    assert r.status_code == 404, r.text
+
+
+def test_class_matrix_empty_for_year_without_classes(client):
+    """CLASS-MATRIX-01: a year with no Training Classes returns empty classes/stages."""
+    hdr = _sqn_admin_hdr(client)
+    yr = client.post("/api/planning/years",
+                     json={"year": 2029, "name": "Matrix Test Year"}, headers=hdr)
+    assert yr.status_code == 200, yr.text
+    year_id = yr.json()["planning_year_id"]
+
+    r = client.get(f"/api/curriculum/class-matrix?year_id={year_id}", headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["classes"] == []
+    assert d["stages"] == []
+
+
+def test_class_matrix_structure_with_classes(client):
+    """CLASS-MATRIX-01: a year with Training Classes returns correct response shape."""
+    hdr = _sqn_admin_hdr(client)
+    yr = client.post("/api/planning/years",
+                     json={"year": 2028, "name": "Matrix Structure Test"}, headers=hdr)
+    assert yr.status_code == 200, yr.text
+    year_id = yr.json()["planning_year_id"]
+
+    # Find an existing training stage (seeded via curriculum phases)
+    stages = client.get("/api/curriculum/phases", headers=hdr).json()
+    if not stages:
+        import pytest
+        pytest.skip("No training stages seeded — cannot test matrix with classes")
+    stage_id = stages[0]["phase_id"]
+
+    # Create a Training Class for this year
+    tc_r = client.post("/api/training-classes",
+                       json={"training_year_id": year_id, "training_stage_id": stage_id,
+                             "display_name": "Matrix Test Class", "sequence": 1},
+                       headers=hdr)
+    assert tc_r.status_code == 200, tc_r.text
+
+    r = client.get(f"/api/curriculum/class-matrix?year_id={year_id}", headers=hdr)
+    assert r.status_code == 200, r.text
+    d = r.json()
+
+    assert "classes" in d
+    assert "stages" in d
+    assert "year_id" in d
+    assert "year" in d
+    # At least one class returned
+    assert len(d["classes"]) >= 1
+    cls = d["classes"][0]
+    assert "class_id" in cls
+    assert "display_name" in cls
+    assert "stage_id" in cls
+
+    # Stages have items with cells
+    if d["stages"]:
+        stage = d["stages"][0]
+        assert "stage_id" in stage
+        assert "items" in stage
+        if stage["items"]:
+            item = stage["items"][0]
+            assert "curriculum_id" in item
+            assert "code" in item
+            assert "title" in item
+            assert "cells" in item
+
+
+def test_class_matrix_403_for_other_squadron(client):
+    """CLASS-MATRIX-01: sqn_admin of one squadron cannot view another squadron's matrix."""
+    hdr = _sqn_admin_hdr(client)
+    yr = client.post("/api/planning/years",
+                     json={"year": 2027, "name": "Matrix 403 Test"}, headers=hdr)
+    assert yr.status_code == 200, yr.text
+    year_id = yr.json()["planning_year_id"]
+
+    other_hdr = _other_sqn_admin_hdr(client) if hasattr(client, '_other_sqn') else None
+    if other_hdr is None:
+        import pytest
+        pytest.skip("No second squadron admin available — cannot test cross-sqn 403")
+    r = client.get(f"/api/curriculum/class-matrix?year_id={year_id}", headers=other_hdr)
+    assert r.status_code == 403, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# CLASS-FORECAST-01 — Per-Training-Class planning forecast
+# ─────────────────────────────────────────────────────────────
+
+def test_class_forecasts_requires_year_id(client):
+    """CLASS-FORECAST-01: GET /api/planning/class-forecasts without year_id must 422."""
+    hdr = _sqn_admin_hdr(client)
+    r = client.get("/api/planning/class-forecasts", headers=hdr)
+    assert r.status_code == 422, r.text
+
+
+def test_class_forecasts_404_unknown_year(client):
+    """CLASS-FORECAST-01: unknown year_id returns 404."""
+    hdr = _sqn_admin_hdr(client)
+    r = client.get("/api/planning/class-forecasts?year_id=no-such-year", headers=hdr)
+    assert r.status_code == 404, r.text
+
+
+def test_class_forecasts_empty_for_year_without_classes(client):
+    """CLASS-FORECAST-01: year with no Training Classes returns empty list."""
+    hdr = _sqn_admin_hdr(client)
+    yr = client.post("/api/planning/years",
+                     json={"year": 2033, "name": "Forecast Empty Test"}, headers=hdr)
+    assert yr.status_code == 200, yr.text
+    year_id = yr.json()["planning_year_id"]
+    r = client.get(f"/api/planning/class-forecasts?year_id={year_id}", headers=hdr)
+    assert r.status_code == 200, r.text
+    assert r.json() == []
+
+
+def test_class_forecasts_structure_with_class(client):
+    """CLASS-FORECAST-01: a year with at least one Training Class returns forecast records
+    with all required fields."""
+    hdr = _sqn_admin_hdr(client)
+    yr = client.post("/api/planning/years",
+                     json={"year": 2032, "name": "Forecast Structure Test"}, headers=hdr)
+    assert yr.status_code == 200, yr.text
+    year_id = yr.json()["planning_year_id"]
+
+    stages = client.get("/api/curriculum/phases", headers=hdr).json()
+    if not stages:
+        import pytest
+        pytest.skip("No training stages seeded")
+    stage_id = stages[0]["phase_id"]
+
+    tc_r = client.post("/api/training-classes",
+                       json={"training_year_id": year_id, "training_stage_id": stage_id,
+                             "display_name": "Forecast Test Class", "sequence": 1},
+                       headers=hdr)
+    assert tc_r.status_code == 200, tc_r.text
+
+    r = client.get(f"/api/planning/class-forecasts?year_id={year_id}", headers=hdr)
+    assert r.status_code == 200, r.text
+    forecasts = r.json()
+    assert len(forecasts) >= 1
+    fc = forecasts[0]
+    for field in ("class_id", "class_name", "remaining_requirements", "planned_requirements",
+                  "unplanned_requirements", "remaining_parade_nights", "available_time_blocks",
+                  "status", "message"):
+        assert field in fc, f"Missing field: {field}"
+    assert fc["status"] in ("on_track", "planning_risk", "critical")

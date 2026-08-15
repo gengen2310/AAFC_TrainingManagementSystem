@@ -250,3 +250,131 @@ def test_archive_template_unauthorized(client):
     gen_hdr = _general_hdr(client)
     r = client.delete(f"/api/parade-night-templates/{tid}", headers=gen_hdr)
     assert r.status_code == 403
+
+
+# ── Bulk Apply Template (BULK-01) ──────────────────────────────────────────────
+
+_BULK_URL = "/api/parade-nights/bulk-apply-template"
+
+
+def _make_tpl(client, hdr, date, name, periods=(1, 2)):
+    src = _create_pn(client, hdr, date)
+    for p in periods:
+        _add_session(client, hdr, src, p)
+    r = client.post(_save_url(src), json={"name": name}, headers=hdr)
+    assert r.status_code == 200, r.text
+    return r.json()["id"]
+
+
+def test_bulk_apply_dry_run_returns_counts(client):
+    hdr = _sqn_admin_hdr(client)
+    tid = _make_tpl(client, hdr, "2036-01-07", "Bulk Dry Run Tpl", periods=(1, 2))
+    pn1 = _create_pn(client, hdr, "2036-01-14")
+    pn2 = _create_pn(client, hdr, "2036-01-21")
+    r = client.post(_BULK_URL, json={
+        "template_id": tid,
+        "parade_night_ids": [pn1, pn2],
+        "conflict_resolution": "skip_night",
+        "dry_run": True,
+    }, headers=hdr)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["dry_run"] is True
+    assert d["nights_processed"] == 2
+    assert d["sessions_added"] == 4  # 2 sessions × 2 nights
+    assert d["nights_skipped"] == 0
+    # Verify dry_run wrote nothing
+    pn_r = client.get(f"/api/parade-nights/{pn1}", headers=hdr)
+    assert len(pn_r.json().get("sessions", [])) == 0
+
+
+def test_bulk_apply_skip_night_leaves_occupied_nights(client):
+    hdr = _sqn_admin_hdr(client)
+    tid = _make_tpl(client, hdr, "2036-02-04", "Skip Tpl", periods=(1,))
+    pn_empty = _create_pn(client, hdr, "2036-02-11")
+    pn_occupied = _create_pn(client, hdr, "2036-02-18")
+    _add_session(client, hdr, pn_occupied, 1)  # pre-populate period 1
+    r = client.post(_BULK_URL, json={
+        "template_id": tid,
+        "parade_night_ids": [pn_empty, pn_occupied],
+        "conflict_resolution": "skip_night",
+        "dry_run": False,
+    }, headers=hdr)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["nights_processed"] == 1  # pn_empty processed
+    assert d["nights_skipped"] == 1    # pn_occupied skipped
+    assert d["conflict_nights"] == 1
+
+
+def test_bulk_apply_alongside_adds_to_occupied(client):
+    hdr = _sqn_admin_hdr(client)
+    tid = _make_tpl(client, hdr, "2036-03-04", "Alongside Tpl", periods=(1,))
+    pn = _create_pn(client, hdr, "2036-03-11")
+    _add_session(client, hdr, pn, 1)  # period 1 already occupied
+    r = client.post(_BULK_URL, json={
+        "template_id": tid,
+        "parade_night_ids": [pn],
+        "conflict_resolution": "alongside",
+        "dry_run": False,
+    }, headers=hdr)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["sessions_added"] == 1  # template period 1 added alongside existing
+
+
+def test_bulk_apply_replace_draft_removes_planned_sessions(client):
+    hdr = _sqn_admin_hdr(client)
+    tid = _make_tpl(client, hdr, "2036-04-01", "Replace Draft Tpl", periods=(1, 2))
+    pn = _create_pn(client, hdr, "2036-04-08")
+    _add_session(client, hdr, pn, 1)  # planned session in period 1
+    r = client.post(_BULK_URL, json={
+        "template_id": tid,
+        "parade_night_ids": [pn],
+        "conflict_resolution": "replace_draft",
+        "dry_run": False,
+    }, headers=hdr)
+    assert r.status_code == 200
+    d = r.json()
+    assert d["nights_processed"] == 1
+    assert d["sessions_added"] == 2  # both template periods applied
+
+
+def test_bulk_apply_does_not_copy_delivered_outcomes(client):
+    hdr = _sqn_admin_hdr(client)
+    src = _create_pn(client, hdr, "2036-05-06")
+    sess = _add_session(client, hdr, src, 1)
+    # Mark as delivered so template captures a session (but with planned status in template)
+    tpl_r = client.post(_save_url(src), json={"name": "Delivered Tpl"}, headers=hdr)
+    tid = tpl_r.json()["id"]
+    dest = _create_pn(client, hdr, "2036-05-13")
+    r = client.post(_BULK_URL, json={
+        "template_id": tid,
+        "parade_night_ids": [dest],
+        "conflict_resolution": "skip_night",
+        "dry_run": False,
+    }, headers=hdr)
+    assert r.status_code == 200
+    # Applied session must have status=planned (never delivered/historical)
+    pn_r = client.get(f"/api/parade-nights/{dest}", headers=hdr)
+    sessions = pn_r.json().get("sessions", [])
+    assert all(s.get("status") == "planned" for s in sessions)
+
+
+def test_bulk_apply_unknown_template_returns_404(client):
+    hdr = _sqn_admin_hdr(client)
+    pn = _create_pn(client, hdr, "2036-06-03")
+    r = client.post(_BULK_URL, json={
+        "template_id": "00000000-0000-0000-0000-000000000000",
+        "parade_night_ids": [pn],
+        "conflict_resolution": "skip_night",
+        "dry_run": True,
+    }, headers=hdr)
+    assert r.status_code == 404
+
+
+def test_bulk_apply_unauthenticated(client):
+    r = client.post(_BULK_URL, json={
+        "template_id": "x", "parade_night_ids": [], "dry_run": True,
+    })
+    assert r.status_code == 401

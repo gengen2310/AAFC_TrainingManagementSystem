@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useId, type KeyboardEvent } from "react";
+import { useState, useEffect, useRef, useId, useCallback, type KeyboardEvent } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { planningApi, trainingApi } from "../../api";
 import { friendlyMessage } from "../../api/client";
@@ -7,6 +7,8 @@ import { ActivityFullDetail, anchorToDisplay } from "./ActivityDetailBlock";
 import { getProgramType } from "../../utils/planningFilters";
 import { useConfirm } from "../ConfirmDialog";
 import { useToast } from "../Toast";
+import { SaveIndicator } from "../ui";
+import { useAutoSave } from "../../utils/useAutoSave";
 
 // ─── Drawer item discriminated union ──────────────────────────────────────────
 export type DrawerItem =
@@ -75,6 +77,26 @@ function SessionForm({
   const [moveTargetPeriod, setMoveTargetPeriod] = useState(1);
   const [moving, setMoving] = useState(false);
   const [moveErr, setMoveErr] = useState<string | null>(null);
+
+  // AUTO-01 Class A: autosave session notes in edit mode (session already exists).
+  // Uses all current form state so the save is consistent — the caller controls
+  // what is committed; a notes autosave does not silently discard other field edits.
+  const sessionId = existing?.session_id ?? null;
+  const autoSaveNotesFn = useCallback(async (val: string) => {
+    if (!sessionId) return; // create mode — no autosave
+    await planningApi.updateSession(sessionId, {
+      curriculum_id: curriculumId ?? null,
+      activity_title: title || null,
+      facilitator_id: facilitatorId || null,
+      assistant_facilitator_id: asstFacId || null,
+      location_id: locationId || null,
+      cadet_group: cadetGroup || null,
+      part_number: partNumber ? Number(partNumber) : null,
+      notes: val || null,
+    });
+    await qc.invalidateQueries({ queryKey: ["planning-weekly"] });
+  }, [sessionId, curriculumId, title, facilitatorId, asstFacId, locationId, cadetGroup, partNumber, qc]);
+  const { onChange: onNotesAutoSave, status: notesSaveStatus } = useAutoSave(autoSaveNotesFn);
 
   const { data: missionsData } = useQuery({
     queryKey: ["planning-missions", yearId],
@@ -426,8 +448,15 @@ function SessionForm({
           </select>
         </label>
         <label>
-          Notes
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional delivery notes" />
+          Notes{isEdit && <SaveIndicator status={notesSaveStatus} />}
+          <textarea
+            value={notes}
+            onChange={e => {
+              setNotes(e.target.value);
+              if (isEdit) onNotesAutoSave(e);
+            }}
+            placeholder="Optional delivery notes"
+          />
         </label>
 
         {isEdit && (
