@@ -2575,9 +2575,10 @@ def get_command_centre(
     pn_to_pd_cc: dict[str, ParadeDate] = {
         pd_obj.parade_night_id: pd_obj for pd_obj in pd_rows_cc if pd_obj.parade_night_id
     }
-    # Active training classes for this planning year
-    active_classes = (
-        db.query(TrainingClass)
+    # Active training classes for this planning year, joined to stage name for PW Stage focus
+    active_class_rows = (
+        db.query(TrainingClass, CurriculumPhase)
+        .join(CurriculumPhase, TrainingClass.training_stage_id == CurriculumPhase.id)
         .filter(
             TrainingClass.training_year_id == py.id,
             TrainingClass.is_archived == False,  # noqa: E712
@@ -2585,10 +2586,16 @@ def get_command_centre(
         .order_by(TrainingClass.sequence, TrainingClass.display_name)
         .all()
     )
+    active_classes = [tc for tc, _phase in active_class_rows]
     active_class_ids = {tc.id for tc in active_classes}
     training_classes_out = [
-        {"training_class_id": tc.id, "display_name": tc.display_name}
-        for tc in active_classes
+        {
+            "training_class_id": tc.id,
+            "display_name": tc.display_name,
+            "training_stage_id": tc.training_stage_id,
+            "stage_name": phase.display_name,
+        }
+        for tc, phase in active_class_rows
     ]
 
     scheduled_curriculum_ids: set[str] = set()

@@ -326,7 +326,7 @@ export interface CommandCentreData {
   unreviewed_wing: { wing_event_id: string; title: string; start_date: string; days_until: number }[];
   active_conflicts: { conflict_id: string; type: string; message: string; parade_date: string | null }[];
   unscheduled_required: { curriculum_id: string; code: string; title: string; phase: string; needs_class_ids: string[] }[];
-  training_classes: { training_class_id: string; display_name: string }[];
+  training_classes: { training_class_id: string; display_name: string; training_stage_id: string; stage_name: string }[];
   recent_imports: { import_type: string; created_at: string | null }[];
   nights_missing_facilitator: number;
 }
