@@ -67,6 +67,7 @@ export function PlanningWorkspace() {
   const [layers, setLayers] = useState<LayerState>(defaultLayers);
   const [audience, setAudience] = useState<Set<string>>(new Set());
   const [priority, setPriority] = useState<Set<string>>(new Set());
+  const [focusClassId, setFocusClassId] = useState<string | null>(null);
   // Mobile-only: left filter/backlog panel is off-canvas below 768px, toggled via the
   // hamburger button in the context bar. Ignored (has no visual effect) above that width.
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
@@ -155,6 +156,10 @@ export function PlanningWorkspace() {
       next.has(p) ? next.delete(p) : next.add(p);
       return next;
     });
+  }
+
+  function handleClassFocus(classId: string | null) {
+    setFocusClassId(prev => (prev === classId ? null : classId));
   }
 
   function handleDateClick(dateId: string, _date: string) {
@@ -291,6 +296,7 @@ export function PlanningWorkspace() {
           layers={layers}
           audience={audience}
           priority={priority}
+          focusClassId={focusClassId}
           conflicts={yearConflicts}
         />
       );
@@ -308,6 +314,7 @@ export function PlanningWorkspace() {
           layers={layers}
           audience={audience}
           priority={priority}
+          focusClassId={focusClassId}
         />
       );
     }
@@ -367,6 +374,7 @@ export function PlanningWorkspace() {
           layers={layers}
           audience={audience}
           priority={priority}
+          focusClassId={focusClassId}
         />
       );
     }
@@ -479,6 +487,8 @@ export function PlanningWorkspace() {
           onAudienceToggle={handleAudienceToggle}
           priority={priority}
           onPriorityToggle={handlePriorityToggle}
+          focusClassId={focusClassId}
+          onClassFocus={handleClassFocus}
           cc={cc ?? null}
           onBacklogItemClick={handleBacklogItemClick}
         />

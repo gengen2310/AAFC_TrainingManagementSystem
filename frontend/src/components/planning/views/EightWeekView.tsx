@@ -25,12 +25,13 @@ interface Props {
   layers?: { conflicts?: boolean; wingHQEvents?: boolean };
   audience?: Set<string>;
   priority?: Set<string>;
+  focusClassId?: string | null;
 }
 
 export function EightWeekView({
   yearId, weeks = 8, customStart, customEnd, facilitators,
   onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick,
-  layers, audience, priority,
+  layers, audience, priority, focusClassId,
 }: Props) {
   const showConflicts = layers?.conflicts ?? true;
   const showAnchors = layers?.wingHQEvents ?? true;
@@ -135,6 +136,7 @@ export function EightWeekView({
             conflictCount={unresolvedCount}
             inHoliday={false}
             compact={false}
+            focusClassId={focusClassId}
             onHeaderClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
             onSessionClick={handleSessionClick}
             onEmptyCellClick={onEmptyCellClick

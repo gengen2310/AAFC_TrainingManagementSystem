@@ -293,6 +293,8 @@ interface ParadeNightBlockProps {
   compact?: boolean;
   /** "sm" shrinks table cell min-widths so blocks fit in a multi-column year grid */
   blockSize?: "sm" | "md";
+  /** When set, dims session cells that don't target this Training Class */
+  focusClassId?: string | null;
   onHeaderClick: () => void;
   onSessionClick?: (session: DisplaySession) => void;
   onEmptyCellClick?: (cadetGroup: string, period: number) => void;
@@ -301,7 +303,7 @@ interface ParadeNightBlockProps {
 export function ParadeNightBlock({
   dateId, date, weekNumber, term, notices = [],
   sessions, sessionCount, filledSlots, conflictCount = 0,
-  inHoliday = false, compact = false, blockSize = "md",
+  inHoliday = false, compact = false, blockSize = "md", focusClassId,
   onHeaderClick, onSessionClick, onEmptyCellClick,
 }: ParadeNightBlockProps) {
   const [addingNotice, setAddingNotice] = useState(false);
@@ -463,10 +465,13 @@ export function ParadeNightBlock({
                         </td>
                       );
                     }
+                    const classDimmed = focusClassId != null &&
+                      !(cell.training_classes ?? []).some(c => c.training_class_id === focusClassId);
                     return (
                       <td
                         key={period}
                         className={`pw-night-cell${cell.conflict === "room" ? " conflict-room" : cell.conflict === "fac" ? " conflict-fac" : ""}`}
+                        style={classDimmed ? { opacity: 0.22 } : undefined}
                         onClick={onSessionClick ? e => { e.stopPropagation(); onSessionClick(cell); } : onHeaderClick}
                         role="button"
                         tabIndex={0}

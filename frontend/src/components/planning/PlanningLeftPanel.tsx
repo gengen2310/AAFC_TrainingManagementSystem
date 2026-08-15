@@ -48,6 +48,8 @@ interface Props {
   onAudienceToggle: (a: string) => void;
   priority: Set<string>;
   onPriorityToggle: (p: string) => void;
+  focusClassId?: string | null;
+  onClassFocus?: (classId: string | null) => void;
   cc: CommandCentreData | null;
   onBacklogItemClick: (type: string, id: string) => void;
   className?: string;
@@ -55,6 +57,7 @@ interface Props {
 
 export function PlanningLeftPanel({
   layers, onLayerToggle, audience, onAudienceToggle, priority, onPriorityToggle,
+  focusClassId, onClassFocus,
   cc, onBacklogItemClick, className,
 }: Props) {
   const [legendOpen, setLegendOpen] = useState(true);
@@ -92,6 +95,32 @@ export function PlanningLeftPanel({
           </label>
         ))}
       </div>
+
+      {/* ── Class focus (only shown when squadron has multiple classes) ───── */}
+      {trainingClasses.length > 1 && (
+        <div className="pw-section">
+          <div className="pw-section-hdr">Class focus</div>
+          <div className="pw-filter-chips">
+            <button
+              className={`pw-chip${!focusClassId ? " on" : ""}`}
+              onClick={() => onClassFocus?.(null)}
+              aria-pressed={!focusClassId}
+            >
+              All
+            </button>
+            {trainingClasses.map(tc => (
+              <button
+                key={tc.training_class_id}
+                className={`pw-chip${focusClassId === tc.training_class_id ? " on" : ""}`}
+                onClick={() => onClassFocus?.(tc.training_class_id)}
+                aria-pressed={focusClassId === tc.training_class_id}
+              >
+                {tc.display_name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Audience ──────────────────────────────────────── */}
       <div className="pw-section">
