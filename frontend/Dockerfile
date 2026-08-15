@@ -4,12 +4,11 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-# Belt-and-suspenders: remove any stale tsc build cache that may have been
-# included in the archive despite .dockerignore (Railway's build agent may not
-# apply .dockerignore client-side the way the Docker CLI does).
-RUN find /app -name "*.tsbuildinfo" -delete 2>/dev/null || true
-# npm run build = tsc -b && vite build  (produces dist/)
-RUN npm run build
+# Type-check first using plain --noEmit (avoids tsc -b build-mode which reads/writes
+# tsconfig.tsbuildinfo and can fail silently in container if the file carries stale paths).
+RUN npx tsc --noEmit
+# Vite build produces the actual dist/ output; esbuild handles transpilation internally.
+RUN npx vite build
 
 # ── Serve stage ───────────────────────────────────────────────────────────────
 FROM nginx:1.27-alpine
