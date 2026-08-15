@@ -10536,6 +10536,7 @@ async function savePNTimingOverride(){
       const tid=document.getElementById('pn-override-tid').value;
       await api('/api/parade-nights/'+_pnOverridePnId+'/timing-override',{method:'POST',body:JSON.stringify({timing_template_id:tid||null,reason})});
     }
+    showToast('Timing override applied.');
     setMsg('✅ Override applied.',true);
     setTimeout(()=>closeModal('m-pn-timing-override'),1300);
   }catch(e){ setMsg(apiErr(e),false); }
@@ -10548,6 +10549,7 @@ async function removePNTimingOverride(){
   setMsg('Removing…',true);
   try{
     await api('/api/parade-nights/'+_pnOverridePnId+'/timing-override',{method:'DELETE'});
+    showToast('Timing override removed.');
     setMsg('✅ Override removed.',true);
     setTimeout(()=>closeModal('m-pn-timing-override'),1300);
   }catch(e){ setMsg(apiErr(e),false); }

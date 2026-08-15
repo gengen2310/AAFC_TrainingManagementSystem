@@ -146,6 +146,7 @@ export function Accounts() {
       setResetUid(null);
       setNewCode({ code: data.new_code, forName: acct?.display_name ?? vars.uid });
     },
+    onError: (e: Error) => toast(friendlyMessage(e, "Could not reset access code."), true),
   });
   const disableMut = useMutation({
     mutationFn: accountApi.disable,
