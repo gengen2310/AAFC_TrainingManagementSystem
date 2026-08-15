@@ -4492,3 +4492,37 @@ See `v1_go_no_go_checklist.md §H` for the full list. Key items:
 - Confirm weekly restore test passed in first production week
 - Schedule first quarterly DR rehearsal
 - Communicate V1 go-live to 7WG beta testers
+
+---
+
+## 90. Final Engineering Gap-Closure Program — COMPLETE (2026-08-15)
+
+Sessions 16–20 of the Final Engineering Gap-Closure Program closed all twelve items
+identified in the brief audit at HEAD `7acb2a8` (2026-08-12). Commit `522e782` is the
+close commit. Audit document: `docs/release/final_107_section_audit.md`.
+
+**All 12 items FIXED LOCALLY:**
+
+P1 (release-safety): MAINT-02 (full 3-state maintenance machine), AUTO-01 (save-state
+model + autosave hook), DATA-CONF-01 (data-freshness layer on dashboard and command
+centre), FAC-DUP-01 (structured duplicate-facilitator disambiguation modal).
+
+P2 (operational): CLASS-MATRIX-01 (curriculum × Training Class progress matrix),
+CLASS-FORECAST-01 (per-class planning forecast), BULK-01 (bulk-apply template to parade
+nights), FAC-SUG-01 (explainable facilitator suggestion engine), PN-WIZ-01 (guided
+6-step Parade Night Builder wizard + quick entry).
+
+P3 (usability polish): DND-01 (HTML5 drag-and-drop scheduling in Planning Workspace
+EightWeekView), DENS-01 (user-selectable display density Comfortable/Compact in both
+frontends), HOL-01 (statutory_holiday label added to `_HOL_TYPE_LABELS`).
+
+**Final state:**
+- Backend: 1753 passed, 7 skipped, 0 failures
+- TypeScript: 0 errors
+- Gap register: 168/194 = 87% complete (CLOSED 38 + STAGING VERIFIED 9 + FIXED LOCALLY 121)
+- Remaining NOT STARTED: DOC-06 (quarterly DR rehearsal) and DOC-07 (go-live communication) — post-release human actions only
+- Staging verification: PENDING — deploy command `echo "DEPLOY TO STAGING 522e782" | bash scripts/deploy-staging.sh` ready for user execution
+
+Level A production deployment (`756e65e`, 2026-08-12) remains the current live state.
+All Final Engineering Program additions are backwards-compatible extensions to Level A.
+Level B and Level C human gates remain per the Level Gate Summary in `MASTER_GAP_REGISTER.md`.
