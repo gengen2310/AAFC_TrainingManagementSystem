@@ -13,9 +13,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ── Planning Workspace E2E ────────────────────────────────────────────────────
   e2e-planning-workspace:
-    name: Planning Workspace E2E (Chromium)
+    name: Planning Workspace E2E (${{ matrix.browser }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
 
     steps:
       - uses: actions/checkout@v4
@@ -58,10 +63,9 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Install Playwright browsers
-        # Chromium only for the main CI run — Firefox/WebKit are Phase 8 work.
+      - name: Install Playwright browser
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run Planning Workspace E2E
         # playwright.config.ts: testDir=./e2e, webServer starts Vite on :5173.
@@ -69,7 +73,7 @@ jobs:
         # accessibility (axe WCAG 2.1 AA), mission-backlog, training-classes,
         # facilitators, reports, rollover, and more (21 spec files).
         working-directory: frontend
-        run: npx playwright test --reporter=list,html
+        run: npx playwright test --project=${{ matrix.browser }} --reporter=list,html
         env:
           CI: "true"
 
@@ -77,13 +81,18 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pw-playwright-report
+          name: pw-playwright-report-${{ matrix.browser }}
           path: frontend/playwright-report/
           retention-days: 7
 
+  # ── Connected Frontend (Main TMS) E2E ────────────────────────────────────────
   e2e-connected-frontend:
-    name: Connected Frontend (Main TMS) E2E (Chromium)
+    name: Connected Frontend E2E (${{ matrix.browser }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
 
     steps:
       - uses: actions/checkout@v4
@@ -121,25 +130,42 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Install Playwright browsers
+      - name: Install Playwright browser
         working-directory: frontend
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Start Planning Workspace dev server
+        # Required by cross-origin-session-handoff.spec.ts which navigates from TMS
+        # (:8080) to the Planning Workspace (:5173) to prove cookie-based handoff.
+        working-directory: frontend
+        run: npx vite &
+        env:
+          VITE_API_BASE_URL: http://localhost:8000
+
+      - name: Wait for Planning Workspace dev server
+        run: |
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:5173/ && echo " PW server ready" && break
+            sleep 2
+          done
 
       - name: Run Connected Frontend (Main TMS) E2E
         # playwright.connected.config.ts: testDir=./e2e-connected, webServer starts
         # python3 -m http.server 8080 --directory ../connected-frontend.
         # Covers: accounts, activities, curriculum, dashboard, facilitators,
-        # navigation, parade nights, training classes, reports, and more (30 spec files).
+        # navigation, parade nights, training classes, reports, and more (35 spec files,
+        # including cross-origin-session-handoff.spec.ts which needs PW on :5173).
         working-directory: frontend
-        run: npx playwright test --config playwright.connected.config.ts --reporter=list,html
+        run: npx playwright test --config playwright.connected.config.ts --project=${{ matrix.browser }} --reporter=list,html
         env:
           CI: "true"
           CONNECTED_LOCAL_API_BASE: http://localhost:8000
+          PW_BASE_URL: http://localhost:5173
 
       - name: Upload Connected Frontend test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: connected-playwright-report
+          name: connected-playwright-report-${{ matrix.browser }}
           path: frontend/playwright-report/
           retention-days: 7
