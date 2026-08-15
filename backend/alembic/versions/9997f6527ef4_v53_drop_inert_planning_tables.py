@@ -31,15 +31,23 @@ def upgrade() -> None:
     # 2. Drop planning_locations (no remaining FKs)
     op.drop_table("planning_locations")
 
-    # 3. Convert planning_conflicts.scheduled_session_id from FK to plain string
-    #    (was incorrectly declared as FK to scheduled_sessions; actually stores
-    #    TrainingSession IDs — removing the FK before dropping scheduled_sessions)
-    with op.batch_alter_table("planning_conflicts", schema=None) as batch_op:
-        batch_op.alter_column(
-            "scheduled_session_id",
-            existing_type=sa.String(length=36),
-            nullable=True,
-        )
+    # 3. Convert planning_conflicts.scheduled_session_id from FK to plain string.
+    #    On SQLite: batch_alter_table recreates the table, dropping all FKs implicitly.
+    #    On PostgreSQL: the FK constraint must be dropped explicitly; batch_alter_table
+    #    only alters nullability and does NOT remove FK constraints in Postgres.
+    conn = op.get_bind()
+    if conn.dialect.name == "postgresql":
+        conn.execute(sa.text(
+            "ALTER TABLE planning_conflicts "
+            "DROP CONSTRAINT IF EXISTS planning_conflicts_scheduled_session_id_fkey"
+        ))
+    else:
+        with op.batch_alter_table("planning_conflicts", schema=None) as batch_op:
+            batch_op.alter_column(
+                "scheduled_session_id",
+                existing_type=sa.String(length=36),
+                nullable=True,
+            )
 
     # 4. Drop scheduled_sessions (fully inert; no live queries)
     op.drop_table("scheduled_sessions")
