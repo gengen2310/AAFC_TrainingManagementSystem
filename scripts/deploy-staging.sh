@@ -852,6 +852,10 @@ info "Backend: new=$BACKEND_NEW_DEPLOY_ID"
 
 echo
 echo "  ── Backend gate 3/4: database revision ──────────────────────────────"
+# Railway's SUCCESS status fires on build completion, not LB cutover. Allow
+# 20s for the new instance to come up and start serving before hitting the
+# authenticated /api/system/migrations endpoint (avoids transient 502).
+sleep 20
 staging_api_call GET "/api/system/migrations"
 [ "$STAGING_API_CODE" = "200" ] \
   || die "/api/system/migrations → $STAGING_API_CODE — HARD FAIL."
