@@ -8288,7 +8288,7 @@ async function saveSessEdit(){
       }
     }
     if(sessErrEl)sessErrEl.textContent='';
-    await reloadAndRender(); closeModal('m-sess-edit'); editSessRef=null;
+    await reloadAndRender(); showToast('Session saved.'); closeModal('m-sess-edit'); editSessRef=null;
   }catch(e){
     if(sessErrEl){sessErrEl.textContent=apiErr(e);sessErrEl.style.color='var(--red)';}else showToast(apiErr(e),true);
   }
@@ -9171,6 +9171,7 @@ async function doSaveGettingHelp(){
   const content=document.getElementById('gh-content-inp').value;
   try{
     await api('/api/activities/getting-help',{method:'PUT',body:{content}});
+    showToast('Getting Help content saved.');
     closeModal('m-getting-help');
     await _loadGettingHelp();
   }catch(e){ msgEl.textContent=apiErr(e); }
@@ -9952,9 +9953,10 @@ async function saveRoom(){
   if(!name){showToast('Room name required.',true);return;}
   const payload={name,capacity:+document.getElementById('room-cap').value||null,type:document.getElementById('room-type').value||null,notes:document.getElementById('room-notes').value||null};
   try{
+    const isEditRoom=!!editRoomId;
     if(editRoomId){ await api('/api/training-areas/'+editRoomId,{method:'PATCH',body:JSON.stringify(payload)}); editRoomId=null; }
     else { await api('/api/training-areas',{method:'POST',body:JSON.stringify(payload)}); }
-    await reloadAndRender(); closeModal('m-add-room');
+    await reloadAndRender(); showToast(isEditRoom?'Room updated.':'Room added.'); closeModal('m-add-room');
     document.getElementById('room-modal-title').textContent='+ Add Room / Training Area';
   }catch(e){ showToast(apiErr(e),true); }
 }
@@ -9976,9 +9978,10 @@ async function saveEquip(){
   if(!name){showToast('Equipment name required.',true);return;}
   const payload={name,quantity:+document.getElementById('equip-qty').value||1,notes:document.getElementById('equip-notes').value||null};
   try{
+    const isEditEquip=!!editEquipId;
     if(editEquipId){ await api('/api/equipment/'+editEquipId,{method:'PATCH',body:JSON.stringify(payload)}); editEquipId=null; }
     else { await api('/api/equipment',{method:'POST',body:JSON.stringify(payload)}); }
-    await reloadAndRender(); closeModal('m-add-equip');
+    await reloadAndRender(); showToast(isEditEquip?'Equipment updated.':'Equipment added.'); closeModal('m-add-equip');
     document.getElementById('equip-modal-title').textContent='+ Add Equipment';
   }catch(e){ showToast(apiErr(e),true); }
 }
@@ -12852,6 +12855,7 @@ async function doSaveSession(){
         });
       }
     }
+    showToast('Session saved.');
     closeModal('m-edit-session');
     if(mode==='pn'){ await loadBuilderFromPn(dateId); }
     else { await loadBuilderGrid(dateId); }
@@ -13645,6 +13649,7 @@ async function saveWingEvent(){
     audience:aud,
   };
   try{
+    const isEditEvent=!!_weEditId;
     if(_weEditId){
       await api(`/api/wing-calendar/events/${_weEditId}`,{method:'PATCH',body});
     } else {
@@ -13652,6 +13657,7 @@ async function saveWingEvent(){
       if(!wid){ msg.textContent='No wing scope.'; return; }
       await api(`/api/wing-calendar/events?wing_id=${wid}`,{method:'POST',body});
     }
+    showToast(isEditEvent?'Event updated.':'Event created.');
     closeModal('m-wing-event');
     await loadWingCalendar();
   }catch(e){ msg.textContent=apiErr(e); }

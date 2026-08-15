@@ -40,7 +40,7 @@ function isLocked(a: AccountRecord): boolean {
 // One-time code display modal — code shown once; never retrievable after close
 function NewCodeModal({ code, forName, onClose }: { code: string; forName: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
-  const copy = () => { navigator.clipboard.writeText(code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); };
+  const copy = () => { navigator.clipboard.writeText(code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(()=>{}); };
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="New access code">
       <div className="modal-box" style={{ maxWidth: 440 }}>
