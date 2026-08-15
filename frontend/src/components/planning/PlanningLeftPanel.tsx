@@ -54,6 +54,8 @@ interface Props {
   onSearchTextChange?: (text: string) => void;
   tierFilter?: string | null;
   onTierFilterChange?: (tier: string | null) => void;
+  focusStageId?: string | null;
+  onStageFocus?: (stageId: string | null) => void;
   cc: CommandCentreData | null;
   onBacklogItemClick: (type: string, id: string) => void;
   className?: string;
@@ -63,6 +65,7 @@ export function PlanningLeftPanel({
   layers, onLayerToggle, audience, onAudienceToggle, priority, onPriorityToggle,
   focusClassId, onClassFocus, searchText, onSearchTextChange,
   tierFilter, onTierFilterChange,
+  focusStageId, onStageFocus,
   cc, onBacklogItemClick, className,
 }: Props) {
   const [legendOpen, setLegendOpen] = useState(true);
@@ -151,10 +154,9 @@ export function PlanningLeftPanel({
         </div>
       </div>
 
-      {/* ── Class focus (only shown when squadron has multiple classes) ───── */}
+      {/* ── Stage focus / Class focus (only shown when squadron has >1 class) ─ */}
       {trainingClasses.length > 1 && (() => {
-        // Group classes by stage so chips are visually clustered when multiple
-        // stages exist (e.g. Senior 1/2/3 under "Senior", Bronze 1/2 under "Bronze")
+        // Build stage → class grouping once; reused by both Stage focus and Class focus sections.
         const stageOrder: string[] = [];
         const byStage: Record<string, typeof trainingClasses> = {};
         for (const tc of trainingClasses) {
@@ -164,37 +166,69 @@ export function PlanningLeftPanel({
         }
         const multiStage = stageOrder.length > 1;
         return (
-          <div className="pw-section">
-            <div className="pw-section-hdr">Class focus</div>
-            <div className="pw-filter-chips">
-              <button
-                className={`pw-chip${!focusClassId ? " on" : ""}`}
-                onClick={() => onClassFocus?.(null)}
-                aria-pressed={!focusClassId}
-              >
-                All
-              </button>
-              {stageOrder.map(stage => (
-                <span key={stage}>
-                  {multiStage && (
-                    <span style={{ display: "block", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", color: "var(--muted-text)", textTransform: "uppercase", marginTop: 5, marginBottom: 2 }}>
-                      {stage}
-                    </span>
-                  )}
-                  {byStage[stage].map(tc => (
-                    <button
-                      key={tc.training_class_id}
-                      className={`pw-chip${focusClassId === tc.training_class_id ? " on" : ""}`}
-                      onClick={() => onClassFocus?.(tc.training_class_id)}
-                      aria-pressed={focusClassId === tc.training_class_id}
-                    >
-                      {tc.display_name}
-                    </button>
-                  ))}
-                </span>
-              ))}
+          <>
+            {/* CLASS-22: Stage focus — only shown when multiple Training Stages exist */}
+            {multiStage && (
+              <div className="pw-section">
+                <div className="pw-section-hdr">Stage focus</div>
+                <div className="pw-filter-chips">
+                  <button
+                    className={`pw-chip${!focusStageId ? " on" : ""}`}
+                    onClick={() => onStageFocus?.(null)}
+                    aria-pressed={!focusStageId}
+                  >
+                    All
+                  </button>
+                  {stageOrder.map(stageName => {
+                    const stageId = byStage[stageName][0]?.training_stage_id ?? stageName;
+                    return (
+                      <button
+                        key={stageId}
+                        className={`pw-chip${focusStageId === stageId ? " on" : ""}`}
+                        onClick={() => onStageFocus?.(focusStageId === stageId ? null : stageId)}
+                        aria-pressed={focusStageId === stageId}
+                      >
+                        {stageName}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Class focus */}
+            <div className="pw-section">
+              <div className="pw-section-hdr">Class focus</div>
+              <div className="pw-filter-chips">
+                <button
+                  className={`pw-chip${!focusClassId ? " on" : ""}`}
+                  onClick={() => onClassFocus?.(null)}
+                  aria-pressed={!focusClassId}
+                >
+                  All
+                </button>
+                {stageOrder.map(stage => (
+                  <span key={stage}>
+                    {multiStage && (
+                      <span style={{ display: "block", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", color: "var(--muted-text)", textTransform: "uppercase", marginTop: 5, marginBottom: 2 }}>
+                        {stage}
+                      </span>
+                    )}
+                    {byStage[stage].map(tc => (
+                      <button
+                        key={tc.training_class_id}
+                        className={`pw-chip${focusClassId === tc.training_class_id ? " on" : ""}`}
+                        onClick={() => onClassFocus?.(tc.training_class_id)}
+                        aria-pressed={focusClassId === tc.training_class_id}
+                      >
+                        {tc.display_name}
+                      </button>
+                    ))}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
+          </>
         );
       })()}
 

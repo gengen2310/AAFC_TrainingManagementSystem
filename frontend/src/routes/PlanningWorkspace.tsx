@@ -68,6 +68,7 @@ export function PlanningWorkspace() {
   const [audience, setAudience] = useState<Set<string>>(new Set());
   const [priority, setPriority] = useState<Set<string>>(new Set());
   const [focusClassId, setFocusClassId] = useState<string | null>(null);
+  const [focusStageId, setFocusStageId] = useState<string | null>(null);
   const [searchText, setSearchText] = useState<string>("");
   const [tierFilter, setTierFilter] = useState<string | null>(null);
   // Mobile-only: left filter/backlog panel is off-canvas below 768px, toggled via the
@@ -108,6 +109,12 @@ export function PlanningWorkspace() {
     enabled: !!selectedYearId,
     staleTime: 2 * 60 * 1000,
   });
+
+  // CLASS-22: map class_id → stage_id for stage focus dimming in ParadeNightBlock.
+  const classStageMap: Record<string, string> = {};
+  for (const tc of cc?.training_classes ?? []) {
+    if (tc.training_stage_id) classStageMap[tc.training_class_id] = tc.training_stage_id;
+  }
 
   // REM-39 follow-up: previously only ParadeNightGridView (the single-night
   // detail grid) ever received real conflict data -- Year/Term/8-Week/2-Week/
@@ -301,6 +308,8 @@ export function PlanningWorkspace() {
           focusClassId={focusClassId}
           searchText={searchText || null}
           tierFilter={tierFilter}
+          focusStageId={focusStageId}
+          classStageMap={classStageMap}
           conflicts={yearConflicts}
         />
       );
@@ -321,6 +330,8 @@ export function PlanningWorkspace() {
           focusClassId={focusClassId}
           searchText={searchText || null}
           tierFilter={tierFilter}
+          focusStageId={focusStageId}
+          classStageMap={classStageMap}
         />
       );
     }
@@ -383,6 +394,8 @@ export function PlanningWorkspace() {
           focusClassId={focusClassId}
           searchText={searchText || null}
           tierFilter={tierFilter}
+          focusStageId={focusStageId}
+          classStageMap={classStageMap}
         />
       );
     }
@@ -501,6 +514,8 @@ export function PlanningWorkspace() {
           onSearchTextChange={setSearchText}
           tierFilter={tierFilter}
           onTierFilterChange={setTierFilter}
+          focusStageId={focusStageId}
+          onStageFocus={setFocusStageId}
           cc={cc ?? null}
           onBacklogItemClick={handleBacklogItemClick}
         />

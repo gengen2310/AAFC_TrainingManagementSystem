@@ -33,6 +33,8 @@ interface Props {
   focusClassId?: string | null;
   searchText?: string | null;
   tierFilter?: string | null;
+  focusStageId?: string | null;
+  classStageMap?: Record<string, string>;
   /** REM-39 residual: already fetched once, year-scoped, by the caller -- passed
    * through to fromNightSummary() so each session cell can show a real,
    * canonical (not client-heuristic) conflict indicator without a second fetch. */
@@ -43,7 +45,7 @@ function anchorsOnDate(date: string, all: AnchorEvent[]): AnchorEvent[] {
   return all.filter(a => a.start_date <= date && date <= (a.end_date ?? a.start_date));
 }
 
-export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick, layers, audience, priority, focusClassId, searchText, tierFilter, conflicts = [] }: Props) {
+export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick, layers, audience, priority, focusClassId, searchText, tierFilter, focusStageId, classStageMap, conflicts = [] }: Props) {
   const showHolidays = layers?.holidays ?? true;
   const showAnchors  = layers?.wingHQEvents ?? true;
   const [termIndex, setTermIndex] = useState(0);
@@ -163,6 +165,8 @@ export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
                     focusClassId={focusClassId}
                     searchText={searchText}
                     tierFilter={tierFilter}
+                    focusStageId={focusStageId}
+                    classStageMap={classStageMap}
                     onHeaderClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
                     onSessionClick={onSessionClick
                       ? (ds) => onSessionClick(ds.session_id, pd.parade_date_id, pd.parade_date)
