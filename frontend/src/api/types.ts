@@ -202,6 +202,8 @@ export interface PlanningSession {
   // CLASS-06: which Training Class(es) this session targets (CLASS-03's
   // SessionAudience linkage), additive on the weekly-program endpoint.
   training_classes?: { training_class_id: string; display_name: string }[];
+  // CLASS-21: curriculum core_status for Foundation/Extension PW filter.
+  core_status?: string | null;
 }
 export interface TimingBlock {
   sequence: number; name: string; block_type: string;
@@ -342,6 +344,8 @@ export interface NightSessionSummary {
   // CLASS-06: which Training Class(es) this session targets (CLASS-03's
   // SessionAudience linkage), additive on the annual-program endpoint.
   training_classes: { training_class_id: string; display_name: string }[];
+  // CLASS-21: curriculum core_status for Foundation/Extension PW filter.
+  core_status?: string | null;
 }
 export interface ParadeNotice {
   notice_id: string;

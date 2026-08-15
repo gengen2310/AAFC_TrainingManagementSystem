@@ -331,7 +331,10 @@ def _location_out(loc: TrainingArea) -> dict:
     }
 
 
-def _real_session_out(s: TrainingSession, db: DBSession) -> dict:
+def _real_session_out(
+    s: TrainingSession, db: DBSession,
+    ci_tier: "dict[str, dict] | None" = None,
+) -> dict:
     """Serialize a real training Session in the builder grid format."""
     room_name = s.training_area_name_at_time
     if not room_name and s.training_area_id:
@@ -343,6 +346,21 @@ def _real_session_out(s: TrainingSession, db: DBSession) -> dict:
         af = db.get(Facilitator, s.assistant_facilitator_id)
         if af:
             asst_name = " ".join(x for x in [af.current_rank, af.first_name, af.last_name] if x)
+    # CLASS-21: curriculum core_status for Foundation/Extension PW filter.
+    # ci_tier pre-loaded by bulk callers (long-range endpoint); falls back to
+    # identity-map PK lookup when not supplied (weekly-program, term-planner).
+    # CurriculumItem has no is_optional field — Optional tier filter requires
+    # a future migration to add that field.
+    core_status: str | None = None
+    if s.curriculum_item_id:
+        if ci_tier is not None:
+            t = ci_tier.get(s.curriculum_item_id)
+            if t:
+                core_status = t["core_status"]
+        else:
+            ci_obj = db.get(CurriculumItem, s.curriculum_item_id)
+            if ci_obj:
+                core_status = ci_obj.core_status
     return {
         "session_id": s.id,
         "parade_night_id": s.parade_night_id,
@@ -366,6 +384,7 @@ def _real_session_out(s: TrainingSession, db: DBSession) -> dict:
         "override_conflict": False,
         "created_at": s.created_at.isoformat() if s.created_at else None,
         "version": s.version,
+        "core_status": core_status,
     }
 
 
@@ -1955,6 +1974,19 @@ def get_long_range(
         AnchorEvent.start_date <= end_dt.isoformat(),
     ).order_by(AnchorEvent.start_date).all()
 
+    # Pre-load CI tier data for all parade nights in range (avoids N+1 in loop).
+    pn_ids_lr = [pd_obj.parade_night_id for pd_obj in parade_dates if pd_obj.parade_night_id]
+    ci_tier_lr: dict[str, dict] = {}
+    if pn_ids_lr:
+        ts_lr_all = db.query(TrainingSession).filter(
+            TrainingSession.parade_night_id.in_(pn_ids_lr),
+            TrainingSession.is_archived == False,  # noqa: E712
+        ).all()
+        ci_ids_lr = {s.curriculum_item_id for s in ts_lr_all if s.curriculum_item_id}
+        if ci_ids_lr:
+            for ci in db.query(CurriculumItem).filter(CurriculumItem.id.in_(ci_ids_lr)).all():
+                ci_tier_lr[ci.id] = {"core_status": ci.core_status}
+
     rows = []
     for pd_obj in parade_dates:
         real_sessions: list[dict] = []
@@ -1964,7 +1996,7 @@ def get_long_range(
                 TrainingSession.parade_night_id == pn_real.id,
                 TrainingSession.is_archived == False,  # noqa: E712
             ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
-            real_sessions = [_real_session_out(s, db) for s in ts]
+            real_sessions = [_real_session_out(s, db, ci_tier=ci_tier_lr) for s in ts]
 
         conflicts = db.query(PlanningConflict).filter(
             PlanningConflict.parade_date_id == pd_obj.id,
@@ -3153,6 +3185,16 @@ def get_annual_program(
             classes_by_session.setdefault(aud.session_id, []).append(
                 {"training_class_id": tc.id, "display_name": tc.display_name})
 
+    # CLASS-21: pre-load CurriculumItem core_status for Foundation/Extension PW
+    # filter. One bulk query, no N+1. ts_rows is only defined when all_pn_ids_pre
+    # is non-empty (same guard as the classes_by_session block above).
+    ci_tier_ap: dict[str, dict] = {}
+    if all_pn_ids_pre and ts_rows:
+        ci_ids_ap = {s.curriculum_item_id for s in ts_rows if s.curriculum_item_id}
+        if ci_ids_ap:
+            for ci in db.query(CurriculumItem).filter(CurriculumItem.id.in_(ci_ids_ap)).all():
+                ci_tier_ap[ci.id] = {"core_status": ci.core_status}
+
     # Build per-date-id session index (eliminates need for a separate /night-summaries call)
     pn_to_date_id = {d.parade_night_id: d.id for d in all_dates if d.parade_night_id}
     ts_by_date_id: dict[str, list] = {}
@@ -3218,6 +3260,7 @@ def get_annual_program(
                     "facilitator": s.facilitator_display_name_at_time,
                     "location": s.training_area_name_at_time,
                     "training_classes": classes_by_session.get(s.id, []),
+                    "core_status": ci_tier_ap.get(s.curriculum_item_id or "", {}).get("core_status"),
                 }
                 for s in date_sessions
             ]

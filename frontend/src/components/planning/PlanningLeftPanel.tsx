@@ -52,6 +52,8 @@ interface Props {
   onClassFocus?: (classId: string | null) => void;
   searchText?: string;
   onSearchTextChange?: (text: string) => void;
+  tierFilter?: string | null;
+  onTierFilterChange?: (tier: string | null) => void;
   cc: CommandCentreData | null;
   onBacklogItemClick: (type: string, id: string) => void;
   className?: string;
@@ -60,6 +62,7 @@ interface Props {
 export function PlanningLeftPanel({
   layers, onLayerToggle, audience, onAudienceToggle, priority, onPriorityToggle,
   focusClassId, onClassFocus, searchText, onSearchTextChange,
+  tierFilter, onTierFilterChange,
   cc, onBacklogItemClick, className,
 }: Props) {
   const [legendOpen, setLegendOpen] = useState(true);
@@ -118,6 +121,34 @@ export function PlanningLeftPanel({
             × Clear
           </button>
         )}
+      </div>
+
+      {/* ── Session tier (Foundation / Extension) ────────────────────────── */}
+      <div className="pw-section">
+        <div className="pw-section-hdr">Session tier</div>
+        <div className="pw-filter-chips">
+          <button
+            className={`pw-chip${!tierFilter ? " on" : ""}`}
+            onClick={() => onTierFilterChange?.(null)}
+            aria-pressed={!tierFilter}
+          >
+            All
+          </button>
+          <button
+            className={`pw-chip${tierFilter === "foundation" ? " on" : ""}`}
+            onClick={() => onTierFilterChange?.(tierFilter === "foundation" ? null : "foundation")}
+            aria-pressed={tierFilter === "foundation"}
+          >
+            Foundation
+          </button>
+          <button
+            className={`pw-chip${tierFilter === "extension" ? " on" : ""}`}
+            onClick={() => onTierFilterChange?.(tierFilter === "extension" ? null : "extension")}
+            aria-pressed={tierFilter === "extension"}
+          >
+            Extension
+          </button>
+        </div>
       </div>
 
       {/* ── Class focus (only shown when squadron has multiple classes) ───── */}

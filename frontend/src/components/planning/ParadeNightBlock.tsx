@@ -34,6 +34,8 @@ export interface DisplaySession {
   // field on the one endpoint (weekly-program) that was extended for it;
   // the other _real_session_out call sites were deliberately not touched.
   training_classes?: { training_class_id: string; display_name: string }[];
+  // CLASS-21: curriculum core_status for Foundation/Extension PW filter.
+  core_status?: string | null;
 }
 
 // Session-specific conflict types (carry a scheduled_session_id and produce
@@ -63,6 +65,7 @@ export function fromNightSummary(
       facilitator: s.facilitator,
       training_classes: s.training_classes,
       conflict: hit ? sessionConflictCategory(hit.conflict_type) : null,
+      core_status: s.core_status ?? null,
     };
   });
 }
@@ -115,6 +118,7 @@ export function fromPlanningSession(
       conflict,
       source: s,
       training_classes: s.training_classes,
+      core_status: s.core_status ?? null,
     };
   });
 }
@@ -297,6 +301,8 @@ interface ParadeNightBlockProps {
   focusClassId?: string | null;
   /** When set, dims session cells whose title and code don't contain the search text */
   searchText?: string | null;
+  /** When set, dims sessions whose curriculum tier doesn't match: "foundation"|"extension"|"optional" */
+  tierFilter?: string | null;
   onHeaderClick: () => void;
   onSessionClick?: (session: DisplaySession) => void;
   onEmptyCellClick?: (cadetGroup: string, period: number) => void;
@@ -305,7 +311,7 @@ interface ParadeNightBlockProps {
 export function ParadeNightBlock({
   dateId, date, weekNumber, term, notices = [],
   sessions, sessionCount, filledSlots, conflictCount = 0,
-  inHoliday = false, compact = false, blockSize = "md", focusClassId, searchText,
+  inHoliday = false, compact = false, blockSize = "md", focusClassId, searchText, tierFilter,
   onHeaderClick, onSessionClick, onEmptyCellClick,
 }: ParadeNightBlockProps) {
   const [addingNotice, setAddingNotice] = useState(false);
@@ -474,7 +480,17 @@ export function ParadeNightBlock({
                       cell.title?.toLowerCase().includes(q) ||
                       cell.code?.toLowerCase().includes(q)
                     );
-                    const isDimmed = classDimmed || searchDimmed;
+                    // CLASS-21: dim by curriculum tier (core_status from CurriculumItem).
+                    // "foundation" → core_status === "core"
+                    // "extension"  → core_status === "additional"
+                    // Sessions with no linked curriculum (core_status null) are dimmed
+                    // under any specific tier filter since they have no classifiable tier.
+                    const tierDimmed = !!tierFilter && (() => {
+                      if (tierFilter === "foundation") return cell.core_status !== "core";
+                      if (tierFilter === "extension")  return cell.core_status !== "additional";
+                      return false;
+                    })();
+                    const isDimmed = classDimmed || searchDimmed || tierDimmed;
                     return (
                       <td
                         key={period}

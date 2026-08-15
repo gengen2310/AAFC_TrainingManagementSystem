@@ -27,12 +27,13 @@ interface Props {
   priority?: Set<string>;
   focusClassId?: string | null;
   searchText?: string | null;
+  tierFilter?: string | null;
 }
 
 export function EightWeekView({
   yearId, weeks = 8, customStart, customEnd, facilitators,
   onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick,
-  layers, audience, priority, focusClassId, searchText,
+  layers, audience, priority, focusClassId, searchText, tierFilter,
 }: Props) {
   const showConflicts = layers?.conflicts ?? true;
   const showAnchors = layers?.wingHQEvents ?? true;
@@ -139,6 +140,7 @@ export function EightWeekView({
             compact={false}
             focusClassId={focusClassId}
             searchText={searchText}
+            tierFilter={tierFilter}
             onHeaderClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
             onSessionClick={handleSessionClick}
             onEmptyCellClick={onEmptyCellClick
