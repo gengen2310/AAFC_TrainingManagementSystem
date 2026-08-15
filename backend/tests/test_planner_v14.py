@@ -734,6 +734,35 @@ def test_annual_program_auditor_can_read(client):
     assert r.status_code in (200, 403)
 
 
+def test_annual_program_empty_year_no_parade_nights(client):
+    """Annual program for a year with no parade nights must return 200, not 500.
+
+    Regression: without the 'if all_pn_ids_pre and ts_rows:' guard in
+    get_annual_program, an empty year would raise UnboundLocalError on the
+    ts_map lookup and surface as an unhandled 500.
+    """
+    hdr = _sqn_admin(client)
+    r = client.post(
+        "/api/planning/years",
+        json={"year": 2999, "name": "Empty Year Regression"},
+        headers=hdr,
+    )
+    assert r.status_code in (200, 201)
+    year_id = r.json()["planning_year_id"]
+    try:
+        r2 = client.get(f"/api/planning/years/{year_id}/annual-program", headers=hdr)
+        assert r2.status_code == 200
+        d = r2.json()
+        assert "terms" in d
+        assert isinstance(d["terms"], list)
+    finally:
+        client.patch(
+            f"/api/planning/years/{year_id}",
+            json={"active_status": False, "version": 0},
+            headers=hdr,
+        )
+
+
 # ─────────────────────────────────────────────────────────────
 # POST /api/planning/years/{id}/rollover
 # ─────────────────────────────────────────────────────────────
