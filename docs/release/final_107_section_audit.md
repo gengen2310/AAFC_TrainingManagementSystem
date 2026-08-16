@@ -1,12 +1,14 @@
 # AAFC TMS — Final 107-Section Engineering Program Audit
 
 **Document type:** Post-completion audit  
-**Audit date:** 2026-08-15  
+**Audit date:** 2026-08-15 (updated 2026-08-16 — post-program a11y remediation; see §10)  
 **Branch:** `main`  
 **Commit at audit:** `522e782` — *feat: Final Engineering Gap-Closure Program — all 12 items FIXED LOCALLY*  
+**Current HEAD:** `4598cdc` — *a11y: fix label-content-name-mismatch and System Console contrast*  
 **Backend test suite:** 1753 passed, 7 skipped, 0 failures  
 **TypeScript:** 0 errors  
-**Staging verification:** CONFIRMED — all 11 §7 browser-interactive checks passed (2026-08-16, Claude in Chrome + ADMIN703/SYSTEMADMIN2026); PW deploy `5d83db66`, SUCCESS 2026-08-15T14:09Z
+**Staging verification:** CONFIRMED — all 11 §7 browser-interactive checks passed (2026-08-16, Claude in Chrome + ADMIN703/SYSTEMADMIN2026); PW deploy `5d83db66`, SUCCESS 2026-08-15T14:09Z  
+**Playwright staging suite:** ✅ CLEAN — 62 passed, 3 skipped, 0 failed (chromium, commit `4598cdc`, 2026-08-16)
 
 ---
 
@@ -58,7 +60,7 @@ gap-register completion status.
 | Backend pytest | **1753 passed, 7 skipped** | +200 tests (1553 baseline → 1753) |
 | New test files | `test_fac_suggestions.py` (6), `test_pn_wizard.py` (7) | — |
 | TypeScript (tsc --noEmit) | **0 errors** | Clean throughout |
-| Playwright E2E | 35+ tests (CLASS-19/21/22/23 filters added in prior sessions) | — |
+| Playwright E2E (staging suite) | **62 passed, 3 skipped** (chromium, commit `4598cdc`) | +27 tests vs. original 35 baseline; see §10 |
 
 ---
 
@@ -184,10 +186,43 @@ All 11 items verified in browser session with staging credentials (Claude in Chr
 | Level A deployment | **ACTIVE** (production, `756e65e`, 2026-08-12) |
 | Level B / Level C gates | All engineering items FIXED LOCALLY; human gates identified and documented |
 | Staging verification | **CONFIRMED** — all 11 §7 browser-interactive checks passed (2026-08-16); see §7 for full evidence per item |
+| Playwright staging suite | **CLEAN** — 62 passed, 3 skipped, 0 failed at `4598cdc` (2026-08-16); see §10 |
 
 **Engineering assessment:** All work mandated by the Final Engineering Program brief is complete at local HEAD (`60c40f3`). No open engineering items remain. The two outstanding NOT STARTED items (DOC-06, DOC-07) are post-release human actions outside engineering scope. All three staging services are confirmed healthy. All 11 §7 browser-interactive checks are now CONFIRMED with evidence. One maintenance lockout edge case was discovered and documented in §8 (recommended fix for Level B).
 
 ---
 
+---
+
+## 10. Post-Program Accessibility Remediation (2026-08-16)
+
+Following the §7 browser-interactive verification, a Playwright staging test suite (`tools/playwright-staging/`) was run against the deployed staging environment and surfaced WCAG failures not previously caught by the local axe-core scan. The suite went from **18 failures → 15 failures → 0 failures** across three commits after `522e782`.
+
+### Failures found and fixed
+
+| Rule | WCAG SC | Element | Root cause | Fix commit |
+|---|---|---|---|---|
+| `label-content-name-mismatch` (14 instances) | 2.5.3 | Topbar "Search ⌘K" button | `aria-label="Search — open command palette"` did not contain the button's `innerText`. Axe uses `innerText` (not the accessibility tree) for the "visible text" side of this check — `aria-hidden` removes elements from the AT but NOT from `innerText`, so the decorative 🔍 emoji and `⌘K` kbd both remained in the visible-text computation despite `aria-hidden="true"` | `4598cdc` — removed emoji span from DOM; `aria-label` changed to `"Search ⌘K"` to exactly match `innerText` |
+| `color-contrast` — Dashboard scope hint | 1.4.3 | `#sa-scope-hint` on `#sa-scope-bar` (`background:#eef4fa`) | `--muted: #657380` gives 4.39:1 on `#eef4fa` (below 4.5:1 AA minimum for normal text) | `3bfb135` — `--muted` darkened to `#5c6a76` (4.57:1 on `#eef4fa`; 4.8:1+ on `--surface`/`--bg`) |
+| `color-contrast` — System Console import button | 1.4.3 | `#sc-curriculum-import-card .btn` | `background:#0891b2;color:#fff` — white on this teal gives 3.39:1 (below 4.5:1) | `4598cdc` — darkened to `#0678a0` (4.59:1 on white) |
+
+### Test infrastructure fixes (same commits)
+
+| Item | Fix |
+|---|---|
+| `a11y-local.spec.ts` timeout in staging run | Added `IS_STAGING = !!process.env.STAGING_SQN_ADMIN_CODE` guard; both local-only tests skip when running against staging (`3bfb135`) |
+| 200% zoom test selecting hidden element | `querySelector(".ph-title")` was returning the first `.ph-title` in `#page-getting-started` (`display:none`), giving all-zero `getBoundingClientRect`. Fixed to `querySelector("#page-dashboard .ph-title")` (`3bfb135`) |
+
+### Key technical distinction: `innerText` vs. accessibility tree
+
+WCAG 2.5.3 requires the accessible name to **contain** the element's visible text. Axe computes "visible text" via `innerText` (CSS-rendered text), not the accessibility tree's text alternative. `aria-hidden="true"` on a child element removes it from the AT but NOT from `innerText` — the only ways to exclude text from `innerText` are `display:none`, `visibility:hidden`, or CSS pseudo-elements (`::before`/`::after`). This distinction explains why adding `aria-hidden="true"` to the `<kbd>⌘K</kbd>` appeared to fix the AT representation but did not resolve the axe violation.
+
+### Final suite result
+
+**Commit `4598cdc`, 2026-08-16, chromium project:**  
+62 passed · 3 skipped (2 local-only tests + 1 mobile-project-only test, correctly excluded) · **0 failed**
+
+---
+
 *Produced by the AAFC TMS Final Engineering Gap-Closure Program, sessions 20–21, 2026-08-15/16.*  
-*Commit: `522e782` on branch `main`.*
+*Updated 2026-08-16 (§10 post-program a11y remediation) at commit `4598cdc`.*
