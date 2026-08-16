@@ -1,14 +1,14 @@
 # AAFC TMS — Final 107-Section Engineering Program Audit
 
 **Document type:** Post-completion audit  
-**Audit date:** 2026-08-15 (updated 2026-08-16 — post-program a11y remediation §10; MAINT-03 fix §8)  
+**Audit date:** 2026-08-15 (updated 2026-08-16 — post-program a11y remediation §10; MAINT-03 fix §8; staging suite complete)  
 **Branch:** `main`  
 **Commit at audit:** `522e782` — *feat: Final Engineering Gap-Closure Program — all 12 items FIXED LOCALLY*  
-**Current HEAD:** `e79533d` — *fix(MAINT-03): system_admin can log back in during maintenance LOCKED*  
+**Current HEAD:** `46e9f4f` — *docs: MAINT-03 promoted to STAGING VERIFIED*  
 **Backend test suite:** 1756 passed, 7 skipped, 0 failures (+3 MAINT-03 regression tests)  
 **TypeScript:** 0 errors  
 **Staging verification:** CONFIRMED — all 11 §7 browser-interactive checks passed (2026-08-16, Claude in Chrome + ADMIN703/SYSTEMADMIN2026); PW deploy `5d83db66`, SUCCESS 2026-08-15T14:09Z  
-**Playwright staging suite:** ✅ CLEAN — 62 passed, 3 skipped, 0 failed (chromium, commit `4598cdc`, 2026-08-16)
+**Playwright staging suite:** ✅ CLEAN — 62 passed, 3 skipped, 0 failed (chromium, all 5 roles, 2026-08-16); HOL-01 promoted STAGING VERIFIED
 
 ---
 
