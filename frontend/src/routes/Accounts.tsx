@@ -5,6 +5,7 @@ import type { TagRecord, PhaseRecord } from "../api";
 import { friendlyMessage } from "../api/client";
 import { Card, Empty, Loading, ErrorNote } from "../components/ui";
 import { useAuth } from "../auth/AuthProvider";
+import { isNational, isWing } from "../auth/permissions";
 import type { AccountRecord, Flight } from "../api/types";
 import { useConfirm } from "../components/ConfirmDialog";
 import { useToast } from "../components/Toast";
@@ -240,13 +241,13 @@ export function Accounts() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           <input placeholder="Search by name, role, unit…" value={search}
             onChange={e => setSearch(e.target.value)} style={{ flex: 1, minWidth: 200 }} />
-          {(session?.is_national) && (
+          {isNational(session) && (
             <select value={wingFilter} onChange={e => { setWingFilter(e.target.value); setSqnFilter(""); }}>
               <option value="">— all wings —</option>
               {(wings.data ?? []).map(w => <option key={w.wing_id} value={w.wing_id}>{w.code}</option>)}
             </select>
           )}
-          {(session?.is_national || session?.is_wing) && (
+          {(isNational(session) || isWing(session)) && (
             <select value={sqnFilter} onChange={e => setSqnFilter(e.target.value)}>
               <option value="">— all squadrons —</option>
               {sqnsForWing(wingFilter).map(s => <option key={s.squadron_id} value={s.squadron_id}>{s.code}</option>)}
@@ -378,7 +379,7 @@ export function Accounts() {
             {(wingScopeRoles.has(createRole) || sqnScopeRoles.has(createRole)) && (
               <label>Wing
                 <select value={createWing} onChange={e => { setCreateWing(e.target.value); setCreateSqn(""); }}
-                  disabled={!session?.is_national}>
+                  disabled={!isNational(session)}>
                   <option value="">— select wing —</option>
                   {(wings.data ?? []).map(w => <option key={w.wing_id} value={w.wing_id}>{w.code}</option>)}
                 </select>

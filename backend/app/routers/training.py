@@ -292,6 +292,16 @@ class ParadeIn(BaseModel):
     session_count: int | None = None  # None = use effective timing template or default
     parade_type: _VALID_PARADE_TYPE | None = "normal"
 
+    @field_validator("date")
+    @classmethod
+    def _validate_date(cls, v: str) -> str:
+        from datetime import date as _date
+        try:
+            _date.fromisoformat(v)
+        except ValueError:
+            raise ValueError(f"date must be a valid ISO-8601 date (YYYY-MM-DD), got '{v}'")
+        return v
+
 
 @router.get("/parade-nights")
 def list_parades(squadron_id: str | None = None, db: DBSession = Depends(get_db),
@@ -481,6 +491,18 @@ class ParadeNightUpdateIn(BaseModel):
     notes: str | None = None
     version: int | None = None
 
+    @field_validator("date")
+    @classmethod
+    def _validate_date(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        from datetime import date as _date
+        try:
+            _date.fromisoformat(v)
+        except ValueError:
+            raise ValueError(f"date must be a valid ISO-8601 date (YYYY-MM-DD), got '{v}'")
+        return v
+
 
 @router.patch("/parade-nights/{pnid}")
 def update_parade_night(pnid: str, body: ParadeNightUpdateIn, db: DBSession = Depends(get_db),
@@ -641,6 +663,7 @@ class StatusIn(BaseModel):
     reason: str | None = None
     rescheduled_to_date: str | None = None
     actual_attendance: int | None = None
+    version: int | None = None  # optimistic-lock guard (optional for backward compat)
 
 
 # Statuses where a bare state change with no explanation would leave an untrustworthy
@@ -717,9 +740,13 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
         if conflicts:
             raise HTTPException(409, detail={"error": "resource_conflict", "conflicts": conflicts})
 
+    initial_status = body.status if body.status else "planned"
+    if initial_status not in ("draft", "planned"):
+        raise HTTPException(400, detail={"error": "invalid_initial_status",
+                                         "message": "New sessions must be created with status 'draft' or 'planned'."})
     s = Session(parade_night_id=pn.id, squadron_id=pn.squadron_id, period_number=body.period_number,
                 cadet_group=body.cadet_group, phase_at_time=body.phase_at_time, custom_title=body.custom_title,
-                expected_attendance=body.expected_attendance, status="planned", created_by=p.user_id)
+                expected_attendance=body.expected_attendance, status=initial_status, created_by=p.user_id)
     _denormalise(db, s, body.curriculum_item_id, body.facilitator_id, body.training_area_id)
     db.add(s); db.commit()
     _recompute(db, pn)
@@ -836,6 +863,7 @@ def set_status(sid: str, body: StatusIn, db: DBSession = Depends(get_db), p: Pri
         raise HTTPException(404, detail={"error": "not_found"})
     pn = db.get(ParadeNight, s.parade_night_id)
     require_can_write_squadron(p, s.squadron_id, pn.wing_id if pn else None)
+    _check_version(s, body.version)
 
     old = _apply_status_transition(s, body.status, body.reason, body.rescheduled_to_date, body.actual_attendance)
 
@@ -927,6 +955,9 @@ def mark_remaining_delivered(pnid: str, db: DBSession = Depends(get_db), p: Prin
     if not pn or pn.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    if pn.closeout_status == "closed":
+        raise HTTPException(409, detail={"error": "parade_night_closed",
+                                          "message": "This Parade Night is closed and sessions can no longer be bulk-updated."})
 
     batch_id = str(_uuid.uuid4())
     sessions = db.query(Session).filter(
@@ -942,7 +973,6 @@ def mark_remaining_delivered(pnid: str, db: DBSession = Depends(get_db), p: Prin
         audit(db, p, object_type="session", object_id=s.id, action="status_change",
               old={"status": old_status}, new={"status": "delivered"},
               reason="bulk_mark_remaining_delivered", batch_id=batch_id, commit=False)
-        db.commit()
         updated_ids.append(s.id)
 
     if updated_ids:
@@ -971,6 +1001,9 @@ def cancel_all_sessions(pnid: str, body: CancelAllIn, db: DBSession = Depends(ge
     if not pn or pn.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+    if pn.closeout_status == "closed":
+        raise HTTPException(409, detail={"error": "parade_night_closed",
+                                          "message": "This Parade Night is closed and sessions can no longer be bulk-cancelled."})
     if not body.reason or not body.reason.strip():
         raise HTTPException(422, detail={"error": "reason_required"})
 
@@ -982,13 +1015,12 @@ def cancel_all_sessions(pnid: str, body: CancelAllIn, db: DBSession = Depends(ge
     ).all()
     updated_ids = []
     for s in sessions:
-        old_status = _apply_status_transition(s, "cancelled", body.reason, body.notes, None)
+        old_status = _apply_status_transition(s, "cancelled", body.reason, None, None)
         db.add(SessionStatusHistory(session_id=s.id, old_status=old_status, new_status="cancelled",
                                     changed_by=p.user_id, reason=body.reason))
         audit(db, p, object_type="session", object_id=s.id, action="status_change",
               old={"status": old_status}, new={"status": "cancelled", "reason": body.reason},
               reason="bulk_cancel_all", batch_id=batch_id, commit=False)
-        db.commit()
         updated_ids.append(s.id)
 
     if updated_ids:

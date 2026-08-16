@@ -174,6 +174,8 @@ def retire_item(item_id: str, db: DBSession = Depends(get_db), p: Principal = De
     if not it:
         raise HTTPException(404, detail={"error": "not_found"})
     k = db.get(ProgramPackage, it.package_id)
+    if not k:
+        raise HTTPException(404, detail={"error": "package_not_found"})
     _require_owner(p, k)
     it.status = "retired"; db.commit()
     audit(db, p, object_type="program_item", object_id=it.id, action="retire")

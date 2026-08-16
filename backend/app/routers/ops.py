@@ -633,7 +633,7 @@ def recent_changes(
     sq_id = p.acting_squadron_id or p.squadron_id
     wi_id = p.acting_wing_id or p.wing_id
 
-    if role in ("sqn_admin", "sqn_viewer"):
+    if role in ("sqn_admin", "sqn_general"):
         q = q.filter(AuditLog.squadron_id == sq_id)
     elif role in ("wing_admin", "wing_viewer"):
         q = q.filter(AuditLog.wing_id == wi_id)

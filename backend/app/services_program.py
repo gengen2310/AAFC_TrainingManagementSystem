@@ -17,11 +17,15 @@ def visible_items_for(db: DBSession, p: Principal, *, schedulable_only: bool = F
     schedulable_only=True restricts to items the principal's squadron can put on a
     parade night (national + own-wing + own-squadron-local).
     """
-    q = db.query(ProgramItem).filter(ProgramItem.is_archived == False)  # noqa: E712
+    q = (db.query(ProgramItem)
+         .join(ProgramPackage, ProgramItem.package_id == ProgramPackage.id)
+         .filter(ProgramItem.is_archived == False,  # noqa: E712
+                 ProgramPackage.is_archived == False))
     items = q.all()
     out = []
     for it in items:
-        if _can_see(p, it, schedulable_only):
+        check = can_schedule(p, it) if schedulable_only else _can_see(p, it, False)
+        if check:
             out.append(it)
     return out
 

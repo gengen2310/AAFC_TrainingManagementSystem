@@ -30,7 +30,8 @@ def _check_maintenance_login_gate(role: str, db: DBSession) -> None:
     """
     if role == "system_admin":
         return
-    if not db.get(SystemSetting, "maintenance_mode"):
+    mm_row = db.get(SystemSetting, "maintenance_mode")
+    if not mm_row or mm_row.value != "on":
         return
     bl_row = db.get(SystemSetting, "maintenance_block_logins")
     if not (bl_row and bl_row.value == "true"):
@@ -250,12 +251,10 @@ def _scoped_fallback_scan(primary_user_id: str, code: str, db: DBSession) -> "Ac
                 continue
         if verify_code(code, sib_ac.code_hash):
             return sib_ac
-        # Mismatch: apply the same failure-counting and lockout logic as the primary
-        # path so sibling accounts cannot be brute-forced via the fallback scan.
-        sib_ac.failed_attempts = (sib_ac.failed_attempts or 0) + 1
-        if sib_ac.failed_attempts >= _LOCKOUT_THRESHOLD:
-            sib_ac.locked_until = utcnow() + timedelta(hours=_LOCKOUT_HOURS)
-        db.commit()
+        # Do NOT increment failed_attempts on siblings — only the primary account
+        # (targeted by the caller) should accumulate failure counts.  Incrementing
+        # every sibling on mismatch created a DoS vector: 5 failed attempts against
+        # any one national-scope account would lock every account of that role.
     return None
 
 

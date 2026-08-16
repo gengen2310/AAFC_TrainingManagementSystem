@@ -223,7 +223,19 @@ async def maintenance_gate(request: Request, call_next):
     if raw_token:
         payload = decode_token(raw_token)
         if payload and payload.get("role") == "system_admin":
-            return await call_next(request)
+            # Verify token_version matches DB so revoked system_admin tokens cannot
+            # bypass the maintenance gate (the endpoint itself also checks via get_principal,
+            # but defence-in-depth closes the gap at the gateway level).
+            user_id = payload.get("sub")
+            token_version = payload.get("tv")
+            try:
+                from .models import User
+                with SessionLocal() as _db:
+                    _u = _db.get(User, user_id)
+                    if _u and _u.active_status and _u.token_version == token_version:
+                        return await call_next(request)
+            except Exception:
+                pass  # fail closed — block on any DB error
 
     return JSONResponse(
         status_code=503,

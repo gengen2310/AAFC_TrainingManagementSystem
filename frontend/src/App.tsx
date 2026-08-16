@@ -5,7 +5,8 @@ import { AuthProvider, useAuth } from "./auth/AuthProvider";
 import { RequireAuth } from "./auth/RequireAuth";
 import { AppShell } from "./layout/AppShell";
 import { SquadronViewProvider } from "./layout/SquadronViewContext";
-import { isNational, isWing, isAuditor } from "./auth/permissions";
+import { isNational, isWing, isAuditor, isAdmin, canViewCadets } from "./auth/permissions";
+import type { SessionInfo } from "./api/types";
 import { Dashboard } from "./routes/Dashboard";
 import { Calendar } from "./routes/Calendar";
 import { ParadeNights } from "./routes/ParadeNights";
@@ -137,6 +138,14 @@ function ModuleEntry() {
   );
 }
 
+// Route-level permission gate — supplements sidebar nav hiding so a user who types
+// the URL directly is blocked, not just hidden from the nav.
+function RequireRole({ check, children }: { check: (s: SessionInfo | null) => boolean; children: ReactNode }) {
+  const { session } = useAuth();
+  if (!check(session)) return <div className="empty">Page not found or access not permitted.</div>;
+  return <>{children}</>;
+}
+
 // ── Normal full-app mode ──────────────────────────────────────────────────────
 
 function Home() {
@@ -186,12 +195,12 @@ export default function App() {
                 <Route path="/facilitators" element={<Facilitators />} />
                 <Route path="/facilitator-schedule" element={<FacilitatorSchedule />} />
                 <Route path="/resources" element={<Resources />} />
-                <Route path="/cadets" element={<Cadets />} />
+                <Route path="/cadets" element={<RequireRole check={canViewCadets}><Cadets /></RequireRole>} />
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/report-catalogue" element={<ReportCatalogue />} />
                 <Route path="/action-items" element={<ActionItems />} />
-                <Route path="/imports" element={<Imports />} />
-                <Route path="/audit" element={<Audit />} />
+                <Route path="/imports" element={<RequireRole check={isAdmin}><Imports /></RequireRole>} />
+                <Route path="/audit" element={<RequireRole check={s => isAdmin(s) || isAuditor(s)}><Audit /></RequireRole>} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/accounts" element={<Accounts />} />
                 <Route path="/settings" element={<Settings />} />

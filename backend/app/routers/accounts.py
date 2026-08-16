@@ -332,7 +332,17 @@ def create_account(body: AccountCreateIn, db: DBSession = Depends(get_db),
     db.flush()  # get u.id
 
     # Generate or hash the initial code
-    plain = body.new_code.strip() if body.new_code else generate_code()
+    if body.new_code:
+        raw = body.new_code.strip()
+        if len(raw) < 6:
+            raise HTTPException(422, detail={"error": "invalid_code",
+                                             "message": "Access code must be at least 6 characters."})
+        if len(raw) > 128:
+            raise HTTPException(422, detail={"error": "invalid_code",
+                                             "message": "Access code is too long (maximum 128 characters)."})
+        plain = raw
+    else:
+        plain = generate_code()
     ac = AccessCode(user_id=u.id, code_hash=hash_code(plain),
                     active_status=True, created_by=p.user_id,
                     updated_by=p.user_id, updated_at=utcnow())
@@ -599,7 +609,7 @@ def reset_code(uid: str, body: ResetCodeIn, db: DBSession = Depends(get_db),
         ac = AccessCode(user_id=u.id, code_hash="", created_by=p.user_id)
         db.add(ac)
     ac.code_hash = hash_code(plain)
-    ac.active_status = True
+    ac.active_status = bool(u.active_status)  # preserve disabled state
     ac.updated_at = utcnow()
     ac.updated_by = p.user_id
     u.token_version = (u.token_version or 0) + 1

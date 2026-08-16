@@ -52,7 +52,7 @@ class ParadeDate(Base, UUIDMixin, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    parade_night_id: Mapped[str | None] = mapped_column(String(36), nullable=True)  # FK → parade_nights.id
+    parade_night_id: Mapped[str | None] = mapped_column(ForeignKey("parade_nights.id", ondelete="SET NULL"), nullable=True, index=True)
 
 
 class HolidayPeriod(Base, UUIDMixin, TimestampMixin):

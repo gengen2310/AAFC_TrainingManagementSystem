@@ -49,12 +49,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear();
   };
 
-  // Exits proxy / delegated-intervention on the backend then refreshes the session.
-  // Used by ProxyControls and by useProxyGuard (navigation guard).
+  // Exits proxy / delegated-intervention on the backend then refreshes the session
+  // and clears the React Query cache.  Cache clear is essential: without it, queries
+  // fetched under the proxy scope remain cached and are served to the post-exit page,
+  // showing the proxied squadron's data.  Both the ProxyControls button and the
+  // navigation guard (useProxyGuard) flow through this function.
   const exitProxy = useCallback(async () => {
     try { await orgApi.exitProxy(); } catch { /* best-effort; still refresh */ }
+    queryClient.clear();
     await refresh();
-  }, [refresh]);
+  }, [refresh, queryClient]);
 
   return <Ctx.Provider value={{ session, loading, login, logout, refresh, exitProxy }}>{children}</Ctx.Provider>;
 }

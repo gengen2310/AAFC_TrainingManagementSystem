@@ -11,7 +11,7 @@ from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
@@ -519,6 +519,11 @@ def update_planning_year(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True)
+    # Structural edits to the year entity itself (name/status) require Proxy Mode
+    # when a wing_admin targets a squadron-scoped year — content operations (CEA
+    # imports, parade dates) do not carry this extra requirement.
+    if p.role == "wing_admin" and py.unit_id:
+        require_can_write_squadron(p, py.unit_id, py.wing_id)
     _check_version(py, body.version)
     if body.name is not None:
         py.name = body.name
@@ -547,6 +552,8 @@ def delete_planning_year(
     archive remains the default whenever any dependent exists."""
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True)
+    if p.role == "wing_admin" and py.unit_id:
+        require_can_write_squadron(p, py.unit_id, py.wing_id)
 
     dependents = {
         "parade_dates": db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).count(),
@@ -582,6 +589,12 @@ class ParadeDateIn(BaseModel):
     parade_type: str = "standard"
     is_active: bool = True
     notes: Optional[str] = None
+
+    @field_validator("parade_date")
+    @classmethod
+    def _validate_parade_date(cls, v: str) -> str:
+        _validate_iso_date(v, "parade_date")
+        return v
 
 
 class GenerateParadeDatesIn(BaseModel):
@@ -1089,9 +1102,18 @@ def delete_parade_date(
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(pd.planning_year_id, db)
     _require_year_access(p, py, write=True)
+    # Resolve FK children before the delete so PostgreSQL FK constraints are not violated.
+    # Notices are owned by the date — delete them. Prep plans and conflicts reference it
+    # optionally (nullable FK) — nullify rather than cascade-delete.
+    db.query(PlanningNotice).filter(PlanningNotice.parade_date_id == pd.id).delete()
+    for app_row in db.query(AnchorPrepPlan).filter(AnchorPrepPlan.planned_parade_date_id == pd.id).all():
+        app_row.planned_parade_date_id = None
+    for pc in db.query(PlanningConflict).filter(PlanningConflict.parade_date_id == pd.id).all():
+        pc.parade_date_id = None
+    db.delete(pd)
     audit(db, p, object_type="parade_date", object_id=pd.id, action="delete",
-          new={"date": pd.parade_date})
-    db.delete(pd); db.commit()
+          new={"date": pd.parade_date}, commit=False)
+    db.commit()
     return {"ok": True}
 
 
@@ -1389,6 +1411,8 @@ def get_prep_suggestions(
     a = db.get(AnchorEvent, anchor_id)
     if not a or a.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
+    py = _get_year_or_404(a.planning_year_id, db)
+    _require_year_access(p, py, write=False)
     rules = db.query(AnchorPrepRule).filter(AnchorPrepRule.event_type == a.event_type).all()
     # Find parade dates in the prep window
     try:
@@ -1593,6 +1617,14 @@ class SessionCreateIn(BaseModel):
     status: str = "draft"
     notes: Optional[str] = None
 
+    @field_validator("status")
+    @classmethod
+    def _validate_status(cls, v: str) -> str:
+        allowed = {"draft", "planned"}
+        if v not in allowed:
+            raise ValueError(f"status must be one of {sorted(allowed)}, got '{v}'")
+        return v
+
 
 class SessionUpdateIn(BaseModel):
     curriculum_id: Optional[str] = None
@@ -1652,7 +1684,7 @@ def create_session(
     s = TrainingSession(
         parade_night_id=pn.id, squadron_id=pn.squadron_id,
         period_number=body.session_number, cadet_group=body.cadet_group,
-        custom_title=body.activity_title, status="planned",
+        custom_title=body.activity_title, status=body.status,
         delivery_notes=body.notes, created_by=p.user_id,
     )
     # Denormalize curriculum and facilitator
