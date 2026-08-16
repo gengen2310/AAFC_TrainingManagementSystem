@@ -39,7 +39,7 @@
   --status-text-danger:  #d41733;
   /* Status / semantic */
   --ok:          #1a7f4b;   --ok-bg:  #d4f0e3;   --ok-text: #145f38;
-  --warn:        #c97a00;   --warn-bg: #fff3cd;
+  --warn:        #c97a00;   --warn-bg: #fff3cd;   --warn-text: #7a5200; /* DES-H04: warn text that passes WCAG AA on --warn-bg (5.4:1) */
   --rescheduled: #7c3aed;
   /* Semantic shortcuts */
   --accent:       var(--blue);
@@ -53,6 +53,10 @@
   --sh2: 0 4px 16px rgba(0,47,101,.14);
   /* Spacing / layout */
   --space-1: 8px; --space-2: 16px; --space-3: 24px; --space-4: 32px;
+  /* DES-M01: typography scale (min 14px body; 16px recommended for 65+ users) */
+  --text-xs: 11px; --text-sm: 13px; --text-base: 15px; --text-lg: 17px; --text-xl: 21px; --text-2xl: 27px;
+  /* DES-M02: extended spacing scale (4px base, fills gaps in existing --space-N) */
+  --space-05: 4px; --space-1h: 12px; --space-2h: 20px; --space-5: 40px; --space-6: 48px;
   --radius: 10px;
 }
 /* shared/tokens.css sync end */
@@ -146,7 +150,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .auth-wrap{background:#fff;border-radius:10px;padding:40px 36px 32px;width:400px;max-width:96vw;box-shadow:0 20px 56px rgba(0,0,0,.40);}
 .auth-logo{text-align:center;margin-bottom:24px;}
 .auth-wm{font-size:16px;font-weight:700;color:var(--dark);letter-spacing:.01em;line-height:1.3;}
-.auth-wm .r{color:var(--blue);}
+.auth-wm .r{color:var(--royal);} /* DES-H01: --blue fails 2.3:1 on white; --royal passes 8.4:1 */
 .auth-div{width:36px;height:3px;background:var(--blue);margin:10px auto 0;border-radius:2px;opacity:.5;}
 .fg{margin-bottom:14px;}
 .fg label{display:block;font-size:12px;font-weight:700;color:var(--steel);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;}
@@ -212,7 +216,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .slbl{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.10em;text-transform:uppercase;margin-bottom:4px;}
 .sval{font-size:27px;font-weight:900;color:var(--dark);line-height:1;}
 .sval.lnk{color:var(--royal);cursor:pointer;text-decoration:underline dotted;}
-.sval.lnk:hover{color:var(--blue);}
+.sval.lnk:hover{color:var(--dark);} /* DES-H01: hover deeper, not lighter */
 .ssub{font-size:11px;color:var(--muted);margin-top:2px;}
 
 /* ── CARD ── */
@@ -238,9 +242,11 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .btn-sm{padding:6px 12px;font-size:11.5px;}
 .btn-xs{padding:4px 9px;font-size:11px;border-radius:5px;}
 .btn-lnk{background:none;border:none;color:var(--royal);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;padding:0;text-decoration:underline dotted;}
-.btn-lnk:hover{color:var(--blue);}
+.btn-lnk:hover{color:var(--dark);} /* DES-H01 */
 .btn:focus-visible,.btn-auth:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
 a:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:2px;}
+/* DES-M06: global keyboard focus ring — WCAG 2.1 SC 2.4.7 */
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px;}
 
 /* ── SEGMENTED TOGGLE (view switchers) ── */
 .seg{display:inline-flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
@@ -266,6 +272,10 @@ a:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:2
 .badge-red,.b-red{background:#fde8e8;color:#8b1a1a;}
 .badge-amber,.badge-yellow,.b-amber{background:#fff3cd;color:#7a5200;}
 .b-blue{background:var(--accent-light);color:var(--dark);}
+/* DES-H02: letter code inside status chips — colour-blind safe redundant indicator */
+.chip-code{font-size:9px;font-weight:900;letter-spacing:.03em;margin-right:3px;opacity:.75;}
+/* DES-M07: minimum 44×44px touch target for icon-only buttons */
+.icon-btn{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;}
 .b-dark{background:var(--dark);color:white;}
 .b-teal{background:#d4f5f0;color:#0a5c50;}
 .b-gold{background:#fff7cc;color:#7a6000;}
@@ -371,6 +381,16 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .dash-section{margin-bottom:24px;}
 .dash-sec-hdr{font-size:11px;font-weight:800;color:var(--steel);letter-spacing:.14em;text-transform:uppercase;padding:10px 0 4px;border-top:2px solid var(--border);margin-bottom:4px;}
 .dash-sec-sub{font-size:11.5px;color:var(--muted);margin-bottom:12px;}
+/* DES-M03: Section A hero — visually dominant; primary use-case scroll depth is 0 */
+.dash-sec-hero{border-left:5px solid var(--dark);background:linear-gradient(to right,rgba(0,47,101,.035),transparent);border-radius:0 6px 6px 0;padding-left:14px;margin-left:-14px;}
+.dash-sec-hero .dash-sec-hdr{font-size:13px;color:var(--dark);border-top:2px solid var(--dark);letter-spacing:.10em;}
+.dash-sec-hero .dash-sec-sub{color:var(--text-2);font-size:12px;}
+/* DES-M05: semantic card border stripes — additive, no layout changes */
+.card-alert{border-left:4px solid var(--red)!important;border-radius:0 8px 8px 0;}
+.card-warn{border-left:4px solid var(--warn)!important;border-radius:0 8px 8px 0;}
+.card-info{border-left:4px solid var(--blue)!important;border-radius:0 8px 8px 0;}
+.card-ok{border-left:4px solid var(--ok)!important;border-radius:0 8px 8px 0;}
+.card-quiet{border-left:4px solid var(--lgrey)!important;border-radius:0 8px 8px 0;}
 .chart-insight{font-size:11.5px;color:var(--royal);font-weight:600;padding:6px 10px;background:var(--accent-light);border-radius:5px;margin-top:8px;border-left:3px solid var(--blue);}
 .chart-skeleton{background:linear-gradient(90deg,#f0f4f8 25%,#e4eaf0 50%,#f0f4f8 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;height:80px;}
 .chart-data-toggle{margin-top:6px;font-size:11.5px;color:var(--muted);}
@@ -418,7 +438,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .cal-dt{font-size:10px;font-weight:800;color:var(--muted);}
 .cal-cell.other .cal-dt{color:var(--muted-text-on-light);}
 .cal-cell.parade .cal-dt{color:var(--dark);}
-.cal-cell.today .cal-dt{color:var(--blue);}
+.cal-cell.today .cal-dt{color:var(--royal);} /* DES-H01: --royal passes 8.4:1 on white */
 .cal-chip{display:block;font-size:8px;margin-top:1px;padding:1px 4px;border-radius:3px;background:var(--dark);color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;}
 .cal-chip.delivered{background:var(--ok);}.cal-chip.cancelled{background:var(--red);}
 .cal-chip.delivered_with_issue{background:#8a9a3a;}.cal-chip.cancelled_late{background:var(--red);}
@@ -576,7 +596,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .fc-stage{font-size:10px;color:var(--muted);margin-top:1px;}
 .fc-pill{font-size:10px;font-weight:700;border-radius:12px;padding:2px 8px;white-space:nowrap;flex-shrink:0;}
 .fc-pill.on-track{background:var(--ok-bg);color:var(--ok-text);}
-.fc-pill.planning-risk{background:var(--warn-bg);color:var(--warn);}
+.fc-pill.planning-risk{background:var(--warn-bg);color:var(--warn-text);} /* DES-H04: --warn fails 3.1:1; --warn-text passes 5.4:1 */
 .fc-pill.critical{background:#fde8e8;color:var(--red);}
 .fc-stats{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:11px;}
 .fc-stat-label{color:var(--muted);}
@@ -656,7 +676,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 .sc-status-ok{color:var(--ok);font-weight:700;}
 .sc-status-warn{color:var(--warn);font-weight:700;}
 .sc-status-err{color:var(--red);font-weight:700;}
-.sc-maint-on{background:var(--warn-bg);border:1px solid var(--warn);color:var(--warn);padding:8px 12px;border-radius:6px;font-size:12.5px;font-weight:600;margin-bottom:10px;}
+.sc-maint-on{background:var(--warn-bg);border:1px solid var(--warn);color:var(--warn-text);padding:8px 12px;border-radius:6px;font-size:12.5px;font-weight:600;margin-bottom:10px;} /* DES-H04 */
 .sc-wing-row{padding:8px 0;border-bottom:1px solid var(--border-light);}
 .sc-wing-name{font-weight:700;font-size:13px;color:var(--dark);margin-bottom:4px;}
 .sc-sqn-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
@@ -903,7 +923,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         </div>
 
         <!-- ══════════ A. TONIGHT ══════════ -->
-        <div class="dash-section">
+        <div class="dash-section dash-sec-hero">
           <div class="dash-sec-hdr">A — Tonight &amp; This Week</div>
           <div class="dash-sec-sub">Readiness for the next parade night and upcoming staffing issues.</div>
           <div id="dash-tonight-section"><div class="card"><div class="chart-skeleton"></div></div></div>
@@ -6989,10 +7009,13 @@ const _ST_LABEL={planned:'Planned',delivered:'Delivered',delivered_with_issue:'D
 const _ST_ICON={planned:'•',delivered:'✓',delivered_with_issue:'✓!',cancelled:'✕',
   cancelled_late:'✕',rescheduled:'↻',not_delivered:'▲'};
 function stLabel(st){return _ST_LABEL[st]||st||'—';}
+// DES-H02: 1-letter codes inside status chips — redundant non-colour indicator (WCAG SC 1.4.1)
+const _ST_CODE={planned:'P',delivered:'D',delivered_with_issue:'D',cancelled:'C',cancelled_late:'C',rescheduled:'R',not_delivered:'N'};
 function stBadge(st){
   const m={planned:'st-planned',delivered:'st-delivered',delivered_with_issue:'st-delivered_with_issue',
     cancelled:'st-cancelled',cancelled_late:'st-cancelled_late',rescheduled:'st-rescheduled',not_delivered:'st-not_delivered'};
-  return `<span class="badge ${m[st]||'b-grey'}">${stLabel(st)}</span>`;
+  const code=_ST_CODE[st]||'';
+  return `<span class="badge ${m[st]||'b-grey'}">${code?`<span class="chip-code">${code}</span>`:''}${stLabel(st)}</span>`;
 }
 function stCls(st){return {delivered:'delivered',delivered_with_issue:'delivered_with_issue',cancelled:'cancelled',cancelled_late:'cancelled_late',rescheduled:'rescheduled',not_delivered:'not_delivered'}[st]||'';}
 
@@ -7124,7 +7147,7 @@ function _chartClassEnrollment(chart){
       const n=cls.expected_count;
       const w=n!=null?Math.round((n/maxCount)*100):0;
       const label=n!=null?n+' cadets':'Not set';
-      const color=n!=null?'var(--royal)':'var(--lgrey)';
+      const color=n!=null?'var(--royal)':'var(--muted)'; /* DES-H04: --lgrey 2.0:1 fails; --muted passes */
       html+=`<div style="display:flex;align-items:center;gap:8px;padding:3px 0 3px 16px" role="img" aria-label="${esc(cls.display_name)}: ${label}">
         <div style="font-size:11px;color:var(--text-2);min-width:114px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cls.display_name)}</div>
         <div style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${color};border-radius:3px"></div></div></div>
@@ -7242,13 +7265,14 @@ function _renderTonightReadiness(chart){
   // misleading 100%/"ready" donut derived from overall_pct (a legacy projection
   // that reads 100 for zero sessions, kept only for older report consumers).
   if(d.planning_status==='not_planned'||!d.sessions_total){
-    return `<div class="card">
+    return `<div class="card card-quiet">
       <div class="ctitle">Tonight — <span style="font-weight:400">${fmtD(d.date,{weekday:'long',day:'numeric',month:'long'})}</span></div>
       <div style="font-size:13px;font-weight:700;color:var(--muted)">Not planned</div>
       <div style="font-size:11px;color:var(--muted);margin-top:4px">No sessions scheduled for this parade night yet.</div>
     </div>`;
   }
   const pct=d.overall_pct||0;const rdC=pct>=80?'var(--ok)':pct>=60?'var(--warn)':'var(--red)';
+  const tonightCardCls=pct>=80?'card-ok':pct>=60?'card-warn':'card-alert'; /* DES-M05 semantic border */
   const conic=`conic-gradient(${rdC} ${pct}%, var(--border) 0)`;
   const unstaffedCount=(d.sessions||[]).filter(s=>!s.facilitator).length;
   const sessHtml=(d.sessions||[]).map((s,i)=>`<div class="sched-lane">
@@ -7271,7 +7295,7 @@ function _renderTonightReadiness(chart){
   }
   const sessCheck=sessTotal>0?`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span class="badge b-ok" style="width:16px;text-align:center;padding:1px 0;font-size:10px">✓</span><span style="font-size:11px">Sessions planned</span><span style="font-size:10px;color:var(--muted)">${sessTotal}</span></div>`:`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span class="badge b-grey" style="width:16px;text-align:center;padding:1px 0;font-size:10px">–</span><span style="font-size:11px;color:var(--muted)">No sessions planned</span></div>`;
   const checklistHtml=`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light)"><div style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Readiness checklist</div>${sessCheck}${_rdItem('Facilitators assigned',facFill,sessTotal)}${_rdItem('Rooms assigned',roomFill,sessTotal)}</div>`;
-  return `<div class="card">
+  return `<div class="card ${tonightCardCls}">
     <div class="ctitle">Tonight — <span style="font-weight:400">${fmtD(d.date,{weekday:'long',day:'numeric',month:'long'})}</span></div>
     <div class="readiness-donut" style="align-items:flex-start">
       <div>
@@ -7776,7 +7800,7 @@ function renderCal(){
     const isT=new Date(calYear,calMonth,d).getTime()===td.getTime();
     let cls='cal-cell'+(pn?' parade':'')+(isT?' today':'')+(acts.length&&!pn?' act-day':'')+(hol?' holiday-day':'');
     let chips='';
-    if(hol)chips+=`<span class="cal-chip" style="background:var(--warn-bg);color:var(--warn)" title="${esc(hol.name)}">${esc(hol.name.substring(0,16))}</span>`;
+    if(hol)chips+=`<span class="cal-chip" style="background:var(--warn-bg);color:var(--warn-text)" title="${esc(hol.name)}">${esc(hol.name.substring(0,16))}</span>`; /* DES-H04 */
     if(pn)(pn.sessions||[]).slice(0,3).forEach(s=>{
       // Status icon prefix, not color alone (WCAG / colour-blind safe) --
       // matches Planning Workspace's StatusBadge.tsx icon set (Stage 11
@@ -11267,11 +11291,17 @@ function renderActions(){
 
   items.sort((a,b)=>a.pri-b.pri||(a.due<b.due?-1:a.due>b.due?1:0));
 
+  // DES-H03: 4px left border stripe per priority tier — visual hierarchy for 80yr-old scan
+  const _AI_STRIPE={0:'var(--red)',1:'var(--warn)',2:'var(--warn)',3:'var(--lgrey)',4:'var(--lgrey)'};
   const CAT_CLS={Alert:'b-red',Task:'b-amber',Outcome:'b-amber',Data:'b-amber',Planning:'b-blue',Backlog:'b-grey'};
   document.getElementById('action-tbody').innerHTML=items.length
-    ?items.map(it=>`<tr>
+    ?items.map(it=>{
+      const stripe=_AI_STRIPE[it.pri];
+      const rowStyle=stripe?`border-left:4px solid ${stripe}`:'border-left:4px solid transparent';
+      const titleColor=it.pri>=5?'var(--text-2)':'var(--text)';
+      return `<tr style="${rowStyle}">
       <td><span class="badge ${CAT_CLS[it.cat]||'b-grey'}" style="font-size:9px">${esc(it.cat)}</span></td>
-      <td><div style="font-weight:700;font-size:12px">${esc(it.title)}</div>
+      <td><div style="font-weight:700;font-size:12px;color:${titleColor}">${esc(it.title)}</div>
           <div style="font-size:10.5px;color:var(--muted)">${esc(it.detail)}</div></td>
       <td style="font-size:11px;color:var(--muted);white-space:nowrap">${it.due?fmtD(it.due,{day:'numeric',month:'short',year:'numeric'}):'—'}</td>
       <td><span class="badge b-amber" style="font-size:9px">${esc(it.issue)}</span></td>
@@ -11280,7 +11310,7 @@ function renderActions(){
         ${it.type==='sess'&&canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${esc(it.date)}',${it.si})">Edit</button>`:''}
         ${it.type==='backend'&&it.id&&canWriteSquadron()?`<button class="btn btn-xs" onclick="_closeActionItem('${esc(it.id)}')">Done</button>`:''}
       </td>
-    </tr>`).join('')
+    </tr>`;}).join('')
     :`<tr><td colspan="5"><div class="empty" style="padding:18px">
         <div class="et">No items require attention.</div>
         <div class="es">All curriculum items are scheduled and outcomes are recorded.</div>
@@ -11963,7 +11993,7 @@ async function loadCommandDashboard(scope){
 
   _cmdReadinessRows=(d.sections&&d.sections.A&&d.sections.A.readiness_matrix&&d.sections.A.readiness_matrix.data)||[];
 
-  const proxyBanner=proxyActive()?`<div style="font-size:11px;color:var(--warn);background:var(--warn-bg);border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block">Delegated Intervention active — protected writes enabled.</div>`:'';
+  const proxyBanner=proxyActive()?`<div style="font-size:11px;color:var(--text);background:var(--warn-bg);border-radius:6px;padding:4px 8px;margin-bottom:8px;display:inline-block">Delegated Intervention active — protected writes enabled.</div>`:''/* DES-H04 */;
   let html=`<div class="ph" style="margin-bottom:6px">
     <h1 class="ph-title">Training Dashboard</h1>
     <div class="ph-sub">
@@ -14339,7 +14369,7 @@ function openCsvCurrImport(){
   document.getElementById('csv-curr-preview-btn').style.display='inline-flex';
   openModal('m-csv-curr-import');
 }
-const _CSV_CURR_ACTION_CLR={created:'color:var(--ok);font-weight:600',updated:'color:var(--blue);font-weight:600',skipped:'color:var(--muted)',failed:'color:var(--error);font-weight:600'};
+const _CSV_CURR_ACTION_CLR={created:'color:var(--ok);font-weight:600',updated:'color:var(--royal);font-weight:600',skipped:'color:var(--muted)',failed:'color:var(--error);font-weight:600'};
 async function _csvCurrRequest(preview){
   const msg=document.getElementById('csv-curr-msg');
   const fileEl=document.getElementById('csv-curr-file');
@@ -14450,7 +14480,7 @@ async function previewSchedImport(){
     const summary=`${updateRows.length} change(s) to apply · ${d.rows.filter(r=>r.action==='unchanged').length} unchanged · ${d.not_found} not found`;
     document.getElementById('sched-import-summary').textContent=summary;
     const tbody=document.getElementById('sched-import-rows');
-    const ACTION_CLR={update:'color:var(--blue);font-weight:600',unchanged:'color:var(--muted)',not_found:'color:var(--error)'};
+    const ACTION_CLR={update:'color:var(--royal);font-weight:600',unchanged:'color:var(--muted)',not_found:'color:var(--error)'};
     tbody.innerHTML=d.rows.map(r=>`<tr>
       <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(r.date||'')}</td>
       <td style="padding:3px 8px;border-bottom:1px solid var(--border)">${esc(String(r.session||''))}</td>
