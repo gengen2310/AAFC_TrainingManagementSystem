@@ -698,10 +698,18 @@ command -v railway &>/dev/null || die "railway CLI not found."
 ok "railway CLI: $(railway --version 2>/dev/null)"
 
 # ══ STEP 12: Login + session verification ════════════════════════════════════
+# STAGING_RESCUE=1 skips the pre-deploy auth check for the specific case where
+# staging is crashed and this deploy IS the fix.  All post-deploy auth gates
+# still run normally against the newly-deployed backend.
 echo
 echo "  [12/12] Authenticating to staging (POST /api/auth/lookup → /api/auth/login)…"
-staging_login
-staging_verify_session "Step 12"
+if [ "${STAGING_RESCUE:-0}" = "1" ]; then
+  info "STAGING_RESCUE=1 — skipping pre-deploy auth check (deploying to a known-broken staging backend)."
+  info "Post-deploy auth gates will still verify the new backend is healthy."
+else
+  staging_login
+  staging_verify_session "Step 12"
+fi
 
 # ══ Preflight summary ═════════════════════════════════════════════════════════
 echo
@@ -861,6 +869,13 @@ echo "  ── Backend gate 3/4: database revision ─────────�
 # 20s for the new instance to come up and start serving before hitting the
 # authenticated /api/system/migrations endpoint (avoids transient 502).
 sleep 20
+# In rescue mode no session was established during preflight (staging was
+# down). Now that the backend is healthy, log in for the first time.
+if [ "${STAGING_RESCUE:-0}" = "1" ]; then
+  info "STAGING_RESCUE: establishing initial session against newly-deployed backend…"
+  staging_login
+  staging_verify_session "Backend gate 3 (rescue login)"
+fi
 staging_api_call GET "/api/system/migrations"
 [ "$STAGING_API_CODE" = "200" ] \
   || die "/api/system/migrations → $STAGING_API_CODE — HARD FAIL."

@@ -31,31 +31,26 @@ def upgrade():
     # and the old unique constraint disappears automatically; we only need to
     # create the new index afterward.
     if dialect == "postgresql":
-        # Drop the unique constraint created by SQLAlchemy's unique=True.
-        # Constraint name follows SQLAlchemy's pg convention: table_col_key.
         op.execute(sa.text(
             "ALTER TABLE parade_night_timing_overrides "
             "DROP CONSTRAINT IF EXISTS "
             "parade_night_timing_overrides_parade_night_id_key"
         ))
-        # Drop any standalone index SQLAlchemy may also have emitted.
         op.execute(sa.text(
             "DROP INDEX IF EXISTS "
             "ix_parade_night_timing_overrides_parade_night_id"
         ))
-        # Non-unique index for fast FK lookups.
         op.execute(sa.text(
             "CREATE INDEX IF NOT EXISTS ix_pnto_parade_night_id "
             "ON parade_night_timing_overrides (parade_night_id)"
         ))
-        # Partial unique index: only one active override per parade night.
         op.execute(sa.text(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_pnto_active_per_night "
             "ON parade_night_timing_overrides (parade_night_id) "
             "WHERE NOT is_archived"
         ))
     else:
-        # SQLite path: batch_alter_table recreates without the old unique index.
+        # SQLite: batch_alter_table recreates without the old unique index.
         with op.batch_alter_table("parade_night_timing_overrides") as batch_op:
             batch_op.drop_index("ix_parade_night_timing_overrides_parade_night_id")
             batch_op.create_index(
@@ -73,49 +68,100 @@ def upgrade():
     # ── R5-L06: session_audience — add unique constraint ────────────────────
     # The docstring states "A session/class pair may exist only once (unique
     # constraint)" but the constraint was missing from the schema.
-    with op.batch_alter_table("session_audience") as batch_op:
-        batch_op.create_unique_constraint(
-            "uq_session_audience_pair",
-            ["session_id", "training_class_id"],
-        )
+    #
+    # On PostgreSQL: use raw DDL so we can first scrub any duplicate pairs
+    # that accumulated before the constraint existed (keeping the row with
+    # the lexicographically smallest UUID, which is always the earliest-created
+    # row given UUIDv4 ordering is random, but any survivor is fine here).
+    # batch_alter_table is reserved for the SQLite path where it is required
+    # for ALTER TABLE support.
+    if dialect == "postgresql":
+        # Remove duplicate (session_id, training_class_id) pairs — keep one.
+        op.execute(sa.text("""
+            DELETE FROM session_audience
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM session_audience
+                GROUP BY session_id, training_class_id
+            )
+        """))
+        op.execute(sa.text(
+            "ALTER TABLE session_audience "
+            "DROP CONSTRAINT IF EXISTS uq_session_audience_pair"
+        ))
+        op.execute(sa.text(
+            "ALTER TABLE session_audience "
+            "ADD CONSTRAINT uq_session_audience_pair "
+            "UNIQUE (session_id, training_class_id)"
+        ))
+    else:
+        with op.batch_alter_table("session_audience") as batch_op:
+            batch_op.create_unique_constraint(
+                "uq_session_audience_pair",
+                ["session_id", "training_class_id"],
+            )
 
     # ── R5-L05: planning_conflicts — add FK for scheduled_session_id ────────
     # The column was String(36) with no FK. Sessions are soft-deleted (not
     # hard-deleted) so a FK won't break existing rows. ondelete=SET NULL
     # protects against any future hard-delete.
-    with op.batch_alter_table("planning_conflicts") as batch_op:
-        batch_op.create_foreign_key(
-            "fk_planning_conflicts_session",
-            "sessions",
-            ["scheduled_session_id"],
-            ["id"],
-            ondelete="SET NULL",
-        )
+    #
+    # On PostgreSQL: use raw DDL so we can first NULL out any stale references
+    # to sessions that were hard-deleted (shouldn't exist but guards against
+    # any data inconsistency accumulated before this FK was in place).
+    if dialect == "postgresql":
+        op.execute(sa.text("""
+            UPDATE planning_conflicts
+            SET scheduled_session_id = NULL
+            WHERE scheduled_session_id IS NOT NULL
+              AND scheduled_session_id NOT IN (SELECT id FROM sessions)
+        """))
+        op.execute(sa.text(
+            "ALTER TABLE planning_conflicts "
+            "DROP CONSTRAINT IF EXISTS fk_planning_conflicts_session"
+        ))
+        op.execute(sa.text(
+            "ALTER TABLE planning_conflicts "
+            "ADD CONSTRAINT fk_planning_conflicts_session "
+            "FOREIGN KEY (scheduled_session_id) REFERENCES sessions(id) "
+            "ON DELETE SET NULL"
+        ))
+    else:
+        with op.batch_alter_table("planning_conflicts") as batch_op:
+            batch_op.create_foreign_key(
+                "fk_planning_conflicts_session",
+                "sessions",
+                ["scheduled_session_id"],
+                ["id"],
+                ondelete="SET NULL",
+            )
 
 
 def downgrade():
     bind = op.get_bind()
     dialect = bind.dialect.name
 
-    with op.batch_alter_table("planning_conflicts") as batch_op:
-        batch_op.drop_constraint("fk_planning_conflicts_session", type_="foreignkey")
-
-    with op.batch_alter_table("session_audience") as batch_op:
-        batch_op.drop_constraint("uq_session_audience_pair", type_="unique")
-
     if dialect == "postgresql":
         op.execute(sa.text(
-            "DROP INDEX IF EXISTS uq_pnto_active_per_night"
+            "ALTER TABLE planning_conflicts "
+            "DROP CONSTRAINT IF EXISTS fk_planning_conflicts_session"
         ))
         op.execute(sa.text(
-            "DROP INDEX IF EXISTS ix_pnto_parade_night_id"
+            "ALTER TABLE session_audience "
+            "DROP CONSTRAINT IF EXISTS uq_session_audience_pair"
         ))
+        op.execute(sa.text("DROP INDEX IF EXISTS uq_pnto_active_per_night"))
+        op.execute(sa.text("DROP INDEX IF EXISTS ix_pnto_parade_night_id"))
         op.execute(sa.text(
             "ALTER TABLE parade_night_timing_overrides "
             "ADD CONSTRAINT parade_night_timing_overrides_parade_night_id_key "
             "UNIQUE (parade_night_id)"
         ))
     else:
+        with op.batch_alter_table("planning_conflicts") as batch_op:
+            batch_op.drop_constraint("fk_planning_conflicts_session", type_="foreignkey")
+        with op.batch_alter_table("session_audience") as batch_op:
+            batch_op.drop_constraint("uq_session_audience_pair", type_="unique")
         op.drop_index("uq_pnto_active_per_night",
                       table_name="parade_night_timing_overrides")
         with op.batch_alter_table("parade_night_timing_overrides") as batch_op:
