@@ -1,11 +1,11 @@
 # AAFC TMS — Final 107-Section Engineering Program Audit
 
 **Document type:** Post-completion audit  
-**Audit date:** 2026-08-15 (updated 2026-08-16 — post-program a11y remediation; see §10)  
+**Audit date:** 2026-08-15 (updated 2026-08-16 — post-program a11y remediation §10; MAINT-03 fix §8)  
 **Branch:** `main`  
 **Commit at audit:** `522e782` — *feat: Final Engineering Gap-Closure Program — all 12 items FIXED LOCALLY*  
-**Current HEAD:** `4598cdc` — *a11y: fix label-content-name-mismatch and System Console contrast*  
-**Backend test suite:** 1753 passed, 7 skipped, 0 failures  
+**Current HEAD:** `e79533d` — *fix(MAINT-03): system_admin can log back in during maintenance LOCKED*  
+**Backend test suite:** 1756 passed, 7 skipped, 0 failures (+3 MAINT-03 regression tests)  
 **TypeScript:** 0 errors  
 **Staging verification:** CONFIRMED — all 11 §7 browser-interactive checks passed (2026-08-16, Claude in Chrome + ADMIN703/SYSTEMADMIN2026); PW deploy `5d83db66`, SUCCESS 2026-08-15T14:09Z  
 **Playwright staging suite:** ✅ CLEAN — 62 passed, 3 skipped, 0 failed (chromium, commit `4598cdc`, 2026-08-16)
@@ -169,7 +169,7 @@ All 11 items verified in browser session with staging credentials (Claude in Chr
 | TermView DnD (DND-01 partial) | TermView uses `fromNightSummary` without full `source` data; cannot reconstruct `curriculum_id`/`facilitator_id` for move payload | ACCEPTED: WORK-08 "Move to another night" keyboard form covers this path. TermView DnD deferred to Level B. |
 | `window.confirm()` in System Console | System Console archive/create handlers use native `alert()`/`confirm()` which block browser automation | ACCEPTED: System Console is a superuser tool, not exposed to squadron users; browser-automation concern is test-tooling only, not a user-facing defect. |
 | Staging seed codes | `SYSTEMADMIN2026`, `ADMIN703` are demo codes for staging only, never used in production | CONFIRMED: codes exist in staging only; security greps on production paths return 0. |
-| Maintenance lockout edge case | `block_logins=true` + LOCKED phase + lost SA session = SA cannot log back in (login endpoint gated, SA bypass requires existing SA token in request). Discovered during MAINT-02 verification. | ACCEPTED RISK for staging verification. Recommended fix (Level B): add pre-auth SA exception path in maintenance middleware — check if the incoming login code hashes to an SA account before applying the login gate. Production mitigation: never enable `block_logins` without a long drain period and a guaranteed active SA session. Staging restored via Railway console or DB after this test. |
+| Maintenance lockout edge case | `block_logins=true` + LOCKED phase + lost SA session = SA cannot log back in (login endpoint gated, SA bypass requires existing SA token in request). Discovered during MAINT-02 verification. | **FIXED — MAINT-03 (2026-08-16, commit `e79533d`).** `/api/auth/login` moved to `_MAINTENANCE_ALWAYS_EXEMPT`; `_check_maintenance_login_gate(role, db)` called in login handler after role known. SA always passes. 3 new regression tests. 1756 passed, 7 skipped. No longer a residual. |
 | DOC-06, DOC-07 | Post-release human actions (DR rehearsal, go-live communication) | NOT STARTED — awaiting human action, no engineering blocker. |
 
 ---
@@ -179,16 +179,17 @@ All 11 items verified in browser session with staging credentials (Claude in Chr
 | Dimension | Result |
 |---|---|
 | All 12 Final Engineering Program items | **FIXED LOCALLY** |
-| Backend regression suite | **PASS** — 1753/1753, 7 skipped |
+| Backend regression suite | **PASS** — 1756/1756, 7 skipped (+3 MAINT-03 regression tests) |
 | TypeScript compilation | **PASS** — 0 errors |
 | Security invariants | **CONFIRMED** |
-| Gap register completion rate | **87%** (168/194) |
+| Gap register completion rate | **87%** (169/195) |
 | Level A deployment | **ACTIVE** (production, `756e65e`, 2026-08-12) |
 | Level B / Level C gates | All engineering items FIXED LOCALLY; human gates identified and documented |
 | Staging verification | **CONFIRMED** — all 11 §7 browser-interactive checks passed (2026-08-16); see §7 for full evidence per item |
 | Playwright staging suite | **CLEAN** — 62 passed, 3 skipped, 0 failed at `4598cdc` (2026-08-16); see §10 |
+| MAINT-03 | **FIXED** (`e79533d`, 2026-08-16) — maintenance lockout residual from §8 is closed |
 
-**Engineering assessment:** All work mandated by the Final Engineering Program brief is complete at local HEAD (`60c40f3`). No open engineering items remain. The two outstanding NOT STARTED items (DOC-06, DOC-07) are post-release human actions outside engineering scope. All three staging services are confirmed healthy. All 11 §7 browser-interactive checks are now CONFIRMED with evidence. One maintenance lockout edge case was discovered and documented in §8 (recommended fix for Level B).
+**Engineering assessment:** All work mandated by the Final Engineering Program brief is complete, including the post-program MAINT-03 fix (`e79533d`). No open engineering items remain. The two outstanding NOT STARTED items (DOC-06, DOC-07) are post-release human actions outside engineering scope. All three staging services are confirmed healthy. All 11 §7 browser-interactive checks are CONFIRMED with evidence. The maintenance lockout edge case documented in §8 is now FIXED.
 
 ---
 
