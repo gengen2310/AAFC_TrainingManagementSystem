@@ -862,7 +862,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-item" tabindex="0" onclick="nav('weekly-program')">Weekly Program</div>
       <div class="nav-lbl">People and Resources</div>
       <div class="nav-item" tabindex="0" onclick="nav('facilitators')">Facilitators</div>
-      <div class="nav-item" tabindex="0" onclick="nav('resources')">Locations and Resources</div>
+      <div class="nav-item" tabindex="0" onclick="nav('resources')">Resources & Training Areas</div>
       <div class="nav-lbl">Needs Attention</div>
       <div class="nav-item" tabindex="0" onclick="nav('action-items')">Needs Attention</div>
       <div class="nav-item" tabindex="0" onclick="nav('action-centre')">Programme Action Centre</div>
@@ -1508,7 +1508,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <!-- RESOURCES (Training Areas) -->
       <div id="page-resources" class="page">
         <div class="ph">
-          <h1 class="ph-title">Locations and Resources</h1>
+          <h1 class="ph-title">Resources & Training Areas</h1>
           <div class="ph-actions no-print">
             <span id="res-refresh-status" style="font-size:10px;color:var(--muted)"></span>
             <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('res-refresh-status',async()=>{await loadData();renderRooms();})">Refresh</button>
@@ -14438,7 +14438,7 @@ async function loadLocations(){
     const allLocs = [...realRooms, ...planRoomsOnly.map(l=>({...l,source:'planning'}))];
     P.locations = allLocs;
     if(!allLocs.length){
-      el.innerHTML='<div class="empty"><div class="et">No locations added</div><div class="es">Add training areas on the <a href="#" onclick="nav(\'resources\');return false">Locations and Resources page</a> (squadron scope) or add a planning-specific location below.</div></div>';
+      el.innerHTML='<div class="empty"><div class="et">No locations added</div><div class="es">Add training areas on the <a href="#" onclick="nav(\'resources\');return false">Resources & Training Areas page</a> (squadron scope) or add a planning-specific location below.</div></div>';
       return;
     }
     el.innerHTML=`<div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Capacity</th><th>Source</th></tr></thead><tbody>`+
