@@ -781,8 +781,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="tb-unit" id="tb-unit">Training System</div>
     </div>
     <div class="tb-right">
-      <button class="tb-btn no-print" onclick="openCmdPalette()" title="Search — or press ⌘K / Ctrl+K" aria-label="Search — open command palette" style="display:flex;align-items:center;gap:4px">
-        <span aria-hidden="true">🔍</span> Search <kbd aria-hidden="true" style="font-size:9px;background:rgba(255,255,255,.18);padding:1px 5px;border-radius:3px;border:1px solid rgba(255,255,255,.3)">⌘K</kbd>
+      <button class="tb-btn no-print" onclick="openCmdPalette()" title="Search — or press ⌘K / Ctrl+K" aria-label="Search ⌘K" style="display:flex;align-items:center;gap:4px">
+        Search <kbd style="font-size:9px;background:rgba(255,255,255,.18);padding:1px 5px;border-radius:3px;border:1px solid rgba(255,255,255,.3)">⌘K</kbd>
       </button>
       <button id="btn-print-program" class="tb-btn no-print" onclick="nav('weekly-program')" title="Quick print weekly program">Print Program</button>
       <span class="sqn-chip" id="tb-chip">SQN</span>
@@ -1930,7 +1930,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div class="sc-section-hdr">Curriculum Import</div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Upload the AAFC training schedule workbook (.xlsm) to import all curriculum items from <em>zz - Program backend</em>. Safe to run multiple times without creating duplicates.</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <label class="btn" style="cursor:pointer;background:#0891b2;color:#fff;border:none">
+            <label class="btn" style="cursor:pointer;background:#0678a0;color:#fff;border:none">
               Select Workbook (.xlsm)
               <input type="file" id="sc-curr-import-file" accept=".xlsm,.xlsx" style="display:none" onchange="scImportCurriculum()">
             </label>
