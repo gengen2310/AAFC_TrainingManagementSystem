@@ -56,7 +56,7 @@ EXPECTED_STAGING_PW_DOMAIN="aafc-tms-planning-workspace-preview-staging.up.railw
 
 EXPECTED_BRANCH="main"
 REQUIRED_ANCESTOR="de27c42"
-REQUIRED_ALEMBIC_HEAD="a3b4c5d6e7f8"
+REQUIRED_ALEMBIC_HEAD="b4c5d6e7f8a9"
 
 BACKEND_GATE_TIMEOUT=600
 FRONTEND_GATE_TIMEOUT=600
@@ -655,7 +655,12 @@ _check_grep() {
   [ "$c" -eq 0 ] && ok "$label" || { fail "$label ($c match(es))"; grep -rn "$pattern" "$path"|head -3; }
 }
 _check_grep "No seeded codes"         "SYSADMIN2026\|ADMIN703\|ADMIN7WG\|ADMINNATIONAL" "connected-frontend"
-_check_grep "No localStorage"          "localStorage"                                     "connected-frontend"
+# SP-02 intentionally stores displayDensity (UI preference) in localStorage —
+# that is not operational data and is a known-safe exception.  Only flag
+# localStorage uses that are NOT the displayDensity preference.
+_ls_hits=$(grep -rn "localStorage" connected-frontend 2>/dev/null | grep -v "displayDensity" | wc -l | tr -d ' ')
+[ "$_ls_hits" -eq 0 ] && ok "No operational localStorage" \
+  || { fail "No operational localStorage ($_ls_hits match(es))"; grep -rn "localStorage" connected-frontend | grep -v "displayDensity" | head -3; }
 _check_grep "No access-code hashes"    "code_hash\|plain_code"                           "connected-frontend"
 _check_grep "No JWT_SECRET/SECRET_KEY" "JWT_SECRET\|SECRET_KEY"                           "connected-frontend"
 _check_grep "No DB connection strings" "postgresql://\|postgres://\|sqlite:///"           "connected-frontend"
