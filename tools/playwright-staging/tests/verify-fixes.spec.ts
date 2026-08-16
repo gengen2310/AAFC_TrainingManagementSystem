@@ -184,12 +184,12 @@ test("HOL-EDIT-01: Edit button on holiday row opens modal; PATCH saves successfu
   }
 
   // Check if any holidays exist; if not, add one
-  const existingEditBtns = await page.evaluate(() =>
-    document.querySelectorAll("button.btn-xs").length > 0
-      ? Array.from(document.querySelectorAll("button.btn-xs"))
-          .filter((b) => b.textContent?.trim() === "Edit").length
-      : 0
-  );
+  const existingEditBtns = await page.evaluate(() => {
+    const body = document.getElementById("py-holidays-body");
+    if (!body) return 0;
+    return Array.from(body.querySelectorAll("button.btn-xs"))
+      .filter((b) => b.textContent?.trim() === "Edit").length;
+  });
 
   if (existingEditBtns === 0) {
     // Add a test holiday via evaluate
@@ -203,8 +203,9 @@ test("HOL-EDIT-01: Edit button on holiday row opens modal; PATCH saves successfu
     await page.waitForTimeout(1500);
   }
 
-  // Find and click Edit button on the first holiday row
-  const editBtn = page.locator("button.btn-xs").filter({ hasText: /^edit$/i }).first();
+  // Find and click Edit button on the first holiday row — scoped to holidays body
+  // to avoid matching hidden curriculum Edit buttons elsewhere in the DOM
+  const editBtn = page.locator("#py-holidays-body button.btn-xs").filter({ hasText: /^edit$/i }).first();
   await expect(editBtn, "Edit button must exist on a holiday row").toBeVisible({ timeout: 8000 });
   await editBtn.click();
   await page.waitForTimeout(500);
