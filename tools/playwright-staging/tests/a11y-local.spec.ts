@@ -4,12 +4,18 @@ import AxeBuilder from "@axe-core/playwright";
 // A11Y-01 axe scan against local frontend (login page only, no backend session required).
 // The page calls the production backend for /api/auth/me; on 401, shows #auth-step1.
 // Start server: cd connected-frontend && python3 -m http.server 8181
+//
+// Skipped automatically when STAGING_SQN_ADMIN_CODE is set (indicates a staging
+// suite run where localhost:8181 is not available).
+
+const IS_STAGING = !!process.env.STAGING_SQN_ADMIN_CODE;
 
 test.use({ baseURL: "http://localhost:8181" });
 
 test("[A11Y] Auth form — zero select-name / label violations", async ({
   page,
 }) => {
+  test.skip(IS_STAGING, "Local-only test — localhost:8181 not available in staging suite");
   await page.goto("/");
   // auth-screen is visible immediately; auth-step1 appears after /api/auth/me 401
   // Production backend responds quickly; allow up to 15s for first network round-trip
@@ -53,6 +59,7 @@ test("[A11Y] Auth form — zero select-name / label violations", async ({
 test("[A11Y] Full page — zero duplicate-id violations (static DOM)", async ({
   page,
 }) => {
+  test.skip(IS_STAGING, "Local-only test — localhost:8181 not available in staging suite");
   await page.goto("/");
   // Only need the page to load — don't require auth-step1 for duplicate-id check
   await page.waitForLoadState("networkidle", { timeout: 15000 });

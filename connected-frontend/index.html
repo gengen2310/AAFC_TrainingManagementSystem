@@ -31,7 +31,7 @@
   --text:   #1e2d3d;
   --text-2: #3a4a55;
   --ink-2:  #44506a;
-  --muted:  #657380;   /* WCAG AA 4.5:1+ on both --surface and --bg */
+  --muted:  #5c6a76;   /* WCAG AA 4.5:1+ on --surface, --bg, and sa-scope-bar (#eef4fa) */
   /* WCAG AA accessibility tokens — text foreground use only */
   --muted-text-on-light: #6e7275;
   --text-on-dark-muted:  #7e9bbb;
@@ -782,7 +782,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     </div>
     <div class="tb-right">
       <button class="tb-btn no-print" onclick="openCmdPalette()" title="Search — or press ⌘K / Ctrl+K" aria-label="Search — open command palette" style="display:flex;align-items:center;gap:4px">
-        <span aria-hidden="true">🔍</span> Search <kbd style="font-size:9px;background:rgba(255,255,255,.18);padding:1px 5px;border-radius:3px;border:1px solid rgba(255,255,255,.3)">⌘K</kbd>
+        <span aria-hidden="true">🔍</span> Search <kbd aria-hidden="true" style="font-size:9px;background:rgba(255,255,255,.18);padding:1px 5px;border-radius:3px;border:1px solid rgba(255,255,255,.3)">⌘K</kbd>
       </button>
       <button id="btn-print-program" class="tb-btn no-print" onclick="nav('weekly-program')" title="Quick print weekly program">Print Program</button>
       <span class="sqn-chip" id="tb-chip">SQN</span>

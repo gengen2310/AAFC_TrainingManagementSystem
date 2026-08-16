@@ -171,7 +171,10 @@ test.describe("[A11Y-WCAG] SC 1.4.4 Resize Text — 200% zoom (640 px)", () => {
 
     // The dashboard title must be visible (not clipped off-screen)
     const titleVisible = await page.evaluate(() => {
-      const el = document.querySelector(".ph-title") as HTMLElement;
+      // Scope to #page-dashboard to avoid matching the first .ph-title in the
+      // hidden #page-getting-started div (display:none → getBoundingClientRect
+      // returns all-zero and the test would always fail regardless of zoom).
+      const el = document.querySelector("#page-dashboard .ph-title") as HTMLElement;
       if (!el) return false;
       const rect = el.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0 && rect.top >= 0;
@@ -194,8 +197,9 @@ test.describe("[A11Y-WCAG] SC 1.4.4 Resize Text — 200% zoom (640 px)", () => {
 
 test.describe("[A11Y-WCAG] SC 1.4.3 Color Contrast", () => {
   // The AAFC TMS palette was audited for WCAG AA compliance during development:
-  // - --muted (#657380) was darkened from #6b7a87 (failed 4.13:1) to meet 4.5:1
-  // - --muted-text-on-light (#6e7275) was computed against both --surface and --bg
+  // - --muted (#5c6a76) was darkened twice: first from #6b7a87 (4.13:1), then from
+  //   #657380 (4.39:1 on sa-scope-bar's #eef4fa) to meet 4.5:1 on all surfaces
+  // - --muted-text-on-light (#6e7275) computed against --surface and --bg
   // - Brand --blue (#51b0e3) is not used as text on light backgrounds
   // Running Axe color-contrast as a hard assertion to catch future regressions.
 

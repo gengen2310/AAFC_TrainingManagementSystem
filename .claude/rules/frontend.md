@@ -26,7 +26,7 @@
 
 --text:   #1e2d3d  /* deep navy-dark for primary text */
 --text-2: #3a4a55
---muted:  #6b7a87
+--muted:  #5c6a76
 
 --ok:      #1a7f4b  --ok-bg:   #d4f0e3  --ok-text: #145f38
 --warn:    #c97a00  --warn-bg: #fff3cd
