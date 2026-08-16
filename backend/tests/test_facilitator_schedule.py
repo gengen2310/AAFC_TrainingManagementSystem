@@ -31,8 +31,14 @@ def _create_session_with_facilitator(client, hdr, sqn_id, wing_id, fac_id, on_da
     pn = client.post("/api/parade-nights", json={
         "squadron_id": sqn_id, "wing_id": wing_id, "date": on_date, "parade_type": "normal",
     }, headers=hdr)
-    assert pn.status_code in (200, 201), pn.text
-    pn_id = pn.json().get("parade_night_id") or pn.json().get("id")
+    if pn.status_code not in (200, 201):
+        # Another test may have already created a parade night for this date; reuse it.
+        detail = pn.json().get("detail", {})
+        existing_id = detail.get("existing_id") if isinstance(detail, dict) else None
+        assert existing_id, pn.text
+        pn_id = existing_id
+    else:
+        pn_id = pn.json().get("parade_night_id") or pn.json().get("id")
 
     sess = client.post("/api/sessions", json={
         "parade_night_id": pn_id, "period_number": 1, "facilitator_id": fac_id,
