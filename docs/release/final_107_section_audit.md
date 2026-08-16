@@ -187,7 +187,7 @@ All 11 items verified in browser session with staging credentials (Claude in Chr
 | Level B / Level C gates | All engineering items FIXED LOCALLY; human gates identified and documented |
 | Staging verification | **CONFIRMED** — all 11 §7 browser-interactive checks passed (2026-08-16); see §7 for full evidence per item |
 | Playwright staging suite | **CLEAN** — 62 passed, 3 skipped, 0 failed at `4598cdc` (2026-08-16); see §10 |
-| MAINT-03 | **FIXED** (`e79533d`, 2026-08-16) — maintenance lockout residual from §8 is closed |
+| MAINT-03 | **STAGING VERIFIED** (`c669c88`, 2026-08-16) — 28/28 preflight, 5 Playwright gates PASS, all 3 staging services active |
 
 **Engineering assessment:** All work mandated by the Final Engineering Program brief is complete, including the post-program MAINT-03 fix (`e79533d`). No open engineering items remain. The two outstanding NOT STARTED items (DOC-06, DOC-07) are post-release human actions outside engineering scope. All three staging services are confirmed healthy. All 11 §7 browser-interactive checks are CONFIRMED with evidence. The maintenance lockout edge case documented in §8 is now FIXED.
 
