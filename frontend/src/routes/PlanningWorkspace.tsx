@@ -535,7 +535,7 @@ export function PlanningWorkspace() {
               }}
               onClick={() => setBottomOpen(true)}
             >
-              Activities ▲
+              Planning Tools ▲
             </button>
           )}
         </div>
