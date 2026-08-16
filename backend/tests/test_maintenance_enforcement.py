@@ -404,18 +404,24 @@ def test_block_logins_false_allows_login_during_maintenance(client):
 
 
 def test_block_logins_true_blocks_login_during_maintenance(client):
-    """block_logins=True causes /api/auth/login to return 503 for unauthenticated users."""
+    """block_logins=True causes /api/auth/login to return 503 for non-SA logins (MAINT-03).
+
+    Previously enforced by middleware; now enforced inside the login handler after role is known
+    (so system_admin can always log back in). Response body uses HTTPException wrapping:
+    {"detail": {"error": "maintenance_mode", ...}}.
+    """
     sysadmin_hdr = _sysadmin(client)
     _enable_maintenance_opts(client, sysadmin_hdr, block_logins=True)
     try:
-        # Clear the sysadmin session cookie so the login request is unauthenticated.
-        # Without clearing, TestClient sends the sysadmin cookie which bypasses the gate.
         client.cookies.clear()
         r = client.post("/api/auth/login", json={"code": "ADMIN703"})
         assert r.status_code == 503
-        assert r.json()["error"] == "maintenance_mode"
+        body = r.json()
+        # Handler raises HTTPException → {"detail": {"error": ...}}
+        err = body.get("error") or body.get("detail", {}).get("error")
+        assert err == "maintenance_mode", f"Unexpected body: {body}"
     finally:
-        # Use the Bearer token from sysadmin_hdr — don't re-login (block_logins is still True).
+        # Use Bearer token from sysadmin_hdr — don't re-login while block_logins is True.
         _disable_maintenance(client, sysadmin_hdr)
 
 

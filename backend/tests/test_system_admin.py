@@ -328,6 +328,49 @@ def test_maintenance_drain_seconds_cap(client):
     client.post("/api/system/maintenance/disable", headers=hdr)
 
 
+def test_maintenance_block_logins_blocks_sqn_admin(client):
+    """MAINT-03: block_logins=True in LOCKED phase returns 503 for non-SA login attempts."""
+    import time
+    hdr_sa = _sysadmin(client)
+    client.post("/api/system/maintenance/enable", json={
+        "confirm": "ENABLE MAINTENANCE", "drain_seconds": 0, "block_logins": True,
+    }, headers=hdr_sa)
+    time.sleep(0.1)
+    r = client.post("/api/auth/login", json={"code": "ADMIN703"})
+    assert r.status_code == 503, f"Expected 503 for sqn_admin login when block_logins, got {r.status_code}"
+    body = r.json()
+    # HTTPException wraps detail in {"detail": {...}}; verify error code regardless
+    err = body.get("error") or body.get("detail", {}).get("error")
+    assert err == "maintenance_mode", f"Unexpected error body: {body}"
+    client.post("/api/system/maintenance/disable", headers=hdr_sa)
+
+
+def test_maintenance_block_logins_allows_sysadmin_login(client):
+    """MAINT-03: block_logins=True in LOCKED phase must NOT block system_admin login."""
+    import time
+    hdr_sa = _sysadmin(client)
+    client.post("/api/system/maintenance/enable", json={
+        "confirm": "ENABLE MAINTENANCE", "drain_seconds": 0, "block_logins": True,
+    }, headers=hdr_sa)
+    time.sleep(0.1)
+    r = client.post("/api/auth/login", json={"code": "SYSADMIN2026"})
+    assert r.status_code == 200, f"system_admin must bypass block_logins gate, got {r.status_code}"
+    assert r.json()["session"]["role"] == "system_admin"
+    client.post("/api/system/maintenance/disable", headers=hdr_sa)
+
+
+def test_maintenance_block_logins_pending_allows_all(client):
+    """MAINT-03: block_logins in PENDING phase (drain window not elapsed) must not block anyone."""
+    hdr_sa = _sysadmin(client)
+    client.post("/api/system/maintenance/enable", json={
+        "confirm": "ENABLE MAINTENANCE", "drain_seconds": 300, "block_logins": True,
+    }, headers=hdr_sa)
+    # PENDING: drain window still open — non-SA login must succeed
+    r = client.post("/api/auth/login", json={"code": "ADMIN703"})
+    assert r.status_code == 200, f"PENDING phase must not block logins, got {r.status_code}"
+    client.post("/api/system/maintenance/disable", headers=hdr_sa)
+
+
 # ─────────────────────────────────────────────────────────────
 # Scope map
 # ─────────────────────────────────────────────────────────────

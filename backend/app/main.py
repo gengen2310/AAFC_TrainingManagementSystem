@@ -159,6 +159,9 @@ _MAINTENANCE_ALWAYS_EXEMPT = frozenset({
     "/api/auth/logout",
     "/api/auth/me",
     "/api/auth/refresh",
+    # Login is exempt here; the handler applies block_logins after role is known
+    # so system_admin can always log back in even when block_logins=True (MAINT-03).
+    "/api/auth/login",
     "/api/system/maintenance",
     "/api/system/maintenance/enable",
     "/api/system/maintenance/disable",

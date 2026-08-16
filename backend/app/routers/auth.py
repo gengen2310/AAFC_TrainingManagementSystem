@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 
 from fastapi import APIRouter, Depends, Response, Request, HTTPException
 from pydantic import BaseModel, Field
@@ -10,7 +10,7 @@ from ..config import settings
 from ..security import (verify_code, create_token, hash_code,
                         login_blocked_db, record_login_failure_db, record_login_success_db)
 from ..database import utcnow
-from ..models import User, AccessCode, Wing, Squadron, NationalEntity, ProxySession
+from ..models import User, AccessCode, Wing, Squadron, NationalEntity, ProxySession, SystemSetting
 from ..dependencies import get_principal, client_meta, real_client_ip
 from ..permissions import Principal
 from ..services import audit
@@ -19,6 +19,40 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 _LOCKOUT_MSG = ("Account locked after too many incorrect attempts. "
                 "Contact your Wing SOCAD for access.")
+
+
+def _check_maintenance_login_gate(role: str, db: DBSession) -> None:
+    """Block non-SA logins when maintenance is LOCKED and block_logins=True (MAINT-03).
+
+    Called after code verification so the user's role is known. system_admin always
+    passes through so they can re-authenticate even when block_logins is active.
+    Phase logic is inlined to avoid circular import from main.py.
+    """
+    if role == "system_admin":
+        return
+    if not db.get(SystemSetting, "maintenance_mode"):
+        return
+    bl_row = db.get(SystemSetting, "maintenance_block_logins")
+    if not (bl_row and bl_row.value == "true"):
+        return
+    # Determine phase: PENDING if still within drain window, else LOCKED.
+    pu_row = db.get(SystemSetting, "maintenance_pending_until")
+    pending_until_iso = pu_row.value if pu_row else None
+    phase = "locked"
+    if pending_until_iso:
+        try:
+            pu = datetime.fromisoformat(pending_until_iso)
+            if pu.tzinfo is None:
+                pu = pu.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) < pu:
+                phase = "pending"
+        except ValueError:
+            pass
+    if phase != "locked":
+        return
+    msg_row = db.get(SystemSetting, "maintenance_message")
+    msg = (msg_row.value if msg_row else None) or "System under maintenance. Please try again later."
+    raise HTTPException(status_code=503, detail={"error": "maintenance_mode", "message": msg})
 _LOCKOUT_THRESHOLD = 5
 _LOCKOUT_HOURS = 24
 
@@ -139,6 +173,7 @@ def login(body: LoginIn, request: Request, response: Response, db: DBSession = D
     user = db.get(User, matched.user_id)
     if not user or not user.active_status:
         raise HTTPException(401, detail={"error": "invalid_user"})
+    _check_maintenance_login_gate(user.role, db)
     user.last_login_at = utcnow()
     matched.failed_attempts = 0
     matched.locked_until = None
