@@ -843,7 +843,8 @@ def batch_archive_accounts(body: BatchArchiveIn, db: DBSession = Depends(get_db)
                            "display_name": u.display_name, "role": u.role})
         except Exception as e:
             db.rollback()
-            results.append({"account_id": uid, "result": "failed", "reason": str(e)})
+            # R5-L03: do not expose raw SQLAlchemy exception (leaks table/constraint names)
+            results.append({"account_id": uid, "result": "failed", "reason": "database_error"})
 
     summary = {
         "archived": sum(1 for r in results if r["result"] == "archived"),

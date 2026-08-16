@@ -151,7 +151,7 @@ def test_zero_session_parade_night_is_not_planned_on_every_surface(client):
     detail = client.get(f"/api/parade-nights/{pn_id}", headers=hdr)
     assert detail.status_code == 200, detail.text
     assert detail.json()["readiness_v2"]["planning_status"] == "not_planned"
-    assert detail.json()["readiness_v2"]["legacy_score"] == 100  # legacy field only — never displayed as "ready"
+    assert detail.json()["readiness_v2"]["legacy_score"] == 0  # R5-L07: zero sessions → 0, not 100
 
     rep = client.get("/api/reports/readiness", headers=hdr)
     rep_entry = next((x for x in rep.json()["parade_nights"] if x["parade_night_id"] == pn_id), None)

@@ -25,7 +25,7 @@ def test_no_sessions_is_not_planned_never_ready():
     r = parade_night_readiness([])
     assert r["planning_status"] == "not_planned"
     assert r["sessions_total"] == 0
-    assert r["legacy_score"] == 100  # legacy projection stays "100" but the real
+    assert r["legacy_score"] == 0   # R5-L07: zero sessions → 0, not 100; unplanned ≠ ready
     assert r["legacy_band"] == "Not planned"  # signal is planning_status, checked above
     # The critical assertion: nothing here can be mistaken for "ready"/"fully staffed".
     assert r["planning_status"] != "planned"

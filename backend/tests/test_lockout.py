@@ -47,6 +47,22 @@ def _clear_account_lock(user_code: str) -> None:
     engine.dispose()
 
 
+def _clear_ip_lock(ip: str = "testclient") -> None:
+    """Clear the DB-backed IP lockout row for the given IP.
+
+    Required after the R5-M19/M21 fix that adds record_login_failure_db to the
+    scoped login path: 5 scoped-path failures now also trigger IP lockout, so
+    tests that verify account-level isolation must reset the IP counter before
+    checking that sibling accounts can still log in.
+    """
+    with engine.begin() as conn:
+        conn.execute(
+            text("UPDATE ip_login_attempts SET locked_until=NULL, attempt_count=0 WHERE ip=:ip"),
+            {"ip": ip},
+        )
+    engine.dispose()
+
+
 # ── DB-backed IP lockout ──────────────────────────────────────────────────────
 
 def test_db_ip_lockout_fires_after_five_wrong_codes(client):
@@ -258,7 +274,11 @@ def test_scoped_lockout_does_not_affect_sibling_account(client):
     r = client.post("/api/auth/login", json={"user_id": uid_viewer, "code": "WRONGCODE"})
     assert r.status_code == 429
 
-    # Admin at the same squadron is unaffected
+    # The 5 scoped-path failures above also incremented the IP counter (R5-M19/M21
+    # fix) — clear it so the sibling-account test isn't confounded by IP lockout.
+    _clear_ip_lock()
+
+    # Admin at the same squadron is unaffected (account-level lockout is isolated)
     h = login(client, "ADMIN703")
     assert h is not None
     _clear_account_lock("703SQN2026")

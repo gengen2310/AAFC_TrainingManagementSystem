@@ -118,7 +118,7 @@ def parade_night_readiness(sessions: list[dict], *, conflicts_by_session: dict |
             "sessions_ready": 0,
             "requirements_summary": "No sessions scheduled",
             "sessions": [],
-            "legacy_score": 100,
+            "legacy_score": 0,  # R5-L07: zero sessions → 0, not 100; unplanned ≠ ready
             "legacy_band": _LEGACY_BAND["not_planned"],
         }
 

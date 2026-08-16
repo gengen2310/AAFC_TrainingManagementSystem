@@ -346,13 +346,20 @@ def list_wing_events(
         except Exception:
             pass  # filter applied in Python below if the DB cast fails
 
-    events = q.order_by(WingHQEvent.start_date).offset(offset).limit(limit).all()
+    # R5-M18: when an audience filter is active, the DB contains() check is an
+    # approximation (LIKE). Python re-filters precisely below. Applying DB
+    # offset/limit before Python filtering produces pages shorter than requested.
+    # Fix: fetch without pagination when audience is set, slice after Python filter.
+    if audience:
+        db_events = q.order_by(WingHQEvent.start_date).all()
+    else:
+        db_events = q.order_by(WingHQEvent.start_date).offset(offset).limit(limit).all()
 
     sqn_id = p.squadron_id
-    links_map = _load_links_for_events([e.id for e in events], db)
+    links_map = _load_links_for_events([e.id for e in db_events], db)
     wing_map = {w.id: w for w in db.query(Wing).filter(Wing.id.in_(wing_ids)).all()}
     result = []
-    for e in events:
+    for e in db_events:
         if audience:
             aud = e.audience or []
             if audience not in aud and "all_personnel" not in aud and "all_cadets" not in aud:
@@ -365,6 +372,9 @@ def list_wing_events(
             wing_code=w.code if w else None,
             wing_name=w.name if w else None,
         ))
+    # Apply pagination after Python audience filter when audience was set
+    if audience:
+        result = result[offset:offset + limit]
     return result
 
 

@@ -6,6 +6,7 @@ Visibility doctrine (spec §7):
   * Squadron-local items: schedulable only by that Squadron, but visible UPWARD
     to its Wing and to National for oversight. Peer Squadrons must NOT see them.
 """
+from collections import Counter
 from sqlalchemy.orm import Session as DBSession
 from .models import ProgramItem, ProgramPackage, Session as TSession
 from .permissions import Principal
@@ -86,10 +87,20 @@ def coverage_for_squadron(db: DBSession, squadron_id: str, wing_id: str | None,
         if s.curriculum_code_at_time:
             by_code.setdefault(s.curriculum_code_at_time, []).append(s.status)
 
+    # R5-M09: only use the code fallback when the code is unique across the item list.
+    # If two items share the same code (e.g. a national + squadron-local item), the
+    # by_code lookup would credit the same session to both, double-counting coverage.
+    code_frequency = Counter(it.code for it in items if it.code)
+
     def statuses_for(it: ProgramItem) -> list[str]:
         # Sessions reference curriculum_item_id; program items carry a code that may
         # match curriculum codes seeded from the same source.
-        return by_item.get(it.id, []) or by_code.get(it.code, [])
+        by_id = by_item.get(it.id, [])
+        if by_id:
+            return by_id
+        if it.code and code_frequency[it.code] == 1:
+            return by_code.get(it.code, [])
+        return []
 
     def is_core(it: ProgramItem) -> bool:
         return it.core_status in ("core", "wing_required", "national_required")

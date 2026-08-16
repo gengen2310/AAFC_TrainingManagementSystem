@@ -74,7 +74,8 @@ describe("LoginPage", () => {
         return Promise.resolve(new Response(JSON.stringify({
           token: "t1",
           session: { user_id: "u-703-admin", display_name: "703 Admin", role: "sqn_admin",
-                     wing_id: "w1", squadron_id: "s1", national_id: null, is_wing: false, is_national: false },
+                     wing_id: "w1", squadron_id: "s1", national_id: null, is_wing: false, is_national: false,
+                     proxy: null }, // R5-L14: include proxy field so proxy-state init after login is testable
         }), { status: 200, headers: { "content-type": "application/json" } }));
       }
       return Promise.resolve(new Response("{}", { status: 200, headers: { "content-type": "application/json" } }));

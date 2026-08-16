@@ -378,3 +378,61 @@ def test_bulk_apply_unauthenticated(client):
         "template_id": "x", "parade_night_ids": [], "dry_run": True,
     })
     assert r.status_code == 401
+
+
+# ── R5-L10: Cross-squadron isolation ─────────────────────────────────────────
+# All earlier tests use a single squadron (703). These tests verify that a
+# second squadron (704) cannot read or apply templates belonging to 703.
+
+def _admin704_hdr(client):
+    return login(client, "ADMIN704")
+
+
+def _make_703_template(client, date: str, name: str = "703 Private Template") -> str:
+    """Create a template owned by 703 and return its id."""
+    hdr = _sqn_admin_hdr(client)
+    pnid = _create_pn(client, hdr, date)
+    _add_session(client, hdr, pnid, 1)
+    r = client.post(_save_url(pnid), json={"name": name}, headers=hdr)
+    assert r.status_code == 200, r.text
+    return r.json()["id"]
+
+
+def test_cross_squadron_list_excludes_foreign_templates(client):
+    """704 admin's template list must not contain templates created by 703."""
+    _make_703_template(client, "2037-01-07")  # ensure 703 has at least one template
+    hdr704 = _admin704_hdr(client)
+    r = client.get("/api/parade-night-templates", headers=hdr704)
+    assert r.status_code == 200
+    names = [t["name"] for t in r.json()]
+    assert "703 Private Template" not in names
+
+
+def test_cross_squadron_get_template_returns_403(client):
+    """704 admin must not be able to retrieve a template owned by 703."""
+    tid = _make_703_template(client, "2037-01-14")
+    hdr704 = _admin704_hdr(client)
+    r = client.get(f"/api/parade-night-templates/{tid}", headers=hdr704)
+    assert r.status_code == 403
+
+
+def test_cross_squadron_apply_template_returns_400(client):
+    """Applying a 703 template to a 704 parade night must be rejected."""
+    tid = _make_703_template(client, "2037-01-21", name="703 Apply Test Template")
+    # Create a parade night owned by 704
+    hdr704 = _admin704_hdr(client)
+    pn_r = client.post("/api/parade-nights", json={"date": "2037-01-28", "term": "T1"}, headers=hdr704)
+    assert pn_r.status_code == 200, pn_r.text
+    pnid_704 = pn_r.json()["parade_night_id"]
+    # 704 admin must not be able to apply a 703-owned template to a 704 parade night;
+    # the endpoint 403s on require_can_write_squadron before checking cross-squadron.
+    r = client.post(_apply_url(tid, pnid_704), headers=hdr704)
+    assert r.status_code in (400, 403)
+
+
+def test_cross_squadron_delete_template_returns_403(client):
+    """704 admin must not be able to archive a template owned by 703."""
+    tid = _make_703_template(client, "2037-02-04", name="703 Delete Test Template")
+    hdr704 = _admin704_hdr(client)
+    r = client.delete(f"/api/parade-night-templates/{tid}", headers=hdr704)
+    assert r.status_code == 403

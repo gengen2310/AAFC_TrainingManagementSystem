@@ -319,9 +319,12 @@ async def access_log(request: Request, call_next):
     dur_ms = round((_time.perf_counter() - start) * 1000, 1)
     from .dependencies import real_client_ip
     client = real_client_ip(request)
+    # R5-L02: escape path to prevent log injection via crafted URL paths breaking
+    # the JSON structure or injecting fabricated log fields.
+    safe_path = request.url.path.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r")
     logging.getLogger("access").info(
         '{"method":"%s","path":"%s","status":%d,"dur_ms":%s,"client":"%s","req_id":"%s"}',
-        request.method, request.url.path, response.status_code, dur_ms, client, req_id)
+        request.method, safe_path, response.status_code, dur_ms, client, req_id)
     # SEC-06: 5xx rate alert — log a structured security warning when errors spike.
     if response.status_code >= 500:
         now_mono = _time.monotonic()

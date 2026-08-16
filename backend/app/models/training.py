@@ -1,5 +1,5 @@
 """Training-domain models with point-in-time historical fields."""
-from sqlalchemy import String, Integer, ForeignKey, Boolean, Text, Float, DateTime, JSON
+from sqlalchemy import String, Integer, ForeignKey, Boolean, Text, Float, DateTime, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 
@@ -320,8 +320,11 @@ class ParadeNightTimingOverride(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
     Archived overrides are retained for audit history.
     """
     __tablename__ = "parade_night_timing_overrides"
+    # R5-M14: unique=True removed; replaced by partial unique index in v55
+    # migration (uq_pnto_active_per_night WHERE is_archived = 0) so that a
+    # new override can be created after the previous one is archived.
     parade_night_id: Mapped[str] = mapped_column(
-        ForeignKey("parade_nights.id"), index=True, unique=True,
+        ForeignKey("parade_nights.id"), index=True,
     )
     timing_template_id: Mapped[str | None] = mapped_column(
         ForeignKey("timing_templates.id"), nullable=True, index=True,
@@ -433,6 +436,9 @@ class SessionAudience(Base, UUIDMixin, TimestampMixin):
     (unique constraint) -- the API is idempotent create, not append.
     """
     __tablename__ = "session_audience"
+    __table_args__ = (
+        UniqueConstraint("session_id", "training_class_id", name="uq_session_audience_pair"),
+    )
     session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), index=True)
     training_class_id: Mapped[str] = mapped_column(ForeignKey("training_classes.id"), index=True)
     outcome_override: Mapped[str | None] = mapped_column(String(30), nullable=True)

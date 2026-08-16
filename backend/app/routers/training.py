@@ -307,7 +307,11 @@ class ParadeIn(BaseModel):
 def list_parades(squadron_id: str | None = None, db: DBSession = Depends(get_db),
                  p: Principal = Depends(get_principal)):
     sq_id = squadron_id or _active_squadron(p)
+    # R5-L09: always resolve the squadron; raise 404 for a supplied but non-existent
+    # sq_id rather than skipping the permission check and returning an empty list.
     s = db.get(Squadron, sq_id) if sq_id else None
+    if sq_id and not s:
+        raise HTTPException(404, detail={"error": "squadron_not_found"})
     if s:
         require_can_view_squadron(p, s.id, s.wing_id)
     pns = db.query(ParadeNight).filter(ParadeNight.squadron_id == sq_id,
@@ -408,13 +412,16 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
                      created_by=p.user_id)
     db.add(pn); db.flush()
 
-    _find_or_create_parade_date_for_night(db, pn, body.term)
+    # R5-M10: capture whether a planning-year link was created. None means the
+    # squadron has no active PlanningYear; the parade night is created but won't
+    # appear in Planning Workspace's calendar (which keys on ParadeDate rows).
+    pd_linked = _find_or_create_parade_date_for_night(db, pn, body.term)
 
     db.commit()
     meta = client_meta(request)
     audit(db, p, object_type="parade_night", object_id=pn.id, action="create",
           new={"date": body.date}, ip=meta["ip"], ua=meta["ua"])
-    return {"ok": True, "parade_night_id": pn.id}
+    return {"ok": True, "parade_night_id": pn.id, "linked_to_planning_year": pd_linked is not None}
 
 
 def _find_or_create_parade_date_for_night(db: DBSession, pn: "ParadeNight", term: str | None = None):

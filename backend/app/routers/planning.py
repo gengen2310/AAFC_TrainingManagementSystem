@@ -1376,6 +1376,11 @@ def archive_anchor(
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(a.planning_year_id, db)
     _require_year_access(p, py, write=True)
+    # R5-M16: delete orphaned AnchorPrepPlan rows before archiving the parent
+    # AnchorEvent. AnchorPrepPlan has no is_archived field (no SoftDeleteMixin)
+    # and the FK has no cascade, so these rows would become dangling and block
+    # any future hard-delete of the event.
+    db.query(AnchorPrepPlan).filter(AnchorPrepPlan.anchor_event_id == a.id).delete()
     a.is_archived = True; a.updated_at = utcnow()
     db.commit()
     audit(db, p, object_type="anchor_event", object_id=a.id, action="archive")
@@ -1485,11 +1490,20 @@ def get_term_planner(
         AnchorEvent.is_archived == False,  # noqa: E712
     ).order_by(AnchorEvent.start_date).all()
 
+    # R5-L12: batch-load all linked parade nights in one query instead of
+    # calling db.get() once per date in the sessions loop and twice per date
+    # in the total_periods sum (O(2N) → O(1)).
+    pn_ids = {pd.parade_night_id for pd in all_dates if pd.parade_night_id}
+    pn_by_id: dict[str, ParadeNight] = (
+        {pn.id: pn for pn in db.query(ParadeNight).filter(ParadeNight.id.in_(pn_ids)).all()}
+        if pn_ids else {}
+    )
+
     sessions_by_date: dict[str, list] = {}
     for pd in all_dates:
         real_sessions: list[dict] = []
         if pd.parade_night_id:
-            pn_real = db.get(ParadeNight, pd.parade_night_id)
+            pn_real = pn_by_id.get(pd.parade_night_id)
             if pn_real:
                 ts = db.query(TrainingSession).filter(
                     TrainingSession.parade_night_id == pn_real.id,
@@ -1501,7 +1515,7 @@ def get_term_planner(
     # Calculate per-term session capacity summary
     # capacity = parade nights × cadet groups × periods
     total_periods = sum(
-        (db.get(ParadeNight, pd.parade_night_id).session_count if pd.parade_night_id and db.get(ParadeNight, pd.parade_night_id) else 3)
+        (pn_by_id[pd.parade_night_id].session_count if pd.parade_night_id and pd.parade_night_id in pn_by_id else 3)
         for pd in all_dates
     )
     capacity = total_periods * len(CADET_GROUPS)

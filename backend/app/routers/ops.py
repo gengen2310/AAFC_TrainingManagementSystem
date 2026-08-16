@@ -556,7 +556,7 @@ def import_commit(body: ImportCommitIn, db: DBSession = Depends(get_db), p: Prin
 
 @router.post("/import/rollback")
 def import_rollback(import_id: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    from ..models import Cadet
+    from ..models import Cadet, CadetClassMembership
     log = db.get(ImportLog, import_id)
     if not log or not log.committed:
         raise HTTPException(404, detail={"error": "not_found_or_not_committed"})
@@ -567,8 +567,18 @@ def import_rollback(import_id: str, db: DBSession = Depends(get_db), p: Principa
     cadets = db.query(Cadet).filter(Cadet.squadron_id == log.squadron_id,
                                     Cadet.created_by == log.user_id,
                                     Cadet.created_at >= log.created_at).all()
+    cadet_ids = [c.id for c in cadets]
     for c in cadets:
         c.is_archived = True; c.archived_at = utcnow()
+    # R5-M17: archive CadetClassMembership rows for rolled-back cadets so they no
+    # longer inflate class member counts or appear in planning reports.
+    if cadet_ids:
+        now = utcnow()
+        for m in db.query(CadetClassMembership).filter(
+            CadetClassMembership.cadet_id.in_(cadet_ids),
+            CadetClassMembership.is_archived == False,  # noqa: E712
+        ).all():
+            m.is_archived = True; m.archived_at = now
     log.rollback_status = "rolled_back"; db.commit()
     audit(db, p, object_type="import", object_id=log.id, action="import_rollback",
           new={"archived": len(cadets)})

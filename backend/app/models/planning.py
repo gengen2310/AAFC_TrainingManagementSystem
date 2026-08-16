@@ -127,7 +127,11 @@ class PlanningConflict(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "planning_conflicts"
     planning_year_id: Mapped[str | None] = mapped_column(ForeignKey("planning_years.id"), nullable=True, index=True)
     parade_date_id: Mapped[str | None] = mapped_column(ForeignKey("parade_dates.id"), nullable=True)
-    scheduled_session_id: Mapped[str | None] = mapped_column(String(36), nullable=True)  # stores TrainingSession.id
+    # R5-L05: proper FK (was bare String(36)). ondelete=SET NULL protects
+    # against hard-delete; normal operation uses soft-delete so rows survive.
+    scheduled_session_id: Mapped[str | None] = mapped_column(
+        ForeignKey("sessions.id", ondelete="SET NULL"), nullable=True,
+    )
     conflict_type: Mapped[str] = mapped_column(String(60), nullable=False)
     severity: Mapped[str] = mapped_column(String(10), default="warning")
     message: Mapped[str] = mapped_column(String(400), nullable=False)

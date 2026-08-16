@@ -77,10 +77,21 @@ class ChangeCodeIn(BaseModel):
 
 
 @router.post("/lookup")
-def lookup(body: LookupIn, db: DBSession = Depends(get_db)):
+def lookup(body: LookupIn, request: Request, db: DBSession = Depends(get_db)):
     """Resolve unit + role to a single account record without touching any credentials."""
-    _NOT_FOUND = HTTPException(404, detail={"error": "not_found",
-                                            "message": "No account found for that combination."})
+    # R5-L01: rate-limit /lookup using the same IP-level bucket as /login so
+    # that already-locked IPs cannot probe account existence, and 404 responses
+    # count toward lockout to deter systematic account enumeration.
+    key = real_client_ip(request)
+    if login_blocked_db(key, db):
+        raise HTTPException(429, detail={"error": "locked_out",
+                                         "message": "Too many attempts. Try again later."})
+
+    def _not_found() -> HTTPException:
+        record_login_failure_db(key, db)
+        return HTTPException(404, detail={"error": "not_found",
+                                          "message": "No account found for that combination."})
+
     unit_type = (body.unit_type or "").strip()
     role = (body.role or "").strip()
     ident = (body.identifier or "").strip()
@@ -90,7 +101,7 @@ def lookup(body: LookupIn, db: DBSession = Depends(get_db)):
             func.upper(Squadron.code) == ident.upper()
         ).first()
         if not sqn:
-            raise _NOT_FOUND
+            raise _not_found()
         user = db.query(User).filter(
             User.squadron_id == sqn.id,
             User.role == role,
@@ -101,7 +112,7 @@ def lookup(body: LookupIn, db: DBSession = Depends(get_db)):
             func.upper(Wing.code) == ident.upper()
         ).first()
         if not wing:
-            raise _NOT_FOUND
+            raise _not_found()
         user = db.query(User).filter(
             User.wing_id == wing.id,
             User.role == role,
@@ -109,16 +120,16 @@ def lookup(body: LookupIn, db: DBSession = Depends(get_db)):
         ).order_by(User.created_at.desc()).first()
     elif unit_type == "national":
         if role not in _NATIONAL_ROLES:
-            raise _NOT_FOUND
+            raise _not_found()
         user = db.query(User).filter(
             User.role == role,
             User.active_status == True  # noqa: E712
         ).order_by(User.created_at.desc()).first()
     else:
-        raise _NOT_FOUND
+        raise _not_found()
 
     if not user:
-        raise _NOT_FOUND
+        raise _not_found()
     return {"user_id": user.id, "display_name": user.display_name}
 
 
@@ -141,14 +152,15 @@ def login(body: LoginIn, request: Request, response: Response, db: DBSession = D
         if ac:
             _raise_if_locked(ac)
         if not ac or not verify_code(code, ac.code_hash):
-            # Scoped path: only increment per-account counter, not the IP counter.
-            # The IP rate limiter defends scan-all brute force; per-account counter
-            # defends targeted attacks on a specific account.
+            # R5-M19/M21: increment both per-account and per-IP counters on failure.
+            # Per-account lockout guards targeted single-account attacks; IP throttle
+            # guards high-volume scanning across multiple accounts from one source.
             if ac:
                 ac.failed_attempts = (ac.failed_attempts or 0) + 1
                 if ac.failed_attempts >= _LOCKOUT_THRESHOLD:
                     ac.locked_until = utcnow() + timedelta(hours=_LOCKOUT_HOURS)
                 db.commit()
+            record_login_failure_db(key, db)
             # Fallback: /lookup uses .first() which may return an older sibling
             # account when multiple active accounts share the same role in a
             # squadron. Scan bounded to the same unit+role scope so no
@@ -169,6 +181,11 @@ def login(body: LoginIn, request: Request, response: Response, db: DBSession = D
             record_login_failure_db(key, db)
             raise HTTPException(401, detail={"error": "invalid_code"})
         _raise_if_locked(matched)
+        # R5-L04 (note): the scan-all path cannot increment a per-account counter on
+        # failure because no account is identified until the code matches. IP-level
+        # throttle (record_login_failure_db above) is the only defence on this path.
+        # This path is test-only; production always provides user_id via /lookup,
+        # which takes the per-account counter path above.
 
     record_login_success_db(key, db)
     user = db.get(User, matched.user_id)
