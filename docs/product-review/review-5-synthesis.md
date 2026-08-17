@@ -386,3 +386,58 @@ The mocked session has no `proxy` field. `proxyActive` initialization path from 
 ---
 
 *Review 5 (ultrareview) complete. 44 findings. 7 HIGH, 14 MEDIUM, 16 LOW. No code was changed in this review.*
+
+---
+
+## Implementation Status (2026-08-17)
+
+All 44 findings implemented and staging-verified. Summary by tier:
+
+### Tier 1 — All 7 HIGH implemented (commits prior to `0b4c1b9`)
+R5-H01 through R5-H07: all committed; staging verified `bbf5908` (Playwright 187/0).
+
+### Tier 2 — All 14 MEDIUM implemented
+| Finding | Commit | Notes |
+|---|---|---|
+| R5-M01 | prior sessions | token_version DB check in maintenance middleware |
+| R5-M02 | prior sessions | Proxy Mode required for wing_admin on squadron years |
+| R5-M03 | prior sessions | `delete_parade_date` FK pre-flight + atomic audit |
+| R5-M04 | prior sessions | Fixed as side effect of M03 — audit uses `commit=False`, single `db.commit()` |
+| R5-M05 | prior sessions | `value == "on"` check |
+| R5-M06 | prior sessions | closeout guard + atomic commit |
+| R5-M07 | prior sessions | `StatusIn.version` + `_check_version()` |
+| R5-M08 | prior sessions | `schedulable_only` uses `can_schedule()` |
+| R5-M09 | `0b4c1b9` | Counter dedup fix in `coverage_for_squadron` |
+| R5-M10 | `0b4c1b9` | `create_parade` captures return value |
+| R5-M11 | prior sessions | `body.status` not hardcoded `"planned"` |
+| R5-M12 | prior sessions | positional arg fix |
+| R5-M13 | prior sessions | ProgramPackage None check |
+| R5-M14 | `0b4c1b9`/`27b99e9` | v55 migration: partial unique index WHERE NOT is_archived; PostgreSQL-safe |
+| R5-M15 | prior sessions | `ProgramPackage.is_archived` filter in `visible_items_for` |
+| R5-M16 | `0b4c1b9` | `AnchorPrepPlan` hard-deleted on `AnchorEvent` archive |
+| R5-M17 | `0b4c1b9` | `CadetClassMembership` archived with cadet |
+| R5-M18 | `0b4c1b9` | Wing calendar pagination after Python filter |
+| R5-M19/M21 | `0b4c1b9` | Scoped login increments IP failure counter |
+| R5-M20 | prior sessions | `/imports` route has `RequireRole check={isAdmin}` |
+
+### Tier 3 — All 16 LOW implemented
+| Finding | Commit | Notes |
+|---|---|---|
+| R5-L01 | `0b4c1b9` | `/api/auth/lookup` shares IP bucket with `/api/auth/login` |
+| R5-L02 | `0b4c1b9` | `safe_path` escaping in access logger |
+| R5-L03 | `0b4c1b9` | Bulk account update DB error caught per-item |
+| R5-L04 | `0b4c1b9` | Comment documenting scan-all inherent limitation |
+| R5-L05 | `0b4c1b9`/`27b99e9` | v55 migration: FK `planning_conflicts.scheduled_session_id → sessions(id) ON DELETE SET NULL` |
+| R5-L06 | `0b4c1b9`/`27b99e9` | v55 migration: `UniqueConstraint(session_id, training_class_id)` on `session_audience` |
+| R5-L07 | `0b4c1b9` | `legacy_score = 0` for zero-session parade night |
+| R5-L08 | v54 migration | `ParadeDate.parade_night_id` FK added as R4#10 |
+| R5-L09 | `0b4c1b9` | 404 for non-existent squadron in `list_parades` |
+| R5-L10 | prior sessions | 4 cross-squadron template isolation tests in `test_pn_templates.py` |
+| R5-L11 | prior sessions | `test_sqn_general_cannot_get_cadet_risk` in `test_session_lifecycle.py` |
+| R5-L12 | `0b4c1b9` | `get_term_planner` batch parade night load (O(1) queries) |
+| R5-L13 | `0b4c1b9` | Combined with R5-L09 fix |
+| R5-L14 | prior sessions | `login.test.tsx` mock includes `proxy: null` field |
+
+**Staging deployment:** `bbf5908` (2026-08-17) — backend `dd4d0e43`, frontend `ee04e8be`, PW `84d4198e`.  
+**Playwright suite:** 187 passed, 8 skipped, 0 failed (3 browsers).  
+**Backend suite:** 1760 passed, 7 skipped.
