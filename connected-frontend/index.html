@@ -865,8 +865,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-item" tabindex="0" onclick="nav('resources')">Resources & Training Areas</div>
       <div class="nav-lbl">Needs Attention</div>
       <div class="nav-item" tabindex="0" onclick="nav('action-items')">Needs Attention</div>
-      <div class="nav-item" tabindex="0" onclick="nav('action-centre')">Programme Action Centre</div>
-      <div class="nav-item" tabindex="0" onclick="nav('program-audit')">Program Audit</div>
       <div class="nav-lbl" id="admin-lbl" style="display:none">Settings</div>
       <div class="nav-item admin-el" tabindex="-1" style="display:none" onclick="nav('settings')">Unit Settings</div>
       <div class="nav-item" id="nav-accounts" tabindex="-1" style="display:none" onclick="nav('accounts')">Account Management</div>
@@ -879,6 +877,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-item nav-scope" id="nav-audit" tabindex="-1" style="display:none" onclick="nav('audit')">Audit</div>
       <div class="nav-lbl" id="nav-system-lbl" style="display:none">System</div>
       <div class="nav-item" id="nav-system-console" tabindex="-1" style="display:none" onclick="nav('system-console')">System Console</div>
+      <div class="nav-lbl">Help &amp; Reference</div>
+      <div class="nav-item" tabindex="0" onclick="nav('help')">Help &amp; Reference</div>
       <div class="nav-lbl" id="nav-lbl-pw" style="display:none">Workspace</div>
       <a class="nav-item-ext" id="nav-pw-link" href="#" target="_blank" rel="noopener" style="display:none">Planning Workspace ↗</a>
       <div class="nav-item-ext" id="nav-pw-unconfigured" style="display:none;opacity:.55;cursor:default" title="Planning Workspace is not configured for this environment. Contact your system administrator.">Planning Workspace (unavailable)</div>
@@ -1307,8 +1307,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <span id="act-refresh-status" style="font-size:10px;color:var(--muted)"></span>
             <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('act-refresh-status',_loadActivitiesPage)">Refresh</button>
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-act')">+ Add Activity</button>
-            <button class="btn btn-sky plan-write-el" style="display:none" onclick="openGenerateActivitiesModal()">Generate Activities</button>
-            <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddHolidayModal()">+ Add Holiday</button>
           </div>
         </div>
         <div class="fbar no-print">
@@ -1336,123 +1334,6 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
              table above so existing Add/Edit/Delete Activity behaviour is unchanged. -->
         <div id="act-tab-squadron"></div>
 
-        <!-- VH-02: section break before support content -->
-        <div class="pg-sec-brk no-print"><span class="pg-sec-lbl">Resources &amp; Support</span></div>
-
-        <!-- Getting Help — admin-editable free text, visible to every role, edited by system_admin only -->
-        <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
-            <div class="ctitle" style="margin:0">Getting Help</div>
-            <button id="gh-edit-btn" class="btn btn-secondary btn-sm" style="display:none" onclick="openGettingHelpModal()">Edit</button>
-          </div>
-          <div id="gh-content-display" class="muted" style="font-size:12.5px;white-space:pre-wrap"></div>
-        </div>
-
-        <!-- VH-02: section break before annual planning -->
-        <div class="pg-sec-brk no-print"><span class="pg-sec-lbl">Annual Planning</span></div>
-
-        <!-- ── Planning Year section (Annual Program functions) ── -->
-        <div class="card">
-          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-            <div class="ctitle" style="margin:0">Planning Year</div>
-            <select id="py-select" aria-label="Select planning year" onchange="loadYearMap(this.value)" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;flex:1;min-width:180px">
-              <option value="">— select a planning year —</option>
-            </select>
-            <span id="py-ctx-label-sqn" style="font-size:11px;color:var(--muted)"></span>
-            <span id="py-action-btns" style="display:flex;gap:6px"></span>
-            <button class="btn btn-dk plan-write-el" style="display:none" onclick="openNewYearModal()">+ New Year</button>
-          </div>
-          <div id="py-sqn-filter-row" style="display:none;margin-bottom:12px">
-            <label for="py-sqn-filter" style="font-size:11px;font-weight:700;color:var(--muted);margin-right:8px">Squadron filter:</label>
-            <select id="py-sqn-filter" aria-label="Filter planning years by squadron" onchange="_loadPlanningYears()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px"></select>
-          </div>
-          <div id="py-map-body" style="min-height:40px"><p class="muted">Select a planning year to view the annual overview.</p></div>
-        </div>
-
-        <!-- Parade Dates card (shown when a year is selected) -->
-        <div class="card" id="py-dates-card" style="display:none;margin-top:12px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <div class="ctitle" style="margin:0">Parade Dates</div>
-            <div style="display:flex;gap:8px">
-              <button class="btn btn-dk plan-write-el" style="display:none" onclick="openGenerateDatesModal()">Generate</button>
-              <button class="btn btn-out plan-write-el" style="display:none" onclick="openAddDateModal()">+ Add Date</button>
-            </div>
-          </div>
-          <div id="py-dates-body"></div>
-        </div>
-
-        <!-- Holidays card (shown when a year is selected) -->
-        <div class="card" id="py-holidays-card" style="display:none;margin-top:12px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <div class="ctitle" style="margin:0">Holiday &amp; Stand-down Periods</div>
-            <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddHolidayModal()">+ Add Holiday</button>
-          </div>
-          <div id="py-holidays-body"></div>
-        </div>
-
-        <!-- Training Classes card (shown when a year is selected) -- CLASS-01/03/04/07:
-             a Training Class is a local group (e.g. "Senior 1", "Senior 2") undertaking
-             a Training Stage. See Help > Training Stages and Training Classes. -->
-        <div class="card" id="py-classes-card" style="display:none;margin-top:12px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <div class="ctitle" style="margin:0">Training Classes</div>
-            <div style="display:flex;align-items:center;gap:10px">
-              <label style="font-size:11px;font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="tc-show-archived" onchange="_tcToggleShowArchived(P.currentYearId)"> Show archived</label>
-              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
-            </div>
-          </div>
-          <p class="muted" style="font-size:11.5px;margin:0 0 10px">
-            A Training Class is a local group completing a Training Stage — for example, Senior 1
-            and Senior 2 can both complete Senior training but undertake different lessons on the
-            same Parade Night. With only one class for a Stage, name it after the Stage.
-          </p>
-          <div id="py-classes-body"></div>
-        </div>
-
-        <!-- Mission Backlog card (shown when a year is selected) — MBACK-02:
-             class-aware curriculum backlog with Training Class filter. -->
-        <div class="card" id="py-missions-card" style="display:none;margin-top:12px">
-          <div id="missions-empty" style="display:none">
-            <p class="muted">Select a planning year above to view the Mission Backlog.</p>
-          </div>
-          <div id="missions-filters-card" style="display:none">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-              <div class="ctitle" style="margin:0">Mission Backlog<button class="ht" tabindex="0" aria-label="About Mission Backlog" data-tip="Curriculum modules required for your active Training Classes that have not yet been scheduled. Use this list to identify what still needs to be planned and for which class.">?</button></div>
-              <span id="missions-count" style="font-size:11px;color:var(--muted)"></span>
-            </div>
-            <div class="fbar no-print" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">
-              <select id="mission-filter-class" aria-label="Filter by Training Class" onchange="renderMissions()" style="min-width:140px">
-                <option value="">All Classes</option>
-              </select>
-              <select id="mission-filter-phase" aria-label="Filter by Training Stage" onchange="loadMissions(P.currentYearId)" style="min-width:140px">
-                <option value="">All Stages</option>
-                <option value="A. Orientation">Orientation</option>
-                <option value="B. Initial">Initial</option>
-                <option value="C. Junior">Junior</option>
-                <option value="D. Intermediate">Intermediate</option>
-                <option value="E. Senior">Senior</option>
-                <option value="I. Bronze">Bronze CLP</option>
-                <option value="J. Silver">Silver CLP</option>
-                <option value="K. Gold">Gold CLP</option>
-              </select>
-              <select id="mission-filter-status" aria-label="Filter by status" onchange="renderMissions()" style="min-width:140px">
-                <option value="">All Status</option>
-                <option value="unscheduled">Unscheduled</option>
-                <option value="scheduled">Scheduled</option>
-              </select>
-              <input id="mission-search" placeholder="Search missions…" oninput="renderMissions()" style="min-width:180px">
-              <button class="btn btn-out btn-sm no-print" onclick="exportPerClassDeliveryCSV()" title="Download per-class delivery summary as CSV">Per-Class CSV</button>
-            </div>
-          </div>
-          <div id="missions-table-card" style="display:none">
-            <div id="missions-body"></div>
-          </div>
-        </div>
-        <!-- CLASS-FORECAST-01: per-class planning forecast cards -->
-        <div class="card" id="py-forecasts-card" style="display:none;margin-top:12px">
-          <div class="ctitle" style="margin-bottom:10px">Class Planning Forecasts<button class="ht" tabindex="0" aria-label="About Class Planning Forecasts" data-tip="How many unplanned curriculum requirements remain for each Training Class, and whether there is enough parade night capacity to deliver them.">?</button></div>
-          <div id="fc-cards-body" class="fc-grid"><p class="muted">Loading…</p></div>
-        </div>
       </div>
 
       <!-- FACILITATORS -->
@@ -1580,6 +1461,26 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
         <div id="pa-body"></div>
       </div>
 
+      <!-- HELP & REFERENCE -->
+      <div id="page-help" class="page">
+        <div class="ph">
+          <h1 class="ph-title">Help &amp; Reference</h1>
+          <div class="ph-sub">Guides, reference material, and support information</div>
+        </div>
+        <div class="card">
+          <div class="ctitle">Getting Started</div>
+          <p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">New to TMS? The setup checklist helps you complete your initial configuration.</p>
+          <button class="btn btn-dk" onclick="nav('getting-started')">Open Setup Checklist</button>
+        </div>
+        <div class="card" style="margin-top:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
+            <div class="ctitle" style="margin:0">Getting Help</div>
+            <button id="gh-edit-btn" class="btn btn-secondary btn-sm" style="display:none" onclick="openGettingHelpModal()">Edit</button>
+          </div>
+          <div id="gh-content-display" class="muted" style="font-size:12.5px;white-space:pre-wrap"></div>
+        </div>
+      </div>
+
       <!-- SETTINGS (admin only) -->
       <div id="page-settings" class="page">
         <div class="ph"><h1 class="ph-title">Unit Settings</h1><div class="ph-sub">Unit configuration</div></div>
@@ -1663,6 +1564,30 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
             <button class="btn btn-dk admin-el" onclick="openTimingTemplateModal()">+ New Template</button>
             <span id="timing-msg" style="font-size:11.5px;font-weight:700"></span>
+          </div>
+        </div>
+        <!-- Training Classes (unit configuration per planning year) -->
+        <div class="card admin-el" id="settings-training-classes-wrap" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="ctitle" style="margin:0">Training Classes</div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <label style="font-size:11px;font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="tc-show-archived" onchange="_tcToggleShowArchived(P.currentYearId)"> Show archived</label>
+              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
+            </div>
+          </div>
+          <p class="muted" style="font-size:11.5px;margin:0 0 8px">
+            A Training Class is a local group completing a Training Stage — for example, Senior 1
+            and Senior 2 can both complete Senior training on the same Parade Night. Associate Training
+            Classes with a Planning Year.
+          </p>
+          <div style="margin-bottom:10px">
+            <label style="font-size:11px;font-weight:700;color:var(--muted);margin-right:8px">Training Year:</label>
+            <select id="tc-year-sel" aria-label="Select training year for classes" onchange="_tcLoadForYear(this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
+              <option value="">— select year —</option>
+            </select>
+          </div>
+          <div id="py-classes-card" style="display:none">
+            <div id="py-classes-body"></div>
           </div>
         </div>
         <div class="card">
@@ -4635,7 +4560,7 @@ function roomById(id){return (S.rooms||[]).find(r=>r.id===id);}
 // Pilot-visible planning pages. Remaining tabs (anchors, term, long-range, rooms, checks) are hidden from nav for this pilot.
 const _PLANNING_PAGES=[];
 const NAV_BY_SCOPE={
-  squadron:['getting-started','dashboard','calendar','parade-nights','weekly-program','curriculum','activities','facilitators','resources','action-items','action-centre','program-audit','settings','accounts',..._PLANNING_PAGES],
+  squadron:['getting-started','dashboard','calendar','parade-nights','weekly-program','curriculum','activities','facilitators','resources','action-items','help','settings','accounts',..._PLANNING_PAGES],
   wing:['getting-started','wing-overview','wing-activities','wing-calendar','curriculum','audit','accounts',..._PLANNING_PAGES],
   national:['getting-started','national','national-activities','wing-calendar','curriculum','audit','accounts',..._PLANNING_PAGES],
   auditor:['audit','accounts',..._PLANNING_PAGES],
@@ -4880,11 +4805,6 @@ function bootApp(){
   }
   const pwEligibleScope=['squadron','wing','national','system_admin'].includes(scope);
   const showPW=!!pwUrl&&pwEligibleScope;
-  // REM-88: when PLANNING_WORKSPACE_URL isn't configured for this environment,
-  // an eligible-scope user previously saw no trace of Planning Workspace at
-  // all -- nothing to indicate it exists, let alone that it's just not set up
-  // here. Show a non-interactive placeholder explaining that instead, rather
-  // than silently omitting the nav item.
   const showPWUnconfigured=!pwUrl&&pwEligibleScope;
   if(pwLink)pwLink.style.display=showPW?'flex':'none';
   if(pwUnconfigured)pwUnconfigured.style.display=showPWUnconfigured?'flex':'none';
@@ -4985,12 +4905,11 @@ function nav(id){
   if(id==='wing-activities'){_actTabLoad('act-tab-wing','wing', (S.role==='system_admin')?saBrowseWingId():null);}
   if(id==='national-activities'){_actTabLoad('act-tab-national','national',null);}
   if(id==='audit')renderAudit();
-  if(id==='settings')renderSettings();
+  if(id==='settings'){renderSettings();_loadSettingsTrainingClasses();}
   if(id==='accounts')renderAccounts();
   if(id==='system-console')loadSystemConsole();
   if(id==='action-items')loadRecentChanges();
-  if(id==='action-centre')renderActionCentre();
-  if(id==='program-audit')renderProgramAudit();
+  if(id==='help')_loadHelpPage();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5217,7 +5136,7 @@ function _renderGsSections(d){
   }
   if(d.squadron){
     html+=`<div class="card"><div class="ctitle">Squadron Setup — ${esc(d.squadron.squadron_code||'')}</div>`+
-      (d.steps||[]).filter(s=>!_GS_NATIONAL_KEYS.includes(s.key)).map(_gsStepRow).join('')+
+      (d.steps||[]).filter(s=>!_GS_NATIONAL_KEYS.includes(s.key)&&!s.optional).map(_gsStepRow).join('')+
       '</div>';
   }
   if(!d.national&&!d.squadron){
@@ -5700,7 +5619,7 @@ async function renderAccounts(){
 
   // Flights card: show for sqn_admin / wing_admin / nat_admin
   const flightCard=document.getElementById('acct-flights-card');
-  if(flightCard){ flightCard.style.display=canWrite||S.isWing||S.isNational?'':'none'; }
+  if(flightCard){ flightCard.style.display='none'; }
   const fbtn=document.getElementById('flight-create-btn');
   if(fbtn) fbtn.style.display=canWrite?'':'none';
   const cbtn=document.getElementById('acct-create-btn');
@@ -10361,12 +10280,54 @@ let _activitiesPageLoaded=false;
 async function _loadActivitiesPage(){
   renderActs();
   _actTabLoad('act-tab-squadron','squadron',null);
-  _loadGettingHelp();
-  if(_activitiesPageLoaded)return;
-  _activitiesPageLoaded=true;
-  await _loadPlanningYears();
-  if(P.currentYearId)loadYearMap(P.currentYearId);
 }
+
+// ═══════════════════════════════════════════════════════════
+//  HELP & REFERENCE PAGE
+// ═══════════════════════════════════════════════════════════
+let _helpPageLoaded=false;
+async function _loadHelpPage(){
+  if(!_helpPageLoaded){
+    _helpPageLoaded=true;
+    await _loadGettingHelp();
+  }
+  // Show/hide edit button based on role
+  const editBtn=document.getElementById('gh-edit-btn');
+  if(editBtn)editBtn.style.display=(S.role==='system_admin')?'':'none';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TRAINING CLASSES IN UNIT SETTINGS
+// ═══════════════════════════════════════════════════════════
+async function _loadSettingsTrainingClasses(){
+  const wrap=document.getElementById('settings-training-classes-wrap');
+  if(!wrap)return;
+  // Only show for sqn_admin
+  if(S.role!=='sqn_admin'){wrap.style.display='none';return;}
+  wrap.style.display='';
+  const sel=document.getElementById('tc-year-sel');
+  if(sel){
+    await _loadPlanningYears();
+    sel.innerHTML='<option value="">— select year —</option>';
+    (P.years||[]).forEach(y=>{
+      const o=document.createElement('option');
+      o.value=y.planning_year_id;
+      o.textContent=(y.name||String(y.year))+(y.active_status?'':' (archived)');
+      sel.appendChild(o);
+    });
+    // Auto-select active year
+    if(P.currentYearId){sel.value=P.currentYearId;_tcLoadForYear(P.currentYearId);}
+  }
+}
+function _tcLoadForYear(yearId){
+  const card=document.getElementById('py-classes-card');
+  if(!card)return;
+  if(!yearId){card.style.display='none';return;}
+  P.currentYearId=yearId;
+  card.style.display='block';
+  _tcToggleShowArchived(yearId);
+}
+
 const _GH_DEFAULT=`AAFC TRAINING MANAGEMENT SYSTEM — HELP GUIDE
 
 ═══════════════════════════════════════════════
