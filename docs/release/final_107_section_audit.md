@@ -227,3 +227,51 @@ WCAG 2.5.3 requires the accessible name to **contain** the element's visible tex
 
 *Produced by the AAFC TMS Final Engineering Gap-Closure Program, sessions 20–21, 2026-08-15/16.*  
 *Updated 2026-08-16 (§10 post-program a11y remediation) at commit `4598cdc`.*
+
+---
+
+## 11. Post-Gap Review Program — Review 5 Schema Integrity + UX Pages (2026-08-16/17)
+
+Following the Post-Gap Human Workflow, Architecture and Design Review program (5 review stages), the final round of implementation was completed and staging-verified.
+
+### Review 5 ultrareview schema integrity (v55 migration `b4c5d6e7f8a9`)
+
+Three schema gaps identified by the ultrareview and implemented in commit `0b4c1b9`, then hardened for PostgreSQL data-safety in commit `27b99e9`:
+
+| Finding | Description | Fix |
+|---|---|---|
+| R5-M14 | `parade_night_timing_overrides` `unique=True` blocks replacement after archive | Removed column-level unique; replaced with partial unique index `WHERE NOT is_archived` |
+| R5-L05 | `PlanningConflict.scheduled_session_id` bare `String(36)`, no FK | Added FK to `sessions(id) ON DELETE SET NULL` with orphan-nullification cleanup |
+| R5-L06 | `SessionAudience` missing `UniqueConstraint(session_id, training_class_id)` | Added constraint with duplicate-deletion cleanup before adding |
+
+PostgreSQL safety: raw DDL with data-cleanup (DELETE duplicates / UPDATE orphans) before adding constraints. SQLite uses `batch_alter_table`. Both paths guarded with `IF EXISTS` / `IF NOT EXISTS`.
+
+### New UX pages
+
+| Page | Nav ID | Data sources |
+|---|---|---|
+| Programme Action Centre | `action-centre` | `S.actionItems`, `S.reports.readiness`, `S.pns`; lazy-fetches planning conflicts |
+| Program Audit: Requested vs. Delivered | `program-audit` | `S.pns`, `S.reports.summary`, `S.reports.coverage` |
+
+Both pages added to `NAV_BY_SCOPE.squadron` and wired in `nav()`. Commit `01bbbbc`.
+
+### Resources page rename
+
+Nav item and page h1 updated from "Locations and Resources" to "Resources & Training Areas" (commit `bbf5908`) — corrects a gap between the design review specification and the implementation; required by the staging-verification Playwright `[Headings]` test.
+
+### Expanded Playwright staging suite
+
+The Playwright staging suite grew from 62 tests (3 browsers × ~21 tests) to **187 tests** (3 browsers × 65 tests), covering auth flows, RBAC, a11y, WCAG colour contrast, keyboard navigation, CRUD operations, Planning Workspace integration, and fix verification. All tests pass: **187 passed, 8 skipped, 0 failed** (commit `bbf5908`, 2026-08-17).
+
+### Backend test baseline
+
+**1760 passed, 7 skipped** (2026-08-17, commit `bbf5908`). Alembic head: `b4c5d6e7f8a9` (v55).
+
+### Staging deployment evidence
+
+Commit `bbf5908` — all three staging services SUCCESS:
+- Backend: `dd4d0e43`
+- Frontend: `ee04e8be`
+- PW: `84d4198e`
+
+*Updated 2026-08-17 (§11 Review 5 schema + UX pages) at commit `bbf5908`.*
