@@ -22,6 +22,11 @@ this is now a repeatable tool, not a one-off snapshot, specifically so this
 program's many phases can each prove capability preservation rather than
 asserting it.
 
+**Updated at commit `3cab866` (2026-08-17):** 314 API routes, 64 tables.
+Net additions from this program: +56 routes, +6 tables. No routes or tables
+from the `4c5e384` baseline were removed — all 258 original routes and 58
+original tables remain present.
+
 ## Relationship to prior baselines
 
 - `docs/remediation/capability_manifest_before.json` — the prior remediation

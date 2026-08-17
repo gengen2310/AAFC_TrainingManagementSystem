@@ -6,7 +6,7 @@
 **Created:** 2026-08-12
 
 All technical gate items (tests, migrations, code changes) are already complete as of
-commit `cfa3ce8` (2026-08-15). The items below are the **human-action gates** that
+commit `3cab866` (2026-08-17). The items below are the **human-action gates** that
 cannot be performed by the development team.
 
 ---
@@ -205,7 +205,7 @@ All sections above must be signed before completing this section.
 **Pre-declaration checks:**
 - ☐ Sections A–F are all signed
 - ☐ A fresh production database backup has been taken within the last 2 hours and the artifact confirmed in GitHub Actions (record the run ID: _________)
-- ☐ Developer on-call has confirmed: test suite passes (1695+ tests), staging deploy is current, no known regressions
+- ☐ Developer on-call has confirmed: test suite passes (1760+ tests), staging deploy is current, no known regressions
 - ☐ The production AAFC TMS frontend and backend are confirmed running (`/api/health/ready` returns `{"status":"ready"}` with `squadrons` matching the expected production org count — confirm the expected count with the developer on-call before checking)
 - ☐ A final D7 smoke test has been completed against production (see `docs/beta/D7_smoke_test_checklist.md`)
 
