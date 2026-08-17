@@ -4,21 +4,28 @@ Functional surface inventory, cross-checked against live source rather than assu
 from prior docs. Companion to `final_source_inventory.md` (structural counts) — this
 doc maps features to the pages/routes/endpoints that implement them.
 
-## `connected-frontend/index.html` — nav pages by scope (`NAV_BY_SCOPE`, line 3356)
+## `connected-frontend/index.html` — nav pages by scope (`NAV_BY_SCOPE`)
+
+**Updated 2026-08-17 at `2b263bd`** — Planning Workspace native integration reverted;
+`help` added to squadron scope; `action-centre` and `program-audit` removed from scope
+lists. Canonical detail in `docs/release/frontend_ui_state.md`.
 
 | Scope | Pages |
 |---|---|
-| `squadron` | getting-started, dashboard, calendar, parade-nights, weekly-program, curriculum, activities, facilitators, resources, action-items, settings, accounts, + shared planning pages |
-| `wing` | getting-started, wing-overview, wing-activities, wing-calendar, curriculum, audit, accounts, + shared planning pages |
-| `national` | getting-started, national, national-activities, wing-calendar, curriculum, audit, accounts, + shared planning pages |
-| `auditor` | audit, accounts, + shared planning pages |
-| `system_admin` | getting-started, system-console, national, national-activities, wing-activities, wing-calendar, curriculum, audit, accounts, + shared planning pages |
+| `squadron` | getting-started, dashboard, calendar, parade-nights, weekly-program, curriculum, activities, facilitators, resources, action-items, **help**, settings, accounts |
+| `wing` | getting-started, wing-overview, wing-activities, wing-calendar, curriculum, audit, accounts |
+| `national` | getting-started, national, national-activities, wing-calendar, curriculum, audit, accounts |
+| `auditor` | audit, accounts |
+| `system_admin` | getting-started, system-console, national, national-activities, wing-activities, wing-calendar, curriculum, audit, accounts |
 
-22 distinct `page-*` IDs found in the file — matches `.claude/rules/frontend.md`'s
-documented `nav()`/`NAV_BY_SCOPE` model exactly, including the `effectiveScope()`
-system_admin widen-not-narrow behaviour and the `saBrowseWingId`/`saBrowseSquadronId`
-helpers described there (re-read directly from source at
-`connected-frontend/index.html:3372-3385`, not taken on the doc's word).
+`_PLANNING_PAGES = []` — placeholder constant, currently empty.  
+Planning Workspace is an **external link** (`nav-pw-link`) shown by `bootApp()` when
+`S.pwUrl` is configured; it is not a nav page.
+
+22 distinct `page-*` IDs in HTML; `page-action-centre` and `page-program-audit` remain
+in DOM but are excluded from all scope lists (unreachable by normal nav). The
+`effectiveScope()` / `saBrowseWingId` / `saBrowseSquadronId` system_admin behaviour is
+unchanged from prior docs.
 
 ## Backend functional areas (by router tag, 237 endpoints total — see `api-inventory.csv`)
 

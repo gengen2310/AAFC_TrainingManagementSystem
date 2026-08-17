@@ -275,3 +275,47 @@ Commit `bbf5908` — all three staging services SUCCESS:
 - PW: `84d4198e`
 
 *Updated 2026-08-17 (§11 Review 5 schema + UX pages) at commit `bbf5908`.*
+
+---
+
+## §12 — Post-audit frontend changes (2026-08-17)
+
+These changes occurred after the final engineering program completed. They are recorded
+here to keep the audit doc current and are fully captured in
+`docs/release/frontend_ui_state.md` (the authoritative frontend UI lock document).
+
+### Planning Workspace native integration — REVERTED
+
+Commits `2598177` ↩ reverted a session that had embedded Planning as a native TMS page
+(`page-planning`, `Planning` nav item, `_loadPlanningPage()` JS block). The decision
+was made to keep Planning Workspace as an **external link** rather than a native page.
+
+Changes reverted:
+- `page-planning` div removed from HTML
+- `Planning` nav item removed from sidebar
+- `'planning'` removed from `NAV_BY_SCOPE.squadron`
+- `_loadPlanningPage()`, `_renderPlanYearChips()`, `_planSelectYear()`, `_planNewYearFor()`,
+  `_showPlanEmptyYear()`, `_renderPlanAnnualView()` all removed
+- `bootApp()` restored to show `Planning Workspace ↗` external link when `S.pwUrl`
+  configured, "Planning Workspace (unavailable)" placeholder for squadron scope when not
+
+### Generate Activities and Add Holiday buttons restored to Activities
+
+Commit `2b263bd` — two `plan-write-el` buttons that had been inadvertently removed from
+the Activities page header are restored: `Generate Activities` (→ `openGenerateActivitiesModal()`)
+and `+ Add Holiday` (→ `openAddHolidayModal()`). These are asserted by three Playwright
+tests (`[Activities] Title…`, `[Activities] Holiday create`, `[Activities] Generate Activities
+modal`) across all three browser projects.
+
+### Staging deployment evidence (§12)
+
+Commit `2b263bd` — all three staging services SUCCESS:
+- Backend: `dc73572f`
+- Frontend: `bd7b9121`
+- PW: `2d021af1`
+
+Backend tests: **1760 passed, 7 skipped** (unchanged). Playwright: 136 passed, 44 skipped,
+15 failed (all pre-existing env-var gaps — `STAGING_SYSADMIN_CODE` not passed in this run;
+zero product-behaviour failures).
+
+*Updated 2026-08-17 (§12 post-audit frontend changes) at commit `2b263bd`.*
