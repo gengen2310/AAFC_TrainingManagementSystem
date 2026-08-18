@@ -43,7 +43,7 @@ async def search_entities(
         .filter(Wing.is_archived == False, Wing.active_status == True)  # noqa: E712
         .filter(or_(Wing.name.ilike(pat), Wing.code.ilike(pat), Wing.short_name.ilike(pat)))
     )
-    if not is_national:
+    if not is_national and not is_auditor:
         wq = wq.filter(Wing.id == p.wing_id)
     for w in wq.limit(_LIMIT).all():
         results.append({
@@ -57,7 +57,7 @@ async def search_entities(
         .filter(Squadron.is_archived == False, Squadron.active_status == True)  # noqa: E712
         .filter(or_(Squadron.name.ilike(pat), Squadron.short_name.ilike(pat), Squadron.code.ilike(pat)))
     )
-    if is_national:
+    if is_national or is_auditor:
         pass
     elif is_wing:
         sq = sq.filter(Squadron.wing_id == p.wing_id)
