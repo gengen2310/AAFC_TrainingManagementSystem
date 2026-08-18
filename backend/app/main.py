@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from .config import settings
 from .database import init_db, SessionLocal
-from .routers import auth, organisations, training, ops, health, program, export_import, accounts, timing, planning, system, wing_calendar, jobs, dashboard, setup
+from .routers import auth, organisations, training, ops, health, program, export_import, accounts, timing, planning, system, wing_calendar, jobs, dashboard, setup, search
 
 # ── SEC-06: 5xx rate alerting ────────────────────────────────────────────────
 # In-process rolling window; accurate for single-process (uvicorn) and
@@ -361,7 +361,7 @@ async def security_headers(request: Request, call_next):
 for r in (health.router, auth.router, organisations.router, accounts.router,
           training.router, timing.router, ops.router, program.router, export_import.router,
           planning.router, wing_calendar.router, system.router, jobs.router,
-          dashboard.router, setup.router):
+          dashboard.router, setup.router, search.router):
     app.include_router(r)
 
 
