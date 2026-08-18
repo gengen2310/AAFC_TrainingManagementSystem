@@ -12663,7 +12663,7 @@ async function doRenamePlanningYear(){
 async function doArchivePlanningYear(){
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
   if(!y)return;
-  confirmAction(`Archive the year? It disappears from active selectors. Historical records are preserved and it can be restored later.`,async()=>{
+  confirmAction(`Archive the ${y.name||y.year} year? It disappears from active selectors. Historical records are preserved and it can be restored later.`,async()=>{
     try{
       await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({active_status:false,version:y.version})});
       showToast('Year archived.');
