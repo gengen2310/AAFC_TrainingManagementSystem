@@ -15812,7 +15812,7 @@ document.addEventListener('keydown',function(e){
     else if(r.action==='facilitator'){
       nav('facilitators');
       var el=document.getElementById('fac-search');
-      if(el){el.value=r.label;if(typeof renderFacs==='function')renderFacs();}
+      if(el){el.value=(r.meta&&r.meta.last_name)||r.label;if(typeof renderFacs==='function')renderFacs();}
     }
     else if(r.action==='account'){
       nav('accounts');
@@ -15857,11 +15857,6 @@ document.addEventListener('keydown',function(e){
       const sc=Math.max(_score(e.code||'',q),_score(e.title||'',q));
       if(sc>0)res.push({score:sc,cat:'Curriculum',label:`${e.code} — ${e.title}`,sub:`Phase: ${e.phase||'—'}`,action:'curr',target:e.code});
     });
-    // Facilitators
-    (S.facs||[]).forEach(f=>{
-      const name=`${f.first_name||''} ${f.last_name||''}`.trim();
-      const sc=_score(name,q);if(sc>0)res.push({score:sc,cat:'Facilitator',label:name,sub:f.role||'',action:'fac',target:f.id});
-    });
     // Parade nights
     (S.pns||[]).slice(-60).forEach(pn=>{
       const sc=_score(pn.date||'',q)||_score(pn.label||pn.date||'',q);
@@ -15904,7 +15899,9 @@ document.addEventListener('keydown',function(e){
                         action:r.type,target:r.id,meta:r.meta||{}});
       });
       var entityHtml=_renderEntityResults(_backendResults,_results.length-_backendResults.length);
-      document.getElementById('cmd-palette-results').innerHTML=localHtml+entityHtml;
+      // Suppress "no results" hint when backend found entities but local found nothing
+      var displayLocal=(_backendResults.length>0&&_results.length===_backendResults.length)?'':localHtml;
+      document.getElementById('cmd-palette-results').innerHTML=displayLocal+entityHtml;
     }).catch(function(){
       document.querySelectorAll('.cp-searching').forEach(function(el){el.remove();});
     });
