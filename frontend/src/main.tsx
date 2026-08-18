@@ -13,8 +13,11 @@ import "./styles/planning.css";
 // has it. The fragment is wiped immediately so it never persists in history.
 const _hashFrag = window.location.hash;
 if (_hashFrag.startsWith("#t=")) {
-  const _tok = decodeURIComponent(_hashFrag.slice(3));
+  const _params = new URLSearchParams(_hashFrag.slice(1));
+  const _tok = _params.get("t") ?? "";
+  const _reqYear = _params.get("y");
   if (_tok) sessionStorage.setItem("aafc_token", _tok);
+  if (_reqYear && /^\d{4}$/.test(_reqYear)) sessionStorage.setItem("aafc_requested_year", _reqYear);
   history.replaceState(null, "", window.location.pathname + window.location.search);
 }
 

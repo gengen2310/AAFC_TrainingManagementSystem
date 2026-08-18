@@ -94,6 +94,14 @@ export function PlanningWorkspace() {
   // Validate/update the cached year_id once the years response arrives.
   useEffect(() => {
     if (!years) return;
+    // Honor a year pre-selected by the TMS → PW handoff fragment (#t=...&y=YYYY)
+    const reqYearStr = sessionStorage.getItem("aafc_requested_year");
+    if (reqYearStr) {
+      sessionStorage.removeItem("aafc_requested_year");
+      const reqYear = parseInt(reqYearStr, 10);
+      const match = years.find(y => y.year === reqYear);
+      if (match) { persistYear(match.planning_year_id); return; }
+    }
     const active = years.find(y => y.active_status) ?? years[0];
     if (!active) return;
     if (active.planning_year_id !== selectedYearId) {
