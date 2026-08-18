@@ -58,6 +58,13 @@
   /* DES-M02: extended spacing scale (4px base, fills gaps in existing --space-N) */
   --space-05: 4px; --space-1h: 12px; --space-2h: 20px; --space-5: 40px; --space-6: 48px;
   --radius: 10px;
+  /* B-DS spacing system — all padding/gap/margin must use these */
+  --sp-xs:8px;--sp-sm:12px;--sp-md:16px;--sp-lg:20px;--sp-xl:24px;
+  --gap-cards:10px;
+  --radius:6px;--radius-lg:10px;
+  /* Nav active state */
+  --nav-active-bg:rgba(81,176,227,.20);
+  --nav-active-border:#51b0e3;
 }
 /* shared/tokens.css sync end */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -272,6 +279,14 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .btn-lnk{background:none;border:none;color:var(--royal);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;padding:0;text-decoration:underline dotted;}
 .btn-lnk:hover{color:var(--dark);} /* DES-H01 */
 .btn:focus-visible,.btn-auth:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+/* B-DS button system */
+.btn-primary{background:linear-gradient(180deg,#003a7a 0%,#002050 100%);color:#fff;border:1px solid rgba(0,30,65,.2);box-shadow:0 1px 0 rgba(255,255,255,.10) inset,0 -1px 0 rgba(0,0,0,.20) inset,0 1px 3px rgba(0,30,65,.25);padding:10px 16px;border-radius:5px;font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.04em;cursor:pointer;transition:background .12s,box-shadow .12s;}
+.btn-primary:hover{background:linear-gradient(180deg,#004590 0%,#002a60 100%);}
+.btn-primary:active{background:linear-gradient(180deg,#001e42 0%,#00183a 100%);transform:translateY(1px);}
+.btn-secondary{background:#f0f7ff;color:#002f65;border:1.5px solid #bee3f8;box-shadow:0 1px 2px rgba(0,47,101,.06);padding:10px 16px;border-radius:5px;font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.04em;cursor:pointer;transition:background .12s;}
+.btn-secondary:hover{background:#e0f0fa;}
+.btn-ghost{background:transparent;color:#004b8d;border:1px solid transparent;padding:10px 16px;border-radius:5px;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:.04em;cursor:pointer;}
+.btn-ghost:hover{color:#002f65;}
 a:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:2px;}
 /* DES-M06: global keyboard focus ring — WCAG 2.1 SC 2.4.7 */
 :focus-visible{outline:3px solid var(--blue);outline-offset:2px;}
