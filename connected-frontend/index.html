@@ -15786,16 +15786,17 @@ document.addEventListener('keydown',function(e){
   };
 
   let _open=false,_idx=0,_results=[];
+  let _searchTimer=null,_backendResults=[],_backendQueryRef='';
 
   function _overlay(){return document.getElementById('cmd-palette-overlay');}
   function _input(){return document.getElementById('cmd-palette-input');}
 
   function openPalette(){
     const o=_overlay();if(!o||_open)return;
-    _open=true;_idx=0;_results=[];
+    _open=true;_idx=0;_results=[];_backendResults=[];_backendQueryRef='';
     o.style.display='flex';
     _input().value='';
-    document.getElementById('cmd-palette-results').innerHTML='<div class="cp-hint">Start typing to search pages, curriculum, parade nights, and facilitators…</div>';
+    document.getElementById('cmd-palette-results').innerHTML='<div class="cp-hint"> </div>';
     setTimeout(()=>_input().focus(),20);
   }
   function closePalette(){
@@ -15808,12 +15809,41 @@ document.addEventListener('keydown',function(e){
     else if(r.action==='curr')showCurrDetail(r.target);
     else if(r.action==='pn'){navToScheduledPN(r.target);}
     else if(r.action==='fac'){nav('facilitators');}
+    else if(r.action==='facilitator'){
+      nav('facilitators');
+      var el=document.getElementById('fac-search');
+      if(el){el.value=r.label;if(typeof renderFacs==='function')renderFacs();}
+    }
+    else if(r.action==='account'){
+      nav('accounts');
+      var el2=document.getElementById('acct-search');
+      if(el2){el2.value=r.label;if(typeof renderAccounts==='function')renderAccounts();}
+    }
+    else if(r.action==='wing'){
+      if(S.role==='system_admin'&&typeof saSelectWing==='function')saSelectWing(r.target);
+      else nav('wing-overview');
+    }
+    else if(r.action==='squadron'){
+      if(S.role==='system_admin'&&typeof saSelectSquadron==='function'){
+        if(r.meta&&r.meta.wing_id)S.saScope.wingId=r.meta.wing_id;
+        saSelectSquadron(r.target);
+      } else nav('dashboard');
+    }
+    else if(r.action==='activity'){
+      nav('activities');
+      var el3=document.getElementById('act-search');
+      if(el3){el3.value=r.label;if(typeof renderActs==='function')renderActs();}
+    }
+    else if(r.action==='session'){
+      if(r.meta&&r.meta.pn_date)navToScheduledPN(r.meta.pn_date);
+      else nav('parade-nights');
+    }
   }
   function _score(text,q){
     const t=text.toLowerCase(),qL=q.toLowerCase();
     if(t===qL)return 3;if(t.startsWith(qL))return 2;if(t.includes(qL))return 1;return 0;
   }
-  function _search(q){
+  function _searchLocal(q){
     if(q.length<1){_results=[];return'<div class="cp-hint">Start typing to search…</div>';}
     const res=[];
     // Pages
@@ -15845,6 +15875,40 @@ document.addEventListener('keydown',function(e){
       ${r.sub?`<span style="font-size:11px;color:var(--muted);margin-left:6px">${esc(r.sub)}</span>`:''}
     </div>`).join('');
   }
+  function _entityCat(type){
+    return({facilitator:'Facilitator',account:'Account',wing:'Wing',
+            squadron:'Squadron',activity:'Activity',session:'Session'})[type]||type;
+  }
+  function _entityBadgeClass(type){
+    return({wing:'b-dark',squadron:'b-royal',activity:'b-steel'})[type]||'b-grey';
+  }
+  function _renderEntityResults(list,startIdx){
+    if(!list||!list.length)return'';
+    return list.map(function(r,i){
+      var idx=startIdx+i;
+      return'<div class="cp-result" onclick="_cpRun('+idx+')" onmouseover="_cpHover('+idx+')" role="option" aria-selected="false">'
+        +'<span class="badge '+_entityBadgeClass(r.type)+'" style="font-size:10px;margin-right:6px">'+esc(_entityCat(r.type))+'</span>'
+        +'<span style="font-weight:700;font-size:12.5px">'+esc(r.label)+'</span>'
+        +(r.sub?'<span style="font-size:11px;color:var(--muted);margin-left:6px">'+esc(r.sub)+'</span>':'')
+        +'</div>';
+    }).join('');
+  }
+  function _fetchEntityResults(q){
+    api('/api/search?q='+encodeURIComponent(q)).then(function(data){
+      if(q!==_backendQueryRef)return;
+      _backendResults=(data.results||[]);
+      var localHtml=_searchLocal(q);
+      // Append entity results to _results array so keyboard nav covers them
+      _backendResults.forEach(function(r){
+        _results.push({score:1,cat:_entityCat(r.type),label:r.label,sub:r.sub||'',
+                        action:r.type,target:r.id,meta:r.meta||{}});
+      });
+      var entityHtml=_renderEntityResults(_backendResults,_results.length-_backendResults.length);
+      document.getElementById('cmd-palette-results').innerHTML=localHtml+entityHtml;
+    }).catch(function(){
+      document.querySelectorAll('.cp-searching').forEach(function(el){el.remove();});
+    });
+  }
   window._cpRun=function(i){_run(_results[i]);};
   window._cpHover=function(i){_idx=i;document.querySelectorAll('.cp-result').forEach((el,j)=>el.classList.toggle('cp-sel',j===i));};
 
@@ -15860,7 +15924,15 @@ document.addEventListener('keydown',function(e){
   document.addEventListener('DOMContentLoaded',function(){
     const inp=document.getElementById('cmd-palette-input');
     if(inp)inp.addEventListener('input',function(){
-      _idx=0;document.getElementById('cmd-palette-results').innerHTML=_search(this.value);
+      var q=this.value;
+      _idx=0;_backendResults=[];
+      document.getElementById('cmd-palette-results').innerHTML=
+        _searchLocal(q)+(q.length>=2?'<div class="cp-hint cp-searching">Searching…</div>':'');
+      clearTimeout(_searchTimer);
+      if(q.length>=2){
+        _backendQueryRef=q;
+        _searchTimer=setTimeout(function(){_fetchEntityResults(q);},200);
+      }
     });
     const o=document.getElementById('cmd-palette-overlay');
     if(o)o.addEventListener('click',function(e){if(e.target===this)closePalette();});
@@ -15875,13 +15947,13 @@ document.addEventListener('keydown',function(e){
   <div style="background:var(--surface);border-radius:12px;box-shadow:0 8px 32px rgba(0,30,60,.28);width:min(560px,94vw);overflow:hidden">
     <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)">
       <span style="color:var(--muted);font-size:14px">🔍</span>
-      <input id="cmd-palette-input" type="search" placeholder="Search pages, curriculum, facilitators, parade nights…"
+      <input id="cmd-palette-input" type="search" placeholder=" "
         autocomplete="off" spellcheck="false"
         style="flex:1;border:none;outline:none;font-size:14px;background:transparent;color:var(--text)" aria-label="Search">
       <kbd style="font-size:10px;background:var(--bg);padding:2px 6px;border-radius:4px;color:var(--muted);border:1px solid var(--border)">Esc</kbd>
     </div>
     <div id="cmd-palette-results" role="listbox" style="max-height:60vh;overflow-y:auto;padding:6px 0">
-      <div class="cp-hint">Start typing to search pages, curriculum, parade nights, and facilitators…</div>
+      <div class="cp-hint"> </div>
     </div>
   </div>
 </div>
@@ -15889,6 +15961,9 @@ document.addEventListener('keydown',function(e){
 .cp-hint{padding:14px 16px;font-size:12px;color:var(--muted);}
 .cp-result{display:flex;align-items:center;padding:9px 16px;cursor:pointer;font-size:13px;}
 .cp-result.cp-sel,.cp-result:hover{background:var(--accent-light);}
+.b-royal{background:var(--royal);color:#fff;}
+.b-steel{background:var(--steel);color:#fff;}
+.cp-searching{font-style:italic;}
 </style>
 </body>
 </html>
