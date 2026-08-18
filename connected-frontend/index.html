@@ -228,6 +228,11 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .yn-row-act{background:none;border:none;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;color:var(--royal);text-decoration:underline;text-underline-offset:2px;padding:0 6px 0 0;}
 .yn-row-act:hover{opacity:.7;}
 .yn-row-act-del{color:#c01530;}
+.cea-row-new td{background:#f0fbf4;}
+.cea-row-update td{background:#eef6fc;}
+.cea-conflict-toggle{font-size:11px;font-weight:700;font-family:inherit;border:1px solid var(--border);border-radius:4px;padding:3px 8px;cursor:pointer;background:var(--bg);}
+.cea-conflict-toggle.keep{border-color:var(--ok,#1a7f4b);color:var(--ok,#1a7f4b);}
+.cea-conflict-toggle.replace{border-color:#c01530;color:#c01530;}
 
 /* ── STAT CARDS ── */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
@@ -1333,6 +1338,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-act')">+ Add Activity</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openGenerateActivitiesModal()">Generate Activities</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddHolidayModal()">+ Add Holiday</button>
+            <button class="btn btn-secondary btn-sm" id="actImportCeaBtn" style="display:none" onclick="openCeaImportModal()">Import CEA &#8593;</button>
             <div class="yn-wrap" id="actYnWrap">
               <div class="year-nav-ctrl">
                 <button class="yn-arrow" id="ynPrev" onclick="ynNav(-1)" disabled title="Previous year">‹</button>
@@ -3231,6 +3237,36 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-body" style="padding:20px 24px 28px">
       <button class="btn btn-ok btn-sm" id="ynCreateBtn" onclick="ynCreateYear()" style="margin-bottom:18px">+ Create <span id="ynCreateLabel">next year</span></button>
       <div id="ynManageTable"></div>
+    </div>
+  </div>
+</div>
+
+<!-- CEA IMPORT MODAL -->
+<div class="modal-bg" id="m-cea-import" onclick="if(event.target===this)closeModal('m-cea-import')">
+  <div class="modal" style="max-width:640px;width:96vw">
+    <div class="modal-hdr" style="background:var(--dark);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:8px 8px 0 0">
+      <span style="color:#fff;font-size:14px;font-weight:800">Import CEA Activities — <span id="ceaImportYearLabel">—</span></span>
+      <button class="modal-x" onclick="closeModal('m-cea-import')" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px 24px">
+      <div id="ceaStep1">
+        <p style="font-size:13px;color:var(--text-2);margin-bottom:14px">Upload a CEA export file (CSV). The system checks for existing activities before importing.</p>
+        <label class="form-lbl" for="ceaFileInput">CEA export file</label>
+        <input type="file" id="ceaFileInput" accept=".csv" style="display:block;margin:8px 0 16px">
+        <button class="btn btn-dk" onclick="ceaPreview()" id="ceaPreviewBtn" disabled>Preview import</button>
+        <div id="ceaUploadErr" style="color:#c01530;font-size:12px;margin-top:8px"></div>
+      </div>
+      <div id="ceaStep2" style="display:none">
+        <div id="ceaPreviewBody"></div>
+        <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-dk" id="ceaImportBtn" onclick="ceaConfirm()">Import all (<span id="ceaImportCount">0</span>)</button>
+          <button class="btn btn-secondary" onclick="ceaBackToUpload()">&#8592; Back</button>
+        </div>
+      </div>
+      <div id="ceaStep3" style="display:none">
+        <div id="ceaResultBody"></div>
+        <button class="btn btn-secondary" style="margin-top:16px" onclick="closeModal('m-cea-import');if(typeof _loadActivitiesPage==='function')_loadActivitiesPage()">Done</button>
+      </div>
     </div>
   </div>
 </div>
@@ -10357,6 +10393,10 @@ function ynInit() {
   if (gear && ['system_admin','wing_admin','national_admin'].includes(S.role||'')) {
     gear.style.display = '';
   }
+  const ceaBtn = document.getElementById('actImportCeaBtn');
+  if (ceaBtn) {
+    ceaBtn.style.display = ['system_admin','wing_admin','national_admin'].includes(S.role||'') ? '' : 'none';
+  }
 }
 
 function setCurrentYear(yearObj, reload) {
@@ -10554,6 +10594,193 @@ function ynExportYear(id,yearNum){
 function ynOpenManage(){
   openModal('m-manage-years');
   ynLoadManagePanel();
+}
+
+// ── CEA Import Modal ────────────────────────────────────────────────────────
+
+var _ceaRows=[];
+var _ceaExisting=[];
+var _ceaKeepIds=new Set();
+
+function openCeaImportModal(){
+  if(!P.currentYearId){ alert('Select a training year first.'); return; }
+  const lbl=document.getElementById('ceaImportYearLabel');
+  if(lbl) lbl.textContent=esc(String(P.currentYearInt||'—'));
+  _ceaRows=[]; _ceaExisting=[]; _ceaKeepIds=new Set();
+  document.getElementById('ceaStep1').style.display='';
+  document.getElementById('ceaStep2').style.display='none';
+  document.getElementById('ceaStep3').style.display='none';
+  document.getElementById('ceaUploadErr').textContent='';
+  const fi=document.getElementById('ceaFileInput');
+  if(fi) fi.value='';
+  const btn=document.getElementById('ceaPreviewBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Preview import'; }
+  openModal('m-cea-import');
+}
+
+document.addEventListener('change',function(e){
+  if(e.target&&e.target.id==='ceaFileInput'){
+    const btn=document.getElementById('ceaPreviewBtn');
+    if(btn) btn.disabled=!e.target.files||!e.target.files.length;
+  }
+});
+
+function _parseCSV(str){
+  const lines=str.split(/\r?\n/).filter(function(l){return l.trim();});
+  if(!lines.length) return [];
+  function splitLine(line){
+    const vals=[]; let cur=''; let inQ=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch==='"'&&line[i+1]==='"'){cur+='"';i++;}
+      else if(ch==='"'){inQ=!inQ;}
+      else if(ch===','&&!inQ){vals.push(cur.trim());cur='';}
+      else{cur+=ch;}
+    }
+    vals.push(cur.trim());
+    return vals;
+  }
+  const headers=splitLine(lines[0]).map(function(h){return h.replace(/^"|"$/g,'');});
+  return lines.slice(1).map(function(line){
+    const vals=splitLine(line);
+    const obj={};
+    headers.forEach(function(h,i){obj[h]=(vals[i]||'').replace(/^"|"$/g,'');});
+    return obj;
+  });
+}
+
+function _ceaGetField(row,aliases){
+  for(const k of aliases){ if(row[k]!==undefined&&row[k]!=='') return row[k]; }
+  return '';
+}
+
+async function ceaPreview(){
+  const fi=document.getElementById('ceaFileInput');
+  if(!fi||!fi.files||!fi.files.length) return;
+  const errEl=document.getElementById('ceaUploadErr');
+  errEl.textContent='';
+  const btn=document.getElementById('ceaPreviewBtn');
+  btn.disabled=true; btn.textContent='Reading…';
+
+  let text;
+  try{
+    text=await new Promise(function(resolve,reject){
+      const r=new FileReader();
+      r.onload=function(ev){resolve(ev.target.result);};
+      r.onerror=function(){reject(new Error('Could not read file'));};
+      r.readAsText(fi.files[0],'UTF-8');
+    });
+  } catch(e){
+    errEl.textContent='Could not read file.';
+    btn.disabled=false; btn.textContent='Preview import';
+    return;
+  }
+
+  try{ _ceaRows=_parseCSV(text); }
+  catch(e){ errEl.textContent='Parse error: '+e.message; btn.disabled=false; btn.textContent='Preview import'; return; }
+
+  if(!_ceaRows.length){ errEl.textContent='No rows found in file.'; btn.disabled=false; btn.textContent='Preview import'; return; }
+
+  try{
+    const existing=await api('/api/planning/years/'+P.currentYearId+'/cea/activities');
+    _ceaExisting=existing||[];
+  } catch(e){ _ceaExisting=[]; }
+
+  const ID_ALIASES=['ActivityID','cea_activity_id','ActivityId','SeqNr','CEA_ID'];
+  const NAME_ALIASES=['ActivityName','activity_name','Name'];
+
+  const existingById={};
+  _ceaExisting.forEach(function(r){ if(r.cea_activity_id) existingById[r.cea_activity_id]=r; });
+
+  _ceaKeepIds=new Set();
+
+  const categorised=_ceaRows.map(function(row,i){
+    const ceaId=_ceaGetField(row,ID_ALIASES);
+    const name=_ceaGetField(row,NAME_ALIASES);
+    const isUpdate=ceaId&&existingById[ceaId];
+    return {row,ceaId,name,isUpdate:!!isUpdate,idx:i};
+  });
+
+  const newCount=categorised.filter(function(c){return !c.isUpdate;}).length;
+  const updCount=categorised.filter(function(c){return c.isUpdate;}).length;
+
+  let html='';
+  if(newCount) html+='<p style="font-size:12px;color:var(--ok,#1a7f4b);font-weight:700;margin-bottom:6px">'+newCount+' new activities will be added</p>';
+  if(updCount) html+='<p style="font-size:12px;color:var(--royal);font-weight:700;margin-bottom:6px">'+updCount+' existing activities — click to keep original</p>';
+
+  html+='<div style="overflow-x:auto;max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">'
+    +'<table class="yn-mgmt-table"><thead><tr><th>CEA ID</th><th>Name</th><th>Action</th></tr></thead><tbody>';
+
+  categorised.forEach(function(c){
+    const rowCls=c.isUpdate?'cea-row-update':'cea-row-new';
+    const decision=c.isUpdate
+      ?'<button class="cea-conflict-toggle replace" data-ceaid="'+esc(c.ceaId)+'" onclick="ceaToggleKeep(this)">Replace</button>'
+      :'<span style="color:var(--ok,#1a7f4b);font-size:11px;font-weight:700">New</span>';
+    html+='<tr class="'+rowCls+'">'
+      +'<td style="font-size:11px;color:var(--muted)">'+esc(c.ceaId)+'</td>'
+      +'<td style="font-weight:600">'+esc(c.name)+'</td>'
+      +'<td>'+decision+'</td>'
+      +'</tr>';
+  });
+
+  html+='</tbody></table></div>';
+  document.getElementById('ceaPreviewBody').innerHTML=html;
+  document.getElementById('ceaImportCount').textContent=_ceaRows.length;
+  document.getElementById('ceaStep1').style.display='none';
+  document.getElementById('ceaStep2').style.display='';
+  btn.disabled=false; btn.textContent='Preview import';
+}
+
+function ceaToggleKeep(btn){
+  const ceaId=btn.getAttribute('data-ceaid');
+  if(_ceaKeepIds.has(ceaId)){
+    _ceaKeepIds.delete(ceaId);
+    btn.textContent='Replace';
+    btn.className='cea-conflict-toggle replace';
+  } else {
+    _ceaKeepIds.add(ceaId);
+    btn.textContent='Keep existing';
+    btn.className='cea-conflict-toggle keep';
+  }
+}
+
+function ceaBackToUpload(){
+  document.getElementById('ceaStep2').style.display='none';
+  document.getElementById('ceaStep1').style.display='';
+}
+
+async function ceaConfirm(){
+  const fi=document.getElementById('ceaFileInput');
+  if(!fi||!fi.files||!fi.files.length){ alert('No file selected.'); return; }
+  const btn=document.getElementById('ceaImportBtn');
+  if(btn){ btn.disabled=true; btn.innerHTML='Importing…'; }
+  const formData=new FormData();
+  formData.append('file',fi.files[0]);
+  if(_ceaKeepIds.size) formData.append('keep_existing',Array.from(_ceaKeepIds).join(','));
+  try{
+    const tok=sessionStorage.getItem('aafc_token')||'';
+    const resp=await fetch(API_BASE+'/api/planning/years/'+P.currentYearId+'/cea/import',{
+      method:'POST',
+      headers:tok?{Authorization:'Bearer '+tok}:{},
+      credentials:'include',
+      body:formData,
+    });
+    if(!resp.ok){
+      const err=await resp.json().catch(function(){return {};});
+      throw new Error((err.detail&&typeof err.detail==='string'?err.detail:'Import failed ('+resp.status+')'));
+    }
+    const result=await resp.json();
+    const created=result.created||0, updated=result.updated||0, skipped=result.skipped||result.kept||0;
+    document.getElementById('ceaResultBody').innerHTML=
+      '<div style="font-size:14px;font-weight:700;color:var(--ok,#1a7f4b);margin-bottom:8px">Import complete</div>'
+      +'<p style="font-size:13px">'+created+' added &nbsp;·&nbsp; '+updated+' updated &nbsp;·&nbsp; '+skipped+' kept existing</p>';
+    document.getElementById('ceaStep2').style.display='none';
+    document.getElementById('ceaStep3').style.display='';
+  } catch(e){
+    if(btn){ btn.disabled=false; btn.innerHTML='Import all (<span id="ceaImportCount">'+_ceaRows.length+'</span>)'; }
+    const errEl=document.getElementById('ceaPreviewBody');
+    errEl.insertAdjacentHTML('afterbegin','<div style="color:#c01530;font-size:12px;font-weight:700;margin-bottom:8px">Import failed: '+esc(e.message)+'</div>');
+  }
 }
 
 function ynSyncPwBadge() {
