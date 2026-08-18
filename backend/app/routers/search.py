@@ -21,7 +21,7 @@ _ACCOUNT_ROLES = {"sqn_admin", "wing_admin", "national_admin", "system_admin"}
 
 
 @router.get("/search")
-async def search_entities(
+def search_entities(
     q: str = "",
     p: Principal = Depends(get_principal),
     db: DBSession = Depends(get_db),
