@@ -15926,12 +15926,15 @@ document.addEventListener('keydown',function(e){
     if(inp)inp.addEventListener('input',function(){
       var q=this.value;
       _idx=0;_backendResults=[];
-      document.getElementById('cmd-palette-results').innerHTML=
-        _searchLocal(q)+(q.length>=2?'<div class="cp-hint cp-searching">Searching…</div>':'');
       clearTimeout(_searchTimer);
       if(q.length>=2){
         _backendQueryRef=q;
+        document.getElementById('cmd-palette-results').innerHTML=
+          _searchLocal(q)+'<div class="cp-hint cp-searching">Searching…</div>';
         _searchTimer=setTimeout(function(){_fetchEntityResults(q);},200);
+      }else{
+        _backendQueryRef='';
+        document.getElementById('cmd-palette-results').innerHTML=_searchLocal(q);
       }
     });
     const o=document.getElementById('cmd-palette-overlay');
