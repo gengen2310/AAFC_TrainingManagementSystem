@@ -218,6 +218,16 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .yn-gear:hover{background:rgba(255,255,255,.12)}
 .yn-wrap{display:flex;flex-direction:column;align-items:flex-end;margin-left:auto}
 .yn-toast{font-size:11px;color:var(--red);margin-top:3px;min-height:14px}
+.yn-mgmt-table{width:100%;border-collapse:collapse;}
+.yn-mgmt-table th{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 12px;border-bottom:1px solid var(--border);text-align:left;}
+.yn-mgmt-table td{padding:10px 12px;font-size:13px;border-bottom:1px solid var(--border-light,#e4edf5);color:var(--text);}
+.yn-mgmt-table tr:last-child td{border-bottom:none;}
+.yn-chip{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:10px;}
+.yn-chip-active{background:var(--ok-bg,#d4f0e3);color:var(--ok,#1a7f4b);}
+.yn-chip-arch{background:var(--bg);color:var(--muted);}
+.yn-row-act{background:none;border:none;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;color:var(--royal);text-decoration:underline;text-underline-offset:2px;padding:0 6px 0 0;}
+.yn-row-act:hover{opacity:.7;}
+.yn-row-act-del{color:#c01530;}
 
 /* ── STAT CARDS ── */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
@@ -3207,6 +3217,20 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-add-equip')">Cancel</button>
       <button class="btn btn-dk" onclick="saveEquip()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGE YEARS MODAL -->
+<div class="modal-bg" id="m-manage-years" onclick="if(event.target===this)closeModal('m-manage-years')">
+  <div class="modal" style="max-width:600px;width:96vw">
+    <div class="modal-hdr" style="background:var(--dark);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:8px 8px 0 0">
+      <span style="color:#fff;font-size:14px;font-weight:800;letter-spacing:.03em">Manage Training Years</span>
+      <button class="modal-x" onclick="closeModal('m-manage-years')" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px 28px">
+      <button class="btn btn-ok btn-sm" id="ynCreateBtn" onclick="ynCreateYear()" style="margin-bottom:18px">+ Create <span id="ynCreateLabel">next year</span></button>
+      <div id="ynManageTable"></div>
     </div>
   </div>
 </div>
@@ -10435,6 +10459,101 @@ function ynToast(msg) {
 function ynOpenManage() {
   if (typeof _ynOpenManagePanel === 'function') { _ynOpenManagePanel(); return; }
   ynToast('Year management coming soon');
+}
+
+// ── Manage Years Panel ──────────────────────────────────────────────────────
+
+async function ynLoadManagePanel(){
+  const tbl=document.getElementById('ynManageTable');
+  if(!tbl) return;
+  tbl.innerHTML='<div class="muted" style="padding:12px 0">Loading…</div>';
+  let years;
+  try{ years=await api('/api/planning/years'); }
+  catch(e){ tbl.innerHTML='<div class="sc-status-err">Could not load years: '+esc(apiErr(e))+'</div>'; return; }
+  years=(years||[]).sort((a,b)=>b.year-a.year);
+  const nextNum=years.length?years[0].year+1:new Date().getFullYear()+1;
+  const lbl=document.getElementById('ynCreateLabel');
+  if(lbl) lbl.textContent=String(nextNum);
+  if(!years.length){
+    tbl.innerHTML='<div class="muted" style="padding:12px 0">No training years yet. Create the first one above.</div>';
+    return;
+  }
+  const rows=years.map(function(y){
+    const id=y.planning_year_id;
+    const chipCls=y.active_status?'yn-chip yn-chip-active':'yn-chip yn-chip-arch';
+    const chipLbl=y.active_status?'Active':'Archived';
+    const archOrRestore=y.active_status
+      ?'<button class="yn-row-act" onclick="ynArchiveYear(\''+esc(id)+'\')">Archive</button>'
+      :'<button class="yn-row-act" onclick="ynRestoreYear(\''+esc(id)+'\')">Restore</button>';
+    const delBtn=y.active_status?''
+      :'<button class="yn-row-act yn-row-act-del" onclick="ynDeleteYear(\''+esc(id)+'\','+y.year+')">Delete</button>';
+    return '<tr>'
+      +'<td style="font-weight:800;font-size:14px;color:var(--dark)">'+esc(String(y.year))+'</td>'
+      +'<td><span class="'+chipCls+'">'+chipLbl+'</span></td>'
+      +'<td>'
+        +'<button class="yn-row-act" onclick="ynExportYear(\''+esc(id)+'\','+y.year+')">Export</button>'
+        +archOrRestore
+        +delBtn
+      +'</td>'
+      +'</tr>';
+  }).join('');
+  tbl.innerHTML='<table class="yn-mgmt-table"><thead><tr><th>Year</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+async function ynCreateYear(){
+  const sorted=[...(P.years||[])].sort((a,b)=>a.year-b.year);
+  const next=sorted.length?sorted[sorted.length-1].year+1:new Date().getFullYear()+1;
+  try{
+    await api('/api/planning/years',{method:'POST',body:{year:next,name:String(next),active_status:true}});
+    const all=await api('/api/planning/years');
+    P.years=(all||[]);
+    const newY=(all||[]).find(y=>y.year===next);
+    if(newY) setCurrentYear(newY);
+    await ynLoadManagePanel();
+  } catch(e){ alert('Could not create year '+next+': '+apiErr(e)); }
+}
+
+async function ynArchiveYear(id){
+  try{
+    await api('/api/planning/years/'+id,{method:'PATCH',body:{active_status:false}});
+    const all=await api('/api/planning/years');
+    P.years=(all||[]);
+    await ynLoadManagePanel();
+  } catch(e){ alert('Archive failed: '+apiErr(e)); }
+}
+
+async function ynRestoreYear(id){
+  try{
+    await api('/api/planning/years/'+id,{method:'PATCH',body:{active_status:true}});
+    const all=await api('/api/planning/years');
+    P.years=(all||[]);
+    await ynLoadManagePanel();
+  } catch(e){ alert('Restore failed: '+apiErr(e)); }
+}
+
+async function ynDeleteYear(id,yearNum){
+  if(!confirm('Permanently delete '+yearNum+'?\nThis fails if the year has any attached data.')) return;
+  try{
+    await api('/api/planning/years/'+id,{method:'DELETE'});
+    const all=await api('/api/planning/years');
+    P.years=(all||[]);
+    await ynLoadManagePanel();
+  } catch(e){ alert('Delete failed: '+apiErr(e)); }
+}
+
+function ynExportYear(id,yearNum){
+  const a=document.createElement('a');
+  a.href=API_BASE+'/api/planning/years/'+id+'/export';
+  a.download='AAFC_TMS_'+yearNum+'.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// Override the ynOpenManage stub — this definition wins (last in file order)
+function ynOpenManage(){
+  openModal('m-manage-years');
+  ynLoadManagePanel();
 }
 
 function ynSyncPwBadge() {
