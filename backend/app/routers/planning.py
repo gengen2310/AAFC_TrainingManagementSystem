@@ -9,7 +9,7 @@ from __future__ import annotations
 import csv as _csv, io, json as _json, re, uuid
 from datetime import date, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session as DBSession
@@ -3883,6 +3883,7 @@ async def export_year_csv(
         .join(ParadeDate, ParadeDate.parade_night_id == ParadeNight.id)
         .filter(
             ParadeDate.planning_year_id == year_id,
+            ParadeDate.is_active.is_(True),
             TrainingSession.is_archived.is_(False),
         )
         .order_by(ParadeDate.parade_date, TrainingSession.period_number)
@@ -5048,6 +5049,7 @@ def _normalise_cea_row(row: dict) -> dict:
 async def import_cea_csv(
     year_id: str,
     file: UploadFile = File(...),
+    keep_existing: str = Form(default=""),
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -5066,6 +5068,9 @@ async def import_cea_csv(
 
     reader = _csv.DictReader(io.StringIO(text))
     rows = list(reader)
+
+    # Build set of cea_activity_ids the caller wants to preserve unchanged
+    _keep_ids = {s.strip() for s in keep_existing.split(",") if s.strip()}
 
     batch = CeaImportBatch(
         id=str(uuid.uuid4()),
@@ -5147,6 +5152,9 @@ async def import_cea_csv(
                 db.add(act)
                 created += 1
             elif action == "update" and existing:
+                if cea_id and cea_id in _keep_ids:
+                    skipped += 1
+                    continue
                 for k, v in parsed.items():
                     if v is not None:
                         setattr(existing, k, v)
