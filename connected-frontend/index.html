@@ -4094,7 +4094,7 @@ async function doLookup(){
   err.style.display='none';
   btn.disabled=true; btn.textContent='Looking up…';
   prog.style.display='block'; bar.style.width='60%';
-  function _resetContinue(){prog.style.display='none';bar.style.width='0%';btn.disabled=false;btn.textContent='Continue →';}
+  function _resetContinue(){prog.style.display='none';bar.style.width='0%';btn.disabled=false;btn.textContent='Next';}
   try{
     const body={unit_type:type,role};
     if(type!=='national') body.identifier=ident;
@@ -4132,7 +4132,7 @@ function showAuthStep1(){
   document.getElementById('auth-err').style.display='none';
   document.getElementById('auth-code').value='';
   const btn=document.getElementById('auth-continue-btn');
-  btn.disabled=false; btn.textContent='Continue →';
+  btn.disabled=false; btn.textContent='Next';
   document.getElementById('auth-progress1').style.display='none';
   document.getElementById('auth-bar1').style.width='0%';
   onAuthFieldChange();
