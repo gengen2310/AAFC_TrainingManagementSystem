@@ -180,7 +180,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 
 /* ── APP SHELL ── */
 #app{display:none;flex-direction:column;min-height:100vh;}
-.topbar{background:var(--dark);height:52px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 8px rgba(0,0,0,.25);position:sticky;top:0;z-index:200;}
+.topbar{background:linear-gradient(180deg,#001b3d 0%,#002550 100%);height:52px;padding:0 var(--sp-lg);display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 0 rgba(255,255,255,.06),0 2px 12px rgba(0,0,0,.35);position:sticky;top:0;z-index:200;}
 .tb-brand{display:flex;align-items:center;gap:10px;}
 .tb-wm{font-size:13px;font-weight:700;color:white;letter-spacing:.03em;}
 .tb-wm .r{color:var(--blue);}
@@ -600,8 +600,8 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .rc-status{font-size:10.5px;color:var(--muted);margin-top:2px;}
 
 /* ── SCOPE / MODE BANNERS ── */
-.scope-banner{display:flex;align-items:center;gap:10px;padding:7px 22px;font-size:11px;font-weight:700;letter-spacing:.04em;background:#eef4fb;color:var(--dark);border-bottom:1px solid var(--border);}
-.scope-banner .sb-tag{font-weight:900;text-transform:uppercase;letter-spacing:.08em;padding:2px 9px;border-radius:20px;font-size:9.5px;background:var(--blue);color:var(--dark);}
+.scope-banner{display:flex;align-items:center;gap:10px;padding:6px var(--sp-lg);font-size:11px;font-weight:700;letter-spacing:.04em;background:#f0f7ff;color:#002f65;border-bottom:1.5px solid #bee3f8;}
+.scope-banner .sb-tag{font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:2px 8px;border-radius:3px;font-size:9px;background:#002f65;color:#fff;}
 /* Base .sb-tag uses --dark text because --blue (#51b0e3) is too light for white
    text at 4.5:1 (was 2.42:1); the four darker background variants below keep
    white text explicitly since they already meet contrast with it. */
@@ -609,10 +609,10 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .scope-banner.sb-wing .sb-tag{background:var(--royal);color:#fff;}
 .scope-banner.sb-auditor .sb-tag{background:var(--steel);color:#fff;}
 .scope-banner.sb-system_admin .sb-tag{background:#1a1a2e;color:#fff;}
-.mode-banner{display:none;align-items:center;justify-content:space-between;gap:12px;padding:8px 22px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:#ffd700;color:#3a2e00;border-bottom:2px solid #c9a800;}
-.mode-banner.intervention{background:#ffe0e0;color:#7a1010;border-bottom-color:#c25;}
+.mode-banner{display:none;align-items:center;justify-content:space-between;gap:12px;padding:7px var(--sp-lg);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:#fffbe6;color:#5a4200;border-bottom:2px solid #f0c800;}
+.mode-banner.intervention{background:#fef0f0;color:#7a1010;border-bottom:2px solid #e03;}
 .mode-banner.show{display:flex;}
-.mode-banner button{font:inherit;font-size:11px;border:1px solid currentColor;background:transparent;color:inherit;border-radius:6px;padding:3px 11px;cursor:pointer;text-transform:uppercase;font-weight:800;}
+.mode-banner button{font:inherit;font-size:11px;border:1px solid currentColor;background:transparent;color:inherit;border-radius:5px;padding:4px 12px;cursor:pointer;text-transform:uppercase;font-weight:700;letter-spacing:.04em;}
 .save-ind{display:inline-block;font-size:11px;font-weight:600;margin-left:8px;color:var(--muted);vertical-align:middle;}
 .save-ind.saving{color:var(--steel);}
 .save-ind.saved{color:var(--ok);}
@@ -680,7 +680,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .wiz-summary-val{font-weight:600;color:var(--text);}
 .add-sess-bar{display:flex;gap:8px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed var(--border);}
 .qe-form{margin-top:8px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);}
-.maint-banner{display:none;align-items:center;gap:10px;padding:8px 22px;font-size:12px;font-weight:700;background:#e51937;color:#fff;border-bottom:2px solid #b5002b;}
+.maint-banner{display:none;align-items:center;gap:10px;padding:7px var(--sp-lg);font-size:12px;font-weight:700;background:#c8102e;color:#fff;border-bottom:2px solid #9a0b22;}
 .maint-banner.show{display:flex;}
 .maint-banner.pending{background:#c97a00;border-bottom-color:#a06200;}
 .maint-banner .maint-icon{font-size:15px;flex-shrink:0;}
@@ -884,7 +884,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
        can_view_squadron/can_view_wing already grant system_admin unconditional read access).
        Only protected writes still require Delegated Intervention, entered below via the
        existing enterMode()/exitMode() machinery shared with Wing Admin's Proxy Mode. -->
-  <div class="no-print" id="sa-scope-bar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 16px;background:#eef4fa;border-bottom:1px solid var(--border);font-size:12px">
+  <div class="no-print" id="sa-scope-bar" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;padding:6px var(--sp-lg);background:#f0f7ff;border-bottom:1.5px solid #bee3f8;font-size:12px">
     <span style="font-weight:700;color:var(--dark)">Viewing:</span>
     <select id="sa-scope-wing" aria-label="Browse Wing" style="font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:4px" onchange="saSelectWing(this.value)">
       <option value="">National (all Wings)</option>
