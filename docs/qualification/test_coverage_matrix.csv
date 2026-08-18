@@ -40,3 +40,4 @@ app/services_readiness.py,96.4%,94.4%,,,,,"measured 2026-08-08 via pytest-cov, r
 app/workers/__init__.py,100.0%,100.0%,,,,,"measured 2026-08-08 via pytest-cov, real run against 1204-test suite"
 app/workers/celery_app.py,8.3%,100.0%,,,,,"measured 2026-08-08 via pytest-cov, real run against 1204-test suite"
 app/workers/dispatcher.py,88.1%,50.0%,,,,,"measured 2026-08-08 via pytest-cov, real run against 1204-test suite"
+tests/test_year_ux.py (5 tests),n/a,n/a,n/a,n/a,"export 200 / export 401 / export 403+404 / cea-import keep_existing skips update / cea-import without keep_existing imports","wrong-scope test (test_export_year_csv_wrong_scope) hits 404 before scope gate fires (fabricated UUID); a genuine other-wing wrong-scope case is not covered","added 2026-08-18; sub-project 1 Year UX; covers GET /export and POST /cea/import new+modified endpoints"

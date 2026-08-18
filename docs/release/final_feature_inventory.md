@@ -79,3 +79,39 @@ surfacing per this engagement's own plan.
   {id}/leave`) are views/behaviours over the same `Facilitator` table, not a second
   model — confirmed via `final_source_inventory.md`'s API-inventory correction above
   (no `PlanningFacilitator` model class exists in the 57-class model inventory).
+
+---
+
+## Year UX — Sub-project 1 (merged 2026-08-18, commit `5ab3b19`)
+
+### New and modified API endpoints
+
+| Method | Path | File | Change |
+|--------|------|------|--------|
+| GET | `/api/planning/years/{year_id}/export` | `planning.py` | New — CSV export of year's activities |
+| POST | `/api/planning/years/{year_id}/cea/import` | `planning.py` | Modified — added `keep_existing` Form parameter (comma-sep cea_activity_ids to skip updating) |
+
+### New backend tests (`backend/tests/test_year_ux.py` — 5 tests)
+
+`test_export_year_csv_returns_200`, `test_export_year_csv_unauthenticated`, `test_export_year_csv_wrong_scope`, `test_cea_import_keep_existing_skips_update`, `test_cea_import_without_keep_existing_still_works`
+
+### New frontend features (`connected-frontend/index.html`)
+
+| Feature | Component / ID | Roles |
+|---------|---------------|-------|
+| Label cleanup | All pages — "Planning Year" / "Training Year" → bare year integer | all |
+| Year nav control | `#ynDisplay`, `#ynPrev`, `#ynNext`, `#ynGear` in Activities ph-actions | sqn_admin + |
+| Manage Years panel | `#m-manage-years` modal — create / archive / restore / delete / export | wing_admin, national_admin, system_admin |
+| CEA Import modal | `#m-cea-import`, `#actImportCeaBtn` — 3-step CSV import with conflict preview | wing_admin, national_admin, system_admin |
+| PW year badge | `#navPwYrBadge`, `#navPwYrHint` in nav-pw-link | all |
+| TMS→PW year handoff | `&y=YYYY` appended to PW deep-link; `aafc_requested_year` sessionStorage | all |
+
+### Updated test-suite baseline
+
+```
+1764 passed, 7 skipped  (note: 1 pre-existing flaky test in test_timing.py, unrelated to sub-project)
+```
+
+### Deferred minor findings (non-blocking, tracked in `.superpowers/sdd/2026-08-18-year-ux/progress.md`)
+
+F-1 aria-labels on year nav buttons · F-2 yn-toast animation · F-3 year-nav-ctrl box-shadow · F-4 year-nav-ctrl flex-shrink · M-1 wrong-scope test hits 404 before scope gate · M-2 dead ynOpenManage stub · M-3 redundant esc() on textContent
