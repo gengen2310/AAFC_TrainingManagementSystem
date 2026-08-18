@@ -3792,6 +3792,140 @@ def export_annual_program_xlsx(
                              headers={"Content-Disposition": f"attachment; filename={fname}"})
 
 
+@router.get("/years/{year_id}/export")
+async def export_year_csv(
+    year_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Download a planning year's full program as a CSV file.
+
+    Sections: CEA activities, parade schedule, scheduled sessions.
+    BOM-prefixed UTF-8 for direct Excel compatibility.
+    Filename: AAFC_TMS_{year}_{scope}_{date}.csv
+    """
+    from datetime import date as _date
+
+    year = db.query(PlanningYear).filter(PlanningYear.id == year_id).first()
+    if not year:
+        raise HTTPException(404, "Year not found")
+    _require_year_access(p, year)
+
+    # ── Scope label ──────────────────────────────────────────────────────────
+    # Principal carries IDs only; look up the human-readable short name.
+    if p.acting_squadron_id or p.squadron_id:
+        sq_id = p.acting_squadron_id or p.squadron_id
+        sq = db.get(Squadron, sq_id)
+        scope_label = (sq.short_name if sq else "SQUADRON").upper()
+    elif p.acting_wing_id or p.wing_id:
+        wg_id = p.acting_wing_id or p.wing_id
+        wg = db.get(Wing, wg_id)
+        scope_label = (wg.short_name if wg else "WING").upper()
+    else:
+        scope_label = "NATIONAL"
+
+    buf = io.StringIO()
+    writer = _csv.writer(buf)
+
+    # ── Header ───────────────────────────────────────────────────────────────
+    writer.writerow([f"TRAINING PROGRAM — {scope_label} — {year.year}"])
+    writer.writerow([f"Exported: {_date.today().isoformat()}"])
+    writer.writerow([])
+
+    # ── CEA Activities ────────────────────────────────────────────────────────
+    writer.writerow(["ACTIVITIES"])
+    writer.writerow(["cea_activity_id", "name", "type", "importance", "owning_level"])
+    activities = (
+        db.query(CeaActivity)
+        .filter(CeaActivity.planning_year_id == year_id, CeaActivity.is_archived.is_(False))
+        .order_by(CeaActivity.activity_name)
+        .all()
+    )
+    for act in activities:
+        writer.writerow([
+            act.cea_activity_id or "",
+            act.activity_name or "",
+            act.activity_type or "",
+            act.importance or "",
+            act.parent_unit or act.host_unit or "",
+        ])
+    writer.writerow([])
+
+    # ── Parade Schedule ───────────────────────────────────────────────────────
+    writer.writerow(["PARADE SCHEDULE"])
+    writer.writerow(["date", "type", "term", "week", "notes"])
+    parade_dates = (
+        db.query(ParadeDate)
+        .filter(ParadeDate.planning_year_id == year_id, ParadeDate.is_active.is_(True))
+        .order_by(ParadeDate.parade_date)
+        .all()
+    )
+    for pd_row in parade_dates:
+        writer.writerow([
+            pd_row.parade_date or "",
+            pd_row.parade_type or "",
+            pd_row.term or "",
+            pd_row.week_number or "",
+            (pd_row.notes or "").replace("\n", " "),
+        ])
+    writer.writerow([])
+
+    # ── Sessions ──────────────────────────────────────────────────────────────
+    # Build a parade_night_id → parade_date lookup from the dates already loaded.
+    pn_to_date: dict[str, str] = {}
+    for pd_row in parade_dates:
+        if pd_row.parade_night_id and pd_row.parade_night_id not in pn_to_date:
+            pn_to_date[pd_row.parade_night_id] = pd_row.parade_date or ""
+
+    sessions = (
+        db.query(TrainingSession)
+        .join(ParadeNight, TrainingSession.parade_night_id == ParadeNight.id)
+        .join(ParadeDate, ParadeDate.parade_night_id == ParadeNight.id)
+        .filter(
+            ParadeDate.planning_year_id == year_id,
+            TrainingSession.is_archived.is_(False),
+        )
+        .order_by(ParadeDate.parade_date, TrainingSession.period_number)
+        .all()
+    )
+
+    # Batch-load session audiences to avoid N+1 queries.
+    session_ids = [s.id for s in sessions]
+    sa_by_session: dict[str, list[str]] = {s.id: [] for s in sessions}
+    if session_ids:
+        audience_rows = (
+            db.query(SessionAudience, TrainingClass)
+            .join(TrainingClass, SessionAudience.training_class_id == TrainingClass.id)
+            .filter(SessionAudience.session_id.in_(session_ids))
+            .all()
+        )
+        for sa, tc in audience_rows:
+            sa_by_session[sa.session_id].append(tc.display_name)
+
+    writer.writerow(["SESSIONS"])
+    writer.writerow(["date", "period", "title", "facilitator", "training_classes"])
+    for sess in sessions:
+        parade_date_str = pn_to_date.get(sess.parade_night_id, "")
+        classes = "; ".join(sa_by_session.get(sess.id, []))
+        writer.writerow([
+            parade_date_str,
+            sess.period_number or "",
+            sess.custom_title or sess.curriculum_title_at_time or "",
+            sess.facilitator_display_name_at_time or "",
+            classes,
+        ])
+
+    csv_bytes = buf.getvalue().encode("utf-8-sig")  # BOM for Excel compatibility
+    safe_scope = scope_label.replace(" ", "_").replace("/", "-")
+    filename = f"AAFC_TMS_{year.year}_{safe_scope}_{_date.today().isoformat()}.csv"
+
+    return StreamingResponse(
+        io.BytesIO(csv_bytes),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/years/{year_id}/schedule/export.xlsx")
 def export_schedule_xlsx(
     year_id: str,
