@@ -57,7 +57,6 @@
   --text-xs: 11px; --text-sm: 13px; --text-base: 15px; --text-lg: 17px; --text-xl: 21px; --text-2xl: 27px;
   /* DES-M02: extended spacing scale (4px base, fills gaps in existing --space-N) */
   --space-05: 4px; --space-1h: 12px; --space-2h: 20px; --space-5: 40px; --space-6: 48px;
-  --radius: 10px;
   /* B-DS spacing system — all padding/gap/margin must use these */
   --sp-xs:8px;--sp-sm:12px;--sp-md:16px;--sp-lg:20px;--sp-xl:24px;
   --gap-cards:10px;
@@ -195,7 +194,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .app-body{display:flex;flex:1;}
 
 /* ── SIDENAV ── */
-.sidenav{width:160px;background:linear-gradient(180deg,#001b3d 0%,#002550 100%);border-right:1px solid rgba(255,255,255,.06);flex-shrink:0;padding:0;height:calc(100vh - 52px);position:sticky;top:52px;overflow-y:auto;display:flex;flex-direction:column;}
+.sidenav{width:156px;background:linear-gradient(180deg,#001b3d 0%,#002550 100%);border-right:1px solid rgba(255,255,255,.06);flex-shrink:0;padding:0;height:calc(100vh - 52px);position:sticky;top:52px;overflow-y:auto;display:flex;flex-direction:column;}
 .sidenav::after{content:'';position:absolute;top:0;right:0;bottom:0;width:1px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03) 60%,transparent);pointer-events:none;}
 /* Logo bar — unit name only */
 .nav-logo-bar{padding:var(--sp-md) var(--sp-md) var(--sp-sm);border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;}
@@ -300,6 +299,9 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .btn-secondary:hover{background:#e0f0fa;}
 .btn-ghost{background:transparent;color:#004b8d;border:1px solid transparent;padding:10px 16px;border-radius:5px;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:.04em;cursor:pointer;}
 .btn-ghost:hover{color:#002f65;}
+.btn-danger{background:linear-gradient(180deg,#c8102e 0%,#9a0b22 100%);color:#fff;border:1px solid rgba(100,0,20,.3);box-shadow:0 1px 0 rgba(255,255,255,.08) inset,0 -1px 0 rgba(0,0,0,.20) inset,0 1px 3px rgba(150,0,30,.3);padding:10px 16px;border-radius:5px;font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.04em;cursor:pointer;transition:background .12s,box-shadow .12s;}
+.btn-danger:hover{background:linear-gradient(180deg,#e01235 0%,#b00d25 100%);}
+.btn-disabled{background:#f4f8fc;color:#b0b7bb;border:1px solid var(--border);cursor:not-allowed;opacity:.7;padding:10px 16px;border-radius:5px;font-family:inherit;font-size:12px;font-weight:700;letter-spacing:.04em;}
 a:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:2px;}
 /* DES-M06: global keyboard focus ring — WCAG 2.1 SC 2.4.7 */
 :focus-visible{outline:3px solid var(--blue);outline-offset:2px;}
