@@ -154,13 +154,11 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 /* ── AUTH ── */
 #auth-screen{min-height:100vh;background:linear-gradient(160deg,#001e42 0%,#000e26 100%);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;}
 #auth-screen::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(81,176,227,.05) 0%,transparent 55%);pointer-events:none;}
-.auth-wrap{background:#fff;border-radius:var(--radius-lg);padding:var(--sp-xl) var(--sp-xl) var(--sp-lg);width:308px;max-width:96vw;box-shadow:0 1px 3px rgba(0,47,101,.08),0 8px 32px rgba(0,0,0,.28);border:1px solid #d1dce8;position:relative;overflow:hidden;}
+.auth-wrap{background:#fff;border-radius:var(--radius-lg);padding:var(--sp-xl) var(--sp-xl) var(--sp-lg);width:360px;max-width:96vw;box-shadow:0 1px 3px rgba(0,47,101,.08),0 8px 32px rgba(0,0,0,.28);border:1px solid #d1dce8;position:relative;overflow:hidden;}
 .auth-wrap::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#002f65,#004b8d 50%,#51b0e3);opacity:.7;}
 .auth-logo{text-align:center;margin-bottom:var(--sp-md);}
-.auth-crest{width:48px;height:48px;border-radius:8px;background:#f0f7ff;border:1px solid #d1dce8;display:flex;align-items:center;justify-content:center;padding:10px;margin:0 auto var(--sp-sm);}
-.auth-crest-text{font-size:14px;font-weight:800;color:#002f65;letter-spacing:.04em;line-height:1;}
-.auth-org{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#455560;margin-bottom:6px;white-space:nowrap;}
-.auth-wm{font-size:17px;font-weight:800;color:#001e42;letter-spacing:.01em;}
+.auth-logo-img{width:300px;max-width:100%;height:auto;display:block;margin:0 auto var(--sp-sm);filter:drop-shadow(0 2px 12px rgba(0,47,101,.12));}
+.auth-wm{font-size:18px;font-weight:800;color:#001e42;letter-spacing:.01em;}
 .auth-div{width:28px;height:2px;background:var(--blue);margin:10px auto 0;border-radius:1px;opacity:.6;}
 .fg{margin-bottom:14px;}
 .fg label{display:block;font-size:12px;font-weight:700;color:var(--steel);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;}
@@ -729,9 +727,19 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   .form-row{grid-template-columns:1fr;}
 }
 @media(min-width:769px){
-  .btn-hamburger{display:none;}
+  .btn-hamburger{display:flex;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:10px 8px;margin-right:4px;color:white;min-height:44px;min-width:44px;}
+  .btn-hamburger span{display:block;width:20px;height:2px;background:white;margin:4px 0;border-radius:1px;}
   .nav-overlay{display:none!important;}
 }
+/* Collapsible nav — desktop toggle */
+body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width .18s ease;}
+.sidenav{transition:width .18s ease;}
+/* Getting Started — equal right-side button widths */
+.gs-step-row .btn{min-width:158px;text-align:center;}
+/* Needs Attention table — better row distinction */
+#action-tbody tr:nth-child(even) td{background:#eef4fb;}
+#action-tbody tr td{padding:10px 12px;border-bottom:1px solid var(--border);}
+#action-tbody tr:hover td{background:#dbeaf5;}
 /* ── System Console ─────────────────────────────────── */
 .sc-card{margin-bottom:16px;}
 .sc-section-hdr{font-size:11px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.10em;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
@@ -794,8 +802,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <div id="auth-screen">
   <div class="auth-wrap">
     <div class="auth-logo">
-      <div class="auth-crest"><span class="auth-crest-text">AAFC</span></div>
-      <div class="auth-org">Australian Air Force Cadets</div>
+      <img src="https://greatershepparton.com.au/images/assets/files/images/events/submitted/AAFC-2Line1~2000_auto_-1_80_5bd6.jpg" class="auth-logo-img" alt="Australian Air Force Cadets" loading="eager">
       <div class="auth-wm">Training Management System</div>
       <div class="auth-div"></div>
     </div>
@@ -917,7 +924,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
            REM-25 for the full before/after capability comparison. -->
       <div class="nav-lbl">Overview</div>
       <div class="nav-item" tabindex="0" onclick="nav('getting-started')">Getting Started</div>
-      <div class="nav-item active" tabindex="0" onclick="nav('dashboard')">Dashboard</div>
+      <div class="nav-item active" tabindex="0" onclick="nav('dashboard')">Training Dashboard</div>
       <div class="nav-item" tabindex="0" onclick="nav('calendar')">Training Calendar</div>
       <div class="nav-lbl">Plan Training</div>
       <div class="nav-item" tabindex="0" onclick="nav('curriculum')">Curriculum</div>
@@ -15773,15 +15780,24 @@ function _apShowDateDetail(ds){
 
 // ─── Mobile navigation drawer ─────────────────────────────────────────────────
 function toggleMobileNav(){
-  const nav=document.querySelector('.sidenav');
-  const overlay=document.getElementById('nav-overlay');
-  const btn=document.getElementById('btn-hamburger');
-  const isOpen=nav&&nav.classList.contains('nav-open');
-  if(isOpen){ closeMobileNav(); }
-  else {
-    if(nav)nav.classList.add('nav-open');
-    if(overlay)overlay.classList.add('nav-open');
-    if(btn)btn.setAttribute('aria-expanded','true');
+  const isMobile=window.innerWidth<769;
+  if(isMobile){
+    const nav=document.querySelector('.sidenav');
+    const overlay=document.getElementById('nav-overlay');
+    const btn=document.getElementById('btn-hamburger');
+    const isOpen=nav&&nav.classList.contains('nav-open');
+    if(isOpen){ closeMobileNav(); }
+    else {
+      if(nav)nav.classList.add('nav-open');
+      if(overlay)overlay.classList.add('nav-open');
+      if(btn)btn.setAttribute('aria-expanded','true');
+    }
+  } else {
+    // Desktop: toggle persistent collapsed state
+    const collapsed=document.body.classList.toggle('nav-collapsed');
+    try{ localStorage.setItem('navCollapsed', collapsed?'1':''); }catch(_){}
+    const btn=document.getElementById('btn-hamburger');
+    if(btn)btn.setAttribute('aria-expanded',collapsed?'false':'true');
   }
 }
 function closeMobileNav(){
@@ -15792,6 +15808,10 @@ function closeMobileNav(){
   if(overlay)overlay.classList.remove('nav-open');
   if(btn)btn.setAttribute('aria-expanded','false');
 }
+// Restore collapsed state on load
+(function(){
+  try{ if(localStorage.getItem('navCollapsed')==='1')document.body.classList.add('nav-collapsed'); }catch(_){}
+})();
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
     const sidenav=document.querySelector('.sidenav');
