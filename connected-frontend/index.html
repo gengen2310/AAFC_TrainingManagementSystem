@@ -893,7 +893,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="nav-lbl">Help &amp; Reference</div>
       <div class="nav-item" tabindex="0" onclick="nav('help')">Help &amp; Reference</div>
       <div class="nav-lbl" id="nav-lbl-pw" style="display:none">Workspace</div>
-      <a class="nav-item-ext" id="nav-pw-link" href="#" target="_blank" rel="noopener" style="display:none">Planning Workspace ↗</a>
+      <a class="nav-item-ext" id="nav-pw-link" href="#" target="_blank" rel="noopener" style="display:none">Planning Workspace ↗<span id="navPwYrBadge" style="display:none;margin-left:8px;font-size:10px;font-weight:800;background:var(--dark);color:#fff;padding:2px 8px;border-radius:10px;letter-spacing:.04em;vertical-align:middle"></span></a>
+      <div id="navPwYrHint" style="display:none;padding:3px 20px 0;font-size:10px;color:var(--muted)"></div>
       <div class="nav-item-ext" id="nav-pw-unconfigured" style="display:none;opacity:.55;cursor:default" title="Planning Workspace is not configured for this environment. Contact your system administrator.">Planning Workspace (unavailable)</div>
     </nav>
 
@@ -4824,7 +4825,11 @@ function bootApp(){
     // cleared by the PW before any navigation so they don't persist in history.
     pwLink.addEventListener('click',function(e){
       const tok=sessionStorage.getItem('aafc_token');
-      if(tok){e.preventDefault();window.open(pwUrl+'#t='+encodeURIComponent(tok),'_blank','noopener');}
+      if(tok){
+        e.preventDefault();
+        const yr=P&&P.currentYearInt?'&y='+P.currentYearInt:'';
+        window.open(pwUrl+'#t='+encodeURIComponent(tok)+yr,'_blank','noopener');
+      }
     },{once:false});
   }
   const pwEligibleScope=['squadron','wing','national','system_admin'].includes(scope);
@@ -10304,6 +10309,13 @@ let _activitiesPageLoaded=false;
 async function _loadActivitiesPage(){
   renderActs();
   _actTabLoad('act-tab-squadron','squadron',null);
+  // Ensure year nav is initialised — fetch years if not yet loaded,
+  // otherwise just refresh the display (avoids a redundant API call).
+  if (!P.years || !P.years.length) {
+    await _loadPlanningYears();
+  } else {
+    ynInit();
+  }
 }
 
 // ── Year nav control ──────────────────────────────────────────────────────────
@@ -10349,6 +10361,7 @@ function _ynUpdateArrows() {
 }
 
 function ynNav(dir) {
+  if (P._ynEditing) return;
   if (!P.years || !P.years.length) return;
   const sorted = [...P.years].sort((a,b) => a.year - b.year);
   const idx = sorted.findIndex(y => y.planning_year_id === P.currentYearId);
@@ -10358,26 +10371,39 @@ function ynNav(dir) {
 }
 
 function ynStartEdit() {
+  if (P._ynEditing) return;
   const disp = document.getElementById('ynDisplay');
-  if (!disp || disp.querySelector('input')) return;
+  if (!disp) return;
+  P._ynEditing = true;
+  // Disable arrows and gear while editing
+  const prev = document.getElementById('ynPrev'), next = document.getElementById('ynNext');
+  const gear = document.getElementById('ynGear');
+  if (prev) prev.disabled = true;
+  if (next) next.disabled = true;
+  if (gear) gear.style.pointerEvents = 'none';
   const cur = P.currentYearInt || '';
-  disp.innerHTML = `<input type="text" maxlength="4" value="${esc(String(cur))}" id="ynInput">`;
+  disp.innerHTML = `<input type="text" maxlength="4" value="${esc(String(cur))}" id="ynInput" aria-label="Enter year">`;
   const inp = document.getElementById('ynInput');
   if (!inp) return;
-  inp.select();
+  inp.focus(); inp.select();
   inp.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); ynCommitEdit(inp.value); }
     if (e.key === 'Escape') { e.preventDefault(); ynCancelEdit(); }
   });
   setTimeout(() => inp.addEventListener('blur', () => setTimeout(() => {
-    if (document.getElementById('ynInput')) ynCancelEdit();
+    if (P._ynEditing) ynCancelEdit();
   }, 120)), 0);
 }
 
 function ynCancelEdit() {
+  if (!P._ynEditing) return;
+  P._ynEditing = false;
   const disp = document.getElementById('ynDisplay');
-  if (!disp) return;
-  disp.innerHTML = `<span id="ynLabel">${esc(String(P.currentYearInt || '—'))}</span>`;
+  if (disp) disp.innerHTML = `<span id="ynLabel">${esc(String(P.currentYearInt || '—'))}</span>`;
+  // Restore arrows and gear
+  const gear = document.getElementById('ynGear');
+  if (gear) gear.style.pointerEvents = '';
+  _ynUpdateArrows();
 }
 
 function ynCommitEdit(val) {
@@ -10409,6 +10435,20 @@ function ynToast(msg) {
 function ynOpenManage() {
   if (typeof _ynOpenManagePanel === 'function') { _ynOpenManagePanel(); return; }
   ynToast('Year management coming soon');
+}
+
+function ynSyncPwBadge() {
+  const badge = document.getElementById('navPwYrBadge');
+  const hint = document.getElementById('navPwYrHint');
+  const yr = P && P.currentYearInt;
+  if (badge) {
+    badge.textContent = yr ? String(yr) : '';
+    badge.style.display = yr ? '' : 'none';
+  }
+  if (hint) {
+    hint.textContent = yr ? `Opens with ${yr} context` : '';
+    hint.style.display = yr ? '' : 'none';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -12705,6 +12745,7 @@ const P = {
   locations: [],
   facilitators: [],
   builderSessions: [],
+  _ynEditing: false,   // true while the year inline-input is open
 };
 
 const _IMPORTANCE_LABELS = { must_attend:'Must Attend', key_event:'Key Event', optional:'Optional' };
