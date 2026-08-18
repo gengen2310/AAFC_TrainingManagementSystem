@@ -536,6 +536,13 @@ def update_squadron(squadron_id: str, body: SquadronUpdateIn, db: DBSession = De
     if not s:
         raise HTTPException(404, detail={"error": "not_found"})
     require_can_write_squadron(p, s.id, s.wing_id)
+    if (
+        body.unit_type is not None
+        and body.unit_type != s.unit_type
+        and p.role == "sqn_admin"
+    ):
+        raise HTTPException(403, detail={"error": "unit_type_locked",
+                                         "message": "Unit type can only be changed by wing or national admin."})
     if body.name is not None:
         name = body.name.strip()
         if not name:

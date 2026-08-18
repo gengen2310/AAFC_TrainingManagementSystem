@@ -228,17 +228,58 @@ def test_create_squadron_returns_unit_number(client):
     assert s["unit_number"] == "12A"
 
 
-def test_patch_squadron_unit_type(client):
+def test_sqn_admin_cannot_change_unit_type(client):
+    """sqn_admin must get 403 when trying to change unit_type."""
     h = login(client, "ADMIN703")
     sqn_id = _get_sqn_id(client, h)
-    r = client.patch(f"/api/squadrons/{sqn_id}", headers=h, json={"unit_type": "specialist_squadron"})
+    r = client.patch(f"/api/squadrons/{sqn_id}", headers=h,
+                     json={"unit_type": "specialist_squadron"})
+    assert r.status_code == 403
+    assert r.json()["detail"]["error"] == "unit_type_locked"
+
+
+def test_sqn_admin_can_send_same_unit_type(client):
+    """sqn_admin sending the current unit_type unchanged must succeed (no-op)."""
+    h = login(client, "ADMIN703")
+    sqn_id = _get_sqn_id(client, h)
+    # Get current unit_type
+    sqns = client.get("/api/squadrons", headers=h).json()
+    current = next(s["unit_type"] for s in sqns if s["squadron_id"] == sqn_id)
+    r = client.patch(f"/api/squadrons/{sqn_id}", headers=h,
+                     json={"unit_type": current})
+    assert r.status_code == 200
+
+
+def test_sqn_admin_can_edit_other_settings(client):
+    """sqn_admin can still PATCH other fields (regression guard)."""
+    h = login(client, "ADMIN703")
+    sqn_id = _get_sqn_id(client, h)
+    r = client.patch(f"/api/squadrons/{sqn_id}", headers=h,
+                     json={"address": "999 Test St"})
+    assert r.status_code == 200
+    # Restore
+    client.patch(f"/api/squadrons/{sqn_id}", headers=h, json={"address": ""})
+
+
+def test_wing_admin_can_change_unit_type(client):
+    """wing_admin must be able to change unit_type of a squadron in their wing."""
+    h = login(client, "ADMIN7WG")
+    sqn_id = _get_sqn_id(client, h)
+    # Enter proxy mode (required for wing_admin to write squadron data)
+    enter = client.post(f"/api/proxy/enter/{sqn_id}", headers=h,
+                        json={"reason": "unit_type update test"})
+    assert enter.status_code == 200, enter.text
+    # Change to specialist_squadron
+    r = client.patch(f"/api/squadrons/{sqn_id}", headers=h,
+                     json={"unit_type": "specialist_squadron"})
     assert r.status_code == 200, r.text
     sqns = client.get("/api/squadrons", headers=h).json()
-    s = next((x for x in sqns if x["squadron_id"] == sqn_id), None)
-    assert s is not None
+    s = next(x for x in sqns if x["squadron_id"] == sqn_id)
     assert s["unit_type"] == "specialist_squadron"
-    # Restore
-    client.patch(f"/api/squadrons/{sqn_id}", headers=h, json={"unit_type": "standard_squadron"})
+    # Restore and exit proxy
+    client.patch(f"/api/squadrons/{sqn_id}", headers=h,
+                 json={"unit_type": "standard_squadron"})
+    client.post("/api/proxy/exit", headers=h)
 
 
 # ── Wing rename ──
