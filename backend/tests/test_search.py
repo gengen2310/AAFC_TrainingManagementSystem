@@ -1,5 +1,6 @@
 """Tests for GET /api/search — universal entity search."""
 import pytest
+from uuid import uuid4
 from tests.conftest import login
 
 
@@ -83,19 +84,78 @@ def test_search_activity_by_name(client):
 
 def test_search_wing_admin_scope(client):
     """wing_admin finds facilitators in own wing; does NOT see other wings."""
-    # Positive: wing_admin for 7WG finds Flanders (703 SQN is in 7WG)
-    h = login(client, "ADMIN7WG")
-    r = client.get("/api/search?q=Flanders", headers=h)
-    assert r.status_code == 200
-    facs = [x for x in r.json()["results"] if x["type"] == "facilitator"]
-    assert len(facs) >= 1, "wing_admin must find facilitators in own wing"
-    # Negative: wing_admin must NOT see facilitators from outside the wing.
-    # McGhie is also in 703 SQN, so we can't use that test here.
-    # But we can verify that facilitators returned all belong to wing_id 7WG.
-    # (In this test data, all facilitators are in 703 SQN which IS in 7WG, so they should appear.
-    # To truly test negative case, we'd need facilitators in OTHER wings, which don't exist in seed.)
-    # The key assertion: if wing_admin searches for a facilitator in 7WG, they get results
-    assert any("Flanders" in f["label"] for f in facs)
+    from app.database import SessionLocal
+    from app.models import Wing, Squadron, Facilitator
+
+    db = SessionLocal()
+    other_wing_id = None
+    other_sqn_id = None
+    other_fac_id = None
+    try:
+        # Create a facilitator in a DIFFERENT wing (not 7WG)
+        other_wing = Wing(
+            id=str(uuid4()),
+            national_id="1",  # Assuming national_id=1 from seed
+            code="OTHERWG",
+            name="Other Wing Test",
+            short_name="OTHERWG",
+            active_status=True
+        )
+        db.add(other_wing)
+        db.commit()
+        other_wing_id = other_wing.id
+
+        other_sqn = Squadron(
+            id=str(uuid4()),
+            wing_id=other_wing.id,
+            code="999",
+            unit_number="999",
+            name="Other Squadron",
+            short_name="999",
+            active_status=True
+        )
+        db.add(other_sqn)
+        db.commit()
+        other_sqn_id = other_sqn.id
+
+        other_fac = Facilitator(
+            id=str(uuid4()),
+            squadron_id=other_sqn.id,
+            wing_id=other_wing.id,
+            first_name="Outside",
+            last_name="WingPerson",
+            current_rank="CIV",
+            type="Civilian",
+            is_archived=False
+        )
+        db.add(other_fac)
+        db.commit()
+        other_fac_id = other_fac.id
+
+        # Positive: wing_admin for 7WG finds Flanders (in 703 SQN which is in 7WG)
+        h = login(client, "ADMIN7WG")
+        r = client.get("/api/search?q=Flanders", headers=h)
+        assert r.status_code == 200
+        facs = [x for x in r.json()["results"] if x["type"] == "facilitator"]
+        assert len(facs) >= 1, "wing_admin must find facilitators in own wing"
+        assert any("Flanders" in f["label"] for f in facs)
+
+        # Negative: wing_admin must NOT see facilitators from OTHER wings
+        r2 = client.get("/api/search?q=Outside", headers=h)
+        assert r2.status_code == 200
+        outside_facs = [x for x in r2.json()["results"] if x["type"] == "facilitator"]
+        outside_ids = {f["id"] for f in outside_facs}
+        assert other_fac_id not in outside_ids, "wing_admin must not see facilitators from other wings"
+    finally:
+        # Cleanup
+        if other_fac_id:
+            db.query(Facilitator).filter(Facilitator.id == other_fac_id).delete()
+        if other_sqn_id:
+            db.query(Squadron).filter(Squadron.id == other_sqn_id).delete()
+        if other_wing_id:
+            db.query(Wing).filter(Wing.id == other_wing_id).delete()
+        db.commit()
+        db.close()
 
 
 def test_search_system_admin_cross_org(client):
