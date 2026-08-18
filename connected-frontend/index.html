@@ -153,25 +153,30 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 }
 
 /* ── AUTH ── */
-#auth-screen{min-height:100vh;background:linear-gradient(160deg,var(--dark) 0%,#001428 100%);display:flex;align-items:center;justify-content:center;padding:20px;}
-.auth-wrap{background:#fff;border-radius:10px;padding:40px 36px 32px;width:400px;max-width:96vw;box-shadow:0 20px 56px rgba(0,0,0,.40);}
-.auth-logo{text-align:center;margin-bottom:24px;}
-.auth-wm{font-size:16px;font-weight:700;color:var(--dark);letter-spacing:.01em;line-height:1.3;}
-.auth-wm .r{color:var(--royal);} /* DES-H01: --blue fails 2.3:1 on white; --royal passes 8.4:1 */
-.auth-div{width:36px;height:3px;background:var(--blue);margin:10px auto 0;border-radius:2px;opacity:.5;}
+#auth-screen{min-height:100vh;background:linear-gradient(160deg,#001e42 0%,#000e26 100%);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;}
+#auth-screen::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(81,176,227,.05) 0%,transparent 55%);pointer-events:none;}
+.auth-wrap{background:#fff;border-radius:var(--radius-lg);padding:var(--sp-xl) var(--sp-xl) var(--sp-lg);width:308px;max-width:96vw;box-shadow:0 1px 3px rgba(0,47,101,.08),0 8px 32px rgba(0,0,0,.28);border:1px solid #d1dce8;position:relative;overflow:hidden;}
+.auth-wrap::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#002f65,#004b8d 50%,#51b0e3);opacity:.7;}
+.auth-logo{text-align:center;margin-bottom:var(--sp-md);}
+.auth-crest{width:48px;height:48px;border-radius:8px;background:#f0f7ff;border:1px solid #d1dce8;display:flex;align-items:center;justify-content:center;padding:10px;margin:0 auto var(--sp-sm);}
+.auth-crest-text{font-size:11px;font-weight:800;color:#002f65;letter-spacing:.04em;line-height:1;}
+.auth-org{font-size:8px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#455560;margin-bottom:4px;white-space:nowrap;}
+.auth-wm{font-size:13px;font-weight:800;color:#001e42;letter-spacing:.01em;}
+.auth-div{width:28px;height:2px;background:var(--blue);margin:10px auto 0;border-radius:1px;opacity:.6;}
 .fg{margin-bottom:14px;}
 .fg label{display:block;font-size:12px;font-weight:700;color:var(--steel);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;}
 .fg select,.fg input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;color:var(--text);background:white;transition:border-color .15s,box-shadow .15s;}
 .fg select:focus,.fg input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(81,176,227,.15);}
-.btn-auth{width:100%;padding:11px;background:var(--dark);color:white;border:none;border-radius:6px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.04em;transition:background .15s;margin-top:6px;}
-.btn-auth:hover:not(:disabled){background:var(--royal);}
-.btn-auth:disabled{background:var(--muted);cursor:not-allowed;opacity:.7;}
+.btn-auth{width:100%;padding:11px;background:linear-gradient(180deg,#003a7a 0%,#002050 100%);color:#fff;border:1px solid rgba(0,30,65,.2);border-radius:5px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.05em;transition:background .12s,box-shadow .12s;margin-top:var(--sp-xs);box-shadow:0 1px 0 rgba(255,255,255,.10) inset,0 -1px 0 rgba(0,0,0,.20) inset,0 1px 3px rgba(0,30,65,.25);}
+.btn-auth:hover:not(:disabled){background:linear-gradient(180deg,#004590 0%,#002a60 100%);}
+.btn-auth:active:not(:disabled){background:linear-gradient(180deg,#001e42 0%,#00183a 100%);transform:translateY(1px);}
+.btn-auth:disabled{background:#f4f8fc;color:#b0b7bb;border:1px solid #d1dce8;cursor:not-allowed;opacity:.7;box-shadow:none;}
 .auth-progress{height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;display:none;}
 .auth-progress-fill{height:100%;background:var(--royal);border-radius:2px;width:0%;transition:width .12s linear;}
 .auth-err{background:#fdeaea;border:1.5px solid #f5a5a5;border-radius:6px;padding:9px 12px;font-size:12px;color:#8b1a1a;margin-top:10px;display:none;}
 .auth-acct-banner{background:#f0f7ff;border:1.5px solid #bee3f8;border-radius:6px;padding:9px 12px;font-size:12.5px;font-weight:600;color:var(--dark);margin-bottom:14px;text-align:center;}
-.auth-back-btn{display:block;background:none;border:none;color:var(--steel);font-size:11.5px;cursor:pointer;padding:4px 0;margin-top:8px;text-decoration:underline;width:100%;text-align:center;}
-.auth-back-btn:hover{color:var(--dark);}
+.auth-back-btn{display:block;background:none;border:none;color:#51b0e3;font-size:11px;font-weight:600;letter-spacing:.02em;cursor:pointer;padding:4px 0;margin-top:var(--sp-xs);text-decoration:none;width:100%;text-align:center;font-family:inherit;opacity:.9;transition:opacity .15s,color .15s;}
+.auth-back-btn:hover{opacity:1;color:#004b8d;}
 
 /* ── APP SHELL ── */
 #app{display:none;flex-direction:column;min-height:100vh;}
@@ -778,7 +783,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 <div id="auth-screen">
   <div class="auth-wrap">
     <div class="auth-logo">
-      <div class="auth-wm">AAFC Training Management System</div>
+      <div class="auth-crest"><span class="auth-crest-text">AAFC</span></div>
+      <div class="auth-org">Australian Air Force Cadets</div>
+      <div class="auth-wm">Training Management System</div>
       <div class="auth-div"></div>
     </div>
 
@@ -822,7 +829,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <option value="">Select…</option>
         </select>
       </div>
-      <button class="btn-auth" id="auth-continue-btn" onclick="doLookup()" disabled>Continue →</button>
+      <button class="btn-auth" id="auth-continue-btn" onclick="doLookup()" disabled>Next</button>
       <div class="auth-progress" id="auth-progress1"><div class="auth-progress-fill" id="auth-bar1"></div></div>
     </div>
 
@@ -832,7 +839,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <div class="fg"><label>Access Code</label><input type="password" id="auth-code" placeholder="Access code" autocomplete="off"></div>
       <button class="btn-auth" id="auth-btn" onclick="doLogin()">Sign In</button>
       <div class="auth-progress" id="auth-progress"><div class="auth-progress-fill" id="auth-progress-bar"></div></div>
-      <button type="button" class="auth-back-btn" onclick="showAuthStep1()">← Change account</button>
+      <button type="button" class="auth-back-btn" onclick="showAuthStep1()">‹ Change selection</button>
     </div>
 
     <div style="font-size:10.5px;color:var(--muted);margin-top:14px;line-height:1.55">Use is limited to authorised personnel. Access and administrative actions are recorded.</div>
