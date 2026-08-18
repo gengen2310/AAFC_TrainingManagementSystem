@@ -10582,12 +10582,7 @@ async function ynDeleteYear(id,yearNum){
 }
 
 function ynExportYear(id,yearNum){
-  const a=document.createElement('a');
-  a.href=API_BASE+'/api/planning/years/'+id+'/export';
-  a.download='AAFC_TMS_'+yearNum+'.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  _downloadExport('/api/planning/years/'+id+'/export','AAFC_TMS_'+yearNum+'.csv');
 }
 
 // Override the ynOpenManage stub — this definition wins (last in file order)
