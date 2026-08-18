@@ -162,7 +162,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .auth-div{width:28px;height:2px;background:var(--blue);margin:10px auto 0;border-radius:1px;opacity:.6;}
 .fg{margin-bottom:14px;}
 .fg label{display:block;font-size:12px;font-weight:700;color:var(--steel);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;}
-.fg select,.fg input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;color:var(--text);background:white;transition:border-color .15s,box-shadow .15s;}
+.fg select,.fg input{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;color:var(--text);background:white;transition:border-color .15s,box-shadow .15s;}
 .fg select:focus,.fg input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(81,176,227,.15);}
 .btn-auth{width:100%;padding:11px;background:linear-gradient(180deg,#003a7a 0%,#002050 100%);color:#fff;border:1px solid rgba(0,30,65,.2);border-radius:5px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.05em;transition:background .12s,box-shadow .12s;margin-top:var(--sp-xs);box-shadow:0 1px 0 rgba(255,255,255,.10) inset,0 -1px 0 rgba(0,0,0,.20) inset,0 1px 3px rgba(0,30,65,.25);}
 .btn-auth:hover:not(:disabled){background:linear-gradient(180deg,#004590 0%,#002a60 100%);}
@@ -171,7 +171,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .auth-progress{height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;display:none;}
 .auth-progress-fill{height:100%;background:var(--royal);border-radius:2px;width:0%;transition:width .12s linear;}
 .auth-err{background:#fdeaea;border:1.5px solid #f5a5a5;border-radius:6px;padding:9px 12px;font-size:12px;color:#8b1a1a;margin-top:10px;display:none;}
-.auth-acct-banner{background:#f0f7ff;border:1.5px solid #bee3f8;border-radius:6px;padding:9px 12px;font-size:12.5px;font-weight:600;color:var(--dark);margin-bottom:14px;text-align:center;}
+.auth-acct-banner{background:#f0f7ff;border:1.5px solid #bee3f8;border-radius:6px;padding:9px 12px;font-size:12px;font-weight:600;color:var(--dark);margin-bottom:14px;text-align:center;}
 .auth-back-btn{display:block;background:none;border:none;color:#51b0e3;font-size:11px;font-weight:600;letter-spacing:.02em;cursor:pointer;padding:4px 0;margin-top:var(--sp-xs);text-decoration:none;width:100%;text-align:center;font-family:inherit;opacity:.9;transition:opacity .15s,color .15s;}
 .auth-back-btn:hover{opacity:1;color:#004b8d;}
 
@@ -192,7 +192,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .app-body{display:flex;flex:1;}
 
 /* ── SIDENAV ── */
-.sidenav{width:250px;background:linear-gradient(180deg,#001b3d 0%,#002550 100%);border-right:1px solid rgba(255,255,255,.06);flex-shrink:0;padding:0;height:calc(100vh - 52px);position:sticky;top:52px;overflow-y:auto;display:flex;flex-direction:column;}
+.sidenav{width:220px;background:linear-gradient(180deg,#001b3d 0%,#002550 100%);border-right:1px solid rgba(255,255,255,.06);flex-shrink:0;padding:0;height:calc(100vh - 52px);position:sticky;top:52px;overflow-y:auto;display:flex;flex-direction:column;}
 .sidenav::after{content:'';position:absolute;top:0;right:0;bottom:0;width:1px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03) 60%,transparent);pointer-events:none;}
 /* Logo bar — unit name only */
 .nav-logo-bar{padding:var(--sp-md) var(--sp-md) var(--sp-sm);border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;}
@@ -202,7 +202,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 /* Nav footer */
 .nav-footer{padding:var(--sp-sm) var(--sp-md);border-top:1px solid rgba(255,255,255,.07);font-size:11px;color:rgba(255,255,255,.65);font-weight:600;letter-spacing:.06em;text-transform:uppercase;flex-shrink:0;}
 .nav-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.55);letter-spacing:.12em;text-transform:uppercase;padding:12px var(--sp-md) 4px;}
-.nav-item{display:flex;align-items:center;padding:11px var(--sp-md);font-size:13px;font-weight:600;color:rgba(255,255,255,.9);cursor:pointer;transition:background .12s,color .12s;border-left:2.5px solid transparent;gap:9px;user-select:none;letter-spacing:.01em;}
+.nav-item{display:flex;align-items:center;padding:11px var(--sp-md);font-size:12px;font-weight:600;color:rgba(255,255,255,.9);cursor:pointer;transition:background .12s,color .12s;border-left:2.5px solid transparent;gap:9px;user-select:none;letter-spacing:.01em;}
 .nav-item:hover:not(.active){background:rgba(255,255,255,.07);color:#fff;}
 .nav-item:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(81,176,227,.4) inset;}
 .nav-item.active{background:var(--nav-active-bg);color:#fff;border-left-color:var(--nav-active-border);padding-left:calc(var(--sp-md) - 2.5px);font-weight:700;}
@@ -210,8 +210,8 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .nav-subitem{padding-left:30px;font-size:12px;font-weight:500;color:var(--steel);}
 .nav-subitem:hover{background:var(--bg);color:var(--dark);}
 .nav-subitem.active{background:#deeefa;color:var(--dark);border-left-color:var(--blue);font-weight:700;}
-.nav-planning-hdr{font-size:10.5px;font-weight:700;color:var(--pale);letter-spacing:.10em;text-transform:uppercase;padding:10px 18px 4px 30px;}
-.nav-item-ext{display:flex;align-items:center;padding:11px var(--sp-md);font-size:13px;font-weight:600;color:rgba(255,255,255,.9);cursor:pointer;transition:background .12s,color .12s;border-left:2.5px solid transparent;gap:9px;user-select:none;text-decoration:none;letter-spacing:.01em;}
+.nav-planning-hdr{font-size:10px;font-weight:700;color:var(--pale);letter-spacing:.10em;text-transform:uppercase;padding:10px 18px 4px 30px;}
+.nav-item-ext{display:flex;align-items:center;padding:11px var(--sp-md);font-size:12px;font-weight:600;color:rgba(255,255,255,.9);cursor:pointer;transition:background .12s,color .12s;border-left:2.5px solid transparent;gap:9px;user-select:none;text-decoration:none;letter-spacing:.01em;}
 .nav-item-ext:hover{background:rgba(255,255,255,.07);color:#fff;}
 .nav-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0;opacity:.8;}
 .main{flex:1;padding:24px 28px;overflow-y:auto;min-width:0;}
@@ -237,7 +237,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .yn-toast{font-size:11px;color:var(--red);margin-top:3px;min-height:14px}
 .yn-mgmt-table{width:100%;border-collapse:collapse;}
 .yn-mgmt-table th{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 12px;border-bottom:1px solid var(--border);text-align:left;}
-.yn-mgmt-table td{padding:10px 12px;font-size:13px;border-bottom:1px solid var(--border-light,#e4edf5);color:var(--text);}
+.yn-mgmt-table td{padding:10px 12px;font-size:12px;border-bottom:1px solid var(--border-light,#e4edf5);color:var(--text);}
 .yn-mgmt-table tr:last-child td{border-bottom:none;}
 .yn-chip{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:10px;}
 .yn-chip-active{background:var(--ok-bg,#d4f0e3);color:var(--ok,#1a7f4b);}
@@ -266,12 +266,12 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 
 /* ── CARD ── */
 .card{background:white;border-radius:8px;padding:18px 20px;box-shadow:var(--sh);margin-bottom:16px;}
-.ctitle{font-size:11.5px;font-weight:800;color:var(--steel);margin-bottom:12px;text-transform:uppercase;letter-spacing:.10em;display:flex;align-items:center;gap:7px;}
+.ctitle{font-size:11px;font-weight:800;color:var(--steel);margin-bottom:12px;text-transform:uppercase;letter-spacing:.10em;display:flex;align-items:center;gap:7px;}
 .card h3{font-size:15px;font-weight:700;color:var(--dark);margin-bottom:10px;}
 .muted{color:var(--muted);}
 
 /* ── BUTTONS ── */
-.btn{padding:9px 16px;border-radius:6px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;border:none;letter-spacing:.04em;transition:all .13s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+.btn{padding:9px 16px;border-radius:6px;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;border:none;letter-spacing:.04em;transition:all .13s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
 .btn-dk{background:var(--dark);color:white;}
 .btn-dk:hover{background:var(--royal);}
 .btn-out{background:white;color:var(--dark);border:1.5px solid var(--dark);}
@@ -284,7 +284,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .btn-danger:hover,.btn-red:hover{background:#c01530;}
 .btn-ok{background:var(--ok);color:white;}
 .btn-ok:hover{background:#145f38;}
-.btn-sm{padding:6px 12px;font-size:11.5px;}
+.btn-sm{padding:6px 12px;font-size:11px;}
 .btn-xs{padding:4px 9px;font-size:11px;border-radius:5px;}
 .btn-lnk{background:none;border:none;color:var(--royal);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;padding:0;text-decoration:underline dotted;}
 .btn-lnk:hover{color:var(--dark);} /* DES-H01 */
@@ -306,7 +306,7 @@ a:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:2
 
 /* ── SEGMENTED TOGGLE (view switchers) ── */
 .seg{display:inline-flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
-.seg-btn{background:var(--surface);border:none;border-right:1.5px solid var(--border);padding:5px 12px;font-size:11px;font-weight:700;font-family:inherit;color:var(--steel);cursor:pointer}
+.seg-btn{background:var(--surface);border:none;border-right:1.5px solid var(--border);padding:5px 12px;font-size:12px;font-weight:700;font-family:inherit;color:var(--steel);cursor:pointer}
 .seg-btn:last-child{border-right:none}
 .seg-btn.active{background:var(--dark);color:#fff}
 .seg-btn:focus-visible{outline:2px solid var(--blue);outline-offset:-2px;z-index:1;position:relative;}
@@ -318,11 +318,11 @@ a:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:2
 .cal-grid-cell.outside{background:var(--surface-2);opacity:.55}
 .cal-grid-cell.today{background:var(--accent-light)}
 .cal-grid-daynum{font-size:11px;font-weight:800;color:var(--steel);margin-bottom:3px}
-.cal-grid-evt{display:block;font-size:9.5px;font-weight:700;padding:1px 4px;border-radius:4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:#fff}
+.cal-grid-evt{display:block;font-size:9px;font-weight:700;padding:1px 4px;border-radius:4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:#fff}
 .cal-grid-more{font-size:9px;color:var(--muted);cursor:pointer}
 
 /* ── BADGES ── */
-.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;letter-spacing:.05em;white-space:nowrap;}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.05em;white-space:nowrap;}
 .badge-green,.b-ok{background:#d4f0e3;color:#1a5c35;}
 .badge-grey,.b-grey{background:#eef0f2;color:var(--steel);}
 .badge-red,.b-red{background:#fde8e8;color:#8b1a1a;}
@@ -355,7 +355,7 @@ a:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:2
 
 /* ── TABLE ── */
 .tw{overflow-x:auto;border-radius:8px;border:1px solid var(--border);}
-table,.data-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+table,.data-table{width:100%;border-collapse:collapse;font-size:12px;}
 table td{font-family:system-ui,Arial,sans-serif;} /* T-01: prose reading clarity */
 thead{background:var(--surface-2);}
 /* REM-85: was font-size:9px -- effectively illegible at normal desktop viewing
@@ -363,7 +363,7 @@ thead{background:var(--surface-2);}
    is the global table-header rule, so every table in the app had the same issue).
    10.5px keeps the compact uppercase-label look (still distinguished from body
    text by weight/letter-spacing/colour) while being genuinely readable. */
-thead th{padding:9px 12px;color:var(--steel);font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--border);text-align:left;}
+thead th{padding:9px 12px;color:var(--steel);font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap;border-bottom:1px solid var(--border);text-align:left;}
 tbody tr{border-bottom:1px solid var(--border-light);}
 tbody tr:last-child{border-bottom:none;}
 tbody tr:hover{background:#f0f7fc;}
@@ -380,18 +380,18 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .form-group,.ff{margin-bottom:18px;}
 .form-group label,.ff label{display:block;font-size:12px;font-weight:800;color:var(--steel);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;}
 .form-group select,.form-group input,.form-group textarea,
-.ff select,.ff input,.ff textarea{width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12.5px;color:var(--text);background:white;transition:border-color .15s,box-shadow .15s;}
+.ff select,.ff input,.ff textarea{width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;color:var(--text);background:white;transition:border-color .15s,box-shadow .15s;}
 .form-group select:focus,.form-group input:focus,.form-group textarea:focus,
 .ff select:focus,.ff input:focus,.ff textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(81,176,227,.12);}
 .ff textarea{resize:vertical;min-height:68px;}
 .ff-ro{background:var(--bg)!important;cursor:default;}
 .chk-grp{display:flex;flex-wrap:wrap;gap:6px;}
-.chk-item{display:flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;cursor:pointer;}
+.chk-item{display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;cursor:pointer;}
 .chk-item input{accent-color:var(--blue);width:13px;height:13px;}
 
 /* ── TABS ── */
 .tab-bar{display:flex;border-bottom:2px solid var(--border);margin-bottom:18px;overflow-x:auto;}
-.tab-btn{padding:8px 14px;font-family:inherit;font-size:11.5px;font-weight:800;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;margin-bottom:-2px;transition:color .12s;white-space:nowrap;}
+.tab-btn{padding:8px 14px;font-family:inherit;font-size:12px;font-weight:800;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;margin-bottom:-2px;transition:color .12s;white-space:nowrap;}
 .tab-btn:hover{color:var(--dark);}
 .tab-btn.active{color:var(--dark);border-bottom-color:var(--blue);font-weight:800;}
 .tab-btn:focus-visible{outline:2px solid var(--blue);outline-offset:-2px;}
@@ -428,7 +428,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .ph-row{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
 .ph-name{width:108px;font-size:11px;font-weight:600;color:var(--text);flex-shrink:0;}
 .ph-bar{flex:1;}
-.ph-cnt{width:80px;text-align:right;font-size:11.5px;color:var(--muted);}
+.ph-cnt{width:80px;text-align:right;font-size:11px;color:var(--muted);}
 
 /* ── DRILL PANEL ── */
 .drill-panel{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:12px;display:none;}
@@ -437,20 +437,20 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 /* ── DASHBOARD CHART STYLES ── */
 .dash-section{margin-bottom:24px;}
 .dash-sec-hdr{font-size:11px;font-weight:800;color:var(--steel);letter-spacing:.14em;text-transform:uppercase;padding:10px 0 4px;border-top:2px solid var(--border);margin-bottom:4px;}
-.dash-sec-sub{font-size:11.5px;color:var(--muted);margin-bottom:12px;}
+.dash-sec-sub{font-size:11px;color:var(--muted);margin-bottom:12px;}
 /* DES-M03: Section A hero — visually dominant; primary use-case scroll depth is 0 */
 .dash-sec-hero{border-left:5px solid var(--dark);background:linear-gradient(to right,rgba(0,47,101,.035),transparent);border-radius:0 6px 6px 0;padding-left:14px;margin-left:-14px;}
 .dash-sec-hero .dash-sec-hdr{font-size:13px;color:var(--dark);border-top:2px solid var(--dark);letter-spacing:.10em;}
-.dash-sec-hero .dash-sec-sub{color:var(--text-2);font-size:12px;}
+.dash-sec-hero .dash-sec-sub{color:var(--text-2);font-size:11px;}
 /* DES-M05: semantic card border stripes — additive, no layout changes */
 .card-alert{border-left:4px solid var(--red)!important;border-radius:0 8px 8px 0;}
 .card-warn{border-left:4px solid var(--warn)!important;border-radius:0 8px 8px 0;}
 .card-info{border-left:4px solid var(--blue)!important;border-radius:0 8px 8px 0;}
 .card-ok{border-left:4px solid var(--ok)!important;border-radius:0 8px 8px 0;}
 .card-quiet{border-left:4px solid var(--lgrey)!important;border-radius:0 8px 8px 0;}
-.chart-insight{font-size:11.5px;color:var(--royal);font-weight:600;padding:6px 10px;background:var(--accent-light);border-radius:5px;margin-top:8px;border-left:3px solid var(--blue);}
+.chart-insight{font-size:12px;color:var(--royal);font-weight:600;padding:6px 10px;background:var(--accent-light);border-radius:5px;margin-top:8px;border-left:3px solid var(--blue);}
 .chart-skeleton{background:linear-gradient(90deg,#f0f4f8 25%,#e4eaf0 50%,#f0f4f8 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;height:80px;}
-.chart-data-toggle{margin-top:6px;font-size:11.5px;color:var(--muted);}
+.chart-data-toggle{margin-top:6px;font-size:11px;color:var(--muted);}
 .chart-data-toggle summary{cursor:pointer;display:inline;user-select:none;}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .pbar{background:var(--border);border-radius:3px;height:14px;overflow:hidden;}
@@ -469,14 +469,14 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .stacked-seg:first-child{border-radius:3px 0 0 3px;}
 .stacked-seg:last-child{border-radius:0 3px 3px 0;}
 .dash-filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:white;border-radius:8px;box-shadow:var(--sh);border:1px solid var(--border);}
-.dash-filter-bar select{padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:11.5px;color:var(--text);}
-.dash-filter-bar label{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+.dash-filter-bar select{padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px;color:var(--text);}
+.dash-filter-bar label{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
 .drill-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .drill-title{font-size:12px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.04em;}
 
 /* ── CALENDAR ── */
 .cal-nav{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
-.cal-nbtn{background:none;border:1.5px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;font-size:13px;transition:all .13s;}
+.cal-nbtn{background:none;border:1.5px solid var(--border);border-radius:6px;padding:4px 9px;cursor:pointer;font-size:12px;transition:all .13s;}
 .cal-nbtn:hover{border-color:var(--blue);background:var(--accent-light);}
 .cal-mo{font-size:16px;font-weight:900;color:var(--dark);}
 .cal-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:3px;}
@@ -524,9 +524,9 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .sess-card.not_delivered{border-color:var(--lgrey);background:#f8f9fa;}
 .sess-card.unassigned{border-color:var(--warn);background:#fffbf0;}
 .sess-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
-.sess-num{font-size:10.5px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;}
+.sess-num{font-size:10px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;}
 .sess-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
-.sess-info{font-size:10.5px;color:var(--muted);}
+.sess-info{font-size:10px;color:var(--muted);}
 .sess-acts{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;}
 
 /* ── PROG BAR ── */
@@ -548,7 +548,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 
 /* ── TOAST (non-blocking, accessible replacement for alert()) ── */
 .toast-region{position:fixed;top:16px;right:16px;z-index:900;display:flex;flex-direction:column;gap:8px;max-width:340px;}
-.toast{background:white;border:1.5px solid var(--border);border-left:4px solid var(--steel);border-radius:8px;padding:10px 14px;font-size:12.5px;font-weight:600;box-shadow:var(--sh2);color:var(--text);}
+.toast{background:white;border:1.5px solid var(--border);border-left:4px solid var(--steel);border-radius:8px;padding:10px 14px;font-size:12px;font-weight:600;box-shadow:var(--sh2);color:var(--text);}
 .toast.err{border-left-color:var(--red);color:#8b1a1a;}
 .toast.ok{border-left-color:var(--ok);color:#145f38;}
 @keyframes _spin{to{transform:rotate(360deg)}}
@@ -557,7 +557,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 
 /* ── WEEKLY PROGRAM ── */
 .wp-tbl{width:100%;border-collapse:collapse;font-size:12px;}
-.wp-tbl th{background:var(--surface-2);color:var(--steel);padding:8px 12px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;border-bottom:1px solid var(--border);text-align:left;}
+.wp-tbl th{background:var(--surface-2);color:var(--steel);padding:8px 12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;border-bottom:1px solid var(--border);text-align:left;}
 .wp-tbl td{border:1px solid var(--border);padding:9px 12px;vertical-align:top;}
 /* Weekly preview section within Parade Night Program */
 .wp-preview-section{margin-top:20px;border-top:2px solid var(--border);padding-top:18px;}
@@ -570,11 +570,11 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .fac-ph{background:var(--dark);color:white;border-radius:10px;padding:18px;margin-bottom:16px;display:flex;align-items:center;gap:14px;}
 .fac-av{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
 .fac-ph h3{font-size:16px;font-weight:600;}
-.fac-ph p{font-size:10.5px;opacity:.6;margin-top:2px;}
+.fac-ph p{font-size:10px;opacity:.6;margin-top:2px;}
 .fac-sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:16px;}
 .fac-st{background:white;border-radius:8px;padding:12px;box-shadow:var(--sh);text-align:center;}
 .fac-sv{font-size:22px;font-weight:700;color:var(--text);}
-.fac-sl{font-size:10.5px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
+.fac-sl{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;}
 
 /* ── CURRICULUM CARD ── */
 .curr-card{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;}
@@ -585,7 +585,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .exp-item{border:1px solid var(--border);border-radius:7px;padding:10px 12px;margin-bottom:7px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;transition:border-color .12s;cursor:pointer;}
 .exp-item:hover{border-color:var(--accent);background:#fafbff;}
 .exp-code{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.04em;margin-bottom:2px;}
-.exp-title{font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:3px;}
+.exp-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px;}
 .exp-meta{display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
 .exp-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;}
 .lh-btn{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:5px;background:var(--accent-light);color:var(--link-on-light);font-size:11px;font-weight:600;text-decoration:none;transition:background .12s;}
@@ -597,7 +597,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .res-chip.ok{border-color:#a8d5bc;background:var(--ok-bg);}
 .res-chip.busy{border-color:#f5b0b0;background:var(--red-bg);}
 .rc-name{font-size:12px;font-weight:600;color:var(--text);}
-.rc-status{font-size:10.5px;color:var(--muted);margin-top:2px;}
+.rc-status{font-size:10px;color:var(--muted);margin-top:2px;}
 
 /* ── SCOPE / MODE BANNERS ── */
 .scope-banner{display:flex;align-items:center;gap:10px;padding:6px var(--sp-lg);font-size:11px;font-weight:700;letter-spacing:.04em;background:#f0f7ff;color:#002f65;border-bottom:1.5px solid #bee3f8;}
@@ -636,11 +636,11 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .cm-cell-not_started{color:var(--muted);}
 .cm-cell-delivered_with_issue{background:#d4f0e3;color:#c97a00;font-weight:700;}
 /* FAC-SUG-01 */
-.fac-sugg-panel{border:1px solid var(--border);border-radius:7px;background:var(--surface-2);padding:8px 10px;margin-bottom:8px;font-size:11.5px;}
-.fac-sugg-title{font-weight:700;color:var(--text-2);font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+.fac-sugg-panel{border:1px solid var(--border);border-radius:7px;background:var(--surface-2);padding:8px 10px;margin-bottom:8px;font-size:11px;}
+.fac-sugg-title{font-weight:700;color:var(--text-2);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
 .fac-sugg-item{display:flex;align-items:flex-start;gap:8px;padding:5px 0;border-top:1px solid var(--border-light);}
 .fac-sugg-item:first-of-type{border-top:none;}
-.fac-sugg-pill{font-size:9.5px;font-weight:700;border-radius:10px;padding:1px 7px;white-space:nowrap;flex-shrink:0;margin-top:1px;}
+.fac-sugg-pill{font-size:9px;font-weight:700;border-radius:10px;padding:1px 7px;white-space:nowrap;flex-shrink:0;margin-top:1px;}
 .fac-sugg-pill.suggested{background:var(--ok-bg);color:var(--ok-text);}
 .fac-sugg-pill.available{background:var(--accent-light);color:var(--dark);}
 .fac-sugg-pill.conflict{background:#fde8e8;color:var(--red);}
@@ -663,19 +663,19 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .fc-stats{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:11px;}
 .fc-stat-label{color:var(--muted);}
 .fc-stat-val{font-weight:700;color:var(--text);}
-.fc-msg{font-size:10.5px;color:var(--text-2);border-top:1px solid var(--border-light);padding-top:6px;line-height:1.4;}
+.fc-msg{font-size:10px;color:var(--text-2);border-top:1px solid var(--border-light);padding-top:6px;line-height:1.4;}
 /* PN-WIZ-01 */
 .wiz-dot{flex:1;height:5px;border-radius:3px;background:var(--border);}
 .wiz-dot.active,.wiz-dot.done{background:var(--blue);}
 .wiz-q{font-size:15px;font-weight:700;color:var(--dark);margin-bottom:4px;}
 .wiz-hint{font-size:12px;color:var(--muted);margin-bottom:10px;}
-.wiz-class-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:12.5px;cursor:pointer;}
+.wiz-class-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:12px;cursor:pointer;}
 .wiz-class-item:last-child{border-bottom:none;}
-.wiz-curr-item{padding:6px 8px;border-radius:5px;cursor:pointer;font-size:12.5px;}
+.wiz-curr-item{padding:6px 8px;border-radius:5px;cursor:pointer;font-size:12px;}
 .wiz-curr-item:hover,.wiz-curr-item.sel{background:var(--accent-light);}
 .wiz-curr-item.sel{font-weight:700;color:var(--dark);}
 .wiz-fac-pill-row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
-.wiz-summary-row{display:flex;gap:6px;margin-bottom:6px;font-size:12.5px;align-items:flex-start;}
+.wiz-summary-row{display:flex;gap:6px;margin-bottom:6px;font-size:12px;align-items:flex-start;}
 .wiz-summary-label{color:var(--muted);min-width:110px;flex-shrink:0;}
 .wiz-summary-val{font-weight:600;color:var(--text);}
 .add-sess-bar{display:flex;gap:8px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed var(--border);}
@@ -689,7 +689,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 /* DENS-01: compact density overrides — only spacing, never text that would fall below accessible minimum */
 body[data-density="compact"] .ff{margin-bottom:8px;}
 body[data-density="compact"] .form-row{gap:8px;margin-bottom:6px;}
-body[data-density="compact"] .btn:not(.btn-xs):not(.btn-sm){padding:4px 10px;font-size:12.5px;}
+body[data-density="compact"] .btn:not(.btn-xs):not(.btn-sm){padding:4px 10px;font-size:12px;}
 body[data-density="compact"] .card{padding:12px 14px;}
 body[data-density="compact"] .modal-body{padding:10px 14px;}
 body[data-density="compact"] .modal-hdr{padding:10px 16px 8px;}
@@ -701,7 +701,7 @@ body[data-density="compact"] .card+.card{margin-top:10px;}
 .mini{height:8px;border-radius:6px;background:#e6edf5;overflow:hidden;min-width:60px;}
 .mini>i{display:block;height:100%;border-radius:6px;background:var(--ok);}
 .mini.amber>i{background:var(--warn);}.mini.red>i{background:var(--red);}.mini.blue>i{background:var(--blue);}
-.cellbar{display:flex;align-items:center;gap:8px;}.cellbar span{font-size:10.5px;font-weight:800;color:var(--dark);min-width:34px;}
+.cellbar{display:flex;align-items:center;gap:8px;}.cellbar span{font-size:10px;font-weight:800;color:var(--dark);min-width:34px;}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle;margin-right:5px;}
 .dot.g{background:var(--ok);}.dot.a{background:var(--warn);}.dot.r{background:var(--red);}.dot.n{background:#bbb;}
 .heat td{text-align:center;font-size:10px;font-weight:800;padding:5px 4px;border:1px solid #fff;color:#fff;}
@@ -743,19 +743,19 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 /* ── System Console ─────────────────────────────────── */
 .sc-card{margin-bottom:16px;}
 .sc-section-hdr{font-size:11px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.10em;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
-.sc-kv{display:grid;grid-template-columns:180px 1fr;gap:4px 12px;font-size:12.5px;margin-bottom:6px;}
+.sc-kv{display:grid;grid-template-columns:180px 1fr;gap:4px 12px;font-size:12px;margin-bottom:6px;}
 .sc-kv dt{color:var(--muted);font-weight:600;}
 .sc-kv dd{color:var(--text);margin:0;}
 .sc-status-ok{color:var(--ok);font-weight:700;}
 .sc-status-warn{color:var(--warn);font-weight:700;}
 .sc-status-err{color:var(--red);font-weight:700;}
-.sc-maint-on{background:var(--warn-bg);border:1px solid var(--warn);color:var(--warn-text);padding:8px 12px;border-radius:6px;font-size:12.5px;font-weight:600;margin-bottom:10px;} /* DES-H04 */
+.sc-maint-on{background:var(--warn-bg);border:1px solid var(--warn);color:var(--warn-text);padding:8px 12px;border-radius:6px;font-size:12px;font-weight:600;margin-bottom:10px;} /* DES-H04 */
 .sc-wing-row{padding:8px 0;border-bottom:1px solid var(--border-light);}
 .sc-wing-name{font-weight:700;font-size:13px;color:var(--dark);margin-bottom:4px;}
 .sc-sqn-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
 .sc-sqn-chip{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 7px;font-size:11px;color:var(--steel);}
 .sc-sqn-chip.inactive{opacity:.5;text-decoration:line-through;}
-.sc-audit-row{display:grid;grid-template-columns:140px 70px 120px 1fr;gap:4px 10px;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:11.5px;}
+.sc-audit-row{display:grid;grid-template-columns:140px 70px 120px 1fr;gap:4px 10px;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:11px;}
 .sc-audit-row dt{color:var(--muted);}
 @media(max-width:600px){
   .sc-audit-row{grid-template-columns:1fr 1fr;}
@@ -811,7 +811,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
          sessionStorage token is verified against the backend, before the
          login form (step 1) is ever shown. -->
     <div id="auth-restoring">
-      <div class="muted" style="text-align:center;font-size:12.5px;padding:18px 0">Checking your session…</div>
+      <div class="muted" style="text-align:center;font-size:12px;padding:18px 0">Checking your session…</div>
     </div>
 
     <!-- Step 1 — identify account -->
@@ -860,7 +860,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <button type="button" class="auth-back-btn" onclick="showAuthStep1()">‹ Change selection</button>
     </div>
 
-    <div style="font-size:10.5px;color:var(--muted);margin-top:14px;line-height:1.55">Use is limited to authorised personnel. Access and administrative actions are recorded.</div>
+    <div style="font-size:10px;color:var(--muted);margin-top:14px;line-height:1.55">Use is limited to authorised personnel. Access and administrative actions are recorded.</div>
     <div class="auth-err" id="auth-err"></div>
   </div>
 </div>
@@ -1219,7 +1219,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div class="cal-hdr" id="cal-hdr"></div>
           <div class="cal-grid" id="cal-grid"></div>
         </div>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;color:var(--muted);">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--muted);">
           <span>Parade night</span><span>Activity</span><span style="color:var(--warn);">● Holiday</span><span style="color:var(--ok);">● Delivered</span>
           <span style="color:var(--muted-text-on-light);">● Not Delivered</span><span style="color:var(--status-text-danger);">● Cancelled</span>
         </div>
@@ -1553,7 +1553,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <div class="card">
           <div class="ctitle">Getting Started</div>
-          <p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">New to TMS? The setup checklist helps you complete your initial configuration.</p>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:12px">New to TMS? The setup checklist helps you complete your initial configuration.</p>
           <button class="btn btn-dk" onclick="nav('getting-started')">Open Setup Checklist</button>
         </div>
         <div class="card" style="margin-top:12px">
@@ -1561,7 +1561,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <div class="ctitle" style="margin:0">Getting Help</div>
             <button id="gh-edit-btn" class="btn btn-secondary btn-sm" style="display:none" onclick="openGettingHelpModal()">Edit</button>
           </div>
-          <div id="gh-content-display" class="muted" style="font-size:12.5px;white-space:pre-wrap"></div>
+          <div id="gh-content-display" class="muted" style="font-size:12px;white-space:pre-wrap"></div>
         </div>
       </div>
 
@@ -1597,7 +1597,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
               </div>
             </div>
           </div>
-          <div class="muted" style="font-size:10.5px;margin:-4px 0 10px">
+          <div class="muted" style="font-size:10px;margin:-4px 0 10px">
             This is the <b>default</b> used only when you <b>generate new</b> Parade Nights — it never
             changes nights that already exist. To move already-generated Parade Nights to a new day,
             change this setting and save: a preview of the affected nights appears before anything moves.
@@ -1605,7 +1605,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div class="form-row">
             <div class="ff"><label>Squadron Crest URL (optional)</label>
               <input id="s-crest" type="url" placeholder="https://…" oninput="_renderCrestPreview()">
-              <div class="muted" style="font-size:10.5px;margin-top:3px">Link to an image hosted elsewhere — must start with http:// or https://. Leave blank to use the default crest.</div>
+              <div class="muted" style="font-size:10px;margin-top:3px">Link to an image hosted elsewhere — must start with http:// or https://. Leave blank to use the default crest.</div>
             </div>
             <div class="ff"><label>Preview</label>
               <div id="s-crest-preview" style="display:flex;align-items:center;height:38px"></div>
@@ -1623,13 +1623,13 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </div>
           <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
             <button class="btn btn-dk admin-el" onclick="saveSettings()">Save Settings</button>
-            <span id="settings-msg" style="font-size:11.5px;font-weight:700"></span>
+            <span id="settings-msg" style="font-size:11px;font-weight:700"></span>
           </div>
         </div>
         <!-- DENS-01: Display size preference -->
         <div class="card" id="dens-card">
           <div class="ctitle">Display Size</div>
-          <p style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Adjust spacing to fit more content on screen. Both settings meet accessibility requirements at 200% zoom. Your preference is saved for this browser session.</p>
+          <p style="font-size:11px;color:var(--muted);margin-bottom:10px">Adjust spacing to fit more content on screen. Both settings meet accessibility requirements at 200% zoom. Your preference is saved for this browser session.</p>
           <div style="display:flex;gap:20px;align-items:center">
             <label style="cursor:pointer;display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600">
               <input type="radio" name="aafc-density" value="comfortable" id="dens-comfortable" onchange="_setDensity('comfortable')">
@@ -1640,15 +1640,15 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
               Compact
             </label>
           </div>
-          <p style="font-size:10.5px;color:var(--muted);margin-top:8px">Comfortable is the default and recommended setting for most users.</p>
+          <p style="font-size:10px;color:var(--muted);margin-top:8px">Comfortable is the default and recommended setting for most users.</p>
         </div>
         <div class="card">
           <div class="ctitle">Timing Templates</div>
-          <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Named parade night schedules with ordered blocks. Instructional Period blocks generate schedulable curriculum sessions. New parade nights automatically use the template effective on their date.</div>
-          <div id="timing-templates-list" style="margin-bottom:12px"><div style="color:var(--muted);font-size:11.5px">Loading…</div></div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Named parade night schedules with ordered blocks. Instructional Period blocks generate schedulable curriculum sessions. New parade nights automatically use the template effective on their date.</div>
+          <div id="timing-templates-list" style="margin-bottom:12px"><div style="color:var(--muted);font-size:11px">Loading…</div></div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
             <button class="btn btn-dk admin-el" onclick="openTimingTemplateModal()">+ New Template</button>
-            <span id="timing-msg" style="font-size:11.5px;font-weight:700"></span>
+            <span id="timing-msg" style="font-size:11px;font-weight:700"></span>
           </div>
         </div>
         <!-- Training Classes (unit configuration per planning year) -->
@@ -1660,7 +1660,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
               <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
             </div>
           </div>
-          <p class="muted" style="font-size:11.5px;margin:0 0 8px">
+          <p class="muted" style="font-size:11px;margin:0 0 8px">
             A Training Class is a local group completing a Training Stage — for example, Senior 1
             and Senior 2 can both complete Senior training on the same Parade Night. Associate Training
             Classes with a year.
@@ -1683,8 +1683,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <div class="ff"><label>Confirm new code</label><input id="cc-confirm" type="password" autocomplete="new-password" placeholder="Re-enter new code"></div>
           </div>
           <button class="btn btn-dk admin-el" onclick="changeMyCode()">Change My Access Code</button>
-          <div id="cc-msg" style="font-size:11.5px;margin-top:10px;font-weight:700"></div>
-          <div style="font-size:10.5px;color:var(--muted);margin-top:10px">To reset another user's code, use the User Directory section below (admin only). All resets are recorded in the audit log.</div>
+          <div id="cc-msg" style="font-size:11px;margin-top:10px;font-weight:700"></div>
+          <div style="font-size:10px;color:var(--muted);margin-top:10px">To reset another user's code, use the User Directory section below (admin only). All resets are recorded in the audit log.</div>
         </div>
         <!-- Admin: user directory for code resets -->
         <div class="card admin-el" id="user-dir-card" style="display:none">
@@ -1715,7 +1715,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <select id="acct-filter-sqn" aria-label="Filter accounts by Squadron" onchange="renderAccounts()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;display:none">
               <option value="">All Squadrons</option>
             </select>
-            <label id="acct-show-archived-row" style="display:none;font-size:11.5px;align-items:center;gap:5px;color:var(--muted);cursor:pointer">
+            <label id="acct-show-archived-row" style="display:none;font-size:11px;align-items:center;gap:5px;color:var(--muted);cursor:pointer">
               <input type="checkbox" id="acct-show-archived" onchange="renderAccounts()"> Show archived
             </label>
             <button class="btn btn-dk acct-write-el" id="acct-create-btn" style="display:none" onclick="openCreateAccountModal()">+ Add Account</button>
@@ -1967,10 +1967,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             </div>
             <div class="form-group" style="margin-top:10px">
               <div style="font-size:12px;font-weight:700;margin-bottom:6px">Access restrictions (after drain window)</div>
-              <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;margin-bottom:4px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:4px">
                 <input type="checkbox" id="sc-maint-block-logins"> Block new logins (current sessions still work)
               </label>
-              <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer">
+              <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
                 <input type="checkbox" id="sc-maint-block-reads"> Block all read access (full lockdown — only system endpoints remain)
               </label>
             </div>
@@ -2447,7 +2447,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title">Copy sessions to another parade night</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-copy-sessions')">×</button></div>
     <div class="modal-body">
-      <p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Copies the planning details of each session (curriculum item, facilitator, room, Training Class audience) from this parade night to the selected night. Sessions already at the same period in the target are not changed.</p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Copies the planning details of each session (curriculum item, facilitator, room, Training Class audience) from this parade night to the selected night. Sessions already at the same period in the target are not changed.</p>
       <div class="ff"><label for="pn-copy-target">Copy to</label><select id="pn-copy-target" aria-label="Target parade night"></select></div>
       <div id="pn-copy-err" style="color:var(--red);font-size:12px;margin-top:6px;display:none"></div>
     </div>
@@ -2463,9 +2463,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title">Apply a session template</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-apply-template')">×</button></div>
     <div class="modal-body">
-      <p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Applies the session structure of the selected template to this parade night. Training Class audiences are not copied — assign them after applying. Periods already occupied are not changed.</p>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Applies the session structure of the selected template to this parade night. Training Class audiences are not copied — assign them after applying. Periods already occupied are not changed.</p>
       <div id="pn-tpl-list" style="display:flex;flex-direction:column;gap:8px"></div>
-      <div id="pn-tpl-empty" style="display:none;color:var(--muted);font-size:12.5px;padding:8px 0">No templates saved yet. Open a parade night with sessions and choose "Save as Template".</div>
+      <div id="pn-tpl-empty" style="display:none;color:var(--muted);font-size:12px;padding:8px 0">No templates saved yet. Open a parade night with sessions and choose "Save as Template".</div>
       <div id="pn-tpl-err" style="color:var(--red);font-size:12px;margin-top:6px;display:none"></div>
     </div>
     <div class="modal-footer">
@@ -2502,7 +2502,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <div id="wiz-classes-list" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px">
           <span class="muted" style="font-size:12px">Loading…</span>
         </div>
-        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;cursor:pointer">
+        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;cursor:pointer">
           <input type="checkbox" id="wiz-skip-class"> Skip — no Training Class selected
         </label>
       </div>
@@ -2511,7 +2511,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <p class="wiz-hint">Choose from the list or leave blank for a custom session.</p>
         <input id="wiz-curr-search" placeholder="Search curriculum items…" oninput="_wizFilterCurr()" style="width:100%;margin-bottom:6px">
         <div id="wiz-curr-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:6px"></div>
-        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;cursor:pointer">
+        <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;cursor:pointer">
           <input type="checkbox" id="wiz-skip-curr" onchange="_wizSkipCurrChange()"> Custom title (type below)
         </label>
         <input id="wiz-custom-title" placeholder="Enter a custom session title…" style="width:100%;margin-top:6px;display:none">
@@ -2551,7 +2551,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       </div>
       <div id="wiz-step-check" style="display:none">
         <div class="wiz-q">Check before saving</div>
-        <div id="wiz-summary" style="border:1px solid var(--border);border-radius:7px;padding:10px 14px;font-size:12.5px;margin-bottom:12px"></div>
+        <div id="wiz-summary" style="border:1px solid var(--border);border-radius:7px;padding:10px 14px;font-size:12px;margin-bottom:12px"></div>
         <div id="wiz-conflicts" style="display:none"></div>
       </div>
       <div id="wiz-msg" style="color:var(--red);font-size:12px;min-height:14px;margin-top:6px"></div>
@@ -2744,7 +2744,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <div class="modal-hdr"><div class="modal-title" id="pn-det-title">Parade Night</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-detail')">×</button></div>
     <div class="modal-body" id="pn-det-body"></div>
     <div class="modal-foot">
-      <span id="pn-det-err" style="font-size:11.5px;margin-right:auto;font-weight:700"></span>
+      <span id="pn-det-err" style="font-size:11px;margin-right:auto;font-weight:700"></span>
       <button class="btn btn-out" onclick="closeModal('m-pn-detail')">Close</button>
     </div>
   </div>
@@ -2761,7 +2761,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="ff"><label>Period</label>
         <input type="number" id="smt-period" min="1" value="1">
       </div>
-      <div id="smt-err" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
+      <div id="smt-err" style="font-size:11px;margin-top:8px;font-weight:700;color:var(--red)"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="_sessMoveToCancel()">Cancel</button>
@@ -2794,7 +2794,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <div class="modal-hdr"><div class="modal-title">Edit Session</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-sess-edit')">×</button></div>
     <div class="modal-body" id="sess-edit-body"></div>
     <div class="modal-foot">
-      <span id="sess-edit-err" style="font-size:11.5px;margin-right:auto;font-weight:700"></span>
+      <span id="sess-edit-err" style="font-size:11px;margin-right:auto;font-weight:700"></span>
       <button class="btn btn-out" onclick="closeModal('m-sess-edit')">Cancel</button>
       <button class="btn btn-dk" onclick="saveSessEdit()">Save</button>
     </div>
@@ -2808,7 +2808,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   <div class="modal" style="max-width:440px">
     <div class="modal-hdr"><div class="modal-title" id="or-title">Reason required</div><button class="modal-x" type="button" onclick="_orCancel()" aria-label="Cancel">×</button></div>
     <div class="modal-body">
-      <p id="or-context" class="muted" style="font-size:12.5px;margin:0 0 12px"></p>
+      <p id="or-context" class="muted" style="font-size:12px;margin:0 0 12px"></p>
       <div class="ff">
         <label for="or-reason">Reason</label>
         <select id="or-reason" aria-required="true" onchange="_onReasonChange(this)">
@@ -2818,7 +2818,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="ff"><label for="or-note">Additional notes (optional)</label>
         <textarea id="or-note" rows="2" placeholder="Any further detail…"></textarea>
       </div>
-      <div id="or-err" role="alert" style="font-size:11.5px;font-weight:700;color:var(--red);min-height:14px"></div>
+      <div id="or-err" role="alert" style="font-size:11px;font-weight:700;color:var(--red);min-height:14px"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" type="button" onclick="_orCancel()">Cancel</button>
@@ -2987,7 +2987,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </table>
         </div>
       </div>
-      <p id="ga-msg" style="font-size:11.5px;color:var(--red);margin-top:8px;font-weight:700"></p>
+      <p id="ga-msg" style="font-size:11px;color:var(--red);margin-top:8px;font-weight:700"></p>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-gen-acts')">Cancel</button>
@@ -3103,11 +3103,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
       </div>
       <div id="fa-areas-edit" class="ff" style="display:none"><label>Subject Areas</label>
-        <div style="font-size:11.5px;color:var(--muted);padding:6px 0">Use the <strong>Tags</strong> button in the facilitator list to manage subject areas.</div>
+        <div style="font-size:11px;color:var(--muted);padding:6px 0">Use the <strong>Tags</strong> button in the facilitator list to manage subject areas.</div>
       </div>
     </div>
     <div class="modal-foot">
-      <span id="fac-save-state" role="status" aria-live="polite" style="font-size:11.5px;font-weight:700;margin-right:auto"></span>
+      <span id="fac-save-state" role="status" aria-live="polite" style="font-size:11px;font-weight:700;margin-right:auto"></span>
       <button class="btn btn-out" onclick="closeModal('m-add-fac')">Cancel</button>
       <button class="btn btn-dk" id="fac-save-btn" onclick="saveFac()">Save Profile</button>
       <button class="btn btn-out" id="fac-save-anyway-btn" style="display:none" onclick="saveFac(true)">Add anyway</button>
@@ -3157,7 +3157,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       </div>
     </div>
     <div class="modal-foot">
-      <span id="fac-merge-state" role="status" aria-live="polite" style="font-size:11.5px;font-weight:700;margin-right:auto"></span>
+      <span id="fac-merge-state" role="status" aria-live="polite" style="font-size:11px;font-weight:700;margin-right:auto"></span>
       <button class="btn btn-out" onclick="closeModal('m-fac-merge')">Cancel</button>
       <button class="btn btn-red" id="fac-merge-btn" onclick="doMergeFac()">Merge &amp; Archive</button>
     </div>
@@ -3169,7 +3169,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title" id="m-tag-title">Edit Subject Areas</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-tag-fac')">×</button></div>
     <div class="modal-body">
-      <p style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Click a tag to toggle it. Dashed border = unit-created tag. Max 20 tags.</p>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:10px">Click a tag to toggle it. Dashed border = unit-created tag. Max 20 tags.</p>
       <div id="m-tag-checks" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px"></div>
       <div class="ff"><label>Other tags (comma-separated)</label><input id="m-tag-custom" placeholder="e.g. Navigation, Survival"></div>
       <div id="m-tag-create-section" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
@@ -3196,7 +3196,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="alert a-info" style="margin-bottom:10px">The previous code cannot be recovered. Share the new code directly with the user once set.</div>
       <div class="ff"><label>New access code</label><input id="m-reset-new" type="password" autocomplete="new-password" placeholder="Enter new code"></div>
       <div class="ff"><label>Confirm new code</label><input id="m-reset-confirm" type="password" autocomplete="new-password" placeholder="Re-enter new code"></div>
-      <div id="m-reset-msg" style="font-size:11.5px;margin-top:8px;font-weight:700"></div>
+      <div id="m-reset-msg" style="font-size:11px;margin-top:8px;font-weight:700"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-reset-code')">Cancel</button>
@@ -3352,7 +3352,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <input id="ca-manual-code" placeholder="Enter code (min 6 chars)" autocomplete="off" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px">
         </div>
       </div>
-      <div id="ca-msg" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
+      <div id="ca-msg" style="font-size:11px;margin-top:8px;font-weight:700;color:var(--red)"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-create-account')">Cancel</button>
@@ -3368,7 +3368,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <div class="modal-body">
       <div class="alert a-warn" style="font-weight:700;margin-bottom:12px">⚠️ This code will not be shown again. Copy it now before closing this window.</div>
       <div style="background:#1a1a2e;color:#7efff5;font-family:monospace;font-size:22px;font-weight:900;letter-spacing:4px;text-align:center;padding:18px 12px;border-radius:8px;user-select:all;margin-bottom:12px" id="m-new-code-value">—</div>
-      <div style="font-size:11.5px;color:var(--muted);text-align:center;margin-bottom:10px">For: <strong id="m-new-code-for">—</strong></div>
+      <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:10px">For: <strong id="m-new-code-for">—</strong></div>
       <button class="btn btn-out" style="width:100%;margin-bottom:6px" onclick="copyNewCode()">Copy to clipboard</button>
       <div id="m-new-code-copy-msg" style="font-size:11px;text-align:center;color:var(--ok);height:14px"></div>
     </div>
@@ -3397,7 +3397,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   <div class="modal" style="max-width:420px">
     <div class="modal-hdr"><div class="modal-title" id="m-acct-reset-title">Reset Access Code</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-acct-reset-code')">×</button></div>
     <div class="modal-body">
-      <div class="alert a-warn" style="font-size:11.5px;margin-bottom:10px">The existing code will be invalidated immediately. The user must use the new code at next sign-in.</div>
+      <div class="alert a-warn" style="font-size:11px;margin-bottom:10px">The existing code will be invalidated immediately. The user must use the new code at next sign-in.</div>
       <div class="card" style="background:var(--hover);padding:12px">
         <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:8px">
           <input type="radio" name="rc-mode" value="auto" checked onchange="onResetCodeModeChange()"> Generate new access code (recommended)
@@ -3409,7 +3409,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <input id="rc-manual-code" placeholder="New code (min 6 chars)" autocomplete="off" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px">
         </div>
       </div>
-      <div id="m-acct-reset-msg" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
+      <div id="m-acct-reset-msg" style="font-size:11px;margin-top:8px;font-weight:700;color:var(--red)"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-acct-reset-code')">Cancel</button>
@@ -3428,7 +3428,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <select id="cf-sqn"><option value="">— select squadron —</option></select>
       </div>
       <div class="alert a-info" style="font-size:11px;margin-top:8px">Flights are local display groupings only. They do not create separate permissions or tenancy.</div>
-      <div id="cf-msg" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
+      <div id="cf-msg" style="font-size:11px;margin-top:8px;font-weight:700;color:var(--red)"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-create-flight')">Cancel</button>
@@ -3464,7 +3464,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <label for="ti-input" id="ti-label">Value</label>
         <input id="ti-input" type="text" autocomplete="off" />
       </div>
-      <div id="ti-err" role="alert" style="font-size:11.5px;font-weight:700;color:var(--red);min-height:14px"></div>
+      <div id="ti-err" role="alert" style="font-size:11px;font-weight:700;color:var(--red);min-height:14px"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" type="button" onclick="_tiCancel()">Cancel</button>
@@ -3481,12 +3481,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="ff"><label>Display Name</label><input id="ea-name" placeholder="Display name" autocomplete="off"></div>
       <div class="ff" id="ea-role-row" style="display:none"><label for="ea-role">Role / Access Type</label>
         <select id="ea-role"></select>
-        <div class="muted" style="font-size:10.5px;margin-top:3px">Changing role within the same scope level only. The account will need to sign in again for the new role to take effect.</div>
+        <div class="muted" style="font-size:10px;margin-top:3px">Changing role within the same scope level only. The account will need to sign in again for the new role to take effect.</div>
       </div>
       <div class="ff" id="ea-flight-row" style="display:none"><label for="ea-flight">Flight (optional)</label>
         <select id="ea-flight"><option value="">— no flight —</option></select>
       </div>
-      <div id="ea-msg" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
+      <div id="ea-msg" style="font-size:11px;margin-top:8px;font-weight:700;color:var(--red)"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-edit-account')">Cancel</button>
@@ -3511,8 +3511,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="ff" id="cs-wing-row" style="display:none"><label for="cs-wing">New Wing</label>
         <select id="cs-wing"><option value="">— select wing —</option></select>
       </div>
-      <div class="muted" style="font-size:10.5px;margin-top:3px">Moving Squadron also clears any assigned Flight (Flights are Squadron-local). The account will need to sign in again for the new scope to take effect.</div>
-      <div id="cs-msg" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
+      <div class="muted" style="font-size:10px;margin-top:3px">Moving Squadron also clears any assigned Flight (Flights are Squadron-local). The account will need to sign in again for the new scope to take effect.</div>
+      <div id="cs-msg" style="font-size:11px;margin-top:8px;font-weight:700;color:var(--red)"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-change-scope')">Cancel</button>
@@ -3551,7 +3551,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <div class="modal-hdr"><div class="modal-title">Rename Flight</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-rename-flight')">×</button></div>
     <div class="modal-body">
       <div class="ff"><label>Flight Name</label><input id="rf-name" placeholder="e.g. Alpha Flight" autocomplete="off"></div>
-      <div id="rf-msg" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
+      <div id="rf-msg" style="font-size:11px;margin-top:8px;font-weight:700;color:var(--red)"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-rename-flight')">Cancel</button>
@@ -3571,7 +3571,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <div class="ff"><label>Short Name</label><input id="cw-short" placeholder="e.g. 8WG" autocomplete="off"></div>
       </div>
       <div class="ff"><label>Full Name</label><input id="cw-name" placeholder="e.g. 8 Wing" autocomplete="off"></div>
-      <div id="cw-msg" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
+      <div id="cw-msg" style="font-size:11px;margin-top:8px;font-weight:700;color:var(--red)"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-create-wing')">Cancel</button>
@@ -3604,7 +3604,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <div class="ff"><label>Short Name</label><input id="csq-short" placeholder="e.g. 703 SQN" autocomplete="off"></div>
       </div>
       <div class="ff"><label>Full Name</label><input id="csq-name" placeholder="e.g. 703 Squadron AAFC" autocomplete="off"></div>
-      <div id="csq-msg" style="font-size:11.5px;margin-top:8px;font-weight:700;color:var(--red)"></div>
+      <div id="csq-msg" style="font-size:11px;margin-top:8px;font-weight:700;color:var(--red)"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-create-sqn')">Cancel</button>
@@ -3627,7 +3627,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <label for="rename-org-short">Short name</label>
         <input id="rename-org-short" type="text" maxlength="40" placeholder="Abbreviation (leave blank to keep current)" style="width:100%">
       </div>
-      <div id="rename-org-msg" style="font-size:11.5px;margin-top:10px;font-weight:700"></div>
+      <div id="rename-org-msg" style="font-size:11px;margin-top:10px;font-weight:700"></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-out" onclick="closeModal('m-rename-org')">Cancel</button>
@@ -3650,7 +3650,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <option value="support_unit">Support Unit</option>
         </select>
       </div>
-      <div id="edit-unit-type-msg" style="font-size:11.5px;margin-top:10px;font-weight:700"></div>
+      <div id="edit-unit-type-msg" style="font-size:11px;margin-top:10px;font-weight:700"></div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-out" onclick="closeModal('m-edit-unit-type')">Cancel</button>
@@ -3680,7 +3680,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       </div>
       <div style="font-weight:600;font-size:12px;margin:14px 0 4px">Blocks <span style="font-weight:400;color:var(--muted);font-size:11px">— IP = Instructional Period (generates a schedulable session); Opt = optional block</span></div>
       <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <table style="width:100%;border-collapse:collapse;font-size:11px">
           <thead><tr style="background:var(--bg2);border-bottom:1px solid var(--border)">
             <th style="padding:4px 4px;text-align:left">#</th>
             <th style="padding:4px 6px;text-align:left;min-width:110px">Block Name</th>
@@ -3696,19 +3696,19 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <tbody id="tt-blocks-body"></tbody>
         </table>
       </div>
-      <button class="btn" style="margin-top:8px;font-size:11.5px" onclick="ttAddBlock()">+ Add Block</button>
+      <button class="btn" style="margin-top:8px;font-size:11px" onclick="ttAddBlock()">+ Add Block</button>
       <div id="tt-warnings" style="color:#c07000;font-size:11px;margin-top:6px"></div>
     </div>
     <div class="modal-foot" style="flex-wrap:wrap;gap:8px">
       <button class="btn btn-dk" onclick="saveTimingTemplate()">Save Template</button>
       <div id="tt-apply-from-wrap" style="display:none;gap:6px;align-items:center;flex-wrap:wrap">
-        <span style="font-size:11.5px;white-space:nowrap">Apply from:</span>
+        <span style="font-size:11px;white-space:nowrap">Apply from:</span>
         <input id="tt-apply-from-date" type="date" style="width:130px">
         <input id="tt-apply-from-reason" type="text" placeholder="Reason" style="width:140px">
         <button class="btn" onclick="ttApplyFromDate()">Apply</button>
       </div>
       <button class="btn btn-out" onclick="closeModal('m-timing')">Close</button>
-      <span id="tt-msg" style="font-size:11.5px;font-weight:700;align-self:center"></span>
+      <span id="tt-msg" style="font-size:11px;font-weight:700;align-self:center"></span>
     </div>
   </div>
 </div>
@@ -3719,7 +3719,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   <div class="modal" style="max-width:700px;width:96%">
     <div class="modal-hdr"><div class="modal-title">Override Parade Night Timing</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-timing-override')">×</button></div>
     <div class="modal-body">
-      <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Change the timing for this parade night only. Does not affect future parade nights.</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Change the timing for this parade night only. Does not affect future parade nights.</div>
       <!-- Mode toggle -->
       <div style="display:flex;gap:0;margin-bottom:12px;border:1px solid var(--border);border-radius:5px;overflow:hidden;width:fit-content">
         <button id="pn-or-mode-tpl" class="btn" style="border-radius:0;padding:4px 14px;font-size:12px;background:var(--dark);color:#fff" onclick="_pnOrMode('template')">Use existing template</button>
@@ -3733,9 +3733,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       </div>
       <!-- Custom blocks section (WORK-05) -->
       <div id="pn-or-cus-section" style="display:none">
-        <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Define the blocks for this parade night. A timing template named "Custom — {date}" will be created automatically.</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Define the blocks for this parade night. A timing template named "Custom — {date}" will be created automatically.</div>
         <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
             <thead><tr style="background:var(--bg2);border-bottom:1px solid var(--border)">
               <th style="padding:4px 4px;text-align:left">#</th>
               <th style="padding:4px 6px;text-align:left;min-width:110px">Block Name</th>
@@ -3750,12 +3750,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <tbody id="pn-cb-body"></tbody>
           </table>
         </div>
-        <button class="btn" style="margin-top:6px;font-size:11.5px" onclick="pnCbAddBlock()">+ Add Block</button>
+        <button class="btn" style="margin-top:6px;font-size:11px" onclick="pnCbAddBlock()">+ Add Block</button>
       </div>
       <div class="form-row" style="margin-top:10px">
         <div class="ff"><label>Reason (required)</label><input id="pn-override-reason" type="text" placeholder="e.g. Shortened ANZAC night"></div>
       </div>
-      <div id="pn-override-msg" style="font-size:11.5px;margin-top:8px;font-weight:700"></div>
+      <div id="pn-override-msg" style="font-size:11px;margin-top:8px;font-weight:700"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-pn-timing-override')">Cancel</button>
@@ -5087,9 +5087,9 @@ async function renderActionCentre(){
         const pct=r.readiness_pct||0;
         const col=np?'var(--muted)':pct>=60?'var(--warn)':'var(--red)';
         return `<div style="border:1.5px solid var(--border);border-radius:8px;padding:10px">`+
-          `<div style="font-size:10.5px;font-weight:800;color:var(--dark)">${fmtD(r.date,{weekday:'short',day:'numeric',month:'short'})}</div>`+
-          `<div style="font-size:11.5px;font-weight:700;color:${col};margin-top:4px">${np?'Not planned':pct+'% ready'}</div>`+
-          `${!np&&r.unstaffed?`<div style="font-size:10.5px;color:var(--warn)">⚠ ${r.unstaffed} unstaffed</div>`:''}`+
+          `<div style="font-size:10px;font-weight:800;color:var(--dark)">${fmtD(r.date,{weekday:'short',day:'numeric',month:'short'})}</div>`+
+          `<div style="font-size:11px;font-weight:700;color:${col};margin-top:4px">${np?'Not planned':pct+'% ready'}</div>`+
+          `${!np&&r.unstaffed?`<div style="font-size:10px;color:var(--warn)">⚠ ${r.unstaffed} unstaffed</div>`:''}`+
           `</div>`;
       }).join('')+`</div>`
     :`<div style="padding:12px;color:var(--ok);font-weight:700">✓ All upcoming nights are on track</div>`;
@@ -5195,8 +5195,8 @@ function renderProgramAudit(){
   const unschedHtml=unscheduled.length
     ?`<div style="margin-top:12px"><div style="font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Unscheduled Items (${unscheduled.length})</div>`+
       `<div style="display:flex;flex-wrap:wrap;gap:5px">`+
-      unscheduled.slice(0,20).map(u=>`<span style="font-size:10.5px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:2px 7px">${esc(u.code?u.code+' ':'')+(u.title||'')}</span>`).join('')+
-      (unscheduled.length>20?`<span style="font-size:10.5px;color:var(--muted);padding:2px 0">+${unscheduled.length-20} more…</span>`:'')+
+      unscheduled.slice(0,20).map(u=>`<span style="font-size:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;padding:2px 7px">${esc(u.code?u.code+' ':'')+(u.title||'')}</span>`).join('')+
+      (unscheduled.length>20?`<span style="font-size:10px;color:var(--muted);padding:2px 0">+${unscheduled.length-20} more…</span>`:'')+
       `</div></div>`
     :`<div style="margin-top:8px;font-size:12px;color:var(--ok);font-weight:700">✓ All curriculum items scheduled</div>`;
 
@@ -5504,14 +5504,14 @@ async function scLoadMaintenance(){
       if(isPending&&d.pending_until)h+=`<div class="muted" style="font-size:12px;margin-bottom:4px">Write-block starts: ${esc(d.pending_until)}</div>`;
       if(d.message) h+=`<div class="muted" style="font-size:12px;margin-bottom:4px">Message: ${esc(d.message)}</div>`;
       if(d.until) h+=`<div class="muted" style="font-size:12px;margin-bottom:4px">Expected return: ${esc(d.until)}</div>`;
-      h+=`<div style="font-size:11.5px;margin:6px 0 10px;display:flex;gap:10px;flex-wrap:wrap">`;
+      h+=`<div style="font-size:11px;margin:6px 0 10px;display:flex;gap:10px;flex-wrap:wrap">`;
       h+=`<span class="${d.block_logins?'sc-status-warn':'sc-status-ok'}">Logins: ${d.block_logins?'Blocked':'Allowed'}</span>`;
       h+=`<span class="${d.block_reads?'sc-status-warn':'sc-status-ok'}">Reads: ${d.block_reads?'Blocked':'Allowed'}</span>`;
       h+=`<span class="${isPending?'sc-status-ok':'sc-status-warn'}">Writes: ${isPending?'Allowed (pending)':'Blocked'}</span>`;
       h+=`</div>`;
       h+=`<button class="btn btn-secondary" onclick="scDisableMaint()">Disable Maintenance Mode</button>`;
     } else {
-      h+=`<div style="font-size:12.5px;color:var(--ok);margin-bottom:10px">Maintenance mode is off. System is operating normally.</div>`;
+      h+=`<div style="font-size:12px;color:var(--ok);margin-bottom:10px">Maintenance mode is off. System is operating normally.</div>`;
       h+=`<button class="btn btn-secondary" onclick="document.getElementById('sc-maint-title').value='';document.getElementById('sc-maint-block-logins').checked=false;document.getElementById('sc-maint-block-reads').checked=false;document.getElementById('sc-maint-drain').value='20';document.getElementById('sc-maint-form').style.display='block';this.style.display='none'">Enable Maintenance Mode…</button>`;
     }
     el.innerHTML=h;
@@ -5556,16 +5556,16 @@ async function scLoadBackups(){
     const d=await api('/api/system/backups');
     const isPg=(d.db_type||'').toLowerCase().includes('postgres');
     if(isPg){
-      el.innerHTML=`<div class="muted" style="font-size:12.5px">Database: ${esc(d.db_type)}</div>
-        <div style="margin-top:8px;font-size:12.5px">Use the button below to download a pg_dump of the live database directly to your browser. No data is written to the server filesystem.</div>
-        <div style="margin-top:6px;font-size:11.5px;color:var(--muted)">To restore: <code>pg_restore --clean --if-exists -d &quot;DATABASE_URL&quot; filename.dump</code><br>
+      el.innerHTML=`<div class="muted" style="font-size:12px">Database: ${esc(d.db_type)}</div>
+        <div style="margin-top:8px;font-size:12px">Use the button below to download a pg_dump of the live database directly to your browser. No data is written to the server filesystem.</div>
+        <div style="margin-top:6px;font-size:11px;color:var(--muted)">To restore: <code>pg_restore --clean --if-exists -d &quot;DATABASE_URL&quot; filename.dump</code><br>
         This is a controlled CLI operation. Do not share the dump file outside authorised personnel.</div>`;
       if(acts) acts.innerHTML='<button id="sc-pgdump-btn" class="btn btn-secondary" onclick="scDownloadPgDump()">Download PostgreSQL Backup (pg_dump)</button>';
     } else {
       if(!d.backups||!d.backups.length){
         el.innerHTML='<div class="muted">No backups found in <code>'+esc(d.backup_dir||'./backups')+'</code>.</div>';
       } else {
-        let h=`<div class="muted" style="font-size:11.5px;margin-bottom:8px">Backup directory: <code>${esc(d.backup_dir)}</code></div>`;
+        let h=`<div class="muted" style="font-size:11px;margin-bottom:8px">Backup directory: <code>${esc(d.backup_dir)}</code></div>`;
         for(const b of d.backups){
           const kb=b.size_bytes?Math.round(b.size_bytes/1024)+'KB':'';
           h+=`<div class="sc-backup-item"><span class="sc-filename">${esc(b.filename)}</span><span class="sc-bsize">${kb}</span><span class="muted">${b.created_at?esc(b.created_at.slice(0,19).replace('T',' '))+'Z':''}</span></div>`;
@@ -5972,7 +5972,7 @@ function _renderAccountTable(){
   rows=_acctSortRows(rows);
 
   if(!rows.length){
-    el.innerHTML='<div style="color:var(--muted);font-size:11.5px;padding:8px 0">'+(!(S.accountList||[]).length?'No accounts in scope.':'No accounts match the filter.')+'</div>';
+    el.innerHTML='<div style="color:var(--muted);font-size:11px;padding:8px 0">'+(!(S.accountList||[]).length?'No accounts in scope.':'No accounts match the filter.')+'</div>';
     return;
   }
 
@@ -6107,7 +6107,7 @@ function _renderFlightTable(){
   const canWrite=_ACCT_WRITE_ROLES.includes(S.role);
   const showArchived=(document.getElementById('flights-show-archived')||{}).checked;
   const flights=showArchived?(_archivedFlightList||[]):(S.flightList||[]);
-  if(!flights.length){ el.innerHTML=`<div style="color:var(--muted);font-size:11.5px;padding:8px 0">No ${showArchived?'archived ':''}flights${showArchived?'':' defined'}.</div>`; return; }
+  if(!flights.length){ el.innerHTML=`<div style="color:var(--muted);font-size:11px;padding:8px 0">No ${showArchived?'archived ':''}flights${showArchived?'':' defined'}.</div>`; return; }
 
   const renameBtn=f=>`<button class="btn btn-xs" onclick="openRenameFlightModal('${f.flight_id}','${_jsAttr(f.name||'')}')">Rename</button>`;
   const archiveBtn=f=>`<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doArchiveFlight('${f.flight_id}','${_jsAttr(f.name||'')}')">Archive</button>`;
@@ -6117,8 +6117,8 @@ function _renderFlightTable(){
   el.innerHTML='<div class="tw"><table><thead><tr><th>Flight Name</th><th>Squadron</th><th>Members</th>'+(canWrite?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
     flights.map(f=>`<tr${f.is_archived?' style="opacity:.6"':''}>
       <td style="font-weight:700">${esc(f.name)}${f.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
-      <td style="font-size:11.5px;color:var(--muted)">${esc(f.squadron_code||f.squadron_name||'—')}</td>
-      <td style="font-size:11.5px">${f.member_count??'—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(f.squadron_code||f.squadron_name||'—')}</td>
+      <td style="font-size:11px">${f.member_count??'—'}</td>
       ${canWrite?`<td class="no-print" style="display:flex;gap:4px">${actionsCell(f)}</td>`:''}
     </tr>`).join('')+
     '</tbody></table></div>';
@@ -6152,7 +6152,7 @@ function _renderWingsTable(){
   const showArchived=(document.getElementById('wings-show-archived')||{}).checked;
   const wings=showArchived?(_orgArchivedWings||[]):(S.wings||[]);
   const isNatAdmin=['national_admin','system_admin'].includes(S.role);
-  if(!wings.length){ el.innerHTML='<div style="color:var(--muted);font-size:11.5px;padding:8px 0">No Wings found.</div>'; return; }
+  if(!wings.length){ el.innerHTML='<div style="color:var(--muted);font-size:11px;padding:8px 0">No Wings found.</div>'; return; }
   const sqnCount=wid=>(S.squadrons||[]).filter(s=>s.wing_id===wid).length;
   const actionsCell=w=>{
     if(!isNatAdmin) return '';
@@ -6164,8 +6164,8 @@ function _renderWingsTable(){
   el.innerHTML='<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Squadrons</th>'+(isNatAdmin?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
     wings.map(w=>`<tr${w.is_archived?' style="opacity:.6"':''}>
       <td style="font-weight:700">${esc(w.code)}${w.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
-      <td style="font-size:11.5px">${esc(w.name||w.short_name||'')}</td>
-      <td style="font-size:11.5px;color:var(--muted)">${sqnCount(w.wing_id)}</td>
+      <td style="font-size:11px">${esc(w.name||w.short_name||'')}</td>
+      <td style="font-size:11px;color:var(--muted)">${sqnCount(w.wing_id)}</td>
       ${isNatAdmin?`<td class="no-print" style="display:flex;gap:4px;flex-wrap:wrap">${actionsCell(w)}</td>`:''}
     </tr>`).join('')+
     '</tbody></table></div>';
@@ -6185,7 +6185,7 @@ function _renderUnitsTable(){
   const isWingAdmin=S.role==='wing_admin';
   const canArchive=s=>isNatAdmin||(isWingAdmin&&s.wing_id===(S.session&&S.session.wing_id));
   const wName=wid=>{ const w=wings.find(x=>x.wing_id===wid); return w?w.code||w.name:wid||'—'; };
-  if(!sqns.length){ el.innerHTML='<div style="color:var(--muted);font-size:11.5px;padding:8px 0">No units found.</div>'; return; }
+  if(!sqns.length){ el.innerHTML='<div style="color:var(--muted);font-size:11px;padding:8px 0">No units found.</div>'; return; }
   const actionsCell=s=>{
     if(!canArchive(s)) return '';
     if(s.is_archived) return `<button class="btn btn-xs btn-ok" onclick="doRestoreSquadron('${s.squadron_id}','${_jsAttr(s.code)}')">Restore</button> `+
@@ -6197,9 +6197,9 @@ function _renderUnitsTable(){
   el.innerHTML='<div class="tw"><table><thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Wing</th>'+((isNatAdmin||isWingAdmin)?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
     sqns.map(s=>`<tr${s.is_archived?' style="opacity:.6"':''}>
       <td style="font-weight:700">${esc(s.code)}${s.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
-      <td style="font-size:11.5px">${esc(s.name||s.short_name||'')}</td>
-      <td style="font-size:11px"><span class="badge b-blue" style="font-size:10.5px">${esc(_UNIT_TYPE_LABELS[s.unit_type]||s.unit_type||'Squadron')}</span></td>
-      <td style="font-size:11.5px;color:var(--muted)">${esc(wName(s.wing_id))}</td>
+      <td style="font-size:11px">${esc(s.name||s.short_name||'')}</td>
+      <td style="font-size:11px"><span class="badge b-blue" style="font-size:10px">${esc(_UNIT_TYPE_LABELS[s.unit_type]||s.unit_type||'Squadron')}</span></td>
+      <td style="font-size:11px;color:var(--muted)">${esc(wName(s.wing_id))}</td>
       ${(isNatAdmin||isWingAdmin)?`<td class="no-print" style="display:flex;gap:4px;flex-wrap:wrap">${actionsCell(s)}</td>`:''}
     </tr>`).join('')+
     '</tbody></table></div>';
@@ -6730,7 +6730,7 @@ function _wizRender(){
         <td class="no-print"><button class="btn btn-xs btn-out" onclick="_wizRemove('${u.user_id}')">Remove</button></td>
       </tr>`).join('')}
       </tbody></table></div>
-      <div style="font-size:11.5px;margin-top:8px;color:var(--muted)">${n} account${n===1?'':'s'} selected.</div>`;
+      <div style="font-size:11px;margin-top:8px;color:var(--muted)">${n} account${n===1?'':'s'} selected.</div>`;
   } else if(w.step===2){
     title.textContent='Step 2 of 5 — Impact Assessment';
     body.innerHTML=`
@@ -6753,13 +6753,13 @@ function _wizRender(){
     title.textContent='Step 4 of 5 — Confirmation';
     body.innerHTML=`
       <p style="font-size:12px">You are about to archive <strong>${n}</strong> account${n===1?'':'s'}.</p>
-      <div style="font-size:11.5px;color:var(--muted);white-space:pre-wrap;border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin:8px 0"><strong>Reason:</strong> ${esc(w.reason.trim())}</div>
-      <p style="font-size:11.5px;color:var(--muted)">This takes effect immediately on confirmation and is recorded in the Audit Log under one correlated batch.</p>`;
+      <div style="font-size:11px;color:var(--muted);white-space:pre-wrap;border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin:8px 0"><strong>Reason:</strong> ${esc(w.reason.trim())}</div>
+      <p style="font-size:11px;color:var(--muted)">This takes effect immediately on confirmation and is recorded in the Audit Log under one correlated batch.</p>`;
   } else if(w.step===5){
     title.textContent='Step 5 of 5 — Result';
     const results=w.results||[];
     body.innerHTML=`
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:11.5px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:11px">
         <span class="badge b-ok">${w.summary.archived} archived</span>
         <span class="badge b-grey">${w.summary.already_archived} already archived</span>
         <span class="badge b-amber">${w.summary.skipped} skipped</span>
@@ -6769,7 +6769,7 @@ function _wizRender(){
       ${results.map(r=>`<tr>
         <td style="font-weight:700">${esc(r.display_name||r.account_id)}</td>
         <td>${r.role?`<span class="badge ${_ROLE_CLS[r.role]||'b-grey'}">${_ROLE_LABELS[r.role]||r.role}</span>`:'—'}</td>
-        <td><span class="badge ${_WIZ_RESULT_BADGE[r.result]||'b-grey'}">${_WIZ_RESULT_LABEL[r.result]||r.result}</span>${r.reason&&_WIZ_SKIP_REASON[r.reason]?` <span style="font-size:10.5px;color:var(--muted)">${_WIZ_SKIP_REASON[r.reason]}</span>`:''}</td>
+        <td><span class="badge ${_WIZ_RESULT_BADGE[r.result]||'b-grey'}">${_WIZ_RESULT_LABEL[r.result]||r.result}</span>${r.reason&&_WIZ_SKIP_REASON[r.reason]?` <span style="font-size:10px;color:var(--muted)">${_WIZ_SKIP_REASON[r.reason]}</span>`:''}</td>
       </tr>`).join('')}
       </tbody></table></div>
       <div style="margin-top:10px">
@@ -6893,7 +6893,7 @@ function _owzRender(){
     title.textContent=`Step 1 of 5 — Confirm ${kindLabel}`;
     body.innerHTML=`<p style="font-size:12px">You are starting an archive workflow for:</p>
       <div style="font-size:14px;font-weight:700;border:1px solid var(--border);border-radius:6px;padding:8px 10px;margin:8px 0">${esc(kindLabel)}: ${esc(w.label)}</div>
-      <p style="font-size:11.5px;color:var(--muted)">The next step checks whether anything currently blocks archiving this ${kindLabel.toLowerCase()}.</p>`;
+      <p style="font-size:11px;color:var(--muted)">The next step checks whether anything currently blocks archiving this ${kindLabel.toLowerCase()}.</p>`;
   } else if(w.step===2){
     title.textContent='Step 2 of 5 — Impact Assessment';
     if(!w.impact){
@@ -6906,7 +6906,7 @@ function _owzRender(){
           ${hb.map(b=>esc(b.message||b.type)).join('<br>')}
         </div>`;
         if(w.kind==='squadron' && (w.impact.active_accounts||[]).length){
-          blockersHtml+=`<div style="font-size:11.5px;font-weight:700;margin:8px 0 4px">Select accounts to archive now to clear this block:</div>
+          blockersHtml+=`<div style="font-size:11px;font-weight:700;margin:8px 0 4px">Select accounts to archive now to clear this block:</div>
             <div class="tw" style="max-height:180px;overflow:auto"><table><thead><tr><th></th><th>Name</th><th>Role</th></tr></thead><tbody>
             ${w.impact.active_accounts.map(a=>`<tr>
               <td><input type="checkbox" onchange="_owzNestedToggle('${a.user_id}',this.checked)" aria-label="Select ${esc(a.display_name||'')}"></td>
@@ -6916,12 +6916,12 @@ function _owzRender(){
             </tbody></table></div>
             <button class="btn btn-xs btn-dk" id="owz-nested-archive-btn" style="margin-top:6px" disabled onclick="_owzArchiveNestedAccounts()">Archive selected accounts now</button>`;
         } else if(w.kind==='wing' && (w.impact.subordinate_orgs||[]).length){
-          blockersHtml+=`<div style="font-size:11.5px;color:var(--muted);margin-top:6px">Archive these Squadrons / Specialist Units individually first (Squadrons / Specialist Units table below):<br>${w.impact.subordinate_orgs.map(s=>esc(s.code)).join(', ')}</div>`;
+          blockersHtml+=`<div style="font-size:11px;color:var(--muted);margin-top:6px">Archive these Squadrons / Specialist Units individually first (Squadrons / Specialist Units table below):<br>${w.impact.subordinate_orgs.map(s=>esc(s.code)).join(', ')}</div>`;
         }
       } else {
         blockersHtml='<div class="alert a-info" style="font-size:12px;margin-bottom:8px">No blocking conditions. This '+kindLabel.toLowerCase()+' can be archived.</div>';
       }
-      const warningsHtml=sw.length?`<div style="font-size:11.5px;margin-top:8px"><strong>Also note:</strong><ul style="margin:4px 0 0 18px;padding:0">${sw.map(x=>`<li>${esc(x.message||x.type)}</li>`).join('')}</ul></div>`:'';
+      const warningsHtml=sw.length?`<div style="font-size:11px;margin-top:8px"><strong>Also note:</strong><ul style="margin:4px 0 0 18px;padding:0">${sw.map(x=>`<li>${esc(x.message||x.type)}</li>`).join('')}</ul></div>`:'';
       body.innerHTML=blockersHtml+warningsHtml;
     }
   } else if(w.step===3){
@@ -6933,7 +6933,7 @@ function _owzRender(){
   } else if(w.step===4){
     title.textContent='Step 4 of 5 — Confirmation';
     body.innerHTML=`<p style="font-size:12px">You are about to archive <strong>${esc(kindLabel)}: ${esc(w.label)}</strong>.</p>
-      <p style="font-size:11.5px;color:var(--muted)">This takes effect immediately on confirmation and is recorded in the Audit Log.</p>`;
+      <p style="font-size:11px;color:var(--muted)">This takes effect immediately on confirmation and is recorded in the Audit Log.</p>`;
   } else if(w.step===5){
     title.textContent='Step 5 of 5 — Result';
     body.innerHTML=w.result==='ok'
@@ -7203,7 +7203,7 @@ function renderUserDir(){
     (u.role||'').includes(flt)||
     (u.squadron_code||'').toLowerCase().includes(flt)||
     (u.wing_code||'').toLowerCase().includes(flt));
-  if(!rows.length){ el.innerHTML='<div style="color:var(--muted);font-size:11.5px;padding:8px 0">'+(!(S.users||[]).length?'No users in scope.':'No users match the filter.')+'</div>'; return; }
+  if(!rows.length){ el.innerHTML='<div style="color:var(--muted);font-size:11px;padding:8px 0">'+(!(S.users||[]).length?'No users in scope.':'No users match the filter.')+'</div>'; return; }
   const unit=u=>u.squadron_code?'SQN '+u.squadron_code:u.wing_code?'Wing '+u.wing_code:u.national_id?'NAT HQ':'—';
   el.innerHTML='<div class="tw"><table><thead><tr><th>Name</th><th>Role</th><th>Unit</th><th></th></tr></thead><tbody>'+
     rows.map(u=>`<tr><td style="font-weight:700">${esc(u.display_name)}</td>
@@ -7312,8 +7312,8 @@ function showDrill(panelId,titleId,bodyId,title,sess){
     <td style="color:var(--muted)">S${s.si+1}</td>
     <td>${phBadge(s.phase)}</td>
     <td style="font-weight:700;font-size:12px">${esc(s.exp||'—')}</td>
-    <td style="font-size:11.5px">${esc(s.facName||'—')}</td>
-    <td style="font-size:11.5px">${esc(s.room||'—')}</td>
+    <td style="font-size:11px">${esc(s.facName||'—')}</td>
+    <td style="font-size:11px">${esc(s.room||'—')}</td>
     <td>${stBadge(s.status)}</td>
     <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${s.date}',${s.si})">Edit</button>`:''}</td>
   </tr>`).join(''):`<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:16px">No sessions</td></tr>`;
@@ -7464,14 +7464,14 @@ function _chartStackedBarH(chart){
     const name=row.phase?(PH_S[row.phase]||row.phase):(row.element||row.label||'—');
     const pctDel=total?Math.round((+(row.delivered)||0)/total*100):0;
     html+=`<div class="ph-row" style="margin-bottom:6px" role="img" aria-label="${esc(name)}: ${pctDel}% delivered">
-      <div class="ph-name" style="min-width:84px;font-size:10.5px">${esc(name.substring(0,14))}</div>
+      <div class="ph-name" style="min-width:84px;font-size:10px">${esc(name.substring(0,14))}</div>
       <div class="ph-bar" style="flex:1">
         <div style="display:flex;height:14px;border-radius:3px;overflow:hidden;background:var(--bg)">
           ${series.map(s=>{const v=+(row[s.key])||0;return v?`<div style="flex:${v};background:${s.color};height:100%" title="${esc(s.label)}: ${v}"></div>`:''}).join('')}
           ${total<maxV?`<div style="flex:${maxV-total};height:100%"></div>`:''}
         </div>
       </div>
-      <div class="ph-cnt" style="min-width:44px;text-align:right;font-size:10.5px;color:var(--muted)">${total||0}</div>
+      <div class="ph-cnt" style="min-width:44px;text-align:right;font-size:10px;color:var(--muted)">${total||0}</div>
     </div>`;
   });
   return html;
@@ -7549,8 +7549,8 @@ function _renderTonightReadiness(chart){
   const unstaffedCount=(d.sessions||[]).filter(s=>!s.facilitator).length;
   const sessHtml=(d.sessions||[]).map((s,i)=>`<div class="sched-lane">
     <span style="font-size:10px;color:var(--muted);min-width:48px">Sess ${i+1}</span>
-    <span style="font-size:11.5px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title||'No curriculum item')}</span>
-    <span style="font-size:10.5px;color:${s.facilitator?'var(--muted)':'var(--red)'}">${esc(s.facilitator||'No facilitator assigned')}</span>
+    <span style="font-size:11px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title||'No curriculum item')}</span>
+    <span style="font-size:10px;color:${s.facilitator?'var(--muted)':'var(--red)'}">${esc(s.facilitator||'No facilitator assigned')}</span>
   </div>`).join('');
   // HELP-04: per-item readiness checklist — each preparation category shown
   // as ✓ / ! / ✗ so users can see exactly what is and is not ready, rather
@@ -7574,7 +7574,7 @@ function _renderTonightReadiness(chart){
         <div class="rdp-ring" style="background:${conic};width:72px;height:72px">
           <div class="rdp-inner" style="width:52px;height:52px;font-size:15px;color:${rdC}">${pct}%</div>
         </div>
-        ${unstaffedCount>0?`<div style="font-size:10.5px;color:var(--red);font-weight:700;margin-top:4px;text-align:center" title="${unstaffedCount} session${unstaffedCount!==1?'s have':' has'} no facilitator assigned yet — see \\"No facilitator assigned\\" in the Session Plan list">⚠ ${unstaffedCount} unstaffed</div>`:''}
+        ${unstaffedCount>0?`<div style="font-size:10px;color:var(--red);font-weight:700;margin-top:4px;text-align:center" title="${unstaffedCount} session${unstaffedCount!==1?'s have':' has'} no facilitator assigned yet — see \\"No facilitator assigned\\" in the Session Plan list">⚠ ${unstaffedCount} unstaffed</div>`:''}
       </div>
       <div style="flex:1">
         <div style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Session Plan</div>
@@ -7596,16 +7596,16 @@ function _renderUpcomingReadiness(chart){
       const dateLabel=fmtD(r.date,{weekday:'short',day:'numeric',month:'short'});
       if(r.planning_status==='not_planned'||!r.sessions_total){
         return `<div style="border:1.5px solid var(--border);border-radius:8px;padding:10px" role="img" aria-label="${r.date}: not planned, no sessions scheduled">
-          <div style="font-size:10.5px;font-weight:800;color:var(--dark)">${dateLabel}</div>
-          <div style="font-size:10.5px;color:var(--muted);font-weight:700;margin-top:5px">Not planned</div>
+          <div style="font-size:10px;font-weight:800;color:var(--dark)">${dateLabel}</div>
+          <div style="font-size:10px;color:var(--muted);font-weight:700;margin-top:5px">Not planned</div>
           <div style="font-size:11px;color:var(--muted)">No sessions scheduled</div>
         </div>`;
       }
       const pct=r.readiness_pct||0;const col=pct>=80?'var(--ok)':pct>=60?'var(--warn)':'var(--red)';
       return `<div style="border:1.5px solid var(--border);border-radius:8px;padding:10px" role="img" aria-label="${r.date}: ${pct}% ready">
-        <div style="font-size:10.5px;font-weight:800;color:var(--dark)">${dateLabel}</div>
+        <div style="font-size:10px;font-weight:800;color:var(--dark)">${dateLabel}</div>
         <div class="pbar" style="margin:5px 0"><div style="height:100%;width:${pct}%;background:${col};border-radius:3px"></div></div>
-        <div style="font-size:10.5px;color:${col};font-weight:700">${pct}% ready</div>
+        <div style="font-size:10px;color:${col};font-weight:700">${pct}% ready</div>
         ${r.unstaffed?`<div style="font-size:11px;color:var(--warn);font-weight:700" title="${r.unstaffed} session${r.unstaffed!==1?'s have':' has'} no facilitator assigned yet — open this parade night to assign one">⚠ ${r.unstaffed} unstaffed</div>`:''}
         <div style="font-size:11px;color:var(--muted)">${r.sessions_total||0} sessions</div>
       </div>`;
@@ -7618,7 +7618,7 @@ function _renderHeatmap(chart){
   const subjects=(rows[0]?.cells||[]).map(c=>c.label);
   return `<div style="overflow-x:auto"><table style="font-size:10px;border-collapse:separate;border-spacing:3px">
     <thead><tr><th></th>${subjects.map(s=>`<th style="font-size:9px;color:var(--muted);padding:2px 4px;white-space:nowrap;writing-mode:vertical-rl;transform:rotate(180deg);height:56px;text-align:left">${esc(s)}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(row=>`<tr><td style="font-size:10.5px;font-weight:700;padding:3px 8px;white-space:nowrap">${esc(row.label)}</td>
+    <tbody>${rows.map(row=>`<tr><td style="font-size:10px;font-weight:700;padding:3px 8px;white-space:nowrap">${esc(row.label)}</td>
       ${(row.cells||[]).map(c=>{const cls=c.risk==='ok'?'hm-ok':c.risk==='warn'?'hm-warn':c.risk==='critical'?'hm-critical':'hm-empty';
         return `<td class="heatmap-cell ${cls}" style="width:34px;height:24px" title="${esc(row.label)} — ${esc(c.label)}: ${c.count} facilitator${c.count!==1?'s':''}">${c.count||0}</td>`;}).join('')}
     </tr>`).join('')}</tbody></table></div>`;
@@ -7841,7 +7841,7 @@ async function loadDashCharts(){
     const el=document.getElementById('chart-cancellation-reasons');
     if(!el)return;
     const pct=Math.round(gapCount/total*100);
-    el.insertAdjacentHTML('beforeend',`<div class="alert a-warn" style="margin-top:8px;font-size:11.5px"><strong>${pct}% of cancellations have no reason recorded (${gapCount} of ${total}).</strong> Recording reasons helps identify patterns. Open each affected session and add a reason under Outcome.</div>`);
+    el.insertAdjacentHTML('beforeend',`<div class="alert a-warn" style="margin-top:8px;font-size:11px"><strong>${pct}% of cancellations have no reason recorded (${gapCount} of ${total}).</strong> Recording reasons helps identify patterns. Open each affected session and add a reason under Outcome.</div>`);
   })();
 
   // C. Curriculum
@@ -8291,7 +8291,7 @@ async function openApplyTemplateModal(pnId){
   const listEl=document.getElementById('pn-tpl-list');
   const emptyEl=document.getElementById('pn-tpl-empty');
   const errEl=document.getElementById('pn-tpl-err');
-  listEl.innerHTML='<div style="color:var(--muted);font-size:12.5px;padding:8px 0">Loading…</div>';
+  listEl.innerHTML='<div style="color:var(--muted);font-size:12px;padding:8px 0">Loading…</div>';
   emptyEl.style.display='none';
   errEl.style.display='none';
   openModal('m-pn-apply-template');
@@ -8306,7 +8306,7 @@ async function openApplyTemplateModal(pnId){
       <div style="border:1px solid var(--border);border-radius:7px;padding:10px 12px;display:flex;align-items:center;gap:10px">
         <div style="flex:1;min-width:0">
           <div style="font-weight:700;font-size:13px;color:var(--dark)">${esc(t.name)}</div>
-          ${t.description?`<div style="font-size:11.5px;color:var(--muted);margin-top:2px">${esc(t.description)}</div>`:''}
+          ${t.description?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(t.description)}</div>`:''}
           <div style="font-size:11px;color:var(--muted);margin-top:3px">${t.session_count} session${t.session_count!==1?'s':''} · Saved ${fmtD(t.created_at.substring(0,10))}</div>
         </div>
         <div style="display:flex;gap:6px;flex-shrink:0">
@@ -8825,7 +8825,7 @@ function showPNDetail(ds){
   // vocabulary (ParadeNightGridView.tsx).
   html+=`<div id="pn-notices-card" style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">
     <div style="font-size:11px;font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Notices</div>
-    <div id="pn-notices-list"><div class="muted" style="font-size:11.5px">Loading…</div></div>
+    <div id="pn-notices-list"><div class="muted" style="font-size:11px">Loading…</div></div>
     ${canWriteSquadron()?`<div style="margin-top:8px;display:flex;gap:6px;align-items:flex-start">
       <input id="pn-notice-text" placeholder="Notice text…" style="flex:1" maxlength="500" aria-label="New notice text">
       <select id="pn-notice-priority" aria-label="Notice priority" style="width:auto">
@@ -8905,12 +8905,12 @@ function showPNDetail(ds){
       ${canWriteSquadron()
         ? `<div class="ff pnd-tc-group" id="d-tc-grp-${i}" style="margin-top:8px;display:none">
              <label>Training Classes</label>
-             <div id="d-tc-${i}" style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:7px;font-size:12.5px">
+             <div id="d-tc-${i}" style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:7px;font-size:12px">
                <span class="muted">Loading…</span>
              </div>
            </div>`
         : (s.trainingClasses&&s.trainingClasses.length
-             ? `<div class="ff" style="margin-top:8px"><label>Training Classes</label><div style="font-size:12.5px;padding:3px 0">${esc(s.trainingClasses.map(c=>c.display_name).join(', '))}</div></div>`
+             ? `<div class="ff" style="margin-top:8px"><label>Training Classes</label><div style="font-size:12px;padding:3px 0">${esc(s.trainingClasses.map(c=>c.display_name).join(', '))}</div></div>`
              : '')
       }
       </div>
@@ -8991,7 +8991,7 @@ async function loadPNNotices(pnid){
   try{
     const notices=await api('/api/parade-nights/'+pnid+'/notices');
     if(!notices.length){
-      list.innerHTML='<div class="muted" style="font-size:11.5px">No notices.</div>';
+      list.innerHTML='<div class="muted" style="font-size:11px">No notices.</div>';
       return;
     }
     list.innerHTML=notices.map(n=>`
@@ -9002,7 +9002,7 @@ async function loadPNNotices(pnid){
         ${canWriteSquadron()?`<button class="btn btn-xs btn-out no-print" onclick="archivePNNotice('${pnid}','${n.notice_id}')" aria-label="Remove notice">Remove</button>`:''}
       </div>`).join('');
   }catch(e){
-    list.innerHTML=`<div class="muted" style="font-size:11.5px;color:var(--red)">Could not load notices: ${esc(apiErr(e))}</div>`;
+    list.innerHTML=`<div class="muted" style="font-size:11px;color:var(--red)">Could not load notices: ${esc(apiErr(e))}</div>`;
   }
 }
 async function addPNNotice(pnid){
@@ -9476,7 +9476,7 @@ async function _populateQuickEditClasses(sessionId){
   if(!document.getElementById('m-sess-edit').classList.contains('active')) return;
 
   group.style.display='';
-  list.innerHTML=classes.map(c=>`<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12.5px">
+  list.innerHTML=classes.map(c=>`<label style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px">
       <input type="checkbox" class="qe-class-chk" value="${esc(c.training_class_id)}" ${checkedIds.has(c.training_class_id)?'checked':''}>
       ${esc(c.display_name)}
     </label>`).join('');
@@ -9575,11 +9575,11 @@ function renderWP(){
     el.innerHTML=(S.pns&&S.pns.length)
       ? `<div class="card no-print" style="text-align:center;padding:32px 20px;color:var(--muted)">
            <div style="font-size:14px;font-weight:700;color:var(--dark);margin-bottom:6px">Choose a parade night above</div>
-           <div style="font-size:12.5px">Select a date from the dropdown to generate its printable weekly program.</div>
+           <div style="font-size:12px">Select a date from the dropdown to generate its printable weekly program.</div>
          </div>`
       : `<div class="card no-print" style="text-align:center;padding:32px 20px;color:var(--muted)">
            <div style="font-size:14px;font-weight:700;color:var(--dark);margin-bottom:6px">No parade nights yet</div>
-           <div style="font-size:12.5px">Create a parade night on the <a href="#" onclick="nav('parade-nights');return false">Parade Nights</a> page, then come back here to generate its weekly program.</div>
+           <div style="font-size:12px">Create a parade night on the <a href="#" onclick="nav('parade-nights');return false">Parade Nights</a> page, then come back here to generate its weekly program.</div>
          </div>`;
     return;
   }
@@ -9614,9 +9614,9 @@ function renderWP(){
             <td style="font-weight:800;color:var(--dark)">Sess ${allSessions.indexOf(s)+1}</td>
             <td>${phBadge(s.phase||'B. Initial')}</td>
             <td style="font-weight:700">${s.exp?esc(s.exp):'<em style="color:var(--muted)">Lesson: Unassigned</em>'}</td>
-            <td style="font-size:11.5px">${(s.trainingClasses||[]).length?esc((s.trainingClasses||[]).map(c=>c.display_name).join(', ')):'<span style="color:var(--muted)">—</span>'}</td>
-            <td style="font-size:11.5px">${esc(s.facName||'—')}</td>
-            <td style="font-size:11.5px">${esc(s.room||'—')}</td>
+            <td style="font-size:11px">${(s.trainingClasses||[]).length?esc((s.trainingClasses||[]).map(c=>c.display_name).join(', ')):'<span style="color:var(--muted)">—</span>'}</td>
+            <td style="font-size:11px">${esc(s.facName||'—')}</td>
+            <td style="font-size:11px">${esc(s.room||'—')}</td>
             <td>${stBadge(s.status||'planned')}</td>
           </tr>`).join(''):`<tr class="no-print"><td colspan="7" style="color:var(--muted);text-align:center;padding:14px">No sessions match the filter.</td></tr>`}</tbody>
         </table>
@@ -9868,7 +9868,7 @@ function renderCurr(){
   list.innerHTML=Object.entries(groups).map(([ph,items])=>`
     <div class="curr-card" style="border-color:${PH_BD[ph]||'#d1dce8'}">
       <div class="curr-hdr" style="background:${PH_BG[ph]||'#f4f8fc'}" onclick="toggleCC(this)">
-        <div style="display:flex;align-items:center;gap:8px">${phBadge(ph)}<span style="font-size:12.5px;font-weight:800;color:var(--dark)">${items.length} item${items.length!==1?'s':''}</span></div>
+        <div style="display:flex;align-items:center;gap:8px">${phBadge(ph)}<span style="font-size:12px;font-weight:800;color:var(--dark)">${items.length} item${items.length!==1?'s':''}</span></div>
         <span style="font-size:11px;color:var(--muted)">▾</span>
       </div>
       <div class="curr-body open">
@@ -9941,7 +9941,7 @@ function showCurrDetail(code){
   document.getElementById('cd-body').innerHTML=`
     <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px">${phBadge(e.phase)} ${elBadge(e.el)} <span class="badge b-blue">${esc(e.term||'—')}</span> <span class="badge b-grey">${e.hours}h</span> <span class="badge ${_PROGRAM_TYPE_CLASS[getProgramType(e.phase)]}">${getProgramType(e.phase)}</span></div>
     ${e.lh?`<div style="margin-bottom:12px"><a href="${safeUrl(e.lh)}" target="_blank" class="lh-btn" style="font-size:12px">View on Learning Hub ↗</a></div>`:''}
-    <div style="font-size:11.5px;margin-bottom:12px"><b>Instructor:</b> ${esc(e.instr||'—')}</div>
+    <div style="font-size:11px;margin-bottom:12px"><b>Instructor:</b> ${esc(e.instr||'—')}</div>
     ${sess.length?`
       <div style="font-size:10px;font-weight:800;color:var(--steel);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Scheduled Sessions (${sess.length})</div>
       <div class="tw"><table><thead><tr><th>Date</th><th>Phase</th><th>Facilitator</th><th>Room</th><th>Status</th><th class="no-print">Action</th></tr></thead>
@@ -10266,15 +10266,15 @@ function _actTabRender(containerId){
         <td>${_actSourceBadge(i)}</td>
         <td style="font-weight:700">${esc(i.activity_name)}${i.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
         <td style="white-space:nowrap">${fmtD(i.date_start)}${i.date_end&&i.date_end!==i.date_start?' – '+fmtD(i.date_end):''}</td>
-        <td style="font-size:11.5px">${esc(i.activity_type||'—')}</td>
-        <td style="font-size:11.5px">${esc(i.location||'—')}</td>
+        <td style="font-size:11px">${esc(i.activity_type||'—')}</td>
+        <td style="font-size:11px">${esc(i.location||'—')}</td>
         <td class="no-print">${i.read_only?'<span class="muted" title="Owned by another scope — view only">🔒</span>':
           (st.view==='archived'?`<button class="btn btn-xs btn-ok" onclick="event.stopPropagation();_actRestore('${containerId}','${i.activity_id}')">Restore</button>`:'')}</td>
       </tr>`;
     });
     html+='</tbody></table></div>';
   }
-  if(st.truncated) html+=`<div class="muted" style="font-size:10.5px;margin-top:6px">Showing the first results — narrow your filters to see more.</div>`;
+  if(st.truncated) html+=`<div class="muted" style="font-size:10px;margin-top:6px">Showing the first results — narrow your filters to see more.</div>`;
   html+=`</div><div id="${containerId}-detail"></div>`;
   host.innerHTML=html;
 }
@@ -11051,7 +11051,7 @@ function renderActs(){
     if(act.isInherited){
       actionsCell=canWriteSquadron()
         ?`<button class="btn btn-xs btn-out" onclick="openActivityOverrideModal('${act.id}')">${ov?'Edit Adjustment':'Adjust'}</button>`
-        :(ov?'<span style="font-size:10.5px;color:var(--muted)">Locally adjusted</span>':'—');
+        :(ov?'<span style="font-size:10px;color:var(--muted)">Locally adjusted</span>':'—');
     } else {
       actionsCell=canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editAct('${act.id}')">Edit</button> <button class="btn btn-xs btn-red" aria-label="Delete activity" onclick="delAct('${act.id}')">×</button>`:'—';
     }
@@ -11059,8 +11059,8 @@ function renderActs(){
       <td style="font-weight:700">${esc(act.name)}${ovBadge}</td>
       <td style="white-space:nowrap">${dateCell}</td>
       <td>${tb}</td>
-      <td style="font-size:11.5px">${esc((act.audience||[]).join(', '))}</td>
-      <td style="font-size:11.5px;color:var(--muted)">${esc((ov&&ov.local_notes)||act.notes||'')}</td>
+      <td style="font-size:11px">${esc((act.audience||[]).join(', '))}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc((ov&&ov.local_notes)||act.notes||'')}</td>
       <td class="no-print">${actionsCell}</td>
     </tr>`;
   }).join(''):`<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:14px">No activities${typeFilter!=='all'?' of this type':''}${search?' matching "'+esc(search)+'"':''}.</td></tr>`;
@@ -11133,7 +11133,7 @@ async function previewGenerateActivities(){
         <td>${esc(row.start_time||'—')}</td>
         <td>${esc(row.finish_time||'—')}</td>
         <td><span class="badge ${statusCls}">${row.status==='include'?'Include':'Skip'}</span></td>
-        <td style="font-size:10.5px;color:var(--muted)">${reasonTxt}</td>
+        <td style="font-size:10px;color:var(--muted)">${reasonTxt}</td>
       </tr>`;
     }).join('');
     pa.style.display='';
@@ -11444,9 +11444,9 @@ function showFacProfile(id){
       <tbody>${f.leave.map(lv=>`<tr>
         <td>${fmtD(lv.start_date,{day:'numeric',month:'short'})}</td>
         <td>${fmtD(lv.end_date,{day:'numeric',month:'short'})}</td>
-        <td style="font-size:11.5px">${esc(lv.reason||'—')}</td>
+        <td style="font-size:11px">${esc(lv.reason||'—')}</td>
         ${canWriteSquadron()?`<td class="no-print"><button class="btn btn-xs btn-out" onclick="_deleteFacLeave('${lv.id}','${id}')">Remove</button></td>`:''}
-      </tr>`).join('')}</tbody></table></div>`:'<div class="muted" style="font-size:11.5px">No upcoming leave recorded.</div>'}
+      </tr>`).join('')}</tbody></table></div>`:'<div class="muted" style="font-size:11px">No upcoming leave recorded.</div>'}
     <div style="margin-top:8px">
       <button class="btn-lnk" style="font-size:11px" onclick="_showFacPastLeave('${id}', false)">Show past / removed leave</button>
     </div>
@@ -11482,7 +11482,7 @@ function _showAddFacLeaveForm(facId){
   <div class="form-row" style="margin-top:4px">
     <div class="ff"><label>Notes (optional)</label><input id="fl-notes" placeholder="Any additional notes"></div>
   </div>
-  <div id="fl-msg" style="font-size:11.5px;margin:4px 0"></div>
+  <div id="fl-msg" style="font-size:11px;margin:4px 0"></div>
   <div class="modal-actions" style="justify-content:flex-start">
     <button class="btn btn-primary btn-sm" onclick="_submitFacLeave('${facId}')">Save Leave</button>
     <button class="btn btn-secondary btn-sm" onclick="document.getElementById('fac-leave-add-form').innerHTML=''">Cancel</button>
@@ -11531,20 +11531,20 @@ async function _showFacPastLeave(facId, forceRefresh){
   if(!forceRefresh&&cont.dataset.loaded){cont.style.display=cont.style.display==='none'?'block':'none';return;}
   cont.style.display='block';
   cont.dataset.loaded='1';
-  cont.innerHTML='<div class="muted" style="font-size:11.5px;padding:4px 0">Loading past leave…</div>';
+  cont.innerHTML='<div class="muted" style="font-size:11px;padding:4px 0">Loading past leave…</div>';
   try{
     const all=await api('/api/planning/facilitators/'+facId+'/leave?include_archived=true');
     const past=Array.isArray(all)?all.filter(lv=>lv.is_archived):[];
-    if(!past.length){ cont.innerHTML='<div class="muted" style="font-size:11.5px">No past or removed leave records.</div>'; return; }
+    if(!past.length){ cont.innerHTML='<div class="muted" style="font-size:11px">No past or removed leave records.</div>'; return; }
     cont.innerHTML='<div class="tw"><table><thead><tr><th>From</th><th>To</th><th>Reason</th>'+(canWriteSquadron()?'<th class="no-print"></th>':'')+'</tr></thead><tbody>'+
       past.map(lv=>`<tr style="opacity:.7">
         <td>${fmtD(lv.start_date,{day:'numeric',month:'short'})}</td>
         <td>${fmtD(lv.end_date,{day:'numeric',month:'short'})}</td>
-        <td style="font-size:11.5px">${esc(lv.reason||'—')}</td>
+        <td style="font-size:11px">${esc(lv.reason||'—')}</td>
         ${canWriteSquadron()?`<td class="no-print"><button class="btn btn-xs btn-ok" onclick="_restoreFacLeave('${lv.id}','${facId}')">Restore</button></td>`:''}
       </tr>`).join('')+
       '</tbody></table></div>';
-  }catch(e){ cont.innerHTML='<div style="color:var(--red);font-size:11.5px">'+esc(apiErr(e))+'</div>'; }
+  }catch(e){ cont.innerHTML='<div style="color:var(--red);font-size:11px">'+esc(apiErr(e))+'</div>'; }
 }
 function _readFacAreas(){
   const areas=[];
@@ -11645,15 +11645,15 @@ function _openFacDupModal(detail,pending){
     ?new Date(_facDupDetail.existing_updated_at).toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'—';
   const status=_facDupDetail.existing_active_status===false?'Archived':'Active';
   document.getElementById('fac-dup-existing-card').innerHTML=`
-    <div style="margin-bottom:6px;font-size:12.5px;font-weight:700;color:var(--dark)">Existing record</div>
-    <div style="padding:10px 12px;background:var(--surface-2);border-radius:6px;font-size:11.5px;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin-bottom:10px">
+    <div style="margin-bottom:6px;font-size:12px;font-weight:700;color:var(--dark)">Existing record</div>
+    <div style="padding:10px 12px;background:var(--surface-2);border-radius:6px;font-size:11px;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin-bottom:10px">
       <span style="color:var(--muted)">Rank</span><span style="font-weight:700">${esc(_facDupDetail.existing_rank||'—')}</span>
       <span style="color:var(--muted)">Type</span><span>${esc(_facDupDetail.existing_type||'—')}</span>
       <span style="color:var(--muted)">Subject areas</span><span>${areas}</span>
       <span style="color:var(--muted)">Status</span><span>${esc(status)}</span>
       <span style="color:var(--muted)">Last updated</span><span>${esc(updated)}</span>
     </div>
-    <div style="font-size:11.5px;color:var(--muted)">Rank does not determine identity — two people may share a name, and one person may change rank over time.</div>`;
+    <div style="font-size:11px;color:var(--muted)">Rank does not determine identity — two people may share a name, and one person may change rank over time.</div>`;
   document.getElementById('fac-dup-merge-panel').style.display='none';
   document.getElementById('fac-dup-actions').style.display='';
   openModal('m-fac-dup');
@@ -11681,7 +11681,7 @@ function _facDupShowMergePreview(){
   const pending=_facDupPending||{};
   const panel=document.getElementById('fac-dup-merge-panel');
   panel.innerHTML=`
-    <div class="alert a-info" style="margin-top:10px;font-size:11.5px">
+    <div class="alert a-info" style="margin-top:10px;font-size:11px">
       <strong>Merge preview</strong><br>
       The existing record will be updated with the details you entered.<br>
       Rank: <strong>${esc(pending.rank||'unchanged')}</strong> &nbsp; Type: <strong>${esc(pending.type||'unchanged')}</strong><br>
@@ -11900,7 +11900,7 @@ function renderRooms(){
   document.getElementById('equip-tbody').innerHTML=equipSrc.map((eq,i)=>`<tr${showEquip?' style="opacity:.6"':''}>
     <td style="font-weight:700">${esc(eq.name)}${showEquip?' <span class="badge b-grey">Archived</span>':''}</td>
     <td style="text-align:center">${eq.qty||'—'}</td>
-    <td style="font-size:11.5px;color:var(--muted)">${esc(eq.notes||'')}</td>
+    <td style="font-size:11px;color:var(--muted)">${esc(eq.notes||'')}</td>
     <td class="no-print">${showEquip
       ?(canWriteSquadron()?`<button class="btn btn-xs btn-ok" onclick="doRestoreEquip('${eq.id}','${_jsAttr(eq.name)}')">Restore</button>`:'')
       :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editEquip('${eq.id}')">Edit</button> <button class="btn btn-xs btn-red" aria-label="Archive equipment" onclick="delEquip('${eq.id}')">×</button>`:'—')}</td>
@@ -12037,7 +12037,7 @@ function renderActions(){
       return `<tr style="${rowStyle}">
       <td><span class="badge ${CAT_CLS[it.cat]||'b-grey'}" style="font-size:9px">${esc(it.cat)}</span></td>
       <td><div style="font-weight:700;font-size:12px;color:${titleColor}">${esc(it.title)}</div>
-          <div style="font-size:10.5px;color:var(--muted)">${esc(it.detail)}</div></td>
+          <div style="font-size:10px;color:var(--muted)">${esc(it.detail)}</div></td>
       <td style="font-size:11px;color:var(--muted);white-space:nowrap">${it.due?fmtD(it.due,{day:'numeric',month:'short',year:'numeric'}):'—'}</td>
       <td><span class="badge b-amber" style="font-size:9px">${esc(it.issue)}</span></td>
       <td class="no-print">
@@ -12257,7 +12257,7 @@ function renderTimingTemplates(){
   if(!el) return;
   const tpls=S.timingTemplates||[];
   if(!tpls.length){
-    el.innerHTML='<div style="color:var(--muted);font-size:11.5px;padding:4px 0">No timing templates defined. Click "+ New Template" to create one.</div>';
+    el.innerHTML='<div style="color:var(--muted);font-size:11px;padding:4px 0">No timing templates defined. Click "+ New Template" to create one.</div>';
     return;
   }
   const today=new Date().toISOString().slice(0,10);
@@ -12311,10 +12311,10 @@ function _ttBlockRow(b,i){
   const dur=_ttDur(b);
   return `<tr>
     <td style="padding:3px 4px;color:var(--muted);white-space:nowrap">${i+1}</td>
-    <td style="padding:2px 3px"><input value="${esc(b.block_name||'')}" oninput="_ttBSet(${i},'block_name',this.value)" style="width:100%;min-width:95px;font-size:11.5px"></td>
-    <td style="padding:2px 3px"><select onchange="_ttBSet(${i},'block_type',this.value)" aria-label="Block type for period ${i+1}" style="width:100%;font-size:11.5px">${typeOpts}</select></td>
-    <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_ttBSet(${i},'start_time',this.value);renderTTBlocks()" style="width:82px;font-size:11.5px"></td>
-    <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_ttBSet(${i},'end_time',this.value);renderTTBlocks()" style="width:82px;font-size:11.5px"></td>
+    <td style="padding:2px 3px"><input value="${esc(b.block_name||'')}" oninput="_ttBSet(${i},'block_name',this.value)" style="width:100%;min-width:95px;font-size:11px"></td>
+    <td style="padding:2px 3px"><select onchange="_ttBSet(${i},'block_type',this.value)" aria-label="Block type for period ${i+1}" style="width:100%;font-size:11px">${typeOpts}</select></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_ttBSet(${i},'start_time',this.value);renderTTBlocks()" style="width:82px;font-size:11px"></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_ttBSet(${i},'end_time',this.value);renderTTBlocks()" style="width:82px;font-size:11px"></td>
     <td style="padding:2px 4px;text-align:center;font-size:11px;color:var(--muted)">${dur!=null?dur:''}</td>
     <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_instructional_period?' checked':''} onchange="_ttBSet(${i},'is_instructional_period',this.checked)"></td>
     <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_optional?' checked':''} onchange="_ttBSet(${i},'is_optional',this.checked)"></td>
@@ -12439,10 +12439,10 @@ function _pnCbBlockRow(b, i) {
   })() : '';
   return `<tr>
     <td style="padding:2px 4px;color:var(--muted);font-size:11px">${i+1}</td>
-    <td style="padding:2px 3px"><input value="${esc(b.block_name)}" oninput="_pnCbSet(${i},'block_name',this.value)" style="width:100px;font-size:11.5px"></td>
-    <td style="padding:2px 3px"><select aria-label="Block type" style="font-size:11.5px" onchange="_pnCbSet(${i},'block_type',this.value);_pnCbSet(${i},'is_instructional_period',this.value==='instructional_period');renderPNCbBlocks()">${typeOpts}</select></td>
-    <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_pnCbSet(${i},'start_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:11.5px"></td>
-    <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_pnCbSet(${i},'end_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:11.5px"></td>
+    <td style="padding:2px 3px"><input value="${esc(b.block_name)}" oninput="_pnCbSet(${i},'block_name',this.value)" style="width:100px;font-size:11px"></td>
+    <td style="padding:2px 3px"><select aria-label="Block type" style="font-size:11px" onchange="_pnCbSet(${i},'block_type',this.value);_pnCbSet(${i},'is_instructional_period',this.value==='instructional_period');renderPNCbBlocks()">${typeOpts}</select></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_pnCbSet(${i},'start_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:11px"></td>
+    <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_pnCbSet(${i},'end_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:11px"></td>
     <td style="padding:2px 4px;text-align:center;font-size:11px;color:var(--muted)">${sh}</td>
     <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_instructional_period?' checked':''} onchange="_pnCbSet(${i},'is_instructional_period',this.checked)"></td>
     <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_optional?' checked':''} onchange="_pnCbSet(${i},'is_optional',this.checked)"></td>
@@ -12608,13 +12608,13 @@ function _renderReadinessMatrix(chart,scope){
     facilitator_confirmed:'Facilitator',facility_confirmed:'Facility',
     equipment_confirmed:'Equipment',overall_readiness:'Overall'};
   let html='<div class="tw"><table><thead><tr><th>Unit</th>'+
-    cols.map(c=>`<th style="text-align:center;font-size:10.5px">${esc(colLabels[c]||c)}</th>`).join('')+
-    '<th style="text-align:center;font-size:10.5px">Trend</th></tr></thead><tbody>';
+    cols.map(c=>`<th style="text-align:center;font-size:10px">${esc(colLabels[c]||c)}</th>`).join('')+
+    '<th style="text-align:center;font-size:10px">Trend</th></tr></thead><tbody>';
   rows.forEach(r=>{
     html+=`<tr class="drow" onclick="cmdDrillReadiness('${r.unit_id}','${scope}')" title="${esc(r.exception_reason||'')}">
-      <td style="font-weight:800">${esc(r.label)}${r.name&&r.name!==r.label?` <span class="muted" style="font-weight:400;font-size:10.5px">${esc(r.name)}</span>`:''}</td>
+      <td style="font-weight:800">${esc(r.label)}${r.name&&r.name!==r.label?` <span class="muted" style="font-weight:400;font-size:10px">${esc(r.name)}</span>`:''}</td>
       ${cols.map(c=>`<td style="text-align:center">${_cmdCell(r[c])}</td>`).join('')}
-      <td style="text-align:center;font-size:10.5px;color:var(--muted)">${_CMD_TREND_SYMBOL[r.trend]||'—'}</td>
+      <td style="text-align:center;font-size:10px;color:var(--muted)">${_CMD_TREND_SYMBOL[r.trend]||'—'}</td>
     </tr>`;
   });
   html+='</tbody></table></div>';
@@ -12669,7 +12669,7 @@ function _renderRiskTimeline(chart){
     html+=`<div class="tw" style="margin-top:10px"><table><thead><tr><th>Date</th><th>Unit</th><th>Category</th><th style="text-align:center">Sessions</th><th>Severity</th></tr></thead><tbody>`+
       items.slice(0,20).map(it=>`<tr><td style="font-size:11px">${esc(it.date)}</td><td style="font-weight:700">${esc(it.unit_label)}</td><td style="font-size:11px">${esc(it.category_label)}</td><td style="text-align:center">${it.affected_sessions}</td><td><span class="badge ${it.severity==='high'?'b-red':'b-amber'}">${esc(_cap(it.severity))}</span></td></tr>`).join('')+
       `</tbody></table></div>`;
-    if(items.length>20)html+=`<div style="font-size:10.5px;color:var(--muted);margin-top:4px">Showing 20 of ${items.length} items — refine using Parade Nights for the full list.</div>`;
+    if(items.length>20)html+=`<div style="font-size:10px;color:var(--muted);margin-top:4px">Showing 20 of ${items.length} items — refine using Parade Nights for the full list.</div>`;
   }
   return html;
 }
@@ -12690,7 +12690,7 @@ function _chartStackedBar100(chart){
           ${total?series.map(s=>{const pct=(row.pct&&row.pct[s.key])||0;return pct?`<div style="flex:${pct};background:${s.color};height:100%" title="${esc(s.label)}: ${row.counts[s.key]} (${pct}%)"></div>`:'';}).join(''):'<div style="flex:1;background:var(--lgrey)" title="No sessions"></div>'}
         </div>
       </div>
-      <div class="ph-cnt" style="min-width:44px;text-align:right;font-size:10.5px;color:var(--muted)">${total}</div>
+      <div class="ph-cnt" style="min-width:44px;text-align:right;font-size:10px;color:var(--muted)">${total}</div>
     </div>`;
   });
   return html;
@@ -12708,7 +12708,7 @@ function _renderPareto(chart){
     return `<div class="ph-row" style="margin-bottom:5px" role="img" aria-label="${esc(r.label)}: ${r.count}, cumulative ${r.cumulative_pct}%" ${drill}>
       <div class="ph-name" style="min-width:130px;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isGap?'font-style:italic;color:var(--muted)':''}" title="${esc(r.label)}">${isGap?'ⓘ ':''}${esc(r.label.substring(0,40))}</div>
       <div class="ph-bar" style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${isGap?'var(--muted)':'var(--royal)'};border-radius:3px"></div></div></div>
-      <div class="ph-cnt" style="min-width:96px;text-align:right;font-size:10.5px;color:var(--muted)">${r.count} · cum. ${r.cumulative_pct}%</div>
+      <div class="ph-cnt" style="min-width:96px;text-align:right;font-size:10px;color:var(--muted)">${r.count} · cum. ${r.cumulative_pct}%</div>
     </div>`;
   }).join('');
 }
@@ -12742,19 +12742,19 @@ async function loadCommandDashboard(scope){
     ${proxyBanner}
   </div>`;
 
-  html+=`<h2 style="font-size:11.5px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 6px">A — Immediate Training Readiness</h2>`;
+  html+=`<h2 style="font-size:11px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 6px">A — Immediate Training Readiness</h2>`;
   html+=_cmdCard(d.sections.A.readiness_matrix,_renderReadinessMatrix(d.sections.A.readiness_matrix,scope));
   html+=_cmdCard(d.sections.A.risk_forecast,_renderRiskTimeline(d.sections.A.risk_forecast));
   html+=_cmdCard(d.sections.A.immediate_issues,_chartStackedBarH(d.sections.A.immediate_issues));
 
-  html+=`<h2 style="font-size:11.5px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.03em;margin:18px 0 6px">B — Training Delivery Performance</h2>`;
+  html+=`<h2 style="font-size:11px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.03em;margin:18px 0 6px">B — Training Delivery Performance</h2>`;
   html+=_cmdCard(d.sections.B.weekly_delivered,_chartStackedBar(d.sections.B.weekly_delivered));
   html+=_cmdCard(d.sections.B.reliability_trend,_chartLine(d.sections.B.reliability_trend));
   html+=_cmdCard(d.sections.B.outcomes_by_unit,_chartStackedBar100(d.sections.B.outcomes_by_unit));
   html+=_cmdCard(d.sections.B.cancellation_pareto,_renderPareto(d.sections.B.cancellation_pareto));
 
   html+=`<div class="drill-panel" id="cmd-drill-${scope}"></div>`;
-  html+=`<h2 style="font-size:11.5px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.03em;margin:18px 0 6px">C — System Adoption</h2>`;
+  html+=`<h2 style="font-size:11px;font-weight:800;color:var(--dark);text-transform:uppercase;letter-spacing:.03em;margin:18px 0 6px">C — System Adoption</h2>`;
   html+=`<div class="card" style="padding:12px 16px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <span style="font-size:12px;color:var(--muted)">Shows squadron-level system activity. Not a surveillance tool — aggregates only.</span>
     <select id="adoption-period-sel-${scope}" style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px" aria-label="Adoption period">
@@ -12841,7 +12841,7 @@ function renderWing(){
   rows.forEach(r=>{
     html+=`<tr class="drow" onclick="wingDrill('${_jsAttr(r.squadron_id)}')">
       <td style="font-weight:800">${esc(r.short_name||r.code)}</td>
-      <td style="font-size:11.5px">${esc(r.parade_day||'—')}</td>
+      <td style="font-size:11px">${esc(r.parade_day||'—')}</td>
       <td style="text-align:center;font-weight:700">${r.nights||0}</td>
       <td style="text-align:center">${r.published||0}</td>
       <td style="text-align:center;font-weight:700">${r.sessions||0}</td>
@@ -13752,9 +13752,9 @@ function _renderApMonth(year,mIdx,PD,HOL,ACT,mName){
   const lastD=new Date(year,mIdx+1,0).getDate();
   const today=new Date().toISOString().slice(0,10);
   let h=`<div style="background:white;border-radius:6px;border:1px solid var(--border);padding:8px">
-    <div style="font-size:10.5px;font-weight:800;color:var(--dark);margin-bottom:5px;letter-spacing:.02em">${mName}</div>
+    <div style="font-size:10px;font-weight:800;color:var(--dark);margin-bottom:5px;letter-spacing:.02em">${mName}</div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px">`;
-  DOW.forEach(d=>{ h+=`<div style="text-align:center;font-size:7.5px;font-weight:700;color:var(--muted);padding:2px 0">${d}</div>`; });
+  DOW.forEach(d=>{ h+=`<div style="text-align:center;font-size:8px;font-weight:700;color:var(--muted);padding:2px 0">${d}</div>`; });
   for(let i=0;i<firstDow;i++) h+=`<div></div>`;
   for(let d=1;d<=lastD;d++){
     const ds=`${year}-${String(mIdx+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
@@ -14064,7 +14064,7 @@ function _tcCoveragePill(pct){
   if(pct==null) return '<span class="muted">—</span>';
   const bg = pct>=80?'var(--ok-bg)':pct>=50?'var(--warn-bg)':'#fde8ea';
   const fg = pct>=80?'var(--ok-text)':pct>=50?'#7a5200':'var(--red)';
-  return `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;background:${bg};color:${fg}">${pct}%</span>`;
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${bg};color:${fg}">${pct}%</span>`;
 }
 
 async function _renderTrainingClasses(yearId){
@@ -14157,7 +14157,7 @@ const _TCP_STATUS_STYLE={
 function _tcpStatusBadge(status){
   const st=_TCP_STATUS_STYLE[status]||_TCP_STATUS_STYLE.not_started;
   const label=(status||'not_started').replace(/_/g,' ');
-  return `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:700;text-transform:capitalize;background:${st.bg};color:${st.fg}">${esc(label)}</span>`;
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:capitalize;background:${st.bg};color:${st.fg}">${esc(label)}</span>`;
 }
 async function openTrainingClassProgressModal(trainingClassId){
   const c=_tcById[trainingClassId];
@@ -14177,7 +14177,7 @@ async function openTrainingClassProgressModal(trainingClassId){
         </div>
         <strong>${pct}%</strong>
       </div>
-      <div class="muted" style="font-size:11.5px">
+      <div class="muted" style="font-size:11px">
         ${delivered} of ${total} requirement${total===1?'':'s'} delivered
         &bull; Planned ${s.planned||0} &bull; Not delivered ${s.not_delivered||0}
         &bull; Cancelled ${s.cancelled||0} &bull; Not started ${s.not_started||0}
@@ -15943,7 +15943,7 @@ document.addEventListener('keydown',function(e){
     if(!_results.length)return`<div class="cp-hint">No results for "${esc(q)}"</div>`;
     return _results.map((r,i)=>`<div class="cp-result${i===_idx?' cp-sel':''}" onclick="_cpRun(${i})" onmouseover="_cpHover(${i})" role="option" aria-selected="${i===_idx}">
       <span class="badge b-grey" style="font-size:10px;margin-right:6px">${esc(r.cat)}</span>
-      <span style="font-weight:700;font-size:12.5px">${esc(r.label)}</span>
+      <span style="font-weight:700;font-size:12px">${esc(r.label)}</span>
       ${r.sub?`<span style="font-size:11px;color:var(--muted);margin-left:6px">${esc(r.sub)}</span>`:''}
     </div>`).join('');
   }
@@ -15960,7 +15960,7 @@ document.addEventListener('keydown',function(e){
       var idx=startIdx+i;
       return'<div class="cp-result" onclick="_cpRun('+idx+')" onmouseover="_cpHover('+idx+')" role="option" aria-selected="false">'
         +'<span class="badge '+_entityBadgeClass(r.type)+'" style="font-size:10px;margin-right:6px">'+esc(_entityCat(r.type))+'</span>'
-        +'<span style="font-weight:700;font-size:12.5px">'+esc(r.label)+'</span>'
+        +'<span style="font-weight:700;font-size:12px">'+esc(r.label)+'</span>'
         +(r.sub?'<span style="font-size:11px;color:var(--muted);margin-left:6px">'+esc(r.sub)+'</span>':'')
         +'</div>';
     }).join('');
@@ -16036,7 +16036,7 @@ document.addEventListener('keydown',function(e){
 </div>
 <style>
 .cp-hint{padding:14px 16px;font-size:12px;color:var(--muted);}
-.cp-result{display:flex;align-items:center;padding:9px 16px;cursor:pointer;font-size:13px;}
+.cp-result{display:flex;align-items:center;padding:9px 16px;cursor:pointer;font-size:12px;}
 .cp-result.cp-sel,.cp-result:hover{background:var(--accent-light);}
 .b-royal{background:var(--royal);color:#fff;}
 .b-steel{background:var(--steel);color:#fff;}
