@@ -206,6 +206,19 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .page-header .page-subtitle,.ph-sub{font-size:12px;color:var(--muted);margin-top:3px;font-weight:400;}
 .page-actions,.ph-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 
+/* ── YEAR NAV CONTROL ── */
+.year-nav-ctrl{display:inline-flex;align-items:center;background:var(--dark);border-radius:22px;overflow:hidden;height:36px;font-family:'Montserrat',Arial,sans-serif}
+.yn-arrow{background:transparent;border:none;color:#fff;font-size:18px;padding:0 12px;cursor:pointer;height:100%;opacity:1;transition:opacity .15s}
+.yn-arrow:disabled{opacity:.35;cursor:default}
+.yn-arrow:not(:disabled):hover{background:rgba(255,255,255,.12)}
+.yn-display{color:#fff;font-size:14px;font-weight:600;padding:0 10px;cursor:pointer;display:flex;align-items:center;min-width:52px;justify-content:center;height:100%}
+.yn-display:hover{background:rgba(255,255,255,.1)}
+.yn-display input{background:transparent;border:none;border-bottom:2px solid var(--blue);color:#fff;font-size:14px;font-weight:600;width:52px;text-align:center;outline:none;font-family:inherit}
+.yn-gear{background:transparent;border:none;border-left:1px solid rgba(255,255,255,.2);color:#fff;font-size:15px;padding:0 11px;cursor:pointer;height:100%}
+.yn-gear:hover{background:rgba(255,255,255,.12)}
+.yn-wrap{display:flex;flex-direction:column;align-items:flex-end;margin-left:auto}
+.yn-toast{font-size:11px;color:var(--red);margin-top:3px;min-height:14px}
+
 /* ── STAT CARDS ── */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
 .stat{background:white;border-radius:8px;padding:15px 16px;box-shadow:var(--sh);border-top:4px solid var(--blue);transition:box-shadow .15s,transform .12s;}
@@ -1309,6 +1322,15 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
             <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-act')">+ Add Activity</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openGenerateActivitiesModal()">Generate Activities</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddHolidayModal()">+ Add Holiday</button>
+            <div class="yn-wrap" id="actYnWrap">
+              <div class="year-nav-ctrl">
+                <button class="yn-arrow" id="ynPrev" onclick="ynNav(-1)" disabled title="Previous year">‹</button>
+                <div class="yn-display" id="ynDisplay" onclick="ynStartEdit()" title="Click to enter year directly"><span id="ynLabel">—</span></div>
+                <button class="yn-arrow" id="ynNext" onclick="ynNav(1)" disabled title="Next year">›</button>
+                <button class="yn-gear" id="ynGear" onclick="ynOpenManage()" style="display:none" title="Manage years">⚙</button>
+              </div>
+              <div class="yn-toast" id="ynToast"></div>
+            </div>
           </div>
         </div>
         <div class="fbar no-print">
@@ -10284,6 +10306,111 @@ async function _loadActivitiesPage(){
   _actTabLoad('act-tab-squadron','squadron',null);
 }
 
+// ── Year nav control ──────────────────────────────────────────────────────────
+
+function ynInit() {
+  if (!P.years || !P.years.length) return;
+  // Set currentYearInt from the already-selected currentYearId
+  if (P.currentYearId && !P.currentYearInt) {
+    const cur = P.years.find(y => y.planning_year_id === P.currentYearId);
+    if (cur) P.currentYearInt = cur.year;
+  }
+  _ynUpdateDisplay();
+  _ynUpdateArrows();
+  const gear = document.getElementById('ynGear');
+  if (gear && ['system_admin','wing_admin','national_admin'].includes(S.role||'')) {
+    gear.style.display = '';
+  }
+}
+
+function setCurrentYear(yearObj, reload) {
+  if (!yearObj) return;
+  P.currentYearId = yearObj.planning_year_id;
+  P.currentYearInt = yearObj.year;
+  _ynUpdateDisplay();
+  _ynUpdateArrows();
+  if (typeof ynSyncPwBadge === 'function') ynSyncPwBadge();
+  if (reload !== false) _loadActivitiesPage();
+}
+
+function _ynUpdateDisplay() {
+  const lbl = document.getElementById('ynLabel');
+  if (lbl) lbl.textContent = P.currentYearInt || '—';
+}
+
+function _ynUpdateArrows() {
+  if (!P.years || !P.years.length) return;
+  const sorted = [...P.years].sort((a,b) => a.year - b.year);
+  const idx = sorted.findIndex(y => y.planning_year_id === P.currentYearId);
+  const prev = document.getElementById('ynPrev');
+  const next = document.getElementById('ynNext');
+  if (prev) prev.disabled = idx <= 0;
+  if (next) next.disabled = idx < 0 || idx >= sorted.length - 1;
+}
+
+function ynNav(dir) {
+  if (!P.years || !P.years.length) return;
+  const sorted = [...P.years].sort((a,b) => a.year - b.year);
+  const idx = sorted.findIndex(y => y.planning_year_id === P.currentYearId);
+  const target = sorted[idx + dir];
+  if (!target) return;
+  setCurrentYear(target);
+}
+
+function ynStartEdit() {
+  const disp = document.getElementById('ynDisplay');
+  if (!disp || disp.querySelector('input')) return;
+  const cur = P.currentYearInt || '';
+  disp.innerHTML = `<input type="text" maxlength="4" value="${esc(String(cur))}" id="ynInput">`;
+  const inp = document.getElementById('ynInput');
+  if (!inp) return;
+  inp.select();
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); ynCommitEdit(inp.value); }
+    if (e.key === 'Escape') { e.preventDefault(); ynCancelEdit(); }
+  });
+  setTimeout(() => inp.addEventListener('blur', () => setTimeout(() => {
+    if (document.getElementById('ynInput')) ynCancelEdit();
+  }, 120)), 0);
+}
+
+function ynCancelEdit() {
+  const disp = document.getElementById('ynDisplay');
+  if (!disp) return;
+  disp.innerHTML = `<span id="ynLabel">${esc(String(P.currentYearInt || '—'))}</span>`;
+}
+
+function ynCommitEdit(val) {
+  const yr = parseInt(val, 10);
+  if (isNaN(yr) || yr < 1900 || yr > 2200) {
+    ynToast('Enter a valid year (e.g. 2026)');
+    ynCancelEdit();
+    return;
+  }
+  const match = (P.years || []).find(y => y.year === yr);
+  if (!match) {
+    ynToast(`No year ${yr} — create one in Manage years ⚙`);
+    ynCancelEdit();
+    return;
+  }
+  ynCancelEdit();
+  setCurrentYear(match);
+}
+
+let _ynToastTimer = null;
+function ynToast(msg) {
+  const el = document.getElementById('ynToast');
+  if (!el) return;
+  el.textContent = msg;
+  clearTimeout(_ynToastTimer);
+  _ynToastTimer = setTimeout(() => { el.textContent = ''; }, 3200);
+}
+
+function ynOpenManage() {
+  if (typeof _ynOpenManagePanel === 'function') { _ynOpenManagePanel(); return; }
+  ynToast('Year management coming soon');
+}
+
 // ═══════════════════════════════════════════════════════════
 //  HELP & REFERENCE PAGE
 // ═══════════════════════════════════════════════════════════
@@ -12571,6 +12698,7 @@ const P = {
   years: [],          // planning years for current user scope
   anchors: [],        // anchor events for selected year
   currentYearId: null,
+  currentYearInt: null,
   currentDateId: null,  // planning date ID (from parade_dates table)
   currentPnId: null,    // real parade_night_id (from parade_nights table)
   _directPnId: null,    // set after parade night creation for auto-navigation
@@ -12626,6 +12754,7 @@ async function _loadPlanningYears() {
       if(P.currentYearId) el.value = P.currentYearId;
     });
     _renderPyActionBtns();
+    if (document.getElementById('ynLabel')) ynInit();
     return P.currentYearId || null;
   } catch(e) { console.warn('planning years load failed', e); return null; }
 }
