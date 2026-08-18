@@ -15810,9 +15810,13 @@ document.addEventListener('keydown',function(e){
     else if(r.action==='pn'){navToScheduledPN(r.target);}
     else if(r.action==='fac'){nav('facilitators');}
     else if(r.action==='facilitator'){
-      nav('facilitators');
-      var el=document.getElementById('fac-search');
-      if(el){el.value=(r.meta&&r.meta.last_name)||r.label;if(typeof renderFacs==='function')renderFacs();}
+      var _sc=effectiveScope();
+      if(_sc==='squadron'){
+        nav('facilitators');
+        var el=document.getElementById('fac-search');
+        if(el){el.value=(r.meta&&r.meta.last_name)||r.label;if(typeof renderFacs==='function')renderFacs();}
+      }
+      // wing/national/system_admin-national: no facilitators page in scope — palette already closed
     }
     else if(r.action==='account'){
       nav('accounts');
@@ -15821,22 +15825,31 @@ document.addEventListener('keydown',function(e){
     }
     else if(r.action==='wing'){
       if(S.role==='system_admin'&&typeof saSelectWing==='function')saSelectWing(r.target);
-      else nav('wing-overview');
+      else if(effectiveScope()==='wing')nav('wing-overview');
+      // national scope: no per-wing page available — palette already closed
     }
     else if(r.action==='squadron'){
       if(S.role==='system_admin'&&typeof saSelectSquadron==='function'){
         if(r.meta&&r.meta.wing_id)S.saScope.wingId=r.meta.wing_id;
         saSelectSquadron(r.target);
-      } else nav('dashboard');
+      } else if(effectiveScope()==='squadron')nav('dashboard');
+      // wing/national: no single-squadron navigation page — palette already closed
     }
     else if(r.action==='activity'){
-      nav('activities');
-      var el3=document.getElementById('act-search');
-      if(el3){el3.value=r.label;if(typeof renderActs==='function')renderActs();}
+      var _sc2=effectiveScope();
+      var _actPage={'squadron':'activities','wing':'wing-activities','national':'national-activities','system_admin':'national-activities'}[_sc2]||'activities';
+      nav(_actPage);
+      if(_sc2==='squadron'){
+        var el3=document.getElementById('act-search');
+        if(el3){el3.value=r.label;if(typeof renderActs==='function')renderActs();}
+      }
     }
     else if(r.action==='session'){
-      if(r.meta&&r.meta.pn_date)navToScheduledPN(r.meta.pn_date);
-      else nav('parade-nights');
+      if(effectiveScope()==='squadron'){
+        if(r.meta&&r.meta.pn_date)navToScheduledPN(r.meta.pn_date);
+        else nav('parade-nights');
+      }
+      // Other scopes: S.pns not populated cross-scope — palette already closed
     }
   }
   function _score(text,q){
