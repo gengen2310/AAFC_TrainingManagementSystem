@@ -292,8 +292,11 @@ def test_past_parade_nights_preserve_old_session_count(client):
     """Changing the future template must not alter already-created parade nights."""
     h = login(client, "ADMIN703")
 
-    # Create a parade night BEFORE any template is in effect for the far future date
-    pnid = _create_pn(client, h, date="2027-01-10", session_count=3)
+    # Create a parade night BEFORE any template is in effect for the far future date.
+    # Use 2028-06-15: a fixed date in a gap no other test occupies, avoiding the
+    # today+145 dynamic date in test_facilitator_schedule.py that otherwise lands
+    # on this date when the suite runs in mid-August 2026.
+    pnid = _create_pn(client, h, date="2028-06-15", session_count=3)
 
     # Now create a 2-session template effective from the past (before that date)
     blocks = [
@@ -302,7 +305,7 @@ def test_past_parade_nights_preserve_old_session_count(client):
         {"display_order": 1, "block_name": "Period B", "block_type": "instructional_period",
          "is_instructional_period": True},
     ]
-    _create_template(client, h, name="Retroactive Test", effective_from="2027-01-01",
+    _create_template(client, h, name="Retroactive Test", effective_from="2028-06-01",
                      blocks=blocks)
 
     # The parade night was created with session_count=3; it must not be silently changed

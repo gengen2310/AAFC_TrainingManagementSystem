@@ -655,10 +655,10 @@ _check_grep() {
   [ "$c" -eq 0 ] && ok "$label" || { fail "$label ($c match(es))"; grep -rn "$pattern" "$path"|head -3; }
 }
 _check_grep "No seeded codes"         "SYSADMIN2026\|ADMIN703\|ADMIN7WG\|ADMINNATIONAL" "connected-frontend"
-# SP-02 intentionally stores displayDensity (UI preference) in localStorage —
-# that is not operational data and is a known-safe exception.  Only flag
-# localStorage uses that are NOT the displayDensity preference.
-_ls_hits=$(grep -rn "localStorage" connected-frontend 2>/dev/null | grep -v "displayDensity" | wc -l | tr -d ' ')
+# SP-02 intentionally stores displayDensity (UI preference) in localStorage.
+# The nav-collapsed state (navCollapsed) is also a UI preference and equally safe.
+# Only flag localStorage uses that are NOT these two known-safe preferences.
+_ls_hits=$(grep -rn "localStorage" connected-frontend 2>/dev/null | grep -v "displayDensity\|navCollapsed" | wc -l | tr -d ' ')
 [ "$_ls_hits" -eq 0 ] && ok "No operational localStorage" \
   || { fail "No operational localStorage ($_ls_hits match(es))"; grep -rn "localStorage" connected-frontend | grep -v "displayDensity" | head -3; }
 _check_grep "No access-code hashes"    "code_hash\|plain_code"                           "connected-frontend"
