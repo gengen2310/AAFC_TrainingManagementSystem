@@ -1580,11 +1580,11 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
           <p class="muted" style="font-size:11.5px;margin:0 0 8px">
             A Training Class is a local group completing a Training Stage — for example, Senior 1
             and Senior 2 can both complete Senior training on the same Parade Night. Associate Training
-            Classes with a Planning Year.
+            Classes with a year.
           </p>
           <div style="margin-bottom:10px">
-            <label style="font-size:11px;font-weight:700;color:var(--muted);margin-right:8px">Training Year:</label>
-            <select id="tc-year-sel" aria-label="Select training year for classes" onchange="_tcLoadForYear(this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
+            <label style="font-size:11px;font-weight:700;color:var(--muted);margin-right:8px">Year:</label>
+            <select id="tc-year-sel" aria-label="Select year for classes" onchange="_tcLoadForYear(this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
               <option value="">— select year —</option>
             </select>
           </div>
@@ -2013,9 +2013,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
 <div class="modal-bg" id="m-new-year">
   <div class="modal">
-    <h2>New Planning Year</h2>
+    <h2>New Year</h2>
     <div class="form-group"><label>Year *</label><input type="number" id="py-year-inp" placeholder="2026" min="2020" max="2040"></div>
-    <div class="form-group"><label>Name *</label><input type="text" id="py-name-inp" placeholder="2026 Training Year"></div>
+    <div class="form-group"><label>Name *</label><input type="text" id="py-name-inp" placeholder="2026"></div>
     <div class="form-group" id="py-unit-row" style="display:none">
       <label>Squadron <span class="muted" style="font-weight:400">(optional — leave blank for a wing-level year)</span></label>
       <select id="py-unit-sel" aria-label="Select squadron (optional, leave blank for wing-level year)" style="width:100%"><option value="">— Wing-level year —</option></select>
@@ -3804,9 +3804,9 @@ async function api(path, opts={}){
     if(code==='reason_required_not_delivered')           msg='A reason must be provided when setting status to Not Delivered.';
     if(code==='invalid_date_format')                     msg='Date must be in YYYY-MM-DD format.';
     if(code==='invalid_cadet_group')                     msg='Cadet group value is not recognised.';
-    if(code==='no_parade_night_linked')                  msg='No parade night is linked to this planning date. Ensure the planning year is set up correctly.';
+    if(code==='no_parade_night_linked')                  msg='No parade night is linked to this planning date. Ensure the year is set up correctly.';
     if(code==='parade_night_not_found')                  msg='Parade night not found.';
-    if(code==='planning_year_not_found')                 msg='Planning year not found.';
+    if(code==='planning_year_not_found')                 msg='Year not found.';
     if(code==='override_requires_reason')                msg='A reason is required to override an identified conflict.';
     if(res.status===403&&code==='proxy_required')        msg='Proxy Mode required. Enter a reason before making changes to this squadron.';
     if(res.status===403&&code==='intervention_required') msg='Delegated Intervention Mode required. Enter a reason before making changes.';
@@ -3820,14 +3820,14 @@ async function api(path, opts={}){
     if(code==='parade_night_closed')                    msg='This Parade Night is closed and cannot be modified.';
     if(code==='already_archived')                       msg='This record has already been archived.';
     if(code==='not_archived')                           msg='This record is not archived.';
-    if(code==='planning_year_already_exists')           msg='A Planning Year for this period already exists.';
+    if(code==='planning_year_already_exists')           msg='A year for this period already exists.';
     if(code==='cross_squadron'||code==='cross_squadron_copy_not_permitted'||code==='cross_squadron_move_forbidden') msg='This record belongs to a different Squadron.';
     if(code==='publish_blocked')                        msg='Cannot publish — some sessions are missing required information. Check facilitators and rooms before publishing.';
     if(code==='close_blocked')                          msg='Cannot close this Parade Night — some sessions are still Planned. Record outcomes first.';
     if(code==='invalid_training_class')                 msg='Training Class not found or does not belong to this Squadron.';
     if(code==='training_class_wrong_squadron')          msg='That Training Class belongs to a different Squadron.';
     if(code==='training_stage_not_found')               msg='Training Stage not found — it may have been archived.';
-    if(code==='training_year_not_found_for_squadron')   msg='No Training Year found for this Squadron. Create one in Getting Started.';
+    if(code==='training_year_not_found_for_squadron')   msg='No year found for this Squadron. Create one in Getting Started.';
     if(code==='reason_required')                        msg='A reason is required for this action.';
     if(code==='name_required')                          msg='A name is required.';
     if(code==='name_exists')                            msg='A record with that name already exists.';
@@ -4998,7 +4998,7 @@ async function _acLoadConflicts(){
   if(!card)return;
   const ctitle=card.querySelector('.ctitle');
   if(!P||!P.currentYearId){
-    if(el)el.outerHTML='<div style="font-size:12px;color:var(--muted)">No active training year — select one from Training Plans first.</div>';
+    if(el)el.outerHTML='<div style="font-size:12px;color:var(--muted)">No active year — select one from Training Plans first.</div>';
     return;
   }
   try{
@@ -7234,7 +7234,7 @@ function _chartHBar(chart){
 // Classes whose coverage_pct is ≥15pp below the stage aggregate are flagged NEEDS ATTENTION.
 function _chartClassProgress(chart){
   const rows=chart.data||[];
-  if(!rows.length)return _dEmptyChart('No Training Classes configured for this squadron and Training Year.');
+  if(!rows.length)return _dEmptyChart('No Training Classes configured for this squadron and year.');
   let html='';
   rows.forEach(row=>{
     const agg=row.coverage_pct!=null?row.coverage_pct:null;
@@ -9558,7 +9558,7 @@ async function openCurrMatrix(btn){
     const years=await api('/api/planning/years?unit_id='+encodeURIComponent(sqnId)).catch(()=>[]);
     const active=(years||[]).find(y=>y.active_status);
     yearId=active?active.planning_year_id:(years&&years[0]?years[0].planning_year_id:null);
-    if(!yearId){if(status)status.textContent='No planning year found.';return;}
+    if(!yearId){if(status)status.textContent='No year found.';return;}
     _cmData=await api('/api/curriculum/class-matrix?year_id='+encodeURIComponent(yearId));
     // Populate stage filter
     const sf=document.getElementById('cm-stage-filter');
@@ -10349,7 +10349,7 @@ WHAT IS PLANNING WORKSPACE?
 ═══════════════════════════════════════════════
 Planning Workspace is the AAFC training planner. It is a separate screen (accessed via the Planning link in the navigation bar) where you:
 
-  • Create a Training Year
+  • Create a year
   • Generate parade night dates
   • Schedule curriculum sessions
   • Assign facilitators and rooms
@@ -10362,14 +10362,14 @@ When to use Planning Workspace: to do the planning — schedule nights, assign c
 ═══════════════════════════════════════════════
 KEY TERMS
 ═══════════════════════════════════════════════
-Training Year
-  A container for all parade nights and training records for one academic year (typically July to June). Create a Training Year before scheduling parade nights.
+Year
+  A container for all parade nights and training records for one academic year (typically July to June). Create a year before scheduling parade nights.
 
 Training Stage
   A national AAFC curriculum level — Initial, Junior, Intermediate, Senior, Bronze, Silver, or Gold. Each stage has a fixed set of required modules defined at the national level. Training Stages are the same for every squadron.
 
 Training Class
-  A squadron-specific group of cadets completing a Training Stage during a Training Year. Where a squadron has enough cadets, one Training Stage can have several classes running at the same time.
+  A squadron-specific group of cadets completing a Training Stage during a year. Where a squadron has enough cadets, one Training Stage can have several classes running at the same time.
 
   Example: a squadron with 30 senior cadets might create Senior 1 (15 cadets) and Senior 2 (15 cadets). Both classes follow the Senior Training Stage, but each has its own independent progress record. Senior 1 may have completed SEN-04 while Senior 2 has it planned. The system tracks them separately.
 
@@ -10400,7 +10400,7 @@ Before using Planning Workspace, set up the following in TMS:
   4. A Training Class for each active Training Stage (e.g. Senior 1 for the Senior stage; add Senior 2 if you have two senior groups)
   5. Activities, if you have camps, field days, or courses this year (TMS → Activities)
 
-Then open Planning Workspace. If no Training Year exists, the setup panel appears automatically. Step through the guided setup to create your Training Year and generate parade nights.
+Then open Planning Workspace. If no year exists, the setup panel appears automatically. Step through the guided setup to create your year and generate parade nights.
 
 ═══════════════════════════════════════════════
 COMMON TASKS
@@ -10412,10 +10412,10 @@ Add a Training Area
   In TMS → Training Areas & Equipment → Add training area. Enter name, type, and capacity. Save.
 
 Set up Training Classes
-  In TMS → Training Year → Training Classes → Add Training Class. Choose the Training Stage and give the class a name (e.g. Senior 1). Repeat for each class. Each class tracks its own progress through the curriculum.
+  In TMS → Year → Training Classes → Add Training Class. Choose the Training Stage and give the class a name (e.g. Senior 1). Repeat for each class. Each class tracks its own progress through the curriculum.
 
 Generate Parade Nights
-  In Planning Workspace: select a Training Year, then use "Guided year setup…" in the toolbar. Choose your parade weekday, start date, end date, and frequency. Select Generate.
+  In Planning Workspace: select a year, then use "Guided year setup…" in the toolbar. Choose your parade weekday, start date, end date, and frequency. Select Generate.
 
 Schedule a session
   In Planning Workspace: click any empty cell on a parade night. Select the curriculum item, Training Class, facilitator, and room. Save.
@@ -11510,7 +11510,7 @@ async function runExceptionChecks(){
 const _RC_TYPE_LABEL = {
   parade_night:'Parade Night', session:'Session', session_audience:'Session Audience',
   session_outcome:'Outcome', scheduled_session:'Scheduled Session',
-  planning_notice:'Notice', planning_year:'Planning Year',
+  planning_notice:'Notice', planning_year:'Year',
   training_class:'Training Class', class_membership:'Class Membership',
 };
 function _rcRelTime(iso){
@@ -11990,7 +11990,7 @@ function heatColor(p){ p=+p||0; return p>=67?'#1a7f4b':p>=34?'#c97a00':p>0?'#e51
 // backend deliberately reuses those same chart_ids for that reason), and
 // adding new renderers only for the genuinely new shapes (readiness matrix,
 // risk timeline, 100%-stacked bars, Pareto with cumulative %).
-const _CMD_WINDOW_LABELS={week:'This Week',term:'This Term',semester:'Semester',year:'Training Year'};
+const _CMD_WINDOW_LABELS={week:'This Week',term:'This Term',semester:'Semester',year:'Year'};
 const _CMD_STATUS_SYMBOL={ok:'✓',warning:'▲',critical:'✕',no_data:'—'};
 const _CMD_STATUS_COLOR={ok:'var(--ok)',warning:'var(--warn)',critical:'var(--red)',no_data:'var(--muted)'};
 const _CMD_TREND_SYMBOL={up:'▲ improving',down:'▼ declining',flat:'▬ steady',no_data:'no prior data'};
@@ -12611,7 +12611,7 @@ async function _loadPlanningYears() {
     selIds.forEach(sid=>{
       const el = document.getElementById(sid);
       if(!el) return;
-      el.innerHTML = '<option value="">— select a planning year —</option>';
+      el.innerHTML = '<option value="">— select a year —</option>';
       // py-select respects squadron filter; other selectors show all
       const yrs = (sid==='py-select') ? visibleYears : P.years;
       yrs.forEach(y=>{
@@ -12650,23 +12650,23 @@ function _renderPyActionBtns(){
 async function doRenamePlanningYear(){
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
   if(!y)return;
-  const newName=await promptText('Rename Training Year','New name',{defaultValue:y.name||String(y.year),okLabel:'Rename'});
+  const newName=await promptText('Rename year','New name',{defaultValue:y.name||String(y.year),okLabel:'Rename'});
   if(!newName)return;
   const trimmed=newName.trim();
   if(!trimmed){ showToast('Name cannot be empty.', true); return; }
   try{
     await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({name:trimmed,version:y.version})});
-    showToast('Training Year renamed.');
+    showToast('Year renamed.');
     await _loadPlanningYears();
   }catch(e){ showToast('Could not rename: '+apiErr(e), true); }
 }
 async function doArchivePlanningYear(){
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
   if(!y)return;
-  confirmAction(`Archive the ${y.name||y.year} Training Year? It disappears from active selectors. Historical records are preserved and it can be restored later.`,async()=>{
+  confirmAction(`Archive the year? It disappears from active selectors. Historical records are preserved and it can be restored later.`,async()=>{
     try{
       await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({active_status:false,version:y.version})});
-      showToast('Training Year archived.');
+      showToast('Year archived.');
       await _loadPlanningYears();
     }catch(e){ showToast('Could not archive: '+apiErr(e), true); }
   });
@@ -12676,7 +12676,7 @@ async function doRestorePlanningYear(){
   if(!y)return;
   try{
     await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({active_status:true,version:y.version})});
-    showToast('Training Year restored.');
+    showToast('Year restored.');
     await _loadPlanningYears();
   }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
 }
@@ -12689,7 +12689,7 @@ async function doDeletePlanningYear(){
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
   if(!y)return;
   const label=y.name||String(y.year);
-  const typed=await promptText('Permanently delete Training Year',`Type the year name to confirm`,{
+  const typed=await promptText('Permanently delete year',`Type the year name to confirm`,{
     context:`This permanently deletes "${label}" — this cannot be undone. It will only succeed if the year has no linked records (parade dates, holidays, notices, etc.); otherwise use Archive instead.`,
     okLabel:'Delete permanently',danger:true,
     validate:v=>v!==label?`Type exactly: ${label}`:'',
@@ -12698,7 +12698,7 @@ async function doDeletePlanningYear(){
   if(typed.trim()!==label){ showToast('Name did not match — nothing was deleted.', true); return; }
   try{
     await api('/api/planning/years/'+P.currentYearId,{method:'DELETE'});
-    showToast('Training Year permanently deleted.');
+    showToast('Year permanently deleted.');
     P.currentYearId=null;
     await _loadPlanningYears();
     loadYearMap('');
@@ -12706,7 +12706,7 @@ async function doDeletePlanningYear(){
     if(e && e.kind==='http' && e.status===409 && e.body && e.body.detail && e.body.detail.dependents){
       const dep=e.body.detail.dependents;
       const depList=Object.entries(dep).map(([k,v])=>`${_cap(k.replace(/_/g,' '))}: ${v}`).join(', ');
-      confirmAction(`Cannot permanently delete — this Training Year has linked records (${depList}). Archive it instead? (reversible, keeps history)`,()=>{
+      confirmAction(`Cannot permanently delete — this year has linked records (${depList}). Archive it instead? (reversible, keeps history)`,()=>{
         doArchivePlanningYear();
       });
     } else {
@@ -12912,7 +12912,7 @@ function exportPerClassDeliveryCSV() {
     });
   });
   if (!Object.keys(classMap).length) {
-    showToast('No Training Classes are set up for this planning year. Add Training Classes under the Training Classes tab before exporting.', true);
+    showToast('No Training Classes are set up for this year. Add Training Classes under the Training Classes tab before exporting.', true);
     return;
   }
   const header = ['Class', 'Code', 'Title', 'Stage', 'Element', 'Recommended Term', 'Delivery Status', 'Sessions Scheduled'];
@@ -12971,7 +12971,7 @@ function _updateDebugPanel(lastError) {
   const rows = [
     ['Role', (S.role||'—')],
     ['Unit', (S.scopeName||'—')],
-    ['Planning Year', yr ? (yr.name||String(yr.year)) : (_missionState.yearId ? _missionState.yearId.slice(0,8)+'…' : 'none')],
+    ['Year', yr ? (yr.name||String(yr.year)) : (_missionState.yearId ? _missionState.yearId.slice(0,8)+'…' : 'none')],
     ['Missions loaded', String(_missionState.missions.length)],
     ['Parade dates loaded', String(_missionState.dates.length)],
     ['Annual program', P.annualProgramLoaded ? 'yes' : 'not yet'],
@@ -13106,7 +13106,7 @@ async function loadYearMap(yearId){
   const missionsCard = document.getElementById('py-missions-card');
   const ctxLbl = document.getElementById('py-ctx-label-sqn');
   if(!yearId){
-    body.innerHTML='<p class="muted">Select a planning year above.</p>';
+    body.innerHTML='<p class="muted">Select a year above.</p>';
     datesCard.style.display='none'; holCard.style.display='none'; classesCard.style.display='none';
     if(missionsCard) missionsCard.style.display='none';
     const fcCard=document.getElementById('py-forecasts-card');
@@ -13376,7 +13376,7 @@ function _buildGenBody(){
 async function previewGenerateDates(){
   const msg=document.getElementById('gen-msg');
   const area=document.getElementById('gen-preview-area');
-  if(!P.currentYearId){ msg.textContent='Select a Training Year from the dropdown above to continue.'; return; }
+  if(!P.currentYearId){ msg.textContent='Select a year from the dropdown above to continue.'; return; }
   const b=_buildGenBody();
   if(!b.start_date){ msg.textContent='Start date is required.'; return; }
   if(!b.end_date&&!b.max_repeats){ msg.textContent='Provide an end date or number of repeats.'; return; }
@@ -13398,7 +13398,7 @@ async function previewGenerateDates(){
 }
 async function doGenerateDates(){
   const msg=document.getElementById('gen-msg');
-  if(!P.currentYearId){ msg.textContent='Select a Training Year from the dropdown above to continue.'; return; }
+  if(!P.currentYearId){ msg.textContent='Select a year from the dropdown above to continue.'; return; }
   const b=_buildGenBody();
   if(!b.start_date){ msg.textContent='Start date is required.'; return; }
   if(!b.end_date&&!b.max_repeats){ msg.textContent='Provide an end date or number of repeats.'; return; }
@@ -13420,7 +13420,7 @@ function openAddHolidayModal(){
 }
 async function doAddHoliday(){
   const hm=document.getElementById('hol-msg');
-  if(!P.currentYearId){ hm.textContent='Select a planning year first.'; return; }
+  if(!P.currentYearId){ hm.textContent='Select a year first.'; return; }
   const name = document.getElementById('hol-name-inp').value.trim();
   const start = document.getElementById('hol-start-inp').value;
   const end = document.getElementById('hol-end-inp').value;
@@ -13630,7 +13630,7 @@ async function openTrainingClassProgressModal(trainingClassId){
 }
 
 async function openAddTrainingClassModal(){
-  if(!P.currentYearId){ showToast('Select a Training Year from the dropdown above before continuing.',true); return; }
+  if(!P.currentYearId){ showToast('Select a year from the dropdown above before continuing.',true); return; }
   document.getElementById('tc-name-inp').value='';
   document.getElementById('tc-seq-inp').value='';
   document.getElementById('tc-add-msg').textContent='';
@@ -13639,7 +13639,7 @@ async function openAddTrainingClassModal(){
 }
 async function doAddTrainingClass(){
   const msg=document.getElementById('tc-add-msg');
-  if(!P.currentYearId){ msg.textContent='Select a Training Year from the dropdown above to continue.'; return; }
+  if(!P.currentYearId){ msg.textContent='Select a year from the dropdown above to continue.'; return; }
   const training_stage_id=document.getElementById('tc-stage-inp').value;
   const display_name=document.getElementById('tc-name-inp').value.trim();
   const seqVal=document.getElementById('tc-seq-inp').value;
@@ -13802,7 +13802,7 @@ function doMergeTrainingClass(){
 async function loadAnchors(yearId){
   P.currentYearId = yearId;
   const el = document.getElementById('anchors-body');
-  if(!yearId){ el.innerHTML='<p class="muted">Select a planning year above.</p>'; return; }
+  if(!yearId){ el.innerHTML='<p class="muted">Select a year above.</p>'; return; }
   try {
     const showArchived=(document.getElementById('anch-show-archived')||{}).checked;
     const url=`/api/planning/years/${yearId}/anchors`+(showArchived?'?include_archived=true':'');
@@ -13853,7 +13853,7 @@ function _audienceBadges(aud){
 }
 
 function openAddAnchorModal(){
-  if(!P.currentYearId){ showToast('Select a Training Year from the dropdown above before continuing.',true); return; }
+  if(!P.currentYearId){ showToast('Select a year from the dropdown above before continuing.',true); return; }
   ['anch-name-inp','anch-start-inp','anch-end-inp','anch-impact-inp','anch-readiness-inp'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('anch-type-inp').value='other';
   document.getElementById('anch-imp-inp').value='key_event';
@@ -13894,7 +13894,7 @@ async function deleteAnchor(anchorId){
 async function loadTermPlanner(yearId, term){
   const body = document.getElementById('term-body');
   const summ = document.getElementById('term-summary-row');
-  if(!yearId){ body.innerHTML='<p class="muted">Select a planning year above.</p>'; summ.innerHTML=''; return; }
+  if(!yearId){ body.innerHTML='<p class="muted">Select a year above.</p>'; summ.innerHTML=''; return; }
   try {
     const params = term ? `?term=${term}` : '';
     const d = await api(`/api/planning/years/${yearId}/term-planner${params}`);
@@ -14353,7 +14353,7 @@ async function loadLongRange(yearId){
     } else { anchRow.innerHTML='<span class="muted">No anchor events in this window.</span>'; }
     // Main grid
     if(!d.parade_dates.length){
-      document.getElementById('lr-body').innerHTML='<div class="empty"><div class="et">No parade dates in this range</div><div class="es">Generate parade dates for your planning year to see them here. <a href="#" onclick="nav(\'activities\');return false">Go to Activities</a>.</div></div>';
+      document.getElementById('lr-body').innerHTML='<div class="empty"><div class="et">No parade dates in this range</div><div class="es">Generate parade dates for your year to see them here. <a href="#" onclick="nav(\'activities\');return false">Go to Activities</a>.</div></div>';
       card.style.display=''; empty.style.display='none'; return;
     }
     let html='';
@@ -14512,7 +14512,7 @@ function _renderConflicts(conflicts, yearId){
 }
 
 async function runAllChecks(){
-  if(!P.currentYearId){ showToast('Select a Training Year from the dropdown above before continuing.',true); return; }
+  if(!P.currentYearId){ showToast('Select a year from the dropdown above before continuing.',true); return; }
   try {
     const r=await api(`/api/planning/years/${P.currentYearId}/run-checks`,{method:'POST'});
     await loadPlanningChecks(P.currentYearId);
@@ -14611,7 +14611,7 @@ function _downloadExport(url, filename){
 }
 
 function exportAnnualProgram(){
-  if(!P.currentYearId){ showToast('Select a Training Year from the dropdown above before continuing.',true); return; }
+  if(!P.currentYearId){ showToast('Select a year from the dropdown above before continuing.',true); return; }
   _downloadExport(`/api/planning/years/${P.currentYearId}/export.xlsx`,`annual-program.xlsx`);
 }
 
@@ -14620,13 +14620,13 @@ function exportCurriculum(){
 }
 
 function exportSchedule(){
-  if(!P.currentYearId){ showToast('Select a Training Year from the dropdown above before continuing.',true); return; }
+  if(!P.currentYearId){ showToast('Select a year from the dropdown above before continuing.',true); return; }
   _downloadExport(`/api/planning/years/${P.currentYearId}/schedule/export.xlsx`,`schedule.xlsx`);
 }
 
 // ── Schedule XLSX Import ────────────────────────────────────
 function openSchedImport(){
-  if(!P.currentYearId){ showToast('Select a Training Year from the dropdown above before continuing.',true); return; }
+  if(!P.currentYearId){ showToast('Select a year from the dropdown above before continuing.',true); return; }
   document.getElementById('sched-import-file').value='';
   document.getElementById('sched-import-msg').textContent='';
   document.getElementById('sched-import-preview').style.display='none';
@@ -14639,7 +14639,7 @@ async function previewSchedImport(){
   const msg=document.getElementById('sched-import-msg');
   const fileEl=document.getElementById('sched-import-file');
   if(!fileEl.files||!fileEl.files[0]){ msg.textContent='Select an XLSX file first.'; return; }
-  if(!P.currentYearId){ msg.textContent='Select a Training Year from the dropdown above to continue.'; return; }
+  if(!P.currentYearId){ msg.textContent='Select a year from the dropdown above to continue.'; return; }
   msg.textContent='Parsing…';
   const form=new FormData();
   form.append('file',fileEl.files[0]);
