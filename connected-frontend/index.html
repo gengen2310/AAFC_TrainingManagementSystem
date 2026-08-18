@@ -195,19 +195,27 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .app-body{display:flex;flex:1;}
 
 /* ── SIDENAV ── */
-.sidenav{width:210px;background:white;border-right:1px solid var(--border);flex-shrink:0;padding:12px 0;height:calc(100vh - 52px);position:sticky;top:52px;overflow-y:auto;}
-.nav-lbl{font-size:10.5px;font-weight:800;color:var(--muted-text-on-light);letter-spacing:.12em;text-transform:uppercase;padding:14px 16px 4px;}
-.nav-item{display:flex;align-items:center;padding:8px 18px;font-size:12.5px;font-weight:500;color:var(--steel);cursor:pointer;transition:background .1s,color .1s;border-left:3px solid transparent;gap:8px;user-select:none;}
-.nav-item:hover{background:var(--bg);color:var(--dark);}
-.nav-item:focus-visible{background:var(--bg);color:var(--dark);outline:2px solid var(--blue);outline-offset:-2px;}
-.nav-item.active{background:#deeefa;color:var(--dark);border-left-color:var(--blue);font-weight:700;}
+.sidenav{width:160px;background:linear-gradient(180deg,#001b3d 0%,#002550 100%);border-right:1px solid rgba(255,255,255,.06);flex-shrink:0;padding:0;height:calc(100vh - 52px);position:sticky;top:52px;overflow-y:auto;display:flex;flex-direction:column;}
+.sidenav::after{content:'';position:absolute;top:0;right:0;bottom:0;width:1px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03) 60%,transparent);pointer-events:none;}
+/* Logo bar — unit name only */
+.nav-logo-bar{padding:var(--sp-md) var(--sp-md) var(--sp-sm);border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0;}
+#nav-unit-name{font-size:13px;font-weight:800;color:rgba(255,255,255,.9);letter-spacing:.01em;line-height:1.2;}
+/* Nav item list */
+.nav-items-wrap{padding:var(--sp-xs) 0;flex:1;overflow-y:auto;}
+/* Nav footer */
+.nav-footer{padding:var(--sp-sm) var(--sp-md);border-top:1px solid rgba(255,255,255,.07);font-size:10px;color:rgba(255,255,255,.32);font-weight:600;letter-spacing:.06em;text-transform:uppercase;flex-shrink:0;}
+.nav-lbl{font-size:9px;font-weight:700;color:rgba(255,255,255,.28);letter-spacing:.14em;text-transform:uppercase;padding:12px var(--sp-md) 4px;}
+.nav-item{display:flex;align-items:center;padding:10px var(--sp-md);font-size:11px;font-weight:600;color:rgba(255,255,255,.48);cursor:pointer;transition:background .12s,color .12s;border-left:2.5px solid transparent;gap:9px;user-select:none;letter-spacing:.01em;}
+.nav-item:hover:not(.active){background:rgba(255,255,255,.04);color:rgba(255,255,255,.72);}
+.nav-item:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(81,176,227,.4) inset;}
+.nav-item.active{background:var(--nav-active-bg);color:#fff;border-left-color:var(--nav-active-border);padding-left:calc(var(--sp-md) - 2.5px);font-weight:700;}
 /* Planning sub-items — indented within Training section */
 .nav-subitem{padding-left:30px;font-size:12px;font-weight:500;color:var(--steel);}
 .nav-subitem:hover{background:var(--bg);color:var(--dark);}
 .nav-subitem.active{background:#deeefa;color:var(--dark);border-left-color:var(--blue);font-weight:700;}
 .nav-planning-hdr{font-size:10.5px;font-weight:700;color:var(--pale);letter-spacing:.10em;text-transform:uppercase;padding:10px 18px 4px 30px;}
-.nav-item-ext{display:flex;align-items:center;padding:8px 18px;font-size:12.5px;font-weight:500;color:var(--steel);cursor:pointer;transition:background .1s,color .1s;border-left:3px solid transparent;gap:8px;user-select:none;text-decoration:none;}
-.nav-item-ext:hover{background:var(--bg);color:var(--dark);}
+.nav-item-ext{display:flex;align-items:center;padding:10px var(--sp-md);font-size:11px;font-weight:600;color:rgba(255,255,255,.48);cursor:pointer;transition:background .12s,color .12s;border-left:2.5px solid transparent;gap:9px;user-select:none;text-decoration:none;letter-spacing:.01em;}
+.nav-item-ext:hover{background:rgba(255,255,255,.04);color:rgba(255,255,255,.72);}
 .nav-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0;opacity:.6;}
 .main{flex:1;padding:24px 28px;overflow-y:auto;min-width:0;}
 .page{display:none;}.page.active{display:block;}
@@ -686,7 +694,8 @@ body[data-density="compact"] .card{padding:12px 14px;}
 body[data-density="compact"] .modal-body{padding:10px 14px;}
 body[data-density="compact"] .modal-hdr{padding:10px 16px 8px;}
 body[data-density="compact"] .modal-foot{padding:8px 16px 10px;}
-body[data-density="compact"] .nav-item{padding:5px 12px 5px 16px;font-size:12.5px;}
+body[data-density="compact"] .nav-item{padding:7px var(--sp-md);font-size:11px;}
+body[data-density="compact"] .nav-item.active{padding-left:calc(var(--sp-md) - 2.5px);}
 body[data-density="compact"] .card+.card{margin-top:10px;}
 /* ── MISC CONNECTED-CLIENT ── */
 .mini{height:8px;border-radius:6px;background:#e6edf5;overflow:hidden;min-width:60px;}
@@ -703,8 +712,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
 
 /* ── RESPONSIVE ── */
 @media(max-width:768px){
-  .sidenav{display:none;position:fixed;top:52px;left:0;bottom:0;z-index:300;box-shadow:2px 0 12px rgba(0,47,101,.18);overflow-y:auto;}
-  .sidenav.nav-open{display:block;}
+  .sidenav{display:none;position:fixed;top:52px;left:0;bottom:0;z-index:300;box-shadow:4px 0 20px rgba(0,0,0,.4);overflow-y:auto;}
+  .sidenav.nav-open{display:flex;}
   .nav-overlay{display:none;position:fixed;inset:0;top:52px;background:rgba(0,0,0,.35);z-index:299;}
   .nav-overlay.nav-open{display:block;}
   /* 44×44px min touch target for hamburger */
@@ -890,6 +899,9 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
   <div class="app-body">
     <!-- SIDENAV -->
     <nav class="sidenav no-print">
+      <!-- B-DS logo bar: unit name only, populated by bootApp() -->
+      <div class="nav-logo-bar"><div id="nav-unit-name">Training System</div></div>
+      <div class="nav-items-wrap">
       <!-- REM-25: reorganised around the Training Officer's actual planning
            cycle (Overview -> Plan Training -> People and Resources -> Needs
            Attention -> Settings) instead of the prior ad-hoc feature-area
@@ -933,6 +945,8 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
       <a class="nav-item-ext" id="nav-pw-link" href="#" target="_blank" rel="noopener" style="display:none">Planning Workspace ↗<span id="navPwYrBadge" style="display:none;margin-left:8px;font-size:10px;font-weight:800;background:var(--dark);color:#fff;padding:2px 8px;border-radius:10px;letter-spacing:.04em;vertical-align:middle"></span></a>
       <div id="navPwYrHint" style="display:none;padding:3px 20px 0;font-size:10px;color:var(--muted)"></div>
       <div class="nav-item-ext" id="nav-pw-unconfigured" style="display:none;opacity:.55;cursor:default" title="Planning Workspace is not configured for this environment. Contact your system administrator.">Planning Workspace (unavailable)</div>
+      </div><!-- /nav-items-wrap -->
+      <div class="nav-footer" id="nav-footer-scope"></div>
     </nav>
 
     <main class="main" id="main-content">
@@ -4892,6 +4906,10 @@ function bootApp(){
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app').style.display='flex';
   document.getElementById('tb-unit').textContent=S.scopeName||info.name;
+  const navUnitName=document.getElementById('nav-unit-name');
+  if(navUnitName) navUnitName.textContent=S.scopeName||info.name;
+  const navFooterScope=document.getElementById('nav-footer-scope');
+  if(navFooterScope) navFooterScope.textContent=effectiveScope().replace('_',' ');
   const chip=document.getElementById('tb-chip');
   chip.textContent=info.short; chip.className='sqn-chip'+(S.isAdmin?' admin':'');
   updateScopeBanner(); updateModeBanner(); updateDebugBar();
