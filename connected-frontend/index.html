@@ -1539,6 +1539,7 @@ body.readonly .admin-el,body.readonly .no-ro{display:none!important;}
                 <option value="specialist_flight">Specialist Flight</option>
                 <option value="support_unit">Support Unit</option>
               </select>
+              <span id="s-unit-type-note" class="muted" style="font-size:11px;margin-left:6px"></span>
             </div>
           </div>
           <div class="form-row">
@@ -4941,6 +4942,10 @@ function bootApp(){
   setVal('s-sqn',S.scopeName||info.name); setVal('s-addr',S.cfg.addr||''); setVal('s-pday',S.cfg.day||'');
   setVal('s-start',S.cfg.start||''); setVal('s-end',S.cfg.end||''); setVal('s-sess',S.cfg.sess||3);
   setVal('s-crest',S.cfg.crestUrl||''); setVal('s-unit-type',S.cfg.unitType||'standard_squadron'); _renderCrestPreview();
+  const _utSel = document.getElementById('s-unit-type');
+  const _utNote = document.getElementById('s-unit-type-note');
+  if (_utSel) _utSel.disabled = (S.role === 'sqn_admin');
+  if (_utNote) _utNote.textContent = (S.role === 'sqn_admin') ? 'Set by wing or national admin' : '';
   renderTimingTemplates();
   const ccMsg=document.getElementById('cc-msg'); if(ccMsg)ccMsg.textContent='';
   calYear=new Date().getFullYear();calMonth=new Date().getMonth();
