@@ -169,12 +169,55 @@ def test_search_system_admin_cross_org(client):
 
 
 def test_search_accounts_by_name_sqn_admin(client):
-    """sqn_admin can search accounts in own squadron."""
-    h = login(client, "ADMIN703")
-    r = client.get("/api/search?q=703 Admin", headers=h)
+    """sqn_admin can search accounts in own squadron by display_name (uses own fixture)."""
+    from app.database import SessionLocal
+    from app.models import User
+
+    headers = login(client, "ADMIN703")
+    me = client.get("/api/auth/me", headers=headers).json()["session"]
+    sqn_id = me["squadron_id"]
+    wing_id = me["wing_id"]
+
+    unique_name = f"SearchTestUser-{uuid4().hex[:8]}"
+    db = SessionLocal()
+    user_id = None
+    try:
+        user = User(
+            id=str(uuid4()),
+            display_name=unique_name,
+            role="sqn_general",
+            squadron_id=sqn_id,
+            wing_id=wing_id,
+            active_status=True,
+            is_archived=False,
+        )
+        db.add(user)
+        db.commit()
+        user_id = user.id
+    finally:
+        db.close()
+
+    try:
+        r = client.get(f"/api/search?q={unique_name[:8]}", headers=headers)
+        assert r.status_code == 200
+        accounts = [x for x in r.json()["results"] if x["type"] == "account"]
+        assert any(a["id"] == user_id for a in accounts), "Expected to find the created account"
+    finally:
+        db = SessionLocal()
+        try:
+            db.query(User).filter(User.id == user_id).delete()
+            db.commit()
+        finally:
+            db.close()
+
+
+def test_sqn_general_gets_no_account_results(client):
+    """sqn_general must never receive account results (spec: accounts excluded for this role)."""
+    h = login(client, "703SQN2026")
+    r = client.get("/api/search?q=Admin", headers=h)
     assert r.status_code == 200
     accounts = [x for x in r.json()["results"] if x["type"] == "account"]
-    assert len(accounts) >= 1
+    assert len(accounts) == 0, "sqn_general must not receive account results"
 
 
 def test_search_wing_by_code(client):
@@ -211,6 +254,7 @@ def test_search_auditor_gets_only_wings_and_squadrons(client):
     r = client.get("/api/search?q=703", headers=h)
     assert r.status_code == 200
     results = r.json()["results"]
+    assert len(results) >= 1, "Auditor must find at least one wing or squadron"
     for item in results:
         assert item["type"] in ("wing", "squadron"), f"Auditor must not see {item['type']}"
 
