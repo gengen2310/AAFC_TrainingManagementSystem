@@ -1,7 +1,8 @@
 """Service desk — backend tests (Sub-project E)."""
-import pytest
+import uuid
+from contextlib import contextmanager
 from app.database import SessionLocal
-from app.models import Squadron
+from app.models import Squadron, Wing
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -19,6 +20,30 @@ def _sqn_id(code: str) -> str:
         assert sqn, f"Squadron with short_name {code!r} not found in seed data"
         return sqn.id
     finally:
+        db.close()
+
+
+@contextmanager
+def _archived_squadron():
+    """Create a temporary archived Squadron, yield its id, then delete it."""
+    db = SessionLocal()
+    try:
+        wing = db.query(Wing).filter(Wing.is_archived == False).first()
+        assert wing, "No active wing in seed data"
+        sqn = Squadron(
+            wing_id=wing.id,
+            code=f"TST{uuid.uuid4().hex[:4].upper()}",
+            name="Test Archived Squadron",
+            short_name="TST-ARCH",
+            is_archived=True,
+        )
+        db.add(sqn)
+        db.commit()
+        db.refresh(sqn)
+        yield sqn.id
+    finally:
+        db.query(Squadron).filter(Squadron.short_name == "TST-ARCH").delete()
+        db.commit()
         db.close()
 
 
@@ -47,19 +72,23 @@ def test_service_ticket_model_importable():
 # ── Public squadrons list ─────────────────────────────────────────────────────
 
 def test_public_squadrons_returns_active_only(client):
-    r = client.get("/api/public/squadrons")
-    assert r.status_code == 200
-    data = r.json()
-    assert isinstance(data, list)
-    assert len(data) > 0
-    # Each item has squadron_id and name only
-    for item in data:
-        assert "squadron_id" in item
-        assert "name" in item
-        assert len(item) == 2
-    # Alphabetically ordered
-    names = [item["name"] for item in data]
-    assert names == sorted(names)
+    with _archived_squadron() as archived_id:
+        r = client.get("/api/public/squadrons")
+        assert r.status_code == 200
+        data = r.json()
+        assert isinstance(data, list)
+        assert len(data) > 0
+        # Each item has squadron_id and name only
+        for item in data:
+            assert "squadron_id" in item
+            assert "name" in item
+            assert len(item) == 2
+        # Alphabetically ordered
+        names = [item["name"] for item in data]
+        assert names == sorted(names)
+        # Archived squadron must not appear
+        returned_ids = {item["squadron_id"] for item in data}
+        assert archived_id not in returned_ids
 
 
 def test_public_squadrons_no_auth_required(client):
@@ -125,22 +154,15 @@ def test_create_ticket_validates_description_length(client):
     assert r.status_code == 422
 
 
-def test_create_ticket_unknown_squadron_rejected(client):
-    # Create and archive a squadron, then submit a ticket for it
-    h = login(client, "SYSADMIN2026")
-    # Create a temporary wing + squadron for this test
-    r = client.get("/api/squadrons", headers=h)
-    assert r.status_code == 200
-    # Use an existing squadron and archive it — but we don't want to corrupt seed data.
-    # Instead, submit with a made-up UUID (not in DB) which should also 404.
-    import uuid
-    fake_id = str(uuid.uuid4())
-    r = client.post("/api/service-desk/tickets", json={
-        "rank": "Fg Off", "first_name": "Jane", "last_name": "Smith",
-        "email": "jane@example.com",
-        "squadron_id": fake_id,
-        "description": "Valid description here.",
-    })
+def test_create_ticket_archived_squadron_rejected(client):
+    # Submit a ticket for an archived squadron — must return 404
+    with _archived_squadron() as archived_id:
+        r = client.post("/api/service-desk/tickets", json={
+            "rank": "Fg Off", "first_name": "Jane", "last_name": "Smith",
+            "email": "jane@example.com",
+            "squadron_id": archived_id,
+            "description": "Valid description here.",
+        })
     assert r.status_code == 404
     assert r.json()["detail"]["error"] == "squadron_not_found"
 
