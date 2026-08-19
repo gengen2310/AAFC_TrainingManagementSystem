@@ -1,4 +1,5 @@
 """Aggregate model imports so Base.metadata sees every table."""
+from .service_ticket import ServiceTicket
 from .wing_calendar import WingHQEvent, SquadronEventStatus, WingEventCurriculumLink
 from .planning import (
     PlanningYear, ParadeDate, HolidayPeriod, AnchorEvent, AnchorPrepRule,
@@ -38,4 +39,5 @@ __all__ = [
     "PlanningFacilitatorLeave", "PlanningNotice",
     "CeaImportBatch", "CeaActivity", "ActivityLocalHide", "ActivityLocalOverride",
     "WingHQEvent", "SquadronEventStatus", "WingEventCurriculumLink",
+    "ServiceTicket",
 ]
