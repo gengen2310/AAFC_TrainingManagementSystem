@@ -16336,7 +16336,7 @@ function sdRenderList() {
       ? esc(t.description.slice(0, 60)) + '…'
       : esc(t.description);
     const active = t.ticket_id === _sdSelectedTicketId ? ' class="sd-row-active"' : '';
-    return `<tr${active} style="cursor:pointer" onclick="sdOpenDetail('${esc(t.ticket_id)}')">
+    return `<tr${active} data-tid="${esc(t.ticket_id)}" style="cursor:pointer" onclick="sdOpenDetail(this.dataset.tid)">
       <td style="font-size:12px;white-space:nowrap">${sdFmtDate(t.created_at)}</td>
       <td style="font-size:12px">${esc(t.rank)} ${esc(t.first_name)} ${esc(t.last_name)}</td>
       <td style="font-size:12px">${esc(t.squadron_name || '')}</td>
@@ -16368,7 +16368,7 @@ function sdOpenDetail(ticketId) {
     : sdStatusBadge(t.status);
 
   const saveBtn = isSysAdmin
-    ? `<div style="text-align:right;margin-top:var(--sp-md)"><button class="btn btn-primary" style="font-size:12px" onclick="sdSave('${esc(ticketId)}')">Save Changes</button></div><div id="sd-save-err" style="display:none;color:var(--red);font-size:11px;margin-top:4px"></div>`
+    ? `<div style="text-align:right;margin-top:var(--sp-md)"><button class="btn btn-primary" style="font-size:12px" data-tid="${esc(ticketId)}" onclick="sdSave(this.dataset.tid)">Save Changes</button></div><div id="sd-save-err" style="display:none;color:var(--red);font-size:11px;margin-top:4px"></div>`
     : '';
 
   document.getElementById('sd-detail-content').innerHTML = `
@@ -16442,6 +16442,12 @@ function sdCloseDetail() {
   document.getElementById('sd-detail').classList.remove('open');
   sdRenderList(); // clear active highlight
 }
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){
+    var det=document.getElementById('sd-detail');
+    if(det&&det.classList.contains('open'))sdCloseDetail();
+  }
+});
 </script>
 
 <!-- Command palette overlay (HELP-06) -->
