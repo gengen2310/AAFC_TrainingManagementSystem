@@ -545,6 +545,52 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .modal-x:hover{background:rgba(255,255,255,.22);}
 .modal-body{padding:20px;}
 .modal-foot{padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+/* ── Service Desk modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,18,40,.55);backdrop-filter:blur(3px);z-index:500;align-items:center;justify-content:center;padding:16px;}
+.modal-close{background:rgba(255,255,255,.12);border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:background .13s;}
+.modal-close:hover{background:rgba(255,255,255,.22);}
+.login-report-link {
+  display: block;
+  text-align: center;
+  margin-top: var(--sp-md);
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,.45);
+  cursor: pointer;
+  background: none;
+  border: none;
+  text-decoration: none;
+  font-family: inherit;
+}
+.login-report-link:hover { color: rgba(255,255,255,.72); }
+#sd-modal .ff-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--steel);
+  display: block;
+  margin-bottom: 4px;
+}
+#sd-modal .ff-input,
+#sd-modal .ff-select {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 12px;
+  font-family: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+#sd-modal textarea.ff-input { resize: vertical; }
+#sd-modal .form-group { margin-bottom: var(--sp-sm); }
+#sd-modal .form-err {
+  font-size: 11px;
+  color: var(--red);
+  margin-top: var(--sp-xs);
+}
 
 /* ── TOAST (non-blocking, accessible replacement for alert()) ── */
 .toast-region{position:fixed;top:16px;right:16px;z-index:900;display:flex;flex-direction:column;gap:8px;max-width:340px;}
@@ -863,6 +909,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <div style="font-size:10px;color:var(--muted);margin-top:14px;line-height:1.55">Use is limited to authorised personnel. Access and administrative actions are recorded.</div>
     <div class="auth-err" id="auth-err"></div>
   </div>
+  <button class="login-report-link" onclick="sdOpenModal()" id="login-report-btn">
+    Report an Issue
+  </button>
 </div>
 
 <!-- ═══ APP ═══ -->
@@ -16017,6 +16066,105 @@ document.addEventListener('keydown',function(e){
   // expose openPalette for the nav button
   window.openCmdPalette=openPalette;
 })();
+
+// ── Service Desk modal ──────────────────────────────────────────────────────
+window._sdSquadrons = null; // cached squadron list
+
+async function sdLoadSquadrons() {
+  if (window._sdSquadrons) return window._sdSquadrons;
+  try {
+    const r = await fetch(API_BASE + '/api/public/squadrons');
+    if (!r.ok) throw new Error('Failed to load squadrons');
+    window._sdSquadrons = await r.json();
+  } catch (e) {
+    window._sdSquadrons = [];
+  }
+  return window._sdSquadrons;
+}
+
+async function sdOpenModal(preselectedSquadronId) {
+  const modal = document.getElementById('sd-modal');
+  const form = document.getElementById('sd-form');
+  const errEl = document.getElementById('sd-err');
+  form.reset();
+  errEl.style.display = 'none';
+  document.getElementById('sd-submit-btn').disabled = false;
+
+  const sqns = await sdLoadSquadrons();
+  const sel = document.getElementById('sd-sqn');
+  sel.innerHTML = '<option value="">— Select unit —</option>' +
+    sqns.map(s => `<option value="${esc(s.squadron_id)}">${esc(s.name)}</option>`).join('');
+
+  if (preselectedSquadronId) {
+    sel.value = preselectedSquadronId;
+    sel.disabled = true;
+  } else {
+    sel.disabled = false;
+  }
+
+  modal.style.display = 'flex';
+  document.getElementById('sd-rank').focus();
+
+  // Close on Escape
+  modal._escHandler = (e) => { if (e.key === 'Escape') sdCloseModal(); };
+  document.addEventListener('keydown', modal._escHandler);
+}
+
+function sdCloseModal() {
+  const modal = document.getElementById('sd-modal');
+  modal.style.display = 'none';
+  if (modal._escHandler) {
+    document.removeEventListener('keydown', modal._escHandler);
+    modal._escHandler = null;
+  }
+}
+
+async function sdSubmit(event) {
+  event.preventDefault();
+  const errEl = document.getElementById('sd-err');
+  const submitBtn = document.getElementById('sd-submit-btn');
+  errEl.style.display = 'none';
+  submitBtn.disabled = true;
+
+  const body = {
+    rank: document.getElementById('sd-rank').value.trim(),
+    first_name: document.getElementById('sd-first').value.trim(),
+    last_name: document.getElementById('sd-last').value.trim(),
+    email: document.getElementById('sd-email').value.trim(),
+    squadron_id: document.getElementById('sd-sqn').value,
+    description: document.getElementById('sd-desc').value.trim(),
+  };
+
+  try {
+    const r = await fetch(API_BASE + '/api/service-desk/tickets', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+
+    if (r.status === 201) {
+      sdCloseModal();
+      showToast('Ticket submitted — a system administrator will follow up.');
+      return;
+    }
+
+    if (r.status === 429) {
+      errEl.textContent = 'Too many requests — please wait before submitting again.';
+      errEl.style.display = 'block';
+    } else {
+      const data = await r.json().catch(() => ({}));
+      const msg = (data.detail && typeof data.detail === 'object' && data.detail.message)
+        ? data.detail.message
+        : 'Submission failed — please check the form and try again.';
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+    }
+  } catch (e) {
+    errEl.textContent = 'Network error — please try again.';
+    errEl.style.display = 'block';
+  }
+  submitBtn.disabled = false;
+}
 </script>
 
 <!-- Command palette overlay (HELP-06) -->
@@ -16042,5 +16190,49 @@ document.addEventListener('keydown',function(e){
 .b-steel{background:var(--steel);color:#fff;}
 .cp-searching{font-style:italic;}
 </style>
+
+<!-- ── Service Desk submission modal ── -->
+<div id="sd-modal" class="modal-overlay" style="display:none;z-index:1100">
+  <div class="modal card" style="width:480px;max-width:96vw;margin:auto">
+    <div class="modal-hdr">
+      <span class="modal-title">Report an Issue</span>
+      <button class="modal-close" onclick="sdCloseModal()">✕</button>
+    </div>
+    <form id="sd-form" onsubmit="sdSubmit(event)" style="padding:var(--sp-md)">
+      <div class="form-group">
+        <label class="ff-label" for="sd-rank">Rank</label>
+        <input id="sd-rank" type="text" class="ff-input" placeholder="e.g. Fg Off" required>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-sm)">
+        <div class="form-group">
+          <label class="ff-label" for="sd-first">First Name</label>
+          <input id="sd-first" type="text" class="ff-input" required>
+        </div>
+        <div class="form-group">
+          <label class="ff-label" for="sd-last">Last Name</label>
+          <input id="sd-last" type="text" class="ff-input" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="ff-label" for="sd-email">Email</label>
+        <input id="sd-email" type="email" class="ff-input" required>
+      </div>
+      <div class="form-group">
+        <label class="ff-label" for="sd-sqn">Unit</label>
+        <select id="sd-sqn" class="ff-select ff-input" required></select>
+      </div>
+      <div class="form-group">
+        <label class="ff-label" for="sd-desc">Description of Issue</label>
+        <textarea id="sd-desc" class="ff-input" rows="4"
+          placeholder="Describe the issue (minimum 10 characters)…" required></textarea>
+      </div>
+      <div id="sd-err" style="display:none" class="form-err"></div>
+      <div class="modal-footer" style="display:flex;gap:var(--sp-sm);justify-content:flex-end;padding-top:var(--sp-sm)">
+        <button type="button" class="btn btn-secondary" onclick="sdCloseModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="sd-submit-btn">Submit</button>
+      </div>
+    </form>
+  </div>
+</div>
 </body>
 </html>
