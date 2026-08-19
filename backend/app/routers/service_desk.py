@@ -1,12 +1,9 @@
-import re
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
-from ..models import Squadron, ServiceTicket, AuditLog
+from ..models import Squadron, ServiceTicket
 from ..dependencies import get_principal
 from ..permissions import Principal, require_role
 from ..services import audit
@@ -169,7 +166,7 @@ def update_ticket(
             ticket.resolved_at = None
 
     if body.admin_notes is not None:
-        changed["admin_notes_updated"] = True
+        changed["admin_notes"] = body.admin_notes
         ticket.admin_notes = body.admin_notes
 
     db.commit()

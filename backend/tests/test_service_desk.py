@@ -125,7 +125,7 @@ def test_create_ticket_validates_description_length(client):
     assert r.status_code == 422
 
 
-def test_create_ticket_archived_squadron_rejected(client):
+def test_create_ticket_unknown_squadron_rejected(client):
     # Create and archive a squadron, then submit a ticket for it
     h = login(client, "SYSADMIN2026")
     # Create a temporary wing + squadron for this test
