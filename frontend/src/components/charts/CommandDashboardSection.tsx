@@ -46,7 +46,7 @@ export function CommandDashboardSection({ window: win, wingId }: { window: "week
         <Card title="B2 — Delivery reliability trend">
           <ChartCard chart={d.sections.B.reliability_trend} />
         </Card>
-        <Card title="B3 — Session outcomes by unit">
+        <Card title="B3 — Training Period outcomes by unit">
           <ChartCard chart={d.sections.B.outcomes_by_unit} />
         </Card>
         <Card title="B4 — Cancellation and non-delivery causes">

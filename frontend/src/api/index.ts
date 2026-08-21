@@ -108,6 +108,8 @@ export const trainingApi = {
   paradeNight: (id: string) => api.get<ParadeNightDetail>(`/api/parade-nights/${id}`),
   createParadeNight: (b: { date: string; term?: string; session_count?: number; parade_type?: string }) =>
     api.post<{ ok: boolean; parade_night_id: string }>("/api/parade-nights", b),
+  patchParadeNight: (id: string, b: { timing_template_id?: string | null }) =>
+    api.patch<{ parade_night_id: string; timing_template_id: string | null }>(`/api/parade-nights/${id}`, b),
   publish: (id: string) => api.post<{ ok: boolean }>(`/api/parade-nights/${id}/publish`),
   close: (id: string) => api.post<{ ok: boolean }>(`/api/parade-nights/${id}/close`),
   // "Mark all delivered, then flag exceptions" bulk action (risk-register

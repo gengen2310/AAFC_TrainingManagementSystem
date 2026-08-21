@@ -497,6 +497,8 @@ class ParadeNightUpdateIn(BaseModel):
     parade_type: _VALID_PARADE_TYPE | None = None
     notes: str | None = None
     version: int | None = None
+    # None (omitted) = leave unchanged; explicit null clears the template; UUID string = set template
+    timing_template_id: str | None = None
 
     @field_validator("date")
     @classmethod
@@ -551,6 +553,15 @@ def update_parade_night(pnid: str, body: ParadeNightUpdateIn, db: DBSession = De
         pn.parade_type = body.parade_type
     if body.notes is not None:
         pn.notes = body.notes
+    if "timing_template_id" in body.model_fields_set:
+        if body.timing_template_id is None:
+            pn.timing_template_id = None
+        else:
+            tmpl = db.get(TimingTemplate, body.timing_template_id)
+            if not tmpl or tmpl.is_archived:
+                raise HTTPException(404, detail={"error": "timing_template_not_found",
+                                                  "message": "The referenced timing template was not found."})
+            pn.timing_template_id = body.timing_template_id
     pn.version += 1
     db.commit()
     audit(db, p, object_type="parade_night", object_id=pn.id, action="update", new={"date": pn.date})

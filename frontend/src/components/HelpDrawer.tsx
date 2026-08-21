@@ -38,9 +38,9 @@ const GLOSSARY: { term: string; definition: string }[] = [
       "A scheduled training evening. Each parade night appears as a date on the planning calendar and can hold multiple sessions across different time periods.",
   },
   {
-    term: "Session",
+    term: "Training Period",
     definition:
-      "One training block within a parade night — a specific curriculum item, time period, one or more Training Classes, facilitator, and room. A session can serve a single class or several classes at once (for example, Senior 1 and Senior 2 attending the same lesson together). A parade night typically has six periods and may run several sessions in parallel.",
+      "One training block within a parade night — a specific curriculum item, period number, one or more Training Classes, facilitator, and room. A Training Period can serve a single class or several classes at once (for example, Senior 1 and Senior 2 attending the same lesson together). A parade night typically has six Training Periods and may run several in parallel.",
   },
   {
     term: "Mission Backlog",

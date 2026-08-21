@@ -104,15 +104,15 @@ export function PlanningLeftPanel({
         ))}
       </div>
 
-      {/* ── Session search ───────────────────────────────── */}
+      {/* ── Training Period search ───────────────────────── */}
       <div className="pw-section">
-        <div className="pw-section-hdr">Session search</div>
+        <div className="pw-section-hdr">Training Period search</div>
         <input
           type="search"
           placeholder="Title or curriculum code…"
           value={searchText ?? ""}
           onChange={e => onSearchTextChange?.(e.target.value)}
-          aria-label="Search sessions by title or curriculum code"
+          aria-label="Search training periods by title or curriculum code"
           style={{ width: "100%", boxSizing: "border-box", padding: "5px 8px", fontSize: 12, border: "1px solid var(--border)", borderRadius: 5, background: "var(--surface)", color: "var(--text)", outline: "none" }}
         />
         {!!searchText && (
@@ -126,9 +126,9 @@ export function PlanningLeftPanel({
         )}
       </div>
 
-      {/* ── Session tier (Foundation / Extension) ────────────────────────── */}
+      {/* ── Training Period tier (Foundation / Extension) ────────────────── */}
       <div className="pw-section">
-        <div className="pw-section-hdr">Session tier</div>
+        <div className="pw-section-hdr">Training Period tier</div>
         <div className="pw-filter-chips">
           <button
             className={`pw-chip${!tierFilter ? " on" : ""}`}

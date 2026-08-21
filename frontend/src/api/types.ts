@@ -64,6 +64,7 @@ export interface ParadeNight {
   parade_night_id: string; squadron_id: string; date: string; term: string | null;
   start_time: string | null; end_time: string | null; session_count: number;
   parade_type: string; published_status: boolean; readiness_score: number | null; closeout_status: string | null;
+  timing_template_id: string | null;
 }
 export interface ParadeNightWithSessions extends ParadeNight { sessions: SessionRow[]; }
 export interface ParadeNightDetail extends ParadeNightWithSessions {

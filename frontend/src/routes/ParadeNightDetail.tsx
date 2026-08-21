@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { trainingApi } from "../api";
+import { trainingApi, planningApi } from "../api";
 import { Empty, Loading, ErrorNote, Button } from "../components/ui";
 import { StatusBadge } from "../components/status/StatusBadge";
 import { ApiError } from "../api/client";
 import type { SessionRow } from "../api/types";
 
-// Detail of one parade night: sessions, publish/close (backend-validated), add session, set status.
+// Detail of one parade night: training periods, publish/close (backend-validated), add training period, set status.
 export function ParadeNightDetailView({ id, canWrite }: { id: string; canWrite: boolean }) {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["parade-night", id], queryFn: () => trainingApi.paradeNight(id) });
@@ -14,24 +14,38 @@ export function ParadeNightDetailView({ id, canWrite }: { id: string; canWrite: 
   const [addOpen, setAddOpen] = useState(false);
   const [statusFor, setStatusFor] = useState<SessionRow | null>(null);
 
+  // Template switcher state
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
+  const [templateErr, setTemplateErr] = useState("");
+  const templatesQ = useQuery({ queryKey: ["timing-templates"], queryFn: () => planningApi.listTimingTemplates() });
+
   const refetch = () => { qc.invalidateQueries({ queryKey: ["parade-night", id] }); qc.invalidateQueries({ queryKey: ["parade-nights"] }); };
   const publish = useMutation({ mutationFn: () => trainingApi.publish(id), onSuccess: () => { setActionErr(""); refetch(); }, onError: (e) => setActionErr(e instanceof ApiError ? e.friendly : "Publish failed.") });
   const close = useMutation({ mutationFn: () => trainingApi.close(id), onSuccess: () => { setActionErr(""); refetch(); }, onError: (e) => setActionErr(e instanceof ApiError ? e.friendly : "Close failed.") });
   const [bulkMsg, setBulkMsg] = useState("");
   const markRemainingDelivered = useMutation({
     mutationFn: () => trainingApi.markRemainingDelivered(id),
-    onSuccess: (r) => { setActionErr(""); setBulkMsg(r.sessions_updated > 0 ? `${r.sessions_updated} session${r.sessions_updated !== 1 ? "s" : ""} marked delivered.` : "No remaining sessions to mark -- everything already has a status."); refetch(); },
+    onSuccess: (r) => { setActionErr(""); setBulkMsg(r.sessions_updated > 0 ? `${r.sessions_updated} training period${r.sessions_updated !== 1 ? "s" : ""} marked delivered.` : "No remaining training periods to mark — everything already has a status."); refetch(); },
     onError: (e) => setActionErr(e instanceof ApiError ? e.friendly : "Bulk update failed."),
+  });
+  const changeTemplate = useMutation({
+    mutationFn: () => trainingApi.patchParadeNight(id, { timing_template_id: pendingTemplateId || null }),
+    onSuccess: () => { setPendingTemplateId(null); setTemplateErr(""); refetch(); },
+    onError: (e) => setTemplateErr(e instanceof ApiError ? e.friendly : "Template change failed."),
   });
 
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
   const pn = q.data!;
 
+  const currentTemplateId = pn.timing_template_id ?? "";
+  const displayTemplateId = pendingTemplateId !== null ? pendingTemplateId : currentTemplateId;
+  const templateChanged = pendingTemplateId !== null && pendingTemplateId !== currentTemplateId;
+
   return (
     <div>
       <p><strong>{pn.date}</strong> · Term {pn.term ?? "—"} · {pn.start_time}–{pn.end_time} · <StatusBadge status={pn.published_status ? "published" : "draft"} /></p>
-      {/* REM-17 (original_instruction.md Section 15): zero required sessions
+      {/* REM-17 (original_instruction.md Section 15): zero required training periods
           means "Not planned", never a percentage/score -- pn.readiness.score
           is hard-coded to 100 for an empty night by design. */}
       <p className="muted">
@@ -39,6 +53,37 @@ export function ParadeNightDetailView({ id, canWrite }: { id: string; canWrite: 
           ? "Readiness — Not planned"
           : `Readiness ${pn.readiness.score} (${pn.readiness.band})`}
       </p>
+
+      {/* ── Template switcher ─────────────────────────────────────────────── */}
+      {canWrite && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <label htmlFor="template-sel" style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap" }}>Template</label>
+          <select
+            id="template-sel"
+            value={displayTemplateId}
+            onChange={(e) => { setPendingTemplateId(e.target.value); setTemplateErr(""); }}
+            style={{ fontSize: 12, padding: "2px 6px", border: "1px solid var(--border)", borderRadius: 4, background: "var(--surface)", color: "var(--text)" }}
+          >
+            <option value="">— No template —</option>
+            {(templatesQ.data ?? []).map((t) => (
+              <option key={t.timing_template_id} value={t.timing_template_id}>{t.name}</option>
+            ))}
+          </select>
+          {templateChanged && (
+            <>
+              <Button onClick={() => changeTemplate.mutate()} disabled={changeTemplate.isPending}>
+                {changeTemplate.isPending ? "Applying…" : "Apply"}
+              </Button>
+              <Button variant="out" onClick={() => { setPendingTemplateId(null); setTemplateErr(""); }}>Cancel</Button>
+            </>
+          )}
+          {templateErr && <span style={{ fontSize: 12, color: "var(--red)" }}>{templateErr}</span>}
+        </div>
+      )}
+      {!canWrite && currentTemplateId && (
+        <p className="muted" style={{ fontSize: 12 }}>Template: {(templatesQ.data ?? []).find(t => t.timing_template_id === currentTemplateId)?.name ?? currentTemplateId}</p>
+      )}
+
       {pn.publish_blockers.length > 0 && (
         <div className="errnote" role="alert">Publish blockers: {pn.publish_blockers.join("; ")}</div>
       )}
@@ -46,10 +91,10 @@ export function ParadeNightDetailView({ id, canWrite }: { id: string; canWrite: 
       {bulkMsg && <p className="muted" style={{ fontSize: 12 }}>{bulkMsg}</p>}
 
       <table>
-        <caption className="vis-hidden">Sessions for this parade night</caption>
-        <thead><tr><th>#</th><th>Phase</th><th>Item</th><th>Facilitator</th><th>Status</th>{canWrite && <th></th>}</tr></thead>
+        <caption className="vis-hidden">Training Periods for this parade night</caption>
+        <thead><tr><th>Period</th><th>Phase</th><th>Item</th><th>Facilitator</th><th>Status</th>{canWrite && <th></th>}</tr></thead>
         <tbody>
-          {pn.sessions.length === 0 ? <tr><td colSpan={canWrite ? 6 : 5}><Empty msg="No sessions yet." /></td></tr> :
+          {pn.sessions.length === 0 ? <tr><td colSpan={canWrite ? 6 : 5}><Empty msg="No Training Periods yet." /></td></tr> :
             pn.sessions.sort((a, b) => a.period_number - b.period_number).map((s) => (
               <tr key={s.id}>
                 <td>{s.period_number}</td><td>{s.phase_at_time ?? "—"}</td>
@@ -63,12 +108,12 @@ export function ParadeNightDetailView({ id, canWrite }: { id: string; canWrite: 
 
       {canWrite && (
         <div className="row-actions">
-          <Button variant="out" onClick={() => setAddOpen(true)}>Add session</Button>
+          <Button variant="out" onClick={() => setAddOpen(true)}>Add Training Period</Button>
           <Button
             variant="out"
             onClick={() => { setBulkMsg(""); markRemainingDelivered.mutate(); }}
             disabled={markRemainingDelivered.isPending || pn.sessions.length === 0}
-            title="Marks every session still Draft/Planned/Published as Delivered. Flag any exceptions (cancelled, not delivered, rescheduled) individually first -- this only fills in the rest."
+            title="Marks every Training Period still Draft/Planned/Published as Delivered. Flag any exceptions (cancelled, not delivered, rescheduled) individually first -- this only fills in the rest."
           >
             {markRemainingDelivered.isPending ? "Marking…" : "Mark remaining delivered"}
           </Button>
@@ -97,7 +142,7 @@ function AddSessionForm({ pnid, onClose, onDone }: { pnid: string; onClose: () =
   });
   return (
     <div className="inline-form">
-      <h3>Add session</h3>
+      <h3>Add Training Period</h3>
       <label htmlFor="s-period">Period</label>
       <input id="s-period" type="number" min={1} max={6} value={period} onChange={(e) => setPeriod(e.target.value)} />
       <label htmlFor="s-item">Curriculum item</label>
@@ -145,7 +190,7 @@ function SetStatusForm({ session, onClose, onDone }: { session: SessionRow; onCl
   });
   return (
     <div className="inline-form">
-      <h3>Set session status</h3>
+      <h3>Set Training Period status</h3>
       <label htmlFor="st-status">Status</label>
       <select id="st-status" value={status} onChange={(e) => setStatus(e.target.value)}>
         {["delivered", "delivered_with_issue", "not_delivered", "cancelled", "cancelled_late", "rescheduled", "planned"].map((s) =>
