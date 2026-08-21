@@ -1557,7 +1557,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
                 <button class="yn-arrow" id="ynPrev" onclick="ynNav(-1)" disabled title="Previous year">‹</button>
                 <div class="yn-display" id="ynDisplay" onclick="ynStartEdit()" title="Click to enter year directly"><span id="ynLabel">—</span></div>
                 <button class="yn-arrow" id="ynNext" onclick="ynNav(1)" disabled title="Next year">›</button>
-                <button class="yn-gear" id="ynGear" onclick="ynOpenManage()" style="display:none" title="Manage years">⚙</button>
+                <button class="yn-gear" id="ynGear" onclick="nav('settings')" style="display:none" title="Manage Training Years">⚙ Manage Years</button>
               </div>
               <div class="yn-toast" id="ynToast"></div>
             </div>
@@ -1812,7 +1812,15 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </div>
           <p style="font-size:10px;color:var(--muted);margin-top:8px">Comfortable is the default and recommended setting for most users.</p>
         </div>
-        <div class="card">
+        <div class="card admin-el" id="settings-training-years-wrap">
+          <div class="card-header d-flex align-items-center justify-content-between" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="ctitle" style="margin:0">Training Years</div>
+            <button class="btn btn-sm admin-el" onclick="ynCreateYear()">+ Create Year</button>
+          </div>
+          <div id="settings-yn-table-wrap"><p class="muted" style="padding:12px 0;font-size:11px">Loading…</p></div>
+          <div id="settings-yn-postcreate" style="display:none" class="alert a-info mt-2"></div>
+        </div>
+        <div class="card" id="settings-timing-templates-wrap">
           <div class="ctitle">Timing Templates</div>
           <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Named parade night schedules with ordered blocks. Training Period blocks generate schedulable curriculum sessions. New parade nights automatically use the template effective on their date.</div>
           <div id="timing-templates-list" style="margin-bottom:12px"><div style="color:var(--muted);font-size:11px">Loading…</div></div>
@@ -2588,6 +2596,17 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <select id="tc-stage-inp" aria-label="Training Stage"></select>
     </div>
     <div class="form-group"><label>Display Name *<button class="ht" tabindex="0" aria-label="About Display Name" data-tip="A short, clear name for this group — e.g. Senior 1, Senior 2, Bronze A. This is how the class appears in planning and reports.">?</button></label><input type="text" id="tc-name-inp" placeholder="e.g. Senior 1"></div>
+    <div class="form-group">
+      <label>Stage Code<button class="ht" tabindex="0" aria-label="About Stage Code" data-tip="The national AAFC stage code for this class (ORI, INI, JNR, INT, SNR). Auto-created classes have this set; leave blank for custom classes.">?</button></label>
+      <select id="tc-stage-code" class="form-control" aria-label="Stage Code">
+        <option value="">— select stage —</option>
+        <option value="ORI">ORI — Orientation</option>
+        <option value="INI">INI — Initial</option>
+        <option value="JNR">JNR — Junior / Bronze</option>
+        <option value="INT">INT — Intermediate / Silver</option>
+        <option value="SNR">SNR — Senior / Gold</option>
+      </select>
+    </div>
     <div class="form-group"><label>Order (optional)<button class="ht" tabindex="0" aria-label="About Order" data-tip="Controls display order when several classes share the same Training Stage. Lower numbers appear first. Leave blank to use the default order.">?</button></label><input type="number" id="tc-seq-inp" min="0" placeholder="0"></div>
     <p id="tc-add-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
@@ -2607,6 +2626,17 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <select id="tc-edit-stage-inp" aria-label="Training Stage"></select>
     </div>
     <div class="form-group"><label>Display Name *<button class="ht" tabindex="0" aria-label="About Display Name" data-tip="A short, clear name for this group — e.g. Senior 1, Senior 2, Bronze A. This is how the class appears in planning and reports.">?</button></label><input type="text" id="tc-edit-name-inp"></div>
+    <div class="form-group">
+      <label>Stage Code<button class="ht" tabindex="0" aria-label="About Stage Code" data-tip="The national AAFC stage code for this class (ORI, INI, JNR, INT, SNR). Auto-created classes have this set; leave blank for custom classes.">?</button></label>
+      <select id="tc-edit-stage-code" class="form-control" aria-label="Stage Code">
+        <option value="">— select stage —</option>
+        <option value="ORI">ORI — Orientation</option>
+        <option value="INI">INI — Initial</option>
+        <option value="JNR">JNR — Junior / Bronze</option>
+        <option value="INT">INT — Intermediate / Silver</option>
+        <option value="SNR">SNR — Senior / Gold</option>
+      </select>
+    </div>
     <div class="form-group"><label>Order (optional)<button class="ht" tabindex="0" aria-label="About Order" data-tip="Controls display order when several classes share the same Training Stage. Lower numbers appear first.">?</button></label><input type="number" id="tc-edit-seq-inp" min="0"></div>
     <p id="tc-edit-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
@@ -7474,6 +7504,24 @@ async function renderSettings(){
     catch(_){ S.users=[]; }
   }
   renderUserDir();
+  // Load year list into Training Years settings card
+  (async () => {
+    const wrap = document.getElementById('settings-yn-table-wrap');
+    if (!wrap) return;
+    try {
+      const years = await api('/api/planning/years');
+      if (!years || !years.length) {
+        wrap.innerHTML = '<p class="muted" style="font-size:11px;padding:4px 0">No training years yet.</p>';
+        return;
+      }
+      const sorted = [...years].sort((a, b) => b.year - a.year);
+      wrap.innerHTML = '<div class="tw"><table class="data-table"><thead><tr><th>Year</th><th>Status</th></tr></thead><tbody>' +
+        sorted.map(y => `<tr>
+          <td style="font-weight:700">${esc(String(y.year))}</td>
+          <td><span class="badge ${y.active_status ? 'b-ok' : 'b-grey'}">${esc(y.active_status ? 'Active' : 'Archived')}</span></td>
+        </tr>`).join('') + '</tbody></table></div>';
+    } catch(e) { wrap.innerHTML = '<p style="color:var(--red);font-size:11px">Failed to load years.</p>'; }
+  })();
 }
 function renderUserDir(){
   const el=document.getElementById('user-dir-table'); if(!el)return;
@@ -10885,6 +10933,27 @@ async function ynCreateYear(){
     const newY=(all||[]).find(y=>y.year===next);
     if(newY) setCurrentYear(newY);
     await ynLoadManagePanel();
+    // Post-create prompt: refresh settings card and show guidance
+    const wrap=document.getElementById('settings-yn-table-wrap');
+    if(wrap){
+      try{
+        const years2=await api('/api/planning/years');
+        const sorted2=[...(years2||[])].sort((a,b)=>b.year-a.year);
+        wrap.innerHTML='<div class="tw"><table class="data-table"><thead><tr><th>Year</th><th>Status</th></tr></thead><tbody>'+
+          sorted2.map(y=>`<tr><td style="font-weight:700">${esc(String(y.year))}</td><td><span class="badge ${y.active_status?'b-ok':'b-grey'}">${esc(y.active_status?'Active':'Archived')}</span></td></tr>`).join('')+
+          '</tbody></table></div>';
+      } catch(_){}
+    }
+    const postWrap=document.getElementById('settings-yn-postcreate');
+    if(postWrap){
+      postWrap.innerHTML=`Year <strong>${esc(String(next))}</strong> created. ` +
+        `5 default training classes have been added. ` +
+        `<a href="#" onclick="document.getElementById('settings-training-classes-wrap')` +
+        `.scrollIntoView({behavior:'smooth'});return false;">Go to Training Classes ↓</a> to customise them, or ` +
+        `<a href="#" onclick="document.getElementById('settings-timing-templates-wrap')` +
+        `.scrollIntoView({behavior:'smooth'});return false;">Timing Templates ↓</a> to set up the parade night structure.`;
+      postWrap.style.display='block';
+    }
   } catch(e){ showToast('Could not create year '+next+': '+apiErr(e),true); }
 }
 
@@ -14455,9 +14524,10 @@ async function _renderTrainingClasses(yearId){
         }
         return out;
       };
-      html+=`<table class="data-table" style="margin-bottom:10px"><thead><tr><th>Class</th><th>Order</th><th>Expected</th>${showArchived?'':'<th>Curriculum Progress</th>'}<th></th></tr></thead><tbody>`+
+      html+=`<table class="data-table" style="margin-bottom:10px"><thead><tr><th>Class</th><th>Stage</th><th>Order</th><th>Expected</th>${showArchived?'':'<th>Curriculum Progress</th>'}<th></th></tr></thead><tbody>`+
         classes.sort((a,b)=>(a.sequence||0)-(b.sequence||0)).map(c=>`<tr${c.is_archived?' style="opacity:.6"':''}>
           <td>${esc(c.display_name)}${c.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
+          <td>${c.stage_code?`<span class="badge">${esc(c.stage_code)}</span>`:'<span class="muted">—</span>'}</td>
           <td>${c.sequence||0}</td>
           <td>${c.expected_count!=null?esc(String(c.expected_count)):'—'}</td>
           ${showArchived?'':`<td>${_tcCoveragePill(pctByClass[c.training_class_id])}</td>`}
@@ -14536,6 +14606,7 @@ async function openAddTrainingClassModal(){
   document.getElementById('tc-name-inp').value='';
   document.getElementById('tc-seq-inp').value='';
   document.getElementById('tc-add-msg').textContent='';
+  const scEl=document.getElementById('tc-stage-code'); if(scEl) scEl.value='';
   await _populateTrainingClassStageSelect('tc-stage-inp');
   openModal('m-add-training-class');
 }
@@ -14546,10 +14617,12 @@ async function doAddTrainingClass(){
   const display_name=document.getElementById('tc-name-inp').value.trim();
   const seqVal=document.getElementById('tc-seq-inp').value;
   if(!training_stage_id||!display_name){ msg.textContent='Training Stage and Display Name are required.'; return; }
+  const stage_code=document.getElementById('tc-stage-code')?.value||null;
   try{
     await api('/api/training-classes',{method:'POST',body:{
       training_year_id:P.currentYearId, training_stage_id, display_name,
       sequence: seqVal?parseInt(seqVal,10):0,
+      stage_code: stage_code||null,
     }});
     closeModal('m-add-training-class');
     await _renderTrainingClasses(P.currentYearId);
@@ -14565,6 +14638,8 @@ async function openEditTrainingClassModal(trainingClassId){
   document.getElementById('tc-edit-name-inp').value=c.display_name||'';
   document.getElementById('tc-edit-seq-inp').value=c.sequence||0;
   document.getElementById('tc-edit-msg').textContent='';
+  const editStageCodeEl=document.getElementById('tc-edit-stage-code');
+  if(editStageCodeEl) editStageCodeEl.value=c.stage_code||'';
   await _populateTrainingClassStageSelect('tc-edit-stage-inp', c.training_stage_id);
   openModal('m-edit-training-class');
 }
@@ -14576,9 +14651,11 @@ async function doEditTrainingClass(){
   const seqVal=document.getElementById('tc-edit-seq-inp').value;
   const client_version=parseInt(document.getElementById('tc-edit-version').value,10);
   if(!training_stage_id||!display_name){ msg.textContent='Training Stage and Display Name are required.'; return; }
+  const edit_stage_code=document.getElementById('tc-edit-stage-code')?.value||null;
   try{
     await api(`/api/training-classes/${cid}`,{method:'PATCH',body:{
       training_stage_id, display_name, sequence: seqVal?parseInt(seqVal,10):0, client_version,
+      stage_code: edit_stage_code||null,
     }});
     closeModal('m-edit-training-class');
     await _renderTrainingClasses(P.currentYearId);
