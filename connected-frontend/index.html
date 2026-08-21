@@ -1105,6 +1105,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="nav-item" tabindex="0" onclick="nav('getting-started')">Getting Started</div>
       <div class="nav-item active" tabindex="0" onclick="nav('dashboard')">Training Dashboard</div>
       <div class="nav-item" tabindex="0" onclick="nav('calendar')">Training Calendar</div>
+      <div class="nav-lbl" id="admin-lbl" style="display:none">Unit Setup</div>
+      <div class="nav-item admin-el" tabindex="-1" style="display:none" onclick="nav('settings')">Unit Setup</div>
       <div class="nav-lbl">Plan Training</div>
       <div class="nav-item" tabindex="0" onclick="nav('curriculum')">Curriculum</div>
       <div class="nav-item" tabindex="0" onclick="nav('activities')">Activities</div>
@@ -1115,8 +1117,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="nav-item" tabindex="0" onclick="nav('resources')">Resources & Training Areas</div>
       <div class="nav-lbl">Needs Attention</div>
       <div class="nav-item" tabindex="0" onclick="nav('action-items')">Needs Attention</div>
-      <div class="nav-lbl" id="admin-lbl" style="display:none">Settings</div>
-      <div class="nav-item admin-el" tabindex="-1" style="display:none" onclick="nav('settings')">Unit Settings</div>
+      <div class="nav-lbl" style="display:none">Administration</div>
       <div class="nav-item" id="nav-accounts" tabindex="-1" style="display:none" onclick="nav('accounts')">Account Management</div>
       <div class="nav-lbl nav-scope" id="hq-lbl" style="display:none">Command</div>
       <div class="nav-item nav-scope" id="nav-wing" tabindex="-1" style="display:none" onclick="nav('wing-overview')">Wing Overview</div>
@@ -1166,6 +1167,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <select id="dash-sqn-filter" aria-label="Filter Wing Dashboard by squadron" onchange="loadDashCharts()" style="display:none;padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:12px"><option value="">All Squadrons</option></select>
           </div>
         </div>
+
+        <!-- Setup banner: shown by renderDash() when sqn_admin has no active training year -->
+        <div id="dash-setup-banner" style="display:none;margin-bottom:12px"></div>
 
         <!-- DATA-CONF-01: data freshness indicator bar -->
         <div id="data-conf-bar" class="data-conf-bar" style="display:none" role="status" aria-live="polite"></div>
@@ -8429,6 +8433,12 @@ function drillDashChart(chartId,drillId){
 function renderDash(){
   const info=getCurrentUnitInfo();
   document.getElementById('dash-title').textContent=info.name+' — Training Dashboard';
+  const banner=document.getElementById('dash-setup-banner');
+  if(banner){
+    const show=S.role==='sqn_admin'&&!P.currentYearId;
+    banner.style.display=show?'':'none';
+    if(show)banner.innerHTML='<div class="card" style="border-left:4px solid var(--blue);background:var(--accent-light);display:flex;align-items:flex-start;gap:14px;padding:14px 16px"><div style="flex:1"><div style="font-size:11px;font-weight:800;color:var(--royal);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">No active training year</div><div style="font-size:12px;color:var(--text-2);margin-bottom:10px">Create a training year to activate your schedule, parade nights, and training program.</div><button class="btn btn-primary btn-sm" onclick="nav(\'settings\')">Set up this year →</button></div></div>';
+  }
   loadDashCharts();
 }
 
