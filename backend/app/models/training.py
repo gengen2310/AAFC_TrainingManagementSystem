@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 from ..database import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
 
 BLOCK_TYPES = frozenset({
-    "arrival", "administration", "roll_call", "parade", "flight_period",
-    "instructional_period", "break", "fatigues", "debrief", "dismissal", "custom",
+    "arrival", "admin", "parade", "briefing", "training_period",
+    "drinks_break", "fatigue", "dismissal", "other",
 })
 
 

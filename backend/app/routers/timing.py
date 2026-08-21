@@ -171,7 +171,15 @@ def _replace_blocks(db: DBSession, template: TimingTemplate,
 
     ip_counter = 0
     for i, bd in enumerate(block_data):
-        is_ip = bd.is_instructional_period or bd.block_type == "instructional_period"
+        # Validate block type against new taxonomy
+        if bd.block_type not in BLOCK_TYPES:
+            raise HTTPException(400, detail={
+                "error": "invalid_block_type",
+                "message": f"block_type '{bd.block_type}' is not valid. "
+                           f"Valid types: {sorted(BLOCK_TYPES)}",
+            })
+        # Sync is_instructional_period with block_type
+        is_ip = bd.block_type == "training_period"
         pnum = bd.period_number
         if is_ip and pnum is None:
             ip_counter += 1
@@ -179,7 +187,7 @@ def _replace_blocks(db: DBSession, template: TimingTemplate,
         dur = bd.duration_minutes
         if dur is None:
             dur = _calc_duration(bd.start_time, bd.end_time)
-        btype = bd.block_type if bd.block_type in BLOCK_TYPES else "custom"
+        btype = bd.block_type
         blk = TimingBlock(
             timing_template_id=template.id,
             display_order=bd.display_order if bd.display_order else i,
@@ -203,11 +211,11 @@ def _replace_blocks(db: DBSession, template: TimingTemplate,
 class BlockIn(BaseModel):
     display_order: int = 0
     block_name: str
-    block_type: str = "custom"
+    block_type: str = "other"  # was "custom" — updated for new taxonomy
     start_time: str | None = None
     end_time: str | None = None
     duration_minutes: int | None = None
-    is_instructional_period: bool = False
+    is_instructional_period: bool = False  # kept for compatibility; overridden by sync logic
     period_number: int | None = None
     is_optional: bool = False
     notes: str | None = None

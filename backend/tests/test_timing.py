@@ -30,11 +30,11 @@ def _create_template(client, headers, *, name="Test Template", effective_from="2
                      blocks=None):
     if blocks is None:
         blocks = [
-            {"display_order": 0, "block_name": "Period 1", "block_type": "instructional_period",
+            {"display_order": 0, "block_name": "Period 1", "block_type": "training_period",
              "is_instructional_period": True, "start_time": "18:50", "end_time": "19:25"},
-            {"display_order": 1, "block_name": "Period 2", "block_type": "instructional_period",
+            {"display_order": 1, "block_name": "Period 2", "block_type": "training_period",
              "is_instructional_period": True, "start_time": "19:25", "end_time": "20:00"},
-            {"display_order": 2, "block_name": "Period 3", "block_type": "instructional_period",
+            {"display_order": 2, "block_name": "Period 3", "block_type": "training_period",
              "is_instructional_period": True, "start_time": "20:30", "end_time": "21:05"},
         ]
     r = client.post("/api/timing-templates", headers=headers,
@@ -123,9 +123,9 @@ def test_create_2_session_template(client):
     blocks = [
         {"display_order": 0, "block_name": "Arrival", "block_type": "arrival",
          "is_instructional_period": False, "start_time": "18:00", "end_time": "18:15"},
-        {"display_order": 1, "block_name": "Period 1", "block_type": "instructional_period",
+        {"display_order": 1, "block_name": "Period 1", "block_type": "training_period",
          "is_instructional_period": True, "start_time": "18:50", "end_time": "19:25"},
-        {"display_order": 2, "block_name": "Period 2", "block_type": "instructional_period",
+        {"display_order": 2, "block_name": "Period 2", "block_type": "training_period",
          "is_instructional_period": True, "start_time": "19:25", "end_time": "20:00"},
         {"display_order": 3, "block_name": "Dismissal", "block_type": "dismissal",
          "is_instructional_period": False, "start_time": "21:30"},
@@ -140,15 +140,15 @@ def test_create_2_session_template(client):
 def test_create_3_session_template(client):
     h = login(client, "ADMIN703")
     blocks = [
-        {"display_order": 0, "block_name": "Roll Call", "block_type": "roll_call",
+        {"display_order": 0, "block_name": "Roll Call", "block_type": "admin",
          "is_instructional_period": False, "start_time": "18:15", "end_time": "18:25"},
-        {"display_order": 1, "block_name": "Period 1", "block_type": "instructional_period",
+        {"display_order": 1, "block_name": "Period 1", "block_type": "training_period",
          "is_instructional_period": True, "start_time": "18:50", "end_time": "19:25"},
-        {"display_order": 2, "block_name": "Period 2", "block_type": "instructional_period",
+        {"display_order": 2, "block_name": "Period 2", "block_type": "training_period",
          "is_instructional_period": True, "start_time": "19:25", "end_time": "20:00"},
-        {"display_order": 3, "block_name": "Drinks Break", "block_type": "break",
+        {"display_order": 3, "block_name": "Drinks Break", "block_type": "drinks_break",
          "is_instructional_period": False, "start_time": "20:00", "end_time": "20:30"},
-        {"display_order": 4, "block_name": "Period 3", "block_type": "instructional_period",
+        {"display_order": 4, "block_name": "Period 3", "block_type": "training_period",
          "is_instructional_period": True, "start_time": "20:30", "end_time": "21:05"},
         {"display_order": 5, "block_name": "Dismissal", "block_type": "dismissal",
          "is_instructional_period": False, "start_time": "21:30"},
@@ -159,33 +159,33 @@ def test_create_3_session_template(client):
 
 
 def test_create_template_with_flight_period(client):
-    """Flight Period is a timing block before Period 1 — not a unit/account scope."""
+    """Pre-period training block (formerly 'flight_period') uses training_period type."""
     h = login(client, "ADMIN703")
     blocks = [
         {"display_order": 0, "block_name": "Parade", "block_type": "parade",
          "is_instructional_period": False},
-        {"display_order": 1, "block_name": "Flight Period", "block_type": "flight_period",
+        {"display_order": 1, "block_name": "Flight Period", "block_type": "training_period",
          "is_instructional_period": True, "start_time": "18:45", "end_time": "18:50"},
-        {"display_order": 2, "block_name": "Period 1", "block_type": "instructional_period",
+        {"display_order": 2, "block_name": "Period 1", "block_type": "training_period",
          "is_instructional_period": True, "start_time": "18:50", "end_time": "19:25"},
-        {"display_order": 3, "block_name": "Period 2", "block_type": "instructional_period",
+        {"display_order": 3, "block_name": "Period 2", "block_type": "training_period",
          "is_instructional_period": True, "start_time": "19:25", "end_time": "20:00"},
     ]
     data = _create_template(client, h, name="With Flight Period", effective_from="2026-08-12",
                             blocks=blocks)
     assert data["instructional_period_count"] == 3
     types = [b["block_type"] for b in data["blocks"]]
-    assert "flight_period" in types
+    assert "training_period" in types
 
 
 def test_create_template_custom_block_names(client):
     h = login(client, "ADMIN703")
     blocks = [
-        {"display_order": 0, "block_name": "Welcome", "block_type": "administration",
+        {"display_order": 0, "block_name": "Welcome", "block_type": "admin",
          "is_instructional_period": False},
-        {"display_order": 1, "block_name": "Main Lesson", "block_type": "custom",
+        {"display_order": 1, "block_name": "Main Lesson", "block_type": "training_period",
          "is_instructional_period": True},
-        {"display_order": 2, "block_name": "Wrap Up", "block_type": "custom",
+        {"display_order": 2, "block_name": "Wrap Up", "block_type": "other",
          "is_instructional_period": False},
     ]
     data = _create_template(client, h, name="Custom Names", effective_from="2026-08-13",
@@ -197,20 +197,20 @@ def test_create_template_custom_block_names(client):
 
 
 def test_non_instructional_blocks_not_counted(client):
-    """Arrival, roll call, break, parade, debrief, dismissal are NOT instructional."""
+    """Arrival, admin, drinks_break, parade, briefing, dismissal are NOT instructional."""
     h = login(client, "ADMIN703")
     blocks = [
         {"display_order": 0, "block_name": "Arrival", "block_type": "arrival",
          "is_instructional_period": False},
-        {"display_order": 1, "block_name": "Roll Call", "block_type": "roll_call",
+        {"display_order": 1, "block_name": "Roll Call", "block_type": "admin",
          "is_instructional_period": False},
-        {"display_order": 2, "block_name": "Period 1", "block_type": "instructional_period",
+        {"display_order": 2, "block_name": "Period 1", "block_type": "training_period",
          "is_instructional_period": True},
-        {"display_order": 3, "block_name": "Drinks Break", "block_type": "break",
+        {"display_order": 3, "block_name": "Drinks Break", "block_type": "drinks_break",
          "is_instructional_period": False},
-        {"display_order": 4, "block_name": "Period 2", "block_type": "instructional_period",
+        {"display_order": 4, "block_name": "Period 2", "block_type": "training_period",
          "is_instructional_period": True},
-        {"display_order": 5, "block_name": "Debrief", "block_type": "debrief",
+        {"display_order": 5, "block_name": "Debrief", "block_type": "briefing",
          "is_instructional_period": False},
         {"display_order": 6, "block_name": "Dismissal", "block_type": "dismissal",
          "is_instructional_period": False},
@@ -230,7 +230,7 @@ def test_save_reload_timing_template(client):
         {"display_order": 0, "block_name": "Arrival", "block_type": "arrival",
          "is_instructional_period": False, "start_time": "18:00", "end_time": "18:15",
          "notes": "cadet arrival window"},
-        {"display_order": 1, "block_name": "Period 1", "block_type": "instructional_period",
+        {"display_order": 1, "block_name": "Period 1", "block_type": "training_period",
          "is_instructional_period": True, "start_time": "18:50", "end_time": "19:25",
          "is_optional": False, "period_number": 1},
     ]
@@ -268,9 +268,9 @@ def test_future_parade_nights_use_new_template(client):
     h = login(client, "ADMIN703")
     # Create a 2-session template effective 2026-11-01
     blocks = [
-        {"display_order": 0, "block_name": "Period A", "block_type": "instructional_period",
+        {"display_order": 0, "block_name": "Period A", "block_type": "training_period",
          "is_instructional_period": True},
-        {"display_order": 1, "block_name": "Period B", "block_type": "instructional_period",
+        {"display_order": 1, "block_name": "Period B", "block_type": "training_period",
          "is_instructional_period": True},
     ]
     _create_template(client, h, name="Future 2-Session", effective_from="2026-11-01",
@@ -300,9 +300,9 @@ def test_past_parade_nights_preserve_old_session_count(client):
 
     # Now create a 2-session template effective from the past (before that date)
     blocks = [
-        {"display_order": 0, "block_name": "Period A", "block_type": "instructional_period",
+        {"display_order": 0, "block_name": "Period A", "block_type": "training_period",
          "is_instructional_period": True},
-        {"display_order": 1, "block_name": "Period B", "block_type": "instructional_period",
+        {"display_order": 1, "block_name": "Period B", "block_type": "training_period",
          "is_instructional_period": True},
     ]
     _create_template(client, h, name="Retroactive Test", effective_from="2028-06-01",
@@ -321,11 +321,11 @@ def test_explicit_session_count_overrides_template(client):
     """If user passes session_count=2 explicitly, the template's count is not used."""
     h = login(client, "ADMIN703")
     blocks = [
-        {"display_order": 0, "block_name": "Period 1", "block_type": "instructional_period",
+        {"display_order": 0, "block_name": "Period 1", "block_type": "training_period",
          "is_instructional_period": True},
-        {"display_order": 1, "block_name": "Period 2", "block_type": "instructional_period",
+        {"display_order": 1, "block_name": "Period 2", "block_type": "training_period",
          "is_instructional_period": True},
-        {"display_order": 2, "block_name": "Period 3", "block_type": "instructional_period",
+        {"display_order": 2, "block_name": "Period 3", "block_type": "training_period",
          "is_instructional_period": True},
     ]
     _create_template(client, h, name="3-Session Override Test", effective_from="2026-12-01",
@@ -341,9 +341,9 @@ def test_explicit_session_count_overrides_template(client):
 def test_effective_template_endpoint(client):
     h = login(client, "ADMIN703")
     blocks = [
-        {"display_order": 0, "block_name": "Period 1", "block_type": "instructional_period",
+        {"display_order": 0, "block_name": "Period 1", "block_type": "training_period",
          "is_instructional_period": True},
-        {"display_order": 1, "block_name": "Period 2", "block_type": "instructional_period",
+        {"display_order": 1, "block_name": "Period 2", "block_type": "training_period",
          "is_instructional_period": True},
     ]
     _create_template(client, h, name="Effective EP Test", effective_from="2026-09-01",
@@ -367,7 +367,7 @@ def test_one_night_override_created(client):
     short = _create_template(client, h, name="Short Night", effective_from="2026-01-01",
                               blocks=[
                                   {"display_order": 0, "block_name": "Period 1",
-                                   "block_type": "instructional_period",
+                                   "block_type": "training_period",
                                    "is_instructional_period": True}
                               ])
     tid = short["timing_template_id"]
@@ -391,7 +391,7 @@ def test_one_night_override_does_not_change_default_template(client):
     short = _create_template(client, h, name="Short Override 2029", effective_from="2029-01-01",
                               blocks=[
                                   {"display_order": 0, "block_name": "Period 1",
-                                   "block_type": "instructional_period",
+                                   "block_type": "training_period",
                                    "is_instructional_period": True}
                               ])
     client.post(f"/api/parade-nights/{pnid}/timing-override", headers=h,
@@ -413,7 +413,7 @@ def test_get_parade_night_timing_shows_override(client):
     short = _create_template(client, h, name="Override Visible", effective_from="2026-01-01",
                               blocks=[
                                   {"display_order": 0, "block_name": "Period 1",
-                                   "block_type": "instructional_period",
+                                   "block_type": "training_period",
                                    "is_instructional_period": True}
                               ])
     client.post(f"/api/parade-nights/{pnid}/timing-override", headers=h,
@@ -433,7 +433,7 @@ def test_remove_timing_override(client):
     short = _create_template(client, h, name="Remove Override Test", effective_from="2026-01-01",
                               blocks=[
                                   {"display_order": 0, "block_name": "Period 1",
-                                   "block_type": "instructional_period",
+                                   "block_type": "training_period",
                                    "is_instructional_period": True}
                               ])
     client.post(f"/api/parade-nights/{pnid}/timing-override", headers=h,
@@ -453,7 +453,7 @@ def test_override_reason_required(client):
     pnid = _create_pn(client, h, date="2028-04-19")
     short = _create_template(client, h, name="No Reason Test", effective_from="2026-01-01",
                               blocks=[{"display_order": 0, "block_name": "P1",
-                                       "block_type": "instructional_period",
+                                       "block_type": "training_period",
                                        "is_instructional_period": True}])
     r = client.post(f"/api/parade-nights/{pnid}/timing-override", headers=h,
                     json={"timing_template_id": short["timing_template_id"], "reason": ""})
@@ -556,7 +556,7 @@ def test_audit_entry_for_timing_override(client):
     pnid = _create_pn(client, h, date="2026-10-11")
     short = _create_template(client, h, name="Audit Override", effective_from="2026-01-01",
                               blocks=[{"display_order": 0, "block_name": "P1",
-                                       "block_type": "instructional_period",
+                                       "block_type": "training_period",
                                        "is_instructional_period": True}])
     client.post(f"/api/parade-nights/{pnid}/timing-override", headers=h,
                 json={"timing_template_id": short["timing_template_id"],
@@ -586,9 +586,9 @@ def test_overlapping_blocks_produce_warnings_not_errors(client):
     """Overlapping blocks should warn but not reject the save."""
     h = login(client, "ADMIN703")
     blocks = [
-        {"display_order": 0, "block_name": "Period 1", "block_type": "instructional_period",
+        {"display_order": 0, "block_name": "Period 1", "block_type": "training_period",
          "is_instructional_period": True, "start_time": "18:50", "end_time": "19:30"},
-        {"display_order": 1, "block_name": "Period 2", "block_type": "instructional_period",
+        {"display_order": 1, "block_name": "Period 2", "block_type": "training_period",
          "is_instructional_period": True, "start_time": "19:20", "end_time": "20:00"},
     ]
     r = client.post("/api/timing-templates", headers=h,
@@ -604,10 +604,54 @@ def test_overlapping_blocks_produce_warnings_not_errors(client):
 def test_block_duration_auto_calculated(client):
     h = login(client, "ADMIN703")
     blocks = [
-        {"display_order": 0, "block_name": "Period 1", "block_type": "instructional_period",
+        {"display_order": 0, "block_name": "Period 1", "block_type": "training_period",
          "is_instructional_period": True, "start_time": "18:50", "end_time": "19:25"},
     ]
     data = _create_template(client, h, name="Duration Test", effective_from="2026-08-26",
                             blocks=blocks)
     b = data["blocks"][0]
     assert b["duration_minutes"] == 35, f"Expected 35 min, got {b['duration_minutes']}"
+
+
+# ─────────────────────────────────────────────────────────────
+# 9. Block type taxonomy (Task 1 — 2026-08-21)
+# ─────────────────────────────────────────────────────────────
+
+def test_block_type_taxonomy_new_values(client):
+    """POST /api/timing-templates must accept every new block type."""
+    h = login(client, "ADMIN703")
+    base_block = {"block_name": "Test", "start_time": "18:00", "end_time": "19:00",
+                  "duration_minutes": 60, "is_instructional_period": False,
+                  "display_order": 1, "is_optional": False}
+    new_types = ["arrival", "admin", "parade", "briefing", "training_period",
+                 "drinks_break", "fatigue", "dismissal", "other"]
+    for bt in new_types:
+        resp = client.post("/api/timing-templates", headers=h, json={
+            "name": f"Test {bt}", "effective_from": "2026-01-01",
+            "blocks": [{**base_block, "block_type": bt,
+                        "is_instructional_period": bt == "training_period"}]
+        })
+        assert resp.status_code == 200, f"block_type={bt} rejected: {resp.text}"
+        data = resp.json()
+        block = data["blocks"][0]
+        assert block["block_type"] == bt
+        if bt == "training_period":
+            assert block["is_instructional_period"] is True
+        else:
+            assert block["is_instructional_period"] is False
+
+
+def test_old_block_types_rejected(client):
+    """Old block type values must now be rejected."""
+    h = login(client, "ADMIN703")
+    for old_bt in ["instructional_period", "administration", "roll_call",
+                   "flight_period", "break", "fatigues", "debrief", "custom"]:
+        resp = client.post("/api/timing-templates", headers=h, json={
+            "name": f"Old {old_bt}", "effective_from": "2026-01-01",
+            "blocks": [{"block_name": "Test", "block_type": old_bt,
+                        "start_time": None, "end_time": None,
+                        "duration_minutes": 60, "is_instructional_period": False,
+                        "display_order": 1, "is_optional": False}]
+        })
+        assert resp.status_code == 422 or resp.status_code == 400, \
+            f"Old block_type={old_bt} was accepted (should be rejected)"
