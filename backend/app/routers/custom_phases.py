@@ -83,7 +83,10 @@ def create_custom_phase(body: CustomPhaseIn, db=Depends(get_db),
     elif body.scope_type == "wing":
         if p.role not in ("wing_admin", "system_admin", "national_admin"):
             raise HTTPException(403, detail={"error": "insufficient_scope"})
-        scope_id = body.scope_id or p.wing_id
+        if p.role == "wing_admin":
+            scope_id = p.wing_id  # force to own wing; ignore body.scope_id
+        else:
+            scope_id = body.scope_id or p.wing_id  # national_admin/system_admin may specify
     elif body.scope_type in ("national", "system"):
         if p.role not in ("national_admin", "system_admin"):
             raise HTTPException(403, detail={"error": "insufficient_scope"})
@@ -111,6 +114,13 @@ def update_custom_phase(phase_id: str, body: CustomPhaseUpdateIn,
     ph = db.get(CustomTrainingPhase, phase_id)
     if not ph or ph.is_deleted:
         raise HTTPException(404, detail={"error": "not_found"})
+    # Ownership guard: sqn_admin may only mutate their own squadron's phases;
+    # wing_admin may only mutate their own wing's phases;
+    # national_admin/system_admin have full access.
+    if ph.scope_type == "squadron" and p.role == "sqn_admin" and ph.scope_id != p.squadron_id:
+        raise HTTPException(403, detail={"error": "insufficient_scope"})
+    if ph.scope_type == "wing" and p.role == "wing_admin" and ph.scope_id != p.wing_id:
+        raise HTTPException(403, detail={"error": "insufficient_scope"})
     if body.name is not None:
         ph.name = body.name
     if body.applies_from is not None:
@@ -131,6 +141,13 @@ def delete_custom_phase(phase_id: str, db=Depends(get_db),
     ph = db.get(CustomTrainingPhase, phase_id)
     if not ph or ph.is_deleted:
         raise HTTPException(404, detail={"error": "not_found"})
+    # Ownership guard: sqn_admin may only mutate their own squadron's phases;
+    # wing_admin may only mutate their own wing's phases;
+    # national_admin/system_admin have full access.
+    if ph.scope_type == "squadron" and p.role == "sqn_admin" and ph.scope_id != p.squadron_id:
+        raise HTTPException(403, detail={"error": "insufficient_scope"})
+    if ph.scope_type == "wing" and p.role == "wing_admin" and ph.scope_id != p.wing_id:
+        raise HTTPException(403, detail={"error": "insufficient_scope"})
     # Dependency gate: check if any sessions reference this phase.
     # Sessions link via custom_phase_id when that field is added (Task 8 extension);
     # for now, soft-delete is always safe.
