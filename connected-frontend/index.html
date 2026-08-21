@@ -90,6 +90,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
   .print-schedule-table .class-header { background: #e8f0f8; font-weight: 600; text-align: center; }
   .print-schedule-table .non-period-row td { background: #f8f8f8; color: #555; font-style: italic; }
   .print-footer { margin-top: 8px; font-size: 7pt; color: #888; text-align: right; }
+  .print-pn-block:not(:last-of-type) { page-break-after: always; }
 }
 .print-only{display:none;}
 
@@ -10007,13 +10008,15 @@ function _renderPNSchedule(pn, schedule, classes, stageGroups) {
     }
     tbody += '</tbody>';
 
-    return `<div class="print-pn-block" style="page-break-after:always;margin-bottom:24px;"><table class="print-schedule-table">${thead}${tbody}</table></div>`;
+    return `<div class="print-pn-block" style="margin-bottom:24px;"><table class="print-schedule-table">${thead}${tbody}</table></div>`;
 }
 
 function _stageCodeMatchesCadetGroup(stageCode, cadetGroup) {
     if (!cadetGroup) return false;
     const MAP = {ORI:'orientation', INI:'initial', JNR:'junior', INT:'intermediate', SNR:'senior'};
-    return cadetGroup.toLowerCase().includes(MAP[stageCode] || '');
+    const mapped = MAP[stageCode];
+    if (!mapped) return false;
+    return cadetGroup.toLowerCase().includes(mapped);
 }
 
 function printReport(){
