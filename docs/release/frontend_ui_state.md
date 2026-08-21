@@ -7,9 +7,9 @@ removes, renames, or hides an item listed here requires explicit authorisation
 removes an item without this record is a regression under
 `.claude/rules/capability-preservation.md`.
 
-**Locked at:** `2b263bd` — *Restore Generate Activities and Add Holiday buttons*  
-**Staging:** `bd7b9121` (frontend) / `dc73572f` (backend) / `2d021af1` (PW) — all SUCCESS  
-**Backend tests:** 1760 passed, 7 skipped  
+**Locked at:** `de885f7` — *fix: use w.wing_id for email config input IDs (A11Y)*  
+**Staging:** `de885f7` deployed 2026-08-21 (fingerprint 458c7d507b82a87c01dc6e8ac77947470ccf29c7)  
+**Backend tests:** 1818 passed, 7 skipped  
 **Playwright staging:** 136 passed, 44 skipped, 15 failed (all failures are pre-existing env-var gaps — `STAGING_SYSADMIN_CODE` not passed and `STAGING_NATIONAL_VIEWER_CODE` not set; zero product-behaviour failures)  
 **Last updated:** 2026-08-17
 
@@ -57,6 +57,7 @@ SYSTEM (id="nav-system-lbl", hidden until system_admin)
 
 HELP & REFERENCE
   Help & Reference        nav('help')                always visible
+  Service Desk            nav('service-desk')        squadron/wing/national/system_admin
 
 WORKSPACE (id="nav-lbl-pw", hidden by default; shown by bootApp())
   Planning Workspace ↗    nav-pw-link (external)     shown when S.pwUrl set AND
@@ -81,11 +82,11 @@ Source: `index.html` ~line 4563 (`const NAV_BY_SCOPE`).
 
 | Scope | Pages |
 |---|---|
-| `squadron` | getting-started, dashboard, calendar, parade-nights, weekly-program, curriculum, activities, facilitators, resources, action-items, help, settings, accounts, + `_PLANNING_PAGES` (currently `[]`) |
-| `wing` | getting-started, wing-overview, wing-activities, wing-calendar, curriculum, audit, accounts, + `_PLANNING_PAGES` |
-| `national` | getting-started, national, national-activities, wing-calendar, curriculum, audit, accounts, + `_PLANNING_PAGES` |
+| `squadron` | getting-started, dashboard, calendar, parade-nights, weekly-program, curriculum, activities, facilitators, resources, action-items, help, settings, accounts, **service-desk**, + `_PLANNING_PAGES` |
+| `wing` | getting-started, wing-overview, wing-activities, wing-calendar, curriculum, audit, accounts, **service-desk**, + `_PLANNING_PAGES` |
+| `national` | getting-started, national, national-activities, wing-calendar, curriculum, audit, accounts, **service-desk**, + `_PLANNING_PAGES` |
 | `auditor` | audit, accounts, + `_PLANNING_PAGES` |
-| `system_admin` | getting-started, system-console, national, national-activities, wing-activities, wing-calendar, curriculum, audit, accounts, + `_PLANNING_PAGES` |
+| `system_admin` | getting-started, system-console, national, national-activities, wing-activities, wing-calendar, curriculum, audit, accounts, **service-desk**, + `_PLANNING_PAGES` |
 
 `_PLANNING_PAGES = []` — placeholder for future planning sub-pages; currently empty.
 
@@ -152,6 +153,14 @@ managed by `_loadSettingsTrainingClasses()`), Access Code. Loaded by `renderSett
 ### page-accounts — Account Management
 Header: `Refresh`, `+ Add Account` (admin-el). Flights card hidden (`display:none`
 unconditionally — removed from pilot). Loaded by `renderAccounts()`.
+
+### page-service-desk — Service Desk  *(added E.2, 2026-08-21)*
+Roles: squadron (sqn_admin, sqn_general), wing_admin, national_admin, system_admin.
+- `sqn_general`: submit-only view — pre-selected squadron, form to create ticket only.
+- `sqn_admin`/`wing_admin`/`national_admin`/`system_admin`: full ticket list with filters (status, category, wing, squadron), detail panel, status PATCH.
+- System Console section: email notification config per scope (system, national, per-wing). Loaded by `scLoadSdEmailConfig()`.
+- Key actions: `Submit Ticket`, `Save` (email config per scope), status change dropdown in detail panel.
+- Loaded by `loadServiceDesk()` (ticket page) and `scLoadSdEmailConfig()` (System Console email config).
 
 ### page-wing-overview — Wing Overview
 Wing dashboard, command centre. Loaded by `renderWing()` + `loadCommandDashboard('wing')`.
