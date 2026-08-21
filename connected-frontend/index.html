@@ -81,6 +81,15 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
   body{font-size:11px!important;background:white!important;}
   .print-only{display:block!important;}
   button,.btn,.btn-auth,.modal-bg{display:none!important;}
+  @page { size: landscape; margin: 12mm; }
+  .print-schedule-table { width: 100%; border-collapse: collapse; font-size: 8pt; table-layout: fixed; }
+  .print-schedule-table th, .print-schedule-table td { border: 1px solid #ccc; padding: 3px 4px; vertical-align: top; word-break: break-word; }
+  .print-schedule-table .col-time { width: 60px; }
+  .print-schedule-table .col-block { width: 100px; }
+  .print-schedule-table .group-header { background: #002f65; color: #fff; text-align: center; font-weight: 700; }
+  .print-schedule-table .class-header { background: #e8f0f8; font-weight: 600; text-align: center; }
+  .print-schedule-table .non-period-row td { background: #f8f8f8; color: #555; font-style: italic; }
+  .print-footer { margin-top: 8px; font-size: 7pt; color: #888; text-align: right; }
 }
 .print-only{display:none;}
 
@@ -9893,75 +9902,120 @@ async function saveSessEdit(){
 // ═══════════════════════════════════════════════════════════
 function populateWPDD(){
   const sel=document.getElementById('wp-sel');
+  if(!sel)return;
   const sorted=[...S.pns].sort((a,b)=>a.date.localeCompare(b.date));
   sel.innerHTML='<option value="">— Choose a parade night —</option>'+sorted.map(pn=>`<option value="${pn.date}">${fmtD(pn.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})} (${esc(pn.term)})</option>`).join('');
 }
-function renderWP(){
-  const ds=document.getElementById('wp-sel').value;
-  const el=document.getElementById('wp-content');
-  // REM-92: a bare blank area gave no indication of what to do next --
-  // distinguish "no parade nights exist yet" (needs one created first) from
-  // "parade nights exist, just none picked yet" (needs a selection), since
-  // the right next action differs.
-  if(!ds){
-    el.innerHTML=(S.pns&&S.pns.length)
-      ? `<div class="card no-print" style="text-align:center;padding:32px 20px;color:var(--muted)">
-           <div style="font-size:14px;font-weight:700;color:var(--dark);margin-bottom:6px">Choose a parade night above</div>
-           <div style="font-size:12px">Select a date from the dropdown to generate its printable weekly program.</div>
-         </div>`
-      : `<div class="card no-print" style="text-align:center;padding:32px 20px;color:var(--muted)">
-           <div style="font-size:14px;font-weight:700;color:var(--dark);margin-bottom:6px">No parade nights yet</div>
-           <div style="font-size:12px">Create a parade night on the <a href="#" onclick="nav('parade-nights');return false">Parade Nights</a> page, then come back here to generate its weekly program.</div>
-         </div>`;
-    return;
-  }
-  const pn=S.pns.find(p=>p.date===ds);if(!pn){el.innerHTML='';return;}
-  const info=getCurrentUnitInfo();
-  const wpQ=(document.getElementById('wp-search')||{value:''}).value.trim().toLowerCase();
-  const wpSt=(document.getElementById('wp-f-status')||{value:'all'}).value;
-  const allSessions=pn.sessions||[];
-  const shownSessions=allSessions.filter((s,i)=>{
-    if(wpSt!=='all'&&(s.status||'planned')!==wpSt)return false;
-    if(!wpQ)return true;
-    return (s.facName||'').toLowerCase().includes(wpQ)||(s.room||'').toLowerCase().includes(wpQ)||(s.exp||'').toLowerCase().includes(wpQ);
-  });
-  el.innerHTML=`
-    <div class="card">
-      <div style="background:var(--dark);color:white;padding:14px 18px;border-radius:8px;margin-bottom:14px;" class="print-only" style="display:block">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:3px">${esc((S.session&&S.session.wing_name)||'Australian Air Force Cadets')}</div>
-        <div style="font-size:17px;font-weight:900">${esc(info.name)}</div>
-        <div style="font-size:12px;opacity:.75;margin-top:2px">Weekly Training Program — ${fmtDL(ds)}</div>
-        <div style="font-size:10px;opacity:.58;margin-top:2px">${esc(info.start)}–${esc(info.end)} · ${esc(pn.term)}${pn.notes?' · '+esc(pn.notes):''}</div>
-      </div>
-      <div style="background:var(--dark);color:white;padding:14px 18px;border-radius:8px;margin-bottom:14px" class="no-print">
-        <div style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.65;margin-bottom:3px">${esc((S.session&&S.session.wing_name)||'Australian Air Force Cadets')}</div>
-        <div style="font-size:17px;font-weight:900">${esc(info.name)}</div>
-        <div style="font-size:12px;opacity:.75;margin-top:2px">Weekly Training Program — ${fmtDL(ds)}</div>
-        <div style="font-size:10px;opacity:.58;margin-top:2px">${esc(info.start)}–${esc(info.end)} · ${esc(pn.term)}${pn.notes?' · '+esc(pn.notes):''}</div>
-      </div>
-      <div class="tw">
-        <table class="wp-tbl">
-          <thead><tr><th>Session</th><th>Phase / Level</th><th>Curriculum Item</th><th>Class</th><th>Facilitator</th><th>Room / Location</th><th>Status</th></tr></thead>
-          <tbody>${shownSessions.length?shownSessions.map(s=>`<tr>
-            <td style="font-weight:800;color:var(--dark)">Sess ${allSessions.indexOf(s)+1}</td>
-            <td>${phBadge(s.phase||'B. Initial')}</td>
-            <td style="font-weight:700">${s.exp?esc(s.exp):'<em style="color:var(--muted)">Lesson: Unassigned</em>'}</td>
-            <td style="font-size:11px">${(s.trainingClasses||[]).length?esc((s.trainingClasses||[]).map(c=>c.display_name).join(', ')):'<span style="color:var(--muted)">—</span>'}</td>
-            <td style="font-size:11px">${esc(s.facName||'—')}</td>
-            <td style="font-size:11px">${esc(s.room||'—')}</td>
-            <td>${stBadge(s.status||'planned')}</td>
-          </tr>`).join(''):`<tr class="no-print"><td colspan="7" style="color:var(--muted);text-align:center;padding:14px">No sessions match the filter.</td></tr>`}</tbody>
-        </table>
-      </div>
-      ${(wpQ||wpSt!=='all')?`<div class="no-print" style="font-size:11px;color:var(--muted);margin-top:4px">Showing ${shownSessions.length} of ${allSessions.length} sessions.</div>`:''}
-      <div style="margin-top:12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);padding-top:9px">AAFC Training System · ${esc((S.session&&S.session.wing_code)||'Wing')} · ${new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})} · <em>Planning document only — not a system of record.</em></div>
-    </div>
-    <div class="no-print" style="margin-top:8px;display:flex;gap:8px">
-      <button class="btn btn-dk" onclick="printReport()">Print This Program</button>
-      ${S.isAdmin?`<button class="btn ${pn.published?'btn-out':'btn-sky'}" onclick="publishWP()" title="${pn.published?'Program already published':'Publish this program — planned sessions move to Published status'}">${pn.published?'✓ Published':'Publish Program'}</button>`:''}
-      <button class="btn btn-out" onclick="nav('parade-nights')">← Back to Parade Nights</button>
-    </div>`;
+async function renderWP() {
+    const wrap = document.getElementById('page-weekly-program');
+    if (!wrap) return;
+    wrap.innerHTML = '<p class="muted p-4">Loading…</p>';
+    try {
+        // Load parade nights for the current training year
+        const yearParam = S.trainingYear ? `&training_year=${encodeURIComponent(S.trainingYear)}` : '';
+        const pns = await api(`/api/parade-nights?limit=200${yearParam}`);
+        if (!pns || !pns.length) {
+            wrap.innerHTML = '<p class="muted p-4">No parade nights for this year.</p>';
+            return;
+        }
+
+        // Load training classes for the current planning year
+        const yearId = (typeof P !== 'undefined' && P.currentYearId) ? P.currentYearId : '';
+        const classes = yearId
+            ? (await api(`/api/training-classes?training_year_id=${encodeURIComponent(yearId)}`))
+              .filter(c => !c.is_archived)
+            : [];
+
+        // Fixed column groups — always 4, always rendered
+        const STAGE_GROUPS = [
+            {label:'Orientation / Initial', codes:['ORI','INI']},
+            {label:'Junior / Bronze',       codes:['JNR']},
+            {label:'Intermediate / Silver', codes:['INT']},
+            {label:'Senior / Gold',         codes:['SNR']},
+        ];
+
+        let html = '';
+        for (const pn of pns) {
+            const schedule = await api(`/api/parade-nights/${pn.parade_night_id}/schedule`);
+            html += _renderPNSchedule(pn, schedule, classes, STAGE_GROUPS);
+        }
+        const today = new Date().toLocaleDateString('en-AU', {day:'2-digit',month:'long',year:'numeric'});
+        wrap.innerHTML = html + `<div class="print-footer">Generated ${esc(today)}</div>`;
+    } catch(e) {
+        wrap.innerHTML = `<p class="text-danger p-4">Failed to load: ${esc(apiErr(e))}</p>`;
+    }
 }
+function _renderPNSchedule(pn, schedule, classes, stageGroups) {
+    const blocks = (schedule && schedule.blocks) || [];
+    const byBlock = (schedule && schedule.sessions_by_block) || {};
+    const unlinked = (schedule && schedule.unlinked_sessions) || [];
+
+    // Determine sub-columns: classes per group (or one placeholder if none)
+    const groupCols = stageGroups.map(g => {
+        const cls = classes.filter(c => g.codes.includes(c.stage_code))
+                           .sort((a,b) => (a.sequence||0)-(b.sequence||0));
+        return {group: g, cols: cls.length ? cls : [{display_name:'—', training_class_id:null}]};
+    });
+    const totalCols = groupCols.reduce((s,g) => s + g.cols.length, 0);
+
+    // Build header
+    const dateStr = pn.date
+        ? (() => { try { return new Date(pn.date).toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); } catch(_){ return esc(pn.date); }})()
+        : '';
+    const sqnName = esc(S.scopeName || (S.session && S.session.display_name) || '');
+    let thead = '<thead>';
+    thead += `<tr><td colspan="${totalCols+2}" class="group-header">${sqnName} · ${esc(dateStr)} · Term ${esc(String(pn.term||'—'))} · ${esc(pn.start_time||'')}–${esc(pn.end_time||'')}</td></tr>`;
+    thead += '<tr><th class="col-time">Time</th><th class="col-block">Block</th>';
+    groupCols.forEach(gc => { thead += `<th colspan="${gc.cols.length}" class="group-header">${esc(gc.group.label)}</th>`; });
+    thead += '</tr><tr><th></th><th></th>';
+    groupCols.forEach(gc => { gc.cols.forEach(cl => { thead += `<th class="class-header">${esc(cl.display_name)}</th>`; }); });
+    thead += '</tr></thead>';
+
+    // Build body
+    const dash = '<td style="text-align:center;color:#aaa">—</td>';
+    let tbody = '<tbody>';
+    for (const b of blocks) {
+        const isTP = b.block_type === 'training_period';
+        const timeStr = b.start_time ? `${esc(b.start_time)}${b.end_time ? '–'+esc(b.end_time) : ''}` : '';
+        if (!isTP) {
+            tbody += `<tr class="non-period-row"><td>${timeStr}</td><td>${esc(b.block_name)}</td>${dash.repeat(totalCols)}</tr>`;
+        } else {
+            const blockSessions = byBlock[b.block_id] || [];
+            tbody += `<tr><td>${timeStr}</td><td><strong>${esc(b.block_name)}</strong></td>`;
+            groupCols.forEach(gc => {
+                gc.cols.forEach(cl => {
+                    if (!cl.training_class_id) { tbody += dash; return; }
+                    const inactive = (cl.start_date && pn.date < cl.start_date) || (cl.end_date && pn.date > cl.end_date);
+                    if (inactive) { tbody += dash; return; }
+                    const sess = blockSessions.find(s => _stageCodeMatchesCadetGroup(cl.stage_code, s.cadet_group));
+                    if (!sess) {
+                        tbody += `<td><em style="color:#aaa">Unassigned</em></td>`;
+                    } else {
+                        const title = esc(sess.custom_title || sess.curriculum_title_at_time || 'Unassigned');
+                        const fac   = sess.facilitator_display_name_at_time ? `<br><small>${esc(sess.facilitator_display_name_at_time)}</small>` : '';
+                        const room  = sess.training_area_name_at_time ? `<br><small style="color:#888">${esc(sess.training_area_name_at_time)}</small>` : '';
+                        tbody += `<td>${title}${fac}${room}</td>`;
+                    }
+                });
+            });
+            tbody += '</tr>';
+        }
+    }
+    if (unlinked.length) {
+        tbody += `<tr><td colspan="${totalCols+2}" style="background:#fff8e1;padding:4px 6px;font-style:italic;font-size:7.5pt;">`;
+        tbody += `Unlinked periods: ${unlinked.map(s=>esc(s.curriculum_title_at_time||'—')).join(', ')}</td></tr>`;
+    }
+    tbody += '</tbody>';
+
+    return `<div class="print-pn-block" style="page-break-after:always;margin-bottom:24px;"><table class="print-schedule-table">${thead}${tbody}</table></div>`;
+}
+
+function _stageCodeMatchesCadetGroup(stageCode, cadetGroup) {
+    if (!cadetGroup) return false;
+    const MAP = {ORI:'orientation', INI:'initial', JNR:'junior', INT:'intermediate', SNR:'senior'};
+    return cadetGroup.toLowerCase().includes(MAP[stageCode] || '');
+}
+
 function printReport(){
   // Hide all pages, show only active
   window.print();
