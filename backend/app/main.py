@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from .config import settings
 from .database import init_db, SessionLocal
 from .routers import auth, organisations, training, ops, health, program, export_import, accounts, timing, planning, system, wing_calendar, jobs, dashboard, setup, search, service_desk
+from .routers.custom_phases import router as custom_phases_router
 
 # ── SEC-06: 5xx rate alerting ────────────────────────────────────────────────
 # In-process rolling window; accurate for single-process (uvicorn) and
@@ -363,6 +364,8 @@ for r in (health.router, auth.router, organisations.router, accounts.router,
           planning.router, wing_calendar.router, system.router, jobs.router,
           dashboard.router, setup.router, search.router, service_desk.router):
     app.include_router(r)
+
+app.include_router(custom_phases_router, prefix="/api")
 
 
 @app.exception_handler(500)

@@ -25,6 +25,7 @@ from .program import (
     Phase, ProgramPackage, ProgramItem, LearningHubResource, ProgramItemDeployment,
     SourceFile, SourceConflict, PromotionRequest, JobStatus,
 )
+from .custom_phases import CustomTrainingPhase  # noqa: F401
 
 __all__ = [
     "NationalEntity", "Wing", "Squadron", "Flight", "User", "AccessCode", "ProxySession", "IpLoginAttempt", "IpApiRequest", "UserApiRequest",
@@ -42,4 +43,5 @@ __all__ = [
     "WingHQEvent", "SquadronEventStatus", "WingEventCurriculumLink",
     "ServiceTicket",
     "ServiceDeskEmailConfig",
+    "CustomTrainingPhase",
 ]
