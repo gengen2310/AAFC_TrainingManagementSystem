@@ -14,7 +14,7 @@ from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, Parade
                       SessionAudience, CadetClassMembership,
                       ParadeNightTemplate, ParadeNightTemplateSession)
 from ..models.planning import ActivityLocalOverride
-from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS
+from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_CODES
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
 from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron,
@@ -2066,6 +2066,7 @@ def _training_class_dict(c: TrainingClass) -> dict:
         "squadron_id": c.squadron_id,
         "training_year_id": c.training_year_id,
         "training_stage_id": c.training_stage_id,
+        "stage_code": c.stage_code,
         "display_name": c.display_name,
         "sequence": c.sequence,
         "start_date": c.start_date,
@@ -2103,6 +2104,7 @@ class TrainingClassIn(BaseModel):
     training_year_id: str
     training_stage_id: str
     display_name: str = Field(max_length=80)
+    stage_code: str | None = None  # ORI|INI|JNR|INT|SNR
     sequence: int = 0
     start_date: str | None = None
     end_date: str | None = None
@@ -2113,6 +2115,7 @@ class TrainingClassIn(BaseModel):
 class TrainingClassUpdateIn(BaseModel):
     display_name: str | None = Field(default=None, max_length=80)
     training_stage_id: str | None = None
+    stage_code: str | None = None  # ORI|INI|JNR|INT|SNR
     sequence: int | None = None
     start_date: str | None = None
     end_date: str | None = None
@@ -2151,9 +2154,13 @@ def create_training_class(body: TrainingClassIn, db: DBSession = Depends(get_db)
     require_can_write_squadron(p, s.id, s.wing_id)
     _require_own_year(db, s.id, body.training_year_id)
     _require_visible_stage(db, p, body.training_stage_id)
+    if body.stage_code and body.stage_code not in STAGE_CODES:
+        raise HTTPException(400, detail={"error": "invalid_stage_code",
+                                         "valid": sorted(STAGE_CODES)})
     c = TrainingClass(
         squadron_id=s.id, training_year_id=body.training_year_id,
         training_stage_id=body.training_stage_id, display_name=body.display_name,
+        stage_code=body.stage_code,
         sequence=body.sequence, start_date=body.start_date, end_date=body.end_date,
         expected_count=body.expected_count, notes=body.notes,
         created_by=p.user_id, updated_by=p.user_id,
@@ -2176,6 +2183,11 @@ def update_training_class(cid: str, body: TrainingClassUpdateIn, db: DBSession =
     if body.training_stage_id is not None:
         _require_visible_stage(db, p, body.training_stage_id)
         c.training_stage_id = body.training_stage_id
+    if body.stage_code is not None:
+        if body.stage_code not in STAGE_CODES:
+            raise HTTPException(400, detail={"error": "invalid_stage_code",
+                                             "valid": sorted(STAGE_CODES)})
+        c.stage_code = body.stage_code
     if body.display_name is not None:
         c.display_name = body.display_name
     if body.sequence is not None:

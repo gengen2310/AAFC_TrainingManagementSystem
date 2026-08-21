@@ -235,3 +235,57 @@ def test_cannot_create_training_class_with_nonexistent_stage(client):
     }, headers=hdr)
     assert r.status_code == 400, r.text
     assert r.json()["detail"]["error"] == "training_stage_not_visible"
+
+
+# ─────────────────────────────────────────────────────────────
+# stage_code field (Task 2)
+# ─────────────────────────────────────────────────────────────
+
+STAGE_CODES = ["ORI", "INI", "JNR", "INT", "SNR"]
+
+
+def test_training_class_stage_code_roundtrip(client):
+    """stage_code must be accepted on create and returned in GET response."""
+    headers = login(client, "ADMIN703")
+    # Requires a valid training_year_id and training_stage_id — get them from existing data
+    years = client.get("/api/planning/years", headers=headers).json()
+    year_id = years[0]["planning_year_id"] if years else None
+    if not year_id:
+        pytest.skip("No planning year available")
+    stages = client.get("/api/curriculum/phases", headers=headers).json()
+    stage_id = stages[0]["phase_id"] if stages else None
+    if not stage_id:
+        pytest.skip("No curriculum phase available")
+    for code in STAGE_CODES:
+        resp = client.post("/api/training-classes", headers=headers, json={
+            "training_year_id": year_id,
+            "training_stage_id": stage_id,
+            "display_name": f"Test {code}",
+            "stage_code": code,
+        })
+        assert resp.status_code == 200, f"stage_code={code} rejected: {resp.text}"
+        tc_id = resp.json()["training_class_id"]
+        get_resp = client.get("/api/training-classes", headers=headers,
+                              params={"training_year_id": year_id})
+        assert get_resp.status_code == 200
+        classes = get_resp.json()
+        tc = next((c for c in classes if c["training_class_id"] == tc_id), None)
+        assert tc is not None, f"Created class {tc_id} not found in list"
+        assert tc["stage_code"] == code
+
+
+def test_training_class_invalid_stage_code(client):
+    headers = login(client, "ADMIN703")
+    years = client.get("/api/planning/years", headers=headers).json()
+    year_id = years[0]["planning_year_id"] if years else None
+    stages = client.get("/api/curriculum/phases", headers=headers).json()
+    stage_id = stages[0]["phase_id"] if stages else None
+    if not year_id or not stage_id:
+        pytest.skip("Prerequisite data missing")
+    resp = client.post("/api/training-classes", headers=headers, json={
+        "training_year_id": year_id,
+        "training_stage_id": stage_id,
+        "display_name": "Bad class",
+        "stage_code": "INVALID",
+    })
+    assert resp.status_code in (400, 422)

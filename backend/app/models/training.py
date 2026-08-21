@@ -380,6 +380,9 @@ class CurriculumPhase(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
 
+STAGE_CODES = frozenset({"ORI", "INI", "JNR", "INT", "SNR"})
+
+
 class TrainingClass(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     """A Squadron-specific local group undertaking a Training Stage during a
     Training Year (e.g. "Senior 1", "Senior 2" — both undertaking the same
@@ -400,7 +403,9 @@ class TrainingClass(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "training_classes"
     squadron_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), index=True)
     training_year_id: Mapped[str] = mapped_column(ForeignKey("planning_years.id"), index=True)
-    training_stage_id: Mapped[str] = mapped_column(ForeignKey("curriculum_phases.id"), index=True)
+    training_stage_id: Mapped[str | None] = mapped_column(ForeignKey("curriculum_phases.id"), index=True, nullable=True)
+    stage_code: Mapped[str | None] = mapped_column(String(10), nullable=True, index=True)
+    # ORI | INI | JNR | INT | SNR — null for classes created before this feature
     display_name: Mapped[str] = mapped_column(String(80))
     sequence: Mapped[int] = mapped_column(Integer, default=0)
     start_date: Mapped[str | None] = mapped_column(String(10), nullable=True)  # ISO date
