@@ -73,6 +73,13 @@ class Settings(BaseSettings):
 
     TRAINING_YEAR: int = 2026
 
+    # SMTP (optional — if not set, email notifications are logged but not sent)
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+    SMTP_FROM: str = "no-reply@aafc-tms.ca"
+
     # URL for the Planning Workspace frontend (served separately).
     # Set this env var in each Railway environment. Empty string = no link shown.
     PLANNING_WORKSPACE_URL: str = ""

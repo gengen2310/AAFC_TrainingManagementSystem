@@ -549,20 +549,35 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,18,40,.55);backdrop-filter:blur(3px);z-index:500;align-items:center;justify-content:center;padding:16px;}
 .modal-close{background:rgba(255,255,255,.12);border:none;color:white;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:background .13s;}
 .modal-close:hover{background:rgba(255,255,255,.22);}
-.login-report-link {
-  display: block;
-  text-align: center;
+.login-help-card {
   margin-top: var(--sp-md);
+  border-top: 1px solid rgba(255,255,255,.15);
+  padding-top: var(--sp-md);
+  text-align: center;
+}
+.login-help-card p {
+  font-size: 11px;
+  color: rgba(255,255,255,.55);
+  margin: 0 0 var(--sp-sm);
+  line-height: 1.5;
+}
+.login-report-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255,255,255,.45);
+  color: rgba(255,255,255,.75);
   cursor: pointer;
-  background: none;
-  border: none;
-  text-decoration: none;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: var(--radius);
+  padding: 6px 14px;
   font-family: inherit;
+  min-height: 28px;
+  transition: background .13s, color .13s;
 }
-.login-report-link:hover { color: rgba(255,255,255,.72); }
+.login-report-link:hover { background: rgba(255,255,255,.18); color: #fff; }
 #sd-modal .ff-label {
   font-size: 10px;
   font-weight: 700;
@@ -652,9 +667,49 @@ tbody td{padding:9px 12px;vertical-align:middle;}
   margin: var(--sp-xs) 0 var(--sp-sm);
 }
 #page-service-desk .sd-row-active td { background: var(--accent-light); }
+#page-service-desk .sd-status-stripe { width: 4px; padding: 0; }
+#page-service-desk .stripe-open { background: var(--blue); }
+#page-service-desk .stripe-in_progress { background: #c97a00; }
+#page-service-desk .stripe-resolved { background: #1a7f4b; }
 .badge-open   { background: #e0f0fa; color: #004b8d; }
 .badge-in_progress { background: #fff3cd; color: #7a4800; }
 .badge-resolved { background: #d4f0e3; color: #145f38; }
+/* Unit typeahead combobox */
+.sd-unit-wrap { position: relative; }
+.sd-unit-dropdown {
+  position: absolute;
+  z-index: 200;
+  top: calc(100% + 2px);
+  left: 0; right: 0;
+  background: var(--surface);
+  border: 1.5px solid var(--blue);
+  border-radius: var(--radius);
+  box-shadow: var(--sh2);
+  max-height: 180px;
+  overflow-y: auto;
+  display: none;
+}
+.sd-unit-dropdown.open { display: block; }
+.sd-unit-opt {
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sd-unit-opt:hover, .sd-unit-opt.focused { background: var(--accent-light); }
+.sd-unit-type {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.sd-unit-type-squadron { background: #e0f0fa; color: #004b8d; }
+.sd-unit-type-wing { background: #fff3cd; color: #7a4800; }
 
 /* ── TOAST (non-blocking, accessible replacement for alert()) ── */
 .toast-region{position:fixed;top:16px;right:16px;z-index:900;display:flex;flex-direction:column;gap:8px;max-width:340px;}
@@ -973,9 +1028,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <div style="font-size:10px;color:var(--muted);margin-top:14px;line-height:1.55">Use is limited to authorised personnel. Access and administrative actions are recorded.</div>
     <div class="auth-err" id="auth-err"></div>
   </div>
-  <button class="login-report-link" onclick="sdOpenModal()" id="login-report-btn">
-    Report an Issue
-  </button>
+  <div class="login-help-card">
+    <p>Having trouble signing in? Submit a support request.</p>
+    <button class="login-report-link" onclick="sdOpenModal()" id="login-report-btn">Report an Issue</button>
+  </div>
 </div>
 
 <!-- ═══ APP ═══ -->
@@ -2150,6 +2206,14 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div id="sc-audit-body"><div class="muted">Loading…</div></div>
         </div>
 
+        <div class="card sc-card" id="sc-sd-email-card">
+          <div class="sc-card-title">Service Desk Notifications</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:var(--sp-sm)">
+            Each email address receives a notification when a ticket is submitted within its scope.
+          </div>
+          <div id="sc-sd-email-body"><div class="muted">Loading…</div></div>
+        </div>
+
       </div>
 
       <!-- ── Service Desk page ── -->
@@ -2160,21 +2224,33 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             Submit a Ticket
           </button>
         </div>
-        <div class="sd-filter-bar" id="sd-filter-bar">
+        <div class="sd-filter-bar" id="sd-filter-bar" style="flex-wrap:wrap;gap:var(--sp-xs);align-items:center">
           <button class="active" onclick="sdSetFilter('all', this)">All</button>
           <button onclick="sdSetFilter('open', this)">Open</button>
           <button onclick="sdSetFilter('in_progress', this)">In Progress</button>
           <button onclick="sdSetFilter('resolved', this)">Resolved</button>
+          <span style="color:var(--border);padding:0 2px">|</span>
+          <select id="sd-cat-filter" class="fbar" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;min-height:28px" onchange="sdSetCategoryFilter(this.value)">
+            <option value="">All Categories</option>
+            <option value="account_access">Account Access</option>
+            <option value="training_data">Training Data</option>
+            <option value="technical_error">Technical Error</option>
+            <option value="feature_request">Feature Request</option>
+            <option value="other">Other</option>
+          </select>
         </div>
         <div class="sd-layout">
           <div class="sd-list" id="sd-list-container">
             <table class="tbl" id="sd-table" style="width:100%">
               <thead>
                 <tr>
+                  <th style="width:4px;padding:0"></th>
                   <th>Date</th>
                   <th>Submitted By</th>
                   <th>Unit</th>
+                  <th>Category</th>
                   <th>Issue</th>
+                  <th>Assigned</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -5469,6 +5545,7 @@ function loadSystemConsole(){
   scLoadMaintenance();
   scLoadBackups();
   scLoadAudit();
+  scLoadSdEmailConfig();
 }
 
 async function scLoadOverview(){
@@ -5788,6 +5865,57 @@ async function scLoadAudit(){
     h+='</div>';
     el.innerHTML=h;
   } catch(e){ el.innerHTML=`<div class="sc-status-err">Could not load the Audit summary: ${esc(apiErr(e))}</div>`; }
+}
+
+async function scLoadSdEmailConfig(){
+  const el=document.getElementById('sc-sd-email-body'); if(!el) return;
+  el.innerHTML='<div class="muted">Loading…</div>';
+  try {
+    const configs=await api('/api/service-desk/email-config');
+    const byScope={};
+    for(const c of configs) byScope[c.scope+(c.wing_id||'')]=c;
+
+    // Fetch wings for the wing section (SA only)
+    let wings=[];
+    if(S&&S.role==='system_admin'){
+      try{ wings=S.wings||[]; } catch(e){}
+    }
+
+    let h='';
+    const row=(label,scope,wingId)=>{
+      const key=scope+(wingId||'');
+      const cur=byScope[key];
+      const val=cur?esc(cur.notification_email):'';
+      const wParam=wingId?`,'${esc(wingId)}'`:'';
+      return `<div style="display:grid;grid-template-columns:160px 1fr auto;gap:var(--sp-sm);align-items:center;margin-bottom:var(--sp-xs)">
+        <span style="font-size:11px;font-weight:600">${esc(label)}</span>
+        <input type="email" class="ff-input" style="font-size:12px;padding:5px 8px" value="${val}"
+          placeholder="not configured" id="sd-email-cfg-${esc(key)}" autocomplete="off">
+        <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;white-space:nowrap"
+          onclick="scSaveSdEmail('${esc(scope)}',document.getElementById('sd-email-cfg-${esc(key)}').value${wParam})">Save</button>
+      </div>`;
+    };
+
+    h+=`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--steel);margin-bottom:4px">System Admin</div>`;
+    h+=row('System Admin','system',null);
+    h+=`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--steel);margin:var(--sp-sm) 0 4px">National HQ</div>`;
+    h+=row('National HQ','national',null);
+    if(wings.length){
+      h+=`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--steel);margin:var(--sp-sm) 0 4px">Wing Notifications</div>`;
+      for(const w of wings) h+=row(esc(w.short_name||w.name),'wing',w.id);
+    }
+    el.innerHTML=h;
+  } catch(e){ el.innerHTML=`<div style="color:var(--red);font-size:12px">${esc(apiErr(e))}</div>`; }
+}
+
+async function scSaveSdEmail(scope, email, wingId){
+  try {
+    const body={scope, notification_email:email};
+    if(wingId) body.wing_id=wingId;
+    await api('PUT','/api/service-desk/email-config',body);
+    showToast('Notification email saved.');
+    scLoadSdEmailConfig();
+  } catch(e){ showToast(apiErr(e),true); }
 }
 
 async function scImportCurriculum(){
@@ -16178,16 +16306,73 @@ document.addEventListener('keydown',function(e){
 // ── Service Desk modal ──────────────────────────────────────────────────────
 window._sdSquadrons = null; // cached squadron list
 
-async function sdLoadSquadrons() {
-  if (window._sdSquadrons) return window._sdSquadrons;
+// ── Unit typeahead state ─────────────────────────────────────────────────────
+let _sdUnits = null;
+let _sdUnitSelected = null; // {unit_id, name, type}
+let _sdUnitFocusIdx = -1;
+
+async function sdLoadUnits() {
+  if (_sdUnits) return _sdUnits;
   try {
-    const r = await fetch(API_BASE + '/api/public/squadrons');
-    if (!r.ok) throw new Error('Failed to load squadrons');
-    window._sdSquadrons = await r.json();
+    const r = await fetch(API_BASE + '/api/public/units');
+    if (!r.ok) throw new Error('Failed to load units');
+    _sdUnits = await r.json();
   } catch (e) {
-    window._sdSquadrons = [];
+    _sdUnits = [];
   }
-  return window._sdSquadrons;
+  return _sdUnits;
+}
+
+function sdUnitOpen() {
+  sdUnitFilter();
+}
+
+function sdUnitFilter() {
+  const input = document.getElementById('sd-unit-input');
+  const dd = document.getElementById('sd-unit-dropdown');
+  const q = (input.value || '').trim().toLowerCase();
+  if (!_sdUnits) { sdLoadUnits().then(() => sdUnitFilter()); return; }
+  const filtered = q
+    ? _sdUnits.filter(u => u.name.toLowerCase().includes(q))
+    : _sdUnits;
+  if (!filtered.length) { dd.classList.remove('open'); return; }
+  _sdUnitFocusIdx = -1;
+  dd.innerHTML = filtered.slice(0, 40).map((u, i) =>
+    `<div class="sd-unit-opt" data-uid="${esc(u.unit_id)}" data-uname="${esc(u.name)}" data-utype="${esc(u.type)}"
+      onmousedown="sdUnitSelect('${esc(u.unit_id)}','${esc(u.name.replace(/'/g,"&#39;"))}','${esc(u.type)}')">
+      <span class="sd-unit-type sd-unit-type-${esc(u.type)}">${esc(u.type === 'wing' ? 'Wing' : 'Sqn')}</span>
+      ${esc(u.name)}
+    </div>`
+  ).join('');
+  dd.classList.add('open');
+}
+
+function sdUnitSelect(uid, name, type) {
+  _sdUnitSelected = {unit_id: uid, name, type};
+  document.getElementById('sd-unit-input').value = name;
+  document.getElementById('sd-unit-id').value = uid;
+  document.getElementById('sd-unit-type').value = type;
+  document.getElementById('sd-unit-dropdown').classList.remove('open');
+}
+
+function sdUnitKey(e) {
+  const dd = document.getElementById('sd-unit-dropdown');
+  const opts = dd.querySelectorAll('.sd-unit-opt');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _sdUnitFocusIdx = Math.min(_sdUnitFocusIdx + 1, opts.length - 1);
+    opts.forEach((o, i) => o.classList.toggle('focused', i === _sdUnitFocusIdx));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _sdUnitFocusIdx = Math.max(_sdUnitFocusIdx - 1, 0);
+    opts.forEach((o, i) => o.classList.toggle('focused', i === _sdUnitFocusIdx));
+  } else if (e.key === 'Enter' && _sdUnitFocusIdx >= 0) {
+    e.preventDefault();
+    const opt = opts[_sdUnitFocusIdx];
+    if (opt) sdUnitSelect(opt.dataset.uid, opt.dataset.uname, opt.dataset.utype);
+  } else if (e.key === 'Escape') {
+    dd.classList.remove('open');
+  }
 }
 
 async function sdOpenModal(preselectedSquadronId) {
@@ -16197,23 +16382,29 @@ async function sdOpenModal(preselectedSquadronId) {
   form.reset();
   errEl.style.display = 'none';
   document.getElementById('sd-submit-btn').disabled = false;
+  _sdUnitSelected = null;
+  document.getElementById('sd-unit-id').value = '';
+  document.getElementById('sd-unit-type').value = '';
+  document.getElementById('sd-unit-dropdown').classList.remove('open');
 
-  const sqns = await sdLoadSquadrons();
-  const sel = document.getElementById('sd-sqn');
-  sel.innerHTML = '<option value="">— Select unit —</option>' +
-    sqns.map(s => `<option value="${esc(s.squadron_id)}">${esc(s.name)}</option>`).join('');
+  // Pre-load units in background
+  sdLoadUnits();
 
+  // If sqn pre-selected (logged-in sqn_admin/sqn_general), pre-fill the typeahead
   if (preselectedSquadronId) {
-    sel.value = preselectedSquadronId;
-    sel.disabled = true;
+    const units = await sdLoadUnits();
+    const sqn = units.find(u => u.unit_id === preselectedSquadronId);
+    if (sqn) {
+      sdUnitSelect(sqn.unit_id, sqn.name, sqn.type);
+      document.getElementById('sd-unit-input').disabled = true;
+    }
   } else {
-    sel.disabled = false;
+    document.getElementById('sd-unit-input').disabled = false;
   }
 
   modal.style.display = 'flex';
-  document.getElementById('sd-rank').focus();
+  document.getElementById('sd-category').focus();
 
-  // Close on Escape
   modal._escHandler = (e) => { if (e.key === 'Escape') sdCloseModal(); };
   document.addEventListener('keydown', modal._escHandler);
 }
@@ -16234,14 +16425,31 @@ async function sdSubmit(event) {
   errEl.style.display = 'none';
   submitBtn.disabled = true;
 
+  // Validate unit selection
+  if (!_sdUnitSelected) {
+    errEl.textContent = 'Please select a unit from the list.';
+    errEl.style.display = 'block';
+    submitBtn.disabled = false;
+    document.getElementById('sd-unit-input').focus();
+    return;
+  }
+
   const body = {
     rank: document.getElementById('sd-rank').value.trim(),
     first_name: document.getElementById('sd-first').value.trim(),
     last_name: document.getElementById('sd-last').value.trim(),
     email: document.getElementById('sd-email').value.trim(),
-    squadron_id: document.getElementById('sd-sqn').value,
+    category: document.getElementById('sd-category').value,
     description: document.getElementById('sd-desc').value.trim(),
   };
+
+  // Set unit fields based on selection type
+  if (_sdUnitSelected.type === 'squadron') {
+    body.squadron_id = _sdUnitSelected.unit_id;
+    body.unit_name = _sdUnitSelected.name;
+  } else {
+    body.unit_name = _sdUnitSelected.name;
+  }
 
   try {
     const r = await fetch(API_BASE + '/api/service-desk/tickets', {
@@ -16252,7 +16460,7 @@ async function sdSubmit(event) {
 
     if (r.status === 201) {
       sdCloseModal();
-      showToast('Ticket submitted — a system administrator will follow up.');
+      showToast('Ticket submitted — your Wing and a system administrator will follow up.');
       return;
     }
 
@@ -16277,6 +16485,7 @@ async function sdSubmit(event) {
 // ── Service Desk page ────────────────────────────────────────────────────────
 let _sdAllTickets = [];
 let _sdActiveFilter = 'all';
+let _sdActiveCategoryFilter = '';
 let _sdSelectedTicketId = null;
 
 function sdFmtDate(iso) {
@@ -16312,14 +16521,14 @@ async function loadServiceDesk() {
   filterBar.style.display = '';
   table.style.display = '';
   empty.textContent = 'No tickets';
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:12px">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);font-size:12px">Loading…</td></tr>';
 
   try {
     const r = await api('GET', '/api/service-desk/tickets');
     _sdAllTickets = r;
     sdRenderList();
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--red);font-size:12px">${esc(apiErr(e))}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--red);font-size:12px">${esc(apiErr(e))}</td></tr>`;
   }
 }
 
@@ -16331,12 +16540,26 @@ function sdSetFilter(filter, btn) {
   sdCloseDetail();
 }
 
+function sdSetCategoryFilter(val) {
+  _sdActiveCategoryFilter = val;
+  sdRenderList();
+  sdCloseDetail();
+}
+
+const _SD_CAT_LABELS = {
+  account_access: 'Account Access', training_data: 'Training Data',
+  technical_error: 'Technical Error', feature_request: 'Feature Request', other: 'Other',
+};
+
 function sdRenderList() {
   const tbody = document.getElementById('sd-tbody');
   const empty = document.getElementById('sd-empty');
-  const filtered = _sdActiveFilter === 'all'
+  let filtered = _sdActiveFilter === 'all'
     ? _sdAllTickets
     : _sdAllTickets.filter(t => t.status === _sdActiveFilter);
+  if (_sdActiveCategoryFilter) {
+    filtered = filtered.filter(t => (t.category || 'other') === _sdActiveCategoryFilter);
+  }
 
   if (filtered.length === 0) {
     tbody.innerHTML = '';
@@ -16348,15 +16571,21 @@ function sdRenderList() {
   empty.style.display = 'none';
 
   tbody.innerHTML = filtered.map(t => {
-    const desc = t.description.length > 60
-      ? esc(t.description.slice(0, 60)) + '…'
+    const desc = t.description.length > 50
+      ? esc(t.description.slice(0, 50)) + '…'
       : esc(t.description);
     const active = t.ticket_id === _sdSelectedTicketId ? ' class="sd-row-active"' : '';
+    const unitDisplay = esc(t.unit_name || t.squadron_name || '');
+    const catLabel = esc(_SD_CAT_LABELS[t.category || 'other'] || 'Other');
+    const assignee = t.assigned_to_name ? esc(t.assigned_to_name) : '<span style="color:var(--muted)">—</span>';
     return `<tr${active} data-tid="${esc(t.ticket_id)}" style="cursor:pointer" onclick="sdOpenDetail(this.dataset.tid)">
+      <td class="sd-status-stripe stripe-${esc(t.status)}"></td>
       <td style="font-size:12px;white-space:nowrap">${sdFmtDate(t.created_at)}</td>
       <td style="font-size:12px">${esc(t.rank)} ${esc(t.first_name)} ${esc(t.last_name)}</td>
-      <td style="font-size:12px">${esc(t.squadron_name || '')}</td>
+      <td style="font-size:12px">${unitDisplay}</td>
+      <td style="font-size:11px;color:var(--muted)">${catLabel}</td>
       <td style="font-size:12px">${desc}</td>
+      <td style="font-size:11px">${assignee}</td>
       <td>${sdStatusBadge(t.status)}</td>
     </tr>`;
   }).join('');
@@ -16368,12 +16597,19 @@ function sdOpenDetail(ticketId) {
   const t = _sdAllTickets.find(x => x.ticket_id === ticketId);
   if (!t) return;
   const detail = document.getElementById('sd-detail');
-  const isSysAdmin = S && S.role === 'system_admin';
-  const notesHtml = isSysAdmin
+  const canEdit = S && ['system_admin','wing_admin','national_admin'].includes(S.role);
+  const catLabel = _SD_CAT_LABELS[t.category || 'other'] || 'Other';
+  const unitDisplay = t.unit_name || t.squadron_name || '';
+
+  const notesHtml = canEdit
     ? `<textarea id="sd-notes-input" class="ff-input" rows="3" style="width:100%;box-sizing:border-box;font-size:12px;font-family:inherit;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius)">${esc(t.admin_notes || '')}</textarea>`
     : `<div style="font-size:12px;color:var(--text)">${t.admin_notes ? esc(t.admin_notes) : '<span style="color:var(--muted)">No notes yet</span>'}</div>`;
 
-  const statusButtons = isSysAdmin
+  const assigneeHtml = canEdit
+    ? `<input id="sd-assignee-input" class="ff-input" type="text" style="width:100%;box-sizing:border-box;font-size:12px;padding:6px 8px" placeholder="e.g. Maj Smith" value="${esc(t.assigned_to_name || '')}">`
+    : `<div style="font-size:12px">${t.assigned_to_name ? esc(t.assigned_to_name) : '<span style="color:var(--muted)">Unassigned</span>'}</div>`;
+
+  const statusButtons = canEdit
     ? `<div style="display:flex;gap:var(--sp-xs);margin-top:var(--sp-xs)">
         ${['open','in_progress','resolved'].map(s => {
           const labels = {open:'Open', in_progress:'In Progress', resolved:'Resolved'};
@@ -16383,19 +16619,23 @@ function sdOpenDetail(ticketId) {
       </div>`
     : sdStatusBadge(t.status);
 
-  const saveBtn = isSysAdmin
+  const saveBtn = canEdit
     ? `<div style="text-align:right;margin-top:var(--sp-md)"><button class="btn btn-primary" style="font-size:12px" data-tid="${esc(ticketId)}" onclick="sdSave(this.dataset.tid)">Save Changes</button></div><div id="sd-save-err" style="display:none;color:var(--red);font-size:11px;margin-top:4px"></div>`
     : '';
 
   document.getElementById('sd-detail-content').innerHTML = `
     <div style="font-size:12px;color:var(--muted)">${sdFmtDate(t.created_at)}</div>
-    <div style="font-size:13px;font-weight:600;margin:var(--sp-xs) 0">${esc(t.squadron_name || '')}</div>
+    <div style="font-size:13px;font-weight:600;margin:var(--sp-xs) 0">${esc(unitDisplay)}</div>
     <div style="font-size:12px;margin-bottom:2px">${esc(t.rank)} ${esc(t.first_name)} ${esc(t.last_name)}</div>
     <div style="font-size:12px;color:var(--muted)">${esc(t.email)}</div>
+    <div style="margin-top:var(--sp-xs)"><span class="badge badge-${esc(t.status || 'open')}" style="font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700">${esc(catLabel)}</span></div>
+    <div class="sd-detail-section">Assigned To</div>
+    <hr>
+    ${assigneeHtml}
     <div class="sd-detail-section">Description</div>
     <hr>
     <div style="font-size:12px;line-height:1.5">${esc(t.description)}</div>
-    <div class="sd-detail-section">Admin Notes</div>
+    <div class="sd-detail-section">Internal Notes</div>
     <hr>
     ${notesHtml}
     <div class="sd-detail-section">Status</div>
@@ -16404,8 +16644,7 @@ function sdOpenDetail(ticketId) {
     ${saveBtn}
   `;
 
-  // Store current editable status selection
-  if (isSysAdmin) detail._editStatus = t.status;
+  if (canEdit) detail._editStatus = t.status;
   detail.classList.add('open');
 }
 
@@ -16427,23 +16666,25 @@ async function sdSave(ticketId) {
   if (errEl) errEl.style.display = 'none';
 
   const notesInput = document.getElementById('sd-notes-input');
+  const assigneeInput = document.getElementById('sd-assignee-input');
   const body = {
     status: detail._editStatus,
     admin_notes: notesInput ? notesInput.value : undefined,
+    assigned_to_name: assigneeInput ? assigneeInput.value.trim() : undefined,
   };
 
   try {
     await api('PATCH', `/api/service-desk/tickets/${ticketId}`, body);
-    // Update local cache
     const t = _sdAllTickets.find(x => x.ticket_id === ticketId);
     if (t) {
       if (body.status) t.status = body.status;
       if (body.admin_notes !== undefined) t.admin_notes = body.admin_notes;
+      if (body.assigned_to_name !== undefined) t.assigned_to_name = body.assigned_to_name;
       if (body.status === 'resolved') t.resolved_at = new Date().toISOString();
       else if (body.status) t.resolved_at = null;
     }
     sdRenderList();
-    sdOpenDetail(ticketId); // re-render panel
+    sdOpenDetail(ticketId);
     showToast('Ticket updated.');
   } catch (e) {
     if (errEl) {
@@ -16462,6 +16703,15 @@ document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){
     var det=document.getElementById('sd-detail');
     if(det&&det.classList.contains('open'))sdCloseDetail();
+  }
+});
+
+// Close unit dropdown when focus leaves the typeahead area
+document.addEventListener('focusin',function(e){
+  const dd=document.getElementById('sd-unit-dropdown');
+  const inp=document.getElementById('sd-unit-input');
+  if(dd&&inp&&!inp.contains(e.target)&&!dd.contains(e.target)){
+    dd.classList.remove('open');
   }
 });
 </script>
@@ -16497,12 +16747,22 @@ document.addEventListener('keydown',function(e){
       <span class="modal-title">Report an Issue</span>
       <button class="modal-close" onclick="sdCloseModal()">✕</button>
     </div>
-    <form id="sd-form" onsubmit="sdSubmit(event)" style="padding:var(--sp-md)">
+    <form id="sd-form" onsubmit="sdSubmit(event)" style="padding:var(--sp-md)" autocomplete="off">
       <div class="form-group">
-        <label class="ff-label" for="sd-rank">Rank</label>
-        <input id="sd-rank" type="text" class="ff-input" placeholder="e.g. Fg Off" required>
+        <label class="ff-label" for="sd-category">Category</label>
+        <select id="sd-category" class="ff-select ff-input" required>
+          <option value="account_access">Account Access</option>
+          <option value="training_data">Training Data</option>
+          <option value="technical_error">Technical Error</option>
+          <option value="feature_request">Feature Request</option>
+          <option value="other">Other</option>
+        </select>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-sm)">
+      <div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:var(--sp-sm)">
+        <div class="form-group">
+          <label class="ff-label" for="sd-rank">Rank</label>
+          <input id="sd-rank" type="text" class="ff-input" placeholder="e.g. Fg Off" required>
+        </div>
         <div class="form-group">
           <label class="ff-label" for="sd-first">First Name</label>
           <input id="sd-first" type="text" class="ff-input" required>
@@ -16513,12 +16773,18 @@ document.addEventListener('keydown',function(e){
         </div>
       </div>
       <div class="form-group">
-        <label class="ff-label" for="sd-email">Email</label>
+        <label class="ff-label" for="sd-email">AAFC Email</label>
         <input id="sd-email" type="email" class="ff-input" required>
       </div>
       <div class="form-group">
-        <label class="ff-label" for="sd-sqn">Unit</label>
-        <select id="sd-sqn" class="ff-select ff-input" required></select>
+        <label class="ff-label" for="sd-unit-input">Unit</label>
+        <div class="sd-unit-wrap">
+          <input id="sd-unit-input" type="text" class="ff-input" placeholder="Type to search wings and squadrons…"
+            autocomplete="off" oninput="sdUnitFilter()" onfocus="sdUnitOpen()" onkeydown="sdUnitKey(event)">
+          <div id="sd-unit-dropdown" class="sd-unit-dropdown" role="listbox"></div>
+        </div>
+        <input type="hidden" id="sd-unit-id">
+        <input type="hidden" id="sd-unit-type">
       </div>
       <div class="form-group">
         <label class="ff-label" for="sd-desc">Description of Issue</label>
@@ -16528,7 +16794,7 @@ document.addEventListener('keydown',function(e){
       <div id="sd-err" style="display:none" class="form-err"></div>
       <div class="modal-footer" style="display:flex;gap:var(--sp-sm);justify-content:flex-end;padding-top:var(--sp-sm)">
         <button type="button" class="btn btn-secondary" onclick="sdCloseModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary" id="sd-submit-btn">Submit</button>
+        <button type="submit" class="btn btn-primary" id="sd-submit-btn">Submit Ticket</button>
       </div>
     </form>
   </div>

@@ -17,9 +17,12 @@ class ServiceTicket(Base, UUIDMixin, TimestampMixin):
     squadron_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("squadrons.id", ondelete="SET NULL"), nullable=True
     )
+    unit_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(40), nullable=True, default="other")
     description: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="open")
     admin_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    assigned_to_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     squadron: Mapped["Squadron"] = relationship("Squadron", lazy="joined", foreign_keys=[squadron_id])
