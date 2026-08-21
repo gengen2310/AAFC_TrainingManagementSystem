@@ -2574,7 +2574,8 @@ def test_class_matrix_404_on_unknown_year(client):
 
 
 def test_class_matrix_empty_for_year_without_classes(client):
-    """CLASS-MATRIX-01: a year with no Training Classes returns empty classes/stages."""
+    """CLASS-MATRIX-01: a new year auto-creates 5 standard Training Classes (ORI/INI/JNR/INT/SNR);
+    those classes have no linked training_stage_id so the matrix returns classes but no stages."""
     hdr = _sqn_admin_hdr(client)
     yr = client.post("/api/planning/years",
                      json={"year": 2029, "name": "Matrix Test Year"}, headers=hdr)
@@ -2584,7 +2585,12 @@ def test_class_matrix_empty_for_year_without_classes(client):
     r = client.get(f"/api/curriculum/class-matrix?year_id={year_id}", headers=hdr)
     assert r.status_code == 200, r.text
     d = r.json()
-    assert d["classes"] == []
+    # Year creation now auto-creates 5 standard classes; each has training_stage_id=None
+    # so no curriculum stage rows are resolved and stages remains empty.
+    assert len(d["classes"]) == 5
+    auto_names = {c["display_name"] for c in d["classes"]}
+    assert "Orientation" in auto_names
+    assert "Senior" in auto_names
     assert d["stages"] == []
 
 
@@ -2673,7 +2679,8 @@ def test_class_forecasts_404_unknown_year(client):
 
 
 def test_class_forecasts_empty_for_year_without_classes(client):
-    """CLASS-FORECAST-01: year with no Training Classes returns empty list."""
+    """CLASS-FORECAST-01: a new year auto-creates 5 standard Training Classes, so the forecast
+    returns 5 entries (one per class) rather than an empty list."""
     hdr = _sqn_admin_hdr(client)
     yr = client.post("/api/planning/years",
                      json={"year": 2033, "name": "Forecast Empty Test"}, headers=hdr)
@@ -2681,7 +2688,12 @@ def test_class_forecasts_empty_for_year_without_classes(client):
     year_id = yr.json()["planning_year_id"]
     r = client.get(f"/api/planning/class-forecasts?year_id={year_id}", headers=hdr)
     assert r.status_code == 200, r.text
-    assert r.json() == []
+    forecasts = r.json()
+    # Year creation auto-creates 5 standard classes (ORI/INI/JNR/INT/SNR)
+    assert len(forecasts) == 5
+    class_names = {f["class_name"] for f in forecasts}
+    assert "Orientation" in class_names
+    assert "Senior" in class_names
 
 
 def test_class_forecasts_structure_with_class(client):

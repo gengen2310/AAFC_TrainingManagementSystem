@@ -107,3 +107,31 @@ def test_cea_import_without_keep_existing_still_works(client):
         files={"file": ("compat.csv", csv_data, "text/csv")},
     )
     assert r.status_code == 200
+
+
+# ── Task 5: auto-create training classes on year creation ──────────────────────
+
+def test_year_creation_auto_creates_training_classes(client):
+    """POST /api/planning/years must auto-create 5 training classes (ORI/INI/JNR/INT/SNR)."""
+    headers = _sqn_admin_hdr(client)
+    resp = client.post("/api/planning/years", headers=headers, json={
+        "year": 2028,
+        "name": "Auto Classes Test",
+        "active_status": True,
+    })
+    assert resp.status_code == 200
+    year_id = resp.json()["planning_year_id"]
+    # Verify auto-created classes
+    classes_resp = client.get(
+        "/api/training-classes",
+        params={"training_year_id": year_id},
+        headers=headers,
+    )
+    assert classes_resp.status_code == 200
+    classes = classes_resp.json()
+    codes = {c["stage_code"] for c in classes}
+    assert codes == {"ORI", "INI", "JNR", "INT", "SNR"}, \
+        f"Expected 5 stage codes, got: {codes}"
+    names = {c["display_name"] for c in classes}
+    assert "Orientation" in names
+    assert "Senior" in names

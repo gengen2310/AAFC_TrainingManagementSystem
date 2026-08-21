@@ -69,11 +69,14 @@ def test_rollover_copies_active_training_classes_by_default(client):
     r = client.post(f"/api/planning/years/{year_id}/rollover", json={}, headers=hdr)
     assert r.status_code == 200, r.text
     d = r.json()
-    assert d["training_classes_copied"] == 2
+    # Year creation auto-creates 5 standard classes (ORI/INI/JNR/INT/SNR), so 5 + 2 manual = 7 copied.
+    assert d["training_classes_copied"] == 7
 
     new_classes = _get_classes(client, hdr, d["new_planning_year_id"])
     names = {c["display_name"] for c in new_classes}
-    assert names == {"Senior 1", "Senior 2"}
+    # The 2 manually created classes are present alongside the 5 auto-classes
+    assert "Senior 1" in names
+    assert "Senior 2" in names
 
     s1 = next(c for c in new_classes if c["display_name"] == "Senior 1")
     assert s1["training_stage_id"] == stage_id
@@ -99,11 +102,14 @@ def test_rollover_does_not_copy_archived_classes(client):
     r = client.post(f"/api/planning/years/{year_id}/rollover", json={}, headers=hdr)
     assert r.status_code == 200, r.text
     d = r.json()
-    assert d["training_classes_copied"] == 1
+    # Year creation auto-creates 5 standard classes (ORI/INI/JNR/INT/SNR) + 1 kept manual = 6 copied.
+    # Archived classes are never rolled over.
+    assert d["training_classes_copied"] == 6
 
     new_classes = _get_classes(client, hdr, d["new_planning_year_id"])
     names = {c["display_name"] for c in new_classes}
-    assert names == {"Kept Class"}
+    assert "Kept Class" in names
+    assert "Archived Class" not in names
     assert keep_id  # sanity: the id we kept is a real class, not unused
 
 
@@ -129,7 +135,8 @@ def test_rollover_with_no_classes_reports_zero_not_an_error(client):
     py = _make_year(client, hdr, 2663, "CLASS-11 Rollover No Classes")
     r = client.post(f"/api/planning/years/{py['planning_year_id']}/rollover", json={}, headers=hdr)
     assert r.status_code == 200, r.text
-    assert r.json()["training_classes_copied"] == 0
+    # Year creation auto-creates 5 standard classes (ORI/INI/JNR/INT/SNR), all of which are copied.
+    assert r.json()["training_classes_copied"] == 5
 
 
 def test_copied_training_class_is_independently_editable(client):

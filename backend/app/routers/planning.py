@@ -488,6 +488,33 @@ def create_planning_year(
     db.add(py); db.commit()
     audit(db, p, object_type="planning_year", object_id=py.id, action="create",
           new={"year": body.year, "name": body.name})
+    # Auto-create the 5 standard training classes when creating a squadron-scoped year.
+    # Wing/national-scoped years have no squadron_id to attach classes to, so skip them.
+    if py.unit_id:
+        _AUTO_STAGE_DEFAULTS = [
+            ("ORI", "Orientation",   1),
+            ("INI", "Initial",       2),
+            ("JNR", "Junior",        3),
+            ("INT", "Intermediate",  4),
+            ("SNR", "Senior",        5),
+        ]
+        start = f"{py.year}-01-01"
+        for code, name, seq in _AUTO_STAGE_DEFAULTS:
+            tc = TrainingClass(
+                id=str(uuid.uuid4()),
+                squadron_id=py.unit_id,
+                training_year_id=py.id,
+                training_stage_id=None,
+                stage_code=code,
+                display_name=name,
+                sequence=seq,
+                start_date=start,
+                end_date=None,
+                created_at=utcnow(),
+                updated_at=utcnow(),
+            )
+            db.add(tc)
+        db.commit()
     sq = db.get(Squadron, py.unit_id) if py.unit_id else None
     wg = db.get(Wing, py.wing_id) if py.wing_id else None
     return _year_out(py,
