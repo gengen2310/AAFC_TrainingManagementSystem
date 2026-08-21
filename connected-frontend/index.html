@@ -14848,7 +14848,7 @@ async function cpDelete(phaseId,phaseName){
       await loadCustomPhases();
       showToast('Custom phase deleted.');
     }catch(e){showToast(apiErr(e),true);}
-  },{danger:true});
+  },true);
 }
 
 // ── CLASS-10: Training Class split/merge ────────────────────────────────
