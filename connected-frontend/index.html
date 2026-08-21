@@ -5560,40 +5560,40 @@ function scArchiveWing(wingId, wingCode){
   confirmAction(`Archive Wing '${wingCode}'?\n\nAll squadrons in this Wing must already be archived. The Wing can be restored later from the Scope Map.`, async()=>{
     try {
       await api(`/api/wings/${wingId}/archive`,{method:'POST'});
-      alert(`Wing '${wingCode}' archived.`);
+      showToast(`Wing '${wingCode}' archived.`);
       await _refreshOrgCache();
       scLoadScopeMap();
-    } catch(e){ alert('Archive failed: '+(apiErr(e))); }
+    } catch(e){ showToast('Archive failed: '+(apiErr(e)),true); }
   }, true);
 }
 
 async function scRestoreWing(wingId, wingCode){
   try {
     await api(`/api/wings/${wingId}/restore`,{method:'POST'});
-    alert(`Wing '${wingCode}' restored.`);
+    showToast(`Wing '${wingCode}' restored.`);
     await _refreshOrgCache();
     scLoadScopeMap();
-  } catch(e){ alert('Restore failed: '+(apiErr(e))); }
+  } catch(e){ showToast('Restore failed: '+(apiErr(e)),true); }
 }
 
 function scArchiveSquadron(sqnId, sqnName){
   confirmAction(`Archive unit '${sqnName}'?\n\nThis will remove the unit from all active views. It can be restored later from the Scope Map.`, async()=>{
     try {
       await api(`/api/squadrons/${sqnId}/archive`,{method:'POST'});
-      alert(`Unit '${sqnName}' archived.`);
+      showToast(`Unit '${sqnName}' archived.`);
       await _refreshOrgCache();
       scLoadScopeMap();
-    } catch(e){ alert('Archive failed: '+(apiErr(e))); }
+    } catch(e){ showToast('Archive failed: '+(apiErr(e)),true); }
   }, true);
 }
 
 async function scRestoreSquadron(sqnId, sqnName){
   try {
     await api(`/api/squadrons/${sqnId}/restore`,{method:'POST'});
-    alert(`Unit '${sqnName}' restored.`);
+    showToast(`Unit '${sqnName}' restored.`);
     await _refreshOrgCache();
     scLoadScopeMap();
-  } catch(e){ alert('Restore failed: '+(apiErr(e))); }
+  } catch(e){ showToast('Restore failed: '+(apiErr(e)),true); }
 }
 
 async function scPopulateWingSelect(){
@@ -5692,7 +5692,7 @@ async function scEnableMaint(){
     scLoadMaintenance();
     scLoadOverview();
     _pollMaintenanceStatus();
-  } catch(e){ alert('Could not enable maintenance mode: '+(apiErr(e))); }
+  } catch(e){ showToast('Could not enable maintenance mode: '+(apiErr(e)),true); }
 }
 
 function scDisableMaint(){
@@ -5701,7 +5701,7 @@ function scDisableMaint(){
       await api('/api/system/maintenance/disable',{method:'POST'});
       scLoadMaintenance();
       scLoadOverview();
-    } catch(e){ alert('Could not disable maintenance mode: '+(apiErr(e))); }
+    } catch(e){ showToast('Could not disable maintenance mode: '+(apiErr(e)),true); }
   });
 }
 
@@ -5736,9 +5736,9 @@ async function scLoadBackups(){
 async function scCreateBackup(){
   try {
     const d=await api('/api/system/backups',{method:'POST'});
-    alert('Backup created: '+d.filename+' ('+Math.round((d.size_bytes||0)/1024)+'KB)');
+    showToast('Backup created: '+d.filename+' ('+Math.round((d.size_bytes||0)/1024)+'KB)');
     scLoadBackups(); scLoadOverview();
-  } catch(e){ alert('Backup failed: '+apiErr(e)); }
+  } catch(e){ showToast('Backup failed: '+apiErr(e),true); }
 }
 
 async function scDownloadPgDump(){
@@ -5751,7 +5751,7 @@ async function scDownloadPgDump(){
     if(!res.ok){
       const body=await res.json().catch(()=>({}));
       const msg=(body&&body.detail&&body.detail.message)||(typeof body.detail==='string'&&body.detail)||'Backup failed. Check the server status and try again.';
-      alert('Backup download failed: '+msg);
+      showToast('Backup download failed: '+msg,true);
       return;
     }
     const blob=await res.blob();
@@ -5763,7 +5763,7 @@ async function scDownloadPgDump(){
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     scLoadOverview();
-  }catch(e){alert('Backup download failed: '+apiErr(e));}
+  }catch(e){showToast('Backup download failed: '+apiErr(e),true);}
   finally{if(btn){btn.disabled=false;btn.textContent='Download PostgreSQL Backup (pg_dump)';}}
 }
 
@@ -6504,7 +6504,7 @@ async function doCreateWing(){
     try{S.wings=await api('/api/wings');}catch(_){}
     closeModal('m-create-wing');
     await renderAccounts();
-    alert(`Wing ${code} created.`);
+    showToast(`Wing ${code} created.`);
   }catch(e){msg.textContent=apiErr(e);}
 }
 
@@ -10757,7 +10757,7 @@ async function ynCreateYear(){
     const newY=(all||[]).find(y=>y.year===next);
     if(newY) setCurrentYear(newY);
     await ynLoadManagePanel();
-  } catch(e){ alert('Could not create year '+next+': '+apiErr(e)); }
+  } catch(e){ showToast('Could not create year '+next+': '+apiErr(e),true); }
 }
 
 async function ynArchiveYear(id){
@@ -10766,7 +10766,7 @@ async function ynArchiveYear(id){
     const all=await api('/api/planning/years');
     P.years=(all||[]);
     await ynLoadManagePanel();
-  } catch(e){ alert('Archive failed: '+apiErr(e)); }
+  } catch(e){ showToast('Archive failed: '+apiErr(e),true); }
 }
 
 async function ynRestoreYear(id){
@@ -10775,17 +10775,18 @@ async function ynRestoreYear(id){
     const all=await api('/api/planning/years');
     P.years=(all||[]);
     await ynLoadManagePanel();
-  } catch(e){ alert('Restore failed: '+apiErr(e)); }
+  } catch(e){ showToast('Restore failed: '+apiErr(e),true); }
 }
 
-async function ynDeleteYear(id,yearNum){
-  if(!confirm('Permanently delete '+yearNum+'?\nThis fails if the year has any attached data.')) return;
-  try{
-    await api('/api/planning/years/'+id,{method:'DELETE'});
-    const all=await api('/api/planning/years');
-    P.years=(all||[]);
-    await ynLoadManagePanel();
-  } catch(e){ alert('Delete failed: '+apiErr(e)); }
+function ynDeleteYear(id,yearNum){
+  confirmAction('Permanently delete '+yearNum+'? This fails if the year has any attached data.',async()=>{
+    try{
+      await api('/api/planning/years/'+id,{method:'DELETE'});
+      const all=await api('/api/planning/years');
+      P.years=(all||[]);
+      await ynLoadManagePanel();
+    } catch(e){ showToast('Delete failed: '+apiErr(e),true); }
+  },true);
 }
 
 function ynExportYear(id,yearNum){
@@ -10805,7 +10806,7 @@ var _ceaExisting=[];
 var _ceaKeepIds=new Set();
 
 function openCeaImportModal(){
-  if(!P.currentYearId){ alert('Select a training year first.'); return; }
+  if(!P.currentYearId){ showToast('Select a training year first.',true); return; }
   const lbl=document.getElementById('ceaImportYearLabel');
   if(lbl) lbl.textContent=esc(String(P.currentYearInt||'—'));
   _ceaRows=[]; _ceaExisting=[]; _ceaKeepIds=new Set();
@@ -10953,7 +10954,7 @@ function ceaBackToUpload(){
 
 async function ceaConfirm(){
   const fi=document.getElementById('ceaFileInput');
-  if(!fi||!fi.files||!fi.files.length){ alert('No file selected.'); return; }
+  if(!fi||!fi.files||!fi.files.length){ showToast('No file selected.',true); return; }
   const btn=document.getElementById('ceaImportBtn');
   if(btn){ btn.disabled=true; btn.innerHTML='Importing…'; }
   const formData=new FormData();
