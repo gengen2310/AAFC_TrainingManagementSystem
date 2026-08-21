@@ -14812,7 +14812,7 @@ async function cpDoCreate(){
   if(!name){msg.textContent='Name is required.';return;}
   if(!applies_from){msg.textContent='Applies From date is required.';return;}
   try{
-    await api('/api/custom-training-phases',{method:'POST',body:JSON.stringify({name,applies_from,applies_to})});
+    await api('/api/custom-training-phases',{method:'POST',body:JSON.stringify({name,scope_type:'squadron',applies_from,applies_to})});
     closeModal('m-add-custom-phase');
     await loadCustomPhases();
     showToast('Custom phase added.');
