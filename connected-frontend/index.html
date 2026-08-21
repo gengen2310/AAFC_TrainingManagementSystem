@@ -2156,7 +2156,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div id="page-service-desk" class="page" style="display:none">
         <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-md)">
           <h1>Service Desk</h1>
-          <button class="btn btn-primary" onclick="sdOpenModal(S && S.role==='sqn_admin' ? S.squadron_id : null)">
+          <button class="btn btn-primary" onclick="sdOpenModal(S && ['sqn_admin','sqn_general'].includes(S.role) ? S.squadron_id : null)">
             Submit a Ticket
           </button>
         </div>
@@ -16294,9 +16294,24 @@ function sdStatusBadge(status) {
 async function loadServiceDesk() {
   const tbody = document.getElementById('sd-tbody');
   const empty = document.getElementById('sd-empty');
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:12px">Loading…</td></tr>';
+  const filterBar = document.getElementById('sd-filter-bar');
+  const table = document.getElementById('sd-table');
+  tbody.innerHTML = '';
   empty.style.display = 'none';
   sdCloseDetail();
+
+  if (S && S.role === 'sqn_general') {
+    filterBar.style.display = 'none';
+    table.style.display = 'none';
+    empty.textContent = 'Use the Submit a Ticket button above to report an issue to your Wing.';
+    empty.style.display = 'block';
+    return;
+  }
+
+  filterBar.style.display = '';
+  table.style.display = '';
+  empty.textContent = 'No tickets';
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);font-size:12px">Loading…</td></tr>';
 
   try {
     const r = await api('GET', '/api/service-desk/tickets');
