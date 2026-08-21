@@ -26,6 +26,8 @@ def upgrade() -> None:
         sa.Column("id", sa.String(36), primary_key=True),
         sa.Column("created_at", sa.DateTime, nullable=True),
         sa.Column("updated_at", sa.DateTime, nullable=True),
+        sa.Column("created_by", sa.String(36), nullable=True),
+        sa.Column("updated_by", sa.String(36), nullable=True),
         sa.Column("scope", sa.String(20), nullable=False),
         sa.Column("wing_id", sa.String(36), sa.ForeignKey("wings.id", ondelete="CASCADE"), nullable=True),
         sa.Column("notification_email", sa.String(200), nullable=False),
