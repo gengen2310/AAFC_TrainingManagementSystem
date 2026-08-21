@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B-DS · Shell Material Treatment</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0c111a;font-family:'Montserrat',Arial,sans-serif;color:#e8edf3;min-height:100vh;padding:32px;}
+
+.page-q{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:8px;}
+.page-h{font-size:20px;font-weight:700;color:#fff;margin-bottom:6px;letter-spacing:-.01em;}
+.page-sub{font-size:13px;color:rgba(255,255,255,.45);margin-bottom:28px;line-height:1.55;}
+
+.options-row{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+
+.opt{}
+.opt-meta{margin-bottom:10px;}
+.opt-tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;background:rgba(81,176,227,.15);color:#51b0e3;border-radius:3px;padding:2px 7px;margin-bottom:6px;}
+.opt-tag.recommended{background:rgba(81,176,227,.25);color:#7dcaf0;}
+.opt-name{font-size:15px;font-weight:700;color:#fff;margin-bottom:3px;}
+.opt-desc{font-size:12px;color:rgba(255,255,255,.45);line-height:1.5;}
+
+/* ── SHELL MOCKUP ── */
+.shell{
+  border-radius:8px;overflow:hidden;
+  display:flex;flex-direction:column;
+  cursor:pointer;
+  transition:transform .15s,box-shadow .15s;
+  border:2px solid rgba(255,255,255,.06);
+  height:340px;
+}
+.shell:hover{transform:translateY(-2px);}
+.shell.selected{border-color:#51b0e3;box-shadow:0 0 0 1px #51b0e3;}
+
+/* topbar */
+.s-top{
+  height:42px;flex-shrink:0;
+  display:flex;align-items:center;
+  padding:0 14px;gap:10px;
+}
+.s-crest{
+  width:22px;height:22px;border-radius:3px;
+  background:rgba(81,176,227,.25);
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:800;color:#51b0e3;letter-spacing:-.02em;
+}
+.s-title{font-size:11px;font-weight:700;flex:1;letter-spacing:.01em;}
+.s-year{font-size:10px;font-weight:600;padding:2px 7px;border-radius:3px;white-space:nowrap;}
+.s-cmd{font-size:10px;opacity:.45;padding:0 4px;}
+
+/* body */
+.s-body{flex:1;display:flex;overflow:hidden;}
+
+/* nav */
+.s-nav{width:152px;flex-shrink:0;padding:10px 0;overflow:hidden;}
+.s-nav-section{font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:8px 14px 3px;opacity:.3;}
+.s-nav-item{
+  display:flex;align-items:center;gap:7px;
+  padding:6px 14px;font-size:11px;font-weight:500;
+  position:relative;
+}
+.s-nav-item.active{font-weight:700;}
+.s-nav-pip{width:2px;height:12px;border-radius:1px;flex-shrink:0;opacity:0;background:#51b0e3;}
+.s-nav-item.active .s-nav-pip{opacity:1;}
+.s-nav-icon{width:11px;height:11px;border-radius:2px;flex-shrink:0;}
+
+/* content */
+.s-content{flex:1;padding:10px;display:flex;flex-direction:column;gap:8px;overflow:hidden;}
+.s-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.s-card{padding:8px 10px;border-radius:4px;}
+.s-card-lbl{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;}
+.s-card-val{font-size:16px;font-weight:800;line-height:1;}
+.s-card-sub{font-size:8px;margin-top:2px;opacity:.5;}
+.s-table{border-radius:4px;overflow:hidden;flex:1;}
+.s-th{display:grid;grid-template-columns:2fr 1fr 1fr;padding:5px 8px;font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;}
+.s-tr{display:grid;grid-template-columns:2fr 1fr 1fr;padding:5px 8px;font-size:9px;font-weight:500;}
+.badge{display:inline-block;font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;letter-spacing:.04em;text-transform:uppercase;}
+
+/* ═══ OPTION A — Current Baseline ═══ */
+.sh-a .s-top{background:#002f65;}
+.sh-a .s-title{color:rgba(255,255,255,.9);}
+.sh-a .s-year{background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);}
+.sh-a .s-nav{background:#002f65;}
+.sh-a .s-nav-section{}
+.sh-a .s-nav-item{color:rgba(255,255,255,.6);}
+.sh-a .s-nav-item.active{color:#fff;background:rgba(255,255,255,.08);}
+.sh-a .s-content{background:#f4f8fc;}
+.sh-a .s-card{background:#fff;border:1px solid #d1dce8;}
+.sh-a .s-card-lbl{color:#5c6a76;}
+.sh-a .s-card-val{color:#1e2d3d;}
+.sh-a .s-table{border:1px solid #d1dce8;}
+.sh-a .s-th{background:#f0f5fa;color:#5c6a76;}
+.sh-a .s-tr{color:#1e2d3d;border-top:1px solid #e4edf5;}
+.sh-a .badge{background:#d4f0e3;color:#145f38;}
+
+/* ═══ OPTION B — Satin (Recommended) ═══ */
+.sh-b .s-top{
+  background:linear-gradient(180deg,#001b3d 0%,#002550 100%);
+  border-bottom:1px solid rgba(255,255,255,.04);
+  box-shadow:0 1px 0 rgba(0,0,0,.3);
+  position:relative;
+}
+.sh-b .s-top::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.07) 30%,rgba(255,255,255,.07) 70%,transparent);
+}
+.sh-b .s-title{color:#fff;}
+.sh-b .s-year{background:rgba(81,176,227,.15);color:#7dcaf0;border:1px solid rgba(81,176,227,.2);}
+.sh-b .s-nav{
+  background:linear-gradient(180deg,#001224 0%,#001c38 100%);
+  box-shadow:inset -1px 0 0 rgba(0,0,0,.25),1px 0 0 rgba(255,255,255,.03);
+}
+.sh-b .s-nav-item{color:rgba(255,255,255,.55);}
+.sh-b .s-nav-item.active{
+  color:#fff;
+  background:linear-gradient(90deg,rgba(81,176,227,.12),rgba(81,176,227,.03));
+  border-left:2px solid #51b0e3;
+  padding-left:12px;
+}
+.sh-b .s-content{background:#f4f8fc;}
+.sh-b .s-card{
+  background:#fff;border:1px solid #d1dce8;
+  box-shadow:0 1px 3px rgba(0,47,101,.07);
+}
+.sh-b .s-card-lbl{color:#5c6a76;}
+.sh-b .s-card-val{color:#002550;}
+.sh-b .s-table{border:1px solid #d1dce8;}
+.sh-b .s-th{
+  background:linear-gradient(180deg,#eef4fb,#e6f0f8);
+  color:#455560;border-bottom:1px solid #d1dce8;
+}
+.sh-b .s-tr{color:#1e2d3d;border-top:1px solid #edf3f9;}
+.sh-b .badge{background:#d4f0e3;color:#145f38;}
+
+/* ═══ OPTION C — Deep Anodised ═══ */
+.sh-c .s-top{
+  background:linear-gradient(180deg,#000d1e 0%,#001530 100%);
+  border-bottom:1px solid rgba(255,255,255,.07);
+  box-shadow:0 2px 8px rgba(0,0,0,.5);
+  position:relative;
+}
+.sh-c .s-top::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.12) 25%,rgba(255,255,255,.12) 75%,transparent);
+}
+.sh-c .s-title{color:#fff;letter-spacing:.02em;}
+.sh-c .s-year{background:rgba(81,176,227,.12);color:#7dcaf0;border:1px solid rgba(81,176,227,.18);}
+.sh-c .s-nav{
+  background:linear-gradient(160deg,#000a18 0%,#001020 60%,#001530 100%);
+  box-shadow:inset -1px 0 0 rgba(0,0,0,.4),1px 0 0 rgba(255,255,255,.05);
+}
+.sh-c .s-nav-item{color:rgba(255,255,255,.5);}
+.sh-c .s-nav-item.active{
+  color:#fff;
+  background:linear-gradient(90deg,rgba(255,255,255,.08),rgba(255,255,255,.02));
+  border-left:2px solid #51b0e3;
+  padding-left:12px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset 0 -1px 0 rgba(0,0,0,.15);
+}
+.sh-c .s-content{background:#f2f7fc;}
+.sh-c .s-card{
+  background:#fff;border:1px solid #c8d8ec;
+  box-shadow:0 1px 4px rgba(0,47,101,.10);
+}
+.sh-c .s-card-lbl{color:#455560;}
+.sh-c .s-card-val{color:#001530;}
+.sh-c .s-table{border:1px solid #c8d8ec;}
+.sh-c .s-th{
+  background:linear-gradient(180deg,#e6f0f8,#dce9f5);
+  color:#455560;border-bottom:1px solid #c8d8ec;
+  box-shadow:0 1px 0 rgba(0,47,101,.05);
+}
+.sh-c .s-tr{color:#1e2d3d;border-top:1px solid #e8f0f8;}
+.sh-c .badge{background:#d4f0e3;color:#145f38;}
+
+/* select interaction */
+.select-hint{
+  text-align:center;font-size:11px;color:rgba(255,255,255,.25);
+  margin-top:20px;letter-spacing:.04em;
+}
+.opt.chosen .shell{border-color:#51b0e3;box-shadow:0 0 0 1px #51b0e3;}
+.opt.chosen .opt-name{color:#7dcaf0;}
+
+/* bottom note */
+.note{
+  margin-top:24px;padding:14px 18px;
+  border-radius:6px;border:1px solid rgba(255,255,255,.07);
+  background:rgba(255,255,255,.03);
+  font-size:12px;color:rgba(255,255,255,.4);line-height:1.6;
+}
+.note strong{color:rgba(255,255,255,.6);}
+</style>
+</head>
+<body>
+
+<div class="page-q">B-DS · Question 1 of N</div>
+<h1 class="page-h">Shell material treatment</h1>
+<p class="page-sub">Three interpretations of the satin-metal nav/chrome — same AAFC VIG palette, same Montserrat, different depth.<br>Content area intentionally unchanged across all three (it stays calm regardless of which shell wins).</p>
+
+<div class="options-row">
+
+  <!-- OPTION A -->
+  <div class="opt" id="opt-a">
+    <div class="opt-meta">
+      <div class="opt-tag">A — Baseline</div>
+      <div class="opt-name">Flat navy</div>
+      <div class="opt-desc">Solid #002f65 throughout. Current behaviour. Zero depth signal.</div>
+    </div>
+    <div class="shell sh-a" onclick="pick('a')">
+      <div class="s-top">
+        <div class="s-crest">704</div>
+        <div class="s-title">704 SQUADRON</div>
+        <div class="s-year">2026 ▾</div>
+        <div class="s-cmd">⌘K</div>
+      </div>
+      <div class="s-body">
+        <div class="s-nav">
+          <div class="s-nav-section">Operations</div>
+          <div class="s-nav-item">
+            <div class="s-nav-pip"></div>
+            <span>Dashboard</span>
+          </div>
+          <div class="s-nav-item active">
+            <div class="s-nav-pip"></div>
+            <span>Parade Nights</span>
+          </div>
+          <div class="s-nav-item">
+            <div class="s-nav-pip"></div>
+            <span>Activities</span>
+          </div>
+          <div class="s-nav-section">Training</div>
+          <div class="s-nav-item">
+            <div class="s-nav-pip"></div>
+            <span>Curriculum</span>
+          </div>
+          <div class="s-nav-item">
+            <div class="s-nav-pip"></div>
+            <span>Facilitators</span>
+          </div>
+        </div>
+        <div class="s-content">
+          <div class="s-cards">
+            <div class="s-card">
+              <div class="s-card-lbl">Parades</div>
+              <div class="s-card-val">34</div>
+              <div class="s-card-sub">of 36 complete</div>
+            </div>
+            <div class="s-card">
+              <div class="s-card-lbl">Sessions</div>
+              <div class="s-card-val">142</div>
+              <div class="s-card-sub">this year</div>
+            </div>
+            <div class="s-card">
+              <div class="s-card-lbl">Readiness</div>
+              <div class="s-card-val">87%</div>
+              <div class="s-card-sub">of targets met</div>
+            </div>
+          </div>
+          <div class="s-table">
+            <div class="s-th">
+              <span>Activity</span><span>Date</span><span>Status</span>
+            </div>
+            <div class="s-tr">
+              <span>Fieldcraft Bivouac</span><span>14 Mar</span>
+              <span><span class="badge">Confirmed</span></span>
+            </div>
+            <div class="s-tr">
+              <span>Range Weekend</span><span>28 Mar</span>
+              <span><span class="badge">Confirmed</span></span>
+            </div>
+            <div class="s-tr">
+              <span>Biathlon — Wing</span><span>05 Apr</span>
+              <span><span class="badge">Confirmed</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION B -->
+  <div class="opt" id="opt-b">
+    <div class="opt-meta">
+      <div class="opt-tag recommended">B — Recommended</div>
+      <div class="opt-name">Satin navy</div>
+      <div class="opt-desc">Very subtle 2-stop gradient on nav/topbar. 1px edge highlights. Measured metallic depth — perceivable but not decorative.</div>
+    </div>
+    <div class="shell sh-b" onclick="pick('b')">
+      <div class="s-top">
+        <div class="s-crest">704</div>
+        <div class="s-title">704 SQUADRON</div>
+        <div class="s-year">2026 ▾</div>
+        <div class="s-cmd">⌘K</div>
+      </div>
+      <div class="s-body">
+        <div class="s-nav">
+          <div class="s-nav-section">Operations</div>
+          <div class="s-nav-item">
+            <div class="s-nav-pip"></div>
+            <span>Dashboard</span>
+          </div>
+          <div class="s-nav-item active">
+            <div class="s-nav-pip"></div>
+            <span>Parade Nights</span>
+          </div>
+          <div class="s-nav-item">
+            <div class="s-nav-pip"></div>
+            <span>Activities</span>
+          </div>
+          <div class="s-nav-section">Training</div>
+          <div class="s-nav-item">
+            <div class="s-nav-pip"></div>
+            <span>Curriculum</span>
+          </div>
+          <div class="s-nav-item">
+            <div class="s-nav-pip"></div>
+            <span>Facilitators</span>
+          </div>
+        </div>
+        <div class="s-content">
+          <div class="s-cards">
+            <div class="s-card">
+              <div class="s-card-lbl">Parades</div>
+              <div class="s-card-val">34</div>
+              <div class="s-card-sub">of 36 complete</div>
+            </div>
+            <div class="s-card">
+              <div class="s-card-lbl">Sessions</div>
+              <div class="s-card-val">142</div>
+              <div class="s-card-sub">this year</div>
+            </div>
+            <div class="s-card">
+              <div class="s-card-lbl">Readiness</div>
+              <div class="s-card-val">87%</div>
+              <div class="s-card-sub">of targets met</div>
+            </div>
+          </div>
+          <div class="s-table">
+            <div class="s-th">
+              <span>Activity</span><span>Date</span><span>Status</span>
+            </div>
+            <div class="s-tr">
+              <span>Fieldcraft Bivouac</span><span>14 Mar</span>
+              <span><span class="badge">Confirmed</span></span>
+            </div>
+            <div class="s-tr">
+              <span>Range Weekend</span><span>28 Mar</span>
+              <span><span class="badge">Confirmed</span></span>
+            </div>
+            <div class="s-tr">
+              <span>Biathlon — Wing</span><span>05 Apr</span>
+              <span><span class="badge">Confirmed</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION C -->
+  <div class="opt" id="opt-c">
+    <div class="opt-meta">
+      <div class="opt-tag">C — Deep anodised</div>
+      <div class="opt-name">Dark titanium</div>
+      <div class="opt-desc">Deeper base (near-black navy). Stronger edge catches. More defined layer separation. Higher contrast between frame and content.</div>
+    </div>
+    <div class="shell sh-c" onclick="pick('c')">
+      <div class="s-top">
+        <div class="s-crest">704</div>
+        <div class="s-title">704 SQUADRON</div>
+        <div class="s-year">2026 ▾</div>
+        <div class="s-cmd">⌘K</div>
+      </div>
+      <div class="s-body">
+        <div class="s-nav">
+          <div class="s-nav-section">Operations</div>
+          <div class="s-nav-item">
+            <div class="s-nav-pip"></div>
+            <span>Dashboard</span>
+          </div>
+          <div class="s-nav-item active">
+            <div class="s-nav-pip"></div>
+            <span>Parade Nights</span>
+          </div>
+          <div class="s-nav-item">
+            <div class="s-nav-pip"></div>
+            <span>Activities</span>
+          </div>
+          <div class="s-nav-section">Training</div>
+          <div class="s-nav-item">
+            <div class="s-nav-pip"></div>
+            <span>Curriculum</span>
+          </div>
+          <div class="s-nav-item">
+            <div class="s-nav-pip"></div>
+            <span>Facilitators</span>
+          </div>
+        </div>
+        <div class="s-content">
+          <div class="s-cards">
+            <div class="s-card">
+              <div class="s-card-lbl">Parades</div>
+              <div class="s-card-val">34</div>
+              <div class="s-card-sub">of 36 complete</div>
+            </div>
+            <div class="s-card">
+              <div class="s-card-lbl">Sessions</div>
+              <div class="s-card-val">142</div>
+              <div class="s-card-sub">this year</div>
+            </div>
+            <div class="s-card">
+              <div class="s-card-lbl">Readiness</div>
+              <div class="s-card-val">87%</div>
+              <div class="s-card-sub">of targets met</div>
+            </div>
+          </div>
+          <div class="s-table">
+            <div class="s-th">
+              <span>Activity</span><span>Date</span><span>Status</span>
+            </div>
+            <div class="s-tr">
+              <span>Fieldcraft Bivouac</span><span>14 Mar</span>
+              <span><span class="badge">Confirmed</span></span>
+            </div>
+            <div class="s-tr">
+              <span>Range Weekend</span><span>28 Mar</span>
+              <span><span class="badge">Confirmed</span></span>
+            </div>
+            <div class="s-tr">
+              <span>Biathlon — Wing</span><span>05 Apr</span>
+              <span><span class="badge">Confirmed</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="select-hint">Click a mockup to select it</p>
+
+<div class="note">
+  <strong>What you're comparing:</strong> Only the nav/topbar chrome. The content area (cards, table, background) is deliberately held constant so you're evaluating the frame, not the data surfaces. The question of card depth and table header treatment comes next.
+</div>
+
+<script>
+function pick(choice) {
+  document.querySelectorAll('.opt').forEach(el => el.classList.remove('chosen'));
+  document.getElementById('opt-' + choice).classList.add('chosen');
+  // record for server
+  if (window.__companion_record) window.__companion_record(choice, 'Shell material: ' + choice.toUpperCase());
+}
+</script>
+</body>
+</html>

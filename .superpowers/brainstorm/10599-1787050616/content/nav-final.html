@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B-DS · Nav — Final</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:#0c111a;font-family:'Montserrat',Arial,sans-serif;color:#e8edf3;
+  padding:40px;display:flex;align-items:flex-start;justify-content:center;gap:40px;flex-wrap:wrap;
+}
+
+/* ── SPACING SYSTEM ──
+   All cards, tables, and content areas snap to these values only.
+   Nothing picks its own padding.
+*/
+:root{
+  --sp-xs:  8px;   /* tight — badge internals, icon padding           */
+  --sp-sm: 12px;   /* small card internal padding                      */
+  --sp-md: 16px;   /* medium card internal padding, table cells        */
+  --sp-lg: 20px;   /* large card internal padding, content area inset  */
+  --sp-xl: 24px;   /* extra — hero blocks (not used here yet)          */
+
+  --gap-cards: 10px; /* grid gap between cards in a row               */
+  --radius: 6px;
+}
+
+.label{
+  font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:rgba(255,255,255,.28);margin-bottom:10px;text-align:center;
+}
+
+/* shell frame */
+.shell{
+  border-radius:8px;overflow:hidden;
+  border:1px solid rgba(255,255,255,.08);
+  display:flex;height:400px;width:440px;
+}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:156px;flex-shrink:0;
+  background:linear-gradient(180deg,#001b3d 0%,#002550 100%);
+  display:flex;flex-direction:column;
+  border-right:1px solid rgba(255,255,255,.06);
+  position:relative;
+}
+.sidebar::after{
+  content:'';position:absolute;top:0;right:0;bottom:0;width:1px;
+  background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03) 60%,transparent);
+  pointer-events:none;
+}
+.logo-bar{
+  padding:var(--sp-md) var(--sp-md) var(--sp-sm);
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.unit-name{font-size:13px;font-weight:800;color:rgba(255,255,255,.9);letter-spacing:.01em;}
+
+.nav-items{padding:var(--sp-xs) 0;flex:1;}
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  padding:10px var(--sp-md);
+  font-size:11px;font-weight:600;color:rgba(255,255,255,.48);
+  cursor:pointer;position:relative;
+  transition:color .12s,background .12s;letter-spacing:.01em;
+}
+.nav-item:hover:not(.active){color:rgba(255,255,255,.72);background:rgba(255,255,255,.04);}
+.nav-icon{width:15px;text-align:center;font-size:12px;flex-shrink:0;opacity:.7;}
+.active .nav-icon{opacity:1;}
+.nav-item.active{
+  color:#fff;
+  background:rgba(81,176,227,.20);
+  border-left:2.5px solid #51b0e3;
+  padding-left:calc(var(--sp-md) - 2.5px);
+}
+.nav-divider{height:1px;background:rgba(255,255,255,.06);margin:6px var(--sp-md);}
+.nav-footer{
+  padding:var(--sp-sm) var(--sp-md);border-top:1px solid rgba(255,255,255,.07);
+  font-size:10px;color:rgba(255,255,255,.35);font-weight:600;
+  letter-spacing:.04em;text-transform:uppercase;
+}
+
+/* ── CONTENT AREA ──
+   All content is inset by --sp-lg on every side.
+   Title, cards, and table all start from the same left edge.
+*/
+.content{
+  flex:1;background:#f4f8fc;
+  padding:var(--sp-lg);
+  overflow:hidden;display:flex;flex-direction:column;gap:var(--sp-md);
+}
+.content-hdr{font-size:14px;font-weight:800;color:#001e42;}
+
+/* ── CARD SIZE SYSTEM ──
+   Cards choose a size tier. Padding and text scale together.
+   They do not pick arbitrary values.
+*/
+.card{
+  background:#fff;border:1px solid #d1dce8;border-radius:var(--radius);
+}
+/* Small — compact info */
+.card-sm .card-val{font-size:11px;font-weight:700;color:#1e2d3d;}
+.card-sm .card-lbl{font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#455560;margin-top:2px;}
+/* Medium — secondary stats */
+.card-md{padding:var(--sp-md);}
+.card-md .card-val{font-size:22px;font-weight:800;color:#002f65;font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
+.card-md .card-lbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#455560;margin-top:4px;}
+/* Large — hero */
+.card-lg{padding:var(--sp-lg);}
+.card-lg .card-val{font-size:32px;font-weight:800;color:#002f65;font-variant-numeric:tabular-nums;}
+.card-lg .card-lbl{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#455560;margin-top:6px;}
+
+/* stat grid — equal columns, equal gap */
+.stat-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:var(--gap-cards);
+}
+
+/* ── TABLE ──
+   Left edge of table = left edge of content area = left edge of title.
+   Every cell (th and td) uses the same horizontal padding: --sp-md.
+   Vertical padding is uniform: --sp-sm top/bottom.
+*/
+.tbl{
+  background:#fff;border:1px solid #d1dce8;
+  border-radius:var(--radius);overflow:hidden;
+  width:100%;border-collapse:collapse;
+}
+.tbl th{
+  padding:var(--sp-xs) var(--sp-md);
+  background:#f4f8fc;border-bottom:1px solid #d1dce8;
+  font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:#455560;text-align:left;white-space:nowrap;
+}
+.tbl td{
+  padding:var(--sp-sm) var(--sp-md);
+  font-size:12px;color:#1e2d3d;font-weight:500;
+  border-bottom:1px solid #edf2f7;
+}
+.tbl tr:last-child td{border-bottom:none;}
+
+.badge{
+  display:inline-block;border-radius:3px;
+  font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  padding:2px 6px;
+}
+.badge-ok{background:#d4f0e3;color:#145f38;}
+.badge-warn{background:#fff3cd;color:#7a4a00;}
+</style>
+</head>
+<body>
+
+<!-- Activities -->
+<div>
+  <div class="label">Activities selected</div>
+  <div class="shell">
+    <div class="sidebar">
+      <div class="logo-bar"><div class="unit-name">704 Squadron</div></div>
+      <div class="nav-items">
+        <div class="nav-item"><span class="nav-icon">◈</span>Dashboard</div>
+        <div class="nav-item active"><span class="nav-icon">◉</span>Activities</div>
+        <div class="nav-item"><span class="nav-icon">▤</span>Cadets</div>
+        <div class="nav-item"><span class="nav-icon">☰</span>Curriculum</div>
+        <div class="nav-divider"></div>
+        <div class="nav-item"><span class="nav-icon">⚙</span>Settings</div>
+      </div>
+      <div class="nav-footer">Squadron</div>
+    </div>
+    <div class="content">
+      <div class="content-hdr">Activities</div>
+      <!-- table left edge = content left edge = title left edge -->
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Activity</th>
+            <th>Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Parade Night</td><td>14 Jul</td><td><span class="badge badge-ok">Complete</span></td></tr>
+          <tr><td>Field Exercise</td><td>19 Jul</td><td><span class="badge badge-ok">Complete</span></td></tr>
+          <tr><td>Parade Night</td><td>21 Jul</td><td><span class="badge badge-warn">Pending</span></td></tr>
+          <tr><td>Corps Camp</td><td>2 Aug</td><td><span class="badge badge-warn">Pending</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div>
+  <div class="label">Dashboard selected</div>
+  <div class="shell">
+    <div class="sidebar">
+      <div class="logo-bar"><div class="unit-name">704 Squadron</div></div>
+      <div class="nav-items">
+        <div class="nav-item active"><span class="nav-icon">◈</span>Dashboard</div>
+        <div class="nav-item"><span class="nav-icon">◉</span>Activities</div>
+        <div class="nav-item"><span class="nav-icon">▤</span>Cadets</div>
+        <div class="nav-item"><span class="nav-icon">☰</span>Curriculum</div>
+        <div class="nav-divider"></div>
+        <div class="nav-item"><span class="nav-icon">⚙</span>Settings</div>
+      </div>
+      <div class="nav-footer">Squadron</div>
+    </div>
+    <div class="content">
+      <div class="content-hdr">Dashboard</div>
+      <!-- 4 medium cards, same size, same padding, same grid column width -->
+      <div class="stat-grid">
+        <div class="card card-md">
+          <div class="card-val">38</div>
+          <div class="card-lbl">Cadets</div>
+        </div>
+        <div class="card card-md">
+          <div class="card-val">86%</div>
+          <div class="card-lbl">Attendance</div>
+        </div>
+        <div class="card card-md">
+          <div class="card-val">12</div>
+          <div class="card-lbl">Activities</div>
+        </div>
+        <div class="card card-md">
+          <div class="card-val">4</div>
+          <div class="card-lbl">Pending</div>
+        </div>
+      </div>
+      <!-- table below cards, same left edge -->
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Activity</th>
+            <th>Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Parade Night</td><td>14 Jul</td><td><span class="badge badge-ok">Complete</span></td></tr>
+          <tr><td>Field Exercise</td><td>19 Jul</td><td><span class="badge badge-warn">Pending</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

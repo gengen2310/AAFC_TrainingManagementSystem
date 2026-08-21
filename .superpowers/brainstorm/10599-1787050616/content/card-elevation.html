@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B-DS · Card &amp; Panel Treatment</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0c111a;font-family:'Montserrat',Arial,sans-serif;color:#e8edf3;padding:28px;}
+
+.page-q{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-bottom:8px;}
+.page-h{font-size:20px;font-weight:700;color:#fff;margin-bottom:6px;}
+.page-sub{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:24px;line-height:1.55;}
+
+.options-row{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:16px;}
+
+.opt{}
+.opt-tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  background:rgba(81,176,227,.12);color:#51b0e3;border-radius:3px;padding:2px 7px;margin-bottom:5px;}
+.opt-tag.rec{background:rgba(81,176,227,.25);color:#7dcaf0;}
+.opt-name{font-size:14px;font-weight:700;color:#fff;margin-bottom:3px;}
+.opt-desc{font-size:11px;color:rgba(255,255,255,.4);line-height:1.5;margin-bottom:10px;}
+
+/* ── MINI SHELL (satin B — locked) ── */
+.shell{
+  border-radius:8px;overflow:hidden;height:380px;display:flex;flex-direction:column;
+  cursor:pointer;border:2px solid rgba(255,255,255,.06);
+  transition:transform .15s;
+}
+.shell:hover{transform:translateY(-2px);}
+.opt.chosen .shell{border-color:#51b0e3;box-shadow:0 0 0 1px #51b0e3;}
+.opt.chosen .opt-name{color:#7dcaf0;}
+
+.s-top{
+  height:40px;flex-shrink:0;display:flex;align-items:center;padding:0 14px;gap:10px;
+  background:linear-gradient(180deg,#001b3d 0%,#002550 100%);
+  border-bottom:1px solid rgba(255,255,255,.04);
+  box-shadow:0 1px 0 rgba(0,0,0,.3);
+  position:relative;
+}
+.s-top::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.07) 30%,rgba(255,255,255,.07) 70%,transparent);
+}
+.s-crest{width:20px;height:20px;border-radius:3px;background:rgba(81,176,227,.2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#51b0e3;}
+.s-title{font-size:11px;font-weight:700;color:#fff;flex:1;}
+.s-year{font-size:10px;font-weight:600;background:rgba(81,176,227,.15);color:#7dcaf0;border:1px solid rgba(81,176,227,.2);border-radius:3px;padding:1px 6px;}
+
+.s-body{flex:1;display:flex;overflow:hidden;}
+
+.s-nav{
+  width:144px;flex-shrink:0;padding:8px 0;
+  background:linear-gradient(180deg,#001224 0%,#001c38 100%);
+  box-shadow:inset -1px 0 0 rgba(0,0,0,.25),1px 0 0 rgba(255,255,255,.03);
+}
+.s-nav-lbl{font-size:8px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:6px 12px 2px;color:rgba(255,255,255,.28);}
+.s-nav-item{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:10px;font-weight:500;color:rgba(255,255,255,.55);}
+.s-nav-item.active{
+  color:#fff;font-weight:700;
+  background:linear-gradient(90deg,rgba(81,176,227,.12),rgba(81,176,227,.03));
+  border-left:2px solid #51b0e3;padding-left:10px;
+}
+.s-nav-pip{width:2px;height:10px;border-radius:1px;background:#51b0e3;opacity:0;flex-shrink:0;}
+.s-nav-item.active .s-nav-pip{opacity:1;}
+
+/* ── CONTENT AREA ── */
+.s-content{flex:1;padding:10px;display:flex;flex-direction:column;gap:8px;overflow:hidden;}
+.s-page-hd{font-size:11px;font-weight:700;margin-bottom:2px;}
+.s-page-sub{font-size:9px;color:#5c6a76;margin-bottom:6px;}
+
+/* stats row */
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.stat{padding:9px 10px;}
+.stat-lbl{font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px;}
+.stat-val{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;}
+.stat-sub{font-size:8px;margin-top:2px;opacity:.5;}
+
+/* section header */
+.sec-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.sec-title{font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;}
+.sec-link{font-size:9px;color:#51b0e3;font-weight:600;}
+
+/* table */
+.tbl{border-radius:4px;overflow:hidden;}
+.tbl-head{display:grid;grid-template-columns:2fr 1fr 1fr;padding:5px 8px;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+.tbl-row{display:grid;grid-template-columns:2fr 1fr 1fr;padding:5px 8px;font-size:9px;font-weight:500;}
+
+.badge{display:inline-block;font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;letter-spacing:.03em;text-transform:uppercase;}
+.badge-ok{background:#d4f0e3;color:#145f38;}
+.badge-warn{background:#fff3cd;color:#7a5200;}
+
+/* ══════════════════════════
+   A — HAIRLINE ONLY
+══════════════════════════ */
+.ca .s-content{background:#f4f8fc;}
+.ca .s-page-hd{color:#1e2d3d;}
+.ca .s-page-sub{color:#5c6a76;}
+.ca .stat{
+  background:#fff;
+  border:1px solid #d1dce8;
+  border-radius:6px;
+}
+.ca .stat-lbl{color:#5c6a76;}
+.ca .stat-val{color:#002f65;}
+.ca .sec-title{color:#455560;}
+.ca .tbl{border:1px solid #d1dce8;}
+.ca .tbl-head{background:#f0f5fa;color:#5c6a76;}
+.ca .tbl-row{color:#1e2d3d;border-top:1px solid #e4edf5;}
+
+/* ══════════════════════════
+   B — HAIRLINE + WHISPER
+══════════════════════════ */
+.cb .s-content{background:#f4f8fc;}
+.cb .s-page-hd{color:#1e2d3d;}
+.cb .s-page-sub{color:#5c6a76;}
+.cb .stat{
+  background:#fff;
+  border:1px solid #d1dce8;
+  border-radius:8px;
+  box-shadow:0 1px 3px rgba(0,47,101,.07),0 0 0 0 transparent;
+}
+.cb .stat-lbl{color:#5c6a76;}
+.cb .stat-val{color:#002550;}
+.cb .sec-title{color:#455560;}
+.cb .tbl{
+  border:1px solid #d1dce8;border-radius:6px;overflow:hidden;
+  box-shadow:0 1px 3px rgba(0,47,101,.06);
+}
+.cb .tbl-head{
+  background:linear-gradient(180deg,#eef4fb,#e6f0f8);
+  color:#455560;border-bottom:1px solid #d1dce8;
+}
+.cb .tbl-row{color:#1e2d3d;border-top:1px solid #edf3f9;}
+
+/* ══════════════════════════
+   C — MORE SHADOW
+══════════════════════════ */
+.cc .s-content{background:#eef4fa;}
+.cc .s-page-hd{color:#1e2d3d;}
+.cc .s-page-sub{color:#5c6a76;}
+.cc .stat{
+  background:#fff;
+  border:1px solid #c8d8ec;
+  border-radius:10px;
+  box-shadow:0 2px 8px rgba(0,47,101,.10),0 1px 2px rgba(0,47,101,.06);
+}
+.cc .stat-lbl{color:#5c6a76;}
+.cc .stat-val{color:#001c38;}
+.cc .sec-title{color:#455560;}
+.cc .tbl{
+  border:1px solid #c8d8ec;border-radius:8px;overflow:hidden;
+  box-shadow:0 2px 6px rgba(0,47,101,.08);
+}
+.cc .tbl-head{
+  background:linear-gradient(180deg,#e6f0f8,#dce8f5);
+  color:#455560;border-bottom:1px solid #c8d8ec;
+}
+.cc .tbl-row{color:#1e2d3d;border-top:1px solid #e8f0f8;}
+
+.hint{text-align:center;font-size:11px;color:rgba(255,255,255,.22);margin-top:4px;}
+.note{margin-top:16px;padding:12px 16px;border-radius:6px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.03);font-size:11px;color:rgba(255,255,255,.38);line-height:1.6;}
+.note strong{color:rgba(255,255,255,.58);}
+</style>
+</head>
+<body>
+
+<div class="page-q">B-DS · Question 2 of N — Shell: Satin navy ✓</div>
+<h1 class="page-h">Card &amp; panel treatment</h1>
+<p class="page-sub">How operational data surfaces feel inside the content area. Shell (satin B) is locked across all three — only the cards, stats, and table treatment varies.</p>
+
+<div class="options-row">
+
+  <!-- A -->
+  <div class="opt" id="opt-a">
+    <div class="opt-tag">A — Hairline only</div>
+    <div class="opt-name">Flat precision</div>
+    <div class="opt-desc">1px border, 6px radius, no shadow. Data containers feel like ruled paper — no elevation signal at all.</div>
+    <div class="shell ca" onclick="pick('a')">
+      <div class="s-top">
+        <div class="s-crest">704</div>
+        <div class="s-title">704 SQUADRON</div>
+        <div class="s-year">2026 ▾</div>
+      </div>
+      <div class="s-body">
+        <div class="s-nav">
+          <div class="s-nav-lbl">Operations</div>
+          <div class="s-nav-item active"><div class="s-nav-pip"></div>Dashboard</div>
+          <div class="s-nav-item"><div class="s-nav-pip"></div>Parade Nights</div>
+          <div class="s-nav-item"><div class="s-nav-pip"></div>Activities</div>
+          <div class="s-nav-lbl">Training</div>
+          <div class="s-nav-item"><div class="s-nav-pip"></div>Curriculum</div>
+          <div class="s-nav-item"><div class="s-nav-pip"></div>Facilitators</div>
+        </div>
+        <div class="s-content">
+          <div class="s-page-hd">Training Dashboard</div>
+          <div class="s-page-sub">704 Squadron · Year 2026</div>
+          <div class="stat-row">
+            <div class="stat">
+              <div class="stat-lbl">Parades</div>
+              <div class="stat-val">34</div>
+              <div class="stat-sub">of 36 complete</div>
+            </div>
+            <div class="stat">
+              <div class="stat-lbl">Sessions</div>
+              <div class="stat-val">142</div>
+              <div class="stat-sub">this year</div>
+            </div>
+            <div class="stat">
+              <div class="stat-lbl">Readiness</div>
+              <div class="stat-val">87%</div>
+              <div class="stat-sub">targets met</div>
+            </div>
+          </div>
+          <div class="sec-hd">
+            <div class="sec-title">Upcoming Activities</div>
+            <div class="sec-link">View all</div>
+          </div>
+          <div class="tbl">
+            <div class="tbl-head"><span>Activity</span><span>Date</span><span>Status</span></div>
+            <div class="tbl-row"><span>Fieldcraft Bivouac</span><span>14 Mar</span><span><span class="badge badge-ok">Confirmed</span></span></div>
+            <div class="tbl-row"><span>Range Weekend</span><span>28 Mar</span><span><span class="badge badge-ok">Confirmed</span></span></div>
+            <div class="tbl-row"><span>Biathlon — Wing</span><span>05 Apr</span><span><span class="badge badge-warn">Pending</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B -->
+  <div class="opt" id="opt-b">
+    <div class="opt-tag rec">B — Recommended</div>
+    <div class="opt-name">Hairline + whisper</div>
+    <div class="opt-desc">1px border, 8px radius, shadow: 0 1px 3px rgba(0,47,101,.07). Cards feel placed on the surface — perceptible but unobtrusive.</div>
+    <div class="shell cb" onclick="pick('b')">
+      <div class="s-top">
+        <div class="s-crest">704</div>
+        <div class="s-title">704 SQUADRON</div>
+        <div class="s-year">2026 ▾</div>
+      </div>
+      <div class="s-body">
+        <div class="s-nav">
+          <div class="s-nav-lbl">Operations</div>
+          <div class="s-nav-item active"><div class="s-nav-pip"></div>Dashboard</div>
+          <div class="s-nav-item"><div class="s-nav-pip"></div>Parade Nights</div>
+          <div class="s-nav-item"><div class="s-nav-pip"></div>Activities</div>
+          <div class="s-nav-lbl">Training</div>
+          <div class="s-nav-item"><div class="s-nav-pip"></div>Curriculum</div>
+          <div class="s-nav-item"><div class="s-nav-pip"></div>Facilitators</div>
+        </div>
+        <div class="s-content">
+          <div class="s-page-hd">Training Dashboard</div>
+          <div class="s-page-sub">704 Squadron · Year 2026</div>
+          <div class="stat-row">
+            <div class="stat">
+              <div class="stat-lbl">Parades</div>
+              <div class="stat-val">34</div>
+              <div class="stat-sub">of 36 complete</div>
+            </div>
+            <div class="stat">
+              <div class="stat-lbl">Sessions</div>
+              <div class="stat-val">142</div>
+              <div class="stat-sub">this year</div>
+            </div>
+            <div class="stat">
+              <div class="stat-lbl">Readiness</div>
+              <div class="stat-val">87%</div>
+              <div class="stat-sub">targets met</div>
+            </div>
+          </div>
+          <div class="sec-hd">
+            <div class="sec-title">Upcoming Activities</div>
+            <div class="sec-link">View all</div>
+          </div>
+          <div class="tbl">
+            <div class="tbl-head"><span>Activity</span><span>Date</span><span>Status</span></div>
+            <div class="tbl-row"><span>Fieldcraft Bivouac</span><span>14 Mar</span><span><span class="badge badge-ok">Confirmed</span></span></div>
+            <div class="tbl-row"><span>Range Weekend</span><span>28 Mar</span><span><span class="badge badge-ok">Confirmed</span></span></div>
+            <div class="tbl-row"><span>Biathlon — Wing</span><span>05 Apr</span><span><span class="badge badge-warn">Pending</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C -->
+  <div class="opt" id="opt-c">
+    <div class="opt-tag">C — More shadow</div>
+    <div class="opt-name">Elevated panels</div>
+    <div class="opt-desc">1px border, 10px radius, shadow: 0 2px 8px rgba(0,47,101,.10). Cards feel visibly raised. Warmer, slightly more SaaS-adjacent.</div>
+    <div class="shell cc" onclick="pick('c')">
+      <div class="s-top">
+        <div class="s-crest">704</div>
+        <div class="s-title">704 SQUADRON</div>
+        <div class="s-year">2026 ▾</div>
+      </div>
+      <div class="s-body">
+        <div class="s-nav">
+          <div class="s-nav-lbl">Operations</div>
+          <div class="s-nav-item active"><div class="s-nav-pip"></div>Dashboard</div>
+          <div class="s-nav-item"><div class="s-nav-pip"></div>Parade Nights</div>
+          <div class="s-nav-item"><div class="s-nav-pip"></div>Activities</div>
+          <div class="s-nav-lbl">Training</div>
+          <div class="s-nav-item"><div class="s-nav-pip"></div>Curriculum</div>
+          <div class="s-nav-item"><div class="s-nav-pip"></div>Facilitators</div>
+        </div>
+        <div class="s-content">
+          <div class="s-page-hd">Training Dashboard</div>
+          <div class="s-page-sub">704 Squadron · Year 2026</div>
+          <div class="stat-row">
+            <div class="stat">
+              <div class="stat-lbl">Parades</div>
+              <div class="stat-val">34</div>
+              <div class="stat-sub">of 36 complete</div>
+            </div>
+            <div class="stat">
+              <div class="stat-lbl">Sessions</div>
+              <div class="stat-val">142</div>
+              <div class="stat-sub">this year</div>
+            </div>
+            <div class="stat">
+              <div class="stat-lbl">Readiness</div>
+              <div class="stat-val">87%</div>
+              <div class="stat-sub">targets met</div>
+            </div>
+          </div>
+          <div class="sec-hd">
+            <div class="sec-title">Upcoming Activities</div>
+            <div class="sec-link">View all</div>
+          </div>
+          <div class="tbl">
+            <div class="tbl-head"><span>Activity</span><span>Date</span><span>Status</span></div>
+            <div class="tbl-row"><span>Fieldcraft Bivouac</span><span>14 Mar</span><span><span class="badge badge-ok">Confirmed</span></span></div>
+            <div class="tbl-row"><span>Range Weekend</span><span>28 Mar</span><span><span class="badge badge-ok">Confirmed</span></span></div>
+            <div class="tbl-row"><span>Biathlon — Wing</span><span>05 Apr</span><span><span class="badge badge-warn">Pending</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="hint">Click a mockup to select it</p>
+
+<div class="note">
+  <strong>What to notice:</strong> How clearly can you tell a stat card from the page background? Does the table header create the right hierarchy without weight? Do the cards feel precise (A), placed (B), or floating (C)?
+</div>
+
+<script>
+function pick(c){
+  document.querySelectorAll('.opt').forEach(e=>e.classList.remove('chosen'));
+  document.getElementById('opt-'+c).classList.add('chosen');
+  if(window.__companion_record) window.__companion_record(c,'Card elevation: '+c.toUpperCase());
+}
+</script>
+</body>
+</html>

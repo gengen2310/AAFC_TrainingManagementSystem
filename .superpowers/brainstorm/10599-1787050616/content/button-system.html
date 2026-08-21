@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B-DS · Button system</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0c111a;font-family:'Montserrat',Arial,sans-serif;color:#e8edf3;padding:28px 32px;}
+
+.page-q{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.28);margin-bottom:8px;}
+.page-h{font-size:20px;font-weight:700;color:#fff;margin-bottom:5px;}
+.page-sub{font-size:12px;color:rgba(255,255,255,.38);margin-bottom:24px;line-height:1.6;max-width:640px;}
+
+/* grid of 3 options */
+.opts{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:14px;}
+.opt-tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;border-radius:3px;padding:2px 7px;margin-bottom:6px;}
+.tag-a{background:rgba(255,255,255,.07);color:rgba(255,255,255,.45);}
+.tag-b{background:rgba(81,176,227,.22);color:#7dcaf0;}
+.tag-c{background:rgba(255,255,255,.07);color:rgba(255,255,255,.45);}
+.opt-name{font-size:13px;font-weight:700;color:#fff;margin-bottom:3px;}
+.opt-desc{font-size:11px;color:rgba(255,255,255,.35);line-height:1.5;margin-bottom:12px;}
+
+/* clickable option panel */
+.opt-panel{
+  border-radius:8px;border:2px solid rgba(255,255,255,.06);
+  background:rgba(255,255,255,.03);
+  padding:18px 16px;cursor:pointer;
+  transition:border-color .15s,background .15s;
+}
+.opt-panel:hover{border-color:rgba(81,176,227,.3);background:rgba(81,176,227,.04);}
+.opt-wrap.chosen .opt-panel{border-color:#51b0e3;background:rgba(81,176,227,.07);}
+.opt-wrap.chosen .opt-name{color:#7dcaf0;}
+
+/* row of buttons inside each panel */
+.btn-row{display:flex;flex-direction:column;gap:8px;}
+.btn-label{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:rgba(255,255,255,.25);margin-bottom:2px;margin-top:4px;}
+.btn-label:first-child{margin-top:0;}
+
+/* shared button base */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  width:100%;padding:10px 16px;border-radius:5px;
+  font-family:'Montserrat',Arial,sans-serif;
+  font-size:12px;font-weight:700;letter-spacing:.04em;
+  cursor:pointer;border:none;transition:all .12s;
+}
+
+/* ═══ PRIMARY — locked, same across all ═══ */
+.btn-primary{
+  background:linear-gradient(180deg,#003a7a 0%,#002050 100%);
+  color:#fff;
+  border:1px solid rgba(0,30,65,.2);
+  box-shadow:0 1px 0 rgba(255,255,255,.10) inset,0 -1px 0 rgba(0,0,0,.20) inset,0 1px 3px rgba(0,30,65,.25);
+}
+
+/* ═══ DANGER — same across all ═══ */
+.btn-danger{
+  background:linear-gradient(180deg,#c8102e 0%,#9a0b22 100%);
+  color:#fff;
+  border:1px solid rgba(100,0,20,.3);
+  box-shadow:0 1px 0 rgba(255,255,255,.08) inset,0 -1px 0 rgba(0,0,0,.20) inset,0 1px 3px rgba(150,0,30,.3);
+}
+
+/* ═══ DISABLED — same across all ═══ */
+.btn-disabled{
+  background:#f4f8fc;color:#b0b7bb;
+  border:1px solid #d1dce8;cursor:not-allowed;
+  box-shadow:none;opacity:.7;
+}
+
+/* ─────────────────────────────
+   A — Sharp outline
+   Secondary: white bg, dark navy border + text
+   Ghost: text-only, steel
+───────────────────────────── */
+.a-secondary{
+  background:#fff;color:#002f65;
+  border:1.5px solid #002f65;
+  box-shadow:none;
+}
+.a-ghost{
+  background:transparent;color:#455560;
+  border:1px solid transparent;
+  box-shadow:none;
+}
+
+/* ─────────────────────────────
+   B — Blue tinted (Recommended)
+   Secondary: light blue tint bg, blue border
+   Ghost: text-only in AAFC blue
+───────────────────────────── */
+.b-secondary{
+  background:#f0f7ff;color:#002f65;
+  border:1.5px solid #bee3f8;
+  box-shadow:0 1px 2px rgba(0,47,101,.06);
+}
+.b-ghost{
+  background:transparent;color:#004b8d;
+  border:1px solid transparent;
+  box-shadow:none;font-weight:600;
+}
+
+/* ─────────────────────────────
+   C — Neutral steel
+   Secondary: light neutral bg, quiet border
+   Ghost: text-only, steel
+───────────────────────────── */
+.c-secondary{
+  background:#f4f8fc;color:#1e2d3d;
+  border:1.5px solid #d1dce8;
+  box-shadow:0 1px 2px rgba(0,47,101,.05);
+}
+.c-ghost{
+  background:transparent;color:#455560;
+  border:1px solid transparent;
+  box-shadow:none;font-weight:600;
+}
+
+.hint{text-align:center;font-size:11px;color:rgba(255,255,255,.18);margin-top:4px;}
+.note{
+  margin-top:14px;padding:12px 16px;border-radius:6px;
+  border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.03);
+  font-size:11px;color:rgba(255,255,255,.32);line-height:1.7;
+}
+.note strong{color:rgba(255,255,255,.5);}
+</style>
+</head>
+<body>
+
+<div class="page-q">B-DS · Question 4 of N — Shell ✓ · Cards ✓ · Login ✓</div>
+<h1 class="page-h">Button system</h1>
+<p class="page-sub">Primary is locked (dark navy gradient, engineered depth). Which secondary and ghost treatment works alongside it? Danger and disabled are the same across all options.</p>
+
+<div class="opts">
+
+  <!-- A -->
+  <div class="opt-wrap" id="opt-a">
+    <div class="opt-tag tag-a">A</div>
+    <div class="opt-name">Sharp outline</div>
+    <div class="opt-desc">Secondary is a crisp navy outline on white. Ghost is bare steel text. Maximum contrast between levels.</div>
+    <div class="opt-panel" onclick="pick('a')">
+      <div class="btn-row">
+        <div class="btn-label">Primary (locked)</div>
+        <button class="btn btn-primary">Save changes</button>
+
+        <div class="btn-label">Secondary</div>
+        <button class="btn a-secondary">Cancel</button>
+
+        <div class="btn-label">Ghost / text</div>
+        <button class="btn a-ghost">View details</button>
+
+        <div class="btn-label">Danger</div>
+        <button class="btn btn-danger">Delete record</button>
+
+        <div class="btn-label">Disabled</div>
+        <button class="btn btn-disabled" disabled>Unavailable</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- B -->
+  <div class="opt-wrap" id="opt-b">
+    <div class="opt-tag tag-b">B — Recommended</div>
+    <div class="opt-name">Blue tinted</div>
+    <div class="opt-desc">Secondary has a soft AAFC-blue tint. Ghost is royal blue text. Family feels cohesive and official.</div>
+    <div class="opt-panel" onclick="pick('b')">
+      <div class="btn-row">
+        <div class="btn-label">Primary (locked)</div>
+        <button class="btn btn-primary">Save changes</button>
+
+        <div class="btn-label">Secondary</div>
+        <button class="btn b-secondary">Cancel</button>
+
+        <div class="btn-label">Ghost / text</div>
+        <button class="btn b-ghost">View details</button>
+
+        <div class="btn-label">Danger</div>
+        <button class="btn btn-danger">Delete record</button>
+
+        <div class="btn-label">Disabled</div>
+        <button class="btn btn-disabled" disabled>Unavailable</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- C -->
+  <div class="opt-wrap" id="opt-c">
+    <div class="opt-tag tag-c">C</div>
+    <div class="opt-name">Neutral steel</div>
+    <div class="opt-desc">Secondary is a light neutral grey. Ghost is quiet steel text. Lets the primary command full attention.</div>
+    <div class="opt-panel" onclick="pick('c')">
+      <div class="btn-row">
+        <div class="btn-label">Primary (locked)</div>
+        <button class="btn btn-primary">Save changes</button>
+
+        <div class="btn-label">Secondary</div>
+        <button class="btn c-secondary">Cancel</button>
+
+        <div class="btn-label">Ghost / text</div>
+        <button class="btn c-ghost">View details</button>
+
+        <div class="btn-label">Danger</div>
+        <button class="btn btn-danger">Delete record</button>
+
+        <div class="btn-label">Disabled</div>
+        <button class="btn btn-disabled" disabled>Unavailable</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="hint">Click a panel to select it</p>
+
+<div class="note">
+  <strong>Consider:</strong> Secondary appears next to Primary on every form (Save / Cancel). Ghost appears in tables and nav for low-priority actions. The right secondary is clearly subordinate to Primary but still readable without squinting. Danger is always high-contrast — never softened.
+</div>
+
+<script>
+function pick(c){
+  document.querySelectorAll('.opt-wrap').forEach(e=>e.classList.remove('chosen'));
+  document.getElementById('opt-'+c).classList.add('chosen');
+}
+</script>
+</body>
+</html>

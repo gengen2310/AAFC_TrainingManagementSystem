@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B-DS · Login v3</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:'Montserrat',Arial,sans-serif;
+  background:linear-gradient(160deg,#001e42 0%,#000e26 100%);
+  min-height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  gap:32px;
+  padding:40px 24px;
+  position:relative;
+  flex-wrap:wrap;
+}
+body::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 40%,rgba(81,176,227,.05) 0%,transparent 55%);
+}
+
+/* step label above each card */
+.step-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;}
+.step-label{
+  font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:rgba(255,255,255,.35);
+}
+.step-arrow{
+  font-size:18px;color:rgba(255,255,255,.15);
+  align-self:center;margin-top:48px;
+}
+
+/* ── WHITE CARD — same system as rest of app ── */
+.card{
+  width:300px;
+  background:#fff;
+  border-radius:10px;
+  border:1px solid #d1dce8;
+  box-shadow:
+    0 1px 3px rgba(0,47,101,.08),
+    0 8px 32px rgba(0,0,0,.28);
+  padding:28px 24px 24px;
+  position:relative;
+  overflow:hidden;
+}
+
+/* subtle top-edge tint — just enough to say "premium" on a white card */
+.card::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,#002f65,#004b8d 50%,#51b0e3);
+  opacity:.7;
+}
+
+/* ── IDENTITY ── */
+.identity{
+  display:flex;flex-direction:column;align-items:center;
+  margin-bottom:22px;
+}
+.crest{
+  width:48px;height:48px;
+  border-radius:8px;
+  background:#f0f7ff;
+  border:1px solid #d1dce8;
+  display:flex;align-items:center;justify-content:center;
+  padding:10px;   /* equal on all sides */
+  margin-bottom:12px;
+}
+.crest-text{
+  font-size:11px;font-weight:800;
+  color:#002f65;letter-spacing:.04em;line-height:1;
+}
+.org-name{
+  font-size:8px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;
+  color:#455560;margin-bottom:4px;text-align:center;
+}
+.product-name{
+  font-size:13px;font-weight:800;
+  color:#001e42;text-align:center;letter-spacing:.01em;
+}
+.divider{
+  width:28px;height:2px;border-radius:1px;
+  background:#51b0e3;opacity:.6;
+  margin:10px auto 0;
+}
+
+/* ── FIELDS ── */
+.field{margin-bottom:12px;}
+.field-group{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+label{
+  display:block;
+  font-size:10px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;
+  color:#455560;margin-bottom:5px;
+}
+select,input[type="password"],input[type="text"]{
+  width:100%;
+  font-family:'Montserrat',Arial,sans-serif;
+  font-size:13px;font-weight:500;
+  color:#1e2d3d;
+  padding:10px 12px;
+  border-radius:5px;
+  background:#fff;
+  border:1.5px solid #d1dce8;
+  outline:none;
+  transition:border-color .15s,box-shadow .15s;
+  appearance:none;
+}
+select{
+  background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%23455560' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;
+  background-color:#fff;
+  padding-right:28px;
+}
+select:focus,input:focus{
+  border-color:#51b0e3;
+  box-shadow:0 0 0 3px rgba(81,176,227,.12);
+}
+select:disabled{
+  background:#f4f8fc;color:#b0b7bb;cursor:not-allowed;
+}
+
+/* account banner (step 2) */
+.acct-banner{
+  background:#f0f7ff;border:1.5px solid #bee3f8;
+  border-radius:6px;padding:9px 12px;
+  font-size:12px;font-weight:600;color:#002f65;
+  text-align:center;margin-bottom:14px;
+}
+.acct-back{
+  display:block;background:none;border:none;
+  color:#455560;font-size:11px;cursor:pointer;
+  padding:3px 0;margin-top:6px;text-decoration:underline;
+  font-family:'Montserrat',Arial,sans-serif;
+  width:100%;text-align:center;
+}
+
+/* ── BUTTONS ── */
+.btn-primary{
+  width:100%;padding:11px;
+  border-radius:5px;
+  border:1px solid rgba(0,30,65,.2);
+  font-family:'Montserrat',Arial,sans-serif;
+  font-size:12px;font-weight:700;
+  letter-spacing:.05em;color:#fff;cursor:pointer;
+  /* engineered: tight tonal gradient, not gloss arc */
+  background:linear-gradient(180deg,#003a7a 0%,#002050 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.10) inset,
+    0 -1px 0 rgba(0,0,0,.20) inset,
+    0 1px 3px rgba(0,30,65,.25);
+  transition:background .12s,box-shadow .12s;
+}
+.btn-primary:hover{
+  background:linear-gradient(180deg,#004590 0%,#002a60 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.12) inset,
+    0 -1px 0 rgba(0,0,0,.25) inset,
+    0 2px 6px rgba(0,30,65,.35);
+}
+.btn-primary:active{
+  background:linear-gradient(180deg,#001e42 0%,#00183a 100%);
+  transform:translateY(1px);
+}
+
+/* progress dots */
+.progress{display:flex;justify-content:center;gap:6px;margin-top:14px;}
+.dot{
+  width:6px;height:6px;border-radius:50%;
+  background:#d1dce8;transition:background .2s;
+}
+.dot.active{background:#51b0e3;}
+.dot.done{background:#004b8d;}
+</style>
+</head>
+<body>
+
+<!-- ─── STEP 1 — Select Organisation ─── -->
+<div class="step-wrap">
+  <div class="step-label">Step 1 of 2 — Select Organisation</div>
+  <div class="card">
+    <div class="identity">
+      <div class="crest"><span class="crest-text">AAFC</span></div>
+      <div class="org-name">Australian Air Force Cadets</div>
+      <div class="product-name">Training Management System</div>
+      <div class="divider"></div>
+    </div>
+
+    <div class="field">
+      <label for="scope">I am signing in as</label>
+      <select id="scope">
+        <option value="">Select role...</option>
+        <option selected>Squadron staff</option>
+        <option>Wing staff</option>
+        <option>National staff</option>
+        <option>Auditor</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="wing">Wing</label>
+      <select id="wing">
+        <option value="">Select wing...</option>
+        <option selected>7 Wing</option>
+        <option>1 Wing</option>
+        <option>2 Wing</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="sqn">Squadron</label>
+      <select id="sqn">
+        <option value="">Select squadron...</option>
+        <option selected>704 Squadron</option>
+        <option>703 Squadron</option>
+        <option>705 Squadron</option>
+      </select>
+    </div>
+
+    <button class="btn-primary">Next →</button>
+
+    <div class="progress">
+      <div class="dot active"></div>
+      <div class="dot"></div>
+    </div>
+  </div>
+</div>
+
+<!-- arrow -->
+<div class="step-arrow">→</div>
+
+<!-- ─── STEP 2 — Access Code ─── -->
+<div class="step-wrap">
+  <div class="step-label">Step 2 of 2 — Access Code</div>
+  <div class="card">
+    <div class="identity">
+      <div class="crest"><span class="crest-text">AAFC</span></div>
+      <div class="org-name">Australian Air Force Cadets</div>
+      <div class="product-name">Training Management System</div>
+      <div class="divider"></div>
+    </div>
+
+    <div class="acct-banner">
+      704 Squadron · Squadron Staff
+      <button class="acct-back">← Change selection</button>
+    </div>
+
+    <div class="field">
+      <label for="code">Access Code</label>
+      <input type="password" id="code" placeholder="Enter your access code">
+    </div>
+
+    <button class="btn-primary">Sign In</button>
+
+    <div class="progress">
+      <div class="dot done"></div>
+      <div class="dot active"></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

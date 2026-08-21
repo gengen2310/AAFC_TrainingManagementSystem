@@ -1785,7 +1785,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <div class="card">
           <div class="ctitle">Session Structure</div>
           <div class="form-row">
-            <div class="ff"><label for="s-sess">Default Sessions Per Night (fallback)</label>
+            <div class="ff"><label for="s-sess">Default Training Periods (fallback)</label>
               <select id="s-sess" aria-label="Default sessions per night">
                 <option value="1">1 Session</option><option value="2">2 Sessions</option><option value="3" selected>3 Sessions</option>
               </select>
@@ -1814,7 +1814,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <div class="card">
           <div class="ctitle">Timing Templates</div>
-          <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Named parade night schedules with ordered blocks. Instructional Period blocks generate schedulable curriculum sessions. New parade nights automatically use the template effective on their date.</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Named parade night schedules with ordered blocks. Training Period blocks generate schedulable curriculum sessions. New parade nights automatically use the template effective on their date.</div>
           <div id="timing-templates-list" style="margin-bottom:12px"><div style="color:var(--muted);font-size:11px">Loading…</div></div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
             <button class="btn btn-dk admin-el" onclick="openTimingTemplateModal()">+ New Template</button>
@@ -2952,7 +2952,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
       </div>
       <div class="form-row">
-        <div class="ff"><label for="pn-nsess">Sessions This Night</label>
+        <div class="ff"><label for="pn-nsess">Training Periods This Night</label>
           <select id="pn-nsess" aria-label="Number of sessions this night" onchange="buildSlots()">
             <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option>
           </select>
@@ -3904,12 +3904,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <div class="ff"><label>Notes</label><input id="tt-notes" type="text" placeholder="e.g. Applies Term 3 onwards"></div>
         <div class="ff"><label for="tt-quick-n">Quick setup</label>
           <div style="display:flex;gap:6px;align-items:center">
-            <select id="tt-quick-n" aria-label="Number of instructional periods for quick setup"><option value="">— periods —</option><option value="1">1 IP</option><option value="2">2 IP</option><option value="3">3 IP</option><option value="4">4 IP</option></select>
+            <select id="tt-quick-n" aria-label="Number of training periods for quick setup"><option value="">— periods —</option><option value="1">1 TP</option><option value="2">2 TP</option><option value="3">3 TP</option><option value="4">4 TP</option></select>
             <button class="btn" onclick="ttQuickSetup()">Auto-populate</button>
           </div>
         </div>
       </div>
-      <div style="font-weight:600;font-size:12px;margin:14px 0 4px">Blocks <span style="font-weight:400;color:var(--muted);font-size:11px">— IP = Instructional Period (generates a schedulable session); Opt = optional block</span></div>
+      <div style="font-weight:600;font-size:12px;margin:14px 0 4px">Blocks <span style="font-weight:400;color:var(--muted);font-size:11px">— TP = Training Period (generates a schedulable session); Opt = optional block</span></div>
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:11px">
           <thead><tr style="background:var(--bg2);border-bottom:1px solid var(--border)">
@@ -3919,7 +3919,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <th style="padding:4px 4px;text-align:left">Start</th>
             <th style="padding:4px 4px;text-align:left">End</th>
             <th style="padding:4px 4px;text-align:center">Min</th>
-            <th style="padding:4px 4px;text-align:center">IP</th>
+            <th style="padding:4px 4px;text-align:center">TP</th>
             <th style="padding:4px 4px;text-align:center">Opt</th>
             <th style="padding:4px 4px;text-align:center">Order</th>
             <th style="padding:4px 4px;text-align:center">Del</th>
@@ -3974,7 +3974,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
               <th style="padding:4px 4px;text-align:left">Start</th>
               <th style="padding:4px 4px;text-align:left">End</th>
               <th style="padding:4px 4px;text-align:center">Min</th>
-              <th style="padding:4px 4px;text-align:center">IP</th>
+              <th style="padding:4px 4px;text-align:center">TP</th>
               <th style="padding:4px 4px;text-align:center">Opt</th>
               <th style="padding:4px 4px;text-align:center">Del</th>
             </tr></thead>
@@ -12526,8 +12526,50 @@ function safeUrl(u){try{const p=new URL(String(u||''),location.href).protocol;re
 function _cap(s){s=String(s||'');return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
 let _ttEditId=null, _ttBlocks=[], _pnOverridePnId=null;
 
-const _TT_BLOCK_TYPES=['arrival','administration','roll_call','parade','flight_period',
-  'instructional_period','break','fatigues','debrief','dismissal','custom'];
+const BLOCK_TYPE_OPTIONS=[
+  {value:'arrival',         label:'Arrival'},
+  {value:'admin',           label:'Admin'},
+  {value:'parade',          label:'Parade'},
+  {value:'briefing',        label:'Briefing'},
+  {value:'training_period', label:'Training Period'},
+  {value:'drinks_break',    label:'Drinks Break'},
+  {value:'fatigue',         label:'Fatigue'},
+  {value:'dismissal',       label:'Dismissal'},
+  {value:'other',           label:'Other (custom name)'},
+];
+
+function ttBlockTypeLabel(bt,name){
+  const MAP={arrival:'Arrival',admin:'Admin',parade:'Parade',briefing:'Briefing',
+             training_period:'Training Period',drinks_break:'Drinks Break',
+             fatigue:'Fatigue',dismissal:'Dismissal',other:''};
+  return bt==='other'?esc(name||'Other'):(MAP[bt]||esc(bt));
+}
+
+function ttSyncBlockType(sel){
+  const row=sel.closest('tr');
+  const nameInput=row.querySelector('.tt-block-name');
+  const ipCheck=row.querySelector('.tt-block-ip');
+  const bt=sel.value;
+  const opt=BLOCK_TYPE_OPTIONS.find(o=>o.value===bt);
+  const label=opt?opt.label:'';
+  const i=Array.from(row.parentNode.rows).indexOf(row);
+  if(bt==='training_period'){
+    if(nameInput&&(!nameInput.value||nameInput.value===nameInput.dataset.autoName)){
+      nameInput.value='Training Period';
+      nameInput.dataset.autoName='Training Period';
+      if(i>=0) _ttBSet(i,'block_name','Training Period');
+    }
+    if(ipCheck){ipCheck.checked=true;ipCheck.disabled=true;}
+  } else {
+    if(nameInput&&(!nameInput.value||nameInput.value===nameInput.dataset.autoName)){
+      const v=bt==='other'?'':label;
+      nameInput.value=v;
+      nameInput.dataset.autoName=v;
+      if(i>=0) _ttBSet(i,'block_name',v);
+    }
+    if(ipCheck){ipCheck.checked=false;ipCheck.disabled=false;}
+  }
+}
 
 function getEffectiveTemplate(date, sqnId){
   const tpls=(S.timingTemplates||[]).filter(t=>
@@ -12551,7 +12593,7 @@ function renderTimingTemplates(){
     const badge=isCurrent?'<span style="background:var(--ok);color:#fff;padding:1px 7px;border-radius:10px;font-size:10px;margin-left:6px;font-weight:700">Current</span>':'';
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
       <div style="flex:1;font-size:12px"><span style="font-weight:600">${esc(t.name)}</span>${badge}
-        <span style="color:var(--muted);font-size:11px;margin-left:8px">from ${t.effective_from}${t.effective_to?' to '+t.effective_to:''} · ${t.instructional_period_count||0} IP block${t.instructional_period_count===1?'':'s'}</span>
+        <span style="color:var(--muted);font-size:11px;margin-left:8px">from ${t.effective_from}${t.effective_to?' to '+t.effective_to:''} · ${t.instructional_period_count||0} Training Period block${t.instructional_period_count===1?'':'s'}</span>
       </div>
       <button class="btn admin-el" style="font-size:11px;padding:2px 8px" onclick="openTimingTemplateModal('${esc(t.timing_template_id)}')">Edit</button>
     </div>`;
@@ -12592,16 +12634,16 @@ function _ttDur(b){
 }
 
 function _ttBlockRow(b,i){
-  const typeOpts=_TT_BLOCK_TYPES.map(t=>`<option value="${t}"${b.block_type===t?' selected':''}>${_cap(t.replace(/_/g,' '))}</option>`).join('');
+  const typeOpts=BLOCK_TYPE_OPTIONS.map(o=>`<option value="${o.value}"${b.block_type===o.value?' selected':''}>${esc(o.label)}</option>`).join('');
   const dur=_ttDur(b);
   return `<tr>
     <td style="padding:3px 4px;color:var(--muted);white-space:nowrap">${i+1}</td>
-    <td style="padding:2px 3px"><input value="${esc(b.block_name||'')}" oninput="_ttBSet(${i},'block_name',this.value)" style="width:100%;min-width:95px;font-size:11px"></td>
-    <td style="padding:2px 3px"><select onchange="_ttBSet(${i},'block_type',this.value)" aria-label="Block type for period ${i+1}" style="width:100%;font-size:11px">${typeOpts}</select></td>
+    <td style="padding:2px 3px"><input class="tt-block-name" value="${esc(b.block_name||'')}" oninput="_ttBSet(${i},'block_name',this.value)" style="width:100%;min-width:95px;font-size:11px"></td>
+    <td style="padding:2px 3px"><select onchange="_ttBSet(${i},'block_type',this.value);_ttBSet(${i},'is_instructional_period',this.value==='training_period');ttSyncBlockType(this)" aria-label="Block type for period ${i+1}" style="width:100%;font-size:11px">${typeOpts}</select></td>
     <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_ttBSet(${i},'start_time',this.value);renderTTBlocks()" style="width:82px;font-size:11px"></td>
     <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_ttBSet(${i},'end_time',this.value);renderTTBlocks()" style="width:82px;font-size:11px"></td>
     <td style="padding:2px 4px;text-align:center;font-size:11px;color:var(--muted)">${dur!=null?dur:''}</td>
-    <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_instructional_period?' checked':''} onchange="_ttBSet(${i},'is_instructional_period',this.checked)"></td>
+    <td style="padding:2px 4px;text-align:center"><input class="tt-block-ip" type="checkbox"${b.is_instructional_period?' checked':''}${b.block_type==='training_period'?' disabled':''} onchange="_ttBSet(${i},'is_instructional_period',this.checked)"></td>
     <td style="padding:2px 4px;text-align:center"><input type="checkbox"${b.is_optional?' checked':''} onchange="_ttBSet(${i},'is_optional',this.checked)"></td>
     <td style="padding:2px 3px;text-align:center;white-space:nowrap">
       ${i>0?`<button class="btn" style="font-size:10px;padding:1px 4px" onclick="_ttBMove(${i},-1)">▲</button>`:'<span style="display:inline-block;width:24px"></span>'}
@@ -12624,19 +12666,33 @@ function _ttBMove(i,dir){
 function _ttBDel(i){ _ttBlocks.splice(i,1); renderTTBlocks(); }
 
 function ttAddBlock(){
-  _ttBlocks.push({block_name:'',block_type:'instructional_period',is_instructional_period:true,is_optional:false,start_time:'',end_time:''});
+  _ttBlocks.push({block_name:'Training Period',block_type:'training_period',is_instructional_period:true,is_optional:false,start_time:'',end_time:''});
   renderTTBlocks();
 }
 
 function ttQuickSetup(){
-  const n=parseInt(document.getElementById('tt-quick-n').value);
-  if(!n||n<1||n>4) return;
-  const nonIP=_ttBlocks.filter(b=>!b.is_instructional_period);
-  const ips=Array.from({length:n},(_,i)=>({
-    block_name:`Period ${i+1}`,block_type:'instructional_period',
-    is_instructional_period:true,is_optional:false,start_time:'',end_time:'',
-  }));
-  _ttBlocks=[...nonIP,...ips];
+  const n=parseInt(document.getElementById('tt-quick-n')?.value||'3',10);
+  if(isNaN(n)||n<1||n>10) return;
+  const blocks=[
+    {block_name:'Arrival',  block_type:'arrival',  is_instructional_period:false,is_optional:false,start_time:'',end_time:''},
+    {block_name:'Admin',    block_type:'admin',    is_instructional_period:false,is_optional:false,start_time:'',end_time:''},
+    {block_name:'Parade',   block_type:'parade',   is_instructional_period:false,is_optional:false,start_time:'',end_time:''},
+    {block_name:'Briefing', block_type:'briefing', is_instructional_period:false,is_optional:false,start_time:'',end_time:''},
+  ];
+  for(let i=0;i<n;i++){
+    blocks.push({block_name:n>1?`Training Period ${i+1}`:'Training Period',
+                 block_type:'training_period',is_instructional_period:true,is_optional:false,start_time:'',end_time:''});
+    if(i===0&&n>1){
+      blocks.push({block_name:'Drinks Break',block_type:'drinks_break',
+                   is_instructional_period:false,is_optional:false,start_time:'',end_time:''});
+    }
+  }
+  blocks.push(
+    {block_name:'Fatigue',   block_type:'fatigue',   is_instructional_period:false,is_optional:false,start_time:'',end_time:''},
+    {block_name:'Parade',    block_type:'parade',    is_instructional_period:false,is_optional:false,start_time:'',end_time:''},
+    {block_name:'Dismissal', block_type:'dismissal', is_instructional_period:false,is_optional:false,start_time:'',end_time:''}
+  );
+  _ttBlocks=blocks.map((b,i)=>({...b,display_order:i+1}));
   renderTTBlocks();
 }
 
@@ -12656,7 +12712,7 @@ async function saveTimingTemplate(){
   const blocks=_ttBlocks.map((b,i)=>({
     display_order:i,
     block_name:b.block_name||('Block '+(i+1)),
-    block_type:b.block_type||'custom',
+    block_type:b.block_type||'other',
     is_instructional_period:!!b.is_instructional_period,
     is_optional:!!b.is_optional,
     start_time:b.start_time||null,
@@ -12716,8 +12772,7 @@ function _pnOrMode(mode) {
   document.getElementById('pn-or-mode-cus').style.color = isTpl ? 'var(--text)' : '#fff';
 }
 function _pnCbBlockRow(b, i) {
-  const types = [['instructional_period','Instructional Period'],['break','Break'],['admin','Admin'],['other','Other']];
-  const typeOpts = types.map(([v,l])=>`<option value="${v}"${b.block_type===v?' selected':''}>${l}</option>`).join('');
+  const typeOpts = BLOCK_TYPE_OPTIONS.map(o=>`<option value="${o.value}"${b.block_type===o.value?' selected':''}>${esc(o.label)}</option>`).join('');
   const sh = b.start_time && b.end_time ? (() => {
     const [sh,sm]=b.start_time.split(':').map(Number), [eh,em]=b.end_time.split(':').map(Number);
     const d=(eh*60+em)-(sh*60+sm); return d>0?String(d):'';
@@ -12725,7 +12780,7 @@ function _pnCbBlockRow(b, i) {
   return `<tr>
     <td style="padding:2px 4px;color:var(--muted);font-size:11px">${i+1}</td>
     <td style="padding:2px 3px"><input value="${esc(b.block_name)}" oninput="_pnCbSet(${i},'block_name',this.value)" style="width:100px;font-size:11px"></td>
-    <td style="padding:2px 3px"><select aria-label="Block type" style="font-size:11px" onchange="_pnCbSet(${i},'block_type',this.value);_pnCbSet(${i},'is_instructional_period',this.value==='instructional_period');renderPNCbBlocks()">${typeOpts}</select></td>
+    <td style="padding:2px 3px"><select aria-label="Block type" style="font-size:11px" onchange="_pnCbSet(${i},'block_type',this.value);_pnCbSet(${i},'is_instructional_period',this.value==='training_period');renderPNCbBlocks()">${typeOpts}</select></td>
     <td style="padding:2px 3px"><input type="time" value="${b.start_time||''}" oninput="_pnCbSet(${i},'start_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:11px"></td>
     <td style="padding:2px 3px"><input type="time" value="${b.end_time||''}" oninput="_pnCbSet(${i},'end_time',this.value);renderPNCbBlocks()" style="width:82px;font-size:11px"></td>
     <td style="padding:2px 4px;text-align:center;font-size:11px;color:var(--muted)">${sh}</td>
@@ -12741,7 +12796,7 @@ function renderPNCbBlocks() {
 function _pnCbSet(i,f,v){ if(_pnCbBlocks[i]) _pnCbBlocks[i][f]=v; }
 function _pnCbDel(i){ _pnCbBlocks.splice(i,1); renderPNCbBlocks(); }
 function pnCbAddBlock(){
-  _pnCbBlocks.push({block_name:'',block_type:'instructional_period',is_instructional_period:true,is_optional:false,start_time:'',end_time:''});
+  _pnCbBlocks.push({block_name:'Training Period',block_type:'training_period',is_instructional_period:true,is_optional:false,start_time:'',end_time:''});
   renderPNCbBlocks();
 }
 

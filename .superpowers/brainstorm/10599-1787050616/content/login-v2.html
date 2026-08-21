@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B-DS · Login v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:'Montserrat',Arial,sans-serif;
+  /* A-style background — dark navy, not near-black */
+  background:linear-gradient(160deg,#001e42 0%,#000e26 100%);
+  min-height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  padding:40px 20px;
+  position:relative;
+  overflow:hidden;
+}
+
+/* very subtle radial lift centred on the panel */
+body::before{
+  content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 40%,rgba(81,176,227,.05) 0%,transparent 55%);
+}
+
+/* ── LOGIN CARD ── dark anodised, B-style, on A-style background */
+.card{
+  width:320px;
+  padding:36px 28px 32px;
+  position:relative;
+  border-radius:10px;
+
+  /* dark anodised satin surface */
+  background:linear-gradient(160deg,#001224 0%,#001a38 100%);
+
+  /* layer edges */
+  border:1px solid rgba(255,255,255,.07);
+  box-shadow:
+    /* engineered top-edge highlight — light catching the rim */
+    0 1px 0 rgba(255,255,255,.08) inset,
+    /* bottom-edge shadow */
+    0 -1px 0 rgba(0,0,0,.35) inset,
+    /* ambient depth */
+    0 20px 60px rgba(0,0,0,.55),
+    0 4px 16px rgba(0,0,0,.3);
+}
+
+/* the 1px top-edge highlight as a pseudo — wider than the inset shadow alone */
+.card::before{
+  content:'';
+  position:absolute;
+  top:0;left:10%;right:10%;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.12) 30%,rgba(255,255,255,.12) 70%,transparent);
+  border-radius:1px;
+}
+
+/* ── IDENTITY ── */
+.identity{
+  display:flex;flex-direction:column;align-items:center;
+  margin-bottom:28px;gap:0;
+}
+
+/* AAFC badge — equal padding on all sides */
+.crest{
+  width:48px;height:48px;
+  border-radius:8px;
+  background:rgba(81,176,227,.12);
+  border:1px solid rgba(81,176,227,.18);
+  display:flex;align-items:center;justify-content:center;
+  padding:10px; /* equal all sides */
+  margin-bottom:14px;
+}
+.crest-text{
+  font-size:11px;font-weight:800;
+  color:#7dcaf0;
+  letter-spacing:.06em;
+  line-height:1;
+}
+
+.org-name{
+  font-size:8px;font-weight:700;
+  letter-spacing:.16em;text-transform:uppercase;
+  color:rgba(255,255,255,.38);
+  margin-bottom:5px;
+  text-align:center;
+}
+.product-name{
+  font-size:14px;font-weight:800;
+  color:rgba(255,255,255,.92);
+  letter-spacing:.01em;
+  text-align:center;
+}
+.divider{
+  width:32px;height:2px;border-radius:1px;
+  background:#51b0e3;opacity:.6;
+  margin:12px auto 0;
+}
+
+/* ── FORM ── */
+.field{margin-bottom:14px;}
+label{
+  display:block;
+  font-size:10px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;
+  color:rgba(255,255,255,.42);
+  margin-bottom:6px;
+}
+select,input[type="password"]{
+  width:100%;
+  font-family:'Montserrat',Arial,sans-serif;
+  font-size:13px;font-weight:500;
+  color:rgba(255,255,255,.88);
+  padding:10px 12px;
+  border-radius:5px;
+  background:rgba(0,0,0,.28);
+  border:1px solid rgba(255,255,255,.10);
+  outline:none;
+  transition:border-color .15s,box-shadow .15s;
+  appearance:none;
+}
+select{
+  background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='rgba(255,255,255,0.4)' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;
+  padding-right:28px;
+}
+select option{background:#001a38;color:#e8edf3;}
+input[type="password"]::placeholder{color:rgba(255,255,255,.25);}
+select:focus,input[type="password"]:focus{
+  border-color:rgba(81,176,227,.45);
+  box-shadow:0 0 0 3px rgba(81,176,227,.10);
+}
+
+/* ── PRIMARY BUTTON — engineered depth, not gloss ── */
+.btn{
+  width:100%;
+  padding:11px;
+  margin-top:4px;
+  border-radius:5px;
+  border:1px solid rgba(255,255,255,.09);
+  font-family:'Montserrat',Arial,sans-serif;
+  font-size:12px;font-weight:700;
+  letter-spacing:.05em;
+  color:#fff;
+  cursor:pointer;
+
+  /* engineered: tight 2-stop tonal gradient, not a shiny gloss arc */
+  background:linear-gradient(180deg,#1a4a80 0%,#0e3464 100%);
+
+  /* subtle top-edge highlight — same language as the card */
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.08) inset,
+    0 -1px 0 rgba(0,0,0,.25) inset,
+    0 1px 3px rgba(0,0,0,.4);
+
+  transition:background .12s,box-shadow .12s;
+}
+.btn:hover{
+  background:linear-gradient(180deg,#1e5490 0%,#133d74 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.1) inset,
+    0 -1px 0 rgba(0,0,0,.3) inset,
+    0 2px 6px rgba(0,0,0,.5);
+}
+.btn:active{
+  background:linear-gradient(180deg,#0e3464 0%,#0a2a52 100%);
+  box-shadow:
+    0 1px 0 rgba(0,0,0,.2) inset,
+    0 -1px 0 rgba(255,255,255,.04) inset;
+  transform:translateY(1px);
+}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="identity">
+    <!-- AAFC badge: equal 10px padding on all four sides -->
+    <div class="crest">
+      <span class="crest-text">AAFC</span>
+    </div>
+    <div class="org-name">Australian Air Force Cadets</div>
+    <div class="product-name">Training Management System</div>
+    <div class="divider"></div>
+  </div>
+
+  <div class="field">
+    <label for="sqn">Squadron</label>
+    <select id="sqn">
+      <option>704 Squadron</option>
+      <option>703 Squadron</option>
+      <option>705 Squadron</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="code">Access Code</label>
+    <input type="password" id="code" placeholder="Enter access code">
+  </div>
+
+  <button class="btn">Sign In</button>
+</div>
+
+</body>
+</html>

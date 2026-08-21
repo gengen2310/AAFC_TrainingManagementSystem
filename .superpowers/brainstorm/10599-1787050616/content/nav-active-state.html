@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B-DS · Nav active state</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0c111a;font-family:'Montserrat',Arial,sans-serif;color:#e8edf3;padding:28px 32px;}
+
+.page-q{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.28);margin-bottom:8px;}
+.page-h{font-size:20px;font-weight:700;color:#fff;margin-bottom:5px;}
+.page-sub{font-size:12px;color:rgba(255,255,255,.38);margin-bottom:24px;line-height:1.6;max-width:700px;}
+
+.opts{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:14px;}
+
+.opt-tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;border-radius:3px;padding:2px 7px;margin-bottom:6px;}
+.tag-a{background:rgba(255,255,255,.07);color:rgba(255,255,255,.45);}
+.tag-b{background:rgba(81,176,227,.22);color:#7dcaf0;}
+.tag-c{background:rgba(255,255,255,.07);color:rgba(255,255,255,.45);}
+.opt-name{font-size:13px;font-weight:700;color:#fff;margin-bottom:3px;}
+.opt-desc{font-size:11px;color:rgba(255,255,255,.35);line-height:1.5;margin-bottom:10px;}
+.opt-wrap.chosen .opt-name{color:#7dcaf0;}
+.opt-wrap.chosen .shell-frame{border-color:#51b0e3;box-shadow:0 0 0 1px #51b0e3;}
+
+/* shell frame */
+.shell-frame{
+  border-radius:8px;overflow:hidden;cursor:pointer;
+  border:2px solid rgba(255,255,255,.06);
+  display:flex;height:320px;
+  transition:border-color .15s;
+}
+.shell-frame:hover{border-color:rgba(81,176,227,.3);}
+
+/* ── SIDEBAR ── satin navy, same across all */
+.sidebar{
+  width:148px;flex-shrink:0;
+  background:linear-gradient(180deg,#001b3d 0%,#002550 100%);
+  display:flex;flex-direction:column;
+  border-right:1px solid rgba(255,255,255,.06);
+  position:relative;
+}
+/* subtle 1px right-edge highlight */
+.sidebar::after{
+  content:'';position:absolute;top:0;right:0;bottom:0;width:1px;
+  background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03) 60%,transparent);
+}
+
+/* logo bar */
+.logo-bar{
+  padding:14px 12px 10px;
+  border-bottom:1px solid rgba(255,255,255,.07);
+  display:flex;align-items:center;gap:8px;
+}
+.logo-badge{
+  width:24px;height:24px;border-radius:4px;
+  background:#f0f7ff;display:flex;align-items:center;justify-content:center;
+  font-size:7px;font-weight:800;color:#002f65;letter-spacing:.03em;flex-shrink:0;
+}
+.logo-text{font-size:9px;font-weight:800;color:rgba(255,255,255,.75);letter-spacing:.04em;line-height:1.3;}
+
+/* nav items */
+.nav-items{padding:8px 0;flex:1;}
+.nav-item{
+  display:flex;align-items:center;gap:9px;
+  padding:9px 12px;
+  font-size:11px;font-weight:600;
+  color:rgba(255,255,255,.52);
+  cursor:pointer;position:relative;
+  transition:color .12s,background .12s;
+  letter-spacing:.01em;
+}
+.nav-item:hover{color:rgba(255,255,255,.75);background:rgba(255,255,255,.04);}
+.nav-icon{width:14px;text-align:center;font-size:12px;flex-shrink:0;opacity:.7;}
+
+/* section divider */
+.nav-divider{height:1px;background:rgba(255,255,255,.06);margin:6px 12px;}
+
+/* ── CONTENT AREA ── */
+.content{
+  flex:1;background:#f4f8fc;
+  padding:16px;overflow:hidden;
+}
+.content-header{
+  font-size:13px;font-weight:800;color:#001e42;margin-bottom:12px;
+}
+/* mini card placeholder */
+.mini-card{
+  background:#fff;border:1px solid #d1dce8;border-radius:6px;
+  padding:10px 12px;margin-bottom:8px;
+  font-size:11px;color:#455560;
+}
+.mini-row{height:8px;border-radius:2px;background:#e4edf5;margin-bottom:5px;}
+.mini-row:last-child{margin-bottom:0;width:65%;}
+
+/* ════════════════════════════════════
+   A — Left border only
+   2px #51b0e3 left stripe, no fill
+════════════════════════════════════ */
+.a-active{
+  color:#fff !important;
+  border-left:2.5px solid #51b0e3;
+  padding-left:calc(12px - 2.5px);
+}
+.a-active .nav-icon{opacity:1;}
+
+/* ════════════════════════════════════
+   B — Border + wash (Recommended)
+   2px #51b0e3 left stripe + subtle blue fill
+════════════════════════════════════ */
+.b-active{
+  color:#fff !important;
+  border-left:2.5px solid #51b0e3;
+  padding-left:calc(12px - 2.5px);
+  background:rgba(81,176,227,.10);
+}
+.b-active .nav-icon{opacity:1;}
+
+/* ════════════════════════════════════
+   C — Pill / filled block
+   full-width tinted pill, no left stripe
+════════════════════════════════════ */
+.c-active{
+  color:#fff !important;
+  background:rgba(81,176,227,.18);
+  border-radius:0 4px 4px 0;
+  margin-right:8px;
+}
+.c-active .nav-icon{opacity:1;}
+
+.hint{text-align:center;font-size:11px;color:rgba(255,255,255,.18);margin-top:4px;}
+.note{margin-top:14px;padding:12px 16px;border-radius:6px;border:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.03);font-size:11px;color:rgba(255,255,255,.32);line-height:1.7;}
+.note strong{color:rgba(255,255,255,.5);}
+</style>
+</head>
+<body>
+
+<div class="page-q">B-DS · Question 6 of N — Shell ✓ · Cards ✓ · Login ✓ · Buttons ✓ · Tables ✓</div>
+<h1 class="page-h">Nav active state</h1>
+<p class="page-sub">The satin navy sidebar is locked. Which treatment best marks the current page — a bare stripe, a stripe plus blue wash, or a filled pill?</p>
+
+<div class="opts">
+
+  <!-- A — Border only -->
+  <div class="opt-wrap" id="opt-a">
+    <div class="opt-tag tag-a">A</div>
+    <div class="opt-name">Left stripe only</div>
+    <div class="opt-desc">2.5px AAFC-blue left border, white text. Minimal — the nav stays dark, the stripe is the only signal.</div>
+    <div class="shell-frame" onclick="pick('a')">
+      <div class="sidebar">
+        <div class="logo-bar">
+          <div class="logo-badge">AAFC</div>
+          <div class="logo-text">704 SQN<br>7 Wing</div>
+        </div>
+        <div class="nav-items">
+          <div class="nav-item a-active"><span class="nav-icon">◈</span>Dashboard</div>
+          <div class="nav-item"><span class="nav-icon">◉</span>Activities</div>
+          <div class="nav-item"><span class="nav-icon">▤</span>Cadets</div>
+          <div class="nav-item"><span class="nav-icon">☰</span>Curriculum</div>
+          <div class="nav-divider"></div>
+          <div class="nav-item"><span class="nav-icon">⚙</span>Settings</div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="content-header">Dashboard</div>
+        <div class="mini-card"><div class="mini-row"></div><div class="mini-row"></div></div>
+        <div class="mini-card"><div class="mini-row"></div><div class="mini-row"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B — Border + wash -->
+  <div class="opt-wrap" id="opt-b">
+    <div class="opt-tag tag-b">B — Recommended</div>
+    <div class="opt-name">Stripe + blue wash</div>
+    <div class="opt-desc">2.5px stripe plus a soft blue fill. Active item has area as well as edge — easier to spot at a glance.</div>
+    <div class="shell-frame" onclick="pick('b')">
+      <div class="sidebar">
+        <div class="logo-bar">
+          <div class="logo-badge">AAFC</div>
+          <div class="logo-text">704 SQN<br>7 Wing</div>
+        </div>
+        <div class="nav-items">
+          <div class="nav-item b-active"><span class="nav-icon">◈</span>Dashboard</div>
+          <div class="nav-item"><span class="nav-icon">◉</span>Activities</div>
+          <div class="nav-item"><span class="nav-icon">▤</span>Cadets</div>
+          <div class="nav-item"><span class="nav-icon">☰</span>Curriculum</div>
+          <div class="nav-divider"></div>
+          <div class="nav-item"><span class="nav-icon">⚙</span>Settings</div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="content-header">Dashboard</div>
+        <div class="mini-card"><div class="mini-row"></div><div class="mini-row"></div></div>
+        <div class="mini-card"><div class="mini-row"></div><div class="mini-row"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C — Filled pill -->
+  <div class="opt-wrap" id="opt-c">
+    <div class="opt-tag tag-c">C</div>
+    <div class="opt-name">Filled pill</div>
+    <div class="opt-desc">Heavier tinted block, rounded right edge. Bold and unmissable — closer to a macOS sidebar feel.</div>
+    <div class="shell-frame" onclick="pick('c')">
+      <div class="sidebar">
+        <div class="logo-bar">
+          <div class="logo-badge">AAFC</div>
+          <div class="logo-text">704 SQN<br>7 Wing</div>
+        </div>
+        <div class="nav-items">
+          <div class="nav-item c-active"><span class="nav-icon">◈</span>Dashboard</div>
+          <div class="nav-item"><span class="nav-icon">◉</span>Activities</div>
+          <div class="nav-item"><span class="nav-icon">▤</span>Cadets</div>
+          <div class="nav-item"><span class="nav-icon">☰</span>Curriculum</div>
+          <div class="nav-divider"></div>
+          <div class="nav-item"><span class="nav-icon">⚙</span>Settings</div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="content-header">Dashboard</div>
+        <div class="mini-card"><div class="mini-row"></div><div class="mini-row"></div></div>
+        <div class="mini-card"><div class="mini-row"></div><div class="mini-row"></div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="hint">Click a panel to select it</p>
+
+<div class="note">
+  <strong>Consider:</strong> The active item is the user's current location — it must be immediately obvious without being distracting. A stripe alone (A) is elegant but subtle on a dark shell; the wash (B) adds area that's easier to find at a glance; the pill (C) is the boldest signal but adds the most visual weight to the nav.
+</div>
+
+<script>
+function pick(c){
+  document.querySelectorAll('.opt-wrap').forEach(e=>e.classList.remove('chosen'));
+  document.getElementById('opt-'+c).classList.add('chosen');
+}
+</script>
+</body>
+</html>
