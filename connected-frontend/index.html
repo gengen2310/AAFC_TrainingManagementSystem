@@ -5902,7 +5902,7 @@ async function scLoadSdEmailConfig(){
     h+=row('National HQ','national',null);
     if(wings.length){
       h+=`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--steel);margin:var(--sp-sm) 0 4px">Wing Notifications</div>`;
-      for(const w of wings) h+=row(esc(w.short_name||w.name),'wing',w.id);
+      for(const w of wings) h+=row(esc(w.short_name||w.name),'wing',w.wing_id);
     }
     el.innerHTML=h;
   } catch(e){ el.innerHTML=`<div style="color:var(--red);font-size:12px">${esc(apiErr(e))}</div>`; }
