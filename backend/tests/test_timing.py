@@ -655,3 +655,41 @@ def test_old_block_types_rejected(client):
         })
         assert resp.status_code == 422 or resp.status_code == 400, \
             f"Old block_type={old_bt} was accepted (should be rejected)"
+
+
+# ─────────────────────────────────────────────────────────────
+# 10. Parade night schedule endpoint (Task 6 — 2026-08-21)
+# ─────────────────────────────────────────────────────────────
+
+def test_parade_night_schedule_endpoint(client):
+    """GET /api/parade-nights/{id}/schedule must return blocks + sessions keyed by block."""
+    h = login(client, "ADMIN703")
+    pns = client.get("/api/parade-nights", headers=h).json()
+    if not pns:
+        import pytest
+        pytest.skip("No parade nights in test data")
+    pn_id = pns[0]["parade_night_id"]
+    resp = client.get(f"/api/parade-nights/{pn_id}/schedule", headers=h)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "blocks" in data
+    assert "sessions_by_block" in data
+    assert "unlinked_sessions" in data
+    assert isinstance(data["blocks"], list)
+    assert isinstance(data["sessions_by_block"], dict)
+    assert isinstance(data["unlinked_sessions"], list)
+    assert "parade_night_id" in data
+    assert data["parade_night_id"] == pn_id
+
+
+def test_parade_night_schedule_requires_auth(client):
+    """GET /api/parade-nights/{id}/schedule must reject unauthenticated requests."""
+    resp = client.get("/api/parade-nights/fake-id/schedule")
+    assert resp.status_code == 401
+
+
+def test_parade_night_schedule_not_found(client):
+    """GET /api/parade-nights/{id}/schedule returns 404 for unknown parade night."""
+    h = login(client, "ADMIN703")
+    resp = client.get("/api/parade-nights/nonexistent-id-xyz/schedule", headers=h)
+    assert resp.status_code == 404

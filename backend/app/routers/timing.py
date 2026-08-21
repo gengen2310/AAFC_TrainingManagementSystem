@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow
 from ..models import (TimingTemplate, TimingBlock, ParadeNightTimingOverride,
-                      ParadeNight, Squadron)
+                      ParadeNight, Squadron, Session)
 from ..models.training import BLOCK_TYPES
 from ..dependencies import get_principal, client_meta
 from ..permissions import Principal, require_can_view_squadron, require_can_write_squadron
@@ -650,4 +650,84 @@ def remove_timing_override(
     audit(db, p, object_type="parade_night_timing_override", object_id=override.id,
           action="remove", new={"parade_night_id": pnid}, ip=meta["ip"], ua=meta["ua"])
     return {"ok": True}
+
+
+# ── GET /api/parade-nights/{pn_id}/schedule ───────────────────────────────────
+
+@router.get("/parade-nights/{pn_id}/schedule")
+def get_parade_night_schedule(
+    pn_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Full schedule for a parade night: template blocks + sessions keyed by block.
+
+    Returns all timing template blocks (if a template is assigned) and all
+    non-archived sessions for the parade night, grouped by timing block.
+    Sessions with no timing_block_id are returned in unlinked_sessions.
+    """
+    pn = db.get(ParadeNight, pn_id)
+    if not pn:
+        raise HTTPException(404, detail={"error": "parade_night_not_found"})
+    require_can_view_squadron(p, pn.squadron_id, pn.wing_id)
+
+    # Determine which timing template applies (direct assignment on parade night)
+    template_id = pn.timing_template_id
+    blocks: list = []
+    if template_id:
+        template = db.get(TimingTemplate, template_id)
+        if template and not template.is_archived:
+            blocks = sorted(template.blocks, key=lambda b: b.display_order)
+
+    # Fetch all non-archived sessions for this parade night
+    sessions = (
+        db.query(Session)
+        .filter(
+            Session.parade_night_id == pn_id,
+            Session.is_archived == False,  # noqa: E712
+        )
+        .all()
+    )
+
+    def _session_dict(s: Session) -> dict:
+        return {
+            "session_id": s.id,
+            "period_number": s.period_number,
+            "timing_block_id": s.timing_block_id,
+            "cadet_group": s.cadet_group,
+            "curriculum_title_at_time": s.curriculum_title_at_time,
+            "custom_title": s.custom_title,
+            "facilitator_display_name_at_time": s.facilitator_display_name_at_time,
+            "training_area_name_at_time": s.training_area_name_at_time,
+            "status": s.status,
+        }
+
+    sessions_by_block: dict[str, list] = {}
+    unlinked: list = []
+    for s in sessions:
+        if s.timing_block_id:
+            sessions_by_block.setdefault(s.timing_block_id, []).append(_session_dict(s))
+        else:
+            unlinked.append(_session_dict(s))
+
+    return {
+        "parade_night_id": pn_id,
+        "timing_template_id": template_id,
+        "blocks": [
+            {
+                "block_id": b.id,
+                "display_order": b.display_order,
+                "block_name": b.block_name,
+                "block_type": b.block_type,
+                "start_time": b.start_time,
+                "end_time": b.end_time,
+                "duration_minutes": b.duration_minutes,
+                "is_instructional_period": b.is_instructional_period,
+                "is_optional": b.is_optional,
+            }
+            for b in blocks
+        ],
+        "sessions_by_block": sessions_by_block,
+        "unlinked_sessions": unlinked,
+    }
 
