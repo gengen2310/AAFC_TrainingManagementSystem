@@ -663,6 +663,9 @@ class SessionIn(BaseModel):
     # Skip the synchronous resource-conflict check below (Phase 3 scheduling UX) --
     # the caller has already shown the conflict to the user and confirmed the move.
     override_conflict: bool = False
+    # Nullable FK to timing_blocks.id — links this session to a print-program block.
+    # null is a valid value that clears the link; omitted means "don't change".
+    timing_block_id: str | None = None
 
 
 class StatusIn(BaseModel):
@@ -834,6 +837,7 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
     s.phase_at_time = body.phase_at_time
     s.custom_title = body.custom_title
     s.expected_attendance = body.expected_attendance
+    s.timing_block_id = body.timing_block_id
     _denormalise(db, s, body.curriculum_item_id, body.facilitator_id, body.training_area_id)
     s.version += 1
 

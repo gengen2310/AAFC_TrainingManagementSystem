@@ -662,3 +662,17 @@ def test_mark_remaining_delivered_is_audited(client):
     rows = client.get("/api/audit?object_type=parade_night_bulk", headers=hdr).json()
     matches = [a for a in rows if a["action"] == "bulk_mark_remaining_delivered"]
     assert len(matches) >= 1
+
+
+def test_session_timing_block_id_in_response(client):
+    """Session GET/POST responses must include timing_block_id (nullable)."""
+    headers = login(client, ADM703)
+    pns = client.get("/api/parade-nights", headers=headers).json()
+    if not pns:
+        pytest.skip("No parade nights")
+    pn_id = pns[0]["parade_night_id"]
+    sessions = client.get(f"/api/parade-nights/{pn_id}", headers=headers)
+    assert sessions.status_code == 200
+    for s in sessions.json().get("sessions", []):
+        assert "timing_block_id" in s
+        # value is None for existing sessions (no migration backfill)

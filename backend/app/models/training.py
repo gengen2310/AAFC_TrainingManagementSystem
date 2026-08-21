@@ -108,6 +108,12 @@ class Session(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     evidence_text: Mapped[str | None] = mapped_column(Text)
     evidence_url: Mapped[str | None] = mapped_column(String(400))
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    timing_block_id: Mapped[str | None] = mapped_column(
+        String(36), nullable=True, index=True
+    )
+    # FK to timing_blocks.id — not a SQLAlchemy FK constraint; enforced at app layer
+    # to avoid cascade complexity across SQLite and PostgreSQL.
+    # ON DELETE behaviour: set to null when the timing template is changed.
 
 
 class SessionStatusHistory(Base, UUIDMixin):
