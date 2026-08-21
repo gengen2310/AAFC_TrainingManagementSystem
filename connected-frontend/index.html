@@ -728,10 +728,10 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .save-ind.saved{color:var(--ok);}
 .save-ind.failed{color:var(--red);}
 .data-conf-bar{display:flex;align-items:flex-start;flex-wrap:wrap;gap:6px;padding:6px 12px;margin:0 0 8px;border-radius:6px;font-size:11px;background:var(--warn-bg);border:1px solid var(--warn);color:var(--text-2);}
-.data-conf-bar .dcb-label{font-weight:700;color:var(--warn);white-space:nowrap;margin-right:4px;}
+.data-conf-bar .dcb-label{font-weight:700;color:var(--warn-text);white-space:nowrap;margin-right:4px;}
 .data-conf-bar .dcb-issue{background:rgba(0,0,0,.06);border-radius:4px;padding:1px 6px;}
 .data-conf-bar.ok{background:var(--ok-bg);border-color:var(--ok);}
-.data-conf-bar.ok .dcb-label{color:var(--ok);}
+.data-conf-bar.ok .dcb-label{color:var(--ok-text);}
 /* CLASS-MATRIX-01 */
 #cm-table-wrap table{border-collapse:collapse;font-size:12px;min-width:max-content;}
 #cm-table-wrap th,#cm-table-wrap td{border:1px solid var(--border);padding:5px 8px;white-space:nowrap;}
@@ -857,7 +857,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 .sc-kv dt{color:var(--muted);font-weight:600;}
 .sc-kv dd{color:var(--text);margin:0;}
 .sc-status-ok{color:var(--ok);font-weight:700;}
-.sc-status-warn{color:var(--warn);font-weight:700;}
+.sc-status-warn{color:var(--warn-text);font-weight:700;}
 .sc-status-err{color:var(--red);font-weight:700;}
 .sc-maint-on{background:var(--warn-bg);border:1px solid var(--warn);color:var(--warn-text);padding:8px 12px;border-radius:6px;font-size:12px;font-weight:600;margin-bottom:10px;} /* DES-H04 */
 .sc-wing-row{padding:8px 0;border-bottom:1px solid var(--border-light);}
@@ -1334,7 +1334,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div class="cal-grid" id="cal-grid"></div>
         </div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--muted);">
-          <span>Parade night</span><span>Activity</span><span style="color:var(--warn);">● Holiday</span><span style="color:var(--ok);">● Delivered</span>
+          <span>Parade night</span><span>Activity</span><span style="color:var(--warn-text);">● Holiday</span><span style="color:var(--ok);">● Delivered</span>
           <span style="color:var(--muted-text-on-light);">● Not Delivered</span><span style="color:var(--status-text-danger);">● Cancelled</span>
         </div>
       </div>
@@ -5245,7 +5245,7 @@ async function renderActionCentre(){
         return `<div style="border:1.5px solid var(--border);border-radius:8px;padding:10px">`+
           `<div style="font-size:10px;font-weight:800;color:var(--dark)">${fmtD(r.date,{weekday:'short',day:'numeric',month:'short'})}</div>`+
           `<div style="font-size:11px;font-weight:700;color:${col};margin-top:4px">${np?'Not planned':pct+'% ready'}</div>`+
-          `${!np&&r.unstaffed?`<div style="font-size:10px;color:var(--warn)">⚠ ${r.unstaffed} unstaffed</div>`:''}`+
+          `${!np&&r.unstaffed?`<div style="font-size:10px;color:var(--warn-text)">⚠ ${r.unstaffed} unstaffed</div>`:''}`+
           `</div>`;
       }).join('')+`</div>`
     :`<div style="padding:12px;color:var(--ok);font-weight:700">✓ All upcoming nights are on track</div>`;
@@ -7762,7 +7762,7 @@ function _renderUpcomingReadiness(chart){
         <div style="font-size:10px;font-weight:800;color:var(--dark)">${dateLabel}</div>
         <div class="pbar" style="margin:5px 0"><div style="height:100%;width:${pct}%;background:${col};border-radius:3px"></div></div>
         <div style="font-size:10px;color:${col};font-weight:700">${pct}% ready</div>
-        ${r.unstaffed?`<div style="font-size:11px;color:var(--warn);font-weight:700" title="${r.unstaffed} session${r.unstaffed!==1?'s have':' has'} no facilitator assigned yet — open this parade night to assign one">⚠ ${r.unstaffed} unstaffed</div>`:''}
+        ${r.unstaffed?`<div style="font-size:11px;color:var(--warn-text);font-weight:700" title="${r.unstaffed} session${r.unstaffed!==1?'s have':' has'} no facilitator assigned yet — open this parade night to assign one">⚠ ${r.unstaffed} unstaffed</div>`:''}
         <div style="font-size:11px;color:var(--muted)">${r.sessions_total||0} sessions</div>
       </div>`;
     }).join('')+`</div>`;
@@ -11581,7 +11581,7 @@ function showFacProfile(id){
       <div class="fac-st"><div class="fac-sv">${sts.planned}</div><div class="fac-sl">Planned</div></div>
       <div class="fac-st"><div class="fac-sv" style="color:var(--steel)">${sts.not_delivered}</div><div class="fac-sl">Not Delivered</div></div>
       <div class="fac-st"><div class="fac-sv" style="color:var(--red)">${sts.cancelled}</div><div class="fac-sl">Cancelled</div></div>
-      <div class="fac-st"><div class="fac-sv" style="color:var(--warn)">${sts.rescheduled}</div><div class="fac-sl">Rescheduled</div></div>
+      <div class="fac-st"><div class="fac-sv" style="color:var(--warn-text)">${sts.rescheduled}</div><div class="fac-sl">Rescheduled</div></div>
       <div class="fac-st"><div class="fac-sv">${sess.length}</div><div class="fac-sl">Total</div></div>
     </div>
     ${Object.keys(phC).length?`<div class="ctitle">Sessions by Phase</div>
@@ -15296,7 +15296,7 @@ async function previewCsvCurr(){
   document.getElementById('csv-curr-preview').style.display='';
   document.getElementById('csv-curr-commit-btn').style.display=(d.created+d.updated)>0?'inline-flex':'none';
   if(d.parse_errors&&d.parse_errors.length){
-    document.getElementById('csv-curr-msg').innerHTML=`<span style="color:var(--warn)">${d.parse_errors.slice(0,5).map(e=>esc(e)).join('<br>')}</span>`;
+    document.getElementById('csv-curr-msg').innerHTML=`<span style="color:var(--warn-text)">${d.parse_errors.slice(0,5).map(e=>esc(e)).join('<br>')}</span>`;
   }
 }
 async function commitCsvCurr(){
