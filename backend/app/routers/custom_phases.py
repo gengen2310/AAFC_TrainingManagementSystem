@@ -121,6 +121,9 @@ def update_custom_phase(phase_id: str, body: CustomPhaseUpdateIn,
         raise HTTPException(403, detail={"error": "insufficient_scope"})
     if ph.scope_type == "wing" and p.role == "wing_admin" and ph.scope_id != p.wing_id:
         raise HTTPException(403, detail={"error": "insufficient_scope"})
+    # spec §5e: wing/national admins cannot mutate squadron-scoped phases
+    if ph.scope_type == "squadron" and p.role in ("wing_admin", "national_admin"):
+        raise HTTPException(403, detail={"error": "insufficient_scope"})
     if body.name is not None:
         ph.name = body.name
     if body.applies_from is not None:
@@ -147,6 +150,9 @@ def delete_custom_phase(phase_id: str, db=Depends(get_db),
     if ph.scope_type == "squadron" and p.role == "sqn_admin" and ph.scope_id != p.squadron_id:
         raise HTTPException(403, detail={"error": "insufficient_scope"})
     if ph.scope_type == "wing" and p.role == "wing_admin" and ph.scope_id != p.wing_id:
+        raise HTTPException(403, detail={"error": "insufficient_scope"})
+    # spec §5e: wing/national admins cannot mutate squadron-scoped phases
+    if ph.scope_type == "squadron" and p.role in ("wing_admin", "national_admin"):
         raise HTTPException(403, detail={"error": "insufficient_scope"})
     # Dependency gate: check if any sessions reference this phase.
     # Sessions link via custom_phase_id when that field is added (Task 8 extension);
