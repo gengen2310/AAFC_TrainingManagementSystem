@@ -1863,6 +1863,14 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <div id="py-classes-body"></div>
           </div>
         </div>
+        <!-- Custom Training Phases (Task 10) -->
+        <div class="card admin-el" id="settings-custom-phases-wrap">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="ctitle" style="margin:0">Custom Training Phases</div>
+            <button class="btn btn-sky admin-el" onclick="cpOpenCreate()">+ Add Phase</button>
+          </div>
+          <div id="settings-custom-phases-list"><p class="muted" style="font-size:11px">Loading…</p></div>
+        </div>
         <div class="card">
           <div class="ctitle">🔑 Access Code</div>
           <div class="alert a-info">Change your own sign-in code. Existing codes cannot be viewed. The previous code cannot be recovered once changed.</div>
@@ -2652,6 +2660,37 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-edit-training-class')">Cancel</button>
       <button class="btn btn-primary" onclick="doEditTrainingClass()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Custom Phase Modal (Task 10) -->
+<div class="modal-bg" id="m-add-custom-phase">
+  <div class="modal">
+    <h2>Add Custom Training Phase</h2>
+    <div class="form-group"><label>Name *</label><input type="text" id="cp-name-inp" placeholder="e.g. Pre-Course Period"></div>
+    <div class="form-group"><label>Applies From *</label><input type="date" id="cp-from-inp"></div>
+    <div class="form-group"><label>Applies To <span style="font-weight:400;color:var(--muted)">(optional — leave blank for open-ended)</span></label><input type="date" id="cp-to-inp"></div>
+    <p id="cp-add-msg" style="color:var(--error);font-size:12px;margin-top:4px"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-add-custom-phase')">Cancel</button>
+      <button class="btn btn-primary" onclick="cpDoCreate()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Custom Phase Modal (Task 10) -->
+<div class="modal-bg" id="m-edit-custom-phase">
+  <div class="modal">
+    <h2>Edit Custom Training Phase</h2>
+    <input type="hidden" id="cp-edit-id">
+    <div class="form-group"><label>Name *</label><input type="text" id="cp-edit-name-inp"></div>
+    <div class="form-group"><label>Applies From *</label><input type="date" id="cp-edit-from-inp"></div>
+    <div class="form-group"><label>Applies To <span style="font-weight:400;color:var(--muted)">(optional — leave blank for open-ended)</span></label><input type="date" id="cp-edit-to-inp"></div>
+    <p id="cp-edit-msg" style="color:var(--error);font-size:12px;margin-top:4px"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-edit-custom-phase')">Cancel</button>
+      <button class="btn btn-primary" onclick="cpDoEdit()">Save</button>
     </div>
   </div>
 </div>
@@ -3988,7 +4027,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 <!-- WORK-05: flexible one-night timing override — pick existing template OR define custom blocks -->
 <div class="modal-bg" id="m-pn-timing-override">
   <div class="modal" style="max-width:700px;width:96%">
-    <div class="modal-hdr"><div class="modal-title">Override Parade Night Timing</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-timing-override')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title">Change Parade Night Template</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-timing-override')">×</button></div>
     <div class="modal-body">
       <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Change the timing for this parade night only. Does not affect future parade nights.</div>
       <!-- Mode toggle -->
@@ -4705,6 +4744,7 @@ async function loadData(){
     // pn.parade_type from this same mapped object where that key was never
     // actually populated.
     notes:pn.notes||'', parade_type:pn.parade_type||'normal',
+    timing_template_id:pn.timing_template_id||null, timing_template_name:pn.timing_template_name||null,
     published:!!pn.published_status, closeout:pn.closeout_status,
     readiness:pn.readiness_score, version:pn.version,
     sessions:(pn.sessions||[]).sort((a,b)=>(a.period_number||0)-(b.period_number||0)).map(s=>({
@@ -7514,6 +7554,7 @@ async function renderSettings(){
     catch(_){ S.users=[]; }
   }
   renderUserDir();
+  loadCustomPhases();
   // Load year list into Training Years settings card
   (async () => {
     const wrap = document.getElementById('settings-yn-table-wrap');
@@ -8532,6 +8573,7 @@ function renderPN(){
 }
 function buildPNCard(pn){
   const allDel=(pn.sessions||[]).length>0&&(pn.sessions||[]).every(s=>s.status==='delivered');
+  const tplName=pn.timing_template_name||((S.timingTemplates||[]).find(t=>t.timing_template_id===pn.timing_template_id)||{}).name||'';
   const sessCards=(pn.sessions||[]).map((s,i)=>`
     <div class="sess-card ${stCls(s.status)||(!s.exp?'unassigned':'')}" onclick="showPNDetail('${pn.date}')">
       <div class="sess-hdr"><span class="sess-num">Sess ${i+1}</span>${stBadge(s.status||'planned')}</div>
@@ -8552,7 +8594,7 @@ function buildPNCard(pn){
         ${allDel?stBadge('delivered'):stBadge('planned')}
         ${pn.published?'<span class="badge b-ok" title="Weekly Program published">Published</span>':''}
         <button class="btn btn-xs btn-sky" onclick="showPNDetail('${pn.date}')">Detail</button>
-        ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Override timing for this parade night" onclick="openPNTimingOverrideModal('${esc(pn.id)}')">Timing…</button>`:''}
+        ${canWriteSquadron()?(tplName?`<button class="btn btn-xs" onclick="openPNTimingOverrideModal('${esc(pn.id)}')" title="Change template">📋 ${esc(tplName)} ▾</button>`:`<button class="btn btn-xs" style="color:var(--muted)" onclick="openPNTimingOverrideModal('${esc(pn.id)}')" title="Set template">+ Template</button>`):''}
         ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Copy sessions to another parade night" onclick="openCopyPNModal('${pn.date}')">Copy to…</button>`:''}
         ${canWriteSquadron()&&(pn.sessions||[]).length>0?`<button class="btn btn-xs btn-out" title="Save this night's sessions as a reusable template" onclick="doSaveAsTemplate('${esc(pn.id)}')">Save as Tpl</button>`:''}
         ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Apply a saved session template to this parade night" onclick="openApplyTemplateModal('${esc(pn.id)}')">Apply Tpl…</button>`:''}
@@ -14727,6 +14769,86 @@ async function archiveTrainingClass(cid, yearId){
     try{ await api(`/api/training-classes/${cid}`,{method:'DELETE'}); await _renderTrainingClasses(yearId); showToast('Training Class archived.'); }
     catch(e){ showToast(apiErr(e),true); }
   });
+}
+
+// ── Custom Training Phases CRUD (Task 10) ────────────────────────────────
+async function loadCustomPhases(){
+  const list=document.getElementById('settings-custom-phases-list');
+  if(!list)return;
+  try{
+    const phases=await api('/api/custom-training-phases');
+    if(!phases||!phases.length){
+      list.innerHTML='<p class="muted" style="font-size:11px">No custom phases defined.</p>';
+      return;
+    }
+    list.innerHTML='<div class="tw"><table class="data-table" style="width:100%"><thead><tr><th>Name</th><th>Scope</th><th>From</th><th>Until</th><th></th></tr></thead><tbody>'+
+      phases.map(ph=>`<tr>
+        <td style="font-weight:600">${esc(ph.name)}</td>
+        <td><span class="badge b-grey">${esc(ph.scope_type||'')}</span></td>
+        <td style="font-size:11px">${esc(ph.applies_from||'')}</td>
+        <td style="font-size:11px">${esc(ph.applies_to||'Open-ended')}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-xs" onclick="cpOpenEdit('${esc(ph.custom_phase_id)}','${esc(ph.name)}','${esc(ph.applies_from||'')}','${esc(ph.applies_to||'')}')">Edit</button>
+          <button class="btn btn-xs" style="color:var(--red)" onclick="cpDelete('${esc(ph.custom_phase_id)}','${esc(ph.name)}')">Delete</button>
+        </td>
+      </tr>`).join('')+
+      '</tbody></table></div>';
+  }catch(e){
+    list.innerHTML=`<p style="color:var(--red);font-size:11px">${esc(apiErr(e))}</p>`;
+  }
+}
+function cpOpenCreate(){
+  document.getElementById('cp-name-inp').value='';
+  document.getElementById('cp-from-inp').value='';
+  document.getElementById('cp-to-inp').value='';
+  document.getElementById('cp-add-msg').textContent='';
+  openModal('m-add-custom-phase');
+}
+async function cpDoCreate(){
+  const msg=document.getElementById('cp-add-msg');
+  const name=document.getElementById('cp-name-inp').value.trim();
+  const applies_from=document.getElementById('cp-from-inp').value;
+  const applies_to=document.getElementById('cp-to-inp').value||null;
+  if(!name){msg.textContent='Name is required.';return;}
+  if(!applies_from){msg.textContent='Applies From date is required.';return;}
+  try{
+    await api('/api/custom-training-phases',{method:'POST',body:JSON.stringify({name,applies_from,applies_to})});
+    closeModal('m-add-custom-phase');
+    await loadCustomPhases();
+    showToast('Custom phase added.');
+  }catch(e){msg.textContent=apiErr(e);}
+}
+function cpOpenEdit(phaseId,name,appliesFrom,appliesTo){
+  document.getElementById('cp-edit-id').value=phaseId;
+  document.getElementById('cp-edit-name-inp').value=name||'';
+  document.getElementById('cp-edit-from-inp').value=appliesFrom||'';
+  document.getElementById('cp-edit-to-inp').value=appliesTo||'';
+  document.getElementById('cp-edit-msg').textContent='';
+  openModal('m-edit-custom-phase');
+}
+async function cpDoEdit(){
+  const msg=document.getElementById('cp-edit-msg');
+  const phaseId=document.getElementById('cp-edit-id').value;
+  const name=document.getElementById('cp-edit-name-inp').value.trim();
+  const applies_from=document.getElementById('cp-edit-from-inp').value;
+  const applies_to=document.getElementById('cp-edit-to-inp').value||null;
+  if(!name){msg.textContent='Name is required.';return;}
+  if(!applies_from){msg.textContent='Applies From date is required.';return;}
+  try{
+    await api(`/api/custom-training-phases/${phaseId}`,{method:'PATCH',body:JSON.stringify({name,applies_from,applies_to})});
+    closeModal('m-edit-custom-phase');
+    await loadCustomPhases();
+    showToast('Custom phase updated.');
+  }catch(e){msg.textContent=apiErr(e);}
+}
+async function cpDelete(phaseId,phaseName){
+  confirmAction(`Delete phase "${phaseName}"? This cannot be undone.`,async()=>{
+    try{
+      await api(`/api/custom-training-phases/${phaseId}`,{method:'DELETE'});
+      await loadCustomPhases();
+      showToast('Custom phase deleted.');
+    }catch(e){showToast(apiErr(e),true);}
+  },{danger:true});
 }
 
 // ── CLASS-10: Training Class split/merge ────────────────────────────────
