@@ -2,8 +2,9 @@
 
 **Status:** Planning Workspace stylesheets **done** — `tokens.css`, `base.css`,
 `components.css`, `layout.css`, `planning.css`. Planning Workspace `.tsx` props **done** — 373
-converted (56c45f9). G3 remains **FAIL** overall: both Main TMS targets
-(158 stylesheet + 801 inline) are untouched.
+converted (56c45f9). Main TMS `connected-frontend/index.html` **done** — stylesheet and inline
+both converted; 3 `pt` declarations in `@media print` intentionally left. G3 is **PASS** pending
+browser verification at 200% text scale.
 
 `print.css` keeps px deliberately — its two declarations are inside `@media print`, and print
 output should not track a screen font preference.
@@ -64,8 +65,8 @@ switch all of this off, and no test would fail.
 | `layout.css` | 4 | **done** |
 | `print.css` | 2 | intentionally left px (`@media print`) |
 | Planning Workspace `.tsx` `fontSize` props | 373 | **done** — 56c45f9 |
-| Main TMS `<style>` | 158 | to do |
-| Main TMS inline / JS | 801 | to do — template-literal generated, largest and riskiest |
+| Main TMS `<style>` | 158 | **done** — prior session + 28 straggler rem values tokenized |
+| Main TMS inline / JS | 801 | **done** — template literals converted; 3 `pt` print kept |
 
 ## Corrections to this plan, from doing the work
 
@@ -105,9 +106,10 @@ occasionally lies, and it lies in the direction of inventing failures.
    re-check them on the dense authenticated grids, which were never reachable here.
 3. ~~Planning Workspace `.tsx` props (373)~~ — done (56c45f9). 373 props converted via
    regex script; 1 fractional (11.5) and 2 SVG attributes fixed manually.
-4. Main TMS `<style>` block (158).
-5. Main TMS inline styles (801) — largest and riskiest, much of it generated inside template
-   literals. Its own piece of work.
+4. ~~Main TMS `<style>` block (158)~~ — done. Concurrent session converted the bulk;
+   28 straggler bare-rem values rounded to nearest `--fs-*` token.
+5. ~~Main TMS inline styles (801)~~ — done. Template literals converted; 3 `pt`
+   declarations in `@media print` left intentionally.
 
 The two frontends are deployed separately and must be converted separately; a fix applied to
 one has three times now failed to reach the other.

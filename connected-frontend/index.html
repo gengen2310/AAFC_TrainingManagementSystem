@@ -2388,7 +2388,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <label for="assign-fac-sel">Facilitator</label>
       <select id="assign-fac-sel" aria-label="Select facilitator" style="width:100%"><option value="">— none assigned —</option></select>
     </div>
-    <p id="assign-msg" style="color:var(--error);font-size:0.85rem;min-height:1.2em"></p>
+    <p id="assign-msg" style="color:var(--error);font-size:var(--fs-md);min-height:1.2em"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-assign-mission')">Cancel</button>
       <button class="btn btn-primary" onclick="doAssignMission()">Assign</button>
@@ -3370,9 +3370,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       </div>
       <p id="csv-curr-msg" style="color:var(--error)"></p>
       <div id="csv-curr-preview" style="display:none;margin-top:10px">
-        <div style="font-weight:600;margin-bottom:6px;font-size:0.87rem" id="csv-curr-summary"></div>
+        <div style="font-weight:600;margin-bottom:6px;font-size:var(--fs-md)" id="csv-curr-summary"></div>
         <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+          <table style="width:100%;border-collapse:collapse;font-size:var(--fs-base)">
             <thead><tr style="background:#f5f7fa">
               <th style="padding:3px 8px;text-align:left">Code</th>
               <th style="padding:3px 8px;text-align:left">Title</th>
@@ -3404,9 +3404,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <input type="file" id="sched-import-file" accept=".xlsx">
       </div>
       <div id="sched-import-preview" style="display:none;margin-top:10px">
-        <div style="font-weight:600;margin-bottom:6px;font-size:0.87rem">Preview — <span id="sched-import-summary"></span></div>
+        <div style="font-weight:600;margin-bottom:6px;font-size:var(--fs-md)">Preview — <span id="sched-import-summary"></span></div>
         <div style="overflow-x:auto;max-height:320px;overflow-y:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:0.8rem">
+          <table style="width:100%;border-collapse:collapse;font-size:var(--fs-base)">
             <thead><tr style="background:#f5f7fa">
               <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Date</th>
               <th style="padding:4px 8px;text-align:left;border-bottom:1px solid var(--border)">Session</th>
@@ -3420,7 +3420,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </table>
         </div>
       </div>
-      <p id="sched-import-msg" style="color:var(--error);font-size:0.85rem;min-height:1.2em;margin-top:8px"></p>
+      <p id="sched-import-msg" style="color:var(--error);font-size:var(--fs-md);min-height:1.2em;margin-top:8px"></p>
     </div>
     <div class="modal-actions">
       <button class="btn btn-out" onclick="closeModal('m-sched-import')">Cancel</button>
@@ -13975,7 +13975,7 @@ function renderMissions() {
         ? '<span class="badge badge-green">Scheduled</span>'
         : '<span class="badge badge-grey">Unscheduled</span>';
       const extraRows = m.scheduled_sessions.length > 1
-        ? `<br><span class="muted" style="font-size:0.75rem">+${m.scheduled_sessions.length-1} more</span>`
+        ? `<br><span class="muted" style="font-size:var(--fs-sm)">+${m.scheduled_sessions.length-1} more</span>`
         : '';
       // CLASS-06: compact Training Class status summary.
       // backlog_status values: scheduled, unscheduled, cancelled, not_delivered, resolved.
@@ -13983,7 +13983,7 @@ function renderMissions() {
       if(hasClassData){
         const bd = m.class_breakdown||[];
         if(!bd.length){
-          classTd = '<td><span class="muted" style="font-size:0.78rem">—</span></td>';
+          classTd = '<td><span class="muted" style="font-size:var(--fs-sm)">—</span></td>';
         } else {
           const needsAction = bd.filter(c=>c.backlog_status==='unscheduled'||c.backlog_status==='cancelled'||c.backlog_status==='not_delivered');
           const dots = bd.map(c=>{
@@ -14001,14 +14001,14 @@ function renderMissions() {
       return `<tr>
         <td><code>${esc(m.code)}</code></td>
         <td>${esc(m.title)}</td>
-        <td><span class="muted" style="font-size:0.82rem">${esc(_phaseShort(m.phase))}</span></td>
+        <td><span class="muted" style="font-size:var(--fs-base)">${esc(_phaseShort(m.phase))}</span></td>
         <td>${esc(m.element||'')}</td>
-        <td style="font-size:0.82rem">${esc(m.instructor_suitability||'')}</td>
+        <td style="font-size:var(--fs-base)">${esc(m.instructor_suitability||'')}</td>
         <td style="text-align:center">${m.part_count||1}</td>
         <td>${esc(m.recommended_term||'')}</td>
         <td>${esc(schedDate)} ${esc(schedSess)}${extraRows}${schedDate?`<br><button class="btn-xs btn-out no-print" style="font-size:var(--fs-3xs);margin-top:3px;padding:1px 5px" onclick="navToScheduledPN('${esc(schedDate)}')" title="Go to this parade night">↗ View PN</button>`:''}</td>
-        <td style="font-size:0.82rem">${esc(facName)}</td>
-        <td style="font-size:0.82rem">${esc(locName)}</td>
+        <td style="font-size:var(--fs-base)">${esc(facName)}</td>
+        <td style="font-size:var(--fs-base)">${esc(locName)}</td>
         <td>${badge}</td>
         ${classTd}
         ${canWrite ? `<td><button class="btn-xs" onclick="openAssignModal('${esc(m.curriculum_id)}','${esc(m.title)}','${esc(m.code)}',${m.part_count||1})">Assign</button></td>` : ''}
@@ -15127,8 +15127,8 @@ async function loadTermPlanner(yearId, term){
           ${_CADET_GROUPS.map(grp=>{
             const grpSessions = byGroup[grp]||[];
             return `<div style="min-width:120px;padding:4px 8px;background:var(--bg-page);border-radius:4px;border:1px solid var(--border)">
-              <span class="muted" style="font-size:0.7rem;text-transform:uppercase">${grp}</span><br>
-              ${grpSessions.length ? grpSessions.map(s=>`<span style="font-size:0.8rem">${esc(s.activity_title||'—')}</span>`).join('<br>') : '<span class="muted" style="font-size:0.8rem">unscheduled</span>'}
+              <span class="muted" style="font-size:var(--fs-xs);text-transform:uppercase">${grp}</span><br>
+              ${grpSessions.length ? grpSessions.map(s=>`<span style="font-size:var(--fs-base)">${esc(s.activity_title||'—')}</span>`).join('<br>') : '<span class="muted" style="font-size:var(--fs-base)">unscheduled</span>'}
             </div>`;
           }).join('')}
         </div>
@@ -15209,13 +15209,13 @@ async function loadBuilderFromPn(pnId){
     html+=`</tr></thead><tbody>`;
     for(let sn=1; sn<=nSess; sn++){
       const block = blocksForSess[sn-1];
-      const timeLabel = block ? `<div style="font-size:0.75rem;color:var(--muted)">${esc(block.start_time||'')}–${esc(block.end_time||'')}</div>` : '';
+      const timeLabel = block ? `<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(block.start_time||'')}–${esc(block.end_time||'')}</div>` : '';
       html+=`<tr><td><strong>${sn}</strong>${timeLabel}</td>`;
       _CADET_GROUPS.forEach(grp=>{
         const s=byGroupSession[`${grp}:${sn}`];
         if(s){
           const title=esc(s.activity_title||s.curriculum_title||'—');
-          const fac=s.facilitator_name?`<div style="font-size:0.75rem;color:var(--muted)">${esc(s.facilitator_name)}</div>`:'';
+          const fac=s.facilitator_name?`<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.facilitator_name)}</div>`:'';
           html+=`<td style="cursor:pointer" onclick="openEditSessionModalPn('${esc(s.session_id)}','${esc(pnId)}')">${title}${fac}${stBadge(s.status)}</td>`;
         } else {
           html+=`<td style="cursor:pointer;color:var(--muted)" onclick="openNewSessionCellPn('${esc(grp)}',${sn},'${esc(pnId)}')">+ Add</td>`;
@@ -15307,13 +15307,13 @@ async function loadBuilderGrid(dateId){
     html+=`</tr></thead><tbody>`;
     for(let sn=1; sn<=nSess; sn++){
       const block = blocksForSess[sn-1];
-      const timeLabel = block ? `<div style="font-size:0.75rem;color:var(--muted)">${esc(block.start_time||'')}–${esc(block.end_time||'')}</div>` : '';
+      const timeLabel = block ? `<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(block.start_time||'')}–${esc(block.end_time||'')}</div>` : '';
       html+=`<tr><td><strong>${sn}</strong>${timeLabel}</td>`;
       _CADET_GROUPS.forEach(grp=>{
         const s = byGroupSession[`${grp}:${sn}`];
         if(s){
           const title = esc(s.activity_title||s.curriculum_title||'—');
-          const fac = s.facilitator_name ? `<div style="font-size:0.75rem;color:var(--muted)">${esc(s.facilitator_name)}</div>` : '';
+          const fac = s.facilitator_name ? `<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.facilitator_name)}</div>` : '';
           html+=`<td style="cursor:pointer" onclick="openEditSessionModal('${esc(s.session_id||'')}','${esc(dateId)}')">${title}${fac}${stBadge(s.status)}</td>`;
         } else {
           html+=`<td style="cursor:pointer;color:var(--muted)" onclick="openNewSessionCell('${esc(grp)}',${sn},'${esc(dateId)}')">+ Add</td>`;
@@ -15347,11 +15347,11 @@ function _renderBuilderWeeklyPreview(sessions, timingBlocks, dateStr){
   html+=`</tr></thead><tbody>`;
   for(let sn=1;sn<=maxSess;sn++){
     const block=instrBlocks[sn-1];
-    const time=block?`<div style="font-size:0.75rem;color:var(--muted)">${esc(block.start_time||'')}–${esc(block.end_time||'')}</div>`:'';
+    const time=block?`<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(block.start_time||'')}–${esc(block.end_time||'')}</div>`:'';
     html+=`<tr><td><strong>${sn}</strong>${time}</td>`;
     _CADET_GROUPS.forEach(grp=>{
       const s=byGroupSession[`${grp}:${sn}`];
-      html+=`<td>${s?`<strong>${esc(s.activity_title||s.curriculum_title||'—')}</strong>${s.facilitator_name?`<div style="font-size:0.75rem;color:var(--muted)">${esc(s.facilitator_name)}</div>`:''}`:
+      html+=`<td>${s?`<strong>${esc(s.activity_title||s.curriculum_title||'—')}</strong>${s.facilitator_name?`<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.facilitator_name)}</div>`:''}`:
         '<span class="muted">—</span>'}</td>`;
     });
     html+=`</tr>`;
@@ -15521,10 +15521,10 @@ async function loadWeeklyProgram(dateId){
     html+=`</tr></thead><tbody>`;
     for(let sn=1; sn<=maxSess; sn++){
       const block=instrBlocks[sn-1];
-      html+=`<tr><td>${sn}${block?`<div style="font-size:0.75rem;color:var(--muted)">${esc(block.start_time)}–${esc(block.end_time)}</div>`:''}</td>`;
+      html+=`<tr><td>${sn}${block?`<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(block.start_time)}–${esc(block.end_time)}</div>`:''}</td>`;
       _CADET_GROUPS.forEach(grp=>{
         const s = byGroupSession[`${grp}:${sn}`];
-        html+=`<td>${s?`<strong>${esc(s.activity_title||s.curriculum_code||'—')}</strong>${s.facilitator_name?`<div style="font-size:0.75rem;color:var(--muted)">${esc(s.facilitator_name)}</div>`:''}`:
+        html+=`<td>${s?`<strong>${esc(s.activity_title||s.curriculum_code||'—')}</strong>${s.facilitator_name?`<div style="font-size:var(--fs-sm);color:var(--muted)">${esc(s.facilitator_name)}</div>`:''}`:
           '<span class="muted">—</span>'}</td>`;
       });
       html+=`</tr>`;
@@ -15577,12 +15577,12 @@ async function loadLongRange(yearId){
         <div style="display:flex;gap:12px;align-items:center;margin-bottom:6px">
           <strong>${esc(pd.parade_date)}</strong> <span class="muted">${_dayName(pd.parade_date)}</span>
           ${conflicts.length?`<span class="badge badge-red">${conflicts.length} conflict${conflicts.length!==1?'s':''}</span>`:''}
-          <span class="muted" style="font-size:0.8rem">${filled}/${_CADET_GROUPS.length*3} slots</span>
+          <span class="muted" style="font-size:var(--fs-base)">${filled}/${_CADET_GROUPS.length*3} slots</span>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:4px">
           ${_CADET_GROUPS.map(grp=>{
             const gs=groups[grp]||[];
-            return `<span style="padding:2px 8px;border-radius:4px;font-size:0.78rem;background:${gs.length?'var(--accent-light, #e8f5e9)':'var(--bg-page)'}">
+            return `<span style="padding:2px 8px;border-radius:4px;font-size:var(--fs-sm);background:${gs.length?'var(--accent-light, #e8f5e9)':'var(--bg-page)'}">
               ${grp.substring(0,3)}: ${gs.length?esc(gs[0].activity_title||'…'):'—'}
             </span>`;
           }).join('')}
@@ -15698,11 +15698,11 @@ function _renderDecisionGuide(checks){
   const el=document.getElementById('checks-guide-body');
   el.innerHTML=`<h3>Decision Guide</h3>`+
     checks.map(c=>`<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-      <span style="font-size:1.2rem">${c.result?'🔴':'✅'}</span>
+      <span style="font-size:var(--fs-2xl)">${c.result?'🔴':'✅'}</span>
       <div>
         <strong>${esc(c.question)}</strong><br>
-        ${c.detail&&c.detail.length?`<span class="muted" style="font-size:0.85rem">${c.detail.map(esc).join(', ')}</span><br>`:''}
-        ${c.action?`<span style="color:var(--warning);font-size:0.85rem">${esc(c.action)}</span>`:''}
+        ${c.detail&&c.detail.length?`<span class="muted" style="font-size:var(--fs-md)">${c.detail.map(esc).join(', ')}</span><br>`:''}
+        ${c.action?`<span style="color:var(--warning);font-size:var(--fs-md)">${esc(c.action)}</span>`:''}
       </div>
     </div>`).join('');
 }
