@@ -1,0 +1,30 @@
+file,selector,height,width,basis,pointer,touch
+connected_extracted.css,".fg select,.fg input",36.8,,fs+pad,PASS,FAIL
+connected_extracted.css,.btn-auth,38.8,,fs+pad,PASS,FAIL
+connected_extracted.css,.nav-item,38.8,,fs+pad,PASS,FAIL
+connected_extracted.css,.nav-item-ext,38.8,,fs+pad,PASS,FAIL
+connected_extracted.css,.btn,34.8,,fs+pad,PASS,FAIL
+connected_extracted.css,.btn-sm,28.0,,min-height,PASS,FAIL
+connected_extracted.css,.btn-xs,28.0,,min-height,PASS,FAIL
+connected_extracted.css,.btn-lnk,28.0,,min-height,PASS,FAIL
+connected_extracted.css,.btn-primary,36.8,,fs+pad,PASS,FAIL
+connected_extracted.css,.btn-secondary,36.8,,fs+pad,PASS,FAIL
+connected_extracted.css,.btn-ghost,36.8,,fs+pad,PASS,FAIL
+connected_extracted.css,.btn-danger,36.8,,fs+pad,PASS,FAIL
+connected_extracted.css,.btn-disabled,36.8,,fs+pad,PASS,FAIL
+connected_extracted.css,.icon-btn,44.0,44.0,min-height,PASS,PASS
+connected_extracted.css,".fbar select,.fbar input",28.0,,min-height,PASS,FAIL
+connected_extracted.css,".form-group select,.form-group input,.form-group tex",34.8,,fs+pad,PASS,FAIL
+connected_extracted.css,.ff textarea,68.0,,min-height,PASS,PASS
+connected_extracted.css,.chk-item input,13.0,13.0,height,FAIL,FAIL
+connected_extracted.css,.tab-btn,32.8,,fs+pad,PASS,FAIL
+connected_extracted.css,.dash-filter-bar select,28.0,,min-height,PASS,FAIL
+connected_extracted.css,#page-service-desk .sd-filter-bar button,24.8,,fs+pad,FAIL,FAIL
+connected_extracted.css,.mode-banner button,23.4,,fs+pad,FAIL,FAIL
+connected_extracted.css,"body[data-density=""compact""] .btn:not(.btn-xs):not(.",28.0,,min-height,PASS,FAIL
+connected_extracted.css,"body[data-density=""compact""] .nav-item",32.8,,fs+pad,PASS,FAIL
+connected_extracted.css,.btn-hamburger,44.0,44.0,min-height,PASS,PASS
+connected_extracted.css,.btn-hamburger span,2.0,20.0,height,FAIL,FAIL
+connected_extracted.css,.btn-hamburger,44.0,44.0,min-height,PASS,PASS
+connected_extracted.css,.btn-hamburger span,2.0,20.0,height,FAIL,FAIL
+connected_extracted.css,.ht,14.0,14.0,height,FAIL,FAIL

@@ -1,0 +1,12 @@
+file,selector,height,width,basis,pointer,touch
+components.css,.btn,34.2,,fs+pad,PASS,FAIL
+components.css,.btn.sm,26.8,,fs+pad,FAIL,FAIL
+components.css,.chip,20.0,20.0,height,FAIL,FAIL
+components.css,.tag-input input,22.2,80.0,fs+pad,FAIL,FAIL
+components.css,".app[data-density=""compact""] .btn:not(.btn.sm)",24.8,,fs+pad,FAIL,FAIL
+layout.css,.nav-item,36.2,,fs+pad,PASS,FAIL
+layout.css,".app[data-density=""compact""] .nav-item",26.8,,fs+pad,FAIL,FAIL
+planning.css,".pw-layer-row input[type=""checkbox""]",14.0,14.0,height,FAIL,FAIL
+planning.css,.pw-chip,21.4,,fs+pad,FAIL,FAIL
+planning.css,".pw-drawer-form input, .pw-drawer-form select, .pw-d",30.8,,fs+pad,PASS,FAIL
+planning.css,.pw-drawer-form textarea,60.0,,min-height,PASS,PASS

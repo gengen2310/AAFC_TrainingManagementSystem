@@ -1,0 +1,298 @@
+frontend,context,state,selector,foreground,background,kind,ratio,required,result,how
+Main TMS,(prefers-contrast: more),resting,body,#000000,#ffffff,text,21.0,4.5,PASS,same-rule; 14px body
+Main TMS,default,resting,body,#1e2d3d,#f4f8fc,text,13.14,4.5,PASS,same-rule; 14px body
+Main TMS,print,resting,.print-schedule-table .group-header,#fff,#002f65,text,13.17,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,print,resting,.print-schedule-table .non-period-row td,#555,#f8f8f8,text,7.02,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.badge.b-grey,#222,#d0d0d0,text,10.32,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.auth-wrap,#d1dce8,#fff,boundary-advisory,1.39,3.0,FAIL,same-rule
+Main TMS,default,resting,.auth-wrap,#d1dce8,#fff,boundary-advisory,1.39,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),resting,.btn-auth,#fff,#003a7a,text,11.13,4.5,PASS,same-rule; 12px body
+Main TMS,default,resting,.btn-auth,#fff,#003a7a,text,11.13,4.5,PASS,same-rule; 12px body
+Main TMS,(prefers-contrast: more),disabled+hover,.btn-auth:hover:not(:disabled),#fff,#004590,text,9.32,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,default,disabled+hover,.btn-auth:hover:not(:disabled),#fff,#004590,text,9.32,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,(prefers-contrast: more),active+disabled,.btn-auth:active:not(:disabled),#fff,#001e42,text,16.61,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,default,active+disabled,.btn-auth:active:not(:disabled),#fff,#001e42,text,16.61,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,(prefers-contrast: more),disabled,.btn-auth:disabled,#b0b7bb,#f4f8fc,text,1.9,4.5,FAIL,same-rule; 12px body
+Main TMS,(prefers-contrast: more),disabled,.btn-auth:disabled,#d1dce8,#f4f8fc,boundary-advisory,1.3,3.0,FAIL,same-rule
+Main TMS,default,disabled,.btn-auth:disabled,#b0b7bb,#f4f8fc,text,1.9,4.5,FAIL,same-rule; 12px body
+Main TMS,default,disabled,.btn-auth:disabled,#d1dce8,#f4f8fc,boundary-advisory,1.3,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),resting,.auth-err,#8b1a1a,#fdeaea,text,8.02,4.5,PASS,same-rule; 12px body
+Main TMS,(prefers-contrast: more),resting,.auth-err,#f5a5a5,#fdeaea,boundary-advisory,1.68,3.0,FAIL,same-rule
+Main TMS,default,resting,.auth-err,#8b1a1a,#fdeaea,text,8.02,4.5,PASS,same-rule; 12px body
+Main TMS,default,resting,.auth-err,#f5a5a5,#fdeaea,boundary-advisory,1.68,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),resting,.auth-acct-banner,#002f65,#f0f7ff,text,12.2,4.5,PASS,same-rule; 12px body
+Main TMS,(prefers-contrast: more),resting,.auth-acct-banner,#bee3f8,#f0f7ff,boundary-advisory,1.25,3.0,FAIL,same-rule
+Main TMS,default,resting,.auth-acct-banner,#002f65,#f0f7ff,text,12.2,4.5,PASS,same-rule; 12px body
+Main TMS,default,resting,.auth-acct-banner,#bee3f8,#f0f7ff,boundary-advisory,1.25,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),resting,.sqn-chip,#002f65,#51b0e3,text,5.44,4.5,PASS,same-rule; 11px body
+Main TMS,default,resting,.sqn-chip,#002f65,#51b0e3,text,5.44,4.5,PASS,same-rule; 11px body
+Main TMS,(prefers-contrast: more),resting,.sqn-chip.admin,#002f65,#ffd700,text,9.39,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.sqn-chip.admin,#002f65,#ffd700,text,9.39,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),hover,.nav-subitem:hover,#002f65,#ffffff,text,13.17,4.5,PASS,same-rule; 12px body
+Main TMS,default,hover,.nav-subitem:hover,#002f65,#f4f8fc,text,12.34,4.5,PASS,same-rule; 12px body
+Main TMS,(prefers-contrast: more),resting,.nav-subitem.active,#002f65,#deeefa,text,11.11,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.nav-subitem.active,#51b0e3,#deeefa,boundary-advisory,2.04,3.0,FAIL,same-rule
+Main TMS,default,resting,.nav-subitem.active,#002f65,#deeefa,text,11.11,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.nav-subitem.active,#51b0e3,#deeefa,boundary-advisory,2.04,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),resting,.yn-display input,#fff,"rgba(255,255,255,.1)",text,1.0,4.5,FAIL,ancestor .yn-display:hover; 14px body
+Main TMS,default,resting,.yn-display input,#fff,"rgba(255,255,255,.1)",text,1.0,4.5,FAIL,ancestor .yn-display:hover; 14px body
+Main TMS,(prefers-contrast: more),resting,.yn-chip-active,#004d24,#c0f0d8,text,8.0,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.yn-chip-active,#1a7f4b,#d4f0e3,text,4.15,4.5,FAIL,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.yn-chip-arch,#404040,#ffffff,text,10.37,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.yn-chip-arch,#5c6a76,#f4f8fc,text,5.21,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.cea-conflict-toggle,#555555,#ffffff,boundary-advisory,7.46,3.0,PASS,same-rule
+Main TMS,default,resting,.cea-conflict-toggle,#d1dce8,#f4f8fc,boundary-advisory,1.3,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),hover,.btn-out:hover,#002f65,#002f65,text,1.0,4.5,FAIL,inherited-fg + same-rule bg; size unknown - assumed body
+Main TMS,default,hover,.btn-out:hover,#002f65,#002f65,text,1.0,4.5,FAIL,inherited-fg + same-rule bg; size unknown - assumed body
+Main TMS,(prefers-contrast: more),hover,.btn-red-out:hover,#cc0011,#cc0011,text,1.0,4.5,FAIL,inherited-fg + same-rule bg; size unknown - assumed body
+Main TMS,default,hover,.btn-red-out:hover,#e51937,#e51937,text,1.0,4.5,FAIL,inherited-fg + same-rule bg; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.btn-sky,#002f65,#c8e6ff,text,10.17,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.btn-sky,#7db2ce,#c8e6ff,boundary-advisory,1.78,3.0,FAIL,same-rule
+Main TMS,default,resting,.btn-sky,#002f65,#e0f0fa,text,11.3,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.btn-sky,#7db2ce,#e0f0fa,boundary-advisory,1.97,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),hover,.btn-sky:hover,#002f65,#c4e4f5,text,9.89,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,hover,.btn-sky:hover,#002f65,#c4e4f5,text,9.89,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,".btn-danger,.btn-red",#fff,#cc0011,text,5.87,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,default,resting,".btn-danger,.btn-red",#fff,#e51937,text,4.64,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,(prefers-contrast: more),hover,".btn-danger:hover,.btn-red:hover",#fff,#c01530,text,6.19,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,default,hover,".btn-danger:hover,.btn-red:hover",#fff,#c01530,text,6.19,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,(prefers-contrast: more),hover,.btn-primary:hover,#fff,#004590,text,9.32,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,default,hover,.btn-primary:hover,#fff,#004590,text,9.32,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,(prefers-contrast: more),active,.btn-primary:active,#fff,#001e42,text,16.61,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,default,active,.btn-primary:active,#fff,#001e42,text,16.61,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,(prefers-contrast: more),hover,.btn-secondary:hover,#002f65,#e0f0fa,text,11.3,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,default,hover,.btn-secondary:hover,#002f65,#e0f0fa,text,11.3,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,(prefers-contrast: more),resting,.btn-danger,#fff,#c8102e,text,5.88,4.5,PASS,same-rule; 12px body
+Main TMS,default,resting,.btn-danger,#fff,#c8102e,text,5.88,4.5,PASS,same-rule; 12px body
+Main TMS,(prefers-contrast: more),hover,.btn-danger:hover,#fff,#e01235,text,4.88,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,default,hover,.btn-danger:hover,#fff,#e01235,text,4.88,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,(prefers-contrast: more),resting,.btn-disabled,#b0b7bb,#f4f8fc,text,1.9,4.5,FAIL,same-rule; 12px body
+Main TMS,(prefers-contrast: more),resting,.btn-disabled,#555555,#f4f8fc,boundary-advisory,6.99,3.0,PASS,same-rule
+Main TMS,default,resting,.btn-disabled,#b0b7bb,#f4f8fc,text,1.9,4.5,FAIL,same-rule; 12px body
+Main TMS,(prefers-contrast: more),resting,.seg-btn,#455560,#ffffff,text,7.72,4.5,PASS,same-rule; 12px body
+Main TMS,default,resting,.seg-btn,#455560,#ffffff,text,7.72,4.5,PASS,same-rule; 12px body
+Main TMS,(prefers-contrast: more),resting,.seg-btn.active,#fff,#002f65,text,13.17,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.seg-btn.active,#fff,#002f65,text,13.17,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,".badge-green,.b-ok",#1a5c35,#d4f0e3,text,6.62,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,".badge-green,.b-ok",#1a5c35,#d4f0e3,text,6.62,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,".badge-grey,.b-grey",#455560,#eef0f2,text,6.75,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,".badge-grey,.b-grey",#455560,#eef0f2,text,6.75,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,".badge-red,.b-red",#8b1a1a,#fde8e8,text,7.91,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,".badge-red,.b-red",#8b1a1a,#fde8e8,text,7.91,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,".badge-amber,.badge-yellow,.b-amber",#7a5200,#fff3cd,text,6.25,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,".badge-amber,.badge-yellow,.b-amber",#7a5200,#fff3cd,text,6.25,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.b-teal,#0a5c50,#d4f5f0,text,6.81,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.b-teal,#0a5c50,#d4f5f0,text,6.81,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.b-gold,#7a6000,#fff7cc,text,5.55,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.b-gold,#7a6000,#fff7cc,text,5.55,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.b-orange,#7a3a00,#ffe8d4,text,7.29,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.b-orange,#7a3a00,#ffe8d4,text,7.29,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.b-purple,#5b1a8b,#f0e8ff,text,9.0,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.b-purple,#5b1a8b,#f0e8ff,text,9.0,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.ph-sil,#333,#e8e8e8,text,10.31,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.ph-sil,#333,#e8e8e8,text,10.31,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.st-delivered_with_issue,#4a5d1f,#eaf3d8,text,6.37,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.st-delivered_with_issue,#4a5d1f,#eaf3d8,text,6.37,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.st-cancelled_late,#8b1a1a,#fde8e8,boundary-advisory,7.91,3.0,PASS,same-rule
+Main TMS,default,resting,.st-cancelled_late,#8b1a1a,#fde8e8,boundary-advisory,7.91,3.0,PASS,same-rule
+Main TMS,(prefers-contrast: more),resting,thead th,#455560,#f0f0f0,text,6.77,4.5,PASS,ancestor thead; 10px body
+Main TMS,default,resting,thead th,#455560,#f0f5fa,text,7.04,4.5,PASS,ancestor thead; 10px body
+Main TMS,(prefers-contrast: more),resting,.a-info,#003d88,#e0eeff,text,8.82,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.a-info,#003d88,#e0eeff,text,8.82,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.dash-sec-hero .dash-sec-hdr,#002f65,"rgba(0,47,101,.035)",text,1.0,4.5,FAIL,ancestor .dash-sec-hero; 13px body
+Main TMS,default,resting,.dash-sec-hero .dash-sec-hdr,#002f65,"rgba(0,47,101,.035)",text,1.0,4.5,FAIL,ancestor .dash-sec-hero; 13px body
+Main TMS,(prefers-contrast: more),resting,.dash-sec-hero .dash-sec-sub,#111111,"rgba(0,47,101,.035)",text,1.43,4.5,FAIL,ancestor .dash-sec-hero; 11px body
+Main TMS,default,resting,.dash-sec-hero .dash-sec-sub,#3a4a55,"rgba(0,47,101,.035)",text,1.44,4.5,FAIL,ancestor .dash-sec-hero; 11px body
+Main TMS,(prefers-contrast: more),resting,.chart-insight,#004b8d,#c8e6ff,text,6.78,4.5,PASS,same-rule; 12px body
+Main TMS,default,resting,.chart-insight,#004b8d,#e0f0fa,text,7.53,4.5,PASS,same-rule; 12px body
+Main TMS,(prefers-contrast: more),resting,.hm-empty,#999,#f0f0f0,text,2.5,4.5,FAIL,same-rule; size unknown - assumed body
+Main TMS,default,resting,.hm-empty,#999,#f0f0f0,text,2.5,4.5,FAIL,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),hover,.cal-nbtn:hover,#51b0e3,#c8e6ff,boundary-advisory,1.87,3.0,FAIL,same-rule
+Main TMS,default,hover,.cal-nbtn:hover,#51b0e3,#e0f0fa,boundary-advisory,2.08,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),resting,.cal-cell.parade,#51b0e3,#e6f3fc,boundary-advisory,2.14,3.0,FAIL,same-rule
+Main TMS,default,resting,.cal-cell.parade,#51b0e3,#e6f3fc,boundary-advisory,2.14,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),resting,.cal-cell.other .cal-dt,#3a3a3a,#ffffff,text,11.37,4.5,PASS,ancestor .cal-cell.other; size unknown - assumed body
+Main TMS,default,resting,.cal-cell.other .cal-dt,#6e7275,#f4f8fc,text,4.55,4.5,PASS,ancestor .cal-cell.other; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.cal-cell.parade .cal-dt,#002f65,#e6f3fc,text,11.66,4.5,PASS,ancestor .cal-cell.parade; size unknown - assumed body
+Main TMS,default,resting,.cal-cell.parade .cal-dt,#002f65,#e6f3fc,text,11.66,4.5,PASS,ancestor .cal-cell.parade; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.sess-card.delivered,#004d24,#f0faf5,boundary-advisory,9.44,3.0,PASS,same-rule
+Main TMS,default,resting,.sess-card.delivered,#1a7f4b,#f0faf5,boundary-advisory,4.71,3.0,PASS,same-rule
+Main TMS,(prefers-contrast: more),resting,.sess-card.cancelled,#cc0011,#fff5f5,boundary-advisory,5.49,3.0,PASS,same-rule
+Main TMS,default,resting,.sess-card.cancelled,#e51937,#fff5f5,boundary-advisory,4.34,3.0,PASS,same-rule
+Main TMS,(prefers-contrast: more),resting,.sess-card.rescheduled,#6a3800,#fffbf0,boundary-advisory,9.32,3.0,PASS,same-rule
+Main TMS,default,resting,.sess-card.rescheduled,#c97a00,#fffbf0,boundary-advisory,3.24,3.0,PASS,same-rule
+Main TMS,(prefers-contrast: more),resting,.sess-card.not_delivered,#b0b7bb,#f8f9fa,boundary-advisory,1.93,3.0,FAIL,same-rule
+Main TMS,default,resting,.sess-card.not_delivered,#b0b7bb,#f8f9fa,boundary-advisory,1.93,3.0,FAIL,same-rule
+Main TMS,default,resting,"#sd-modal .ff-input,
+#sd-modal .ff-select",#1e2d3d,#ffffff,text,14.02,4.5,PASS,same-rule; 12px body
+Main TMS,default,resting,"#sd-modal .ff-input,
+#sd-modal .ff-select",#d1dce8,#ffffff,boundary-advisory,1.39,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),resting,#page-service-desk .sd-filter-bar button.active,#fff,#51b0e3,text,2.42,4.5,FAIL,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,#page-service-desk .sd-filter-bar button.active,#51b0e3,#51b0e3,boundary-advisory,1.0,3.0,FAIL,same-rule
+Main TMS,default,resting,#page-service-desk .sd-filter-bar button.active,#fff,#51b0e3,text,2.42,4.5,FAIL,same-rule; size unknown - assumed body
+Main TMS,default,resting,#page-service-desk .sd-filter-bar button.active,#51b0e3,#51b0e3,boundary-advisory,1.0,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),resting,.badge-open,#004b8d,#e0f0fa,text,7.53,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.badge-in_progress,#7a4800,#fff3cd,text,6.88,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.badge-in_progress,#7a4800,#fff3cd,text,6.88,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.badge-resolved,#145f38,#d4f0e3,text,6.38,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.badge-resolved,#145f38,#d4f0e3,text,6.38,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.sd-unit-dropdown,#51b0e3,#ffffff,boundary-advisory,2.42,3.0,FAIL,same-rule
+Main TMS,default,resting,.sd-unit-dropdown,#51b0e3,#ffffff,boundary-advisory,2.42,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),hover,.exp-item:hover,#51b0e3,#fafbff,boundary-advisory,2.34,3.0,FAIL,same-rule
+Main TMS,default,hover,.exp-item:hover,#51b0e3,#fafbff,boundary-advisory,2.34,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),resting,.lh-btn,#003399,#c8e6ff,text,8.39,4.5,PASS,same-rule; 11px body
+Main TMS,(prefers-contrast: more),hover,.lh-btn:hover,#003399,#cce0ff,text,8.11,4.5,PASS,inherited-fg + same-rule bg; 11px body
+Main TMS,default,hover,.lh-btn:hover,#004b8d,#cce0ff,text,6.56,4.5,PASS,inherited-fg + same-rule bg; 11px body
+Main TMS,(prefers-contrast: more),resting,.res-chip.ok,#a8d5bc,#c0f0d8,boundary-advisory,1.29,3.0,FAIL,same-rule
+Main TMS,default,resting,.res-chip.ok,#a8d5bc,#d4f0e3,boundary-advisory,1.35,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),resting,.scope-banner.sb-national .sb-tag,#fff,#7c3aed,text,5.7,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.scope-banner.sb-national .sb-tag,#fff,#7c3aed,text,5.7,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.scope-banner.sb-wing .sb-tag,#fff,#004b8d,text,8.78,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.scope-banner.sb-wing .sb-tag,#fff,#004b8d,text,8.78,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.scope-banner.sb-auditor .sb-tag,#fff,#455560,text,7.72,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.scope-banner.sb-auditor .sb-tag,#fff,#455560,text,7.72,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.scope-banner.sb-system_admin .sb-tag,#fff,#1a1a2e,text,17.06,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.scope-banner.sb-system_admin .sb-tag,#fff,#1a1a2e,text,17.06,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.mode-banner,#5a4200,#fffbe6,text,9.12,4.5,PASS,same-rule; 11px body
+Main TMS,default,resting,.mode-banner,#5a4200,#fffbe6,text,9.12,4.5,PASS,same-rule; 11px body
+Main TMS,(prefers-contrast: more),resting,.mode-banner.intervention,#7a1010,#fef0f0,text,9.92,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.mode-banner.intervention,#7a1010,#fef0f0,text,9.92,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.data-conf-bar,#111111,#ffe090,text,14.67,4.5,PASS,same-rule; 11px body
+Main TMS,(prefers-contrast: more),resting,.data-conf-bar,#6a3800,#ffe090,boundary-advisory,7.49,3.0,PASS,same-rule
+Main TMS,default,resting,.data-conf-bar,#3a4a55,#fff3cd,text,8.27,4.5,PASS,same-rule; 11px body
+Main TMS,default,resting,.data-conf-bar,#c97a00,#fff3cd,boundary-advisory,3.02,3.0,PASS,same-rule
+Main TMS,(prefers-contrast: more),resting,.data-conf-bar .dcb-label,#7a5200,#ffe090,text,5.38,4.5,PASS,ancestor .data-conf-bar; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.data-conf-bar.ok,#004d24,#c0f0d8,boundary-advisory,8.0,3.0,PASS,same-rule
+Main TMS,default,resting,.data-conf-bar.ok,#1a7f4b,#d4f0e3,boundary-advisory,4.15,3.0,PASS,same-rule
+Main TMS,(prefers-contrast: more),resting,.data-conf-bar.ok .dcb-label,#003318,#c0f0d8,text,11.23,4.5,PASS,ancestor .data-conf-bar.ok; size unknown - assumed body
+Main TMS,default,resting,.cm-cell-not_delivered,#455560,#f0f0f0,text,6.77,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.cm-cell-cancelled,#b5002b,#f8f0f0,text,6.24,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.cm-cell-cancelled,#b5002b,#f8f0f0,text,6.24,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.cm-cell-delivered_with_issue,#c97a00,#d4f0e3,text,2.77,4.5,FAIL,same-rule; size unknown - assumed body
+Main TMS,default,resting,.cm-cell-delivered_with_issue,#c97a00,#d4f0e3,text,2.77,4.5,FAIL,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.fac-sugg-panel,#555555,#f0f0f0,boundary-advisory,6.54,3.0,PASS,same-rule
+Main TMS,default,resting,.fac-sugg-panel,#d1dce8,#f0f5fa,boundary-advisory,1.27,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),resting,.fac-sugg-pill.conflict,#cc0011,#fde8e8,text,5.0,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.fac-sugg-pill.conflict,#e51937,#fde8e8,text,3.95,4.5,FAIL,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.fac-sugg-pill.unavailable,#404040,#f0f0f0,text,9.1,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.fac-sugg-pill.unavailable,#5c6a76,#f0f0f0,text,4.88,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),hover,".wiz-curr-item:hover,.wiz-curr-item.sel",#002f65,#c8e6ff,text,10.17,4.5,PASS,inherited-fg + same-rule bg; 12px body
+Main TMS,(prefers-contrast: more),resting,.maint-banner.pending,#a06200,#c97a00,boundary-advisory,1.48,3.0,FAIL,same-rule
+Main TMS,default,resting,.maint-banner.pending,#a06200,#c97a00,boundary-advisory,1.48,3.0,FAIL,same-rule
+Main TMS,(prefers-contrast: more),resting,.debug-bar,#9fd0f0,#11202e,text,10.04,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,default,resting,.debug-bar,#9fd0f0,#11202e,text,10.04,4.5,PASS,same-rule; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.debug-bar b,#fff,#11202e,text,16.54,4.5,PASS,ancestor .debug-bar; size unknown - assumed body
+Main TMS,default,resting,.debug-bar b,#fff,#11202e,text,16.54,4.5,PASS,ancestor .debug-bar; size unknown - assumed body
+Main TMS,(prefers-contrast: more),resting,.debug-bar .warn,#ffd36b,#11202e,text,11.64,4.5,PASS,ancestor .debug-bar; size unknown - assumed body
+Main TMS,default,resting,.debug-bar .warn,#ffd36b,#11202e,text,11.64,4.5,PASS,ancestor .debug-bar; size unknown - assumed body
+Main TMS,default,resting,.sc-sqn-chip,#455560,#f4f8fc,text,7.23,4.5,PASS,same-rule; 11px body
+Main TMS,(prefers-contrast: more),resting,.ht,#455560,#555555,text,1.04,4.5,FAIL,same-rule; 9px body
+Main TMS,default,resting,.ht,#455560,#d1dce8,text,5.55,4.5,PASS,same-rule; 9px body
+Main TMS,(prefers-contrast: more),resting,.ht::after,#fff,#1e2d3d,text,14.02,4.5,PASS,same-rule; 11px body
+Main TMS,default,resting,.ht::after,#fff,#1e2d3d,text,14.02,4.5,PASS,same-rule; 11px body
+Planning WS,(prefers-contrast: more),resting,.pw-ctx,#fff,#000044,text,19.38,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,.pw-ctx,#fff,#000044,text,19.38,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.pw-chip,#3a3a3a,#ffffff,text,11.37,4.5,PASS,same-rule; 11px body
+Planning WS,(prefers-contrast: more),resting,.pw-chip,#555555,#ffffff,boundary-advisory,7.46,3.0,PASS,same-rule
+Planning WS,default,resting,.pw-chip,#303030,#ffffff,text,13.2,4.5,PASS,same-rule; 11px body
+Planning WS,default,resting,.pw-chip,#555555,#ffffff,boundary-advisory,7.46,3.0,PASS,same-rule
+Planning WS,(prefers-contrast: more),resting,.pw-chip.on,#000044,#000044,boundary-advisory,1.0,3.0,FAIL,same-rule
+Planning WS,default,resting,.pw-chip.on,#000044,#000044,boundary-advisory,1.0,3.0,FAIL,same-rule
+Planning WS,(prefers-contrast: more),hover,.pw-backlog-item:hover,#000000,#ffffff,text,21.0,4.5,PASS,inherited-fg + same-rule bg; 11px body
+Planning WS,default,hover,.pw-backlog-item:hover,#000000,#ffffff,text,21.0,4.5,PASS,inherited-fg + same-rule bg; 11px body
+Planning WS,(prefers-contrast: more),resting,.pw-date-cell.holiday,#FFB74D,#FFF3E0,boundary-advisory,1.58,3.0,FAIL,same-rule
+Planning WS,default,resting,.pw-date-cell.holiday,#FFB74D,#FFF3E0,boundary-advisory,1.58,3.0,FAIL,same-rule
+Planning WS,(prefers-contrast: more),resting,.pw-anchor-pill.must_attend,#8A0F22,#FDECEE,text,8.48,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.pw-anchor-pill.must_attend,#cc0011,#FDECEE,boundary-advisory,5.15,3.0,PASS,same-rule
+Planning WS,default,resting,.pw-anchor-pill.must_attend,#8A0F22,#FDECEE,text,8.48,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,.pw-anchor-pill.must_attend,#cc0011,#FDECEE,boundary-advisory,5.15,3.0,PASS,same-rule
+Planning WS,(prefers-contrast: more),resting,.pw-anchor-pill.key_event,#0F5A33,#E8F5EE,text,7.4,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.pw-anchor-pill.key_event,#004d24,#E8F5EE,boundary-advisory,8.97,3.0,PASS,same-rule
+Planning WS,default,resting,.pw-anchor-pill.key_event,#0F5A33,#E8F5EE,text,7.4,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,.pw-anchor-pill.key_event,#004d24,#E8F5EE,boundary-advisory,8.97,3.0,PASS,same-rule
+Planning WS,(prefers-contrast: more),resting,.pw-anchor-pill.wing,#004B8D,#EBF5FF,text,7.96,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.pw-anchor-pill.wing,#000099,#EBF5FF,boundary-advisory,13.04,3.0,PASS,same-rule
+Planning WS,default,resting,.pw-anchor-pill.wing,#004B8D,#EBF5FF,text,7.96,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,.pw-anchor-pill.wing,#000099,#EBF5FF,boundary-advisory,13.04,3.0,PASS,same-rule
+Planning WS,(prefers-contrast: more),resting,.pw-sess-mini.conflict-room,#cc0011,#FFF5F5,boundary-advisory,5.49,3.0,PASS,same-rule
+Planning WS,default,resting,.pw-sess-mini.conflict-room,#cc0011,#FFF5F5,boundary-advisory,5.49,3.0,PASS,same-rule
+Planning WS,(prefers-contrast: more),resting,.pw-sess-mini.conflict-fac,#6a3800,#FFFBF0,boundary-advisory,9.32,3.0,PASS,same-rule
+Planning WS,default,resting,.pw-sess-mini.conflict-fac,#6a3800,#FFFBF0,boundary-advisory,9.32,3.0,PASS,same-rule
+Planning WS,(prefers-contrast: more),resting,.pw-conflict-badge.fac,#7A3A00,#FFF3E0,text,7.87,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,.pw-conflict-badge.fac,#7A3A00,#FFF3E0,text,7.87,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.pw-conflict-badge.load,#5A4000,#FFF8E1,text,9.12,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,.pw-conflict-badge.load,#5A4000,#FFF8E1,text,9.12,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.pn-cell-inner.break-cell,#3a3a3a,#F5F5F5,text,10.43,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,.pn-cell-inner.break-cell,#303030,#F5F5F5,text,12.11,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),hover,.pn-add-btn:hover,#000044,#EBF5FF,text,17.57,4.5,PASS,same-rule; 11px body
+Planning WS,default,hover,.pn-add-btn:hover,#000044,#EBF5FF,text,17.57,4.5,PASS,same-rule; 11px body
+Planning WS,(prefers-contrast: more),resting,".pw-drawer-form input, .pw-drawer-form select, .pw-drawer-form textarea",#000000,#ffffff,text,21.0,4.5,PASS,same-rule; 12px body
+Planning WS,default,resting,".pw-drawer-form input, .pw-drawer-form select, .pw-drawer-form textarea",#000000,#ffffff,text,21.0,4.5,PASS,same-rule; 12px body
+Planning WS,(prefers-contrast: more),resting,.pw-conflict-alert.warn,#F57C00,#FFF3E0,boundary-advisory,2.47,3.0,FAIL,same-rule
+Planning WS,default,resting,.pw-conflict-alert.warn,#F57C00,#FFF3E0,boundary-advisory,2.47,3.0,FAIL,same-rule
+Planning WS,(prefers-contrast: more),resting,.pw-conflict-alert.soft,#FFB300,#FFF8E1,boundary-advisory,1.69,3.0,FAIL,same-rule
+Planning WS,default,resting,.pw-conflict-alert.soft,#FFB300,#FFF8E1,boundary-advisory,1.69,3.0,FAIL,same-rule
+Planning WS,(prefers-contrast: more),resting,.pw-badge-national,#4A1080,#F2EBFE,text,10.79,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.pw-badge-national,#44007a,#F2EBFE,boundary-advisory,11.85,3.0,PASS,same-rule
+Planning WS,default,resting,.pw-badge-national,#4A1080,#F2EBFE,text,10.79,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,.pw-badge-national,#44007a,#F2EBFE,boundary-advisory,11.85,3.0,PASS,same-rule
+Planning WS,(prefers-contrast: more),resting,.pw-block.holiday,#f5c26b,#fffaf2,boundary-advisory,1.58,3.0,FAIL,same-rule
+Planning WS,default,resting,.pw-block.holiday,#f5c26b,#fffaf2,boundary-advisory,1.58,3.0,FAIL,same-rule
+Planning WS,(prefers-contrast: more),hover,.pw-block-hdr:hover,#fff,#003a80,text,10.96,4.5,PASS,inherited-fg + same-rule bg; size unknown - assumed body
+Planning WS,default,hover,.pw-block-hdr:hover,#fff,#003a80,text,10.96,4.5,PASS,inherited-fg + same-rule bg; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.pw-block-band-hdr,#3a3a3a,#f5f7fa,text,10.6,4.5,PASS,same-rule; 10px body
+Planning WS,default,resting,.pw-block-band-hdr,#303030,#f5f7fa,text,12.3,4.5,PASS,same-rule; 10px body
+Planning WS,(prefers-contrast: more),resting,.pw-night-grid thead th,#fff,#004b8d,text,8.78,4.5,PASS,same-rule; 11px body
+Planning WS,default,resting,.pw-night-grid thead th,#fff,#004b8d,text,8.78,4.5,PASS,same-rule; 11px body
+Planning WS,(prefers-contrast: more),resting,.pw-night-grid tbody th,#555555,#f5f7fa,boundary-advisory,6.95,3.0,PASS,same-rule
+Planning WS,default,resting,.pw-night-grid tbody th,#555555,#f5f7fa,boundary-advisory,6.95,3.0,PASS,same-rule
+Planning WS,(prefers-contrast: more),resting,.pw-block-warnings,#cc0011,#fff5f5,text,5.49,4.5,PASS,same-rule; 11px body
+Planning WS,default,resting,.pw-block-warnings,#cc0011,#fff5f5,text,5.49,4.5,PASS,same-rule; 11px body
+Planning WS,(prefers-contrast: more),hover,.pw-pn-add-notice-btn:hover,#000044,#ffffff,text,19.38,4.5,PASS,same-rule; 11px body
+Planning WS,(prefers-contrast: more),hover,.pw-pn-add-notice-btn:hover,#000099,#ffffff,boundary-advisory,14.38,3.0,PASS,same-rule
+Planning WS,default,hover,.pw-pn-add-notice-btn:hover,#000044,#ffffff,text,19.38,4.5,PASS,same-rule; 11px body
+Planning WS,default,hover,.pw-pn-add-notice-btn:hover,#000099,#ffffff,boundary-advisory,14.38,3.0,PASS,same-rule
+Planning WS,(prefers-contrast: more),resting,.nav-item.active,#000044,#000099,text,1.35,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.nav-item.active,#000099,#000099,boundary-advisory,1.0,3.0,FAIL,same-rule
+Planning WS,default,resting,.nav-item.active,#000044,#000099,text,1.35,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,default,resting,.nav-item.active,#000099,#000099,boundary-advisory,1.0,3.0,FAIL,same-rule
+Planning WS,(prefers-contrast: more),resting,.banner.proxy,#1D2733,#6a3800,text,1.57,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,default,resting,.banner.proxy,#1D2733,#6a3800,text,1.57,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.banner.intervention,#fff,#44007a,text,13.75,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,.banner.intervention,#fff,#44007a,text,13.75,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,"html[data-theme=""dark""] .errnote",#FFB4BE,#3A1620,text,9.52,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,"html[data-theme=""dark""] .errnote",#FFB4BE,#3A1620,text,9.52,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.btn.danger,#cc0011,#cc0011,boundary-advisory,1.0,3.0,FAIL,same-rule
+Planning WS,default,resting,.btn.danger,#cc0011,#cc0011,boundary-advisory,1.0,3.0,FAIL,same-rule
+Planning WS,(prefers-contrast: more),resting,.scope-pill,#002F65,#000099,text,1.09,4.5,FAIL,same-rule; 11px body
+Planning WS,default,resting,.scope-pill,#002F65,#000099,text,1.09,4.5,FAIL,same-rule; 11px body
+Planning WS,(prefers-contrast: more),resting,.chip-not_delivered,#6a3800,#FFF3E0,boundary-advisory,8.79,3.0,PASS,same-rule
+Planning WS,default,resting,.chip-not_delivered,#6a3800,#FFF3E0,boundary-advisory,8.79,3.0,PASS,same-rule
+Planning WS,(prefers-contrast: more),resting,.scope-note,#111111,#f0f0f0,text,16.57,4.5,PASS,same-rule; 14px body
+Planning WS,default,resting,.scope-note,#111111,#f0f0f0,text,16.57,4.5,PASS,same-rule; 14px body
+Planning WS,(prefers-contrast: more),resting,.hm-ok,#14532d,#cfead8,text,7.12,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,.hm-ok,#14532d,#cfead8,text,7.12,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.hm-warn,#7a4a00,#fde9c8,text,6.29,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,.hm-warn,#7a4a00,#fde9c8,text,6.29,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.hm-red,#7a1d16,#f7d0cc,text,7.37,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,.hm-red,#7a1d16,#f7d0cc,text,7.37,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.hm-na,#3a3a3a,#f0f0f0,text,9.98,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,default,resting,.hm-na,#303030,#f0f0f0,text,11.58,4.5,PASS,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.fts-item.fts-ok,#004d24,#004d24,text,1.0,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.fts-item.fts-ok,#004d24,#004d24,boundary-advisory,1.0,3.0,FAIL,same-rule
+Planning WS,default,resting,.fts-item.fts-ok,#004d24,#004d24,text,1.0,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,default,resting,.fts-item.fts-ok,#004d24,#004d24,boundary-advisory,1.0,3.0,FAIL,same-rule
+Planning WS,(prefers-contrast: more),resting,.fts-item.fts-warn,#a86600,#6a3800,text,2.1,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.fts-item.fts-warn,#6a3800,#6a3800,boundary-advisory,1.0,3.0,FAIL,same-rule
+Planning WS,default,resting,.fts-item.fts-warn,#a86600,#6a3800,text,2.1,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,default,resting,.fts-item.fts-warn,#6a3800,#6a3800,boundary-advisory,1.0,3.0,FAIL,same-rule
+Planning WS,(prefers-contrast: more),resting,.fts-item.fts-red,#cc0011,#cc0011,text,1.0,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,default,resting,.fts-item.fts-red,#cc0011,#cc0011,text,1.0,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.fts-item.fts-blue,#004b8d,#004b8d,text,1.0,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.fts-item.fts-blue,#004b8d,#004b8d,boundary-advisory,1.0,3.0,FAIL,same-rule
+Planning WS,default,resting,.fts-item.fts-blue,#004b8d,#004b8d,text,1.0,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,default,resting,.fts-item.fts-blue,#004b8d,#004b8d,boundary-advisory,1.0,3.0,FAIL,same-rule
+Planning WS,(prefers-contrast: more),resting,.fts-item.fts-purple,#44007a,#44007a,text,1.0,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,(prefers-contrast: more),resting,.fts-item.fts-purple,#44007a,#44007a,boundary-advisory,1.0,3.0,FAIL,same-rule
+Planning WS,default,resting,.fts-item.fts-purple,#44007a,#44007a,text,1.0,4.5,FAIL,same-rule; size unknown - assumed body
+Planning WS,default,resting,.fts-item.fts-purple,#44007a,#44007a,boundary-advisory,1.0,3.0,FAIL,same-rule

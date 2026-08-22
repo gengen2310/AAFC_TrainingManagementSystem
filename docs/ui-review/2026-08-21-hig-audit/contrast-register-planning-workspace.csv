@@ -1,0 +1,831 @@
+context,file,selector,fg,bg,px,weight,large,required,ratio,result,how,size_known
+light,base.css,body,#1e2d3d,#f4f8fc,14.0,400,False,4.5,13.14,PASS,same-rule,yes
+dark,base.css,body,#e7eef6,#081426,14.0,400,False,4.5,15.78,PASS,same-rule,yes
+hc,base.css,body,#000000,#ffffff,14.0,400,False,4.5,21.0,PASS,same-rule,yes
+contrast-more,base.css,body,#000000,#ffffff,14.0,400,False,4.5,21.0,PASS,same-rule,yes
+light,base.css,a,#004b8d,#ffffff,13.0,400,False,4.5,8.78,PASS,assumed --surface,no
+light,base.css,a,#004b8d,#f4f8fc,13.0,400,False,4.5,8.23,PASS,assumed --background,no
+dark,base.css,a,#004b8d,#0f1c30,13.0,400,False,4.5,1.95,FAIL,assumed --surface,no
+dark,base.css,a,#004b8d,#081426,13.0,400,False,4.5,2.1,FAIL,assumed --background,no
+hc,base.css,a,#004b8d,#ffffff,13.0,400,False,4.5,8.78,PASS,assumed --surface,no
+hc,base.css,a,#004b8d,#ffffff,13.0,400,False,4.5,8.78,PASS,assumed --background,no
+contrast-more,base.css,a,#004b8d,#ffffff,13.0,400,False,4.5,8.78,PASS,assumed --surface,no
+contrast-more,base.css,a,#004b8d,#ffffff,13.0,400,False,4.5,8.78,PASS,assumed --background,no
+light,base.css,.skip-link,#ffffff,#002f65,13.0,400,False,4.5,13.17,PASS,same-rule,no
+dark,base.css,.skip-link,#ffffff,#51b0e3,13.0,400,False,4.5,2.42,FAIL,same-rule,no
+hc,base.css,.skip-link,#ffffff,#000044,13.0,400,False,4.5,19.38,PASS,same-rule,no
+contrast-more,base.css,.skip-link,#ffffff,#000044,13.0,400,False,4.5,19.38,PASS,same-rule,no
+light,base.css,th,#657380,#ffffff,11.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,base.css,th,#657380,#f4f8fc,11.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,base.css,th,#9fb2c6,#0f1c30,11.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,base.css,th,#9fb2c6,#081426,11.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,base.css,th,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,base.css,th,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,base.css,th,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,base.css,th,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,components.css,.stat .lbl,#657380,#ffffff,11.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,components.css,.stat .lbl,#657380,#f4f8fc,11.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,components.css,.stat .lbl,#9fb2c6,#0f1c30,11.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,components.css,.stat .lbl,#9fb2c6,#081426,11.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,components.css,.stat .lbl,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,components.css,.stat .lbl,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,components.css,.stat .lbl,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,components.css,.stat .lbl,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,components.css,.btn,#ffffff,#002f65,13.0,700,False,4.5,13.17,PASS,same-rule,yes
+dark,components.css,.btn,#ffffff,#51b0e3,13.0,700,False,4.5,2.42,FAIL,same-rule,yes
+hc,components.css,.btn,#ffffff,#000044,13.0,700,False,4.5,19.38,PASS,same-rule,yes
+contrast-more,components.css,.btn,#ffffff,#000044,13.0,700,False,4.5,19.38,PASS,same-rule,yes
+light,components.css,.badge.ok,#1a7f4b,#ffffff,13.0,400,False,4.5,5.02,PASS,assumed --surface,no
+light,components.css,.badge.ok,#1a7f4b,#f4f8fc,13.0,400,False,4.5,4.71,PASS,assumed --background,no
+hc,components.css,.badge.ok,#004d24,#ffffff,13.0,400,False,4.5,10.06,PASS,assumed --surface,no
+hc,components.css,.badge.ok,#004d24,#ffffff,13.0,400,False,4.5,10.06,PASS,assumed --background,no
+contrast-more,components.css,.badge.ok,#004d24,#ffffff,13.0,400,False,4.5,10.06,PASS,assumed --surface,no
+contrast-more,components.css,.badge.ok,#004d24,#ffffff,13.0,400,False,4.5,10.06,PASS,assumed --background,no
+light,components.css,.badge.warn,#a86600,#ffffff,13.0,400,False,4.5,4.6,PASS,assumed --surface,no
+light,components.css,.badge.warn,#a86600,#f4f8fc,13.0,400,False,4.5,4.31,FAIL,assumed --background,no
+dark,components.css,.badge.warn,#a86600,#0f1c30,13.0,400,False,4.5,3.71,FAIL,assumed --surface,no
+dark,components.css,.badge.warn,#a86600,#081426,13.0,400,False,4.5,4.01,FAIL,assumed --background,no
+hc,components.css,.badge.warn,#a86600,#ffffff,13.0,400,False,4.5,4.6,PASS,assumed --surface,no
+hc,components.css,.badge.warn,#a86600,#ffffff,13.0,400,False,4.5,4.6,PASS,assumed --background,no
+contrast-more,components.css,.badge.warn,#a86600,#ffffff,13.0,400,False,4.5,4.6,PASS,assumed --surface,no
+contrast-more,components.css,.badge.warn,#a86600,#ffffff,13.0,400,False,4.5,4.6,PASS,assumed --background,no
+light,components.css,.badge.red,#e51937,#ffffff,13.0,400,False,4.5,4.64,PASS,assumed --surface,no
+light,components.css,.badge.red,#e51937,#f4f8fc,13.0,400,False,4.5,4.35,FAIL,assumed --background,no
+dark,components.css,.badge.red,#ff6b6b,#0f1c30,13.0,400,False,4.5,6.16,PASS,assumed --surface,no
+dark,components.css,.badge.red,#ff6b6b,#081426,13.0,400,False,4.5,6.65,PASS,assumed --background,no
+hc,components.css,.badge.red,#cc0011,#ffffff,13.0,400,False,4.5,5.87,PASS,assumed --surface,no
+hc,components.css,.badge.red,#cc0011,#ffffff,13.0,400,False,4.5,5.87,PASS,assumed --background,no
+contrast-more,components.css,.badge.red,#e51937,#ffffff,13.0,400,False,4.5,4.64,PASS,assumed --surface,no
+contrast-more,components.css,.badge.red,#e51937,#ffffff,13.0,400,False,4.5,4.64,PASS,assumed --background,no
+light,components.css,.badge.blue,#004b8d,#ffffff,13.0,400,False,4.5,8.78,PASS,assumed --surface,no
+light,components.css,.badge.blue,#004b8d,#f4f8fc,13.0,400,False,4.5,8.23,PASS,assumed --background,no
+dark,components.css,.badge.blue,#004b8d,#0f1c30,13.0,400,False,4.5,1.95,FAIL,assumed --surface,no
+dark,components.css,.badge.blue,#004b8d,#081426,13.0,400,False,4.5,2.1,FAIL,assumed --background,no
+hc,components.css,.badge.blue,#004b8d,#ffffff,13.0,400,False,4.5,8.78,PASS,assumed --surface,no
+hc,components.css,.badge.blue,#004b8d,#ffffff,13.0,400,False,4.5,8.78,PASS,assumed --background,no
+contrast-more,components.css,.badge.blue,#004b8d,#ffffff,13.0,400,False,4.5,8.78,PASS,assumed --surface,no
+contrast-more,components.css,.badge.blue,#004b8d,#ffffff,13.0,400,False,4.5,8.78,PASS,assumed --background,no
+light,components.css,.lh,#004b8d,#ffffff,13.0,700,False,4.5,8.78,PASS,assumed --surface,no
+light,components.css,.lh,#004b8d,#f4f8fc,13.0,700,False,4.5,8.23,PASS,assumed --background,no
+dark,components.css,.lh,#004b8d,#0f1c30,13.0,700,False,4.5,1.95,FAIL,assumed --surface,no
+dark,components.css,.lh,#004b8d,#081426,13.0,700,False,4.5,2.1,FAIL,assumed --background,no
+hc,components.css,.lh,#004b8d,#ffffff,13.0,700,False,4.5,8.78,PASS,assumed --surface,no
+hc,components.css,.lh,#004b8d,#ffffff,13.0,700,False,4.5,8.78,PASS,assumed --background,no
+contrast-more,components.css,.lh,#004b8d,#ffffff,13.0,700,False,4.5,8.78,PASS,assumed --surface,no
+contrast-more,components.css,.lh,#004b8d,#ffffff,13.0,700,False,4.5,8.78,PASS,assumed --background,no
+light,components.css,.empty,#657380,#ffffff,13.0,400,False,4.5,4.86,PASS,assumed --surface,no
+light,components.css,.empty,#657380,#f4f8fc,13.0,400,False,4.5,4.56,PASS,assumed --background,no
+dark,components.css,.empty,#9fb2c6,#0f1c30,13.0,400,False,4.5,7.86,PASS,assumed --surface,no
+dark,components.css,.empty,#9fb2c6,#081426,13.0,400,False,4.5,8.48,PASS,assumed --background,no
+hc,components.css,.empty,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --surface,no
+hc,components.css,.empty,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --background,no
+contrast-more,components.css,.empty,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --surface,no
+contrast-more,components.css,.empty,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --background,no
+light,components.css,".login-box input,.login-box select",#1e2d3d,#ffffff,13.0,400,False,4.5,14.02,PASS,same-rule,no
+dark,components.css,".login-box input,.login-box select",#e7eef6,#0f1c30,13.0,400,False,4.5,14.61,PASS,same-rule,no
+hc,components.css,".login-box input,.login-box select",#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,same-rule,no
+contrast-more,components.css,".login-box input,.login-box select",#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,same-rule,no
+light,components.css,.err,#e51937,#ffffff,12.0,700,False,4.5,4.64,PASS,assumed --surface,yes
+light,components.css,.err,#e51937,#f4f8fc,12.0,700,False,4.5,4.35,FAIL,assumed --background,yes
+dark,components.css,.err,#ff6b6b,#0f1c30,12.0,700,False,4.5,6.16,PASS,assumed --surface,yes
+dark,components.css,.err,#ff6b6b,#081426,12.0,700,False,4.5,6.65,PASS,assumed --background,yes
+hc,components.css,.err,#cc0011,#ffffff,12.0,700,False,4.5,5.87,PASS,assumed --surface,yes
+hc,components.css,.err,#cc0011,#ffffff,12.0,700,False,4.5,5.87,PASS,assumed --background,yes
+contrast-more,components.css,.err,#e51937,#ffffff,12.0,700,False,4.5,4.64,PASS,assumed --surface,yes
+contrast-more,components.css,.err,#e51937,#ffffff,12.0,700,False,4.5,4.64,PASS,assumed --background,yes
+light,components.css,.badge.muted,#657380,#ffffff,13.0,400,False,4.5,4.86,PASS,assumed --surface,no
+light,components.css,.badge.muted,#657380,#f4f8fc,13.0,400,False,4.5,4.56,PASS,assumed --background,no
+dark,components.css,.badge.muted,#9fb2c6,#0f1c30,13.0,400,False,4.5,7.86,PASS,assumed --surface,no
+dark,components.css,.badge.muted,#9fb2c6,#081426,13.0,400,False,4.5,8.48,PASS,assumed --background,no
+hc,components.css,.badge.muted,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --surface,no
+hc,components.css,.badge.muted,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --background,no
+contrast-more,components.css,.badge.muted,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --surface,no
+contrast-more,components.css,.badge.muted,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --background,no
+light,components.css,.badge.purple,#7c3aed,#ffffff,13.0,400,False,4.5,5.7,PASS,assumed --surface,no
+light,components.css,.badge.purple,#7c3aed,#f4f8fc,13.0,400,False,4.5,5.34,PASS,assumed --background,no
+dark,components.css,.badge.purple,#7c3aed,#0f1c30,13.0,400,False,4.5,3.0,FAIL,assumed --surface,no
+dark,components.css,.badge.purple,#7c3aed,#081426,13.0,400,False,4.5,3.24,FAIL,assumed --background,no
+hc,components.css,.badge.purple,#44007a,#ffffff,13.0,400,False,4.5,13.75,PASS,assumed --surface,no
+hc,components.css,.badge.purple,#44007a,#ffffff,13.0,400,False,4.5,13.75,PASS,assumed --background,no
+contrast-more,components.css,.badge.purple,#7c3aed,#ffffff,13.0,400,False,4.5,5.7,PASS,assumed --surface,no
+contrast-more,components.css,.badge.purple,#7c3aed,#ffffff,13.0,400,False,4.5,5.7,PASS,assumed --background,no
+light,components.css,.stat .hint,#657380,#ffffff,11.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,components.css,.stat .hint,#657380,#f4f8fc,11.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,components.css,.stat .hint,#9fb2c6,#0f1c30,11.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,components.css,.stat .hint,#9fb2c6,#081426,11.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,components.css,.stat .hint,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,components.css,.stat .hint,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,components.css,.stat .hint,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,components.css,.stat .hint,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,components.css,.muted,#657380,#ffffff,13.0,400,False,4.5,4.86,PASS,assumed --surface,no
+light,components.css,.muted,#657380,#f4f8fc,13.0,400,False,4.5,4.56,PASS,assumed --background,no
+dark,components.css,.muted,#9fb2c6,#0f1c30,13.0,400,False,4.5,7.86,PASS,assumed --surface,no
+dark,components.css,.muted,#9fb2c6,#081426,13.0,400,False,4.5,8.48,PASS,assumed --background,no
+hc,components.css,.muted,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --surface,no
+hc,components.css,.muted,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --background,no
+contrast-more,components.css,.muted,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --surface,no
+contrast-more,components.css,.muted,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --background,no
+light,components.css,.errnote,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,yes
+dark,components.css,.errnote,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,yes
+hc,components.css,.errnote,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,yes
+contrast-more,components.css,.errnote,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,yes
+light,components.css,"html[data-theme=""dark""] .errnote",#ffb4be,#3a1620,13.0,400,False,4.5,9.52,PASS,same-rule,no
+dark,components.css,"html[data-theme=""dark""] .errnote",#ffb4be,#3a1620,13.0,400,False,4.5,9.52,PASS,same-rule,no
+hc,components.css,"html[data-theme=""dark""] .errnote",#ffb4be,#3a1620,13.0,400,False,4.5,9.52,PASS,same-rule,no
+contrast-more,components.css,"html[data-theme=""dark""] .errnote",#ffb4be,#3a1620,13.0,400,False,4.5,9.52,PASS,same-rule,no
+light,components.css,.okmsg,#0f5a33,#e8f5ee,13.0,400,False,4.5,7.4,PASS,same-rule,yes
+dark,components.css,.okmsg,#0f5a33,#e8f5ee,13.0,400,False,4.5,7.4,PASS,same-rule,yes
+hc,components.css,.okmsg,#0f5a33,#e8f5ee,13.0,400,False,4.5,7.4,PASS,same-rule,yes
+contrast-more,components.css,.okmsg,#0f5a33,#e8f5ee,13.0,400,False,4.5,7.4,PASS,same-rule,yes
+light,components.css,.scope-pill,#002f65,#51b0e3,13.0,400,False,4.5,5.44,PASS,same-rule,no
+dark,components.css,.scope-pill,#002f65,#51b0e3,13.0,400,False,4.5,5.44,PASS,same-rule,no
+hc,components.css,.scope-pill,#002f65,#000099,13.0,400,False,4.5,1.09,FAIL,same-rule,no
+contrast-more,components.css,.scope-pill,#002f65,#51b0e3,13.0,400,False,4.5,5.44,PASS,same-rule,no
+light,components.css,".form input,.form select,.inline-form input,.inline-form sel",#1e2d3d,#ffffff,13.0,400,False,4.5,14.02,PASS,same-rule,no
+dark,components.css,".form input,.form select,.inline-form input,.inline-form sel",#e7eef6,#0f1c30,13.0,400,False,4.5,14.61,PASS,same-rule,no
+hc,components.css,".form input,.form select,.inline-form input,.inline-form sel",#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,same-rule,no
+contrast-more,components.css,".form input,.form select,.inline-form input,.inline-form sel",#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,same-rule,no
+light,components.css,.cal-sessions,#657380,#ffffff,11.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,components.css,.cal-sessions,#657380,#f4f8fc,11.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,components.css,.cal-sessions,#9fb2c6,#0f1c30,11.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,components.css,.cal-sessions,#9fb2c6,#081426,11.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,components.css,.cal-sessions,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,components.css,.cal-sessions,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,components.css,.cal-sessions,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,components.css,.cal-sessions,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,components.css,.sensitive,#657380,#ffffff,13.0,400,False,4.5,4.86,PASS,assumed --surface,no
+light,components.css,.sensitive,#657380,#f4f8fc,13.0,400,False,4.5,4.56,PASS,assumed --background,no
+dark,components.css,.sensitive,#9fb2c6,#0f1c30,13.0,400,False,4.5,7.86,PASS,assumed --surface,no
+dark,components.css,.sensitive,#9fb2c6,#081426,13.0,400,False,4.5,8.48,PASS,assumed --background,no
+hc,components.css,.sensitive,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --surface,no
+hc,components.css,.sensitive,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --background,no
+contrast-more,components.css,.sensitive,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --surface,no
+contrast-more,components.css,.sensitive,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --background,no
+light,components.css,.login-foot,#657380,#ffffff,11.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,components.css,.login-foot,#657380,#f4f8fc,11.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,components.css,.login-foot,#9fb2c6,#0f1c30,11.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,components.css,.login-foot,#9fb2c6,#081426,11.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,components.css,.login-foot,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,components.css,.login-foot,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,components.css,.login-foot,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,components.css,.login-foot,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,components.css,.field-err,#e51937,#ffffff,13.0,400,False,4.5,4.64,PASS,assumed --surface,no
+light,components.css,.field-err,#e51937,#f4f8fc,13.0,400,False,4.5,4.35,FAIL,assumed --background,no
+dark,components.css,.field-err,#ff6b6b,#0f1c30,13.0,400,False,4.5,6.16,PASS,assumed --surface,no
+dark,components.css,.field-err,#ff6b6b,#081426,13.0,400,False,4.5,6.65,PASS,assumed --background,no
+hc,components.css,.field-err,#cc0011,#ffffff,13.0,400,False,4.5,5.87,PASS,assumed --surface,no
+hc,components.css,.field-err,#cc0011,#ffffff,13.0,400,False,4.5,5.87,PASS,assumed --background,no
+contrast-more,components.css,.field-err,#cc0011,#ffffff,13.0,400,False,4.5,5.87,PASS,assumed --surface,no
+contrast-more,components.css,.field-err,#cc0011,#ffffff,13.0,400,False,4.5,5.87,PASS,assumed --background,no
+light,components.css,.okmsg,#1a7f4b,#ffffff,13.0,400,False,4.5,5.02,PASS,assumed --surface,no
+light,components.css,.okmsg,#1a7f4b,#f4f8fc,13.0,400,False,4.5,4.71,PASS,assumed --background,no
+hc,components.css,.okmsg,#004d24,#ffffff,13.0,400,False,4.5,10.06,PASS,assumed --surface,no
+hc,components.css,.okmsg,#004d24,#ffffff,13.0,400,False,4.5,10.06,PASS,assumed --background,no
+contrast-more,components.css,.okmsg,#004d24,#ffffff,13.0,400,False,4.5,10.06,PASS,assumed --surface,no
+contrast-more,components.css,.okmsg,#004d24,#ffffff,13.0,400,False,4.5,10.06,PASS,assumed --background,no
+light,components.css,.scope-note,#44506a,#f0f5fa,13.0,400,False,4.5,7.36,PASS,same-rule,no
+dark,components.css,.scope-note,#c7d4e3,#16233a,13.0,400,False,4.5,10.45,PASS,same-rule,no
+hc,components.css,.scope-note,#111111,#f0f0f0,13.0,400,False,4.5,16.57,PASS,same-rule,no
+contrast-more,components.css,.scope-note,#111111,#f0f0f0,13.0,400,False,4.5,16.57,PASS,same-rule,no
+light,components.css,.hm-ok,#14532d,#cfead8,13.0,400,False,4.5,7.12,PASS,same-rule,no
+dark,components.css,.hm-ok,#14532d,#cfead8,13.0,400,False,4.5,7.12,PASS,same-rule,no
+hc,components.css,.hm-ok,#14532d,#cfead8,13.0,400,False,4.5,7.12,PASS,same-rule,no
+contrast-more,components.css,.hm-ok,#14532d,#cfead8,13.0,400,False,4.5,7.12,PASS,same-rule,no
+light,components.css,.hm-warn,#7a4a00,#fde9c8,13.0,400,False,4.5,6.29,PASS,same-rule,no
+dark,components.css,.hm-warn,#7a4a00,#fde9c8,13.0,400,False,4.5,6.29,PASS,same-rule,no
+hc,components.css,.hm-warn,#7a4a00,#fde9c8,13.0,400,False,4.5,6.29,PASS,same-rule,no
+contrast-more,components.css,.hm-warn,#7a4a00,#fde9c8,13.0,400,False,4.5,6.29,PASS,same-rule,no
+light,components.css,.hm-red,#7a1d16,#f7d0cc,13.0,400,False,4.5,7.37,PASS,same-rule,no
+dark,components.css,.hm-red,#7a1d16,#f7d0cc,13.0,400,False,4.5,7.37,PASS,same-rule,no
+hc,components.css,.hm-red,#7a1d16,#f7d0cc,13.0,400,False,4.5,7.37,PASS,same-rule,no
+contrast-more,components.css,.hm-red,#7a1d16,#f7d0cc,13.0,400,False,4.5,7.37,PASS,same-rule,no
+light,components.css,.hm-na,#657380,#f0f5fa,13.0,400,False,4.5,4.43,FAIL,same-rule,no
+dark,components.css,.hm-na,#9fb2c6,#16233a,13.0,400,False,4.5,7.23,PASS,same-rule,no
+hc,components.css,.hm-na,#303030,#f0f0f0,13.0,400,False,4.5,11.58,PASS,same-rule,no
+contrast-more,components.css,.hm-na,#3a3a3a,#f0f0f0,13.0,400,False,4.5,9.98,PASS,same-rule,no
+light,components.css,.tag-chip,#002f65,#ffffff,11.5,700,False,4.5,13.17,PASS,assumed --surface,yes
+light,components.css,.tag-chip,#002f65,#f4f8fc,11.5,700,False,4.5,12.34,PASS,assumed --background,yes
+dark,components.css,.tag-chip,#51b0e3,#0f1c30,11.5,700,False,4.5,7.05,PASS,assumed --surface,yes
+dark,components.css,.tag-chip,#51b0e3,#081426,11.5,700,False,4.5,7.62,PASS,assumed --background,yes
+hc,components.css,.tag-chip,#000044,#ffffff,11.5,700,False,4.5,19.38,PASS,assumed --surface,yes
+hc,components.css,.tag-chip,#000044,#ffffff,11.5,700,False,4.5,19.38,PASS,assumed --background,yes
+contrast-more,components.css,.tag-chip,#000044,#ffffff,11.5,700,False,4.5,19.38,PASS,assumed --surface,yes
+contrast-more,components.css,.tag-chip,#000044,#ffffff,11.5,700,False,4.5,19.38,PASS,assumed --background,yes
+light,components.css,.fts-item.fts-ok,#1a7f4b,#d6e8df,13.0,400,False,4.5,3.94,FAIL,same-rule,no
+hc,components.css,.fts-item.fts-ok,#004d24,#d1dfd8,13.0,400,False,4.5,7.31,PASS,same-rule,no
+contrast-more,components.css,.fts-item.fts-ok,#004d24,#d1dfd8,13.0,400,False,4.5,7.31,PASS,same-rule,no
+light,components.css,.fts-item.fts-warn,#a86600,#f5e7d1,13.0,400,False,4.5,3.77,FAIL,same-rule,no
+hc,components.css,.fts-item.fts-warn,#a86600,#e4dbd1,13.0,400,False,4.5,3.36,FAIL,same-rule,no
+contrast-more,components.css,.fts-item.fts-warn,#a86600,#e4dbd1,13.0,400,False,4.5,3.36,FAIL,same-rule,no
+light,components.css,.fts-item.fts-red,#e51937,#fbdce1,13.0,400,False,4.5,3.63,FAIL,same-rule,no
+dark,components.css,.fts-item.fts-red,#ff6b6b,#332839,13.0,400,False,4.5,5.03,PASS,same-rule,no
+hc,components.css,.fts-item.fts-red,#cc0011,#f7d9db,13.0,400,False,4.5,4.45,FAIL,same-rule,no
+contrast-more,components.css,.fts-item.fts-red,#e51937,#fbdce1,13.0,400,False,4.5,3.63,FAIL,same-rule,no
+light,components.css,.fts-item.fts-blue,#004b8d,#d9e4ee,13.0,400,False,4.5,6.81,PASS,same-rule,no
+dark,components.css,.fts-item.fts-blue,#004b8d,#0d233e,13.0,400,False,4.5,1.8,FAIL,same-rule,no
+hc,components.css,.fts-item.fts-blue,#004b8d,#d9e4ee,13.0,400,False,4.5,6.81,PASS,same-rule,no
+contrast-more,components.css,.fts-item.fts-blue,#004b8d,#d9e4ee,13.0,400,False,4.5,6.81,PASS,same-rule,no
+light,components.css,.fts-item.fts-purple,#7c3aed,#ebe1fc,13.0,400,False,4.5,4.53,PASS,same-rule,no
+dark,components.css,.fts-item.fts-purple,#7c3aed,#1f204c,13.0,400,False,4.5,2.69,FAIL,same-rule,no
+hc,components.css,.fts-item.fts-purple,#44007a,#e3d9eb,13.0,400,False,4.5,10.08,PASS,same-rule,no
+contrast-more,components.css,.fts-item.fts-purple,#7c3aed,#ebe1fc,13.0,400,False,4.5,4.53,PASS,same-rule,no
+light,components.css,.fts-leave-now-tag,#a86600,#f4e4cc,9.5,700,False,4.5,3.68,FAIL,same-rule,yes
+hc,components.css,.fts-leave-now-tag,#a86600,#e1d7cc,9.5,700,False,4.5,3.24,FAIL,same-rule,yes
+contrast-more,components.css,.fts-leave-now-tag,#a86600,#e1d7cc,9.5,700,False,4.5,3.24,FAIL,same-rule,yes
+light,layout.css,.topbar,#ffffff,#002f65,13.0,400,False,4.5,13.17,PASS,same-rule,no
+dark,layout.css,.topbar,#ffffff,#51b0e3,13.0,400,False,4.5,2.42,FAIL,same-rule,no
+hc,layout.css,.topbar,#ffffff,#000044,13.0,400,False,4.5,19.38,PASS,same-rule,no
+contrast-more,layout.css,.topbar,#ffffff,#000044,13.0,400,False,4.5,19.38,PASS,same-rule,no
+light,layout.css,.nav-item.active,#002f65,#e5f3fb,13.0,700,False,4.5,11.63,PASS,same-rule,no
+dark,layout.css,.nav-item.active,#51b0e3,#19324b,13.0,700,False,4.5,5.42,PASS,same-rule,no
+hc,layout.css,.nav-item.active,#000044,#d9d9f0,13.0,700,False,4.5,13.97,PASS,same-rule,no
+contrast-more,layout.css,.nav-item.active,#000044,#d9d9f0,13.0,700,False,4.5,13.97,PASS,same-rule,no
+light,layout.css,.nav-group,#657380,#ffffff,10.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,layout.css,.nav-group,#657380,#f4f8fc,10.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,layout.css,.nav-group,#9fb2c6,#0f1c30,10.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,layout.css,.nav-group,#9fb2c6,#081426,10.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,layout.css,.nav-group,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,layout.css,.nav-group,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,layout.css,.nav-group,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,layout.css,.nav-group,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,layout.css,.banner.proxy,#1d2733,#c97a00,13.0,400,False,4.5,4.51,PASS,same-rule,no
+hc,layout.css,.banner.proxy,#1d2733,#6a3800,13.0,400,False,4.5,1.57,FAIL,same-rule,no
+contrast-more,layout.css,.banner.proxy,#1d2733,#6a3800,13.0,400,False,4.5,1.57,FAIL,same-rule,no
+light,layout.css,.banner.intervention,#ffffff,#7c3aed,13.0,400,False,4.5,5.7,PASS,same-rule,no
+dark,layout.css,.banner.intervention,#ffffff,#7c3aed,13.0,400,False,4.5,5.7,PASS,same-rule,no
+hc,layout.css,.banner.intervention,#ffffff,#44007a,13.0,400,False,4.5,13.75,PASS,same-rule,no
+contrast-more,layout.css,.banner.intervention,#ffffff,#7c3aed,13.0,400,False,4.5,5.7,PASS,same-rule,no
+light,planning.css,.pw-ctx,#ffffff,#002f65,13.0,400,False,4.5,13.17,PASS,same-rule,no
+dark,planning.css,.pw-ctx,#ffffff,#51b0e3,13.0,400,False,4.5,2.42,FAIL,same-rule,no
+hc,planning.css,.pw-ctx,#ffffff,#000044,13.0,400,False,4.5,19.38,PASS,same-rule,no
+contrast-more,planning.css,.pw-ctx,#ffffff,#002f65,13.0,400,False,4.5,13.17,PASS,same-rule,no
+light,planning.css,.pw-section-hdr,#657380,#ffffff,11.0,800,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-section-hdr,#657380,#f4f8fc,11.0,800,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-section-hdr,#9fb2c6,#0f1c30,11.0,800,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-section-hdr,#9fb2c6,#081426,11.0,800,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-section-hdr,#303030,#ffffff,11.0,800,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-section-hdr,#303030,#ffffff,11.0,800,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-section-hdr,#3a3a3a,#ffffff,11.0,800,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-section-hdr,#3a3a3a,#ffffff,11.0,800,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-chip,#657380,#f4f8fc,11.0,600,False,4.5,4.56,PASS,same-rule,yes
+dark,planning.css,.pw-chip,#9fb2c6,#081426,11.0,600,False,4.5,8.48,PASS,same-rule,yes
+hc,planning.css,.pw-chip,#303030,#ffffff,11.0,600,False,4.5,13.2,PASS,same-rule,yes
+contrast-more,planning.css,.pw-chip,#3a3a3a,#ffffff,11.0,600,False,4.5,11.37,PASS,same-rule,yes
+light,planning.css,.pw-chip.on,#ffffff,#002f65,13.0,400,False,4.5,13.17,PASS,same-rule,no
+dark,planning.css,.pw-chip.on,#ffffff,#51b0e3,13.0,400,False,4.5,2.42,FAIL,same-rule,no
+hc,planning.css,.pw-chip.on,#ffffff,#000044,13.0,400,False,4.5,19.38,PASS,same-rule,no
+contrast-more,planning.css,.pw-chip.on,#ffffff,#002f65,13.0,400,False,4.5,13.17,PASS,same-rule,no
+light,planning.css,.pw-backlog-item,#1e2d3d,#ffffff,11.0,400,False,4.5,14.02,PASS,assumed --surface,yes
+light,planning.css,.pw-backlog-item,#1e2d3d,#f4f8fc,11.0,400,False,4.5,13.14,PASS,assumed --background,yes
+dark,planning.css,.pw-backlog-item,#e7eef6,#0f1c30,11.0,400,False,4.5,14.61,PASS,assumed --surface,yes
+dark,planning.css,.pw-backlog-item,#e7eef6,#081426,11.0,400,False,4.5,15.78,PASS,assumed --background,yes
+hc,planning.css,.pw-backlog-item,#000000,#ffffff,11.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+hc,planning.css,.pw-backlog-item,#000000,#ffffff,11.0,400,False,4.5,21.0,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-backlog-item,#000000,#ffffff,11.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-backlog-item,#000000,#ffffff,11.0,400,False,4.5,21.0,PASS,assumed --background,yes
+light,planning.css,.pw-backlog-code,#657380,#ffffff,11.0,700,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-backlog-code,#657380,#f4f8fc,11.0,700,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-backlog-code,#9fb2c6,#0f1c30,11.0,700,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-backlog-code,#9fb2c6,#081426,11.0,700,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-backlog-code,#303030,#ffffff,11.0,700,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-backlog-code,#303030,#ffffff,11.0,700,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-backlog-code,#3a3a3a,#ffffff,11.0,700,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-backlog-code,#3a3a3a,#ffffff,11.0,700,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-term-hdr,#002f65,#ffffff,13.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+light,planning.css,.pw-term-hdr,#002f65,#f4f8fc,13.0,800,False,4.5,12.34,PASS,assumed --background,yes
+dark,planning.css,.pw-term-hdr,#51b0e3,#0f1c30,13.0,800,False,4.5,7.05,PASS,assumed --surface,yes
+dark,planning.css,.pw-term-hdr,#51b0e3,#081426,13.0,800,False,4.5,7.62,PASS,assumed --background,yes
+hc,planning.css,.pw-term-hdr,#000044,#ffffff,13.0,800,False,4.5,19.38,PASS,assumed --surface,yes
+hc,planning.css,.pw-term-hdr,#000044,#ffffff,13.0,800,False,4.5,19.38,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-term-hdr,#002f65,#ffffff,13.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-term-hdr,#002f65,#ffffff,13.0,800,False,4.5,13.17,PASS,assumed --background,yes
+light,planning.css,.pw-date-label,#1e2d3d,#ffffff,12.0,800,False,4.5,14.02,PASS,assumed --surface,yes
+light,planning.css,.pw-date-label,#1e2d3d,#f4f8fc,12.0,800,False,4.5,13.14,PASS,assumed --background,yes
+dark,planning.css,.pw-date-label,#e7eef6,#0f1c30,12.0,800,False,4.5,14.61,PASS,assumed --surface,yes
+dark,planning.css,.pw-date-label,#e7eef6,#081426,12.0,800,False,4.5,15.78,PASS,assumed --background,yes
+hc,planning.css,.pw-date-label,#000000,#ffffff,12.0,800,False,4.5,21.0,PASS,assumed --surface,yes
+hc,planning.css,.pw-date-label,#000000,#ffffff,12.0,800,False,4.5,21.0,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-date-label,#000000,#ffffff,12.0,800,False,4.5,21.0,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-date-label,#000000,#ffffff,12.0,800,False,4.5,21.0,PASS,assumed --background,yes
+light,planning.css,.pw-date-type,#657380,#ffffff,10.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-date-type,#657380,#f4f8fc,10.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-date-type,#9fb2c6,#0f1c30,10.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-date-type,#9fb2c6,#081426,10.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-date-type,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-date-type,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-date-type,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-date-type,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-anchor-pill.must_attend,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,no
+dark,planning.css,.pw-anchor-pill.must_attend,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,no
+hc,planning.css,.pw-anchor-pill.must_attend,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,no
+contrast-more,planning.css,.pw-anchor-pill.must_attend,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,no
+light,planning.css,.pw-anchor-pill.key_event,#0f5a33,#e8f5ee,13.0,400,False,4.5,7.4,PASS,same-rule,no
+dark,planning.css,.pw-anchor-pill.key_event,#0f5a33,#e8f5ee,13.0,400,False,4.5,7.4,PASS,same-rule,no
+hc,planning.css,.pw-anchor-pill.key_event,#0f5a33,#e8f5ee,13.0,400,False,4.5,7.4,PASS,same-rule,no
+contrast-more,planning.css,.pw-anchor-pill.key_event,#0f5a33,#e8f5ee,13.0,400,False,4.5,7.4,PASS,same-rule,no
+light,planning.css,.pw-anchor-pill.optional,#657380,#f4f8fc,13.0,400,False,4.5,4.56,PASS,same-rule,no
+dark,planning.css,.pw-anchor-pill.optional,#9fb2c6,#081426,13.0,400,False,4.5,8.48,PASS,same-rule,no
+hc,planning.css,.pw-anchor-pill.optional,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,same-rule,no
+contrast-more,planning.css,.pw-anchor-pill.optional,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,same-rule,no
+light,planning.css,.pw-anchor-pill.wing,#004b8d,#ebf5ff,13.0,400,False,4.5,7.96,PASS,same-rule,no
+dark,planning.css,.pw-anchor-pill.wing,#004b8d,#ebf5ff,13.0,400,False,4.5,7.96,PASS,same-rule,no
+hc,planning.css,.pw-anchor-pill.wing,#004b8d,#ebf5ff,13.0,400,False,4.5,7.96,PASS,same-rule,no
+contrast-more,planning.css,.pw-anchor-pill.wing,#004b8d,#ebf5ff,13.0,400,False,4.5,7.96,PASS,same-rule,no
+light,planning.css,.pw-week-term,#657380,#ffffff,11.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-week-term,#657380,#f4f8fc,11.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-week-term,#9fb2c6,#0f1c30,11.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-week-term,#9fb2c6,#081426,11.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-week-term,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-week-term,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-week-term,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-week-term,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-sess-mini-period,#657380,#ffffff,10.0,700,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-sess-mini-period,#657380,#f4f8fc,10.0,700,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-sess-mini-period,#9fb2c6,#0f1c30,10.0,700,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-sess-mini-period,#9fb2c6,#081426,10.0,700,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-sess-mini-period,#303030,#ffffff,10.0,700,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-sess-mini-period,#303030,#ffffff,10.0,700,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-sess-mini-period,#3a3a3a,#ffffff,10.0,700,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-sess-mini-period,#3a3a3a,#ffffff,10.0,700,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-sess-mini-fac,#657380,#ffffff,10.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-sess-mini-fac,#657380,#f4f8fc,10.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-sess-mini-fac,#9fb2c6,#0f1c30,10.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-sess-mini-fac,#9fb2c6,#081426,10.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-sess-mini-fac,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-sess-mini-fac,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-sess-mini-fac,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-sess-mini-fac,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-conflict-badge.room,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,no
+dark,planning.css,.pw-conflict-badge.room,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,no
+hc,planning.css,.pw-conflict-badge.room,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,no
+contrast-more,planning.css,.pw-conflict-badge.room,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,no
+light,planning.css,.pw-conflict-badge.fac,#7a3a00,#fff3e0,13.0,400,False,4.5,7.87,PASS,same-rule,no
+dark,planning.css,.pw-conflict-badge.fac,#7a3a00,#fff3e0,13.0,400,False,4.5,7.87,PASS,same-rule,no
+hc,planning.css,.pw-conflict-badge.fac,#7a3a00,#fff3e0,13.0,400,False,4.5,7.87,PASS,same-rule,no
+contrast-more,planning.css,.pw-conflict-badge.fac,#7a3a00,#fff3e0,13.0,400,False,4.5,7.87,PASS,same-rule,no
+light,planning.css,.pw-conflict-badge.load,#5a4000,#fff8e1,13.0,400,False,4.5,9.12,PASS,same-rule,no
+dark,planning.css,.pw-conflict-badge.load,#5a4000,#fff8e1,13.0,400,False,4.5,9.12,PASS,same-rule,no
+hc,planning.css,.pw-conflict-badge.load,#5a4000,#fff8e1,13.0,400,False,4.5,9.12,PASS,same-rule,no
+contrast-more,planning.css,.pw-conflict-badge.load,#5a4000,#fff8e1,13.0,400,False,4.5,9.12,PASS,same-rule,no
+light,planning.css,.pn-grid thead th,#ffffff,#002f65,11.0,700,False,4.5,13.17,PASS,same-rule,yes
+dark,planning.css,.pn-grid thead th,#ffffff,#51b0e3,11.0,700,False,4.5,2.42,FAIL,same-rule,yes
+hc,planning.css,.pn-grid thead th,#ffffff,#000044,11.0,700,False,4.5,19.38,PASS,same-rule,yes
+contrast-more,planning.css,.pn-grid thead th,#ffffff,#002f65,11.0,700,False,4.5,13.17,PASS,same-rule,yes
+light,planning.css,.pn-cell-inner.break-cell,#657380,#f5f5f5,13.0,400,False,4.5,4.46,FAIL,same-rule,no
+dark,planning.css,.pn-cell-inner.break-cell,#9fb2c6,#f5f5f5,13.0,400,False,4.5,1.99,FAIL,same-rule,no
+hc,planning.css,.pn-cell-inner.break-cell,#303030,#f5f5f5,13.0,400,False,4.5,12.11,PASS,same-rule,no
+contrast-more,planning.css,.pn-cell-inner.break-cell,#3a3a3a,#f5f5f5,13.0,400,False,4.5,10.43,PASS,same-rule,no
+light,planning.css,.pn-cell-code,#004b8d,#ffffff,10.0,700,False,4.5,8.78,PASS,assumed --surface,yes
+light,planning.css,.pn-cell-code,#004b8d,#f4f8fc,10.0,700,False,4.5,8.23,PASS,assumed --background,yes
+dark,planning.css,.pn-cell-code,#004b8d,#0f1c30,10.0,700,False,4.5,1.95,FAIL,assumed --surface,yes
+dark,planning.css,.pn-cell-code,#004b8d,#081426,10.0,700,False,4.5,2.1,FAIL,assumed --background,yes
+hc,planning.css,.pn-cell-code,#004b8d,#ffffff,10.0,700,False,4.5,8.78,PASS,assumed --surface,yes
+hc,planning.css,.pn-cell-code,#004b8d,#ffffff,10.0,700,False,4.5,8.78,PASS,assumed --background,yes
+contrast-more,planning.css,.pn-cell-code,#004b8d,#ffffff,10.0,700,False,4.5,8.78,PASS,assumed --surface,yes
+contrast-more,planning.css,.pn-cell-code,#004b8d,#ffffff,10.0,700,False,4.5,8.78,PASS,assumed --background,yes
+light,planning.css,.pn-cell-room,#657380,#ffffff,10.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pn-cell-room,#657380,#f4f8fc,10.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pn-cell-room,#9fb2c6,#0f1c30,10.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pn-cell-room,#9fb2c6,#081426,10.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pn-cell-room,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pn-cell-room,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pn-cell-room,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pn-cell-room,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pn-cell-fac,#1e2d3d,#ffffff,10.0,400,False,4.5,14.02,PASS,assumed --surface,yes
+light,planning.css,.pn-cell-fac,#1e2d3d,#f4f8fc,10.0,400,False,4.5,13.14,PASS,assumed --background,yes
+dark,planning.css,.pn-cell-fac,#e7eef6,#0f1c30,10.0,400,False,4.5,14.61,PASS,assumed --surface,yes
+dark,planning.css,.pn-cell-fac,#e7eef6,#081426,10.0,400,False,4.5,15.78,PASS,assumed --background,yes
+hc,planning.css,.pn-cell-fac,#000000,#ffffff,10.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+hc,planning.css,.pn-cell-fac,#000000,#ffffff,10.0,400,False,4.5,21.0,PASS,assumed --background,yes
+contrast-more,planning.css,.pn-cell-fac,#000000,#ffffff,10.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+contrast-more,planning.css,.pn-cell-fac,#000000,#ffffff,10.0,400,False,4.5,21.0,PASS,assumed --background,yes
+light,planning.css,.pn-add-btn,#657380,#f4f8fc,11.0,400,False,4.5,4.56,PASS,same-rule,yes
+dark,planning.css,.pn-add-btn,#9fb2c6,#081426,11.0,400,False,4.5,8.48,PASS,same-rule,yes
+hc,planning.css,.pn-add-btn,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,same-rule,yes
+contrast-more,planning.css,.pn-add-btn,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,same-rule,yes
+light,planning.css,.pn-add-btn:hover,#002f65,#ebf5ff,13.0,400,False,4.5,11.94,PASS,same-rule,no
+dark,planning.css,.pn-add-btn:hover,#51b0e3,#ebf5ff,13.0,400,False,4.5,2.2,FAIL,same-rule,no
+hc,planning.css,.pn-add-btn:hover,#000044,#ebf5ff,13.0,400,False,4.5,17.57,PASS,same-rule,no
+contrast-more,planning.css,.pn-add-btn:hover,#002f65,#ebf5ff,13.0,400,False,4.5,11.94,PASS,same-rule,no
+light,planning.css,.pw-drawer-label,#657380,#ffffff,11.0,700,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-drawer-label,#657380,#f4f8fc,11.0,700,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-drawer-label,#9fb2c6,#0f1c30,11.0,700,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-drawer-label,#9fb2c6,#081426,11.0,700,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-drawer-label,#303030,#ffffff,11.0,700,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-drawer-label,#303030,#ffffff,11.0,700,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-drawer-label,#3a3a3a,#ffffff,11.0,700,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-drawer-label,#3a3a3a,#ffffff,11.0,700,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-drawer-value,#1e2d3d,#ffffff,13.0,400,False,4.5,14.02,PASS,assumed --surface,yes
+light,planning.css,.pw-drawer-value,#1e2d3d,#f4f8fc,13.0,400,False,4.5,13.14,PASS,assumed --background,yes
+dark,planning.css,.pw-drawer-value,#e7eef6,#0f1c30,13.0,400,False,4.5,14.61,PASS,assumed --surface,yes
+dark,planning.css,.pw-drawer-value,#e7eef6,#081426,13.0,400,False,4.5,15.78,PASS,assumed --background,yes
+hc,planning.css,.pw-drawer-value,#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+hc,planning.css,.pw-drawer-value,#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-drawer-value,#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-drawer-value,#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,assumed --background,yes
+light,planning.css,".pw-drawer-form input, .pw-drawer-form select, .pw-drawer-fo",#1e2d3d,#ffffff,12.0,400,False,4.5,14.02,PASS,same-rule,yes
+dark,planning.css,".pw-drawer-form input, .pw-drawer-form select, .pw-drawer-fo",#e7eef6,#0f1c30,12.0,400,False,4.5,14.61,PASS,same-rule,yes
+hc,planning.css,".pw-drawer-form input, .pw-drawer-form select, .pw-drawer-fo",#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,same-rule,yes
+contrast-more,planning.css,".pw-drawer-form input, .pw-drawer-form select, .pw-drawer-fo",#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,same-rule,yes
+light,planning.css,.pw-conflict-alert.err,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,no
+dark,planning.css,.pw-conflict-alert.err,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,no
+hc,planning.css,.pw-conflict-alert.err,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,no
+contrast-more,planning.css,.pw-conflict-alert.err,#8a0f22,#fdecee,13.0,400,False,4.5,8.48,PASS,same-rule,no
+light,planning.css,.pw-conflict-alert.warn,#7a3a00,#fff3e0,13.0,400,False,4.5,7.87,PASS,same-rule,no
+dark,planning.css,.pw-conflict-alert.warn,#7a3a00,#fff3e0,13.0,400,False,4.5,7.87,PASS,same-rule,no
+hc,planning.css,.pw-conflict-alert.warn,#7a3a00,#fff3e0,13.0,400,False,4.5,7.87,PASS,same-rule,no
+contrast-more,planning.css,.pw-conflict-alert.warn,#7a3a00,#fff3e0,13.0,400,False,4.5,7.87,PASS,same-rule,no
+light,planning.css,.pw-conflict-alert.soft,#5a4000,#fff8e1,13.0,400,False,4.5,9.12,PASS,same-rule,no
+dark,planning.css,.pw-conflict-alert.soft,#5a4000,#fff8e1,13.0,400,False,4.5,9.12,PASS,same-rule,no
+hc,planning.css,.pw-conflict-alert.soft,#5a4000,#fff8e1,13.0,400,False,4.5,9.12,PASS,same-rule,no
+contrast-more,planning.css,.pw-conflict-alert.soft,#5a4000,#fff8e1,13.0,400,False,4.5,9.12,PASS,same-rule,no
+light,planning.css,.pw-badge-wing,#004b8d,#ebf5ff,13.0,400,False,4.5,7.96,PASS,same-rule,no
+dark,planning.css,.pw-badge-wing,#004b8d,#ebf5ff,13.0,400,False,4.5,7.96,PASS,same-rule,no
+hc,planning.css,.pw-badge-wing,#004b8d,#ebf5ff,13.0,400,False,4.5,7.96,PASS,same-rule,no
+contrast-more,planning.css,.pw-badge-wing,#004b8d,#ebf5ff,13.0,400,False,4.5,7.96,PASS,same-rule,no
+light,planning.css,.pw-badge-sqn,#0f5a33,#e8f5ee,13.0,400,False,4.5,7.4,PASS,same-rule,no
+dark,planning.css,.pw-badge-sqn,#0f5a33,#e8f5ee,13.0,400,False,4.5,7.4,PASS,same-rule,no
+hc,planning.css,.pw-badge-sqn,#0f5a33,#e8f5ee,13.0,400,False,4.5,7.4,PASS,same-rule,no
+contrast-more,planning.css,.pw-badge-sqn,#0f5a33,#e8f5ee,13.0,400,False,4.5,7.4,PASS,same-rule,no
+light,planning.css,.pw-badge-national,#4a1080,#f2ebfe,13.0,400,False,4.5,10.79,PASS,same-rule,no
+dark,planning.css,.pw-badge-national,#4a1080,#f2ebfe,13.0,400,False,4.5,10.79,PASS,same-rule,no
+hc,planning.css,.pw-badge-national,#4a1080,#f2ebfe,13.0,400,False,4.5,10.79,PASS,same-rule,no
+contrast-more,planning.css,.pw-badge-national,#4a1080,#f2ebfe,13.0,400,False,4.5,10.79,PASS,same-rule,no
+light,planning.css,.pw-btab:hover,#1e2d3d,#ffffff,13.0,400,False,4.5,14.02,PASS,assumed --surface,no
+light,planning.css,.pw-btab:hover,#1e2d3d,#f4f8fc,13.0,400,False,4.5,13.14,PASS,assumed --background,no
+dark,planning.css,.pw-btab:hover,#e7eef6,#0f1c30,13.0,400,False,4.5,14.61,PASS,assumed --surface,no
+dark,planning.css,.pw-btab:hover,#e7eef6,#081426,13.0,400,False,4.5,15.78,PASS,assumed --background,no
+hc,planning.css,.pw-btab:hover,#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,assumed --surface,no
+hc,planning.css,.pw-btab:hover,#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,assumed --background,no
+contrast-more,planning.css,.pw-btab:hover,#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,assumed --surface,no
+contrast-more,planning.css,.pw-btab:hover,#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,assumed --background,no
+light,planning.css,.pw-btab.active,#002f65,#ffffff,13.0,400,False,4.5,13.17,PASS,assumed --surface,no
+light,planning.css,.pw-btab.active,#002f65,#f4f8fc,13.0,400,False,4.5,12.34,PASS,assumed --background,no
+dark,planning.css,.pw-btab.active,#51b0e3,#0f1c30,13.0,400,False,4.5,7.05,PASS,assumed --surface,no
+dark,planning.css,.pw-btab.active,#51b0e3,#081426,13.0,400,False,4.5,7.62,PASS,assumed --background,no
+hc,planning.css,.pw-btab.active,#000044,#ffffff,13.0,400,False,4.5,19.38,PASS,assumed --surface,no
+hc,planning.css,.pw-btab.active,#000044,#ffffff,13.0,400,False,4.5,19.38,PASS,assumed --background,no
+contrast-more,planning.css,.pw-btab.active,#002f65,#ffffff,13.0,400,False,4.5,13.17,PASS,assumed --surface,no
+contrast-more,planning.css,.pw-btab.active,#002f65,#ffffff,13.0,400,False,4.5,13.17,PASS,assumed --background,no
+light,planning.css,.pw-backlog-card-code,#004b8d,#ffffff,11.0,700,False,4.5,8.78,PASS,assumed --surface,yes
+light,planning.css,.pw-backlog-card-code,#004b8d,#f4f8fc,11.0,700,False,4.5,8.23,PASS,assumed --background,yes
+dark,planning.css,.pw-backlog-card-code,#004b8d,#0f1c30,11.0,700,False,4.5,1.95,FAIL,assumed --surface,yes
+dark,planning.css,.pw-backlog-card-code,#004b8d,#081426,11.0,700,False,4.5,2.1,FAIL,assumed --background,yes
+hc,planning.css,.pw-backlog-card-code,#004b8d,#ffffff,11.0,700,False,4.5,8.78,PASS,assumed --surface,yes
+hc,planning.css,.pw-backlog-card-code,#004b8d,#ffffff,11.0,700,False,4.5,8.78,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-backlog-card-code,#004b8d,#ffffff,11.0,700,False,4.5,8.78,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-backlog-card-code,#004b8d,#ffffff,11.0,700,False,4.5,8.78,PASS,assumed --background,yes
+light,planning.css,.pw-backlog-card-meta,#657380,#ffffff,11.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-backlog-card-meta,#657380,#f4f8fc,11.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-backlog-card-meta,#9fb2c6,#0f1c30,11.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-backlog-card-meta,#9fb2c6,#081426,11.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-backlog-card-meta,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-backlog-card-meta,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-backlog-card-meta,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-backlog-card-meta,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-fac-table th,#657380,#ffffff,11.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-fac-table th,#657380,#f4f8fc,11.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-fac-table th,#9fb2c6,#0f1c30,11.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-fac-table th,#9fb2c6,#081426,11.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-fac-table th,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-fac-table th,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-fac-table th,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-fac-table th,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-empty,#657380,#ffffff,13.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-empty,#657380,#f4f8fc,13.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-empty,#9fb2c6,#0f1c30,13.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-empty,#9fb2c6,#081426,13.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-empty,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-empty,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-empty,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-empty,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-loading,#657380,#ffffff,13.0,400,False,4.5,4.86,PASS,assumed --surface,no
+light,planning.css,.pw-loading,#657380,#f4f8fc,13.0,400,False,4.5,4.56,PASS,assumed --background,no
+dark,planning.css,.pw-loading,#9fb2c6,#0f1c30,13.0,400,False,4.5,7.86,PASS,assumed --surface,no
+dark,planning.css,.pw-loading,#9fb2c6,#081426,13.0,400,False,4.5,8.48,PASS,assumed --background,no
+hc,planning.css,.pw-loading,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --surface,no
+hc,planning.css,.pw-loading,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --background,no
+contrast-more,planning.css,.pw-loading,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --surface,no
+contrast-more,planning.css,.pw-loading,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --background,no
+light,planning.css,.pw-err,#e51937,#ffffff,12.0,400,False,4.5,4.64,PASS,assumed --surface,yes
+light,planning.css,.pw-err,#e51937,#f4f8fc,12.0,400,False,4.5,4.35,FAIL,assumed --background,yes
+dark,planning.css,.pw-err,#ff6b6b,#0f1c30,12.0,400,False,4.5,6.16,PASS,assumed --surface,yes
+dark,planning.css,.pw-err,#ff6b6b,#081426,12.0,400,False,4.5,6.65,PASS,assumed --background,yes
+hc,planning.css,.pw-err,#cc0011,#ffffff,12.0,400,False,4.5,5.87,PASS,assumed --surface,yes
+hc,planning.css,.pw-err,#cc0011,#ffffff,12.0,400,False,4.5,5.87,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-err,#e51937,#ffffff,12.0,400,False,4.5,4.64,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-err,#e51937,#ffffff,12.0,400,False,4.5,4.64,PASS,assumed --background,yes
+light,planning.css,.pw-curric-clear:hover,#e51937,#ffffff,13.0,400,False,4.5,4.64,PASS,assumed --surface,no
+light,planning.css,.pw-curric-clear:hover,#e51937,#f4f8fc,13.0,400,False,4.5,4.35,FAIL,assumed --background,no
+dark,planning.css,.pw-curric-clear:hover,#ff6b6b,#0f1c30,13.0,400,False,4.5,6.16,PASS,assumed --surface,no
+dark,planning.css,.pw-curric-clear:hover,#ff6b6b,#081426,13.0,400,False,4.5,6.65,PASS,assumed --background,no
+hc,planning.css,.pw-curric-clear:hover,#cc0011,#ffffff,13.0,400,False,4.5,5.87,PASS,assumed --surface,no
+hc,planning.css,.pw-curric-clear:hover,#cc0011,#ffffff,13.0,400,False,4.5,5.87,PASS,assumed --background,no
+contrast-more,planning.css,.pw-curric-clear:hover,#e51937,#ffffff,13.0,400,False,4.5,4.64,PASS,assumed --surface,no
+contrast-more,planning.css,.pw-curric-clear:hover,#e51937,#ffffff,13.0,400,False,4.5,4.64,PASS,assumed --background,no
+light,planning.css,.pw-setup-header h2,#002f65,#ffffff,20.0,800,True,3.0,13.17,PASS,assumed --surface,yes
+light,planning.css,.pw-setup-header h2,#002f65,#f4f8fc,20.0,800,True,3.0,12.34,PASS,assumed --background,yes
+dark,planning.css,.pw-setup-header h2,#51b0e3,#0f1c30,20.0,800,True,3.0,7.05,PASS,assumed --surface,yes
+dark,planning.css,.pw-setup-header h2,#51b0e3,#081426,20.0,800,True,3.0,7.62,PASS,assumed --background,yes
+hc,planning.css,.pw-setup-header h2,#000044,#ffffff,20.0,800,True,3.0,19.38,PASS,assumed --surface,yes
+hc,planning.css,.pw-setup-header h2,#000044,#ffffff,20.0,800,True,3.0,19.38,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-setup-header h2,#002f65,#ffffff,20.0,800,True,3.0,13.17,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-setup-header h2,#002f65,#ffffff,20.0,800,True,3.0,13.17,PASS,assumed --background,yes
+light,planning.css,.pw-setup-header p,#657380,#ffffff,13.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-setup-header p,#657380,#f4f8fc,13.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-setup-header p,#9fb2c6,#0f1c30,13.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-setup-header p,#9fb2c6,#081426,13.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-setup-header p,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-setup-header p,#303030,#ffffff,13.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-setup-header p,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-setup-header p,#3a3a3a,#ffffff,13.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-setup-step-num,#ffffff,#002f65,14.0,800,False,4.5,13.17,PASS,same-rule,yes
+dark,planning.css,.pw-setup-step-num,#ffffff,#51b0e3,14.0,800,False,4.5,2.42,FAIL,same-rule,yes
+hc,planning.css,.pw-setup-step-num,#ffffff,#000044,14.0,800,False,4.5,19.38,PASS,same-rule,yes
+contrast-more,planning.css,.pw-setup-step-num,#ffffff,#002f65,14.0,800,False,4.5,13.17,PASS,same-rule,yes
+light,planning.css,.pw-setup-step-title,#1e2d3d,#ffffff,14.0,800,False,4.5,14.02,PASS,assumed --surface,yes
+light,planning.css,.pw-setup-step-title,#1e2d3d,#f4f8fc,14.0,800,False,4.5,13.14,PASS,assumed --background,yes
+dark,planning.css,.pw-setup-step-title,#e7eef6,#0f1c30,14.0,800,False,4.5,14.61,PASS,assumed --surface,yes
+dark,planning.css,.pw-setup-step-title,#e7eef6,#081426,14.0,800,False,4.5,15.78,PASS,assumed --background,yes
+hc,planning.css,.pw-setup-step-title,#000000,#ffffff,14.0,800,False,4.5,21.0,PASS,assumed --surface,yes
+hc,planning.css,.pw-setup-step-title,#000000,#ffffff,14.0,800,False,4.5,21.0,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-setup-step-title,#000000,#ffffff,14.0,800,False,4.5,21.0,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-setup-step-title,#000000,#ffffff,14.0,800,False,4.5,21.0,PASS,assumed --background,yes
+light,planning.css,.pw-list-full-title,#002f65,#ffffff,13.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+light,planning.css,.pw-list-full-title,#002f65,#f4f8fc,13.0,800,False,4.5,12.34,PASS,assumed --background,yes
+dark,planning.css,.pw-list-full-title,#51b0e3,#0f1c30,13.0,800,False,4.5,7.05,PASS,assumed --surface,yes
+dark,planning.css,.pw-list-full-title,#51b0e3,#081426,13.0,800,False,4.5,7.62,PASS,assumed --background,yes
+hc,planning.css,.pw-list-full-title,#000044,#ffffff,13.0,800,False,4.5,19.38,PASS,assumed --surface,yes
+hc,planning.css,.pw-list-full-title,#000044,#ffffff,13.0,800,False,4.5,19.38,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-list-full-title,#002f65,#ffffff,13.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-list-full-title,#002f65,#ffffff,13.0,800,False,4.5,13.17,PASS,assumed --background,yes
+light,planning.css,.pw-list-full-count,#657380,#ffffff,11.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-list-full-count,#657380,#f4f8fc,11.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-list-full-count,#9fb2c6,#0f1c30,11.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-list-full-count,#9fb2c6,#081426,11.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-list-full-count,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-list-full-count,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-list-full-count,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-list-full-count,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-lv-th,#ffffff,#002f65,11.0,700,False,4.5,13.17,PASS,same-rule,yes
+dark,planning.css,.pw-lv-th,#ffffff,#51b0e3,11.0,700,False,4.5,2.42,FAIL,same-rule,yes
+hc,planning.css,.pw-lv-th,#ffffff,#000044,11.0,700,False,4.5,19.38,PASS,same-rule,yes
+contrast-more,planning.css,.pw-lv-th,#ffffff,#002f65,11.0,700,False,4.5,13.17,PASS,same-rule,yes
+light,planning.css,.pw-lv-td-date,#002f65,#ffffff,13.0,800,False,4.5,13.17,PASS,assumed --surface,no
+light,planning.css,.pw-lv-td-date,#002f65,#f4f8fc,13.0,800,False,4.5,12.34,PASS,assumed --background,no
+dark,planning.css,.pw-lv-td-date,#51b0e3,#0f1c30,13.0,800,False,4.5,7.05,PASS,assumed --surface,no
+dark,planning.css,.pw-lv-td-date,#51b0e3,#081426,13.0,800,False,4.5,7.62,PASS,assumed --background,no
+hc,planning.css,.pw-lv-td-date,#000044,#ffffff,13.0,800,False,4.5,19.38,PASS,assumed --surface,no
+hc,planning.css,.pw-lv-td-date,#000044,#ffffff,13.0,800,False,4.5,19.38,PASS,assumed --background,no
+contrast-more,planning.css,.pw-lv-td-date,#002f65,#ffffff,13.0,800,False,4.5,13.17,PASS,assumed --surface,no
+contrast-more,planning.css,.pw-lv-td-date,#002f65,#ffffff,13.0,800,False,4.5,13.17,PASS,assumed --background,no
+light,planning.css,.pw-lv-p-num,#002f65,#ffffff,11.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+light,planning.css,.pw-lv-p-num,#002f65,#f4f8fc,11.0,800,False,4.5,12.34,PASS,assumed --background,yes
+dark,planning.css,.pw-lv-p-num,#51b0e3,#0f1c30,11.0,800,False,4.5,7.05,PASS,assumed --surface,yes
+dark,planning.css,.pw-lv-p-num,#51b0e3,#081426,11.0,800,False,4.5,7.62,PASS,assumed --background,yes
+hc,planning.css,.pw-lv-p-num,#000044,#ffffff,11.0,800,False,4.5,19.38,PASS,assumed --surface,yes
+hc,planning.css,.pw-lv-p-num,#000044,#ffffff,11.0,800,False,4.5,19.38,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-lv-p-num,#002f65,#ffffff,11.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-lv-p-num,#002f65,#ffffff,11.0,800,False,4.5,13.17,PASS,assumed --background,yes
+light,planning.css,.pw-lv-p-detail,#657380,#ffffff,11.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-lv-p-detail,#657380,#f4f8fc,11.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-lv-p-detail,#9fb2c6,#0f1c30,11.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-lv-p-detail,#9fb2c6,#081426,11.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-lv-p-detail,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-lv-p-detail,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-lv-p-detail,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-lv-p-detail,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-lv-empty-period,#657380,#ffffff,11.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-lv-empty-period,#657380,#f4f8fc,11.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-lv-empty-period,#9fb2c6,#0f1c30,11.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-lv-empty-period,#9fb2c6,#081426,11.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-lv-empty-period,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-lv-empty-period,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-lv-empty-period,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-lv-empty-period,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-block-hdr,#ffffff,#002f65,13.0,400,False,4.5,13.17,PASS,same-rule,no
+dark,planning.css,.pw-block-hdr,#ffffff,#51b0e3,13.0,400,False,4.5,2.42,FAIL,same-rule,no
+hc,planning.css,.pw-block-hdr,#ffffff,#000044,13.0,400,False,4.5,19.38,PASS,same-rule,no
+contrast-more,planning.css,.pw-block-hdr,#ffffff,#002f65,13.0,400,False,4.5,13.17,PASS,same-rule,no
+light,planning.css,.pw-block-date,#ffffff,#ffffff,13.0,800,False,4.5,1.0,FAIL,assumed --surface,yes
+light,planning.css,.pw-block-date,#ffffff,#f4f8fc,13.0,800,False,4.5,1.07,FAIL,assumed --background,yes
+dark,planning.css,.pw-block-date,#ffffff,#0f1c30,13.0,800,False,4.5,17.09,PASS,assumed --surface,yes
+dark,planning.css,.pw-block-date,#ffffff,#081426,13.0,800,False,4.5,18.45,PASS,assumed --background,yes
+hc,planning.css,.pw-block-date,#ffffff,#ffffff,13.0,800,False,4.5,1.0,FAIL,assumed --surface,yes
+hc,planning.css,.pw-block-date,#ffffff,#ffffff,13.0,800,False,4.5,1.0,FAIL,assumed --background,yes
+contrast-more,planning.css,.pw-block-date,#ffffff,#ffffff,13.0,800,False,4.5,1.0,FAIL,assumed --surface,yes
+contrast-more,planning.css,.pw-block-date,#ffffff,#ffffff,13.0,800,False,4.5,1.0,FAIL,assumed --background,yes
+light,planning.css,.pw-block-band-hdr,#657380,#f5f7fa,10.0,800,False,4.5,4.53,PASS,same-rule,yes
+dark,planning.css,.pw-block-band-hdr,#9fb2c6,#f5f7fa,10.0,800,False,4.5,2.03,FAIL,same-rule,yes
+hc,planning.css,.pw-block-band-hdr,#303030,#f5f7fa,10.0,800,False,4.5,12.3,PASS,same-rule,yes
+contrast-more,planning.css,.pw-block-band-hdr,#3a3a3a,#f5f7fa,10.0,800,False,4.5,10.6,PASS,same-rule,yes
+light,planning.css,.pw-block-no-content,#657380,#ffffff,11.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-block-no-content,#657380,#f4f8fc,11.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-block-no-content,#9fb2c6,#0f1c30,11.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-block-no-content,#9fb2c6,#081426,11.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-block-no-content,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-block-no-content,#303030,#ffffff,11.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-block-no-content,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-block-no-content,#3a3a3a,#ffffff,11.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-block-notice,#5a3d00,#ffffff,11.0,400,False,4.5,9.99,PASS,assumed --surface,yes
+light,planning.css,.pw-block-notice,#5a3d00,#f4f8fc,11.0,400,False,4.5,9.36,PASS,assumed --background,yes
+dark,planning.css,.pw-block-notice,#5a3d00,#0f1c30,11.0,400,False,4.5,1.71,FAIL,assumed --surface,yes
+dark,planning.css,.pw-block-notice,#5a3d00,#081426,11.0,400,False,4.5,1.85,FAIL,assumed --background,yes
+hc,planning.css,.pw-block-notice,#5a3d00,#ffffff,11.0,400,False,4.5,9.99,PASS,assumed --surface,yes
+hc,planning.css,.pw-block-notice,#5a3d00,#ffffff,11.0,400,False,4.5,9.99,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-block-notice,#5a3d00,#ffffff,11.0,400,False,4.5,9.99,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-block-notice,#5a3d00,#ffffff,11.0,400,False,4.5,9.99,PASS,assumed --background,yes
+light,planning.css,.pw-block-notice.urgent,#8a0f22,#ffffff,13.0,600,False,4.5,9.67,PASS,assumed --surface,no
+light,planning.css,.pw-block-notice.urgent,#8a0f22,#f4f8fc,13.0,600,False,4.5,9.06,PASS,assumed --background,no
+dark,planning.css,.pw-block-notice.urgent,#8a0f22,#0f1c30,13.0,600,False,4.5,1.77,FAIL,assumed --surface,no
+dark,planning.css,.pw-block-notice.urgent,#8a0f22,#081426,13.0,600,False,4.5,1.91,FAIL,assumed --background,no
+hc,planning.css,.pw-block-notice.urgent,#8a0f22,#ffffff,13.0,600,False,4.5,9.67,PASS,assumed --surface,no
+hc,planning.css,.pw-block-notice.urgent,#8a0f22,#ffffff,13.0,600,False,4.5,9.67,PASS,assumed --background,no
+contrast-more,planning.css,.pw-block-notice.urgent,#8a0f22,#ffffff,13.0,600,False,4.5,9.67,PASS,assumed --surface,no
+contrast-more,planning.css,.pw-block-notice.urgent,#8a0f22,#ffffff,13.0,600,False,4.5,9.67,PASS,assumed --background,no
+light,planning.css,.pw-block-notice-archive:hover,#e51937,#ffffff,13.0,400,False,4.5,4.64,PASS,assumed --surface,no
+light,planning.css,.pw-block-notice-archive:hover,#e51937,#f4f8fc,13.0,400,False,4.5,4.35,FAIL,assumed --background,no
+dark,planning.css,.pw-block-notice-archive:hover,#ff6b6b,#0f1c30,13.0,400,False,4.5,6.16,PASS,assumed --surface,no
+dark,planning.css,.pw-block-notice-archive:hover,#ff6b6b,#081426,13.0,400,False,4.5,6.65,PASS,assumed --background,no
+hc,planning.css,.pw-block-notice-archive:hover,#cc0011,#ffffff,13.0,400,False,4.5,5.87,PASS,assumed --surface,no
+hc,planning.css,.pw-block-notice-archive:hover,#cc0011,#ffffff,13.0,400,False,4.5,5.87,PASS,assumed --background,no
+contrast-more,planning.css,.pw-block-notice-archive:hover,#e51937,#ffffff,13.0,400,False,4.5,4.64,PASS,assumed --surface,no
+contrast-more,planning.css,.pw-block-notice-archive:hover,#e51937,#ffffff,13.0,400,False,4.5,4.64,PASS,assumed --background,no
+light,planning.css,.pw-night-grid thead th,#ffffff,#004b8d,11.0,700,False,4.5,8.78,PASS,same-rule,yes
+dark,planning.css,.pw-night-grid thead th,#ffffff,#004b8d,11.0,700,False,4.5,8.78,PASS,same-rule,yes
+hc,planning.css,.pw-night-grid thead th,#ffffff,#004b8d,11.0,700,False,4.5,8.78,PASS,same-rule,yes
+contrast-more,planning.css,.pw-night-grid thead th,#ffffff,#004b8d,11.0,700,False,4.5,8.78,PASS,same-rule,yes
+light,planning.css,.pw-nc-empty,#b0b7bb,#ffffff,11.0,400,False,4.5,2.03,FAIL,assumed --surface,yes
+light,planning.css,.pw-nc-empty,#b0b7bb,#f4f8fc,11.0,400,False,4.5,1.9,FAIL,assumed --background,yes
+dark,planning.css,.pw-nc-empty,#b0b7bb,#0f1c30,11.0,400,False,4.5,8.41,PASS,assumed --surface,yes
+dark,planning.css,.pw-nc-empty,#b0b7bb,#081426,11.0,400,False,4.5,9.08,PASS,assumed --background,yes
+hc,planning.css,.pw-nc-empty,#b0b7bb,#ffffff,11.0,400,False,4.5,2.03,FAIL,assumed --surface,yes
+hc,planning.css,.pw-nc-empty,#b0b7bb,#ffffff,11.0,400,False,4.5,2.03,FAIL,assumed --background,yes
+contrast-more,planning.css,.pw-nc-empty,#b0b7bb,#ffffff,11.0,400,False,4.5,2.03,FAIL,assumed --surface,yes
+contrast-more,planning.css,.pw-nc-empty,#b0b7bb,#ffffff,11.0,400,False,4.5,2.03,FAIL,assumed --background,yes
+light,planning.css,.pw-nc-code,#004b8d,#ffffff,10.0,700,False,4.5,8.78,PASS,assumed --surface,yes
+light,planning.css,.pw-nc-code,#004b8d,#f4f8fc,10.0,700,False,4.5,8.23,PASS,assumed --background,yes
+dark,planning.css,.pw-nc-code,#004b8d,#0f1c30,10.0,700,False,4.5,1.95,FAIL,assumed --surface,yes
+dark,planning.css,.pw-nc-code,#004b8d,#081426,10.0,700,False,4.5,2.1,FAIL,assumed --background,yes
+hc,planning.css,.pw-nc-code,#004b8d,#ffffff,10.0,700,False,4.5,8.78,PASS,assumed --surface,yes
+hc,planning.css,.pw-nc-code,#004b8d,#ffffff,10.0,700,False,4.5,8.78,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-nc-code,#004b8d,#ffffff,10.0,700,False,4.5,8.78,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-nc-code,#004b8d,#ffffff,10.0,700,False,4.5,8.78,PASS,assumed --background,yes
+light,planning.css,.pw-nc-detail,#657380,#ffffff,10.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-nc-detail,#657380,#f4f8fc,10.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-nc-detail,#9fb2c6,#0f1c30,10.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-nc-detail,#9fb2c6,#081426,10.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-nc-detail,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-nc-detail,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-nc-detail,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-nc-detail,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-nc-classes,#004b8d,#ffffff,13.0,600,False,4.5,8.78,PASS,assumed --surface,no
+light,planning.css,.pw-nc-classes,#004b8d,#f4f8fc,13.0,600,False,4.5,8.23,PASS,assumed --background,no
+dark,planning.css,.pw-nc-classes,#004b8d,#0f1c30,13.0,600,False,4.5,1.95,FAIL,assumed --surface,no
+dark,planning.css,.pw-nc-classes,#004b8d,#081426,13.0,600,False,4.5,2.1,FAIL,assumed --background,no
+hc,planning.css,.pw-nc-classes,#004b8d,#ffffff,13.0,600,False,4.5,8.78,PASS,assumed --surface,no
+hc,planning.css,.pw-nc-classes,#004b8d,#ffffff,13.0,600,False,4.5,8.78,PASS,assumed --background,no
+contrast-more,planning.css,.pw-nc-classes,#004b8d,#ffffff,13.0,600,False,4.5,8.78,PASS,assumed --surface,no
+contrast-more,planning.css,.pw-nc-classes,#004b8d,#ffffff,13.0,600,False,4.5,8.78,PASS,assumed --background,no
+light,planning.css,.pw-nc-equip,#657380,#ffffff,10.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-nc-equip,#657380,#f4f8fc,10.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-nc-equip,#9fb2c6,#0f1c30,10.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-nc-equip,#9fb2c6,#081426,10.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-nc-equip,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-nc-equip,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-nc-equip,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-nc-equip,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-block-warnings,#e51937,#fff5f5,11.0,700,False,4.5,4.34,FAIL,same-rule,yes
+dark,planning.css,.pw-block-warnings,#ff6b6b,#fff5f5,11.0,700,False,4.5,2.59,FAIL,same-rule,yes
+hc,planning.css,.pw-block-warnings,#cc0011,#fff5f5,11.0,700,False,4.5,5.49,PASS,same-rule,yes
+contrast-more,planning.css,.pw-block-warnings,#e51937,#fff5f5,11.0,700,False,4.5,4.34,FAIL,same-rule,yes
+light,planning.css,.pw-block-cg-p,#657380,#ffffff,13.0,700,False,4.5,4.86,PASS,assumed --surface,no
+light,planning.css,.pw-block-cg-p,#657380,#f4f8fc,13.0,700,False,4.5,4.56,PASS,assumed --background,no
+dark,planning.css,.pw-block-cg-p,#9fb2c6,#0f1c30,13.0,700,False,4.5,7.86,PASS,assumed --surface,no
+dark,planning.css,.pw-block-cg-p,#9fb2c6,#081426,13.0,700,False,4.5,8.48,PASS,assumed --background,no
+hc,planning.css,.pw-block-cg-p,#303030,#ffffff,13.0,700,False,4.5,13.2,PASS,assumed --surface,no
+hc,planning.css,.pw-block-cg-p,#303030,#ffffff,13.0,700,False,4.5,13.2,PASS,assumed --background,no
+contrast-more,planning.css,.pw-block-cg-p,#3a3a3a,#ffffff,13.0,700,False,4.5,11.37,PASS,assumed --surface,no
+contrast-more,planning.css,.pw-block-cg-p,#3a3a3a,#ffffff,13.0,700,False,4.5,11.37,PASS,assumed --background,no
+light,planning.css,.pw-year-term-hdr,#ffffff,#002f65,13.0,400,False,4.5,13.17,PASS,same-rule,no
+dark,planning.css,.pw-year-term-hdr,#ffffff,#51b0e3,13.0,400,False,4.5,2.42,FAIL,same-rule,no
+hc,planning.css,.pw-year-term-hdr,#ffffff,#000044,13.0,400,False,4.5,19.38,PASS,same-rule,no
+contrast-more,planning.css,.pw-year-term-hdr,#ffffff,#002f65,13.0,400,False,4.5,13.17,PASS,same-rule,no
+light,planning.css,.pw-pn-view-date,#002f65,#ffffff,16.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+light,planning.css,.pw-pn-view-date,#002f65,#f4f8fc,16.0,800,False,4.5,12.34,PASS,assumed --background,yes
+dark,planning.css,.pw-pn-view-date,#51b0e3,#0f1c30,16.0,800,False,4.5,7.05,PASS,assumed --surface,yes
+dark,planning.css,.pw-pn-view-date,#51b0e3,#081426,16.0,800,False,4.5,7.62,PASS,assumed --background,yes
+hc,planning.css,.pw-pn-view-date,#000044,#ffffff,16.0,800,False,4.5,19.38,PASS,assumed --surface,yes
+hc,planning.css,.pw-pn-view-date,#000044,#ffffff,16.0,800,False,4.5,19.38,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-pn-view-date,#002f65,#ffffff,16.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-pn-view-date,#002f65,#ffffff,16.0,800,False,4.5,13.17,PASS,assumed --background,yes
+light,planning.css,.pw-pn-add-notice-btn:hover,#002f65,#f4f8fc,13.0,400,False,4.5,12.34,PASS,same-rule,no
+dark,planning.css,.pw-pn-add-notice-btn:hover,#51b0e3,#081426,13.0,400,False,4.5,7.62,PASS,same-rule,no
+hc,planning.css,.pw-pn-add-notice-btn:hover,#000044,#ffffff,13.0,400,False,4.5,19.38,PASS,same-rule,no
+contrast-more,planning.css,.pw-pn-add-notice-btn:hover,#002f65,#ffffff,13.0,400,False,4.5,13.17,PASS,same-rule,no
+light,planning.css,.pw-legend-sub,#657380,#ffffff,10.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-legend-sub,#657380,#f4f8fc,10.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-legend-sub,#9fb2c6,#0f1c30,10.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-legend-sub,#9fb2c6,#081426,10.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-legend-sub,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-legend-sub,#303030,#ffffff,10.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-legend-sub,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-legend-sub,#3a3a3a,#ffffff,10.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-help-header,#ffffff,#002f65,13.0,400,False,4.5,13.17,PASS,same-rule,no
+dark,planning.css,.pw-help-header,#ffffff,#51b0e3,13.0,400,False,4.5,2.42,FAIL,same-rule,no
+hc,planning.css,.pw-help-header,#ffffff,#000044,13.0,400,False,4.5,19.38,PASS,same-rule,no
+contrast-more,planning.css,.pw-help-header,#ffffff,#002f65,13.0,400,False,4.5,13.17,PASS,same-rule,no
+light,planning.css,.pw-help-tab:hover,#1e2d3d,#ffffff,13.0,400,False,4.5,14.02,PASS,assumed --surface,no
+light,planning.css,.pw-help-tab:hover,#1e2d3d,#f4f8fc,13.0,400,False,4.5,13.14,PASS,assumed --background,no
+dark,planning.css,.pw-help-tab:hover,#e7eef6,#0f1c30,13.0,400,False,4.5,14.61,PASS,assumed --surface,no
+dark,planning.css,.pw-help-tab:hover,#e7eef6,#081426,13.0,400,False,4.5,15.78,PASS,assumed --background,no
+hc,planning.css,.pw-help-tab:hover,#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,assumed --surface,no
+hc,planning.css,.pw-help-tab:hover,#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,assumed --background,no
+contrast-more,planning.css,.pw-help-tab:hover,#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,assumed --surface,no
+contrast-more,planning.css,.pw-help-tab:hover,#000000,#ffffff,13.0,400,False,4.5,21.0,PASS,assumed --background,no
+light,planning.css,.pw-help-tab.active,#002f65,#ffffff,13.0,400,False,4.5,13.17,PASS,assumed --surface,no
+light,planning.css,.pw-help-tab.active,#002f65,#f4f8fc,13.0,400,False,4.5,12.34,PASS,assumed --background,no
+dark,planning.css,.pw-help-tab.active,#51b0e3,#0f1c30,13.0,400,False,4.5,7.05,PASS,assumed --surface,no
+dark,planning.css,.pw-help-tab.active,#51b0e3,#081426,13.0,400,False,4.5,7.62,PASS,assumed --background,no
+hc,planning.css,.pw-help-tab.active,#000044,#ffffff,13.0,400,False,4.5,19.38,PASS,assumed --surface,no
+hc,planning.css,.pw-help-tab.active,#000044,#ffffff,13.0,400,False,4.5,19.38,PASS,assumed --background,no
+contrast-more,planning.css,.pw-help-tab.active,#002f65,#ffffff,13.0,400,False,4.5,13.17,PASS,assumed --surface,no
+contrast-more,planning.css,.pw-help-tab.active,#002f65,#ffffff,13.0,400,False,4.5,13.17,PASS,assumed --background,no
+light,planning.css,.pw-help-section h3,#002f65,#ffffff,13.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+light,planning.css,.pw-help-section h3,#002f65,#f4f8fc,13.0,800,False,4.5,12.34,PASS,assumed --background,yes
+dark,planning.css,.pw-help-section h3,#51b0e3,#0f1c30,13.0,800,False,4.5,7.05,PASS,assumed --surface,yes
+dark,planning.css,.pw-help-section h3,#51b0e3,#081426,13.0,800,False,4.5,7.62,PASS,assumed --background,yes
+hc,planning.css,.pw-help-section h3,#000044,#ffffff,13.0,800,False,4.5,19.38,PASS,assumed --surface,yes
+hc,planning.css,.pw-help-section h3,#000044,#ffffff,13.0,800,False,4.5,19.38,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-help-section h3,#002f65,#ffffff,13.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-help-section h3,#002f65,#ffffff,13.0,800,False,4.5,13.17,PASS,assumed --background,yes
+light,planning.css,.pw-help-section p,#1e2d3d,#ffffff,12.0,400,False,4.5,14.02,PASS,assumed --surface,yes
+light,planning.css,.pw-help-section p,#1e2d3d,#f4f8fc,12.0,400,False,4.5,13.14,PASS,assumed --background,yes
+dark,planning.css,.pw-help-section p,#e7eef6,#0f1c30,12.0,400,False,4.5,14.61,PASS,assumed --surface,yes
+dark,planning.css,.pw-help-section p,#e7eef6,#081426,12.0,400,False,4.5,15.78,PASS,assumed --background,yes
+hc,planning.css,.pw-help-section p,#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+hc,planning.css,.pw-help-section p,#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-help-section p,#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-help-section p,#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --background,yes
+light,planning.css,".pw-help-section ul, .pw-help-section ol",#1e2d3d,#ffffff,12.0,400,False,4.5,14.02,PASS,assumed --surface,yes
+light,planning.css,".pw-help-section ul, .pw-help-section ol",#1e2d3d,#f4f8fc,12.0,400,False,4.5,13.14,PASS,assumed --background,yes
+dark,planning.css,".pw-help-section ul, .pw-help-section ol",#e7eef6,#0f1c30,12.0,400,False,4.5,14.61,PASS,assumed --surface,yes
+dark,planning.css,".pw-help-section ul, .pw-help-section ol",#e7eef6,#081426,12.0,400,False,4.5,15.78,PASS,assumed --background,yes
+hc,planning.css,".pw-help-section ul, .pw-help-section ol",#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+hc,planning.css,".pw-help-section ul, .pw-help-section ol",#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --background,yes
+contrast-more,planning.css,".pw-help-section ul, .pw-help-section ol",#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+contrast-more,planning.css,".pw-help-section ul, .pw-help-section ol",#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --background,yes
+light,planning.css,.pw-help-intro,#657380,#ffffff,12.0,400,False,4.5,4.86,PASS,assumed --surface,yes
+light,planning.css,.pw-help-intro,#657380,#f4f8fc,12.0,400,False,4.5,4.56,PASS,assumed --background,yes
+dark,planning.css,.pw-help-intro,#9fb2c6,#0f1c30,12.0,400,False,4.5,7.86,PASS,assumed --surface,yes
+dark,planning.css,.pw-help-intro,#9fb2c6,#081426,12.0,400,False,4.5,8.48,PASS,assumed --background,yes
+hc,planning.css,.pw-help-intro,#303030,#ffffff,12.0,400,False,4.5,13.2,PASS,assumed --surface,yes
+hc,planning.css,.pw-help-intro,#303030,#ffffff,12.0,400,False,4.5,13.2,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-help-intro,#3a3a3a,#ffffff,12.0,400,False,4.5,11.37,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-help-intro,#3a3a3a,#ffffff,12.0,400,False,4.5,11.37,PASS,assumed --background,yes
+light,planning.css,.pw-help-compare-head,#002f65,#ffffff,11.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+light,planning.css,.pw-help-compare-head,#002f65,#f4f8fc,11.0,800,False,4.5,12.34,PASS,assumed --background,yes
+dark,planning.css,.pw-help-compare-head,#51b0e3,#0f1c30,11.0,800,False,4.5,7.05,PASS,assumed --surface,yes
+dark,planning.css,.pw-help-compare-head,#51b0e3,#081426,11.0,800,False,4.5,7.62,PASS,assumed --background,yes
+hc,planning.css,.pw-help-compare-head,#000044,#ffffff,11.0,800,False,4.5,19.38,PASS,assumed --surface,yes
+hc,planning.css,.pw-help-compare-head,#000044,#ffffff,11.0,800,False,4.5,19.38,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-help-compare-head,#002f65,#ffffff,11.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-help-compare-head,#002f65,#ffffff,11.0,800,False,4.5,13.17,PASS,assumed --background,yes
+light,planning.css,.pw-help-checklist,#1e2d3d,#ffffff,12.0,400,False,4.5,14.02,PASS,assumed --surface,yes
+light,planning.css,.pw-help-checklist,#1e2d3d,#f4f8fc,12.0,400,False,4.5,13.14,PASS,assumed --background,yes
+dark,planning.css,.pw-help-checklist,#e7eef6,#0f1c30,12.0,400,False,4.5,14.61,PASS,assumed --surface,yes
+dark,planning.css,.pw-help-checklist,#e7eef6,#081426,12.0,400,False,4.5,15.78,PASS,assumed --background,yes
+hc,planning.css,.pw-help-checklist,#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+hc,planning.css,.pw-help-checklist,#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-help-checklist,#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-help-checklist,#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --background,yes
+light,planning.css,.pw-help-checklist li::marker,#1a7f4b,#ffffff,13.0,700,False,4.5,5.02,PASS,assumed --surface,no
+light,planning.css,.pw-help-checklist li::marker,#1a7f4b,#f4f8fc,13.0,700,False,4.5,4.71,PASS,assumed --background,no
+hc,planning.css,.pw-help-checklist li::marker,#004d24,#ffffff,13.0,700,False,4.5,10.06,PASS,assumed --surface,no
+hc,planning.css,.pw-help-checklist li::marker,#004d24,#ffffff,13.0,700,False,4.5,10.06,PASS,assumed --background,no
+contrast-more,planning.css,.pw-help-checklist li::marker,#004d24,#ffffff,13.0,700,False,4.5,10.06,PASS,assumed --surface,no
+contrast-more,planning.css,.pw-help-checklist li::marker,#004d24,#ffffff,13.0,700,False,4.5,10.06,PASS,assumed --background,no
+light,planning.css,".pw-help-accordion-body p, .pw-help-accordion-body ol, .pw-h",#1e2d3d,#ffffff,12.0,400,False,4.5,14.02,PASS,assumed --surface,yes
+light,planning.css,".pw-help-accordion-body p, .pw-help-accordion-body ol, .pw-h",#1e2d3d,#f4f8fc,12.0,400,False,4.5,13.14,PASS,assumed --background,yes
+dark,planning.css,".pw-help-accordion-body p, .pw-help-accordion-body ol, .pw-h",#e7eef6,#0f1c30,12.0,400,False,4.5,14.61,PASS,assumed --surface,yes
+dark,planning.css,".pw-help-accordion-body p, .pw-help-accordion-body ol, .pw-h",#e7eef6,#081426,12.0,400,False,4.5,15.78,PASS,assumed --background,yes
+hc,planning.css,".pw-help-accordion-body p, .pw-help-accordion-body ol, .pw-h",#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+hc,planning.css,".pw-help-accordion-body p, .pw-help-accordion-body ol, .pw-h",#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --background,yes
+contrast-more,planning.css,".pw-help-accordion-body p, .pw-help-accordion-body ol, .pw-h",#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+contrast-more,planning.css,".pw-help-accordion-body p, .pw-help-accordion-body ol, .pw-h",#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --background,yes
+light,planning.css,.pw-help-faq-a,#1e2d3d,#ffffff,12.0,400,False,4.5,14.02,PASS,assumed --surface,yes
+light,planning.css,.pw-help-faq-a,#1e2d3d,#f4f8fc,12.0,400,False,4.5,13.14,PASS,assumed --background,yes
+dark,planning.css,.pw-help-faq-a,#e7eef6,#0f1c30,12.0,400,False,4.5,14.61,PASS,assumed --surface,yes
+dark,planning.css,.pw-help-faq-a,#e7eef6,#081426,12.0,400,False,4.5,15.78,PASS,assumed --background,yes
+hc,planning.css,.pw-help-faq-a,#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+hc,planning.css,.pw-help-faq-a,#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-help-faq-a,#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-help-faq-a,#000000,#ffffff,12.0,400,False,4.5,21.0,PASS,assumed --background,yes
+light,planning.css,.pw-help-report-label,#002f65,#ffffff,11.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+light,planning.css,.pw-help-report-label,#002f65,#f4f8fc,11.0,800,False,4.5,12.34,PASS,assumed --background,yes
+dark,planning.css,.pw-help-report-label,#51b0e3,#0f1c30,11.0,800,False,4.5,7.05,PASS,assumed --surface,yes
+dark,planning.css,.pw-help-report-label,#51b0e3,#081426,11.0,800,False,4.5,7.62,PASS,assumed --background,yes
+hc,planning.css,.pw-help-report-label,#000044,#ffffff,11.0,800,False,4.5,19.38,PASS,assumed --surface,yes
+hc,planning.css,.pw-help-report-label,#000044,#ffffff,11.0,800,False,4.5,19.38,PASS,assumed --background,yes
+contrast-more,planning.css,.pw-help-report-label,#002f65,#ffffff,11.0,800,False,4.5,13.17,PASS,assumed --surface,yes
+contrast-more,planning.css,.pw-help-report-label,#002f65,#ffffff,11.0,800,False,4.5,13.17,PASS,assumed --background,yes
