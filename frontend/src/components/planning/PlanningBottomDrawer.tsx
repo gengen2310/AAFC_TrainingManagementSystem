@@ -6,7 +6,7 @@ import { ApiError, friendlyMessage } from "../../api/client";
 import { ImportFacilitatorsModal } from "./ImportFacilitatorsModal";
 import { FacilitatorTimeline, type ZoomPreset } from "../charts/FacilitatorTimeline";
 import { FacilitatorScheduleList } from "../charts/FacilitatorScheduleList";
-import { Loading, ErrorNote } from "../ui";
+import { Loading, ErrorNote, ErrorRemedy } from "../ui";
 import { getProgramType } from "../../utils/planningFilters";
 import { useAuth } from "../../auth/AuthProvider";
 import { isSystemAdmin } from "../../auth/permissions";
@@ -226,9 +226,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
       <div className="pw-err" style={{ padding: 16 }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load the mission backlog</div>
         <div style={{ fontSize: 'var(--fs-sm)', opacity: .8 }}>{msg}</div>
-        <div style={{ fontSize: 'var(--fs-xs)', marginTop: 6, color: "var(--muted-text)" }}>
-          Check that you have an internet connection, then reload the page.
-        </div>
+        <ErrorRemedy error={error} />
       </div>
     );
   }

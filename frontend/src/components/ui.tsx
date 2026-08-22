@@ -64,16 +64,52 @@ export function Bar({ pct, label }: { pct: number; label?: string }) {
 // discard whatever the user was typing), so this variant shows just the
 // reason, matching the form's own still-visible Save/Cancel buttons as the
 // implicit next step.
+// Same resolution as App.tsx / AppShell.tsx: the PW has no sign-in of its own.
+const TMS_BASE =
+  (document.querySelector('meta[name="aafc-tms-base"]') as HTMLMetaElement | null)
+    ?.content || "https://aafc-tms-frontend-production.up.railway.app";
+// SESSION-04: the one place that decides what to tell the user to DO about an
+// error. Five view components each hard-coded "check your internet connection",
+// which is wrong for an expired session and for a server error.
+export function ErrorRemedy({ error }: { error: unknown }) {
+  const status = (error as { status?: number } | null)?.status;
+  const isNetwork = !!(error as { isNetwork?: boolean } | null)?.isNetwork;
+  if (status === 401) return (
+    <div style={{ fontSize: 'var(--fs-xs)', marginTop: 6, color: "var(--muted-text)" }}>
+      <a href={TMS_BASE}>Sign in again</a> to continue. Planning Workspace uses your TMS session.
+    </div>
+  );
+  if (isNetwork) return (
+    <div style={{ fontSize: 'var(--fs-xs)', marginTop: 6, color: "var(--muted-text)" }}>
+      Check that you have an internet connection, then reload the page.
+    </div>
+  );
+  return null;
+}
 export function ErrorNote({ error, variant = "load" }: { error: unknown; variant?: "load" | "action" }) {
   const msg = friendlyMessage(error, "Unknown error");
   if (variant === "action") {
     return <div className="errnote" role="alert">{msg}</div>;
   }
+  // SESSION-04: the connectivity line used to print under EVERY error, so an
+  // expired session read "Your session has expired. Please log in again. Check
+  // your connection, then reload the page." -- two different causes in one
+  // message, only one of them true, and a remedy the user cannot act on.
+  // Defence Writing UI standard §2.14 (Accuracy): state exactly what is true.
+  const status = (error as { status?: number } | null)?.status;
+  const isNetwork = !!(error as { isNetwork?: boolean } | null)?.isNetwork;
+  const expired = status === 401;
   return (
     <div className="errnote" role="alert">
       <div style={{ fontWeight: 700 }}>Could not load this data</div>
       <div style={{ fontSize: 'var(--fs-sm)', opacity: .85, marginTop: 2 }}>{msg}</div>
-      <div style={{ fontSize: 'var(--fs-xs)', marginTop: 4 }}>Check your connection, then reload the page.</div>
+      {expired ? (
+        <div style={{ fontSize: 'var(--fs-xs)', marginTop: 4 }}>
+          <a href={TMS_BASE}>Sign in again</a> to continue. Planning Workspace uses your TMS session.
+        </div>
+      ) : isNetwork ? (
+        <div style={{ fontSize: 'var(--fs-xs)', marginTop: 4 }}>Check your connection, then reload the page.</div>
+      ) : null}
     </div>
   );
 }

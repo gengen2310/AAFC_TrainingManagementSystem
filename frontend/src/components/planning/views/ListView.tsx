@@ -1,3 +1,4 @@
+import { ErrorRemedy } from "../../ui";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
@@ -145,9 +146,7 @@ export function ListView({ yearId, viewRange, customStart, customEnd, conflicts 
       <div className="pw-err" style={{ padding: 16 }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load the parade night list</div>
         <div style={{ fontSize: 'var(--fs-sm)', opacity: .8 }}>{msg}</div>
-        <div style={{ fontSize: 'var(--fs-xs)', marginTop: 6, color: "var(--muted-text)" }}>
-          Check that you have an internet connection, then reload the page.
-        </div>
+        <ErrorRemedy error={loadError} />
       </div>
     );
   }

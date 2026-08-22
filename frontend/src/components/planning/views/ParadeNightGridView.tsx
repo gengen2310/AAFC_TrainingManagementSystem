@@ -1,3 +1,4 @@
+import { ErrorRemedy } from "../../ui";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
@@ -242,9 +243,7 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
       <div className="pw-err" style={{ padding: 16 }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load the parade night</div>
         <div style={{ fontSize: 'var(--fs-sm)', opacity: .8 }}>{msg}</div>
-        <div style={{ fontSize: 'var(--fs-xs)', marginTop: 6, color: "var(--muted-text)" }}>
-          Check that you have an internet connection, then reload the page.
-        </div>
+        <ErrorRemedy error={error} />
       </div>
     );
   }

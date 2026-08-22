@@ -4216,8 +4216,64 @@ const API_BASE = (window.AAFC_API_BASE
   || (document.querySelector('meta[name="aafc-api-base"]')||{}).content
   || '').replace(/\/$/,'');
 function tokenGet(){return sessionStorage.getItem('aafc_token')||'';}   // JWT only; never codes/data
-function tokenSet(t){if(t)sessionStorage.setItem('aafc_token',t);}
-function tokenClear(){sessionStorage.removeItem('aafc_token');}
+function tokenSet(t){if(t){sessionStorage.setItem('aafc_token',t);_scheduleRefresh();}}
+function tokenClear(){sessionStorage.removeItem('aafc_token');_cancelRefresh();}
+
+// ── SESSION-01: sliding refresh ──────────────────────────────────────────────
+// /api/auth/refresh has existed since the auth router was written and its own
+// docstring says "the frontend calls this endpoint while the current token is
+// still valid, so active users are not logged out mid-session". Nothing called
+// it, so every session died at ACCESS_TOKEN_TTL_MIN (30) regardless of activity.
+//
+// The endpoint deliberately REJECTS an expired token (it exists so there is no
+// second long-lived credential), which is why this is a proactive timer and not
+// a retry-on-401 interceptor -- by the time a 401 arrives it is already too late.
+//
+// The schedule reads the exp claim from the token itself rather than assuming 30,
+// so it stays correct if the server's TTL changes. Reading an unverified claim is
+// safe here: it only decides when to ask: the server still verifies every request.
+let _refreshTimer=null;
+function _jwtExpMs(t){
+  try{
+    const b=t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    const p=JSON.parse(atob(b.padEnd(b.length+(4-b.length%4)%4,'=')));
+    return p&&p.exp ? p.exp*1000 : 0;
+  }catch(_){ return 0; }
+}
+function _cancelRefresh(){ if(_refreshTimer){clearTimeout(_refreshTimer);_refreshTimer=null;} }
+function _scheduleRefresh(){
+  _cancelRefresh();
+  const t=tokenGet(); if(!t) return;
+  const exp=_jwtExpMs(t); if(!exp) return;
+  const remaining=exp-Date.now();
+  if(remaining<=0) return;                       // already dead; the next call surfaces it
+  const at=Math.max(30000, Math.floor(remaining*0.6));   // 60% of what is left, never under 30s
+  _refreshTimer=setTimeout(async()=>{
+    try{
+      const out=await api('/api/auth/refresh',{method:'POST'});
+      if(out&&out.token) tokenSet(out.token);    // reschedules itself via tokenSet
+    }catch(_){
+      // A failed refresh needs no handling here: api() routes a 401 through
+      // handleSessionExpired(), and a transient network failure simply means the
+      // next user action re-surfaces the problem with better context than a toast.
+    }
+  }, at);
+}
+
+// ── SESSION-02: make expiry recoverable ──────────────────────────────────────
+// api() threw {kind:'auth'} on a mid-session 401 and nothing handled it, so the
+// error landed on whichever of 215 inline apiErr() call sites happened to be
+// running -- text on a dead page with no way back. doLogout() already had the
+// correct recovery; expiry just never reached it.
+function handleSessionExpired(msg){
+  _cancelRefresh();
+  S={sqn:null,isAdmin:false,isWing:false,session:null,pns:[],facs:[],acts:[],rooms:[],equip:[],cfg:{},curr:[],reports:{}};
+  try{ showAuthStep1(); }catch(_){}
+  const scr=document.getElementById('auth-screen');
+  if(scr) scr.style.display='flex';
+  const err=document.querySelector('#auth-screen .auth-err');
+  if(err){ err.textContent=msg; err.style.display=''; }
+}
 async function api(path, opts={}){
   const headers=Object.assign({'Content-Type':'application/json'}, opts.headers||{});
   const t=tokenGet(); if(t)headers['Authorization']='Bearer '+t;
@@ -4277,10 +4333,15 @@ async function api(path, opts={}){
     }
   }
   if(res.status===401){
+    const hadSession=!!t;   // t is the token this request was sent with
     tokenClear();
     let b401=null; try{b401=await res.json();}catch(_){}
     const c401=(b401&&b401.detail&&typeof b401.detail==='object'&&b401.detail.error)||'';
-    const msg401=c401==='invalid_user'?'Your account has been deactivated. Contact your Wing HQ.':'Your session has expired. Sign in again.';
+    const msg401=c401==='invalid_user'?'Your account has been deactivated. Contact your Wing HQ.':'Your session ended after a period of inactivity. Sign in to continue.';
+    // SESSION-02: only a request that CARRIED a token is an expired session. A 401
+    // from /auth/login or /auth/lookup means a wrong access code and must stay on
+    // the form -- bouncing the user to step 1 on a typo would lose their selection.
+    if(hadSession) handleSessionExpired(msg401);
     throw {kind:'auth', status:401, code:c401, msg:msg401};
   }
   let body=null, bodyParseFailed=false;
