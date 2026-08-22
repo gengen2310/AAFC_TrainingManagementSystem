@@ -349,6 +349,12 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
    radios keep the UA size because their wrapping <label> is the real click target. */
 input[type=text],input[type=time],input[type=url],input[type=password],input[type=number],
 input[type=date],input[type=search],input[type=email],input:not([type]),select,textarea{min-height:28px;}
+/* AUDIT-2026-08 G5: the UA default checkbox/radio is 13x13. Where one sits inside a
+   a label element carrying text, that label is the real click target and clears 28px;
+   a bare one in a table cell does not, so raise the control itself and give any
+   label that wraps one a 28px floor. */
+input[type=checkbox],input[type=radio]{width:18px;height:18px;}
+label:has(> input[type=checkbox]),label:has(> input[type=radio]){min-height:28px;display:inline-flex;align-items:center;}
 .btn-icon{min-width:28px;min-height:28px;display:inline-flex;align-items:center;justify-content:center;padding:2px 6px;font-size:var(--fs-sm);line-height:1;}
 .btn-lnk{background:none;border:none;color:var(--royal);font-family:inherit;font-size:var(--fs-sm);font-weight:600;cursor:pointer;padding:0 2px;min-width:28px;text-decoration:underline dotted;min-height:28px;display:inline-flex;align-items:center;}
 .btn-lnk:hover{color:var(--dark);} /* DES-H01 */
