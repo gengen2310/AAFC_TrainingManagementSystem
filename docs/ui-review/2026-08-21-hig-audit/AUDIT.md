@@ -288,8 +288,11 @@ which no hex may be changed. For the primary navigation, **every documented prop
 | `.nav-item.active` background | `#deeefa` | **`var(--nav-active-bg)`** |
 | `.nav-item.active` colour | `var(--dark)` | **`#fff`** |
 
-The nav was rebuilt from light to dark and the document was never updated. 17 of 42 custom properties
-defined in the Main TMS are absent from `DESIGN.md` entirely: `--danger --gap-cards --ink-2 --line
+The nav was rebuilt from light to dark and the document was never updated. **Corrected 2026-08-22:**
+this originally read "17 of 42". That count was understated — the grep behind it required the token at
+line start, so tokens sharing a line (`--ok: …; --ok-bg: …;`) were never counted. The real figure is
+**33 of 61**. The undercount is exactly the failure mode this method warns about: a number produced by
+a script is only as good as the script's coverage. Original list: `--danger --gap-cards --ink-2 --line
 --nav-active-bg --nav-active-border --navy --ok-bg --ok-text --primary --radius --rescheduled --sp-xs
 --space-05 --space-1 --text-xs --warn-bg`.
 
