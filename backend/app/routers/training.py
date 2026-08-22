@@ -304,7 +304,8 @@ class ParadeIn(BaseModel):
 
 
 @router.get("/parade-nights")
-def list_parades(squadron_id: str | None = None, db: DBSession = Depends(get_db),
+def list_parades(squadron_id: str | None = None, training_year: int | None = None,
+                 db: DBSession = Depends(get_db),
                  p: Principal = Depends(get_principal)):
     sq_id = squadron_id or _active_squadron(p)
     # R5-L09: always resolve the squadron; raise 404 for a supplied but non-existent
@@ -314,8 +315,16 @@ def list_parades(squadron_id: str | None = None, db: DBSession = Depends(get_db)
         raise HTTPException(404, detail={"error": "squadron_not_found"})
     if s:
         require_can_view_squadron(p, s.id, s.wing_id)
-    pns = db.query(ParadeNight).filter(ParadeNight.squadron_id == sq_id,
-                                       ParadeNight.is_archived == False).order_by(ParadeNight.date).all()  # noqa: E712
+    q = db.query(ParadeNight).filter(ParadeNight.squadron_id == sq_id,
+                                     ParadeNight.is_archived == False)  # noqa: E712
+    # WP-5: `training_year` is optional and defaults to None, which preserves the
+    # previous "every non-archived night for the squadron" behaviour for existing
+    # callers. The Weekly Program has always sent this param; until now it was not
+    # declared here, so FastAPI silently dropped it and the page rendered every
+    # night the squadron had ever had, across all years.
+    if training_year is not None:
+        q = q.filter(ParadeNight.training_year == training_year)
+    pns = q.order_by(ParadeNight.date).all()
 
     from collections import defaultdict
     pn_ids = [pn.id for pn in pns]

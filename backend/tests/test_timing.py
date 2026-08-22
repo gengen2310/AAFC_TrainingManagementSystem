@@ -693,3 +693,99 @@ def test_parade_night_schedule_not_found(client):
     h = login(client, "ADMIN703")
     resp = client.get("/api/parade-nights/nonexistent-id-xyz/schedule", headers=h)
     assert resp.status_code == 404
+
+
+# ─────────────────────────────────────────────────────────────
+# 11. Bulk parade-night schedules (WP-1/WP-2 — 2026-08-22)
+#
+# The Weekly Program used to call /parade-nights/{id}/schedule once per night
+# inside a serial awaited loop: 244 sequential requests for one page against an
+# API_RATE_LIMIT of 300 per window. These guard the bulk replacement, and above
+# all its PARITY with the single endpoint — a faster endpoint that returns
+# subtly different data is a regression, not an optimisation.
+# ─────────────────────────────────────────────────────────────
+
+def test_bulk_schedules_returns_all_nights(client):
+    """GET /api/parade-night-schedules returns one entry per non-archived night."""
+    h = login(client, "ADMIN703")
+    pns = client.get("/api/parade-nights", headers=h).json()
+    resp = client.get("/api/parade-night-schedules", headers=h)
+    assert resp.status_code == 200
+    schedules = resp.json()["schedules"]
+    assert len(schedules) == len(pns)
+    assert [s["parade_night_id"] for s in schedules] == [p["parade_night_id"] for p in pns]
+
+
+def test_bulk_schedules_match_single_endpoint_exactly(client):
+    """Every bulk entry must equal what the per-night endpoint returns.
+
+    This is the capability-preservation guard: it is what makes replacing 244
+    single-night calls with one bulk call safe.
+    """
+    h = login(client, "ADMIN703")
+    schedules = client.get("/api/parade-night-schedules", headers=h).json()["schedules"]
+    if not schedules:
+        import pytest
+        pytest.skip("No parade nights in test data")
+    for bulk_entry in schedules:
+        pn_id = bulk_entry["parade_night_id"]
+        one = client.get(f"/api/parade-nights/{pn_id}/schedule", headers=h)
+        assert one.status_code == 200
+        assert one.json() == bulk_entry, f"bulk differs from single endpoint for {pn_id}"
+
+
+def test_bulk_schedules_requires_auth(client):
+    """GET /api/parade-night-schedules must reject unauthenticated requests."""
+    assert client.get("/api/parade-night-schedules").status_code == 401
+
+
+def test_bulk_schedules_forbidden_cross_squadron(client):
+    """A squadron admin must not read another squadron's schedules."""
+    h703 = login(client, "ADMIN703")
+    sq703 = client.get("/api/auth/me", headers=h703).json()["session"]["squadron_id"]
+    h704 = login(client, "ADMIN704")
+    resp = client.get(f"/api/parade-night-schedules?squadron_id={sq703}", headers=h704)
+    assert resp.status_code == 403
+
+
+def test_bulk_schedules_unknown_squadron_404(client):
+    """An explicit but non-existent squadron_id is a 404, not a silent empty list."""
+    h = login(client, "ADMIN703")
+    resp = client.get("/api/parade-night-schedules?squadron_id=no-such-squadron", headers=h)
+    assert resp.status_code == 404
+
+
+def test_training_year_filter_applies_to_list_and_bulk(client):
+    """WP-5: `training_year` was sent by the frontend but never declared, so
+    FastAPI dropped it and every night was returned regardless of year. Both
+    endpoints must now honour it, and must always agree with each other."""
+    h = login(client, "ADMIN703")
+    unfiltered = client.get("/api/parade-nights", headers=h).json()
+    if not unfiltered:
+        import pytest
+        pytest.skip("No parade nights in test data")
+
+    # training_year is not exposed in the parade-night payload, so read the real
+    # value off the row rather than assuming the seed's default.
+    from app.database import SessionLocal
+    from app.models import ParadeNight
+    db = SessionLocal()
+    try:
+        year = db.get(ParadeNight, unfiltered[0]["parade_night_id"]).training_year
+    finally:
+        db.close()
+
+    same_year = client.get(f"/api/parade-nights?training_year={year}", headers=h).json()
+    assert same_year, "filtering by a year that exists must not return nothing"
+
+    # A year with no nights must return an empty list, not fall back to everything.
+    absent = client.get(f"/api/parade-nights?training_year={year + 500}", headers=h).json()
+    assert absent == []
+
+    # The bulk endpoint must filter identically, or the page and its data diverge.
+    bulk_same = client.get(f"/api/parade-night-schedules?training_year={year}",
+                           headers=h).json()["schedules"]
+    bulk_absent = client.get(f"/api/parade-night-schedules?training_year={year + 500}",
+                             headers=h).json()["schedules"]
+    assert len(bulk_same) == len(same_year)
+    assert bulk_absent == []

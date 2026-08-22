@@ -652,6 +652,68 @@ def remove_timing_override(
     return {"ok": True}
 
 
+# ── Parade-night schedule shaping (shared by the single and bulk endpoints) ───
+
+
+def _schedule_session_dict(s: Session) -> dict:
+    return {
+        "session_id": s.id,
+        "period_number": s.period_number,
+        "timing_block_id": s.timing_block_id,
+        "cadet_group": s.cadet_group,
+        "curriculum_title_at_time": s.curriculum_title_at_time,
+        "custom_title": s.custom_title,
+        "facilitator_display_name_at_time": s.facilitator_display_name_at_time,
+        "training_area_name_at_time": s.training_area_name_at_time,
+        "status": s.status,
+    }
+
+
+def _schedule_block_dict(b: TimingBlock) -> dict:
+    return {
+        "block_id": b.id,
+        "display_order": b.display_order,
+        "block_name": b.block_name,
+        "block_type": b.block_type,
+        "start_time": b.start_time,
+        "end_time": b.end_time,
+        "duration_minutes": b.duration_minutes,
+        "is_instructional_period": b.is_instructional_period,
+        "is_optional": b.is_optional,
+    }
+
+
+def _shape_schedule(pn_id: str, template_id: str | None, blocks: list,
+                    sessions: list) -> dict:
+    """Group a parade night's sessions by timing block. Pure shaping, no queries —
+    so the bulk endpoint can feed it pre-fetched rows instead of re-querying."""
+    sessions_by_block: dict[str, list] = {}
+    unlinked: list = []
+    for s in sessions:
+        if s.timing_block_id:
+            sessions_by_block.setdefault(s.timing_block_id, []).append(
+                _schedule_session_dict(s))
+        else:
+            unlinked.append(_schedule_session_dict(s))
+    return {
+        "parade_night_id": pn_id,
+        "timing_template_id": template_id,
+        "blocks": [_schedule_block_dict(b) for b in blocks],
+        "sessions_by_block": sessions_by_block,
+        "unlinked_sessions": unlinked,
+    }
+
+
+def _resolved_template_blocks(db: DBSession, template_id: str | None) -> list:
+    """Ordered, non-archived blocks for a template id (empty when unassigned)."""
+    if not template_id:
+        return []
+    template = db.get(TimingTemplate, template_id)
+    if template and not template.is_archived:
+        return sorted(template.blocks, key=lambda b: b.display_order)
+    return []
+
+
 # ── GET /api/parade-nights/{pn_id}/schedule ───────────────────────────────────
 
 @router.get("/parade-nights/{pn_id}/schedule")
@@ -671,15 +733,7 @@ def get_parade_night_schedule(
         raise HTTPException(404, detail={"error": "parade_night_not_found"})
     require_can_view_squadron(p, pn.squadron_id, pn.wing_id)
 
-    # Determine which timing template applies (direct assignment on parade night)
-    template_id = pn.timing_template_id
-    blocks: list = []
-    if template_id:
-        template = db.get(TimingTemplate, template_id)
-        if template and not template.is_archived:
-            blocks = sorted(template.blocks, key=lambda b: b.display_order)
-
-    # Fetch all non-archived sessions for this parade night
+    blocks = _resolved_template_blocks(db, pn.timing_template_id)
     sessions = (
         db.query(Session)
         .filter(
@@ -688,46 +742,88 @@ def get_parade_night_schedule(
         )
         .all()
     )
+    return _shape_schedule(pn_id, pn.timing_template_id, blocks, sessions)
 
-    def _session_dict(s: Session) -> dict:
-        return {
-            "session_id": s.id,
-            "period_number": s.period_number,
-            "timing_block_id": s.timing_block_id,
-            "cadet_group": s.cadet_group,
-            "curriculum_title_at_time": s.curriculum_title_at_time,
-            "custom_title": s.custom_title,
-            "facilitator_display_name_at_time": s.facilitator_display_name_at_time,
-            "training_area_name_at_time": s.training_area_name_at_time,
-            "status": s.status,
+
+# ── GET /api/parade-night-schedules ───────────────────────────────────────────
+#
+# WP-1/WP-2: the Weekly Program used to fetch /parade-nights/{id}/schedule once
+# per night inside a serial `await` loop -- 244 sequential round-trips for one
+# page, against an API_RATE_LIMIT of 300 per window. This returns every schedule
+# the page needs in a single request, using the same bulk .in_() pattern
+# list_parades() already uses to avoid its own N+1.
+#
+# The filters mirror /api/parade-nights exactly, so the two always agree on which
+# nights belong to the page. Ids are deliberately NOT accepted as a query
+# parameter: 244 UUIDs is ~9KB of query string, past nginx's default request-line
+# limit.
+
+@router.get("/parade-night-schedules")
+def list_parade_night_schedules(
+    squadron_id: str | None = None,
+    training_year: int | None = None,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Schedules for every non-archived parade night matching the filters.
+
+    Returns {"schedules": [...]} in date order, each entry identical in shape to
+    GET /api/parade-nights/{pn_id}/schedule.
+    """
+    sq_id = squadron_id or _active_squadron(p)
+    sq = db.get(Squadron, sq_id) if sq_id else None
+    if sq_id and not sq:
+        raise HTTPException(404, detail={"error": "squadron_not_found"})
+    if sq:
+        require_can_view_squadron(p, sq.id, sq.wing_id)
+    if not sq_id:
+        return {"schedules": []}
+
+    q = db.query(ParadeNight).filter(
+        ParadeNight.squadron_id == sq_id,
+        ParadeNight.is_archived == False,  # noqa: E712
+    )
+    if training_year is not None:
+        q = q.filter(ParadeNight.training_year == training_year)
+    pns = q.order_by(ParadeNight.date).all()
+    if not pns:
+        return {"schedules": []}
+
+    pn_ids = [pn.id for pn in pns]
+
+    # Blocks: resolve every referenced template in two queries, not one per night.
+    tpl_ids = {pn.timing_template_id for pn in pns if pn.timing_template_id}
+    live_tpl_ids: set[str] = set()
+    if tpl_ids:
+        live_tpl_ids = {
+            t.id for t in db.query(TimingTemplate).filter(
+                TimingTemplate.id.in_(tpl_ids),
+                TimingTemplate.is_archived == False,  # noqa: E712
+            ).all()
         }
+    blocks_by_tpl: dict[str, list] = {}
+    if live_tpl_ids:
+        for b in db.query(TimingBlock).filter(
+            TimingBlock.timing_template_id.in_(live_tpl_ids)
+        ).order_by(TimingBlock.display_order).all():
+            blocks_by_tpl.setdefault(b.timing_template_id, []).append(b)
 
-    sessions_by_block: dict[str, list] = {}
-    unlinked: list = []
-    for s in sessions:
-        if s.timing_block_id:
-            sessions_by_block.setdefault(s.timing_block_id, []).append(_session_dict(s))
-        else:
-            unlinked.append(_session_dict(s))
+    # Sessions: one query for every night on the page.
+    sessions_by_pn: dict[str, list] = {}
+    for sess in db.query(Session).filter(
+        Session.parade_night_id.in_(pn_ids),
+        Session.is_archived == False,  # noqa: E712
+    ).all():
+        sessions_by_pn.setdefault(sess.parade_night_id, []).append(sess)
 
-    return {
-        "parade_night_id": pn_id,
-        "timing_template_id": template_id,
-        "blocks": [
-            {
-                "block_id": b.id,
-                "display_order": b.display_order,
-                "block_name": b.block_name,
-                "block_type": b.block_type,
-                "start_time": b.start_time,
-                "end_time": b.end_time,
-                "duration_minutes": b.duration_minutes,
-                "is_instructional_period": b.is_instructional_period,
-                "is_optional": b.is_optional,
-            }
-            for b in blocks
-        ],
-        "sessions_by_block": sessions_by_block,
-        "unlinked_sessions": unlinked,
-    }
+    return {"schedules": [
+        _shape_schedule(
+            pn.id,
+            pn.timing_template_id,
+            blocks_by_tpl.get(pn.timing_template_id, [])
+            if pn.timing_template_id in live_tpl_ids else [],
+            sessions_by_pn.get(pn.id, []),
+        )
+        for pn in pns
+    ]}
 
