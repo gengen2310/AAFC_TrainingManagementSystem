@@ -741,6 +741,67 @@ def _recompute(db: DBSession, pn: ParadeNight):
     db.commit()
 
 
+def _is_parallel_delivery(body, sib) -> bool:
+    """True when two sessions in the same period are one delivery, not a clash.
+
+    A squadron routinely runs parallel Training Classes -- Senior 1 and Senior 2
+    both taking the same lesson from the same instructor in the same room. That
+    is one teaching event recorded as two sessions (the printed Weekly Program
+    renders one session per class column), and the resource check used to reject
+    it as a facilitator/room double-booking, which made those parade nights
+    unsaveable.
+
+    Same content is the test. If the two sessions teach different things, the
+    instructor really would have to be in two places and it is a genuine clash.
+    Rooms must also agree: the same lesson in two different rooms is not one
+    event, so that still counts.
+    """
+    a_item, b_item = body.curriculum_item_id, sib.curriculum_item_id
+    if a_item and b_item:
+        same_content = a_item == b_item
+    elif not a_item and not b_item:
+        a_t = (body.custom_title or "").strip().lower()
+        b_t = (sib.custom_title or "").strip().lower()
+        same_content = bool(a_t) and a_t == b_t
+    else:
+        same_content = False
+    if not same_content:
+        return False
+    # One lesson cannot happen in two rooms at once.
+    if body.training_area_id and sib.training_area_id:
+        return body.training_area_id == sib.training_area_id
+    return True
+
+
+def _resource_conflicts(db: DBSession, parade_night_id: str, period_number, body,
+                        exclude_session_id: str | None = None) -> list[dict]:
+    """Facilitator/room double-bookings against other sessions in the same period.
+
+    Shared by create_session and edit_session, which previously carried two
+    identical copies of this loop.
+    """
+    q = db.query(Session).filter(
+        Session.parade_night_id == parade_night_id,
+        Session.period_number == period_number,
+        Session.is_archived == False,  # noqa: E712
+    )
+    if exclude_session_id:
+        q = q.filter(Session.id != exclude_session_id)
+    conflicts: list[dict] = []
+    for sib in q.all():
+        if _is_parallel_delivery(body, sib):
+            continue
+        if body.facilitator_id and sib.facilitator_id == body.facilitator_id:
+            conflicts.append({"type": "facilitator_clash", "session_id": sib.id,
+                              "resource_id": sib.facilitator_id,
+                              "resource_name": sib.facilitator_display_name_at_time})
+        if body.training_area_id and sib.training_area_id == body.training_area_id:
+            conflicts.append({"type": "room_clash", "session_id": sib.id,
+                              "resource_id": sib.training_area_id,
+                              "resource_name": sib.training_area_name_at_time})
+    return conflicts
+
+
 @router.post("/sessions")
 def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     pn = db.get(ParadeNight, body.parade_night_id)
@@ -753,20 +814,7 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
     # still be double-booked with zero warning by creating a brand new session
     # rather than editing an existing one into a clash. ──
     if not body.override_conflict:
-        siblings = db.query(Session).filter(
-            Session.parade_night_id == pn.id,
-            Session.period_number == body.period_number, Session.is_archived == False,  # noqa: E712
-        ).all()
-        conflicts = []
-        for sib in siblings:
-            if body.facilitator_id and sib.facilitator_id == body.facilitator_id:
-                conflicts.append({"type": "facilitator_clash", "session_id": sib.id,
-                                  "resource_id": sib.facilitator_id,
-                                  "resource_name": sib.facilitator_display_name_at_time})
-            if body.training_area_id and sib.training_area_id == body.training_area_id:
-                conflicts.append({"type": "room_clash", "session_id": sib.id,
-                                  "resource_id": sib.training_area_id,
-                                  "resource_name": sib.training_area_name_at_time})
+        conflicts = _resource_conflicts(db, pn.id, body.period_number, body)
         if conflicts:
             raise HTTPException(409, detail={"error": "resource_conflict", "conflicts": conflicts})
 
@@ -832,20 +880,8 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
     # (relabelling two non-overlapping period numbers doesn't create new overlap) --
     # only a genuine new collision against a third session's resource does. ──
     if not body.override_conflict:
-        siblings = db.query(Session).filter(
-            Session.parade_night_id == target_pn.id, Session.id != s.id,
-            Session.period_number == body.period_number, Session.is_archived == False,  # noqa: E712
-        ).all()
-        conflicts = []
-        for sib in siblings:
-            if body.facilitator_id and sib.facilitator_id == body.facilitator_id:
-                conflicts.append({"type": "facilitator_clash", "session_id": sib.id,
-                                  "resource_id": sib.facilitator_id,
-                                  "resource_name": sib.facilitator_display_name_at_time})
-            if body.training_area_id and sib.training_area_id == body.training_area_id:
-                conflicts.append({"type": "room_clash", "session_id": sib.id,
-                                  "resource_id": sib.training_area_id,
-                                  "resource_name": sib.training_area_name_at_time})
+        conflicts = _resource_conflicts(db, target_pn.id, body.period_number, body,
+                                        exclude_session_id=s.id)
         if conflicts:
             raise HTTPException(409, detail={"error": "resource_conflict", "conflicts": conflicts})
 

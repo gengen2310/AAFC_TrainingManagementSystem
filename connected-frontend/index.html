@@ -10123,8 +10123,10 @@ async function _populatePnDetailClasses(pn){
   }));
 }
 
+let _pndOverrideAll=false;
 async function savePNDetail(ds,cnt){
   const pn=S.pns.find(p=>p.date===ds);if(!pn)return;
+  _pndOverrideAll=false;   // CONF-2: one decision per save, not per session
   const errEl=document.getElementById('pn-det-err');
   // Collect any required reasons up front, before writing anything — so a
   // cancelled reason panel never leaves an earlier session half-saved.
@@ -10162,7 +10164,22 @@ async function savePNDetail(ds,cnt){
       if(newSt&&newSt!==s.status){ body.status=newSt; body.reason=reason||null; }
       // Single atomic PUT: fields + status transition committed together server-side —
       // no partial-update window between a field save and a separate status save.
-      await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify(body)});
+      //
+      // CONF-2: a genuine double-booking used to end the save with an error and no
+      // way forward, even though _sessMove() has offered "these clash — proceed
+      // anyway?" for the move path all along. Ask once, then apply the same
+      // decision to the rest of this save rather than prompting per session.
+      if(_pndOverrideAll) body.override_conflict = true;
+      try{
+        await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify(body)});
+      }catch(e){
+        if(!(e && e.code==='resource_conflict')) throw e;
+        const conflicts=(e.body&&e.body.detail&&e.body.detail.conflicts)||[];
+        const proceed=await _showConflictPrompt(conflicts);
+        if(!proceed){ if(errEl){errEl.textContent='Save stopped — nothing further was changed.';errEl.style.color='var(--red)';} return; }
+        _pndOverrideAll = true;
+        await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify(Object.assign({},body,{override_conflict:true}))});
+      }
       // CLASS-03: save Training Class audience if the picker was loaded for this session.
       const tcList=document.getElementById('d-tc-'+i);
       if(tcList&&tcList.dataset.loaded==='true'){
