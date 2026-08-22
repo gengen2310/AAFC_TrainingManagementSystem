@@ -1978,8 +1978,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             night overrides both. Changing this does not alter parade nights that already exist.
           </p>
           <div class="form-row">
-            <div class="ff"><label for="s-sess">Default Training Periods (fallback)</label>
-              <select id="s-sess" aria-label="Default sessions per night">
+            <div class="ff"><label for="s-sess">Default Training Periods</label>
+              <!-- The <label for> supplies the accessible name. The aria-label that
+                   used to sit here said "Default sessions per night", which overrode
+                   the visible label and announced something different from what is
+                   on screen (WCAG 2.5.3, Label in Name). -->
+              <select id="s-sess">
                 <option value="1">1 Session</option><option value="2">2 Sessions</option><option value="3" selected>3 Sessions</option>
               </select>
             </div>
