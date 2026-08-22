@@ -318,3 +318,65 @@ does to the index or the working tree.
 
 **This work is still uncommitted.** Given a second session is actively stashing in this tree,
 it should be committed to a branch promptly or it is liable to be swept up again.
+
+---
+
+## FIX-05 · The 35 `#6b7a87` literals, and the root cause behind them
+
+**Files:** `tokens.css`, `components.css`, `planning.css`, 5 `.tsx` files
+**Gate:** G1 · **Audit item:** recommendation 4
+
+Swapping the literals for `var(--muted-text)` alone would **not** have fixed this.
+`--muted-text` resolved to `#657380`, which fails on three of the five backgrounds the
+literals actually sit on:
+
+| Colour | `#ffffff` | `#f4f8fc` | `#f1f5f9` | `#f0f0f0` | `#f5f5f5` |
+|---|---|---|---|---|---|
+| `#6b7a87` (was) | 4.41 ✕ | 4.14 ✕ | 4.03 ✕ | 3.87 ✕ | 4.05 ✕ |
+| `#657380` (`--muted`) | 4.86 ✓ | 4.56 ✓ | 4.44 ✕ | 4.27 ✕ | 4.46 ✕ |
+| `#5c6a76` (now) | 5.56 ✓ | 5.21 ✓ | 5.07 ✓ | 4.88 ✓ | 5.10 ✓ |
+
+The real finding is in `tools/playwright-staging/tests/a11y-wcag.spec.ts`: the Main TMS
+darkened `--muted` **twice** — `#6b7a87` → `#657380` → `#5c6a76`, the second step to clear
+4.5:1 on `sa-scope-bar`'s `#eef4fa`. The Planning Workspace only ever got the first step.
+
+**The two-frontend asymmetry, third instance.** `min-height:28px`, then the theme work,
+now this. Each time a fix landed on one side only. `.claude/rules/architecture.md` makes
+the split deliberate, so this will keep recurring: any accessibility remediation here
+needs applying twice, on purpose, as part of the same change.
+
+Also removed `--muted-on-sunk`, introduced earlier on this branch and made redundant by
+the darkening — it resolved identically to `--muted` in all four contexts. Two names for
+one colour is how palettes drift.
+
+Verified: no regression (light/dark/hc still 0 failing of 23), `--muted-text` now passes
+on all six surfaces in use, `npm run build` passes.
+
+---
+
+## FIX-06 · `DESIGN.md` reconciled
+
+**File:** `DESIGN.md` · **Audit item:** recommendation 6
+
+Every documented `.nav-item` property was wrong, including its light/dark polarity, and
+33 of 61 Main TMS tokens were undocumented. Both fixed; token coverage is now complete.
+
+**The audit undercounted its own finding.** It reported "17 of 42". The grep behind that
+required the token at line start, so tokens sharing a line (`--ok: …; --ok-bg: …;`) were
+never seen. The true figure is **33 of 61**, and `AUDIT.md` now says so. This is the
+method's own warning turned on itself: a number produced by a script is only as good as
+that script's coverage, and "run a script" is not the same as "measured correctly".
+
+`DESIGN.md` now also carries the rules this branch established, so they are not
+re-broken: the focus-ring token and its two specificity traps, the requirement that every
+foreground token be defined in all four appearance contexts, the no-self-aliasing rule
+that caused the dark-theme cycle, and `--primary` being the chrome surface.
+
+## Remaining after this branch
+
+| Item | Gate | Size |
+|---|---|---|
+| Session move is drag-only in the Planning Workspace | G6 | small — the Main TMS `↑`/`↓` pattern already solves it |
+| Text does not enlarge — 1,492 of 1,528 font-size specs px-locked | G3 | programme; ~1,500 call sites, both frontends separately |
+| 2,454 inline style declarations never contrast-checked | — | coverage gap, not a clean result |
+| Authenticated screens, narrow viewports, screen-reader, human testing | G10, G12 | unmeasured |
