@@ -266,6 +266,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .nav-planning-hdr{font-size:var(--fs-2xs);font-weight:700;color:var(--pale);letter-spacing:.10em;text-transform:uppercase;padding:10px 18px 4px 30px;}
 .nav-item-ext{display:flex;align-items:center;padding:11px var(--sp-md);font-size:var(--fs-sm);font-weight:600;color:rgba(255,255,255,.9);cursor:pointer;transition:background .12s,color .12s;border-left:2.5px solid transparent;gap:9px;user-select:none;text-decoration:none;letter-spacing:.01em;}
 .nav-item-ext:hover{background:rgba(255,255,255,.07);color:#fff;}
+.nav-item-ext:focus-visible{outline:none;box-shadow:0 0 0 2px var(--focus-ring) inset;}
 .nav-icon{font-size:var(--fs-md);width:18px;text-align:center;flex-shrink:0;opacity:.8;}
 .main{flex:1;padding:24px 28px;overflow-y:auto;min-width:0;}
 .page{display:none;}.page.active{display:block;}
@@ -1221,7 +1222,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <nav class="sidenav no-print">
       <!-- B-DS logo bar: unit name only, populated by bootApp() -->
       <div class="nav-logo-bar"><div id="nav-unit-name">Training System</div></div>
-      <div class="nav-items-wrap">
+      <div class="nav-items-wrap" role="link">
       <!-- REM-25: reorganised around the Training Officer's actual planning
            cycle (Overview -> Plan Training -> People and Resources -> Needs
            Attention -> Settings) instead of the prior ad-hoc feature-area
@@ -1234,37 +1235,41 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
            working completely unchanged. See docs/remediation/master_gap_register.csv
            REM-25 for the full before/after capability comparison. -->
       <div class="nav-lbl">Overview</div>
-      <div class="nav-item" tabindex="0" onclick="nav('getting-started')">Getting Started</div>
-      <div class="nav-item active" tabindex="0" onclick="nav('dashboard')">Training Dashboard</div>
-      <div class="nav-item" tabindex="0" onclick="nav('calendar')">Training Calendar</div>
+      <div class="nav-item" role="link" tabindex="0" onclick="nav('getting-started')">Getting Started</div>
+      <!-- NAV-5: page-help, _loadHelpPage() and nav()'s 'help' branch all
+           existed, and nothing anywhere called nav('help') -- the Help &
+           Reference page was built and unreachable for every role. -->
+      <div class="nav-item" role="link" tabindex="0" onclick="nav('help')">Help &amp; Reference</div>
+      <div class="nav-item active" role="link" tabindex="0" onclick="nav('dashboard')">Training Dashboard</div>
+      <div class="nav-item" role="link" tabindex="0" onclick="nav('calendar')">Training Calendar</div>
       <div class="nav-lbl" id="admin-lbl" style="display:none">Unit Setup</div>
-      <div class="nav-item admin-el" tabindex="-1" style="display:none" onclick="nav('settings')">Unit Setup</div>
+      <div class="nav-item admin-el" role="link" tabindex="-1" style="display:none" onclick="nav('settings')">Unit Setup</div>
       <div class="nav-lbl">Plan Training</div>
-      <div class="nav-item" tabindex="0" onclick="nav('curriculum')">Curriculum</div>
-      <div class="nav-item" tabindex="0" onclick="nav('activities')">Activities</div>
-      <div class="nav-item" tabindex="0" onclick="nav('parade-nights')">Parade Nights</div>
-      <div class="nav-item" tabindex="0" onclick="nav('weekly-program')">Weekly Program</div>
+      <div class="nav-item" role="link" tabindex="0" onclick="nav('curriculum')">Curriculum</div>
+      <div class="nav-item" role="link" tabindex="0" onclick="nav('activities')">Activities</div>
+      <div class="nav-item" role="link" tabindex="0" onclick="nav('parade-nights')">Parade Nights</div>
+      <div class="nav-item" role="link" tabindex="0" onclick="nav('weekly-program')">Weekly Program</div>
       <div class="nav-lbl">People and Resources</div>
-      <div class="nav-item" tabindex="0" onclick="nav('facilitators')">Facilitators</div>
-      <div class="nav-item" tabindex="0" onclick="nav('resources')">Resources & Training Areas</div>
+      <div class="nav-item" role="link" tabindex="0" onclick="nav('facilitators')">Facilitators</div>
+      <div class="nav-item" role="link" tabindex="0" onclick="nav('resources')">Resources & Training Areas</div>
       <div class="nav-lbl">Needs Attention</div>
-      <div class="nav-item" tabindex="0" onclick="nav('action-items')">Needs Attention</div>
+      <div class="nav-item" role="link" tabindex="0" onclick="nav('action-items')">Needs Attention</div>
       <div class="nav-lbl" style="display:none">Administration</div>
-      <div class="nav-item" id="nav-accounts" tabindex="-1" style="display:none" onclick="nav('accounts')">Account Management</div>
+      <div class="nav-item" role="link" id="nav-accounts" tabindex="-1" style="display:none" onclick="nav('accounts')">Account Management</div>
       <div class="nav-lbl nav-scope" id="hq-lbl" style="display:none">Command</div>
-      <div class="nav-item nav-scope" id="nav-wing" tabindex="-1" style="display:none" onclick="nav('wing-overview')">Wing Overview</div>
-      <div class="nav-item nav-scope" id="nav-wing-activities" tabindex="-1" style="display:none" onclick="nav('wing-activities')">Wing Activities</div>
-      <div class="nav-item nav-scope" id="nav-wing-calendar" tabindex="-1" style="display:none" onclick="nav('wing-calendar')">Wing HQ Calendar</div>
-      <div class="nav-item nav-scope" id="nav-national" tabindex="-1" style="display:none" onclick="nav('national')">National Overview</div>
-      <div class="nav-item nav-scope" id="nav-national-activities" tabindex="-1" style="display:none" onclick="nav('national-activities')">National Activities</div>
-      <div class="nav-item nav-scope" id="nav-audit" tabindex="-1" style="display:none" onclick="nav('audit')">Audit</div>
+      <div class="nav-item nav-scope" role="link" id="nav-wing" tabindex="-1" style="display:none" onclick="nav('wing-overview')">Wing Overview</div>
+      <div class="nav-item nav-scope" role="link" id="nav-wing-activities" tabindex="-1" style="display:none" onclick="nav('wing-activities')">Wing Activities</div>
+      <div class="nav-item nav-scope" role="link" id="nav-wing-calendar" tabindex="-1" style="display:none" onclick="nav('wing-calendar')">Wing HQ Calendar</div>
+      <div class="nav-item nav-scope" role="link" id="nav-national" tabindex="-1" style="display:none" onclick="nav('national')">National Overview</div>
+      <div class="nav-item nav-scope" role="link" id="nav-national-activities" tabindex="-1" style="display:none" onclick="nav('national-activities')">National Activities</div>
+      <div class="nav-item nav-scope" role="link" id="nav-audit" tabindex="-1" style="display:none" onclick="nav('audit')">Audit</div>
       <div class="nav-lbl" id="nav-system-lbl" style="display:none">System</div>
-      <div class="nav-item" id="nav-system-console" tabindex="-1" style="display:none" onclick="nav('system-console')">System Console</div>
-      <div class="nav-item" id="nav-service-desk" tabindex="-1" style="display:none" onclick="nav('service-desk')">Service Desk</div>
+      <div class="nav-item" role="link" id="nav-system-console" tabindex="-1" style="display:none" onclick="nav('system-console')">System Console</div>
+      <div class="nav-item" role="link" id="nav-service-desk" tabindex="-1" style="display:none" onclick="nav('service-desk')">Service Desk</div>
       <div class="nav-lbl" id="nav-lbl-pw" style="display:none">Workspace</div>
       <a class="nav-item-ext" id="nav-pw-link" href="#" target="_blank" rel="noopener" style="display:none">Planning Workspace ↗<span id="navPwYrBadge" style="display:none;margin-left:8px;font-size:var(--fs-2xs);font-weight:800;background:var(--dark);color:#fff;padding:2px 8px;border-radius:10px;letter-spacing:.04em;vertical-align:middle"></span></a>
       <div id="navPwYrHint" style="display:none;padding:3px 20px 0;font-size:var(--fs-2xs);color:var(--muted)"></div>
-      <div class="nav-item-ext" id="nav-pw-unconfigured" style="display:none;opacity:.55;cursor:default" title="Planning Workspace is not configured for this environment. Contact your system administrator.">Planning Workspace (unavailable)</div>
+      <div class="nav-item-ext" id="nav-pw-unconfigured" aria-disabled="true" style="display:none;opacity:.55;cursor:default" title="Planning Workspace is not configured for this environment. Contact your system administrator.">Planning Workspace (unavailable)</div>
       </div><!-- /nav-items-wrap -->
       <div class="nav-footer" id="nav-footer-scope"></div>
     </nav>
@@ -5280,10 +5285,10 @@ function roomById(id){return (S.rooms||[]).find(r=>r.id===id);}
 const _PLANNING_PAGES=[];
 const NAV_BY_SCOPE={
   squadron:['getting-started','dashboard','calendar','parade-nights','weekly-program','curriculum','activities','facilitators','resources','action-items','help','settings','accounts','service-desk',..._PLANNING_PAGES],
-  wing:['getting-started','wing-overview','wing-activities','wing-calendar','curriculum','audit','accounts','service-desk',..._PLANNING_PAGES],
-  national:['getting-started','national','national-activities','wing-calendar','curriculum','audit','accounts','service-desk',..._PLANNING_PAGES],
-  auditor:['audit','accounts',..._PLANNING_PAGES],
-  system_admin:['getting-started','system-console','national','national-activities','wing-activities','wing-calendar','curriculum','audit','accounts','service-desk',..._PLANNING_PAGES]
+  wing:['getting-started','wing-overview','wing-activities','wing-calendar','curriculum','audit','accounts','service-desk','help',..._PLANNING_PAGES],
+  national:['getting-started','national','national-activities','wing-calendar','curriculum','audit','accounts','service-desk','help',..._PLANNING_PAGES],
+  auditor:['getting-started','audit','accounts','help',..._PLANNING_PAGES],
+  system_admin:['getting-started','system-console','national','national-activities','wing-activities','wing-calendar','curriculum','audit','accounts','service-desk','help',..._PLANNING_PAGES]
 };
 const SCOPE_LANDING={squadron:'dashboard',wing:'wing-overview',national:'national',auditor:'audit',system_admin:'system-console'};
 // In Proxy Mode (Wing) or Delegated Intervention (NAT HQ) the UI shows the EXACT SQN workspace
@@ -5627,7 +5632,8 @@ function nav(id){
   document.querySelectorAll('.page').forEach(p=>{p.classList.remove('active');p.setAttribute('aria-hidden','true');});
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pg=document.getElementById('page-'+id);if(pg){pg.classList.add('active');pg.removeAttribute('aria-hidden');}
-  document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes("'"+id+"'"))n.classList.add('active');});
+  document.querySelectorAll('.nav-item').forEach(n=>n.removeAttribute('aria-current'));
+  document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes("'"+id+"'")){n.classList.add('active');n.setAttribute('aria-current','page');}});
   if(id==='getting-started')loadGettingStarted();
   if(id==='calendar')renderCal();
   if(id==='weekly-program'){populateWPDD();renderWP();}
