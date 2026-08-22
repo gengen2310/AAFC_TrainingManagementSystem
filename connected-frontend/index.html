@@ -1001,6 +1001,19 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   .sc-kv{grid-template-columns:1fr;}
   .sc-kv dt{font-weight:700;margin-top:4px;}
 }
+/* AUDIT-2026-08 G10: at 360px the topbar's right-hand cluster (Search / scope chip /
+   Sign Out) is ~202px against a 360px viewport, so it pushed 16px past the edge and
+   clipped Sign Out. The bar is a fixed 52px tall, so it cannot simply wrap — instead
+   let the brand shrink and the cluster stay whole. Measured at 360/600/768/860/1000/1280. */
+@media(max-width:680px){
+  .topbar{height:auto;min-height:52px;padding:6px var(--sp-sm);flex-wrap:wrap;row-gap:6px;}
+  .topbar .tb-brand,.topbar .brand{min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .tb-right{flex-wrap:wrap;justify-content:flex-end;gap:6px;min-width:0;}
+}
+/* Content rows that pair a control with a timestamp overflowed at 360px; let them wrap. */
+@media(max-width:480px){
+  .sc-backup-item,.sc-audit-row,.dash-filter-bar,.fbar{flex-wrap:wrap;}
+}
 .sc-backup-item{display:flex;gap:12px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border-light);font-size:var(--fs-sm);}
 .sc-backup-item .sc-filename{font-family:monospace;color:var(--dark);}
 .sc-backup-item .sc-bsize{color:var(--muted);}
