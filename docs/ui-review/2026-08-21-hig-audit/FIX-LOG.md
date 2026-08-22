@@ -678,3 +678,25 @@ Worth recording because the cap looked like an obvious improvement and was only 
 measuring after the change rather than reasoning about it. The bound belongs on the chips,
 not on the row that also holds the actions — restructuring the JSX that way is the better
 long-term shape, and was not attempted here.
+
+---
+
+## FIX-12 · Two remaining G5 hit-target gaps — `seg-btn` and Account Management bulk-select
+
+**File:** `connected-frontend/index.html` · **Gate:** G5
+
+### `.seg-btn` — Wing HQ Calendar view switcher
+
+`.seg-btn` uses `font-size:var(--fs-sm)` (11px) and `padding:5px 12px`, giving a rendered height
+of ~24px — below the 28px target. Added `min-height:28px`. Two elements ("Grid" / "Table" buttons
+on the Wing HQ Calendar page), all admin roles that see Wing HQ.
+
+### Account Management bulk-select checkboxes
+
+49 bare `<input type="checkbox">` rendered inside `<td>` cells by `_renderAccountTable()` and its
+select-all header. The global `input[type=checkbox]` rule sets `width:height:18px`; without a
+wrapping label the effective pointer area is the checkbox itself (18×18). The same label-wrapper
+pattern used in FIX-08 for the PW's bulk-select: a `<label>` with `display:flex; align-items:center;
+justify-content:center; min-height:28px; min-width:28px` containing the checkbox. The checkbox's
+own `aria-label` supersedes the label element's text content (empty), so the accessible name is
+unchanged. Select-all header checkbox same treatment.

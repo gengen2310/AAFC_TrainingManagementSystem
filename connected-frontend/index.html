@@ -376,7 +376,7 @@ a:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;border-ra
 
 /* ── SEGMENTED TOGGLE (view switchers) ── */
 .seg{display:inline-flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
-.seg-btn{background:var(--surface);border:none;border-right:1.5px solid var(--border);padding:5px 12px;font-size:var(--fs-sm);font-weight:700;font-family:inherit;color:var(--steel);cursor:pointer}
+.seg-btn{background:var(--surface);border:none;border-right:1.5px solid var(--border);padding:5px 12px;font-size:var(--fs-sm);font-weight:700;font-family:inherit;color:var(--steel);cursor:pointer;min-height:28px}/* AUDIT-2026-08 G5 */
 .seg-btn:last-child{border-right:none}
 .seg-btn.active{background:var(--dark);color:#fff}
 .seg-btn:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-2px;z-index:1;position:relative;}
@@ -6540,11 +6540,12 @@ function _renderAccountTable(){
     return `<div style="display:flex;gap:4px;flex-wrap:wrap">${editBtn}${changeScopeBtn}${resetBtn}${unlockBtn}${toggleBtn}${deleteBtn}</div>`;
   };
 
-  const selCol=canBulk?`<th class="no-print" style="width:24px"><input type="checkbox" id="acct-select-all" ${allVisibleSelected?'checked':''} onchange="_acctToggleAll(this.checked)" aria-label="Select all accounts matching the current filter"></th>`:'';
+  /* AUDIT-2026-08 G5: wrap bare checkboxes in a label so the click area meets 28px [HIG] */
+  const selCol=canBulk?`<th class="no-print" style="width:30px"><label style="display:flex;align-items:center;justify-content:center;min-height:28px;min-width:28px;cursor:pointer"><input type="checkbox" id="acct-select-all" ${allVisibleSelected?'checked':''} onchange="_acctToggleAll(this.checked)" aria-label="Select all accounts matching the current filter"></label></th>`:'';
   el.innerHTML='<div class="tw"><table><thead><tr>'+selCol+'<th>Name</th><th>Role</th><th>Scope</th><th>Unit</th><th>Status</th><th>Last Login</th><th>Code Last Changed</th>'+(canWrite?'<th class="no-print">Actions</th>':'')+'</tr></thead><tbody>'+
     rows.map(u=>{
       const isMe=u.user_id===myUid;
-      const cb=canBulk?`<td class="no-print">${(isMe||u.is_archived)?'':`<input type="checkbox" ${S.acctSelected.has(u.user_id)?'checked':''} onchange="_acctToggleOne('${u.user_id}',this.checked)" aria-label="Select ${esc(u.display_name||'')}">`}</td>`:'';
+      const cb=canBulk?`<td class="no-print">${(isMe||u.is_archived)?'':`<label style="display:flex;align-items:center;justify-content:center;min-height:28px;min-width:28px;cursor:pointer"><input type="checkbox" ${S.acctSelected.has(u.user_id)?'checked':''} onchange="_acctToggleOne('${u.user_id}',this.checked)" aria-label="Select ${esc(u.display_name||'')}"></label>`}</td>`:'';
       return `<tr>${cb}
       <td style="font-weight:700">${esc(u.display_name||'—')}</td>
       <td><span class="badge ${_ROLE_CLS[u.role]||'b-grey'}">${_ROLE_LABELS[u.role]||u.role}</span></td>
