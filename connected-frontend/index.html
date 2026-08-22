@@ -348,7 +348,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
    padding and rendered 21-22px; [HIG] wants 28pt for a pointer target. Checkboxes and
    radios keep the UA size because their wrapping <label> is the real click target. */
 input[type=text],input[type=time],input[type=url],input[type=password],input[type=number],
-input[type=date],input[type=search],input[type=email],input:not([type]),select,textarea{min-height:28px;}
+input[type=date],input[type=search],input[type=email],input:not([type]),select,textarea{min-height:28px;font-size:inherit;}
 /* AUDIT-2026-08 G5: the UA default checkbox/radio is 13x13. Where one sits inside a
    a label element carrying text, that label is the real click target and clears 28px;
    a bare one in a table cell does not, so raise the control itself and give any
@@ -5767,7 +5767,7 @@ async function scLoadScopeMap(){
       const chips=(w.squadrons||[]).map(s=>{
         const sArchived=s.is_archived===true;
         const archiveOrRestoreBtn=sArchived
-          ?`<button style="font-size:var(--fs-3xs);padding:1px 4px;margin-left:4px;background:transparent;border:1px solid #bbb;cursor:pointer;border-radius:3px;line-height:1" onclick="scRestoreSquadron('${s.id}','${esc(s.name||s.id)}')">Restore</button>`
+          ?`<button class="btn-icon" style="font-size:var(--fs-3xs);padding:2px 8px;margin-left:4px;background:transparent;border:1px solid #bbb;cursor:pointer;border-radius:3px;line-height:1" onclick="scRestoreSquadron('${s.id}','${esc(s.name||s.id)}')">Restore</button>`
           :`<button style="font-size:var(--fs-3xs);padding:1px 4px;margin-left:4px;background:transparent;border:1px solid #bbb;cursor:pointer;border-radius:3px;line-height:1" onclick="scArchiveSquadron('${s.id}','${esc(s.name||s.id)}')">Archive</button>`;
         return `<span class="sc-sqn-chip${sArchived?' inactive':''}" title="${esc(s.unit_type||'')}">
           ${esc(s.name||s.id)}${sArchived?' <span class="muted" style="font-size:var(--fs-3xs)">(archived)</span>':''}

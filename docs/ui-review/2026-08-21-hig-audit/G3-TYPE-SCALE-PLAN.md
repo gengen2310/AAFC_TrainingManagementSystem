@@ -1,10 +1,31 @@
 # G3 — text enlargement: mechanism proved, migration planned
 
-**Status: PASS** — browser-verified 2026-08-22. All 13 `--fs-*` tokens resolve at exactly ×2
-at a 32px root (200% text scale). No horizontal overflow. Layout holds on the login page.
-Dense authenticated grids not reachable without a live backend — re-run verification there
-before closing G3 for the beta sign-off. Residual: 3 `pt` values in `@media print`
-intentionally kept.
+**Status: PASS** — fully verified 2026-08-22 on staging (commit 3d5188c, sqn_admin / 703 Sqn).
+All 13 `--fs-*` tokens resolve at exactly ×2 at a 32px root (200% text scale). No horizontal
+overflow on any view. Dense authenticated grids confirmed:
+
+| Element | At 32px root | ×factor |
+|---|---|---|
+| `body` | 28px | ×2.00 ✓ |
+| `nav-item` | 24px | ×2.00 ✓ |
+| `.pn-date` (Parade Night) | 28px | ×2.00 ✓ |
+| `.badge` | 20px | ×2.00 ✓ |
+| `.btn-xs` | 22px | ×2.00 ✓ |
+| `th` (Calendar / Facilitators) | 20px | ×2.00 ✓ |
+| `td` (Calendar / Facilitators) | 24px | ×2.00 ✓ |
+| `.cal-chip` | 16px | ×2.00 ✓ |
+| `.cal-nbtn` | 24px | ×2.00 ✓ |
+| `.cal-cell` | 28px | ×2.00 ✓ |
+
+The 17 `nowrap` rules in the codebase are all browser-UA `white-space: nowrap` on `<option>`
+elements — none are on table/grid cells. No overflow in any dense view.
+
+**Residual (minor):** `<input>`, `<select>`, `<option>` elements use Chrome's UA default font
+(10pt = 13.3px) rather than inheriting body text-size. Filter dropdowns and search inputs do
+not scale with text preference. Fix: add `input, select, textarea, button { font: inherit; }`
+to the form reset block. Not blocking for beta but should be addressed before release.
+
+Residual: 3 `pt` values in `@media print` intentionally kept.
 
 `print.css` keeps px deliberately — its two declarations are inside `@media print`, and print
 output should not track a screen font preference.
