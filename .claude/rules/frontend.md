@@ -116,7 +116,11 @@ default action.
 
 ## API calls
 
-- Use the `api(method, path, body)` helper — handles cookie auth and JSON
+- Use the `api(path, opts)` helper — handles cookie auth and JSON. **The signature is
+  `api(path, opts = {})`, path first**, matching `fetch`; `opts` takes `method`, `body`
+  (plain objects are auto-serialised), and `headers`. Writing `api('GET', path)` sends the
+  request to the relative URL `GET` and silently fails — this had broken the Service Desk
+  ticket list and ticket save until 2026-08-22.
 - Handle errors with `apiErr(e)` for user-visible messages
 - Do not hard-code API base URL — `API_BASE` is resolved at runtime
 

@@ -2337,7 +2337,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       </div>
 
       <!-- ── Service Desk page ── -->
-      <div id="page-service-desk" class="page" style="display:none">
+      <div id="page-service-desk" class="page">
         <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-md)">
           <h1>Service Desk</h1>
           <button class="btn btn-primary" onclick="sdOpenModal(S && ['sqn_admin','sqn_general'].includes(S.role) ? S.squadron_id : null)">
@@ -17120,7 +17120,7 @@ async function loadServiceDesk() {
   tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);font-size:var(--fs-sm)">Loading…</td></tr>';
 
   try {
-    const r = await api('GET', '/api/service-desk/tickets');
+    const r = await api('/api/service-desk/tickets');
     _sdAllTickets = r;
     sdRenderList();
   } catch (e) {
@@ -17270,7 +17270,7 @@ async function sdSave(ticketId) {
   };
 
   try {
-    await api('PATCH', `/api/service-desk/tickets/${ticketId}`, body);
+    await api(`/api/service-desk/tickets/${ticketId}`, {method:'PATCH', body});
     const t = _sdAllTickets.find(x => x.ticket_id === ticketId);
     if (t) {
       if (body.status) t.status = body.status;
