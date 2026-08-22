@@ -340,6 +340,19 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
   background:var(--surface);white-space:nowrap;
 }
 .yn-empty{color:var(--muted);font-size:var(--fs-sm);padding:14px 0;}
+/* Referenced by the training-class table header; this file had no definition. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;}
+/* E2: training-class table — progress and size in one row. */
+.cls-table td,.cls-table th{vertical-align:middle;}
+.cls-table .cls-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;
+  font-size:var(--fs-xs);}
+.cls-table .cls-prog{width:38%;min-width:110px;}
+.cls-table .cls-name{padding-left:22px;font-size:var(--fs-xs);color:var(--text-2);}
+.cls-table .cls-stage-row th{font-size:var(--fs-xs);font-weight:800;color:var(--text);text-align:left;}
+.cls-table .cls-stage-row td,.cls-table .cls-stage-row th{border-top:1px solid var(--border);}
+.cls-flag{font-size:var(--fs-3xs);font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--red);white-space:nowrap;}
 @media(max-width:560px){
   .yn-year-acts{margin-left:0;width:100%;}
   .yn-year-id{min-width:0;}
@@ -1325,6 +1338,20 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
         <!-- ══════════ A. TONIGHT ══════════ -->
         <div class="dash-section dash-sec-hero">
+        <!-- E4: Quick Actions was the last card on a 12-screen page, so the
+             actions people come here to take sat below everything they came
+             here to read. Moved above section A. -->
+        <div class="card no-print">
+          <div class="ctitle">Quick Actions</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-dk" onclick="openModal('m-add-pn')">+ Parade Night</button>
+            <button class="btn btn-sky" onclick="nav('calendar')">Calendar</button>
+            <button class="btn btn-out" onclick="nav('action-items')">Needs Attention</button>
+            <button class="btn btn-out" onclick="nav('weekly-program')">Weekly Program</button>
+            <button class="btn btn-out admin-el" style="display:none" onclick="openAddCurr()">+ Add Curriculum</button>
+            <button class="btn btn-out" id="btn-load-strategic" onclick="_loadDashStrategic()" title="Load resilience and long-term charts">Load Resilience Charts ↓</button>
+          </div>
+        </div>
           <div class="dash-sec-hdr">A — Tonight &amp; This Week</div>
           <div class="dash-sec-sub">Readiness for the next parade night and upcoming staffing issues.</div>
           <div id="dash-tonight-section"><div class="card"><div class="chart-skeleton"></div></div></div>
@@ -1362,7 +1389,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             </div>
           </div>
           <div class="card" id="card-delivery-forecast" style="display:none">
-            <div class="ctitle">Delivery forecast — end of year <button class="ht" tabindex="0" aria-label="About delivery forecast" data-tip="Projects remaining planned sessions against your year-to-date delivery rate. Deterministic: forecast = remaining planned × historical rate. No AI scoring.">?</button></div>
+            <div class="ctitle">Delivery forecast <button class="ht" tabindex="0" aria-label="About delivery forecast" data-tip="Projects remaining planned sessions against your year-to-date delivery rate. Deterministic: forecast = remaining planned × historical rate. No AI scoring.">?</button></div>
             <div class="ssub" style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px">At your current rate, how many planned sessions are at risk of not being delivered by year end?</div>
             <div id="chart-delivery-forecast"><div class="chart-skeleton" style="height:60px"></div></div>
             <div id="insight-delivery-forecast" class="chart-insight" style="display:none"></div>
@@ -1388,20 +1415,16 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <div id="chart-element-curriculum-progress"><div class="chart-skeleton" style="height:160px"></div></div>
             <div id="insight-element-curriculum-progress" class="chart-insight" style="display:none"></div>
           </div>
-          <!-- CLASS-07: class-level progress — only visible when Training Classes exist for this squadron/year;
-               the backend returns charts.class_curriculum_progress with an empty data array (no chart) when no
-               classes are configured, so the card is hidden until classes exist. -->
-          <div class="card" id="card-class-curriculum-progress" style="display:none">
-            <div class="ctitle">Progress by Training Class</div>
+          <!-- E2: "Progress by Training Class" and "Training Class sizes" were two
+               cards over the same 21 rows, 2,373px each, one after the other. They are
+               one table now, with the cadet count as a column beside the progress it
+               belongs next to. Both API fields are still consumed and both insight
+               containers are preserved. Hidden until Training Classes exist. -->
+          <div class="card" id="card-class-overview" style="display:none">
+            <div class="ctitle">Training classes</div>
             <div class="ssub" id="exp-class-curriculum-progress" style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px"></div>
-            <div id="chart-class-curriculum-progress"><div class="chart-skeleton" style="height:120px"></div></div>
+            <div id="chart-class-overview"><div class="chart-skeleton" style="height:120px"></div></div>
             <div id="insight-class-curriculum-progress" class="chart-insight" style="display:none"></div>
-          </div>
-          <!-- Phase 6 analytics: class size distribution — hidden until Training Classes exist -->
-          <div class="card" id="card-class-enrollment" style="display:none">
-            <div class="ctitle">Training Class sizes</div>
-            <div class="ssub" style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px">Expected cadet count per class — use to check balance across parallel classes and match room capacity.</div>
-            <div id="chart-class-enrollment"><div class="chart-skeleton" style="height:80px"></div></div>
             <div id="insight-class-enrollment" class="chart-insight" style="display:none"></div>
           </div>
           <div class="dash-grid">
@@ -1505,18 +1528,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </div>
         </div>
 
-        <!-- Quick Actions -->
-        <div class="card no-print">
-          <div class="ctitle">Quick Actions</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-dk" onclick="openModal('m-add-pn')">+ Parade Night</button>
-            <button class="btn btn-sky" onclick="nav('calendar')">Calendar</button>
-            <button class="btn btn-out" onclick="nav('action-items')">Needs Attention</button>
-            <button class="btn btn-out" onclick="nav('weekly-program')">Weekly Program</button>
-            <button class="btn btn-out admin-el" style="display:none" onclick="openAddCurr()">+ Add Curriculum</button>
-            <button class="btn btn-out" id="btn-load-strategic" onclick="_loadDashStrategic()" title="Load resilience and long-term charts">Load Resilience Charts ↓</button>
-          </div>
-        </div>
       </div>
 
       <!-- CALENDAR -->
@@ -4969,7 +4980,17 @@ async function loadData(){
       // stayed empty until the planning page happened to load. The Training
       // Calendar's year selector is built from it, which is why a newly created
       // year did not appear there.
-      if(typeof P!=='undefined') P.years=years||[];
+      if(typeof P!=='undefined'){
+        P.years=years||[];
+        // YR-4: P.currentYearId was only ever set by _loadPlanningYears(), which
+        // runs when the planning page opens. At boot it stayed null, so the
+        // Dashboard showed "No active training year" while the unit had active
+        // years, and the calendar had no training year to follow.
+        if(!P.currentYearId && P.years.length && typeof _pickDefaultYear==='function'){
+          const d=_pickDefaultYear(P.years);
+          if(d){ P.currentYearId=d.planning_year_id; P.currentYearInt=d.year; }
+        }
+      }
       const activeIds=(years||[]).filter(y=>y.active_status).map(y=>y.planning_year_id);
       const lists=await Promise.all(activeIds.map(id=>api('/api/planning/years/'+id+'/holidays').catch(()=>[])));
       return lists.flat();
@@ -7934,7 +7955,15 @@ function fmtD(s,o){return s?new Date(s+'T00:00:00').toLocaleDateString('en-AU',o
 function fmtDL(s){return s?new Date(s+'T00:00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'—';}
 function today(){const d=new Date();d.setHours(0,0,0,0);return d;}
 
-const EL_L={Drill:'Drill',Air_Space:'Air & Space',Field:'Field Skills',Personal_Dev:'Personal Dev',Service_Community:'Service & Comm',SQN_Affairs:'SQN Affairs'};
+const EL_L={Drill:'Drill',Air_Space:'Air & Space',Field:'Field Skills',Personal_Dev:'Personal Dev',Service_Community:'Service & Comm',SQN_Affairs:'SQN Affairs'}
+// E3: the backend sends element codes (Air_Space, Personal_Dev, SQN_Affairs) as
+// chart labels. EL_L has mapped them to readable names all along but was only
+// applied by elBadge() and the facilitator list, so the Dashboard printed the
+// raw codes -- 7 of them on screen at once.
+function _dLabel(v){
+  const k=String(v==null?'':v);
+  return (typeof EL_L!=='undefined'&&EL_L[k])?EL_L[k]:k;
+};
 const EL_C={Drill:'b-red',Air_Space:'b-blue',Field:'b-ok',Personal_Dev:'b-purple',Service_Community:'b-amber',SQN_Affairs:'b-teal'};
 const PH_S={'A. Orientation':'Orientation','B. Initial':'Initial','C. Junior':'Junior','D. Intermediate':'Intermediate','E. Senior':'Senior','I. Bronze':'Bronze CLP','J. Silver':'Silver CLP','K. Gold':'Gold CLP'};
 const PH_C={'A. Orientation':'ph-ori','B. Initial':'ph-ini','C. Junior':'ph-jun','D. Intermediate':'ph-int','E. Senior':'ph-sen','I. Bronze':'ph-bro','J. Silver':'ph-sil','K. Gold':'ph-gld'};
@@ -8044,7 +8073,7 @@ function _chartHBar(chart){
     // (muted dashed bar, "ⓘ" prefix), not styled like a genuine cause.
     const isGap=!!r.data_quality_gap;
     return `<div class="ph-row" style="margin-bottom:5px" role="img" aria-label="${esc(lbl)}: ${lblFor(r)}" ${drill}>
-      <div class="ph-name" style="min-width:110px;font-size:var(--fs-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isGap?'font-style:italic;color:var(--muted)':''}" title="${esc(r.label||r.name||'')}">${isGap?'ⓘ ':''}${esc(lbl)}</div>
+      <div class="ph-name" style="min-width:110px;font-size:var(--fs-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isGap?'font-style:italic;color:var(--muted)':''}" title="${esc(r.label||r.name||'')}">${isGap?'ⓘ ':''}${esc(_dLabel(lbl))}</div>
       <div class="ph-bar" style="flex:1"><div class="pbar" style="${isGap?'border:1px dashed var(--muted)':''}"><div style="height:100%;width:${w}%;background:${isGap?'var(--muted)':colorFor(r)};border-radius:3px;transition:width .3s" title="${lblFor(r)}"></div></div></div>
       <div class="ph-cnt" style="min-width:52px;text-align:right;font-size:var(--fs-xs);color:var(--muted)">${lblFor(r)}</div>
     </div>`;
@@ -8054,6 +8083,60 @@ function _chartHBar(chart){
 // CLASS-07: Training Class curriculum progress — stage aggregate with per-class breakdown.
 // data rows: {stage, stage_id, class_count, coverage_pct, delivered, total, classes:[{display_name,delivered,total,coverage_pct}]}
 // Classes whose coverage_pct is ≥15pp below the stage aggregate are flagged NEEDS ATTENTION.
+// E2: one table over the training classes, merging curriculum progress with
+// expected size. Previously two cards rendered the same 21 rows one after the
+// other, 2,373px each, so comparing a class's progress against its size meant
+// scrolling between them. Keyed on stage + class name, which is what both
+// payloads are grouped by.
+function _chartClassTable(progressChart, enrollmentChart){
+  const pRows=(progressChart&&progressChart.data)||[];
+  const eRows=(enrollmentChart&&enrollmentChart.data)||[];
+  if(!pRows.length&&!eRows.length){
+    return _dEmptyChart('No Training Classes configured for this squadron and year.');
+  }
+  // expected_count by "stage||class"
+  const counts={};
+  eRows.forEach(function(r){
+    (r.classes||[]).forEach(function(c){ counts[(r.stage||'')+'||'+(c.display_name||'')]=c.expected_count; });
+  });
+  const stageTotals={};
+  eRows.forEach(function(r){ stageTotals[r.stage||'']=r.total_expected; });
+
+  const pct=function(v){return v==null?'\u2014':Math.round(v)+'%';};
+  const col=function(v){return v==null?'var(--muted)':v>=80?'var(--ok)':v>=60?'var(--warn)':'var(--red)';};
+
+  let body='';
+  const source = pRows.length?pRows:eRows;
+  source.forEach(function(row){
+    const stage=row.stage||'Unnamed stage';
+    const agg=row.coverage_pct!=null?row.coverage_pct:null;
+    const total=stageTotals[stage];
+    body+='<tr class="cls-stage-row">'
+      + '<th scope="rowgroup">'+esc(stage)+'</th>'
+      + '<td class="cls-num">'+(total!=null?esc(String(total)):'\u2014')+'</td>'
+      + '<td class="cls-prog"><div class="pbar"><div style="height:100%;width:'+(agg!=null?Math.round(agg):0)+'%;background:'+col(agg)+';border-radius:3px"></div></div></td>'
+      + '<td class="cls-num" style="color:'+col(agg)+'">'+pct(agg)+'</td>'
+      + '<td></td></tr>';
+    (row.classes||[]).forEach(function(cls){
+      const nm=cls.display_name||'';
+      const v=cls.coverage_pct;
+      const n=counts[stage+'||'+nm];
+      const behind=agg!=null&&v!=null&&v<=agg-15;
+      body+='<tr>'
+        + '<td class="cls-name">'+esc(nm)+'</td>'
+        + '<td class="cls-num">'+(n!=null?esc(String(n)):'\u2014')+'</td>'
+        + '<td class="cls-prog"><div class="pbar"><div style="height:100%;width:'+(v!=null?Math.round(v):0)+'%;background:'+col(v)+';border-radius:3px"></div></div></td>'
+        + '<td class="cls-num" style="color:'+col(v)+'">'+pct(v)+'</td>'
+        + '<td>'+(behind?'<span class="cls-flag">Needs attention</span>':'')+'</td>'
+        + '</tr>';
+    });
+  });
+  return '<div class="tw"><table class="data-table cls-table">'
+    + '<thead><tr><th scope="col">Training class</th><th scope="col" class="cls-num">Cadets</th>'
+    + '<th scope="col" colspan="2">Curriculum progress</th><th scope="col"><span class="sr-only">Status</span></th></tr></thead>'
+    + '<tbody>'+body+'</tbody></table></div>';
+}
+
 function _chartClassProgress(chart){
   const rows=chart.data||[];
   if(!rows.length)return _dEmptyChart('No Training Classes configured for this squadron and year.');
@@ -8148,7 +8231,7 @@ function _chartStackedBarH(chart){
     const name=row.phase?(PH_S[row.phase]||row.phase):(row.element||row.label||'—');
     const pctDel=total?Math.round((+(row.delivered)||0)/total*100):0;
     html+=`<div class="ph-row" style="margin-bottom:6px" role="img" aria-label="${esc(name)}: ${pctDel}% delivered">
-      <div class="ph-name" style="min-width:84px;font-size:var(--fs-2xs)">${esc(name.substring(0,14))}</div>
+      <div class="ph-name" style="min-width:84px;font-size:var(--fs-2xs)">${esc(_dLabel(name).substring(0,14))}</div>
       <div class="ph-bar" style="flex:1">
         <div style="display:flex;height:14px;border-radius:3px;overflow:hidden;background:var(--bg)">
           ${series.map(s=>{const v=+(row[s.key])||0;return v?`<div style="flex:${v};background:${s.color};height:100%" title="${esc(s.label)}: ${v}"></div>`:''}).join('')}
@@ -8329,15 +8412,40 @@ function _chartGroupedBar(chart){
 }
 
 // Internal: render a chart into a container div
+// E5: this is the screen-reader fallback for every chart, and it was built by
+// dumping raw object keys -- "coverage pct", "total items", "stage id" -- and
+// every value, including UUIDs no reader can use. Keys now go through a label
+// map, identifier-ish columns are dropped, and percentages get their unit.
+const _CHART_COL_LABELS={
+  label:'Item', name:'Name', count:'Sessions', pct:'Share', total:'Total',
+  total_items:'Curriculum items', coverage_pct:'Coverage', cumulative_pct:'Cumulative',
+  delivered:'Delivered', delivered_with_issue:'Delivered with issue',
+  not_delivered:'Not delivered', cancelled:'Cancelled', cancelled_late:'Cancelled late',
+  rescheduled:'Rescheduled', planned:'Planned', status:'Status', phase:'Phase',
+  element:'Element', stage:'Training stage', expected_count:'Cadets',
+  total_expected:'Cadets', display_name:'Training class',
+};
+const _CHART_PCT_COLS=new Set(['pct','coverage_pct','cumulative_pct']);
 function _chartAccessibleTable(chart){
   const rows=chart.data||[];if(!rows.length)return'';
+  // Drop identifiers and nested structures -- an id is not information to a
+  // person reading the table aloud.
   const skip=new Set(['drill_id','data_quality_gap','color','classes']);
-  const keys=Object.keys(rows[0]||{}).filter(k=>!skip.has(k));if(!keys.length)return'';
+  const isIdKey=k=>/(^|_)id$/.test(k)||/_id$/.test(k)||k==='id';
+  const keys=Object.keys(rows[0]||{}).filter(k=>!skip.has(k)&&!isIdKey(k));
+  if(!keys.length)return'';
   const title=esc(chart.title||'Chart data');
-  const thead='<tr>'+keys.map(k=>`<th scope="col">${esc(k.replace(/_/g,' '))}</th>`).join('')+'</tr>';
-  const tbody=rows.map(r=>'<tr>'+keys.map(k=>`<td>${esc(String(r[k]??'—'))}</td>`).join('')+'</tr>').join('');
+  const head=k=>_CHART_COL_LABELS[k]||(k.charAt(0).toUpperCase()+k.slice(1).replace(/_/g,' '));
+  const cell=(k,v)=>{
+    if(v===null||v===undefined||v==='')return '\u2014';
+    if(_CHART_PCT_COLS.has(k))return esc(String(v))+'%';
+    if(k==='label'||k==='name'||k==='element')return esc(_dLabel(v));
+    return esc(String(v));
+  };
+  const thead='<tr>'+keys.map(k=>`<th scope="col">${esc(head(k))}</th>`).join('')+'</tr>';
+  const tbody=rows.map(r=>'<tr>'+keys.map(k=>`<td>${cell(k,r[k])}</td>`).join('')+'</tr>').join('');
   return`<details class="chart-data-toggle">
-    <summary>Show data table — ${title}</summary>
+    <summary>Show data table \u2014 ${title}</summary>
     <div class="tw" style="margin-top:6px;font-size:var(--fs-xs)">
       <table aria-label="${title} data table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>
     </div>
@@ -8533,15 +8641,16 @@ async function loadDashCharts(){
   _dSetExp('exp-curriculum-progress',charts.curriculum_progress?.explanation);
   _dRenderChart('chart-element-curriculum-progress',charts.element_curriculum_progress,_chartStackedBarH,'insight-element-curriculum-progress');
   _dSetExp('exp-element-curriculum-progress',charts.element_curriculum_progress?.explanation);
-  // CLASS-07: show/hide the class-progress card based on whether classes exist.
-  const clsCard=document.getElementById('card-class-curriculum-progress');
-  if(clsCard){const hasClasses=(charts.class_curriculum_progress?.data||[]).length>0;clsCard.style.display=hasClasses?'':'none';}
-  _dRenderChart('chart-class-curriculum-progress',charts.class_curriculum_progress,_chartClassProgress,'insight-class-curriculum-progress');
+  // E2/CLASS-07: one card over both payloads. Shown when either has classes.
+  const clsCard=document.getElementById('card-class-overview');
+  const hasProg=(charts.class_curriculum_progress?.data||[]).length>0;
+  const hasCE=(charts.class_enrollment?.data||[]).length>0;
+  if(clsCard) clsCard.style.display=(hasProg||hasCE)?'':'none';
+  const clsHost=document.getElementById('chart-class-overview');
+  if(clsHost) clsHost.innerHTML=_chartClassTable(charts.class_curriculum_progress,charts.class_enrollment);
   _dSetExp('exp-class-curriculum-progress',charts.class_curriculum_progress?.explanation);
-  // Phase 6: class enrollment distribution — show card only when classes exist
-  const ceCard=document.getElementById('card-class-enrollment');
-  if(ceCard){const hasCE=(charts.class_enrollment?.data||[]).length>0;ceCard.style.display=hasCE?'':'none';}
-  _dRenderChart('chart-class-enrollment',charts.class_enrollment,_chartClassEnrollment,'insight-class-enrollment');
+  if(charts.class_curriculum_progress?.insight) _dSetInsight('insight-class-curriculum-progress',charts.class_curriculum_progress.insight);
+  if(charts.class_enrollment?.insight) _dSetInsight('insight-class-enrollment',charts.class_enrollment.insight);
   _dRenderChart('chart-curriculum-backlog',charts.curriculum_backlog,_chartHBar,'insight-curriculum-backlog');
   _dRenderChart('chart-facilitator-workload',charts.facilitator_workload,_chartHBar,'insight-facilitator-workload');
 
@@ -13784,7 +13893,7 @@ function _chartStackedBar100(chart){
   rows.forEach(row=>{
     const total=row.total||0;
     html+=`<div class="ph-row" style="margin-bottom:6px" role="img" aria-label="${esc(row.label)}: ${total} sessions">
-      <div class="ph-name" style="min-width:70px;font-size:var(--fs-xs)">${esc(row.label)}</div>
+      <div class="ph-name" style="min-width:70px;font-size:var(--fs-xs)">${esc(_dLabel(row.label))}</div>
       <div class="ph-bar" style="flex:1">
         <div style="display:flex;height:16px;border-radius:3px;overflow:hidden;background:var(--bg)">
           ${total?series.map(s=>{const pct=(row.pct&&row.pct[s.key])||0;return pct?`<div style="flex:${pct};background:${s.color};height:100%" title="${esc(s.label)}: ${row.counts[s.key]} (${pct}%)"></div>`:'';}).join(''):'<div style="flex:1;background:var(--lgrey)" title="No sessions"></div>'}
@@ -13806,7 +13915,7 @@ function _renderPareto(chart){
     const isGap=!!r.data_quality_gap;
     const drill=r.drill_id?`onclick="drillDashChart('${esc(chart.chart_id)}','${esc(r.drill_id)}')" style="cursor:pointer"`:'';
     return `<div class="ph-row" style="margin-bottom:5px" role="img" aria-label="${esc(r.label)}: ${r.count}, cumulative ${r.cumulative_pct}%" ${drill}>
-      <div class="ph-name" style="min-width:130px;font-size:var(--fs-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isGap?'font-style:italic;color:var(--muted)':''}" title="${esc(r.label)}">${isGap?'ⓘ ':''}${esc(r.label.substring(0,40))}</div>
+      <div class="ph-name" style="min-width:130px;font-size:var(--fs-xs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isGap?'font-style:italic;color:var(--muted)':''}" title="${esc(r.label)}">${isGap?'ⓘ ':''}${esc(_dLabel(r.label).substring(0,40))}</div>
       <div class="ph-bar" style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${isGap?'var(--muted)':'var(--royal)'};border-radius:3px"></div></div></div>
       <div class="ph-cnt" style="min-width:96px;text-align:right;font-size:var(--fs-2xs);color:var(--muted)">${r.count} · cum. ${r.cumulative_pct}%</div>
     </div>`;
