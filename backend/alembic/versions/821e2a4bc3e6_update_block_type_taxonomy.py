@@ -45,10 +45,22 @@ def upgrade():
                   sqlite_where=sa.text('NOT is_archived'))
     op.create_index(op.f('ix_parade_night_timing_overrides_parade_night_id'),
                     'parade_night_timing_overrides', ['parade_night_id'], unique=False)
-    op.add_column('service_desk_email_configs',
-                  sa.Column('created_by', sa.String(length=36), nullable=True))
-    op.add_column('service_desk_email_configs',
-                  sa.Column('updated_by', sa.String(length=36), nullable=True))
+    # Guard: v45 (3197cd57cd98) already adds created_by/updated_by on PostgreSQL staging;
+    # autogenerate produced these as new due to local SQLite schema drift.
+    existing_cols = {c['name'] for c in sa.inspect(conn).get_columns('service_desk_email_configs')}
+    if 'created_by' not in existing_cols:
+        op.add_column('service_desk_email_configs',
+                      sa.Column('created_by', sa.String(length=36), nullable=True))
+    if 'updated_by' not in existing_cols:
+        op.add_column('service_desk_email_configs',
+                      sa.Column('updated_by', sa.String(length=36), nullable=True))
+    # Backfill NULLs before SET NOT NULL — guards against rows inserted with nullable timestamps.
+    conn.execute(sa.text(
+        "UPDATE service_desk_email_configs SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL"
+    ))
+    conn.execute(sa.text(
+        "UPDATE service_desk_email_configs SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL"
+    ))
     with op.batch_alter_table('service_desk_email_configs') as batch_op:
         batch_op.alter_column('created_at', existing_type=sa.DATETIME(), nullable=False)
         batch_op.alter_column('updated_at', existing_type=sa.DATETIME(), nullable=False)
