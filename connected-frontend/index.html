@@ -579,7 +579,11 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .pg-sec-lbl{font-size:var(--fs-2xs);font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
 
 /* ── PARADE NIGHT CARD ── */
-.pn-card{background:white;border-radius:8px;box-shadow:var(--sh);border-left:5px solid var(--blue);margin-bottom:12px;overflow:hidden;}
+.pn-card{background:white;border-radius:8px;box-shadow:var(--sh);border-left:5px solid var(--blue);margin-bottom:12px;overflow-x:auto;overflow-y:hidden;}
+/* AUDIT-2026-08 G10/1.4.10: overflow:hidden was here to clip the rounded corners against
+   the accent border, but it also swallowed any content wider than the card. At 200% text
+   that clipped 1,295 elements with no way to reach them. overflow-x:auto keeps the vertical
+   clip and makes wide content scrollable in its own container instead of vanishing. */
 .pn-term-group{margin-bottom:8px;}
 .pn-term-hdr{font-size:var(--fs-xs);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:8px 0 6px;border-bottom:1px solid var(--border-light);margin-bottom:8px;}
 .pn-hdr{background:linear-gradient(90deg,var(--dark) 0%,var(--royal) 100%);color:white;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px;}
