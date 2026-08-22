@@ -1,10 +1,10 @@
 # G3 — text enlargement: mechanism proved, migration planned
 
-**Status:** Planning Workspace stylesheets **done** — `tokens.css`, `base.css`,
-`components.css`, `layout.css`, `planning.css`. Planning Workspace `.tsx` props **done** — 373
-converted (56c45f9). Main TMS `connected-frontend/index.html` **done** — stylesheet and inline
-both converted; 3 `pt` declarations in `@media print` intentionally left. G3 is **PASS** pending
-browser verification at 200% text scale.
+**Status: PASS** — browser-verified 2026-08-22. All 13 `--fs-*` tokens resolve at exactly ×2
+at a 32px root (200% text scale). No horizontal overflow. Layout holds on the login page.
+Dense authenticated grids not reachable without a live backend — re-run verification there
+before closing G3 for the beta sign-off. Residual: 3 `pt` values in `@media print`
+intentionally kept.
 
 `print.css` keeps px deliberately — its two declarations are inside `@media print`, and print
 output should not track a screen font preference.
