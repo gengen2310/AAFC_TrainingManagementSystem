@@ -34,7 +34,7 @@ def upgrade():
     )).fetchall()
     for row_id, block_type, is_ip in rows:
         new_type = _TYPE_MAP.get(block_type, block_type)
-        new_ip = 1 if new_type in _SCHEDULABLE else 0
+        new_ip = new_type in _SCHEDULABLE
         conn.execute(sa.text(
             "UPDATE timing_blocks SET block_type=:bt, is_instructional_period=:ip WHERE id=:id"
         ), {"bt": new_type, "ip": new_ip, "id": row_id})
