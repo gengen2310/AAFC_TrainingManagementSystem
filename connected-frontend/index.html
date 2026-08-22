@@ -1493,7 +1493,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <option value="cancelled">Cancelled</option><option value="rescheduled">Rescheduled</option>
             <option value="not_delivered">Not Delivered</option>
           </select>
-          <input id="pn-search" placeholder="Search sessions…" oninput="renderPN()" style="min-width:160px;">
+          <input id="pn-search" placeholder="Search sessions…" oninput="renderPN()" style="min-width:160px;" aria-label="Search sessions">
         </div>
         <div id="pn-bulk-bar" class="no-print" style="display:none;background:var(--surface-2);border:1.5px solid var(--blue);border-radius:8px;padding:10px 14px;margin-bottom:12px;align-items:center;gap:12px;flex-wrap:wrap">
           <span id="pn-bulk-count" style="font-weight:700;font-size:var(--fs-base);color:var(--dark)"></span>
@@ -1525,7 +1525,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </div>
         </div>
         <div class="fbar no-print">
-          <input id="wp-search" placeholder="Search facilitator, room, curriculum item…" oninput="renderWP()" style="min-width:220px">
+          <input id="wp-search" placeholder="Search facilitator, room, curriculum item…" oninput="renderWP()" style="min-width:220px" aria-label="Search facilitator, room, curriculum item">
           <select id="wp-f-status" aria-label="Filter Weekly Program by status" onchange="renderWP()">
             <option value="all">All Statuses</option>
             <option value="planned">Planned</option><option value="delivered">Delivered</option>
@@ -1570,7 +1570,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <select id="cm-stage-filter" aria-label="Filter matrix by stage" onchange="_renderCurrMatrix()">
               <option value="all">All Stages</option>
             </select>
-            <input id="cm-search" placeholder="Search items…" oninput="_renderCurrMatrix()" style="min-width:160px">
+            <input id="cm-search" placeholder="Search items…" oninput="_renderCurrMatrix()" style="min-width:160px" aria-label="Search items">
             <label style="display:flex;align-items:center;gap:5px;font-size:var(--fs-sm);white-space:nowrap">
               <input type="checkbox" id="cm-action-only" onchange="_renderCurrMatrix()"> Action required only
             </label>
@@ -1594,7 +1594,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <option value="cancelled">Cancelled</option>
             <option value="unscheduled">Unscheduled</option>
           </select>
-          <input id="curr-search" placeholder="Search curriculum…" oninput="renderCurr()" style="min-width:180px;">
+          <input id="curr-search" placeholder="Search curriculum…" oninput="renderCurr()" style="min-width:180px;" aria-label="Search curriculum">
           <label style="display:flex;align-items:center;gap:5px;font-size:var(--fs-sm);color:var(--steel);white-space:nowrap">
             <input type="checkbox" id="curr-f-nolh" onchange="renderCurr()"> Missing Learning Hub link
           </label>
@@ -1643,7 +1643,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <option value="Optional">Optional</option>
             <option value="Holiday">Holidays</option>
           </select>
-          <input id="act-search" placeholder="Search activities…" oninput="renderActs()" style="min-width:180px;">
+          <input id="act-search" placeholder="Search activities…" oninput="renderActs()" style="min-width:180px;" aria-label="Search activities">
         </div>
         <div class="tw">
           <table>
@@ -1669,7 +1669,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div class="ph-actions no-print">
             <span id="fac-refresh-status" style="font-size:var(--fs-2xs);color:var(--muted)"></span>
             <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('fac-refresh-status',async()=>{await loadData();renderFacs();await loadFacilitatorStats();})">Refresh</button>
-            <input id="fac-search" placeholder="Search name or rank…" oninput="renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:var(--fs-sm);margin-right:8px;min-width:160px">
+            <input id="fac-search" placeholder="Search name or rank…" oninput="renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:var(--fs-sm);margin-right:8px;min-width:160px" aria-label="Search name or rank">
             <select id="fac-filter" aria-label="Filter facilitators by subject area" onchange="S.facFilter=this.value;renderFacs()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:var(--fs-sm);margin-right:8px">
               <option value="">All subject areas</option>
             </select>
@@ -2881,7 +2881,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div id="wiz-step-2" style="display:none">
         <div class="wiz-q">What curriculum item will be delivered?</div>
         <p class="wiz-hint">Choose from the list or leave blank for a custom session.</p>
-        <input id="wiz-curr-search" placeholder="Search curriculum items…" oninput="_wizFilterCurr()" style="width:100%;margin-bottom:6px">
+        <input id="wiz-curr-search" placeholder="Search curriculum items…" oninput="_wizFilterCurr()" style="width:100%;margin-bottom:6px" aria-label="Search curriculum items">
         <div id="wiz-curr-list" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:6px"></div>
         <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:var(--fs-sm);cursor:pointer">
           <input type="checkbox" id="wiz-skip-curr" onchange="_wizSkipCurrChange()"> Custom title (type below)
@@ -10752,7 +10752,7 @@ function _actTabRender(containerId){
         <option value="all">All sources</option>
         ${[...new Set(st.items.map(i=>i.source))].map(s=>`<option value="${esc(s)}">${esc(_ACT_SOURCE_LABEL[s]||s)}</option>`).join('')}
       </select>
-      <input id="${containerId}-search" placeholder="Search…" oninput="_actTabRender('${containerId}')" style="min-width:160px">
+      <input id="${containerId}-search" placeholder="Search…" oninput="_actTabRender('${containerId}')" style="min-width:160px" aria-label="Search">
       <span style="margin-left:auto">${viewBtns}</span>
     </div>`;
 
