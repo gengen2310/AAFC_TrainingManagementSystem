@@ -308,8 +308,8 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
    3-column action table in the modal -- so the same objects looked like two
    different features. Built from the tokens the rest of the app already uses:
    --surface, --border, --dark, --blue, and the existing .yn-chip status pills. */
-.yn-year-list{display:flex;flex-direction:column;gap:8px;}
-.yn-year-row{
+.yn-year-list,.cp-list{display:flex;flex-direction:column;gap:8px;}
+.yn-year-row,.cp-row{
   display:flex;align-items:center;gap:14px;flex-wrap:wrap;
   background:var(--surface);border:1px solid var(--border);
   border-left:4px solid var(--border);border-radius:8px;padding:11px 14px;
@@ -328,7 +328,11 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .yn-year-meta{font-size:var(--fs-2xs);color:var(--muted);margin-top:2px;}
-.yn-year-acts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto;}
+.yn-year-acts,.cp-acts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto;}
+.cp-name{font-size:var(--fs-sm);font-weight:700;color:var(--text);}
+.cp-range{font-size:var(--fs-2xs);color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums;}
+.cp-date-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:460px){.cp-date-pair{grid-template-columns:1fr;}}
 .yn-current-tag{
   font-size:var(--fs-3xs);font-weight:800;letter-spacing:.06em;text-transform:uppercase;
   color:var(--royal);border:1px solid var(--blue);border-radius:10px;padding:2px 8px;
@@ -2008,6 +2012,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <div class="ctitle" style="margin:0">Custom Training Phases</div>
             <button class="btn btn-sky admin-el" onclick="cpOpenCreate()">+ Add Phase</button>
           </div>
+          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 12px">
+            Named stretches of the calendar that sit outside the normal terms &mdash; a pre-course
+            period or a camp block &mdash; so parade nights inside them are labelled correctly.
+          </p>
           <div id="settings-custom-phases-list"><p class="muted" style="font-size:var(--fs-xs)">Loading…</p></div>
         </div>
         <div class="card">
@@ -2804,32 +2812,59 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Add Custom Phase Modal (Task 10) -->
-<div class="modal-bg" id="m-add-custom-phase" role="dialog" aria-modal="true" aria-labelledby="m-add-custom-phase-title">
-  <div class="modal">
-    <h2 id="m-add-custom-phase-title">Add Custom Training Phase</h2>
-    <div class="form-group"><label for="cp-name-inp">Name *</label><input type="text" id="cp-name-inp" placeholder="e.g. Pre-Course Period"></div>
-    <div class="form-group"><label for="cp-from-inp">Applies From *</label><input type="date" id="cp-from-inp"></div>
-    <div class="form-group"><label for="cp-to-inp">Applies To <span style="font-weight:400;color:var(--muted)">(optional — leave blank for open-ended)</span></label><input type="date" id="cp-to-inp"></div>
-    <p id="cp-add-msg" style="color:var(--error);font-size:var(--fs-sm);margin-top:4px"></p>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal('m-add-custom-phase')">Cancel</button>
-      <button class="btn btn-primary" onclick="cpDoCreate()">Add</button>
+<div class="modal-bg" id="m-add-custom-phase" role="dialog" aria-modal="true" aria-labelledby="m-add-custom-phase-title" onclick="if(event.target===this)closeModal('m-add-custom-phase')">
+  <div class="modal" style="max-width:520px;width:96vw">
+    <div class="modal-hdr">
+      <span id="m-add-custom-phase-title" style="font-size:var(--fs-md);font-weight:800;letter-spacing:.03em">Add custom training phase</span>
+      <button class="modal-x" onclick="closeModal('m-add-custom-phase')" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="muted" style="font-size:var(--fs-xs);margin:0 0 16px">
+        A custom phase names a stretch of the calendar that sits outside the normal terms &mdash;
+        a pre-course period or a camp block, for example &mdash; so parade nights inside it are
+        labelled correctly.
+      </p>
+      <div class="form-group"><label for="cp-name-inp">Name</label>
+        <input type="text" id="cp-name-inp" placeholder="e.g. Pre-Course Period"></div>
+      <div class="cp-date-pair">
+        <div class="form-group" style="margin:0"><label for="cp-from-inp">Starts</label>
+          <input type="date" id="cp-from-inp"></div>
+        <div class="form-group" style="margin:0"><label for="cp-to-inp">Ends</label>
+          <input type="date" id="cp-to-inp"></div>
+      </div>
+      <p class="muted" style="font-size:var(--fs-2xs);margin:8px 0 0">Leave the end date blank for an open-ended phase.</p>
+      <p id="cp-add-msg" style="color:var(--red);font-size:var(--fs-sm);margin-top:10px"></p>
+      <div class="modal-actions" style="margin-top:18px">
+        <button class="btn btn-secondary" onclick="closeModal('m-add-custom-phase')">Cancel</button>
+        <button class="btn btn-primary" onclick="cpDoCreate()">Add phase</button>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- Edit Custom Phase Modal (Task 10) -->
-<div class="modal-bg" id="m-edit-custom-phase" role="dialog" aria-modal="true" aria-labelledby="m-edit-custom-phase-title">
-  <div class="modal">
-    <h2 id="m-edit-custom-phase-title">Edit Custom Training Phase</h2>
-    <input type="hidden" id="cp-edit-id">
-    <div class="form-group"><label for="cp-edit-name-inp">Name *</label><input type="text" id="cp-edit-name-inp"></div>
-    <div class="form-group"><label for="cp-edit-from-inp">Applies From *</label><input type="date" id="cp-edit-from-inp"></div>
-    <div class="form-group"><label for="cp-edit-to-inp">Applies To <span style="font-weight:400;color:var(--muted)">(optional — leave blank for open-ended)</span></label><input type="date" id="cp-edit-to-inp"></div>
-    <p id="cp-edit-msg" style="color:var(--error);font-size:var(--fs-sm);margin-top:4px"></p>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal('m-edit-custom-phase')">Cancel</button>
-      <button class="btn btn-primary" onclick="cpDoEdit()">Save</button>
+<div class="modal-bg" id="m-edit-custom-phase" role="dialog" aria-modal="true" aria-labelledby="m-edit-custom-phase-title" onclick="if(event.target===this)closeModal('m-edit-custom-phase')">
+  <div class="modal" style="max-width:520px;width:96vw">
+    <div class="modal-hdr">
+      <span id="m-edit-custom-phase-title" style="font-size:var(--fs-md);font-weight:800;letter-spacing:.03em">Edit custom training phase</span>
+      <button class="modal-x" onclick="closeModal('m-edit-custom-phase')" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cp-edit-id">
+      <div class="form-group"><label for="cp-edit-name-inp">Name</label>
+        <input type="text" id="cp-edit-name-inp"></div>
+      <div class="cp-date-pair">
+        <div class="form-group" style="margin:0"><label for="cp-edit-from-inp">Starts</label>
+          <input type="date" id="cp-edit-from-inp"></div>
+        <div class="form-group" style="margin:0"><label for="cp-edit-to-inp">Ends</label>
+          <input type="date" id="cp-edit-to-inp"></div>
+      </div>
+      <p class="muted" style="font-size:var(--fs-2xs);margin:8px 0 0">Leave the end date blank for an open-ended phase.</p>
+      <p id="cp-edit-msg" style="color:var(--red);font-size:var(--fs-sm);margin-top:10px"></p>
+      <div class="modal-actions" style="margin-top:18px">
+        <button class="btn btn-secondary" onclick="closeModal('m-edit-custom-phase')">Cancel</button>
+        <button class="btn btn-primary" onclick="cpDoEdit()">Save changes</button>
+      </div>
     </div>
   </div>
 </div>
@@ -3723,11 +3758,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 <!-- ROLL OVER YEAR MODAL -->
 <div class="modal-bg" id="m-rollover-year" role="dialog" aria-modal="true" aria-labelledby="m-rollover-title" onclick="if(event.target===this)closeModal('m-rollover-year')">
   <div class="modal" style="max-width:520px;width:96vw">
-    <div class="modal-hdr" style="background:var(--dark);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:8px 8px 0 0">
-      <span id="m-rollover-title" style="color:#fff;font-size:var(--fs-md);font-weight:800;letter-spacing:.03em">Roll over training year</span>
+    <div class="modal-hdr">
+      <span id="m-rollover-title" style="font-size:var(--fs-md);font-weight:800;letter-spacing:.03em">Roll over training year</span>
       <button class="modal-x" onclick="closeModal('m-rollover-year')" aria-label="Close">&times;</button>
     </div>
-    <div class="modal-body" style="padding:20px 24px 24px">
+    <div class="modal-body">
       <p class="muted" style="font-size:var(--fs-xs);margin:0 0 16px">
         Starts a new training year from <strong id="ro-source-year"></strong>. Parade dates move forward by
         the same number of years. Nothing in the source year is changed.
@@ -5503,7 +5538,16 @@ function bootApp(){
   if(pwLbl)pwLbl.style.display=(showPW||showPWUnconfigured)?'block':'none';
   // Write controls: visible only where this role/scope can currently write; auditor/viewers read-only.
   const canWrite = scope==='squadron' ? canWriteSquadron() : false; // wing/national write only via proxy into a squadron
-  document.querySelectorAll('.admin-el').forEach(el=>{el.style.display=(canWrite||(scope!=='squadron'&&proxyActive()))?'inline-flex':'none';});
+  // SET-1: this forced inline-flex onto every .admin-el, including whole
+  // <div class="card admin-el"> containers -- which turned the card into a flex
+  // row and laid its heading, description and list out side by side instead of
+  // stacked. Buttons and inline labels still want inline-flex; a card wants its
+  // own block layout back.
+  document.querySelectorAll('.admin-el').forEach(el=>{
+    const show=(canWrite||(scope!=='squadron'&&proxyActive()));
+    if(!show){el.style.display='none';return;}
+    el.style.display=el.classList.contains('card')?'block':'inline-flex';
+  });
   if(isReadOnly()){ document.body.classList.add('readonly'); document.querySelectorAll('.admin-el').forEach(el=>el.style.display='none'); }
   else { document.body.classList.remove('readonly'); }
   // Planning-write controls: visible for sqn_admin + wing_admin (own calendar, no proxy needed).
@@ -6863,7 +6907,7 @@ async function _saveOrgRename(){
   const msg=document.getElementById('rename-org-msg');
   const name=(nameEl&&nameEl.value.trim())||'';
   const short=(shortEl&&shortEl.value.trim())||'';
-  if(!name){ if(msg){msg.textContent='Name is required.';msg.style.color='var(--red)';} return; }
+  if(!name){ if(msg){msg.textContent='Give the phase a name.';msg.style.color='var(--red)';} return; }
   if(msg){msg.textContent='Saving…';msg.style.color='var(--muted)';}
   const path=_renameOrgType==='wing'?`/api/wings/${_renameOrgId}`:`/api/squadrons/${_renameOrgId}`;
   const body={name};
@@ -11411,7 +11455,25 @@ function _ynRenderYearList(el, years, opts){
     return;
   }
   const curId = (typeof P!=='undefined') ? P.currentYearId : null;
-  el.innerHTML = '<div class="yn-year-list">' + years.map(function(y){
+  // Archived years are kept out of the way. A unit accumulates one year per
+  // year, and this list is otherwise unbounded -- the dev database holds 118,
+  // which would make the card taller than the rest of Unit Setup combined.
+  const showArch = !!opts.showArchived;
+  const active = years.filter(function(y){return y.active_status;});
+  const archived = years.filter(function(y){return !y.active_status;});
+  const visible = showArch ? years : active;
+  const archNote = archived.length
+    ? '<button class="btn btn-xs btn-out" style="align-self:flex-start;margin-top:4px" '
+      + 'onclick="ynToggleArchived(this)" aria-expanded="'+(showArch?'true':'false')+'">'
+      + (showArch ? 'Hide archived years' : ('Show '+archived.length+' archived year'+(archived.length===1?'':'s')))
+      + '</button>'
+    : '';
+  if(!visible.length && !showArch && archived.length){
+    el.innerHTML = '<div class="yn-empty">No active training years. '
+      + archived.length + ' archived.</div><div class="yn-year-list">'+archNote+'</div>';
+    return;
+  }
+  el.innerHTML = '<div class="yn-year-list">' + visible.map(function(y){
     const id = y.planning_year_id;
     const isCur = id === curId;
     const active = !!y.active_status;
@@ -11444,7 +11506,17 @@ function _ynRenderYearList(el, years, opts){
       + '<div class="yn-year-body">'+nameLine+'<div class="yn-year-meta">'+esc(meta)+'</div></div>'
       + '<div class="yn-year-acts">'+acts+'</div>'
       + '</div>';
-  }).join('') + '</div>';
+  }).join('') + archNote + '</div>';
+}
+
+// Toggle archived years in whichever year list the button belongs to.
+function ynToggleArchived(btn){
+  const host = btn.closest('#settings-yn-table-wrap, #ynManageTable');
+  if(!host) return;
+  const nowShow = btn.getAttribute('aria-expanded') !== 'true';
+  _ynRenderYearList(host, (typeof P!=='undefined'&&P.years)||[], {
+    canWrite: canWriteSquadron(), showArchived: nowShow
+  });
 }
 
 // Both year surfaces load through here.
@@ -15301,21 +15373,24 @@ async function loadCustomPhases(){
   try{
     const phases=await api('/api/custom-training-phases');
     if(!phases||!phases.length){
-      list.innerHTML='<p class="muted" style="font-size:var(--fs-xs)">No custom phases defined.</p>';
+      list.innerHTML='<div class="yn-empty">No custom phases yet. Add one to label a period that sits outside the normal terms.</div>';
       return;
     }
-    list.innerHTML='<div class="tw"><table class="data-table" style="width:100%"><thead><tr><th>Name</th><th>Scope</th><th>From</th><th>Until</th><th></th></tr></thead><tbody>'+
-      phases.map(ph=>`<tr>
-        <td style="font-weight:600">${esc(ph.name)}</td>
-        <td><span class="badge b-grey">${esc(ph.scope_type||'')}</span></td>
-        <td style="font-size:var(--fs-xs)">${esc(ph.applies_from||'')}</td>
-        <td style="font-size:var(--fs-xs)">${esc(ph.applies_to||'Open-ended')}</td>
-        <td style="white-space:nowrap">
-          <button class="btn btn-xs" onclick="cpOpenEdit('${esc(ph.custom_phase_id)}','${esc(ph.name)}','${esc(ph.applies_from||'')}','${esc(ph.applies_to||'')}')">Edit</button>
-          <button class="btn btn-xs" style="color:var(--red)" onclick="cpDelete('${esc(ph.custom_phase_id)}','${esc(ph.name)}')">Delete</button>
-        </td>
-      </tr>`).join('')+
-      '</tbody></table></div>';
+    // Rendered as rows rather than a 5-column table: a phase is a name and a
+    // date range, and the old table showed a raw scope_type enum in a badge and
+    // unformatted ISO dates.
+    list.innerHTML='<div class="cp-list">'+phases.map(function(ph){
+      const from=ph.applies_from?fmtD(ph.applies_from,{day:'numeric',month:'short',year:'numeric'}):'';
+      const to=ph.applies_to?fmtD(ph.applies_to,{day:'numeric',month:'short',year:'numeric'}):'';
+      const range=to?(from+' \u2192 '+to):(from+' \u2192 open-ended');
+      return '<div class="cp-row">'
+        +'<div class="yn-year-body"><div class="cp-name">'+esc(ph.name)+'</div>'
+        +'<div class="cp-range">'+esc(range)+'</div></div>'
+        +'<div class="cp-acts">'
+        +'<button class="btn btn-xs btn-out" onclick="cpOpenEdit(\''+esc(ph.custom_phase_id)+'\',\''+esc(ph.name)+'\',\''+esc(ph.applies_from||'')+'\',\''+esc(ph.applies_to||'')+'\')">Edit</button>'
+        +'<button class="btn btn-xs btn-red" onclick="cpDelete(\''+esc(ph.custom_phase_id)+'\',\''+esc(ph.name)+'\')">Delete</button>'
+        +'</div></div>';
+    }).join('')+'</div>';
   }catch(e){
     list.innerHTML=`<p style="color:var(--red);font-size:var(--fs-xs)">${esc(apiErr(e))}</p>`;
   }
@@ -15332,8 +15407,8 @@ async function cpDoCreate(){
   const name=document.getElementById('cp-name-inp').value.trim();
   const applies_from=document.getElementById('cp-from-inp').value;
   const applies_to=document.getElementById('cp-to-inp').value||null;
-  if(!name){msg.textContent='Name is required.';return;}
-  if(!applies_from){msg.textContent='Applies From date is required.';return;}
+  if(!name){msg.textContent='Give the phase a name.';return;}
+  if(!applies_from){msg.textContent='Enter the date the phase starts.';return;}
   try{
     await api('/api/custom-training-phases',{method:'POST',body:JSON.stringify({name,scope_type:'squadron',applies_from,applies_to})});
     closeModal('m-add-custom-phase');
@@ -15355,8 +15430,8 @@ async function cpDoEdit(){
   const name=document.getElementById('cp-edit-name-inp').value.trim();
   const applies_from=document.getElementById('cp-edit-from-inp').value;
   const applies_to=document.getElementById('cp-edit-to-inp').value||null;
-  if(!name){msg.textContent='Name is required.';return;}
-  if(!applies_from){msg.textContent='Applies From date is required.';return;}
+  if(!name){msg.textContent='Give the phase a name.';return;}
+  if(!applies_from){msg.textContent='Enter the date the phase starts.';return;}
   try{
     await api(`/api/custom-training-phases/${phaseId}`,{method:'PATCH',body:JSON.stringify({name,applies_from,applies_to})});
     closeModal('m-edit-custom-phase');
