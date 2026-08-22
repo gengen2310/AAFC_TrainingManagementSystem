@@ -1,4 +1,5 @@
 """Pytest fixtures: isolated SQLite DB, seeded data, and an authenticated client."""
+import itertools
 import os
 import tempfile
 import pytest
@@ -44,6 +45,26 @@ def client():
     # Dispose pooled connections so the next request sees fresh DB state
     engine.dispose()
     return TestClient(app)
+
+
+# REM-134: a unit may hold one planning year per year number, enforced by
+# POST /api/planning/years. The suite seeds once per session and never resets
+# between tests, so any helper with a fixed year collided with itself on its
+# second call -- and with the seed, which already gives 703 the year 2026.
+# Tests that do not care which year they get should ask for one.
+#
+# Allocated years start at 5000 -- above every literal the suite uses (the
+# highest is 2999) and above the seed's 2026, so an allocated year can never
+# collide with a hand-written one. POST /api/planning/years does not constrain
+# the year, so there is no ceiling to work around. Step 3 leaves the two years
+# after each allocation free, which rollover tests need: they create a source
+# year and roll it over to source+1.
+_test_year_counter = itertools.count(5000, 3)
+
+
+def next_test_year() -> int:
+    """An unused planning year, unique for the life of the test session."""
+    return next(_test_year_counter)
 
 
 def login(client, code):

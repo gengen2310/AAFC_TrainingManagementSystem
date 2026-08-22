@@ -7,7 +7,7 @@ docs/remediation/master_gap_register.csv's CLASS-03.
 from datetime import date, timedelta
 
 import pytest
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 def _sqn_admin_hdr(client):
@@ -74,7 +74,7 @@ def _make_session(client, hdr, days_ahead):
 
 def test_set_and_get_single_class_audience(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2090)
+    year = _make_year(client, hdr, next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     class_id = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
     sid = _make_session(client, hdr, days_ahead=20)
@@ -95,7 +95,7 @@ def test_combined_session_targets_multiple_classes_without_duplication(client):
     Example 2 (Senior 1 + Senior 2 -> one combined Drill Session), not a
     duplicated Session per class."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2089)
+    year = _make_year(client, hdr, next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
     c2 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 2")
@@ -115,7 +115,7 @@ def test_combined_session_targets_multiple_classes_without_duplication(client):
 
 def test_put_audience_is_idempotent_replace_not_append(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2088)
+    year = _make_year(client, hdr, next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
     c2 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 2")
@@ -141,7 +141,7 @@ def test_split_session_removes_one_class_without_losing_the_others(client):
     is expected to create a separate Session for the removed class -- the
     audience endpoint itself only needs to support the removal half)."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2087)
+    year = _make_year(client, hdr, next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
     c2 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 2")
@@ -173,7 +173,7 @@ def test_per_class_outcome_exception_on_combined_session(client):
     actually receive it -- addendum §48's exact scenario. Must not require
     three separate Sessions."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2086)
+    year = _make_year(client, hdr, next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
     c2 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 2")
@@ -196,7 +196,7 @@ def test_per_class_outcome_exception_on_combined_session(client):
 
 def test_outcome_override_requires_reason_for_reason_required_statuses(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2085)
+    year = _make_year(client, hdr, next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
     sid = _make_session(client, hdr, days_ahead=35)
@@ -209,7 +209,7 @@ def test_outcome_override_requires_reason_for_reason_required_statuses(client):
 
 def test_clearing_outcome_override_reverts_to_null(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2084)
+    year = _make_year(client, hdr, next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
     sid = _make_session(client, hdr, days_ahead=38)
@@ -229,7 +229,7 @@ def test_clearing_outcome_override_reverts_to_null(client):
 
 def test_sqn_general_cannot_set_session_audience(client):
     hdr_admin = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr_admin, 2083)
+    year = _make_year(client, hdr_admin, next_test_year())
     stage_id = _senior_stage_id(client, hdr_admin)
     c1 = _make_class(client, hdr_admin, year["planning_year_id"], stage_id, "Senior 1")
     sid = _make_session(client, hdr_admin, days_ahead=41)
@@ -246,7 +246,7 @@ def test_set_session_audience_unauthenticated(client):
 
 def test_cannot_link_a_class_from_another_squadron(client):
     hdr_703 = _sqn_admin_hdr(client)
-    year_703 = _make_year(client, hdr_703, 2082)
+    year_703 = _make_year(client, hdr_703, next_test_year())
     stage_id = _senior_stage_id(client, hdr_703)
     class_703 = _make_class(client, hdr_703, year_703["planning_year_id"], stage_id, "Senior 1")
 
@@ -310,7 +310,7 @@ def test_class_clash_detected_when_same_class_in_concurrent_sessions(client):
     the same class to a concurrent Session B (same parade night, same period)
     must return 409 class_conflict."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2079)
+    year = _make_year(client, hdr, next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     class_id = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
     sid_a, sid_b = _make_two_sessions_same_pn(client, hdr, days_ahead=250)
@@ -330,7 +330,7 @@ def test_class_clash_override_flag_allows_through(client):
     """MBACK-05: override_conflict=True bypasses the 409 and assigns the
     Training Class to both concurrent sessions."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2078)
+    year = _make_year(client, hdr, next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     class_id = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
     sid_a, sid_b = _make_two_sessions_same_pn(client, hdr, days_ahead=253)
@@ -349,7 +349,7 @@ def test_different_classes_in_concurrent_sessions_no_clash(client):
     """MBACK-05: two concurrent sessions using *different* Training Classes
     must not trigger any conflict."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2077)
+    year = _make_year(client, hdr, next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
     c2 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 2")

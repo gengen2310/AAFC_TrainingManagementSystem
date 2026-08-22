@@ -2,7 +2,7 @@
 frontend "Getting Started" stepper. No writes, no new backend infrastructure
 beyond this endpoint (per the plan).
 """
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 def _sysadmin(client):
@@ -173,7 +173,7 @@ def test_holidays_configured_false_until_a_holiday_exists_for_the_active_year(cl
     enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "Holiday setup test"}, headers=hdr)
     assert enter.status_code == 200, enter.text
     year_id = client.post("/api/planning/years", json={
-        "year": 2099, "name": "Holiday Setup Test Year", "unit_id": sqn_id,
+        "year": next_test_year(), "name": "Holiday Setup Test Year", "unit_id": sqn_id,
     }, headers=hdr).json()["planning_year_id"]
     client.post(f"/api/planning/years/{year_id}/holidays", json={
         "name": "Test School Holidays", "start_date": "2099-04-01", "end_date": "2099-04-14",
@@ -210,7 +210,7 @@ def _fresh_squadron_with_active_year(client, hdr, wing_code, sqn_code):
     enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "Setup status test"}, headers=hdr)
     assert enter.status_code == 200, enter.text
     year_id = client.post("/api/planning/years", json={
-        "year": 2099, "name": f"{sqn_code} Setup Test Year", "unit_id": sqn_id,
+        "year": next_test_year(), "name": f"{sqn_code} Setup Test Year", "unit_id": sqn_id,
     }, headers=hdr).json()["planning_year_id"]
     return sqn_id, year_id
 

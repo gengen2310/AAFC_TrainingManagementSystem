@@ -17,7 +17,7 @@ Year numbering: uses 2161–2179 (odd source years, even rollover targets) to
 avoid collisions with other test files (test_concurrency.py uses 2088–2099,
 test_planner_v14.py uses 2028–2062) and with each other when run alphabetically.
 """
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 ADM = "ADMIN703"
 GENERAL = "703SQN2026"
@@ -29,7 +29,9 @@ def _hdr(client):
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
-def _make_year(client, hdr, year=2080, name=None):
+def _make_year(client, hdr, year=None, name=None):
+    # REM-134: a fixed default year collided with itself on the second call.
+    year = next_test_year() if year is None else year
     r = client.post("/api/planning/years",
                     json={"year": year, "name": name or f"E2E Test Year {year}"},
                     headers=hdr)
@@ -134,7 +136,7 @@ def test_rollover_full_round_trip_creates_new_year(client):
 def test_rollover_date_shifts_parade_dates_by_one_year(client):
     """Parade dates in the new year are exactly one year after the source dates."""
     hdr = _hdr(client)
-    source = _make_year(client, hdr, year=2163)
+    source = _make_year(client, hdr, year=next_test_year())
     gen = _generate_parade_dates(client, hdr, source["planning_year_id"],
                                  start="2163-09-01", end="2163-09-30")
     old_dates = sorted(_generated_date_strings(gen))
@@ -157,7 +159,7 @@ def test_rollover_date_shifts_parade_dates_by_one_year(client):
 def test_rollover_date_shifts_holidays_by_one_year(client):
     """Holiday periods are date-shifted one year forward."""
     hdr = _hdr(client)
-    source = _make_year(client, hdr, year=2165)
+    source = _make_year(client, hdr, year=next_test_year())
     _add_holiday(client, hdr, source["planning_year_id"],
                  start="2165-07-01", end="2165-07-14")
 
@@ -176,7 +178,7 @@ def test_rollover_date_shifts_holidays_by_one_year(client):
 def test_rollover_old_year_data_intact_after_rollover(client):
     """Rollover is non-destructive: source year data unchanged."""
     hdr = _hdr(client)
-    source = _make_year(client, hdr, year=2167)
+    source = _make_year(client, hdr, year=next_test_year())
     gen = _generate_parade_dates(client, hdr, source["planning_year_id"],
                                  start="2167-09-01", end="2167-09-30")
     old_count = len(_generated_date_strings(gen))
@@ -204,7 +206,7 @@ def test_rollover_anchor_events_not_copied(client):
     which is more error-prone than creating them fresh.
     """
     hdr = _hdr(client)
-    source = _make_year(client, hdr, year=2169)
+    source = _make_year(client, hdr, year=next_test_year())
     _add_anchor(client, hdr, source["planning_year_id"], start="2169-06-01")
 
     r = _rollover(client, hdr, source["planning_year_id"])
@@ -224,7 +226,7 @@ def test_rollover_anchor_events_not_copied(client):
 def test_rollover_parade_dates_create_linked_parade_nights(client):
     """Each copied parade date must have a linked parade_night_id in the new year."""
     hdr = _hdr(client)
-    source = _make_year(client, hdr, year=2171)
+    source = _make_year(client, hdr, year=next_test_year())
     _generate_parade_dates(client, hdr, source["planning_year_id"],
                            start="2171-09-01", end="2171-09-30")
 
@@ -242,7 +244,7 @@ def test_rollover_parade_dates_create_linked_parade_nights(client):
 def test_rollover_idempotency_second_attempt_returns_409(client):
     """Second rollover to the same target year must return 409 (idempotency guard)."""
     hdr = _hdr(client)
-    source = _make_year(client, hdr, year=2173)
+    source = _make_year(client, hdr, year=next_test_year())
 
     r1 = _rollover(client, hdr, source["planning_year_id"])
     assert r1.status_code == 200, r1.text
@@ -257,7 +259,7 @@ def test_rollover_response_counts_match_actual_data(client):
     """The response summary counts (dates_copied, holidays_copied) match what's
     actually retrievable from the new year's list endpoints."""
     hdr = _hdr(client)
-    source = _make_year(client, hdr, year=2175)
+    source = _make_year(client, hdr, year=next_test_year())
     gen = _generate_parade_dates(client, hdr, source["planning_year_id"],
                                  start="2175-09-01", end="2175-09-30")
     _add_holiday(client, hdr, source["planning_year_id"],
@@ -282,7 +284,7 @@ def test_rollover_response_counts_match_actual_data(client):
 def test_rollover_new_year_is_operational_sessions_can_be_added(client):
     """After rollover, the new year's parade nights can have sessions created."""
     hdr = _hdr(client)
-    source = _make_year(client, hdr, year=2177)
+    source = _make_year(client, hdr, year=next_test_year())
     # Use a full month so at least one Thursday (weekday=3) falls in range.
     # A single-day range risks picking a non-Thursday and producing 0 dates.
     _generate_parade_dates(client, hdr, source["planning_year_id"],

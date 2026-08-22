@@ -9,7 +9,7 @@ the reviewed pipeline; the legacy one is retired.
 """
 import io
 
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 def _sqn_admin(client):
@@ -64,7 +64,7 @@ def _wing_admin_year_for_squadron(client, sqn_admin_hdr):
     years = r.json() if isinstance(r.json(), list) else r.json().get("years", [])
     if years:
         return years[0]["planning_year_id"]
-    r = client.post("/api/planning/years", json={"year": 2098, "name": "CEA Test Year"},
+    r = client.post("/api/planning/years", json={"year": next_test_year(), "name": "CEA Test Year"},
                     headers=sqn_admin_hdr)
     assert r.status_code == 200, r.text
     return r.json()["planning_year_id"]

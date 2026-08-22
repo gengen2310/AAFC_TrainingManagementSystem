@@ -31,6 +31,13 @@ PREP_STATUS = ("planned", "confirmed", "complete")
 
 class PlanningYear(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "planning_years"
+    # REM-134: a squadron holds at most one planning year per year number.
+    # unit_id is NULL for wing/national years, and both SQLite and PostgreSQL
+    # treat NULLs as distinct in a unique index, so those rows are unconstrained
+    # -- which is correct: they are not squadron-scoped.
+    __table_args__ = (
+        UniqueConstraint("unit_id", "year", name="uq_planning_years_unit_year"),
+    )
     unit_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
     wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     year: Mapped[int] = mapped_column(Integer, nullable=False)

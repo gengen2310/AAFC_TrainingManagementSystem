@@ -480,6 +480,22 @@ def create_planning_year(
     # intervention at all (Stage 10, 2026-08-05).
     if unit_id:
         require_can_write_squadron(p, unit_id, wing_id)
+    # REM-134: one planning year per (unit, year). There was no check here at all,
+    # while POST /years/{id}/rollover has always returned 409 for exactly this --
+    # the two creation paths disagreed, and repeated calls silently produced
+    # duplicates that every downstream year selector then listed several times.
+    # 409 matches rollover rather than inventing a second status for one condition.
+    if unit_id:
+        dupe = db.query(PlanningYear).filter(
+            PlanningYear.unit_id == unit_id,
+            PlanningYear.year == body.year,
+        ).first()
+        if dupe:
+            raise HTTPException(409, detail={
+                "error": "planning_year_already_exists",
+                "existing_id": dupe.id,
+                "message": f"Training year {body.year} already exists for this unit.",
+            })
     py = PlanningYear(
         id=str(uuid.uuid4()), year=body.year, name=body.name,
         unit_id=unit_id, wing_id=wing_id, active_status=body.active_status,

@@ -17,7 +17,7 @@ import uuid
 from datetime import date, timedelta
 
 import pytest
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 def _sqn_admin_hdr(client):
@@ -110,7 +110,7 @@ def _get_chart(client, hdr):
 
 def test_chart_matches_class_progress_api_for_two_even_classes(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2071)
+    year = _make_year(client, hdr, next_test_year())
     stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Bronze 1")
     c2 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Bronze 2")
@@ -149,7 +149,7 @@ def test_significantly_behind_class_is_flagged(client):
     """addendum §75: a stage aggregate must not hide one struggling class
     behind a healthy blended number."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2070)
+    year = _make_year(client, hdr, next_test_year())
     stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
     c_ahead = _make_class(client, hdr, year["planning_year_id"], stage_id, "Silver 1")
     c_behind = _make_class(client, hdr, year["planning_year_id"], stage_id, "Silver 2")

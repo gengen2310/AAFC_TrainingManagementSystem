@@ -14,7 +14,7 @@ that would have caught the Facilitator-pattern mistake if copied verbatim.
 """
 from datetime import date, timedelta
 
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 ADM703 = "ADMIN703"
 GEN703 = "703SQN2026"
@@ -155,7 +155,7 @@ def test_reassign_skips_cadet_with_no_active_membership(client):
 def test_reassign_rejects_cross_stage_target(client):
     hdr = _sqn_admin_hdr(client)
     sqn_id = _own_squadron_id(client, hdr)
-    year_id = _make_year(client, hdr, 2085)
+    year_id = _make_year(client, hdr, next_test_year())
     stage_1 = _make_stage(client, hdr, sqn_id, "CLASS-10-STAGE-1")
     stage_2 = _make_stage(client, hdr, sqn_id, "CLASS-10-STAGE-2")
     class_a = _make_class(client, hdr, year_id, stage_1, "Class A")
@@ -173,8 +173,8 @@ def test_reassign_rejects_cross_stage_target(client):
 def test_reassign_rejects_cross_year_target(client):
     hdr = _sqn_admin_hdr(client)
     sqn_id = _own_squadron_id(client, hdr)
-    year_1 = _make_year(client, hdr, 2084)
-    year_2 = _make_year(client, hdr, 2083)
+    year_1 = _make_year(client, hdr, next_test_year())
+    year_2 = _make_year(client, hdr, next_test_year())
     stage_id = _make_stage(client, hdr, sqn_id, "CLASS-10-CROSSYEAR")
     class_a = _make_class(client, hdr, year_1, stage_id, "Class A")
     class_c = _make_class(client, hdr, year_2, stage_id, "Class C (different year)")
@@ -268,7 +268,7 @@ def test_merge_self_rejected(client):
 def test_merge_rejects_cross_stage_target(client):
     hdr = _sqn_admin_hdr(client)
     sqn_id = _own_squadron_id(client, hdr)
-    year_id = _make_year(client, hdr, 2078)
+    year_id = _make_year(client, hdr, next_test_year())
     stage_1 = _make_stage(client, hdr, sqn_id, "CLASS-10-MERGE-STAGE-1")
     stage_2 = _make_stage(client, hdr, sqn_id, "CLASS-10-MERGE-STAGE-2")
     source = _make_class(client, hdr, year_id, stage_1, "Source")

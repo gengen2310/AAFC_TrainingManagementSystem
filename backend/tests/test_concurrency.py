@@ -6,7 +6,7 @@ Each test verifies that:
 3. An update without a version field succeeds (backward-compatible).
 """
 import pytest
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 def _sqn_admin(client):
@@ -21,7 +21,9 @@ def _wing_admin(client):
 # PlanningYear — optimistic locking
 # ─────────────────────────────────────────────────────────────
 
-def _make_year(client, hdr, year=2099):
+def _make_year(client, hdr, year=None):
+    # REM-134: a fixed default year collided with itself on the second call.
+    year = next_test_year() if year is None else year
     r = client.post("/api/planning/years", json={"year": year, "name": f"{year} Lock Test"}, headers=hdr)
     assert r.status_code == 200, r.text
     return r.json()
@@ -29,13 +31,13 @@ def _make_year(client, hdr, year=2099):
 
 def test_planning_year_version_starts_at_zero(client):
     hdr = _sqn_admin(client)
-    data = _make_year(client, hdr, year=2091)
+    data = _make_year(client, hdr, year=next_test_year())
     assert data["version"] == 0
 
 
 def test_planning_year_version_increments_on_update(client):
     hdr = _sqn_admin(client)
-    data = _make_year(client, hdr, year=2092)
+    data = _make_year(client, hdr, year=next_test_year())
     year_id = data["planning_year_id"]
 
     r = client.patch(f"/api/planning/years/{year_id}", json={"name": "Updated Name"}, headers=hdr)
@@ -48,7 +50,7 @@ def test_planning_year_version_increments_on_update(client):
 
 def test_planning_year_stale_version_returns_409(client):
     hdr = _sqn_admin(client)
-    data = _make_year(client, hdr, year=2093)
+    data = _make_year(client, hdr, year=next_test_year())
     year_id = data["planning_year_id"]
 
     # First update succeeds with correct version (0)
@@ -67,7 +69,7 @@ def test_planning_year_stale_version_returns_409(client):
 def test_planning_year_update_without_version_succeeds(client):
     """Backward compatibility: omitting version skips the check."""
     hdr = _sqn_admin(client)
-    data = _make_year(client, hdr, year=2094)
+    data = _make_year(client, hdr, year=next_test_year())
     year_id = data["planning_year_id"]
 
     r = client.patch(f"/api/planning/years/{year_id}", json={"name": "No Version Field"}, headers=hdr)
@@ -91,14 +93,14 @@ def _make_anchor(client, hdr, year_id):
 
 def test_anchor_version_starts_at_zero(client):
     hdr = _sqn_admin(client)
-    year = _make_year(client, hdr, year=2095)
+    year = _make_year(client, hdr, year=next_test_year())
     anchor = _make_anchor(client, hdr, year["planning_year_id"])
     assert anchor["version"] == 0
 
 
 def test_anchor_stale_version_returns_409(client):
     hdr = _sqn_admin(client)
-    year = _make_year(client, hdr, year=2096)
+    year = _make_year(client, hdr, year=next_test_year())
     anchor = _make_anchor(client, hdr, year["planning_year_id"])
     anchor_id = anchor["anchor_event_id"]
 
@@ -117,7 +119,7 @@ def test_anchor_stale_version_returns_409(client):
 
 def test_anchor_update_without_version_succeeds(client):
     hdr = _sqn_admin(client)
-    year = _make_year(client, hdr, year=2097)
+    year = _make_year(client, hdr, year=next_test_year())
     anchor = _make_anchor(client, hdr, year["planning_year_id"])
     anchor_id = anchor["anchor_event_id"]
 

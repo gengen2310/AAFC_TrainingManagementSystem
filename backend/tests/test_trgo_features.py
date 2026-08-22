@@ -5,7 +5,7 @@ import io
 from datetime import date, timedelta
 
 import pytest
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 def _sqn_admin_hdr(client):
@@ -20,7 +20,9 @@ def _general_hdr(client):
     return login(client, "703SQN2026")
 
 
-def _make_year(client, hdr, year=2099, name="TRGO Feature Test Year"):
+def _make_year(client, hdr, year=None, name="TRGO Feature Test Year"):
+    # REM-134: a shared default year collided on every call after the first.
+    year = next_test_year() if year is None else year
     r = client.post("/api/planning/years", json={"year": year, "name": name}, headers=hdr)
     assert r.status_code == 200, r.text
     return r.json()["planning_year_id"]
@@ -49,7 +51,7 @@ def _seed_parade_dates(client, hdr, year_id, dates):
 
 def test_update_future_parade_day_preview_does_not_write(client):
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2091)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     tuesday_date = (monday + timedelta(days=1)).isoformat()
     _seed_parade_dates(client, hdr, year_id, [tuesday_date])
@@ -74,7 +76,7 @@ def test_update_future_parade_day_preview_does_not_write(client):
 
 def test_update_future_parade_day_commit_requires_reason(client):
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2092)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     _seed_parade_dates(client, hdr, year_id, [(monday + timedelta(days=1)).isoformat()])
 
@@ -87,7 +89,7 @@ def test_update_future_parade_day_commit_requires_reason(client):
 
 def test_update_future_parade_day_commit_moves_date_and_preserves_night(client):
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2093)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     tuesday_date = (monday + timedelta(days=1)).isoformat()
     ids = _seed_parade_dates(client, hdr, year_id, [tuesday_date])
@@ -116,7 +118,7 @@ def test_update_future_parade_day_commit_moves_date_and_preserves_night(client):
 def test_update_future_parade_day_historical_records_unchanged(client):
     """Records before from_date must never be touched."""
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2094)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     future_tuesday = (monday + timedelta(days=1)).isoformat()
     past_tuesday = "2020-01-07"  # a real past Tuesday, well before "today"
@@ -133,7 +135,7 @@ def test_update_future_parade_day_historical_records_unchanged(client):
 def test_update_future_parade_day_exceptions_preserved_by_default(client):
     """A non-standard parade_type (e.g. a one-off special night) must not move."""
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2095)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     special_date = (monday + timedelta(days=1)).isoformat()
     r = client.post(f"/api/planning/years/{year_id}/parade-dates",
@@ -150,7 +152,7 @@ def test_update_future_parade_day_exceptions_preserved_by_default(client):
 
 def test_update_future_parade_day_holiday_conflict_blocks(client):
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2096)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     tuesday_date = (monday + timedelta(days=1)).isoformat()
     friday_date = (monday + timedelta(days=4)).isoformat()
@@ -171,7 +173,7 @@ def test_update_future_parade_day_holiday_conflict_blocks(client):
 
 def test_update_future_parade_day_duplicate_date_blocks(client):
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2097)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     tuesday_date = (monday + timedelta(days=1)).isoformat()
     friday_date = (monday + timedelta(days=4)).isoformat()
@@ -189,7 +191,7 @@ def test_update_future_parade_day_duplicate_date_blocks(client):
 
 def test_update_future_parade_day_writes_audit(client):
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2098)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     _seed_parade_dates(client, hdr, year_id, [(monday + timedelta(days=1)).isoformat()])
 
@@ -205,7 +207,7 @@ def test_update_future_parade_day_writes_audit(client):
 def test_update_future_parade_day_sqn_general_cannot_commit(client):
     hdr_admin = _sqn_admin_hdr(client)
     hdr_general = _general_hdr(client)
-    year_id = _make_year(client, hdr_admin, year=2081)
+    year_id = _make_year(client, hdr_admin)
     monday = _future_monday()
     _seed_parade_dates(client, hdr_admin, year_id, [(monday + timedelta(days=1)).isoformat()])
 
@@ -218,7 +220,7 @@ def test_update_future_parade_day_sqn_general_cannot_commit(client):
 def test_update_future_parade_day_rollback_on_conflict_does_not_partially_apply(client):
     """A blocked row must be reported as skipped, never partially written."""
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2082)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     tuesday_date = (monday + timedelta(days=1)).isoformat()
     friday_date = (monday + timedelta(days=4)).isoformat()
@@ -257,7 +259,7 @@ def _parade_night_id_for_date(client, hdr, year_id, parade_date_id):
 
 def test_update_future_parade_day_session_status_scope_invalid_value_rejected(client):
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2084)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     _seed_parade_dates(client, hdr, year_id, [(monday + timedelta(days=1)).isoformat()])
 
@@ -278,7 +280,7 @@ def test_update_future_parade_day_draft_only_excludes_a_planned_night(client):
     accumulate sessions from earlier tests onto the same night.
     """
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2085)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     test_date = (monday + timedelta(days=8)).isoformat()
     ids = _seed_parade_dates(client, hdr, year_id, [test_date])
@@ -297,7 +299,7 @@ def test_update_future_parade_day_draft_only_excludes_a_planned_night(client):
 
 def test_update_future_parade_day_draft_and_planned_includes_planned_excludes_published(client):
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2086)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     planned_date = (monday + timedelta(days=15)).isoformat()
     published_date = (monday + timedelta(days=16)).isoformat()
@@ -322,7 +324,7 @@ def test_update_future_parade_day_session_status_scope_omitted_still_includes_pu
     """Backward compatibility: with no session_status_scope, today's unfiltered
     behaviour is unchanged -- a published night is still eligible."""
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2087)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     published_date = (monday + timedelta(days=22)).isoformat()
     ids = _seed_parade_dates(client, hdr, year_id, [published_date])
@@ -342,7 +344,7 @@ def test_update_future_parade_day_session_status_scope_omitted_still_includes_pu
 def test_update_future_parade_day_draft_only_still_includes_a_night_with_no_sessions(client):
     """Nothing to protect -- an empty night is always eligible regardless of scope."""
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2088)
+    year_id = _make_year(client, hdr)
     # Hardcoded Thursday: test_session_audience days_ahead=41 = monday+29 for sqn 703.
     empty_date = "2099-10-29"
     _seed_parade_dates(client, hdr, year_id, [empty_date])
@@ -363,7 +365,7 @@ def test_update_future_parade_day_draft_only_still_includes_a_night_with_no_sess
 
 def test_cea_activities_list_includes_hide_state_defaults(client):
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2083)
+    year_id = _make_year(client, hdr)
     r = client.post(f"/api/planning/years/{year_id}/cea/activities",
                     json={"activity_name": "Unhidden activity"}, headers=hdr)
     assert r.status_code == 200, r.text
@@ -377,7 +379,7 @@ def test_cea_activities_list_includes_hide_state_defaults(client):
 
 def test_cea_activities_list_reflects_local_hide(client):
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2084)
+    year_id = _make_year(client, hdr)
     r = client.post(f"/api/planning/years/{year_id}/cea/activities",
                     json={"activity_name": "To be hidden"}, headers=hdr)
     activity_id = r.json()["id"]
@@ -396,7 +398,7 @@ def test_cea_local_hide_does_not_affect_other_squadron(client):
     """Local hide must be a per-squadron overlay, never visible to a sibling squadron."""
     hdr703 = _sqn_admin_hdr(client)
     hdr704 = login(client, "ADMIN704")
-    year_id = _make_year(client, hdr703, year=2085)
+    year_id = _make_year(client, hdr703)
     r = client.post(f"/api/planning/years/{year_id}/cea/activities",
                     json={"activity_name": "703-scoped activity"}, headers=hdr703)
     activity_id = r.json()["id"]
@@ -634,7 +636,7 @@ def _assign_two_missions_on_dates(client, hdr, year_id, date_a, date_b):
 
 def test_missions_date_range_filter_includes_session_in_range(client):
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2094)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     date_a = monday.isoformat()
     date_b = (monday + timedelta(days=28)).isoformat()
@@ -652,7 +654,7 @@ def test_missions_date_range_filter_includes_session_in_range(client):
 
 def test_missions_date_range_filter_excludes_out_of_range_scheduled(client):
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2095)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     date_a = monday.isoformat()
     date_b = (monday + timedelta(days=28)).isoformat()
@@ -674,7 +676,7 @@ def test_missions_date_range_filter_never_hides_unscheduled_items(client):
     regardless of the active date-range filter -- a backlog is about what still
     needs attention, not only what falls in the currently visible window."""
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2096)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
 
     before_r = client.get(f"/api/planning/years/{year_id}/missions?status=unscheduled", headers=hdr)
@@ -693,7 +695,7 @@ def test_missions_date_range_filter_never_hides_unscheduled_items(client):
 
 def test_missions_date_range_filter_open_ended_start_only(client):
     hdr = _sqn_admin_hdr(client)
-    year_id = _make_year(client, hdr, year=2097)
+    year_id = _make_year(client, hdr)
     monday = _future_monday()
     date_a = monday.isoformat()
     date_b = (monday + timedelta(days=28)).isoformat()

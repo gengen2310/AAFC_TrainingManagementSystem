@@ -14,7 +14,7 @@ Each test verifies that:
 """
 import io
 import pytest
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 # ─── helpers ──────────────────────────────────────────────────────────────────
@@ -23,7 +23,9 @@ def _hdr(client, code):
     return login(client, code)
 
 
-def _make_year(client, hdr, year=2099, name="IDOR Test Year"):
+def _make_year(client, hdr, year=None, name="IDOR Test Year"):
+    # REM-134: a shared default year collided on every call after the first.
+    year = next_test_year() if year is None else year
     r = client.post("/api/planning/years", json={"year": year, "name": name}, headers=hdr)
     assert r.status_code == 200, f"year creation failed: {r.text}"
     return r.json()["planning_year_id"]
@@ -397,7 +399,7 @@ class TestCEAImportFileSizeGuard:
 
     def _setup_wing_admin_year(self, client):
         hdr = _hdr(client, "ADMIN7WG")
-        r = client.post("/api/planning/years", json={"year": 2099, "name": "Wing Year"}, headers=hdr)
+        r = client.post("/api/planning/years", json={"year": next_test_year(), "name": "Wing Year"}, headers=hdr)
         assert r.status_code == 200, r.text
         return hdr, r.json()["planning_year_id"]
 
@@ -521,7 +523,7 @@ class TestSqnGeneralYearScope:
         """sqn_general can read planning years that belong to their squadron."""
         hdr_admin = _hdr(client, "ADMIN703")
         hdr_gen = _hdr(client, "703SQN2026")
-        _make_year(client, hdr_admin, year=2088, name="Gen Scope Year")
+        _make_year(client, hdr_admin, name="Gen Scope Year")
 
         r = client.get("/api/planning/years", headers=hdr_gen)
         assert r.status_code == 200
