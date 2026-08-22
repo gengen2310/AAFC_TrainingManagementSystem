@@ -63,7 +63,7 @@ function NotAuthenticated() {
           Please return to the Training Management System and log in first.
           Planning Workspace uses your existing TMS session.
         </p>
-        <a href={TMS_URL} style={{ display: "inline-block", background: "#51b0e3", color: "white", fontWeight: 700, fontSize: 'var(--fs-base)', padding: "10px 24px", borderRadius: 6, textDecoration: "none" }}>
+        <a href={TMS_URL} style={{ display: "inline-block", background: "var(--royal)", color: "white", fontWeight: 700, fontSize: 'var(--fs-base)', padding: "10px 24px", borderRadius: 6, textDecoration: "none" }}>
           Return to TMS
         </a>
       </div>
@@ -91,7 +91,7 @@ function ModuleError({ onRetry }: { onRetry: () => void }) {
           The system could not load planning data. If this keeps happening, contact support.
         </p>
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-          <button onClick={onRetry} style={{ background: "#51b0e3", color: "white", fontWeight: 700, fontSize: 'var(--fs-base)', padding: "10px 20px", borderRadius: 6, border: 0, cursor: "pointer" }}>
+          <button onClick={onRetry} style={{ background: "var(--royal)", color: "white", fontWeight: 700, fontSize: 'var(--fs-base)', padding: "10px 20px", borderRadius: 6, border: 0, cursor: "pointer" }}>
             Retry
           </button>
           <a href={TMS_URL} style={{ display: "inline-block", background: "white", color: "#455560", fontWeight: 600, fontSize: 'var(--fs-base)', padding: "10px 20px", borderRadius: 6, textDecoration: "none", border: "1px solid #d1dce8" }}>

@@ -375,7 +375,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                           RESOLVED
                         </span>
                       ) : m.has_not_delivered ? (
-                        <span title={[s0?.not_delivered_reason, s0?.outcome_note].filter(Boolean).join(" — ") || "No reason recorded"} style={{ color: "#fff", background: "#78909c", fontWeight: 700, fontSize: 'var(--fs-3xs)', padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                        <span title={[s0?.not_delivered_reason, s0?.outcome_note].filter(Boolean).join(" — ") || "No reason recorded"} style={{ color: "#fff", background: "var(--steel)", fontWeight: 700, fontSize: 'var(--fs-3xs)', padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
                           NOT DELIVERED
                         </span>
                       ) : m.has_cancelled ? (

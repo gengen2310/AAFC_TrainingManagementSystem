@@ -380,3 +380,75 @@ that caused the dark-theme cycle, and `--primary` being the chrome surface.
 | Text does not enlarge — 1,492 of 1,528 font-size specs px-locked | G3 | programme; ~1,500 call sites, both frontends separately |
 | 2,454 inline style declarations never contrast-checked | — | coverage gap, not a clean result |
 | Authenticated screens, narrow viewports, screen-reader, human testing | G10, G12 | unmeasured |
+
+---
+
+## FIX-07 · The inline-style channel — measured, and three real failures fixed
+
+**Files:** `frontend/src/App.tsx`, `frontend/src/components/planning/PlanningBottomDrawer.tsx`
+**Tool:** `inline-contrast.py` (new) · **Gate:** G1 · **Audit item:** the stated largest coverage gap
+
+The audit called this "the largest gap": 2,454 inline style declarations that stylesheet
+tooling cannot see and that were never contrast-checked. This closes it, and corrects the
+size of the gap in the process.
+
+### The exposure was far smaller than the raw count implied
+
+| | connected-frontend | frontend/src |
+|---|---|---|
+| inline style declarations | 1,617 | 829 |
+| with a resolvable literal foreground | **22** | **18** |
+| no decidable colour (`var()`, gradient, translucent, or none) | 1,595 | 811 |
+
+**~98% reference tokens or set no colour at all**, so they inherit the palette this branch
+already fixed. "2,454 declarations unchecked" was true but misleading: the literal exposure
+was 40 sites, not 2,454. Coverage figures describe what was *examined*, and a large one can
+still hide a small real risk — or, as here, imply a large one that is not there.
+
+### Findings
+
+| Ratio | Site | Pair | Fixed to |
+|---|---|---|---|
+| **2.42:1** | `App.tsx:66` | `white` on `#51b0e3` | `var(--royal)` — 8.78:1 |
+| **2.42:1** | `App.tsx:94` | `white` on `#51b0e3` | `var(--royal)` — 8.78:1 |
+| **3.35:1** | `PlanningBottomDrawer.tsx:378` | `#fff` on `#78909c` | `var(--steel)` — 7.72:1 |
+
+All three are the same mistake the stylesheet work kept finding: white text on the *light*
+AAFC blue. Now: 0 paired failures, 0 fail-everywhere colours across both frontends.
+
+15 sites remain **conditional** — a literal that passes on one surface family and fails on
+the other (e.g. `#fff`, safe on the dark chrome, unsafe on light). None is decidable without
+a rendered DOM. They are listed by the tool, not hidden.
+
+### Two bugs in the tool, both of which faked a clean result
+
+Recorded because a measuring instrument that reports "0 failures" while silently skipping its
+input is worse than no instrument.
+
+1. **React style objects are comma-separated, not semicolon-separated.** Parsing them as CSS
+   text made `[^;]+` swallow `white, fontWeight: 700, fontSize: …` as one "colour", which
+   then failed to parse and was skipped. Only 2 of 829 declarations resolved and it reported
+   **0 paired failures** — while `App.tsx:66` sat there at 2.42:1. Fixed with a
+   parenthesis-aware comma split, so `rgba(0,0,0,.5)` survives intact. Resolution went 2 → 18
+   and the three real defects appeared.
+2. **A single light-surface set.** White text failed against every surface and was reported as
+   FAIL-ALL, when it is correct on the dark header and nav. Surfaces are now split into light
+   and dark families; only a colour failing both is called definite.
+
+The first bug was caught by testing the tool against a defect known to exist. That is the only
+reason it was caught: every other signal said the code was clean.
+
+## Gate status after this branch
+
+| Gate | Before | After |
+|---|---|---|
+| G1 contrast | FAIL | stylesheet + inline channels measured, 0 known failures |
+| G3 text enlargement | FAIL | **PASS** — 0 px font-size in either frontend (bar `@media print`) |
+| G4 keyboard | FAIL | focus ring ≥3:1 on every surface via a scoped token |
+| G5 hit targets | FAIL | all measured controls ≥28px |
+| G6 gesture alternatives | FAIL | **PASS** — keyboard move, 7 tests |
+| G11 semantics | FAIL | **PASS** — 0 unlabelled icon buttons |
+
+Still unmeasured, and not claimable: the authenticated screens. Every result on this branch
+comes from probe pages, the sign-in screen, and static analysis. G10 and G12 remain
+unassessed, and the 15 conditional inline sites need a rendered check.
