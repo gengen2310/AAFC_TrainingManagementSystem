@@ -498,6 +498,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 
 /* ── FILTER BAR ── */
 .fbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+.fbar-lbl{font-size:var(--fs-2xs);font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);white-space:nowrap;}
 .fbar select,.fbar input{padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:var(--fs-sm);color:var(--text);background:white;min-height:28px;}
 .fbar select:focus,.fbar input:focus{outline:none;border-color:var(--focus-ring);box-shadow:0 0 0 3px rgba(0,75,141,.22);}
 
@@ -679,6 +680,11 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .modal-x{background:rgba(255,255,255,.12);border:none;color:white;width:1.75em;height:1.75em;min-width:28px;min-height:28px;flex-shrink:0;border-radius:50%;cursor:pointer;font-size:var(--fs-lg);display:flex;align-items:center;justify-content:center;transition:background .13s;}
 .modal-x:hover{background:rgba(255,255,255,.22);}
 .modal-body{padding:20px;}
+/* Modals written before the .modal-hdr/.modal-body pattern have no padding of
+   their own -- content sits flush against the edge of the panel. Give them the
+   same inset the standard pattern provides, so they read like every other box. */
+.modal:not(:has(> .modal-hdr)){padding:20px;}
+.modal:not(:has(> .modal-hdr)) > h2:first-child{margin:0 0 16px;font-size:var(--fs-lg);color:var(--dark);}
 .modal-foot{padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
 /* ── Service Desk modal ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,18,40,.55);backdrop-filter:blur(3px);z-index:500;align-items:center;justify-content:center;padding:16px;}
@@ -1610,14 +1616,28 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
       <!-- WEEKLY PROGRAM -->
       <div id="page-weekly-program" class="page">
-        <div class="ph no-print"><h1 class="ph-title">Weekly Program</h1><div class="ph-sub">The full training year's program, ready to print. Choose a night below to publish it.</div></div>
-        <div class="card no-print">
-          <div class="ff">
-            <label for="wp-sel">Publish night</label>
-            <select id="wp-sel" aria-label="Choose the parade night to publish"><option value="">— Choose a night to publish —</option></select>
+        <div class="ph no-print">
+          <div>
+            <h1 class="ph-title">Weekly Program</h1>
+            <div class="ph-sub">Printable training program. Choose a term and night, then print or publish what you see.</div>
+          </div>
+          <div class="ph-actions">
+            <button class="btn btn-out" onclick="wpPrint()" title="Print the program currently shown">Print</button>
+            <button class="btn btn-primary" id="wp-publish-btn" onclick="publishWP()" disabled
+                    title="Choose a single night to publish it">Publish night</button>
           </div>
         </div>
         <div class="fbar no-print">
+          <label for="wp-f-term" class="fbar-lbl">Term</label>
+          <select id="wp-f-term" aria-label="Filter Weekly Program by term" onchange="wpTermChanged()">
+            <option value="all">All terms</option>
+            <option value="T1">Term 1</option><option value="T2">Term 2</option>
+            <option value="T3">Term 3</option><option value="T4">Term 4</option>
+          </select>
+          <label for="wp-sel" class="fbar-lbl">Night</label>
+          <select id="wp-sel" aria-label="Choose which parade night to show" onchange="_wpPaint()">
+            <option value="">All nights</option>
+          </select>
           <input id="wp-search" placeholder="Search facilitator, room, curriculum item…" oninput="_wpPaint()" style="min-width:220px" aria-label="Search facilitator, room, curriculum item">
           <select id="wp-f-status" aria-label="Filter Weekly Program by status" onchange="_wpPaint()">
             <option value="all">All Statuses</option>
@@ -1625,6 +1645,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <option value="cancelled">Cancelled</option><option value="rescheduled">Rescheduled</option>
             <option value="not_delivered">Not Delivered</option>
           </select>
+          <span id="wp-count" class="fbar-lbl" style="margin-left:auto"></span>
         </div>
         <div id="wp-content"></div>
       </div>
@@ -2710,8 +2731,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
 <!-- Add Holiday Modal -->
 <div class="modal-bg" id="m-add-holiday" role="dialog" aria-modal="true" aria-labelledby="m-add-holiday-title">
-  <div class="modal">
-    <h2 id="m-add-holiday-title">Add Holiday / Stand-Down Period</h2>
+  <div class="modal" style="max-width:520px;width:96vw">
+    <div class="modal-hdr">
+      <span id="m-add-holiday-title" style="font-size:var(--fs-md);font-weight:800;letter-spacing:.03em">Add holiday or stand-down period</span>
+      <button class="modal-x" onclick="closeModal('m-add-holiday')" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
     <div class="form-group"><label for="hol-name-inp">Name *</label><input type="text" id="hol-name-inp" placeholder="e.g. Easter Break"></div>
     <div class="form-group"><label for="hol-type-inp">Type *</label>
       <select id="hol-type-inp" aria-label="Holiday or stand-down type">
@@ -2734,6 +2759,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-add-holiday')">Cancel</button>
       <button class="btn btn-primary" onclick="doAddHoliday()">Add</button>
+    </div>
     </div>
   </div>
 </div>
@@ -2771,8 +2797,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
 <!-- Add Training Class Modal -->
 <div class="modal-bg" id="m-add-training-class" role="dialog" aria-modal="true" aria-labelledby="m-add-training-class-title">
-  <div class="modal">
-    <h2 id="m-add-training-class-title">Add Training Class</h2>
+  <div class="modal" style="max-width:520px;width:96vw">
+    <div class="modal-hdr">
+      <span id="m-add-training-class-title" style="font-size:var(--fs-md);font-weight:800;letter-spacing:.03em">Add training class</span>
+      <button class="modal-x" onclick="closeModal('m-add-training-class')" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
     <div class="form-group"><label for="tc-stage-inp">Training Stage *<button class="ht" tabindex="0" aria-label="About Training Stage" data-tip="The national curriculum level — e.g. Senior, Junior, Initial. One stage can have several classes: Senior 1 and Senior 2 are both the Senior stage.">?</button></label>
       <select id="tc-stage-inp" aria-label="Training Stage"></select>
     </div>
@@ -2793,6 +2823,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-add-training-class')">Cancel</button>
       <button class="btn btn-primary" onclick="doAddTrainingClass()">Add</button>
+    </div>
     </div>
   </div>
 </div>
@@ -10444,16 +10475,9 @@ async function saveSessEdit(){
 // ═══════════════════════════════════════════════════════════
 //  WEEKLY PROGRAM
 // ═══════════════════════════════════════════════════════════
-function populateWPDD(){
-  const sel=document.getElementById('wp-sel');
-  if(!sel)return;
-  const sorted=[...S.pns].sort((a,b)=>a.date.localeCompare(b.date));
-  sel.innerHTML='<option value="">— Choose a parade night —</option>'+sorted.map(pn=>`<option value="${pn.date}">${fmtD(pn.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})} (${esc(pn.term)})</option>`).join('');
-}
 // WP-6: renderWP() used to overwrite #page-weekly-program -- the entire page,
 // toolbar included -- so the search box, night selector and status filter were
-// destroyed on first render. No filter could ever run because no control
-// survived to fire one. It now paints into #wp-content, which has been sitting
+// destroyed on first render. It paints into #wp-content, which had been sitting
 // in the markup all along and was never written to.
 //
 // Fetched once per page visit; the filters re-paint from this and never refetch.
@@ -10467,6 +10491,12 @@ const WP_STAGE_GROUPS = [
     {label:'Senior / Gold',         codes:['SNR']},
 ];
 
+// The night selector is rebuilt from whichever term is chosen, so this is now
+// just the entry point nav() already calls. It used to write its own flat list
+// of every night, which would overwrite the term-filtered one.
+function populateWPDD(){
+  if(typeof _wpSyncNightOptions==='function') _wpSyncNightOptions();
+}
 async function renderWP() {
     const wrap = document.getElementById('wp-content');
     if (!wrap) return;
@@ -10492,11 +10522,59 @@ async function renderWP() {
         const schedByPn = {};
         for (const sc of ((bulk && bulk.schedules) || [])) schedByPn[sc.parade_night_id] = sc;
         _wpData = {pns: pns || [], classes, schedByPn};
+        // WP-7: open on the term containing today rather than the whole year.
+        // Only on first load -- a choice the user makes afterwards stands.
+        const termSel = document.getElementById('wp-f-term');
+        if (termSel && !termSel.dataset.userSet) {
+            const t = _wpCurrentTerm();
+            if (t && [...termSel.options].some(o => o.value === t)) termSel.value = t;
+        }
+        _wpSyncNightOptions();
         _wpPaint();
     } catch(e) {
         _wpData = null;
         wrap.innerHTML = `<p class="text-danger p-4">Failed to load: ${esc(apiErr(e))}</p>`;
     }
+}
+
+// WP-7: each night's header already printed its term, but there was no way to
+// filter by it, so finding "this term" meant scrolling the whole year.
+function _wpCurrentTerm(){
+  const pns=((_wpData&&_wpData.pns)||[]).filter(p=>p.term);
+  if(!pns.length) return 'all';
+  const today=new Date().toISOString().slice(0,10);
+  const ahead=pns.filter(p=>p.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
+  if(ahead.length) return ahead[0].term;
+  return pns.slice().sort((a,b)=>b.date.localeCompare(a.date))[0].term;
+}
+function _wpNightsInTerm(){
+  const term=(document.getElementById('wp-f-term')||{}).value||'all';
+  return ((_wpData&&_wpData.pns)||[])
+    .filter(p=>term==='all'||p.term===term)
+    .slice().sort((a,b)=>a.date.localeCompare(b.date));
+}
+function _wpSyncNightOptions(){
+  const sel=document.getElementById('wp-sel');
+  if(!sel) return;
+  const prev=sel.value;
+  const nights=_wpNightsInTerm();
+  sel.innerHTML='<option value="">All nights</option>'+nights.map(function(pn){
+    return '<option value="'+esc(pn.date)+'">'+esc(fmtD(pn.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'}))+'</option>';
+  }).join('');
+  if(prev && nights.some(function(n){return n.date===prev;})) sel.value=prev;
+}
+function wpTermChanged(){
+  const t=document.getElementById('wp-f-term');
+  if(t) t.dataset.userSet='1';
+  _wpSyncNightOptions(); _wpPaint();
+}
+
+// WP-8: printReport() has existed all along and nothing ever called it, and this
+// page had no print control. window.print() prints the active page; the print
+// stylesheet already hides every other page and all chrome.
+function wpPrint(){
+  if(typeof _wpData==='undefined'||!_wpData){ showToast('Nothing to print yet.',true); return; }
+  window.print();
 }
 
 // Render from _wpData applying the current filters. No network access -- this is
@@ -10509,9 +10587,20 @@ function _wpPaint() {
     const stEl = document.getElementById('wp-f-status');
     const q = ((qEl && qEl.value) || '').trim().toLowerCase();
     const status = (stEl && stEl.value) || 'all';
+    const term = (document.getElementById('wp-f-term')||{}).value || 'all';
+    const oneNight = (document.getElementById('wp-sel')||{}).value || '';
+
+    // Publish acts on the night being shown, so it only makes sense for one.
+    const pubBtn = document.getElementById('wp-publish-btn');
+    if (pubBtn) {
+        pubBtn.disabled = !oneNight;
+        pubBtn.title = oneNight ? 'Publish the night shown' : 'Choose a single night to publish it';
+    }
 
     let html = '', shown = 0;
     for (const pn of _wpData.pns) {
+        if (term !== 'all' && pn.term !== term) continue;
+        if (oneNight && pn.date !== oneNight) continue;
         const sched = _wpFilterSchedule(_wpData.schedByPn[pn.parade_night_id], q, status);
         if (!sched) continue;
         shown++;
@@ -10522,6 +10611,9 @@ function _wpPaint() {
         wrap.innerHTML = '<p class="muted p-4">No parade nights for this training year.</p>';
         return;
     }
+    const countEl = document.getElementById('wp-count');
+    if (countEl) countEl.textContent = shown ? (shown + ' night' + (shown===1?'':'s') + ' shown') : '';
+
     if (!shown) {
         const bits = [];
         if (q) bits.push(`matching \u201c${esc(q)}\u201d`);
