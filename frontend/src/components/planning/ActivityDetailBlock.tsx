@@ -140,8 +140,8 @@ const IMPORTANCE_COLOR: Record<string, string> = {
   key_event:     "#002f65",
   weekly_parade: "#1a7f4b",
   optional:      "#1a5276",
-  noting:        "#6b7a87",
-  irrelevant:    "#6b7a87",
+  noting:        "var(--muted-text)",
+  irrelevant:    "var(--muted-text)",
 };
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
@@ -211,8 +211,8 @@ function impLabel(a: ActivityDisplay): string {
 }
 
 function impColor(a: ActivityDisplay): string {
-  if (!a.importance || a.classification_status === "needs_review") return "#6b7a87";
-  return IMPORTANCE_COLOR[a.importance] ?? "#6b7a87";
+  if (!a.importance || a.classification_status === "needs_review") return "var(--muted-text)";
+  return IMPORTANCE_COLOR[a.importance] ?? "var(--muted-text)";
 }
 
 
@@ -227,7 +227,7 @@ function Field({ label, value }: { label: string; value: string }) {
   const isNotSet = value === "not set" || value === "not reviewed";
   return (
     <div style={{ display: "flex", gap: 4, fontSize: 10, lineHeight: 1.4 }}>
-      <span style={{ color: "#6b7a87", minWidth: 80, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: "var(--muted-text)", minWidth: 80, flexShrink: 0 }}>{label}</span>
       <span style={{ color: isNotSet ? "#aaa" : "var(--text)", fontStyle: isNotSet ? "italic" : undefined }}>
         {value}
       </span>
@@ -239,7 +239,7 @@ function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; bg: string; color: string }> = {
     classified:   { label: "Reviewed",      bg: "#e8f5e9", color: "#1a7f4b" },
     needs_review: { label: "Needs review",  bg: "#fff8e1", color: "#c97a00" },
-    irrelevant:   { label: "Irrelevant",    bg: "#f5f5f5", color: "#6b7a87" },
+    irrelevant:   { label: "Irrelevant",    bg: "#f5f5f5", color: "var(--muted-text)" },
   };
   const s = map[status] ?? { label: status, bg: "#f0f0f0", color: "var(--text)" };
   return (
@@ -301,11 +301,11 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
         </div>
 
         {/* Host · Source */}
-        <div style={{ fontSize: 10, color: "#6b7a87", marginBottom: 1 }}>{hostSrc}</div>
+        <div style={{ fontSize: 10, color: "var(--muted-text)", marginBottom: 1 }}>{hostSrc}</div>
 
         {/* Location */}
         <div style={{ fontSize: 10, marginBottom: 1 }}>
-          <span style={{ color: "#6b7a87" }}>Location: </span>
+          <span style={{ color: "var(--muted-text)" }}>Location: </span>
           <span style={{ fontStyle: a.location ? undefined : "italic", color: a.location ? "var(--text)" : "#aaa" }}>
             {or(a.location)}
           </span>
@@ -313,7 +313,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
 
         {/* Nomination close (if set) */}
         {a.nomination_end_date && (
-          <div style={{ fontSize: 10, color: "#6b7a87", marginBottom: 1 }}>
+          <div style={{ fontSize: 10, color: "var(--muted-text)", marginBottom: 1 }}>
             Nominations close: {fmtShortDate(a.nomination_end_date)}
           </div>
         )}
@@ -321,7 +321,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
         {/* Status · Audience · Importance */}
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
           <StatusBadge status={a.classification_status} />
-          <span style={{ fontSize: 9, color: "#6b7a87", background: "#f4f8fc", borderRadius: 3, padding: "1px 5px" }}>
+          <span style={{ fontSize: 9, color: "var(--muted-text)", background: "#f4f8fc", borderRadius: 3, padding: "1px 5px" }}>
             {audienceLabel(a)}
           </span>
           <span style={{
@@ -373,7 +373,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
 
       {/* ID · Type */}
       {(a.activity_id || typeFmt) && (
-        <div style={{ fontSize: 10, color: "#6b7a87", marginBottom: 3 }}>
+        <div style={{ fontSize: 10, color: "var(--muted-text)", marginBottom: 3 }}>
           {a.activity_id && <span>ID: <strong style={{ color: "var(--text)" }}>{a.activity_id}</strong></span>}
           {a.activity_id && typeFmt && <span> · </span>}
           {typeFmt && <span>Type: {typeFmt}</span>}
@@ -386,32 +386,32 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
           ? <span>Host: <strong>{a.host_unit}</strong></span>
           : null}
         {a.host_unit && a.parent_unit
-          ? <span style={{ color: "#6b7a87" }}> · </span>
+          ? <span style={{ color: "var(--muted-text)" }}> · </span>
           : null}
         {a.parent_unit
-          ? <span style={{ color: "#6b7a87" }}>Parent: {a.parent_unit}</span>
+          ? <span style={{ color: "var(--muted-text)" }}>Parent: {a.parent_unit}</span>
           : null}
         {!a.host_unit && !a.parent_unit && (
-          <span style={{ color: "#6b7a87" }}>Source: {a.source_label}</span>
+          <span style={{ color: "var(--muted-text)" }}>Source: {a.source_label}</span>
         )}
       </div>
 
       {/* Dates */}
       <div style={{ fontSize: 10, marginBottom: 2 }}>
-        <span style={{ color: "#6b7a87" }}>Activity: </span>
+        <span style={{ color: "var(--muted-text)" }}>Activity: </span>
         <span>{dateRange}</span>
       </div>
 
       {/* Nomination dates */}
       {nomRange && (
-        <div style={{ fontSize: 10, color: "#6b7a87", marginBottom: 2 }}>
+        <div style={{ fontSize: 10, color: "var(--muted-text)", marginBottom: 2 }}>
           Nominations: {nomRange}
         </div>
       )}
 
       {/* Location */}
       <div style={{ fontSize: 10, marginBottom: 4 }}>
-        <span style={{ color: "#6b7a87" }}>Location: </span>
+        <span style={{ color: "var(--muted-text)" }}>Location: </span>
         <span style={{
           fontStyle: a.location ? undefined : "italic",
           color: a.location ? "var(--text)" : "#aaa",
@@ -422,7 +422,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
 
       {/* POC (if available) */}
       {a.activity_poc && (
-        <div style={{ fontSize: 10, color: "#6b7a87", marginBottom: 4 }}>
+        <div style={{ fontSize: 10, color: "var(--muted-text)", marginBottom: 4 }}>
           POC: <span style={{ color: "var(--text)" }}>{a.activity_poc}</span>
         </div>
       )}
@@ -436,12 +436,12 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
           {impLabel(a)}
         </span>
         <span style={{
-          fontSize: 9, color: "#6b7a87", background: "#f4f8fc", borderRadius: 3, padding: "1px 5px",
+          fontSize: 9, color: "var(--muted-text)", background: "#f4f8fc", borderRadius: 3, padding: "1px 5px",
         }}>
           {audienceLabel(a)}
         </span>
         {(a.host_unit || a.parent_unit) && (
-          <span style={{ fontSize: 9, color: "#6b7a87", background: "#f0f0f0", borderRadius: 3, padding: "1px 5px" }}>
+          <span style={{ fontSize: 9, color: "var(--muted-text)", background: "#f0f0f0", borderRadius: 3, padding: "1px 5px" }}>
             {a.source_label}
           </span>
         )}
@@ -487,7 +487,7 @@ export function ActivityFullDetail({
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
         <StatusBadge status={a.classification_status} />
-        <span style={{ fontSize: 9, background: "#f0f0f0", color: "#6b7a87", borderRadius: 3, padding: "1px 5px", fontWeight: 700 }}>
+        <span style={{ fontSize: 9, background: "#f0f0f0", color: "var(--muted-text)", borderRadius: 3, padding: "1px 5px", fontWeight: 700 }}>
           {a.source_label}
         </span>
         {!canEdit && (
@@ -573,10 +573,10 @@ export function ActivityListRow({
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? e => e.key === "Enter" && onClick() : undefined}
     >
-      <td style={{ fontSize: 10, color: "#6b7a87", whiteSpace: "nowrap" }}>{a.activity_id ?? "—"}</td>
+      <td style={{ fontSize: 10, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{a.activity_id ?? "—"}</td>
       <td style={{ fontWeight: 700, fontSize: 11, minWidth: 160 }}>{a.activity_name}</td>
       <td style={{ fontSize: 10 }}>{a.host_unit ?? "—"}</td>
-      <td style={{ fontSize: 10, color: "#6b7a87" }}>{a.parent_unit ?? "—"}</td>
+      <td style={{ fontSize: 10, color: "var(--muted-text)" }}>{a.parent_unit ?? "—"}</td>
       <td style={{ fontSize: 10, whiteSpace: "nowrap" }}>
         {a.activity_start_date ? fmtShortDate(a.activity_start_date) : "—"}
       </td>
@@ -587,8 +587,8 @@ export function ActivityListRow({
       <td style={{ fontSize: 10, whiteSpace: "nowrap" }}>
         {a.nomination_end_date ? fmtShortDate(a.nomination_end_date) : "—"}
       </td>
-      <td style={{ fontSize: 10, color: "#6b7a87" }}>{a.location ?? "—"}</td>
-      <td style={{ fontSize: 10, color: "#6b7a87" }}>{a.activity_poc ?? "—"}</td>
+      <td style={{ fontSize: 10, color: "var(--muted-text)" }}>{a.location ?? "—"}</td>
+      <td style={{ fontSize: 10, color: "var(--muted-text)" }}>{a.activity_poc ?? "—"}</td>
       <td>
         <span style={{
           fontSize: 9, fontWeight: 700, textTransform: "uppercase",
@@ -599,9 +599,9 @@ export function ActivityListRow({
       </td>
       <td style={{ fontSize: 10 }}>{audienceLabel(a)}</td>
       <td><StatusBadge status={a.classification_status} /></td>
-      <td style={{ fontSize: 10, color: "#6b7a87" }}>{typeFmt}</td>
+      <td style={{ fontSize: 10, color: "var(--muted-text)" }}>{typeFmt}</td>
       <td>
-        <span style={{ fontSize: 9, background: "#f0f0f0", color: "#6b7a87", borderRadius: 3, padding: "1px 5px" }}>
+        <span style={{ fontSize: 9, background: "#f0f0f0", color: "var(--muted-text)", borderRadius: 3, padding: "1px 5px" }}>
           {a.source_label}
         </span>
       </td>

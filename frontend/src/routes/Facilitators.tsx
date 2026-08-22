@@ -222,11 +222,11 @@ function DuplicateProfileCard({ detail }: { detail: DuplicateFacilitatorDetail }
   const areas = detail.existing_subject_areas?.length ? detail.existing_subject_areas.join(", ") : "—";
   return (
     <div style={{ marginTop: 6, padding: "8px 10px", background: "var(--surface-2, #f0f5fa)", borderRadius: 6, fontSize: 11.5, display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 10px" }}>
-      <span style={{ color: "var(--muted-text, #6b7a87)" }}>Rank</span><span style={{ fontWeight: 700 }}>{detail.existing_rank || "—"}</span>
-      <span style={{ color: "var(--muted-text, #6b7a87)" }}>Type</span><span>{detail.existing_type || "—"}</span>
-      <span style={{ color: "var(--muted-text, #6b7a87)" }}>Subject areas</span><span>{areas}</span>
-      <span style={{ color: "var(--muted-text, #6b7a87)" }}>Status</span><span>{detail.existing_active_status === false ? "Archived" : "Active"}</span>
-      <span style={{ color: "var(--muted-text, #6b7a87)" }}>Last updated</span><span>{updated}</span>
+      <span style={{ color: "var(--muted-text)" }}>Rank</span><span style={{ fontWeight: 700 }}>{detail.existing_rank || "—"}</span>
+      <span style={{ color: "var(--muted-text)" }}>Type</span><span>{detail.existing_type || "—"}</span>
+      <span style={{ color: "var(--muted-text)" }}>Subject areas</span><span>{areas}</span>
+      <span style={{ color: "var(--muted-text)" }}>Status</span><span>{detail.existing_active_status === false ? "Archived" : "Active"}</span>
+      <span style={{ color: "var(--muted-text)" }}>Last updated</span><span>{updated}</span>
     </div>
   );
 }

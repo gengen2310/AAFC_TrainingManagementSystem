@@ -121,7 +121,7 @@ table.heatmap .hm-corner { background: var(--surface-2); }
 .hm-ok { background: #cfead8; color: #14532d; }
 .hm-warn { background: #fde9c8; color: #7a4a00; }
 .hm-red { background: #f7d0cc; color: #7a1d16; }
-.hm-na { background: var(--surface-2); color: var(--muted-on-sunk); }
+.hm-na { background: var(--surface-2); color: var(--muted-text); }
 
 /* ── tag chip input (Facilitators subject areas) ── */
 .tag-input{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface);cursor:text;min-height:40px;}

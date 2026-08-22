@@ -68,7 +68,7 @@ type SortDir = "asc" | "desc";
 const PROG_TYPE_STYLE: Record<string, CSSProperties> = {
   foundation: { fontSize: 9, fontWeight: 700, color: "#1A7F4B", background: "#d1fae5", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
   extension:  { fontSize: 9, fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
-  optional:   { fontSize: 9, fontWeight: 700, color: "#6b7a87", background: "#f1f5f9", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
+  optional:   { fontSize: 9, fontWeight: 700, color: "var(--muted-text)", background: "#f1f5f9", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
 };
 
 // CLASS-05: per-Training-Class chips in the backlog table, reusing the same

@@ -166,7 +166,7 @@ export function ListView({ yearId, viewRange, customStart, customEnd, conflicts 
             borderBottom: "2px solid var(--aafc-dark-blue)", paddingBottom: 6, marginBottom: 12,
           }}>
             Activities — {rangeLabel}
-            <span style={{ fontSize: 11, fontWeight: 400, color: "#6b7a87", marginLeft: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 400, color: "var(--muted-text)", marginLeft: 8 }}>
               {activities.length} activit{activities.length !== 1 ? "ies" : "y"}
             </span>
           </div>
