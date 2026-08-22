@@ -618,9 +618,8 @@ cannot be reached by scrolling, wrapping, or any other means.
 
 This is not a narrow-viewport bug. It reproduces at 320, 360, 600, 768, 1024 and 1440.
 
-**Deliberately left open.** The obvious candidate, `.pw-filter-chips`, already sets
-`flex-wrap: wrap` — so the offending row is a different, unclassed container that I did
-not positively identify. Changing `.pw-root`'s `overflow` to force a scrollbar would be a
+**Identified and fixed — see below.** The obvious candidate, `.pw-filter-chips`, already
+sets `flex-wrap: wrap`; the offending row was a different, inline-styled container. Changing `.pw-root`'s `overflow` to force a scrollbar would be a
 guess at the wrong level: `.pw-root` is the app shell (`height: calc(100vh - 48px)`,
 panels scrolling internally), and loosening it risks the shell's own scroll behaviour.
 Fixing the actual row is right; guessing which one is not.
@@ -638,3 +637,44 @@ planning grid genuinely reflow to 320px is design work, not a CSS change, and is
 scope for an audit remediation.
 
 Verified after the change: 45 tests pass, build clean.
+
+
+---
+
+## FIX-11 · The unreachable chip row identified and fixed
+
+`routes/PlanningWorkspace.tsx:437` — the **year selector**. It renders one `pw-chip` per
+planning year in an inline-styled `display:flex` row with no wrap, and the row's action
+buttons come **after** the chips in DOM order.
+
+**The user-visible defect was never really the chips.** With enough years, `+ Anchor event`,
+`Update future parade day` and `Guided year setup` are pushed past the right edge, and
+`.pw-root` is `overflow:hidden`, so they cannot be scrolled to at any viewport width. Three
+primary actions, silently unreachable.
+
+Measured at 1440px against 131 seeded years: row scrollWidth **12,918px** in a 1,195px box,
+110 chips past the edge, all three actions off-screen.
+
+Fix: `flexWrap: "wrap"` plus a `rowGap`.
+
+| | before | after |
+|---|---|---|
+| row scrollWidth vs client | 12,918 / 1,195 | 1,267 / 1,267 |
+| chips past the right edge | 110 | **0** |
+| document elements past the edge | 110 | **0** |
+| the three action buttons | all off-screen | **all on screen** |
+
+### A refinement that made it worse, and was reverted
+
+Wrapping 131 chips makes the row 687px tall, so a `maxHeight: 22vh` + `overflowY: auto` cap
+was added to stop it eating the viewport. Re-measuring showed the cap pushed the same three
+action buttons **below the row's scroll fold** — recreating the exact defect the fix existed
+to remove, in the other axis.
+
+Reverted. Wrapping alone keeps every control reachable, and the 687px height only appears
+against seeded data with 131 planning years; a real unit has a handful.
+
+Worth recording because the cap looked like an obvious improvement and was only exposed by
+measuring after the change rather than reasoning about it. The bound belongs on the chips,
+not on the row that also holds the actions — restructuring the JSX that way is the better
+long-term shape, and was not attempted here.

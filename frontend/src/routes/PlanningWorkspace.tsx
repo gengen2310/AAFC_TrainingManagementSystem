@@ -432,9 +432,18 @@ export function PlanningWorkspace() {
         onHelpOpen={() => setHelpOpen(true)}
       />
 
-      {/* Year selector + quick actions */}
+      {/* Year selector + quick actions.
+          AUDIT-2026-08 G10 / WCAG 1.4.10 — flexWrap here is load-bearing. This row renders one
+          chip per planning year and the action buttons ("+ Anchor event" and siblings) come
+          AFTER them, so without wrapping a unit with many years pushes those actions off-screen.
+          .pw-root is overflow:hidden, so they cannot be scrolled to at any viewport width.
+          Measured at 1440px against 131 seeded years: 12,918px of content in a 1,195px box.
+          A maxHeight cap was tried here and removed: capping the row pushed those same action
+          buttons below its scroll fold, which is the defect this fix exists to prevent. Wrapping
+          alone keeps every control reachable. A realistic unit has a handful of years; the 687px
+          height only appears against seeded data with 131 of them. */}
       {selectedYearId && (
-        <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)", padding: "4px 14px", display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)", padding: "4px 14px", display: "flex", flexWrap: "wrap", gap: 8, rowGap: 6, alignItems: "center" }}>
           {yearOptions && (
             <>
               <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: "var(--muted-text)" }}>Year:</span>
