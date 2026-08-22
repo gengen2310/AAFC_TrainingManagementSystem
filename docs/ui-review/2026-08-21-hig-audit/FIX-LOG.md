@@ -452,3 +452,73 @@ reason it was caught: every other signal said the code was clean.
 Still unmeasured, and not claimable: the authenticated screens. Every result on this branch
 comes from probe pages, the sign-in screen, and static analysis. G10 and G12 remain
 unassessed, and the 15 conditional inline sites need a rendered check.
+
+---
+
+## FIX-08 · The authenticated screens — measured at last
+
+**Setup:** local FastAPI backend on :8000 against the existing seeded SQLite DB, the SPA served
+on :8080 from a `_local-test.html` copy whose `aafc-api-base` points at localhost. The tracked
+`index.html` still points at production and was never altered; the copy is git-ignored.
+Signed in through the real login handler (not a direct API call, which would not populate
+`sessionStorage`) as `sqn_admin` at 703SQN.
+
+Everything before this point in the audit was measured on probe pages and the sign-in screen.
+This is the first time the application itself was measured.
+
+### Result across 13 authenticated pages
+
+| | before | after |
+|---|---|---|
+| text pairs measured | — | **509** |
+| contrast failures | 1 | **0** |
+| hit targets < 28px | **1,342** | **14** (12 real; 2 are the `.ht` pseudo-element overlay) |
+| unlabelled controls | **275** | 31 |
+
+### 1,342 hit-target failures were five rules
+
+The counts are per-rendered-element, so one rule in a table repeats per row. The actual work:
+
+| Rule | Sites | Defect | Fix |
+|---|---|---|---|
+| `.btn-xs` | 895 | `min-height` was set, `min-width` was not — icon buttons rendered 25px wide | add `min-width:28px` |
+| bulk-select checkbox | 244 | 16×16 in a 26×16 label; label carried a `title`, the input had no name | `aria-label`, 28×28 label |
+| `.modal-x` / `.modal-close` | 66 | flex children of `.modal-hdr` shrinking to **6×13** | `flex-shrink:0` + `min-*` |
+| `.lh-btn`, `.btn-lnk`, `.cal-nbtn` | 76 | 24px tall / 11px wide | `min-height`/`min-width:28px` |
+| `.tb-btn` | 3/page | topbar at 24–25px — only exists once signed in | `min-height:28px` |
+
+**The `.modal-x` regression was mine.** Moving those buttons from fixed px to `em` earlier on this
+branch removed the implicit floor, and as flex children with `flex-shrink:1` they collapsed to
+6×13. It was invisible until the app was driven authenticated: modals do not exist on the
+sign-in screen. Fixed-size-to-`em` conversions need `flex-shrink:0` wherever the element is a
+flex child.
+
+### 9 CSS custom properties were referenced but never defined
+
+`--error` (24 uses), `--warning`, `--amber`, `--bg-card`, `--bg-page`, `--bg2`, `--b2`,
+`--hover`, `--red-bg` — **37 declarations, none with a fallback.** Every one computed to the
+inherited value, so the styling silently did not apply: the Archive control was never actually
+red, "error" text was never actually the error colour.
+
+`css_audit.py` cannot see this. An unresolvable `var()` is skipped, not flagged — so a token
+that does not exist looks exactly like a token it merely could not evaluate. **Add an
+undefined-token check to any CSS audit; a missing definition is silent by design.**
+
+Defined as aliases of the real palette. The two used as text colours map to `--warn-text` and
+`--status-text-danger`, because raw `--warn` is 4.05:1 on white. Re-measured after: still 0
+contrast failures, so activating 37 dormant declarations introduced nothing.
+
+### Static enumeration still earned its place
+
+Four `.cal-chip` variants put white on their fill: `not_delivered` 2.03:1, `delivered_with_issue`
+3.10:1, `rescheduled` and `act` 3.35:1. The live sweep caught **one** — only that variant
+appeared in the day's data. Enumerating the CSS found the other three. Live measurement proves
+what renders; static enumeration covers what could render.
+
+### Still open
+
+- 12 real hit targets: 10 form inputs at 104×21, one `.btn` at 41×18, one select at 146×22
+- 31 unlabelled inputs, mostly on Unit Setup, Curriculum and Activities
+- Only the `sqn_admin` role was walked. `wing_admin`, `national_admin`, `auditor` and
+  `system_admin` have their own pages and were not measured.
+- G10 (adaptive layout) and G12 (data integrity) remain unassessed.
