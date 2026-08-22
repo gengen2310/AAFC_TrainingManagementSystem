@@ -42,6 +42,22 @@
      One value cannot serve both, so the ring is a token and the dark chrome re-points
      it below. */
   --focus-ring:          var(--royal);   /* >=7.27:1 on every light surface */
+
+  /* ── Aliases for tokens that were referenced but never defined ─────────────
+     AUDIT-2026-08: 37 declarations across 9 names used var(--x) for a token that
+     does not exist, none with a fallback, so every one silently computed to the
+     inherited value and the styling simply did not apply. css_audit.py never saw
+     this: an unresolvable var() is skipped, not flagged. The two used as text
+     colours map to the -text variants, because raw --warn is 4.05:1 on white. */
+  --error:    var(--status-text-danger);  /* 24 uses, all `color:` */
+  --warning:  var(--warn-text);           /*  1 use,  `color:`     */
+  --amber:    var(--warn);
+  --bg-card:  var(--surface);
+  --bg-page:  var(--bg);
+  --bg2:      var(--surface-2);
+  --b2:       var(--border);
+  --hover:    var(--surface-2);
+  --red-bg:   #fde8e8;
   --status-text-danger:  #d41733;
   /* Status / semantic */
   --ok:          #1a7f4b;   --ok-bg:  #d4f0e3;   --ok-text: #145f38;
