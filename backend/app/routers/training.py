@@ -14,6 +14,8 @@ from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, Parade
                       SessionAudience, CadetClassMembership,
                       ParadeNightTemplate, ParadeNightTemplateSession)
 from ..models.planning import ActivityLocalOverride
+from ..models.faq import FaqEntry
+from ..richtext import sanitize_rich_text
 from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_CODES
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
@@ -3314,13 +3316,127 @@ def update_activities_getting_help(body: GettingHelpIn, db: DBSession = Depends(
     if row is None:
         row = SystemSetting(key=_GETTING_HELP_KEY)
         db.add(row)
-    row.value = body.content
+    # Stored HTML is rendered into every user's Help page, so it passes the
+    # allowlist here as well as on render. Audit the stored value, not the
+    # submitted one, so the log shows what users will actually see.
+    row.value = sanitize_rich_text(body.content)
     row.updated_at = utcnow()
     row.updated_by = p.user_id
     db.commit()
     audit(db, p, object_type="system_setting", object_id=_GETTING_HELP_KEY,
-          action="getting_help_content_updated", old={"content": old_value}, new={"content": body.content})
+          action="getting_help_content_updated", old={"content": old_value}, new={"content": row.value})
     return {"content": row.value, "updated_at": row.updated_at}
+
+
+# ── FAQ ──────────────────────────────────────────────────────────────────────
+# Authored by system_admin, readable by every signed-in user. Grouped by an
+# admin-defined category rather than a fixed enum, so the list can follow how
+# squadrons actually ask questions without a migration each time.
+
+def _faq_dict(f: FaqEntry) -> dict:
+    return {
+        "id": f.id,
+        "category": f.category,
+        "question": f.question,
+        "answer_html": f.answer_html,
+        "sort_order": f.sort_order,
+        "is_published": f.is_published,
+        "updated_at": f.updated_at,
+    }
+
+
+@router.get("/activities/faq")
+def list_faq(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    q = db.query(FaqEntry)
+    # Everyone else only ever sees published entries, so an admin can draft an
+    # answer without it appearing half-written on every squadron's Help page.
+    if p.role != "system_admin":
+        q = q.filter(FaqEntry.is_published == True)  # noqa: E712
+    rows = q.order_by(FaqEntry.category, FaqEntry.sort_order, FaqEntry.created_at).all()
+
+    categories: list[dict] = []
+    by_name: dict[str, dict] = {}
+    for f in rows:
+        group = by_name.get(f.category)
+        if group is None:
+            group = {"category": f.category, "entries": []}
+            by_name[f.category] = group
+            categories.append(group)
+        group["entries"].append(_faq_dict(f))
+    return {"categories": categories, "total": len(rows)}
+
+
+class FaqIn(BaseModel):
+    category: str = "General"
+    question: str
+    answer_html: str = ""
+    sort_order: int = 0
+    is_published: bool = True
+
+    @field_validator("question")
+    @classmethod
+    def _question_not_blank(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("A question is required.")
+        return v[:300]
+
+    @field_validator("category")
+    @classmethod
+    def _category_not_blank(cls, v: str) -> str:
+        return ((v or "").strip() or "General")[:80]
+
+
+@router.post("/activities/faq")
+def create_faq(body: FaqIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    f = FaqEntry(
+        category=body.category,
+        question=body.question,
+        answer_html=sanitize_rich_text(body.answer_html),
+        sort_order=body.sort_order,
+        is_published=body.is_published,
+        created_by=p.user_id,
+        updated_by=p.user_id,
+    )
+    db.add(f)
+    db.commit()
+    audit(db, p, object_type="faq_entry", object_id=f.id, action="faq_entry_created",
+          new={"category": f.category, "question": f.question})
+    return _faq_dict(f)
+
+
+@router.put("/activities/faq/{faq_id}")
+def update_faq(faq_id: str, body: FaqIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    f = db.get(FaqEntry, faq_id)
+    if not f:
+        raise HTTPException(404, detail="FAQ entry not found.")
+    old = {"category": f.category, "question": f.question, "is_published": f.is_published}
+    f.category = body.category
+    f.question = body.question
+    f.answer_html = sanitize_rich_text(body.answer_html)
+    f.sort_order = body.sort_order
+    f.is_published = body.is_published
+    f.updated_by = p.user_id
+    f.updated_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="faq_entry", object_id=f.id, action="faq_entry_updated",
+          old=old, new={"category": f.category, "question": f.question, "is_published": f.is_published})
+    return _faq_dict(f)
+
+
+@router.delete("/activities/faq/{faq_id}")
+def delete_faq(faq_id: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    f = db.get(FaqEntry, faq_id)
+    if not f:
+        raise HTTPException(404, detail="FAQ entry not found.")
+    snapshot = {"category": f.category, "question": f.question}
+    db.delete(f)
+    db.commit()
+    audit(db, p, object_type="faq_entry", object_id=faq_id, action="faq_entry_deleted", old=snapshot)
+    return {"ok": True}
 
 
 @router.get("/activities")

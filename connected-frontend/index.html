@@ -1118,6 +1118,71 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     scroll-behavior:auto!important;
   }
 }
+
+/* ═══ Help & Reference: rendered rich text, FAQ, and the editor ═══ */
+.help-grid{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:12px;align-items:start}
+@media(max-width:900px){.help-grid{grid-template-columns:1fr}}
+.help-aside .card{position:sticky;top:12px}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+
+/* Rendered author content. Scoped to .rt so these never leak into app chrome. */
+.rt{font-size:var(--fs-sm);color:var(--text-2);line-height:1.65}
+.rt > :first-child{margin-top:0}
+.rt > :last-child{margin-bottom:0}
+.rt h2{font-size:var(--fs-md);color:var(--dark);font-weight:700;margin:18px 0 6px;line-height:1.3}
+.rt h3{font-size:var(--fs-sm);color:var(--dark);font-weight:700;margin:14px 0 4px;line-height:1.35}
+.rt h4{font-size:var(--fs-sm);color:var(--text);font-weight:600;margin:12px 0 4px}
+.rt p{margin:0 0 10px;max-width:74ch}
+.rt ul,.rt ol{margin:0 0 10px;padding-left:22px;max-width:74ch}
+.rt li{margin-bottom:4px}
+.rt a{color:var(--royal);text-decoration:underline;text-underline-offset:2px}
+.rt a:hover{color:var(--dark)}
+.rt strong{font-weight:700;color:var(--text)}
+.rt blockquote{margin:0 0 10px;padding:8px 12px;border-left:3px solid var(--blue);background:var(--surface-2);border-radius:0 6px 6px 0;max-width:74ch}
+.rt-empty{color:var(--muted);font-size:var(--fs-sm);font-style:normal}
+
+/* FAQ — native details/summary, so expand and collapse work from the keyboard
+   and are announced correctly without any JS. */
+.faq-cat{margin-bottom:16px}
+.faq-cat:last-child{margin-bottom:0}
+.faq-cat-name{font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.faq-cat-name::after{content:"";flex:1;height:1px;background:var(--border-light)}
+.faq-item{border:1px solid var(--border-light);border-radius:6px;margin-bottom:6px;background:var(--surface)}
+.faq-item[open]{border-color:var(--border);box-shadow:var(--sh)}
+.faq-item > summary{
+  list-style:none;cursor:pointer;padding:10px 12px;display:flex;align-items:center;gap:9px;
+  font-size:var(--fs-sm);font-weight:600;color:var(--text);border-radius:6px;min-height:44px;
+}
+.faq-item > summary::-webkit-details-marker{display:none}
+.faq-item > summary:hover{background:var(--surface-2)}
+.faq-item > summary:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.faq-caret{flex:none;width:14px;color:var(--muted);transition:transform .15s ease;font-size:11px}
+@media(prefers-reduced-motion:reduce){.faq-caret{transition:none}}
+.faq-item[open] .faq-caret{transform:rotate(90deg)}
+.faq-q{flex:1;min-width:0}
+.faq-draft{font-size:var(--fs-3xs,9px);font-weight:600;padding:2px 6px;border-radius:999px;background:var(--warn-bg);color:#7a4800;white-space:nowrap}
+.faq-a{padding:0 12px 12px 35px;border-top:1px solid var(--border-light);margin-top:0;padding-top:10px}
+.faq-admin{display:flex;gap:6px;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border-light)}
+
+/* Rich text editor */
+.rte-bar{display:flex;flex-wrap:wrap;gap:2px;padding:6px;border:1px solid var(--border);border-bottom:0;border-radius:6px 6px 0 0;background:var(--surface-2)}
+.rte-bar .rte-sep{width:1px;background:var(--border);margin:3px 4px;align-self:stretch}
+.rte-btn{
+  font-family:inherit;font-size:var(--fs-xs);font-weight:600;color:var(--text-2);
+  background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer;
+  min-width:30px;height:28px;padding:0 7px;display:inline-flex;align-items:center;justify-content:center;
+}
+.rte-btn:hover{background:var(--surface);border-color:var(--border)}
+.rte-btn:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.rte-btn[aria-pressed="true"]{background:var(--accent-light);border-color:var(--blue);color:var(--dark)}
+.rte-area{
+  border:1px solid var(--border);border-radius:0 0 6px 6px;background:var(--surface);
+  padding:12px 14px;min-height:220px;max-height:46vh;overflow-y:auto;
+}
+.rte-area:focus{outline:2px solid var(--blue);outline-offset:-2px}
+.rte-area:empty::before{content:attr(data-placeholder);color:var(--muted)}
+.rte-hint{font-size:var(--fs-2xs);color:var(--muted);margin-top:6px}
+
 </style>
 </head>
 <body>
@@ -1907,17 +1972,33 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <h1 class="ph-title">Help &amp; Reference</h1>
           <div class="ph-sub">Guides, reference material, and support information</div>
         </div>
-        <div class="card">
-          <div class="ctitle">Getting Started</div>
-          <p style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:12px">New to TMS? The setup checklist helps you complete your initial configuration.</p>
-          <button class="btn btn-dk" onclick="nav('getting-started')">Open Setup Checklist</button>
-        </div>
-        <div class="card" style="margin-top:12px">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
-            <div class="ctitle" style="margin:0">Getting Help</div>
-            <button id="gh-edit-btn" class="btn btn-secondary btn-sm" style="display:none" onclick="openGettingHelpModal()">Edit</button>
+
+        <div class="help-grid">
+          <div class="help-main">
+            <div class="card">
+              <div class="card-head">
+                <div class="ctitle" style="margin:0">Getting help</div>
+                <button id="gh-edit-btn" class="btn btn-secondary btn-sm" style="display:none" onclick="openGettingHelpModal()">Edit</button>
+              </div>
+              <div id="gh-content-display" class="rt"></div>
+              <div id="gh-updated" class="muted" style="font-size:var(--fs-2xs);margin-top:12px"></div>
+            </div>
+
+            <div class="card" style="margin-top:12px">
+              <div class="card-head">
+                <div class="ctitle" style="margin:0">Frequently asked questions</div>
+                <button id="faq-add-btn" class="btn btn-secondary btn-sm" style="display:none" onclick="openFaqModal()">Add question</button>
+              </div>
+              <div id="faq-body"></div>
+            </div>
           </div>
-          <div id="gh-content-display" class="muted" style="font-size:var(--fs-sm);white-space:pre-wrap"></div>
+
+          <aside class="help-aside">
+            <div class="card">
+              <div class="ctitle">Start here</div>
+              <div id="help-links" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
+            </div>
+          </aside>
         </div>
       </div>
 
@@ -3139,13 +3220,51 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
 <!-- Getting Help Edit Modal (system_admin only) -->
 <div class="modal-bg" id="m-getting-help" role="dialog" aria-modal="true" aria-labelledby="m-getting-help-title">
-  <div class="modal">
-    <h2 id="m-getting-help-title">Edit Getting Help Content</h2>
-    <div class="form-group"><label for="gh-content-inp">Content</label><textarea id="gh-content-inp" rows="8" placeholder="e.g. Contact your Wing Training Officer for support with this page."></textarea></div>
+  <div class="modal" style="max-width:720px">
+    <h2 id="m-getting-help-title">Edit getting help</h2>
+    <div id="gh-editor-mount"></div>
     <p id="gh-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-getting-help')">Cancel</button>
-      <button class="btn btn-primary" onclick="doSaveGettingHelp()">Save</button>
+      <button class="btn btn-primary" onclick="doSaveGettingHelp()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / edit an FAQ entry -->
+<div class="modal-bg" id="m-faq" role="dialog" aria-modal="true" aria-labelledby="m-faq-title">
+  <div class="modal" style="max-width:720px">
+    <h2 id="m-faq-title">Add a question</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="faq-cat-inp">Category</label>
+        <input type="text" id="faq-cat-inp" list="faq-cat-list" placeholder="e.g. Parade Nights">
+        <datalist id="faq-cat-list"></datalist>
+      </div>
+      <div class="form-group">
+        <label for="faq-order-inp">Position in category</label>
+        <input type="number" id="faq-order-inp" value="0" min="0" step="1">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="faq-q-inp">Question *</label>
+      <input type="text" id="faq-q-inp" maxlength="300" placeholder="e.g. How do I roll a training year over?">
+    </div>
+    <div class="form-group">
+      <label for="faq-answer-editor">Answer</label>
+      <div id="faq-editor-mount"></div>
+    </div>
+    <div class="form-group">
+      <label style="display:inline-flex;align-items:center;gap:8px;min-height:28px;cursor:pointer">
+        <input type="checkbox" id="faq-pub-inp" checked>
+        <span>Visible to everyone</span>
+      </label>
+      <div class="muted" style="font-size:var(--fs-2xs)">Turn this off to keep a draft answer to yourself while you write it.</div>
+    </div>
+    <p id="faq-msg" style="color:var(--error)"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('m-faq')">Cancel</button>
+      <button class="btn btn-primary" onclick="doSaveFaq()">Save question</button>
     </div>
   </div>
 </div>
@@ -12231,145 +12350,529 @@ function _tcLoadForYear(yearId){
   _tcToggleShowArchived(yearId);
 }
 
-const _GH_DEFAULT=`AAFC TRAINING MANAGEMENT SYSTEM — HELP GUIDE
+/* ═══ Help & Reference ═══════════════════════════════════════════════════════
+   Author content is the only HTML in the TMS that comes from another user, so
+   it passes an allowlist here as well as on the server. Sanitising on save
+   alone would leave anything stored before this landed unfiltered; sanitising
+   on render alone would leave a bad value sitting in the database waiting for
+   a consumer that forgets. Both, deliberately.
+   The allowlist below must stay in step with backend/app/richtext.py.        */
 
-═══════════════════════════════════════════════
-WHAT IS TMS?
-═══════════════════════════════════════════════
-TMS (Training Management System) is the AAFC system for managing your squadron's records. Use TMS to:
+const _RT_TAGS={P:1,BR:1,H2:1,H3:1,H4:1,STRONG:1,EM:1,U:1,UL:1,OL:1,LI:1,A:1,BLOCKQUOTE:1};
+const _RT_ALIAS={B:'STRONG',I:'EM',STRIKE:'EM',H1:'H2',H5:'H4',H6:'H4',DIV:'P'};
+const _RT_DROP={SCRIPT:1,STYLE:1,TEMPLATE:1,IFRAME:1,OBJECT:1,EMBED:1,SVG:1,MATH:1,NOSCRIPT:1,TITLE:1,HEAD:1};
 
-  • Create and manage accounts
-  • Manage facilitators
-  • Manage training areas and equipment
-  • View reports and dashboards
-  • Configure squadron settings
-  • Manage curriculum and activities
+function _rtSafeHref(v){
+  if(!v)return null;
+  const raw=String(v).trim();
+  if(!raw)return null;
+  // Browsers ignore whitespace and control characters inside a scheme, so
+  // "java\tscript:" runs. Normalise before deciding.
+  const flat=raw.replace(/[\s\x00-\x1f\x7f]/g,'').toLowerCase();
+  if(flat.startsWith('//'))return null;      // protocol-relative: off-site
+  if(flat.startsWith('/')||flat.startsWith('#'))return raw;
+  if(/^(https?:|mailto:)/.test(flat))return raw;
+  return null;
+}
+function _rtWalk(src,dest){
+  Array.prototype.forEach.call(src.childNodes,function(n){
+    if(n.nodeType===3){dest.appendChild(document.createTextNode(n.nodeValue));return;}
+    if(n.nodeType!==1)return;
+    const tag=n.tagName.toUpperCase();
+    if(_RT_DROP[tag])return;                  // tag and its contents both go
+    const name=_RT_ALIAS[tag]||tag;
+    if(!_RT_TAGS[name]){_rtWalk(n,dest);return;}   // unwrap: text survives
+    const el=document.createElement(name.toLowerCase());
+    if(name==='A'){
+      const href=_rtSafeHref(n.getAttribute('href'));
+      if(href){
+        el.setAttribute('href',href);
+        if(/^https?:/i.test(href.replace(/[\s\x00-\x1f\x7f]/g,''))){
+          el.setAttribute('rel','noopener noreferrer');
+          el.setAttribute('target','_blank');
+        }
+      }
+    }
+    _rtWalk(n,el);
+    dest.appendChild(el);
+  });
+}
+function _rtSanitize(html){
+  // DOMParser does not run scripts or load resources, so parsing is safe.
+  const doc=new DOMParser().parseFromString('<body>'+(html||'')+'</body>','text/html');
+  const holder=document.createElement('div');
+  _rtWalk(doc.body,holder);
+  return holder.innerHTML.trim();
+}
+function _rtRender(el,html,emptyMsg){
+  if(!el)return;
+  const clean=_rtSanitize(html);
+  if(!clean){el.innerHTML='';el.appendChild(Object.assign(document.createElement('p'),{className:'rt-empty',textContent:emptyMsg||'Nothing here yet.'}));return;}
+  el.innerHTML=clean;
+}
 
-═══════════════════════════════════════════════
-WHAT IS PLANNING WORKSPACE?
-═══════════════════════════════════════════════
-Planning Workspace is the AAFC training planner. It is a separate screen (accessed via the Planning link in the navigation bar) where you:
+/* ── Rich text editor ──────────────────────────────────────────────────────
+   execCommand is deprecated but is the only formatting API every browser this
+   app supports implements, and this file has no build step to bring in an
+   editor library. Output goes through _rtSanitize before it is sent, so
+   whatever execCommand emits is normalised to the allowlist either way.     */
 
-  • Create a year
-  • Generate parade night dates
-  • Schedule curriculum sessions
-  • Assign facilitators and rooms
-  • Record training outcomes
-  • Review Mission Backlog
+const _RTE_BUTTONS=[
+  {cmd:'bold',        label:'B',    title:'Bold',            style:'font-weight:800'},
+  {cmd:'italic',      label:'I',    title:'Italic',          style:'font-style:italic'},
+  {cmd:'underline',   label:'U',    title:'Underline',       style:'text-decoration:underline'},
+  {sep:1},
+  {block:'h2',        label:'H2',   title:'Heading'},
+  {block:'h3',        label:'H3',   title:'Subheading'},
+  {block:'p',         label:'Body', title:'Body text'},
+  {sep:1},
+  {cmd:'insertUnorderedList', label:'Bullets', title:'Bulleted list'},
+  {cmd:'insertOrderedList',   label:'Numbers', title:'Numbered list'},
+  {sep:1},
+  {act:'link',        label:'Link',   title:'Add a link'},
+  {cmd:'unlink',      label:'Unlink', title:'Remove link'},
+  {sep:1},
+  {cmd:'removeFormat',label:'Clear',  title:'Clear formatting'}
+];
+const _rteState={};
 
-When to use TMS: to manage your organisation — accounts, facilities, activities.
-When to use Planning Workspace: to do the planning — schedule nights, assign curriculum, track delivery.
+function _rteMount(mountId,html,placeholder){
+  const mount=document.getElementById(mountId);
+  if(!mount)return;
+  mount.innerHTML='';
 
-═══════════════════════════════════════════════
-KEY TERMS
-═══════════════════════════════════════════════
-Year
-  A container for all parade nights and training records for one academic year (typically July to June). Create a year before scheduling parade nights.
+  const bar=document.createElement('div');
+  bar.className='rte-bar';
+  bar.setAttribute('role','toolbar');
+  bar.setAttribute('aria-label','Text formatting');
 
-Training Stage
-  A national AAFC curriculum level — Initial, Junior, Intermediate, Senior, Bronze, Silver, or Gold. Each stage has a fixed set of required modules defined at the national level. Training Stages are the same for every squadron.
+  const area=document.createElement('div');
+  area.className='rte-area';
+  area.contentEditable='true';
+  area.setAttribute('role','textbox');
+  area.setAttribute('aria-multiline','true');
+  area.setAttribute('aria-label','Content');
+  area.setAttribute('data-placeholder',placeholder||'Start typing…');
+  area.innerHTML=_rtSanitize(html)||'<p><br></p>';
 
-Training Class
-  A squadron-specific group of cadets completing a Training Stage during a year. Where a squadron has enough cadets, one Training Stage can have several classes running at the same time.
+  const linkRow=document.createElement('div');
+  linkRow.style.cssText='display:none;gap:6px;margin-top:6px;align-items:center';
+  const linkInp=document.createElement('input');
+  linkInp.type='text';
+  linkInp.placeholder='https://example.org or /planning';
+  linkInp.setAttribute('aria-label','Link address');
+  linkInp.style.cssText='flex:1;font-size:var(--fs-xs);padding:6px 8px;border:1px solid var(--border);border-radius:4px';
+  const linkGo=Object.assign(document.createElement('button'),{type:'button',className:'btn btn-primary btn-sm',textContent:'Add link'});
+  const linkNo=Object.assign(document.createElement('button'),{type:'button',className:'btn btn-secondary btn-sm',textContent:'Cancel'});
+  linkRow.append(linkInp,linkGo,linkNo);
 
-  Example: a squadron with 30 senior cadets might create Senior 1 (15 cadets) and Senior 2 (15 cadets). Both classes follow the Senior Training Stage, but each has its own independent progress record. Senior 1 may have completed SEN-04 while Senior 2 has it planned. The system tracks them separately.
+  let savedRange=null;
+  const saveRange=function(){
+    const sel=window.getSelection();
+    if(sel&&sel.rangeCount&&area.contains(sel.anchorNode))savedRange=sel.getRangeAt(0).cloneRange();
+  };
+  const restoreRange=function(){
+    if(!savedRange)return;
+    const sel=window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
+  };
+  area.addEventListener('keyup',saveRange);
+  area.addEventListener('mouseup',saveRange);
 
-  Why the distinction matters: a single Training Stage can have multiple classes, each at a different point in the curriculum. If the system treated them as one group, it could not tell you which class still needs a module, or which class needs to be scheduled next.
+  const buttons=[];
+  _RTE_BUTTONS.forEach(function(def){
+    if(def.sep){const sp=document.createElement('span');sp.className='rte-sep';bar.appendChild(sp);return;}
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='rte-btn';
+    b.textContent=def.label;
+    b.title=def.title;
+    b.setAttribute('aria-label',def.title);
+    if(def.cmd)b.setAttribute('aria-pressed','false');
+    if(def.style)b.style.cssText=def.style;
+    // Keeps the caret in the editable when the button is clicked.
+    b.addEventListener('mousedown',function(e){e.preventDefault();});
+    b.addEventListener('click',function(){
+      area.focus();
+      if(def.act==='link'){
+        saveRange();
+        linkRow.style.display='flex';
+        linkInp.value='';
+        linkInp.focus();
+        return;
+      }
+      if(def.block){document.execCommand('formatBlock',false,def.block);}
+      else{document.execCommand(def.cmd,false,null);}
+      syncState();
+    });
+    b.__def=def;
+    buttons.push(b);
+    bar.appendChild(b);
+  });
 
-Parade Night
-  A scheduled training evening. Each parade night can hold multiple sessions across different time periods.
+  linkGo.addEventListener('click',function(){
+    const href=_rtSafeHref(linkInp.value);
+    if(!href){showToast('Enter a web address starting with https:// or a path starting with /',true);return;}
+    area.focus();
+    restoreRange();
+    document.execCommand('createLink',false,href);
+    linkRow.style.display='none';
+    syncState();
+  });
+  linkNo.addEventListener('click',function(){linkRow.style.display='none';area.focus();});
+  linkInp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){e.preventDefault();linkGo.click();}
+    if(e.key==='Escape'){e.preventDefault();linkNo.click();}
+  });
 
-Session
-  One training block within a parade night. Each session is linked to a curriculum item, time period, facilitator, room, and one or more Training Classes.
+  function syncState(){
+    buttons.forEach(function(b){
+      const def=b.__def;
+      if(!def.cmd)return;
+      let on=false;
+      try{on=document.queryCommandState(def.cmd);}catch(_){on=false;}
+      b.setAttribute('aria-pressed',on?'true':'false');
+    });
+  }
+  area.addEventListener('keyup',syncState);
+  area.addEventListener('mouseup',syncState);
 
-  A session can serve more than one Training Class. If Senior 1 and Senior 2 are doing the same module together, assign both classes to one session — they share the session but the system records the delivery against each class separately.
+  // Pasting from Word or a web page is the main way unwanted markup arrives.
+  area.addEventListener('paste',function(e){
+    e.preventDefault();
+    const cb=e.clipboardData||window.clipboardData;
+    const html=cb?cb.getData('text/html'):'';
+    const text=cb?cb.getData('text/plain'):'';
+    if(html){document.execCommand('insertHTML',false,_rtSanitize(html));}
+    else{document.execCommand('insertText',false,text||'');}
+  });
 
-Activity
-  A training event that happens outside the standard parade night schedule — field days, camps, competitions, courses, and other activities. Activities appear in Planning Workspace as reference items and feed into Mission Backlog when they include curriculum delivery. Activities are created and managed in TMS → Activities. CEA (Canadian Expedition Activity) activities are imported from the national system.
+  mount.append(bar,area,linkRow);
+  const hint=document.createElement('div');
+  hint.className='rte-hint';
+  hint.textContent='Formatting is limited to headings, bold, italic, underline, lists and links. Anything else is removed when you save.';
+  mount.appendChild(hint);
 
-Mission Backlog
-  A list of curriculum modules required for your active Training Classes that have not yet been scheduled. The backlog tells you what still needs to be planned and for which class. If a module is needed by Senior 1 but not Senior 2, the backlog shows that distinction.
+  _rteState[mountId]=area;
+  try{document.execCommand('styleWithCSS',false,false);}catch(_){}
+}
+function _rteValue(mountId){
+  const area=_rteState[mountId];
+  return area?_rtSanitize(area.innerHTML):'';
+}
 
-═══════════════════════════════════════════════
-HOW TO GET STARTED — FIRST TIME
-═══════════════════════════════════════════════
-Before using Planning Workspace, set up the following in TMS:
+/* ── Getting help ────────────────────────────────────────────────────────── */
 
-  1. Squadron details (name, parade day, parade location)
-  2. At least one facilitator
-  3. At least one training area
-  4. A Training Class for each active Training Stage (e.g. Senior 1 for the Senior stage; add Senior 2 if you have two senior groups)
-  5. Activities, if you have camps, field days, or courses this year (TMS → Activities)
+const _GH_DEFAULT=`
+<h2>What is TMS?</h2>
+<p>TMS (Training Management System) is the AAFC system for managing your squadron's records. Use TMS to:</p>
+<ul>
+  <li>Create and manage accounts</li>
+  <li>Manage facilitators</li>
+  <li>Manage training areas and equipment</li>
+  <li>View reports and dashboards</li>
+  <li>Configure squadron settings</li>
+  <li>Manage curriculum and activities</li>
+</ul>
 
-Then open Planning Workspace. If no year exists, the setup panel appears automatically. Step through the guided setup to create your year and generate parade nights.
+<h2>What is Planning Workspace?</h2>
+<p>Planning Workspace is the AAFC training planner. It is a separate screen, reached from the Planning link in the navigation bar, where you:</p>
+<ul>
+  <li>Create a year</li>
+  <li>Generate parade night dates</li>
+  <li>Schedule curriculum sessions</li>
+  <li>Assign facilitators and rooms</li>
+  <li>Record training outcomes</li>
+  <li>Review Mission Backlog</li>
+</ul>
+<p><strong>Use TMS</strong> to manage your organisation — accounts, facilities, activities.<br>
+<strong>Use Planning Workspace</strong> to do the planning — schedule nights, assign curriculum, track delivery.</p>
 
-═══════════════════════════════════════════════
-COMMON TASKS
-═══════════════════════════════════════════════
-Add a Facilitator
-  In TMS → Facilitators → Add facilitator. Enter name, rank, and type. Save.
+<h2>Key terms</h2>
+<h3>Year</h3>
+<p>A container for all parade nights and training records for one academic year, typically July to June. Create a year before scheduling parade nights.</p>
+<h3>Training Stage</h3>
+<p>A national AAFC curriculum level — Initial, Junior, Intermediate, Senior, Bronze, Silver, or Gold. Each stage has a fixed set of required modules defined at the national level. Training Stages are the same for every squadron.</p>
+<h3>Training Class</h3>
+<p>A squadron-specific group of cadets completing a Training Stage during a year. Where a squadron has enough cadets, one Training Stage can have several classes running at the same time.</p>
+<p>For example, a squadron with 30 senior cadets might create Senior 1 (15 cadets) and Senior 2 (15 cadets). Both classes follow the Senior Training Stage, but each has its own independent progress record. Senior 1 may have completed SEN-04 while Senior 2 has it planned. The system tracks them separately.</p>
+<p>Why the distinction matters: a single Training Stage can have several classes, each at a different point in the curriculum. If the system treated them as one group, it could not tell you which class still needs a module, or which class to schedule next.</p>
+<h3>Parade Night</h3>
+<p>A scheduled training evening. Each parade night can hold several sessions across different time periods.</p>
+<h3>Session</h3>
+<p>One training block within a parade night, linked to a curriculum item, time period, facilitator, room, and one or more Training Classes.</p>
+<p>A session can serve more than one Training Class. If Senior 1 and Senior 2 are doing the same module together, assign both classes to one session — they share the session, and the system records the delivery against each class separately.</p>
+<h3>Activity</h3>
+<p>A training event outside the standard parade night schedule — field days, camps, competitions, courses and similar. Activities appear in Planning Workspace as reference items and feed into Mission Backlog when they include curriculum delivery. Create and manage them in TMS under Activities. CEA activities are imported from the national system.</p>
+<h3>Mission Backlog</h3>
+<p>A list of curriculum modules required for your active Training Classes that have not yet been scheduled. The backlog tells you what still needs planning and for which class. If a module is needed by Senior 1 but not Senior 2, the backlog shows that distinction.</p>
 
-Add a Training Area
-  In TMS → Training Areas & Equipment → Add training area. Enter name, type, and capacity. Save.
+<h2>Setting up for the first time</h2>
+<p>Before using Planning Workspace, set the following up in TMS:</p>
+<ol>
+  <li>Squadron details — name, parade day, parade location</li>
+  <li>At least one facilitator</li>
+  <li>At least one training area</li>
+  <li>A Training Class for each active Training Stage, for example Senior 1 for the Senior stage; add Senior 2 if you have two senior groups</li>
+  <li>Activities, if you have camps, field days or courses this year</li>
+</ol>
+<p>Then open Planning Workspace. If no year exists, the setup panel appears automatically. Step through the guided setup to create your year and generate parade nights.</p>
 
-Set up Training Classes
-  In TMS → Year → Training Classes → Add Training Class. Choose the Training Stage and give the class a name (e.g. Senior 1). Repeat for each class. Each class tracks its own progress through the curriculum.
+<h2>Common tasks</h2>
+<h3>Add a facilitator</h3>
+<p>TMS → Facilitators → Add facilitator. Enter name, rank and type, then save.</p>
+<h3>Add a training area</h3>
+<p>TMS → Training Areas &amp; Equipment → Add training area. Enter name, type and capacity, then save.</p>
+<h3>Set up Training Classes</h3>
+<p>TMS → Year → Training Classes → Add Training Class. Choose the Training Stage and name the class, for example Senior 1. Repeat for each class. Each class tracks its own progress through the curriculum.</p>
+<h3>Generate parade nights</h3>
+<p>In Planning Workspace, select a year and use Guided year setup in the toolbar. Choose your parade weekday, start date, end date and frequency, then select Generate.</p>
+<h3>Schedule a session</h3>
+<p>In Planning Workspace, click any empty cell on a parade night. Select the curriculum item, Training Class, facilitator and room, then save.</p>
+<h3>Record a training outcome</h3>
+<p>In Planning Workspace, click the session after the parade night. Change status to Delivered, Cancelled or Not Delivered, add notes, then save.</p>
+<h3>View reports</h3>
+<p>TMS → Dashboard shows delivery rates, curriculum progress and facilitator readiness. Weekly Program, training summaries and Wing-level comparisons are under Reports.</p>
+<h3>Add an activity</h3>
+<p>TMS → Activities → Add activity. Enter the name, date and type, and assign curriculum items if they apply. Activities then appear as reference events in Planning Workspace.</p>
 
-Generate Parade Nights
-  In Planning Workspace: select a year, then use "Guided year setup…" in the toolbar. Choose your parade weekday, start date, end date, and frequency. Select Generate.
+<h2>Getting support</h2>
+<p>For help with TMS or Planning Workspace, contact your Wing SOCAD (Squadron Organisation and Cadet Administration) officer.</p>
+<p>To report a technical issue, include:</p>
+<ul>
+  <li>Squadron name and number</li>
+  <li>Your role</li>
+  <li>What you were trying to do</li>
+  <li>What happened, with the exact error message if there was one</li>
+  <li>Approximate time</li>
+  <li>Browser used</li>
+</ul>`;
 
-Schedule a session
-  In Planning Workspace: click any empty cell on a parade night. Select the curriculum item, Training Class, facilitator, and room. Save.
-
-Record a training outcome
-  In Planning Workspace: click the session after the parade night. Change status to Delivered, Cancelled, or Not Delivered. Add notes. Save.
-
-View Reports
-  In TMS → Dashboard to see delivery rates, curriculum progress, and facilitator readiness. Reports (Weekly Program, training summaries, and Wing-level comparisons) are in TMS → Reports.
-
-Add an Activity
-  In TMS → Activities → Add activity. Enter the activity name, date, type, and assign curriculum items if applicable. Activities appear as reference events in Planning Workspace.
-
-═══════════════════════════════════════════════
-GETTING SUPPORT
-═══════════════════════════════════════════════
-For help with TMS or Planning Workspace, contact your Wing SOCAD (Squadron Organisation and Cadet Administration) officer.
-
-To report a technical issue, include:
-  • Squadron name and number
-  • Your role
-  • What you were trying to do
-  • What happened (exact error message if any)
-  • Approximate time
-  • Browser used (Chrome, Firefox, Safari, etc.)`;
+let _ghStored='';
 
 async function _loadGettingHelp(){
+  const isAdmin=(S.role==='system_admin');
   const editBtn=document.getElementById('gh-edit-btn');
-  if(editBtn)editBtn.style.display=(S.role==='system_admin')?'inline-flex':'none';
+  if(editBtn)editBtn.style.display=isAdmin?'inline-flex':'none';
+  const addBtn=document.getElementById('faq-add-btn');
+  if(addBtn)addBtn.style.display=isAdmin?'inline-flex':'none';
+
+  _helpRenderLinks();
+  const stamp=document.getElementById('gh-updated');
   try{
     const r=await api('/api/activities/getting-help');
-    document.getElementById('gh-content-display').textContent=(r&&r.content)||_GH_DEFAULT;
+    _ghStored=(r&&r.content)||'';
+    _rtRender(document.getElementById('gh-content-display'),_ghStored||_GH_DEFAULT);
+    if(stamp){
+      stamp.textContent=(_ghStored&&r&&r.updated_at)
+        ? 'Last updated '+_fmtHelpStamp(r.updated_at)
+        : 'Showing the standard guide. No local version has been saved.';
+    }
   }catch(_){
-    document.getElementById('gh-content-display').textContent=_GH_DEFAULT;
+    _ghStored='';
+    _rtRender(document.getElementById('gh-content-display'),_GH_DEFAULT);
+    if(stamp)stamp.textContent='Showing the standard guide.';
+  }
+  _loadFaq();
+}
+function _fmtHelpStamp(v){
+  try{
+    if(!v)return '';
+    // The API returns a naive UTC timestamp with no zone marker. Left alone,
+    // Date() reads it as local time -- eight hours out in Perth, which puts the
+    // stamp on the wrong day. Mark it as UTC before parsing.
+    let raw=String(v).replace(' ','T');
+    if(!/[zZ]$|[+-]\d{2}:?\d{2}$/.test(raw))raw+='Z';
+    const d=new Date(raw);
+    if(isNaN(d))return String(v);
+    return d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
+  }catch(_){return String(v);}
+}
+function _helpRenderLinks(){
+  const box=document.getElementById('help-links');
+  if(!box)return;
+  // Only offer destinations this role can actually reach, so the card never
+  // shows a link that lands on a blank page.
+  const allowed=(typeof NAV_BY_SCOPE!=='undefined'&&NAV_BY_SCOPE[effectiveScope()])||[];
+  const candidates=[
+    {id:'getting-started',label:'Setup checklist',hint:'Work through your initial configuration'},
+    {id:'service-desk',   label:'Service Desk',   hint:'Raise a ticket or track one you sent'},
+    {id:'curriculum',     label:'Curriculum',     hint:'Browse stages, modules and elements'},
+    {id:'activities',     label:'Activities',     hint:'Camps, field days and courses'}
+  ].filter(function(c){return allowed.indexOf(c.id)!==-1;});
+
+  box.innerHTML='';
+  candidates.forEach(function(c){
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='btn btn-secondary';
+    b.style.cssText='text-align:left;display:block;width:100%;padding:9px 11px;white-space:normal;line-height:1.35';  // .btn is nowrap, which clipped the hint
+    b.onclick=function(){nav(c.id);};
+    b.innerHTML='<span style="display:block;font-weight:600;font-size:var(--fs-xs)">'+esc(c.label)+
+                '</span><span style="display:block;font-weight:400;font-size:var(--fs-2xs);color:var(--muted);margin-top:2px">'+esc(c.hint)+'</span>';
+    box.appendChild(b);
+  });
+  if(!candidates.length){
+    box.innerHTML='<div class="muted" style="font-size:var(--fs-2xs)">No further sections are available for your role.</div>';
   }
 }
 function openGettingHelpModal(){
-  const current=document.getElementById('gh-content-display').textContent;
-  const isDefault=(current===_GH_DEFAULT);
-  document.getElementById('gh-content-inp').value=isDefault?'':current;
   document.getElementById('gh-msg').textContent='';
+  // Open on whatever is actually stored. If nothing is, start from the standard
+  // guide so an admin edits real content rather than an empty box.
+  _rteMount('gh-editor-mount',_ghStored||_GH_DEFAULT,'Write the guidance your squadrons should see…');
   openModal('m-getting-help');
 }
 async function doSaveGettingHelp(){
   const msgEl=document.getElementById('gh-msg');
-  const content=document.getElementById('gh-content-inp').value;
+  const content=_rteValue('gh-editor-mount');
   try{
     await api('/api/activities/getting-help',{method:'PUT',body:{content}});
-    showToast('Getting Help content saved.');
+    showToast('Getting help content saved.');
     closeModal('m-getting-help');
     await _loadGettingHelp();
   }catch(e){ msgEl.textContent=apiErr(e); }
 }
+
+/* ── FAQ ─────────────────────────────────────────────────────────────────── */
+
+let _faqData={categories:[],total:0};
+let _faqEditId=null;
+
+async function _loadFaq(){
+  try{
+    _faqData=await api('/api/activities/faq');
+  }catch(_){
+    _faqData={categories:[],total:0};
+  }
+  _renderFaq();
+}
+function _renderFaq(){
+  const box=document.getElementById('faq-body');
+  if(!box)return;
+  const isAdmin=(S.role==='system_admin');
+  box.innerHTML='';
+
+  // Keep the category suggestions in step with what already exists.
+  const dl=document.getElementById('faq-cat-list');
+  if(dl){
+    dl.innerHTML='';
+    (_faqData.categories||[]).forEach(function(g){
+      const o=document.createElement('option');o.value=g.category;dl.appendChild(o);
+    });
+  }
+
+  if(!(_faqData.categories||[]).length){
+    box.innerHTML='<div class="muted" style="font-size:var(--fs-sm)">'+
+      (isAdmin
+        ? 'No questions yet. Select <strong>Add question</strong> to write the first one — everyone signed in will see it.'
+        : 'No questions have been published yet.')+
+      '</div>';
+    return;
+  }
+
+  _faqData.categories.forEach(function(group){
+    const wrap=document.createElement('div');
+    wrap.className='faq-cat';
+    const h=document.createElement('div');
+    h.className='faq-cat-name';
+    h.appendChild(document.createTextNode(group.category));
+    wrap.appendChild(h);
+
+    group.entries.forEach(function(entry){
+      const d=document.createElement('details');
+      d.className='faq-item';
+
+      const sum=document.createElement('summary');
+      const caret=document.createElement('span');
+      caret.className='faq-caret';
+      caret.setAttribute('aria-hidden','true');
+      caret.textContent='▶';
+      const q=document.createElement('span');
+      q.className='faq-q';
+      q.textContent=entry.question;
+      sum.append(caret,q);
+      if(!entry.is_published){
+        const tag=document.createElement('span');
+        tag.className='faq-draft';
+        tag.textContent='Draft — only you can see this';
+        sum.appendChild(tag);
+      }
+
+      const body=document.createElement('div');
+      body.className='faq-a rt';
+      _rtRender(body,entry.answer_html,'No answer has been written yet.');
+
+      if(isAdmin){
+        const tools=document.createElement('div');
+        tools.className='faq-admin';
+        const ed=Object.assign(document.createElement('button'),{type:'button',className:'btn btn-secondary btn-sm',textContent:'Edit'});
+        ed.onclick=function(){openFaqModal(entry.id);};
+        const del=Object.assign(document.createElement('button'),{type:'button',className:'btn btn-secondary btn-sm',textContent:'Delete'});
+        del.onclick=function(){doDeleteFaq(entry.id,entry.question);};
+        tools.append(ed,del);
+        body.appendChild(tools);
+      }
+
+      d.append(sum,body);
+      wrap.appendChild(d);
+    });
+    box.appendChild(wrap);
+  });
+}
+function _faqFind(id){
+  let hit=null;
+  (_faqData.categories||[]).forEach(function(g){
+    g.entries.forEach(function(e){if(e.id===id)hit=e;});
+  });
+  return hit;
+}
+function openFaqModal(id){
+  _faqEditId=id||null;
+  const entry=id?_faqFind(id):null;
+  document.getElementById('m-faq-title').textContent=entry?'Edit question':'Add a question';
+  document.getElementById('faq-cat-inp').value=entry?entry.category:'';
+  document.getElementById('faq-q-inp').value=entry?entry.question:'';
+  document.getElementById('faq-order-inp').value=entry?entry.sort_order:0;
+  document.getElementById('faq-pub-inp').checked=entry?!!entry.is_published:true;
+  document.getElementById('faq-msg').textContent='';
+  _rteMount('faq-editor-mount',entry?entry.answer_html:'','Write the answer…');
+  openModal('m-faq');
+}
+async function doSaveFaq(){
+  const msgEl=document.getElementById('faq-msg');
+  const question=(document.getElementById('faq-q-inp').value||'').trim();
+  if(!question){msgEl.textContent='Enter the question people will be looking for.';return;}
+  const body={
+    category:(document.getElementById('faq-cat-inp').value||'').trim()||'General',
+    question:question,
+    answer_html:_rteValue('faq-editor-mount'),
+    sort_order:parseInt(document.getElementById('faq-order-inp').value,10)||0,
+    is_published:!!document.getElementById('faq-pub-inp').checked
+  };
+  try{
+    if(_faqEditId){await api('/api/activities/faq/'+encodeURIComponent(_faqEditId),{method:'PUT',body:body});}
+    else{await api('/api/activities/faq',{method:'POST',body:body});}
+    showToast(_faqEditId?'Question updated.':'Question added.');
+    closeModal('m-faq');
+    _faqEditId=null;
+    await _loadFaq();
+  }catch(e){ msgEl.textContent=apiErr(e); }
+}
+function doDeleteFaq(id,question){
+  // confirmAction(), not native confirm() -- a native dialog blocks the page
+  // entirely under browser automation (see .claude/rules/frontend.md).
+  confirmAction('Delete "'+question+'"? This removes it for everyone and cannot be undone.',
+    async function(){
+      try{
+        await api('/api/activities/faq/'+encodeURIComponent(id),{method:'DELETE'});
+        showToast('Question deleted.');
+        await _loadFaq();
+      }catch(e){ showToast(apiErr(e),true); }
+    }, true);
+}
+
 function renderActs(){
   const td=today();
   const typeFilter=(document.getElementById('act-f-type')||{}).value||'all';
