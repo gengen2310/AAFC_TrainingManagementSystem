@@ -1,8 +1,8 @@
 # G3 — text enlargement: mechanism proved, migration planned
 
-**Status:** the Planning Workspace stylesheets are **done** — `tokens.css`, `base.css`,
-`components.css`, `layout.css`, `planning.css`. 0 px font-size declarations remain in them.
-G3 remains **FAIL** overall: 371 `.tsx` `fontSize` props and both Main TMS targets
+**Status:** Planning Workspace stylesheets **done** — `tokens.css`, `base.css`,
+`components.css`, `layout.css`, `planning.css`. Planning Workspace `.tsx` props **done** — 373
+converted (56c45f9). G3 remains **FAIL** overall: both Main TMS targets
 (158 stylesheet + 801 inline) are untouched.
 
 `print.css` keeps px deliberately — its two declarations are inside `@media print`, and print
@@ -63,7 +63,7 @@ switch all of this off, and no test would fail.
 | `planning.css` | 125 | **done** |
 | `layout.css` | 4 | **done** |
 | `print.css` | 2 | intentionally left px (`@media print`) |
-| Planning Workspace `.tsx` `fontSize` props | 371 | to do — inline, invisible to CSS tooling |
+| Planning Workspace `.tsx` `fontSize` props | 373 | **done** — 56c45f9 |
 | Main TMS `<style>` | 158 | to do |
 | Main TMS inline / JS | 801 | to do — template-literal generated, largest and riskiest |
 
@@ -103,8 +103,8 @@ occasionally lies, and it lies in the direction of inventing failures.
    fixed heights had to move to `em` sizing first, or the type would have clipped instead of
    scaling. The 17 `nowrap` rules turned out not to overflow at 200% in the components measured;
    re-check them on the dense authenticated grids, which were never reachable here.
-3. Planning Workspace `.tsx` props (371) — mechanical now the scale exists; prefer moving them
-   into CSS classes rather than swapping one inline literal for another.
+3. ~~Planning Workspace `.tsx` props (373)~~ — done (56c45f9). 373 props converted via
+   regex script; 1 fractional (11.5) and 2 SVG attributes fixed manually.
 4. Main TMS `<style>` block (158).
 5. Main TMS inline styles (801) — largest and riskiest, much of it generated inside template
    literals. Its own piece of work.
