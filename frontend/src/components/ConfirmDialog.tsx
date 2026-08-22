@@ -59,7 +59,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               <h2>{state.title ?? "Confirm"}</h2>
             </div>
             <div className="modal-body">
-              <p style={{ margin: 0, fontSize: 14, whiteSpace: "pre-line" }}>{state.message}</p>
+              <p style={{ margin: 0, fontSize: 'var(--fs-md)', whiteSpace: "pre-line" }}>{state.message}</p>
             </div>
             <div className="modal-foot" style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               <button className="btn out sm" onClick={() => close(false)}>

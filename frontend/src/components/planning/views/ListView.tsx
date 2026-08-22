@@ -144,8 +144,8 @@ export function ListView({ yearId, viewRange, customStart, customEnd, conflicts 
     return (
       <div className="pw-err" style={{ padding: 16 }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load the parade night list</div>
-        <div style={{ fontSize: 12, opacity: .8 }}>{msg}</div>
-        <div style={{ fontSize: 11, marginTop: 6, color: "var(--muted-text)" }}>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: .8 }}>{msg}</div>
+        <div style={{ fontSize: 'var(--fs-xs)', marginTop: 6, color: "var(--muted-text)" }}>
           Check that you have an internet connection, then reload the page.
         </div>
       </div>
@@ -162,11 +162,11 @@ export function ListView({ yearId, viewRange, customStart, customEnd, conflicts 
       {activities.length > 0 && (
         <div style={{ marginBottom: 20 }}>
           <div style={{
-            fontSize: 13, fontWeight: 700, color: "var(--aafc-dark-blue)",
+            fontSize: 'var(--fs-base)', fontWeight: 700, color: "var(--aafc-dark-blue)",
             borderBottom: "2px solid var(--aafc-dark-blue)", paddingBottom: 6, marginBottom: 12,
           }}>
             Activities — {rangeLabel}
-            <span style={{ fontSize: 11, fontWeight: 400, color: "var(--muted-text)", marginLeft: 8 }}>
+            <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 400, color: "var(--muted-text)", marginLeft: 8 }}>
               {activities.length} activit{activities.length !== 1 ? "ies" : "y"}
             </span>
           </div>
@@ -225,7 +225,7 @@ export function ListView({ yearId, viewRange, customStart, customEnd, conflicts 
                     >
                       {fmt(s.parade_date)}
                       {s.term && (
-                        <div style={{ fontSize: 10, fontWeight: 400, color: "var(--muted-text)" }}>
+                        <div style={{ fontSize: 'var(--fs-2xs)', fontWeight: 400, color: "var(--muted-text)" }}>
                           {s.term}{s.week_number ? ` · Wk ${s.week_number}` : ""}
                         </div>
                       )}
@@ -233,12 +233,12 @@ export function ListView({ yearId, viewRange, customStart, customEnd, conflicts 
 
                     <td className="pw-lv-td">
                       {isStandDown ? (
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--muted-text)",
+                        <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: 700, color: "var(--muted-text)",
                           background: "#f0f0f0", borderRadius: 20, padding: "2px 8px" }}>
                           Stand-down
                         </span>
                       ) : (
-                        <span style={{ fontSize: 10, fontWeight: 700, color: "var(--aafc-dark-blue)",
+                        <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: 700, color: "var(--aafc-dark-blue)",
                           background: "#EEF4FB", borderRadius: 20, padding: "2px 8px" }}>
                           Planned
                         </span>
@@ -247,11 +247,11 @@ export function ListView({ yearId, viewRange, customStart, customEnd, conflicts 
 
                     <td className="pw-lv-td" style={{ maxWidth: 120 }}>
                       {s.notices.length === 0 ? (
-                        <span style={{ color: "var(--muted-text)", fontSize: 10 }}>—</span>
+                        <span style={{ color: "var(--muted-text)", fontSize: 'var(--fs-2xs)' }}>—</span>
                       ) : (
                         s.notices.map(n => (
                           <div key={n.notice_id} style={{
-                            fontSize: 10, marginBottom: 2, overflow: "hidden",
+                            fontSize: 'var(--fs-2xs)', marginBottom: 2, overflow: "hidden",
                             textOverflow: "ellipsis", whiteSpace: "nowrap",
                             color: n.priority === "urgent" ? "var(--aafc-red)" : undefined,
                           }}>
@@ -297,20 +297,20 @@ export function ListView({ yearId, viewRange, customStart, customEnd, conflicts 
                     <td className="pw-lv-td" style={{ textAlign: "center" }}>
                       {s.conflict_count > 0 ? (
                         <span
-                          style={{ fontSize: 11, fontWeight: 700, color: "var(--warning)" }}
+                          style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: "var(--warning)" }}
                           title={`${s.conflict_count} unresolved conflict${s.conflict_count !== 1 ? "s" : ""} (room, facilitator, or workload double-booking) — open this parade night to see and resolve each one`}
                         >
                           ⚠ {s.conflict_count}
                         </span>
                       ) : (
-                        <span style={{ color: "var(--muted-text)", fontSize: 10 }}>—</span>
+                        <span style={{ color: "var(--muted-text)", fontSize: 'var(--fs-2xs)' }}>—</span>
                       )}
                     </td>
 
                     <td className="pw-lv-td">
                       <button
                         className="btn sm out"
-                        style={{ fontSize: 11, padding: "3px 8px" }}
+                        style={{ fontSize: 'var(--fs-xs)', padding: "3px 8px" }}
                         onClick={() => onDateClick(s.parade_date_id, s.parade_date)}
                       >
                         Open

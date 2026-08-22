@@ -90,8 +90,8 @@ export function YearView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
     return (
       <div className="pw-err" style={{ padding: 16 }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load the annual programme</div>
-        <div style={{ fontSize: 12, opacity: .8 }}>{msg}</div>
-        <div style={{ fontSize: 11, marginTop: 6, color: "var(--muted-text)" }}>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: .8 }}>{msg}</div>
+        <div style={{ fontSize: 'var(--fs-xs)', marginTop: 6, color: "var(--muted-text)" }}>
           Check that you have an internet connection, then reload the page.
         </div>
       </div>
@@ -107,7 +107,7 @@ export function YearView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
     return (
       <div className="pw-empty">
         <span>No parade nights set up for this planning year.</span>
-        <span style={{ fontSize: 11 }}>
+        <span style={{ fontSize: 'var(--fs-xs)' }}>
           Generate parade dates using the setup wizard, or add individual nights from the Year panel.
         </span>
       </div>
@@ -166,7 +166,7 @@ export function YearView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
                 {/* Equal-width block grid for this term's parade nights */}
                 <div className="pw-year-block-grid">
                   {term.parade_dates.filter(pd => pd.is_active !== false).length === 0 && (
-                    <div style={{ padding: "14px 16px", fontSize: 13, color: "var(--muted-text)", fontStyle: "italic", gridColumn: "1 / -1" }}>
+                    <div style={{ padding: "14px 16px", fontSize: 'var(--fs-base)', color: "var(--muted-text)", fontStyle: "italic", gridColumn: "1 / -1" }}>
                       No parade nights scheduled for this term.
                     </div>
                   )}

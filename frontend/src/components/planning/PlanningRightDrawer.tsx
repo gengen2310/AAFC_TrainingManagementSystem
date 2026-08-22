@@ -308,7 +308,7 @@ function SessionForm({
                           placeholder="Override reason (required — this is audited)"
                           value={overrideReason}
                           onChange={e => setOverrideReason(e.target.value)}
-                          style={{ width: "100%", fontSize: 11, padding: "5px 7px", borderRadius: 6, border: "1.5px solid var(--border)", marginBottom: 4, resize: "vertical", minHeight: 50 }}
+                          style={{ width: "100%", fontSize: 'var(--fs-xs)', padding: "5px 7px", borderRadius: 6, border: "1.5px solid var(--border)", marginBottom: 4, resize: "vertical", minHeight: 50 }}
                         />
                         {overrideErr && <div className="pw-err" style={{ marginBottom: 4 }}>{overrideErr}</div>}
                         <div style={{ display: "flex", gap: 6 }}>
@@ -319,13 +319,13 @@ function SessionForm({
                         </div>
                       </div>
                     ) : (
-                      <button className="btn sm out" style={{ fontSize: 11 }} onClick={() => setOverridingId(c.conflict_id)}>
+                      <button className="btn sm out" style={{ fontSize: 'var(--fs-xs)' }} onClick={() => setOverridingId(c.conflict_id)}>
                         Override (with reason)
                       </button>
                     )}
                   </div>
                 )}
-                {c.is_resolved && <div style={{ fontSize: 10, color: "var(--success)", marginTop: 4 }}>✓ Overridden — {c.override_reason}</div>}
+                {c.is_resolved && <div style={{ fontSize: 'var(--fs-2xs)', color: "var(--success)", marginTop: 4 }}>✓ Overridden — {c.override_reason}</div>}
               </div>
             </div>
           ))}
@@ -334,13 +334,13 @@ function SessionForm({
 
       <div className="pw-drawer-form">
         <div ref={pickerRef} style={{ position: "relative", marginBottom: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-text)", marginBottom: 4 }}>
+          <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: "var(--muted-text)", marginBottom: 4 }}>
             Curriculum link
           </div>
           {curriculumId && linkedMission ? (
             <div className="pw-curric-linked">
               <span className="pw-curric-code">{linkedMission.code}</span>
-              <span style={{ flex: 1, fontSize: 12 }}>{linkedMission.title}</span>
+              <span style={{ flex: 1, fontSize: 'var(--fs-sm)' }}>{linkedMission.title}</span>
               <button type="button" className="pw-curric-clear" onClick={clearCurriculum} aria-label="Unlink curriculum">✕</button>
             </div>
           ) : (
@@ -361,7 +361,7 @@ function SessionForm({
                 onChange={e => { setCurrSearch(e.target.value); setPickerOpen(true); }}
                 onFocus={() => setPickerOpen(true)}
                 onKeyDown={handleSearchKeyDown}
-                style={{ width: "100%", fontSize: 12, padding: "6px 9px", borderRadius: 6, border: "1.5px solid var(--border)" }}
+                style={{ width: "100%", fontSize: 'var(--fs-sm)', padding: "6px 9px", borderRadius: 6, border: "1.5px solid var(--border)" }}
               />
               {pickerOpen && searchResults.length > 0 && (
                 <div className="pw-curric-dropdown" role="listbox" id={`${listboxId}-listbox`} aria-label="Curriculum search results">
@@ -389,17 +389,17 @@ function SessionForm({
                       <span className="pw-curric-code">{m.code}</span>
                       <span style={{ flex: 1 }}>{m.title}</span>
                       {m.needs_reschedule
-                        ? <span style={{ fontSize: 10, color: "var(--warning)", fontWeight: 700 }}>reschedule needed</span>
+                        ? <span style={{ fontSize: 'var(--fs-2xs)', color: "var(--warning)", fontWeight: 700 }}>reschedule needed</span>
                         : !m.is_scheduled
-                        ? <span style={{ fontSize: 10, color: "var(--aafc-blue)", fontWeight: 600 }}>needs scheduling</span>
-                        : <span style={{ fontSize: 10, color: "var(--muted-text)" }}>scheduled</span>
+                        ? <span style={{ fontSize: 'var(--fs-2xs)', color: "var(--aafc-blue)", fontWeight: 600 }}>needs scheduling</span>
+                        : <span style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)" }}>scheduled</span>
                       }
                     </div>
                   ))}
                 </div>
               )}
               {pickerOpen && currSearch.length >= 2 && searchResults.length === 0 && (
-                <div className="pw-curric-dropdown" style={{ padding: "10px 12px", color: "var(--muted-text)", fontSize: 12 }}>
+                <div className="pw-curric-dropdown" style={{ padding: "10px 12px", color: "var(--muted-text)", fontSize: 'var(--fs-sm)' }}>
                   No curriculum found
                 </div>
               )}
@@ -464,19 +464,19 @@ function SessionForm({
             <button
               type="button"
               className="btn sm out"
-              style={{ fontSize: 11, width: "100%", textAlign: "left" }}
+              style={{ fontSize: 'var(--fs-xs)', width: "100%", textAlign: "left" }}
               onClick={() => setShowMove(v => !v)}
             >
               {showMove ? "▾" : "▸"} Move to another night
             </button>
             {showMove && (
               <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-                <label style={{ fontSize: 12 }}>
+                <label style={{ fontSize: 'var(--fs-sm)' }}>
                   Parade night
                   <select
                     value={moveTargetNightId}
                     onChange={e => setMoveTargetNightId(e.target.value)}
-                    style={{ fontSize: 12 }}
+                    style={{ fontSize: 'var(--fs-sm)' }}
                   >
                     <option value="">— Select night —</option>
                     {movableNights.map(n => (
@@ -487,7 +487,7 @@ function SessionForm({
                     ))}
                   </select>
                 </label>
-                <label style={{ fontSize: 12 }}>
+                <label style={{ fontSize: 'var(--fs-sm)' }}>
                   Session number
                   <input
                     type="number"
@@ -495,7 +495,7 @@ function SessionForm({
                     max={4}
                     value={moveTargetPeriod}
                     onChange={e => setMoveTargetPeriod(Number(e.target.value))}
-                    style={{ fontSize: 12 }}
+                    style={{ fontSize: 'var(--fs-sm)' }}
                   />
                 </label>
                 {moveErr && <div className="pw-err">{moveErr}</div>}
@@ -570,14 +570,14 @@ function WingEventPanel({ event, onClose }: { event: WingHQEvent; onClose: () =>
       {event.notes && (
         <div className="pw-drawer-section">
           <div className="pw-drawer-label">Notes</div>
-          <div className="pw-drawer-value" style={{ fontSize: 12 }}>{event.notes}</div>
+          <div className="pw-drawer-value" style={{ fontSize: 'var(--fs-sm)' }}>{event.notes}</div>
         </div>
       )}
       {current && (
         <div className="pw-drawer-section">
           <div className="pw-drawer-label">Your review status</div>
           <div className="pw-drawer-value" style={{ fontWeight: 700, textTransform: "capitalize" }}>{current.status}</div>
-          {current.notes && <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 2 }}>{current.notes}</div>}
+          {current.notes && <div style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)", marginTop: 2 }}>{current.notes}</div>}
         </div>
       )}
       <div className="pw-drawer-section">
@@ -587,7 +587,7 @@ function WingEventPanel({ event, onClose }: { event: WingHQEvent; onClose: () =>
           value={reviewNotes}
           onChange={e => setReviewNotes(e.target.value)}
           placeholder="Notes for your review"
-          style={{ width: "100%", fontSize: 12, padding: "7px 9px", borderRadius: 7, border: "1.5px solid var(--border)", resize: "vertical", minHeight: 50 }}
+          style={{ width: "100%", fontSize: 'var(--fs-sm)', padding: "7px 9px", borderRadius: 7, border: "1.5px solid var(--border)", resize: "vertical", minHeight: 50 }}
         />
       </div>
       {err && <div className="pw-err">{err}</div>}
@@ -672,10 +672,10 @@ function CreateAnchorForm({ yearId, onClose }: { yearId: string; onClose: () => 
         <label>End date<input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} /></label>
       </div>
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-text)", marginBottom: 6 }}>Audience</div>
+        <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: "var(--muted-text)", marginBottom: 6 }}>Audience</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {AUDIENCE_FIELDS.map(({ key, label }) => (
-            <label key={key} style={{ display: "flex", gap: 5, alignItems: "center", fontSize: 12, fontWeight: 400 }}>
+            <label key={key} style={{ display: "flex", gap: 5, alignItems: "center", fontSize: 'var(--fs-sm)', fontWeight: 400 }}>
               <input type="checkbox" checked={audience[key as keyof typeof audience]} onChange={e => setAudience(prev => ({ ...prev, [key]: e.target.checked }))} />
               {label}
             </label>
@@ -834,7 +834,7 @@ function ScheduleFromBacklogPanel({
   if (success) {
     return (
       <div>
-        <div style={{ color: "var(--success)", fontWeight: 700, fontSize: 14, marginBottom: 10 }}>
+        <div style={{ color: "var(--success)", fontWeight: 700, fontSize: 'var(--fs-md)', marginBottom: 10 }}>
           Session scheduled.
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -890,7 +890,7 @@ function ScheduleFromBacklogPanel({
             <div className="pw-drawer-section">
               <div className="pw-drawer-label" style={{ marginBottom: 4 }}>Already scheduled</div>
               {mission.scheduled_sessions.map(ss => (
-                <div key={ss.session_id} style={{ fontSize: 11, marginBottom: 2, color: "var(--muted-text)" }}>
+                <div key={ss.session_id} style={{ fontSize: 'var(--fs-xs)', marginBottom: 2, color: "var(--muted-text)" }}>
                   {ss.parade_date} · P{ss.session_number} · {ss.cadet_group ?? "—"}
                   {ss.facilitator_name ? ` · ${ss.facilitator_name}` : ""}
                 </div>
@@ -901,7 +901,7 @@ function ScheduleFromBacklogPanel({
       )}
 
       <div style={{ borderTop: "1px solid var(--border)", margin: "12px 0", paddingTop: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: "var(--aafc-dark-blue)", marginBottom: 10 }}>
+        <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 800, color: "var(--aafc-dark-blue)", marginBottom: 10 }}>
           Schedule this mission
         </div>
         <div className="pw-drawer-form">

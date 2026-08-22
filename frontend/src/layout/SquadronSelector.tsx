@@ -16,14 +16,14 @@ export function SquadronSelector() {
 
   return (
     <div className="nav-group-sqn-selector">
-      <label htmlFor="sqn-view-select" style={{ fontSize: 11, fontWeight: 700, display: "block", marginBottom: 4 }}>
+      <label htmlFor="sqn-view-select" style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, display: "block", marginBottom: 4 }}>
         Viewing squadron
       </label>
       <select
         id="sqn-view-select"
         value={selectedSquadronId ?? ""}
         onChange={(e) => setSelectedSquadronId(e.target.value || null)}
-        style={{ width: "100%", fontSize: 12, padding: "5px 7px" }}
+        style={{ width: "100%", fontSize: 'var(--fs-sm)', padding: "5px 7px" }}
       >
         <option value="">— Select a squadron —</option>
         {squadrons.map((s) => (

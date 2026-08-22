@@ -259,7 +259,7 @@ export function PlanningWorkspace() {
       return (
         <div className="pw-empty">
           <span>No planning year available.</span>
-          <span style={{ fontSize: 11 }}>Ask your wing or national admin to set up a planning year.</span>
+          <span style={{ fontSize: 'var(--fs-xs)' }}>Ask your wing or national admin to set up a planning year.</span>
         </div>
       );
     }
@@ -358,7 +358,7 @@ export function PlanningWorkspace() {
         return (
           <div className="pw-empty">
             <span>No parade night selected.</span>
-            <span style={{ fontSize: 11 }}>Switch to Year or 8-week view and click a parade date.</span>
+            <span style={{ fontSize: 'var(--fs-xs)' }}>Switch to Year or 8-week view and click a parade date.</span>
             <button className="btn sm out" onClick={() => setViewRange("year")}>Go to Year view</button>
           </div>
         );
@@ -376,7 +376,7 @@ export function PlanningWorkspace() {
         return (
           <div className="pw-empty">
             <span>Select a date range above.</span>
-            <span style={{ fontSize: 11 }}>Use the From and To inputs in the toolbar to set your range.</span>
+            <span style={{ fontSize: 'var(--fs-xs)' }}>Use the From and To inputs in the toolbar to set your range.</span>
           </div>
         );
       }
@@ -437,7 +437,7 @@ export function PlanningWorkspace() {
         <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)", padding: "4px 14px", display: "flex", gap: 8, alignItems: "center" }}>
           {yearOptions && (
             <>
-              <span style={{ fontSize: 11, fontWeight: 700, color: "var(--muted-text)" }}>Year:</span>
+              <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: "var(--muted-text)" }}>Year:</span>
               {yearOptions.map(y => (
                 <button
                   key={y.planning_year_id}
@@ -452,7 +452,7 @@ export function PlanningWorkspace() {
           )}
           <button
             className="btn sm out"
-            style={{ fontSize: 11, padding: "3px 10px" }}
+            style={{ fontSize: 'var(--fs-xs)', padding: "3px 10px" }}
             onClick={() => setDrawerItem({ type: "new-anchor", yearId: selectedYearId })}
           >
             + Anchor event
@@ -460,7 +460,7 @@ export function PlanningWorkspace() {
           {canWriteSquadron(session) && (
             <button
               className="btn sm out"
-              style={{ fontSize: 11, padding: "3px 10px" }}
+              style={{ fontSize: 'var(--fs-xs)', padding: "3px 10px" }}
               onClick={() => setUpdatingParadeDay(true)}
             >
               Update future parade nights…
@@ -469,7 +469,7 @@ export function PlanningWorkspace() {
           {canWriteSquadron(session) && (
             <button
               className="btn sm out"
-              style={{ fontSize: 11, padding: "3px 10px" }}
+              style={{ fontSize: 'var(--fs-xs)', padding: "3px 10px" }}
               onClick={() => setGuidedSetupOpen(true)}
             >
               Guided year setup…
@@ -539,7 +539,7 @@ export function PlanningWorkspace() {
                 position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
                 background: "var(--aafc-dark-blue)", color: "#fff", border: 0,
                 padding: "5px 20px", borderRadius: "8px 8px 0 0",
-                fontSize: 11, fontWeight: 700, cursor: "pointer", zIndex: 20,
+                fontSize: 'var(--fs-xs)', fontWeight: 700, cursor: "pointer", zIndex: 20,
               }}
               onClick={() => setBottomOpen(true)}
             >

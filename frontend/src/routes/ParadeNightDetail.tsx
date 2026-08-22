@@ -57,12 +57,12 @@ export function ParadeNightDetailView({ id, canWrite }: { id: string; canWrite: 
       {/* ── Template switcher ─────────────────────────────────────────────── */}
       {canWrite && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <label htmlFor="template-sel" style={{ fontSize: 12, color: "var(--muted-text)", whiteSpace: "nowrap" }}>Template</label>
+          <label htmlFor="template-sel" style={{ fontSize: 'var(--fs-sm)', color: "var(--muted-text)", whiteSpace: "nowrap" }}>Template</label>
           <select
             id="template-sel"
             value={displayTemplateId}
             onChange={(e) => { setPendingTemplateId(e.target.value); setTemplateErr(""); }}
-            style={{ fontSize: 12, padding: "2px 6px", border: "1px solid var(--border)", borderRadius: 4, background: "var(--surface)", color: "var(--text)" }}
+            style={{ fontSize: 'var(--fs-sm)', padding: "2px 6px", border: "1px solid var(--border)", borderRadius: 4, background: "var(--surface)", color: "var(--text)" }}
           >
             <option value="">— No template —</option>
             {(templatesQ.data ?? []).map((t) => (
@@ -77,18 +77,18 @@ export function ParadeNightDetailView({ id, canWrite }: { id: string; canWrite: 
               <Button variant="out" onClick={() => { setPendingTemplateId(null); setTemplateErr(""); }}>Cancel</Button>
             </>
           )}
-          {templateErr && <span style={{ fontSize: 12, color: "var(--red)" }}>{templateErr}</span>}
+          {templateErr && <span style={{ fontSize: 'var(--fs-sm)', color: "var(--red)" }}>{templateErr}</span>}
         </div>
       )}
       {!canWrite && currentTemplateId && (
-        <p className="muted" style={{ fontSize: 12 }}>Template: {(templatesQ.data ?? []).find(t => t.timing_template_id === currentTemplateId)?.name ?? currentTemplateId}</p>
+        <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>Template: {(templatesQ.data ?? []).find(t => t.timing_template_id === currentTemplateId)?.name ?? currentTemplateId}</p>
       )}
 
       {pn.publish_blockers.length > 0 && (
         <div className="errnote" role="alert">Publish blockers: {pn.publish_blockers.join("; ")}</div>
       )}
       {actionErr && <div className="errnote" role="alert">{actionErr}</div>}
-      {bulkMsg && <p className="muted" style={{ fontSize: 12 }}>{bulkMsg}</p>}
+      {bulkMsg && <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>{bulkMsg}</p>}
 
       <table>
         <caption className="vis-hidden">Training Periods for this parade night</caption>

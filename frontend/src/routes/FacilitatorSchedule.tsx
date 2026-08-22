@@ -54,9 +54,9 @@ export function FacilitatorSchedule() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
         <h1>Facilitator Schedule</h1>
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+          <label style={{ fontSize: 'var(--fs-sm)', display: "flex", alignItems: "center", gap: 6 }}>
             Zoom
-            <select value={zoom} onChange={(e) => setZoom(e.target.value as ZoomPreset)} style={{ fontSize: 12, padding: "4px 6px" }}>
+            <select value={zoom} onChange={(e) => setZoom(e.target.value as ZoomPreset)} style={{ fontSize: 'var(--fs-sm)', padding: "4px 6px" }}>
               <option value="week">Week</option>
               <option value="month">Month</option>
               <option value="term">Term</option>

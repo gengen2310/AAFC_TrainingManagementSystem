@@ -140,7 +140,7 @@ function AddNoticeForm({ dateId, onDone }: { dateId: string; onDone: () => void 
           <option value="normal">Normal</option>
           <option value="urgent">Urgent</option>
         </select>
-        {err && <span style={{ fontSize: 11, color: "var(--aafc-red)", marginLeft: 6 }}>{err}</span>}
+        {err && <span style={{ fontSize: 'var(--fs-xs)', color: "var(--aafc-red)", marginLeft: 6 }}>{err}</span>}
         <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
           <button className="btn sm primary" onClick={handleSave} disabled={saving}>{saving ? "…" : "Save"}</button>
           <button className="btn sm out" onClick={onDone}>Cancel</button>
@@ -241,8 +241,8 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
     return (
       <div className="pw-err" style={{ padding: 16 }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load the parade night</div>
-        <div style={{ fontSize: 12, opacity: .8 }}>{msg}</div>
-        <div style={{ fontSize: 11, marginTop: 6, color: "var(--muted-text)" }}>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: .8 }}>{msg}</div>
+        <div style={{ fontSize: 'var(--fs-xs)', marginTop: 6, color: "var(--muted-text)" }}>
           Check that you have an internet connection, then reload the page.
         </div>
       </div>
@@ -277,7 +277,7 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
             </span>
           )}
           {!data.parade_night_id && (
-            <span style={{ fontSize: 11, color: "var(--muted-text)" }}>Draft — not yet linked to a parade night</span>
+            <span style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)" }}>Draft — not yet linked to a parade night</span>
           )}
         </div>
       </div>
@@ -301,7 +301,7 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
           </button>
         )}
         {notices.length === 0 && !addingNotice && (
-          <span style={{ fontSize: 11, color: "var(--muted-text)", fontStyle: "italic" }}>No notices</span>
+          <span style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)", fontStyle: "italic" }}>No notices</span>
         )}
       </div>
 
@@ -321,7 +321,7 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
                 <th key={b.sequence} className={b.block_type === "break" ? "break-col" : ""}>
                   {b.name}
                   {b.start_time && b.end_time && (
-                    <div style={{ fontWeight: 400, fontSize: 10, opacity: 0.8 }}>
+                    <div style={{ fontWeight: 400, fontSize: 'var(--fs-2xs)', opacity: 0.8 }}>
                       {b.start_time}–{b.end_time}
                     </div>
                   )}
@@ -404,7 +404,7 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
                         )}
                         <div className="pn-cell-title">{session.activity_title ?? "—"}</div>
                         {!!session.training_classes?.length && (
-                          <div className="pn-cell-classes" style={{ fontSize: 10, color: "var(--aafc-dark-blue, #002f65)" }}>
+                          <div className="pn-cell-classes" style={{ fontSize: 'var(--fs-2xs)', color: "var(--aafc-dark-blue, #002f65)" }}>
                             {session.training_classes.map(c => c.display_name).join(", ")}
                           </div>
                         )}
@@ -430,7 +430,7 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
         <button
           type="button"
           className="btn sm out"
-          style={{ fontSize: 11 }}
+          style={{ fontSize: 'var(--fs-xs)' }}
           onClick={() => setShowArchived(v => !v)}
         >
           {showArchived ? "Hide archived sessions" : "Show archived sessions"}
@@ -441,7 +441,7 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
             {!archivedData ? (
               <div className="pw-loading">Loading archived sessions…</div>
             ) : archivedData.sessions.length === 0 ? (
-              <div style={{ fontSize: 12, color: "var(--muted-text)" }}>No archived sessions for this parade night.</div>
+              <div style={{ fontSize: 'var(--fs-sm)', color: "var(--muted-text)" }}>No archived sessions for this parade night.</div>
             ) : (
               <table className="pw-lv-table">
                 <thead>
@@ -462,7 +462,7 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
                         <button
                           type="button"
                           className="btn sm out"
-                          style={{ fontSize: 11 }}
+                          style={{ fontSize: 'var(--fs-xs)' }}
                           disabled={restoringId === s.session_id}
                           onClick={() => doRestoreSession(s.session_id)}
                         >

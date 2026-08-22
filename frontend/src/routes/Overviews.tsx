@@ -128,7 +128,7 @@ export function WingOverview() {
                 <tr key={s.squadron_id}>
                   <td><strong>{s.short_name}</strong></td>
                   <td><span className="badge warn">{s.not_delivered_count}</span></td>
-                  <td className="muted" style={{ fontSize: 12 }}>
+                  <td className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
                     {s.sessions.map((x) => x.curriculum_code_at_time ?? "—").join(", ")}
                   </td>
                 </tr>
@@ -149,7 +149,7 @@ export function WingOverview() {
                   <td><strong>{s.short_name}</strong></td>
                   <td>{s.cancelled_sessions > 0 ? <span className="badge warn">{s.cancelled_sessions}</span> : "0"}</td>
                   <td>{s.cancelled_nights > 0 ? <span className="badge warn">{s.cancelled_nights}</span> : "0"}</td>
-                  <td className="muted" style={{ fontSize: 12 }}>{s.reasons[0]?.reason ?? "—"}{s.reasons[0] && s.reasons[0].count > 1 ? ` ×${s.reasons[0].count}` : ""}</td>
+                  <td className="muted" style={{ fontSize: 'var(--fs-sm)' }}>{s.reasons[0]?.reason ?? "—"}{s.reasons[0] && s.reasons[0].count > 1 ? ` ×${s.reasons[0].count}` : ""}</td>
                 </tr>
               ))}
             </tbody>
@@ -294,14 +294,14 @@ export function NationalOverview() {
       <p className="scope-note">Viewing National-level assurance data. Unit of analysis: wing. Editing a squadron requires Delegated Intervention with a reason.</p>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        <label htmlFor="command-wing-select" style={{ fontSize: 12, fontWeight: 700, color: "var(--muted-text)" }}>
+        <label htmlFor="command-wing-select" style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: "var(--muted-text)" }}>
           Command Dashboard scope
         </label>
         <select
           id="command-wing-select"
           value={commandWingId}
           onChange={(e) => setCommandWingId(e.target.value)}
-          style={{ fontSize: 12, padding: "4px 8px" }}
+          style={{ fontSize: 'var(--fs-sm)', padding: "4px 8px" }}
         >
           <option value="">All Wings (national)</option>
           {rows.map((w) => (

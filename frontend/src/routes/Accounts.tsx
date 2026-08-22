@@ -50,10 +50,10 @@ function NewCodeModal({ code, forName, onClose }: { code: string; forName: strin
         <div className="alert warn" style={{ fontWeight: 700, marginBottom: 12 }}>
           This code will not be shown again. Copy it now before closing this window.
         </div>
-        <div style={{ background: "#1a1a2e", color: "#7efff5", fontFamily: "monospace", fontSize: 22,
+        <div style={{ background: "#1a1a2e", color: "#7efff5", fontFamily: "monospace", fontSize: 'var(--fs-2xl)',
           fontWeight: 900, letterSpacing: 4, textAlign: "center", padding: "18px 12px",
           borderRadius: 8, userSelect: "all", marginBottom: 12 }}>{code}</div>
-        <p className="muted" style={{ textAlign: "center", fontSize: 12 }}>For: <strong>{forName}</strong></p>
+        <p className="muted" style={{ textAlign: "center", fontSize: 'var(--fs-sm)' }}>For: <strong>{forName}</strong></p>
         <button className="btn out" style={{ width: "100%", marginBottom: 6 }} onClick={copy}>
           {copied ? "Copied!" : "Copy to clipboard"}
         </button>
@@ -253,7 +253,7 @@ export function Accounts() {
               {sqnsForWing(wingFilter).map(s => <option key={s.squadron_id} value={s.squadron_id}>{s.code}</option>)}
             </select>
           )}
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 'var(--fs-sm)' }}>
             <input type="checkbox" checked={includeArchived} onChange={e => setIncludeArchived(e.target.checked)} />
             Show archived
           </label>
@@ -277,7 +277,7 @@ export function Accounts() {
                     <td><strong>{a.display_name}</strong></td>
                     <td><span className="badge">{ROLE_LABELS[a.role] ?? a.role}</span></td>
                     <td><span className="badge">{SCOPE_LABELS[a.scope_type] ?? a.scope_type}</span></td>
-                    <td className="muted" style={{ fontSize: 11 }}>
+                    <td className="muted" style={{ fontSize: 'var(--fs-xs)' }}>
                       {a.squadron_code ? `SQN ${a.squadron_code}` : a.wing_code ? `Wing ${a.wing_code}` : "NAT HQ"}
                     </td>
                     <td>
@@ -285,7 +285,7 @@ export function Accounts() {
                         : a.active_status ? <span className="badge ok">Active</span> : <span className="badge warn">Disabled</span>}
                       {isLocked(a) && <span className="badge warn" style={{ marginLeft: 4 }}>Locked</span>}
                     </td>
-                    <td style={{ fontSize: 11 }}>
+                    <td style={{ fontSize: 'var(--fs-xs)' }}>
                       {a.last_login_at ? new Date(a.last_login_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" }) : "Never"}
                     </td>
                     {canWrite && (
@@ -332,7 +332,7 @@ export function Accounts() {
       {/* Flights card */}
       {canWrite && (
         <Card title="Flights (local groupings)">
-          <p className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+          <p className="muted" style={{ fontSize: 'var(--fs-sm)', marginBottom: 8 }}>
             Flights are local display groupings within a squadron. They do not change permissions or tenancy.
           </p>
           <button className="btn primary sm" style={{ marginBottom: 12 }} onClick={() => { setShowCreateFlight(true); setFlightName(""); setFlightSqn(session?.squadron_id ?? ""); }}>
@@ -346,7 +346,7 @@ export function Accounts() {
                 {(flights.data ?? []).map((f: Flight) => (
                   <tr key={f.flight_id}>
                     <td><strong>{f.name}</strong></td>
-                    <td className="muted" style={{ fontSize: 11 }}>{f.squadron_code ?? f.squadron_name ?? "—"}</td>
+                    <td className="muted" style={{ fontSize: 'var(--fs-xs)' }}>{f.squadron_code ?? f.squadron_name ?? "—"}</td>
                     <td style={{ display: "flex", gap: 4 }}>
                       <button className="btn sm" onClick={() => { setRenameFid(f.flight_id); setRenameName(f.name); }}>Rename</button>
                       <button className="btn sm danger" onClick={async () => {
@@ -448,7 +448,7 @@ export function Accounts() {
             <div className="modal-box" style={{ maxWidth: 420 }}>
               <h2 style={{ marginTop: 0 }}>Reset Access Code</h2>
               <p className="muted">Account: <strong>{acct?.display_name ?? resetUid}</strong></p>
-              <div className="alert warn" style={{ fontSize: 12, marginBottom: 10 }}>
+              <div className="alert warn" style={{ fontSize: 'var(--fs-sm)', marginBottom: 10 }}>
                 The existing code will be invalidated immediately.
               </div>
               <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -520,7 +520,7 @@ export function Accounts() {
             <div className="modal-box" style={{ maxWidth: 380 }}>
               <h2 style={{ marginTop: 0 }}>Change Role</h2>
               <p className="muted">Account: <strong>{acct?.display_name ?? roleUid}</strong></p>
-              <p className="muted" style={{ fontSize: 12 }}>
+              <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
                 Only roles at the same scope level ({SCOPE_LABELS[acct?.scope_type ?? ""] ?? acct?.scope_type}) can be assigned here.
                 Changing scope level requires archiving this account and creating a new one.
               </p>
@@ -550,7 +550,7 @@ export function Accounts() {
             <div className="modal-box" style={{ maxWidth: 420 }}>
               <h2 style={{ marginTop: 0 }}>Delete Account Permanently</h2>
               <p className="muted">Account: <strong>{acct?.display_name ?? deleteUid}</strong></p>
-              <div className="alert warn" style={{ fontSize: 12, marginBottom: 10 }}>
+              <div className="alert warn" style={{ fontSize: 'var(--fs-sm)', marginBottom: 10 }}>
                 This cannot be undone. Only succeeds if the account has no audit or login
                 history — otherwise it remains archived (the safe, reversible default).
               </div>
@@ -597,7 +597,7 @@ export function Accounts() {
                 {(squadrons.data ?? []).map(s => <option key={s.squadron_id} value={s.squadron_id}>{s.code}</option>)}
               </select>
             </label>
-            <p className="muted" style={{ fontSize: 12 }}>Flights are local display groupings only — they do not create separate permissions.</p>
+            <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>Flights are local display groupings only — they do not create separate permissions.</p>
             <div className="modal-foot">
               <button className="btn out" onClick={() => setShowCreateFlight(false)}>Cancel</button>
               <button className="btn primary" disabled={createFlightMut.isPending} onClick={() => {
@@ -701,11 +701,11 @@ function RefDataSection({ config, naturalScope, ownWingId, ownSquadronId }: {
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>
+      <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>
         {config.label}
       </div>
       {q.isLoading ? <Loading /> : items.length === 0 ? (
-        <p className="muted" style={{ fontSize: 11 }}>None yet.</p>
+        <p className="muted" style={{ fontSize: 'var(--fs-xs)' }}>None yet.</p>
       ) : (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
           {items.map((it) => {
@@ -718,11 +718,11 @@ function RefDataSection({ config, naturalScope, ownWingId, ownSquadronId }: {
             const label = "display_name" in it ? it.display_name : "";
             return (
               <span key={config.idOf(it)} className="badge" style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                {label} <em className="muted" style={{ fontStyle: "normal", fontSize: 9 }}>{scope}</em>
+                {label} <em className="muted" style={{ fontStyle: "normal", fontSize: 'var(--fs-3xs)' }}>{scope}</em>
                 {mine && (
                   <button
                     onClick={async () => { if (await confirm("Archive this item? It will no longer appear in pickers, but existing records are unaffected.", { confirmLabel: "Archive" })) archiveMut.mutate(config.idOf(it)); }}
-                    style={{ border: "none", background: "none", cursor: "pointer", color: "var(--danger)", fontSize: 11, padding: 0 }}
+                    style={{ border: "none", background: "none", cursor: "pointer", color: "var(--danger)", fontSize: 'var(--fs-xs)', padding: 0 }}
                     title="Archive"
                   >×</button>
                 )}
@@ -752,7 +752,7 @@ function ReferenceDataCard() {
   if (!naturalScope) return null;
   return (
     <Card title="Reference Data">
-      <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+      <p className="muted" style={{ fontSize: 'var(--fs-sm)', marginBottom: 10 }}>
         Training stages, facilitator types, and subject areas are created here at your own scope ({naturalScope}).
       </p>
       <div style={{ display: "grid", gap: 14 }}>

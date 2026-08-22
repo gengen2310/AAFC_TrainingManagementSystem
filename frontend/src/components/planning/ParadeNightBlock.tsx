@@ -269,12 +269,12 @@ function AddNoticeForm({ dateId, onDone }: { dateId: string; onDone: () => void 
           <option value="normal">Normal</option>
           <option value="urgent">Urgent</option>
         </select>
-        {err && <span style={{ fontSize: 10, color: "var(--aafc-red)", marginLeft: 6 }}>{err}</span>}
+        {err && <span style={{ fontSize: 'var(--fs-2xs)', color: "var(--aafc-red)", marginLeft: 6 }}>{err}</span>}
         <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-          <button className="btn sm primary" style={{ fontSize: 11, padding: "3px 8px" }} onClick={handleSave} disabled={saving}>
+          <button className="btn sm primary" style={{ fontSize: 'var(--fs-xs)', padding: "3px 8px" }} onClick={handleSave} disabled={saving}>
             {saving ? "…" : "Save"}
           </button>
-          <button className="btn sm out" style={{ fontSize: 11, padding: "3px 8px" }} onClick={onDone}>Cancel</button>
+          <button className="btn sm out" style={{ fontSize: 'var(--fs-xs)', padding: "3px 8px" }} onClick={onDone}>Cancel</button>
         </div>
       </div>
     </div>
@@ -430,7 +430,7 @@ export function ParadeNightBlock({
           <span>Notices</span>
           <button
             className="pw-block-add-notice-btn"
-            style={{ fontSize: 10, background: "none", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 6px", cursor: "pointer", color: "var(--muted-text)", fontWeight: 700 }}
+            style={{ fontSize: 'var(--fs-2xs)', background: "none", border: "1px solid var(--border)", borderRadius: 4, padding: "1px 6px", cursor: "pointer", color: "var(--muted-text)", fontWeight: 700 }}
             onClick={e => { e.stopPropagation(); setAddingNotice(v => !v); }}
             aria-label="Add notice"
           >

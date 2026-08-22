@@ -76,7 +76,7 @@ export function UpdateFutureParadeDayModal({ yearId, onClose, onDone }: {
   return (
     <Modal title="Update future parade nights" onClose={onClose}>
       <div className="form">
-        <p className="muted" style={{ fontSize: 12 }}>
+        <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
           Moves upcoming standard parade nights to a new day of the week. Historical
           records and one-night exceptions are never changed by this action.
         </p>
@@ -91,14 +91,14 @@ export function UpdateFutureParadeDayModal({ yearId, onClose, onDone }: {
 
         {preview && (
           <>
-            <p style={{ fontSize: 12 }}>
+            <p style={{ fontSize: 'var(--fs-sm)' }}>
               <strong>{preview.to_update}</strong> parade night{preview.to_update === 1 ? "" : "s"} will move to {WEEKDAYS[weekday]}.
               {(preview.blocked ?? 0) > 0 && <> <strong>{preview.blocked}</strong> blocked by a conflict.</>}
               {preview.exceptions_preserved > 0 && <> {preview.exceptions_preserved} one-night exception{preview.exceptions_preserved === 1 ? "" : "s"} preserved automatically.</>}
             </p>
             {preview.changes && preview.changes.length > 0 && (
               <div style={{ maxHeight: 220, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 6 }}>
-                <table style={{ width: "100%", fontSize: 12 }}>
+                <table style={{ width: "100%", fontSize: 'var(--fs-sm)' }}>
                   <thead><tr><th>Include</th><th>Current date</th><th>New date</th><th>Status</th></tr></thead>
                   <tbody>
                     {preview.changes.map((c) => (

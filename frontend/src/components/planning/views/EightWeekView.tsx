@@ -129,8 +129,8 @@ export function EightWeekView({
     return (
       <div className="pw-err" style={{ padding: 16 }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load planning data</div>
-        <div style={{ fontSize: 12, opacity: .8 }}>{msg}</div>
-        <div style={{ fontSize: 11, marginTop: 6, color: "var(--muted-text)" }}>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: .8 }}>{msg}</div>
+        <div style={{ fontSize: 'var(--fs-xs)', marginTop: 6, color: "var(--muted-text)" }}>
           Check that the date range is valid, and that you have an internet connection.
         </div>
       </div>
@@ -141,7 +141,7 @@ export function EightWeekView({
     return (
       <div className="pw-empty">
         <span>No parade nights in the next {weeks} weeks.</span>
-        <span style={{ fontSize: 11 }}>Ensure parade dates are set up in the annual program.</span>
+        <span style={{ fontSize: 'var(--fs-xs)' }}>Ensure parade dates are set up in the annual program.</span>
       </div>
     );
   }
