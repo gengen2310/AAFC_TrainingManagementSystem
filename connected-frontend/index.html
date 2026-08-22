@@ -5106,6 +5106,7 @@ async function loadData(){
     readiness:pn.readiness_score, version:pn.version,
     sessions:(pn.sessions||[]).sort((a,b)=>(a.period_number||0)-(b.period_number||0)).map(s=>({
       id:s.id, phase:s.phase_at_time||'', element:s.element_at_time||'', code:s.curriculum_code_at_time||'',
+      timingBlockId:s.timing_block_id||null,   // TB-1: which printed-program period this session sits in
       exp:s.curriculum_title_at_time||s.custom_title||'', facId:s.facilitator_id||'',
       facName:_facName(s), room:s.training_area_name_at_time||'', status:s.status||'planned',
       period_number:s.period_number||1,
@@ -9734,6 +9735,24 @@ function addPN(){
 }
 
 // PN DETAIL MODAL
+// TB-1: the printed Weekly Program lays sessions out by timing block, and
+// nothing in either frontend could ever set one -- every session fell through to
+// the "Unlinked periods" footnote. These are the blocks a night can offer:
+// its template's Training Period blocks, in order.
+function _pnPeriodBlocks(pn){
+  if(!pn||!pn.timing_template_id) return [];
+  const tpl=((typeof S!=='undefined'&&S.timingTemplates)||[])
+    .find(t=>t.timing_template_id===pn.timing_template_id);
+  if(!tpl) return [];
+  return (tpl.blocks||[])
+    .filter(b=>b.is_instructional_period)
+    .sort((a,b)=>(a.display_order||0)-(b.display_order||0));
+}
+function _pnPeriodLabel(b){
+  const t=[b.start_time,b.end_time].filter(Boolean).join('\u2013');
+  return (b.block_name||'Period')+(t?' \u00b7 '+t:'');
+}
+
 function showPNDetail(ds){
   const pn=S.pns.find(p=>p.date===ds);if(!pn)return;
   document.getElementById('pn-det-title').textContent=fmtDL(ds);
@@ -9814,6 +9833,22 @@ function showPNDetail(ds){
       </div>
       <div id="sess-hist-${i}" style="display:none;font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px;padding:8px;background:var(--surface-2);border-radius:6px"></div>
       <div style="${!canWriteSquadron()?'pointer-events:none;opacity:.85':''}">
+      ${(function(){
+        const blocks=_pnPeriodBlocks(pn);
+        if(!blocks.length){
+          return `<div class="ff"><label>Program period</label>
+            <div style="font-size:var(--fs-xs);color:var(--muted);padding:4px 0">
+              This night has no timing template, so it has no periods to place sessions in.
+              Set one in Unit Setup &rarr; Timing Templates.</div></div>`;
+        }
+        const opts=blocks.map(b=>`<option value="${esc(b.timing_block_id)}" ${s.timingBlockId===b.timing_block_id?'selected':''}>${esc(_pnPeriodLabel(b))}</option>`).join('');
+        return `<div class="ff"><label for="d-tb-${i}">Program period</label>
+          <select id="d-tb-${i}" aria-label="Program period for session ${i+1}" ${!canWriteSquadron()?'disabled':''}>
+            <option value="">\u2014 Not placed \u2014</option>${opts}
+          </select>
+          <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:3px">Where this session appears on the printed Weekly Program.</div>
+        </div>`;
+      })()}
       <div class="form-row">
         <div class="ff"><label for="d-ph-${i}">Phase</label><select id="d-ph-${i}" aria-label="Phase for session ${i+1}" ${!canWriteSquadron()?'disabled':''}>${phOpts}</select></div>
         <div class="ff"><label for="d-st-${i}">Status</label><select id="d-st-${i}" aria-label="Status for session ${i+1}" ${!canWriteSquadron()?'disabled':''}>${stOpts}</select></div>
@@ -10113,11 +10148,16 @@ async function savePNDetail(ds,cnt){
       const phase=document.getElementById('d-ph-'+i)?.value||s.phase||'B. Initial';
       const ci=S.curr.find(c=>c.title===expTitle);
       const room=S.rooms.find(r=>r.name===roomName);
+      // TB-1: send the program period. PUT replaces the session, so omitting
+      // this cleared timing_block_id on every save -- latent until something
+      // could set it.
+      const tbEl=document.getElementById('d-tb-'+i);
       const body={
         parade_night_id:pn.id, period_number:s.period_number||i+1,
         phase_at_time:phase, curriculum_item_id:ci?ci.id:null,
         facilitator_id:facId||null, training_area_id:room?room.id:null,
-        custom_title:expTitle&&!ci?expTitle:null
+        custom_title:expTitle&&!ci?expTitle:null,
+        timing_block_id: tbEl ? (tbEl.value||null) : (s.timingBlockId||null)
       };
       if(newSt&&newSt!==s.status){ body.status=newSt; body.reason=reason||null; }
       // Single atomic PUT: fields + status transition committed together server-side —
@@ -10168,6 +10208,10 @@ function _sessBuildBody(s,overrides){
     phase_at_time:s.phase||'B. Initial', curriculum_item_id:ci?ci.id:null,
     facilitator_id:s.facId||null, training_area_id:room?room.id:null,
     custom_title:s.exp&&!ci?s.exp:null,
+    // TB-1: PUT replaces the whole session, and timing_block_id defaults to
+    // null server-side. Omitting it here silently cleared a session's period
+    // on every reorder or move.
+    timing_block_id:s.timingBlockId||null,
   },overrides);
 }
 
@@ -10704,7 +10748,12 @@ function _renderPNSchedule(pn, schedule, classes, stageGroups) {
     const dash = '<td style="text-align:center;color:#aaa">—</td>';
     let tbody = '<tbody>';
     for (const b of blocks) {
-        const isTP = b.block_type === 'training_period';
+        // TB-2: this tested block_type === 'training_period' only. The backend's
+        // own period count uses is_instructional_period (see training.py's
+        // ip_count), and that flag is the semantic one -- block_type is a
+        // category label. Any block flagged as an instructional period gets
+        // class columns; the string is kept as a fallback.
+        const isTP = !!b.is_instructional_period || b.block_type === 'training_period';
         const timeStr = b.start_time ? `${esc(b.start_time)}${b.end_time ? '–'+esc(b.end_time) : ''}` : '';
         if (!isTP) {
             tbody += `<tr class="non-period-row"><td>${timeStr}</td><td>${esc(b.block_name)}</td>${dash.repeat(totalCols)}</tr>`;

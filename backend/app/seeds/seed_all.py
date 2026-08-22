@@ -193,20 +193,29 @@ def seed_all():
         notes="Default template for all 703 SQN parade nights from 2026.",
     )
     db.add(tmpl_703); db.commit()
+    # block_type must be one of models.training.BLOCK_TYPES:
+    #   arrival, admin, parade, briefing, training_period, drinks_break,
+    #   fatigue, dismissal, other
+    # This table previously used roll_call / administration / instructional_period /
+    # break / fatigues / debrief -- none of which are members. The API rejects those
+    # (timing.py validates against BLOCK_TYPES), but the seed writes through
+    # SQLAlchemy and bypassed that check, so every seeded database carried block
+    # types the application itself considers invalid. The display name still says
+    # what the block is; block_type is the category.
     _703_BLOCKS = [
-        # order, name,                  type,                  start,   end,    dur, is_ip, pnum
-        (0,  "Arrival",               "arrival",             "18:00", "18:15",  15, False, None),
-        (1,  "Roll Call",             "roll_call",           "18:15", "18:25",  10, False, None),
-        (2,  "Cadets Forming Up",     "administration",      "18:25", "18:30",   5, False, None),
-        (3,  "Parade",                "parade",              "18:30", "18:45",  15, False, None),
-        (4,  "Period 1",              "instructional_period","18:50", "19:25",  35, True,  1),
-        (5,  "Period 2",              "instructional_period","19:25", "20:00",  35, True,  2),
-        (6,  "Drinks Break",          "break",               "20:00", "20:30",  30, False, None),
-        (7,  "Period 3",              "instructional_period","20:30", "21:05",  35, True,  3),
-        (8,  "Fatigues",              "fatigues",            "21:05", "21:15",  10, False, None),
-        (9,  "Final Parade",          "parade",              "21:15", "21:25",  10, False, None),
-        (10, "Debrief",               "debrief",             "21:25", "21:30",   5, False, None),
-        (11, "Dismissal",             "dismissal",           "21:30", "21:30",   0, False, None),
+        # order, name,                  type,               start,   end,    dur, is_ip, pnum
+        (0,  "Arrival",               "arrival",         "18:00", "18:15",  15, False, None),
+        (1,  "Roll Call",             "admin",           "18:15", "18:25",  10, False, None),
+        (2,  "Cadets Forming Up",     "admin",           "18:25", "18:30",   5, False, None),
+        (3,  "Parade",                "parade",          "18:30", "18:45",  15, False, None),
+        (4,  "Period 1",              "training_period", "18:50", "19:25",  35, True,  1),
+        (5,  "Period 2",              "training_period", "19:25", "20:00",  35, True,  2),
+        (6,  "Drinks Break",          "drinks_break",    "20:00", "20:30",  30, False, None),
+        (7,  "Period 3",              "training_period", "20:30", "21:05",  35, True,  3),
+        (8,  "Fatigues",              "fatigue",         "21:05", "21:15",  10, False, None),
+        (9,  "Final Parade",          "parade",          "21:15", "21:25",  10, False, None),
+        (10, "Debrief",               "briefing",        "21:25", "21:30",   5, False, None),
+        (11, "Dismissal",             "dismissal",       "21:30", "21:30",   0, False, None),
     ]
     for order, name, btype, start, end, dur, is_ip, pnum in _703_BLOCKS:
         db.add(TimingBlock(
