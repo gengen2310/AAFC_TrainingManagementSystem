@@ -73,23 +73,26 @@ verifying it against the VIG.
 --nav-active-bg:     rgba(81,176,227,.20);
 --nav-active-border: #51b0e3;
 
-/* Spacing — two scales coexist; --sp-* is the newer one used by the nav */
+/* Spacing — --sp-* is the live scale (53 uses) */
 --sp-xs:8px;  --sp-sm:12px;  --sp-md:16px;  --sp-lg:20px;  --sp-xl:24px;
---space-05:4px;  --space-1:8px;   --space-1h:12px; --space-2:16px;
---space-2h:20px; --space-3:24px;  --space-4:32px;  --space-5:40px;  --space-6:48px;
 --gap-cards:10px;
 
-/* Type scale */
---text-xs:11px; --text-sm:13px; --text-base:15px;
---text-lg:17px; --text-xl:21px; --text-2xl:27px;
+/* Type scale — rem, so text follows the browser's font-size preference.
+   Values are the previous px sizes over a 16px root. */
+--fs-4xs:0.5rem;    --fs-3xs:0.5625rem; --fs-2xs:0.625rem;  --fs-xs:0.6875rem;
+--fs-sm:0.75rem;    --fs-base:0.8125rem;--fs-md:0.875rem;   --fs-lg:1rem;
+--fs-xl:1.125rem;   --fs-2xl:1.25rem;   --fs-3xl:1.375rem;  --fs-4xl:1.75rem;
+--fs-5xl:2.25rem;
 
 /* Radius */
 --radius:6px;  --radius-lg:10px;
 ```
 
-> **Two spacing scales and two type conventions exist side by side.** `--sp-*` and
-> `--space-*` are both live, and most component rules still use literal px rather than
-> either. Consolidating them is unfinished work, not a documented intent.
+> **Corrected 2026-08-22.** An earlier version of this section listed `--space-*` and
+> `--text-*` as live tokens. Both were **defined but never referenced** (0 uses each,
+> against 53 for `--sp-*`) and have been removed. `--text-*` was replaced by the rem
+> `--fs-*` scale above. Nothing may set a px `font-size` on `html`, or rem type silently
+> stops responding to the user's preference and no test will catch it.
 
 ### Planning Workspace (`frontend/src/styles/tokens.css`)
 
