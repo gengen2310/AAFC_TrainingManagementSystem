@@ -67,6 +67,24 @@
   --sh2: 0 4px 16px rgba(0,47,101,.14);
 
   /* ── Spacing / layout ────────────────────────────────────────────────── */
+  /* ── Type scale (AUDIT-2026-08 G3) ───────────────────────────────────────
+     rem, not px. px type ignores the browser's own font-size preference
+     entirely: at the time of the audit 1,492 of 1,528 font-size declarations
+     across both frontends were px-locked, so a user who sets their browser to
+     200% text got no enlargement at all. Values are the existing px sizes over
+     a 16px root, so nothing changes at the default setting.
+     Nothing may set a px font-size on html, or this stops working. */
+  --fs-3xs:  0.5625rem;  /*  9px */
+  --fs-2xs:  0.625rem;   /* 10px */
+  --fs-xs:   0.6875rem;  /* 11px */
+  --fs-sm:   0.75rem;    /* 12px */
+  --fs-base: 0.8125rem;  /* 13px */
+  --fs-md:   0.875rem;   /* 14px */
+  --fs-lg:   1rem;       /* 16px */
+  --fs-xl:   1.125rem;   /* 18px */
+  --fs-2xl:  1.25rem;    /* 20px */
+  --fs-3xl:  1.625rem;   /* 26px */
+
   --space-1: 8px;
   --space-2: 16px;
   --space-3: 24px;
