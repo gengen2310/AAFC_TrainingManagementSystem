@@ -225,7 +225,7 @@ body.pw-active .main {
 .pn-cell-inner.empty { background: var(--background); }
 .pn-cell-inner.conflict-room { background: #FFF5F5; }
 .pn-cell-inner.conflict-fac { background: #FFFBEC; }
-.pn-cell-inner.break-cell { background: var(--surface-2); text-align: center; color: var(--muted-text); font-style: italic; vertical-align: middle; display: flex; align-items: center; justify-content: center; }
+.pn-cell-inner.break-cell { background: var(--surface-2); text-align: center; color: var(--muted-on-sunk); font-style: italic; vertical-align: middle; display: flex; align-items: center; justify-content: center; }
 .pn-cell-title { font-weight: 700; font-size: 12px; margin-bottom: 3px; line-height: 1.3; }
 .pn-cell-code { font-size: 10px; color: var(--aafc-royal-blue); font-weight: 700; margin-bottom: 2px; }
 .pn-cell-room { font-size: 10px; color: var(--muted-text); margin-bottom: 2px; }

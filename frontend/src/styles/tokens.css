@@ -106,6 +106,7 @@
   --on-emphasis:     #ffffff;         /* 13.17:1 on light --primary #002f65 */
   --on-danger:       #ffffff;         /* 4.83:1  on light --red  #e51937 */
   --on-accent:       #002F65;         /* ink on --aafc-blue (scope pill) */
+  --muted-on-sunk:   #5c6a76;         /* 5.07:1 on --surface-2 #f0f5fa */
   --ok-on-tint:      #166c40;         /* 5.06:1 on ok-tinted surface */
   --warn-on-tint:    #8d5500;         /* 5.02:1 on warn-tinted surface */
   --danger-on-tint:  #c3152f;         /* 4.74:1 on danger-tinted surface */
@@ -147,6 +148,7 @@ html[data-theme="dark"] {
   --on-emphasis:    #101A26;   /* 7.24:1 on #51b0e3 */
   --on-danger:      #101A26;   /* 7.35:1 on dark --red #ff6b6b */
   --on-accent:      #101A26;   /* 7.24:1 on dark --aafc-blue #51b0e3 */
+  --muted-on-sunk:  #9fb2c6;   /* 7.23:1 on dark --surface-2 #16233a */
   --ok-on-tint:     #3EAE77;   /* 4.61:1 */
   --warn-on-tint:   #D9982E;   /* 5.17:1 */
   --danger-on-tint: #ff6b6b;   /* 5.03:1 */
@@ -185,6 +187,7 @@ html[data-theme="hc"] {
   --on-emphasis:    #ffffff;
   --on-danger:      #ffffff;   /* on hc --danger #cc0011 */
   --on-accent:      #ffffff;   /* was #002F65 on --aafc-blue #000099 = 1.09:1 */
+  --muted-on-sunk:  #303030;   /* 11.58:1 on hc --surface-2 #f0f0f0 */
   --ok-on-tint:     #004d24;   /* 7.31:1 */
   --warn-on-tint:   #6a3800;   /* 7.05:1 */
   --danger-on-tint: #ad000e;   /* 5.71:1 — base #cc0011 was 4.45:1 */
@@ -222,6 +225,7 @@ html[data-theme="hc"] {
     --on-emphasis:    #ffffff;
     --on-danger:      #ffffff;
     --on-accent:      #ffffff;
+    --muted-on-sunk:  #3a3a3a;
     --ok-on-tint:     #004d24;
     --warn-on-tint:   #6a3800;
     --danger-on-tint: #ad000e;
