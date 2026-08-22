@@ -1970,6 +1970,13 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <div class="card">
           <div class="ctitle">Session Structure</div>
+          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 12px">
+            How many training periods a new parade night starts with. A timing template decides
+            this for any night that uses one &mdash; the count comes from its Training Period
+            blocks. This value is used only when no template applies to that date, or the
+            template has no Training Period blocks. Typing a different number while creating a
+            night overrides both. Changing this does not alter parade nights that already exist.
+          </p>
           <div class="form-row">
             <div class="ff"><label for="s-sess">Default Training Periods (fallback)</label>
               <select id="s-sess" aria-label="Default sessions per night">
