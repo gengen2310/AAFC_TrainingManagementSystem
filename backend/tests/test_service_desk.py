@@ -546,3 +546,62 @@ def test_email_config_national_admin_cannot_set_system_email(client):
 def test_email_config_requires_auth(client):
     r = client.get("/api/service-desk/email-config")
     assert r.status_code == 401
+
+
+# ── Viewer role access ─────────────────────────────────────────────────────────
+
+def test_wing_viewer_sees_own_wing_tickets_only(client):
+    sqn703 = _sqn_id("703SQN")
+    sqn704 = _sqn_id("704SQN")
+    _make_ticket(client, sqn703, description="7WG ticket — visible to 7WG viewer.")
+    _make_ticket(client, sqn704, description="Other-wing ticket — invisible to 7WG viewer.")
+
+    from app.database import SessionLocal
+    from app.models import Wing, Squadron as Sqn
+    db = SessionLocal()
+    try:
+        w7wg = db.query(Wing).filter(Wing.code == "7WG").first()
+        sqns_in_7wg = {s.id for s in db.query(Sqn).filter(Sqn.wing_id == w7wg.id).all()}
+    finally:
+        db.close()
+
+    h = login(client, "7WG2026")
+    r = client.get("/api/service-desk/tickets", headers=h)
+    assert r.status_code == 200
+    tickets = r.json()
+    for t in tickets:
+        assert t["squadron_id"] in sqns_in_7wg, (
+            f"wing_viewer got ticket for squadron {t['squadron_id']} outside 7WG"
+        )
+
+
+def test_national_viewer_sees_all_tickets(client):
+    sqn703 = _sqn_id("703SQN")
+    _make_ticket(client, sqn703, description="National viewer visibility test.")
+
+    h = login(client, "NATIONAL2026")
+    r = client.get("/api/service-desk/tickets", headers=h)
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+def test_wing_viewer_cannot_patch_ticket(client):
+    sqn703 = _sqn_id("703SQN")
+    created = _make_ticket(client, sqn703, description="Patch attempt by wing_viewer.")
+    ticket_id = created["ticket_id"]
+
+    h = login(client, "7WG2026")
+    r = client.patch(f"/api/service-desk/tickets/{ticket_id}",
+                     json={"status": "resolved"}, headers=h)
+    assert r.status_code == 403
+
+
+def test_national_viewer_cannot_patch_ticket(client):
+    sqn703 = _sqn_id("703SQN")
+    created = _make_ticket(client, sqn703, description="Patch attempt by national_viewer.")
+    ticket_id = created["ticket_id"]
+
+    h = login(client, "NATIONAL2026")
+    r = client.patch(f"/api/service-desk/tickets/{ticket_id}",
+                     json={"status": "resolved"}, headers=h)
+    assert r.status_code == 403

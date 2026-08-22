@@ -235,14 +235,14 @@ def list_tickets(
 
     q = db.query(ServiceTicket)
 
-    if p.role == "wing_admin":
+    if p.role in ("wing_admin", "wing_viewer"):
         q = (
             q.join(Squadron, ServiceTicket.squadron_id == Squadron.id)
             .filter(Squadron.wing_id == p.wing_id)
         )
     elif p.role == "sqn_admin":
         q = q.filter(ServiceTicket.squadron_id == p.squadron_id)
-    # national_admin and system_admin see all — no additional filter
+    # national_admin, national_viewer, system_admin see all — no additional filter
 
     if status is not None:
         if status not in _VALID_STATUSES:
