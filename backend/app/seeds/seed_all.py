@@ -8,7 +8,8 @@ from ..security import hash_code
 from ..models import (NationalEntity, Wing, Squadron, Flight, User, AccessCode,
                       CurriculumItem, CurriculumElement, CurriculumPhase, Facilitator, FacilitatorRankHistory,
                       TrainingArea, Equipment, ParadeNight, Session, Cadet,
-                      TimingTemplate, TimingBlock, FacilitatorTypeTag, SessionStatusReasonTag)
+                      TimingTemplate, TimingBlock, FacilitatorTypeTag, SessionStatusReasonTag,
+                      TrainingClass)
 
 _DEFAULT_ELEMENTS = [
     ("Air_Space",         "Air & Space",                "national"),
@@ -231,6 +232,20 @@ def seed_all():
         ))
     db.commit()
 
+    # The printed Weekly Program places a session into a row by its
+    # timing_block_id. Seeded sessions carried a period_number but no block, so
+    # every one of them landed in the "Unlinked periods" footnote and the demo
+    # program printed as an empty timetable. Map period 1/2/3 to the matching
+    # Training Period block.
+    _period_block_id = {
+        b.period_number: b.id
+        for b in db.query(TimingBlock).filter(
+            TimingBlock.timing_template_id == tmpl_703.id,
+            TimingBlock.is_instructional_period == True,  # noqa: E712
+        ).all()
+        if b.period_number
+    }
+
     # Tuples: (period, cadet_group, curriculum_code, room, facilitator_last_name, status)
     demo_pns = [
         # Within one period a facilitator delivers one lesson and a room hosts one
@@ -312,6 +327,7 @@ def seed_all():
                            facilitator_rank_at_time=f.current_rank if f else None,
                            facilitator_display_name_at_time=(f.current_rank + " " + f.last_name) if f else None,
                            training_area_id=r.id if r else None, training_area_name_at_time=room,
+                           timing_block_id=_period_block_id.get(period),
                            expected_attendance=15, status=status))
         db.commit()
 
@@ -405,6 +421,24 @@ def seed_planning_data(db, wing, sqn_by_code):
         created_at=now, updated_at=now,
     )
     db.add(py); db.commit()
+
+    # The printed Weekly Program's columns ARE the Training Classes, and a session
+    # only appears under one whose stage matches its cadet_group. Creating a year
+    # through the API auto-creates these five (see planning.py's
+    # _AUTO_STAGE_DEFAULTS); the seed writes its year directly and so had none,
+    # which left every column showing a placeholder dash.
+    # Stage codes map to the cadet_group values used above:
+    #   ORI->orientation  INI->initial  JNR->junior  INT->intermediate  SNR->senior
+    for _code, _name, _seq in [("ORI", "Orientation", 1), ("INI", "Initial", 2),
+                               ("JNR", "Junior", 3), ("INT", "Intermediate", 4),
+                               ("SNR", "Senior", 5)]:
+        db.add(TrainingClass(
+            squadron_id=s703.id, training_year_id=py.id, training_stage_id=None,
+            stage_code=_code, display_name=_name, sequence=_seq,
+            start_date=f"{py.year}-01-01", end_date=None,
+            created_at=now, updated_at=now,
+        ))
+    db.commit()
 
     # WA 2026 school holidays and public holidays
     wa_holidays = [
