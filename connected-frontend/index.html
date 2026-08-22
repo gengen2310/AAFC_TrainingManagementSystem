@@ -1098,7 +1098,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <!-- Step 2 — enter access code -->
     <div id="auth-step2" style="display:none">
       <div class="auth-acct-banner" id="auth-acct-banner"></div>
-      <div class="fg"><label>Access Code</label><input type="password" id="auth-code" placeholder="Access code" autocomplete="off"></div>
+      <div class="fg"><label for="auth-code">Access Code</label><input type="password" id="auth-code" placeholder="Access code" autocomplete="off"></div>
       <button class="btn-auth" id="auth-btn" onclick="doLogin()">Sign In</button>
       <div class="auth-progress" id="auth-progress"><div class="auth-progress-fill" id="auth-progress-bar"></div></div>
       <button type="button" class="auth-back-btn" onclick="showAuthStep1()">‹ Change selection</button>
@@ -1824,8 +1824,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <div class="card">
           <div class="ctitle">Squadron Details</div>
           <div class="form-row">
-            <div class="ff"><label>Squadron Name</label><input class="ff-ro" id="s-sqn" readonly></div>
-            <div class="ff"><label>Address</label><input id="s-addr"></div>
+            <div class="ff"><label for="s-sqn">Squadron Name</label><input class="ff-ro" id="s-sqn" readonly></div>
+            <div class="ff"><label for="s-addr">Address</label><input id="s-addr"></div>
           </div>
           <div class="form-row">
             <div class="ff"><label for="s-unit-type">Unit Type</label>
@@ -1856,7 +1856,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             change this setting and save: a preview of the affected nights appears before anything moves.
           </div>
           <div class="form-row">
-            <div class="ff"><label>Squadron Crest URL (optional)</label>
+            <div class="ff"><label for="s-crest">Squadron Crest URL (optional)</label>
               <input id="s-crest" type="url" placeholder="https://…" oninput="_renderCrestPreview()">
               <div class="muted" style="font-size:var(--fs-2xs);margin-top:3px">Link to an image hosted elsewhere — must start with http:// or https://. Leave blank to use the default crest.</div>
             </div>
@@ -1927,7 +1927,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             Classes with a year.
           </p>
           <div style="margin-bottom:10px">
-            <label style="font-size:var(--fs-xs);font-weight:700;color:var(--muted);margin-right:8px">Year:</label>
+            <label style="font-size:var(--fs-xs);font-weight:700;color:var(--muted);margin-right:8px" for="tc-year-sel">Year:</label>
             <select id="tc-year-sel" aria-label="Select year for classes" onchange="_tcLoadForYear(this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
               <option value="">— select year —</option>
             </select>
@@ -1948,8 +1948,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div class="ctitle">🔑 Access Code</div>
           <div class="alert a-info">Change your own sign-in code. Existing codes cannot be viewed. The previous code cannot be recovered once changed.</div>
           <div class="form-row">
-            <div class="ff"><label>New access code</label><input id="cc-new" type="password" autocomplete="new-password" placeholder="Enter new code"></div>
-            <div class="ff"><label>Confirm new code</label><input id="cc-confirm" type="password" autocomplete="new-password" placeholder="Re-enter new code"></div>
+            <div class="ff"><label for="cc-new">New access code</label><input id="cc-new" type="password" autocomplete="new-password" placeholder="Enter new code"></div>
+            <div class="ff"><label for="cc-confirm">Confirm new code</label><input id="cc-confirm" type="password" autocomplete="new-password" placeholder="Re-enter new code"></div>
           </div>
           <button class="btn btn-dk admin-el" onclick="changeMyCode()">Change My Access Code</button>
           <div id="cc-msg" style="font-size:var(--fs-xs);margin-top:10px;font-weight:700"></div>
@@ -2177,9 +2177,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <div id="sc-wing-form" style="display:none;margin-top:10px">
               <div style="font-weight:700;font-size:var(--fs-sm);color:var(--dark);margin-bottom:8px">Create New Wing</div>
               <div class="form-row" style="grid-template-columns:120px 1fr 120px;gap:8px;margin-bottom:8px">
-                <div class="form-group" style="margin:0"><label style="font-size:var(--fs-xs)">Wing Code *</label><input id="sc-wing-code" type="text" placeholder="e.g. 1WG" style="width:100%"></div>
-                <div class="form-group" style="margin:0"><label style="font-size:var(--fs-xs)">Full Name *</label><input id="sc-wing-name" type="text" placeholder="e.g. 1 Wing" style="width:100%"></div>
-                <div class="form-group" style="margin:0"><label style="font-size:var(--fs-xs)">Short Name</label><input id="sc-wing-short" type="text" placeholder="e.g. 1WG" style="width:100%"></div>
+                <div class="form-group" style="margin:0"><label style="font-size:var(--fs-xs)" for="sc-wing-code">Wing Code *</label><input id="sc-wing-code" type="text" placeholder="e.g. 1WG" style="width:100%"></div>
+                <div class="form-group" style="margin:0"><label style="font-size:var(--fs-xs)" for="sc-wing-name">Full Name *</label><input id="sc-wing-name" type="text" placeholder="e.g. 1 Wing" style="width:100%"></div>
+                <div class="form-group" style="margin:0"><label style="font-size:var(--fs-xs)" for="sc-wing-short">Short Name</label><input id="sc-wing-short" type="text" placeholder="e.g. 1WG" style="width:100%"></div>
               </div>
               <div id="sc-wing-msg" class="muted" style="font-size:var(--fs-sm);margin-bottom:8px"></div>
               <button class="btn btn-primary btn-sm" onclick="scCreateWing()">Create Wing</button>
@@ -2195,8 +2195,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
                 <div class="form-group" style="margin:0"><label for="sc-sqn-wing" style="font-size:var(--fs-xs)">Wing *</label>
                   <select id="sc-sqn-wing" aria-label="Wing for new unit" style="width:100%;font-size:var(--fs-sm);padding:6px 8px;border:1px solid var(--border);border-radius:4px"><option value="">Select wing…</option></select>
                 </div>
-                <div class="form-group" style="margin:0"><label style="font-size:var(--fs-xs)">Unit Code *</label><input id="sc-sqn-code" type="text" placeholder="e.g. 703" style="width:100%"></div>
-                <div class="form-group" style="margin:0"><label style="font-size:var(--fs-xs)">Full Name *</label><input id="sc-sqn-name" type="text" placeholder="e.g. 703 City Squadron" style="width:100%"></div>
+                <div class="form-group" style="margin:0"><label style="font-size:var(--fs-xs)" for="sc-sqn-code">Unit Code *</label><input id="sc-sqn-code" type="text" placeholder="e.g. 703" style="width:100%"></div>
+                <div class="form-group" style="margin:0"><label style="font-size:var(--fs-xs)" for="sc-sqn-name">Full Name *</label><input id="sc-sqn-name" type="text" placeholder="e.g. 703 City Squadron" style="width:100%"></div>
                 <div class="form-group" style="margin:0"><label for="sc-sqn-type" style="font-size:var(--fs-xs)">Unit Type</label>
                   <select id="sc-sqn-type" aria-label="Unit type for new unit" style="width:100%;font-size:var(--fs-sm);padding:6px 8px;border:1px solid var(--border);border-radius:4px">
                     <option value="standard_squadron">Standard Squadron</option>
@@ -2219,15 +2219,15 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div id="sc-maint-body"><div class="muted">Loading…</div></div>
           <div id="sc-maint-form" style="margin-top:14px;display:none">
             <div class="form-group">
-              <label>Title shown to users (optional)</label>
+              <label for="sc-maint-title">Title shown to users (optional)</label>
               <input id="sc-maint-title" type="text" placeholder="Maintenance" style="width:100%;max-width:300px">
             </div>
             <div class="form-group">
-              <label>Message shown to users</label>
+              <label for="sc-maint-msg">Message shown to users</label>
               <input id="sc-maint-msg" type="text" placeholder="System under maintenance. Try again later." style="width:100%;max-width:480px">
             </div>
             <div class="form-group">
-              <label>Expected return time (optional, ISO format)</label>
+              <label for="sc-maint-until">Expected return time (optional, ISO format)</label>
               <input id="sc-maint-until" type="text" placeholder="e.g. 2026-12-01 08:00 UTC (24-hour)" style="width:100%;max-width:300px">
             </div>
             <div class="form-group">
@@ -2376,10 +2376,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
 <!-- New Planning Year Modal -->
 <!-- Assign Mission Modal -->
-<div class="modal-bg" id="m-assign-mission">
+<div class="modal-bg" id="m-assign-mission" role="dialog" aria-modal="true" aria-labelledby="m-assign-mission-title">
   <div class="modal" style="max-width:480px">
     <div class="modal-hdr">
-      <div class="modal-title">Assign Mission</div>
+      <div class="modal-title" id="m-assign-mission-title">Assign Mission</div>
       <button class="modal-x" aria-label="Close" onclick="closeModal('m-assign-mission')">×</button>
     </div>
     <p id="assign-title" style="font-weight:600;margin-bottom:12px"></p>
@@ -2424,11 +2424,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   </div>
 </div>
 
-<div class="modal-bg" id="m-new-year">
+<div class="modal-bg" id="m-new-year" role="dialog" aria-modal="true" aria-labelledby="m-new-year-title">
   <div class="modal">
-    <h2>New Year</h2>
-    <div class="form-group"><label>Year *</label><input type="number" id="py-year-inp" placeholder="2026" min="2020" max="2040"></div>
-    <div class="form-group"><label>Name *</label><input type="text" id="py-name-inp" placeholder="2026"></div>
+    <h2 id="m-new-year-title">New Year</h2>
+    <div class="form-group"><label for="py-year-inp">Year *</label><input type="number" id="py-year-inp" placeholder="2026" min="2020" max="2040"></div>
+    <div class="form-group"><label for="py-name-inp">Name *</label><input type="text" id="py-name-inp" placeholder="2026"></div>
     <div class="form-group" id="py-unit-row" style="display:none">
       <label>Squadron <span class="muted" style="font-weight:400">(optional — leave blank for a wing-level year)</span></label>
       <select id="py-unit-sel" aria-label="Select squadron (optional, leave blank for wing-level year)" style="width:100%"><option value="">— Wing-level year —</option></select>
@@ -2442,18 +2442,18 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Parade Day Change — propagation wizard -->
-<div class="modal-bg" id="m-pday-propagate">
+<div class="modal-bg" id="m-pday-propagate" role="dialog" aria-modal="true" aria-labelledby="m-pday-propagate-title">
   <div class="modal" style="max-width:640px">
-    <h2>Apply new parade day to existing nights?</h2>
+    <h2 id="m-pday-propagate-title">Apply new parade day to existing nights?</h2>
     <div id="pday-prop-body"></div>
   </div>
 </div>
 
 <!-- Add Single Parade Date Modal -->
-<div class="modal-bg" id="m-add-pd">
+<div class="modal-bg" id="m-add-pd" role="dialog" aria-modal="true" aria-labelledby="m-add-pd-title">
   <div class="modal">
-    <h2>Add Parade Date</h2>
-    <div class="form-group"><label>Date *</label><input type="date" id="pd-date-inp"></div>
+    <h2 id="m-add-pd-title">Add Parade Date</h2>
+    <div class="form-group"><label for="pd-date-inp">Date *</label><input type="date" id="pd-date-inp"></div>
     <div class="form-group"><label for="pd-type-inp">Type</label>
       <select id="pd-type-inp" aria-label="Parade date type">
         <option value="standard">Standard</option>
@@ -2461,7 +2461,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <option value="cancelled">Cancelled</option>
       </select>
     </div>
-    <div class="form-group"><label>Notes</label><textarea id="pd-notes-inp" rows="2"></textarea></div>
+    <div class="form-group"><label for="pd-notes-inp">Notes</label><textarea id="pd-notes-inp" rows="2"></textarea></div>
     <p id="pd-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-add-pd')">Cancel</button>
@@ -2471,9 +2471,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Auto-Generate Parade Dates Modal -->
-<div class="modal-bg" id="m-gen-dates">
+<div class="modal-bg" id="m-gen-dates" role="dialog" aria-modal="true" aria-labelledby="m-gen-dates-title">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title">Bulk Generate Parade Dates</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-gen-dates')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-gen-dates-title">Bulk Generate Parade Dates</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-gen-dates')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
         <div class="form-group"><label for="gen-freq">Repeat every</label>
@@ -2498,15 +2498,15 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Program start date *</label><input type="date" id="gen-start"></div>
-        <div class="form-group"><label>Program end date</label><input type="date" id="gen-end"></div>
+        <div class="form-group"><label for="gen-start">Program start date *</label><input type="date" id="gen-start"></div>
+        <div class="form-group"><label for="gen-end">Program end date</label><input type="date" id="gen-end"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Parade start time</label><input type="time" id="gen-start-time" placeholder="Squadron default"></div>
-        <div class="form-group"><label>Parade finish time</label><input type="time" id="gen-end-time" placeholder="Squadron default"></div>
+        <div class="form-group"><label for="gen-start-time">Parade start time</label><input type="time" id="gen-start-time" placeholder="Squadron default"></div>
+        <div class="form-group"><label for="gen-end-time">Parade finish time</label><input type="time" id="gen-end-time" placeholder="Squadron default"></div>
       </div>
-      <div class="form-group"><label>Max Repeats (alternative to Program end date)</label><input type="number" id="gen-max-repeats" min="1" max="200" placeholder="e.g. 30"></div>
-      <div class="form-group"><label>Excluded dates (YYYY-MM-DD, comma or space separated)</label><input type="text" id="gen-excl-dates" placeholder="e.g. 2026-04-10, 2026-04-17"></div>
+      <div class="form-group"><label for="gen-max-repeats">Max Repeats (alternative to Program end date)</label><input type="number" id="gen-max-repeats" min="1" max="200" placeholder="e.g. 30"></div>
+      <div class="form-group"><label for="gen-excl-dates">Excluded dates (YYYY-MM-DD, comma or space separated)</label><input type="text" id="gen-excl-dates" placeholder="e.g. 2026-04-10, 2026-04-17"></div>
       <div class="form-group"><label><input type="checkbox" id="gen-excl-hols" checked> Skip existing holiday periods</label></div>
       <p id="gen-msg" style="color:var(--error)"></p>
       <div id="gen-preview-area" style="display:none;margin-top:8px;max-height:180px;overflow-y:auto"></div>
@@ -2520,7 +2520,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Wing HQ Event Create/Edit Modal -->
-<div class="modal-bg" id="m-wing-event">
+<div class="modal-bg" id="m-wing-event" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:640px">
     <div class="modal-hdr">
       <div class="modal-title" id="we-modal-title">New Wing HQ Event</div>
@@ -2530,7 +2530,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <input type="hidden" id="we-edit-id">
       <div class="form-row">
         <div class="form-group" style="flex:2">
-          <label>Title *</label>
+          <label for="we-title">Title *</label>
           <input type="text" id="we-title" placeholder="e.g. Gold 1 Consolidation Day">
         </div>
         <div class="form-group" style="flex:1">
@@ -2550,10 +2550,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>Start Date *</label><input type="date" id="we-start"></div>
-        <div class="form-group"><label>End Date</label><input type="date" id="we-end"></div>
-        <div class="form-group"><label>Start Time</label><input type="time" id="we-start-time"></div>
-        <div class="form-group"><label>End Time</label><input type="time" id="we-end-time"></div>
+        <div class="form-group"><label for="we-start">Start Date *</label><input type="date" id="we-start"></div>
+        <div class="form-group"><label for="we-end">End Date</label><input type="date" id="we-end"></div>
+        <div class="form-group"><label for="we-start-time">Start Time</label><input type="time" id="we-start-time"></div>
+        <div class="form-group"><label for="we-end-time">End Time</label><input type="time" id="we-end-time"></div>
       </div>
       <div class="form-row">
         <div class="form-group" style="flex:1">
@@ -2567,7 +2567,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </select>
         </div>
         <div class="form-group" style="flex:2">
-          <label>Location</label>
+          <label for="we-location">Location</label>
           <input type="text" id="we-location" placeholder="e.g. RAAF Base Pearce">
         </div>
       </div>
@@ -2590,7 +2590,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <label><input type="checkbox" id="we-anchor"> Is a planning anchor</label>
         </div>
       </div>
-      <div class="form-group"><label>Notes</label><textarea id="we-notes" rows="2" placeholder="Additional details, reference number, etc."></textarea></div>
+      <div class="form-group"><label for="we-notes">Notes</label><textarea id="we-notes" rows="2" placeholder="Additional details, reference number, etc."></textarea></div>
       <p id="we-msg" style="color:var(--error);font-size:var(--fs-sm);min-height:1.2em"></p>
     </div>
     <div class="modal-foot">
@@ -2601,10 +2601,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Wing HQ Event Detail Modal (read-only for squadron users) -->
-<div class="modal-bg" id="m-wing-event-detail">
+<div class="modal-bg" id="m-wing-event-detail" role="dialog" aria-modal="true" aria-labelledby="m-wing-event-detail-title">
   <div class="modal" style="max-width:580px">
     <div class="modal-hdr">
-      <div class="modal-title">Wing HQ Event</div>
+      <div class="modal-title" id="m-wing-event-detail-title">Wing HQ Event</div>
       <button class="modal-x" aria-label="Close" onclick="closeModal('m-wing-event-detail')">×</button>
     </div>
     <div class="modal-body" id="we-detail-body">
@@ -2619,10 +2619,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
 
 <!-- Add Holiday Modal -->
-<div class="modal-bg" id="m-add-holiday">
+<div class="modal-bg" id="m-add-holiday" role="dialog" aria-modal="true" aria-labelledby="m-add-holiday-title">
   <div class="modal">
-    <h2>Add Holiday / Stand-Down Period</h2>
-    <div class="form-group"><label>Name *</label><input type="text" id="hol-name-inp" placeholder="e.g. Easter Break"></div>
+    <h2 id="m-add-holiday-title">Add Holiday / Stand-Down Period</h2>
+    <div class="form-group"><label for="hol-name-inp">Name *</label><input type="text" id="hol-name-inp" placeholder="e.g. Easter Break"></div>
     <div class="form-group"><label for="hol-type-inp">Type *</label>
       <select id="hol-type-inp" aria-label="Holiday or stand-down type">
         <option value="school_holiday">School Holiday</option>
@@ -2636,8 +2636,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       </select>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Start *</label><input type="date" id="hol-start-inp"></div>
-      <div class="form-group"><label>End *</label><input type="date" id="hol-end-inp"></div>
+      <div class="form-group"><label for="hol-start-inp">Start *</label><input type="date" id="hol-start-inp"></div>
+      <div class="form-group"><label for="hol-end-inp">End *</label><input type="date" id="hol-end-inp"></div>
     </div>
     <div class="form-group"><label><input type="checkbox" id="hol-affects-inp" checked> Affects parade nights</label></div>
     <p id="hol-msg" style="color:var(--error)"></p>
@@ -2649,11 +2649,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Edit Holiday Modal -->
-<div class="modal-bg" id="m-edit-holiday">
+<div class="modal-bg" id="m-edit-holiday" role="dialog" aria-modal="true" aria-labelledby="m-edit-holiday-title">
   <div class="modal">
-    <h2>Edit Holiday / Stand-Down Period</h2>
+    <h2 id="m-edit-holiday-title">Edit Holiday / Stand-Down Period</h2>
     <input type="hidden" id="hol-edit-id">
-    <div class="form-group"><label>Name *</label><input type="text" id="hol-edit-name" placeholder="e.g. Easter Break"></div>
+    <div class="form-group"><label for="hol-edit-name">Name *</label><input type="text" id="hol-edit-name" placeholder="e.g. Easter Break"></div>
     <div class="form-group"><label for="hol-edit-type">Type *</label>
       <select id="hol-edit-type" aria-label="Holiday or stand-down type">
         <option value="school_holiday">School Holiday</option>
@@ -2667,8 +2667,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       </select>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Start *</label><input type="date" id="hol-edit-start"></div>
-      <div class="form-group"><label>End *</label><input type="date" id="hol-edit-end"></div>
+      <div class="form-group"><label for="hol-edit-start">Start *</label><input type="date" id="hol-edit-start"></div>
+      <div class="form-group"><label for="hol-edit-end">End *</label><input type="date" id="hol-edit-end"></div>
     </div>
     <div class="form-group"><label><input type="checkbox" id="hol-edit-affects"> Affects parade nights</label></div>
     <p id="hol-edit-msg" style="color:var(--error)"></p>
@@ -2680,9 +2680,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Add Training Class Modal -->
-<div class="modal-bg" id="m-add-training-class">
+<div class="modal-bg" id="m-add-training-class" role="dialog" aria-modal="true" aria-labelledby="m-add-training-class-title">
   <div class="modal">
-    <h2>Add Training Class</h2>
+    <h2 id="m-add-training-class-title">Add Training Class</h2>
     <div class="form-group"><label for="tc-stage-inp">Training Stage *<button class="ht" tabindex="0" aria-label="About Training Stage" data-tip="The national curriculum level — e.g. Senior, Junior, Initial. One stage can have several classes: Senior 1 and Senior 2 are both the Senior stage.">?</button></label>
       <select id="tc-stage-inp" aria-label="Training Stage"></select>
     </div>
@@ -2708,9 +2708,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Edit Training Class Modal -->
-<div class="modal-bg" id="m-edit-training-class">
+<div class="modal-bg" id="m-edit-training-class" role="dialog" aria-modal="true" aria-labelledby="m-edit-training-class-title">
   <div class="modal">
-    <h2>Edit Training Class</h2>
+    <h2 id="m-edit-training-class-title">Edit Training Class</h2>
     <input type="hidden" id="tc-edit-id">
     <input type="hidden" id="tc-edit-version">
     <div class="form-group"><label for="tc-edit-stage-inp">Training Stage *<button class="ht" tabindex="0" aria-label="About Training Stage" data-tip="The national curriculum level — e.g. Senior, Junior, Initial. One stage can have several classes: Senior 1 and Senior 2 are both the Senior stage.">?</button></label>
@@ -2738,11 +2738,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Add Custom Phase Modal (Task 10) -->
-<div class="modal-bg" id="m-add-custom-phase">
+<div class="modal-bg" id="m-add-custom-phase" role="dialog" aria-modal="true" aria-labelledby="m-add-custom-phase-title">
   <div class="modal">
-    <h2>Add Custom Training Phase</h2>
-    <div class="form-group"><label>Name *</label><input type="text" id="cp-name-inp" placeholder="e.g. Pre-Course Period"></div>
-    <div class="form-group"><label>Applies From *</label><input type="date" id="cp-from-inp"></div>
+    <h2 id="m-add-custom-phase-title">Add Custom Training Phase</h2>
+    <div class="form-group"><label for="cp-name-inp">Name *</label><input type="text" id="cp-name-inp" placeholder="e.g. Pre-Course Period"></div>
+    <div class="form-group"><label for="cp-from-inp">Applies From *</label><input type="date" id="cp-from-inp"></div>
     <div class="form-group"><label>Applies To <span style="font-weight:400;color:var(--muted)">(optional — leave blank for open-ended)</span></label><input type="date" id="cp-to-inp"></div>
     <p id="cp-add-msg" style="color:var(--error);font-size:var(--fs-sm);margin-top:4px"></p>
     <div class="modal-actions">
@@ -2753,12 +2753,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Edit Custom Phase Modal (Task 10) -->
-<div class="modal-bg" id="m-edit-custom-phase">
+<div class="modal-bg" id="m-edit-custom-phase" role="dialog" aria-modal="true" aria-labelledby="m-edit-custom-phase-title">
   <div class="modal">
-    <h2>Edit Custom Training Phase</h2>
+    <h2 id="m-edit-custom-phase-title">Edit Custom Training Phase</h2>
     <input type="hidden" id="cp-edit-id">
-    <div class="form-group"><label>Name *</label><input type="text" id="cp-edit-name-inp"></div>
-    <div class="form-group"><label>Applies From *</label><input type="date" id="cp-edit-from-inp"></div>
+    <div class="form-group"><label for="cp-edit-name-inp">Name *</label><input type="text" id="cp-edit-name-inp"></div>
+    <div class="form-group"><label for="cp-edit-from-inp">Applies From *</label><input type="date" id="cp-edit-from-inp"></div>
     <div class="form-group"><label>Applies To <span style="font-weight:400;color:var(--muted)">(optional — leave blank for open-ended)</span></label><input type="date" id="cp-edit-to-inp"></div>
     <p id="cp-edit-msg" style="color:var(--error);font-size:var(--fs-sm);margin-top:4px"></p>
     <div class="modal-actions">
@@ -2770,12 +2770,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
 <!-- Split Training Class Modal (CLASS-10): moves selected cadets from the
      source class into a newly-created class in the same Stage/Year. -->
-<div class="modal-bg" id="m-split-training-class">
+<div class="modal-bg" id="m-split-training-class" role="dialog" aria-modal="true">
   <div class="modal">
     <h2 id="tcsplit-title">Split Training Class</h2>
     <input type="hidden" id="tcsplit-source-id">
-    <div class="form-group"><label>New Class Name *</label><input type="text" id="tcsplit-name-inp" placeholder="e.g. Senior 2"></div>
-    <div class="form-group"><label>Order (optional)</label><input type="number" id="tcsplit-seq-inp" min="0" placeholder="0"></div>
+    <div class="form-group"><label for="tcsplit-name-inp">New Class Name *</label><input type="text" id="tcsplit-name-inp" placeholder="e.g. Senior 2"></div>
+    <div class="form-group"><label for="tcsplit-seq-inp">Order (optional)</label><input type="number" id="tcsplit-seq-inp" min="0" placeholder="0"></div>
     <div class="form-group">
       <label>Cadets to move into the new class</label>
       <div id="tcsplit-members" style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:6px;padding:8px"></div>
@@ -2792,7 +2792,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 <!-- Merge Training Class Modal (CLASS-10): moves every active member of the
      source class into an existing target class in the same Stage/Year, then
      archives the source. SessionAudience history is never rewritten. -->
-<div class="modal-bg" id="m-merge-training-class">
+<div class="modal-bg" id="m-merge-training-class" role="dialog" aria-modal="true">
   <div class="modal">
     <h2 id="tcmerge-title">Merge Training Class</h2>
     <input type="hidden" id="tcmerge-source-id">
@@ -2809,7 +2809,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Training Class Curriculum Progress Modal (CLASS-04 dedicated UI) -->
-<div class="modal-bg" id="m-training-class-progress">
+<div class="modal-bg" id="m-training-class-progress" role="dialog" aria-modal="true">
   <div class="modal modal-lg">
     <h2 id="tcp-title">Curriculum Progress</h2>
     <div id="tcp-summary"></div>
@@ -2826,9 +2826,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Copy Sessions to Another Parade Night Modal (WORK-11) -->
-<div class="modal-bg" id="m-pn-copy-sessions">
+<div class="modal-bg" id="m-pn-copy-sessions" role="dialog" aria-modal="true" aria-labelledby="m-pn-copy-sessions-title">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title">Copy sessions to another parade night</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-copy-sessions')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-pn-copy-sessions-title">Copy sessions to another parade night</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-copy-sessions')">×</button></div>
     <div class="modal-body">
       <p style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:12px">Copies the planning details of each session (curriculum item, facilitator, room, Training Class audience) from this parade night to the selected night. Sessions already at the same period in the target are not changed.</p>
       <div class="ff"><label for="pn-copy-target">Copy to</label><select id="pn-copy-target" aria-label="Target parade night"></select></div>
@@ -2842,9 +2842,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Parade Night Templates — Apply modal (WORK-17) -->
-<div class="modal-bg" id="m-pn-apply-template">
+<div class="modal-bg" id="m-pn-apply-template" role="dialog" aria-modal="true" aria-labelledby="m-pn-apply-template-title">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title">Apply a session template</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-apply-template')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-pn-apply-template-title">Apply a session template</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-apply-template')">×</button></div>
     <div class="modal-body">
       <p style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:12px">Applies the session structure of the selected template to this parade night. Training Class audiences are not copied — assign them after applying. Periods already occupied are not changed.</p>
       <div id="pn-tpl-list" style="display:flex;flex-direction:column;gap:8px"></div>
@@ -2858,11 +2858,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- PN-WIZ-01: Guided Session Builder wizard -->
-<div class="modal-bg" id="m-sess-wizard">
+<div class="modal-bg" id="m-sess-wizard" role="dialog" aria-modal="true" aria-labelledby="m-sess-wizard-title">
   <div class="modal" style="max-width:540px">
     <div class="modal-hdr">
       <div>
-        <div class="modal-title">Guided Session Builder</div>
+        <div class="modal-title" id="m-sess-wizard-title">Guided Session Builder</div>
         <div id="wiz-step-label" style="font-size:var(--fs-xs);color:var(--muted);margin-top:1px">Step 1 of 6</div>
       </div>
       <button class="modal-x" aria-label="Close wizard" onclick="_wizCancel()">×</button>
@@ -2949,9 +2949,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Bulk Apply Template Modal (BULK-01) -->
-<div class="modal-bg" id="m-bulk-apply-tpl">
+<div class="modal-bg" id="m-bulk-apply-tpl" role="dialog" aria-modal="true" aria-labelledby="m-bulk-apply-tpl-title">
   <div class="modal" style="max-width:500px">
-    <div class="modal-hdr"><div class="modal-title">Apply structure to selected nights</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-bulk-apply-tpl')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-bulk-apply-tpl-title">Apply structure to selected nights</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-bulk-apply-tpl')">×</button></div>
     <div class="modal-body">
       <div class="form-group">
         <label for="bat-tpl-sel">Template</label>
@@ -2979,10 +2979,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Getting Help Edit Modal (system_admin only) -->
-<div class="modal-bg" id="m-getting-help">
+<div class="modal-bg" id="m-getting-help" role="dialog" aria-modal="true" aria-labelledby="m-getting-help-title">
   <div class="modal">
-    <h2>Edit Getting Help Content</h2>
-    <div class="form-group"><label>Content</label><textarea id="gh-content-inp" rows="8" placeholder="e.g. Contact your Wing Training Officer for support with this page."></textarea></div>
+    <h2 id="m-getting-help-title">Edit Getting Help Content</h2>
+    <div class="form-group"><label for="gh-content-inp">Content</label><textarea id="gh-content-inp" rows="8" placeholder="e.g. Contact your Wing Training Officer for support with this page."></textarea></div>
     <p id="gh-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-getting-help')">Cancel</button>
@@ -2992,10 +2992,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Add Anchor Event Modal -->
-<div class="modal-bg" id="m-add-anchor">
+<div class="modal-bg" id="m-add-anchor" role="dialog" aria-modal="true" aria-labelledby="m-add-anchor-title">
   <div class="modal" style="max-width:540px">
-    <h2>Add Anchor Event</h2>
-    <div class="form-group"><label>Event Name *</label><input type="text" id="anch-name-inp"></div>
+    <h2 id="m-add-anchor-title">Add Anchor Event</h2>
+    <div class="form-group"><label for="anch-name-inp">Event Name *</label><input type="text" id="anch-name-inp"></div>
     <div class="form-row">
       <div class="form-group"><label for="anch-type-inp">Type</label>
         <select id="anch-type-inp" aria-label="Anchor event type">
@@ -3019,11 +3019,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       </div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Start Date *</label><input type="date" id="anch-start-inp"></div>
-      <div class="form-group"><label>End Date</label><input type="date" id="anch-end-inp"></div>
+      <div class="form-group"><label for="anch-start-inp">Start Date *</label><input type="date" id="anch-start-inp"></div>
+      <div class="form-group"><label for="anch-end-inp">End Date</label><input type="date" id="anch-end-inp"></div>
     </div>
-    <div class="form-group"><label>Planning Impact</label><textarea id="anch-impact-inp" rows="2" placeholder="How does this event affect training planning?"></textarea></div>
-    <div class="form-group"><label>Readiness Requirements</label><textarea id="anch-readiness-inp" rows="2" placeholder="What must cadets know / be able to do?"></textarea></div>
+    <div class="form-group"><label for="anch-impact-inp">Planning Impact</label><textarea id="anch-impact-inp" rows="2" placeholder="How does this event affect training planning?"></textarea></div>
+    <div class="form-group"><label for="anch-readiness-inp">Readiness Requirements</label><textarea id="anch-readiness-inp" rows="2" placeholder="What must cadets know / be able to do?"></textarea></div>
     <p id="anch-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-add-anchor')">Cancel</button>
@@ -3033,10 +3033,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Add Location Modal -->
-<div class="modal-bg" id="m-add-location">
+<div class="modal-bg" id="m-add-location" role="dialog" aria-modal="true" aria-labelledby="m-add-location-title">
   <div class="modal">
-    <h2>Add Planning Location</h2>
-    <div class="form-group"><label>Name *</label><input type="text" id="loc-name-inp" placeholder="e.g. Main Hall"></div>
+    <h2 id="m-add-location-title">Add Planning Location</h2>
+    <div class="form-group"><label for="loc-name-inp">Name *</label><input type="text" id="loc-name-inp" placeholder="e.g. Main Hall"></div>
     <div class="form-group"><label for="loc-type-inp">Type</label>
       <select id="loc-type-inp" aria-label="Location type">
         <option value="indoor">Indoor</option>
@@ -3044,8 +3044,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <option value="offsite">Off-Site</option>
       </select>
     </div>
-    <div class="form-group"><label>Capacity</label><input type="number" id="loc-cap-inp" placeholder="e.g. 60" min="1"></div>
-    <div class="form-group"><label>Notes</label><textarea id="loc-notes-inp" rows="2"></textarea></div>
+    <div class="form-group"><label for="loc-cap-inp">Capacity</label><input type="number" id="loc-cap-inp" placeholder="e.g. 60" min="1"></div>
+    <div class="form-group"><label for="loc-notes-inp">Notes</label><textarea id="loc-notes-inp" rows="2"></textarea></div>
     <p id="loc-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-add-location')">Cancel</button>
@@ -3055,15 +3055,15 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Session Edit Modal -->
-<div class="modal-bg" id="m-edit-session">
+<div class="modal-bg" id="m-edit-session" role="dialog" aria-modal="true" aria-labelledby="m-edit-session-title">
   <div class="modal" style="max-width:520px">
-    <h2>Edit Session</h2>
+    <h2 id="m-edit-session-title">Edit Session</h2>
     <input type="hidden" id="sess-edit-id">
     <input type="hidden" id="sess-pd-id">
     <div class="form-group"><label for="sess-curr-inp">Curriculum Item</label>
       <select id="sess-curr-inp"><option value="">— none (use custom title) —</option></select>
     </div>
-    <div class="form-group"><label>Custom Title (if no curriculum item)</label><input type="text" id="sess-title-inp" placeholder="Leave blank if using curriculum item above"></div>
+    <div class="form-group"><label for="sess-title-inp">Custom Title (if no curriculum item)</label><input type="text" id="sess-title-inp" placeholder="Leave blank if using curriculum item above"></div>
     <div class="form-group"><label for="sess-fac-inp">Facilitator</label>
       <select id="sess-fac-inp"><option value="">— none —</option></select>
     </div>
@@ -3079,7 +3079,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <option value="not_delivered">Not Delivered</option>
       </select>
     </div>
-    <div class="form-group"><label>Notes</label><textarea id="sess-notes-inp" rows="2"></textarea></div>
+    <div class="form-group"><label for="sess-notes-inp">Notes</label><textarea id="sess-notes-inp" rows="2"></textarea></div>
     <p id="sess-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-edit-session')">Cancel</button>
@@ -3093,12 +3093,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 <!-- ═══ MODALS ═══ -->
 
 <!-- Add Parade Night -->
-<div class="modal-bg" id="m-add-pn">
+<div class="modal-bg" id="m-add-pn" role="dialog" aria-modal="true" aria-labelledby="m-add-pn-title">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title">+ Add Parade Night</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-pn')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-add-pn-title">+ Add Parade Night</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-pn')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="ff"><label>Date</label><input type="date" id="pn-date"></div>
+        <div class="ff"><label for="pn-date">Date</label><input type="date" id="pn-date"></div>
         <div class="ff"><label for="pn-term">Term</label>
           <select id="pn-term" aria-label="Parade night term"><option value="T1">Term 1 (Feb–Mar)</option><option value="T2">Term 2 (Apr–Jun)</option><option value="T3">Term 3 (Jul–Sep)</option><option value="T4">Term 4 (Oct–Dec)</option></select>
         </div>
@@ -3109,7 +3109,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option>
           </select>
         </div>
-        <div class="ff"><label>Notes</label><input id="pn-notes" placeholder="e.g. ANZAC prep"></div>
+        <div class="ff"><label for="pn-notes">Notes</label><input id="pn-notes" placeholder="e.g. ANZAC prep"></div>
       </div>
       <div id="pn-slots"></div>
       <div id="pn-clash-warn" class="alert a-red" style="display:none"><span id="pn-clash-msg"></span></div>
@@ -3122,7 +3122,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Parade Night Detail -->
-<div class="modal-bg" id="m-pn-detail">
+<div class="modal-bg" id="m-pn-detail" role="dialog" aria-modal="true">
   <div class="modal modal-xl">
     <div class="modal-hdr"><div class="modal-title" id="pn-det-title">Parade Night</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-detail')">×</button></div>
     <div class="modal-body" id="pn-det-body"></div>
@@ -3134,14 +3134,14 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Accessible module scheduling (Phase 3.1): Move to a different Parade Night -->
-<div class="modal-bg" id="m-sess-move-to">
+<div class="modal-bg" id="m-sess-move-to" role="dialog" aria-modal="true" aria-labelledby="m-sess-move-to-title">
   <div class="modal" style="max-width:420px">
-    <div class="modal-hdr"><div class="modal-title">Move Session</div><button class="modal-x" aria-label="Close" onclick="_sessMoveToCancel()">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-sess-move-to-title">Move Session</div><button class="modal-x" aria-label="Close" onclick="_sessMoveToCancel()">×</button></div>
     <div class="modal-body">
       <div class="ff"><label for="smt-pn">Move to Parade Night</label>
         <select id="smt-pn"></select>
       </div>
-      <div class="ff"><label>Period</label>
+      <div class="ff"><label for="smt-period">Period</label>
         <input type="number" id="smt-period" min="1" value="1">
       </div>
       <div id="smt-err" style="font-size:var(--fs-xs);margin-top:8px;font-weight:700;color:var(--red)"></div>
@@ -3157,9 +3157,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
      Shared by Move Up/Down, Move to Parade Night, and (Phase 3.2) drag-and-drop --
      all three call the identical _sessMove()/PUT path and hit this same prompt
      on a 409 resource_conflict. -->
-<div class="modal-bg" id="m-sched-conflict">
+<div class="modal-bg" id="m-sched-conflict" role="dialog" aria-modal="true" aria-labelledby="m-sched-conflict-title">
   <div class="modal" style="max-width:420px">
-    <div class="modal-hdr"><div class="modal-title">Scheduling Conflict</div><button class="modal-x" aria-label="Close" onclick="_scResolve(false)">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-sched-conflict-title">Scheduling Conflict</div><button class="modal-x" aria-label="Close" onclick="_scResolve(false)">×</button></div>
     <div class="modal-body">
       <div class="alert a-warn" style="font-size:var(--fs-sm);margin-bottom:8px">This move creates a conflict:</div>
       <ul id="sc-list" style="margin:0 0 4px 18px;padding:0;font-size:var(--fs-sm)"></ul>
@@ -3172,9 +3172,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Session Quick Edit -->
-<div class="modal-bg" id="m-sess-edit">
+<div class="modal-bg" id="m-sess-edit" role="dialog" aria-modal="true" aria-labelledby="m-sess-edit-title">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title">Edit Session</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-sess-edit')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-sess-edit-title">Edit Session</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-sess-edit')">×</button></div>
     <div class="modal-body" id="sess-edit-body"></div>
     <div class="modal-foot">
       <span id="sess-edit-err" style="font-size:var(--fs-xs);margin-right:auto;font-weight:700"></span>
@@ -3211,17 +3211,17 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Add/Edit Curriculum Item -->
-<div class="modal-bg" id="m-add-curr">
+<div class="modal-bg" id="m-add-curr" role="dialog" aria-modal="true">
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title" id="curr-modal-title">+ Add Curriculum Item</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-curr')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="ff"><label>Module Code</label><input id="c-code" placeholder="e.g. JNR-M99"></div>
-        <div class="ff"><label>Title</label><input id="c-title" placeholder="Curriculum item title"></div>
+        <div class="ff"><label for="c-code">Module Code</label><input id="c-code" placeholder="e.g. JNR-M99"></div>
+        <div class="ff"><label for="c-title">Title</label><input id="c-title" placeholder="Curriculum item title"></div>
       </div>
       <div class="form-row">
         <div class="ff"><label>Identifier <span class="muted" style="font-weight:400;font-size:var(--fs-2xs)">(unique key, e.g. JNR-M99(1))</span></label><input id="c-identifier" placeholder="Optional — auto-set on import"></div>
-        <div class="ff"><label>Part Number</label><input type="number" id="c-part" value="1" min="1" step="1" style="max-width:100px"></div>
+        <div class="ff"><label for="c-part">Part Number</label><input type="number" id="c-part" value="1" min="1" step="1" style="max-width:100px"></div>
       </div>
       <div class="form-row">
         <div class="ff">
@@ -3260,12 +3260,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <label id="c-term-label" for="c-term">Term <span id="c-term-optional" class="muted" style="font-weight:400;font-size:var(--fs-2xs)"></span></label>
           <select id="c-term" aria-label="Curriculum item term"><option value="">— no term assigned —</option><option value="T1">T1</option><option value="T2">T2</option><option value="T3">T3</option><option value="T4">T4</option></select>
         </div>
-        <div class="ff"><label>Hours</label><input type="number" id="c-hours" value="1" min="0.25" step="0.25"></div>
+        <div class="ff"><label for="c-hours">Hours</label><input type="number" id="c-hours" value="1" min="0.25" step="0.25"></div>
       </div>
       <div class="ff" id="c-wing-row" style="display:none"><label for="c-wing-id">Wing</label>
         <select id="c-wing-id" aria-label="Owning wing"></select>
       </div>
-      <div class="ff"><label>Learning Hub URL</label><input id="c-lh" placeholder="https://airforcecadets.net.au/lh/…"></div>
+      <div class="ff"><label for="c-lh">Learning Hub URL</label><input id="c-lh" placeholder="https://airforcecadets.net.au/lh/…"></div>
       <div class="ff"><label for="c-instr">Instructor Suitability</label>
         <select id="c-instr"><option value="Staff">Staff</option><option value="Senior Cadet OR Staff">Senior Cadet OR Staff</option><option value="Senior Cadet">Senior Cadet</option></select>
       </div>
@@ -3278,7 +3278,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Curriculum Item Detail -->
-<div class="modal-bg" id="m-curr-detail">
+<div class="modal-bg" id="m-curr-detail" role="dialog" aria-modal="true">
   <div class="modal modal-lg">
     <div class="modal-hdr"><div class="modal-title" id="cd-title">Curriculum Item Detail</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-curr-detail')">×</button></div>
     <div class="modal-body" id="cd-body"></div>
@@ -3287,13 +3287,13 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Add Activity -->
-<div class="modal-bg" id="m-add-act">
+<div class="modal-bg" id="m-add-act" role="dialog" aria-modal="true" aria-labelledby="m-add-act-title">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title">+ Add Activity</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-act')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-add-act-title">+ Add Activity</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-act')">×</button></div>
     <div class="modal-body">
-      <div class="ff"><label>Activity Name</label><input id="act-name" placeholder="e.g. ANZAC Day — Fremantle"></div>
+      <div class="ff"><label for="act-name">Activity Name</label><input id="act-name" placeholder="e.g. ANZAC Day — Fremantle"></div>
       <div class="form-row">
-        <div class="ff"><label>Date</label><input type="date" id="act-date"></div>
+        <div class="ff"><label for="act-date">Date</label><input type="date" id="act-date"></div>
         <div class="ff"><label for="act-type">Importance</label>
           <select id="act-type" aria-label="Activity importance"><option value="Must Attend">Must Attend</option><option value="Key Event">Key Event</option><option value="Optional">Optional</option></select>
         </div>
@@ -3307,7 +3307,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <label class="chk-item"><input type="checkbox" id="aa-sen"> Senior</label>
         </div>
       </div>
-      <div class="ff"><label>Prep Notes</label><textarea id="act-notes"></textarea></div>
+      <div class="ff"><label for="act-notes">Prep Notes</label><textarea id="act-notes"></textarea></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-add-act')">Cancel</button>
@@ -3317,23 +3317,23 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Generate Recurring Activities -->
-<div class="modal-bg" id="m-gen-acts">
+<div class="modal-bg" id="m-gen-acts" role="dialog" aria-modal="true" aria-labelledby="m-gen-acts-title">
   <div class="modal" style="max-width:680px">
-    <div class="modal-hdr"><div class="modal-title">Generate Recurring Activities</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-gen-acts')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-gen-acts-title">Generate Recurring Activities</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-gen-acts')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="ff" style="flex:2"><label>Activity Name *</label><input id="ga-name" placeholder="e.g. Drill Night"></div>
+        <div class="ff" style="flex:2"><label for="ga-name">Activity Name *</label><input id="ga-name" placeholder="e.g. Drill Night"></div>
         <div class="ff"><label for="ga-type">Type</label>
           <select id="ga-type" aria-label="Activity type"><option value="Must Attend">Must Attend</option><option value="Key Event">Key Event</option><option value="Optional" selected>Optional</option></select>
         </div>
       </div>
       <div class="form-row">
-        <div class="ff"><label>Start Date *</label><input type="date" id="ga-start"></div>
-        <div class="ff"><label>End Date *</label><input type="date" id="ga-end"></div>
+        <div class="ff"><label for="ga-start">Start Date *</label><input type="date" id="ga-start"></div>
+        <div class="ff"><label for="ga-end">End Date *</label><input type="date" id="ga-end"></div>
       </div>
       <div class="form-row">
-        <div class="ff"><label>Start Time</label><input type="time" id="ga-time-start"></div>
-        <div class="ff"><label>Finish Time</label><input type="time" id="ga-time-end"></div>
+        <div class="ff"><label for="ga-time-start">Start Time</label><input type="time" id="ga-time-start"></div>
+        <div class="ff"><label for="ga-time-end">Finish Time</label><input type="time" id="ga-time-end"></div>
       </div>
       <div class="form-row">
         <div class="ff"><label for="ga-recur">Recurrence *</label>
@@ -3353,11 +3353,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <option value="6">Sunday</option>
           </select>
         </div>
-        <div class="ff"><label>Max occurrences</label><input type="number" id="ga-count" min="1" max="200" placeholder="(no limit)"></div>
+        <div class="ff"><label for="ga-count">Max occurrences</label><input type="number" id="ga-count" min="1" max="200" placeholder="(no limit)"></div>
       </div>
-      <div class="ff"><label>Exclude dates (comma-separated YYYY-MM-DD)</label><input id="ga-excl" placeholder="e.g. 2026-04-10, 2026-12-25"></div>
-      <div class="ff"><label>Location</label><input id="ga-location" placeholder="e.g. SQN HQ"></div>
-      <div class="ff"><label>Notes</label><input id="ga-notes"></div>
+      <div class="ff"><label for="ga-excl">Exclude dates (comma-separated YYYY-MM-DD)</label><input id="ga-excl" placeholder="e.g. 2026-04-10, 2026-12-25"></div>
+      <div class="ff"><label for="ga-location">Location</label><input id="ga-location" placeholder="e.g. SQN HQ"></div>
+      <div class="ff"><label for="ga-notes">Notes</label><input id="ga-notes"></div>
       <div id="ga-preview-area" style="display:none;margin-top:14px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <div class="ctitle" style="margin:0" id="ga-preview-title">Preview</div>
@@ -3381,13 +3381,13 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- CSV Curriculum Import -->
-<div class="modal-bg" id="m-csv-curr-import">
+<div class="modal-bg" id="m-csv-curr-import" role="dialog" aria-modal="true" aria-labelledby="m-csv-curr-import-title">
   <div class="modal" style="max-width:760px">
-    <div class="modal-hdr"><div class="modal-title">Import Curriculum from CSV</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-csv-curr-import')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-csv-curr-import-title">Import Curriculum from CSV</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-csv-curr-import')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info">Upload a CSV with columns: Training Phase, Experiential Code, Title, Elements, Foundation or Extension, Instructor Suitability, Timing, Location, Learning Hub Link. Preview shows exactly what would be created/updated before anything is written.</div>
       <div class="form-row">
-        <div class="form-group"><label>CSV File *</label><input type="file" id="csv-curr-file" accept=".csv,text/csv"></div>
+        <div class="form-group"><label for="csv-curr-file">CSV File *</label><input type="file" id="csv-curr-file" accept=".csv,text/csv"></div>
         <div class="form-group"><label for="csv-curr-level">Owning Level</label>
           <select id="csv-curr-level">
             <option value="national">National</option>
@@ -3422,13 +3422,13 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Schedule XLSX Import -->
-<div class="modal-bg" id="m-sched-import">
+<div class="modal-bg" id="m-sched-import" role="dialog" aria-modal="true" aria-labelledby="m-sched-import-title">
   <div class="modal" style="max-width:720px">
-    <div class="modal-hdr"><div class="modal-title">Import Schedule from XLSX</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-sched-import')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-sched-import-title">Import Schedule from XLSX</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-sched-import')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info" style="margin-bottom:10px">Upload an edited schedule XLSX. Expected columns: <strong>Date, Session, Group, Code, Title</strong>. Only curriculum code / title changes are imported — other session fields are unchanged. Changes are role-permission-gated.</div>
       <div class="form-group">
-        <label>XLSX File *</label>
+        <label for="sched-import-file">XLSX File *</label>
         <input type="file" id="sched-import-file" accept=".xlsx">
       </div>
       <div id="sched-import-preview" style="display:none;margin-top:10px">
@@ -3459,7 +3459,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Add Facilitator -->
-<div class="modal-bg" id="m-add-fac">
+<div class="modal-bg" id="m-add-fac" role="dialog" aria-modal="true">
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title" id="fac-modal-title">+ Add Facilitator</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-fac')">×</button></div>
     <div class="modal-body">
@@ -3472,8 +3472,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
       </div>
       <div class="form-row">
-        <div class="ff"><label>Given Name</label><input id="fac-first" oninput="_clearFacDupWarning();_markFacUnsaved()"></div>
-        <div class="ff"><label>Family Name</label><input id="fac-last" oninput="_clearFacDupWarning();_markFacUnsaved()"></div>
+        <div class="ff"><label for="fac-first">Given Name</label><input id="fac-first" oninput="_clearFacDupWarning();_markFacUnsaved()"></div>
+        <div class="ff"><label for="fac-last">Family Name</label><input id="fac-last" oninput="_clearFacDupWarning();_markFacUnsaved()"></div>
       </div>
       <div id="fa-areas-create" class="ff"><label>Subject Areas</label>
         <div class="chk-grp">
@@ -3517,7 +3517,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Facilitator Profile -->
-<div class="modal-bg" id="m-fac-profile">
+<div class="modal-bg" id="m-fac-profile" role="dialog" aria-modal="true">
   <div class="modal modal-xl">
     <div class="modal-hdr"><div class="modal-title" id="fp-title">Facilitator Profile</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-fac-profile')">×</button></div>
     <div class="modal-body" id="fp-body"></div>
@@ -3528,9 +3528,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Merge Facilitator -->
-<div class="modal-bg" id="m-fac-merge">
+<div class="modal-bg" id="m-fac-merge" role="dialog" aria-modal="true" aria-labelledby="m-fac-merge-title">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title">Merge Facilitator</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-fac-merge')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-fac-merge-title">Merge Facilitator</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-fac-merge')">×</button></div>
     <div class="modal-body">
       <div class="alert a-warn" style="margin-bottom:12px">This cannot be undone. The duplicate archives, and all sessions, leave records, and assistant/backup assignments transfer to the facilitator you keep.</div>
       <div id="fac-merge-info" style="font-size:var(--fs-sm);margin-bottom:12px"></div>
@@ -3548,13 +3548,13 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Subject-area tag editor -->
-<div class="modal-bg" id="m-tag-fac">
+<div class="modal-bg" id="m-tag-fac" role="dialog" aria-modal="true">
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title" id="m-tag-title">Edit Subject Areas</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-tag-fac')">×</button></div>
     <div class="modal-body">
       <p style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:10px">Click a tag to toggle it. Dashed border = unit-created tag. Max 20 tags.</p>
       <div id="m-tag-checks" style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px"></div>
-      <div class="ff"><label>Other tags (comma-separated)</label><input id="m-tag-custom" placeholder="e.g. Navigation, Survival"></div>
+      <div class="ff"><label for="m-tag-custom">Other tags (comma-separated)</label><input id="m-tag-custom" placeholder="e.g. Navigation, Survival"></div>
       <div id="m-tag-create-section" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
         <label style="font-size:var(--fs-xs);font-weight:700;color:var(--muted);display:block;margin-bottom:6px">CREATE NEW UNIT TAG</label>
         <div style="display:flex;gap:8px">
@@ -3572,13 +3572,13 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Admin: reset another user's access code -->
-<div class="modal-bg" id="m-reset-code">
+<div class="modal-bg" id="m-reset-code" role="dialog" aria-modal="true">
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title" id="m-reset-title">Reset Access Code</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-reset-code')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info" style="margin-bottom:10px">The previous code cannot be recovered. Share the new code directly with the user once set.</div>
-      <div class="ff"><label>New access code</label><input id="m-reset-new" type="password" autocomplete="new-password" placeholder="Enter new code"></div>
-      <div class="ff"><label>Confirm new code</label><input id="m-reset-confirm" type="password" autocomplete="new-password" placeholder="Re-enter new code"></div>
+      <div class="ff"><label for="m-reset-new">New access code</label><input id="m-reset-new" type="password" autocomplete="new-password" placeholder="Enter new code"></div>
+      <div class="ff"><label for="m-reset-confirm">Confirm new code</label><input id="m-reset-confirm" type="password" autocomplete="new-password" placeholder="Re-enter new code"></div>
       <div id="m-reset-msg" style="font-size:var(--fs-xs);margin-top:8px;font-weight:700"></div>
     </div>
     <div class="modal-foot">
@@ -3589,18 +3589,18 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Add Room -->
-<div class="modal-bg" id="m-add-room">
+<div class="modal-bg" id="m-add-room" role="dialog" aria-modal="true">
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title" id="room-modal-title">+ Add Room / Training Area</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-room')">×</button></div>
     <div class="modal-body">
-      <div class="ff"><label>Room Name</label><input id="room-name" placeholder="e.g. Bravo, Major Parade Ground, Aviation Room"></div>
+      <div class="ff"><label for="room-name">Room Name</label><input id="room-name" placeholder="e.g. Bravo, Major Parade Ground, Aviation Room"></div>
       <div class="form-row">
-        <div class="ff"><label>Capacity</label><input type="number" id="room-cap" value="20" min="1"></div>
+        <div class="ff"><label for="room-cap">Capacity</label><input type="number" id="room-cap" value="20" min="1"></div>
         <div class="ff"><label for="room-type">Type</label>
           <select id="room-type" aria-label="Room type"><option value="Indoor">Indoor</option><option value="Outdoor">Outdoor</option><option value="Indoor/Outdoor">Indoor/Outdoor</option></select>
         </div>
       </div>
-      <div class="ff"><label>Notes</label><input id="room-notes" placeholder="Any relevant details"></div>
+      <div class="ff"><label for="room-notes">Notes</label><input id="room-notes" placeholder="Any relevant details"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-add-room')">Cancel</button>
@@ -3610,7 +3610,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- REM-103: local override for an inherited Wing/National activity -->
-<div class="modal-bg" id="m-act-override">
+<div class="modal-bg" id="m-act-override" role="dialog" aria-modal="true">
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title" id="act-override-title">Adjust for our squadron</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-act-override')">×</button></div>
     <div class="modal-body">
@@ -3637,14 +3637,14 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Add Equipment -->
-<div class="modal-bg" id="m-add-equip">
+<div class="modal-bg" id="m-add-equip" role="dialog" aria-modal="true">
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title" id="equip-modal-title">+ Add Equipment</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-equip')">×</button></div>
     <div class="modal-body">
-      <div class="ff"><label>Equipment Name</label><input id="equip-name" placeholder="e.g. Drones, Projector, Radio Sets"></div>
+      <div class="ff"><label for="equip-name">Equipment Name</label><input id="equip-name" placeholder="e.g. Drones, Projector, Radio Sets"></div>
       <div class="form-row">
-        <div class="ff"><label>Quantity</label><input type="number" id="equip-qty" value="1" min="1"></div>
-        <div class="ff"><label>Notes</label><input id="equip-notes" placeholder="Booking notes"></div>
+        <div class="ff"><label for="equip-qty">Quantity</label><input type="number" id="equip-qty" value="1" min="1"></div>
+        <div class="ff"><label for="equip-notes">Notes</label><input id="equip-notes" placeholder="Booking notes"></div>
       </div>
     </div>
     <div class="modal-foot">
@@ -3655,7 +3655,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- MANAGE YEARS MODAL -->
-<div class="modal-bg" id="m-manage-years" onclick="if(event.target===this)closeModal('m-manage-years')">
+<div class="modal-bg" id="m-manage-years" role="dialog" aria-modal="true" onclick="if(event.target===this)closeModal('m-manage-years')">
   <div class="modal" style="max-width:600px;width:96vw">
     <div class="modal-hdr" style="background:var(--dark);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:8px 8px 0 0">
       <span style="color:#fff;font-size:var(--fs-md);font-weight:800;letter-spacing:.03em">Manage Training Years</span>
@@ -3669,7 +3669,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- CEA IMPORT MODAL -->
-<div class="modal-bg" id="m-cea-import" onclick="if(event.target===this)closeModal('m-cea-import')">
+<div class="modal-bg" id="m-cea-import" role="dialog" aria-modal="true" onclick="if(event.target===this)closeModal('m-cea-import')">
   <div class="modal" style="max-width:640px;width:96vw">
     <div class="modal-hdr" style="background:var(--dark);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:8px 8px 0 0">
       <span style="color:#fff;font-size:var(--fs-md);font-weight:800">Import CEA Activities — <span id="ceaImportYearLabel">—</span></span>
@@ -3699,12 +3699,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- ACCOUNTS: Create Account Modal -->
-<div class="modal-bg" id="m-create-account">
+<div class="modal-bg" id="m-create-account" role="dialog" aria-modal="true" aria-labelledby="m-create-account-title">
   <div class="modal" style="max-width:540px">
-    <div class="modal-hdr"><div class="modal-title">Add Account</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-create-account')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-create-account-title">Add Account</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-create-account')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info" style="font-size:var(--fs-xs);margin-bottom:10px">You can only create accounts within your permitted scope.</div>
-      <div class="ff"><label>Display Name</label><input id="ca-name" placeholder="e.g. Smith, J — 703 SQN Admin"></div>
+      <div class="ff"><label for="ca-name">Display Name</label><input id="ca-name" placeholder="e.g. Smith, J — 703 SQN Admin"></div>
       <div class="form-row">
         <div class="ff"><label for="ca-role">Role<button class="ht" tabindex="0" aria-label="About Role" data-tip="Sqn General: read-only access to their squadron. Sqn Admin: manages the squadron, creates accounts, records outcomes. Wing Admin: manages all squadrons in the wing. National Admin: manages all wings and squadrons.">?</button></label>
           <select id="ca-role" aria-label="Account role" onchange="onCreateAccountRoleChange()">
@@ -3745,7 +3745,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- ACCOUNTS: New Code Display Modal (one-time) -->
-<div class="modal-bg" id="m-new-code">
+<div class="modal-bg" id="m-new-code" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:440px">
     <div class="modal-hdr"><div class="modal-title" id="m-new-code-title">New Access Code</div><button class="modal-x" aria-label="Close" onclick="closeNewCodeModal()">×</button></div>
     <div class="modal-body">
@@ -3762,9 +3762,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- SYSTEM CONSOLE: Staging Bootstrap Codes Modal (one-time, multiple accounts) -->
-<div class="modal-bg" id="m-bootstrap-codes">
+<div class="modal-bg" id="m-bootstrap-codes" role="dialog" aria-modal="true" aria-labelledby="m-bootstrap-codes-title">
   <div class="modal" style="max-width:580px">
-    <div class="modal-hdr"><div class="modal-title">Staging Accounts Created</div></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-bootstrap-codes-title">Staging Accounts Created</div></div>
     <div class="modal-body">
       <div class="alert a-warn" style="font-weight:700;margin-bottom:12px">⚠️ These codes will NOT be shown again. Copy all codes now before closing.</div>
       <div id="m-bootstrap-results"></div>
@@ -3776,7 +3776,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- ACCOUNTS: Reset Code Modal (new endpoint) -->
-<div class="modal-bg" id="m-acct-reset-code">
+<div class="modal-bg" id="m-acct-reset-code" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:420px">
     <div class="modal-hdr"><div class="modal-title" id="m-acct-reset-title">Reset Access Code</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-acct-reset-code')">×</button></div>
     <div class="modal-body">
@@ -3802,11 +3802,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- ACCOUNTS: Create Flight Modal -->
-<div class="modal-bg" id="m-create-flight">
+<div class="modal-bg" id="m-create-flight" role="dialog" aria-modal="true" aria-labelledby="m-create-flight-title">
   <div class="modal" style="max-width:380px">
-    <div class="modal-hdr"><div class="modal-title">Add Flight</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-create-flight')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-create-flight-title">Add Flight</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-create-flight')">×</button></div>
     <div class="modal-body">
-      <div class="ff"><label>Flight Name</label><input id="cf-name" placeholder="e.g. Alpha Flight, Bravo Flight"></div>
+      <div class="ff"><label for="cf-name">Flight Name</label><input id="cf-name" placeholder="e.g. Alpha Flight, Bravo Flight"></div>
       <div class="ff" id="cf-sqn-row"><label for="cf-sqn">Squadron</label>
         <select id="cf-sqn"><option value="">— select squadron —</option></select>
       </div>
@@ -3826,7 +3826,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
      frontend.md's "system_admin scope" note), so every call site converted to
      this modal also becomes directly testable via Playwright without the
      api(...)-bypass workaround that note describes. -->
-<div class="modal-bg" id="m-confirm">
+<div class="modal-bg" id="m-confirm" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:400px">
     <div class="modal-hdr"><div class="modal-title" id="confirm-title">Confirm</div><button class="modal-x" aria-label="Close" onclick="_confirmNo()">×</button></div>
     <div class="modal-body"><p id="confirm-msg" style="white-space:pre-line;margin:0"></p></div>
@@ -3857,11 +3857,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- ACCOUNTS: Edit Account Modal -->
-<div class="modal-bg" id="m-edit-account">
+<div class="modal-bg" id="m-edit-account" role="dialog" aria-modal="true" aria-labelledby="m-edit-account-title">
   <div class="modal" style="max-width:380px">
-    <div class="modal-hdr"><div class="modal-title">Edit Account</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-edit-account')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-edit-account-title">Edit Account</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-edit-account')">×</button></div>
     <div class="modal-body">
-      <div class="ff"><label>Display Name</label><input id="ea-name" placeholder="Display name" autocomplete="off"></div>
+      <div class="ff"><label for="ea-name">Display Name</label><input id="ea-name" placeholder="Display name" autocomplete="off"></div>
       <div class="ff" id="ea-role-row" style="display:none"><label for="ea-role">Role / Access Type</label>
         <select id="ea-role"></select>
         <div class="muted" style="font-size:var(--fs-2xs);margin-top:3px">Changing role within the same scope level only. The account will need to sign in again for the new role to take effect.</div>
@@ -3883,7 +3883,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
      different, riskier operation (org-membership move) than a display-name or
      role change, so it gets its own explicit action rather than being folded
      into the compound Edit save. -->
-<div class="modal-bg" id="m-change-scope">
+<div class="modal-bg" id="m-change-scope" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:420px">
     <div class="modal-hdr"><div class="modal-title" id="cs-title">Change Scope</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-change-scope')">×</button></div>
     <div class="modal-body">
@@ -3908,7 +3908,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
      Required Decisions, Confirmation, Result). Body/foot are rebuilt per step
      by _wizRender() rather than five separate modals, so step state (reason,
      confirmation checkbox, results) survives Back/Continue navigation. -->
-<div class="modal-bg" id="m-archive-wizard">
+<div class="modal-bg" id="m-archive-wizard" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:560px">
     <div class="modal-hdr"><div class="modal-title" id="waz-title">Bulk Archive Accounts</div><button class="modal-x" aria-label="Close" onclick="_wizClose()">×</button></div>
     <div class="modal-body" id="waz-body"></div>
@@ -3920,7 +3920,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
      account wizard; Step 2 is populated from GET .../archive-impact and, for
      a Squadron blocked by active accounts, nests the bulk-account-selection
      flow so the admin can resolve the block without leaving the wizard). -->
-<div class="modal-bg" id="m-org-archive-wizard">
+<div class="modal-bg" id="m-org-archive-wizard" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:560px">
     <div class="modal-hdr"><div class="modal-title" id="owz-title">Archive Organisation</div><button class="modal-x" aria-label="Close" onclick="_owzClose()">×</button></div>
     <div class="modal-body" id="owz-body"></div>
@@ -3929,11 +3929,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- ACCOUNTS: Rename Flight Modal -->
-<div class="modal-bg" id="m-rename-flight">
+<div class="modal-bg" id="m-rename-flight" role="dialog" aria-modal="true" aria-labelledby="m-rename-flight-title">
   <div class="modal" style="max-width:360px">
-    <div class="modal-hdr"><div class="modal-title">Rename Flight</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-rename-flight')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-rename-flight-title">Rename Flight</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-rename-flight')">×</button></div>
     <div class="modal-body">
-      <div class="ff"><label>Flight Name</label><input id="rf-name" placeholder="e.g. Alpha Flight" autocomplete="off"></div>
+      <div class="ff"><label for="rf-name">Flight Name</label><input id="rf-name" placeholder="e.g. Alpha Flight" autocomplete="off"></div>
       <div id="rf-msg" style="font-size:var(--fs-xs);margin-top:8px;font-weight:700;color:var(--red)"></div>
     </div>
     <div class="modal-foot">
@@ -3944,16 +3944,16 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- UNITS: Create Wing Modal (NAT HQ only) -->
-<div class="modal-bg" id="m-create-wing">
+<div class="modal-bg" id="m-create-wing" role="dialog" aria-modal="true" aria-labelledby="m-create-wing-title">
   <div class="modal" style="max-width:460px">
-    <div class="modal-hdr"><div class="modal-title">Create Wing</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-create-wing')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-create-wing-title">Create Wing</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-create-wing')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info" style="font-size:var(--fs-xs);margin-bottom:10px">NAT HQ admin only. Creates a Wing under the National Headquarters. Wing code must be unique (e.g. 7WG, 1WG).</div>
       <div class="form-row">
-        <div class="ff"><label>Wing Code</label><input id="cw-code" placeholder="e.g. 8WG" autocomplete="off" style="text-transform:uppercase"></div>
-        <div class="ff"><label>Short Name</label><input id="cw-short" placeholder="e.g. 8WG" autocomplete="off"></div>
+        <div class="ff"><label for="cw-code">Wing Code</label><input id="cw-code" placeholder="e.g. 8WG" autocomplete="off" style="text-transform:uppercase"></div>
+        <div class="ff"><label for="cw-short">Short Name</label><input id="cw-short" placeholder="e.g. 8WG" autocomplete="off"></div>
       </div>
-      <div class="ff"><label>Full Name</label><input id="cw-name" placeholder="e.g. 8 Wing" autocomplete="off"></div>
+      <div class="ff"><label for="cw-name">Full Name</label><input id="cw-name" placeholder="e.g. 8 Wing" autocomplete="off"></div>
       <div id="cw-msg" style="font-size:var(--fs-xs);margin-top:8px;font-weight:700;color:var(--red)"></div>
     </div>
     <div class="modal-foot">
@@ -3964,9 +3964,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- UNITS: Create Squadron / Specialist Unit Modal -->
-<div class="modal-bg" id="m-create-sqn">
+<div class="modal-bg" id="m-create-sqn" role="dialog" aria-modal="true" aria-labelledby="m-create-sqn-title">
   <div class="modal" style="max-width:500px">
-    <div class="modal-hdr"><div class="modal-title">Create Squadron / Specialist Unit</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-create-sqn')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-create-sqn-title">Create Squadron / Specialist Unit</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-create-sqn')">×</button></div>
     <div class="modal-body">
       <div class="alert a-info" style="font-size:var(--fs-xs);margin-bottom:10px">Wing admin: own Wing only. NAT HQ admin: any Wing. Unit code must be unique (e.g. 703, SPECFLT01).</div>
       <div class="form-row">
@@ -3983,10 +3983,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
       </div>
       <div class="form-row">
-        <div class="ff"><label>Unit Code</label><input id="csq-code" placeholder="e.g. 703 or SPECFLT01" autocomplete="off" style="text-transform:uppercase"></div>
-        <div class="ff"><label>Short Name</label><input id="csq-short" placeholder="e.g. 703 SQN" autocomplete="off"></div>
+        <div class="ff"><label for="csq-code">Unit Code</label><input id="csq-code" placeholder="e.g. 703 or SPECFLT01" autocomplete="off" style="text-transform:uppercase"></div>
+        <div class="ff"><label for="csq-short">Short Name</label><input id="csq-short" placeholder="e.g. 703 SQN" autocomplete="off"></div>
       </div>
-      <div class="ff"><label>Full Name</label><input id="csq-name" placeholder="e.g. 703 Squadron AAFC" autocomplete="off"></div>
+      <div class="ff"><label for="csq-name">Full Name</label><input id="csq-name" placeholder="e.g. 703 Squadron AAFC" autocomplete="off"></div>
       <div id="csq-msg" style="font-size:var(--fs-xs);margin-top:8px;font-weight:700;color:var(--red)"></div>
     </div>
     <div class="modal-foot">
@@ -3998,7 +3998,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
 <!-- ── Edit Unit Type Modal ──────────────────────────────────────────────── -->
 <!-- ── Rename Wing / Squadron Modal ─────────────────────────────────────── -->
-<div class="modal-bg" id="m-rename-org">
+<div class="modal-bg" id="m-rename-org" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:420px;width:96%">
     <div class="modal-hdr"><div class="modal-title" id="rename-org-title">Rename</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-rename-org')">×</button></div>
     <div class="modal-body">
@@ -4019,9 +4019,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   </div>
 </div>
 
-<div class="modal-bg" id="m-edit-unit-type">
+<div class="modal-bg" id="m-edit-unit-type" role="dialog" aria-modal="true" aria-labelledby="m-edit-unit-type-title">
   <div class="modal" style="max-width:420px;width:96%">
-    <div class="modal-hdr"><div class="modal-title">Change Unit Type</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-edit-unit-type')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-edit-unit-type-title">Change Unit Type</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-edit-unit-type')">×</button></div>
     <div class="modal-body">
       <p id="edit-unit-type-name" style="font-weight:700;margin-bottom:12px"></p>
       <div class="ff">
@@ -4043,17 +4043,17 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- ── Timing Template Editor Modal ─────────────────────────────────────── -->
-<div class="modal-bg" id="m-timing">
+<div class="modal-bg" id="m-timing" role="dialog" aria-modal="true">
   <div class="modal" style="max-width:720px;width:96%">
     <div class="modal-hdr"><div class="modal-title" id="timing-modal-title">New Timing Template</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-timing')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="ff"><label>Template Name</label><input id="tt-name" type="text" placeholder="e.g. Standard 3-Period Night"></div>
-        <div class="ff"><label>Effective From</label><input id="tt-from" type="date"></div>
-        <div class="ff"><label>Effective To (optional)</label><input id="tt-to" type="date"></div>
+        <div class="ff"><label for="tt-name">Template Name</label><input id="tt-name" type="text" placeholder="e.g. Standard 3-Period Night"></div>
+        <div class="ff"><label for="tt-from">Effective From</label><input id="tt-from" type="date"></div>
+        <div class="ff"><label for="tt-to">Effective To (optional)</label><input id="tt-to" type="date"></div>
       </div>
       <div class="form-row" style="margin-top:4px">
-        <div class="ff"><label>Notes</label><input id="tt-notes" type="text" placeholder="e.g. Applies Term 3 onwards"></div>
+        <div class="ff"><label for="tt-notes">Notes</label><input id="tt-notes" type="text" placeholder="e.g. Applies Term 3 onwards"></div>
         <div class="ff"><label for="tt-quick-n">Quick setup</label>
           <div style="display:flex;gap:6px;align-items:center">
             <select id="tt-quick-n" aria-label="Number of training periods for quick setup"><option value="">— periods —</option><option value="1">1 TP</option><option value="2">2 TP</option><option value="3">3 TP</option><option value="4">4 TP</option></select>
@@ -4098,9 +4098,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
 <!-- ── Parade Night Timing Override Modal ────────────────────────────────── -->
 <!-- WORK-05: flexible one-night timing override — pick existing template OR define custom blocks -->
-<div class="modal-bg" id="m-pn-timing-override">
+<div class="modal-bg" id="m-pn-timing-override" role="dialog" aria-modal="true" aria-labelledby="m-pn-timing-override-title">
   <div class="modal" style="max-width:700px;width:96%">
-    <div class="modal-hdr"><div class="modal-title">Change Parade Night Template</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-timing-override')">×</button></div>
+    <div class="modal-hdr"><div class="modal-title" id="m-pn-timing-override-title">Change Parade Night Template</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-pn-timing-override')">×</button></div>
     <div class="modal-body">
       <div style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:10px">Change the timing for this parade night only. Does not affect future parade nights.</div>
       <!-- Mode toggle -->
@@ -4136,7 +4136,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <button class="btn" style="margin-top:6px;font-size:var(--fs-xs)" onclick="pnCbAddBlock()">+ Add Block</button>
       </div>
       <div class="form-row" style="margin-top:10px">
-        <div class="ff"><label>Reason (required)</label><input id="pn-override-reason" type="text" placeholder="e.g. Shortened ANZAC night"></div>
+        <div class="ff"><label for="pn-override-reason">Reason (required)</label><input id="pn-override-reason" type="text" placeholder="e.g. Shortened ANZAC night"></div>
       </div>
       <div id="pn-override-msg" style="font-size:var(--fs-xs);margin-top:8px;font-weight:700"></div>
     </div>
@@ -7176,7 +7176,7 @@ function _wizRender(){
   } else if(w.step===3){
     title.textContent='Step 3 of 5 — Required Decisions';
     body.innerHTML=`
-      <div class="ff"><label>Reason (required, minimum 10 characters)</label>
+      <div class="ff"><label for="waz-reason">Reason (required, minimum 10 characters)</label>
         <textarea id="waz-reason" rows="3" oninput="_wizReasonInput(this.value)" placeholder="e.g. End-of-year account cleanup — cadets who have left the unit">${esc(w.reason||'')}</textarea>
       </div>
       <div class="ff"><label>Effective date (optional — audit record only; archiving happens immediately, there is no scheduled/deferred archiving)</label>
@@ -9305,12 +9305,12 @@ function showPNDetail(ds){
     html+=`<div style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">
       <div style="font-size:var(--fs-xs);font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Parade Night Details</div>
       <div class="form-row">
-        <div class="ff"><label>Term</label><input id="pnd-term" value="${esc(pn.term||'')}"></div>
+        <div class="ff"><label for="pnd-term">Term</label><input id="pnd-term" value="${esc(pn.term||'')}"></div>
         <div class="ff"><label for="pnd-type">Type</label><select id="pnd-type" aria-label="Parade night type">${typeOpts}</select></div>
       </div>
       <div class="form-row">
-        <div class="ff"><label>Start Time</label><input type="time" id="pnd-start" value="${esc(pn.start_time||'')}"></div>
-        <div class="ff"><label>End Time</label><input type="time" id="pnd-end" value="${esc(pn.end_time||'')}"></div>
+        <div class="ff"><label for="pnd-start">Start Time</label><input type="time" id="pnd-start" value="${esc(pn.start_time||'')}"></div>
+        <div class="ff"><label for="pnd-end">End Time</label><input type="time" id="pnd-end" value="${esc(pn.end_time||'')}"></div>
       </div>
       <div class="ff"><label>Notes<span class="save-ind" id="pnd-notes-status"></span></label><input id="pnd-notes" value="${esc(pn.notes||'')}"></div>
       <button class="btn btn-xs btn-sky" style="margin-top:6px" onclick="savePNCoreDetails('${ds}')">Save Details</button>
@@ -9395,10 +9395,10 @@ function showPNDetail(ds){
     </div>
     <div id="pn-quick-entry" class="qe-form no-print" style="display:none">
       <div style="display:grid;grid-template-columns:70px 1fr 1fr 1fr;gap:8px;align-items:end">
-        <div><label style="font-size:var(--fs-xs);font-weight:600">Period</label><input type="number" id="qe-period" min="1" max="20" value="1" style="width:100%"></div>
-        <div><label style="font-size:var(--fs-xs);font-weight:600">Curriculum</label><select id="qe-curr-sel" style="width:100%"><option value="">— None —</option>${qeCurrOpts}</select></div>
-        <div><label style="font-size:var(--fs-xs);font-weight:600">Facilitator</label><select id="qe-fac-sel" style="width:100%"><option value="">— None —</option>${qeFacOpts}</select></div>
-        <div><label style="font-size:var(--fs-xs);font-weight:600">Room</label><select id="qe-room-sel" style="width:100%"><option value="">— None —</option>${qeRoomOpts}</select></div>
+        <div><label style="font-size:var(--fs-xs);font-weight:600" for="qe-period">Period</label><input type="number" id="qe-period" min="1" max="20" value="1" style="width:100%"></div>
+        <div><label style="font-size:var(--fs-xs);font-weight:600" for="qe-curr-sel">Curriculum</label><select id="qe-curr-sel" style="width:100%"><option value="">— None —</option>${qeCurrOpts}</select></div>
+        <div><label style="font-size:var(--fs-xs);font-weight:600" for="qe-fac-sel">Facilitator</label><select id="qe-fac-sel" style="width:100%"><option value="">— None —</option>${qeFacOpts}</select></div>
+        <div><label style="font-size:var(--fs-xs);font-weight:600" for="qe-room-sel">Room</label><select id="qe-room-sel" style="width:100%"><option value="">— None —</option>${qeRoomOpts}</select></div>
       </div>
       <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
         <button class="btn btn-sm btn-primary" onclick="_qeSubmit('${esc(pn.id)}','${esc(pn.date)}')">Add Session</button>
@@ -10816,15 +10816,15 @@ function _actShowDetail(containerId, activityId){
   panel.innerHTML=`<div class="drill-panel show">
     <div class="drill-hdr"><div class="drill-title">Edit — ${esc(item.activity_name)}</div><button class="modal-x" aria-label="Close" onclick="document.getElementById('${containerId}-detail').innerHTML=''">×</button></div>
     <div class="form-row">
-      <div class="ff"><label>Name</label><input id="${containerId}-e-name" value="${esc(item.activity_name)}"></div>
-      <div class="ff"><label>Type</label><input id="${containerId}-e-type" value="${esc(item.activity_type||'')}"></div>
+      <div class="ff"><label for="${containerId}-e-name">Name</label><input id="${containerId}-e-name" value="${esc(item.activity_name)}"></div>
+      <div class="ff"><label for="${containerId}-e-type">Type</label><input id="${containerId}-e-type" value="${esc(item.activity_type||'')}"></div>
     </div>
     <div class="form-row">
-      <div class="ff"><label>Start date</label><input type="date" id="${containerId}-e-start" value="${esc(item.date_start||'')}"></div>
-      <div class="ff"><label>End date</label><input type="date" id="${containerId}-e-end" value="${esc(item.date_end||'')}"></div>
+      <div class="ff"><label for="${containerId}-e-start">Start date</label><input type="date" id="${containerId}-e-start" value="${esc(item.date_start||'')}"></div>
+      <div class="ff"><label for="${containerId}-e-end">End date</label><input type="date" id="${containerId}-e-end" value="${esc(item.date_end||'')}"></div>
     </div>
-    <div class="ff"><label>Location</label><input id="${containerId}-e-loc" value="${esc(item.location||'')}"></div>
-    <div class="ff"><label>Notes</label><textarea id="${containerId}-e-notes" rows="2">${esc(item.notes||'')}</textarea></div>
+    <div class="ff"><label for="${containerId}-e-loc">Location</label><input id="${containerId}-e-loc" value="${esc(item.location||'')}"></div>
+    <div class="ff"><label for="${containerId}-e-notes">Notes</label><textarea id="${containerId}-e-notes" rows="2">${esc(item.notes||'')}</textarea></div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
       <button class="btn btn-dk btn-sm" onclick="_actSaveEdit()">Save</button>
       <button class="btn btn-out btn-sm" onclick="_actArchive('${containerId}','${item.activity_id}')">Archive</button>
@@ -10882,15 +10882,15 @@ function _actOpenCreate(containerId){
   panel.innerHTML=`<div class="drill-panel show">
     <div class="drill-hdr"><div class="drill-title">New ${st.scopeType==='national'?'National':'Wing'} Activity</div><button class="modal-x" aria-label="Close" onclick="document.getElementById('${containerId}-detail').innerHTML=''">×</button></div>
     <div class="form-row">
-      <div class="ff"><label>Name *</label><input id="${containerId}-c-name"></div>
-      <div class="ff"><label>Type</label><input id="${containerId}-c-type" placeholder="e.g. Camp, Ceremonial"></div>
+      <div class="ff"><label for="${containerId}-c-name">Name *</label><input id="${containerId}-c-name"></div>
+      <div class="ff"><label for="${containerId}-c-type">Type</label><input id="${containerId}-c-type" placeholder="e.g. Camp, Ceremonial"></div>
     </div>
     <div class="form-row">
-      <div class="ff"><label>Start date *</label><input type="date" id="${containerId}-c-start"></div>
-      <div class="ff"><label>End date</label><input type="date" id="${containerId}-c-end"></div>
+      <div class="ff"><label for="${containerId}-c-start">Start date *</label><input type="date" id="${containerId}-c-start"></div>
+      <div class="ff"><label for="${containerId}-c-end">End date</label><input type="date" id="${containerId}-c-end"></div>
     </div>
-    <div class="ff"><label>Location</label><input id="${containerId}-c-loc"></div>
-    <div class="ff"><label>Notes</label><textarea id="${containerId}-c-notes" rows="2"></textarea></div>
+    <div class="ff"><label for="${containerId}-c-loc">Location</label><input id="${containerId}-c-loc"></div>
+    <div class="ff"><label for="${containerId}-c-notes">Notes</label><textarea id="${containerId}-c-notes" rows="2"></textarea></div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
       <button class="btn btn-dk btn-sm" onclick="_actSaveCreate('${containerId}')">Create</button>
       <span id="${containerId}-c-msg" style="font-size:var(--fs-xs);font-weight:700;color:var(--red)"></span>
@@ -12007,12 +12007,12 @@ function _showAddFacLeaveForm(facId){
   if(!el)return;
   const today=new Date().toISOString().slice(0,10);
   el.innerHTML=`<div class="form-row" style="margin-top:6px;align-items:flex-end">
-    <div class="ff"><label>From</label><input type="date" id="fl-start" value="${today}"></div>
-    <div class="ff"><label>To</label><input type="date" id="fl-end" value="${today}"></div>
-    <div class="ff" style="flex:2"><label>Reason (optional)</label><input id="fl-reason" placeholder="e.g. Annual leave"></div>
+    <div class="ff"><label for="fl-start">From</label><input type="date" id="fl-start" value="${today}"></div>
+    <div class="ff"><label for="fl-end">To</label><input type="date" id="fl-end" value="${today}"></div>
+    <div class="ff" style="flex:2"><label for="fl-reason">Reason (optional)</label><input id="fl-reason" placeholder="e.g. Annual leave"></div>
   </div>
   <div class="form-row" style="margin-top:4px">
-    <div class="ff"><label>Notes (optional)</label><input id="fl-notes" placeholder="Any additional notes"></div>
+    <div class="ff"><label for="fl-notes">Notes (optional)</label><input id="fl-notes" placeholder="Any additional notes"></div>
   </div>
   <div id="fl-msg" style="font-size:var(--fs-xs);margin:4px 0"></div>
   <div class="modal-actions" style="justify-content:flex-start">
@@ -12723,7 +12723,7 @@ async function _pdayPropPreview(sessionScope){
     } else {
       html+=`<p style="color:var(--muted)">No eligible Parade Nights found in this scope.</p>`;
     }
-    html+=`<div class="form-group" style="margin-top:12px"><label>Reason (required, audited)</label><input id="pday-prop-reason" placeholder="e.g. Squadron changed parade night to ${esc(dayName(_pdayPropNewWeekday)||'')}"></div>
+    html+=`<div class="form-group" style="margin-top:12px"><label for="pday-prop-reason">Reason (required, audited)</label><input id="pday-prop-reason" placeholder="e.g. Squadron changed parade night to ${esc(dayName(_pdayPropNewWeekday)||'')}"></div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-pday-propagate')">Cancel</button>
       <button class="btn btn-primary" ${r.to_update?'':'disabled'} onclick="_pdayPropApply('${sessionScope}')">Apply changes</button>
