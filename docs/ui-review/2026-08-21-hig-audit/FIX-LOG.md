@@ -700,3 +700,33 @@ pattern used in FIX-08 for the PW's bulk-select: a `<label>` with `display:flex;
 justify-content:center; min-height:28px; min-width:28px` containing the checkbox. The checkbox's
 own `aria-label` supersedes the label element's text content (empty), so the accessible name is
 unchanged. Select-all header checkbox same treatment.
+
+---
+
+## FIX-13 · G11 unlabelled form fields — 16 inputs across main TMS frontend
+
+**File:** `connected-frontend/index.html` · **Gate:** G11
+
+Systematic enumeration of all inputs without a programmatically associated label (no `for`-linked
+`<label>`, no `aria-label`, not nested inside a `<label>`). Hidden state inputs (`type="hidden"`,
+`*-edit-id`) and inputs already inside a wrapping `<label>` were excluded.
+
+| Input ID | Page / context | Fix |
+|---|---|---|
+| `s-start` | Unit Settings — Parade Time range | `aria-label="Parade start time"` |
+| `s-end` | Unit Settings — Parade Time range | `aria-label="Parade end time"` |
+| `user-dir-filter` | Unit Settings — User Directory search | `aria-label="Filter users by name, role, or unit"` |
+| `acct-search` | Account Management — filter bar | `aria-label="Filter accounts by name, role, or unit"` |
+| `sc-maint-drain` | System Console — Maintenance section | `for="sc-maint-drain"` on `<label>` |
+| `sc-maint-confirm` | System Console — Maintenance section | `for="sc-maint-confirm"` on `<label>` |
+| `tc-name-inp` | Add Training Class modal | `for="tc-name-inp"` on `<label>` |
+| `tc-seq-inp` | Add Training Class modal | `for="tc-seq-inp"` on `<label>` |
+| `tc-edit-name-inp` | Edit Training Class modal | `for="tc-edit-name-inp"` on `<label>` |
+| `tc-edit-seq-inp` | Edit Training Class modal | `for="tc-edit-seq-inp"` on `<label>` |
+| `cp-to-inp` | Add Custom Phase modal | `for="cp-to-inp"` on `<label>` |
+| `cp-edit-to-inp` | Edit Custom Phase modal | `for="cp-edit-to-inp"` on `<label>` |
+| `fac-rank` | Facilitator editor — rank field | `for="fac-rank"` on `<label>` |
+| `tt-apply-from-date` | Timing Template — apply-from panel | `aria-label="Apply timing template from date"` |
+| `tt-apply-from-reason` | Timing Template — apply-from panel | `aria-label="Reason for applying template from that date"` |
+| `waz-effective` | Wing Archive Wizard | `for="waz-effective"` on `<label>` |
+| `pnd-notes` | Parade Night Details panel | `for="pnd-notes"` on `<label>` |

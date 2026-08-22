@@ -1545,16 +1545,16 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
       <!-- WEEKLY PROGRAM -->
       <div id="page-weekly-program" class="page">
-        <div class="ph no-print"><h1 class="ph-title">Weekly Program</h1><div class="ph-sub">Select a parade night to generate the printable program</div></div>
+        <div class="ph no-print"><h1 class="ph-title">Weekly Program</h1><div class="ph-sub">The full training year's program, ready to print. Choose a night below to publish it.</div></div>
         <div class="card no-print">
           <div class="ff">
-            <label for="wp-sel">Parade Night</label>
-            <select id="wp-sel" aria-label="Select parade night" onchange="renderWP()"><option value="">— Choose a parade night —</option></select>
+            <label for="wp-sel">Publish night</label>
+            <select id="wp-sel" aria-label="Choose the parade night to publish"><option value="">— Choose a night to publish —</option></select>
           </div>
         </div>
         <div class="fbar no-print">
-          <input id="wp-search" placeholder="Search facilitator, room, curriculum item…" oninput="renderWP()" style="min-width:220px" aria-label="Search facilitator, room, curriculum item">
-          <select id="wp-f-status" aria-label="Filter Weekly Program by status" onchange="renderWP()">
+          <input id="wp-search" placeholder="Search facilitator, room, curriculum item…" oninput="_wpPaint()" style="min-width:220px" aria-label="Search facilitator, room, curriculum item">
+          <select id="wp-f-status" aria-label="Filter Weekly Program by status" onchange="_wpPaint()">
             <option value="all">All Statuses</option>
             <option value="planned">Planned</option><option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option><option value="rescheduled">Rescheduled</option>
@@ -1863,7 +1863,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             </div>
             <div class="ff"><label>Parade Time</label>
               <div style="display:flex;gap:8px;align-items:center;">
-                <input type="time" id="s-start"> <span>to</span> <input type="time" id="s-end">
+                <input type="time" id="s-start" aria-label="Parade start time"> <span>to</span> <input type="time" id="s-end" aria-label="Parade end time">
               </div>
             </div>
           </div>
@@ -1976,7 +1976,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <div class="card admin-el" id="user-dir-card" style="display:none">
           <div class="ctitle">🗂️ User Directory — Admin Code Reset</div>
           <div class="alert a-info" style="margin-bottom:10px;font-size:var(--fs-xs)">Select a user to reset their access code. You can only reset users within your authorised unit. The old code cannot be recovered.</div>
-          <div class="ff" style="max-width:340px;margin-bottom:10px"><input id="user-dir-filter" placeholder="Filter by name, role, or unit…" oninput="renderUserDir()" autocomplete="off"></div>
+          <div class="ff" style="max-width:340px;margin-bottom:10px"><input id="user-dir-filter" placeholder="Filter by name, role, or unit…" oninput="renderUserDir()" autocomplete="off" aria-label="Filter users by name, role, or unit"></div>
           <div id="user-dir-table"></div>
         </div>
       </div>
@@ -1994,7 +1994,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <!-- filter + create -->
         <div class="card">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-            <input id="acct-search" placeholder="Filter by name, role, unit…" oninput="renderAccounts()" autocomplete="off" style="flex:1;min-width:200px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:var(--fs-sm)">
+            <input id="acct-search" placeholder="Filter by name, role, unit…" oninput="renderAccounts()" autocomplete="off" aria-label="Filter accounts by name, role, or unit" style="flex:1;min-width:200px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:var(--fs-sm)">
             <select id="acct-filter-wing" aria-label="Filter accounts by Wing" onchange="renderAccounts()" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:var(--fs-sm);display:none">
               <option value="">All Wings</option>
             </select>
@@ -2248,7 +2248,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
               <input id="sc-maint-until" type="text" placeholder="e.g. 2026-12-01 08:00 UTC (24-hour)" style="width:100%;max-width:300px">
             </div>
             <div class="form-group">
-              <label>Drain window — seconds before writes are blocked <span class="muted">(0–300, default 20)</span></label>
+              <label for="sc-maint-drain">Drain window — seconds before writes are blocked <span class="muted">(0–300, default 20)</span></label>
               <input id="sc-maint-drain" type="number" min="0" max="300" value="20" style="width:90px">
             </div>
             <div class="form-group" style="margin-top:10px">
@@ -2261,7 +2261,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
               </label>
             </div>
             <div class="form-group">
-              <label>Confirmation — type exactly: <strong>ENABLE MAINTENANCE</strong></label>
+              <label for="sc-maint-confirm">Confirmation — type exactly: <strong>ENABLE MAINTENANCE</strong></label>
               <input id="sc-maint-confirm" type="text" placeholder="ENABLE MAINTENANCE" style="width:100%;max-width:300px">
             </div>
             <button class="btn btn-danger" onclick="scEnableMaint()">Enable Maintenance Mode</button>
@@ -2703,7 +2703,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <div class="form-group"><label for="tc-stage-inp">Training Stage *<button class="ht" tabindex="0" aria-label="About Training Stage" data-tip="The national curriculum level — e.g. Senior, Junior, Initial. One stage can have several classes: Senior 1 and Senior 2 are both the Senior stage.">?</button></label>
       <select id="tc-stage-inp" aria-label="Training Stage"></select>
     </div>
-    <div class="form-group"><label>Display Name *<button class="ht" tabindex="0" aria-label="About Display Name" data-tip="A short, clear name for this group — e.g. Senior 1, Senior 2, Bronze A. This is how the class appears in planning and reports.">?</button></label><input type="text" id="tc-name-inp" placeholder="e.g. Senior 1"></div>
+    <div class="form-group"><label for="tc-name-inp">Display Name *<button class="ht" tabindex="0" aria-label="About Display Name" data-tip="A short, clear name for this group — e.g. Senior 1, Senior 2, Bronze A. This is how the class appears in planning and reports.">?</button></label><input type="text" id="tc-name-inp" placeholder="e.g. Senior 1"></div>
     <div class="form-group">
       <label>Stage Code<button class="ht" tabindex="0" aria-label="About Stage Code" data-tip="The national AAFC stage code for this class (ORI, INI, JNR, INT, SNR). Auto-created classes have this set; leave blank for custom classes.">?</button></label>
       <select id="tc-stage-code" class="form-control" aria-label="Stage Code">
@@ -2715,7 +2715,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <option value="SNR">SNR — Senior / Gold</option>
       </select>
     </div>
-    <div class="form-group"><label>Order (optional)<button class="ht" tabindex="0" aria-label="About Order" data-tip="Controls display order when several classes share the same Training Stage. Lower numbers appear first. Leave blank to use the default order.">?</button></label><input type="number" id="tc-seq-inp" min="0" placeholder="0"></div>
+    <div class="form-group"><label for="tc-seq-inp">Order (optional)<button class="ht" tabindex="0" aria-label="About Order" data-tip="Controls display order when several classes share the same Training Stage. Lower numbers appear first. Leave blank to use the default order.">?</button></label><input type="number" id="tc-seq-inp" min="0" placeholder="0"></div>
     <p id="tc-add-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-add-training-class')">Cancel</button>
@@ -2733,7 +2733,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <div class="form-group"><label for="tc-edit-stage-inp">Training Stage *<button class="ht" tabindex="0" aria-label="About Training Stage" data-tip="The national curriculum level — e.g. Senior, Junior, Initial. One stage can have several classes: Senior 1 and Senior 2 are both the Senior stage.">?</button></label>
       <select id="tc-edit-stage-inp" aria-label="Training Stage"></select>
     </div>
-    <div class="form-group"><label>Display Name *<button class="ht" tabindex="0" aria-label="About Display Name" data-tip="A short, clear name for this group — e.g. Senior 1, Senior 2, Bronze A. This is how the class appears in planning and reports.">?</button></label><input type="text" id="tc-edit-name-inp"></div>
+    <div class="form-group"><label for="tc-edit-name-inp">Display Name *<button class="ht" tabindex="0" aria-label="About Display Name" data-tip="A short, clear name for this group — e.g. Senior 1, Senior 2, Bronze A. This is how the class appears in planning and reports.">?</button></label><input type="text" id="tc-edit-name-inp"></div>
     <div class="form-group">
       <label>Stage Code<button class="ht" tabindex="0" aria-label="About Stage Code" data-tip="The national AAFC stage code for this class (ORI, INI, JNR, INT, SNR). Auto-created classes have this set; leave blank for custom classes.">?</button></label>
       <select id="tc-edit-stage-code" class="form-control" aria-label="Stage Code">
@@ -2745,7 +2745,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <option value="SNR">SNR — Senior / Gold</option>
       </select>
     </div>
-    <div class="form-group"><label>Order (optional)<button class="ht" tabindex="0" aria-label="About Order" data-tip="Controls display order when several classes share the same Training Stage. Lower numbers appear first.">?</button></label><input type="number" id="tc-edit-seq-inp" min="0"></div>
+    <div class="form-group"><label for="tc-edit-seq-inp">Order (optional)<button class="ht" tabindex="0" aria-label="About Order" data-tip="Controls display order when several classes share the same Training Stage. Lower numbers appear first.">?</button></label><input type="number" id="tc-edit-seq-inp" min="0"></div>
     <p id="tc-edit-msg" style="color:var(--error)"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-edit-training-class')">Cancel</button>
@@ -2760,7 +2760,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <h2 id="m-add-custom-phase-title">Add Custom Training Phase</h2>
     <div class="form-group"><label for="cp-name-inp">Name *</label><input type="text" id="cp-name-inp" placeholder="e.g. Pre-Course Period"></div>
     <div class="form-group"><label for="cp-from-inp">Applies From *</label><input type="date" id="cp-from-inp"></div>
-    <div class="form-group"><label>Applies To <span style="font-weight:400;color:var(--muted)">(optional — leave blank for open-ended)</span></label><input type="date" id="cp-to-inp"></div>
+    <div class="form-group"><label for="cp-to-inp">Applies To <span style="font-weight:400;color:var(--muted)">(optional — leave blank for open-ended)</span></label><input type="date" id="cp-to-inp"></div>
     <p id="cp-add-msg" style="color:var(--error);font-size:var(--fs-sm);margin-top:4px"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-add-custom-phase')">Cancel</button>
@@ -2776,7 +2776,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <input type="hidden" id="cp-edit-id">
     <div class="form-group"><label for="cp-edit-name-inp">Name *</label><input type="text" id="cp-edit-name-inp"></div>
     <div class="form-group"><label for="cp-edit-from-inp">Applies From *</label><input type="date" id="cp-edit-from-inp"></div>
-    <div class="form-group"><label>Applies To <span style="font-weight:400;color:var(--muted)">(optional — leave blank for open-ended)</span></label><input type="date" id="cp-edit-to-inp"></div>
+    <div class="form-group"><label for="cp-edit-to-inp">Applies To <span style="font-weight:400;color:var(--muted)">(optional — leave blank for open-ended)</span></label><input type="date" id="cp-edit-to-inp"></div>
     <p id="cp-edit-msg" style="color:var(--error);font-size:var(--fs-sm);margin-top:4px"></p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-edit-custom-phase')">Cancel</button>
@@ -3483,7 +3483,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="alert a-info">Rank is stored separately so historical records stay accurate when rank changes.</div>
       <div class="alert a-warn" id="fac-dup-warn" style="display:none"></div>
       <div class="form-row">
-        <div class="ff"><label>Current Rank<button class="ht" tabindex="0" aria-label="About Current Rank" data-tip="The facilitator's current AAFC rank — e.g. FLTLT(AAFC), WO(AAFC), SGT(AAFC), CUO. Rank is stored separately from name so that historical session records remain accurate when rank changes.">?</button></label><input id="fac-rank" list="fac-rank-list" placeholder="e.g. FLTLT(AAFC), CUO, CPL(AAFC)" oninput="_markFacUnsaved()" autocomplete="off"><datalist id="fac-rank-list"></datalist></div>
+        <div class="ff"><label for="fac-rank">Current Rank<button class="ht" tabindex="0" aria-label="About Current Rank" data-tip="The facilitator's current AAFC rank — e.g. FLTLT(AAFC), WO(AAFC), SGT(AAFC), CUO. Rank is stored separately from name so that historical session records remain accurate when rank changes.">?</button></label><input id="fac-rank" list="fac-rank-list" placeholder="e.g. FLTLT(AAFC), CUO, CPL(AAFC)" oninput="_markFacUnsaved()" autocomplete="off"><datalist id="fac-rank-list"></datalist></div>
         <div class="ff"><label for="fac-type">Type<button class="ht" tabindex="0" aria-label="About Type" data-tip="Staff: squadron staff not holding an AAFC rank. Officer / NCO: uniformed AAFC members. Senior Cadet: a cadet delivering elements of training. Civilian: non-uniformed instructor. Affects which sessions they can lead.">?</button></label>
           <select id="fac-type" aria-label="Facilitator type" onchange="_onFacTypeChange(this)"><option value="Staff">Staff</option><option value="Officer">Officer (AAFC)</option><option value="NCO">Warrant Officer / NCO (AAFC)</option><option value="Senior Cadet">Senior Cadet</option><option value="Civilian">Civilian Instructor</option></select>
         </div>
@@ -4103,8 +4103,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <button class="btn btn-dk" onclick="saveTimingTemplate()">Save Template</button>
       <div id="tt-apply-from-wrap" style="display:none;gap:6px;align-items:center;flex-wrap:wrap">
         <span style="font-size:var(--fs-xs);white-space:nowrap">Apply from:</span>
-        <input id="tt-apply-from-date" type="date" style="width:130px">
-        <input id="tt-apply-from-reason" type="text" placeholder="Reason" style="width:140px">
+        <input id="tt-apply-from-date" type="date" style="width:130px" aria-label="Apply timing template from date">
+        <input id="tt-apply-from-reason" type="text" placeholder="Reason" style="width:140px" aria-label="Reason for applying template from that date">
         <button class="btn" onclick="ttApplyFromDate()">Apply</button>
       </div>
       <button class="btn btn-out" onclick="closeModal('m-timing')">Close</button>
@@ -7258,7 +7258,7 @@ function _wizRender(){
       <div class="ff"><label for="waz-reason">Reason (required, minimum 10 characters)</label>
         <textarea id="waz-reason" rows="3" oninput="_wizReasonInput(this.value)" placeholder="e.g. End-of-year account cleanup — cadets who have left the unit">${esc(w.reason||'')}</textarea>
       </div>
-      <div class="ff"><label>Effective date (optional — audit record only; archiving happens immediately, there is no scheduled/deferred archiving)</label>
+      <div class="ff"><label for="waz-effective">Effective date (optional — audit record only; archiving happens immediately, there is no scheduled/deferred archiving)</label>
         <input type="date" id="waz-effective" value="${esc(w.effectiveAt||'')}" onchange="_wizEffectiveInput(this.value)">
       </div>
       <label style="display:flex;align-items:flex-start;gap:8px;font-size:var(--fs-sm);margin-top:10px;cursor:pointer">
@@ -9391,7 +9391,7 @@ function showPNDetail(ds){
         <div class="ff"><label for="pnd-start">Start Time</label><input type="time" id="pnd-start" value="${esc(pn.start_time||'')}"></div>
         <div class="ff"><label for="pnd-end">End Time</label><input type="time" id="pnd-end" value="${esc(pn.end_time||'')}"></div>
       </div>
-      <div class="ff"><label>Notes<span class="save-ind" id="pnd-notes-status"></span></label><input id="pnd-notes" value="${esc(pn.notes||'')}"></div>
+      <div class="ff"><label for="pnd-notes">Notes<span class="save-ind" id="pnd-notes-status"></span></label><input id="pnd-notes" value="${esc(pn.notes||'')}"></div>
       <button class="btn btn-xs btn-sky" style="margin-top:6px" onclick="savePNCoreDetails('${ds}')">Save Details</button>
     </div>`;
   }
@@ -10107,45 +10107,127 @@ function populateWPDD(){
   const sorted=[...S.pns].sort((a,b)=>a.date.localeCompare(b.date));
   sel.innerHTML='<option value="">— Choose a parade night —</option>'+sorted.map(pn=>`<option value="${pn.date}">${fmtD(pn.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'})} (${esc(pn.term)})</option>`).join('');
 }
-async function renderWP() {
-    const wrap = document.getElementById('page-weekly-program');
-    if (!wrap) return;
-    wrap.innerHTML = '<p class="muted p-4">Loading…</p>';
-    try {
-        // Load parade nights for the current training year
-        const yearParam = S.trainingYear ? `&training_year=${encodeURIComponent(S.trainingYear)}` : '';
-        const pns = await api(`/api/parade-nights?limit=200${yearParam}`);
-        if (!pns || !pns.length) {
-            wrap.innerHTML = '<p class="muted p-4">No parade nights for this year.</p>';
-            return;
-        }
+// WP-6: renderWP() used to overwrite #page-weekly-program -- the entire page,
+// toolbar included -- so the search box, night selector and status filter were
+// destroyed on first render. No filter could ever run because no control
+// survived to fire one. It now paints into #wp-content, which has been sitting
+// in the markup all along and was never written to.
+//
+// Fetched once per page visit; the filters re-paint from this and never refetch.
+let _wpData = null;   // {pns, classes, schedByPn}
 
-        // Load training classes for the current planning year
+// Fixed column groups -- always 4, always rendered
+const WP_STAGE_GROUPS = [
+    {label:'Orientation / Initial', codes:['ORI','INI']},
+    {label:'Junior / Bronze',       codes:['JNR']},
+    {label:'Intermediate / Silver', codes:['INT']},
+    {label:'Senior / Gold',         codes:['SNR']},
+];
+
+async function renderWP() {
+    const wrap = document.getElementById('wp-content');
+    if (!wrap) return;
+    wrap.innerHTML = '<p class="muted p-4">Loading\u2026</p>';
+    try {
+        const yearQ = S.trainingYear
+            ? `?training_year=${encodeURIComponent(S.trainingYear)}` : '';
+
+        // WP-1/WP-2: three requests for the whole page. This was previously two
+        // plus one /schedule per parade night -- 244 locally -- issued serially
+        // inside an awaited for-loop, against an API_RATE_LIMIT of 300/window.
+        const [pns, bulk] = await Promise.all([
+            api(`/api/parade-nights${yearQ}`),
+            api(`/api/parade-night-schedules${yearQ}`),
+        ]);
+
         const yearId = (typeof P !== 'undefined' && P.currentYearId) ? P.currentYearId : '';
         const classes = yearId
             ? (await api(`/api/training-classes?training_year_id=${encodeURIComponent(yearId)}`))
               .filter(c => !c.is_archived)
             : [];
 
-        // Fixed column groups — always 4, always rendered
-        const STAGE_GROUPS = [
-            {label:'Orientation / Initial', codes:['ORI','INI']},
-            {label:'Junior / Bronze',       codes:['JNR']},
-            {label:'Intermediate / Silver', codes:['INT']},
-            {label:'Senior / Gold',         codes:['SNR']},
-        ];
-
-        let html = '';
-        for (const pn of pns) {
-            const schedule = await api(`/api/parade-nights/${pn.parade_night_id}/schedule`);
-            html += _renderPNSchedule(pn, schedule, classes, STAGE_GROUPS);
-        }
-        const today = new Date().toLocaleDateString('en-AU', {day:'2-digit',month:'long',year:'numeric'});
-        wrap.innerHTML = html + `<div class="print-footer">Generated ${esc(today)}</div>`;
+        const schedByPn = {};
+        for (const sc of ((bulk && bulk.schedules) || [])) schedByPn[sc.parade_night_id] = sc;
+        _wpData = {pns: pns || [], classes, schedByPn};
+        _wpPaint();
     } catch(e) {
+        _wpData = null;
         wrap.innerHTML = `<p class="text-danger p-4">Failed to load: ${esc(apiErr(e))}</p>`;
     }
 }
+
+// Render from _wpData applying the current filters. No network access -- this is
+// what the search box calls on every keystroke (WP-3: `oninput` used to call
+// renderWP(), which would now be 3 requests per character).
+function _wpPaint() {
+    const wrap = document.getElementById('wp-content');
+    if (!wrap || !_wpData) return;
+    const qEl = document.getElementById('wp-search');
+    const stEl = document.getElementById('wp-f-status');
+    const q = ((qEl && qEl.value) || '').trim().toLowerCase();
+    const status = (stEl && stEl.value) || 'all';
+
+    let html = '', shown = 0;
+    for (const pn of _wpData.pns) {
+        const sched = _wpFilterSchedule(_wpData.schedByPn[pn.parade_night_id], q, status);
+        if (!sched) continue;
+        shown++;
+        html += _renderPNSchedule(pn, sched, _wpData.classes, WP_STAGE_GROUPS);
+    }
+
+    if (!_wpData.pns.length) {
+        wrap.innerHTML = '<p class="muted p-4">No parade nights for this training year.</p>';
+        return;
+    }
+    if (!shown) {
+        const bits = [];
+        if (q) bits.push(`matching \u201c${esc(q)}\u201d`);
+        if (status !== 'all') bits.push(`with status \u201c${esc(status.replace(/_/g,' '))}\u201d`);
+        wrap.innerHTML = `<p class="muted p-4">No sessions ${esc(bits.join(' '))}. `
+            + `Clear the search and status filter to see all ${_wpData.pns.length} parade nights.</p>`;
+        return;
+    }
+    const today = new Date().toLocaleDateString('en-AU', {day:'2-digit',month:'long',year:'numeric'});
+    wrap.innerHTML = html + `<div class="print-footer">Generated ${esc(today)}</div>`;
+}
+
+// WP-4: the search box and status filter were wired to renderWP(), which never
+// read either one -- they refetched the entire page and changed nothing. These
+// two functions are the filter they always implied.
+
+// Does one session match the typed query? The placeholder promises "facilitator,
+// room, curriculum item", so those are the fields searched, plus the cadet group
+// and any custom title. Change this one function to change what search means.
+function _wpMatch(sess, q) {
+    return [
+        sess.curriculum_title_at_time,
+        sess.custom_title,
+        sess.facilitator_display_name_at_time,
+        sess.training_area_name_at_time,
+        sess.cadet_group,
+    ].some(v => String(v || '').toLowerCase().includes(q));
+}
+
+// Returns a copy of `sched` carrying only sessions that pass both filters, or
+// null when the night has none left -- a night with nothing matching is dropped
+// from the program rather than printed as an empty shell.
+function _wpFilterSchedule(sched, q, status) {
+    if (!sched) return null;
+    if (!q && status === 'all') return sched;
+    const keep = s => (status === 'all' || String(s.status || '') === status)
+                   && (!q || _wpMatch(s, q));
+    const byBlock = {};
+    let kept = 0;
+    for (const bid of Object.keys(sched.sessions_by_block || {})) {
+        const f = (sched.sessions_by_block[bid] || []).filter(keep);
+        if (f.length) { byBlock[bid] = f; kept += f.length; }
+    }
+    const unlinked = (sched.unlinked_sessions || []).filter(keep);
+    kept += unlinked.length;
+    if (!kept) return null;
+    return Object.assign({}, sched, {sessions_by_block: byBlock, unlinked_sessions: unlinked});
+}
+
 function _renderPNSchedule(pn, schedule, classes, stageGroups) {
     const blocks = (schedule && schedule.blocks) || [];
     const byBlock = (schedule && schedule.sessions_by_block) || {};
