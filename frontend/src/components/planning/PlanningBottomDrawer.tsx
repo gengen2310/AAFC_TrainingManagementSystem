@@ -53,10 +53,10 @@ const TABS: { key: BottomTab; label: string }[] = [
 
 const inputSx: CSSProperties = {
   padding: "5px 8px", borderRadius: 6,
-  border: "1.5px solid var(--border)", fontSize: 12, width: "100%",
+  border: "1.5px solid var(--border)", fontSize: 'var(--fs-sm)', width: "100%",
 };
 const labelSx: CSSProperties = {
-  fontSize: 12, fontWeight: 700,
+  fontSize: 'var(--fs-sm)', fontWeight: 700,
   display: "flex", flexDirection: "column", gap: 4,
 };
 
@@ -66,9 +66,9 @@ type SortDir = "asc" | "desc";
 
 
 const PROG_TYPE_STYLE: Record<string, CSSProperties> = {
-  foundation: { fontSize: 9, fontWeight: 700, color: "#1A7F4B", background: "#d1fae5", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
-  extension:  { fontSize: 9, fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
-  optional:   { fontSize: 9, fontWeight: 700, color: "var(--muted-text)", background: "#f1f5f9", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
+  foundation: { fontSize: 'var(--fs-3xs)', fontWeight: 700, color: "#1A7F4B", background: "#d1fae5", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
+  extension:  { fontSize: 'var(--fs-3xs)', fontWeight: 700, color: "#92400e", background: "#fef3c7", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
+  optional:   { fontSize: 'var(--fs-3xs)', fontWeight: 700, color: "var(--muted-text)", background: "#f1f5f9", padding: "1px 5px", borderRadius: 3, whiteSpace: "nowrap" },
 };
 
 // CLASS-05: per-Training-Class chips in the backlog table, reusing the same
@@ -91,7 +91,7 @@ const CLASS_STATUS_LABEL: Record<string, string> = {
 function classChipStyle(status: string): CSSProperties {
   return {
     ...(CLASS_STATUS_STYLE[status] ?? CLASS_STATUS_STYLE.unscheduled),
-    fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap",
+    fontSize: 'var(--fs-3xs)', fontWeight: 700, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap",
   };
 }
 
@@ -215,7 +215,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
   }
 
   const selSx: CSSProperties = {
-    fontSize: 11, padding: "2px 4px", borderRadius: 4,
+    fontSize: 'var(--fs-xs)', padding: "2px 4px", borderRadius: 4,
     border: "1px solid var(--border)", width: "100%", background: "#fff",
   };
 
@@ -225,8 +225,8 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
     return (
       <div className="pw-err" style={{ padding: 16 }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>Could not load the mission backlog</div>
-        <div style={{ fontSize: 12, opacity: .8 }}>{msg}</div>
-        <div style={{ fontSize: 11, marginTop: 6, color: "var(--muted-text)" }}>
+        <div style={{ fontSize: 'var(--fs-sm)', opacity: .8 }}>{msg}</div>
+        <div style={{ fontSize: 'var(--fs-xs)', marginTop: 6, color: "var(--muted-text)" }}>
           Check that you have an internet connection, then reload the page.
         </div>
       </div>
@@ -283,22 +283,22 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
             {opts.terms.map(t => <option key={t} value={t}>Term {t}</option>)}
           </select>
         )}
-        <label style={{ fontSize: 11, color: "var(--muted-text)", display: "flex", alignItems: "center", gap: 4 }}>
+        <label style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)", display: "flex", alignItems: "center", gap: 4 }}>
           From
           <input type="date" value={fDateStart} onChange={e => setFDateStart(e.target.value)} style={{ ...inputSx, width: 130 }} aria-label="Scheduled from date" />
         </label>
-        <label style={{ fontSize: 11, color: "var(--muted-text)", display: "flex", alignItems: "center", gap: 4 }}>
+        <label style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)", display: "flex", alignItems: "center", gap: 4 }}>
           To
           <input type="date" value={fDateEnd} onChange={e => setFDateEnd(e.target.value)} style={{ ...inputSx, width: 130 }} aria-label="Scheduled to date" />
         </label>
         <button
           className="btn sm out"
-          style={{ fontSize: 11, padding: "3px 8px", whiteSpace: "nowrap" }}
+          style={{ fontSize: 'var(--fs-xs)', padding: "3px 8px", whiteSpace: "nowrap" }}
           onClick={() => { setSearch(""); setFPhase(""); setFElement(""); setFSuitability(""); setFCore(""); setFTerm(""); setFStatus("unscheduled"); setFDateStart(""); setFDateEnd(""); }}
         >
           Reset
         </button>
-        <span style={{ fontSize: 11, color: "var(--muted-text)", marginLeft: "auto", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)", marginLeft: "auto", whiteSpace: "nowrap" }}>
           {displayed.length} of {total} · {scheduledCount} scheduled
         </span>
       </div>
@@ -312,7 +312,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
-          <table className="pw-fac-table" style={{ fontSize: 11, minWidth: 1100 }}>
+          <table className="pw-fac-table" style={{ fontSize: 'var(--fs-xs)', minWidth: 1100 }}>
             <thead>
               <tr>
                 <SortHdr col="code" label="Code" style={{ minWidth: 80 }} />
@@ -371,19 +371,19 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                     {/* Status — see backlog_status's six-state model (backend/app/routers/planning.py) */}
                     <td>
                       {m.backlog_status === "resolved" ? (
-                        <span title={`Previously ${m.has_cancelled ? "cancelled" : "not delivered"}, now delivered.${s0?.outcome_note ? " " + s0.outcome_note : ""}`} style={{ color: "#fff", background: "var(--success, #1A7F4B)", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                        <span title={`Previously ${m.has_cancelled ? "cancelled" : "not delivered"}, now delivered.${s0?.outcome_note ? " " + s0.outcome_note : ""}`} style={{ color: "#fff", background: "var(--success, #1A7F4B)", fontWeight: 700, fontSize: 'var(--fs-3xs)', padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
                           RESOLVED
                         </span>
                       ) : m.has_not_delivered ? (
-                        <span title={[s0?.not_delivered_reason, s0?.outcome_note].filter(Boolean).join(" — ") || "No reason recorded"} style={{ color: "#fff", background: "#78909c", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                        <span title={[s0?.not_delivered_reason, s0?.outcome_note].filter(Boolean).join(" — ") || "No reason recorded"} style={{ color: "#fff", background: "#78909c", fontWeight: 700, fontSize: 'var(--fs-3xs)', padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
                           NOT DELIVERED
                         </span>
                       ) : m.has_cancelled ? (
-                        <span title={[s0?.cancelled_reason, s0?.outcome_note].filter(Boolean).join(" — ") || "No reason recorded"} style={{ color: "#fff", background: "var(--aafc-red)", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                        <span title={[s0?.cancelled_reason, s0?.outcome_note].filter(Boolean).join(" — ") || "No reason recorded"} style={{ color: "#fff", background: "var(--aafc-red)", fontWeight: 700, fontSize: 'var(--fs-3xs)', padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
                           CANCELLED
                         </span>
                       ) : m.backlog_status === "rescheduled" ? (
-                        <span title={s0?.rescheduled_to_date ? `Rescheduled to ${fmtDate(s0.rescheduled_to_date)}` : "Rescheduled"} style={{ color: "#fff", background: "var(--rescheduled, #7C3AED)", fontWeight: 700, fontSize: 9, padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
+                        <span title={s0?.rescheduled_to_date ? `Rescheduled to ${fmtDate(s0.rescheduled_to_date)}` : "Rescheduled"} style={{ color: "#fff", background: "var(--rescheduled, #7C3AED)", fontWeight: 700, fontSize: 'var(--fs-3xs)', padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap" }}>
                           RESCHEDULED
                         </span>
                       ) : !m.is_scheduled ? (
@@ -402,7 +402,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                         <span>
                           {fmtDate(s0.parade_date)}
                           {extraSessions > 0 && (
-                            <span style={{ fontSize: 9, color: "var(--muted-text)", marginLeft: 3 }}>+{extraSessions}</span>
+                            <span style={{ fontSize: 'var(--fs-3xs)', color: "var(--muted-text)", marginLeft: 3 }}>+{extraSessions}</span>
                           )}
                         </span>
                       ) : "—"}
@@ -421,9 +421,9 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                     </td>
                     {/* Warnings */}
                     <td>
-                      {warnCoreUnsched && <span title="Foundation lesson not scheduled" style={{ color: "var(--aafc-red)", fontSize: 11 }}>⚠ Foundation</span>}
-                      {warnNoFac && <span title="No facilitator assigned" style={{ color: "var(--warning, #d97706)", fontSize: 11 }}>⚠ Fac</span>}
-                      {warnNoRoom && !warnCoreUnsched && <span title="No room assigned" style={{ color: "var(--muted-text)", fontSize: 11 }}>⚠ Room</span>}
+                      {warnCoreUnsched && <span title="Foundation lesson not scheduled" style={{ color: "var(--aafc-red)", fontSize: 'var(--fs-xs)' }}>⚠ Foundation</span>}
+                      {warnNoFac && <span title="No facilitator assigned" style={{ color: "var(--warning, #d97706)", fontSize: 'var(--fs-xs)' }}>⚠ Fac</span>}
+                      {warnNoRoom && !warnCoreUnsched && <span title="No room assigned" style={{ color: "var(--muted-text)", fontSize: 'var(--fs-xs)' }}>⚠ Room</span>}
                     </td>
                     {/* Classes — CLASS-05: per-Training-Class share of this mission's
                         six-state status, empty when this item's Stage has no active
@@ -445,7 +445,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                           {m.unassigned_session_count > 0 && (
                             <span
                               title={`${m.unassigned_session_count} scheduled session(s) with no Training Class assigned`}
-                              style={{ fontSize: 9, color: "var(--muted-text)", fontStyle: "italic", whiteSpace: "nowrap" }}
+                              style={{ fontSize: 'var(--fs-3xs)', color: "var(--muted-text)", fontStyle: "italic", whiteSpace: "nowrap" }}
                             >
                               +{m.unassigned_session_count} unassigned
                             </span>
@@ -458,7 +458,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                       {s0 ? (
                         <button
                           className="btn sm out"
-                          style={{ fontSize: 10, padding: "2px 7px" }}
+                          style={{ fontSize: 'var(--fs-2xs)', padding: "2px 7px" }}
                           onClick={async () => {
                             const full = await planningApi.getSession(s0.session_id);
                             onItemClick({
@@ -473,7 +473,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                       ) : (
                         <button
                           className="btn sm out"
-                          style={{ fontSize: 10, padding: "2px 7px" }}
+                          style={{ fontSize: 'var(--fs-2xs)', padding: "2px 7px" }}
                           onClick={() => onItemClick({ type: "curriculum", curriculum: {
                             curriculum_id: m.curriculum_id,
                             code: m.code,
@@ -488,7 +488,7 @@ function BacklogContent({ yearId, onItemClick }: { yearId: string; onItemClick: 
                         <button
                           className="btn sm out"
                           disabled={reschedulingId === s0.session_id}
-                          style={{ fontSize: 10, padding: "2px 7px", borderColor: "var(--aafc-red)", color: "var(--aafc-red)" }}
+                          style={{ fontSize: 'var(--fs-2xs)', padding: "2px 7px", borderColor: "var(--aafc-red)", color: "var(--aafc-red)" }}
                           title={s0.cancelled_reason ?? s0.not_delivered_reason ?? ""}
                           onClick={async () => {
                             if (!await confirm(
@@ -625,29 +625,29 @@ function FacilitatorLeaveSection({
       {/* Workload Stats */}
       {yearId && (
         <div style={{ marginBottom: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--aafc-dark-blue)", marginBottom: 6 }}>
+          <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: "var(--aafc-dark-blue)", marginBottom: 6 }}>
             Workload (current year)
           </div>
           {workloadLoading ? (
-            <div style={{ fontSize: 11, color: "var(--muted-text)" }}>Loading…</div>
+            <div style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)" }}>Loading…</div>
           ) : wl ? (
-            <div style={{ display: "flex", gap: 14, fontSize: 11, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 14, fontSize: 'var(--fs-xs)', flexWrap: "wrap" }}>
               <span><strong>{wl.total_scheduled}</strong> sessions total</span>
               <span><strong>{wl.nights_with_sessions}</strong> nights</span>
               <span>avg <strong>{wl.avg_per_night}</strong>/night</span>
               <span>max <strong>{wl.max_per_night}</strong>, min <strong>{wl.min_per_night}</strong></span>
             </div>
           ) : (
-            <div style={{ fontSize: 11, color: "var(--muted-text)" }}>No workload data.</div>
+            <div style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)" }}>No workload data.</div>
           )}
 
           {/* Upcoming sessions */}
           {wl && wl.upcoming_sessions.length > 0 && (
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Upcoming sessions</div>
+              <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, marginBottom: 4 }}>Upcoming sessions</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {wl.upcoming_sessions.slice(0, 5).map(s => (
-                  <div key={s.session_id} style={{ fontSize: 11, display: "flex", gap: 8, color: "var(--text)" }}>
+                  <div key={s.session_id} style={{ fontSize: 'var(--fs-xs)', display: "flex", gap: 8, color: "var(--text)" }}>
                     <span style={{ color: "var(--aafc-dark-blue)", fontWeight: 600 }}>{s.parade_date}</span>
                     <span>{s.title ?? "—"}</span>
                     {s.cadet_group && <span style={{ color: "var(--muted-text)" }}>{s.cadet_group}</span>}
@@ -655,7 +655,7 @@ function FacilitatorLeaveSection({
                   </div>
                 ))}
                 {wl.upcoming_sessions.length > 5 && (
-                  <div style={{ fontSize: 10, color: "var(--muted-text)" }}>+{wl.upcoming_sessions.length - 5} more</div>
+                  <div style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)" }}>+{wl.upcoming_sessions.length - 5} more</div>
                 )}
               </div>
             </div>
@@ -666,17 +666,17 @@ function FacilitatorLeaveSection({
       {/* Leave Periods */}
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--aafc-dark-blue)" }}>Leave / Unavailability</div>
+          <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: "var(--aafc-dark-blue)" }}>Leave / Unavailability</div>
           <div style={{ display: "flex", gap: 6 }}>
             <button
               className="btn sm out"
-              style={{ fontSize: 11, padding: "2px 8px" }}
+              style={{ fontSize: 'var(--fs-xs)', padding: "2px 8px" }}
               onClick={() => setShowArchivedLeave(v => !v)}
             >
               {showArchivedLeave ? "Hide archived" : "Show archived"}
             </button>
             {!addingLeave && (
-              <button className="btn sm out" style={{ fontSize: 11, padding: "2px 8px" }} onClick={() => setAddingLeave(true)}>
+              <button className="btn sm out" style={{ fontSize: 'var(--fs-xs)', padding: "2px 8px" }} onClick={() => setAddingLeave(true)}>
                 + Add Leave
               </button>
             )}
@@ -684,7 +684,7 @@ function FacilitatorLeaveSection({
         </div>
 
         {leaveWarning && (
-          <div style={{ fontSize: 11, color: "var(--warning)", background: "#fff8e6", border: "1px solid var(--warning)", borderRadius: 6, padding: "6px 10px", marginBottom: 6 }}>
+          <div style={{ fontSize: 'var(--fs-xs)', color: "var(--warning)", background: "#fff8e6", border: "1px solid var(--warning)", borderRadius: 6, padding: "6px 10px", marginBottom: 6 }}>
             {leaveWarning}
           </div>
         )}
@@ -709,7 +709,7 @@ function FacilitatorLeaveSection({
                 <input value={leaveNotes} onChange={e => setLeaveNotes(e.target.value)} placeholder="Optional additional notes" style={inputSx} />
               </label>
             </div>
-            {leaveErr && <div style={{ color: "var(--aafc-red)", fontSize: 11, marginBottom: 6 }}>{leaveErr}</div>}
+            {leaveErr && <div style={{ color: "var(--aafc-red)", fontSize: 'var(--fs-xs)', marginBottom: 6 }}>{leaveErr}</div>}
             <div style={{ display: "flex", gap: 8 }}>
               <button className="btn sm primary" onClick={handleAddLeave} disabled={leaveSaving}>
                 {leaveSaving ? "Saving…" : "Add leave"}
@@ -720,20 +720,20 @@ function FacilitatorLeaveSection({
         )}
 
         {leaveLoading ? (
-          <div style={{ fontSize: 11, color: "var(--muted-text)" }}>Loading leave…</div>
+          <div style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)" }}>Loading leave…</div>
         ) : leave.length === 0 ? (
-          <div style={{ fontSize: 11, color: "var(--muted-text)" }}>No leave recorded.</div>
+          <div style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)" }}>No leave recorded.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {leave.map(l => (
-              <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, background: "#fff", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 10px" }}>
+              <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 'var(--fs-xs)', background: "#fff", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 10px" }}>
                 <span style={{ fontWeight: 600, color: "var(--aafc-dark-blue)" }}>
                   {l.start_date}{l.end_date !== l.start_date ? ` → ${l.end_date}` : ""}
                 </span>
                 {l.reason && <span style={{ color: "var(--muted-text)" }}>{l.reason}</span>}
                 <button
                   className="btn sm out"
-                  style={{ marginLeft: "auto", fontSize: 10, padding: "2px 7px", color: "var(--aafc-red)" }}
+                  style={{ marginLeft: "auto", fontSize: 'var(--fs-2xs)', padding: "2px 7px", color: "var(--aafc-red)" }}
                   onClick={() => handleDeleteLeave(l.id)}
                   disabled={deletingLeaveId === l.id}
                 >
@@ -746,23 +746,23 @@ function FacilitatorLeaveSection({
 
         {showArchivedLeave && (
           <div style={{ marginTop: 8 }}>
-            {restoreLeaveErr && <div style={{ color: "var(--aafc-red)", fontSize: 11, marginBottom: 6 }}>{restoreLeaveErr}</div>}
+            {restoreLeaveErr && <div style={{ color: "var(--aafc-red)", fontSize: 'var(--fs-xs)', marginBottom: 6 }}>{restoreLeaveErr}</div>}
             {!archivedLeaveData ? (
-              <div style={{ fontSize: 11, color: "var(--muted-text)" }}>Loading archived leave…</div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)" }}>Loading archived leave…</div>
             ) : archivedLeaveData.leave.filter(l => l.is_archived).length === 0 ? (
-              <div style={{ fontSize: 11, color: "var(--muted-text)" }}>No archived leave periods.</div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)" }}>No archived leave periods.</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {archivedLeaveData.leave.filter(l => l.is_archived).map(l => (
-                  <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, background: "var(--surface-2, #eef2f7)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 10px", opacity: .75 }}>
+                  <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 'var(--fs-xs)', background: "var(--surface-2, #eef2f7)", border: "1px solid var(--border)", borderRadius: 6, padding: "5px 10px", opacity: .75 }}>
                     <span style={{ fontWeight: 600, color: "var(--aafc-dark-blue)" }}>
                       {l.start_date}{l.end_date !== l.start_date ? ` → ${l.end_date}` : ""}
                     </span>
                     {l.reason && <span style={{ color: "var(--muted-text)" }}>{l.reason}</span>}
-                    <span className="badge muted" style={{ fontSize: 10 }}>Archived</span>
+                    <span className="badge muted" style={{ fontSize: 'var(--fs-2xs)' }}>Archived</span>
                     <button
                       className="btn sm out"
-                      style={{ marginLeft: "auto", fontSize: 10, padding: "2px 7px" }}
+                      style={{ marginLeft: "auto", fontSize: 'var(--fs-2xs)', padding: "2px 7px" }}
                       onClick={() => handleRestoreLeave(l.id)}
                       disabled={restoringLeaveId === l.id}
                     >
@@ -803,9 +803,9 @@ function ScheduleContent({ squadronId }: { squadronId?: string }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-        <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+        <label style={{ fontSize: 'var(--fs-sm)', display: "flex", alignItems: "center", gap: 6 }}>
           Zoom
-          <select value={zoom} onChange={(e) => setZoom(e.target.value as ZoomPreset)} style={{ fontSize: 12, padding: "4px 6px" }}>
+          <select value={zoom} onChange={(e) => setZoom(e.target.value as ZoomPreset)} style={{ fontSize: 'var(--fs-sm)', padding: "4px 6px" }}>
             <option value="week">Week</option>
             <option value="month">Month</option>
             <option value="term">Term</option>
@@ -930,9 +930,9 @@ function FacilitatorsContent({
               <input value={subjectAreas} onChange={e => setSubjectAreas(e.target.value)} placeholder="e.g. Aviation, Leadership" style={inputSx} />
             </label>
           </div>
-          {err && <div style={{ color: "var(--aafc-red)", fontSize: 12, marginBottom: 6 }}>{err}</div>}
+          {err && <div style={{ color: "var(--aafc-red)", fontSize: 'var(--fs-sm)', marginBottom: 6 }}>{err}</div>}
           {dupWarning && (
-            <div style={{ color: "var(--aafc-red)", fontSize: 12, marginBottom: 6 }}>
+            <div style={{ color: "var(--aafc-red)", fontSize: 'var(--fs-sm)', marginBottom: 6 }}>
               {dupWarning} If this is a different person with the same name, you can add them anyway.
             </div>
           )}
@@ -970,10 +970,10 @@ function FacilitatorsContent({
                   >
                     <td style={{ fontWeight: 600, color: "var(--aafc-dark-blue)" }}>
                       {f.display_name}
-                      {f.rank && <span style={{ fontWeight: 400, color: "var(--muted-text)", fontSize: 11, marginLeft: 4 }}>{f.rank}</span>}
+                      {f.rank && <span style={{ fontWeight: 400, color: "var(--muted-text)", fontSize: 'var(--fs-xs)', marginLeft: 4 }}>{f.rank}</span>}
                     </td>
                     <td style={{ textTransform: "capitalize" }}>{f.type}</td>
-                    <td style={{ fontSize: 11 }}>{f.subject_areas.join(", ") || "—"}</td>
+                    <td style={{ fontSize: 'var(--fs-xs)' }}>{f.subject_areas.join(", ") || "—"}</td>
                     <td style={{ textAlign: "center" }}>{f.max_sessions_per_night}</td>
                   </tr>
                 );
@@ -1027,12 +1027,12 @@ function RoomsContent({ locations, onAddLocation, onEditLocation }: {
                 <td style={{ textTransform: "capitalize" }}>{l.location_type}</td>
                 <td style={{ textAlign: "center" }}>{l.capacity ?? "—"}</td>
                 <td>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: l.active_status ? "var(--success)" : "var(--muted-text)" }}>
+                  <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: l.active_status ? "var(--success)" : "var(--muted-text)" }}>
                     {l.active_status ? "Active" : "Inactive"}
                   </span>
                 </td>
                 <td>
-                  <button className="btn sm out" style={{ fontSize: 11, padding: "3px 8px" }} onClick={() => onEditLocation(l)}>Edit</button>
+                  <button className="btn sm out" style={{ fontSize: 'var(--fs-xs)', padding: "3px 8px" }} onClick={() => onEditLocation(l)}>Edit</button>
                 </td>
               </tr>
             ))}
@@ -1120,7 +1120,7 @@ function EquipmentContent() {
               <input value={notes} onChange={e => setNotes(e.target.value)} style={inputSx} />
             </label>
           </div>
-          {err && <div style={{ color: "var(--aafc-red)", fontSize: 12, marginBottom: 6 }}>{err}</div>}
+          {err && <div style={{ color: "var(--aafc-red)", fontSize: 'var(--fs-sm)', marginBottom: 6 }}>{err}</div>}
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn sm primary" onClick={handleAdd} disabled={saving}>{saving ? "Saving…" : "Add equipment"}</button>
             <button className="btn sm out" onClick={resetForm}>Cancel</button>
@@ -1155,7 +1155,7 @@ function EquipmentContent() {
                     {item.available_quantity}
                   </span>
                 </td>
-                <td style={{ fontSize: 11, textTransform: "capitalize" }}>
+                <td style={{ fontSize: 'var(--fs-xs)', textTransform: "capitalize" }}>
                   {item.condition ?? "—"}
                 </td>
               </tr>
@@ -1248,44 +1248,44 @@ function HolidaysContent({ yearId }: { yearId: string }) {
       {adding && (
         <div style={{ padding: "10px 14px", background: "var(--surface)", borderBottom: "1px solid var(--border)" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-            <label style={{ gridColumn: "1 / -1", fontSize: 12, fontWeight: 700, display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ gridColumn: "1 / -1", fontSize: 'var(--fs-sm)', fontWeight: 700, display: "flex", flexDirection: "column", gap: 4 }}>
               Name *
               <input
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="e.g. Spring Break"
-                style={{ fontWeight: 400, padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12 }}
+                style={{ fontWeight: 400, padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 'var(--fs-sm)' }}
               />
             </label>
-            <label style={{ fontSize: 12, fontWeight: 700, display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, display: "flex", flexDirection: "column", gap: 4 }}>
               Start *
-              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12 }} />
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 'var(--fs-sm)' }} />
             </label>
-            <label style={{ fontSize: 12, fontWeight: 700, display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, display: "flex", flexDirection: "column", gap: 4 }}>
               End *
-              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12 }} />
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 'var(--fs-sm)' }} />
             </label>
-            <label style={{ fontSize: 12, fontWeight: 700, display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, display: "flex", flexDirection: "column", gap: 4 }}>
               Type
-              <select value={holidayType} onChange={e => setHolidayType(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12 }}>
+              <select value={holidayType} onChange={e => setHolidayType(e.target.value)} style={{ padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 'var(--fs-sm)' }}>
                 {HOLIDAY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </label>
           </div>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, marginBottom: 8 }}>
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 'var(--fs-sm)', marginBottom: 8 }}>
             <input type="checkbox" checked={affectsParade} onChange={e => setAffectsParade(e.target.checked)} />
             Affects parade nights (stand-down)
           </label>
-          <label style={{ fontSize: 12, fontWeight: 700, display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
+          <label style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
             Notes (optional)
             <input
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="e.g. State school holiday — check local gazette for exact dates"
-              style={{ fontWeight: 400, padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12 }}
+              style={{ fontWeight: 400, padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 'var(--fs-sm)' }}
             />
           </label>
-          {err && <div style={{ color: "var(--aafc-red)", fontSize: 12, marginBottom: 6 }}>{err}</div>}
+          {err && <div style={{ color: "var(--aafc-red)", fontSize: 'var(--fs-sm)', marginBottom: 6 }}>{err}</div>}
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn sm primary" onClick={handleAdd} disabled={saving}>
               {saving ? "Saving…" : "Add holiday"}
@@ -1314,10 +1314,10 @@ function HolidaysContent({ yearId }: { yearId: string }) {
             {holidays.map(h => (
               <tr key={h.holiday_id}>
                 <td style={{ fontWeight: 600 }}>{h.name}</td>
-                <td style={{ fontSize: 11 }}>
+                <td style={{ fontSize: 'var(--fs-xs)' }}>
                   {h.start_date}{h.end_date !== h.start_date ? ` → ${h.end_date}` : ""}
                 </td>
-                <td style={{ fontSize: 11, textTransform: "capitalize" }}>
+                <td style={{ fontSize: 'var(--fs-xs)', textTransform: "capitalize" }}>
                   {h.holiday_type.replace(/_/g, " ")}
                 </td>
                 <td style={{ textAlign: "center" }}>
@@ -1328,7 +1328,7 @@ function HolidaysContent({ yearId }: { yearId: string }) {
                 <td>
                   <button
                     className="btn sm out"
-                    style={{ fontSize: 11, padding: "3px 8px", color: "var(--aafc-red)" }}
+                    style={{ fontSize: 'var(--fs-xs)', padding: "3px 8px", color: "var(--aafc-red)" }}
                     onClick={() => handleDelete(h.holiday_id)}
                     disabled={deletingId === h.holiday_id}
                   >
@@ -1479,21 +1479,21 @@ function ClassifyModal({
       {/* Only stops the backdrop's click-to-close from firing for clicks inside the dialog. */}
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
       <div style={{ background: "#fff", borderRadius: 10, padding: 24, width: 420, maxWidth: "95vw" }} onClick={e => e.stopPropagation()}>
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>Classify Activity</div>
-        <div style={{ fontSize: 12, color: "var(--muted-text)", marginBottom: 16 }}>{activity.activity_name}</div>
+        <div style={{ fontSize: 'var(--fs-md)', fontWeight: 700, marginBottom: 4 }}>Classify Activity</div>
+        <div style={{ fontSize: 'var(--fs-sm)', color: "var(--muted-text)", marginBottom: 16 }}>{activity.activity_name}</div>
 
-        <label htmlFor="classify-importance" style={{ fontSize: 12, fontWeight: 700, display: "block", marginBottom: 4 }}>Importance</label>
+        <label htmlFor="classify-importance" style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, display: "block", marginBottom: 4 }}>Importance</label>
         <select
           id="classify-importance"
           value={importance}
           onChange={e => setImportance(e.target.value)}
-          style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 12, marginBottom: 14 }}
+          style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1.5px solid var(--border)", fontSize: 'var(--fs-sm)', marginBottom: 14 }}
         >
           <option value="">— select —</option>
           {Object.entries(IMPORTANCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
 
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Audience</div>
+        <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, marginBottom: 6 }}>Audience</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
           {([
             ["Staff Only", staffOnly, setStaffOnly],
@@ -1501,17 +1501,17 @@ function ClassifyModal({
             ["Proficient (LCDT & CCPLS)", proficient, setProficient],
             ["First Years", firstYears, setFirstYears],
           ] as [string, boolean, (v: boolean) => void][]).map(([label, val, setter]) => (
-            <label key={label} style={{ display: "flex", gap: 8, fontSize: 12, alignItems: "center", cursor: "pointer" }}>
+            <label key={label} style={{ display: "flex", gap: 8, fontSize: 'var(--fs-sm)', alignItems: "center", cursor: "pointer" }}>
               <input type="checkbox" checked={val} onChange={e => setter(e.target.checked)} />
               {label}
             </label>
           ))}
         </div>
 
-        {err && <div style={{ fontSize: 11, color: "var(--aafc-red)", marginBottom: 8 }}>{err}</div>}
+        {err && <div style={{ fontSize: 'var(--fs-xs)', color: "var(--aafc-red)", marginBottom: 8 }}>{err}</div>}
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button className="btn sm out" style={{ fontSize: 12 }} onClick={onClose}>Cancel</button>
-          <button className="btn sm primary" style={{ fontSize: 12 }} onClick={handleSave} disabled={saving}>
+          <button className="btn sm out" style={{ fontSize: 'var(--fs-sm)' }} onClick={onClose}>Cancel</button>
+          <button className="btn sm primary" style={{ fontSize: 'var(--fs-sm)' }} onClick={handleSave} disabled={saving}>
             {saving ? "Saving…" : "Save classification"}
           </button>
         </div>
@@ -1860,50 +1860,50 @@ function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?
           type="date" value={fStart} onChange={e => setFStart(e.target.value)}
           title="From date" style={{ ...inputSx, width: 130 }}
         />
-        <span style={{ fontSize: 11, color: "var(--muted-text)" }}>→</span>
+        <span style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)" }}>→</span>
         <input
           type="date" value={fEnd} onChange={e => setFEnd(e.target.value)}
           title="To date" style={{ ...inputSx, width: 130 }}
         />
         <button
-          className="btn sm out" style={{ fontSize: 11, padding: "3px 8px" }}
+          className="btn sm out" style={{ fontSize: 'var(--fs-xs)', padding: "3px 8px" }}
           onClick={() => { setFSearch(""); setFSource("all"); setFStatus("all"); setFStart(""); setFEnd(""); }}
         >
           Reset
         </button>
-        <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--muted-text)", cursor: "pointer", whiteSpace: "nowrap" }}>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 'var(--fs-xs)', color: "var(--muted-text)", cursor: "pointer", whiteSpace: "nowrap" }}>
           <input type="checkbox" checked={fShowHidden} onChange={e => setFShowHidden(e.target.checked)} />
           Show hidden
         </label>
-        <span style={{ fontSize: 11, color: "var(--muted-text)", marginLeft: "auto", whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)", marginLeft: "auto", whiteSpace: "nowrap" }}>
           {filtered.length} of {unified.length}
         </span>
         <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
           <input type="file" accept=".csv,.txt" style={{ display: "none" }} onChange={handleFileImport} disabled={uploading} />
-          <span className="btn sm out" style={{ fontSize: 11, padding: "3px 9px", pointerEvents: "none", whiteSpace: "nowrap" }}>
+          <span className="btn sm out" style={{ fontSize: 'var(--fs-xs)', padding: "3px 9px", pointerEvents: "none", whiteSpace: "nowrap" }}>
             {uploading ? "Importing…" : "Import CEA"}
           </span>
         </label>
-        <button className="btn sm primary" style={{ fontSize: 11, whiteSpace: "nowrap" }} onClick={() => setShowCreate(v => !v)}>
+        <button className="btn sm primary" style={{ fontSize: 'var(--fs-xs)', whiteSpace: "nowrap" }} onClick={() => setShowCreate(v => !v)}>
           + Add activity
         </button>
       </div>
 
       {/* Import result banner */}
       {importResult && (
-        <div style={{ padding: "6px 14px", background: "#f0fff4", borderBottom: "1px solid var(--border)", fontSize: 11, display: "flex", gap: 14, alignItems: "center" }}>
+        <div style={{ padding: "6px 14px", background: "#f0fff4", borderBottom: "1px solid var(--border)", fontSize: 'var(--fs-xs)', display: "flex", gap: 14, alignItems: "center" }}>
           <span style={{ fontWeight: 700, color: "#1A7F4B" }}>Import complete</span>
           <span>{importResult.created} new</span>
           <span>{importResult.updated} updated</span>
           <span style={{ color: "var(--muted-text)" }}>{importResult.duplicates} duplicates · {importResult.skipped} skipped</span>
           {importResult.errors > 0 && <span style={{ color: "var(--aafc-red)" }}>{importResult.errors} errors</span>}
-          <button onClick={() => setImportResult(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "var(--muted-text)" }}>×</button>
+          <button onClick={() => setImportResult(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 'var(--fs-md)', color: "var(--muted-text)" }}>×</button>
         </div>
       )}
       {importErr && (
-        <div style={{ padding: "6px 14px", background: "#fff0f0", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--aafc-red)", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ padding: "6px 14px", background: "#fff0f0", borderBottom: "1px solid var(--border)", fontSize: 'var(--fs-xs)', color: "var(--aafc-red)", display: "flex", alignItems: "center", gap: 8 }}>
           Import failed: {importErr}
-          <button onClick={() => setImportErr(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>×</button>
+          <button onClick={() => setImportErr(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 'var(--fs-md)' }}>×</button>
         </div>
       )}
 
@@ -1934,10 +1934,10 @@ function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?
             </select>
           </label>
           <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
-            <button className="btn sm primary" onClick={handleCreate} disabled={creating || !newName.trim()} style={{ fontSize: 11 }}>
+            <button className="btn sm primary" onClick={handleCreate} disabled={creating || !newName.trim()} style={{ fontSize: 'var(--fs-xs)' }}>
               {creating ? "Saving…" : "Save"}
             </button>
-            <button className="btn sm out" onClick={() => setShowCreate(false)} style={{ fontSize: 11 }}>Cancel</button>
+            <button className="btn sm out" onClick={() => setShowCreate(false)} style={{ fontSize: 'var(--fs-xs)' }}>Cancel</button>
           </div>
         </div>
       )}
@@ -1951,7 +1951,7 @@ function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
-          <table className="pw-fac-table" style={{ fontSize: 11, minWidth: 900 }}>
+          <table className="pw-fac-table" style={{ fontSize: 'var(--fs-xs)', minWidth: 900 }}>
             <thead>
               <tr>
                 <SortTh col="source" label="Source" style={{ minWidth: 70 }} />
@@ -1971,7 +1971,7 @@ function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?
                 <tr key={`${r.source}-${r.id}`} style={{ background: r.is_removed ? "#fff3cd" : r.is_hidden ? "#f4f5f7" : undefined, opacity: r.is_hidden ? 0.7 : 1 }}>
                   <td>
                     <span style={{
-                      fontSize: 9, fontWeight: 700, padding: "2px 5px", borderRadius: 3,
+                      fontSize: 'var(--fs-3xs)', fontWeight: 700, padding: "2px 5px", borderRadius: 3,
                       background: SOURCE_COLORS[r.source] + "22",
                       color: SOURCE_COLORS[r.source],
                       border: `1px solid ${SOURCE_COLORS[r.source]}44`,
@@ -1983,39 +1983,39 @@ function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?
                   <td style={{ fontWeight: 600, maxWidth: 260 }}>
                     {r.name}
                     {r.is_removed && (
-                      <span style={{ marginLeft: 4, fontSize: 9, color: "var(--warning)", fontWeight: 700 }}>[Not in latest import]</span>
+                      <span style={{ marginLeft: 4, fontSize: 'var(--fs-3xs)', color: "var(--warning)", fontWeight: 700 }}>[Not in latest import]</span>
                     )}
                     {r.is_hidden && (
-                      <span style={{ marginLeft: 4, fontSize: 9, color: "var(--muted-text)", fontWeight: 700 }}>[Hidden for your squadron]</span>
+                      <span style={{ marginLeft: 4, fontSize: 'var(--fs-3xs)', color: "var(--muted-text)", fontWeight: 700 }}>[Hidden for your squadron]</span>
                     )}
                     {r.local_note && (
-                      <div style={{ fontSize: 9, color: "var(--muted-text)", fontWeight: 400, fontStyle: "italic" }}>{r.local_note}</div>
+                      <div style={{ fontSize: 'var(--fs-3xs)', color: "var(--muted-text)", fontWeight: 400, fontStyle: "italic" }}>{r.local_note}</div>
                     )}
                   </td>
                   <td style={{ whiteSpace: "nowrap" }}>{r.start_date ?? "—"}</td>
                   <td style={{ whiteSpace: "nowrap", color: "var(--muted-text)" }}>{r.end_date ?? "—"}</td>
-                  <td style={{ fontSize: 10, color: "var(--muted-text)", maxWidth: 150 }}>{r.unit ?? "—"}</td>
-                  <td style={{ fontSize: 10, color: "var(--muted-text)" }}>{r.location ?? "—"}</td>
-                  <td style={{ fontSize: 10, color: "var(--muted-text)", textTransform: "capitalize" }}>{r.extra ?? "—"}</td>
+                  <td style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)", maxWidth: 150 }}>{r.unit ?? "—"}</td>
+                  <td style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)" }}>{r.location ?? "—"}</td>
+                  <td style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)", textTransform: "capitalize" }}>{r.extra ?? "—"}</td>
                   <td>
                     {r.importance
-                      ? <span style={{ fontWeight: 600, color: "var(--aafc-dark-blue)", fontSize: 10 }}>{IMPORTANCE_LABELS[r.importance] ?? r.importance}</span>
+                      ? <span style={{ fontWeight: 600, color: "var(--aafc-dark-blue)", fontSize: 'var(--fs-2xs)' }}>{IMPORTANCE_LABELS[r.importance] ?? r.importance}</span>
                       : <span style={{ color: "var(--muted-text)" }}>—</span>}
                   </td>
                   <td>
                     {r.classification_status === "needs_review" ? (
-                      <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_COLORS.needs_review }}>Needs review</span>
+                      <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: 700, color: STATUS_COLORS.needs_review }}>Needs review</span>
                     ) : r.classification_status === "classified" ? (
-                      <span style={{ fontSize: 10, fontWeight: 700, color: STATUS_COLORS.classified }}>Classified</span>
+                      <span style={{ fontSize: 'var(--fs-2xs)', fontWeight: 700, color: STATUS_COLORS.classified }}>Classified</span>
                     ) : (
-                      <span style={{ fontSize: 10, color: "var(--muted-text)" }}>{r.classification_status ?? "—"}</span>
+                      <span style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)" }}>{r.classification_status ?? "—"}</span>
                     )}
                   </td>
                   <td style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                     {r.raw_cea && (
                       <button
                         className="btn sm out"
-                        style={{ fontSize: 10, padding: "2px 6px" }}
+                        style={{ fontSize: 'var(--fs-2xs)', padding: "2px 6px" }}
                         onClick={() => setClassifying(r.raw_cea!)}
                       >
                         Classify
@@ -2024,7 +2024,7 @@ function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?
                     {r.raw_cea && (
                       <button
                         className="btn sm out"
-                        style={{ fontSize: 10, padding: "2px 6px" }}
+                        style={{ fontSize: 'var(--fs-2xs)', padding: "2px 6px" }}
                         onClick={() => {
                           if (r.is_hidden) { toggleHide(r.raw_cea!); }
                           else { setHidingId(r.id); setHideNote(r.local_note ?? ""); }
@@ -2044,10 +2044,10 @@ function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?
       {/* CEA import history — collapsed by default */}
       <div style={{ borderTop: "1px solid var(--border)", marginTop: 8 }}>
         <button
-          style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "7px 14px", background: "none", border: "none", cursor: "pointer", fontSize: 11, fontWeight: 700, color: "var(--aafc-dark-blue)", textAlign: "left" }}
+          style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "7px 14px", background: "none", border: "none", cursor: "pointer", fontSize: 'var(--fs-xs)', fontWeight: 700, color: "var(--aafc-dark-blue)", textAlign: "left" }}
           onClick={() => setShowHistory(v => !v)}
         >
-          <span style={{ fontSize: 10 }}>{showHistory ? "▾" : "▸"}</span>
+          <span style={{ fontSize: 'var(--fs-2xs)' }}>{showHistory ? "▾" : "▸"}</span>
           CEA import history
         </button>
         {showHistory && (
@@ -2055,9 +2055,9 @@ function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?
             {batchLoading ? (
               <div className="pw-loading" style={{ padding: "10px 0" }}>Loading…</div>
             ) : batches.length === 0 ? (
-              <div style={{ fontSize: 11, color: "var(--muted-text)" }}>No imports yet.</div>
+              <div style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)" }}>No imports yet.</div>
             ) : (
-              <table className="pw-fac-table" style={{ fontSize: 11 }}>
+              <table className="pw-fac-table" style={{ fontSize: 'var(--fs-xs)' }}>
                 <thead>
                   <tr>
                     <th>File</th><th>Imported at</th><th>Rows</th>
@@ -2100,8 +2100,8 @@ function ActivitiesContent({ yearId, squadronId }: { yearId: string; squadronId?
         return (
           <div className="pw-modal-overlay" role="dialog" aria-label="Hide activity for your squadron" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
             <div style={{ background: "var(--surface)", borderRadius: 8, padding: 16, width: 360, boxShadow: "0 8px 24px rgba(0,0,0,0.2)" }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Hide "{target.activity_name}" for your squadron</div>
-              <p style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8 }}>
+              <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, marginBottom: 6 }}>Hide "{target.activity_name}" for your squadron</div>
+              <p style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)", marginBottom: 8 }}>
                 This only affects what your squadron sees -- the shared activity record is not changed, and other squadrons still see it normally.
               </p>
               <label style={labelSx}>

@@ -75,7 +75,7 @@ export function GuidedYearSetupModal({ years, squadronId, onClose, onDone }: Pro
       <Modal title="Guided year setup" onClose={() => { onDone(); onClose(); }}>
         <div className="form">
           <p><strong>Setup complete for {yearLabel}.</strong></p>
-          <p className="muted" style={{ fontSize: 12 }}>
+          <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
             You can keep refining timing, dates, and placements at any time from the Planning
             Workspace toolbar or by reopening this guided setup.
           </p>
@@ -88,7 +88,7 @@ export function GuidedYearSetupModal({ years, squadronId, onClose, onDone }: Pro
   return (
     <Modal title="Guided year setup" onClose={onClose}>
       <div className="form">
-        <ol style={{ display: "flex", gap: 6, fontSize: 11, listStyle: "none", padding: 0, margin: "0 0 10px" }}>
+        <ol style={{ display: "flex", gap: 6, fontSize: 'var(--fs-xs)', listStyle: "none", padding: 0, margin: "0 0 10px" }}>
           {(["start", "timing", "dates", "placement"] as Step[]).map((s) => (
             <li key={s} style={{
               padding: "2px 8px", borderRadius: 999,
@@ -100,7 +100,7 @@ export function GuidedYearSetupModal({ years, squadronId, onClose, onDone }: Pro
 
         {step === "start" && (
           <>
-            <p className="muted" style={{ fontSize: 12 }}>
+            <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
               Set up a new training year, then optionally apply a timing template, generate
               parade dates, and bulk-place curriculum onto open slots.
             </p>
@@ -213,13 +213,13 @@ function TimingStep({ onSkip, onDone }: { onSkip: () => void; onDone: () => void
 
   return (
     <>
-      <p className="muted" style={{ fontSize: 12 }}>
+      <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
         Apply a unit timing template so new parade nights from a chosen date onward use its
         period structure. Existing parade nights already created are never changed by this step.
       </p>
-      {loadingList && <p style={{ fontSize: 12 }}>Loading timing templates…</p>}
+      {loadingList && <p style={{ fontSize: 'var(--fs-sm)' }}>Loading timing templates…</p>}
       {templates && templates.length === 0 && (
-        <p style={{ fontSize: 12 }}>
+        <p style={{ fontSize: 'var(--fs-sm)' }}>
           No timing templates exist yet for this squadron. Create one from Unit Settings,
           then reopen this step — or skip and continue without one.
         </p>
@@ -240,7 +240,7 @@ function TimingStep({ onSkip, onDone }: { onSkip: () => void; onDone: () => void
           <label htmlFor="ys-timing-reason">Reason (optional)</label>
           <input id="ys-timing-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Applying this year's standard timing" />
           {chosen && (
-            <p style={{ fontSize: 12, marginTop: 4 }}>
+            <p style={{ fontSize: 'var(--fs-sm)', marginTop: 4 }}>
               <strong>{chosen.name}</strong> will become effective from {effectiveFrom} onward.
               Any currently open-ended template will be closed the day before.
             </p>
@@ -248,7 +248,7 @@ function TimingStep({ onSkip, onDone }: { onSkip: () => void; onDone: () => void
         </>
       )}
       {applied && (
-        <p style={{ fontSize: 13, color: "var(--success)", fontWeight: 700 }}>
+        <p style={{ fontSize: 'var(--fs-base)', color: "var(--success)", fontWeight: 700 }}>
           ✓ Applied. {applied.closed_previous_count > 0 && `${applied.closed_previous_count} previously open template(s) closed.`}
         </p>
       )}
@@ -318,7 +318,7 @@ function DatesStep({ yearId, squadronId, alreadyDone, onSkip, onDone }: {
   if (alreadyDone) {
     return (
       <>
-        <p style={{ fontSize: 13, color: "var(--success)", fontWeight: 700 }}>
+        <p style={{ fontSize: 'var(--fs-base)', color: "var(--success)", fontWeight: 700 }}>
           ✓ Parade dates were copied automatically as part of the roll-over.
         </p>
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -330,7 +330,7 @@ function DatesStep({ yearId, squadronId, alreadyDone, onSkip, onDone }: {
 
   return (
     <>
-      <p className="muted" style={{ fontSize: 12 }}>Generate the recurring parade-night dates for this year.</p>
+      <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>Generate the recurring parade-night dates for this year.</p>
       {!result && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -370,7 +370,7 @@ function DatesStep({ yearId, squadronId, alreadyDone, onSkip, onDone }: {
         </>
       )}
       {result && (
-        <p style={{ fontSize: 13, color: "var(--success)", fontWeight: 700 }}>
+        <p style={{ fontSize: 'var(--fs-base)', color: "var(--success)", fontWeight: 700 }}>
           ✓ {result.created} parade date{result.created === 1 ? "" : "s"} generated.
         </p>
       )}
@@ -454,7 +454,7 @@ function PlacementStep({ yearId, onSkip, onDone }: { yearId: string; onSkip: () 
 
   return (
     <>
-      <p className="muted" style={{ fontSize: 12 }}>
+      <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
         Place one curriculum item across several open slots at once — an alternative to
         placing sessions one at a time from the calendar view.
       </p>
@@ -490,11 +490,11 @@ function PlacementStep({ yearId, onSkip, onDone }: { yearId: string; onSkip: () 
           </div>
 
           {slots && slots.length === 0 && (
-            <p style={{ fontSize: 12, marginTop: 8 }}>No open slots for period {period} in this range.</p>
+            <p style={{ fontSize: 'var(--fs-sm)', marginTop: 8 }}>No open slots for period {period} in this range.</p>
           )}
           {slots && slots.length > 0 && (
             <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 6, marginTop: 8 }}>
-              <table style={{ width: "100%", fontSize: 12 }}>
+              <table style={{ width: "100%", fontSize: 'var(--fs-sm)' }}>
                 <thead><tr><th>Include</th><th>Date</th></tr></thead>
                 <tbody>
                   {slots.map((s) => (
@@ -513,7 +513,7 @@ function PlacementStep({ yearId, onSkip, onDone }: { yearId: string; onSkip: () 
         </>
       )}
       {result && (
-        <p style={{ fontSize: 13, fontWeight: 700, color: result.failed > 0 ? "var(--warn, #c97a00)" : "var(--success)" }}>
+        <p style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: result.failed > 0 ? "var(--warn, #c97a00)" : "var(--success)" }}>
           ✓ {result.placed} session{result.placed === 1 ? "" : "s"} placed.
           {result.failed > 0 && ` ${result.failed} could not be placed (a conflict was detected — review them individually in the calendar view).`}
         </p>

@@ -84,9 +84,9 @@ export function Dashboard() {
     <div>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
         <h1>Dashboard</h1>
-        <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
+        <label style={{ fontSize: 'var(--fs-sm)', display: "flex", alignItems: "center", gap: 6 }}>
           Period
-          <select value={win} onChange={e => setWin(e.target.value as Window)} style={{ fontSize: 12, padding: "4px 6px" }}>
+          <select value={win} onChange={e => setWin(e.target.value as Window)} style={{ fontSize: 'var(--fs-sm)', padding: "4px 6px" }}>
             <option value="week">This week</option>
             <option value="term">This term</option>
             <option value="year">This year</option>
@@ -96,7 +96,7 @@ export function Dashboard() {
 
       {scope !== "squadron" && (
         <div style={{ margin: "0 0 12px" }}>
-          <p className="muted" style={{ fontSize: 12 }}>
+          <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
             {viewingSquadron
               ? "Showing the selected squadron's own Dashboard, plus your comparison charts below."
               : "Select a squadron from the nav to see its own tactical Dashboard here."}

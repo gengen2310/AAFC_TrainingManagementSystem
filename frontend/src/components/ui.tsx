@@ -21,7 +21,7 @@ export function SaveIndicator({ status }: { status: SaveStatus }) {
   const { label, color } = map[status];
   return (
     <span
-      style={{ fontSize: 11, fontWeight: 600, marginLeft: 8, color }}
+      style={{ fontSize: 'var(--fs-xs)', fontWeight: 600, marginLeft: 8, color }}
       aria-live="polite"
       aria-atomic="true"
     >
@@ -72,8 +72,8 @@ export function ErrorNote({ error, variant = "load" }: { error: unknown; variant
   return (
     <div className="errnote" role="alert">
       <div style={{ fontWeight: 700 }}>Could not load this data</div>
-      <div style={{ fontSize: 12, opacity: .85, marginTop: 2 }}>{msg}</div>
-      <div style={{ fontSize: 11, marginTop: 4 }}>Check your connection, then reload the page.</div>
+      <div style={{ fontSize: 'var(--fs-sm)', opacity: .85, marginTop: 2 }}>{msg}</div>
+      <div style={{ fontSize: 'var(--fs-xs)', marginTop: 4 }}>Check your connection, then reload the page.</div>
     </div>
   );
 }

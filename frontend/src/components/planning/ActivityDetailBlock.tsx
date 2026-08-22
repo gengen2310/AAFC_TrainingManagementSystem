@@ -226,7 +226,7 @@ function or(v: string | null | undefined): string {
 function Field({ label, value }: { label: string; value: string }) {
   const isNotSet = value === "not set" || value === "not reviewed";
   return (
-    <div style={{ display: "flex", gap: 4, fontSize: 10, lineHeight: 1.4 }}>
+    <div style={{ display: "flex", gap: 4, fontSize: 'var(--fs-2xs)', lineHeight: 1.4 }}>
       <span style={{ color: "var(--muted-text)", minWidth: 80, flexShrink: 0 }}>{label}</span>
       <span style={{ color: isNotSet ? "#aaa" : "var(--text)", fontStyle: isNotSet ? "italic" : undefined }}>
         {value}
@@ -244,7 +244,7 @@ function StatusBadge({ status }: { status: string }) {
   const s = map[status] ?? { label: status, bg: "#f0f0f0", color: "var(--text)" };
   return (
     <span style={{
-      fontSize: 9, fontWeight: 700, textTransform: "uppercase",
+      fontSize: 'var(--fs-3xs)', fontWeight: 700, textTransform: "uppercase",
       background: s.bg, color: s.color, borderRadius: 3, padding: "1px 5px",
       whiteSpace: "nowrap",
     }}>
@@ -291,20 +291,20 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
         aria-label={`Activity: ${a.activity_name}`}
       >
         {/* Name */}
-        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--aafc-dark-blue)", lineHeight: 1.3, marginBottom: 2 }}>
+        <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: "var(--aafc-dark-blue)", lineHeight: 1.3, marginBottom: 2 }}>
           {a.activity_name}
         </div>
 
         {/* Dates */}
-        <div style={{ fontSize: 10, color: "var(--text)", marginBottom: 1 }}>
+        <div style={{ fontSize: 'var(--fs-2xs)', color: "var(--text)", marginBottom: 1 }}>
           {fmtDateRange(a.activity_start_date, a.activity_end_date, a.start_time, a.end_time)}
         </div>
 
         {/* Host · Source */}
-        <div style={{ fontSize: 10, color: "var(--muted-text)", marginBottom: 1 }}>{hostSrc}</div>
+        <div style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)", marginBottom: 1 }}>{hostSrc}</div>
 
         {/* Location */}
-        <div style={{ fontSize: 10, marginBottom: 1 }}>
+        <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: 1 }}>
           <span style={{ color: "var(--muted-text)" }}>Location: </span>
           <span style={{ fontStyle: a.location ? undefined : "italic", color: a.location ? "var(--text)" : "#aaa" }}>
             {or(a.location)}
@@ -313,7 +313,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
 
         {/* Nomination close (if set) */}
         {a.nomination_end_date && (
-          <div style={{ fontSize: 10, color: "var(--muted-text)", marginBottom: 1 }}>
+          <div style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)", marginBottom: 1 }}>
             Nominations close: {fmtShortDate(a.nomination_end_date)}
           </div>
         )}
@@ -321,11 +321,11 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
         {/* Status · Audience · Importance */}
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 4 }}>
           <StatusBadge status={a.classification_status} />
-          <span style={{ fontSize: 9, color: "var(--muted-text)", background: "#f4f8fc", borderRadius: 3, padding: "1px 5px" }}>
+          <span style={{ fontSize: 'var(--fs-3xs)', color: "var(--muted-text)", background: "#f4f8fc", borderRadius: 3, padding: "1px 5px" }}>
             {audienceLabel(a)}
           </span>
           <span style={{
-            fontSize: 9, fontWeight: 700, textTransform: "uppercase",
+            fontSize: 'var(--fs-3xs)', fontWeight: 700, textTransform: "uppercase",
             color: iColor, background: `${iColor}18`, borderRadius: 3, padding: "1px 5px",
           }}>
             {impLabel(a)}
@@ -365,7 +365,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
     >
       {/* Name + status badge */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 4 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--aafc-dark-blue)", lineHeight: 1.3, flex: 1 }}>
+        <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 700, color: "var(--aafc-dark-blue)", lineHeight: 1.3, flex: 1 }}>
           {a.activity_name}
         </div>
         <StatusBadge status={a.classification_status} />
@@ -373,7 +373,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
 
       {/* ID · Type */}
       {(a.activity_id || typeFmt) && (
-        <div style={{ fontSize: 10, color: "var(--muted-text)", marginBottom: 3 }}>
+        <div style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)", marginBottom: 3 }}>
           {a.activity_id && <span>ID: <strong style={{ color: "var(--text)" }}>{a.activity_id}</strong></span>}
           {a.activity_id && typeFmt && <span> · </span>}
           {typeFmt && <span>Type: {typeFmt}</span>}
@@ -381,7 +381,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
       )}
 
       {/* Host / Parent */}
-      <div style={{ fontSize: 10, marginBottom: 3 }}>
+      <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: 3 }}>
         {a.host_unit
           ? <span>Host: <strong>{a.host_unit}</strong></span>
           : null}
@@ -397,20 +397,20 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
       </div>
 
       {/* Dates */}
-      <div style={{ fontSize: 10, marginBottom: 2 }}>
+      <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: 2 }}>
         <span style={{ color: "var(--muted-text)" }}>Activity: </span>
         <span>{dateRange}</span>
       </div>
 
       {/* Nomination dates */}
       {nomRange && (
-        <div style={{ fontSize: 10, color: "var(--muted-text)", marginBottom: 2 }}>
+        <div style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)", marginBottom: 2 }}>
           Nominations: {nomRange}
         </div>
       )}
 
       {/* Location */}
-      <div style={{ fontSize: 10, marginBottom: 4 }}>
+      <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: 4 }}>
         <span style={{ color: "var(--muted-text)" }}>Location: </span>
         <span style={{
           fontStyle: a.location ? undefined : "italic",
@@ -422,7 +422,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
 
       {/* POC (if available) */}
       {a.activity_poc && (
-        <div style={{ fontSize: 10, color: "var(--muted-text)", marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)", marginBottom: 4 }}>
           POC: <span style={{ color: "var(--text)" }}>{a.activity_poc}</span>
         </div>
       )}
@@ -430,18 +430,18 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
       {/* Footer chips */}
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
         <span style={{
-          fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3,
+          fontSize: 'var(--fs-3xs)', fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.3,
           color: iColor, background: `${iColor}18`, borderRadius: 3, padding: "1px 5px",
         }}>
           {impLabel(a)}
         </span>
         <span style={{
-          fontSize: 9, color: "var(--muted-text)", background: "#f4f8fc", borderRadius: 3, padding: "1px 5px",
+          fontSize: 'var(--fs-3xs)', color: "var(--muted-text)", background: "#f4f8fc", borderRadius: 3, padding: "1px 5px",
         }}>
           {audienceLabel(a)}
         </span>
         {(a.host_unit || a.parent_unit) && (
-          <span style={{ fontSize: 9, color: "var(--muted-text)", background: "#f0f0f0", borderRadius: 3, padding: "1px 5px" }}>
+          <span style={{ fontSize: 'var(--fs-3xs)', color: "var(--muted-text)", background: "#f0f0f0", borderRadius: 3, padding: "1px 5px" }}>
             {a.source_label}
           </span>
         )}
@@ -455,7 +455,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
 function sectionHdr(title: string) {
   return (
     <div style={{
-      fontSize: 11, fontWeight: 700, color: "var(--aafc-dark-blue)",
+      fontSize: 'var(--fs-xs)', fontWeight: 700, color: "var(--aafc-dark-blue)",
       borderBottom: "1.5px solid var(--border)", paddingBottom: 4,
       marginBottom: 6, marginTop: 14,
     }}>
@@ -481,17 +481,17 @@ export function ActivityFullDetail({
 
   return (
     <div style={{ padding: "0 2px" }}>
-      <div style={{ fontSize: 15, fontWeight: 700, color: "var(--aafc-dark-blue)", lineHeight: 1.3, marginBottom: 6 }}>
+      <div style={{ fontSize: 'var(--fs-md)', fontWeight: 700, color: "var(--aafc-dark-blue)", lineHeight: 1.3, marginBottom: 6 }}>
         {a.activity_name}
       </div>
 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
         <StatusBadge status={a.classification_status} />
-        <span style={{ fontSize: 9, background: "#f0f0f0", color: "var(--muted-text)", borderRadius: 3, padding: "1px 5px", fontWeight: 700 }}>
+        <span style={{ fontSize: 'var(--fs-3xs)', background: "#f0f0f0", color: "var(--muted-text)", borderRadius: 3, padding: "1px 5px", fontWeight: 700 }}>
           {a.source_label}
         </span>
         {!canEdit && (
-          <span style={{ fontSize: 9, background: "#fff3cd", color: "#856404", borderRadius: 3, padding: "1px 5px", fontWeight: 700 }}>
+          <span style={{ fontSize: 'var(--fs-3xs)', background: "#fff3cd", color: "#856404", borderRadius: 3, padding: "1px 5px", fontWeight: 700 }}>
             READ-ONLY
           </span>
         )}
@@ -536,12 +536,12 @@ export function ActivityFullDetail({
           {sectionHdr("Local squadron context")}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 4 }}>
             {onAddNote && (
-              <button className="btn sm out" style={{ fontSize: 11 }} onClick={onAddNote}>
+              <button className="btn sm out" style={{ fontSize: 'var(--fs-xs)' }} onClick={onAddNote}>
                 Add local note
               </button>
             )}
             {onHide && (
-              <button className="btn sm out" style={{ fontSize: 11 }} onClick={onHide}>
+              <button className="btn sm out" style={{ fontSize: 'var(--fs-xs)' }} onClick={onHide}>
                 Hide from local view
               </button>
             )}
@@ -573,35 +573,35 @@ export function ActivityListRow({
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? e => e.key === "Enter" && onClick() : undefined}
     >
-      <td style={{ fontSize: 10, color: "var(--muted-text)", whiteSpace: "nowrap" }}>{a.activity_id ?? "—"}</td>
-      <td style={{ fontWeight: 700, fontSize: 11, minWidth: 160 }}>{a.activity_name}</td>
-      <td style={{ fontSize: 10 }}>{a.host_unit ?? "—"}</td>
-      <td style={{ fontSize: 10, color: "var(--muted-text)" }}>{a.parent_unit ?? "—"}</td>
-      <td style={{ fontSize: 10, whiteSpace: "nowrap" }}>
+      <td style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)", whiteSpace: "nowrap" }}>{a.activity_id ?? "—"}</td>
+      <td style={{ fontWeight: 700, fontSize: 'var(--fs-xs)', minWidth: 160 }}>{a.activity_name}</td>
+      <td style={{ fontSize: 'var(--fs-2xs)' }}>{a.host_unit ?? "—"}</td>
+      <td style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)" }}>{a.parent_unit ?? "—"}</td>
+      <td style={{ fontSize: 'var(--fs-2xs)', whiteSpace: "nowrap" }}>
         {a.activity_start_date ? fmtShortDate(a.activity_start_date) : "—"}
       </td>
-      <td style={{ fontSize: 10, whiteSpace: "nowrap" }}>
+      <td style={{ fontSize: 'var(--fs-2xs)', whiteSpace: "nowrap" }}>
         {a.activity_end_date && a.activity_end_date !== a.activity_start_date
           ? fmtShortDate(a.activity_end_date) : "—"}
       </td>
-      <td style={{ fontSize: 10, whiteSpace: "nowrap" }}>
+      <td style={{ fontSize: 'var(--fs-2xs)', whiteSpace: "nowrap" }}>
         {a.nomination_end_date ? fmtShortDate(a.nomination_end_date) : "—"}
       </td>
-      <td style={{ fontSize: 10, color: "var(--muted-text)" }}>{a.location ?? "—"}</td>
-      <td style={{ fontSize: 10, color: "var(--muted-text)" }}>{a.activity_poc ?? "—"}</td>
+      <td style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)" }}>{a.location ?? "—"}</td>
+      <td style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)" }}>{a.activity_poc ?? "—"}</td>
       <td>
         <span style={{
-          fontSize: 9, fontWeight: 700, textTransform: "uppercase",
+          fontSize: 'var(--fs-3xs)', fontWeight: 700, textTransform: "uppercase",
           color: impColor(a),
         }}>
           {a.importance ? (IMPORTANCE_LABELS[a.importance] ?? a.importance.replace(/_/g, " ")) : "—"}
         </span>
       </td>
-      <td style={{ fontSize: 10 }}>{audienceLabel(a)}</td>
+      <td style={{ fontSize: 'var(--fs-2xs)' }}>{audienceLabel(a)}</td>
       <td><StatusBadge status={a.classification_status} /></td>
-      <td style={{ fontSize: 10, color: "var(--muted-text)" }}>{typeFmt}</td>
+      <td style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)" }}>{typeFmt}</td>
       <td>
-        <span style={{ fontSize: 9, background: "#f0f0f0", color: "var(--muted-text)", borderRadius: 3, padding: "1px 5px" }}>
+        <span style={{ fontSize: 'var(--fs-3xs)', background: "#f0f0f0", color: "var(--muted-text)", borderRadius: 3, padding: "1px 5px" }}>
           {a.source_label}
         </span>
       </td>

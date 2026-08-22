@@ -13,16 +13,16 @@ export function TwoWeekView({ yearId, facilitators, onDateClick, onSessionClick 
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: "var(--aafc-dark-blue)" }}>
+          <div style={{ fontSize: 'var(--fs-md)', fontWeight: 800, color: "var(--aafc-dark-blue)" }}>
             Next 2 Parade Nights
           </div>
-          <div style={{ fontSize: 11, color: "var(--muted-text)" }}>
+          <div style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)" }}>
             Staff-ready view · suitable for printing or screenshot
           </div>
         </div>
         <button
           className="btn sm out"
-          style={{ marginLeft: "auto", fontSize: 11 }}
+          style={{ marginLeft: "auto", fontSize: 'var(--fs-xs)' }}
           onClick={() => window.print()}
         >
           Print

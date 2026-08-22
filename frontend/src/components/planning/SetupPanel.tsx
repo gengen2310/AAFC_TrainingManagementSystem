@@ -165,7 +165,7 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
             <div className="pw-setup-step-title">Create Training Year</div>
             {step === "year" && (
               <div className="pw-drawer-form" style={{ maxWidth: 480 }}>
-                <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "0 0 12px" }}>
+                <p style={{ fontSize: 'var(--fs-sm)', color: "var(--muted-text)", margin: "0 0 12px" }}>
                   Name the training year. The name will appear on all reports and in the year selector.
                   Use a format like <em>2025–2026 Training Year</em>.
                 </p>
@@ -202,7 +202,7 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
               </div>
             )}
             {step === "dates" && (
-              <div style={{ fontSize: 13, color: "var(--success)", fontWeight: 700 }}>
+              <div style={{ fontSize: 'var(--fs-base)', color: "var(--success)", fontWeight: 700 }}>
                 ✓ Planning year created: {yearName}
               </div>
             )}
@@ -218,7 +218,7 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
               const preview = previewDates(weekday, startDate, endDate, frequency);
               return (
                 <div className="pw-drawer-form" style={{ maxWidth: 520 }}>
-                  <p style={{ fontSize: 12, color: "var(--muted-text)", margin: "0 0 12px" }}>
+                  <p style={{ fontSize: 'var(--fs-sm)', color: "var(--muted-text)", margin: "0 0 12px" }}>
                     Parade nights are the individual training evenings that make up your Training Year.
                     Choose your regular parade weekday, the dates your training runs between, and how often parades occur.
                     A preview of the dates appears below before you confirm.
@@ -245,12 +245,12 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
                       <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
                     </label>
                     <label>
-                      Parade start time <span style={{ fontWeight: 400, color: "var(--muted-text)", fontSize: 11 }}>(optional)</span>
+                      Parade start time <span style={{ fontWeight: 400, color: "var(--muted-text)", fontSize: 'var(--fs-xs)' }}>(optional)</span>
                       <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
                         title="Overrides the squadron default parade start time" />
                     </label>
                     <label>
-                      Parade end time <span style={{ fontWeight: 400, color: "var(--muted-text)", fontSize: 11 }}>(optional)</span>
+                      Parade end time <span style={{ fontWeight: 400, color: "var(--muted-text)", fontSize: 'var(--fs-xs)' }}>(optional)</span>
                       <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
                         title="Overrides the squadron default parade end time" />
                     </label>
@@ -262,13 +262,13 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
 
                   {preview.length > 0 && (
                     <div style={{ marginTop: 12, padding: "10px 14px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8 }}>
-                      <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6 }}>
+                      <div style={{ fontWeight: 700, fontSize: 'var(--fs-sm)', marginBottom: 6 }}>
                         Preview — {preview.length} date{preview.length !== 1 ? "s" : ""}
                         {excludeHolidays && <span style={{ fontWeight: 400, color: "var(--muted-text)", marginLeft: 6 }}>(holidays excluded on save)</span>}
                       </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 10px" }}>
                         {preview.map(d => (
-                          <span key={d} style={{ fontSize: 11, color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{fmtDate(d)}</span>
+                          <span key={d} style={{ fontSize: 'var(--fs-xs)', color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{fmtDate(d)}</span>
                         ))}
                       </div>
                     </div>
@@ -285,13 +285,13 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
             })()}
             {datesResult && (
               <div>
-                <div style={{ fontSize: 13, color: "var(--success)", fontWeight: 700 }}>
+                <div style={{ fontSize: 'var(--fs-base)', color: "var(--success)", fontWeight: 700 }}>
                   ✓ {datesResult.created} parade date{datesResult.created !== 1 ? "s" : ""} generated
                 </div>
                 {datesResult.dates.length > 0 && (
                   <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: "3px 10px" }}>
                     {datesResult.dates.map(d => (
-                      <span key={d} style={{ fontSize: 11, color: "var(--muted-text)", fontVariantNumeric: "tabular-nums" }}>{fmtDate(d)}</span>
+                      <span key={d} style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)", fontVariantNumeric: "tabular-nums" }}>{fmtDate(d)}</span>
                     ))}
                   </div>
                 )}
@@ -304,10 +304,10 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
       {datesResult && (
         <div style={{ marginTop: 20, padding: "14px 18px", background: "var(--surface)", borderRadius: 10, border: "1.5px solid var(--border)" }}>
           <div style={{ fontWeight: 700, marginBottom: 6, color: "var(--success)" }}>Setup complete!</div>
-          <div style={{ fontSize: 13, color: "var(--muted-text)", lineHeight: 1.6 }}>
+          <div style={{ fontSize: 'var(--fs-base)', color: "var(--muted-text)", lineHeight: 1.6 }}>
             Your Training Year and parade nights are ready. The planning calendar will now show.
           </div>
-          <div style={{ fontSize: 12, color: "var(--muted-text)", marginTop: 8, lineHeight: 1.6 }}>
+          <div style={{ fontSize: 'var(--fs-sm)', color: "var(--muted-text)", marginTop: 8, lineHeight: 1.6 }}>
             <strong>What to do next in TMS:</strong> add Facilitators, Training Areas, and Training Classes — then come back here to schedule curriculum sessions.
             Use the <strong>?</strong> button at the top of this page for step-by-step instructions.
           </div>

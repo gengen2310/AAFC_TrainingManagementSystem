@@ -29,7 +29,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div key={t.id} role="status" style={{
             background: t.isError ? "var(--red, #e51937)" : "var(--dark, #002f65)",
             color: "#fff", padding: "9px 16px", borderRadius: 7,
-            fontSize: 13, fontWeight: 600, boxShadow: "0 4px 16px rgba(0,0,0,.22)",
+            fontSize: 'var(--fs-base)', fontWeight: 600, boxShadow: "0 4px 16px rgba(0,0,0,.22)",
             maxWidth: 340, pointerEvents: "auto", animation: "pw-toast-in .18s ease",
           }}>
             {t.text}

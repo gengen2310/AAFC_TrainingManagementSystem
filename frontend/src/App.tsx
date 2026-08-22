@@ -57,13 +57,13 @@ function NotAuthenticated() {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f4f8fc" }}>
       <div style={{ background: "white", border: "1px solid #d1dce8", borderRadius: 10, padding: "36px 40px", maxWidth: 420, textAlign: "center", boxShadow: "0 4px 16px rgba(0,47,101,.10)" }}>
-        <div style={{ fontSize: 32, marginBottom: 16 }}>🔒</div>
-        <h1 style={{ fontSize: 17, fontWeight: 700, color: "#002f65", marginBottom: 10 }}>Session not found</h1>
-        <p style={{ fontSize: 13, color: "#455560", lineHeight: 1.6, marginBottom: 24 }}>
+        <div style={{ fontSize: '2rem', marginBottom: 16 }}>🔒</div>
+        <h1 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, color: "#002f65", marginBottom: 10 }}>Session not found</h1>
+        <p style={{ fontSize: 'var(--fs-base)', color: "#455560", lineHeight: 1.6, marginBottom: 24 }}>
           Please return to the Training Management System and log in first.
           Planning Workspace uses your existing TMS session.
         </p>
-        <a href={TMS_URL} style={{ display: "inline-block", background: "#51b0e3", color: "white", fontWeight: 700, fontSize: 13, padding: "10px 24px", borderRadius: 6, textDecoration: "none" }}>
+        <a href={TMS_URL} style={{ display: "inline-block", background: "#51b0e3", color: "white", fontWeight: 700, fontSize: 'var(--fs-base)', padding: "10px 24px", borderRadius: 6, textDecoration: "none" }}>
           Return to TMS
         </a>
       </div>
@@ -75,7 +75,7 @@ function ModuleLoading() {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f4f8fc" }}>
       <div style={{ textAlign: "center", color: "#455560" }}>
-        <div style={{ fontSize: 14, fontWeight: 600 }}>Loading Planning Workspace…</div>
+        <div style={{ fontSize: 'var(--fs-md)', fontWeight: 600 }}>Loading Planning Workspace…</div>
       </div>
     </div>
   );
@@ -85,16 +85,16 @@ function ModuleError({ onRetry }: { onRetry: () => void }) {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f4f8fc" }}>
       <div style={{ background: "white", border: "1px solid #d1dce8", borderRadius: 10, padding: "36px 40px", maxWidth: 480, textAlign: "center", boxShadow: "0 4px 16px rgba(0,47,101,.10)" }}>
-        <div style={{ fontSize: 32, marginBottom: 16 }}>⚠️</div>
-        <h1 style={{ fontSize: 17, fontWeight: 700, color: "#002f65", marginBottom: 10 }}>Planning Workspace could not load</h1>
-        <p style={{ fontSize: 13, color: "#455560", lineHeight: 1.6, marginBottom: 24 }}>
+        <div style={{ fontSize: '2rem', marginBottom: 16 }}>⚠️</div>
+        <h1 style={{ fontSize: 'var(--fs-xl)', fontWeight: 700, color: "#002f65", marginBottom: 10 }}>Planning Workspace could not load</h1>
+        <p style={{ fontSize: 'var(--fs-base)', color: "#455560", lineHeight: 1.6, marginBottom: 24 }}>
           The system could not load planning data. If this keeps happening, contact support.
         </p>
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-          <button onClick={onRetry} style={{ background: "#51b0e3", color: "white", fontWeight: 700, fontSize: 13, padding: "10px 20px", borderRadius: 6, border: 0, cursor: "pointer" }}>
+          <button onClick={onRetry} style={{ background: "#51b0e3", color: "white", fontWeight: 700, fontSize: 'var(--fs-base)', padding: "10px 20px", borderRadius: 6, border: 0, cursor: "pointer" }}>
             Retry
           </button>
-          <a href={TMS_URL} style={{ display: "inline-block", background: "white", color: "#455560", fontWeight: 600, fontSize: 13, padding: "10px 20px", borderRadius: 6, textDecoration: "none", border: "1px solid #d1dce8" }}>
+          <a href={TMS_URL} style={{ display: "inline-block", background: "white", color: "#455560", fontWeight: 600, fontSize: 'var(--fs-base)', padding: "10px 20px", borderRadius: 6, textDecoration: "none", border: "1px solid #d1dce8" }}>
             Return to TMS
           </a>
         </div>

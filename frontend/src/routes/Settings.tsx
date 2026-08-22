@@ -160,7 +160,7 @@ export function Settings() {
             )}
 
             {!isLoading && filtered.length > 0 && (
-              <table className="cmp-table" style={{ fontSize: 13 }}>
+              <table className="cmp-table" style={{ fontSize: 'var(--fs-base)' }}>
                 <thead>
                   <tr>
                     <th style={{ textAlign: "left", padding: "6px 8px", fontWeight: 700 }}>Name</th>
@@ -179,7 +179,7 @@ export function Settings() {
                     >
                       <td style={{ padding: "6px 8px", fontWeight: 600 }}>{u.display_name}</td>
                       <td style={{ padding: "6px 8px" }}>{roleBadge(u.role)}</td>
-                      <td style={{ padding: "6px 8px", color: "var(--muted-text)", fontSize: 12 }}>
+                      <td style={{ padding: "6px 8px", color: "var(--muted-text)", fontSize: 'var(--fs-sm)' }}>
                         {unitLabel(u)}
                       </td>
                       <td style={{ padding: "6px 8px", textAlign: "right" }}>
@@ -203,7 +203,7 @@ export function Settings() {
             <Card title={`Reset code — ${selected.display_name}`}>
               <p className="muted" style={{ marginBottom: 10 }}>
                 {roleBadge(selected.role)}
-                <span style={{ marginLeft: 8, fontSize: 12 }}>{unitLabel(selected)}</span>
+                <span style={{ marginLeft: 8, fontSize: 'var(--fs-sm)' }}>{unitLabel(selected)}</span>
               </p>
               <div className="form" style={{ maxWidth: 340 }}>
                 <label htmlFor="cc-code">New access code</label>

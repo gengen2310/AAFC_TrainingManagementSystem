@@ -104,7 +104,7 @@ export function ImportFacilitatorsModal({ onClose, onDone }: { onClose: () => vo
   return (
     <Modal title="Import facilitators from CSV" onClose={onClose}>
       <div className="form">
-        <p className="muted" style={{ fontSize: 12 }}>
+        <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
           Upload a CSV with columns: rank, first_name, last_name, type, subject_areas (semicolon-separated), active_status.
           Nothing is written until you confirm.
         </p>
@@ -119,13 +119,13 @@ export function ImportFacilitatorsModal({ onClose, onDone }: { onClose: () => vo
 
         {preview && (
           <>
-            <p style={{ fontSize: 12 }}>
+            <p style={{ fontSize: 'var(--fs-sm)' }}>
               <strong>{preview.to_create}</strong> to add.
               {preview.duplicates > 0 && <> <strong>{preview.duplicates}</strong> possible duplicate{preview.duplicates === 1 ? "" : "s"} — tick to import anyway.</>}
               {preview.errors > 0 && <> <strong>{preview.errors}</strong> row{preview.errors === 1 ? "" : "s"} with an error will be skipped.</>}
             </p>
             <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 6 }}>
-              <table style={{ width: "100%", fontSize: 12 }}>
+              <table style={{ width: "100%", fontSize: 'var(--fs-sm)' }}>
                 <thead><tr><th>Row</th><th>Name</th><th>Status</th><th>Import anyway</th></tr></thead>
                 <tbody>
                   {preview.rows.map((r) => (

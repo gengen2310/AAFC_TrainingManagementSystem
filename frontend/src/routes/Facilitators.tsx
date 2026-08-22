@@ -164,7 +164,7 @@ function TagInput({ tags, onChange, id, placeholder = "Type and press Enter or ,
         </span>
       ))}
       {atMax
-        ? <span className="muted" style={{ fontSize: 11 }}>Maximum {MAX_TAGS} tags reached</span>
+        ? <span className="muted" style={{ fontSize: 'var(--fs-xs)' }}>Maximum {MAX_TAGS} tags reached</span>
         : <input ref={ref} id={id} value={input} onChange={onInputChange} onKeyDown={onKeyDown}
             onBlur={() => { if (input.trim()) commit(input); }}
             placeholder={tags.length === 0 ? placeholder : ""} />}
@@ -221,7 +221,7 @@ function DuplicateProfileCard({ detail }: { detail: DuplicateFacilitatorDetail }
   const updated = detail.existing_updated_at ? new Date(detail.existing_updated_at).toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" }) : "—";
   const areas = detail.existing_subject_areas?.length ? detail.existing_subject_areas.join(", ") : "—";
   return (
-    <div style={{ marginTop: 6, padding: "8px 10px", background: "var(--surface-2, #f0f5fa)", borderRadius: 6, fontSize: 11.5, display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 10px" }}>
+    <div style={{ marginTop: 6, padding: "8px 10px", background: "var(--surface-2, #f0f5fa)", borderRadius: 6, fontSize: 'var(--fs-xs)', display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 10px" }}>
       <span style={{ color: "var(--muted-text)" }}>Rank</span><span style={{ fontWeight: 700 }}>{detail.existing_rank || "—"}</span>
       <span style={{ color: "var(--muted-text)" }}>Type</span><span>{detail.existing_type || "—"}</span>
       <span style={{ color: "var(--muted-text)" }}>Subject areas</span><span>{areas}</span>
@@ -269,7 +269,7 @@ function AddFacModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
         </select>
         <label htmlFor="add-fac-subjects">Subject areas</label>
         <TagInput id="add-fac-subjects" tags={subjects} onChange={setSubjects} />
-        <p className="muted" style={{ fontSize: 11, margin: "0 0 4px" }}>
+        <p className="muted" style={{ fontSize: 'var(--fs-xs)', margin: "0 0 4px" }}>
           Press Enter or comma to add each tag · max {MAX_TAGS} tags · {MAX_LEN} chars each
         </p>
         {err && <div className="err" role="alert">{err}</div>}
@@ -345,7 +345,7 @@ function TagsModal({ fac, onClose, onDone }: { fac: Facilitator; onClose: () => 
       <div className="form">
         <label htmlFor="edit-fac-subjects">Subject areas</label>
         <TagInput id="edit-fac-subjects" tags={subjects} onChange={(t) => { setSubjects(t); setErr(""); }} />
-        <p className="muted" style={{ fontSize: 11, margin: "0 0 4px" }}>
+        <p className="muted" style={{ fontSize: 'var(--fs-xs)', margin: "0 0 4px" }}>
           Press Enter or comma to add · Backspace removes last tag · max {MAX_TAGS} tags
         </p>
         {err && <div className="errnote" role="alert">{err}</div>}

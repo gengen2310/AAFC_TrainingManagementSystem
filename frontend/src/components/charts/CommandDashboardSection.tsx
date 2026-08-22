@@ -23,7 +23,7 @@ export function CommandDashboardSection({ window: win, wingId }: { window: "week
   return (
     <>
       <Card title={`Command Dashboard — ${d.scope === "wing" ? "Wing" : "National"} (${d.period.label})`}>
-        <p className="muted" style={{ fontSize: 11, margin: 0 }}>
+        <p className="muted" style={{ fontSize: 'var(--fs-xs)', margin: 0 }}>
           {d.units_in_scope} unit(s) in scope · {d.data_confidence.units_reporting} reporting this period
           {d.data_confidence.completeness_pct != null && ` (${d.data_confidence.completeness_pct}% complete)`}
         </p>

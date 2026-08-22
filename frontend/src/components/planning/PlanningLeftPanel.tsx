@@ -113,11 +113,11 @@ export function PlanningLeftPanel({
           value={searchText ?? ""}
           onChange={e => onSearchTextChange?.(e.target.value)}
           aria-label="Search training periods by title or curriculum code"
-          style={{ width: "100%", boxSizing: "border-box", padding: "5px 8px", fontSize: 12, border: "1px solid var(--border)", borderRadius: 5, background: "var(--surface)", color: "var(--text)", outline: "none" }}
+          style={{ width: "100%", boxSizing: "border-box", padding: "5px 8px", fontSize: 'var(--fs-sm)', border: "1px solid var(--border)", borderRadius: 5, background: "var(--surface)", color: "var(--text)", outline: "none" }}
         />
         {!!searchText && (
           <button
-            style={{ marginTop: 4, fontSize: 11, background: "none", border: "none", cursor: "pointer", color: "var(--muted-text)", padding: 0 }}
+            style={{ marginTop: 4, fontSize: 'var(--fs-xs)', background: "none", border: "none", cursor: "pointer", color: "var(--muted-text)", padding: 0 }}
             onClick={() => onSearchTextChange?.("")}
             aria-label="Clear search"
           >
@@ -210,7 +210,7 @@ export function PlanningLeftPanel({
                 {stageOrder.map(stage => (
                   <span key={stage}>
                     {multiStage && (
-                      <span style={{ display: "block", fontSize: 9, fontWeight: 700, letterSpacing: ".08em", color: "var(--muted-text)", textTransform: "uppercase", marginTop: 5, marginBottom: 2 }}>
+                      <span style={{ display: "block", fontSize: 'var(--fs-3xs)', fontWeight: 700, letterSpacing: ".08em", color: "var(--muted-text)", textTransform: "uppercase", marginTop: 5, marginBottom: 2 }}>
                         {stage}
                       </span>
                     )}
@@ -305,7 +305,7 @@ export function PlanningLeftPanel({
 
         {unreviewed.length > 0 && (
           <>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--aafc-royal-blue)", padding: "4px 2px 2px" }}>
+            <div style={{ fontSize: 'var(--fs-2xs)', fontWeight: 700, color: "var(--aafc-royal-blue)", padding: "4px 2px 2px" }}>
               UNREVIEWED WING EVENTS
             </div>
             {unreviewed.slice(0, 5).map((e) => (
@@ -319,7 +319,7 @@ export function PlanningLeftPanel({
               >
                 <span className="pw-backlog-dot" style={{ background: "#004B8D" }} />
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700 }}>{e.title}</div>
+                  <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700 }}>{e.title}</div>
                   <div className="pw-backlog-code">{e.start_date} · {e.days_until}d away</div>
                 </div>
               </div>
@@ -329,7 +329,7 @@ export function PlanningLeftPanel({
 
         {prepGaps.length > 0 && (
           <>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--warning)", padding: "4px 2px 2px" }}>
+            <div style={{ fontSize: 'var(--fs-2xs)', fontWeight: 700, color: "var(--warning)", padding: "4px 2px 2px" }}>
               PREP GAPS
             </div>
             {prepGaps.slice(0, 5).map((g) => (
@@ -343,7 +343,7 @@ export function PlanningLeftPanel({
               >
                 <span className="pw-backlog-dot" style={{ background: "var(--warning)" }} />
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700 }}>{g.event_name}</div>
+                  <div style={{ fontSize: 'var(--fs-xs)', fontWeight: 700 }}>{g.event_name}</div>
                   <div className="pw-backlog-code">{g.start_date} · no prep planned</div>
                 </div>
               </div>
@@ -353,14 +353,14 @@ export function PlanningLeftPanel({
 
         {allUnscheduled.length > 0 && (
           <>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--muted-text)", padding: "4px 2px 2px" }}>
+            <div style={{ fontSize: 'var(--fs-2xs)', fontWeight: 700, color: "var(--muted-text)", padding: "4px 2px 2px" }}>
               UNSCHEDULED CURRICULUM
             </div>
             {trainingClasses.length > 1 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginBottom: 4 }}>
                 <button
                   className={`pw-chip${backlogClassFilter === null ? " on" : ""}`}
-                  style={{ fontSize: 10, padding: "1px 6px" }}
+                  style={{ fontSize: 'var(--fs-2xs)', padding: "1px 6px" }}
                   onClick={() => setBacklogClassFilter(null)}
                   aria-pressed={backlogClassFilter === null}
                 >
@@ -370,7 +370,7 @@ export function PlanningLeftPanel({
                   <button
                     key={tc.training_class_id}
                     className={`pw-chip${backlogClassFilter === tc.training_class_id ? " on" : ""}`}
-                    style={{ fontSize: 10, padding: "1px 6px" }}
+                    style={{ fontSize: 'var(--fs-2xs)', padding: "1px 6px" }}
                     onClick={() => setBacklogClassFilter(
                       backlogClassFilter === tc.training_class_id ? null : tc.training_class_id
                     )}
@@ -393,17 +393,17 @@ export function PlanningLeftPanel({
                 <span className="pw-backlog-dot" style={{ background: "var(--aafc-gunmetal)" }} />
                 <div>
                   <div className="pw-backlog-code">{u.code}</div>
-                  <div style={{ fontSize: 11 }}>{u.title}</div>
+                  <div style={{ fontSize: 'var(--fs-xs)' }}>{u.title}</div>
                 </div>
               </div>
             ))}
             {unscheduled.length === 0 && backlogClassFilter && (
-              <div style={{ fontSize: 10, color: "var(--muted-text)", padding: "2px 4px" }}>
+              <div style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)", padding: "2px 4px" }}>
                 No unscheduled curriculum for this class
               </div>
             )}
             {unscheduled.length > 5 && (
-              <div style={{ fontSize: 10, color: "var(--muted-text)", padding: "2px 4px" }}>
+              <div style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)", padding: "2px 4px" }}>
                 +{unscheduled.length - 5} more — open Mission Backlog below
               </div>
             )}
@@ -412,14 +412,14 @@ export function PlanningLeftPanel({
 
         {activeConflicts.length > 0 && (
           <>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "var(--aafc-red)", padding: "4px 2px 2px" }}>
+            <div style={{ fontSize: 'var(--fs-2xs)', fontWeight: 700, color: "var(--aafc-red)", padding: "4px 2px 2px" }}>
               CONFLICTS
             </div>
             {activeConflicts.slice(0, 5).map((c) => (
               <div key={c.conflict_id} className="pw-backlog-item">
                 <span className="pw-backlog-dot" style={{ background: "var(--aafc-red)" }} />
                 <div>
-                  <div style={{ fontSize: 11 }}>{c.message}</div>
+                  <div style={{ fontSize: 'var(--fs-xs)' }}>{c.message}</div>
                   {c.parade_date && <div className="pw-backlog-code">{c.parade_date}</div>}
                 </div>
               </div>
@@ -428,7 +428,7 @@ export function PlanningLeftPanel({
         )}
 
         {totalBacklog === 0 && (
-          <div style={{ fontSize: 11, color: "var(--muted-text)", padding: "6px 2px" }}>
+          <div style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)", padding: "6px 2px" }}>
             No outstanding items
           </div>
         )}

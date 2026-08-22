@@ -14,13 +14,13 @@ const cardSx: CSSProperties = {
   background: "var(--surface)", border: "1px solid var(--border)",
   borderRadius: "var(--radius, 10px)", padding: "14px 16px", marginBottom: 12,
 };
-const titleSx: CSSProperties = { fontSize: 13, fontWeight: 700, color: "var(--text)", marginBottom: 2 };
-const expSx: CSSProperties = { fontSize: 11, color: "var(--muted-text)", marginBottom: 10 };
+const titleSx: CSSProperties = { fontSize: 'var(--fs-base)', fontWeight: 700, color: "var(--text)", marginBottom: 2 };
+const expSx: CSSProperties = { fontSize: 'var(--fs-xs)', color: "var(--muted-text)", marginBottom: 10 };
 const insightSx: CSSProperties = {
-  fontSize: 11, color: "var(--aafc-dark-blue)", background: "var(--aafc-blue, #51B0E3)1a",
+  fontSize: 'var(--fs-xs)', color: "var(--aafc-dark-blue)", background: "var(--aafc-blue, #51B0E3)1a",
   border: "1px solid var(--border)", borderRadius: 6, padding: "6px 10px", marginTop: 10,
 };
-const emptySx: CSSProperties = { fontSize: 12, color: "var(--muted-text)", padding: "12px 4px" };
+const emptySx: CSSProperties = { fontSize: 'var(--fs-sm)', color: "var(--muted-text)", padding: "12px 4px" };
 
 function EmptyState({ chart }: { chart: DashboardChart }) {
   return <div style={emptySx}>{chart.empty_state ?? "No data available."}</div>;
@@ -81,13 +81,13 @@ export function HBarChart({ chart }: { chart: DashboardChart }) {
           : String(v);
         return (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <div style={{ minWidth: 110, maxWidth: 140, fontSize: 11, fontStyle: isGap ? "italic" : undefined, color: isGap ? "var(--muted-text)" : undefined, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={labelOf(r)}>
+            <div style={{ minWidth: 110, maxWidth: 140, fontSize: 'var(--fs-xs)', fontStyle: isGap ? "italic" : undefined, color: isGap ? "var(--muted-text)" : undefined, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={labelOf(r)}>
               {isGap && "ⓘ "}{labelOf(r)}
             </div>
             <div style={{ flex: 1, background: "var(--background, #f1f5f9)", borderRadius: 3, height: 10, border: isGap ? "1px dashed var(--muted-text)" : undefined }}>
               <div style={{ width: `${w}%`, height: "100%", background: isGap ? "var(--muted-text, #8a93a6)" : colorFor(r), borderRadius: 3, transition: "width .3s" }} />
             </div>
-            <div style={{ minWidth: 52, textAlign: "right", fontSize: 11, color: "var(--muted-text)" }}>{display}</div>
+            <div style={{ minWidth: 52, textAlign: "right", fontSize: 'var(--fs-xs)', color: "var(--muted-text)" }}>{display}</div>
           </div>
         );
       })}
@@ -118,17 +118,17 @@ export function DonutChart({ chart }: { chart: DashboardChart }) {
           display: "flex", alignItems: "center", justifyContent: "center",
         }}
       >
-        <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700 }}>
+        <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 'var(--fs-md)', fontWeight: 700 }}>
           {total}
         </div>
       </div>
       <div style={{ flex: 1 }}>
         {rows.filter(r => numOf(r, "count") > 0).map((r, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, marginBottom: 3 }}>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 'var(--fs-xs)', marginBottom: 3 }}>
             <span style={{ width: 10, height: 10, borderRadius: "50%", background: colorFor(r), flexShrink: 0 }} />
             <span>{String(r.label ?? r.status ?? "—")}</span>
             <span style={{ marginLeft: "auto", color: "var(--muted-text)" }}>
-              {numOf(r, "count")} <span style={{ fontSize: 9 }}>({Math.round((numOf(r, "count") / total) * 100)}%)</span>
+              {numOf(r, "count")} <span style={{ fontSize: 'var(--fs-3xs)' }}>({Math.round((numOf(r, "count") / total) * 100)}%)</span>
             </span>
           </div>
         ))}
@@ -172,11 +172,11 @@ export function LineChart({ chart }: { chart: DashboardChart }) {
             line's colour alone doesn't tell a reader what "80" or "60" means. */}
         {th?.green != null && <>
           <line x1={PAD} x2={W - PAD} y1={yFor(th.green)} y2={yFor(th.green)} stroke="var(--success, #1A7F4B)" strokeDasharray="3,3" strokeWidth={1} />
-          <text x={W - PAD} y={yFor(th.green) - 3} textAnchor="end" fontSize={8} fill="var(--success, #1A7F4B)">Target {th.green}%</text>
+          <text x={W - PAD} y={yFor(th.green) - 3} textAnchor="end" fontSize="0.5rem" fill="var(--success, #1A7F4B)">Target {th.green}%</text>
         </>}
         {th?.amber != null && <>
           <line x1={PAD} x2={W - PAD} y1={yFor(th.amber)} y2={yFor(th.amber)} stroke="var(--warning, #C97A00)" strokeDasharray="3,3" strokeWidth={1} />
-          <text x={W - PAD} y={yFor(th.amber) - 3} textAnchor="end" fontSize={8} fill="var(--warning, #C97A00)">Warning {th.amber}%</text>
+          <text x={W - PAD} y={yFor(th.amber) - 3} textAnchor="end" fontSize="0.5rem" fill="var(--warning, #C97A00)">Warning {th.amber}%</text>
         </>}
         {segments.map((pts, i) => <polyline key={i} points={pts} fill="none" stroke="var(--aafc-royal-blue, #004B8D)" strokeWidth={2} />)}
         {values.map((v, i) => v == null ? null : <circle key={i} cx={PAD + i * stepX} cy={yFor(v)} r={2.5} fill="var(--aafc-royal-blue, #004B8D)" />)}
@@ -194,7 +194,7 @@ export function StackedBarHChart({ chart }: { chart: DashboardChart }) {
     <div>
       <div style={{ display: "flex", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
         {series.map(s => (
-          <span key={s.key} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
+          <span key={s.key} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 'var(--fs-2xs)' }}>
             <span style={{ width: 9, height: 9, background: s.color ?? "var(--aafc-royal-blue)", borderRadius: 2 }} />
             {s.label}
           </span>
@@ -204,7 +204,7 @@ export function StackedBarHChart({ chart }: { chart: DashboardChart }) {
         const total = series.reduce((s, sr) => s + numOf(r, sr.key), 0) || 1;
         return (
           <div key={i} style={{ marginBottom: 6 }}>
-            <div style={{ fontSize: 10, color: "var(--muted-text)", marginBottom: 2 }}>{labelOf(r)}</div>
+            <div style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)", marginBottom: 2 }}>{labelOf(r)}</div>
             <div style={{ display: "flex", height: 12, borderRadius: 3, overflow: "hidden", background: "var(--background)" }}>
               {series.map(s => {
                 const v = numOf(r, s.key);
@@ -229,7 +229,7 @@ export function GroupedBarChart({ chart }: { chart: DashboardChart }) {
     <div>
       <div style={{ display: "flex", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
         {series.map(s => (
-          <span key={s.key} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10 }}>
+          <span key={s.key} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 'var(--fs-2xs)' }}>
             <span style={{ width: 9, height: 9, background: s.color ?? "var(--aafc-royal-blue)", borderRadius: 2 }} />
             {s.label}
           </span>
@@ -245,7 +245,7 @@ export function GroupedBarChart({ chart }: { chart: DashboardChart }) {
                 return <div key={s.key} title={`${s.label}: ${v}`} style={{ width: 10, height: h, background: s.color ?? "var(--aafc-royal-blue)", borderRadius: "2px 2px 0 0" }} />;
               })}
             </div>
-            <div style={{ fontSize: 9, color: "var(--muted-text)", marginTop: 3, maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: 'var(--fs-3xs)', color: "var(--muted-text)", marginTop: 3, maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {labelOf(r)}
             </div>
           </div>
@@ -263,17 +263,17 @@ export function HeatmapChart({ chart }: { chart: DashboardChart }) {
   const riskColor = (risk: string) => risk === "ok" ? "#d1fae5" : risk === "warn" ? "#fef3c7" : risk === "critical" ? "#fee2e2" : "#f1f5f9";
   return (
     <div style={{ overflowX: "auto" }}>
-      <table style={{ fontSize: 10, borderCollapse: "separate", borderSpacing: 3 }}>
+      <table style={{ fontSize: 'var(--fs-2xs)', borderCollapse: "separate", borderSpacing: 3 }}>
         <thead>
           <tr>
             <th></th>
-            {cols.map((c, i) => <th key={i} style={{ fontSize: 9, color: "var(--muted-text)", padding: "2px 4px", whiteSpace: "nowrap" }}>{c}</th>)}
+            {cols.map((c, i) => <th key={i} style={{ fontSize: 'var(--fs-3xs)', color: "var(--muted-text)", padding: "2px 4px", whiteSpace: "nowrap" }}>{c}</th>)}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, i) => (
             <tr key={i}>
-              <td style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", whiteSpace: "nowrap" }}>{row.label}</td>
+              <td style={{ fontSize: 'var(--fs-2xs)', fontWeight: 700, padding: "3px 8px", whiteSpace: "nowrap" }}>{row.label}</td>
               {row.cells.map((c, j) => (
                 <td key={j} title={`${row.label} — ${c.label}: ${c.count}`} style={{ width: 30, height: 22, textAlign: "center", background: riskColor(c.risk), borderRadius: 3 }}>
                   {c.count || 0}
@@ -307,9 +307,9 @@ export function ReadinessCard({ chart }: { chart: DashboardChart }) {
     const dateLabel = new Date(d.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
     return (
       <div>
-        <div style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8 }}>{dateLabel}{d.term ? ` · Term ${d.term}` : ""}</div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--muted-text)" }}>Not planned</div>
-        <div style={{ fontSize: 11, color: "var(--muted-text)", marginTop: 4 }}>No sessions scheduled for this parade night yet.</div>
+        <div style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)", marginBottom: 8 }}>{dateLabel}{d.term ? ` · Term ${d.term}` : ""}</div>
+        <div style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: "var(--muted-text)" }}>Not planned</div>
+        <div style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)", marginTop: 4 }}>No sessions scheduled for this parade night yet.</div>
       </div>
     );
   }
@@ -318,21 +318,21 @@ export function ReadinessCard({ chart }: { chart: DashboardChart }) {
   const dateLabel = new Date(d.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
   return (
     <div>
-      <div style={{ fontSize: 11, color: "var(--muted-text)", marginBottom: 8 }}>{dateLabel}{d.term ? ` · Term ${d.term}` : ""}</div>
+      <div style={{ fontSize: 'var(--fs-xs)', color: "var(--muted-text)", marginBottom: 8 }}>{dateLabel}{d.term ? ` · Term ${d.term}` : ""}</div>
       <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
         <div style={{
           width: 68, height: 68, borderRadius: "50%", flexShrink: 0,
           background: `conic-gradient(${col} ${pct}%, var(--background, #e5e7eb) 0)`,
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
-          <div style={{ width: 50, height: 50, borderRadius: "50%", background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, color: col }}>
+          <div style={{ width: 50, height: 50, borderRadius: "50%", background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 'var(--fs-md)', fontWeight: 700, color: col }}>
             {pct}%
           </div>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "var(--muted-text)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>Session Plan</div>
+          <div style={{ fontSize: 'var(--fs-2xs)', fontWeight: 800, color: "var(--muted-text)", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6 }}>Session Plan</div>
           {d.sessions.map(s => (
-            <div key={s.id} style={{ display: "flex", gap: 6, fontSize: 11, marginBottom: 3 }}>
+            <div key={s.id} style={{ display: "flex", gap: 6, fontSize: 'var(--fs-xs)', marginBottom: 3 }}>
               <span style={{ minWidth: 40, color: "var(--muted-text)" }}>P{s.period ?? "—"}</span>
               <span style={{ flex: 1, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.title ?? "Unassigned"}</span>
               <span style={{ color: s.facilitator ? "var(--muted-text)" : "var(--aafc-red)" }}>{s.facilitator ?? "Unstaffed"}</span>
@@ -341,7 +341,7 @@ export function ReadinessCard({ chart }: { chart: DashboardChart }) {
           {d.issues.length > 0 && (
             <div style={{ marginTop: 8 }}>
               {d.issues.map((iss, i) => (
-                <div key={i} style={{ fontSize: 11, color: iss.severity === "high" ? "var(--aafc-red)" : "var(--warning, #C97A00)" }}>
+                <div key={i} style={{ fontSize: 'var(--fs-xs)', color: iss.severity === "high" ? "var(--aafc-red)" : "var(--warning, #C97A00)" }}>
                   ⚠ {iss.message}
                 </div>
               ))}
@@ -374,22 +374,22 @@ export function ReadinessGrid({ chart }: { chart: DashboardChart }) {
         if (notPlanned) {
           return (
             <div key={i} style={{ border: "1.5px solid var(--border)", borderRadius: 8, padding: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 800 }}>{dateLabel}</div>
-              <div style={{ fontSize: 10, color: "var(--muted-text)", fontWeight: 700, marginTop: 5 }}>Not planned</div>
-              <div style={{ fontSize: 9, color: "var(--muted-text)" }}>No sessions scheduled</div>
+              <div style={{ fontSize: 'var(--fs-2xs)', fontWeight: 800 }}>{dateLabel}</div>
+              <div style={{ fontSize: 'var(--fs-2xs)', color: "var(--muted-text)", fontWeight: 700, marginTop: 5 }}>Not planned</div>
+              <div style={{ fontSize: 'var(--fs-3xs)', color: "var(--muted-text)" }}>No sessions scheduled</div>
             </div>
           );
         }
         const col = r.readiness_pct >= 80 ? "var(--success, #1A7F4B)" : r.readiness_pct >= 60 ? "var(--warning, #C97A00)" : "var(--aafc-red, #E51937)";
         return (
           <div key={i} style={{ border: "1.5px solid var(--border)", borderRadius: 8, padding: 8 }}>
-            <div style={{ fontSize: 10, fontWeight: 800 }}>{dateLabel}</div>
+            <div style={{ fontSize: 'var(--fs-2xs)', fontWeight: 800 }}>{dateLabel}</div>
             <div style={{ height: 4, background: "var(--background)", borderRadius: 2, margin: "5px 0" }}>
               <div style={{ width: `${r.readiness_pct}%`, height: "100%", background: col, borderRadius: 2 }} />
             </div>
-            <div style={{ fontSize: 10, color: col, fontWeight: 700 }}>{r.readiness_pct}% ready</div>
-            {r.unstaffed > 0 && <div style={{ fontSize: 9, color: "var(--warning, #C97A00)", fontWeight: 700 }}>⚠ {r.unstaffed} unstaffed</div>}
-            <div style={{ fontSize: 9, color: "var(--muted-text)" }}>{r.sessions_total} sessions</div>
+            <div style={{ fontSize: 'var(--fs-2xs)', color: col, fontWeight: 700 }}>{r.readiness_pct}% ready</div>
+            {r.unstaffed > 0 && <div style={{ fontSize: 'var(--fs-3xs)', color: "var(--warning, #C97A00)", fontWeight: 700 }}>⚠ {r.unstaffed} unstaffed</div>}
+            <div style={{ fontSize: 'var(--fs-3xs)', color: "var(--muted-text)" }}>{r.sessions_total} sessions</div>
           </div>
         );
       })}
@@ -407,9 +407,9 @@ function MatrixCellDot({ cell }: { cell: MatrixCell }) {
   const col = MATRIX_STATUS_COLOR[cell.status] ?? MATRIX_STATUS_COLOR.no_data;
   const title = cell.exception_reason ?? (cell.numerator != null && cell.denominator != null ? `${cell.numerator}/${cell.denominator}` : "No data");
   return (
-    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11, color: col, fontWeight: 700 }}>
+    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 'var(--fs-xs)', color: col, fontWeight: 700 }}>
       {MATRIX_STATUS_ICON[cell.status] ?? "—"}
-      {cell.numerator != null && cell.denominator != null && <span style={{ fontWeight: 400, fontSize: 10 }}>{cell.numerator}/{cell.denominator}</span>}
+      {cell.numerator != null && cell.denominator != null && <span style={{ fontWeight: 400, fontSize: 'var(--fs-2xs)' }}>{cell.numerator}/{cell.denominator}</span>}
     </span>
   );
 }
@@ -425,14 +425,14 @@ export function ReadinessMatrixChart({ chart }: { chart: DashboardChart }) {
   if (!rows.length) return <EmptyState chart={chart} />;
   return (
     <div style={{ overflowX: "auto" }}>
-      <table style={{ fontSize: 11, width: "100%", borderCollapse: "collapse" }}>
+      <table style={{ fontSize: 'var(--fs-xs)', width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr style={{ borderBottom: "1px solid var(--border)" }}>
-            <th style={{ textAlign: "left", padding: "4px 8px", fontSize: 10, color: "var(--muted-text)" }}>Unit</th>
-            <th style={{ padding: "4px 8px", fontSize: 10, color: "var(--muted-text)" }}>Curriculum</th>
-            <th style={{ padding: "4px 8px", fontSize: 10, color: "var(--muted-text)" }}>Facilitator</th>
-            <th style={{ padding: "4px 8px", fontSize: 10, color: "var(--muted-text)" }}>Facility</th>
-            <th style={{ padding: "4px 8px", fontSize: 10, color: "var(--muted-text)" }}>Overall</th>
+            <th style={{ textAlign: "left", padding: "4px 8px", fontSize: 'var(--fs-2xs)', color: "var(--muted-text)" }}>Unit</th>
+            <th style={{ padding: "4px 8px", fontSize: 'var(--fs-2xs)', color: "var(--muted-text)" }}>Curriculum</th>
+            <th style={{ padding: "4px 8px", fontSize: 'var(--fs-2xs)', color: "var(--muted-text)" }}>Facilitator</th>
+            <th style={{ padding: "4px 8px", fontSize: 'var(--fs-2xs)', color: "var(--muted-text)" }}>Facility</th>
+            <th style={{ padding: "4px 8px", fontSize: 'var(--fs-2xs)', color: "var(--muted-text)" }}>Overall</th>
           </tr>
         </thead>
         <tbody>
@@ -461,7 +461,7 @@ export function RiskTimelineChart({ chart }: { chart: DashboardChart }) {
   const high = items.filter(i => i.severity === "high");
   const rest = items.filter(i => i.severity !== "high");
   const row = (i: (typeof items)[number], idx: number) => (
-    <div key={idx} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: 11, padding: "3px 0", borderBottom: "1px solid var(--border-light, var(--border))" }}>
+    <div key={idx} style={{ display: "flex", gap: 8, alignItems: "baseline", fontSize: 'var(--fs-xs)', padding: "3px 0", borderBottom: "1px solid var(--border-light, var(--border))" }}>
       <span style={{ color: i.severity === "high" ? "var(--aafc-red, #E51937)" : "var(--warning, #C97A00)", fontWeight: 700 }}>
         {i.severity === "high" ? "▲" : "•"}
       </span>
@@ -473,13 +473,13 @@ export function RiskTimelineChart({ chart }: { chart: DashboardChart }) {
     <div>
       {high.length > 0 && (
         <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "var(--aafc-red, #E51937)", marginBottom: 4 }}>WITHIN 2 WEEKS ({high.length})</div>
+          <div style={{ fontSize: 'var(--fs-2xs)', fontWeight: 800, color: "var(--aafc-red, #E51937)", marginBottom: 4 }}>WITHIN 2 WEEKS ({high.length})</div>
           {high.slice(0, 25).map(row)}
         </div>
       )}
       {rest.length > 0 && (
         <div>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "var(--muted-text)", marginBottom: 4 }}>LATER IN THE 8-WEEK WINDOW ({rest.length})</div>
+          <div style={{ fontSize: 'var(--fs-2xs)', fontWeight: 800, color: "var(--muted-text)", marginBottom: 4 }}>LATER IN THE 8-WEEK WINDOW ({rest.length})</div>
           {rest.slice(0, 25).map(row)}
         </div>
       )}
@@ -499,12 +499,12 @@ export function ChartInfoToggle({ chart }: { chart: DashboardChart }) {
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
         aria-expanded={open}
-        style={{ background: "none", border: "none", padding: 0, fontSize: 10, color: "var(--aafc-royal-blue, #004B8D)", cursor: "pointer", textDecoration: "underline" }}
+        style={{ background: "none", border: "none", padding: 0, fontSize: 'var(--fs-2xs)', color: "var(--aafc-royal-blue, #004B8D)", cursor: "pointer", textDecoration: "underline" }}
       >
         {open ? "Hide" : "Purpose, measure & action"}
       </button>
       {open && (
-        <dl style={{ fontSize: 11, margin: "6px 0 0", color: "var(--muted-text)" }}>
+        <dl style={{ fontSize: 'var(--fs-xs)', margin: "6px 0 0", color: "var(--muted-text)" }}>
           {chart.purpose && <><dt style={{ fontWeight: 700, color: "var(--text)" }}>Purpose</dt><dd style={{ margin: "0 0 6px" }}>{chart.purpose}</dd></>}
           {chart.measure && <><dt style={{ fontWeight: 700, color: "var(--text)" }}>Measure</dt><dd style={{ margin: "0 0 6px" }}>{chart.measure}</dd></>}
           {chart.action && <><dt style={{ fontWeight: 700, color: "var(--text)" }}>Action</dt><dd style={{ margin: 0 }}>{chart.action}</dd></>}

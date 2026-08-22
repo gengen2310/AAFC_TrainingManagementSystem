@@ -86,7 +86,7 @@ export function LoginPage() {
   return (
     <div className="login-wrap">
       <main id="main" className="login-box">
-        <h1 style={{ textAlign: "center", color: "var(--aafc-dark-blue)", fontSize: 18 }}>
+        <h1 style={{ textAlign: "center", color: "var(--aafc-dark-blue)", fontSize: 'var(--fs-xl)' }}>
           AAFC Training<br />Management System
         </h1>
         <div className="login-rule" />
