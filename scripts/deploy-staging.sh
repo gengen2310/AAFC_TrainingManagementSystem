@@ -865,10 +865,10 @@ info "Backend: new=$BACKEND_NEW_DEPLOY_ID"
 
 echo
 echo "  ── Backend gate 3/4: database revision ──────────────────────────────"
-# Railway's SUCCESS status fires on build completion, not LB cutover. Allow
-# 20s for the new instance to come up and start serving before hitting the
-# authenticated /api/system/migrations endpoint (avoids transient 502).
-sleep 20
+# Railway's SUCCESS fires on build completion. The container then runs
+# `alembic upgrade head` before gunicorn starts — on multi-step migrations
+# this can take longer than a fixed sleep, causing a transient 502 on the
+# first poll attempt. Retry with a polling loop instead of a one-shot call.
 # In rescue mode no session was established during preflight (staging was
 # down). Now that the backend is healthy, log in for the first time.
 if [ "${STAGING_RESCUE:-0}" = "1" ]; then
@@ -876,9 +876,19 @@ if [ "${STAGING_RESCUE:-0}" = "1" ]; then
   staging_login
   staging_verify_session "Backend gate 3 (rescue login)"
 fi
-staging_api_call GET "/api/system/migrations"
+_mig_elapsed=0
+_mig_timeout=120
+while [ "$_mig_elapsed" -lt "$_mig_timeout" ]; do
+  staging_api_call GET "/api/system/migrations"
+  if [ "$STAGING_API_CODE" = "200" ]; then
+    break
+  fi
+  info "/api/system/migrations → HTTP $STAGING_API_CODE (${_mig_elapsed}s elapsed, backend still starting) — retrying in 15s…"
+  sleep 15
+  _mig_elapsed=$((_mig_elapsed + 15))
+done
 [ "$STAGING_API_CODE" = "200" ] \
-  || die "/api/system/migrations → $STAGING_API_CODE — HARD FAIL."
+  || die "/api/system/migrations → $STAGING_API_CODE after ${_mig_timeout}s — HARD FAIL."
 DB_REVISION=$(echo "$STAGING_API_BODY" | python3 -c "
 import json,sys; print(json.load(sys.stdin).get('revision','MISSING'))" 2>/dev/null || echo "ERROR")
 IS_SINGLE=$(echo "$STAGING_API_BODY" | python3 -c "
@@ -886,7 +896,7 @@ import json,sys; print(json.load(sys.stdin).get('is_single_head',False))" 2>/dev
 info "is_single_head: $IS_SINGLE  revision: $DB_REVISION"
 [ "$IS_SINGLE" = "True" ] || die "Multiple Alembic heads — HARD FAIL."
 [ "$DB_REVISION" = "$REQUIRED_ALEMBIC_HEAD" ] \
-  && ok "DB revision: $DB_REVISION — exact match (v47)" \
+  && ok "DB revision: $DB_REVISION — exact match (v49 custom_training_phases)" \
   || die "DB revision '$DB_REVISION' ≠ '$REQUIRED_ALEMBIC_HEAD' — HARD FAIL."
 
 echo
