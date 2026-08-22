@@ -587,7 +587,11 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .pn-term-group{margin-bottom:8px;}
 .pn-term-hdr{font-size:var(--fs-xs);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:8px 0 6px;border-bottom:1px solid var(--border-light);margin-bottom:8px;}
 .pn-hdr{background:linear-gradient(90deg,var(--dark) 0%,var(--royal) 100%);color:white;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px;}
-.pn-date{font-size:var(--fs-md);font-weight:800;}
+.pn-date{font-size:var(--fs-md);font-weight:800;margin:0;}
+/* PN-3: secondary card actions behind a disclosure. Toggled by class, not the
+   `hidden` attribute -- an inline display would override [hidden]{display:none}. */
+.pn-more{display:none;gap:6px;align-items:center;flex-wrap:wrap;}
+.pn-more.open{display:inline-flex;}
 .pn-meta{font-size:var(--fs-2xs);color:rgba(255,255,255,.6);margin-top:2px;}
 .pn-body{padding:12px 16px;}
 .sess-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:9px;margin-top:9px;}
@@ -1510,18 +1514,18 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </div>
         </div>
         <div class="fbar no-print">
-          <select id="pn-f-term" aria-label="Filter Parade Nights by term" onchange="renderPN()">
+          <select id="pn-f-term" aria-label="Filter Parade Nights by term" onchange="pnFilterChanged()">
             <option value="all">All Terms</option>
             <option value="T1">Term 1</option><option value="T2">Term 2</option>
             <option value="T3">Term 3</option><option value="T4">Term 4</option>
           </select>
-          <select id="pn-f-status" aria-label="Filter Parade Nights by status" onchange="renderPN()">
+          <select id="pn-f-status" aria-label="Filter Parade Nights by status" onchange="pnFilterChanged()">
             <option value="all">All Statuses</option>
             <option value="planned">Planned</option><option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option><option value="rescheduled">Rescheduled</option>
             <option value="not_delivered">Not Delivered</option>
           </select>
-          <input id="pn-search" placeholder="Search sessions…" oninput="renderPN()" style="min-width:160px;" aria-label="Search sessions">
+          <input id="pn-search" placeholder="Search sessions…" oninput="pnFilterChanged()" style="min-width:160px;" aria-label="Search sessions">
         </div>
         <div id="pn-bulk-bar" class="no-print" style="display:none;background:var(--surface-2);border:1.5px solid var(--blue);border-radius:8px;padding:10px 14px;margin-bottom:12px;align-items:center;gap:12px;flex-wrap:wrap">
           <span id="pn-bulk-count" style="font-weight:700;font-size:var(--fs-base);color:var(--dark)"></span>
@@ -8638,10 +8642,40 @@ function openWithDate(ds){document.getElementById('pn-date').value=ds;buildSlots
 function _savePNFilters(tf,sf,q){
   try{ sessionStorage.setItem('aafc_pn_filters',JSON.stringify({tf,sf,q})); }catch(_){}
 }
+// PN-3: which term is "now"? Derived from the data rather than hardcoded date
+// ranges, so it stays correct whatever a squadron's term boundaries are.
+// Prefers the next upcoming night; falls back to the most recent past one.
+function _currentPNTerm(){
+  const pns=((typeof S!=='undefined'&&S.pns)||[]).filter(p=>p.term);
+  if(!pns.length)return null;
+  const today=new Date().toISOString().slice(0,10);
+  const upcoming=pns.filter(p=>p.date>=today).sort((a,b)=>a.date.localeCompare(b.date));
+  if(upcoming.length)return upcoming[0].term;
+  return pns.slice().sort((a,b)=>b.date.localeCompare(a.date))[0].term;
+}
+// PN-3: only a real user change persists. renderPN() is also called by
+// renderAll() at boot, and when it saved unconditionally it stamped "all" into
+// sessionStorage before the page was ever opened -- which then always beat the
+// current-term default below.
+function pnFilterChanged(){
+  const te=document.getElementById('pn-f-term');
+  const se=document.getElementById('pn-f-status');
+  const qe=document.getElementById('pn-search');
+  _savePNFilters(te?te.value:'all', se?se.value:'all', qe?qe.value:'');
+  renderPN();
+}
 function _restorePNFilters(){
   try{
     const saved=JSON.parse(sessionStorage.getItem('aafc_pn_filters')||'null');
-    if(!saved)return;
+    if(!saved){
+      // With no saved choice the page used to open on "all" -- every parade
+      // night the squadron has ever had, expanded. Open on the current term
+      // instead. A choice the user makes is saved above and still wins.
+      const te0=document.getElementById('pn-f-term');
+      const t=_currentPNTerm();
+      if(te0&&t&&[...te0.options].some(o=>o.value===t))te0.value=t;
+      return;
+    }
     const te=document.getElementById('pn-f-term');
     const se=document.getElementById('pn-f-status');
     const qe=document.getElementById('pn-search');
@@ -8649,6 +8683,15 @@ function _restorePNFilters(){
     if(se&&saved.sf)se.value=saved.sf;
     if(qe&&saved.q)qe.value=saved.q;
   }catch(_){}
+}
+// PN-3: reveal a card's secondary actions. Kept as a class toggle so the
+// buttons stay in the DOM order they had, and aria-expanded tracks state.
+function togglePNMore(btn,id){
+  const box=document.getElementById('pnmore-'+id);
+  if(!box)return;
+  const open=box.classList.toggle('open');
+  btn.setAttribute('aria-expanded',open?'true':'false');
+  btn.textContent=open?'Less \u25b4':'More \u25be';
 }
 const _pnSelected=new Set();
 function _pnToggle(id){
@@ -8700,7 +8743,6 @@ function renderPN(){
   const tf=document.getElementById('pn-f-term').value;
   const sf=document.getElementById('pn-f-status').value;
   const q=(document.getElementById('pn-search').value||'').toLowerCase();
-  _savePNFilters(tf,sf,q);
   const sorted=[...S.pns].sort((a,b)=>a.date.localeCompare(b.date));
   const filtered=sorted.filter(pn=>{
     if(tf!=='all'&&pn.term!==tf)return false;
@@ -8739,7 +8781,7 @@ function buildPNCard(pn){
       <div class="sess-info">${s.phase?phBadge(s.phase)+' ':''} ${s.facName?esc(s.facName):''} ${s.room?'· '+esc(s.room):''} ${s.trainingClasses&&s.trainingClasses.length?'· '+esc(s.trainingClasses.map(c=>c.display_name).join(', ')):''}</div>
       ${canWriteSquadron()?`<div class="sess-acts no-print" onclick="event.stopPropagation()">
         <button class="btn btn-xs btn-ok" onclick="qkSt('${pn.date}',${i},'delivered')" aria-label="Mark Session ${i+1} delivered">✓</button>
-        <button class="btn btn-xs" style="background:#eef0f2;color:var(--steel)" onclick="qkSt('${pn.date}',${i},'not_delivered')" aria-label="Mark Session ${i+1} not delivered"></button>
+        <button class="btn btn-xs" style="background:#eef0f2;color:var(--steel)" onclick="qkSt('${pn.date}',${i},'not_delivered')" aria-label="Mark Session ${i+1} not delivered">${_ST_ICON.not_delivered}</button>
         <button class="btn btn-xs btn-red" onclick="qkSt('${pn.date}',${i},'cancelled')" aria-label="Cancel Session ${i+1}">✗</button>
         <button class="btn btn-xs btn-sky" onclick="quickEdit('${pn.date}',${i})" aria-label="Edit Session ${i+1}">✏</button>
       </div>`:''}
@@ -8747,16 +8789,19 @@ function buildPNCard(pn){
   return `<div class="pn-card" id="pncard-${esc(pn.id)}">
     <div class="pn-hdr">
       ${canWriteSquadron()?`<label class="no-print" style="display:flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;padding-right:10px;cursor:pointer" onclick="event.stopPropagation()"><input type="checkbox" id="pnchk-${esc(pn.id)}" aria-label="Select parade night ${esc(fmtDL(pn.date))} for bulk actions" onchange="_pnToggle('${esc(pn.id)}')" style="width:16px;height:16px;cursor:pointer" ${_pnSelected.has(pn.id)?'checked':''}></label>`:''}
-      <div><div class="pn-date">${fmtDL(pn.date)}</div><div class="pn-meta">${esc(pn.term)} · ${(pn.sessions||[]).length} sessions${pn.notes?' · '+esc(pn.notes):''}</div></div>
+      <div><h2 class="pn-date">${fmtDL(pn.date)}</h2><div class="pn-meta">${esc(pn.term)} · ${(pn.sessions||[]).length} sessions${pn.notes?' · '+esc(pn.notes):''}</div></div>
       <div style="display:flex;gap:6px;align-items:center" class="no-print">
         ${allDel?stBadge('delivered'):stBadge('planned')}
         ${pn.published?'<span class="badge b-ok" title="Weekly Program published">Published</span>':''}
         <button class="btn btn-xs btn-sky" onclick="showPNDetail('${pn.date}')">Detail</button>
-        ${canWriteSquadron()?(tplName?`<button class="btn btn-xs" onclick="openPNTimingOverrideModal('${esc(pn.id)}')" title="Change template">📋 ${esc(tplName)} ▾</button>`:`<button class="btn btn-xs" style="color:var(--muted)" onclick="openPNTimingOverrideModal('${esc(pn.id)}')" title="Set template">+ Template</button>`):''}
-        ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Copy sessions to another parade night" onclick="openCopyPNModal('${pn.date}')">Copy to…</button>`:''}
-        ${canWriteSquadron()&&(pn.sessions||[]).length>0?`<button class="btn btn-xs btn-out" title="Save this night's sessions as a reusable template" onclick="doSaveAsTemplate('${esc(pn.id)}')">Save as Tpl</button>`:''}
-        ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Apply a saved session template to this parade night" onclick="openApplyTemplateModal('${esc(pn.id)}')">Apply Tpl…</button>`:''}
-        ${canWriteSquadron()?`<button class="btn btn-xs btn-red" aria-label="Delete parade night" onclick="delPN('${pn.date}')">×</button>`:''}
+        ${canWriteSquadron()?`<button class="btn btn-xs btn-out" aria-expanded="false" aria-controls="pnmore-${esc(pn.id)}" title="More actions for ${esc(fmtDL(pn.date))}" onclick="togglePNMore(this,'${esc(pn.id)}')">More ▾</button>`:''}
+        ${canWriteSquadron()?`<span class="pn-more" id="pnmore-${esc(pn.id)}">
+          ${tplName?`<button class="btn btn-xs" onclick="openPNTimingOverrideModal('${esc(pn.id)}')" title="Change template">📋 ${esc(tplName)} ▾</button>`:`<button class="btn btn-xs" style="color:var(--muted)" onclick="openPNTimingOverrideModal('${esc(pn.id)}')" title="Set template">+ Template</button>`}
+          <button class="btn btn-xs btn-out" title="Copy sessions to another parade night" onclick="openCopyPNModal('${pn.date}')">Copy to…</button>
+          ${(pn.sessions||[]).length>0?`<button class="btn btn-xs btn-out" title="Save this night's sessions as a reusable template" onclick="doSaveAsTemplate('${esc(pn.id)}')">Save as Tpl</button>`:''}
+          <button class="btn btn-xs btn-out" title="Apply a saved session template to this parade night" onclick="openApplyTemplateModal('${esc(pn.id)}')">Apply Tpl…</button>
+          <button class="btn btn-xs btn-red" aria-label="Delete parade night ${esc(fmtDL(pn.date))}" onclick="delPN('${pn.date}')">×</button>
+        </span>`:''}
       </div>
     </div>
     <div class="pn-body"><div class="sess-grid">${sessCards}</div></div>
