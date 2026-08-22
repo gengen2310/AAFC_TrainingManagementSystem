@@ -68,6 +68,7 @@ _SQUADRON_STEP_KEYS = {
     "equipment_added", "timing_template_confirmed", "crest_set", "cadets_added", "holidays_configured",
     "cea_imported", "activities_classified", "anchor_events_reviewed", "parade_nights_generated",
     "parade_night_published", "curriculum_coverage", "flights_created",
+    "sessions_have_periods",   # added 2026-08-23
 }
 
 
@@ -77,7 +78,7 @@ def test_steps_list_scoped_to_squadron_only_for_sqn_admin(client):
     d = r.json()
     step_keys = {s["key"] for s in d["steps"]}
     assert step_keys == _SQUADRON_STEP_KEYS
-    assert len(d["steps"]) == 16  # 15 original + training_classes_created (optional)
+    assert len(d["steps"]) == 17  # 15 original + training_classes_created + sessions_have_periods
 
 
 def test_flights_created_step_is_marked_optional(client):
@@ -332,3 +333,120 @@ def test_parade_night_published_true_once_a_parade_night_is_published(client):
 def test_setup_status_unauthenticated(client):
     r = client.get("/api/setup/status")
     assert r.status_code == 401
+
+
+# ── 2026-08-23 audit of the Getting Started checklist ────────────────────────
+
+def _steps(client, hdr):
+    r = client.get("/api/setup/status", headers=hdr)
+    assert r.status_code == 200, r.text
+    return {st["key"]: st for st in r.json()["steps"]}
+
+
+def test_curriculum_step_is_done_once_scheduling_has_started(client):
+    # Coverage counts every curriculum item VISIBLE to the squadron, which is the
+    # whole national curriculum across all Training Stages. A fully seeded 703 SQN
+    # measures well under 100%, so requiring 100% made the step unreachable -- and
+    # since `complete` is an AND over the non-optional steps, it made the whole
+    # checklist unreachable for everyone.
+    steps = _steps(client, _sqn_admin_703(client))
+    cov = steps["curriculum_coverage"]
+    assert 0 < cov["count"] < 100, f"expected partial coverage on seeded data, got {cov['count']}"
+    assert cov["done"] is True, "scheduling has started, so the step should be done"
+
+
+def test_a_squadron_that_has_scheduled_nothing_has_the_curriculum_step_pending(client):
+    hdr = _sysadmin(client)
+    wing_id = client.get("/api/wings", headers=hdr).json()[0]["wing_id"]
+    r = client.post("/api/squadrons",
+                    json={"code": "GS1", "name": "Getting Started Check 1", "wing_id": wing_id},
+                    headers=hdr)
+    assert r.status_code in (200, 201), r.text
+    sq_id = r.json().get("squadron_id") or r.json().get("id")
+    steps = {st["key"]: st
+             for st in client.get(f"/api/setup/status?squadron_id={sq_id}", headers=hdr).json()["steps"]}
+    assert steps["curriculum_coverage"]["done"] is False
+    assert steps["curriculum_coverage"]["count"] == 0
+
+
+def test_the_session_period_step_exists_and_links_to_parade_nights(client):
+    # A session with no program period never reaches the Weekly Program grid, so
+    # a squadron can look fully planned and print a blank page.
+    steps = _steps(client, _sqn_admin_703(client))
+    assert "sessions_have_periods" in steps, "the session-period step is missing"
+    step = steps["sessions_have_periods"]
+    assert step["link_page"] == "parade-nights"
+    assert step["label"] == "Assign sessions to program periods"
+    assert isinstance(step["count"], int)
+
+
+def test_session_period_step_agrees_with_the_underlying_counts(client):
+    # Not "all seeded sessions have a period": other tests in the suite create
+    # sessions without one, and the database is seeded once per session, so that
+    # assertion is order-dependent. Test the rule instead of a snapshot.
+    hdr = _sqn_admin_703(client)
+    d = client.get("/api/setup/status", headers=hdr).json()
+    sq = d["squadron"]
+    step = {st["key"]: st for st in d["steps"]}["sessions_have_periods"]
+
+    assert sq["sessions_total"] > 0, "seeded 703 should have sessions"
+    assert sq["sessions_with_period"] > 0, "the seed sets timing_block_id on its sessions"
+    assert step["count"] == sq["sessions_with_period"]
+    assert step["done"] is (sq["sessions_total"] > 0
+                            and sq["sessions_with_period"] == sq["sessions_total"])
+
+
+def test_every_step_links_to_a_page_that_exists(client):
+    # A checklist row is clickable; a row pointing at a page that does not exist
+    # is a dead end rather than a nudge.
+    import pathlib, re
+    html = pathlib.Path(__file__).resolve().parents[2] / "connected-frontend" / "index.html"
+    if not html.exists():
+        import pytest
+        pytest.skip("connected-frontend/index.html not present in this checkout")
+    pages = set(re.findall(r'id="page-([a-z0-9-]+)"', html.read_text()))
+    for key, st in _steps(client, _sqn_admin_703(client)).items():
+        assert st["link_page"] in pages, f"step {key} links to missing page {st['link_page']}"
+
+
+def test_step_labels_use_sentence_case(client):
+    # The rest of the interface is sentence case; the checklist was Title Case.
+    allowed = {"CEA", "Wing", "Squadron", "Training", "Stage"}
+    for key, st in _steps(client, _sqn_admin_703(client)).items():
+        words = st["label"].split()
+        for w in words[1:]:
+            stripped = w.strip(".,/&")
+            if stripped and stripped[0].isupper() and stripped not in allowed:
+                raise AssertionError(f"step {key} label is not sentence case: {st['label']!r}")
+
+
+def test_timing_template_step_ignores_a_template_outside_its_effective_window(client):
+    # The check used to count any non-archived template, so a squadron whose only
+    # template had expired reported "confirmed" while _effective_template()
+    # returned None and new parade nights got no timing at all.
+    from app.database import SessionLocal
+    from app.models import TimingTemplate
+
+    hdr = _sqn_admin_703(client)
+    assert _steps(client, hdr)["timing_template_confirmed"]["done"] is True
+
+    db = SessionLocal()
+    saved = []
+    try:
+        # /api/auth/me nests everything under "session".
+        sq_id = client.get("/api/auth/me", headers=hdr).json()["session"]["squadron_id"]
+        rows = db.query(TimingTemplate).filter(TimingTemplate.squadron_id == sq_id).all()
+        assert rows, "expected the seeded 703 timing template"
+        saved = [(t.id, t.effective_to) for t in rows]
+        for t in rows:
+            t.effective_to = "2000-01-01"      # expired
+        db.commit()
+
+        assert _steps(client, hdr)["timing_template_confirmed"]["done"] is False, \
+            "an expired template must not read as confirmed"
+    finally:
+        for tid, original in saved:
+            db.get(TimingTemplate, tid).effective_to = original
+        db.commit()
+        db.close()
+    assert _steps(client, hdr)["timing_template_confirmed"]["done"] is True

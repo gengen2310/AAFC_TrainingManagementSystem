@@ -6075,9 +6075,24 @@ function _renderGsSections(d){
       '</div>';
   }
   if(d.squadron){
-    html+=`<div class="card"><div class="ctitle">Squadron Setup — ${esc(d.squadron.squadron_code||'')}</div>`+
-      (d.steps||[]).filter(s=>!_GS_NATIONAL_KEYS.includes(s.key)&&!s.optional).map(_gsStepRow).join('')+
+    const sqnSteps=(d.steps||[]).filter(s=>!_GS_NATIONAL_KEYS.includes(s.key));
+    const required=sqnSteps.filter(s=>!s.optional);
+    const optional=sqnSteps.filter(s=>s.optional);
+    const doneCount=required.filter(s=>s.done).length;
+    html+=`<div class="card"><div class="card-head"><div class="ctitle" style="margin:0">Squadron setup — ${esc(d.squadron.squadron_code||'')}</div>`+
+      `<span class="muted" style="font-size:var(--fs-xs)">${doneCount} of ${required.length} done</span></div>`+
+      required.map(_gsStepRow).join('')+
       '</div>';
+    // Optional steps were filtered out entirely, which made _gsStepRow's
+    // "Optional" badge dead code and hid both recommendations the backend
+    // deliberately surfaces as guidance. Training classes in particular are
+    // load-bearing: without one the Weekly Program has no column to print into.
+    if(optional.length){
+      html+='<div class="card" style="margin-top:12px"><div class="ctitle">Recommended</div>'+
+        '<p class="muted" style="font-size:var(--fs-xs);margin:0 0 10px">Not required for setup to count as complete, but most squadrons need these.</p>'+
+        optional.map(_gsStepRow).join('')+
+        '</div>';
+    }
   }
   if(!d.national&&!d.squadron){
     html+='<div class="alert a-info">Select a Wing or Squadron to check setup status.</div>';
