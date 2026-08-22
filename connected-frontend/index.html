@@ -2409,7 +2409,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div id="page-service-desk" class="page">
         <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-md)">
           <h1>Service Desk</h1>
-          <button class="btn btn-primary" onclick="sdOpenModal(S && ['sqn_admin','sqn_general'].includes(S.role) ? S.squadron_id : null)">
+          <button class="btn btn-primary" onclick="sdOpenModal(S && ['sqn_admin','sqn_general'].includes(S.role) ? (S.session && S.session.squadron_id) : null)">
             Submit a Ticket
           </button>
         </div>
@@ -5585,7 +5585,15 @@ function bootApp(){
   document.querySelectorAll('.admin-el').forEach(el=>{
     const show=(canWrite||(scope!=='squadron'&&proxyActive()));
     if(!show){el.style.display='none';return;}
-    el.style.display=el.classList.contains('card')?'block':'inline-flex';
+    // NAV-6: this used to force inline-flex on everything carrying .admin-el.
+    // A .nav-item is a full-width row (.nav-item{display:flex}); inline-flex
+    // shrank "Unit Setup" to its text -- 102px in a 220px sidebar -- so the rest
+    // of the row was dead to the pointer while every other nav row was clickable
+    // end to end. A .card wants block (SET-1). Everything else still wants
+    // inline-flex.
+    el.style.display = el.classList.contains('card')     ? 'block'
+                     : el.classList.contains('nav-item') ? 'flex'
+                     : 'inline-flex';
   });
   if(isReadOnly()){ document.body.classList.add('readonly'); document.querySelectorAll('.admin-el').forEach(el=>el.style.display='none'); }
   else { document.body.classList.remove('readonly'); }
@@ -7098,7 +7106,14 @@ const _ROLES_NAT_SCOPE=['national_viewer','national_admin','auditor','system_adm
 const _ROLES_WING_SCOPE=['wing_viewer','wing_admin'];
 const _ROLES_SQN_SCOPE=['sqn_general','sqn_admin'];
 
-function openCreateAccountModal(preselectedSqnId){
+async function openCreateAccountModal(preselectedSqnId){
+  // ACC-1: for a sqn_admin nothing had ever populated S.squadrons, so the
+  // squadron select rendered with its placeholder alone and the form was
+  // impossible to complete. GET /api/squadrons returns exactly the units the
+  // caller may act on (1 for a sqn_admin, 16 for a wing_admin).
+  if(!Array.isArray(S.squadrons) || !S.squadrons.length){
+    try{ S.squadrons = await api('/api/squadrons'); }catch(_){ S.squadrons = S.squadrons||[]; }
+  }
   document.getElementById('ca-name').value='';
   document.getElementById('ca-role').value='';
   document.getElementById('ca-msg').textContent='';
@@ -7140,10 +7155,14 @@ function _populateCreateSqns(wingId){
   const sel=document.getElementById('ca-sqn'); sel.innerHTML='<option value="">— select squadron —</option>';
   const src=(S.squadrons||[]).filter(s=>!wingId||s.wing_id===wingId);
   src.forEach(s=>{ const o=new Option(s.code||s.short_name||s.name, s.squadron_id); sel.appendChild(o); });
-  // sqn_admin: pre-select and lock own sqn
-  if(S.role==='sqn_admin' && S.sqn){
-    const own=(S.squadrons||[]).find(x=>x.code===S.sqn||x.short_name===S.sqn);
+  // ACC-2: sqn_admin gets its own squadron pre-selected and locked. This used to
+  // compare S.sqn against code/short_name -- but S.sqn holds the squadron UUID,
+  // not a code, so it never matched and nothing was ever pre-selected.
+  const ownId = (S.session && S.session.squadron_id) || null;
+  if(S.role==='sqn_admin' && ownId){
+    const own=(S.squadrons||[]).find(x=>x.squadron_id===ownId);
     if(own){ sel.value=own.squadron_id; sel.disabled=true; }
+    else { sel.disabled=false; }
   } else { sel.disabled=false; }
 }
 
@@ -17457,6 +17476,39 @@ function sdCloseModal() {
   }
 }
 
+// SD-5: turn whatever the API returned into something the person filling in the
+// form can act on. FastAPI sends 422 validation errors as a list of
+// {loc:[...], msg}, which the previous handler could not read at all.
+const _SD_FIELD_LABELS = {
+  rank:'Rank', first_name:'First name', last_name:'Last name', email:'Email',
+  category:'Category', description:'Description', squadron_id:'Unit', unit_name:'Unit',
+};
+function _sdErrorMessage(data, status){
+  const d = data && data.detail;
+  if (Array.isArray(d) && d.length) {
+    const parts = d.slice(0, 3).map(e => {
+      const field = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : '';
+      const label = _SD_FIELD_LABELS[field] || field || 'This form';
+      let why = String(e.msg || '').replace(/^Value error,\s*/i, '').trim();
+      if (/valid email/i.test(why)) why = 'is not a valid email address';
+      else if (/^field required$|^missing$/i.test(why)) why = 'is required';
+      else if (/field is required and must not be blank/i.test(why)) why = 'is required';
+      // The validator often names the field itself ("description must be at
+      // least 10 characters"). Do not print the name twice.
+      const bare = String(field).replace(/_/g, ' ');
+      const rx = new RegExp('^' + bare.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s+', 'i');
+      if (rx.test(why)) why = why.replace(rx, '');
+      why = why.charAt(0).toLowerCase() + why.slice(1);
+      return `${label} ${why}`;
+    });
+    return parts.join('. ') + '.';
+  }
+  if (d && typeof d === 'object' && d.message) return d.message;
+  if (typeof d === 'string' && d) return d;
+  if (status === 403) return 'You do not have permission to submit this ticket.';
+  return `Submission failed (${status}). Please check the form and try again.`;
+}
+
 async function sdSubmit(event) {
   event.preventDefault();
   const errEl = document.getElementById('sd-err');
@@ -17508,10 +17560,7 @@ async function sdSubmit(event) {
       errEl.style.display = 'block';
     } else {
       const data = await r.json().catch(() => ({}));
-      const msg = (data.detail && typeof data.detail === 'object' && data.detail.message)
-        ? data.detail.message
-        : 'Submission failed — please check the form and try again.';
-      errEl.textContent = msg;
+      errEl.textContent = _sdErrorMessage(data, r.status);
       errEl.style.display = 'block';
     }
   } catch (e) {
