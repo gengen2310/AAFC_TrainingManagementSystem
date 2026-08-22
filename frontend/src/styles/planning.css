@@ -401,8 +401,9 @@ body.pw-active .main {
 .pw-setup-step.active { opacity: 1; border-color: var(--aafc-blue); }
 .pw-setup-step.done { opacity: 1; border-color: var(--success); background: rgba(26,127,75,.05); }
 .pw-setup-step-num {
-  /* AUDIT-2026-08 G3: min-* so the digit can grow with the user's text size. */
-  min-width: 32px; min-height: 32px; aspect-ratio: 1; border-radius: 50%; flex-shrink: 0;
+  /* AUDIT-2026-08 G3: em so the digit can grow with the user's text size.
+     2.3em x 14px = the original 32px. */
+  width: 2.3em; height: 2.3em; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   font-weight: 800; font-size: var(--fs-md);
   background: var(--aafc-dark-blue); color: #fff;
@@ -1030,11 +1031,12 @@ body.pw-active .main {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* AUDIT-2026-08 G3: min-*, not fixed — at 200% text the glyph outgrows a 26px box
-     and would be clipped. aspect-ratio keeps it circular as it grows. */
-  min-width: 26px;
-  min-height: 26px;
-  aspect-ratio: 1;
+  /* AUDIT-2026-08 G3: em, not px — the circle tracks its own glyph, so it grows with
+     the user's text size instead of clipping it. 2em x 13px = the original 26px.
+     Deliberately NOT aspect-ratio + min-width: on a non-flex child that resolves
+     against the containing block and blows the element up to full width. */
+  width: 2em;
+  height: 2em;
   border-radius: 50%;
   border: 1.5px solid rgba(255,255,255,.4);
   background: rgba(255,255,255,.12);

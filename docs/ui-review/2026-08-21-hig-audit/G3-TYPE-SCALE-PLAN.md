@@ -1,7 +1,12 @@
 # G3 — text enlargement: mechanism proved, migration planned
 
-**Status:** pilot landed (`tokens.css`, `base.css`, `components.css`). The rest is planned,
-not done. G3 remains **FAIL** until the migration completes.
+**Status:** the Planning Workspace stylesheets are **done** — `tokens.css`, `base.css`,
+`components.css`, `layout.css`, `planning.css`. 0 px font-size declarations remain in them.
+G3 remains **FAIL** overall: 371 `.tsx` `fontSize` props and both Main TMS targets
+(158 stylesheet + 801 inline) are untouched.
+
+`print.css` keeps px deliberately — its two declarations are inside `@media print`, and print
+output should not track a screen font preference.
 
 ## The defect
 
@@ -53,35 +58,66 @@ switch all of this off, and no test would fail.
 
 ## What is left
 
-| Target | font-size declarations | Risk |
+| Target | font-size declarations | Status |
 |---|---|---|
-| `planning.css` | 124 | **high** — 13 fixed `height`, 5 `min-height`, 17 `nowrap`, 13 `overflow:hidden` |
-| `layout.css`, `print.css` | 6 | low |
-| Planning Workspace `.tsx` `fontSize` props | 371 | medium — inline, invisible to CSS tooling |
-| Main TMS `<style>` | 158 | medium |
-| Main TMS inline / JS | 801 | **high** — inline, template-literal generated |
+| `planning.css` | 125 | **done** |
+| `layout.css` | 4 | **done** |
+| `print.css` | 2 | intentionally left px (`@media print`) |
+| Planning Workspace `.tsx` `fontSize` props | 371 | to do — inline, invisible to CSS tooling |
+| Main TMS `<style>` | 158 | to do |
+| Main TMS inline / JS | 801 | to do — template-literal generated, largest and riskiest |
+
+## Corrections to this plan, from doing the work
+
+**"13 fixed heights each need to become min-height" was wrong.** Only **4 of 13** bear text,
+and one of those is `.pw-sr-only` (1×1, clipped by design). The other nine are dots, bars,
+checkboxes and dividers, where a fixed px size is correct and should stay. The real count was
+**3**: `.pn-add-btn`, `.pw-setup-step-num`, `.pw-help-btn`. The original figure came from
+counting `height:\s*[0-9]+px` without asking whether the rule contained text.
+
+**`aspect-ratio: 1` + `min-width` is a trap, not the fix.** Used on `.pw-setup-step-num`, it
+made a bare (non-flex) instance resolve its width against the containing block and expand to
+**1497×1497**. The correct tool is `em`: `width: 2.3em; height: 2.3em` makes the box track its
+own glyph, so it grows with the text and stays circular, with no dependency on the parent's
+display type. Both circles now double correctly (32→64, 26→52) in flex and block contexts alike.
+
+## Measuring text scaling: set the root at load, never mutate it
+
+Mutating `document.documentElement.style.fontSize` at runtime does **not** reliably re-resolve
+`rem` inside a custom property in Chrome. `.pw-help-btn` measured a flat 13px at a 32px root
+under runtime mutation — with exactly one matching rule, `--fs-base` correctly reading
+`0.8125rem`, and no inline style — while `.btn`, using the identical token, scaled to 26px in
+the same page.
+
+Loaded fresh with `<html style="font-size:32px">`, `.pw-help-btn` is **26px** and its box
+**52×52**. The rule was correct the whole time; the measurement was not. Two runtime readings
+would have been reported as defects, and one nearly triggered a fix to working code.
+
+**Verify with a page loaded at the target root size.** The runtime toggle is convenient and
+occasionally lies, and it lies in the direction of inventing failures.
 
 ## Order, and why
 
-1. `layout.css` + `print.css` — trivial, finishes the Planning Workspace stylesheets.
-2. **`planning.css` with a layout pass, not just a find-and-replace.** This is where the work
-   actually is. Converting the type without addressing the fixed heights and `nowrap` will
-   produce clipping instead of scaling — a different failure, not a fix. Each of the 13 fixed
-   heights needs to become `min-height`, and each `nowrap` justified or removed.
-3. Planning Workspace `.tsx` props — mechanical once the scale exists; prefer moving them into
-   CSS classes rather than swapping one inline literal for another.
-4. Main TMS `<style>` block.
-5. Main TMS inline styles — largest and riskiest, much of it generated inside template
-   literals. Treat as its own piece of work.
+1. ~~`layout.css` + `print.css`~~ — done.
+2. ~~`planning.css` with a layout pass~~ — done. The layout pass mattered: three text-bearing
+   fixed heights had to move to `em` sizing first, or the type would have clipped instead of
+   scaling. The 17 `nowrap` rules turned out not to overflow at 200% in the components measured;
+   re-check them on the dense authenticated grids, which were never reachable here.
+3. Planning Workspace `.tsx` props (371) — mechanical now the scale exists; prefer moving them
+   into CSS classes rather than swapping one inline literal for another.
+4. Main TMS `<style>` block (158).
+5. Main TMS inline styles (801) — largest and riskiest, much of it generated inside template
+   literals. Its own piece of work.
 
 The two frontends are deployed separately and must be converted separately; a fix applied to
 one has three times now failed to reach the other.
 
-## Coverage of the pilot measurement
+## Coverage of these measurements
 
-The "0 clipped, 0 horizontal overflow at 200%" result is from a **synthetic probe page**
-carrying the components in isolation. It is not a statement about the application. The
-clipping risk is concentrated in `planning.css`, which is not converted yet, and the
-authenticated screens where the dense grids live were never reachable in this session.
+Measured at a 32px root set at load: every probed element scales ×2.00, `0` clipped, `0`
+horizontal overflow, `scrollWidth == innerWidth`.
 
-Re-run the 200% check against the real app after step 2, and treat that as the real answer.
+That is a result about a **probe page** carrying these components in isolation — not about the
+application. The dense authenticated grids, where the 17 `nowrap` rules and the real column
+pressure live, were never reachable in this session. Re-run the load-time 200% check against the
+real app before treating the Planning Workspace half of G3 as closed.
