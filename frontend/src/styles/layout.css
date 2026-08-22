@@ -1,5 +1,14 @@
 .app{display:grid;grid-template-rows:auto auto 1fr;min-height:100vh;}
 .topbar{display:flex;justify-content:space-between;align-items:center;background:var(--primary);color:#fff;padding:10px 18px;}
+/* AUDIT-2026-08 G10 / WCAG 1.4.10: the right-hand cluster (scope, role, Theme, Size,
+   Sign out) could not wrap, so the bar had a hard ~555px minimum and the PAGE scrolled
+   sideways below that — measured at 320 and 360px. Let the bar and the cluster wrap,
+   and let the brand ellipsise, so the page itself never scrolls horizontally. */
+@media (max-width: 700px){
+  .topbar{flex-wrap:wrap;row-gap:6px;padding:8px 12px;}
+  .topbar .brand{min-width:0;flex:1 1 100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .topbar .right{flex:1 1 100%;flex-wrap:wrap;justify-content:flex-start;gap:6px;}
+}
 .topbar .brand{font-weight:900;letter-spacing:.04em;}
 .topbar .right{display:flex;gap:10px;align-items:center;}
 .body{display:grid;grid-template-columns:230px 1fr;}

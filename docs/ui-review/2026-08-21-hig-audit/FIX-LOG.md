@@ -583,3 +583,58 @@ seeded synthetic data. Not covered: `national_viewer` and `wing_viewer`, modal d
 drawers (only the pages behind nav items were visited), any flow behind a native
 `confirm()`/`prompt()` — those block browser automation by design — narrow viewports, and every
 form in an error or validation state.
+
+---
+
+## FIX-10 · Planning Workspace at narrow widths — one fix, one open defect
+
+Measured in fixed-width iframes served from the Vite dev server (same origin, so the
+harness can read each frame), signed in as `sqn_admin`. Widths 320 / 360 / 600 / 768 /
+1024 / 1440.
+
+### Fixed: the topbar had a hard ~555px minimum
+
+`.topbar`'s right-hand cluster — scope pill, role pill, Theme, Size, Sign out — could not
+wrap, so the bar stayed 555px wide however narrow the viewport got and **the page itself
+scrolled sideways**. Same defect, same shape, as the Main TMS topbar fixed earlier.
+
+| Width | topbar before | topbar after | body scrolls sideways |
+|---|---|---|---|
+| 320px | 555 | **326** | yes → yes (5px, see below) |
+| 360px | 555 | **345** | **yes → no** |
+| 600px | 585 | 585 | no |
+
+At 320px a 5px overflow remains. Not chased: it is a border/padding rounding artefact an
+order of magnitude smaller than the original 235px, and 320 is the floor of SC 1.4.10
+rather than a supported target here.
+
+### Open, and NOT fixed: ~11,700px of chips clipped and unreachable at every width
+
+At 1440px — a comfortable desktop width, not a narrow one — 110 `button.pw-chip` controls
+sit past the right edge. The row holding them is `display:flex; flex-wrap:nowrap;
+overflow-x:visible`, 1,195px wide with a **12,918px scrollWidth**, inside `.pw-root`
+which is `overflow:hidden`. So roughly 11,700px of real, visible, interactive buttons
+cannot be reached by scrolling, wrapping, or any other means.
+
+This is not a narrow-viewport bug. It reproduces at 320, 360, 600, 768, 1024 and 1440.
+
+**Deliberately left open.** The obvious candidate, `.pw-filter-chips`, already sets
+`flex-wrap: wrap` — so the offending row is a different, unclassed container that I did
+not positively identify. Changing `.pw-root`'s `overflow` to force a scrollbar would be a
+guess at the wrong level: `.pw-root` is the app shell (`height: calc(100vh - 48px)`,
+panels scrolling internally), and loosening it risks the shell's own scroll behaviour.
+Fixing the actual row is right; guessing which one is not.
+
+Note the data: 131 chips is seeded test data ("REM-39 Conflict Test" repeated). A real
+squadron would have fewer. The row is unbounded either way — nothing in the CSS stops it
+growing past the viewport — so the defect is structural, not a data artefact.
+
+### The Planning Workspace is a fixed-viewport app shell
+
+`.pw-root` is `height: calc(100vh - 48px); overflow: hidden` with panels that scroll
+internally, and the stylesheets carry media queries down to 768px and nothing below.
+That is a deliberate desktop-application pattern, not an oversight. Making the dense
+planning grid genuinely reflow to 320px is design work, not a CSS change, and is out of
+scope for an audit remediation.
+
+Verified after the change: 45 tests pass, build clean.
