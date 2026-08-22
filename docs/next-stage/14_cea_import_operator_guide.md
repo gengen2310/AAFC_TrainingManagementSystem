@@ -8,7 +8,7 @@
 
 ## What is a CEA activity?
 
-CEA (Cadet Exchange Activities) is the national cadet activity management system maintained by National Headquarters. It records approved external activities that squadrons can nominate cadets to attend — camps, courses, competitions, exchanges, and similar events.
+CEA (Cadet Enterprise Application) is the national cadet activity management system maintained by National Headquarters. It records approved external activities that squadrons can nominate cadets to attend — camps, courses, competitions, exchanges, and similar events.
 
 TMS does not replace CEA. It imports a snapshot of approved activities so that Wing and Squadron administrators can see upcoming events alongside their local training schedule, assign relevant activities to training nights, and plan cadet participation.
 

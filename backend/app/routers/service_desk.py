@@ -106,8 +106,12 @@ def _ticket_out(t: ServiceTicket) -> dict:
         "status": t.status,
         "admin_notes": t.admin_notes,
         "assigned_to_name": t.assigned_to_name,
-        "created_at": t.created_at.isoformat() + "Z" if t.created_at else None,
-        "resolved_at": t.resolved_at.isoformat() + "Z" if t.resolved_at else None,
+        # These were the only endpoints that hand-built a Z suffix, which was
+        # correct while columns returned naive datetimes. UTCDateTime now keeps
+        # tzinfo and main.py's encoder emits the Z, so hand the value over
+        # unformatted -- appending one here produced "+00:00Z".
+        "created_at": t.created_at,
+        "resolved_at": t.resolved_at,
     }
 
 
@@ -212,7 +216,7 @@ def create_ticket(body: TicketCreateIn, db: DBSession = Depends(get_db)):
         "unit_name": resolved_unit_name,
         "category": ticket.category,
         "description": ticket.description,
-        "created_at": ticket.created_at.isoformat() + "Z" if ticket.created_at else "",
+        "created_at": ticket.created_at,
     }
     try:
         send_ticket_notification(ticket_data, recipients)
@@ -346,7 +350,7 @@ def get_email_config(
             "scope": c.scope,
             "wing_id": c.wing_id,
             "notification_email": c.notification_email,
-            "updated_at": c.updated_at.isoformat() + "Z" if c.updated_at else None,
+            "updated_at": c.updated_at,
         }
         for c in configs
     ]

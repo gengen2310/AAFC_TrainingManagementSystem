@@ -14,7 +14,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session as DBSession
 
-from ..database import get_db, utcnow
+from ..database import get_db, utcnow, iso_z
 from ..models import (
     Wing, Squadron, CurriculumItem, Facilitator, AuditLog, ParadeNight, TrainingArea,
     TrainingClass, SessionAudience, CurriculumPhase,
@@ -248,8 +248,8 @@ def _year_out(py: PlanningYear, unit_code: str | None = None,
         "year": py.year, "name": py.name, "active_status": py.active_status,
         "unit_code": unit_code, "unit_name": unit_name, "wing_code": wing_code,
         "created_by": py.created_by, "updated_by": py.updated_by,
-        "created_at": py.created_at.isoformat() if py.created_at else None,
-        "updated_at": py.updated_at.isoformat() if py.updated_at else None,
+        "created_at": iso_z(py.created_at) if py.created_at else None,
+        "updated_at": iso_z(py.updated_at) if py.updated_at else None,
         "version": py.version,
     }
 
@@ -308,7 +308,7 @@ def _anchor_out(a: AnchorEvent) -> dict:
         "readiness_requirements": a.readiness_requirements,
         "notes": a.notes, "is_archived": a.is_archived,
         "created_by": a.created_by,
-        "created_at": a.created_at.isoformat() if a.created_at else None,
+        "created_at": iso_z(a.created_at) if a.created_at else None,
         "version": a.version,
     }
 
@@ -382,7 +382,7 @@ def _real_session_out(
         "notes": s.delivery_notes,
         "is_combined": False,
         "override_conflict": False,
-        "created_at": s.created_at.isoformat() if s.created_at else None,
+        "created_at": iso_z(s.created_at) if s.created_at else None,
         "version": s.version,
         "core_status": core_status,
     }
@@ -396,7 +396,7 @@ def _conflict_out(c: PlanningConflict) -> dict:
         "conflict_type": c.conflict_type, "severity": c.severity,
         "message": c.message, "is_resolved": c.is_resolved,
         "override_reason": c.override_reason,
-        "created_at": c.created_at.isoformat() if c.created_at else None,
+        "created_at": iso_z(c.created_at) if c.created_at else None,
     }
 
 
@@ -4470,7 +4470,7 @@ def list_facilitator_leave(
                 "start_date": r.start_date, "end_date": r.end_date,
                 "reason": r.reason, "notes": r.notes,
                 "created_by": r.created_by,
-                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "created_at": iso_z(r.created_at) if r.created_at else None,
                 "is_archived": r.is_archived,
             }
             for r in rows
@@ -4555,7 +4555,7 @@ def add_facilitator_leave(
             "start_date": leave.start_date, "end_date": leave.end_date,
             "reason": leave.reason, "notes": leave.notes,
             "created_by": leave.created_by,
-            "created_at": leave.created_at.isoformat() if leave.created_at else None,
+            "created_at": iso_z(leave.created_at) if leave.created_at else None,
         },
         "affected_sessions": affected,
     }
@@ -4697,8 +4697,8 @@ def _notice_out(n: PlanningNotice) -> dict:
         "priority": n.priority,
         "created_by": n.created_by,
         "is_archived": n.is_archived,
-        "created_at": n.created_at.isoformat() if n.created_at else None,
-        "updated_at": n.updated_at.isoformat() if n.updated_at else None,
+        "created_at": iso_z(n.created_at) if n.created_at else None,
+        "updated_at": iso_z(n.updated_at) if n.updated_at else None,
     }
 
 
@@ -4963,7 +4963,7 @@ def _cea_activity_out(a: CeaActivity) -> dict:
         "classified_at": a.classified_at,
         "is_removed_from_cea": a.is_removed_from_cea,
         "is_archived": a.is_archived,
-        "created_at": a.created_at.isoformat() if a.created_at else None,
+        "created_at": iso_z(a.created_at) if a.created_at else None,
     }
 
 
@@ -5032,7 +5032,7 @@ def list_cea_batches(
             "duplicate_count": b.duplicate_count,
             "skipped_count": b.skipped_count,
             "error_count": b.error_count,
-            "created_at": b.created_at.isoformat() if b.created_at else None,
+            "created_at": iso_z(b.created_at) if b.created_at else None,
         }
         for b in rows
     ]}

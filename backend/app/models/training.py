@@ -3,7 +3,7 @@ from sqlalchemy import String, Integer, ForeignKey, Boolean, Text, Float, DateTi
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 
-from ..database import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
+from ..database import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin, UTCDateTime
 
 BLOCK_TYPES = frozenset({
     "arrival", "admin", "parade", "briefing", "training_period",
@@ -33,7 +33,7 @@ class CurriculumItem(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     recommended_term: Mapped[str | None] = mapped_column(String(10))
     recommended_sequence: Mapped[int] = mapped_column(Integer, default=0)
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
-    retired_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    retired_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     replacement_curriculum_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     location_type: Mapped[str | None] = mapped_column(String(60), nullable=True)
     internal_admin_notes: Mapped[str | None] = mapped_column(Text)
@@ -63,8 +63,8 @@ class ParadeNight(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     closeout_status: Mapped[str] = mapped_column(String(20), default="open")  # open|closed
     published_by: Mapped[str | None] = mapped_column(String(36))
     closed_by: Mapped[str | None] = mapped_column(String(36))
-    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     timing_template_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     # Optimistic locking for update_parade_night's own-field edits (date/term/time/notes/
     # etc.) -- confirmed via live testing that two concurrent PATCHes silently last-write-
@@ -123,7 +123,7 @@ class SessionStatusHistory(Base, UUIDMixin):
     new_status: Mapped[str | None] = mapped_column(String(30))
     changed_by: Mapped[str | None] = mapped_column(String(36))
     reason: Mapped[str | None] = mapped_column(Text)
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    timestamp: Mapped[datetime] = mapped_column(UTCDateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class Facilitator(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):

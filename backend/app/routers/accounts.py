@@ -29,7 +29,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
-from ..database import get_db, utcnow
+from ..database import get_db, utcnow, iso_z
 from ..models import User, AccessCode, Wing, Squadron, Flight, NationalEntity, AuditLog
 from ..dependencies import get_principal
 from ..permissions import Principal
@@ -195,15 +195,15 @@ def _account_out(u: User, db: DBSession) -> dict:
         "flight_name": flight_name,
         "active_status": u.active_status,
         "is_archived": u.is_archived,
-        "archived_at": u.archived_at.isoformat() if u.archived_at else None,
-        "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
-        "created_at": u.created_at.isoformat() if u.created_at else None,
+        "archived_at": iso_z(u.archived_at) if u.archived_at else None,
+        "last_login_at": iso_z(u.last_login_at) if u.last_login_at else None,
+        "created_at": iso_z(u.created_at) if u.created_at else None,
         "created_by": u.created_by,
         # Access-code metadata only (never hash, never plaintext)
         "code_active": ac.active_status if ac else False,
-        "code_last_changed": ac.updated_at.isoformat() if ac and ac.updated_at else None,
+        "code_last_changed": iso_z(ac.updated_at) if ac and ac.updated_at else None,
         "code_changed_by": ac.updated_by if ac else None,
-        "locked_until": ac.locked_until.isoformat() if ac and ac.locked_until else None,
+        "locked_until": iso_z(ac.locked_until) if ac and ac.locked_until else None,
     }
 
 
@@ -999,4 +999,4 @@ def _flight_out(f: Flight, db: DBSession | None = None) -> dict:
             "squadron_code": sqn_code, "squadron_name": sqn_name,
             "name": f.name, "active_status": f.active_status,
             "is_archived": f.is_archived,
-            "created_at": f.created_at.isoformat() if f.created_at else None}
+            "created_at": iso_z(f.created_at) if f.created_at else None}

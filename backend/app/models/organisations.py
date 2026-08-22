@@ -3,7 +3,7 @@ from sqlalchemy import String, Integer, ForeignKey, Boolean, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 
-from ..database import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
+from ..database import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin, UTCDateTime
 
 
 class NationalEntity(Base, UUIDMixin, TimestampMixin):
@@ -79,7 +79,7 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     squadron_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
     flight_id: Mapped[str | None] = mapped_column(ForeignKey("flights.id"), nullable=True, index=True)
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
-    last_login_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     token_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
@@ -94,7 +94,7 @@ class AccessCode(Base, UUIDMixin, TimestampMixin):
     code_hash: Mapped[str] = mapped_column(String(255), index=True)
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
     failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
-    locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    locked_until: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class IpLoginAttempt(Base):
@@ -107,8 +107,8 @@ class IpLoginAttempt(Base):
     __tablename__ = "ip_login_attempts"
     ip: Mapped[str] = mapped_column(String(45), primary_key=True)  # IPv6 max 45 chars
     attempt_count: Mapped[int] = mapped_column(Integer, default=0)
-    window_start: Mapped[datetime] = mapped_column(DateTime)
-    locked_until: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    window_start: Mapped[datetime] = mapped_column(UTCDateTime)
+    locked_until: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class IpApiRequest(Base):
@@ -122,7 +122,7 @@ class IpApiRequest(Base):
     __tablename__ = "ip_api_requests"
     ip: Mapped[str] = mapped_column(String(45), primary_key=True)
     request_count: Mapped[int] = mapped_column(Integer, default=0)
-    window_start: Mapped[datetime] = mapped_column(DateTime)
+    window_start: Mapped[datetime] = mapped_column(UTCDateTime)
 
 
 class UserApiRequest(Base):
@@ -137,7 +137,7 @@ class UserApiRequest(Base):
     __tablename__ = "user_api_requests"
     user_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     request_count: Mapped[int] = mapped_column(Integer, default=0)
-    window_start: Mapped[datetime] = mapped_column(DateTime)
+    window_start: Mapped[datetime] = mapped_column(UTCDateTime)
 
 
 class ProxySession(Base, UUIDMixin, TimestampMixin):

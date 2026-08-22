@@ -20,7 +20,7 @@ from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy import cast, String
 from sqlalchemy.orm import Session as DBSession
 
-from ..database import get_db, utcnow
+from ..database import get_db, utcnow, iso_z
 from ..models import Wing, Squadron, CurriculumItem
 from ..models.wing_calendar import (
     WingHQEvent, SquadronEventStatus, WingEventCurriculumLink,
@@ -89,7 +89,7 @@ def _sqn_status_out(ss: SquadronEventStatus | None) -> dict | None:
         "status": ss.status,
         "notes": ss.notes,
         "reviewed_by": ss.reviewed_by,
-        "reviewed_at": ss.reviewed_at.isoformat() if ss.reviewed_at else None,
+        "reviewed_at": iso_z(ss.reviewed_at) if ss.reviewed_at else None,
         "local_activity_id": ss.local_activity_id,
     }
 
@@ -130,8 +130,8 @@ def _event_out(
         "squadron_status": sqn_status,
         "created_by": e.created_by,
         "updated_by": e.updated_by,
-        "created_at": e.created_at.isoformat() if e.created_at else None,
-        "updated_at": e.updated_at.isoformat() if e.updated_at else None,
+        "created_at": iso_z(e.created_at) if e.created_at else None,
+        "updated_at": iso_z(e.updated_at) if e.updated_at else None,
     }
 
 

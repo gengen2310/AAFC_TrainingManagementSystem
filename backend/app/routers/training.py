@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import List, Literal, Optional
 from sqlalchemy.orm import Session as DBSession
 
-from ..database import get_db, utcnow
+from ..database import get_db, utcnow, iso_z
 from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
                       Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, SessionStatusReasonTag, TrainingArea, Equipment,
                       Activity, Cadet, Squadron, TimingTemplate, TimingBlock, SystemSetting, TrainingClass, PlanningYear,
@@ -657,8 +657,8 @@ def _notice_out(n) -> dict:
         "created_by": n.created_by,
         "is_archived": n.is_archived,
         "version": n.version,
-        "created_at": n.created_at.isoformat() if n.created_at else None,
-        "updated_at": n.updated_at.isoformat() if n.updated_at else None,
+        "created_at": iso_z(n.created_at) if n.created_at else None,
+        "updated_at": iso_z(n.updated_at) if n.updated_at else None,
     }
 
 
@@ -962,7 +962,7 @@ def get_status_history(sid: str, db: DBSession = Depends(get_db), p: Principal =
     rows = db.query(SessionStatusHistory).filter(
         SessionStatusHistory.session_id == sid).order_by(SessionStatusHistory.timestamp).all()
     return [{"old_status": r.old_status, "new_status": r.new_status, "changed_by": r.changed_by,
-             "reason": r.reason, "timestamp": r.timestamp.isoformat()} for r in rows]
+             "reason": r.reason, "timestamp": iso_z(r.timestamp)} for r in rows]
 
 
 def _denormalise(db, s: Session, cid, fid, rid):
@@ -1286,7 +1286,7 @@ def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends
                 "existing_type": existing.type,
                 "existing_subject_areas": _parse_json_list(existing.subject_areas),
                 "existing_active_status": existing.active_status,
-                "existing_updated_at": existing.updated_at.isoformat() if existing.updated_at else None,
+                "existing_updated_at": iso_z(existing.updated_at) if existing.updated_at else None,
             })
     rank = _normalise_rank(body.current_rank)
     f = Facilitator(squadron_id=s.id, wing_id=s.wing_id, first_name=body.first_name,
@@ -1655,7 +1655,7 @@ def _membership_dict(m: CadetClassMembership, tc: TrainingClass | None = None) -
         "training_stage_id": tc.training_stage_id if tc else None,
         "start_date": m.start_date, "end_date": m.end_date, "active_status": m.active_status,
         "source": m.source, "version": m.version,
-        "created_at": m.created_at.isoformat() if m.created_at else None,
+        "created_at": iso_z(m.created_at) if m.created_at else None,
     }
 
 
@@ -5249,7 +5249,7 @@ def _tag_out(t: SubjectAreaTag) -> dict:
         "wing_id": t.wing_id,
         "is_active": t.is_active,
         "created_by": t.created_by,
-        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "created_at": iso_z(t.created_at) if t.created_at else None,
     }
 
 
@@ -5395,7 +5395,7 @@ def _fac_type_out(t: FacilitatorTypeTag) -> dict:
         "wing_id": t.wing_id,
         "is_active": t.is_active,
         "created_by": t.created_by,
-        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "created_at": iso_z(t.created_at) if t.created_at else None,
     }
 
 
@@ -5542,7 +5542,7 @@ def _reason_out(t: SessionStatusReasonTag) -> dict:
         "wing_id": t.wing_id,
         "is_active": t.is_active,
         "created_by": t.created_by,
-        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "created_at": iso_z(t.created_at) if t.created_at else None,
     }
 
 
@@ -5708,7 +5708,7 @@ def _template_out(t: ParadeNightTemplate, include_sessions: bool = False) -> dic
         "description": t.description,
         "squadron_id": t.squadron_id,
         "session_count": len(t.sessions) if t.sessions is not None else 0,
-        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "created_at": iso_z(t.created_at) if t.created_at else None,
         "sessions": [
             {
                 "id": s.id,

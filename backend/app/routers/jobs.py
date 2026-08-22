@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
-from ..database import get_db
+from ..database import get_db, iso_z
 from ..dependencies import get_principal
 from ..permissions import Principal, require_role
 from ..models.program import JobStatus
@@ -47,9 +47,9 @@ def get_job(job_id: str, db: DBSession = Depends(get_db), p: Principal = Depends
         "progress_percentage": job.progress_percentage,
         "result_reference": job.result_reference,
         "error_message": job.error_message,
-        "started_at": job.started_at.isoformat() if job.started_at else None,
-        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
-        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "started_at": iso_z(job.started_at) if job.started_at else None,
+        "completed_at": iso_z(job.completed_at) if job.completed_at else None,
+        "created_at": iso_z(job.created_at) if job.created_at else None,
     }
 
 
