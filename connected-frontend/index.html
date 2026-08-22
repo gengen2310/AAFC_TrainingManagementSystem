@@ -301,6 +301,44 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .yn-row-act{background:none;border:none;font-size:var(--fs-xs);font-weight:700;font-family:inherit;cursor:pointer;color:var(--royal);text-decoration:underline;text-underline-offset:2px;padding:0 6px 0 0;}
 .yn-row-act:hover{opacity:.7;}
 .yn-row-act-del{color:#c01530;}
+/* ── Training Years list ────────────────────────────────────────────────────
+   One presentation for both surfaces that manage years (the Unit Setup card
+   and the Manage Training Years modal). They previously rendered from two
+   separate code paths -- a read-only 2-column table in Unit Setup and a
+   3-column action table in the modal -- so the same objects looked like two
+   different features. Built from the tokens the rest of the app already uses:
+   --surface, --border, --dark, --blue, and the existing .yn-chip status pills. */
+.yn-year-list{display:flex;flex-direction:column;gap:8px;}
+.yn-year-row{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:var(--surface);border:1px solid var(--border);
+  border-left:4px solid var(--border);border-radius:8px;padding:11px 14px;
+}
+.yn-year-row.is-current{border-left-color:var(--blue);background:var(--accent-light);}
+.yn-year-row.is-arch{background:var(--surface-2);}
+.yn-year-id{display:flex;align-items:baseline;gap:9px;min-width:118px;}
+.yn-year-num{
+  font-size:var(--fs-xl);font-weight:800;color:var(--dark);line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+.yn-year-row.is-arch .yn-year-num{color:var(--muted);}
+.yn-year-body{flex:1 1 190px;min-width:0;}
+.yn-year-name{
+  font-size:var(--fs-sm);font-weight:600;color:var(--text);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.yn-year-meta{font-size:var(--fs-2xs);color:var(--muted);margin-top:2px;}
+.yn-year-acts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto;}
+.yn-current-tag{
+  font-size:var(--fs-3xs);font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--royal);border:1px solid var(--blue);border-radius:10px;padding:2px 8px;
+  background:var(--surface);white-space:nowrap;
+}
+.yn-empty{color:var(--muted);font-size:var(--fs-sm);padding:14px 0;}
+@media(max-width:560px){
+  .yn-year-acts{margin-left:0;width:100%;}
+  .yn-year-id{min-width:0;}
+}
 .cea-row-new td{background:#f0fbf4;}
 .cea-row-update td{background:#eef6fc;}
 .cea-conflict-toggle{font-size:var(--fs-xs);font-weight:700;font-family:inherit;border:1px solid var(--border);border-radius:4px;padding:3px 8px;cursor:pointer;background:var(--bg);}
@@ -1487,7 +1525,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <button class="cal-nbtn" onclick="calMove(1)" aria-label="Next month">›</button>
             <div style="flex:1"></div>
             <select onchange="calYear=+this.value;renderCal()" id="cal-yr" aria-label="Calendar year" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:var(--fs-sm);">
-              <option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
+              <!-- CAL-1: options are built at runtime by _syncCalYearOptions() from the
+                   training years and the dates actually present. This list used to be
+                   hardcoded 2025/2026/2027, so a year created outside that range could
+                   never be reached and the calendar appeared not to update. -->
             </select>
           </div>
           <div class="cal-hdr" id="cal-hdr"></div>
@@ -1917,10 +1958,14 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <p style="font-size:var(--fs-2xs);color:var(--muted);margin-top:8px">Comfortable is the default and recommended setting for most users.</p>
         </div>
         <div class="card admin-el" id="settings-training-years-wrap">
-          <div class="card-header d-flex align-items-center justify-content-between" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
             <div class="ctitle" style="margin:0">Training Years</div>
-            <button class="btn btn-sm admin-el" onclick="ynCreateYear()">+ Create Year</button>
+            <button class="btn btn-sky admin-el" onclick="ynCreateYear()">+ Create <span id="ynCreateLabelCard">next year</span></button>
           </div>
+          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 12px">
+            Each training year holds its own parade dates, training classes and holiday periods.
+            Roll a year over to start the next one from a copy rather than rebuilding it by hand.
+          </p>
           <div id="settings-yn-table-wrap"><p class="muted" style="padding:12px 0;font-size:var(--fs-xs)">Loading…</p></div>
           <div id="settings-yn-postcreate" style="display:none" class="alert a-info mt-2"></div>
         </div>
@@ -1929,7 +1974,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:10px">Named parade night schedules with ordered blocks. Training Period blocks generate schedulable curriculum sessions. New parade nights automatically use the template effective on their date.</div>
           <div id="timing-templates-list" style="margin-bottom:12px"><div style="color:var(--muted);font-size:var(--fs-xs)">Loading…</div></div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
-            <button class="btn btn-dk admin-el" onclick="openTimingTemplateModal()">+ New Template</button>
+            <button class="btn btn-sky admin-el" onclick="openTimingTemplateModal()">+ New Template</button>
             <span id="timing-msg" style="font-size:var(--fs-xs);font-weight:700"></span>
           </div>
         </div>
@@ -3675,6 +3720,45 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   </div>
 </div>
 
+<!-- ROLL OVER YEAR MODAL -->
+<div class="modal-bg" id="m-rollover-year" role="dialog" aria-modal="true" aria-labelledby="m-rollover-title" onclick="if(event.target===this)closeModal('m-rollover-year')">
+  <div class="modal" style="max-width:520px;width:96vw">
+    <div class="modal-hdr" style="background:var(--dark);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:8px 8px 0 0">
+      <span id="m-rollover-title" style="color:#fff;font-size:var(--fs-md);font-weight:800;letter-spacing:.03em">Roll over training year</span>
+      <button class="modal-x" onclick="closeModal('m-rollover-year')" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:20px 24px 24px">
+      <p class="muted" style="font-size:var(--fs-xs);margin:0 0 16px">
+        Starts a new training year from <strong id="ro-source-year"></strong>. Parade dates move forward by
+        the same number of years. Nothing in the source year is changed.
+      </p>
+      <div class="form-group">
+        <label for="ro-target-year">New year</label>
+        <input type="number" id="ro-target-year" min="1990" max="2999" step="1" style="max-width:140px">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px;margin:14px 0 4px">
+        <label class="chk-item" style="display:flex;align-items:center;gap:9px;font-size:var(--fs-sm);cursor:pointer">
+          <input type="checkbox" id="ro-copy-classes" checked> Copy training classes
+        </label>
+        <label class="chk-item" style="display:flex;align-items:center;gap:9px;font-size:var(--fs-sm);cursor:pointer">
+          <input type="checkbox" id="ro-copy-holidays" checked> Copy holiday periods
+        </label>
+        <label class="chk-item" style="display:flex;align-items:center;gap:9px;font-size:var(--fs-sm);cursor:pointer">
+          <input type="checkbox" id="ro-carry-sessions" checked> Note sessions not yet delivered
+        </label>
+      </div>
+      <p class="muted" style="font-size:var(--fs-2xs);margin:10px 0 0">
+        Anchor events are not copied \u2014 set those on the new year once its dates are confirmed.
+      </p>
+      <p id="ro-msg" style="font-size:var(--fs-sm);margin-top:10px"></p>
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="btn btn-secondary" onclick="closeModal('m-rollover-year')">Cancel</button>
+        <button class="btn btn-primary" id="ro-confirm-btn" onclick="ynDoRollover()">Roll over</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MANAGE YEARS MODAL -->
 <div class="modal-bg" id="m-manage-years" role="dialog" aria-modal="true" onclick="if(event.target===this)closeModal('m-manage-years')">
   <div class="modal" style="max-width:600px;width:96vw">
@@ -3683,7 +3767,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <button class="modal-x" onclick="closeModal('m-manage-years')" aria-label="Close">&times;</button>
     </div>
     <div class="modal-body" style="padding:20px 24px 28px">
-      <button class="btn btn-ok btn-sm" id="ynCreateBtn" onclick="ynCreateYear()" style="margin-bottom:18px">+ Create <span id="ynCreateLabel">next year</span></button>
+      <button class="btn btn-sky" id="ynCreateBtn" onclick="ynCreateYear()" style="margin-bottom:18px">+ Create <span id="ynCreateLabel">next year</span></button>
       <div id="ynManageTable"></div>
     </div>
   </div>
@@ -4841,6 +4925,11 @@ async function loadData(){
   const p_holidays=_sqnId?(async()=>{
     try{
       const years=await api('/api/planning/years?unit_id='+encodeURIComponent(_sqnId));
+      // CAL-1: this fetch already had the year list and threw it away, so P.years
+      // stayed empty until the planning page happened to load. The Training
+      // Calendar's year selector is built from it, which is why a newly created
+      // year did not appear there.
+      if(typeof P!=='undefined') P.years=years||[];
       const activeIds=(years||[]).filter(y=>y.active_status).map(y=>y.planning_year_id);
       const lists=await Promise.all(activeIds.map(id=>api('/api/planning/years/'+id+'/holidays').catch(()=>[])));
       return lists.flat();
@@ -5461,7 +5550,7 @@ function bootApp(){
   if (_utNote) _utNote.textContent = (S.role === 'sqn_admin') ? 'Set by wing or national admin' : '';
   renderTimingTemplates();
   const ccMsg=document.getElementById('cc-msg'); if(ccMsg)ccMsg.textContent='';
-  calYear=new Date().getFullYear();calMonth=new Date().getMonth();
+  calYear=_calDefaultYear();calMonth=new Date().getMonth();
   populateWPDD();
   _restorePNFilters();
   _restoreMissionFilters();
@@ -7711,22 +7800,15 @@ async function renderSettings(){
   }
   renderUserDir();
   loadCustomPhases();
-  // Load year list into Training Years settings card
+  // Load year list into the Training Years settings card. Uses the same
+  // renderer as the Manage Training Years modal -- this block used to draw its
+  // own 2-column read-only table, which is why the two surfaces looked like
+  // different features.
   (async () => {
     const wrap = document.getElementById('settings-yn-table-wrap');
     if (!wrap) return;
     try {
-      const years = await api('/api/planning/years');
-      if (!years || !years.length) {
-        wrap.innerHTML = '<p class="muted" style="font-size:var(--fs-xs);padding:4px 0">No training years yet.</p>';
-        return;
-      }
-      const sorted = [...years].sort((a, b) => b.year - a.year);
-      wrap.innerHTML = '<div class="tw"><table class="data-table"><thead><tr><th>Year</th><th>Status</th></tr></thead><tbody>' +
-        sorted.map(y => `<tr>
-          <td style="font-weight:700">${esc(String(y.year))}</td>
-          <td><span class="badge ${y.active_status ? 'b-ok' : 'b-grey'}">${esc(y.active_status ? 'Active' : 'Archived')}</span></td>
-        </tr>`).join('') + '</tbody></table></div>';
+      await ynRefreshAllYearViews();
     } catch(e) { wrap.innerHTML = '<p style="color:var(--red);font-size:var(--fs-xs)">Failed to load years.</p>'; }
   })();
 }
@@ -8602,7 +8684,32 @@ async function _refreshCalendar(){
   // not on a plain reload, so the currently-viewed month/year survives.
   await _pageRefresh('cal-refresh-status', async()=>{ await loadData(); renderCal(); });
 }
+// CAL-1: rebuild the calendar year list from what exists -- the training years
+// plus every year that actually carries a parade night or activity. Always
+// includes the year currently shown so the <select> can never render blank.
+function _syncCalYearOptions(){
+  const sel=document.getElementById('cal-yr');
+  if(!sel) return;
+  const yrs=new Set();
+  const add=v=>{const n=parseInt(v,10); if(n>=1990&&n<=2999) yrs.add(n);};
+  ((typeof P!=='undefined'&&P.years)||[]).forEach(y=>add(y&&y.year));
+  ((typeof S!=='undefined'&&S.pns)||[]).forEach(x=>add(String(x.date||'').slice(0,4)));
+  ((typeof S!=='undefined'&&S.acts)||[]).forEach(x=>add(String(x.date||'').slice(0,4)));
+  add(new Date().getFullYear());
+  add(calYear);
+  const list=[...yrs].sort((a,b)=>a-b);
+  sel.innerHTML=list.map(y=>`<option value="${y}">${y}</option>`).join('');
+}
+
+// CAL-2: the calendar opened on the wall-clock year even when the unit was
+// planning a different training year, so a newly created year was never shown.
+function _calDefaultYear(){
+  const ty=(typeof P!=='undefined'&&P.currentYearInt)?parseInt(P.currentYearInt,10):null;
+  return (ty&&ty>=1990&&ty<=2999)?ty:new Date().getFullYear();
+}
+
 function renderCal(){
+  _syncCalYearOptions();
   document.getElementById('cal-m').textContent=MONTHS[calMonth]+' '+calYear;
   document.getElementById('cal-yr').value=calYear;
   document.getElementById('cal-hdr').innerHTML=DAYS.map(d=>`<div class="cal-dn">${d}</div>`).join('');
@@ -11170,6 +11277,16 @@ function setCurrentYear(yearObj, reload) {
   if (!yearObj) return;
   P.currentYearId = yearObj.planning_year_id;
   P.currentYearInt = yearObj.year;
+  // CAL-2: the Training Calendar follows the training year. Without this,
+  // creating or switching a year left the calendar sitting on whatever year it
+  // booted with, which is what "the calendar doesn't update" looked like.
+  const _cy = parseInt(yearObj.year, 10);
+  if (_cy >= 1990 && _cy <= 2999) {
+    calYear = _cy;
+    if (typeof _syncCalYearOptions === 'function') _syncCalYearOptions();
+    const _calPage = document.getElementById('page-calendar');
+    if (_calPage && _calPage.classList.contains('active')) renderCal();
+  }
   _ynUpdateDisplay();
   _ynUpdateArrows();
   if (typeof ynSyncPwBadge === 'function') ynSyncPwBadge();
@@ -11270,64 +11387,163 @@ function ynOpenManage() {
 
 // ── Manage Years Panel ──────────────────────────────────────────────────────
 
+// YR-1: the next training year follows the year currently being planned (or the
+// real calendar year), not the largest year that has ever existed -- a single
+// stray year would otherwise push every subsequent Create Year along with it.
+function _ynNextYearNumber(){
+  const existing=new Set(((typeof P!=='undefined'&&P.years)||[]).map(y=>parseInt(y&&y.year,10)));
+  const cur=parseInt((typeof P!=='undefined'&&P.currentYearInt)||0,10);
+  const base=(cur>=1990&&cur<=2998)?cur:new Date().getFullYear();
+  let n=base+1;
+  while(existing.has(n)&&n<=2999) n++;
+  return n;
+}
+
+// One renderer for every surface that lists training years, so the Unit Setup
+// card and the Manage Training Years modal cannot drift apart again.
+// `canWrite` gates the destructive actions; `compact` drops the description.
+function _ynRenderYearList(el, years, opts){
+  opts = opts || {};
+  const canWrite = opts.canWrite !== false;
+  years = (years||[]).slice().sort((a,b)=> b.year - a.year);
+  if(!years.length){
+    el.innerHTML = '<div class="yn-empty">No training years yet. Create one to start planning.</div>';
+    return;
+  }
+  const curId = (typeof P!=='undefined') ? P.currentYearId : null;
+  el.innerHTML = '<div class="yn-year-list">' + years.map(function(y){
+    const id = y.planning_year_id;
+    const isCur = id === curId;
+    const active = !!y.active_status;
+    const cls = 'yn-year-row' + (isCur?' is-current':'') + (active?'':' is-arch');
+    // The name is only worth a line of its own when it says something the year
+    // number does not.
+    const nameLine = (y.name && String(y.name) !== String(y.year))
+      ? '<div class="yn-year-name">'+esc(String(y.name))+'</div>' : '';
+    const created = y.created_at ? fmtD(String(y.created_at).slice(0,10),{day:'numeric',month:'short',year:'numeric'}) : '';
+    const meta = [ active?'Active':'Archived', created?('Created '+created):'' ]
+      .filter(Boolean).join(' \u00b7 ');
+    let acts = '';
+    if(canWrite && active){
+      acts += '<button class="btn btn-xs btn-sky" title="Copy this year\u2019s parade dates, holidays and training classes into a new year" '
+           +  'onclick="ynOpenRollover(\''+esc(id)+'\','+(+y.year)+')">Roll over \u2192</button>';
+    }
+    acts += '<button class="btn btn-xs btn-out" onclick="ynExportYear(\''+esc(id)+'\','+(+y.year)+')">Export</button>';
+    if(canWrite){
+      acts += active
+        ? '<button class="btn btn-xs btn-out" onclick="ynArchiveYear(\''+esc(id)+'\')">Archive</button>'
+        : '<button class="btn btn-xs btn-out" onclick="ynRestoreYear(\''+esc(id)+'\')">Restore</button>';
+      if(!active){
+        acts += '<button class="btn btn-xs btn-red" onclick="ynDeleteYear(\''+esc(id)+'\','+(+y.year)+')">Delete</button>';
+      }
+    }
+    return '<div class="'+cls+'">'
+      + '<div class="yn-year-id"><span class="yn-year-num">'+esc(String(y.year))+'</span>'
+      + (isCur?'<span class="yn-current-tag">Planning now</span>':'')
+      + '</div>'
+      + '<div class="yn-year-body">'+nameLine+'<div class="yn-year-meta">'+esc(meta)+'</div></div>'
+      + '<div class="yn-year-acts">'+acts+'</div>'
+      + '</div>';
+  }).join('') + '</div>';
+}
+
+// Both year surfaces load through here.
+async function _ynFetchYears(){
+  const all = await api('/api/planning/years');
+  if(typeof P!=='undefined') P.years = all || [];
+  return all || [];
+}
+
+// Repaint every year surface that is currently in the DOM.
+async function ynRefreshAllYearViews(){
+  let years;
+  try{ years = await _ynFetchYears(); }catch(e){ return; }
+  const modalEl = document.getElementById('ynManageTable');
+  if(modalEl) _ynRenderYearList(modalEl, years, {canWrite:canWriteSquadron()});
+  const cardEl = document.getElementById('settings-yn-table-wrap');
+  if(cardEl) _ynRenderYearList(cardEl, years, {canWrite:canWriteSquadron()});
+  const lbl = document.getElementById('ynCreateLabel');
+  if(lbl) lbl.textContent = String(_ynNextYearNumber());
+  const lbl2 = document.getElementById('ynCreateLabelCard');
+  if(lbl2) lbl2.textContent = String(_ynNextYearNumber());
+  if(typeof _syncCalYearOptions==='function') _syncCalYearOptions();
+}
+
 async function ynLoadManagePanel(){
   const tbl=document.getElementById('ynManageTable');
   if(!tbl) return;
-  tbl.innerHTML='<div class="muted" style="padding:12px 0">Loading…</div>';
-  let years;
-  try{ years=await api('/api/planning/years'); }
-  catch(e){ tbl.innerHTML='<div class="sc-status-err">Could not load years: '+esc(apiErr(e))+'</div>'; return; }
-  years=(years||[]).sort((a,b)=>b.year-a.year);
-  const nextNum=years.length?years[0].year+1:new Date().getFullYear()+1;
-  const lbl=document.getElementById('ynCreateLabel');
-  if(lbl) lbl.textContent=String(nextNum);
-  if(!years.length){
-    tbl.innerHTML='<div class="muted" style="padding:12px 0">No training years yet. Create the first one above.</div>';
+  tbl.innerHTML='<div class="yn-empty">Loading\u2026</div>';
+  try{ await ynRefreshAllYearViews(); }
+  catch(e){ tbl.innerHTML='<div class="sc-status-err">Could not load years: '+esc(apiErr(e))+'</div>'; }
+}
+
+// ── Year rollover ───────────────────────────────────────────────────────────
+// POST /api/planning/years/{id}/rollover has existed and been covered by 21
+// backend tests for some time; nothing in this frontend ever called it, so
+// there was no way to start a year from the previous one without rebuilding it
+// by hand.
+let _ynRolloverSrcId=null;
+function ynOpenRollover(id, year){
+  _ynRolloverSrcId=id;
+  const target=(+year)+1;
+  const t=document.getElementById('ro-target-year'); if(t) t.value=target;
+  const src=document.getElementById('ro-source-year'); if(src) src.textContent=String(year);
+  ['ro-copy-holidays','ro-copy-classes','ro-carry-sessions'].forEach(function(k){
+    const c=document.getElementById(k); if(c) c.checked=true;
+  });
+  const msg=document.getElementById('ro-msg'); if(msg){msg.textContent='';msg.className='';}
+  openModal('m-rollover-year');
+}
+async function ynDoRollover(){
+  const msg=document.getElementById('ro-msg');
+  const btn=document.getElementById('ro-confirm-btn');
+  if(!_ynRolloverSrcId) return;
+  const target=parseInt((document.getElementById('ro-target-year')||{}).value,10);
+  if(!(target>=1990&&target<=2999)){
+    if(msg){msg.textContent='Enter a target year between 1990 and 2999.';msg.className='sc-status-err';}
     return;
   }
-  const rows=years.map(function(y){
-    const id=y.planning_year_id;
-    const chipCls=y.active_status?'yn-chip yn-chip-active':'yn-chip yn-chip-arch';
-    const chipLbl=y.active_status?'Active':'Archived';
-    const archOrRestore=y.active_status
-      ?'<button class="yn-row-act" onclick="ynArchiveYear(\''+esc(id)+'\')">Archive</button>'
-      :'<button class="yn-row-act" onclick="ynRestoreYear(\''+esc(id)+'\')">Restore</button>';
-    const delBtn=y.active_status?''
-      :'<button class="yn-row-act yn-row-act-del" onclick="ynDeleteYear(\''+esc(id)+'\','+y.year+')">Delete</button>';
-    return '<tr>'
-      +'<td style="font-weight:800;font-size:var(--fs-md);color:var(--dark)">'+esc(String(y.year))+'</td>'
-      +'<td><span class="'+chipCls+'">'+chipLbl+'</span></td>'
-      +'<td>'
-        +'<button class="yn-row-act" onclick="ynExportYear(\''+esc(id)+'\','+y.year+')">Export</button>'
-        +archOrRestore
-        +delBtn
-      +'</td>'
-      +'</tr>';
-  }).join('');
-  tbl.innerHTML='<table class="yn-mgmt-table"><thead><tr><th>Year</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  const body={
+    target_year: target,
+    copy_holidays: !!(document.getElementById('ro-copy-holidays')||{}).checked,
+    copy_training_classes: !!(document.getElementById('ro-copy-classes')||{}).checked,
+    carry_incomplete_sessions: !!(document.getElementById('ro-carry-sessions')||{}).checked,
+  };
+  if(btn){btn.disabled=true;btn.textContent='Rolling over\u2026';}
+  if(msg){msg.textContent='';msg.className='';}
+  try{
+    const r=await api('/api/planning/years/'+_ynRolloverSrcId+'/rollover',{method:'POST',body});
+    closeModal('m-rollover-year');
+    const bits=[
+      r.parade_dates_copied+' parade date'+(r.parade_dates_copied===1?'':'s'),
+      r.holidays_copied+' holiday period'+(r.holidays_copied===1?'':'s'),
+      r.training_classes_copied+' training class'+(r.training_classes_copied===1?'':'es'),
+    ];
+    showToast('Training year '+r.year+' created from '+ (document.getElementById('ro-source-year')||{}).textContent
+      +'. Copied '+bits.join(', ')+'.');
+    await ynRefreshAllYearViews();
+    const newY=(P.years||[]).find(function(y){return y.planning_year_id===r.new_planning_year_id;});
+    if(newY) setCurrentYear(newY);
+    await reloadAndRender();
+  }catch(e){
+    const d=e&&e.body&&e.body.detail;
+    if(d&&d.error==='planning_year_already_exists'){
+      if(msg){msg.textContent='Training year '+target+' already exists for this unit. Choose a different target year.';msg.className='sc-status-err';}
+    } else if(msg){ msg.textContent=apiErr(e); msg.className='sc-status-err'; }
+  } finally {
+    if(btn){btn.disabled=false;btn.textContent='Roll over';}
+  }
 }
 
 async function ynCreateYear(){
-  const sorted=[...(P.years||[])].sort((a,b)=>a.year-b.year);
-  const next=sorted.length?sorted[sorted.length-1].year+1:new Date().getFullYear()+1;
+  const next=_ynNextYearNumber();
   try{
     await api('/api/planning/years',{method:'POST',body:{year:next,name:String(next),active_status:true}});
     const all=await api('/api/planning/years');
     P.years=(all||[]);
     const newY=(all||[]).find(y=>y.year===next);
     if(newY) setCurrentYear(newY);
-    await ynLoadManagePanel();
-    // Post-create prompt: refresh settings card and show guidance
-    const wrap=document.getElementById('settings-yn-table-wrap');
-    if(wrap){
-      try{
-        const years2=await api('/api/planning/years');
-        const sorted2=[...(years2||[])].sort((a,b)=>b.year-a.year);
-        wrap.innerHTML='<div class="tw"><table class="data-table"><thead><tr><th>Year</th><th>Status</th></tr></thead><tbody>'+
-          sorted2.map(y=>`<tr><td style="font-weight:700">${esc(String(y.year))}</td><td><span class="badge ${y.active_status?'b-ok':'b-grey'}">${esc(y.active_status?'Active':'Archived')}</span></td></tr>`).join('')+
-          '</tbody></table></div>';
-      } catch(_){}
-    }
+    await ynRefreshAllYearViews();
     const postWrap=document.getElementById('settings-yn-postcreate');
     if(postWrap){
       postWrap.innerHTML=`Year <strong>${esc(String(next))}</strong> created. ` +
@@ -11346,7 +11562,7 @@ async function ynArchiveYear(id){
     await api('/api/planning/years/'+id,{method:'PATCH',body:{active_status:false}});
     const all=await api('/api/planning/years');
     P.years=(all||[]);
-    await ynLoadManagePanel();
+    await ynRefreshAllYearViews();
   } catch(e){ showToast('Archive failed: '+apiErr(e),true); }
 }
 
@@ -11355,7 +11571,7 @@ async function ynRestoreYear(id){
     await api('/api/planning/years/'+id,{method:'PATCH',body:{active_status:true}});
     const all=await api('/api/planning/years');
     P.years=(all||[]);
-    await ynLoadManagePanel();
+    await ynRefreshAllYearViews();
   } catch(e){ showToast('Restore failed: '+apiErr(e),true); }
 }
 
@@ -11365,7 +11581,7 @@ function ynDeleteYear(id,yearNum){
       await api('/api/planning/years/'+id,{method:'DELETE'});
       const all=await api('/api/planning/years');
       P.years=(all||[]);
-      await ynLoadManagePanel();
+      await ynRefreshAllYearViews();
     } catch(e){ showToast('Delete failed: '+apiErr(e),true); }
   },true);
 }
@@ -13941,6 +14157,26 @@ const _EVENT_TYPE_LABELS = {
 };
 const _CADET_GROUPS = ['orientation','initial','junior','intermediate','senior'];
 
+// YR-3: choose the training year a unit is most likely to want on open.
+// Preference order: the active year matching today's calendar year, then the
+// nearest active year still ahead, then the most recent active year behind,
+// then whatever exists. Previously this was "first active in a year-descending
+// list", i.e. always the newest year created.
+function _pickDefaultYear(list){
+  const yrs=(list||[]).filter(Boolean);
+  if(!yrs.length) return null;
+  const act=yrs.filter(y=>y.active_status);
+  const pool=act.length?act:yrs;
+  const now=new Date().getFullYear();
+  const exact=pool.find(y=>parseInt(y.year,10)===now);
+  if(exact) return exact;
+  const ahead=pool.filter(y=>parseInt(y.year,10)>now).sort((a,b)=>a.year-b.year);
+  if(ahead.length) return ahead[0];
+  const behind=pool.filter(y=>parseInt(y.year,10)<now).sort((a,b)=>b.year-a.year);
+  if(behind.length) return behind[0];
+  return pool[0];
+}
+
 // ── Populate year selects; auto-select active/first year and return its ID ──
 async function _loadPlanningYears() {
   try {
@@ -13952,9 +14188,11 @@ async function _loadPlanningYears() {
     const visibleYears = filterSqnId
       ? P.years.filter(y=>y.unit_id===filterSqnId)
       : P.years;
-    // Auto-select: prefer the active year in visible set; fall back to first
+    // YR-3: prefer the year actually being run today. The list arrives ordered
+    // year DESC, so "first active" meant "highest year ever created" -- open a
+    // year for a future season and the whole app silently jumped to it.
     if(!P.currentYearId && visibleYears.length) {
-      const active = visibleYears.find(y=>y.active_status) || visibleYears[0];
+      const active = _pickDefaultYear(visibleYears);
       P.currentYearId = active.planning_year_id;
     }
     const selIds = [
