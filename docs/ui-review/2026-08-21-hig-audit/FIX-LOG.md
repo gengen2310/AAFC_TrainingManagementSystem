@@ -522,3 +522,64 @@ what renders; static enumeration covers what could render.
 - Only the `sqn_admin` role was walked. `wing_admin`, `national_admin`, `auditor` and
   `system_admin` have their own pages and were not measured.
 - G10 (adaptive layout) and G12 (data integrity) remain unassessed.
+
+---
+
+## FIX-09 · All five roles measured
+
+Every earlier result covered `sqn_admin` only. Signed in as each role in turn through the
+real login handler against the local backend.
+
+| Role | Pages | Text pairs | Contrast | hit <28px | Unlabelled |
+|---|---|---|---|---|---|
+| `sqn_admin` (703SQN) | 13 | 478 | **0** | 0 | 13 |
+| `wing_admin` (7WG) | 8 | 267 | **0** | 41 | 5 |
+| `national_admin` | 8 | 263 | **0** | 51 | 5 |
+| `system_admin` | 10 | 352 | **0** | 69 → 51 | 10 |
+| `auditor` | 2 | 52 | **0** | 0 | 1 |
+| **total** | **41 page-visits** | **1,412** | **0** | | |
+
+**Contrast is clean across every role.** 1,412 text pairs, zero failures. Seven screens were
+measured here for the first time in the whole audit: Wing Overview, Wing Activities, Wing HQ
+Calendar, National Overview, National Activities, Audit, and System Console.
+
+### One new fix
+
+System Console rendered 18 inline-styled "Archive" buttons at **40×13** (`padding:1px 4px`,
+`font-size:9px`). Now `.btn-icon` with `padding:2px 8px` — the same pattern as the reference-badge
+archive control found earlier, in a different template.
+
+### Proxy Mode was already active on the wing_admin account
+
+Signing in as `wing_admin` showed the *squadron* nav, not the wing nav, and the debug bar read
+`mode PROXY active`. `effectiveScope()` returns `squadron` while proxy is on, which is correct
+behaviour — but it means **the wing pages are invisible until proxy is exited**, and a sweep that
+did not check would have silently re-measured the squadron pages and reported them as wing.
+
+It was not a state leak: `S.proxy` came from the server, not `sessionStorage`, and
+`proxy_sessions` holds a matching active row that predates this session. Pre-existing test data.
+Verified in the database before drawing any conclusion — the alternative read (proxy leaking
+across a sign-out) would have been a serious security finding, and it would have been wrong.
+
+### What remains
+
+| Item | Count | Where |
+|---|---|---|
+| bare checkboxes below 28px | 49 | Account Management, all admin roles |
+| `.seg-btn` below 28px | 2 | Wing HQ Calendar |
+| unlabelled form fields | 5–10 per role | Account Management, Unit Setup, System Console |
+
+The checkboxes are 18×18 after the earlier fix and sit in table cells with no wrapping label, so
+the control itself is the whole target. Reaching 28px needs either a padded wrapper or a
+`min-height` on the cell — a layout change per table, not a token change.
+
+The unlabelled fields each need a real label naming their purpose. That is content work, not a
+mechanical fix, and guessing names would be worse than leaving them listed.
+
+### Coverage, stated plainly
+
+This is one squadron (703), one wing (7WG), one browser, one viewport, at default text size, on
+seeded synthetic data. Not covered: `national_viewer` and `wing_viewer`, modal dialogs and
+drawers (only the pages behind nav items were visited), any flow behind a native
+`confirm()`/`prompt()` — those block browser automation by design — narrow viewports, and every
+form in an error or validation state.
