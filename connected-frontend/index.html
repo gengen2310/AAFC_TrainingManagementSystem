@@ -6290,7 +6290,7 @@ async function _loadRefList(t){
       if(isArchived){
         return `<span class="badge b-grey" style="display:inline-flex;align-items:center;gap:5px;opacity:.55">${esc(it[t.nameField])} <em style="font-style:normal;opacity:.6;font-size:var(--fs-3xs)">${esc(scopeName)}</em><em style="font-style:normal;font-size:var(--fs-3xs);color:var(--steel)">Archived</em>${mine?` <button onclick="_restoreRefItem('${t.key}','${it[t.idField]}')" style="border:none;background:none;cursor:pointer;color:var(--ok);font-size:var(--fs-xs);padding:0" title="Restore">↩</button>`:''}</span>`;
       }
-      return `<span class="badge b-grey" style="display:inline-flex;align-items:center;gap:5px">${esc(it[t.nameField])} <em style="font-style:normal;opacity:.6;font-size:var(--fs-3xs)">${esc(scopeName)}</em>${mine?` <button onclick="_archiveRefItem('${t.key}','${it[t.idField]}')" style="border:none;background:none;cursor:pointer;color:var(--error);font-size:var(--fs-xs);padding:0" title="Archive">×</button>`:''}</span>`;
+      return `<span class="badge b-grey" style="display:inline-flex;align-items:center;gap:5px">${esc(it[t.nameField])} <em style="font-style:normal;opacity:.6;font-size:var(--fs-3xs)">${esc(scopeName)}</em>${mine?` <button class="btn-icon" onclick="_archiveRefItem('${t.key}','${it[t.idField]}')" style="border:none;background:none;cursor:pointer;color:var(--status-text-danger);flex-shrink:0" aria-label="Archive ${esc(it[t.nameField])}" title="Archive">×</button>`:''}</span>`;
     }).join('');
   }catch(_){ el.innerHTML='<span class="muted" style="font-size:var(--fs-xs)">Could not load.</span>'; }
 }
