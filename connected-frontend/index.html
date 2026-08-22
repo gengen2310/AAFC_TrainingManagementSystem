@@ -770,49 +770,25 @@ tbody td{padding:9px 12px;vertical-align:middle;}
   color: #fff;
   border-color: var(--royal);
 }
-#page-service-desk .sd-layout {
-  display: flex;
-  gap: 0;
-  min-height: 400px;
-  overflow: hidden;
-}
-#page-service-desk .sd-list {
-  flex: 1;
-  overflow-x: auto;
-  transition: flex .18s;
-}
-#page-service-desk .sd-detail {
-  width: 360px;
-  flex-shrink: 0;
-  border-left: 1px solid var(--border);
-  background: var(--surface);
-  transform: translateX(100%);
-  transition: transform .18s;
-  overflow-y: auto;
-  padding: var(--sp-md);
-  box-sizing: border-box;
-}
-#page-service-desk .sd-detail.open {
-  transform: translateX(0);
-}
-#page-service-desk .sd-detail-section {
-  font-size:var(--fs-2xs);
+/* Option A (2026-08-23): the private two-pane layout is gone. The list is a
+   shared .card + .tbl and a ticket opens in the standard modal, so Service Desk
+   now inherits design work done anywhere else instead of drifting.
+   The 4px colour-only status stripe went with it -- the labelled badge in the
+   Status column already carried the same information and survives greyscale. */
+#page-service-desk tr.sd-row-active td { background: var(--accent-light); }
+#page-service-desk .sd-count { margin-left: auto; font-size: var(--fs-xs); color: var(--muted); }
+#page-service-desk .tbl tbody tr { cursor: pointer; }
+#page-service-desk .tbl tbody tr:hover td { background: var(--surface-2); }
+#page-service-desk .tbl tbody tr:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.sd-field-label {
+  font-size: var(--fs-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .05em;
   color: var(--steel);
-  margin: var(--sp-sm) 0 var(--sp-xs);
+  margin: 0 0 4px;
 }
-#page-service-desk .sd-detail hr {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: var(--sp-xs) 0 var(--sp-sm);
-}
-#page-service-desk .sd-row-active td { background: var(--accent-light); }
-#page-service-desk .sd-status-stripe { width: 4px; padding: 0; }
-#page-service-desk .stripe-open { background: var(--blue); }
-#page-service-desk .stripe-in_progress { background: #c97a00; }
-#page-service-desk .stripe-resolved { background: #1a7f4b; }
+.sd-field { margin-bottom: var(--sp-sm); }
 .badge-open   { background: #e0f0fa; color: #004b8d; }
 .badge-in_progress { background: #fff3cd; color: #7a4800; }
 .badge-resolved { background: #d4f0e3; color: #145f38; }
@@ -2540,33 +2516,28 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <option value="feature_request">Feature Request</option>
             <option value="other">Other</option>
           </select>
+          <select id="sd-unit-filter" class="fbar" aria-label="Filter by unit" style="font-size:var(--fs-xs);padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius);min-height:28px" onchange="sdSetUnitFilter(this.value)">
+            <option value="">All units</option>
+          </select>
+          <span class="sd-count" id="sd-count"></span>
         </div>
-        <div class="sd-layout">
-          <div class="sd-list" id="sd-list-container">
-            <table class="tbl" id="sd-table" style="width:100%">
-              <thead>
-                <tr>
-                  <th style="width:4px;padding:0"></th>
-                  <th>Date</th>
-                  <th>Submitted By</th>
-                  <th>Unit</th>
-                  <th>Category</th>
-                  <th>Issue</th>
-                  <th>Assigned</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="sd-tbody"></tbody>
-            </table>
-            <div id="sd-empty" style="display:none;text-align:center;padding:var(--sp-xl);color:var(--muted);font-size:var(--fs-base)">
-              No tickets
-            </div>
-          </div>
-          <div class="sd-detail" id="sd-detail">
-            <div style="display:flex;justify-content:flex-end">
-              <button class="btn btn-secondary btn-icon" onclick="sdCloseDetail()" aria-label="Close detail panel" title="Close">✕</button>
-            </div>
-            <div id="sd-detail-content"></div>
+        <div class="card" style="padding:0;overflow-x:auto">
+          <table class="tbl" id="sd-table" style="width:100%">
+            <thead>
+              <tr>
+                <th>Raised</th>
+                <th>Submitted by</th>
+                <th>Unit</th>
+                <th>Category</th>
+                <th>Issue</th>
+                <th>Assigned</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="sd-tbody"></tbody>
+          </table>
+          <div id="sd-empty" style="display:none;text-align:center;padding:var(--sp-xl);color:var(--muted);font-size:var(--fs-base)">
+            No tickets match these filters.
           </div>
         </div>
       </div>
@@ -3227,6 +3198,25 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('m-getting-help')">Cancel</button>
       <button class="btn btn-primary" onclick="doSaveGettingHelp()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Service Desk: one ticket, opened from the list -->
+<div class="modal-bg" id="m-sd-ticket" role="dialog" aria-modal="true" aria-labelledby="m-sd-ticket-title">
+  <div class="modal" style="max-width:620px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <div>
+        <h2 id="m-sd-ticket-title" style="margin:0">Ticket</h2>
+        <div id="sd-t-meta" class="muted" style="font-size:var(--fs-xs);margin-top:2px"></div>
+      </div>
+      <div id="sd-t-status-badge"></div>
+    </div>
+    <div id="sd-t-body" style="margin-top:var(--sp-md)"></div>
+    <div id="sd-save-err" style="display:none;color:var(--red);font-size:var(--fs-xs);margin-top:6px"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="sdCloseDetail()">Close</button>
+      <button class="btn btn-primary" id="sd-save-btn" style="display:none" onclick="sdSave(this.dataset.tid)">Save changes</button>
     </div>
   </div>
 </div>
@@ -12678,14 +12668,8 @@ async function _loadGettingHelp(){
 }
 function _fmtHelpStamp(v){
   try{
-    if(!v)return '';
-    // The API returns a naive UTC timestamp with no zone marker. Left alone,
-    // Date() reads it as local time -- eight hours out in Perth, which puts the
-    // stamp on the wrong day. Mark it as UTC before parsing.
-    let raw=String(v).replace(' ','T');
-    if(!/[zZ]$|[+-]\d{2}:?\d{2}$/.test(raw))raw+='Z';
-    const d=new Date(raw);
-    if(isNaN(d))return String(v);
+    const d=parseServerTime(v);
+    if(!d)return String(v||'');
     return d.toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'});
   }catch(_){return String(v);}
 }
@@ -18246,13 +18230,35 @@ async function sdSubmit(event) {
 let _sdAllTickets = [];
 let _sdActiveFilter = 'all';
 let _sdActiveCategoryFilter = '';
+let _sdActiveUnitFilter = '';
+let _sdEditStatus = null;
 let _sdSelectedTicketId = null;
 
+/* The API returns naive UTC timestamps with no zone marker (2026-08-22T22:55:19).
+   Date() reads those as LOCAL time, which is eight hours out in Perth and puts
+   the value on the wrong day either side of midnight. Mark it as UTC, then let
+   the browser render it in the reader's own timezone -- "raised today" should
+   say today.
+   Date-only values (2026-08-14) are left alone: they carry no time, and
+   attaching one would reintroduce the same class of drift. */
+function parseServerTime(v){
+  if(!v)return null;
+  const raw=String(v);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return new Date(raw+'T00:00:00');
+  let iso=raw.replace(' ','T');
+  if(!/[zZ]$|[+-]\d{2}:?\d{2}$/.test(iso))iso+='Z';
+  const d=new Date(iso);
+  return isNaN(d)?null:d;
+}
+
 function sdFmtDate(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
+  // Was: new Date(iso) then getUTCDate(). That parsed a naive UTC string as
+  // local time and then read it back as UTC -- two errors that happened to
+  // cancel into the UTC date, which is not the date the reader is living in.
+  const d = parseServerTime(iso);
+  if (!d) return '';
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 function sdStatusBadge(status) {
@@ -18280,30 +18286,40 @@ async function loadServiceDesk() {
 
   filterBar.style.display = '';
   table.style.display = '';
-  empty.textContent = 'No tickets';
-  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);font-size:var(--fs-sm)">Loading…</td></tr>';
+  // sdRenderList() owns the empty-state wording from here on, since it is the
+  // only thing that knows whether the list is empty or merely filtered.
+  empty.textContent = 'No tickets yet.';
+  // 7 columns since the colour-only status stripe column was removed.
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);font-size:var(--fs-sm)">Loading…</td></tr>';
 
   try {
     const r = await api('/api/service-desk/tickets');
     _sdAllTickets = r;
     sdRenderList();
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--red);font-size:var(--fs-sm)">${esc(apiErr(e))}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);font-size:var(--fs-sm)">${esc(apiErr(e))}</td></tr>`;
   }
 }
 
 function sdSetFilter(filter, btn) {
   _sdActiveFilter = filter;
-  document.querySelectorAll('#sd-filter-bar button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#sd-filter-bar button').forEach(b => {
+    b.classList.remove('active');
+    b.setAttribute('aria-pressed', 'false');
+  });
   btn.classList.add('active');
+  btn.setAttribute('aria-pressed', 'true');
   sdRenderList();
-  sdCloseDetail();
 }
 
 function sdSetCategoryFilter(val) {
   _sdActiveCategoryFilter = val;
   sdRenderList();
-  sdCloseDetail();
+}
+
+function sdSetUnitFilter(val) {
+  _sdActiveUnitFilter = val;
+  sdRenderList();
 }
 
 const _SD_CAT_LABELS = {
@@ -18320,9 +18336,26 @@ function sdRenderList() {
   if (_sdActiveCategoryFilter) {
     filtered = filtered.filter(t => (t.category || 'other') === _sdActiveCategoryFilter);
   }
+  if (_sdActiveUnitFilter) {
+    filtered = filtered.filter(t => (t.unit_name || t.squadron_name || '') === _sdActiveUnitFilter);
+  }
+
+  sdRenderUnitFilter();
+  const openCount = _sdAllTickets.filter(t => t.status === 'open').length;
+  const countEl = document.getElementById('sd-count');
+  if (countEl) {
+    countEl.textContent = filtered.length === _sdAllTickets.length
+      ? `${_sdAllTickets.length} ticket${_sdAllTickets.length === 1 ? '' : 's'} · ${openCount} open`
+      : `${filtered.length} of ${_sdAllTickets.length} tickets · ${openCount} open`;
+  }
 
   if (filtered.length === 0) {
     tbody.innerHTML = '';
+    // "No tickets" and "nothing matches your filters" are different situations
+    // and need different wording -- the second one tells you what to do next.
+    empty.textContent = _sdAllTickets.length === 0
+      ? 'No tickets yet.'
+      : 'No tickets match these filters. Clear a filter to see the rest.';
     empty.style.display = 'block';
     document.getElementById('sd-table').style.display = 'none';
     return;
@@ -18331,15 +18364,19 @@ function sdRenderList() {
   empty.style.display = 'none';
 
   tbody.innerHTML = filtered.map(t => {
-    const desc = t.description.length > 50
-      ? esc(t.description.slice(0, 50)) + '…'
+    const desc = t.description.length > 60
+      ? esc(t.description.slice(0, 60)) + '…'
       : esc(t.description);
     const active = t.ticket_id === _sdSelectedTicketId ? ' class="sd-row-active"' : '';
     const unitDisplay = esc(t.unit_name || t.squadron_name || '');
     const catLabel = esc(_SD_CAT_LABELS[t.category || 'other'] || 'Other');
-    const assignee = t.assigned_to_name ? esc(t.assigned_to_name) : '<span style="color:var(--muted)">—</span>';
-    return `<tr${active} data-tid="${esc(t.ticket_id)}" style="cursor:pointer" onclick="sdOpenDetail(this.dataset.tid)">
-      <td class="sd-status-stripe stripe-${esc(t.status)}"></td>
+    const assignee = t.assigned_to_name ? esc(t.assigned_to_name) : '<span style="color:var(--muted)">Unassigned</span>';
+    // The row is a real activation target: Enter and Space open the ticket, so
+    // the list is workable without a pointer.
+    return `<tr${active} data-tid="${esc(t.ticket_id)}" tabindex="0" role="button"
+      aria-label="Open ticket from ${esc(t.rank)} ${esc(t.first_name)} ${esc(t.last_name)}"
+      onclick="sdOpenDetail(this.dataset.tid)"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();sdOpenDetail(this.dataset.tid);}">
       <td style="font-size:var(--fs-sm);white-space:nowrap">${sdFmtDate(t.created_at)}</td>
       <td style="font-size:var(--fs-sm)">${esc(t.rank)} ${esc(t.first_name)} ${esc(t.last_name)}</td>
       <td style="font-size:var(--fs-sm)">${unitDisplay}</td>
@@ -18351,84 +18388,143 @@ function sdRenderList() {
   }).join('');
 }
 
+function sdRenderUnitFilter() {
+  const sel = document.getElementById('sd-unit-filter');
+  if (!sel) return;
+  const units = [...new Set(_sdAllTickets.map(t => t.unit_name || t.squadron_name || '').filter(Boolean))].sort();
+  // A unit filter with one option filters nothing -- hide it rather than show a
+  // control that cannot change the result.
+  sel.style.display = units.length > 1 ? '' : 'none';
+  const current = _sdActiveUnitFilter;
+  if (sel.dataset.units === units.join('|')) { sel.value = current; return; }
+  sel.dataset.units = units.join('|');
+  sel.innerHTML = '<option value="">All units</option>' +
+    units.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
+  sel.value = current;
+}
+
+let _sdModalWatched = false;
+function sdWatchModal() {
+  // The app's global Escape handler closes the topmost modal directly, without
+  // going through sdCloseDetail(), which left the row highlight stuck on.
+  // Watching the modal's own class means the highlight follows it however it
+  // closes -- Close button, Escape, or a future path that does not exist yet.
+  if (_sdModalWatched) return;
+  const modal = document.getElementById('m-sd-ticket');
+  if (!modal) return;
+  _sdModalWatched = true;
+  new MutationObserver(() => {
+    if (!modal.classList.contains('active') && _sdSelectedTicketId) {
+      _sdSelectedTicketId = null;
+      sdRenderList();
+    }
+  }).observe(modal, {attributes: true, attributeFilter: ['class']});
+}
+
+function sdShortTitle(text, limit) {
+  // Cut on a word boundary. Slicing at a fixed count produced titles that ended
+  // mid-word ("... against Senior 2, only..."), which reads as broken rather
+  // than abbreviated.
+  const t = String(text || '').trim();
+  const max = limit || 62;
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const sp = cut.lastIndexOf(' ');
+  return (sp > max * 0.6 ? cut.slice(0, sp) : cut).replace(/[,;:.\s]+$/, '') + '…';
+}
+
 function sdOpenDetail(ticketId) {
-  _sdSelectedTicketId = ticketId;
-  sdRenderList(); // re-render to show active row highlight
   const t = _sdAllTickets.find(x => x.ticket_id === ticketId);
   if (!t) return;
-  const detail = document.getElementById('sd-detail');
+  _sdSelectedTicketId = ticketId;
+  sdRenderList(); // keep the row highlighted behind the modal
+
   const canEdit = S && ['system_admin','wing_admin','national_admin'].includes(S.role);
   const catLabel = _SD_CAT_LABELS[t.category || 'other'] || 'Other';
   const unitDisplay = t.unit_name || t.squadron_name || '';
 
+  document.getElementById('m-sd-ticket-title').textContent = sdShortTitle(t.description);
+  document.getElementById('sd-t-meta').textContent =
+    `Raised ${sdFmtDate(t.created_at)} · ${t.rank} ${t.first_name} ${t.last_name} · ${unitDisplay}`;
+  document.getElementById('sd-t-status-badge').innerHTML = sdStatusBadge(t.status);
+
   const notesHtml = canEdit
-    ? `<textarea id="sd-notes-input" class="ff-input" rows="3" style="width:100%;box-sizing:border-box;font-size:var(--fs-sm);font-family:inherit;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius)">${esc(t.admin_notes || '')}</textarea>`
+    ? `<textarea id="sd-notes-input" rows="3" aria-label="Internal notes" style="width:100%;box-sizing:border-box;font-size:var(--fs-sm);font-family:inherit;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius)">${esc(t.admin_notes || '')}</textarea>`
     : `<div style="font-size:var(--fs-sm);color:var(--text)">${t.admin_notes ? esc(t.admin_notes) : '<span style="color:var(--muted)">No notes yet</span>'}</div>`;
 
   const assigneeHtml = canEdit
-    ? `<input id="sd-assignee-input" class="ff-input" type="text" style="width:100%;box-sizing:border-box;font-size:var(--fs-sm);padding:6px 8px" placeholder="e.g. Maj Smith" value="${esc(t.assigned_to_name || '')}">`
+    ? `<input id="sd-assignee-input" type="text" aria-label="Assigned to" style="width:100%;box-sizing:border-box;font-size:var(--fs-sm);padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);min-height:32px" placeholder="e.g. SQNLDR Reid" value="${esc(t.assigned_to_name || '')}">`
     : `<div style="font-size:var(--fs-sm)">${t.assigned_to_name ? esc(t.assigned_to_name) : '<span style="color:var(--muted)">Unassigned</span>'}</div>`;
 
-  const statusButtons = canEdit
-    ? `<div style="display:flex;gap:var(--sp-xs);margin-top:var(--sp-xs)">
-        ${['open','in_progress','resolved'].map(s => {
-          const labels = {open:'Open', in_progress:'In Progress', resolved:'Resolved'};
-          const active = t.status === s ? 'btn-primary' : 'btn-secondary';
-          return `<button class="btn ${active}" id="sd-status-${s}" style="font-size:var(--fs-xs);padding:4px 10px" onclick="sdSelectStatus('${s}')">${labels[s]}</button>`;
+  const statusHtml = canEdit
+    ? `<div role="group" aria-label="Ticket status" style="display:flex;gap:var(--sp-xs);flex-wrap:wrap">
+        ${['open','in_progress','resolved'].map(st => {
+          const labels = {open:'Open', in_progress:'In progress', resolved:'Resolved'};
+          const on = t.status === st;
+          return `<button type="button" class="btn ${on ? 'btn-primary' : 'btn-secondary'}" id="sd-status-${st}"
+            aria-pressed="${on}" style="font-size:var(--fs-xs);padding:5px 12px;min-height:28px"
+            onclick="sdSelectStatus('${st}')">${labels[st]}</button>`;
         }).join('')}
       </div>`
     : sdStatusBadge(t.status);
 
-  const saveBtn = canEdit
-    ? `<div style="text-align:right;margin-top:var(--sp-md)"><button class="btn btn-primary" style="font-size:var(--fs-sm)" data-tid="${esc(ticketId)}" onclick="sdSave(this.dataset.tid)">Save Changes</button></div><div id="sd-save-err" style="display:none;color:var(--red);font-size:var(--fs-xs);margin-top:4px"></div>`
-    : '';
+  document.getElementById('sd-t-body').innerHTML = `
+    <div class="sd-field">
+      <div class="sd-field-label">Description</div>
+      <div style="font-size:var(--fs-sm);line-height:1.55">${esc(t.description)}</div>
+    </div>
+    <div class="sd-field">
+      <div class="sd-field-label">Category</div>
+      <div style="font-size:var(--fs-sm)">${esc(catLabel)}</div>
+    </div>
+    <div class="sd-field">
+      <div class="sd-field-label">Contact</div>
+      <div style="font-size:var(--fs-sm)">${esc(t.email)}</div>
+    </div>
+    <div class="sd-field">
+      <div class="sd-field-label">Assigned to</div>
+      ${assigneeHtml}
+    </div>
+    <div class="sd-field">
+      <div class="sd-field-label">Internal notes</div>
+      ${notesHtml}
+    </div>
+    <div class="sd-field">
+      <div class="sd-field-label">Status</div>
+      ${statusHtml}
+    </div>`;
 
-  document.getElementById('sd-detail-content').innerHTML = `
-    <div style="font-size:var(--fs-sm);color:var(--muted)">${sdFmtDate(t.created_at)}</div>
-    <div style="font-size:var(--fs-base);font-weight:600;margin:var(--sp-xs) 0">${esc(unitDisplay)}</div>
-    <div style="font-size:var(--fs-sm);margin-bottom:2px">${esc(t.rank)} ${esc(t.first_name)} ${esc(t.last_name)}</div>
-    <div style="font-size:var(--fs-sm);color:var(--muted)">${esc(t.email)}</div>
-    <div style="margin-top:var(--sp-xs)"><span class="badge badge-${esc(t.status || 'open')}" style="font-size:var(--fs-3xs);padding:2px 6px;border-radius:4px;font-weight:700">${esc(catLabel)}</span></div>
-    <div class="sd-detail-section">Assigned To</div>
-    <hr>
-    ${assigneeHtml}
-    <div class="sd-detail-section">Description</div>
-    <hr>
-    <div style="font-size:var(--fs-sm);line-height:1.5">${esc(t.description)}</div>
-    <div class="sd-detail-section">Internal Notes</div>
-    <hr>
-    ${notesHtml}
-    <div class="sd-detail-section">Status</div>
-    <hr>
-    ${statusButtons}
-    ${saveBtn}
-  `;
+  const saveBtn = document.getElementById('sd-save-btn');
+  saveBtn.style.display = canEdit ? 'inline-flex' : 'none';
+  saveBtn.dataset.tid = ticketId;
+  const err = document.getElementById('sd-save-err');
+  if (err) err.style.display = 'none';
 
-  if (canEdit) detail._editStatus = t.status;
-  detail.classList.add('open');
+  _sdEditStatus = t.status;
+  sdWatchModal();
+  openModal('m-sd-ticket');
 }
 
 function sdSelectStatus(status) {
-  const detail = document.getElementById('sd-detail');
-  detail._editStatus = status;
-  ['open','in_progress','resolved'].forEach(s => {
-    const btn = document.getElementById('sd-status-' + s);
-    if (btn) {
-      btn.className = 'btn ' + (s === status ? 'btn-primary' : 'btn-secondary');
-      btn.style.cssText = 'font-size:var(--fs-xs);padding:4px 10px';
-    }
+  _sdEditStatus = status;
+  ['open','in_progress','resolved'].forEach(st => {
+    const btn = document.getElementById('sd-status-' + st);
+    if (!btn) return;
+    const on = st === status;
+    btn.className = 'btn ' + (on ? 'btn-primary' : 'btn-secondary');
+    btn.style.cssText = 'font-size:var(--fs-xs);padding:5px 12px;min-height:28px';
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
 }
 
 async function sdSave(ticketId) {
-  const detail = document.getElementById('sd-detail');
   const errEl = document.getElementById('sd-save-err');
   if (errEl) errEl.style.display = 'none';
 
   const notesInput = document.getElementById('sd-notes-input');
   const assigneeInput = document.getElementById('sd-assignee-input');
   const body = {
-    status: detail._editStatus,
+    status: _sdEditStatus,
     admin_notes: notesInput ? notesInput.value : undefined,
     assigned_to_name: assigneeInput ? assigneeInput.value.trim() : undefined,
   };
@@ -18444,7 +18540,9 @@ async function sdSave(ticketId) {
       else if (body.status) t.resolved_at = null;
     }
     sdRenderList();
-    sdOpenDetail(ticketId);
+    closeModal('m-sd-ticket');
+    _sdSelectedTicketId = null;
+    sdRenderList();
     showToast('Ticket updated.');
   } catch (e) {
     if (errEl) {
@@ -18455,17 +18553,10 @@ async function sdSave(ticketId) {
 }
 
 function sdCloseDetail() {
+  closeModal('m-sd-ticket');
   _sdSelectedTicketId = null;
-  document.getElementById('sd-detail').classList.remove('open');
-  sdRenderList(); // clear active highlight
+  sdRenderList(); // clear the row highlight
 }
-document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'){
-    var det=document.getElementById('sd-detail');
-    if(det&&det.classList.contains('open'))sdCloseDetail();
-  }
-});
-
 // Close unit dropdown when focus leaves the typeahead area
 document.addEventListener('focusin',function(e){
   const dd=document.getElementById('sd-unit-dropdown');
