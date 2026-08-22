@@ -30,5 +30,5 @@
 
 /* DENS-01: compact display density overrides */
 .app[data-density="compact"] .main{padding:14px 18px;}
-.app[data-density="compact"] .nav-item{padding:5px 10px 5px 8px;font-size:var(--fs-sm);}
+.app[data-density="compact"] .nav-item{padding:5px 10px 5px 8px;font-size:var(--fs-sm);min-height:28px;}/* AUDIT-2026-08 G5 */
 .app[data-density="compact"] .nav-group{margin:8px 6px 3px;}

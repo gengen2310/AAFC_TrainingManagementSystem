@@ -85,7 +85,7 @@ body.pw-active .main {
 }
 .pw-layer-row {
   display: flex; align-items: center; gap: 7px;
-  padding: 4px 2px; font-size: var(--fs-sm); cursor: pointer;
+  padding: 4px 2px; font-size: var(--fs-sm); cursor: pointer; min-height: 28px;/* AUDIT-2026-08 G5 */
 }
 .pw-layer-row input[type="checkbox"] { width: 14px; height: 14px; flex-shrink: 0; accent-color: var(--aafc-blue); }
 .pw-layer-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -93,7 +93,7 @@ body.pw-active .main {
 .pw-chip {
   font-size: var(--fs-xs); font-weight: 600; padding: 3px 9px; border-radius: 20px;
   border: 1.5px solid var(--border); background: var(--background); color: var(--muted-text);
-  cursor: pointer; transition: all .12s;
+  cursor: pointer; transition: all .12s; min-height: 28px;/* AUDIT-2026-08 G5 */
 }
 .pw-chip.on { background: var(--emphasis); color: var(--on-emphasis); border-color: var(--emphasis); }
 .pw-backlog-item {

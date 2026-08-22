@@ -730,3 +730,27 @@ Systematic enumeration of all inputs without a programmatically associated label
 | `tt-apply-from-reason` | Timing Template — apply-from panel | `aria-label="Reason for applying template from that date"` |
 | `waz-effective` | Wing Archive Wizard | `for="waz-effective"` on `<label>` |
 | `pnd-notes` | Parade Night Details panel | `for="pnd-notes"` on `<label>` |
+
+---
+
+## FIX-14 · G5 Planning Workspace hit-target residuals — 5 rules below 28px
+
+**Files:** `frontend/src/styles/components.css`, `frontend/src/styles/layout.css`, `frontend/src/styles/planning.css` · **Gate:** G5
+
+Five rules in the Planning Workspace that were in the original G5 FAIL list and were not addressed by the Main TMS sweep (FIX-04/08/09/12). All had derived heights below 28px based on their padding + font-size:
+
+| Rule | Computed height (before) | Fix |
+|---|---|---|
+| `.btn.sm` | ~26.8px | `min-height:28px` on class |
+| `.app[data-density="compact"] .btn:not(.btn.sm)` | ~24.8px | `min-height:28px` on class |
+| `.app[data-density="compact"] .nav-item` | ~26.8px | `min-height:28px` on class |
+| `.pw-layer-row` | ~26px (label element, whole row is click target) | `min-height:28px` on class |
+| `.pw-chip` | ~20px | `min-height:28px` on class |
+
+`.pw-layer-row` is rendered as a `<label>` in `PlanningLeftPanel.tsx`, making the full row the pointer target for the nested `input[type="checkbox"]`. The row was already ~26px; `min-height:28px` closes the remaining 2px gap.
+
+The `min-height` approach is correct for inline-style overrides too: elements with `padding` in an inline style override the class padding but not `min-height` (a distinct property), so the 28px floor applies regardless of the inline style.
+
+`.chip` (20×20, decorative `<span>`) was excluded — it appears only as a non-interactive status badge in `Calendar.tsx`.
+
+53/53 PW tests pass after the change.
