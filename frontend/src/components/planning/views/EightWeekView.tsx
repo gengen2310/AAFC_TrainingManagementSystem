@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { planningApi, trainingApi } from "../../../api";
 import { friendlyMessage } from "../../../api/client";
@@ -47,6 +47,35 @@ export function EightWeekView({
 
   // DND-01: move session handler — preserves all existing session fields and
   // updates only parade_night_id and period_number on the target cell.
+  // A11Y-G6: keyboard equivalent of drag-and-drop. Dragging is pointer-only, so the same
+  // move must be reachable from the keyboard. State lives here rather than in a block so a
+  // keyboard move can cross parade nights exactly as a drag can.
+  const [moveSource, setMoveSource] = useState<DragSessionPayload | null>(null);
+  const [moveAnnounce, setMoveAnnounce] = useState("");
+
+  const handlePickUpSession = useCallback((payload: DragSessionPayload) => {
+    setMoveSource(payload);
+    setMoveAnnounce(`${payload.activity_title ?? "Session"} picked up. Tab to an empty slot and press Enter to place it, or press Escape to cancel.`);
+  }, []);
+
+  const handleCancelMove = useCallback(() => {
+    setMoveSource(prev => {
+      if (prev) setMoveAnnounce("Move cancelled. The session was not moved.");
+      return null;
+    });
+  }, []);
+
+  // A11Y-G6: Escape abandons the move from anywhere, not only from a grid cell —
+  // focus may well have moved on by the time the user changes their mind. A document
+  // listener rather than a handler on the wrapper div, which would make a static
+  // element interactive (jsx-a11y/no-static-element-interactions).
+  useEffect(() => {
+    if (!moveSource) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleCancelMove(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [moveSource, handleCancelMove]);
+
   const handleMoveSession = useCallback(async (payload: DragSessionPayload, targetDateId: string, targetPeriod: number, _targetCadetGroup: string) => {
     try {
       await trainingApi.editSession(payload.session_id, {
@@ -62,8 +91,13 @@ export function EightWeekView({
       await qc.invalidateQueries({ queryKey: ["planning-long-range"] });
       await qc.invalidateQueries({ queryKey: ["planning-night-summaries"] });
       toast("Session moved.");
+      setMoveSource(null);
+      setMoveAnnounce(`${payload.activity_title ?? "Session"} moved to period ${targetPeriod}.`);
     } catch (e) {
-      toast(friendlyMessage(e, "Could not move session — it may have a conflict."));
+      const msg = friendlyMessage(e, "Could not move session — it may have a conflict.");
+      toast(msg);
+      // Keep the session picked up so the move can be retried on another slot.
+      setMoveAnnounce(`${msg} The session is still picked up — choose another slot, or press Escape to cancel.`);
     }
   }, [qc, toast]);
 
@@ -118,6 +152,15 @@ export function EightWeekView({
 
   return (
     <div className="pw-8week">
+      {/* A11Y-G6: announces pick up / place / cancel to assistive tech. */}
+      <div aria-live="polite" role="status" className="pw-sr-only">{moveAnnounce}</div>
+      {moveSource && (
+        <div className="pw-move-bar" role="status">
+          <strong>Moving:</strong> {moveSource.activity_title ?? "Session"}
+          <span> — choose an empty slot and press Enter, or </span>
+          <button type="button" className="btn sm" onClick={handleCancelMove}>Cancel move</button>
+        </div>
+      )}
       {visibleAnchors.length > 0 && (
         <div className="pw-anchor-strip" style={{ marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
           {visibleAnchors.map((a, i) => (
@@ -178,6 +221,9 @@ export function EightWeekView({
               ? (cg, period) => onEmptyCellClick(pd.parade_date_id, pd.parade_date, cg, period)
               : undefined}
             onMoveSession={handleMoveSession}
+            moveSource={moveSource}
+            onPickUpSession={handlePickUpSession}
+            onCancelMove={handleCancelMove}
           />
         );
       })}

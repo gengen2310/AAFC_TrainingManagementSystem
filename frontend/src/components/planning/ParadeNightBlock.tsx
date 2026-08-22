@@ -312,6 +312,13 @@ interface ParadeNightBlockProps {
   onEmptyCellClick?: (cadetGroup: string, period: number) => void;
   /** DND-01: called when a session is drag-dropped onto an empty cell */
   onMoveSession?: (payload: DragSessionPayload, targetDateId: string, targetPeriod: number, targetCadetGroup: string) => Promise<void>;
+  /** A11Y-G6: the session currently "picked up" for a keyboard move, if any.
+   *  Held by the parent view so a move can cross blocks exactly as a drag can. */
+  moveSource?: DragSessionPayload | null;
+  /** A11Y-G6: pick a session up for a keyboard move (Enter/M on a session cell). */
+  onPickUpSession?: (payload: DragSessionPayload) => void;
+  /** A11Y-G6: abandon the current keyboard move (Escape). */
+  onCancelMove?: () => void;
 }
 
 /** DND-01: minimal data transferred via the HTML5 drag API across components */
@@ -331,10 +338,22 @@ export function ParadeNightBlock({
   inHoliday = false, compact = false, blockSize = "md", focusClassId, searchText, tierFilter,
   focusStageId, classStageMap,
   onHeaderClick, onSessionClick, onEmptyCellClick, onMoveSession,
+  moveSource = null, onPickUpSession, onCancelMove,
 }: ParadeNightBlockProps) {
   const [addingNotice, setAddingNotice] = useState(false);
   // CLASS-23: per-block collapsed state. Collapsed shows only the header bar.
   const [collapsed, setCollapsed] = useState(false);
+  // A11Y-G6: one payload builder for both drag and keyboard, so the two paths cannot drift.
+  const buildPayload = (cell: DisplaySession): DragSessionPayload => ({
+    session_id: cell.session_id,
+    cadet_group: cell.cadet_group,
+    curriculum_id: cell.source!.curriculum_id,
+    facilitator_id: cell.source!.facilitator_id,
+    location_id: cell.source!.location_id,
+    activity_title: cell.source!.activity_title,
+    status: cell.source!.status,
+  });
+
   // DND-01: drop target cell key (format "{period}-{cadetGroup}") while drag is over this block.
   const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
   // Count of live drop-enter events to avoid flicker from child elements triggering dragLeave.
@@ -497,16 +516,31 @@ export function ParadeNightBlock({
                         : onHeaderClick;
                       const cellKey = `${period}-${g.cadetGroups[0]}`;
                       const isDropTarget = dropTargetKey === cellKey;
+                      // A11Y-G6: while a session is picked up, every empty cell is a keyboard
+                      // drop target and Enter places rather than adds.
+                      const isArmed = !!moveSource && !!onMoveSession;
+                      const placeHere = () => {
+                        if (!moveSource || !onMoveSession) return;
+                        void onMoveSession(moveSource, dateId, period, g.cadetGroups[0]);
+                      };
                       return (
                         <td
                           key={period}
-                          className={`pw-night-cell empty${isDropTarget ? " dnd-over" : ""}`}
+                          className={`pw-night-cell empty${isDropTarget ? " dnd-over" : ""}${isArmed ? " pw-move-target" : ""}`}
                           style={isDropTarget ? { outline: "2px dashed var(--aafc-blue, #51b0e3)", background: "var(--surface-2, #f0f5fa)" } : undefined}
-                          onClick={handleEmptyClick}
+                          onClick={isArmed ? placeHere : handleEmptyClick}
                           role="button"
                           tabIndex={0}
-                          onKeyDown={e => e.key === "Enter" && handleEmptyClick()}
-                          aria-label={onEmptyCellClick ? "Click to add a session" : "No lesson — click to open night detail"}
+                          onKeyDown={e => {
+                            if (isArmed && e.key === "Escape") { e.preventDefault(); onCancelMove?.(); return; }
+                            if (isArmed && (e.key === "Enter" || e.key === "m" || e.key === "M")) {
+                              e.preventDefault(); e.stopPropagation(); placeHere(); return;
+                            }
+                            if (e.key === "Enter") handleEmptyClick();
+                          }}
+                          aria-label={isArmed
+                            ? `Empty slot, ${g.fullLabel} period ${period}. Press Enter to move ${moveSource?.activity_title ?? "the session"} here, or Escape to cancel.`
+                            : (onEmptyCellClick ? `Empty slot, ${g.fullLabel} period ${period}. Press Enter to add a session.` : "No lesson — press Enter to open night detail")}
                           onDragEnter={onMoveSession ? e => { e.preventDefault(); dropEnterCount.current++; setDropTargetKey(cellKey); } : undefined}
                           onDragLeave={onMoveSession ? () => { dropEnterCount.current = Math.max(0, dropEnterCount.current - 1); if (dropEnterCount.current === 0) setDropTargetKey(null); } : undefined}
                           onDragOver={onMoveSession ? e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } : undefined}
@@ -522,7 +556,7 @@ export function ParadeNightBlock({
                           } : undefined}
                         >
                           <div className="pw-night-cell-inner">
-                            <span className="pw-nc-empty">{isDropTarget ? "Drop here" : "No lesson"}</span>
+                            <span className="pw-nc-empty">{isDropTarget || isArmed ? "Move here" : "No lesson"}</span>
                           </div>
                         </td>
                       );
@@ -546,31 +580,42 @@ export function ParadeNightBlock({
                     })();
                     const isDimmed = classDimmed || stageDimmed || searchDimmed || tierDimmed;
                     const canDrag = !!onMoveSession && !!cell.source;
+                    const isMoveSource = !!moveSource && moveSource.session_id === cell.session_id;
                     return (
                       <td
                         key={period}
-                        className={`pw-night-cell${cell.conflict === "room" ? " conflict-room" : cell.conflict === "fac" ? " conflict-fac" : ""}`}
-                        style={isDimmed ? { opacity: 0.22 } : undefined}
+                        className={`pw-night-cell${cell.conflict === "room" ? " conflict-room" : cell.conflict === "fac" ? " conflict-fac" : ""}${isMoveSource ? " pw-move-source" : ""}`}
+                        style={isDimmed && !isMoveSource ? { opacity: 0.22 } : undefined}
                         draggable={canDrag}
                         onDragStart={canDrag ? e => {
                           e.stopPropagation();
                           e.dataTransfer.effectAllowed = "move";
-                          const payload: DragSessionPayload = {
-                            session_id: cell.session_id,
-                            cadet_group: cell.cadet_group,
-                            curriculum_id: cell.source!.curriculum_id,
-                            facilitator_id: cell.source!.facilitator_id,
-                            location_id: cell.source!.location_id,
-                            activity_title: cell.source!.activity_title,
-                            status: cell.source!.status,
-                          };
-                          e.dataTransfer.setData("application/json", JSON.stringify(payload));
+                          e.dataTransfer.setData("application/json", JSON.stringify(buildPayload(cell)));
                         } : undefined}
                         onDragEnd={canDrag ? () => { setDropTargetKey(null); dropEnterCount.current = 0; } : undefined}
                         onClick={onSessionClick ? e => { e.stopPropagation(); onSessionClick(cell); } : onHeaderClick}
                         role="button"
                         tabIndex={0}
+                        aria-keyshortcuts={canDrag ? "M" : undefined}
+                        aria-label={canDrag
+                          ? (isMoveSource
+                              ? `${cell.title ?? "Session"} — picked up to move. Tab to an empty slot and press Enter to place it, or press Escape to cancel.`
+                              : `${cell.title ?? "Session"}, ${g.fullLabel} period ${period}. Press Enter to open, or M to pick it up and move it.`)
+                          : undefined}
                         onKeyDown={e => {
+                          // A11Y-G6: keyboard equivalent of dragging. Drag is a pointer-only
+                          // gesture, so every move it can perform must also be reachable here.
+                          if (canDrag && (e.key === "m" || e.key === "M")) {
+                            e.preventDefault(); e.stopPropagation();
+                            if (isMoveSource) onCancelMove?.();
+                            else onPickUpSession?.(buildPayload(cell));
+                            return;
+                          }
+                          if (e.key === "Escape" && moveSource) {
+                            e.preventDefault(); e.stopPropagation();
+                            onCancelMove?.();
+                            return;
+                          }
                           if (e.key === "Enter") {
                             if (onSessionClick) { e.stopPropagation(); onSessionClick(cell); }
                             else onHeaderClick();
