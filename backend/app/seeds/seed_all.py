@@ -233,31 +233,43 @@ def seed_all():
 
     # Tuples: (period, cadet_group, curriculum_code, room, facilitator_last_name, status)
     demo_pns = [
+        # Within one period a facilitator delivers one lesson and a room hosts one
+        # lesson. Orientation+Initial and Intermediate+Senior are deliberately
+        # paired on the same lesson, room and instructor -- that is parallel
+        # delivery to two Training Classes, which the resource check allows and
+        # the printed Weekly Program renders as two class columns. It is also
+        # forced by the room list: three rooms exist, Seniors Working Room is held
+        # by the Int/Snr pair and Major Parade Ground by Junior, so Orientation and
+        # Initial share Bravo and must therefore share the lesson.
+        # Before 2026-08-22 this table double-booked McGhie, Milligen and Daniels
+        # across different lessons in one period (5 facilitator and 6 room
+        # clashes), which made those parade nights unsaveable once the conflict
+        # check was wired into the write path.
         ("2026-02-06", "T1", [
             (1, "orientation", "ORI-M01", "Bravo", "Daley", "delivered"),
             (1, "initial", "ORI-M01", "Bravo", "Daley", "delivered"),
             (1, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "delivered"),
             (1, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
             (1, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
-            (2, "orientation", "ORI-M01", "Bravo", "McGhie", "delivered"),
+            (2, "orientation", "INL-M00", "Bravo", "McGhie", "delivered"),
             (2, "initial", "INL-M00", "Bravo", "McGhie", "delivered"),
             (2, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "delivered"),
             (2, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
             (2, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
             (3, "orientation", "ORI-M01", "Bravo", "Daley", "delivered"),
-            (3, "initial", "INL-M00", "Bravo", "McGhie", "delivered"),
+            (3, "initial", "ORI-M01", "Bravo", "Daley", "delivered"),
             (3, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "delivered"),
             (3, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
             (3, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
         ]),
         ("2026-05-01", "T2", [
-            (1, "orientation", "ORI-M01", "Bravo", "Daley", "delivered"),
-            (1, "initial", "INL-M08", "Bravo", "Milligen", "delivered"),
+            (1, "orientation", "INL-M08", "Bravo", "Daley", "delivered"),
+            (1, "initial", "INL-M08", "Bravo", "Daley", "delivered"),
             (1, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "delivered"),
             (1, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
             (1, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
-            (2, "orientation", "ORI-M01", "Bravo", "Daley", "delivered"),
-            (2, "initial", "INL-M08", "Major Parade Ground", "Milligen", "not_delivered"),
+            (2, "orientation", "INL-M08", "Bravo", "Daley", "delivered"),
+            (2, "initial", "INL-M08", "Bravo", "Daley", "not_delivered"),
             (2, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "not_delivered"),
             (2, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
             (2, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
@@ -268,12 +280,12 @@ def seed_all():
             (1, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "planned"),
             (1, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
             (1, "senior", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
-            (2, "orientation", "ORI-M01", "Bravo", "Daniels", "planned"),
+            (2, "orientation", "INL-M02", "Bravo", "Daniels", "planned"),
             (2, "initial", "INL-M02", "Bravo", "Daniels", "planned"),
             (2, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "planned"),
             (2, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
             (2, "senior", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
-            (3, "orientation", "ORI-M01", "Bravo", "Daniels", "planned"),
+            (3, "orientation", "INL-M02", "Bravo", "Daniels", "planned"),
             (3, "initial", "INL-M02", "Bravo", "Daniels", "planned"),
             (3, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "planned"),
             (3, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
