@@ -5,7 +5,7 @@
 .stat{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:var(--radius);padding:14px;}
 .stat .lbl{font-size:11px;color:var(--muted-text);}
 .stat .val{font-size:26px;font-weight:900;}
-.btn{border:1px solid var(--primary);background:var(--primary);color:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;}
+.btn{border:1px solid var(--emphasis);background:var(--emphasis);color:var(--on-emphasis);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;}
 .btn.out{background:transparent;color:var(--primary);}
 .btn.sm{padding:5px 10px;font-size:12px;}
 .badge{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:6px;padding:2px 7px;font-size:10.5px;font-weight:700;}
@@ -13,7 +13,7 @@
 /* text uses a darkened shade of --warning (#c97a00 is only 3.35:1 on white at this
    weight/size, below WCAG AA's 4.5:1 for normal text); border keeps the token as-is
    since non-text UI contrast only needs 3:1, which it already meets. */
-.badge.warn{border-color:var(--warning);color:#a86600;}
+.badge.warn{border-color:var(--warning);color:var(--warn-on-tint);}
 .badge.red{border-color:var(--aafc-red);color:var(--aafc-red);}
 .badge.blue{border-color:var(--aafc-royal-blue);color:var(--aafc-royal-blue);}
 .lh{color:var(--aafc-royal-blue);font-weight:700;text-decoration:none;}
@@ -41,10 +41,10 @@
 html[data-theme="dark"] .errnote{background:#3A1620;color:#FFB4BE;}
 .okmsg{background:#E8F5EE;border:1px solid var(--success);color:#0F5A33;border-radius:8px;padding:8px 12px;font-size:13px;margin-bottom:10px;}
 .row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
-.btn.danger{background:var(--aafc-red);border-color:var(--aafc-red);}
+.btn.danger{background:var(--aafc-red);border-color:var(--aafc-red);color:var(--on-danger);}
 .btn.light{color:#fff;border-color:rgba(255,255,255,.6);background:transparent;}
 .scope-pill,.role-pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;}
-.scope-pill{background:var(--aafc-blue);color:#002F65;}
+.scope-pill{background:var(--aafc-blue);color:var(--on-accent);}
 .role-pill{background:rgba(255,255,255,.18);color:#fff;}
 
 /* ── forms ── */
@@ -121,7 +121,7 @@ table.heatmap .hm-corner { background: var(--surface-2); }
 .hm-ok { background: #cfead8; color: #14532d; }
 .hm-warn { background: #fde9c8; color: #7a4a00; }
 .hm-red { background: #f7d0cc; color: #7a1d16; }
-.hm-na { background: var(--surface-2); color: var(--muted-text); }
+.hm-na { background: var(--surface-2); color: var(--muted-on-sunk); }
 
 /* ── tag chip input (Facilitators subject areas) ── */
 .tag-input{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface);cursor:text;min-height:40px;}
@@ -136,13 +136,13 @@ table.heatmap .hm-corner { background: var(--surface-2); }
    status icon (see FacilitatorTimeline.tsx's STATUS_ICON), these classes
    only reinforce it. */
 .fts-item.fts-session{border-radius:10px;font-size:11px;font-weight:700;padding:2px 6px;}
-.fts-item.fts-ok{background:color-mix(in srgb, var(--success) 18%, var(--surface));border-color:var(--success);color:var(--success);}
-.fts-item.fts-warn{background:color-mix(in srgb, var(--warning) 18%, var(--surface));border-color:var(--warning);color:#a86600;}
-.fts-item.fts-red{background:color-mix(in srgb, var(--aafc-red) 15%, var(--surface));border-color:var(--aafc-red);color:var(--aafc-red);}
-.fts-item.fts-blue{background:color-mix(in srgb, var(--aafc-royal-blue) 15%, var(--surface));border-color:var(--aafc-royal-blue);color:var(--aafc-royal-blue);}
-.fts-item.fts-purple{background:color-mix(in srgb, var(--rescheduled) 15%, var(--surface));border-color:var(--rescheduled);color:var(--rescheduled);}
-.fts-item.fts-leave{background:repeating-linear-gradient(45deg, color-mix(in srgb, var(--warning) 22%, var(--surface)), color-mix(in srgb, var(--warning) 22%, var(--surface)) 6px, var(--surface) 6px, var(--surface) 12px);border:1px solid var(--warning);color:#a86600;font-size:11px;font-weight:700;}
-.fts-leave-now-tag{font-size:9.5px;font-weight:700;color:#a86600;background:color-mix(in srgb, var(--warning) 20%, var(--surface));border:1px solid var(--warning);border-radius:5px;padding:1px 5px;margin-left:4px;}
+.fts-item.fts-ok{background:color-mix(in srgb, var(--success) 18%, var(--surface));border-color:var(--success);color:var(--ok-on-tint);}
+.fts-item.fts-warn{background:color-mix(in srgb, var(--warning) 18%, var(--surface));border-color:var(--warning);color:var(--warn-on-tint);}
+.fts-item.fts-red{background:color-mix(in srgb, var(--aafc-red) 15%, var(--surface));border-color:var(--aafc-red);color:var(--danger-on-tint);}
+.fts-item.fts-blue{background:color-mix(in srgb, var(--aafc-royal-blue) 15%, var(--surface));border-color:var(--aafc-royal-blue);color:var(--blue-on-tint);}
+.fts-item.fts-purple{background:color-mix(in srgb, var(--rescheduled) 15%, var(--surface));border-color:var(--rescheduled);color:var(--resch-on-tint);}
+.fts-item.fts-leave{background:repeating-linear-gradient(45deg, color-mix(in srgb, var(--warning) 22%, var(--surface)), color-mix(in srgb, var(--warning) 22%, var(--surface)) 6px, var(--surface) 6px, var(--surface) 12px);border:1px solid var(--warning);color:var(--warn-on-tint);font-size:11px;font-weight:700;}
+.fts-leave-now-tag{font-size:9.5px;font-weight:700;color:var(--warn-on-tint);background:color-mix(in srgb, var(--warning) 20%, var(--surface));border:1px solid var(--warning);border-radius:5px;padding:1px 5px;margin-left:4px;}
 .fts-list-fac{margin-bottom:20px;}
 .fts-list-fac h3{font-size:13px;font-weight:800;margin-bottom:8px;}
 
