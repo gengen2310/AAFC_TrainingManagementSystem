@@ -471,6 +471,11 @@ export function PlanningWorkspace() {
               {yearOptions.map(y => (
                 <button
                   key={y.planning_year_id}
+                  type="button"
+                  // PW-A1: selection was carried by the "on" class alone. The filter
+                  // chips beside these already expose aria-pressed; the year chips did
+                  // not, so which of 63 years was selected was visual-only.
+                  aria-pressed={selectedYearId === y.planning_year_id}
                   className={`pw-chip${selectedYearId === y.planning_year_id ? " on" : ""}`}
                   onClick={() => { persistYear(y.planning_year_id); setSelectedDateId(null); }}
                 >
