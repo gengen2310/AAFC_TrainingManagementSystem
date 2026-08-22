@@ -327,7 +327,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .muted{color:var(--muted);}
 
 /* ── BUTTONS ── */
-.btn{padding:9px 16px;border-radius:6px;font-family:inherit;font-size:var(--fs-sm);font-weight:700;cursor:pointer;border:none;letter-spacing:.04em;transition:all .13s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+.btn{padding:9px 16px;border-radius:6px;font-family:inherit;font-size:var(--fs-sm);font-weight:700;cursor:pointer;border:none;letter-spacing:.04em;transition:all .13s;display:inline-flex;align-items:center;min-height:28px;gap:5px;white-space:nowrap;}
 .btn-dk{background:var(--dark);color:white;}
 .btn-dk:hover{background:var(--royal);}
 .btn-out{background:white;color:var(--dark);border:1.5px solid var(--dark);}
@@ -344,6 +344,11 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .btn-xs{padding:4px 9px;font-size:var(--fs-xs);border-radius:5px;min-height:28px;min-width:28px;}  /* AUDIT-2026-08 G5: min-height alone left icon buttons 25px wide */
 /* AUDIT-2026-08 G5: icon-only controls were inline-styled down to ~16px tall.
    Shared floor for them - 28x28 pointer target [HIG]. */
+/* AUDIT-2026-08 G5: a floor for form controls. Several are inline-styled with small
+   padding and rendered 21-22px; [HIG] wants 28pt for a pointer target. Checkboxes and
+   radios keep the UA size because their wrapping <label> is the real click target. */
+input[type=text],input[type=time],input[type=url],input[type=password],input[type=number],
+input[type=date],input[type=search],input[type=email],input:not([type]),select,textarea{min-height:28px;}
 .btn-icon{min-width:28px;min-height:28px;display:inline-flex;align-items:center;justify-content:center;padding:2px 6px;font-size:var(--fs-sm);line-height:1;}
 .btn-lnk{background:none;border:none;color:var(--royal);font-family:inherit;font-size:var(--fs-sm);font-weight:600;cursor:pointer;padding:0 2px;min-width:28px;text-decoration:underline dotted;min-height:28px;display:inline-flex;align-items:center;}
 .btn-lnk:hover{color:var(--dark);} /* DES-H01 */
