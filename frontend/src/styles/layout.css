@@ -10,16 +10,16 @@
    connected-frontend is the TMS root frontend users land on, Planning
    Workspace is the preview app; each keeps its own token names/values, this
    only aligns the shared visual convention, not the token source. */
-.nav-item{display:block;width:100%;text-align:left;border:0;border-left:3px solid transparent;background:none;color:var(--text);padding:9px 10px 9px 8px;border-radius:8px;font-size:13px;}
+.nav-item{display:block;width:100%;text-align:left;border:0;border-left:3px solid transparent;background:none;color:var(--text);padding:9px 10px 9px 8px;border-radius:8px;font-size:var(--fs-base);}
 .nav-item:hover{background:var(--background);}
 .nav-item.active{background:color-mix(in srgb, var(--accent) 15%, var(--surface));color:var(--primary);border-left-color:var(--accent);font-weight:700;}
-.nav-group{font-size:10px;text-transform:uppercase;color:var(--muted-text);margin:12px 6px 4px;letter-spacing:.05em;}
+.nav-group{font-size:var(--fs-2xs);text-transform:uppercase;color:var(--muted-text);margin:12px 6px 4px;letter-spacing:.05em;}
 .main{padding:24px;max-width:1200px;}
-.banner{padding:10px 18px;font-weight:700;font-size:12px;}
+.banner{padding:10px 18px;font-weight:700;font-size:var(--fs-sm);}
 .banner.proxy{background:var(--warning);color:var(--on-warn);}
 .banner.intervention{background:var(--rescheduled);color:#fff;}
 
 /* DENS-01: compact display density overrides */
 .app[data-density="compact"] .main{padding:14px 18px;}
-.app[data-density="compact"] .nav-item{padding:5px 10px 5px 8px;font-size:12px;}
+.app[data-density="compact"] .nav-item{padding:5px 10px 5px 8px;font-size:var(--fs-sm);}
 .app[data-density="compact"] .nav-group{margin:8px 6px 3px;}
