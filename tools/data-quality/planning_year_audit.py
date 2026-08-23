@@ -71,13 +71,32 @@ def main(target):
 
     # unit_id is NULL for wing and national years, and the unique index treats
     # NULLs as distinct, so those rows are not constrained and not reported.
-    dupes = {k: v for k, v in by_unit_year.items() if len(v) > 1 and k[0] is not None}
-    print(f"duplicate (unit_id, year) groups: {len(dupes)}")
-    extra = sum(len(v) - 1 for v in dupes.values())
-    print(f"  rows beyond the first in each group: {extra}")
-    if dupes:
-        print("  MIGRATION b4c1f7d92e08 WILL REFUSE TO RUN until these are resolved.")
-    for (unit, year), grp in sorted(dupes.items(), key=lambda kv: -len(kv[1]))[:8]:
+    #
+    # The shipped index is PARTIAL -- unique among ACTIVE rows only. Archived rows
+    # do not participate, which is what makes archiving a valid resolution. This
+    # script used to count every row regardless of active_status and so reported a
+    # blocker that no longer existed: after archiving staging's surplus on
+    # 2026-08-23 it still said the migration would refuse, while the migration
+    # itself was satisfied.
+    active_dupes = {k: v for k, v in by_unit_year.items()
+                    if k[0] is not None and sum(1 for r in v if r[4]) > 1}
+    all_dupes = {k: v for k, v in by_unit_year.items() if len(v) > 1 and k[0] is not None}
+
+    print(f"duplicate ACTIVE (unit_id, year) groups: {len(active_dupes)}   <- this is the blocker")
+    extra = sum(sum(1 for r in v if r[4]) - 1 for v in active_dupes.values())
+    print(f"  active rows beyond the first in each group: {extra}")
+    if active_dupes:
+        print("  THE MIGRATION WILL REFUSE TO RUN until these are resolved.")
+        print("  Archive the surplus (active_status = false); deletion is not required.")
+    else:
+        print("  Nothing blocks the migration.")
+
+    historic = len(all_dupes) - len(active_dupes)
+    if historic:
+        print(f"\ngroups where the same year repeats but only one row is active: {historic}")
+        print("  Not a blocker -- archived rows do not participate in the partial index.")
+
+    for (unit, year), grp in sorted(active_dupes.items(), key=lambda kv: -len(kv[1]))[:8]:
         print(f"  year {year}: {len(grp)} rows  (unit {str(unit)[:8]}\u2026)")
         for r in grp[:3]:
             print(f"      {str(r[0])[:8]}\u2026  {'active ' if r[4] else 'archived'}  {str(r[3])[:44]}")
@@ -107,7 +126,7 @@ def main(target):
             print(f"  {tbl}: {type(e).__name__}: {str(e)[:90]}")
 
     db.close()
-    return 1 if dupes else 0
+    return 1 if active_dupes else 0
 
 
 if __name__ == "__main__":
