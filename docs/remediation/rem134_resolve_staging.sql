@@ -5,21 +5,25 @@
 -- "2064 Session-Class Test Year <timestamp>", all created within 60 seconds on
 -- 2026-08-09. Test debris from an automated run, on a synthetic environment.
 --
--- MORE THAN ONE row carries data, so planning_year_resolution_sql.py would not
--- resolve this automatically and asked for a decision. What follows is a
--- judgement, not a derivation:
+-- EVERY row in this group carries at least one dependent, so nothing here is a
+-- free archive. Measured counts:
 --
---   KEEP    856c3d14   13 parade dates, 5 training classes   <- the substantive row
---   ARCHIVE 7783e831   no dependents
---   ARCHIVE 6a196045   no dependents
---   ARCHIVE 22a6790e   no dependents
---   ARCHIVE 46bff487   no dependents
---   ARCHIVE 629ea352   1 holiday period   <- NOT empty; archiving hides that holiday
+--   KEEP    856c3d14   13 parade dates,  0 holidays,  5 training classes
+--   ARCHIVE 7783e831    0 parade dates,  0 holidays,  1 training class
+--   ARCHIVE 6a196045    0 parade dates,  0 holidays,  1 training class
+--   ARCHIVE 22a6790e    0 parade dates,  0 holidays,  1 training class
+--   ARCHIVE 46bff487    0 parade dates,  0 holidays,  1 training class
+--   ARCHIVE 629ea352    0 parade dates,  1 holiday,   1 training class
 --
--- 629ea352 is the only real call here. It holds a single holiday period created
--- by the same test run. On synthetic staging data that is acceptable. The same
--- reasoning does NOT transfer to production — see rem134_resolve_production.sql,
--- where every archived row is genuinely empty.
+-- So archiving the five hides 5 training classes and 1 holiday period. They are
+-- artefacts of one automated test run on synthetic data, which is why this is
+-- acceptable here. It would NOT be acceptable on production, and the production
+-- runbook is deliberately different: there, every row it archives has zero
+-- dependents of any kind.
+--
+-- planning_year_resolution_sql.py refuses to generate this automatically, for
+-- exactly this reason. The decision below is a judgement, recorded so it can be
+-- reviewed rather than re-derived.
 --
 -- Nothing is deleted. Archiving is reversible; the statement to undo it is at the
 -- bottom of this file.
