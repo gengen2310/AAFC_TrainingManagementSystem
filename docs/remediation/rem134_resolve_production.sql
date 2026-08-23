@@ -1,45 +1,105 @@
 -- REM-134 planning-year resolution — PRODUCTION
--- 9 active rows across 4 duplicate group(s).
--- training_classes table present in this environment: False
+-- Verified against production 2026-08-23; alembic revision f6a7b8c9d0e1.
+-- 4 duplicate ACTIVE (unit_id, year) groups, 9 active rows, all year 2026.
 --
--- Nothing here deletes anything. Rows are ARCHIVED (active_status = false),
--- which is this system's normal way to retire a planning year, and archived
--- rows do not participate in the partial unique index that migration
--- d1e4f8a03b27 creates. Archiving is reversible; deletion would not be.
+-- LIVE SQUADRON DATA. Read this before running it.
 --
--- Dependent counts below are parade_dates + holiday_periods.
+-- Nothing is deleted. Rows are ARCHIVED (active_status = false), which is this
+-- system's normal way to retire a planning year. Archived rows do not
+-- participate in the partial unique index, which is what makes archiving a
+-- sufficient resolution. It is also reversible; the undo is at the bottom.
 --
--- RESOLVED AUTOMATICALLY — exactly one row in the group carries data, so
--- the choice is not a judgement call. Kept:
---   703 2026  c33ca5b7-2c22-48e8-bfa0-d30cf9f578f8  pd=4 hp=0 tc=0  2026–2027 Training Year
---   704 2026  420e1d56-5f61-40a8-8399-a37380054c5f  pd=16 hp=0 tc=0  2026 test 1.0
---   721 2026  312b067d-8e4f-478d-9c63-c225b2f97967  pd=16 hp=0 tc=0  2026–2027 Training Year
+-- EVERY row archived below has ZERO dependents — no parade dates, no holiday
+-- periods. That was measured, not assumed. Contrast with the staging runbook,
+-- where each archived row did hold a training class and that cost is stated
+-- explicitly. Here there is nothing to lose.
 --
--- NOT HANDLED — no row in these groups carries any data, so there is no
--- basis for preferring one. Ask which name is intended, keep that one,
--- archive the rest by hand:
---   708 2026  ec1a2a05-0bf9-495f-83aa-a82428957203  created 2026-08-17  2026 Training Year
---   708 2026  79491d55-b84a-44f4-af3c-bfa060c79cce  created 2026-08-19  2026
+--   703 2026  KEEP    c33ca5b7  4 parade dates   "2026–2027 Training Year"
+--             ARCHIVE 57b5c229  no dependents    "2026–2027 Training Year"
+--
+--   704 2026  KEEP    420e1d56  16 parade dates  "2026 test 1.0"      <- see note
+--             ARCHIVE 0d39e637  no dependents    "2026 Training Year"
+--             ARCHIVE c4aa3393  no dependents    "2026–2027 Training Year"
+--
+--   708 2026  KEEP    ec1a2a05  no dependents    "2026 Training Year"  <- user's decision
+--             ARCHIVE 79491d55  no dependents    "2026"
+--
+--   721 2026  KEEP    312b067d  16 parade dates  "2026–2027 Training Year"
+--             ARCHIVE 6ea1640f  no dependents    "2026–2027 Training Year"
+--
+-- 703, 704 and 721 are mechanical: exactly one row in each group holds the
+-- parade dates, so keeping it is forced by the data.
+--
+-- 708 was NOT mechanical. Neither of its rows has any dependents, so nothing in
+-- the database distinguished them. Kept "2026 Training Year" (ec1a2a05) on the
+-- user's instruction, 2026-08-23; the row named plainly "2026" is archived.
+--
+-- NOTE ON 704: the row that must be kept is named "2026 test 1.0", because all 16
+-- of that squadron's parade dates hang off it. Renaming it is a separate action
+-- for 704 to take through the interface — do not move data between rows to make
+-- the names tidier.
 
 BEGIN;
 
 UPDATE planning_years SET active_status = false, updated_at = now()
 WHERE id IN (
-    '57b5c229-647a-4c0a-b47e-8b6420a01a11',   -- 703 2026, no dependents, created 2026-08-04
-    '0d39e637-2fd8-4c2b-ae33-e800559a9430',   -- 704 2026, no dependents, created 2026-08-03
-    'c4aa3393-7c88-43c0-b66a-76cd9047f454',   -- 704 2026, no dependents, created 2026-08-09
-    '6ea1640f-9e67-4295-a46b-e104d41be956'   -- 721 2026, no dependents, created 2026-08-09
+    '57b5c229-647a-4c0a-b47e-8b6420a01a11',   -- 703, no dependents, created 2026-08-04
+    '0d39e637-2fd8-4c2b-ae33-e800559a9430',   -- 704, no dependents, created 2026-08-03
+    'c4aa3393-7c88-43c0-b66a-76cd9047f454',   -- 704, no dependents, created 2026-08-09
+    '79491d55-b84a-44f4-af3c-bfa060c79cce',   -- 708, no dependents, created 2026-08-19, named "2026"
+    '6ea1640f-9e67-4295-a46b-e104d41be956'    -- 721, no dependents, created 2026-08-09
 );
--- expect: UPDATE 4
+-- expect: UPDATE 5
 
--- Verify BEFORE committing. Both queries must return zero rows.
-SELECT unit_id, year, count(*) FROM planning_years
-WHERE unit_id IS NOT NULL AND active_status = true
-GROUP BY unit_id, year HAVING count(*) > 1;
+-- Verify BEFORE committing. All four must hold.
 
-SELECT py.id FROM planning_years py
-WHERE py.active_status = false AND EXISTS (
-  SELECT 1 FROM parade_dates pd WHERE pd.planning_year_id = py.id);
--- ^ nothing archived here should own parade dates
+-- 1. no duplicate active groups remain
+SELECT count(*) AS duplicate_groups_must_be_zero FROM (
+  SELECT unit_id, year FROM planning_years
+  WHERE unit_id IS NOT NULL AND active_status
+  GROUP BY unit_id, year HAVING count(*) > 1) x;
 
-COMMIT;   -- or ROLLBACK; if either check returned rows
+-- 2. nothing was deleted
+SELECT count(*) AS planning_years_must_be_21 FROM planning_years;
+
+-- 3. every row that carries parade dates is still active
+SELECT count(*) AS rows_with_dates_wrongly_archived FROM planning_years py
+WHERE NOT py.active_status
+  AND EXISTS (SELECT 1 FROM parade_dates pd WHERE pd.planning_year_id = py.id);
+-- must be 0
+
+-- 4. the four intended survivors are the ones still active
+SELECT s.code, py.name, py.active_status
+FROM planning_years py JOIN squadrons s ON s.id = py.unit_id
+WHERE py.id IN ('c33ca5b7-2c22-48e8-bfa0-d30cf9f578f8',
+                '420e1d56-5f61-40a8-8399-a37380054c5f',
+                'ec1a2a05-0bf9-495f-83aa-a82428957203',
+                '312b067d-8e4f-478d-9c63-c225b2f97967')
+ORDER BY s.code;
+-- all four must show active_status = true
+
+COMMIT;   -- or ROLLBACK; if any check failed
+
+
+-- ── Reversal ────────────────────────────────────────────────────────────────
+-- UPDATE planning_years SET active_status = true WHERE id IN (
+--     '57b5c229-647a-4c0a-b47e-8b6420a01a11',
+--     '0d39e637-2fd8-4c2b-ae33-e800559a9430',
+--     'c4aa3393-7c88-43c0-b66a-76cd9047f454',
+--     '79491d55-b84a-44f4-af3c-bfa060c79cce',
+--     '6ea1640f-9e67-4295-a46b-e104d41be956');
+
+
+-- ── After this runs ─────────────────────────────────────────────────────────
+-- Production is then clear of the REM-134 blocker, but it is 23 migrations
+-- behind (f6a7b8c9d0e1 -> d1e4f8a03b27) and that is a separate, larger exercise.
+-- Pre-flighted read-only on 2026-08-23: the three table drops, the
+-- session_audience dedupe and both orphan cleanups are all no-ops against
+-- production's data, so duplicate years were the only blocker. Re-run
+-- tools/data-quality/migration_preflight.py immediately before deploying —
+-- that result is a point-in-time snapshot.
+--
+-- Migrate by DEPLOYING, not by running alembic against the database alone:
+-- 821e2a4bc3e6 rewrites timing_blocks.block_type and the deployed production
+-- backend predates that taxonomy. Staging was deployed this way on 2026-08-23
+-- and came up clean.
