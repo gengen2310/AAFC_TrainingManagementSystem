@@ -1,0 +1,23 @@
+-- REM-134 planning-year resolution — STAGING
+-- 6 active rows across 1 duplicate group(s).
+-- training_classes table present in this environment: True
+--
+-- Nothing here deletes anything. Rows are ARCHIVED (active_status = false),
+-- which is this system's normal way to retire a planning year, and archived
+-- rows do not participate in the partial unique index that migration
+-- d1e4f8a03b27 creates. Archiving is reversible; deletion would not be.
+--
+-- Dependent counts below are parade_dates + holiday_periods + training_classes.
+--
+-- NOT HANDLED — MORE THAN ONE row in these groups carries data. Archiving
+-- either one hides real records, so this needs a person who knows what the
+-- squadron actually ran. Consider moving the dependents onto the row you
+-- intend to keep before archiving the other.
+--   703 2064  856c3d14-7dca-4dd9-ad1b-18a9a987c52d  pd=13 hp=0 tc=5  2064 Session-Class Test Year 1  <-- has data
+--   703 2064  7783e831-2a8b-4855-b3cf-e52521eb7ff0  pd=0 hp=0 tc=1  2064 Session-Class Test Year 1  <-- has data
+--   703 2064  6a196045-e82f-4ac9-93dd-6a871234d3cb  pd=0 hp=0 tc=1  2064 Session-Class Test Year 1  <-- has data
+--   703 2064  22a6790e-3767-42c1-b8b7-c3cbc79d0ac6  pd=0 hp=0 tc=1  2064 Session-Class Test Year 1  <-- has data
+--   703 2064  46bff487-3649-4e45-96bb-8382ff2107b1  pd=0 hp=0 tc=1  2064 Session-Class Test Year 1  <-- has data
+--   703 2064  629ea352-8f2a-42d4-9e52-107b3c80cad8  pd=0 hp=1 tc=1  2064 Session-Class Test Year 1  <-- has data
+
+-- Nothing can be archived automatically in this environment.
