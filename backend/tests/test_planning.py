@@ -2737,3 +2737,59 @@ def test_class_forecasts_structure_with_class(client):
                   "status", "message"):
         assert field in fc, f"Missing field: {field}"
     assert fc["status"] in ("on_track", "planning_risk", "critical")
+
+
+# ── REM-134 correction: uniqueness applies to ACTIVE years only ──────────────
+
+def test_archiving_a_year_frees_its_number_for_a_replacement(client):
+    """The workflow a blanket unique constraint would have broken.
+
+    active_status=false is this system's archive state for a planning year, and
+    archiving is the normal operational action. A squadron that sets a year up
+    badly must be able to archive it and create a correct one with the same
+    number. Auditing production on 2026-08-23 also found four squadrons whose
+    only route out of duplicate 2026 years was archiving, since deleting live
+    rows to satisfy a constraint is not acceptable.
+    """
+    hdr = login(client, "ADMIN703")
+    year = next_test_year()
+
+    first = client.post("/api/planning/years",
+                        json={"year": year, "name": "Set up badly"}, headers=hdr)
+    assert first.status_code == 200, first.text
+    first_id = first.json()["planning_year_id"]
+
+    # A second ACTIVE year with the same number is still refused.
+    clash = client.post("/api/planning/years",
+                        json={"year": year, "name": "Second active"}, headers=hdr)
+    assert clash.status_code == 409, clash.text
+    assert clash.json()["detail"]["error"] == "planning_year_already_exists"
+
+    # Archive the first, and the number becomes available again.
+    arch = client.patch(f"/api/planning/years/{first_id}",
+                        json={"active_status": False}, headers=hdr)
+    assert arch.status_code == 200, arch.text
+
+    replacement = client.post("/api/planning/years",
+                              json={"year": year, "name": "Set up correctly"}, headers=hdr)
+    assert replacement.status_code == 200, replacement.text
+
+    # The archived row survives -- archiving is not deletion.
+    listed = {y["planning_year_id"]: y for y in client.get("/api/planning/years", headers=hdr).json()}
+    assert first_id in listed, "the archived year must still exist"
+    assert listed[first_id]["active_status"] is False
+
+
+def test_two_archived_years_with_the_same_number_are_allowed(client):
+    # Only active rows participate in the index, so history can accumulate.
+    hdr = login(client, "ADMIN703")
+    year = next_test_year()
+    ids = []
+    for name in ("First attempt", "Second attempt"):
+        r = client.post("/api/planning/years", json={"year": year, "name": name}, headers=hdr)
+        assert r.status_code == 200, r.text
+        ids.append(r.json()["planning_year_id"])
+        client.patch(f"/api/planning/years/{ids[-1]}", json={"active_status": False}, headers=hdr)
+
+    listed = {y["planning_year_id"] for y in client.get("/api/planning/years", headers=hdr).json()}
+    assert set(ids) <= listed, "both archived years should still be listed"

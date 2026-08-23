@@ -7,7 +7,7 @@ parade night builder, and conflict detection.
 ScheduledSession and PlanningLocation were retired in migration v53
 (a1b2c3d4e5f6) — both superseded by TrainingSession and TrainingArea.
 """
-from sqlalchemy import String, Integer, Boolean, Text, Date, ForeignKey, JSON, UniqueConstraint
+from sqlalchemy import String, Integer, Boolean, Text, Date, ForeignKey, JSON, UniqueConstraint, Index, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..database import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
@@ -31,12 +31,28 @@ PREP_STATUS = ("planned", "confirmed", "complete")
 
 class PlanningYear(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "planning_years"
-    # REM-134: a squadron holds at most one planning year per year number.
-    # unit_id is NULL for wing/national years, and both SQLite and PostgreSQL
-    # treat NULLs as distinct in a unique index, so those rows are unconstrained
-    # -- which is correct: they are not squadron-scoped.
+    # REM-134: a squadron holds at most one ACTIVE planning year per year number.
+    #
+    # Scoped to active rows on purpose. active_status=false is this system's
+    # archive state for a planning year (see the PATCH .../years/{id} archive
+    # path in planning.py, and capability-preservation.md: archive is the normal
+    # operational action, deletion is the exception). A blanket unique constraint
+    # would have made "archive the badly set up 2026 year, then create a correct
+    # one" impossible -- a real workflow, broken by the fix meant to protect it.
+    # It would also have forced deletion of live production rows to deploy at
+    # all, since every duplicate found there on 2026-08-23 was active.
+    #
+    # unit_id is NULL for wing and national years, and both SQLite and
+    # PostgreSQL treat NULLs as distinct in a unique index, so those rows stay
+    # unconstrained -- correct, since they are not squadron-scoped.
     __table_args__ = (
-        UniqueConstraint("unit_id", "year", name="uq_planning_years_unit_year"),
+        Index(
+            "uq_planning_years_unit_year_active",
+            "unit_id", "year",
+            unique=True,
+            sqlite_where=text("active_status = 1"),
+            postgresql_where=text("active_status = true"),
+        ),
     )
     unit_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
     wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)

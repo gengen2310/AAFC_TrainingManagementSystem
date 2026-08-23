@@ -486,9 +486,13 @@ def create_planning_year(
     # duplicates that every downstream year selector then listed several times.
     # 409 matches rollover rather than inventing a second status for one condition.
     if unit_id:
+        # Active rows only, matching uq_planning_years_unit_year_active. An
+        # archived year of the same number is not a conflict -- archiving one and
+        # creating a replacement is a supported workflow.
         dupe = db.query(PlanningYear).filter(
             PlanningYear.unit_id == unit_id,
             PlanningYear.year == body.year,
+            PlanningYear.active_status == True,  # noqa: E712
         ).first()
         if dupe:
             raise HTTPException(409, detail={
