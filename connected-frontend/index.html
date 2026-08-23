@@ -1389,7 +1389,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
              actions people come here to take sat below everything they came
              here to read. Moved above section A. -->
         <div class="card no-print">
-          <div class="ctitle">Quick Actions</div>
+          <h3 class="ctitle">Quick Actions</h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-dk" onclick="openModal('m-add-pn')">+ Parade Night</button>
             <button class="btn btn-sky" onclick="nav('calendar')">Calendar</button>
@@ -1399,7 +1399,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <button class="btn btn-out" id="btn-load-strategic" onclick="_loadDashStrategic()" title="Load resilience and long-term charts">Load Resilience Charts ↓</button>
           </div>
         </div>
-          <div class="dash-sec-hdr">A — Tonight &amp; This Week</div>
+          <h2 class="dash-sec-hdr">A — Tonight &amp; This Week</h2>
           <div class="dash-sec-sub">Readiness for the next parade night and upcoming staffing issues.</div>
           <div id="dash-tonight-section"><div class="card"><div class="chart-skeleton"></div></div></div>
           <div id="dash-upcoming-readiness-section"></div>
@@ -1407,17 +1407,17 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
         <!-- ══════════ B. THIS TERM ══════════ -->
         <div class="dash-section">
-          <div class="dash-sec-hdr">B — This Term — Session Delivery</div>
+          <h2 class="dash-sec-hdr">B — This Term — Session Delivery</h2>
           <div class="dash-sec-sub">Session outcomes, weekly delivery and trends over the selected period.</div>
           <div class="dash-grid">
             <div class="card">
-              <div class="ctitle">Training delivered each week</div>
+              <h3 class="ctitle">Training delivered each week</h3>
               <div class="ssub" id="exp-weekly-outcomes" style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px"></div>
               <div id="chart-weekly-outcomes"><div class="chart-skeleton"></div></div>
               <div id="insight-weekly-outcomes" class="chart-insight" style="display:none"></div>
             </div>
             <div class="card">
-              <div class="ctitle">Delivery reliability — 12 weeks <span id="trend-thresholds" style="font-weight:400;color:var(--muted);font-size:var(--fs-3xs);text-transform:none;letter-spacing:0"> · green ≥80% · amber ≥60%</span><button class="ht" tabindex="0" aria-label="About Delivery reliability" data-tip="Delivered sessions ÷ total scheduled sessions over the past 12 parade nights. 100% means every planned session ran. Cancelled and not-delivered sessions reduce this figure.">?</button></div>
+              <h3 class="ctitle">Delivery reliability — 12 weeks <span id="trend-thresholds" style="font-weight:400;color:var(--muted);font-size:var(--fs-3xs);text-transform:none;letter-spacing:0"> · green ≥80% · amber ≥60%</span><button class="ht" tabindex="0" aria-label="About Delivery reliability" data-tip="Delivered sessions ÷ total scheduled sessions over the past 12 parade nights. 100% means every planned session ran. Cancelled and not-delivered sessions reduce this figure.">?</button></h3>
               <div class="ssub" id="exp-delivery-trend" style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px"></div>
               <div id="chart-delivery-trend"><div class="chart-skeleton"></div></div>
               <div id="insight-delivery-trend" class="chart-insight" style="display:none"></div>
@@ -1425,18 +1425,18 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </div>
           <div class="dash-grid">
             <div class="card">
-              <div class="ctitle">Session outcomes</div>
+              <h3 class="ctitle">Session outcomes</h3>
               <div id="chart-session-outcomes"><div class="chart-skeleton"></div></div>
               <div id="insight-session-outcomes" class="chart-insight" style="display:none"></div>
             </div>
             <div class="card">
-              <div class="ctitle">Cancellation &amp; not-delivered reasons</div>
+              <h3 class="ctitle">Cancellation &amp; not-delivered reasons</h3>
               <div id="chart-cancellation-reasons"><div class="chart-skeleton"></div></div>
               <div id="insight-cancellation-reasons" class="chart-insight" style="display:none"></div>
             </div>
           </div>
           <div class="card" id="card-delivery-forecast" style="display:none">
-            <div class="ctitle">Delivery forecast <button class="ht" tabindex="0" aria-label="About delivery forecast" data-tip="Projects remaining planned sessions against your year-to-date delivery rate. Deterministic: forecast = remaining planned × historical rate. No AI scoring.">?</button></div>
+            <h3 class="ctitle">Delivery forecast <button class="ht" tabindex="0" aria-label="About delivery forecast" data-tip="Projects remaining planned sessions against your year-to-date delivery rate. Deterministic: forecast = remaining planned × historical rate. No AI scoring.">?</button></h3>
             <div class="ssub" style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px">At your current rate, how many planned sessions are at risk of not being delivered by year end?</div>
             <div id="chart-delivery-forecast"><div class="chart-skeleton" style="height:60px"></div></div>
             <div id="insight-delivery-forecast" class="chart-insight" style="display:none"></div>
@@ -1445,10 +1445,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
         <!-- ══════════ C. CURRICULUM ══════════ -->
         <div class="dash-section">
-          <div class="dash-sec-hdr">C — Curriculum Progress</div>
+          <h2 class="dash-sec-hdr">C — Curriculum Progress</h2>
           <div class="dash-sec-sub">Sessions recorded per curriculum phase — delivered, planned and not delivered.</div>
           <div class="card">
-            <div class="ctitle">Progress by phase</div>
+            <h3 class="ctitle">Progress by phase</h3>
             <div class="ssub" id="exp-curriculum-progress" style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px"></div>
             <div id="chart-curriculum-progress"><div class="chart-skeleton" style="height:160px"></div></div>
             <div id="insight-curriculum-progress" class="chart-insight" style="display:none"></div>
@@ -1457,7 +1457,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
                shape/renderer, answers "how much [element] have we delivered"
                (previously only filterable in Mission Backlog, never aggregated). -->
           <div class="card">
-            <div class="ctitle">Progress by element</div>
+            <h3 class="ctitle">Progress by element</h3>
             <div class="ssub" id="exp-element-curriculum-progress" style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px"></div>
             <div id="chart-element-curriculum-progress"><div class="chart-skeleton" style="height:160px"></div></div>
             <div id="insight-element-curriculum-progress" class="chart-insight" style="display:none"></div>
@@ -1468,7 +1468,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
                belongs next to. Both API fields are still consumed and both insight
                containers are preserved. Hidden until Training Classes exist. -->
           <div class="card" id="card-class-overview" style="display:none">
-            <div class="ctitle">Training classes</div>
+            <h3 class="ctitle">Training classes</h3>
             <div class="ssub" id="exp-class-curriculum-progress" style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px"></div>
             <div id="chart-class-overview"><div class="chart-skeleton" style="height:120px"></div></div>
             <div id="insight-class-curriculum-progress" class="chart-insight" style="display:none"></div>
@@ -1476,12 +1476,12 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </div>
           <div class="dash-grid">
             <div class="card">
-              <div class="ctitle">Curriculum backlog — past sessions not delivered</div>
+              <h3 class="ctitle">Curriculum backlog — past sessions not delivered</h3>
               <div id="chart-curriculum-backlog"><div class="chart-skeleton"></div></div>
               <div id="insight-curriculum-backlog" class="chart-insight" style="display:none"></div>
             </div>
             <div class="card">
-              <div class="ctitle">Facilitator workload — sessions per facilitator</div>
+              <h3 class="ctitle">Facilitator workload — sessions per facilitator</h3>
               <div id="chart-facilitator-workload"><div class="chart-skeleton"></div></div>
               <div id="insight-facilitator-workload" class="chart-insight" style="display:none"></div>
             </div>
@@ -1490,46 +1490,46 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
         <!-- ══════════ D. STRATEGIC ══════════ -->
         <div class="dash-section" id="dash-strategic-section" style="display:none">
-          <div class="dash-sec-hdr">D — Staffing Resilience &amp; Long-Term Trends</div>
+          <h2 class="dash-sec-hdr">D — Staffing Resilience &amp; Long-Term Trends</h2>
           <div class="dash-sec-sub">Capability risks, facilitator dependency and delivery trend across terms.</div>
           <div class="dash-grid">
             <div class="card">
-              <div class="ctitle">Capability dependency — who carries the most sessions?</div>
+              <h3 class="ctitle">Capability dependency — who carries the most sessions?</h3>
               <div id="chart-capability-dependency"><div class="chart-skeleton"></div></div>
               <div id="insight-capability-dependency" class="chart-insight" style="display:none"></div>
             </div>
             <div class="card">
-              <div class="ctitle">Subject area resilience — qualified facilitators per area</div>
+              <h3 class="ctitle">Subject area resilience — qualified facilitators per area</h3>
               <div id="chart-subject-area-resilience"><div class="chart-skeleton"></div></div>
               <div id="insight-subject-area-resilience" class="chart-insight" style="display:none"></div>
             </div>
             <div class="card">
-              <div class="ctitle">Facilitator status</div>
+              <h3 class="ctitle">Facilitator status</h3>
               <div id="chart-facilitator-status"><div class="chart-skeleton"></div></div>
               <div id="insight-facilitator-status" class="chart-insight" style="display:none"></div>
             </div>
             <div class="card">
-              <div class="ctitle">Facilitators by type</div>
+              <h3 class="ctitle">Facilitators by type</h3>
               <div id="chart-facilitator-type"><div class="chart-skeleton"></div></div>
               <div id="insight-facilitator-type" class="chart-insight" style="display:none"></div>
             </div>
             <div class="card">
-              <div class="ctitle">Repeated facilitator gaps — last 8 weeks</div>
+              <h3 class="ctitle">Repeated facilitator gaps — last 8 weeks</h3>
               <div id="chart-facilitator-gaps"><div class="chart-skeleton"></div></div>
               <div id="insight-facilitator-gaps" class="chart-insight" style="display:none"></div>
             </div>
             <div class="card">
-              <div class="ctitle">Sessions needing a substitute</div>
+              <h3 class="ctitle">Sessions needing a substitute</h3>
               <div id="chart-facilitator-leave-impact"><div class="chart-skeleton"></div></div>
               <div id="insight-facilitator-leave-impact" class="chart-insight" style="display:none"></div>
             </div>
           </div>
           <div class="card">
-            <div class="ctitle">Long-term delivery trend by term</div>
+            <h3 class="ctitle">Long-term delivery trend by term</h3>
             <div id="chart-long-term-trend"><div class="chart-skeleton"></div></div>
           </div>
           <div class="card" id="card-term-ytd" style="display:none">
-            <div class="ctitle">Delivery — term comparison and year to date</div>
+            <h3 class="ctitle">Delivery — term comparison and year to date</h3>
             <div class="ssub" style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px">Year-to-date rate and current vs previous term. Set the training term on each Parade Night to enable this view.</div>
             <div id="chart-term-ytd"><div class="chart-skeleton" style="height:60px"></div></div>
             <div id="insight-term-ytd" class="chart-insight" style="display:none"></div>
@@ -1538,20 +1538,20 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
         <!-- ══════════ WING COMPARISON ══════════ -->
         <div class="dash-section" id="dash-wing-section" style="display:none">
-          <div class="dash-sec-hdr">Wing — Squadron Comparison</div>
+          <h2 class="dash-sec-hdr">Wing — Squadron Comparison</h2>
           <div class="dash-sec-sub">How squadrons compare across the Wing for the selected period.</div>
           <div class="card">
-            <div class="ctitle">Squadron delivery readiness — ranked</div>
+            <h3 class="ctitle">Squadron delivery readiness — ranked</h3>
             <div id="chart-squadron-readiness"><div class="chart-skeleton"></div></div>
             <div id="insight-squadron-readiness" class="chart-insight" style="display:none"></div>
           </div>
           <div class="dash-grid">
             <div class="card">
-              <div class="ctitle">Squadron session outcomes comparison</div>
+              <h3 class="ctitle">Squadron session outcomes comparison</h3>
               <div id="chart-squadron-delivery"><div class="chart-skeleton"></div></div>
             </div>
             <div class="card">
-              <div class="ctitle">Wing subject-area facilitator coverage</div>
+              <h3 class="ctitle">Wing subject-area facilitator coverage</h3>
               <div id="chart-wing-subject-gaps"><div class="chart-skeleton"></div></div>
               <div id="insight-wing-subject-gaps" class="chart-insight" style="display:none"></div>
             </div>
@@ -1560,16 +1560,16 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
         <!-- ══════════ NATIONAL COMPARISON ══════════ -->
         <div class="dash-section" id="dash-national-section" style="display:none">
-          <div class="dash-sec-hdr">National — Wing Comparison</div>
+          <h2 class="dash-sec-hdr">National — Wing Comparison</h2>
           <div class="dash-sec-sub">How Wings compare across the national system.</div>
           <div class="dash-grid">
             <div class="card">
-              <div class="ctitle">Wing delivery readiness — ranked</div>
+              <h3 class="ctitle">Wing delivery readiness — ranked</h3>
               <div id="chart-wing-readiness"><div class="chart-skeleton"></div></div>
               <div id="insight-wing-readiness" class="chart-insight" style="display:none"></div>
             </div>
             <div class="card">
-              <div class="ctitle">Wing session outcomes comparison</div>
+              <h3 class="ctitle">Wing session outcomes comparison</h3>
               <div id="chart-wing-delivery"><div class="chart-skeleton"></div></div>
             </div>
           </div>
@@ -1834,27 +1834,27 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <div class="dash-grid" style="margin-bottom:16px">
           <div class="card">
-            <div class="ctitle">Facilitator status</div>
+            <h2 class="ctitle">Facilitator status</h2>
             <div id="fac-chart-status"><div class="chart-skeleton"></div></div>
             <div id="fac-insight-status" class="chart-insight" style="display:none"></div>
           </div>
           <div class="card">
-            <div class="ctitle">Workload distribution — sessions per facilitator</div>
+            <h2 class="ctitle">Workload distribution — sessions per facilitator</h2>
             <div id="fac-chart-workload"><div class="chart-skeleton"></div></div>
             <div id="fac-insight-workload" class="chart-insight" style="display:none"></div>
           </div>
           <div class="card">
-            <div class="ctitle">Subject area coverage — qualified facilitators per area</div>
+            <h2 class="ctitle">Subject area coverage — qualified facilitators per area</h2>
             <div id="fac-chart-spof"><div class="chart-skeleton"></div></div>
             <div id="fac-insight-spof" class="chart-insight" style="display:none"></div>
           </div>
           <div class="card">
-            <div class="ctitle">Repeated gaps — unfilled sessions by subject area (last 8 weeks)</div>
+            <h2 class="ctitle">Repeated gaps — unfilled sessions by subject area (last 8 weeks)</h2>
             <div id="fac-chart-gaps"><div class="chart-skeleton"></div></div>
             <div id="fac-insight-gaps" class="chart-insight" style="display:none"></div>
           </div>
           <div class="card">
-            <div class="ctitle">Facilitators by type</div>
+            <h2 class="ctitle">Facilitators by type</h2>
             <div id="fac-chart-type"><div class="chart-skeleton"></div></div>
             <div id="fac-insight-type" class="chart-insight" style="display:none"></div>
           </div>
@@ -1880,18 +1880,18 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <div class="dash-grid">
           <div class="card">
-            <div class="ctitle" style="display:flex;align-items:center;gap:8px">Rooms / Training Areas
+            <h2 class="ctitle" style="display:flex;align-items:center;gap:8px">Rooms / Training Areas
               <label class="admin-el" style="display:none;font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px;margin-left:auto"><input type="checkbox" id="room-show-archived" onchange="_resToggleShowArchived('room')"> Show archived</label>
-            </div>
+            </h2>
             <div class="tw"><table>
               <thead><tr><th>Name</th><th>Capacity</th><th>Type</th><th class="no-print">Actions</th></tr></thead>
               <tbody id="room-tbody"></tbody>
             </table></div>
           </div>
           <div class="card">
-            <div class="ctitle" style="display:flex;align-items:center;gap:8px">Equipment
+            <h2 class="ctitle" style="display:flex;align-items:center;gap:8px">Equipment
               <label class="admin-el" style="display:none;font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px;margin-left:auto"><input type="checkbox" id="equip-show-archived" onchange="_resToggleShowArchived('equip')"> Show archived</label>
-            </div>
+            </h2>
             <div class="tw"><table>
               <thead><tr><th>Name</th><th>Qty</th><th>Notes</th><th class="no-print">Actions</th></tr></thead>
               <tbody id="equip-tbody"></tbody>
@@ -1912,7 +1912,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <!-- HELP-05: What Changed? activity feed -->
         <div class="card" style="margin-top:18px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div class="ctitle" style="margin-bottom:0">What Changed?</div>
+            <h2 class="ctitle" style="margin-bottom:0">What Changed?</h2>
             <div style="display:flex;gap:8px;align-items:center">
               <label style="font-size:var(--fs-sm);color:var(--muted)">Show last
                 <select id="rc-days" style="font-size:var(--fs-sm);padding:2px 4px;margin:0 4px" onchange="loadRecentChanges()">
@@ -1953,7 +1953,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div class="help-main">
             <div class="card">
               <div class="card-head">
-                <div class="ctitle" style="margin:0">Getting help</div>
+                <h2 class="ctitle" style="margin:0">Getting help</h2>
                 <button id="gh-edit-btn" class="btn btn-secondary btn-sm" style="display:none" onclick="openGettingHelpModal()">Edit</button>
               </div>
               <div id="gh-content-display" class="rt"></div>
@@ -1962,7 +1962,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
             <div class="card" style="margin-top:12px">
               <div class="card-head">
-                <div class="ctitle" style="margin:0">Frequently asked questions</div>
+                <h2 class="ctitle" style="margin:0">Frequently asked questions</h2>
                 <button id="faq-add-btn" class="btn btn-secondary btn-sm" style="display:none" onclick="openFaqModal()">Add question</button>
               </div>
               <div id="faq-body"></div>
@@ -1971,7 +1971,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 
           <aside class="help-aside">
             <div class="card">
-              <div class="ctitle">Start here</div>
+              <h2 class="ctitle">Start here</h2>
               <div id="help-links" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
             </div>
           </aside>
@@ -1982,7 +1982,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div id="page-settings" class="page">
         <div class="ph"><h1 class="ph-title">Unit Settings</h1><div class="ph-sub">Unit configuration</div></div>
         <div class="card">
-          <div class="ctitle">Squadron Details</div>
+          <h2 class="ctitle">Squadron Details</h2>
           <div class="form-row">
             <div class="ff"><label for="s-sqn">Squadron Name</label><input class="ff-ro" id="s-sqn" readonly></div>
             <div class="ff"><label for="s-addr">Address</label><input id="s-addr"></div>
@@ -2026,7 +2026,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </div>
         </div>
         <div class="card">
-          <div class="ctitle">Session Structure</div>
+          <h2 class="ctitle">Session Structure</h2>
           <p class="muted" style="font-size:var(--fs-xs);margin:0 0 12px">
             How many training periods a new parade night starts with. A timing template decides
             this for any night that uses one &mdash; the count comes from its Training Period
@@ -2052,7 +2052,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <!-- DENS-01: Display size preference -->
         <div class="card" id="dens-card">
-          <div class="ctitle">Display Size</div>
+          <h2 class="ctitle">Display Size</h2>
           <p style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:10px">Adjust spacing to fit more content on screen. Both settings meet accessibility requirements at 200% zoom. Your preference is saved for this browser session.</p>
           <div style="display:flex;gap:20px;align-items:center">
             <label style="cursor:pointer;display:flex;align-items:center;gap:7px;font-size:var(--fs-base);font-weight:600">
@@ -2068,7 +2068,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <div class="card admin-el" id="settings-training-years-wrap">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-            <div class="ctitle" style="margin:0">Training Years</div>
+            <h2 class="ctitle" style="margin:0">Training Years</h2>
             <button class="btn btn-sky admin-el" onclick="ynCreateYear()">+ Create <span id="ynCreateLabelCard">next year</span></button>
           </div>
           <p class="muted" style="font-size:var(--fs-xs);margin:0 0 12px">
@@ -2079,7 +2079,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div id="settings-yn-postcreate" style="display:none" class="alert a-info mt-2"></div>
         </div>
         <div class="card" id="settings-timing-templates-wrap">
-          <div class="ctitle">Timing Templates</div>
+          <h2 class="ctitle">Timing Templates</h2>
           <div style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:10px">Named parade night schedules with ordered blocks. Training Period blocks generate schedulable curriculum sessions. New parade nights automatically use the template effective on their date.</div>
           <div id="timing-templates-list" style="margin-bottom:12px"><div style="color:var(--muted);font-size:var(--fs-xs)">Loading…</div></div>
           <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
@@ -2090,7 +2090,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <!-- Training Classes (unit configuration per planning year) -->
         <div class="card admin-el" id="settings-training-classes-wrap" style="display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <div class="ctitle" style="margin:0">Training Classes</div>
+            <h2 class="ctitle" style="margin:0">Training Classes</h2>
             <div style="display:flex;align-items:center;gap:10px">
               <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="tc-show-archived" onchange="_tcToggleShowArchived(P.currentYearId)"> Show archived</label>
               <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
@@ -2114,7 +2114,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <!-- Custom Training Phases (Task 10) -->
         <div class="card admin-el" id="settings-custom-phases-wrap">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <div class="ctitle" style="margin:0">Custom Training Phases</div>
+            <h2 class="ctitle" style="margin:0">Custom Training Phases</h2>
             <button class="btn btn-sky admin-el" onclick="cpOpenCreate()">+ Add Phase</button>
           </div>
           <p class="muted" style="font-size:var(--fs-xs);margin:0 0 12px">
@@ -2124,7 +2124,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div id="settings-custom-phases-list"><p class="muted" style="font-size:var(--fs-xs)">Loading…</p></div>
         </div>
         <div class="card">
-          <div class="ctitle">🔑 Access Code</div>
+          <h2 class="ctitle">🔑 Access Code</h2>
           <div class="alert a-info">Change your own sign-in code. Existing codes cannot be viewed. The previous code cannot be recovered once changed.</div>
           <div class="form-row">
             <div class="ff"><label for="cc-new">New access code</label><input id="cc-new" type="password" autocomplete="new-password" placeholder="Enter new code"></div>
@@ -2136,7 +2136,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <!-- Admin: user directory for code resets -->
         <div class="card admin-el" id="user-dir-card" style="display:none">
-          <div class="ctitle">🗂️ User Directory — Admin Code Reset</div>
+          <h2 class="ctitle">🗂️ User Directory — Admin Code Reset</h2>
           <div class="alert a-info" style="margin-bottom:10px;font-size:var(--fs-xs)">Select a user to reset their access code. You can only reset users within your authorised unit. The old code cannot be recovered.</div>
           <div class="ff" style="max-width:340px;margin-bottom:10px"><input id="user-dir-filter" placeholder="Filter by name, role, or unit…" oninput="renderUserDir()" autocomplete="off" aria-label="Filter users by name, role, or unit"></div>
           <div id="user-dir-table"></div>
@@ -2172,18 +2172,18 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <!-- Wings sub-section (NAT HQ admin only) -->
         <div class="card" id="acct-wings-card" style="display:none">
-          <div class="ctitle" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+          <h2 class="ctitle" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
             <span>Wings</span>
             <div style="display:flex;align-items:center;gap:10px">
               <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="wings-show-archived" onchange="_orgToggleShowArchived('wing')"> Show archived</label>
               <button class="btn btn-xs btn-sky" id="wing-create-btn-2" style="display:none" onclick="openCreateWingModal()">+ Add Wing</button>
-            </div>
+            </h2>
           </div>
           <div id="wings-table"></div>
         </div>
         <!-- Units sub-section: Squadrons / Specialist Units (Wing + NAT HQ) -->
         <div class="card" id="acct-units-card" style="display:none">
-          <div class="ctitle" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+          <h2 class="ctitle" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
             <span>Squadrons / Specialist Units</span>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <select id="units-type-filter" aria-label="Filter by unit type" onchange="_renderUnitsTable()" style="font-size:var(--fs-xs);padding:3px 6px">
@@ -2196,18 +2196,18 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
               <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="units-show-archived" onchange="_orgToggleShowArchived('squadron')"> Show archived</label>
               <button class="btn btn-xs btn-sky" id="wing-create-btn" style="display:none" onclick="openCreateWingModal()">+ Add Wing</button>
               <button class="btn btn-xs btn-sky" id="sqn-create-btn" style="display:none" onclick="openCreateSqnModal()">+ Add Squadron / Specialist Unit</button>
-            </div>
+            </h2>
           </div>
           <div id="units-table"></div>
         </div>
         <!-- Flights sub-section -->
         <div class="card" id="acct-flights-card" style="display:none">
-          <div class="ctitle" style="display:flex;justify-content:space-between;align-items:center">
+          <h2 class="ctitle" style="display:flex;justify-content:space-between;align-items:center">
             <span>Local Squadron Flights (Sub-Squadron Groupings)</span>
             <div style="display:flex;align-items:center;gap:10px">
               <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="flights-show-archived" onchange="_flightsToggleShowArchived()"> Show archived</label>
               <button class="btn btn-xs btn-sky acct-write-el" id="flight-create-btn" style="display:none" onclick="openCreateFlightModal()">+ Add Flight</button>
-            </div>
+            </h2>
           </div>
           <div class="alert a-info" style="font-size:var(--fs-xs);margin:6px 0 10px">Flights are local squadron groupings only. They do not create separate tenancy or change permissions. A user assigned to a Flight still belongs entirely to the Squadron.</div>
           <div id="flight-table"></div>
@@ -2221,7 +2221,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
              the Facilitator Tags modal) -- this card covers the common
              "create at my own level" case, not a full cross-scope picker. -->
         <div class="card acct-write-el" id="acct-refdata-card" style="display:none">
-          <div class="ctitle">Reference Data</div>
+          <h2 class="ctitle">Reference Data</h2>
           <p class="muted" style="font-size:var(--fs-xs);margin:0 0 10px">Training stages, facilitator types, and subject areas are created here at your own scope (<span id="refdata-scope-label"></span>).</p>
           <div id="refdata-sections" style="display:grid;gap:14px"></div>
         </div>
@@ -3628,7 +3628,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="ff"><label for="ga-notes">Notes</label><input id="ga-notes"></div>
       <div id="ga-preview-area" style="display:none;margin-top:14px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div class="ctitle" style="margin:0" id="ga-preview-title">Preview</div>
+          <h2 class="ctitle" style="margin:0" id="ga-preview-title">Preview</h2>
           <div style="font-size:var(--fs-xs);color:var(--muted)" id="ga-preview-summary"></div>
         </div>
         <div style="max-height:240px;overflow-y:auto">
@@ -5910,19 +5910,19 @@ async function renderActionCentre(){
 
   el.innerHTML=
     `<div class="card" style="margin-bottom:14px">`+
-      `<div class="ctitle">Outstanding Items &amp; Blockers <span class="badge ${openItems.length?'b-red':'b-ok'}" style="vertical-align:middle;margin-left:6px">${openItems.length}</span></div>`+
+      `<h3 class="ctitle">Outstanding Items &amp; Blockers <span class="badge ${openItems.length?'b-red':'b-ok'}" style="vertical-align:middle;margin-left:6px">${openItems.length}</span></h3>`+
       itemsHtml+
     `</div>`+
     `<div class="card" style="margin-bottom:14px">`+
-      `<div class="ctitle">Upcoming Nights Needing Attention</div>`+
+      `<h3 class="ctitle">Upcoming Nights Needing Attention</h3>`+
       deadlinesHtml+
     `</div>`+
     `<div class="card" id="ac-conflicts-card" style="margin-bottom:14px">`+
-      `<div class="ctitle">Unresolved Planning Conflicts</div>`+
+      `<h3 class="ctitle">Unresolved Planning Conflicts</h3>`+
       `<div class="muted" id="ac-conflicts-body">Loading…</div>`+
     `</div>`+
     `<div class="card">`+
-      `<div class="ctitle">Sign-off Queue <span class="badge ${signoffPns.length?'b-amber':'b-ok'}" style="vertical-align:middle;margin-left:6px">${signoffPns.length}</span></div>`+
+      `<h3 class="ctitle">Sign-off Queue <span class="badge ${signoffPns.length?'b-amber':'b-ok'}" style="vertical-align:middle;margin-left:6px">${signoffPns.length}</span></h3>`+
       `<div style="font-size:var(--fs-sm);color:var(--muted);margin-bottom:8px">Published parade nights awaiting closeout.</div>`+
       signoffHtml+
     `</div>`;
@@ -6002,7 +6002,7 @@ function renderProgramAudit(){
 
   el.innerHTML=
     `<div class="card" style="margin-bottom:14px">`+
-      `<div class="ctitle">Parade Nights: Planned vs. Delivered</div>`+
+      `<h3 class="ctitle">Parade Nights: Planned vs. Delivered</h3>`+
       `<div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:10px">`+
         `<div class="stat"><div class="sval">${totalNights}</div><div class="slbl">Total nights</div></div>`+
         `<div class="stat ${publishedNights===totalNights&&totalNights?'s-ok':''}"><div class="sval">${publishedNights}</div><div class="slbl">Published</div></div>`+
@@ -6012,7 +6012,7 @@ function renderProgramAudit(){
       (totalNights?`<div class="pbar" style="height:10px;border-radius:5px;margin:4px 0"><div style="height:100%;width:${closedPct}%;background:var(--ok);border-radius:5px"></div></div><div style="font-size:var(--fs-xs);color:var(--muted)">${closedPct}% nights closed out</div>`:'<div class="muted">No parade nights on record.</div>')+
     `</div>`+
     `<div class="card" style="margin-bottom:14px">`+
-      `<div class="ctitle">Sessions: By Status</div>`+
+      `<h3 class="ctitle">Sessions: By Status</h3>`+
       (totalSess
         ?`<div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:10px">`+
           `<div class="stat"><div class="sval">${totalSess}</div><div class="slbl">Total sessions</div></div>`+
@@ -6022,7 +6022,7 @@ function renderProgramAudit(){
         :`<div class="muted">No session records yet.</div>`)+
     `</div>`+
     `<div class="card">`+
-      `<div class="ctitle">Curriculum: Requested vs. Scheduled</div>`+
+      `<h2 class="ctitle">Curriculum: Requested vs. Scheduled</h2>`+
       `<div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:10px">`+
         `<div class="stat"><div class="sval">${covTotal}</div><div class="slbl">Total items</div></div>`+
         `<div class="stat ${covSched===covTotal&&covTotal?'s-ok':'s-warn'}"><div class="sval">${covSched}</div><div class="slbl">Scheduled</div></div>`+
@@ -6070,7 +6070,7 @@ function _renderGsSections(d){
     html+='<div class="alert a-ok">Setup looks complete — every checklist item below is done. This page stays here if you ever want to review it again.</div>';
   }
   if(d.national){
-    html+='<div class="card"><div class="ctitle">National / Wing Setup</div>'+
+    html+='<div class="card"><h2 class="ctitle">National / Wing Setup</h2>'+
       (d.steps||[]).filter(s=>_GS_NATIONAL_KEYS.includes(s.key)).map(_gsStepRow).join('')+
       '</div>';
   }
@@ -6079,7 +6079,7 @@ function _renderGsSections(d){
     const required=sqnSteps.filter(s=>!s.optional);
     const optional=sqnSteps.filter(s=>s.optional);
     const doneCount=required.filter(s=>s.done).length;
-    html+=`<div class="card"><div class="card-head"><div class="ctitle" style="margin:0">Squadron setup — ${esc(d.squadron.squadron_code||'')}</div>`+
+    html+=`<div class="card"><div class="card-head"><h2 class="ctitle" style="margin:0">Squadron setup — ${esc(d.squadron.squadron_code||'')}</h2>`+
       `<span class="muted" style="font-size:var(--fs-xs)">${doneCount} of ${required.length} done</span></div>`+
       required.map(_gsStepRow).join('')+
       '</div>';
@@ -6088,7 +6088,7 @@ function _renderGsSections(d){
     // deliberately surfaces as guidance. Training classes in particular are
     // load-bearing: without one the Weekly Program has no column to print into.
     if(optional.length){
-      html+='<div class="card" style="margin-top:12px"><div class="ctitle">Recommended</div>'+
+      html+='<div class="card" style="margin-top:12px"><h2 class="ctitle">Recommended</h2>'+
         '<p class="muted" style="font-size:var(--fs-xs);margin:0 0 10px">Not required for setup to count as complete, but most squadrons need these.</p>'+
         optional.map(_gsStepRow).join('')+
         '</div>';
@@ -8491,7 +8491,7 @@ function _renderTonightReadiness(chart){
   // that reads 100 for zero sessions, kept only for older report consumers).
   if(d.planning_status==='not_planned'||!d.sessions_total){
     return `<div class="card card-quiet">
-      <div class="ctitle">Tonight — <span style="font-weight:400">${fmtD(d.date,{weekday:'long',day:'numeric',month:'long'})}</span></div>
+      <h2 class="ctitle">Tonight — <span style="font-weight:400">${fmtD(d.date,{weekday:'long',day:'numeric',month:'long'})}</span></h2>
       <div style="font-size:var(--fs-base);font-weight:700;color:var(--muted)">Not planned</div>
       <div style="font-size:var(--fs-xs);color:var(--muted);margin-top:4px">No sessions scheduled for this parade night yet.</div>
     </div>`;
@@ -8521,7 +8521,7 @@ function _renderTonightReadiness(chart){
   const sessCheck=sessTotal>0?`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span class="badge b-ok" style="width:16px;text-align:center;padding:1px 0;font-size:var(--fs-2xs)">✓</span><span style="font-size:var(--fs-xs)">Sessions planned</span><span style="font-size:var(--fs-2xs);color:var(--muted)">${sessTotal}</span></div>`:`<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px"><span class="badge b-grey" style="width:16px;text-align:center;padding:1px 0;font-size:var(--fs-2xs)">–</span><span style="font-size:var(--fs-xs);color:var(--muted)">No sessions planned</span></div>`;
   const checklistHtml=`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light)"><div style="font-size:var(--fs-2xs);font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Readiness checklist</div>${sessCheck}${_rdItem('Facilitators assigned',facFill,sessTotal)}${_rdItem('Rooms assigned',roomFill,sessTotal)}</div>`;
   return `<div class="card ${tonightCardCls}">
-    <div class="ctitle">Tonight — <span style="font-weight:400">${fmtD(d.date,{weekday:'long',day:'numeric',month:'long'})}</span></div>
+    <h2 class="ctitle">Tonight — <span style="font-weight:400">${fmtD(d.date,{weekday:'long',day:'numeric',month:'long'})}</span></h2>
     <div class="readiness-donut" style="align-items:flex-start">
       <div>
         <div class="rdp-ring" style="background:${conic};width:72px;height:72px">
@@ -11548,7 +11548,7 @@ function _actTabRender(containerId){
 
   let html=`<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
-      <div class="ctitle" style="margin-bottom:0">${st.scopeType==='squadron'?'Inherited Activities':'Activities'}</div>
+      <h2 class="ctitle" style="margin-bottom:0">${st.scopeType==='squadron'?'Inherited Activities':'Activities'}</h2>
       ${createBtn}
     </div>
     <div class="fbar no-print" style="margin:10px 0">
@@ -13272,16 +13272,16 @@ function showFacProfile(id){
       <div class="fac-st"><div class="fac-sv" style="color:var(--warn-text)">${sts.rescheduled}</div><div class="fac-sl">Rescheduled</div></div>
       <div class="fac-st"><div class="fac-sv">${sess.length}</div><div class="fac-sl">Total</div></div>
     </div>
-    ${Object.keys(phC).length?`<div class="ctitle">Sessions by Phase</div>
+    ${Object.keys(phC).length?`<h3 class="ctitle">Sessions by Phase</h3>
       ${Object.entries(phC).sort((a,b)=>b[1]-a[1]).map(([ph,n])=>`
       <div class="ph-row"><div class="ph-name">${PH_S[ph]||ph}</div>
         <div class="ph-bar"><div class="pbar"><div class="pfill" style="width:${Math.round(n/sess.length*100)}%"></div></div></div>
         <div class="ph-cnt">${n}</div>
       </div>`).join('')}`:''}
-    <div class="ctitle" style="margin-top:14px;display:flex;align-items:center;justify-content:space-between">
+    <h3 class="ctitle" style="margin-top:14px;display:flex;align-items:center;justify-content:space-between">
       <span>Upcoming Leave (next 90 days)</span>
       ${canWriteSquadron()?`<button class="btn btn-xs btn-sky no-print" onclick="_showAddFacLeaveForm('${id}')">+ Add Leave</button>`:''}
-    </div>
+    </h3>
     <div id="fac-leave-add-form"></div>
     ${f.leave&&f.leave.length?`
       <div class="tw"><table><thead><tr><th>From</th><th>To</th><th>Reason</th>${canWriteSquadron()?'<th class="no-print"></th>':''}</tr></thead>
@@ -13295,7 +13295,7 @@ function showFacProfile(id){
       <button class="btn-lnk" style="font-size:var(--fs-xs)" onclick="_showFacPastLeave('${id}', false)">Show past / removed leave</button>
     </div>
     <div id="fac-past-leave-section" style="display:none;margin-top:6px"></div>
-    ${sess.length?`<div class="ctitle" style="margin-top:14px">Session History</div>
+    ${sess.length?`<h2 class="ctitle" style="margin-top:14px">Session History</h2>
       <div class="tw"><table><thead><tr><th>Date</th><th>S</th><th>Phase</th><th>Curriculum Item</th><th>Room</th><th>Status</th><th class="no-print">Action</th></tr></thead>
       <tbody>${sess.map(s=>`<tr>
         <td>${fmtD(s.date,{day:'numeric',month:'short'})}</td>
@@ -14479,7 +14479,7 @@ function _cmdCard(chart, bodyHtml){
   }
   return `<div class="card" style="margin-bottom:14px">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
-      <div class="ctitle" style="margin-bottom:0">${esc(chart.title||'')}</div>
+      <h2 class="ctitle" style="margin-bottom:0">${esc(chart.title||'')}</h2>
       ${_cmdInfoToggle(chart)}
     </div>
     ${assessment?`<div style="font-size:var(--fs-sm);color:var(--text-2);margin:6px 0 10px">${esc(assessment)}</div>`:''}
@@ -14735,7 +14735,7 @@ function renderWing(){
     <div class="stat ${nd?'s-red':'s-ok'}"><div class="sval">${nd}</div><div class="slbl">Not Delivered</div></div>
   </div>`;
   // Comparison table
-  html+=`<div class="card"><div class="ctitle">Squadron Comparison</div><div class="tw"><table>
+  html+=`<div class="card"><h2 class="ctitle">Squadron Comparison</h2><div class="tw"><table>
     <thead><tr><th>Squadron</th><th>Parade Day</th><th style="text-align:center">Nights</th><th style="text-align:center">Pub.</th><th style="text-align:center">Sessions</th><th>Delivered</th><th>Coverage</th><th style="text-align:center">Not Del.</th><th style="text-align:center">Readiness</th><th>Status</th>${canProxy?'<th class="no-print"></th>':''}</tr></thead><tbody>`;
   rows.forEach(r=>{
     html+=`<tr class="drow" onclick="wingDrill('${_jsAttr(r.squadron_id)}')">
@@ -14761,7 +14761,7 @@ function renderWing(){
   // Stage 9, 2026-08-05.
   if(S.wingPhase&&S.wingPhase.phases&&S.wingPhase.phases.length){
     const wp=S.wingPhase;
-    html+=`<div class="card"><div class="ctitle">Curriculum Coverage — by Phase</div><div class="tw"><table>
+    html+=`<div class="card"><h2 class="ctitle">Curriculum Coverage — by Phase</h2><div class="tw"><table>
       <thead><tr><th>Squadron</th>${wp.phases.map(ph=>`<th style="text-align:center;font-size:var(--fs-2xs)">${esc(PH_S[ph]||ph)}</th>`).join('')}</tr></thead><tbody>`+
       wp.squadrons.map(s=>`<tr><td style="font-weight:800">${esc(s.short_name||'')}</td>${wp.phases.map(ph=>{
         const pct=(s.phase_pct&&s.phase_pct[ph])||0;
@@ -14771,7 +14771,7 @@ function renderWing(){
   }
   if(S.cap&&S.cap.squadrons&&S.cap.squadrons.length){
     const cp=S.cap;
-    html+=`<div class="card"><div class="ctitle">Training Balance — Facilitator Subject-Area Coverage</div><div class="tw"><table>
+    html+=`<div class="card"><h2 class="ctitle">Training Balance — Facilitator Subject-Area Coverage</h2><div class="tw"><table>
       <thead><tr><th>Squadron</th>${SUBJECTS.map(s=>`<th style="text-align:center;font-size:var(--fs-2xs)" title="${esc(s.label)}">${s.emoji}</th>`).join('')}</tr></thead><tbody>`+
       cp.squadrons.map(s=>`<tr><td style="font-weight:800">${esc(s.short_name||'')}</td>${SUBJECTS.map(su=>{
         const n=(s.subject_facilitators&&s.subject_facilitators[su.key])||0;
@@ -14783,7 +14783,7 @@ function renderWing(){
   if(S.wingCancel){
     const wc=S.wingCancel;
     const hasData=wc.squadrons&&wc.squadrons.length&&(wc.total_cancelled_sessions+wc.total_cancelled_nights)>0;
-    html+=`<div class="card"><div class="ctitle">Cancellation Trend${wc.total_cancelled_sessions||wc.total_cancelled_nights?` — <span class="badge b-amber">${wc.total_cancelled_sessions} cancelled sessions · ${wc.total_cancelled_nights} stand-downs</span>`:' — No cancellations this period'}</div>`;
+    html+=`<div class="card"><h2 class="ctitle">Cancellation Trend${wc.total_cancelled_sessions||wc.total_cancelled_nights?` — <span class="badge b-amber">${wc.total_cancelled_sessions} cancelled sessions · ${wc.total_cancelled_nights} stand-downs</span>`:' — No cancellations this period'}</h2>`;
     if(hasData){
       html+=`<div class="tw"><table><thead><tr><th>Squadron</th><th style="text-align:center">Cancelled sessions</th><th style="text-align:center">Stand-downs</th><th>Top reason</th></tr></thead><tbody>`;
       wc.squadrons.forEach(s=>{
@@ -14804,7 +14804,7 @@ function renderWing(){
   if(S.wingNdel){
     const wn=S.wingNdel;
     const hasData=wn.squadrons&&wn.squadrons.length>0;
-    html+=`<div class="card"><div class="ctitle">Not-Delivered Sessions — Wing Summary${wn.total_not_delivered?` <span class="badge b-red">${wn.total_not_delivered} total</span>`:''}</div>`;
+    html+=`<div class="card"><h2 class="ctitle">Not-Delivered Sessions — Wing Summary${wn.total_not_delivered?` <span class="badge b-red">${wn.total_not_delivered} total</span>`:''}</h2>`;
     if(hasData){
       html+=`<div class="tw"><table><thead><tr><th>Squadron</th><th style="text-align:center">Count</th><th>Sample</th></tr></thead><tbody>`;
       wn.squadrons.forEach(s=>{
@@ -14853,7 +14853,7 @@ function renderNational(){
     <div class="stat ${avgCov>=67?'s-ok':avgCov>=34?'s-warn':'s-red'}"><div class="sval">${avgCov}%</div><div class="slbl">Avg Coverage</div></div>
     <div class="stat ${atRisk?'s-red':'s-ok'}"><div class="sval">${atRisk}</div><div class="slbl">Wings Needing Attention</div></div>
   </div>`;
-  html+=`<div class="card"><div class="ctitle">Wing Comparison</div><div class="tw"><table>
+  html+=`<div class="card"><h2 class="ctitle">Wing Comparison</h2><div class="tw"><table>
     <thead><tr><th>Wing</th><th style="text-align:center">Squadrons</th><th style="text-align:center">Sessions</th><th>Delivered</th><th>Coverage</th><th style="text-align:center">Not Del.</th><th>Status</th></tr></thead><tbody>`;
   wings.forEach(w=>{
     const dp=w.sessions?Math.round((w.delivered||0)/w.sessions*100):0;
@@ -14869,7 +14869,7 @@ function renderNational(){
   html+=`</tbody></table></div></div><div class="drill-panel" id="national-drill"></div>`;
   // National capability gap summary (from national-capability)
   if(S.natCap&&S.natCap.wings){
-    html+=`<div class="card"><div class="ctitle">National Capability — SQNs with no facilitator coverage</div><div class="tw"><table>
+    html+=`<div class="card"><h2 class="ctitle">National Capability — SQNs with no facilitator coverage</h2><div class="tw"><table>
       <thead><tr><th>Wing</th>${SUBJECTS.map(s=>`<th style="text-align:center;font-size:var(--fs-2xs)" title="${s.label}">${s.label}</th>`).join('')}</tr></thead><tbody>`+
       S.natCap.wings.map(w=>{const nn=w.subject_none_sqns||{};return `<tr><td style="font-weight:800">${esc(w.name||w.code)}</td>${SUBJECTS.map(s=>`<td style="text-align:center">${nn[s.key]?`<span class="badge b-red">${nn[s.key]}</span>`:'<span class="badge b-ok">&#10003;</span>'}</td>`).join('')}</tr>`;}).join('')+
       `</tbody></table></div><div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:8px">Red = number of SQNs in that Wing with no facilitator tagged in the subject. Refer to Facilitator Load and Training Balance for detail.</div></div>`;
