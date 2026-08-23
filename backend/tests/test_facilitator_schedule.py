@@ -162,12 +162,31 @@ def test_facilitator_leave_impact_flags_session_scheduled_during_leave(client):
     wing_id = client.get("/api/auth/me", headers=hdr).json()["session"]["wing_id"]
     fac_id = _seed_facilitator(client, hdr)
 
-    clash_date = (date.today() + timedelta(days=145)).isoformat()
+    # Anchor to mid-December of the current year so the session and leave
+    # period fall inside the window=year range (same issue as the sibling
+    # test above: today+145 crosses into January next year from late August
+    # onward, placing both the session and the leave outside the chart's
+    # 2026-01-01..12-31 window and making the assertion a no-op).
+    # December 17 is a Thursday in 2026 and is never a Friday, so it
+    # carries no seed-collision risk. Step back one day if the year somehow
+    # lands it on a Friday (future-proofing).
+    candidate = date(date.today().year, 12, 17)
+    while candidate.weekday() == 4:
+        candidate -= timedelta(days=1)
+    if candidate <= date.today():
+        # Last days of year — step forward instead.
+        candidate = date.today() + timedelta(days=1)
+        while candidate.weekday() == 4:
+            candidate += timedelta(days=1)
+    clash_date = candidate.isoformat()
+    leave_start = (candidate - timedelta(days=5)).isoformat()
+    leave_end = (candidate + timedelta(days=5)).isoformat()
+
     _create_session_with_facilitator(client, hdr, sqn_id, wing_id, fac_id, clash_date, status="planned")
 
     lv = client.post(f"/api/planning/facilitators/{fac_id}/leave", json={
-        "start_date": (date.today() + timedelta(days=140)).isoformat(),
-        "end_date": (date.today() + timedelta(days=150)).isoformat(),
+        "start_date": leave_start,
+        "end_date": leave_end,
         "reason": "leave over the clash date",
     }, headers=hdr)
     assert lv.status_code == 200, lv.text
