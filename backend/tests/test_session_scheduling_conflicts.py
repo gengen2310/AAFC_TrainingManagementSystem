@@ -241,3 +241,123 @@ def test_create_session_different_period_no_conflict(client):
         "parade_night_id": pn, "period_number": 2, "facilitator_id": fac_id,
     }, headers=hdr)
     assert r.status_code == 200, r.text
+
+
+# ─────────────────────────────────────────────────────────────
+# Parallel Training Classes are one delivery, not a double-booking
+#
+# A squadron routinely runs Senior 1 and Senior 2 through the same lesson with
+# the same instructor in the same room. The printed Weekly Program renders one
+# session per class column, so that is recorded as two sessions in one period --
+# and the resource check used to reject it, which made those parade nights
+# impossible to save at all.
+# ─────────────────────────────────────────────────────────────
+
+def _curriculum_items(client, hdr):
+    # GET /api/curriculum returns {"items": [...]}, not a bare list.
+    return client.get("/api/curriculum", headers=hdr).json()["items"]
+
+
+def _first_curriculum_id(client, hdr):
+    items = _curriculum_items(client, hdr)
+    assert items, "no seeded curriculum for 703"
+    return items[0]["curriculum_id"]
+
+
+def test_same_lesson_same_facilitator_and_room_is_not_a_clash(client):
+    """Two parallel classes taking one lesson from one instructor in one room."""
+    hdr = _sqn_admin_703(client)
+    fac = _first_facilitator_id(client, hdr)
+    area = _first_training_area_id(client, hdr)
+    item = _first_curriculum_id(client, hdr)
+    pn = _make_pn(client, hdr, "2027-12-01", session_count=2)
+
+    a = client.post("/api/sessions", json={
+        "parade_night_id": pn, "period_number": 1, "facilitator_id": fac,
+        "training_area_id": area, "curriculum_item_id": item, "cadet_group": "senior",
+    }, headers=hdr)
+    assert a.status_code == 200, a.text
+
+    b = client.post("/api/sessions", json={
+        "parade_night_id": pn, "period_number": 1, "facilitator_id": fac,
+        "training_area_id": area, "curriculum_item_id": item, "cadet_group": "intermediate",
+    }, headers=hdr)
+    assert b.status_code == 200, b.text
+
+
+def test_different_lessons_same_facilitator_is_still_a_clash(client):
+    """The instructor would have to be in two places -- still rejected."""
+    hdr = _sqn_admin_703(client)
+    fac = _first_facilitator_id(client, hdr)
+    items = _curriculum_items(client, hdr)
+    assert len(items) >= 2, "need two curriculum items"
+    pn = _make_pn(client, hdr, "2027-12-02", session_count=2)
+
+    client.post("/api/sessions", json={
+        "parade_night_id": pn, "period_number": 1, "facilitator_id": fac,
+        "curriculum_item_id": items[0]["curriculum_id"],
+    }, headers=hdr)
+    r = client.post("/api/sessions", json={
+        "parade_night_id": pn, "period_number": 1, "facilitator_id": fac,
+        "curriculum_item_id": items[1]["curriculum_id"],
+    }, headers=hdr)
+    assert r.status_code == 409, r.text
+    assert any(c["type"] == "facilitator_clash" for c in r.json()["detail"]["conflicts"])
+
+
+def test_same_lesson_in_two_different_rooms_is_still_a_clash(client):
+    """One lesson cannot happen in two rooms at once."""
+    hdr = _sqn_admin_703(client)
+    fac = _first_facilitator_id(client, hdr)
+    item = _first_curriculum_id(client, hdr)
+    areas = client.get("/api/training-areas", headers=hdr).json()
+    assert len(areas) >= 2, "need two training areas"
+    pn = _make_pn(client, hdr, "2027-12-03", session_count=2)
+
+    client.post("/api/sessions", json={
+        "parade_night_id": pn, "period_number": 1, "facilitator_id": fac,
+        "training_area_id": areas[0]["training_area_id"], "curriculum_item_id": item,
+    }, headers=hdr)
+    r = client.post("/api/sessions", json={
+        "parade_night_id": pn, "period_number": 1, "facilitator_id": fac,
+        "training_area_id": areas[1]["training_area_id"], "curriculum_item_id": item,
+    }, headers=hdr)
+    assert r.status_code == 409, r.text
+    assert any(c["type"] == "facilitator_clash" for c in r.json()["detail"]["conflicts"])
+
+
+def test_untitled_sessions_sharing_a_facilitator_still_clash(client):
+    """Two sessions with no curriculum item and no title are not evidence of one
+    delivery, so the check must not treat 'both blank' as a match."""
+    hdr = _sqn_admin_703(client)
+    fac = _first_facilitator_id(client, hdr)
+    pn = _make_pn(client, hdr, "2027-12-04", session_count=2)
+
+    client.post("/api/sessions", json={
+        "parade_night_id": pn, "period_number": 1, "facilitator_id": fac,
+    }, headers=hdr)
+    r = client.post("/api/sessions", json={
+        "parade_night_id": pn, "period_number": 1, "facilitator_id": fac,
+    }, headers=hdr)
+    assert r.status_code == 409, r.text
+
+
+def test_editing_into_a_parallel_delivery_is_allowed(client):
+    """The same rule applies on PUT, not just POST."""
+    hdr = _sqn_admin_703(client)
+    fac = _first_facilitator_id(client, hdr)
+    area = _first_training_area_id(client, hdr)
+    item = _first_curriculum_id(client, hdr)
+    pn = _make_pn(client, hdr, "2027-12-05", session_count=2)
+
+    client.post("/api/sessions", json={
+        "parade_night_id": pn, "period_number": 1, "facilitator_id": fac,
+        "training_area_id": area, "curriculum_item_id": item,
+    }, headers=hdr)
+    sid_b = _make_session(client, hdr, pn, 2)
+
+    r = client.put(f"/api/sessions/{sid_b}", json={
+        "parade_night_id": pn, "period_number": 1, "facilitator_id": fac,
+        "training_area_id": area, "curriculum_item_id": item,
+    }, headers=hdr)
+    assert r.status_code == 200, r.text

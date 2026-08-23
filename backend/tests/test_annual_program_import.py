@@ -9,6 +9,7 @@ in this app requires Proxy Mode; this endpoint's row-resolution logic bypassed t
 for wing/national-scoped plan years.
 """
 from conftest import login
+from tests.conftest import next_test_year
 
 
 def _sqn_id(client, headers, code):
@@ -35,7 +36,7 @@ def test_wing_admin_without_proxy_cannot_import_rows_into_a_squadron(client):
     proxy_before = client.get("/api/proxy/current", headers=h).json()
     assert proxy_before["active"] is False
 
-    yr = client.post("/api/planning/years", headers=h, json={"year": 2032, "name": "Scope Test Year A"})
+    yr = client.post("/api/planning/years", headers=h, json={"year": next_test_year(), "name": "Scope Test Year A"})
     assert yr.status_code == 200, yr.text
     year_id = yr.json()["planning_year_id"]
 
@@ -61,7 +62,7 @@ def test_wing_admin_preview_flags_scope_denied_rows_without_writing(client):
     """Preview mode must surface the same scope check (so a user sees which rows would be
     blocked before committing) without ever writing to the database."""
     h = login(client, "ADMIN7WG")
-    yr = client.post("/api/planning/years", headers=h, json={"year": 2033, "name": "Scope Test Year B"})
+    yr = client.post("/api/planning/years", headers=h, json={"year": next_test_year(), "name": "Scope Test Year B"})
     year_id = yr.json()["planning_year_id"]
 
     files = {"file": ("program.csv", _make_csv(seq="IDOR-TEST-B"), "text/csv")}
@@ -83,7 +84,7 @@ def test_wing_admin_with_active_proxy_can_import_rows_into_that_squadron(client)
     h = login(client, "ADMIN7WG")
     sqn_id = _sqn_id(client, h, "703")
 
-    yr = client.post("/api/planning/years", headers=h, json={"year": 2034, "name": "Scope Test Year C"})
+    yr = client.post("/api/planning/years", headers=h, json={"year": next_test_year(), "name": "Scope Test Year C"})
     year_id = yr.json()["planning_year_id"]
 
     enter = client.post(f"/api/proxy/enter/{sqn_id}", headers=h, json={"reason": "Legitimate import"})
@@ -112,7 +113,7 @@ def test_wing_admin_proxied_into_a_different_squadron_still_blocked_for_this_one
     sqn_704 = _sqn_id(client, h, "704")
     assert sqn_703 and sqn_704 and sqn_703 != sqn_704
 
-    yr = client.post("/api/planning/years", headers=h, json={"year": 2035, "name": "Scope Test Year D"})
+    yr = client.post("/api/planning/years", headers=h, json={"year": next_test_year(), "name": "Scope Test Year D"})
     year_id = yr.json()["planning_year_id"]
 
     enter = client.post(f"/api/proxy/enter/{sqn_704}", headers=h, json={"reason": "Proxied into 704 only"})

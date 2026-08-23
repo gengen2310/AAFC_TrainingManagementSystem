@@ -8,7 +8,8 @@ from ..security import hash_code
 from ..models import (NationalEntity, Wing, Squadron, Flight, User, AccessCode,
                       CurriculumItem, CurriculumElement, CurriculumPhase, Facilitator, FacilitatorRankHistory,
                       TrainingArea, Equipment, ParadeNight, Session, Cadet,
-                      TimingTemplate, TimingBlock, FacilitatorTypeTag, SessionStatusReasonTag)
+                      TimingTemplate, TimingBlock, FacilitatorTypeTag, SessionStatusReasonTag,
+                      TrainingClass)
 
 _DEFAULT_ELEMENTS = [
     ("Air_Space",         "Air & Space",                "national"),
@@ -193,20 +194,29 @@ def seed_all():
         notes="Default template for all 703 SQN parade nights from 2026.",
     )
     db.add(tmpl_703); db.commit()
+    # block_type must be one of models.training.BLOCK_TYPES:
+    #   arrival, admin, parade, briefing, training_period, drinks_break,
+    #   fatigue, dismissal, other
+    # This table previously used roll_call / administration / instructional_period /
+    # break / fatigues / debrief -- none of which are members. The API rejects those
+    # (timing.py validates against BLOCK_TYPES), but the seed writes through
+    # SQLAlchemy and bypassed that check, so every seeded database carried block
+    # types the application itself considers invalid. The display name still says
+    # what the block is; block_type is the category.
     _703_BLOCKS = [
-        # order, name,                  type,                  start,   end,    dur, is_ip, pnum
-        (0,  "Arrival",               "arrival",             "18:00", "18:15",  15, False, None),
-        (1,  "Roll Call",             "roll_call",           "18:15", "18:25",  10, False, None),
-        (2,  "Cadets Forming Up",     "administration",      "18:25", "18:30",   5, False, None),
-        (3,  "Parade",                "parade",              "18:30", "18:45",  15, False, None),
-        (4,  "Period 1",              "instructional_period","18:50", "19:25",  35, True,  1),
-        (5,  "Period 2",              "instructional_period","19:25", "20:00",  35, True,  2),
-        (6,  "Drinks Break",          "break",               "20:00", "20:30",  30, False, None),
-        (7,  "Period 3",              "instructional_period","20:30", "21:05",  35, True,  3),
-        (8,  "Fatigues",              "fatigues",            "21:05", "21:15",  10, False, None),
-        (9,  "Final Parade",          "parade",              "21:15", "21:25",  10, False, None),
-        (10, "Debrief",               "debrief",             "21:25", "21:30",   5, False, None),
-        (11, "Dismissal",             "dismissal",           "21:30", "21:30",   0, False, None),
+        # order, name,                  type,               start,   end,    dur, is_ip, pnum
+        (0,  "Arrival",               "arrival",         "18:00", "18:15",  15, False, None),
+        (1,  "Roll Call",             "admin",           "18:15", "18:25",  10, False, None),
+        (2,  "Cadets Forming Up",     "admin",           "18:25", "18:30",   5, False, None),
+        (3,  "Parade",                "parade",          "18:30", "18:45",  15, False, None),
+        (4,  "Period 1",              "training_period", "18:50", "19:25",  35, True,  1),
+        (5,  "Period 2",              "training_period", "19:25", "20:00",  35, True,  2),
+        (6,  "Drinks Break",          "drinks_break",    "20:00", "20:30",  30, False, None),
+        (7,  "Period 3",              "training_period", "20:30", "21:05",  35, True,  3),
+        (8,  "Fatigues",              "fatigue",         "21:05", "21:15",  10, False, None),
+        (9,  "Final Parade",          "parade",          "21:15", "21:25",  10, False, None),
+        (10, "Debrief",               "briefing",        "21:25", "21:30",   5, False, None),
+        (11, "Dismissal",             "dismissal",       "21:30", "21:30",   0, False, None),
     ]
     for order, name, btype, start, end, dur, is_ip, pnum in _703_BLOCKS:
         db.add(TimingBlock(
@@ -222,33 +232,59 @@ def seed_all():
         ))
     db.commit()
 
+    # The printed Weekly Program places a session into a row by its
+    # timing_block_id. Seeded sessions carried a period_number but no block, so
+    # every one of them landed in the "Unlinked periods" footnote and the demo
+    # program printed as an empty timetable. Map period 1/2/3 to the matching
+    # Training Period block.
+    _period_block_id = {
+        b.period_number: b.id
+        for b in db.query(TimingBlock).filter(
+            TimingBlock.timing_template_id == tmpl_703.id,
+            TimingBlock.is_instructional_period == True,  # noqa: E712
+        ).all()
+        if b.period_number
+    }
+
     # Tuples: (period, cadet_group, curriculum_code, room, facilitator_last_name, status)
     demo_pns = [
+        # Within one period a facilitator delivers one lesson and a room hosts one
+        # lesson. Orientation+Initial and Intermediate+Senior are deliberately
+        # paired on the same lesson, room and instructor -- that is parallel
+        # delivery to two Training Classes, which the resource check allows and
+        # the printed Weekly Program renders as two class columns. It is also
+        # forced by the room list: three rooms exist, Seniors Working Room is held
+        # by the Int/Snr pair and Major Parade Ground by Junior, so Orientation and
+        # Initial share Bravo and must therefore share the lesson.
+        # Before 2026-08-22 this table double-booked McGhie, Milligen and Daniels
+        # across different lessons in one period (5 facilitator and 6 room
+        # clashes), which made those parade nights unsaveable once the conflict
+        # check was wired into the write path.
         ("2026-02-06", "T1", [
             (1, "orientation", "ORI-M01", "Bravo", "Daley", "delivered"),
             (1, "initial", "ORI-M01", "Bravo", "Daley", "delivered"),
             (1, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "delivered"),
             (1, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
             (1, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
-            (2, "orientation", "ORI-M01", "Bravo", "McGhie", "delivered"),
+            (2, "orientation", "INL-M00", "Bravo", "McGhie", "delivered"),
             (2, "initial", "INL-M00", "Bravo", "McGhie", "delivered"),
             (2, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "delivered"),
             (2, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
             (2, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
             (3, "orientation", "ORI-M01", "Bravo", "Daley", "delivered"),
-            (3, "initial", "INL-M00", "Bravo", "McGhie", "delivered"),
+            (3, "initial", "ORI-M01", "Bravo", "Daley", "delivered"),
             (3, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "delivered"),
             (3, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
             (3, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
         ]),
         ("2026-05-01", "T2", [
-            (1, "orientation", "ORI-M01", "Bravo", "Daley", "delivered"),
-            (1, "initial", "INL-M08", "Bravo", "Milligen", "delivered"),
+            (1, "orientation", "INL-M08", "Bravo", "Daley", "delivered"),
+            (1, "initial", "INL-M08", "Bravo", "Daley", "delivered"),
             (1, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "delivered"),
             (1, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
             (1, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
-            (2, "orientation", "ORI-M01", "Bravo", "Daley", "delivered"),
-            (2, "initial", "INL-M08", "Major Parade Ground", "Milligen", "not_delivered"),
+            (2, "orientation", "INL-M08", "Bravo", "Daley", "delivered"),
+            (2, "initial", "INL-M08", "Bravo", "Daley", "not_delivered"),
             (2, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "not_delivered"),
             (2, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
             (2, "senior", "INT-M04", "Seniors Working Room", "Flanders", "delivered"),
@@ -259,12 +295,12 @@ def seed_all():
             (1, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "planned"),
             (1, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
             (1, "senior", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
-            (2, "orientation", "ORI-M01", "Bravo", "Daniels", "planned"),
+            (2, "orientation", "INL-M02", "Bravo", "Daniels", "planned"),
             (2, "initial", "INL-M02", "Bravo", "Daniels", "planned"),
             (2, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "planned"),
             (2, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
             (2, "senior", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
-            (3, "orientation", "ORI-M01", "Bravo", "Daniels", "planned"),
+            (3, "orientation", "INL-M02", "Bravo", "Daniels", "planned"),
             (3, "initial", "INL-M02", "Bravo", "Daniels", "planned"),
             (3, "junior", "JNR-M01", "Major Parade Ground", "Milligen", "planned"),
             (3, "intermediate", "INT-M04", "Seniors Working Room", "Flanders", "planned"),
@@ -291,6 +327,7 @@ def seed_all():
                            facilitator_rank_at_time=f.current_rank if f else None,
                            facilitator_display_name_at_time=(f.current_rank + " " + f.last_name) if f else None,
                            training_area_id=r.id if r else None, training_area_name_at_time=room,
+                           timing_block_id=_period_block_id.get(period),
                            expected_attendance=15, status=status))
         db.commit()
 
@@ -384,6 +421,24 @@ def seed_planning_data(db, wing, sqn_by_code):
         created_at=now, updated_at=now,
     )
     db.add(py); db.commit()
+
+    # The printed Weekly Program's columns ARE the Training Classes, and a session
+    # only appears under one whose stage matches its cadet_group. Creating a year
+    # through the API auto-creates these five (see planning.py's
+    # _AUTO_STAGE_DEFAULTS); the seed writes its year directly and so had none,
+    # which left every column showing a placeholder dash.
+    # Stage codes map to the cadet_group values used above:
+    #   ORI->orientation  INI->initial  JNR->junior  INT->intermediate  SNR->senior
+    for _code, _name, _seq in [("ORI", "Orientation", 1), ("INI", "Initial", 2),
+                               ("JNR", "Junior", 3), ("INT", "Intermediate", 4),
+                               ("SNR", "Senior", 5)]:
+        db.add(TrainingClass(
+            squadron_id=s703.id, training_year_id=py.id, training_stage_id=None,
+            stage_code=_code, display_name=_name, sequence=_seq,
+            start_date=f"{py.year}-01-01", end_date=None,
+            created_at=now, updated_at=now,
+        ))
+    db.commit()
 
     # WA 2026 school holidays and public holidays
     wa_holidays = [

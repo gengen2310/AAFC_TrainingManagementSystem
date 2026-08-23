@@ -7,13 +7,15 @@ from pydantic import BaseModel, Field, field_validator
 from typing import List, Literal, Optional
 from sqlalchemy.orm import Session as DBSession
 
-from ..database import get_db, utcnow
+from ..database import get_db, utcnow, iso_z
 from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
                       Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, SessionStatusReasonTag, TrainingArea, Equipment,
                       Activity, Cadet, Squadron, TimingTemplate, TimingBlock, SystemSetting, TrainingClass, PlanningYear,
                       SessionAudience, CadetClassMembership,
                       ParadeNightTemplate, ParadeNightTemplateSession)
 from ..models.planning import ActivityLocalOverride
+from ..models.faq import FaqEntry
+from ..richtext import sanitize_rich_text
 from ..models.training import ELEMENT_SCOPE_LEVELS, PHASE_SCOPE_LEVELS, STAGE_CODES
 from .timing import _effective_template
 from ..dependencies import get_principal, client_meta
@@ -655,8 +657,8 @@ def _notice_out(n) -> dict:
         "created_by": n.created_by,
         "is_archived": n.is_archived,
         "version": n.version,
-        "created_at": n.created_at.isoformat() if n.created_at else None,
-        "updated_at": n.updated_at.isoformat() if n.updated_at else None,
+        "created_at": iso_z(n.created_at) if n.created_at else None,
+        "updated_at": iso_z(n.updated_at) if n.updated_at else None,
     }
 
 
@@ -741,6 +743,67 @@ def _recompute(db: DBSession, pn: ParadeNight):
     db.commit()
 
 
+def _is_parallel_delivery(body, sib) -> bool:
+    """True when two sessions in the same period are one delivery, not a clash.
+
+    A squadron routinely runs parallel Training Classes -- Senior 1 and Senior 2
+    both taking the same lesson from the same instructor in the same room. That
+    is one teaching event recorded as two sessions (the printed Weekly Program
+    renders one session per class column), and the resource check used to reject
+    it as a facilitator/room double-booking, which made those parade nights
+    unsaveable.
+
+    Same content is the test. If the two sessions teach different things, the
+    instructor really would have to be in two places and it is a genuine clash.
+    Rooms must also agree: the same lesson in two different rooms is not one
+    event, so that still counts.
+    """
+    a_item, b_item = body.curriculum_item_id, sib.curriculum_item_id
+    if a_item and b_item:
+        same_content = a_item == b_item
+    elif not a_item and not b_item:
+        a_t = (body.custom_title or "").strip().lower()
+        b_t = (sib.custom_title or "").strip().lower()
+        same_content = bool(a_t) and a_t == b_t
+    else:
+        same_content = False
+    if not same_content:
+        return False
+    # One lesson cannot happen in two rooms at once.
+    if body.training_area_id and sib.training_area_id:
+        return body.training_area_id == sib.training_area_id
+    return True
+
+
+def _resource_conflicts(db: DBSession, parade_night_id: str, period_number, body,
+                        exclude_session_id: str | None = None) -> list[dict]:
+    """Facilitator/room double-bookings against other sessions in the same period.
+
+    Shared by create_session and edit_session, which previously carried two
+    identical copies of this loop.
+    """
+    q = db.query(Session).filter(
+        Session.parade_night_id == parade_night_id,
+        Session.period_number == period_number,
+        Session.is_archived == False,  # noqa: E712
+    )
+    if exclude_session_id:
+        q = q.filter(Session.id != exclude_session_id)
+    conflicts: list[dict] = []
+    for sib in q.all():
+        if _is_parallel_delivery(body, sib):
+            continue
+        if body.facilitator_id and sib.facilitator_id == body.facilitator_id:
+            conflicts.append({"type": "facilitator_clash", "session_id": sib.id,
+                              "resource_id": sib.facilitator_id,
+                              "resource_name": sib.facilitator_display_name_at_time})
+        if body.training_area_id and sib.training_area_id == body.training_area_id:
+            conflicts.append({"type": "room_clash", "session_id": sib.id,
+                              "resource_id": sib.training_area_id,
+                              "resource_name": sib.training_area_name_at_time})
+    return conflicts
+
+
 @router.post("/sessions")
 def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     pn = db.get(ParadeNight, body.parade_night_id)
@@ -753,20 +816,7 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
     # still be double-booked with zero warning by creating a brand new session
     # rather than editing an existing one into a clash. ──
     if not body.override_conflict:
-        siblings = db.query(Session).filter(
-            Session.parade_night_id == pn.id,
-            Session.period_number == body.period_number, Session.is_archived == False,  # noqa: E712
-        ).all()
-        conflicts = []
-        for sib in siblings:
-            if body.facilitator_id and sib.facilitator_id == body.facilitator_id:
-                conflicts.append({"type": "facilitator_clash", "session_id": sib.id,
-                                  "resource_id": sib.facilitator_id,
-                                  "resource_name": sib.facilitator_display_name_at_time})
-            if body.training_area_id and sib.training_area_id == body.training_area_id:
-                conflicts.append({"type": "room_clash", "session_id": sib.id,
-                                  "resource_id": sib.training_area_id,
-                                  "resource_name": sib.training_area_name_at_time})
+        conflicts = _resource_conflicts(db, pn.id, body.period_number, body)
         if conflicts:
             raise HTTPException(409, detail={"error": "resource_conflict", "conflicts": conflicts})
 
@@ -832,20 +882,8 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
     # (relabelling two non-overlapping period numbers doesn't create new overlap) --
     # only a genuine new collision against a third session's resource does. ──
     if not body.override_conflict:
-        siblings = db.query(Session).filter(
-            Session.parade_night_id == target_pn.id, Session.id != s.id,
-            Session.period_number == body.period_number, Session.is_archived == False,  # noqa: E712
-        ).all()
-        conflicts = []
-        for sib in siblings:
-            if body.facilitator_id and sib.facilitator_id == body.facilitator_id:
-                conflicts.append({"type": "facilitator_clash", "session_id": sib.id,
-                                  "resource_id": sib.facilitator_id,
-                                  "resource_name": sib.facilitator_display_name_at_time})
-            if body.training_area_id and sib.training_area_id == body.training_area_id:
-                conflicts.append({"type": "room_clash", "session_id": sib.id,
-                                  "resource_id": sib.training_area_id,
-                                  "resource_name": sib.training_area_name_at_time})
+        conflicts = _resource_conflicts(db, target_pn.id, body.period_number, body,
+                                        exclude_session_id=s.id)
         if conflicts:
             raise HTTPException(409, detail={"error": "resource_conflict", "conflicts": conflicts})
 
@@ -924,7 +962,7 @@ def get_status_history(sid: str, db: DBSession = Depends(get_db), p: Principal =
     rows = db.query(SessionStatusHistory).filter(
         SessionStatusHistory.session_id == sid).order_by(SessionStatusHistory.timestamp).all()
     return [{"old_status": r.old_status, "new_status": r.new_status, "changed_by": r.changed_by,
-             "reason": r.reason, "timestamp": r.timestamp.isoformat()} for r in rows]
+             "reason": r.reason, "timestamp": iso_z(r.timestamp)} for r in rows]
 
 
 def _denormalise(db, s: Session, cid, fid, rid):
@@ -1248,7 +1286,7 @@ def add_fac(body: FacIn, db: DBSession = Depends(get_db), p: Principal = Depends
                 "existing_type": existing.type,
                 "existing_subject_areas": _parse_json_list(existing.subject_areas),
                 "existing_active_status": existing.active_status,
-                "existing_updated_at": existing.updated_at.isoformat() if existing.updated_at else None,
+                "existing_updated_at": iso_z(existing.updated_at) if existing.updated_at else None,
             })
     rank = _normalise_rank(body.current_rank)
     f = Facilitator(squadron_id=s.id, wing_id=s.wing_id, first_name=body.first_name,
@@ -1617,7 +1655,7 @@ def _membership_dict(m: CadetClassMembership, tc: TrainingClass | None = None) -
         "training_stage_id": tc.training_stage_id if tc else None,
         "start_date": m.start_date, "end_date": m.end_date, "active_status": m.active_status,
         "source": m.source, "version": m.version,
-        "created_at": m.created_at.isoformat() if m.created_at else None,
+        "created_at": iso_z(m.created_at) if m.created_at else None,
     }
 
 
@@ -3278,13 +3316,127 @@ def update_activities_getting_help(body: GettingHelpIn, db: DBSession = Depends(
     if row is None:
         row = SystemSetting(key=_GETTING_HELP_KEY)
         db.add(row)
-    row.value = body.content
+    # Stored HTML is rendered into every user's Help page, so it passes the
+    # allowlist here as well as on render. Audit the stored value, not the
+    # submitted one, so the log shows what users will actually see.
+    row.value = sanitize_rich_text(body.content)
     row.updated_at = utcnow()
     row.updated_by = p.user_id
     db.commit()
     audit(db, p, object_type="system_setting", object_id=_GETTING_HELP_KEY,
-          action="getting_help_content_updated", old={"content": old_value}, new={"content": body.content})
+          action="getting_help_content_updated", old={"content": old_value}, new={"content": row.value})
     return {"content": row.value, "updated_at": row.updated_at}
+
+
+# ── FAQ ──────────────────────────────────────────────────────────────────────
+# Authored by system_admin, readable by every signed-in user. Grouped by an
+# admin-defined category rather than a fixed enum, so the list can follow how
+# squadrons actually ask questions without a migration each time.
+
+def _faq_dict(f: FaqEntry) -> dict:
+    return {
+        "id": f.id,
+        "category": f.category,
+        "question": f.question,
+        "answer_html": f.answer_html,
+        "sort_order": f.sort_order,
+        "is_published": f.is_published,
+        "updated_at": f.updated_at,
+    }
+
+
+@router.get("/activities/faq")
+def list_faq(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    q = db.query(FaqEntry)
+    # Everyone else only ever sees published entries, so an admin can draft an
+    # answer without it appearing half-written on every squadron's Help page.
+    if p.role != "system_admin":
+        q = q.filter(FaqEntry.is_published == True)  # noqa: E712
+    rows = q.order_by(FaqEntry.category, FaqEntry.sort_order, FaqEntry.created_at).all()
+
+    categories: list[dict] = []
+    by_name: dict[str, dict] = {}
+    for f in rows:
+        group = by_name.get(f.category)
+        if group is None:
+            group = {"category": f.category, "entries": []}
+            by_name[f.category] = group
+            categories.append(group)
+        group["entries"].append(_faq_dict(f))
+    return {"categories": categories, "total": len(rows)}
+
+
+class FaqIn(BaseModel):
+    category: str = "General"
+    question: str
+    answer_html: str = ""
+    sort_order: int = 0
+    is_published: bool = True
+
+    @field_validator("question")
+    @classmethod
+    def _question_not_blank(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("A question is required.")
+        return v[:300]
+
+    @field_validator("category")
+    @classmethod
+    def _category_not_blank(cls, v: str) -> str:
+        return ((v or "").strip() or "General")[:80]
+
+
+@router.post("/activities/faq")
+def create_faq(body: FaqIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    f = FaqEntry(
+        category=body.category,
+        question=body.question,
+        answer_html=sanitize_rich_text(body.answer_html),
+        sort_order=body.sort_order,
+        is_published=body.is_published,
+        created_by=p.user_id,
+        updated_by=p.user_id,
+    )
+    db.add(f)
+    db.commit()
+    audit(db, p, object_type="faq_entry", object_id=f.id, action="faq_entry_created",
+          new={"category": f.category, "question": f.question})
+    return _faq_dict(f)
+
+
+@router.put("/activities/faq/{faq_id}")
+def update_faq(faq_id: str, body: FaqIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    f = db.get(FaqEntry, faq_id)
+    if not f:
+        raise HTTPException(404, detail="FAQ entry not found.")
+    old = {"category": f.category, "question": f.question, "is_published": f.is_published}
+    f.category = body.category
+    f.question = body.question
+    f.answer_html = sanitize_rich_text(body.answer_html)
+    f.sort_order = body.sort_order
+    f.is_published = body.is_published
+    f.updated_by = p.user_id
+    f.updated_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="faq_entry", object_id=f.id, action="faq_entry_updated",
+          old=old, new={"category": f.category, "question": f.question, "is_published": f.is_published})
+    return _faq_dict(f)
+
+
+@router.delete("/activities/faq/{faq_id}")
+def delete_faq(faq_id: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    require_system_admin(p)
+    f = db.get(FaqEntry, faq_id)
+    if not f:
+        raise HTTPException(404, detail="FAQ entry not found.")
+    snapshot = {"category": f.category, "question": f.question}
+    db.delete(f)
+    db.commit()
+    audit(db, p, object_type="faq_entry", object_id=faq_id, action="faq_entry_deleted", old=snapshot)
+    return {"ok": True}
 
 
 @router.get("/activities")
@@ -5097,7 +5249,7 @@ def _tag_out(t: SubjectAreaTag) -> dict:
         "wing_id": t.wing_id,
         "is_active": t.is_active,
         "created_by": t.created_by,
-        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "created_at": iso_z(t.created_at) if t.created_at else None,
     }
 
 
@@ -5243,7 +5395,7 @@ def _fac_type_out(t: FacilitatorTypeTag) -> dict:
         "wing_id": t.wing_id,
         "is_active": t.is_active,
         "created_by": t.created_by,
-        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "created_at": iso_z(t.created_at) if t.created_at else None,
     }
 
 
@@ -5390,7 +5542,7 @@ def _reason_out(t: SessionStatusReasonTag) -> dict:
         "wing_id": t.wing_id,
         "is_active": t.is_active,
         "created_by": t.created_by,
-        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "created_at": iso_z(t.created_at) if t.created_at else None,
     }
 
 
@@ -5556,7 +5708,7 @@ def _template_out(t: ParadeNightTemplate, include_sessions: bool = False) -> dic
         "description": t.description,
         "squadron_id": t.squadron_id,
         "session_count": len(t.sessions) if t.sessions is not None else 0,
-        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "created_at": iso_z(t.created_at) if t.created_at else None,
         "sessions": [
             {
                 "id": s.id,

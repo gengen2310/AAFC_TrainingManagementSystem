@@ -24,7 +24,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session as DBSession
 
-from ..database import get_db
+from ..database import get_db, utcnow
 from ..dependencies import get_principal
 from ..models import (
     ParadeNight, Session, Facilitator, Squadron, Wing,
@@ -2400,7 +2400,9 @@ def _data_freshness(
         if last_cea is None:
             issues.append("No CEA import on record")
         else:
-            cea_days = (datetime.utcnow() - last_cea).days
+            # utcnow() is timezone-aware, matching what UTCDateTime columns now
+            # return. datetime.utcnow() is naive and would raise here.
+            cea_days = (utcnow() - last_cea).days
             if cea_days > 30:
                 issues.append(f"CEA data is {cea_days} day(s) old")
 

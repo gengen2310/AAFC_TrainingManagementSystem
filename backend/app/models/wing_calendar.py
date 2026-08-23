@@ -9,7 +9,7 @@ from sqlalchemy import String, Integer, Boolean, Text, DateTime, ForeignKey, JSO
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 
-from ..database import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
+from ..database import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin, UTCDateTime
 
 
 WING_EVENT_TYPES = (
@@ -70,7 +70,7 @@ class SquadronEventStatus(Base, UUIDMixin, TimestampMixin):
     status: Mapped[str] = mapped_column(String(30), default="not_reviewed")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     local_activity_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
 

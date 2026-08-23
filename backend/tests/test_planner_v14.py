@@ -5,7 +5,7 @@ year rollover, extended anchor event fields, holiday_type, parade date
 term/week_number fields, and RBAC enforcement for new endpoints.
 """
 import pytest
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 def _sqn_admin(client):
@@ -28,7 +28,9 @@ def _auditor(client):
     return login(client, "AUDITOR2026")
 
 
-def _make_year(client, hdr, year=2028, name="Test Year"):
+def _make_year(client, hdr, year=None, name="Test Year"):
+    # REM-134: a fixed default year collided with itself on the second call.
+    year = next_test_year() if year is None else year
     r = client.post("/api/planning/years", json={"year": year, "name": name}, headers=hdr)
     assert r.status_code == 200, r.text
     return r.json()
@@ -138,7 +140,7 @@ def test_seeded_anchor_events_exist(client):
 def test_create_holiday_with_type(client):
     """Creating a holiday should accept and return holiday_type."""
     hdr = _sqn_admin(client)
-    py = _make_year(client, hdr, year=2031, name="Holiday Type Test")
+    py = _make_year(client, hdr, year=next_test_year(), name="Holiday Type Test")
     year_id = py["planning_year_id"]
 
     h = _make_holiday(client, hdr, year_id, name="Exam Period", htype="exam_period",
@@ -152,7 +154,7 @@ def test_statutory_holiday_type_round_trips(client):
     connected-frontend it renders as raw snake_case to users.
     """
     hdr = _sqn_admin(client)
-    py = _make_year(client, hdr, year=2033, name="Statutory Holiday Test")
+    py = _make_year(client, hdr, year=next_test_year(), name="Statutory Holiday Test")
     year_id = py["planning_year_id"]
 
     h = _make_holiday(client, hdr, year_id, name="Remembrance Day",
@@ -164,7 +166,7 @@ def test_statutory_holiday_type_round_trips(client):
 def test_holiday_default_type_is_school_holiday(client):
     """A holiday created without holiday_type should default to school_holiday."""
     hdr = _sqn_admin(client)
-    py = _make_year(client, hdr, year=2032, name="Default Type Test")
+    py = _make_year(client, hdr, year=next_test_year(), name="Default Type Test")
     year_id = py["planning_year_id"]
 
     r = client.post(f"/api/planning/years/{year_id}/holidays", json={
@@ -181,7 +183,7 @@ def test_holiday_default_type_is_school_holiday(client):
 def test_parade_date_has_term_and_week_number_fields(client):
     """Parade date response should include term and week_number keys."""
     hdr = _sqn_admin(client)
-    py = _make_year(client, hdr, year=2033, name="Date Fields Test")
+    py = _make_year(client, hdr, year=next_test_year(), name="Date Fields Test")
     year_id = py["planning_year_id"]
     pd = _make_parade_date(client, hdr, year_id, "2033-02-07")
     # Keys must exist (may be None)
@@ -197,7 +199,7 @@ def test_parade_date_has_term_and_week_number_fields(client):
 def test_anchor_event_extended_fields_in_response(client):
     """AnchorEvent response should include V14 extended fields."""
     hdr = _sqn_admin(client)
-    py = _make_year(client, hdr, year=2034, name="Anchor Extended")
+    py = _make_year(client, hdr, year=next_test_year(), name="Anchor Extended")
     year_id = py["planning_year_id"]
 
     r = client.post(f"/api/planning/years/{year_id}/anchors", json={
@@ -759,7 +761,7 @@ def test_annual_program_empty_year_no_parade_nights(client):
     hdr = _sqn_admin(client)
     r = client.post(
         "/api/planning/years",
-        json={"year": 2999, "name": "Empty Year Regression"},
+        json={"year": next_test_year(), "name": "Empty Year Regression"},
         headers=hdr,
     )
     assert r.status_code in (200, 201)
@@ -785,7 +787,8 @@ def test_annual_program_empty_year_no_parade_nights(client):
 def test_rollover_creates_new_year(client):
     """Rollover should create a new planning year with incremented year."""
     hdr = _sqn_admin(client)
-    py = _make_year(client, hdr, year=2040, name="Rollover Source")
+    src_year = next_test_year()
+    py = _make_year(client, hdr, year=src_year, name="Rollover Source")
     year_id = py["planning_year_id"]
 
     # Add a parade date and holiday
@@ -798,7 +801,7 @@ def test_rollover_creates_new_year(client):
     assert r.status_code == 200
     d = r.json()
     assert d["ok"] is True
-    assert d["year"] == 2041
+    assert d["year"] == src_year + 1
     assert d["new_planning_year_id"]
 
 
@@ -824,7 +827,7 @@ def test_rollover_copies_holidays(client):
 def test_rollover_without_holidays(client):
     """Rollover with copy_holidays=False should not copy holidays."""
     hdr = _sqn_admin(client)
-    py = _make_year(client, hdr, year=2042, name="Rollover No Holidays")
+    py = _make_year(client, hdr, year=next_test_year(), name="Rollover No Holidays")
     year_id = py["planning_year_id"]
     _make_holiday(client, hdr, year_id, "Easter", "public_holiday", "2042-04-03", "2042-04-06")
 
@@ -836,7 +839,7 @@ def test_rollover_without_holidays(client):
 def test_rollover_duplicate_returns_409(client):
     """Rolling over to a year that already exists should return 409."""
     hdr = _sqn_admin(client)
-    py = _make_year(client, hdr, year=2043, name="Rollover Dup Source")
+    py = _make_year(client, hdr, year=next_test_year(), name="Rollover Dup Source")
     _make_year(client, hdr, year=2044, name="Already Exists")  # target already present
 
     r = client.post(f"/api/planning/years/{py['planning_year_id']}/rollover", json={
@@ -848,7 +851,7 @@ def test_rollover_duplicate_returns_409(client):
 def test_rollover_custom_target_year(client):
     """Rollover should accept a custom target year."""
     hdr = _sqn_admin(client)
-    py = _make_year(client, hdr, year=2050, name="Custom Target Source")
+    py = _make_year(client, hdr, year=next_test_year(), name="Custom Target Source")
     year_id = py["planning_year_id"]
 
     r = client.post(f"/api/planning/years/{year_id}/rollover", json={"target_year": 2055}, headers=hdr)
@@ -859,7 +862,7 @@ def test_rollover_custom_target_year(client):
 def test_rollover_blocked_for_general_user(client):
     """sqn_general should not be able to perform a year rollover."""
     hdr_admin = _sqn_admin(client)
-    py = _make_year(client, hdr_admin, year=2060, name="Rollover RBAC Test")
+    py = _make_year(client, hdr_admin, year=next_test_year(), name="Rollover RBAC Test")
     year_id = py["planning_year_id"]
 
     hdr = _general(client)
@@ -870,7 +873,7 @@ def test_rollover_blocked_for_general_user(client):
 def test_rollover_parade_dates_advanced_by_one_year(client):
     """Rollover must copy parade dates with dates advanced by exactly one year."""
     hdr = _sqn_admin(client)
-    py = _make_year(client, hdr, year=2061, name="Rollover Date Advance")
+    py = _make_year(client, hdr, year=next_test_year(), name="Rollover Date Advance")
     year_id = py["planning_year_id"]
     _make_parade_date(client, hdr, year_id, "2061-09-04")
     _make_parade_date(client, hdr, year_id, "2061-09-11")
@@ -895,7 +898,7 @@ def test_rollover_parade_dates_advanced_by_one_year(client):
 def test_rollover_source_year_sessions_unchanged(client):
     """Rollover must not modify or delete sessions in the source year."""
     hdr = _sqn_admin(client)
-    py = _make_year(client, hdr, year=2062, name="Rollover Source Unchanged")
+    py = _make_year(client, hdr, year=next_test_year(), name="Rollover Source Unchanged")
     year_id = py["planning_year_id"]
     _make_parade_date(client, hdr, year_id, "2062-10-06")
 

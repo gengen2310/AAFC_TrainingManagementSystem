@@ -18,7 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session as DBSession
 
 from ..config import settings
-from ..database import get_db
+from ..database import get_db, iso_z
 from ..dependencies import get_principal
 from ..database import utcnow
 from ..models import (
@@ -313,7 +313,7 @@ def audit_summary(db: DBSession = Depends(get_db), p: Principal = Depends(get_pr
     return {"count": len(logs), "logs": [
         {
             "id": e.id,
-            "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+            "timestamp": iso_z(e.timestamp) if e.timestamp else None,
             "user_id": e.user_id,
             "role": e.role,
             "scope": e.scope,

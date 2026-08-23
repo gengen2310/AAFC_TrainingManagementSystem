@@ -22,7 +22,7 @@ lesson learned building parade-night-grid-classes.spec.ts).
 """
 import uuid
 
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 def _sqn_admin_hdr(client):
@@ -100,8 +100,9 @@ def _find_session_summary(annual_program, session_id):
 
 def test_session_with_no_audience_has_empty_training_classes(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2620)
-    pd = _make_parade_date(client, hdr, year["planning_year_id"], "2620-08-01")
+    yr = next_test_year()
+    year = _make_year(client, hdr, yr)
+    pd = _make_parade_date(client, hdr, year["planning_year_id"], f"{yr}-08-01")
     sid = _make_session(client, hdr, pd["parade_night_id"])
 
     ap = _get_annual_program(client, hdr, year["planning_year_id"])
@@ -113,12 +114,13 @@ def test_session_with_no_audience_has_empty_training_classes(client):
 
 def test_session_shows_its_real_training_class_assignment(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2621)
+    yr = next_test_year()
+    year = _make_year(client, hdr, yr)
     yr_id = year["planning_year_id"]
     stage_id = _make_stage(client, hdr, year["unit_id"])
     c1 = _make_class(client, hdr, yr_id, stage_id, "Annual Program Class 1")
 
-    pd = _make_parade_date(client, hdr, yr_id, "2621-08-02")
+    pd = _make_parade_date(client, hdr, yr_id, f"{yr}-08-02")
     sid = _make_session(client, hdr, pd["parade_night_id"])
     aud = client.put(f"/api/sessions/{sid}/audience", json={"training_class_ids": [c1]}, headers=hdr)
     assert aud.status_code == 200, aud.text
@@ -131,13 +133,14 @@ def test_session_shows_its_real_training_class_assignment(client):
 
 def test_session_assigned_to_two_classes_shows_both(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2622)
+    yr = next_test_year()
+    year = _make_year(client, hdr, yr)
     yr_id = year["planning_year_id"]
     stage_id = _make_stage(client, hdr, year["unit_id"])
     c1 = _make_class(client, hdr, yr_id, stage_id, "AP Combined A")
     c2 = _make_class(client, hdr, yr_id, stage_id, "AP Combined B")
 
-    pd = _make_parade_date(client, hdr, yr_id, "2622-08-03")
+    pd = _make_parade_date(client, hdr, yr_id, f"{yr}-08-03")
     sid = _make_session(client, hdr, pd["parade_night_id"])
     aud = client.put(f"/api/sessions/{sid}/audience", json={"training_class_ids": [c1, c2]}, headers=hdr)
     assert aud.status_code == 200, aud.text
@@ -153,14 +156,15 @@ def test_sessions_in_different_terms_dont_leak_each_others_classes(client):
     """Cross-checks the bulk-query-once-for-the-whole-year approach doesn't
     accidentally merge classes across unrelated sessions."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2623)
+    yr = next_test_year()
+    year = _make_year(client, hdr, yr)
     yr_id = year["planning_year_id"]
     stage_id = _make_stage(client, hdr, year["unit_id"])
     c1 = _make_class(client, hdr, yr_id, stage_id, "AP Term1 Class")
     c2 = _make_class(client, hdr, yr_id, stage_id, "AP Term3 Class")
 
-    pd1 = _make_parade_date(client, hdr, yr_id, "2623-02-03")  # Term 1
-    pd3 = _make_parade_date(client, hdr, yr_id, "2623-08-04")  # Term 3
+    pd1 = _make_parade_date(client, hdr, yr_id, f"{yr}-02-03")  # Term 1
+    pd3 = _make_parade_date(client, hdr, yr_id, f"{yr}-08-04")  # Term 3
     sid1 = _make_session(client, hdr, pd1["parade_night_id"])
     sid3 = _make_session(client, hdr, pd3["parade_night_id"])
     client.put(f"/api/sessions/{sid1}/audience", json={"training_class_ids": [c1]}, headers=hdr)
@@ -176,11 +180,12 @@ def test_sessions_in_different_terms_dont_leak_each_others_classes(client):
 
 def test_general_user_can_read_training_classes_on_annual_program(client):
     hdr_admin = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr_admin, 2624)
+    yr = next_test_year()
+    year = _make_year(client, hdr_admin, yr)
     yr_id = year["planning_year_id"]
     stage_id = _make_stage(client, hdr_admin, year["unit_id"])
     c1 = _make_class(client, hdr_admin, yr_id, stage_id, "AP General Read Class")
-    pd = _make_parade_date(client, hdr_admin, yr_id, "2624-08-05")
+    pd = _make_parade_date(client, hdr_admin, yr_id, f"{yr}-08-05")
     sid = _make_session(client, hdr_admin, pd["parade_night_id"])
     client.put(f"/api/sessions/{sid}/audience", json={"training_class_ids": [c1]}, headers=hdr_admin)
 

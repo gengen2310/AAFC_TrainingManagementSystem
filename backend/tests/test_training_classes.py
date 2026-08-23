@@ -7,7 +7,7 @@ Backlog/dashboard class-awareness, bulk setup -- none of that is built yet;
 this covers only the base CRUD surface added this pass).
 """
 import pytest
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 def _sqn_admin_hdr(client):
@@ -22,7 +22,9 @@ def _general_hdr(client):
     return login(client, "703SQN2026")
 
 
-def _make_year(client, hdr, year=2099):
+def _make_year(client, hdr, year=None):
+    # REM-134: a fixed default year collided with itself on the second call.
+    year = next_test_year() if year is None else year
     r = client.post("/api/planning/years", json={"year": year, "name": f"{year} Training Year"}, headers=hdr)
     assert r.status_code == 200, r.text
     return r.json()
@@ -69,7 +71,7 @@ def test_five_parallel_senior_classes_are_independent(client):
     'ONE STAGE = ONE COLUMN = ONE CLASS' anti-pattern this program's
     impact analysis confirmed the pre-existing schema had)."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, year=2098)
+    year = _make_year(client, hdr, year=next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     created_ids = []
     for i in range(1, 6):
@@ -91,7 +93,7 @@ def test_five_parallel_senior_classes_are_independent(client):
 
 def test_update_training_class_rename_and_version_increments(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, year=2097)
+    year = _make_year(client, hdr, year=next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     created = client.post("/api/training-classes", json={
         "training_year_id": year["planning_year_id"],
@@ -115,7 +117,7 @@ def test_update_training_class_rename_and_version_increments(client):
 
 def test_stale_version_update_returns_409(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, year=2096)
+    year = _make_year(client, hdr, year=next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     created = client.post("/api/training-classes", json={
         "training_year_id": year["planning_year_id"],
@@ -136,7 +138,7 @@ def test_stale_version_update_returns_409(client):
 
 def test_archive_training_class_is_soft_delete(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, year=2095)
+    year = _make_year(client, hdr, year=next_test_year())
     stage_id = _senior_stage_id(client, hdr)
     created = client.post("/api/training-classes", json={
         "training_year_id": year["planning_year_id"],
@@ -166,7 +168,7 @@ def test_archive_training_class_is_soft_delete(client):
 
 def test_sqn_general_cannot_create_training_class(client):
     hdr_admin = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr_admin, year=2094)
+    year = _make_year(client, hdr_admin, year=next_test_year())
     stage_id = _senior_stage_id(client, hdr_admin)
     hdr_general = _general_hdr(client)
     r = client.post("/api/training-classes", json={
@@ -195,7 +197,7 @@ def test_wing_admin_without_proxy_cannot_write_squadron_training_class(client):
     still go through require_can_write_squadron like every other squadron
     write, not bypass it because the caller is a higher role."""
     hdr_admin = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr_admin, year=2093)
+    year = _make_year(client, hdr_admin, year=next_test_year())
     stage_id = _senior_stage_id(client, hdr_admin)
     hdr_wing = _wing_admin_hdr(client)
     r = client.post("/api/training-classes", json={
@@ -212,7 +214,7 @@ def test_wing_admin_without_proxy_cannot_write_squadron_training_class(client):
 
 def test_cannot_create_training_class_for_another_squadrons_year(client):
     hdr_703 = _sqn_admin_hdr(client)
-    year_703 = _make_year(client, hdr_703, year=2092)
+    year_703 = _make_year(client, hdr_703, year=next_test_year())
     stage_id = _senior_stage_id(client, hdr_703)
 
     hdr_704 = login(client, "ADMIN704")
@@ -227,7 +229,7 @@ def test_cannot_create_training_class_for_another_squadrons_year(client):
 
 def test_cannot_create_training_class_with_nonexistent_stage(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, year=2091)
+    year = _make_year(client, hdr, year=next_test_year())
     r = client.post("/api/training-classes", json={
         "training_year_id": year["planning_year_id"],
         "training_stage_id": "not-a-real-phase-id",

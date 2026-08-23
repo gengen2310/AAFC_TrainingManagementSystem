@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from collections.abc import Generator
 
 from sqlalchemy import create_engine, String, DateTime, Boolean
+from sqlalchemy.types import TypeDecorator
 from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase, Mapped, mapped_column
 
 from .config import settings
@@ -57,6 +58,58 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def iso_z(value: datetime | None) -> str | None:
+    """ISO 8601 with a "Z" suffix, for routers that build response dicts by hand.
+
+    UTCDateTime hands back aware UTC values, so a bare .isoformat() spells the
+    zone "+00:00" while Pydantic and the encoder registered in main.py spell it
+    "Z". Both are correct and both parse, but one API should not use two
+    spellings for the same instant.
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+class UTCDateTime(TypeDecorator):
+    """A DateTime column that always hands Python a timezone-aware UTC value.
+
+    utcnow() has always returned an aware datetime, so the intent throughout this
+    codebase is "everything is UTC". A plain DateTime column silently broke that
+    on the way back out: SQLite and a non-timezone PostgreSQL column both drop
+    tzinfo, so a value written as aware was read back naive. FastAPI and Pydantic
+    then serialised it with no zone marker, and browsers parse a zone-less
+    timestamp as LOCAL time -- eight hours out in Perth, which moved dates onto
+    the wrong day either side of midnight.
+
+    Storage format is unchanged: values are still written as naive UTC, exactly
+    as before, so this needs no migration and reads existing rows correctly --
+    they were already naive UTC by convention. Only the Python-side value gains
+    its tzinfo back.
+    """
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            # A naive value reaching the database is UTC by this codebase's
+            # convention; store it unchanged rather than guessing a timezone.
+            return value
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+    def process_result_value(self, value: datetime | None, dialect) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+
 def new_uuid() -> str:
     return str(uuid.uuid4())
 
@@ -70,8 +123,8 @@ class UUIDMixin:
 
 
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
 

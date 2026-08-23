@@ -3,7 +3,7 @@ from sqlalchemy import String, Integer, Text, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, timezone
 
-from ..database import Base, UUIDMixin, TimestampMixin
+from ..database import Base, UUIDMixin, TimestampMixin, UTCDateTime
 
 
 class ActionItem(Base, UUIDMixin, TimestampMixin):
@@ -21,7 +21,7 @@ class ActionItem(Base, UUIDMixin, TimestampMixin):
     linked_object_id: Mapped[str | None] = mapped_column(String(36))
     source: Mapped[str] = mapped_column(String(20), default="manual")  # manual|automation
     closed_by: Mapped[str | None] = mapped_column(String(36))
-    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     closure_note: Mapped[str | None] = mapped_column(Text)
 
 
@@ -40,14 +40,14 @@ class Exception(Base, UUIDMixin, TimestampMixin):
     due_date: Mapped[str | None] = mapped_column(String(10))
     status: Mapped[str] = mapped_column(String(20), default="open", index=True)
     escalation_level: Mapped[int] = mapped_column(Integer, default=0)
-    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     resolution_note: Mapped[str | None] = mapped_column(Text)
 
 
 class AuditLog(Base, UUIDMixin):
     """Immutable. There is no update/delete path through the API."""
     __tablename__ = "audit_logs"
-    timestamp: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    timestamp: Mapped[datetime] = mapped_column(UTCDateTime, default=lambda: datetime.now(timezone.utc), index=True)
     user_id: Mapped[str | None] = mapped_column(String(36), index=True)
     role: Mapped[str | None] = mapped_column(String(40))
     scope: Mapped[str | None] = mapped_column(String(20))
@@ -71,7 +71,7 @@ class SystemSetting(Base):
     __tablename__ = "system_settings"
     key: Mapped[str] = mapped_column(String(80), primary_key=True)
     value: Mapped[str | None] = mapped_column(Text, nullable=True)
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
 

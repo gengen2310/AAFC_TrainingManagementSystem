@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
-from ..database import get_db, utcnow
+from ..database import get_db, utcnow, iso_z
 from ..models import (
     Wing, Squadron, ProxySession, AuditLog, NationalEntity, User,
     ParadeNight, Session as TrainingSession, Facilitator, TrainingArea, Equipment, Activity, WingHQEvent,
@@ -699,6 +699,6 @@ def get_audit(object_type: str | None = None, object_id: str | None = None, batc
     if batch_id:
         q = q.filter(AuditLog.batch_id == batch_id)
     rows = q.order_by(AuditLog.timestamp.desc()).limit(min(limit, 1000)).all()
-    return [{"audit_id": r.id, "timestamp": r.timestamp.isoformat(), "role": r.role,
+    return [{"audit_id": r.id, "timestamp": iso_z(r.timestamp), "role": r.role,
              "action": r.action, "object_type": r.object_type, "object_id": r.object_id,
              "reason": r.reason, "proxy_session_id": r.proxy_session_id, "batch_id": r.batch_id} for r in rows]

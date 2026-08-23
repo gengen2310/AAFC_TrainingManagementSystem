@@ -43,9 +43,21 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
                 Facilitator.squadron_id == sq_id, Facilitator.is_archived == False).count()  # noqa: E712
             training_areas_added = db.query(TrainingArea).filter(
                 TrainingArea.squadron_id == sq_id, TrainingArea.is_archived == False).count()  # noqa: E712
-            timing_template_confirmed = db.query(TimingTemplate).filter(
-                TimingTemplate.squadron_id == sq_id, TimingTemplate.is_archived == False).count() > 0  # noqa: E712
             today = date.today().isoformat()
+            # Match the conditions _effective_template() actually resolves on
+            # (timing.py). Counting any non-archived template reported "confirmed"
+            # for a squadron whose only template was inactive or outside its
+            # effective window -- the checklist said done while new parade nights
+            # got no timing at all.
+            timing_template_confirmed = any(
+                t.effective_to is None or t.effective_to >= today
+                for t in db.query(TimingTemplate).filter(
+                    TimingTemplate.squadron_id == sq_id,
+                    TimingTemplate.is_archived == False,   # noqa: E712
+                    TimingTemplate.active_status == True,  # noqa: E712
+                    TimingTemplate.effective_from <= today,
+                ).all()
+            )
             parade_nights_generated = db.query(ParadeNight).filter(
                 ParadeNight.squadron_id == sq_id, ParadeNight.is_archived == False,  # noqa: E712
                 ParadeNight.date >= today).count()
@@ -83,6 +95,31 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
                     TrainingClass.training_year_id.in_(active_year_ids),
                     TrainingClass.is_archived == False).count()  # noqa: E712
 
+            # Sessions need a program period (timing_block_id) before they can
+            # appear on the Weekly Program grid -- the period is the row. A
+            # squadron can hold a full schedule that prints blank without it,
+            # which is exactly what happened before 2026-08-23, so it earns a
+            # checklist step of its own.
+            sq_pn_ids = [
+                pn.id for pn in db.query(ParadeNight).filter(
+                    ParadeNight.squadron_id == sq_id,
+                    ParadeNight.is_archived == False,  # noqa: E712
+                ).all()
+            ]
+            sessions_total = 0
+            sessions_with_period = 0
+            if sq_pn_ids:
+                sessions_total = db.query(TrainingSession).filter(
+                    TrainingSession.parade_night_id.in_(sq_pn_ids),
+                    TrainingSession.is_archived == False,  # noqa: E712
+                ).count()
+                sessions_with_period = db.query(TrainingSession).filter(
+                    TrainingSession.parade_night_id.in_(sq_pn_ids),
+                    TrainingSession.is_archived == False,  # noqa: E712
+                    TrainingSession.timing_block_id.isnot(None),
+                ).count()
+            sessions_have_periods = sessions_total > 0 and sessions_with_period == sessions_total
+
             # Curriculum coverage: % of items visible to this squadron (national +
             # this wing + this squadron -- same visibility rule as GET /curriculum)
             # that have at least one scheduled session.
@@ -117,66 +154,82 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
                 "parade_night_published": parade_night_published,
                 "flights_created": flights_created,
                 "training_classes_created": training_classes_created,
+                "sessions_total": sessions_total,
+                "sessions_with_period": sessions_with_period,
+                "sessions_have_periods": sessions_have_periods,
             }
 
     steps = []
     if national is not None:
-        steps.append({"key": "wings_created", "label": "Create Wings", "done": national["wings_created"] > 0,
+        steps.append({"key": "wings_created", "label": "Create wings", "done": national["wings_created"] > 0,
                       "count": national["wings_created"], "link_page": "accounts"})
-        steps.append({"key": "squadrons_created", "label": "Create Squadrons / Specialist Units",
+        steps.append({"key": "squadrons_created", "label": "Create squadrons and specialist units",
                       "done": national["squadrons_created"] > 0, "count": national["squadrons_created"],
                       "link_page": "accounts"})
     if squadron is not None:
         # Planning Year comes first among squadron steps -- Parade Nights,
         # Anchor Events, and Holidays are all scoped to it, so setting it up
         # is a genuine prerequisite, not just an arbitrary ordering choice.
-        steps.append({"key": "planning_year_active", "label": "Set Up Active Planning Year",
+        steps.append({"key": "planning_year_active", "label": "Set up the active training year",
                       "done": squadron["planning_year_active"], "count": None, "link_page": "settings"})
         # Training Classes: optional because a single-class squadron running one group per Stage
         # does not need to create named classes -- the legacy cadet_group field handles that.
         # Surfaced as guidance so squadrons running multiple parallel groups are prompted to set
         # them up, which unlocks class-aware curriculum progress and Mission Backlog tracking.
-        steps.append({"key": "training_classes_created", "label": "Create Training Classes",
+        steps.append({"key": "training_classes_created", "label": "Create training classes",
                       "done": squadron["training_classes_created"] > 0,
                       "count": squadron["training_classes_created"],
                       "link_page": "settings", "optional": True})
-        steps.append({"key": "facilitators_added", "label": "Add Facilitators",
+        steps.append({"key": "facilitators_added", "label": "Add facilitators",
                       "done": squadron["facilitators_added"] > 0, "count": squadron["facilitators_added"],
                       "link_page": "facilitators"})
-        steps.append({"key": "training_areas_added", "label": "Add Training Areas / Rooms",
+        steps.append({"key": "training_areas_added", "label": "Add training areas and rooms",
                       "done": squadron["training_areas_added"] > 0, "count": squadron["training_areas_added"],
                       "link_page": "resources"})
-        steps.append({"key": "equipment_added", "label": "Add Equipment",
+        steps.append({"key": "equipment_added", "label": "Add equipment",
                       "done": squadron["equipment_added"] > 0, "count": squadron["equipment_added"],
                       "link_page": "resources"})
-        steps.append({"key": "timing_template_confirmed", "label": "Confirm Parade Night Timing Template",
+        steps.append({"key": "timing_template_confirmed", "label": "Confirm the parade night timing template",
                       "done": squadron["timing_template_confirmed"], "count": None, "link_page": "settings"})
-        steps.append({"key": "crest_set", "label": "Set Squadron Crest",
+        steps.append({"key": "crest_set", "label": "Set the squadron crest",
                       "done": squadron["crest_set"], "count": None, "link_page": "settings"})
-        steps.append({"key": "cadets_added", "label": "Add Cadets to Squadron Roster",
+        steps.append({"key": "cadets_added", "label": "Add cadets to the squadron roster",
                       "done": squadron["cadets_added"] > 0, "count": squadron["cadets_added"],
                       "link_page": "settings"})
-        steps.append({"key": "holidays_configured", "label": "Add or Import Holidays",
+        steps.append({"key": "holidays_configured", "label": "Add or import holidays",
                       "done": squadron["holidays_configured"], "count": None, "link_page": "activities"})
-        steps.append({"key": "cea_imported", "label": "Import CEA Activities", "done": squadron["cea_imported"],
+        steps.append({"key": "cea_imported", "label": "Import CEA activities", "done": squadron["cea_imported"],
                       "count": None, "link_page": "activities"})
-        steps.append({"key": "activities_classified", "label": "Classify Activities by Priority & Audience",
+        steps.append({"key": "activities_classified", "label": "Classify activities by priority and audience",
                       "done": squadron["activities_classified"], "count": None, "link_page": "activities"})
-        steps.append({"key": "anchor_events_reviewed", "label": "Review Annual Training Program Anchor Events",
+        steps.append({"key": "anchor_events_reviewed", "label": "Review annual program anchor events",
                       "done": squadron["anchor_events_reviewed"], "count": None, "link_page": "activities"})
-        steps.append({"key": "parade_nights_generated", "label": "Generate Parade Nights",
+        steps.append({"key": "parade_nights_generated", "label": "Generate parade nights",
                       "done": squadron["parade_nights_generated"] > 0,
                       "count": squadron["parade_nights_generated"], "link_page": "parade-nights"})
-        steps.append({"key": "parade_night_published", "label": "Publish a Parade Night",
+        steps.append({"key": "parade_night_published", "label": "Publish a parade night",
                       "done": squadron["parade_night_published"], "count": None, "link_page": "parade-nights"})
-        steps.append({"key": "curriculum_coverage", "label": "Schedule Curriculum Items",
-                      "done": squadron["curriculum_coverage_pct"] >= 100,
+        # Coverage is the share of every curriculum item VISIBLE to this squadron
+        # -- the whole national curriculum across all Training Stages -- that has
+        # a session. No squadron delivers all of it in one year: a fully seeded
+        # 703 SQN measures 46.2%. Requiring 100% meant this step could never be
+        # done, and because `complete` below is an AND over the non-optional
+        # steps, the checklist could never report complete for anyone.
+        # The step now marks done once scheduling has actually started, and keeps
+        # the percentage as a progress readout.
+        steps.append({"key": "curriculum_coverage", "label": "Schedule curriculum sessions",
+                      "done": squadron["curriculum_coverage_pct"] > 0,
                       "count": squadron["curriculum_coverage_pct"], "link_page": "curriculum"})
+        # Added 2026-08-23: without a program period a session is invisible on the
+        # Weekly Program, so a squadron can look fully planned and print nothing.
+        steps.append({"key": "sessions_have_periods", "label": "Assign sessions to program periods",
+                      "done": squadron["sessions_have_periods"],
+                      "count": squadron["sessions_with_period"], "link_page": "parade-nights"})
         # Flight is a local, optional cadet-organisation grouping, not a
         # required setup action (see Flight model docstring / architecture.md)
         # -- surfaced as guidance in the fuller sequence but excluded from the
         # `complete` calculation below via its own "optional" flag.
-        steps.append({"key": "flights_created", "label": "Organise Cadets into Flights",
+        steps.append({"key": "flights_created", "label": "Organise cadets into flights",
                       "done": squadron["flights_created"] > 0, "count": squadron["flights_created"],
                       "link_page": "settings", "optional": True})
 

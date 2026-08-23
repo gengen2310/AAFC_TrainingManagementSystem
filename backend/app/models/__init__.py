@@ -1,5 +1,6 @@
 """Aggregate model imports so Base.metadata sees every table."""
 from .service_ticket import ServiceTicket
+from .faq import FaqEntry
 from .service_desk_email_config import ServiceDeskEmailConfig
 from .wing_calendar import WingHQEvent, SquadronEventStatus, WingEventCurriculumLink
 from .planning import (
@@ -44,4 +45,5 @@ __all__ = [
     "ServiceTicket",
     "ServiceDeskEmailConfig",
     "CustomTrainingPhase",
+    "FaqEntry",
 ]

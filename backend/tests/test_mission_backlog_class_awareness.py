@@ -18,7 +18,7 @@ here.
 import uuid
 from datetime import date, timedelta
 
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 def _sqn_admin_hdr(client):
@@ -137,7 +137,7 @@ def _find_mission(missions, ci_id):
 
 def test_mission_item_gains_class_breakdown_and_unassigned_count_fields(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2401)
+    year = _make_year(client, hdr, next_test_year())
     _stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
     ci = _make_curriculum_item(client, hdr, "M05-A", stage_name)
 
@@ -160,7 +160,7 @@ def test_no_classes_for_stage_gives_empty_breakdown_even_when_scheduled(client):
     """A Stage with zero active Training Classes must not error -- the item's
     own backlog_status is unaffected, class_breakdown is just empty."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2402)
+    year = _make_year(client, hdr, next_test_year())
     _stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
     ci = _make_curriculum_item(client, hdr, "M05-B", stage_name)
     _make_session(client, hdr, ci, status="delivered")
@@ -178,7 +178,7 @@ def test_no_classes_for_stage_gives_empty_breakdown_even_when_scheduled(client):
 
 def test_class_breakdown_splits_by_session_audience(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2403)
+    year = _make_year(client, hdr, next_test_year())
     stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "M05 Class 1")
     c2 = _make_class(client, hdr, year["planning_year_id"], stage_id, "M05 Class 2")
@@ -214,7 +214,7 @@ def test_class_breakdown_six_state_matches_item_level_logic(client):
     same mission -- addendum's six-state model should resolve this to
     "resolved" at the CLASS level, exactly as it would for the whole item."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2404)
+    year = _make_year(client, hdr, next_test_year())
     stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "M05 Class Resolved")
     ci = _make_curriculum_item(client, hdr, "M05-D", stage_name)
@@ -239,7 +239,7 @@ def test_session_assigned_to_multiple_classes_counts_in_each(client):
     """One combined Session serving two Classes at once (addendum's stated
     use case) must be counted in both classes' breakdown, not just one."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2405)
+    year = _make_year(client, hdr, next_test_year())
     stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "M05 Combined A")
     c2 = _make_class(client, hdr, year["planning_year_id"], stage_id, "M05 Combined B")
@@ -260,7 +260,7 @@ def test_class_breakdown_only_includes_classes_for_the_items_own_stage(client):
     """A class belonging to a different Stage must never appear in another
     Stage's items' class_breakdown."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2406)
+    year = _make_year(client, hdr, next_test_year())
     stage_a_id, stage_a_name = _make_stage(client, hdr, year["unit_id"])
     stage_b_id, stage_b_name = _make_stage(client, hdr, year["unit_id"])
     _make_class(client, hdr, year["planning_year_id"], stage_a_id, "M05 Stage A Class")
@@ -278,7 +278,7 @@ def test_general_user_can_read_class_breakdown(client):
     """sqn_general (read-only) must still be able to read this new field --
     it is a GET, matching every other missions-endpoint RBAC expectation."""
     hdr_admin = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr_admin, 2407)
+    year = _make_year(client, hdr_admin, next_test_year())
     stage_id, stage_name = _make_stage(client, hdr_admin, year["unit_id"])
     _make_class(client, hdr_admin, year["planning_year_id"], stage_id, "M05 General Read Class")
     ci = _make_curriculum_item(client, hdr_admin, "M05-G", stage_name)

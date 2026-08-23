@@ -3,7 +3,7 @@
 GET /api/planning/years/{year_id}/export → text/csv
 """
 import pytest
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ def test_year_creation_auto_creates_training_classes(client):
     """POST /api/planning/years must auto-create 5 training classes (ORI/INI/JNR/INT/SNR)."""
     headers = _sqn_admin_hdr(client)
     resp = client.post("/api/planning/years", headers=headers, json={
-        "year": 2028,
+        "year": next_test_year(),
         "name": "Auto Classes Test",
         "active_status": True,
     })

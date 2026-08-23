@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
-from ..database import get_db, utcnow
+from ..database import get_db, utcnow, iso_z
 from ..models import (Session, ParadeNight, CurriculumItem, ActionItem, Exception as Exc,
                       Squadron, Wing, ImportLog, AuditLog)
 from ..dependencies import get_principal
@@ -653,7 +653,7 @@ def recent_changes(
     return {"count": len(rows), "since": since.isoformat(), "changes": [
         {
             "id": e.id,
-            "timestamp": e.timestamp.isoformat() if e.timestamp else None,
+            "timestamp": iso_z(e.timestamp) if e.timestamp else None,
             "role": e.role,
             "object_type": e.object_type,
             "object_id": e.object_id,

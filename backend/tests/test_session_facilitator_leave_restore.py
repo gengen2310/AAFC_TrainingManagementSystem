@@ -5,7 +5,7 @@ but neither had a restore counterpart or any way to see the archived record
 through the product. Follows the same archive/restore pattern already proven
 for Facilitator, Wing HQ Event, and Curriculum Item.
 """
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 ADM703 = "ADMIN703"
 ADM704 = "ADMIN704"
@@ -16,11 +16,15 @@ def _sqn_hdr(client):
 
 
 def _setup_year_with_date(client, hdr):
-    r = client.post("/api/planning/years", json={"year": 2026, "name": "2026 Training Year"}, headers=hdr)
+    # REM-134: was a fixed 2026 -- the year the seed already gives 703 -- so this
+    # collided on its first call. The parade date is derived from the allocated
+    # year so it still falls inside it.
+    year = next_test_year()
+    r = client.post("/api/planning/years", json={"year": year, "name": f"{year} Training Year"}, headers=hdr)
     assert r.status_code == 200, r.text
     yr_id = r.json()["planning_year_id"]
     rp = client.post(f"/api/planning/years/{yr_id}/parade-dates",
-                     json={"parade_date": "2026-09-04"}, headers=hdr)
+                     json={"parade_date": f"{year}-09-04"}, headers=hdr)
     assert rp.status_code == 200, rp.text
     return yr_id, rp.json()["parade_date_id"]
 

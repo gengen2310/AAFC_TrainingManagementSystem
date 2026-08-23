@@ -6,7 +6,7 @@ from sqlalchemy import String, Integer, ForeignKey, Boolean, Text, DateTime, Flo
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 
-from ..database import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
+from ..database import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin, UTCDateTime
 
 
 class Phase(Base, UUIDMixin, TimestampMixin):
@@ -36,8 +36,8 @@ class ProgramPackage(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     effective_to: Mapped[str | None] = mapped_column(String(10))
     approved_by: Mapped[str | None] = mapped_column(String(36))
     published_by: Mapped[str | None] = mapped_column(String(36))
-    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    retired_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    retired_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class ProgramItem(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
@@ -80,7 +80,7 @@ class LearningHubResource(Base, UUIDMixin, TimestampMixin):
     resource_type: Mapped[str] = mapped_column(String(20), default="page")  # page|file|activity|guide|unknown
     source: Mapped[str] = mapped_column(String(40), default="Learning Hub")
     requires_login: Mapped[bool] = mapped_column(Boolean, default=False)
-    last_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     verification_status: Mapped[str] = mapped_column(String(20), default="unknown")  # unknown|valid|invalid|requires_login|changed
 
 
@@ -128,7 +128,7 @@ class SourceConflict(Base, UUIDMixin, TimestampMixin):
     resolved_value: Mapped[str | None] = mapped_column(Text)
     resolution_reason: Mapped[str | None] = mapped_column(Text)
     resolved_by: Mapped[str | None] = mapped_column(String(36))
-    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
 
 class PromotionRequest(Base, UUIDMixin, TimestampMixin):
@@ -152,5 +152,5 @@ class JobStatus(Base, UUIDMixin, TimestampMixin):
     progress_percentage: Mapped[int] = mapped_column(Integer, default=0)
     result_reference: Mapped[str | None] = mapped_column(String(300))
     error_message: Mapped[str | None] = mapped_column(Text)
-    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)

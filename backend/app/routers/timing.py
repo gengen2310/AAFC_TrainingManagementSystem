@@ -20,7 +20,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session as DBSession
 
-from ..database import get_db, utcnow
+from ..database import get_db, utcnow, iso_z
 from ..models import (TimingTemplate, TimingBlock, ParadeNightTimingOverride,
                       ParadeNight, Squadron, Session)
 from ..models.training import BLOCK_TYPES
@@ -92,8 +92,8 @@ def _template_dict(t: TimingTemplate, include_blocks: bool = True) -> dict:
         "notes": t.notes,
         "instructional_period_count": sum(1 for b in blocks if b.is_instructional_period),
         "version": t.version,
-        "created_at": t.created_at.isoformat() if t.created_at else None,
-        "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+        "created_at": iso_z(t.created_at) if t.created_at else None,
+        "updated_at": iso_z(t.updated_at) if t.updated_at else None,
     }
     if include_blocks:
         d["blocks"] = [_block_dict(b) for b in blocks]

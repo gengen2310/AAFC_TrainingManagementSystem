@@ -18,7 +18,7 @@ import uuid
 from datetime import date, timedelta
 
 import pytest
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 def _sqn_admin_hdr(client):
@@ -111,7 +111,7 @@ def _make_session(client, hdr, curriculum_item_id=None, status=None):
 
 def test_class_with_no_sessions_shows_not_started(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2081)
+    year = _make_year(client, hdr, next_test_year())
     stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
     _make_curriculum_item(client, hdr, "SEN-P1", stage_name)
     class_id = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
@@ -129,7 +129,7 @@ def test_class_with_no_sessions_shows_not_started(client):
 
 def test_delivered_session_marks_class_progress_delivered(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2080)
+    year = _make_year(client, hdr, next_test_year())
     stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
     item_id = _make_curriculum_item(client, hdr, "SEN-P2", stage_name)
     class_id = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
@@ -147,7 +147,7 @@ def test_two_classes_completing_same_item_are_independent(client):
     """Senior 1 completed SEN-P3 but Senior 2 did not -- addendum §43's
     exact scenario. Must NOT mark the item complete for both classes."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2079)
+    year = _make_year(client, hdr, next_test_year())
     stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
     item_id = _make_curriculum_item(client, hdr, "SEN-P3", stage_name)
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
@@ -166,7 +166,7 @@ def test_per_class_outcome_override_reflected_in_progress(client):
     recorded as an exception (not_delivered) -- the class progress view for
     Senior 3 must show not_delivered, not delivered."""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2078)
+    year = _make_year(client, hdr, next_test_year())
     stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
     item_id = _make_curriculum_item(client, hdr, "SEN-P4", stage_name)
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
@@ -209,7 +209,7 @@ def test_stage_aggregate_sums_delivered_and_applicable_across_classes(client):
     denominators between classes -- not built this pass, see CLASS-04's
     residual_limitation in the gap register.)"""
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2077)
+    year = _make_year(client, hdr, next_test_year())
     stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
 
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1")
@@ -254,7 +254,7 @@ def test_stage_aggregate_sums_delivered_and_applicable_across_classes(client):
 
 def test_stage_progress_for_stage_with_no_classes_returns_zero_not_error(client):
     hdr = _sqn_admin_hdr(client)
-    year = _make_year(client, hdr, 2076)
+    year = _make_year(client, hdr, next_test_year())
     stage_id, _ = _make_stage(client, hdr, year["unit_id"])
     r = client.get(f"/api/curriculum/phases/{stage_id}/class-progress",
                    params={"squadron_id": year["unit_id"]}, headers=hdr)

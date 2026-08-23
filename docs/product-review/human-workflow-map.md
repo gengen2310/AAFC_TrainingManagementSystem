@@ -163,7 +163,7 @@ For each major workflow, applying the 10-question test:
 | 16 | Know what "Mission Backlog" means (terminology) | P3 | Military terminology may be unfamiliar |
 | 17 | Find facilitator suggestions for a session | P3 | Available in Quick Edit (quick-entry mode) but not labelled prominently |
 | 18 | Export curriculum or delivery data | P3 | Export buttons on Curriculum page, not obvious |
-| 19 | Find CEA (Canadian Expeditionary Activity) activities | P3 | Mixed into activities list with no clear separation |
+| 19 | Find CEA (Cadet Enterprise Application) activities | P3 | Mixed into activities list with no clear separation |
 | 20 | Access Wing events from Squadron view | P3 | Wing Events appear as read-only overlays on Activities, not well-signposted |
 
 ---

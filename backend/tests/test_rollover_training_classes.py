@@ -22,7 +22,7 @@ neither this file nor rollover_year() itself makes -- _find_or_create_parade_nig
 here is called with the new year's own unit_id, not the "highest active
 year" lookup).
 """
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 def _sqn_admin_hdr(client):
@@ -91,7 +91,7 @@ def test_rollover_copies_active_training_classes_by_default(client):
 
 def test_rollover_does_not_copy_archived_classes(client):
     hdr = _sqn_admin_hdr(client)
-    py = _make_year(client, hdr, 2661, "CLASS-11 Rollover Source B")
+    py = _make_year(client, hdr, next_test_year(), "CLASS-11 Rollover Source B")
     year_id = py["planning_year_id"]
     stage_id = _make_stage(client, hdr, py["unit_id"])
     keep_id = _make_class(client, hdr, year_id, stage_id, "Kept Class")
@@ -115,7 +115,7 @@ def test_rollover_does_not_copy_archived_classes(client):
 
 def test_rollover_with_copy_training_classes_false_skips_them(client):
     hdr = _sqn_admin_hdr(client)
-    py = _make_year(client, hdr, 2662, "CLASS-11 Rollover Source C")
+    py = _make_year(client, hdr, next_test_year(), "CLASS-11 Rollover Source C")
     year_id = py["planning_year_id"]
     stage_id = _make_stage(client, hdr, py["unit_id"])
     _make_class(client, hdr, year_id, stage_id, "Should Not Copy")
@@ -132,7 +132,7 @@ def test_rollover_with_copy_training_classes_false_skips_them(client):
 
 def test_rollover_with_no_classes_reports_zero_not_an_error(client):
     hdr = _sqn_admin_hdr(client)
-    py = _make_year(client, hdr, 2663, "CLASS-11 Rollover No Classes")
+    py = _make_year(client, hdr, next_test_year(), "CLASS-11 Rollover No Classes")
     r = client.post(f"/api/planning/years/{py['planning_year_id']}/rollover", json={}, headers=hdr)
     assert r.status_code == 200, r.text
     # Year creation auto-creates 5 standard classes (ORI/INI/JNR/INT/SNR), all of which are copied.
@@ -143,7 +143,7 @@ def test_copied_training_class_is_independently_editable(client):
     """The copy must be a real, separate row -- editing the new year's class
     must not affect the source year's class."""
     hdr = _sqn_admin_hdr(client)
-    py = _make_year(client, hdr, 2664, "CLASS-11 Rollover Independence")
+    py = _make_year(client, hdr, next_test_year(), "CLASS-11 Rollover Independence")
     year_id = py["planning_year_id"]
     stage_id = _make_stage(client, hdr, py["unit_id"])
     _make_class(client, hdr, year_id, stage_id, "Original Name")

@@ -8,6 +8,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.encoders import ENCODERS_BY_TYPE
+import datetime as _dt
+from datetime import timezone as _tzmod
 
 from .config import settings
 from .database import init_db, SessionLocal
@@ -108,6 +111,27 @@ async def lifespan(app: FastAPI):
     if settings.DATABASE_URL.startswith("sqlite"):
         init_db()
     yield
+
+
+# ── Datetime serialisation ───────────────────────────────────────────────────
+# UTCDateTime (database.py) hands every timestamp back as timezone-aware UTC, so
+# responses now carry a zone marker either way. The two serialisation paths spell
+# it differently, though: Pydantic response models emit "Z", while a route that
+# returns a plain dict goes through jsonable_encoder and emits "+00:00". Both are
+# valid ISO 8601 and both parse identically in a browser, but one API should not
+# use two spellings for the same instant. Registering the encoder here makes the
+# dict path agree with the model path.
+#
+# ENCODERS_BY_TYPE is keyed on the exact type and jsonable_encoder consults it
+# before anything else, so this only affects datetime and nothing subclassing it.
+def _isoformat_utc(value: _dt.datetime) -> str:
+    if value.tzinfo is None:
+        # Naive values are UTC by this codebase's convention (see utcnow()).
+        value = value.replace(tzinfo=_tzmod.utc)
+    return value.astimezone(_tzmod.utc).isoformat().replace("+00:00", "Z")
+
+
+ENCODERS_BY_TYPE[_dt.datetime] = _isoformat_utc
 
 
 app = FastAPI(title="AAFC Training Management System — National", version="17.1.1", lifespan=lifespan,

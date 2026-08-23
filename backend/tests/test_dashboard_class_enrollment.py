@@ -6,7 +6,7 @@ and that the chart handles both populated and empty squadron states correctly.
 import uuid
 
 import pytest
-from tests.conftest import login
+from tests.conftest import login, next_test_year
 
 
 def _hdr(client):
@@ -58,7 +58,7 @@ def test_chart_has_required_fields(client):
 
 def test_class_with_expected_count_appears_in_chart(client):
     hdr = _hdr(client)
-    year = _make_year(client, hdr, 2075)
+    year = _make_year(client, hdr, next_test_year())
     stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
 
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "Senior 1", expected_count=18)
@@ -76,7 +76,7 @@ def test_class_with_expected_count_appears_in_chart(client):
 
 def test_class_without_expected_count_shows_none(client):
     hdr = _hdr(client)
-    year = _make_year(client, hdr, 2076)
+    year = _make_year(client, hdr, next_test_year())
     stage_id, _ = _make_stage(client, hdr, year["unit_id"])
     _make_class(client, hdr, year["planning_year_id"], stage_id, "Bronze 1")  # no expected_count
 

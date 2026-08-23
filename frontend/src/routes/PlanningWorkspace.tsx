@@ -24,6 +24,27 @@ import { HelpDrawer } from "../components/HelpDrawer";
 import type { PlanningSession, AnchorEvent } from "../api/types";
 
 
+
+// YR-3: choose the training year the unit is most likely to want on open.
+// The API returns years ordered year-descending, so "first active" meant
+// "newest year ever created" -- creating a year for a future season silently
+// moved the whole workspace to it. Prefer the active year matching today, then
+// the nearest active year ahead, then the most recent behind.
+function pickDefaultYear<T extends { year: number; active_status?: boolean }>(list: T[]): T | null {
+  const yrs = (list ?? []).filter(Boolean);
+  if (!yrs.length) return null;
+  const act = yrs.filter(y => y.active_status);
+  const pool = act.length ? act : yrs;
+  const now = new Date().getFullYear();
+  const exact = pool.find(y => Number(y.year) === now);
+  if (exact) return exact;
+  const ahead = pool.filter(y => Number(y.year) > now).sort((a, b) => a.year - b.year);
+  if (ahead.length) return ahead[0];
+  const behind = pool.filter(y => Number(y.year) < now).sort((a, b) => b.year - a.year);
+  if (behind.length) return behind[0];
+  return pool[0];
+}
+
 export function PlanningWorkspace() {
   const { session } = useAuth();
   const qc = useQueryClient();
@@ -102,7 +123,7 @@ export function PlanningWorkspace() {
       const match = years.find(y => y.year === reqYear);
       if (match) { persistYear(match.planning_year_id); return; }
     }
-    const active = years.find(y => y.active_status) ?? years[0];
+    const active = pickDefaultYear(years);
     if (!active) return;
     if (active.planning_year_id !== selectedYearId) {
       persistYear(active.planning_year_id);
@@ -450,6 +471,11 @@ export function PlanningWorkspace() {
               {yearOptions.map(y => (
                 <button
                   key={y.planning_year_id}
+                  type="button"
+                  // PW-A1: selection was carried by the "on" class alone. The filter
+                  // chips beside these already expose aria-pressed; the year chips did
+                  // not, so which of 63 years was selected was visual-only.
+                  aria-pressed={selectedYearId === y.planning_year_id}
                   className={`pw-chip${selectedYearId === y.planning_year_id ? " on" : ""}`}
                   onClick={() => { persistYear(y.planning_year_id); setSelectedDateId(null); }}
                 >
