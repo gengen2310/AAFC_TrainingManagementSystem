@@ -12312,15 +12312,14 @@ function ynSyncPwBadge() {
 // ═══════════════════════════════════════════════════════════
 //  HELP & REFERENCE PAGE
 // ═══════════════════════════════════════════════════════════
-let _helpPageLoaded=false;
 async function _loadHelpPage(){
-  if(!_helpPageLoaded){
-    _helpPageLoaded=true;
-    await _loadGettingHelp();
-  }
-  // Show/hide edit button based on role
-  const editBtn=document.getElementById('gh-edit-btn');
-  if(editBtn)editBtn.style.display=(S.role==='system_admin')?'':'none';
+  // Reloads every visit. This used to be a one-shot guarded by _helpPageLoaded,
+  // which was harmless while the page held a single static blob. It is not
+  // harmless now: the FAQ is shared reference content that a system_admin is
+  // expected to add to, and readers would not see a new question until they
+  // reloaded the whole app. Two small requests on a page nobody navigates to in
+  // a loop is the right trade.
+  await _loadGettingHelp();
 }
 
 // ═══════════════════════════════════════════════════════════
