@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow, iso_z
 from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
-                      Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, SessionStatusReasonTag, TrainingArea, Equipment,
+                      Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, SessionStatusReasonTag, ActivityTypeTag, TrainingAreaCapabilityTag, TrainingArea, Equipment,
                       Activity, Cadet, Squadron, TimingTemplate, TimingBlock, SystemSetting, TrainingClass, PlanningYear,
                       SessionAudience, CadetClassMembership,
                       ParadeNightTemplate, ParadeNightTemplateSession)
@@ -1615,7 +1615,8 @@ def list_rooms(squadron_id: str | None = None, include_archived: bool = False,
         q = q.filter(TrainingArea.is_archived == False)  # noqa: E712
     rows = q.all()
     return [{"training_area_id": r.id, "name": r.name, "type": r.type, "capacity": r.capacity,
-             "indoor_outdoor": r.indoor_outdoor, "is_archived": r.is_archived} for r in rows]
+             "indoor_outdoor": r.indoor_outdoor, "is_archived": r.is_archived,
+             "capabilities": r.capabilities or []} for r in rows]
 
 
 @router.get("/equipment")
@@ -2095,6 +2096,7 @@ class TrainingAreaIn(BaseModel):
     capacity: int | None = None
     indoor_outdoor: str | None = None
     notes: str | None = None
+    capabilities: list[str] | None = None
 
 
 class TrainingAreaUpdateIn(BaseModel):
@@ -2103,6 +2105,7 @@ class TrainingAreaUpdateIn(BaseModel):
     capacity: int | None = None
     indoor_outdoor: str | None = None
     notes: str | None = None
+    capabilities: list[str] | None = None
 
 
 _WRITE_BLOCKED = ("sqn_general", "wing_viewer", "national_viewer", "auditor")
@@ -2120,7 +2123,8 @@ def create_room(body: TrainingAreaIn, db: DBSession = Depends(get_db), p: Princi
         raise HTTPException(400, detail={"error": "no_squadron_scope"})
     require_can_write_squadron(p, s.id, s.wing_id)
     r = TrainingArea(squadron_id=s.id, name=body.name, type=body.type,
-                     capacity=body.capacity, indoor_outdoor=body.indoor_outdoor, notes=body.notes)
+                     capacity=body.capacity, indoor_outdoor=body.indoor_outdoor, notes=body.notes,
+                     capabilities=body.capabilities or [])
     db.add(r)
     db.commit()
     audit(db, p, object_type="training_area", object_id=r.id, action="create")
@@ -2145,6 +2149,8 @@ def update_room(rid: str, body: TrainingAreaUpdateIn, db: DBSession = Depends(ge
         r.indoor_outdoor = body.indoor_outdoor
     if body.notes is not None:
         r.notes = body.notes
+    if body.capabilities is not None:
+        r.capabilities = body.capabilities
     db.commit()
     audit(db, p, object_type="training_area", object_id=r.id, action="update")
     return {"ok": True, "training_area_id": r.id}
@@ -5737,6 +5743,272 @@ def restore_session_status_reason_tag(
     tag.is_active = True
     db.commit()
     audit(db, p, object_type="SessionStatusReasonTag", object_id=tag_id, action="restore")
+    return {"ok": True}
+
+
+# ── Activity Type reference data — mirrors session-status-reason-tags (REM-23 part 3)
+# Activity.activity_type stays a free-text column; advisory, not a hard FK. ──
+
+
+def _acttype_out(t: ActivityTypeTag) -> dict:
+    return {
+        "tag_id": t.id,
+        "display_name": t.display_name,
+        "normalised_name": t.normalised_name,
+        "scope": t.scope,
+        "squadron_id": t.squadron_id,
+        "wing_id": t.wing_id,
+        "is_active": t.is_active,
+        "created_by": t.created_by,
+        "created_at": iso_z(t.created_at) if t.created_at else None,
+    }
+
+
+class ActivityTypeTagIn(BaseModel):
+    display_name: str
+    scope: str = "squadron"
+    wing_id: str | None = None
+    squadron_id: str | None = None
+
+
+@router.get("/activity-type-tags")
+def list_activity_type_tags(
+    include_archived: bool = False,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Return active (or all, when include_archived=true) activity-type tags."""
+    wing_id, sq_id = _visible_tag_scope(p)
+    require_can_view_squadron(p, sq_id or "", wing_id)
+    conditions = [ActivityTypeTag.scope == "global"]
+    if wing_id:
+        conditions.append((ActivityTypeTag.scope == "wing") & (ActivityTypeTag.wing_id == wing_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(ActivityTypeTag.scope == "wing")
+    if sq_id:
+        conditions.append((ActivityTypeTag.scope == "squadron") & (ActivityTypeTag.squadron_id == sq_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(ActivityTypeTag.scope == "squadron")
+    from sqlalchemy import or_ as _or_acttype
+    q = db.query(ActivityTypeTag).filter(_or_acttype(*conditions))
+    if not include_archived:
+        q = q.filter(ActivityTypeTag.is_active == True)  # noqa: E712
+    rows = q.order_by(ActivityTypeTag.display_name).all()
+    return [_acttype_out(t) for t in rows]
+
+
+@router.post("/activity-type-tags", status_code=201)
+def create_activity_type_tag(
+    body: ActivityTypeTagIn,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Create a new activity-type tag at the requested scope."""
+    scope = body.scope if body.scope in ("global", "wing", "squadron") else "squadron"
+    _can_create_tag(p, scope, body.wing_id, body.squadron_id)
+    display = body.display_name.strip()
+    if not display:
+        raise HTTPException(400, detail={"error": "tag_name_blank"})
+    if len(display) > 80:
+        raise HTTPException(400, detail={"error": "tag_name_too_long", "max": 80})
+    norm = _normalise_tag(display)
+    wing_id = body.wing_id or ((p.acting_wing_id or p.wing_id) if scope in ("wing", "squadron") else None)
+    squadron_id = body.squadron_id or ((p.acting_squadron_id or p.squadron_id) if scope == "squadron" else None)
+    existing = (
+        db.query(ActivityTypeTag)
+        .filter(
+            ActivityTypeTag.normalised_name == norm,
+            ActivityTypeTag.is_active == True,  # noqa: E712
+            (
+                (ActivityTypeTag.squadron_id == squadron_id) |
+                (ActivityTypeTag.wing_id == wing_id) |
+                (ActivityTypeTag.scope == "global")
+            ),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(409, detail={"error": "tag_already_exists", "existing_id": existing.id})
+    tag = ActivityTypeTag(
+        squadron_id=squadron_id, wing_id=wing_id, scope=scope,
+        display_name=display, normalised_name=norm, is_active=True, created_by=p.user_id,
+    )
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    audit(db, p, object_type="ActivityTypeTag", object_id=tag.id, action="create",
+          new={"display_name": tag.display_name, "scope": tag.scope})
+    return _acttype_out(tag)
+
+
+@router.delete("/activity-type-tags/{tag_id}", status_code=200)
+def archive_activity_type_tag(
+    tag_id: str,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Archive an activity-type tag (does not affect existing Activity rows)."""
+    tag = db.get(ActivityTypeTag, tag_id)
+    if not tag:
+        raise HTTPException(404, detail={"error": "tag_not_found"})
+    _can_create_tag(p, tag.scope, tag.wing_id, tag.squadron_id)
+    if not tag.is_active:
+        raise HTTPException(409, detail={"error": "tag_already_archived"})
+    tag.is_active = False
+    db.commit()
+    audit(db, p, object_type="ActivityTypeTag", object_id=tag_id, action="archive")
+    return {"ok": True}
+
+
+@router.post("/activity-type-tags/{tag_id}/restore", status_code=200)
+def restore_activity_type_tag(
+    tag_id: str,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Restore an archived activity-type tag."""
+    tag = db.get(ActivityTypeTag, tag_id)
+    if not tag:
+        raise HTTPException(404, detail={"error": "tag_not_found"})
+    _can_create_tag(p, tag.scope, tag.wing_id, tag.squadron_id)
+    if tag.is_active:
+        raise HTTPException(409, detail={"error": "tag_already_active"})
+    tag.is_active = True
+    db.commit()
+    audit(db, p, object_type="ActivityTypeTag", object_id=tag_id, action="restore")
+    return {"ok": True}
+
+
+# ── Training Area Capability reference data — mirrors activity-type-tags (REM-23 part 3)
+# TrainingArea.capabilities stays a JSON column; advisory, not hard FKs. ──
+
+
+def _capability_out(t: TrainingAreaCapabilityTag) -> dict:
+    return {
+        "tag_id": t.id,
+        "display_name": t.display_name,
+        "normalised_name": t.normalised_name,
+        "scope": t.scope,
+        "squadron_id": t.squadron_id,
+        "wing_id": t.wing_id,
+        "is_active": t.is_active,
+        "created_by": t.created_by,
+        "created_at": iso_z(t.created_at) if t.created_at else None,
+    }
+
+
+class TrainingAreaCapabilityTagIn(BaseModel):
+    display_name: str
+    scope: str = "squadron"
+    wing_id: str | None = None
+    squadron_id: str | None = None
+
+
+@router.get("/training-area-capability-tags")
+def list_training_area_capability_tags(
+    include_archived: bool = False,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Return active (or all, when include_archived=true) training-area capability tags."""
+    wing_id, sq_id = _visible_tag_scope(p)
+    require_can_view_squadron(p, sq_id or "", wing_id)
+    conditions = [TrainingAreaCapabilityTag.scope == "global"]
+    if wing_id:
+        conditions.append((TrainingAreaCapabilityTag.scope == "wing") & (TrainingAreaCapabilityTag.wing_id == wing_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(TrainingAreaCapabilityTag.scope == "wing")
+    if sq_id:
+        conditions.append((TrainingAreaCapabilityTag.scope == "squadron") & (TrainingAreaCapabilityTag.squadron_id == sq_id))
+    elif p.role in _NAT_ADMIN_ROLES:
+        conditions.append(TrainingAreaCapabilityTag.scope == "squadron")
+    from sqlalchemy import or_ as _or_cap
+    q = db.query(TrainingAreaCapabilityTag).filter(_or_cap(*conditions))
+    if not include_archived:
+        q = q.filter(TrainingAreaCapabilityTag.is_active == True)  # noqa: E712
+    rows = q.order_by(TrainingAreaCapabilityTag.display_name).all()
+    return [_capability_out(t) for t in rows]
+
+
+@router.post("/training-area-capability-tags", status_code=201)
+def create_training_area_capability_tag(
+    body: TrainingAreaCapabilityTagIn,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Create a new training-area capability tag at the requested scope."""
+    scope = body.scope if body.scope in ("global", "wing", "squadron") else "squadron"
+    _can_create_tag(p, scope, body.wing_id, body.squadron_id)
+    display = body.display_name.strip()
+    if not display:
+        raise HTTPException(400, detail={"error": "tag_name_blank"})
+    if len(display) > 80:
+        raise HTTPException(400, detail={"error": "tag_name_too_long", "max": 80})
+    norm = _normalise_tag(display)
+    wing_id = body.wing_id or ((p.acting_wing_id or p.wing_id) if scope in ("wing", "squadron") else None)
+    squadron_id = body.squadron_id or ((p.acting_squadron_id or p.squadron_id) if scope == "squadron" else None)
+    existing = (
+        db.query(TrainingAreaCapabilityTag)
+        .filter(
+            TrainingAreaCapabilityTag.normalised_name == norm,
+            TrainingAreaCapabilityTag.is_active == True,  # noqa: E712
+            (
+                (TrainingAreaCapabilityTag.squadron_id == squadron_id) |
+                (TrainingAreaCapabilityTag.wing_id == wing_id) |
+                (TrainingAreaCapabilityTag.scope == "global")
+            ),
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(409, detail={"error": "tag_already_exists", "existing_id": existing.id})
+    tag = TrainingAreaCapabilityTag(
+        squadron_id=squadron_id, wing_id=wing_id, scope=scope,
+        display_name=display, normalised_name=norm, is_active=True, created_by=p.user_id,
+    )
+    db.add(tag)
+    db.commit()
+    db.refresh(tag)
+    audit(db, p, object_type="TrainingAreaCapabilityTag", object_id=tag.id, action="create",
+          new={"display_name": tag.display_name, "scope": tag.scope})
+    return _capability_out(tag)
+
+
+@router.delete("/training-area-capability-tags/{tag_id}", status_code=200)
+def archive_training_area_capability_tag(
+    tag_id: str,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Archive a training-area capability tag (does not affect existing TrainingArea rows)."""
+    tag = db.get(TrainingAreaCapabilityTag, tag_id)
+    if not tag:
+        raise HTTPException(404, detail={"error": "tag_not_found"})
+    _can_create_tag(p, tag.scope, tag.wing_id, tag.squadron_id)
+    if not tag.is_active:
+        raise HTTPException(409, detail={"error": "tag_already_archived"})
+    tag.is_active = False
+    db.commit()
+    audit(db, p, object_type="TrainingAreaCapabilityTag", object_id=tag_id, action="archive")
+    return {"ok": True}
+
+
+@router.post("/training-area-capability-tags/{tag_id}/restore", status_code=200)
+def restore_training_area_capability_tag(
+    tag_id: str,
+    p: Principal = Depends(get_principal),
+    db: DBSession = Depends(get_db),
+):
+    """Restore an archived training-area capability tag."""
+    tag = db.get(TrainingAreaCapabilityTag, tag_id)
+    if not tag:
+        raise HTTPException(404, detail={"error": "tag_not_found"})
+    _can_create_tag(p, tag.scope, tag.wing_id, tag.squadron_id)
+    if tag.is_active:
+        raise HTTPException(409, detail={"error": "tag_already_active"})
+    tag.is_active = True
+    db.commit()
+    audit(db, p, object_type="TrainingAreaCapabilityTag", object_id=tag_id, action="restore")
     return {"ok": True}
 
 

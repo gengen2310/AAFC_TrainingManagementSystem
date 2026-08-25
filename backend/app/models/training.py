@@ -199,6 +199,36 @@ class SessionStatusReasonTag(Base, UUIDMixin, TimestampMixin):
     created_by: Mapped[str | None] = mapped_column(String(36))
 
 
+class ActivityTypeTag(Base, UUIDMixin, TimestampMixin):
+    """Canonical activity-importance/type reference data; user-creatable, scoped
+    to squadron/wing/global -- mirrors FacilitatorTypeTag/SessionStatusReasonTag's
+    exact shape (REM-23 continuation). Activity.activity_type stays a free-text
+    column (advisory, not a hard FK), so this table adds governance with zero
+    migration risk to existing Activity rows."""
+    __tablename__ = "activity_type_tags"
+    squadron_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
+    wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    scope: Mapped[str] = mapped_column(String(20), default="squadron")  # global / wing / squadron
+    display_name: Mapped[str] = mapped_column(String(80))
+    normalised_name: Mapped[str] = mapped_column(String(80), index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str | None] = mapped_column(String(36))
+
+
+class TrainingAreaCapabilityTag(Base, UUIDMixin, TimestampMixin):
+    """Canonical training-area capability reference data; user-creatable, scoped
+    to squadron/wing/global -- mirrors the same advisory tag pattern. TrainingArea.capabilities
+    stays a JSON column storing display_name strings (advisory, not hard FKs)."""
+    __tablename__ = "training_area_capability_tags"
+    squadron_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
+    wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    scope: Mapped[str] = mapped_column(String(20), default="squadron")  # global / wing / squadron
+    display_name: Mapped[str] = mapped_column(String(80))
+    normalised_name: Mapped[str] = mapped_column(String(80), index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_by: Mapped[str | None] = mapped_column(String(36))
+
+
 class TrainingArea(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "training_areas"
     squadron_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), index=True)
@@ -209,6 +239,7 @@ class TrainingArea(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     availability_status: Mapped[str] = mapped_column(String(20), default="available")
     notes: Mapped[str | None] = mapped_column(Text)
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
+    capabilities: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
 
 class Equipment(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):

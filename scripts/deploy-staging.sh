@@ -56,7 +56,7 @@ EXPECTED_STAGING_PW_DOMAIN="aafc-tms-planning-workspace-preview-staging.up.railw
 
 EXPECTED_BRANCH="main"
 REQUIRED_ANCESTOR="de27c42"
-REQUIRED_ALEMBIC_HEAD="d1e4f8a03b27"
+REQUIRED_ALEMBIC_HEAD="e2f3a4b5c6d7"
 
 BACKEND_GATE_TIMEOUT=600
 FRONTEND_GATE_TIMEOUT=600
@@ -428,7 +428,7 @@ staging_api_call() {
 # 11 August, 413 commits behind.
 stamp_build_commit() {
   local svc_id="$1" svc_label="$2"
-  railway variable set --set "APP_BUILD_COMMIT=${CURRENT_HEAD_FULL}" \
+  railway variable set "APP_BUILD_COMMIT=${CURRENT_HEAD_FULL}" \
     --service "$svc_id" \
     --environment "$ACTUAL_STAGING_ENV_ID" \
     --project "$EXPECTED_PROJECT_ID" \

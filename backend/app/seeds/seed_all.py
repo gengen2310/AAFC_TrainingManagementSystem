@@ -9,7 +9,7 @@ from ..models import (NationalEntity, Wing, Squadron, Flight, User, AccessCode,
                       CurriculumItem, CurriculumElement, CurriculumPhase, Facilitator, FacilitatorRankHistory,
                       TrainingArea, Equipment, ParadeNight, Session, Cadet,
                       TimingTemplate, TimingBlock, FacilitatorTypeTag, SessionStatusReasonTag,
-                      TrainingClass)
+                      ActivityTypeTag, TrainingAreaCapabilityTag, TrainingClass)
 
 _DEFAULT_ELEMENTS = [
     ("Air_Space",         "Air & Space",                "national"),
@@ -27,6 +27,19 @@ _DEFAULT_ELEMENTS = [
 # text, plus "Staff" -- Facilitator.type's real default), duplicated here
 # since reset_db() bypasses Alembic (see the curriculum-phases seed below
 # for the same, already-established reasoning).
+_DEFAULT_ACTIVITY_TYPES = ["Must Attend", "Key Event", "Optional"]
+
+_DEFAULT_TRAINING_AREA_CAPABILITIES = [
+    "Projector",
+    "Whiteboard",
+    "PA System",
+    "WiFi",
+    "Computer Terminals",
+    "Drill Floor",
+    "Outdoor Parade Space",
+    "Kitchen/Galley",
+]
+
 _DEFAULT_FACILITATOR_TYPES = [
     "Staff",
     "Officer",
@@ -374,6 +387,24 @@ def seed_all():
         ).first():
             db.add(CurriculumPhase(name=name, display_name=display_name,
                                    scope_level=scope, sort_order=sort_order, active_status=True))
+    # Seed default activity-type reference data (idempotent) — REM-23 part 3.
+    for name in _DEFAULT_ACTIVITY_TYPES:
+        norm = " ".join(name.strip().lower().split())
+        if not db.query(ActivityTypeTag).filter(
+            ActivityTypeTag.normalised_name == norm,
+            ActivityTypeTag.scope == "global",
+        ).first():
+            db.add(ActivityTypeTag(scope="global", display_name=name,
+                                   normalised_name=norm, is_active=True))
+    # Seed default training-area capability reference data (idempotent) — REM-23 part 3.
+    for name in _DEFAULT_TRAINING_AREA_CAPABILITIES:
+        norm = " ".join(name.strip().lower().split())
+        if not db.query(TrainingAreaCapabilityTag).filter(
+            TrainingAreaCapabilityTag.normalised_name == norm,
+            TrainingAreaCapabilityTag.scope == "global",
+        ).first():
+            db.add(TrainingAreaCapabilityTag(scope="global", display_name=name,
+                                             normalised_name=norm, is_active=True))
     # Seed default facilitator-type reference data (idempotent) — same reasoning
     # as the curriculum phases seed above.
     for name in _DEFAULT_FACILITATOR_TYPES:
