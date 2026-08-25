@@ -865,6 +865,35 @@ def _resource_conflicts(db: DBSession, parade_night_id: str, period_number, body
     return conflicts
 
 
+def _validate_timing_block(db: DBSession, pn, block_id: str | None) -> None:
+    """Reject a program period the parade night does not actually offer.
+
+    Session.timing_block_id is a String(36) with no database foreign key -- the
+    model says as much and defers the guarantee to "the app layer", which never
+    implemented it. Any string was accepted and stored, on create and on edit.
+
+    That matters because the block IS the row: the printed Weekly Program lays
+    sessions out by timing block. A session pointing at a block that resolves to
+    nothing never appears on the grid, and one borrowed from another template
+    appears under a period the night does not run -- both silently, with nothing
+    to explain the gap.
+    """
+    if not block_id:
+        return
+    blk = db.get(TimingBlock, block_id)
+    if blk is None:
+        raise HTTPException(400, detail={
+            "error": "unknown_timing_block",
+            "message": "That program period no longer exists. Reopen the parade night and choose one again.",
+        })
+    if pn is not None and pn.timing_template_id and blk.timing_template_id != pn.timing_template_id:
+        raise HTTPException(400, detail={
+            "error": "timing_block_not_on_this_night",
+            "message": "That program period belongs to a different timing template, "
+                       "so this parade night does not run it.",
+        })
+
+
 @router.post("/sessions")
 def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     pn = db.get(ParadeNight, body.parade_night_id)
@@ -891,6 +920,7 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
     # such a session fell through to the "Unlinked periods" footnote and never
     # appeared in the grid. Found 2026-08-26; edit_session honoured the field all
     # along, which is why this survived: anything edited once looked correct.
+    _validate_timing_block(db, pn, body.timing_block_id)
     s = Session(parade_night_id=pn.id, squadron_id=pn.squadron_id, period_number=body.period_number,
                 cadet_group=body.cadet_group, phase_at_time=body.phase_at_time, custom_title=body.custom_title,
                 expected_attendance=body.expected_attendance, status=initial_status,
@@ -963,6 +993,7 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
     s.phase_at_time = body.phase_at_time
     s.custom_title = body.custom_title
     s.expected_attendance = body.expected_attendance
+    _validate_timing_block(db, target_pn, body.timing_block_id)
     s.timing_block_id = body.timing_block_id
     _denormalise(db, s, body.curriculum_item_id, body.facilitator_id, body.training_area_id)
     s.version += 1
