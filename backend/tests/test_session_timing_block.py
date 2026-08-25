@@ -91,3 +91,56 @@ def test_editing_a_session_without_naming_the_period_keeps_it(client):
     assert r.status_code == 200, r.text
     assert _block_of(client, hdr, date, sid) == bid, \
         "editing an unrelated field must not clear the period"
+
+
+def test_a_session_cannot_be_given_a_block_that_does_not_exist(client):
+    """The model comments this field as "enforced at the app layer". It was not.
+
+    timing_block_id is a String(36) with no database FK -- the model says so
+    explicitly and defers the guarantee to the application, which never made it.
+    Any string was accepted and stored on both create and edit. A session holding
+    a block id that resolves to nothing simply never renders on the Weekly
+    Program grid, with no error anywhere to explain why.
+    """
+    hdr = login(client, "ADMIN703")
+    date, pnid, _bid = _night_with_blocks(client, hdr)
+
+    r = client.post("/api/sessions",
+                    json={"parade_night_id": pnid, "period_number": 1,
+                          "timing_block_id": "not-a-real-block"},
+                    headers=hdr)
+    assert r.status_code == 400, f"expected a rejection, got {r.status_code}"
+    assert "timing_block" in str(r.json()).lower()
+
+
+def test_a_session_cannot_borrow_a_block_from_another_night_s_template(client):
+    """A real block, but not one this night offers.
+
+    The block is the row the session prints on. One belonging to a different
+    template is not a row this night has, so the session would either vanish from
+    the grid or appear under a period the night does not run.
+    """
+    hdr = login(client, "ADMIN703")
+    _d1, pn1, _b1 = _night_with_blocks(client, hdr)
+    _d2, _pn2, b2 = _night_with_blocks(client, hdr)   # a second template entirely
+
+    r = client.post("/api/sessions",
+                    json={"parade_night_id": pn1, "period_number": 1,
+                          "timing_block_id": b2},
+                    headers=hdr)
+    assert r.status_code == 400, f"expected a rejection, got {r.status_code}"
+
+
+def test_editing_a_session_rejects_a_bogus_block_too(client):
+    """Same guarantee on the edit path, which has accepted anything all along."""
+    hdr = login(client, "ADMIN703")
+    date, pnid, bid = _night_with_blocks(client, hdr)
+    sid = client.post("/api/sessions",
+                      json={"parade_night_id": pnid, "period_number": 1,
+                            "timing_block_id": bid}, headers=hdr).json()["session_id"]
+
+    r = client.put(f"/api/sessions/{sid}",
+                   json={"parade_night_id": pnid, "period_number": 1,
+                         "timing_block_id": "not-a-real-block"}, headers=hdr)
+    assert r.status_code == 400, f"expected a rejection, got {r.status_code}"
+    assert _block_of(client, hdr, date, sid) == bid, "the rejected edit must not have changed anything"

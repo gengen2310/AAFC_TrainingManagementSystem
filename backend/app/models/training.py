@@ -111,7 +111,11 @@ class Session(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     timing_block_id: Mapped[str | None] = mapped_column(
         String(36), nullable=True, index=True
     )
-    # FK to timing_blocks.id — not a SQLAlchemy FK constraint; enforced at app layer
+    # FK to timing_blocks.id — not a SQLAlchemy FK constraint; enforced at the
+    # app layer by _validate_timing_block() in routers/training.py, on both the
+    # create and edit paths. That enforcement was missing until 2026-08-26:
+    # this comment asserted a guarantee nothing implemented, and any string was
+    # accepted and stored.
     # to avoid cascade complexity across SQLite and PostgreSQL.
     # ON DELETE behaviour: set to null when the timing template is changed.
 
