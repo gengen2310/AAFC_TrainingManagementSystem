@@ -428,7 +428,7 @@ staging_api_call() {
 # 11 August, 413 commits behind.
 stamp_build_commit() {
   local svc_id="$1" svc_label="$2"
-  railway variable set --set "APP_BUILD_COMMIT=${CURRENT_HEAD_FULL}" \
+  railway variable set "APP_BUILD_COMMIT=${CURRENT_HEAD_FULL}" \
     --service "$svc_id" \
     --environment "$ACTUAL_STAGING_ENV_ID" \
     --project "$EXPECTED_PROJECT_ID" \
