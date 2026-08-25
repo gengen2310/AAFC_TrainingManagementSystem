@@ -1874,7 +1874,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div class="ph-actions no-print">
             <span id="res-refresh-status" style="font-size:var(--fs-2xs);color:var(--muted)"></span>
             <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('res-refresh-status',async()=>{await loadData();renderRooms();})">Refresh</button>
-            <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-room')">+ Add Room</button>
+            <button class="btn btn-dk admin-el" style="display:none" onclick="openAddRoomModal()">+ Add Room</button>
             <button class="btn btn-out admin-el" style="display:none" onclick="openModal('m-add-equip')">+ Add Equipment</button>
           </div>
         </div>
@@ -3563,7 +3563,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="form-row">
         <div class="ff"><label for="act-date">Date</label><input type="date" id="act-date"></div>
         <div class="ff"><label for="act-type">Importance</label>
-          <select id="act-type" aria-label="Activity importance"><option value="Must Attend">Must Attend</option><option value="Key Event">Key Event</option><option value="Optional">Optional</option></select>
+          <select id="act-type" aria-label="Activity importance" onchange="_onActivityTypeChange(this)"><option value="Must Attend">Must Attend</option><option value="Key Event">Key Event</option><option value="Optional">Optional</option></select>
         </div>
       </div>
       <div class="ff"><label>Audience</label>
@@ -3592,7 +3592,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="form-row">
         <div class="ff" style="flex:2"><label for="ga-name">Activity Name *</label><input id="ga-name" placeholder="e.g. Drill Night"></div>
         <div class="ff"><label for="ga-type">Type</label>
-          <select id="ga-type" aria-label="Activity type"><option value="Must Attend">Must Attend</option><option value="Key Event">Key Event</option><option value="Optional" selected>Optional</option></select>
+          <select id="ga-type" aria-label="Activity type" onchange="_onActivityTypeChange(this)"><option value="Must Attend">Must Attend</option><option value="Key Event">Key Event</option><option value="Optional" selected>Optional</option></select>
         </div>
       </div>
       <div class="form-row">
@@ -3869,6 +3869,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
       </div>
       <div class="ff"><label for="room-notes">Notes</label><input id="room-notes" placeholder="Any relevant details"></div>
+      <div class="ff"><label>Capabilities</label><div id="room-capabilities" style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 0;min-height:28px"></div></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-add-room')">Cancel</button>
@@ -5102,6 +5103,8 @@ async function loadData(){
   const p_tags=api('/api/subject-area-tags').catch(()=>[]);
   const p_factypes=api('/api/facilitator-type-tags').catch(()=>[]);
   const p_reasontags=api('/api/session-status-reason-tags').catch(()=>[]);
+  const p_acttypes=api('/api/activity-type-tags').catch(()=>[]);
+  const p_captags=api('/api/training-area-capability-tags').catch(()=>[]);
   const p_pns=_apiT('/api/parade-nights'+_sqq,null,'Parade Nights');
   const p_facs=_apiT('/api/facilitators'+_sqq,null,'Facilitators');
   const p_cur=_apiT('/api/curriculum'+_sqq,null,'Curriculum');
@@ -5185,7 +5188,7 @@ async function loadData(){
     sqnData,timing,auditData,
     wov,wph,wcap,wcancel,wndel,wsqns,
     nat,natov,natcap,wings,nsqns,
-    reasontags,
+    reasontags,acttypes,captags,
   ]=await Promise.all([
     p_uicfg,p_tags,p_factypes,
     p_pns,p_facs,p_cur,p_phases,p_ta,p_eq,p_ai,p_acts,p_holidays,p_proxy,
@@ -5193,7 +5196,7 @@ async function loadData(){
     p_sqnData,p_timing,p_audit,
     p_wov,p_wph,p_wcap,p_wcancel,p_wndel,p_wsqns,
     p_nat,p_natov,p_natcap,p_wings,p_nsqns,
-    p_reasontags,
+    p_reasontags,p_acttypes,p_captags,
   ]);
 
   // Set state from resolved results
@@ -5232,7 +5235,7 @@ async function loadData(){
   // fallback _populateCurrPhases() uses for the curriculum-item form.
   S.phases=(Array.isArray(phases)&&phases.length)?phases.map(p=>({name:p.name,displayName:p.display_name})):
     ['A. Orientation','B. Initial','C. Junior','D. Intermediate','E. Senior','I. Bronze','J. Silver','K. Gold'].map(n=>({name:n,displayName:n}));
-  S.rooms=(ta||[]).map(r=>({id:r.training_area_id||r.id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||''}));
+  S.rooms=(ta||[]).map(r=>({id:r.training_area_id||r.id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||'',capabilities:r.capabilities||[]}));
   S.equip=(eq||[]).map(x=>({id:x.equipment_id||x.id,name:x.name,qty:x.quantity||x.qty,notes:x.notes||''}));
   S.actionItems=(ai||[]).map(a=>({id:a.action_id,title:a.title,description:a.description,owner:a.owner,due:a.due_date,status:a.status,severity:a.severity,source:a.source}));
   // REM-13: scope_type=squadron responses are {items:[...]}; the legacy
@@ -5252,6 +5255,9 @@ async function loadData(){
   _populateFacTypeSelect();
   S.sessionStatusReasonTags=Array.isArray(reasontags)?reasontags.filter(t=>t.is_active):[];
   _populateReasonSelect();
+  S.activityTypeTags=Array.isArray(acttypes)?acttypes.filter(t=>t.is_active):[];
+  _populateActivityTypeSelects();
+  S.trainingAreaCapabilityTags=Array.isArray(captags)?captags.filter(t=>t.is_active):[];
   S.reports={summary:repSum,readiness:repRead,coverage:repCov,facload:repFload,notdelivered:repNdel};
   S.cfg={day:'',start:'',end:'',sess:3,dur:35,addr:'',crestUrl:''};
   if(sqnData){
@@ -5377,6 +5383,40 @@ const OUTCOME_REASON_REQUIRED={
 };
 let _orResolve=null;
 // REM-23 continuation: #or-reason is now API-driven from
+// Activity Type dropdowns (#act-type, #ga-type) — REM-23 part 3.
+// Replaces hardcoded Must Attend/Key Event/Optional <option> list with
+// API-governed tags. "+" Add new affordance for admins, same as #fac-type.
+function _populateActivityTypeSelects(){
+  const tags=(S.activityTypeTags||[]);
+  const opts=tags.length
+    ? tags.map(t=>`<option value="${esc(t.display_name)}">${esc(t.display_name)}</option>`).join('')
+    : ['Must Attend','Key Event','Optional'].map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  const addOpt=canWriteSquadron()?'<option value="__add_new__">+ Add new type…</option>':'';
+  ['act-type','ga-type'].forEach(id=>{
+    const sel=document.getElementById(id); if(!sel)return;
+    const prior=sel.value;
+    sel.innerHTML=opts+addOpt;
+    if(prior && [...sel.options].some(o=>o.value===prior)) sel.value=prior;
+    else if(tags.length) sel.value=tags.find(t=>t.normalised_name==='optional')?.display_name||tags[0].display_name;
+    else sel.value='Optional';
+  });
+}
+async function _onActivityTypeChange(sel){
+  if(sel.value!=='__add_new__')return;
+  const name=await promptText('New activity type','Type name',{okLabel:'Create'});
+  if(!name){ sel.value=S.activityTypeTags[0]?.display_name||'Optional'; return; }
+  try{
+    const t=await api('/api/activity-type-tags',{method:'POST',body:JSON.stringify({display_name:name})});
+    S.activityTypeTags=[...(S.activityTypeTags||[]),t];
+    _populateActivityTypeSelects();
+    ['act-type','ga-type'].forEach(id=>{const s=document.getElementById(id);if(s)s.value=t.display_name;});
+    showToast('Type "'+t.display_name+'" created.');
+  }catch(e){
+    showToast(e.code==='tag_already_exists'?'That type already exists.':'Could not create type: '+apiErr(e),true);
+    sel.value=S.activityTypeTags[0]?.display_name||'Optional';
+  }
+}
+
 // /api/session-status-reason-tags (same governed reference-data pattern as
 // #fac-type/Facilitator Type) instead of a hardcoded <option> list. "Other"
 // is always appended and is deliberately NOT part of the governed tag set
@@ -6705,6 +6745,14 @@ const _REFDATA_TYPES=[
   {key:'reason',label:'Session Status Reasons',listUrl:'/api/session-status-reason-tags',createUrl:'/api/session-status-reason-tags',
    archiveUrl:id=>`/api/session-status-reason-tags/${id}`,archiveMethod:'DELETE',
    restoreUrl:id=>`/api/session-status-reason-tags/${id}/restore`,
+   idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
+  {key:'acttype',label:'Activity Types',listUrl:'/api/activity-type-tags',createUrl:'/api/activity-type-tags',
+   archiveUrl:id=>`/api/activity-type-tags/${id}`,archiveMethod:'DELETE',
+   restoreUrl:id=>`/api/activity-type-tags/${id}/restore`,
+   idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
+  {key:'roomcap',label:'Training Area Capabilities',listUrl:'/api/training-area-capability-tags',createUrl:'/api/training-area-capability-tags',
+   archiveUrl:id=>`/api/training-area-capability-tags/${id}`,archiveMethod:'DELETE',
+   restoreUrl:id=>`/api/training-area-capability-tags/${id}/restore`,
    idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
 ];
 async function _renderRefData(){
@@ -13749,10 +13797,36 @@ function renderRooms(){
       :(canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="editEquip('${eq.id}')">Edit</button> <button class="btn btn-xs btn-red" aria-label="Archive equipment" onclick="delEquip('${eq.id}')">×</button>`:'—')}</td>
   </tr>`).join('')||`<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:14px">No ${showEquip?'archived ':''}equipment.</td></tr>`;
 }
+function openAddRoomModal(){
+  editRoomId=null;
+  document.getElementById('room-modal-title').textContent='+ Add Room / Training Area';
+  document.getElementById('room-name').value='';
+  document.getElementById('room-cap').value='20';
+  document.getElementById('room-type').value='Indoor';
+  document.getElementById('room-notes').value='';
+  _renderRoomCapabilities([]);
+  openModal('m-add-room');
+}
+function _renderRoomCapabilities(selected){
+  // Render capability checkboxes from S.trainingAreaCapabilityTags.
+  const caps=S.trainingAreaCapabilityTags||[];
+  const sel=new Set(Array.isArray(selected)?selected:[]);
+  const wrap=document.getElementById('room-capabilities'); if(!wrap)return;
+  if(!caps.length){ wrap.innerHTML='<span style="font-size:var(--fs-xs);color:var(--muted)">No capabilities defined yet.</span>'; return; }
+  wrap.innerHTML=caps.map(c=>{
+    const checked=sel.has(c.display_name)?'checked':'';
+    return `<label style="display:inline-flex;align-items:center;gap:4px;font-size:var(--fs-xs);cursor:pointer;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:3px 8px"><input type="checkbox" value="${esc(c.display_name)}" ${checked} style="margin:0"> ${esc(c.display_name)}</label>`;
+  }).join('');
+}
+function _collectRoomCapabilities(){
+  const wrap=document.getElementById('room-capabilities'); if(!wrap)return[];
+  return [...wrap.querySelectorAll('input[type=checkbox]:checked')].map(cb=>cb.value);
+}
 async function saveRoom(){
   const name=document.getElementById('room-name').value.trim();
   if(!name){showToast('Room name required.',true);return;}
-  const payload={name,capacity:+document.getElementById('room-cap').value||null,type:document.getElementById('room-type').value||null,notes:document.getElementById('room-notes').value||null};
+  const capabilities=_collectRoomCapabilities();
+  const payload={name,capacity:+document.getElementById('room-cap').value||null,type:document.getElementById('room-type').value||null,notes:document.getElementById('room-notes').value||null,capabilities};
   try{
     const isEditRoom=!!editRoomId;
     if(editRoomId){ await api('/api/training-areas/'+editRoomId,{method:'PATCH',body:JSON.stringify(payload)}); editRoomId=null; }
@@ -13766,6 +13840,7 @@ function editRoom(id){
   document.getElementById('room-modal-title').textContent='Edit Room';
   document.getElementById('room-name').value=r.name;document.getElementById('room-cap').value=r.capacity;
   document.getElementById('room-type').value=r.type;document.getElementById('room-notes').value=r.notes||'';
+  _renderRoomCapabilities(r.capabilities||[]);
   openModal('m-add-room');
 }
 async function delRoom(id){
