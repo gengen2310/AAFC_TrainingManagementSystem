@@ -67,7 +67,7 @@ _SQUADRON_STEP_KEYS = {
     "planning_year_active", "training_classes_created", "facilitators_added", "training_areas_added",
     "equipment_added", "timing_template_confirmed", "crest_set", "cadets_added", "holidays_configured",
     "cea_imported", "activities_classified", "anchor_events_reviewed", "parade_nights_generated",
-    "parade_night_published", "curriculum_coverage", "flights_created",
+    "parade_night_published", "curriculum_coverage",
     "sessions_have_periods",   # added 2026-08-23
 }
 
@@ -78,37 +78,38 @@ def test_steps_list_scoped_to_squadron_only_for_sqn_admin(client):
     d = r.json()
     step_keys = {s["key"] for s in d["steps"]}
     assert step_keys == _SQUADRON_STEP_KEYS
-    assert len(d["steps"]) == 17  # 15 original + training_classes_created + sessions_have_periods
+    assert len(d["steps"]) == 16  # 15 original + training_classes_created + sessions_have_periods,
+                                  # minus flights_created (removed 2026-08-25 at user request)
 
 
-def test_flights_created_step_is_marked_optional(client):
-    # 703's seed data has 2 Flights (Alpha/Bravo) -- not an exact-count
-    # assertion, since other tests in the full suite legitimately create
-    # more Flights for 703 (shared DB across the whole session), matching
-    # this file's own established >= pattern elsewhere. This only checks the
-    # "optional" flag is present and the count is real, not the emptiness
-    # case (that needs a fresh squadron, see below).
+def test_flights_step_is_no_longer_in_the_checklist(client):
+    """Removed 2026-08-25 at the user's request: "remove - Organise cadets into
+    flights (0)".
+
+    Flight is a local cadet-organisation grouping, not a tenancy level and not a
+    setup prerequisite (Flight model docstring, architecture.md). Listing it as a
+    step -- even an optional one -- implied it was part of getting set up.
+    """
+    d = client.get("/api/setup/status", headers=_sqn_admin_703(client)).json()
+    keys = {st["key"] for st in d["steps"]}
+    assert "flights_created" not in keys, "the flights step should no longer be a checklist item"
+
+
+def test_removing_the_flights_step_did_not_remove_the_capability(client):
+    """USER-AUTHORISED REMOVAL of a checklist step, not of a feature.
+
+    703's seed has Alpha/Bravo flights. The count stays in the squadron block so
+    anything reporting on flights still works, and the flights themselves are
+    still managed in Unit Setup.
+    """
     hdr = _sqn_admin_703(client)
     d = client.get("/api/setup/status", headers=hdr).json()
-    step = next(s for s in d["steps"] if s["key"] == "flights_created")
-    assert step.get("optional") is True
-    assert step["done"] is True
+    assert "flights_created" in d["squadron"], "the flights count must still be reported"
     assert d["squadron"]["flights_created"] >= 2
 
-
-def test_flights_created_false_and_excluded_from_complete_for_a_squadron_with_none(client):
-    hdr = _sysadmin(client)
-    sqn_id, _ = _fresh_squadron_with_active_year(client, hdr, "FLWG1", "FL01")
-    client.post("/api/proxy/exit", headers=hdr)
-    d = client.get(f"/api/setup/status?squadron_id={sqn_id}", headers=hdr).json()
-    step = next(s for s in d["steps"] if s["key"] == "flights_created")
-    assert step["done"] is False
-    assert step.get("optional") is True
-    # Being optional means it must never be able to block `complete` on its
-    # own -- assert this directly rather than trusting the flag's label.
-    non_optional_steps = [s for s in d["steps"] if not s.get("optional")]
-    would_be_complete_ignoring_optional = all(s["done"] for s in non_optional_steps)
-    assert d["complete"] == would_be_complete_ignoring_optional
+    r = client.get("/api/flights", headers=hdr)
+    assert r.status_code == 200, "the flights endpoint must still serve"
+    assert len(r.json()) >= 2, "the seeded flights must still exist"
 
 
 def test_squadron_id_query_param_lets_national_admin_view_a_squadron(client):

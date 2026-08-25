@@ -2040,11 +2040,15 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
                    used to sit here said "Default sessions per night", which overrode
                    the visible label and announced something different from what is
                    on screen (WCAG 2.5.3, Label in Name). -->
-              <select id="s-sess">
+              <select id="s-sess" onchange="_renderSessionStructureNote()">
                 <option value="1">1 Session</option><option value="2">2 Sessions</option><option value="3" selected>3 Sessions</option>
               </select>
             </div>
           </div>
+          <!-- Asked three times what this does with the timing template. The rule
+               was written out above and did not land, so the page now states the
+               OUTCOME for this squadron rather than the rule. -->
+          <div id="s-sess-effect" class="muted" style="font-size:var(--fs-2xs);margin:-2px 0 10px"></div>
           <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
             <button class="btn btn-dk admin-el" onclick="saveSettings()">Save Settings</button>
             <span id="settings-msg" style="font-size:var(--fs-xs);font-weight:700"></span>
@@ -5786,6 +5790,7 @@ function bootApp(){
   const setVal=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v;};
   setVal('s-sqn',S.scopeName||info.name); setVal('s-addr',S.cfg.addr||''); setVal('s-pday',S.cfg.day||'');
   setVal('s-start',S.cfg.start||''); setVal('s-end',S.cfg.end||''); setVal('s-sess',S.cfg.sess||3);
+  _renderSessionStructureNote();
   setVal('s-crest',S.cfg.crestUrl||''); setVal('s-unit-type',S.cfg.unitType||'standard_squadron'); _renderCrestPreview();
   const _utSel = document.getElementById('s-unit-type');
   const _utNote = document.getElementById('s-unit-type-note');
@@ -9849,11 +9854,39 @@ function addPN(){
     document.getElementById('pn-clash-msg').textContent=clashes.join(' | ');
     document.getElementById('pn-clash-warn').style.display='flex';
   }
-  S.pendingSessions=sessions; // captured for reference; sessions are added against the created night
+  // The session rows the user filled in used to be collected here, clash-checked,
+  // assigned to S.pendingSessions and then silently discarded -- nothing ever read
+  // that variable, despite the comment claiming otherwise. Reported 2026-08-25 as
+  // "did input some data it did not show on the parade night". They are now
+  // created against the night, reusing _sessBuildBody so the field mapping cannot
+  // drift from the edit path.
   api('/api/parade-nights',{method:'POST',body:JSON.stringify({date,term,session_count:nsess,parade_type:notes||'normal'})})
     .then(async(r)=>{
+      const pnId=r&&r.parade_night_id;
+      const failures=[];
+      if(pnId){
+        for(let i=0;i<sessions.length;i++){
+          const s=sessions[i];
+          // An untouched row carries no content; creating it would add a blank session.
+          if(!s.exp&&!s.facId&&!s.room)continue;
+          s.__pnId=pnId; s.period_number=i+1;
+          try{ await api('/api/sessions',{method:'POST',body:_sessBuildBody(s)}); }
+          catch(e){ failures.push(`Period ${i+1}: ${apiErr(e)}`); }
+        }
+      }
       await reloadAndRender(); closeModal('m-add-pn');
       document.getElementById('pn-date').value='';document.getElementById('pn-notes').value='';document.getElementById('pn-slots').innerHTML='';
+      if(failures.length){
+        showToast('Parade night created, but some sessions were not saved — '+failures.join('; '),true);
+      }else if(r&&r.linked_to_planning_year===false){
+        // The API reports this and nothing read it, so a night that will not appear
+        // in Planning Workspace looked like a clean success.
+        showToast('Parade night created, but it is not attached to a training year, '
+                 +'so it will not appear in Planning Workspace or the Weekly Program. '
+                 +'Check that an active training year covers '+date+'.',true);
+      }else{
+        showToast('Parade night created.');
+      }
     })
     .catch(e=>showToast(apiErr(e),true));
 }
@@ -9863,6 +9896,36 @@ function addPN(){
 // nothing in either frontend could ever set one -- every session fell through to
 // the "Unlinked periods" footnote. These are the blocks a night can offer:
 // its template's Training Period blocks, in order.
+function _effectiveTimingTemplate(){
+  // The template in force today: the most recent one whose effective_from has
+  // passed and whose effective_to (if any) has not. Mirrors _effective_template()
+  // in backend/app/routers/timing.py -- if that changes, this must follow.
+  const today=new Date().toISOString().slice(0,10);
+  return ((typeof S!=='undefined'&&S.timingTemplates)||[])
+    .filter(t=>t.active_status!==false && (t.effective_from||'') <= today
+               && (!t.effective_to || t.effective_to >= today))
+    .sort((a,b)=>String(b.effective_from||'').localeCompare(String(a.effective_from||'')))[0]||null;
+}
+function _renderSessionStructureNote(){
+  const el=document.getElementById('s-sess-effect');
+  if(!el)return;
+  const fallback=parseInt((document.getElementById('s-sess')||{}).value,10)||3;
+  const tpl=_effectiveTimingTemplate();
+  const periods=tpl?(tpl.blocks||[]).filter(b=>b.is_instructional_period).length:0;
+  if(tpl&&periods>0){
+    el.innerHTML='In effect now: <b>'+esc(tpl.name||'your timing template')+'</b> defines <b>'+periods+
+      ' training period'+(periods===1?'':'s')+'</b>, so new parade nights get '+periods+
+      '. This setting is not used while that template applies.';
+  }else if(tpl){
+    el.innerHTML='In effect now: <b>'+esc(tpl.name||'your timing template')+
+      '</b> defines no training periods, so this setting is used — new parade nights get <b>'+
+      fallback+'</b>.';
+  }else{
+    el.innerHTML='No timing template covers today, so this setting is used — new parade nights get <b>'+
+      fallback+'</b>.';
+  }
+}
+
 function _pnPeriodBlocks(pn){
   if(!pn||!pn.timing_template_id) return [];
   const tpl=((typeof S!=='undefined'&&S.timingTemplates)||[])
