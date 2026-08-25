@@ -435,6 +435,72 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
     return {"ok": True, "parade_night_id": pn.id, "linked_to_planning_year": pd_linked is not None}
 
 
+def _year_for_date(db: DBSession, squadron_id: str, date: str):
+    """The active PlanningYear a parade night on `date` belongs to.
+
+    Reported 2026-08-25: a parade night created in TMS did not appear in Planning
+    Workspace, the Weekly Program or the calendar. This picked
+    `order_by(year.desc()).first()` -- the highest-numbered active year -- and
+    never looked at the date. The moment a squadron has two active years, which
+    happens as soon as next year's is created, every new night attached to the
+    newest one regardless of when it fell. Planning Workspace builds its canvas
+    from ParadeDate rows joined on planning_year_id, so opening the year you
+    scheduled in showed nothing.
+
+    Resolution order, most specific first:
+
+      1. An active year whose EXISTING parade dates span this date. PlanningYear
+         has no start/end column -- its span is only ever implied by the dates it
+         holds -- so this is the closest thing to the user's own definition of
+         the year, and it is correct whether the squadron runs calendar years or
+         July-June ones.
+      2. An active year numbered the same as the date's calendar year. Needed for
+         a year created moments ago that has no dates yet, which is exactly the
+         reported case. Calendar alignment is what this system actually produces:
+         a freshly seeded 703 SQN year 2026 spans 2026-01-30 to 2026-12-11.
+      3. The only active year, if there is exactly one. No ambiguity to resolve.
+      4. None -- the caller reports the night as unlinked rather than guessing.
+
+    Never reaches into a wing or national scoped year: unit_id must match.
+    """
+    from ..models.planning import ParadeDate, PlanningYear
+    from sqlalchemy import func
+
+    years = (
+        db.query(PlanningYear)
+        .filter(PlanningYear.unit_id == squadron_id,
+                PlanningYear.active_status == True)  # noqa: E712
+        .order_by(PlanningYear.year.desc())
+        .all()
+    )
+    if not years:
+        return None
+
+    # 1. spanned by the year's own parade dates
+    for y in years:
+        bounds = db.query(func.min(ParadeDate.parade_date),
+                          func.max(ParadeDate.parade_date)) \
+                   .filter(ParadeDate.planning_year_id == y.id).first()
+        if bounds and bounds[0] and bounds[0] <= date <= bounds[1]:
+            return y
+
+    # 2. calendar-year match
+    try:
+        cal = int(str(date)[:4])
+    except (TypeError, ValueError):
+        cal = None
+    if cal is not None:
+        for y in years:
+            if y.year == cal:
+                return y
+
+    # 3. unambiguous single year
+    if len(years) == 1:
+        return years[0]
+
+    return None
+
+
 def _find_or_create_parade_date_for_night(db: DBSession, pn: "ParadeNight", term: str | None = None):
     """REM-129/REM-34: Planning Workspace's main canvas/command-centre view
     (and PlanningNotice, which FKs to ParadeDate, not ParadeNight) is built
@@ -464,12 +530,7 @@ def _find_or_create_parade_date_for_night(db: DBSession, pn: "ParadeNight", term
     if existing_link:
         return existing_link
 
-    active_year = (
-        db.query(PlanningYear)
-        .filter(PlanningYear.unit_id == pn.squadron_id, PlanningYear.active_status == True)  # noqa: E712
-        .order_by(PlanningYear.year.desc())
-        .first()
-    )
+    active_year = _year_for_date(db, pn.squadron_id, pn.date)
     if not active_year:
         return None
 
@@ -824,9 +885,16 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
     if initial_status not in ("draft", "planned"):
         raise HTTPException(400, detail={"error": "invalid_initial_status",
                                          "message": "New sessions must be created with status 'draft' or 'planned'."})
+    # timing_block_id was declared on SessionIn and never written here, so a
+    # session created with a program period silently had none. The printed
+    # Weekly Program lays sessions out BY block -- the block is the row -- so
+    # such a session fell through to the "Unlinked periods" footnote and never
+    # appeared in the grid. Found 2026-08-26; edit_session honoured the field all
+    # along, which is why this survived: anything edited once looked correct.
     s = Session(parade_night_id=pn.id, squadron_id=pn.squadron_id, period_number=body.period_number,
                 cadet_group=body.cadet_group, phase_at_time=body.phase_at_time, custom_title=body.custom_title,
-                expected_attendance=body.expected_attendance, status=initial_status, created_by=p.user_id)
+                expected_attendance=body.expected_attendance, status=initial_status,
+                timing_block_id=body.timing_block_id, created_by=p.user_id)
     _denormalise(db, s, body.curriculum_item_id, body.facilitator_id, body.training_area_id)
     db.add(s); db.commit()
     _recompute(db, pn)

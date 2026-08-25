@@ -2040,11 +2040,15 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
                    used to sit here said "Default sessions per night", which overrode
                    the visible label and announced something different from what is
                    on screen (WCAG 2.5.3, Label in Name). -->
-              <select id="s-sess">
+              <select id="s-sess" onchange="_renderSessionStructureNote()">
                 <option value="1">1 Session</option><option value="2">2 Sessions</option><option value="3" selected>3 Sessions</option>
               </select>
             </div>
           </div>
+          <!-- Asked three times what this does with the timing template. The rule
+               was written out above and did not land, so the page now states the
+               OUTCOME for this squadron rather than the rule. -->
+          <div id="s-sess-effect" class="muted" style="font-size:var(--fs-2xs);margin:-2px 0 10px"></div>
           <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
             <button class="btn btn-dk admin-el" onclick="saveSettings()">Save Settings</button>
             <span id="settings-msg" style="font-size:var(--fs-xs);font-weight:700"></span>
@@ -5109,6 +5113,14 @@ async function loadData(){
   const p_facs=_apiT('/api/facilitators'+_sqq,null,'Facilitators');
   const p_cur=_apiT('/api/curriculum'+_sqq,null,'Curriculum');
   const p_phases=_apiT('/api/curriculum/phases',null,'Curriculum phases');
+  // Custom training phases are ad-hoc scheduling groups (Wing Band, Biathlon
+  // Team). They had a full CRUD screen in Unit Setup and NOTHING read them --
+  // reported 2026-08-25 as "did not show up in the Phase in TMS". Loaded here
+  // so a session can be scheduled against one. Deliberately kept out of
+  // /api/curriculum/phases: that list also backs the Training Class stage
+  // picker, where training_stage_id is a FK to curriculum_phases.id, so a
+  // custom phase offered there would violate it.
+  const p_customph=api('/api/custom-training-phases').catch(()=>[]);
   const p_ta=_apiT('/api/training-areas',null,'Training Areas');
   const p_eq=_apiT('/api/equipment',null,'Equipment');
   const p_ai=_apiT('/api/action-items',null,'Action Items');
@@ -5235,6 +5247,16 @@ async function loadData(){
   // fallback _populateCurrPhases() uses for the curriculum-item form.
   S.phases=(Array.isArray(phases)&&phases.length)?phases.map(p=>({name:p.name,displayName:p.display_name})):
     ['A. Orientation','B. Initial','C. Junior','D. Intermediate','E. Senior','I. Bronze','J. Silver','K. Gold'].map(n=>({name:n,displayName:n}));
+  // Appended, not merged: S.phases feeds the SESSION phase pickers only, where the
+  // value is a name string stored as Session.phase_at_time. The Training Class and
+  // curriculum-item pickers call /api/curriculum/phases directly and are untouched.
+  const _cph=await p_customph.catch(()=>[]);
+  if(Array.isArray(_cph)&&_cph.length){
+    S.customPhases=_cph.map(c=>({name:c.name,displayName:c.name+' (custom)'}));
+    S.phases=S.phases.concat(S.customPhases);
+  }else{ S.customPhases=[]; }
+  // `capabilities` comes from REM-23 (Training Area Capability reference data) on
+  // main; kept alongside the custom-phase load, which touches a different key.
   S.rooms=(ta||[]).map(r=>({id:r.training_area_id||r.id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||'',capabilities:r.capabilities||[]}));
   S.equip=(eq||[]).map(x=>({id:x.equipment_id||x.id,name:x.name,qty:x.quantity||x.qty,notes:x.notes||''}));
   S.actionItems=(ai||[]).map(a=>({id:a.action_id,title:a.title,description:a.description,owner:a.owner,due:a.due_date,status:a.status,severity:a.severity,source:a.source}));
@@ -5826,6 +5848,7 @@ function bootApp(){
   const setVal=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v;};
   setVal('s-sqn',S.scopeName||info.name); setVal('s-addr',S.cfg.addr||''); setVal('s-pday',S.cfg.day||'');
   setVal('s-start',S.cfg.start||''); setVal('s-end',S.cfg.end||''); setVal('s-sess',S.cfg.sess||3);
+  _renderSessionStructureNote();
   setVal('s-crest',S.cfg.crestUrl||''); setVal('s-unit-type',S.cfg.unitType||'standard_squadron'); _renderCrestPreview();
   const _utSel = document.getElementById('s-unit-type');
   const _utNote = document.getElementById('s-unit-type-note');
@@ -9306,7 +9329,7 @@ function buildPNCard(pn){
       <div style="display:flex;gap:6px;align-items:center" class="no-print">
         ${allDel?stBadge('delivered'):stBadge('planned')}
         ${pn.published?'<span class="badge b-ok" title="Weekly Program published">Published</span>':''}
-        <button class="btn btn-xs btn-sky" onclick="showPNDetail('${pn.date}')">Detail</button>
+        <button class="btn btn-xs btn-sky" onclick="showPNDetail('${pn.date}')" title="Open this parade night to edit its sessions, facilitators, rooms and periods">Open / edit</button>
         ${canWriteSquadron()?`<button class="btn btn-xs btn-out" aria-expanded="false" aria-controls="pnmore-${esc(pn.id)}" title="More actions for ${esc(fmtDL(pn.date))}" onclick="togglePNMore(this,'${esc(pn.id)}')">More ▾</button>`:''}
         ${canWriteSquadron()?`<span class="pn-more" id="pnmore-${esc(pn.id)}">
           ${tplName?`<button class="btn btn-xs" onclick="openPNTimingOverrideModal('${esc(pn.id)}')" title="Change template">📋 ${esc(tplName)} ▾</button>`:`<button class="btn btn-xs" style="color:var(--muted)" onclick="openPNTimingOverrideModal('${esc(pn.id)}')" title="Set template">+ Template</button>`}
@@ -9897,11 +9920,39 @@ function addPN(){
     document.getElementById('pn-clash-msg').textContent=clashes.join(' | ');
     document.getElementById('pn-clash-warn').style.display='flex';
   }
-  S.pendingSessions=sessions; // captured for reference; sessions are added against the created night
+  // The session rows the user filled in used to be collected here, clash-checked,
+  // assigned to S.pendingSessions and then silently discarded -- nothing ever read
+  // that variable, despite the comment claiming otherwise. Reported 2026-08-25 as
+  // "did input some data it did not show on the parade night". They are now
+  // created against the night, reusing _sessBuildBody so the field mapping cannot
+  // drift from the edit path.
   api('/api/parade-nights',{method:'POST',body:JSON.stringify({date,term,session_count:nsess,parade_type:notes||'normal'})})
     .then(async(r)=>{
+      const pnId=r&&r.parade_night_id;
+      const failures=[];
+      if(pnId){
+        for(let i=0;i<sessions.length;i++){
+          const s=sessions[i];
+          // An untouched row carries no content; creating it would add a blank session.
+          if(!s.exp&&!s.facId&&!s.room)continue;
+          s.__pnId=pnId; s.period_number=i+1;
+          try{ await api('/api/sessions',{method:'POST',body:_sessBuildBody(s)}); }
+          catch(e){ failures.push(`Period ${i+1}: ${apiErr(e)}`); }
+        }
+      }
       await reloadAndRender(); closeModal('m-add-pn');
       document.getElementById('pn-date').value='';document.getElementById('pn-notes').value='';document.getElementById('pn-slots').innerHTML='';
+      if(failures.length){
+        showToast('Parade night created, but some sessions were not saved — '+failures.join('; '),true);
+      }else if(r&&r.linked_to_planning_year===false){
+        // The API reports this and nothing read it, so a night that will not appear
+        // in Planning Workspace looked like a clean success.
+        showToast('Parade night created, but it is not attached to a training year, '
+                 +'so it will not appear in Planning Workspace or the Weekly Program. '
+                 +'Check that an active training year covers '+date+'.',true);
+      }else{
+        showToast('Parade night created.');
+      }
     })
     .catch(e=>showToast(apiErr(e),true));
 }
@@ -9911,6 +9962,36 @@ function addPN(){
 // nothing in either frontend could ever set one -- every session fell through to
 // the "Unlinked periods" footnote. These are the blocks a night can offer:
 // its template's Training Period blocks, in order.
+function _effectiveTimingTemplate(){
+  // The template in force today: the most recent one whose effective_from has
+  // passed and whose effective_to (if any) has not. Mirrors _effective_template()
+  // in backend/app/routers/timing.py -- if that changes, this must follow.
+  const today=new Date().toISOString().slice(0,10);
+  return ((typeof S!=='undefined'&&S.timingTemplates)||[])
+    .filter(t=>t.active_status!==false && (t.effective_from||'') <= today
+               && (!t.effective_to || t.effective_to >= today))
+    .sort((a,b)=>String(b.effective_from||'').localeCompare(String(a.effective_from||'')))[0]||null;
+}
+function _renderSessionStructureNote(){
+  const el=document.getElementById('s-sess-effect');
+  if(!el)return;
+  const fallback=parseInt((document.getElementById('s-sess')||{}).value,10)||3;
+  const tpl=_effectiveTimingTemplate();
+  const periods=tpl?(tpl.blocks||[]).filter(b=>b.is_instructional_period).length:0;
+  if(tpl&&periods>0){
+    el.innerHTML='In effect now: <b>'+esc(tpl.name||'your timing template')+'</b> defines <b>'+periods+
+      ' training period'+(periods===1?'':'s')+'</b>, so new parade nights get '+periods+
+      '. This setting is not used while that template applies.';
+  }else if(tpl){
+    el.innerHTML='In effect now: <b>'+esc(tpl.name||'your timing template')+
+      '</b> defines no training periods, so this setting is used — new parade nights get <b>'+
+      fallback+'</b>.';
+  }else{
+    el.innerHTML='No timing template covers today, so this setting is used — new parade nights get <b>'+
+      fallback+'</b>.';
+  }
+}
+
 function _pnPeriodBlocks(pn){
   if(!pn||!pn.timing_template_id) return [];
   const tpl=((typeof S!=='undefined'&&S.timingTemplates)||[])
@@ -10320,20 +10401,17 @@ async function savePNDetail(ds,cnt){
       const facId=document.getElementById('d-fa-'+i)?.value||null;
       const roomName=document.getElementById('d-rm-'+i)?.value||'';
       const phase=document.getElementById('d-ph-'+i)?.value||s.phase||'B. Initial';
-      const ci=S.curr.find(c=>c.title===expTitle);
-      const room=S.rooms.find(r=>r.name===roomName);
-      // TB-1: send the program period. PUT replaces the session, so omitting
+          // TB-1: send the program period. PUT replaces the session, so omitting
       // this cleared timing_block_id on every save -- latent until something
       // could set it.
       const tbEl=document.getElementById('d-tb-'+i);
-      const body={
-        parade_night_id:pn.id, period_number:s.period_number||i+1,
-        phase_at_time:phase, curriculum_item_id:ci?ci.id:null,
-        facilitator_id:facId||null, training_area_id:room?room.id:null,
-        custom_title:expTitle&&!ci?expTitle:null,
-        timing_block_id: tbEl ? (tbEl.value||null) : (s.timingBlockId||null)
-      };
-      if(newSt&&newSt!==s.status){ body.status=newSt; body.reason=reason||null; }
+      const body=_sessBuildBody({
+        __pnId:pn.id, period_number:s.period_number||i+1,
+        phase:phase, exp:expTitle, facId:facId, room:roomName,
+        // this screen offers a period selector, so the DOM value wins over the
+        // session's stored one
+        timingBlockId: tbEl ? (tbEl.value||null) : (s.timingBlockId||null),
+      }, (newSt&&newSt!==s.status) ? {status:newSt, reason:reason||null} : undefined);
       // Single atomic PUT: fields + status transition committed together server-side —
       // no partial-update window between a field save and a separate status save.
       //
@@ -10658,8 +10736,6 @@ async function saveSessEdit(){
   const expTitle=document.getElementById('qe-ex').value;
   const facId=document.getElementById('qe-fa').value||null;
   const roomName=document.getElementById('qe-rm').value;
-  const ci=S.curr.find(c=>c.title===expTitle);
-  const room=S.rooms.find(r=>r.name===roomName);
   const sessErrEl=document.getElementById('sess-edit-err');
   // Collect the reason (if this transition needs one) BEFORE saving anything, so
   // cancelling the reason panel leaves the session completely untouched rather than
@@ -10671,13 +10747,17 @@ async function saveSessEdit(){
   }
   if(sessErrEl){sessErrEl.textContent='Saving…';sessErrEl.style.color='var(--muted)';}
   try{
-    const body={
-      parade_night_id:pn.id, period_number:s.period_number||editSessRef.idx+1,
-      phase_at_time:s.phase||'B. Initial', curriculum_item_id:ci?ci.id:null,
-      facilitator_id:facId||null, training_area_id:room?room.id:null,
-      custom_title:expTitle&&!ci?expTitle:null
-    };
-    if(newSt!==s.status){ body.status=newSt; body.reason=reason||null; }
+    // Built by _sessBuildBody() rather than by hand. This copy omitted
+    // timing_block_id, and PUT replaces the whole session, so every quick edit
+    // silently cleared the session's program period and dropped it out of the
+    // printed Weekly Program. Two other copies of this object carried a comment
+    // warning about exactly that; writing the warning twice did not stop the
+    // third copy getting it wrong, which is why there is now only one.
+    const body=_sessBuildBody({
+      __pnId:pn.id, period_number:s.period_number||editSessRef.idx+1,
+      phase:s.phase, exp:expTitle, facId:facId, room:roomName,
+      timingBlockId:s.timingBlockId,
+    }, (newSt!==s.status) ? {status:newSt, reason:reason||null} : undefined);
     // Single atomic PUT — see savePNDetail()'s comment for why this replaced the
     // previous separate PUT-then-POST(/status) two-call sequence.
     await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify(body)});
@@ -11426,6 +11506,15 @@ async function doCreatePhaseInline(){
     if(sel)sel.value=r.name||name;
     document.getElementById('c-phase-new').style.display='none';
     nameInput.value='';
+    // POST /curriculum/phases is idempotent on name+scope and returns the existing
+    // row with existed:true. Nothing read that, so a second stage with a name
+    // already in use silently selected the first one and looked like "you can only
+    // create one training stage" (reported 2026-08-25).
+    if(r&&r.existed){
+      showToast('A training stage named "'+name+'" already exists at this level, so it was selected rather than created again.',true);
+    }else{
+      showToast('Training stage created.');
+    }
   }catch(e){msgEl.textContent=apiErr(e);}
 }
 function openAddCurr(){

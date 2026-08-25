@@ -77,10 +77,20 @@ def _make_curriculum_item(client, hdr, code, phase):
 _next_day_offset = [400]  # a range this file owns exclusively, clear of every other file's literals
 
 
-def _make_session(client, hdr, curriculum_item_id, status=None, training_class_ids=None):
+def _make_session(client, hdr, curriculum_item_id, status=None, training_class_ids=None, year=None):
     offset = _next_day_offset[0]
     _next_day_offset[0] += 3
-    candidate = date(2050, 1, 1) + timedelta(days=offset)
+    # The parade night must fall inside the planning year it belongs to. These
+    # dates used to be pinned to 2050 while the year came from next_test_year(),
+    # and they linked anyway only because the old auto-link ignored the date and
+    # took the highest-numbered active year -- the defect reported on 2026-08-25.
+    #
+    # The offset is wrapped into the year: _next_day_offset starts at 400, and
+    # 400 days past 1 January lands in the FOLLOWING year, which would put every
+    # night outside the year it is supposed to belong to. Each test uses its own
+    # next_test_year(), so wrapped offsets cannot collide across tests, and the
+    # step of 3 keeps them distinct within one.
+    candidate = date(year or 2050, 1, 1) + timedelta(days=offset % 300)
     if candidate.weekday() == 4:
         candidate += timedelta(days=1)
     target_date = candidate.isoformat()
@@ -163,7 +173,7 @@ def test_no_classes_for_stage_gives_empty_breakdown_even_when_scheduled(client):
     year = _make_year(client, hdr, next_test_year())
     _stage_id, stage_name = _make_stage(client, hdr, year["unit_id"])
     ci = _make_curriculum_item(client, hdr, "M05-B", stage_name)
-    _make_session(client, hdr, ci, status="delivered")
+    _make_session(client, hdr, ci, status="delivered", year=year["year"])
 
     missions = _get_missions(client, hdr, year["planning_year_id"])
     m = _find_mission(missions, ci)
@@ -186,8 +196,8 @@ def test_class_breakdown_splits_by_session_audience(client):
 
     # Delivered to class 1 only; class 2 has no session at all; one further
     # session is scheduled but deliberately left with no audience assignment.
-    _make_session(client, hdr, ci, status="delivered", training_class_ids=[c1])
-    _make_session(client, hdr, ci, status="planned", training_class_ids=None)
+    _make_session(client, hdr, ci, status="delivered", training_class_ids=[c1], year=year["year"])
+    _make_session(client, hdr, ci, status="planned", training_class_ids=None, year=year["year"])
 
     missions = _get_missions(client, hdr, year["planning_year_id"])
     m = _find_mission(missions, ci)
@@ -219,8 +229,8 @@ def test_class_breakdown_six_state_matches_item_level_logic(client):
     c1 = _make_class(client, hdr, year["planning_year_id"], stage_id, "M05 Class Resolved")
     ci = _make_curriculum_item(client, hdr, "M05-D", stage_name)
 
-    _make_session(client, hdr, ci, status="cancelled", training_class_ids=[c1])
-    _make_session(client, hdr, ci, status="delivered", training_class_ids=[c1])
+    _make_session(client, hdr, ci, status="cancelled", training_class_ids=[c1], year=year["year"])
+    _make_session(client, hdr, ci, status="delivered", training_class_ids=[c1], year=year["year"])
 
     missions = _get_missions(client, hdr, year["planning_year_id"])
     m = _find_mission(missions, ci)
@@ -245,7 +255,7 @@ def test_session_assigned_to_multiple_classes_counts_in_each(client):
     c2 = _make_class(client, hdr, year["planning_year_id"], stage_id, "M05 Combined B")
     ci = _make_curriculum_item(client, hdr, "M05-E", stage_name)
 
-    _make_session(client, hdr, ci, status="delivered", training_class_ids=[c1, c2])
+    _make_session(client, hdr, ci, status="delivered", training_class_ids=[c1, c2], year=year["year"])
 
     missions = _get_missions(client, hdr, year["planning_year_id"])
     m = _find_mission(missions, ci)

@@ -492,6 +492,21 @@ export function PlanningWorkspace() {
           >
             + Anchor event
           </button>
+          {/* Reported 2026-08-25: "the guided mode is very useful - but very hard
+              to find it". It sat second in this row as a 12px outline button,
+              indistinguishable from the maintenance action beside it. It is the
+              primary way to set a year up, so it now leads the row, carries the
+              primary style, and says what it does rather than naming itself. */}
+          {canWriteSquadron(session) && (
+            <button
+              className="btn sm"
+              style={{ fontSize: 'var(--fs-xs)', padding: "4px 12px", fontWeight: 600 }}
+              onClick={() => setGuidedSetupOpen(true)}
+              title="Generate this year's parade nights, terms and holidays step by step"
+            >
+              Set up this year — guided
+            </button>
+          )}
           {canWriteSquadron(session) && (
             <button
               className="btn sm out"
@@ -499,15 +514,6 @@ export function PlanningWorkspace() {
               onClick={() => setUpdatingParadeDay(true)}
             >
               Update future parade nights…
-            </button>
-          )}
-          {canWriteSquadron(session) && (
-            <button
-              className="btn sm out"
-              style={{ fontSize: 'var(--fs-xs)', padding: "3px 10px" }}
-              onClick={() => setGuidedSetupOpen(true)}
-            >
-              Guided year setup…
             </button>
           )}
         </div>

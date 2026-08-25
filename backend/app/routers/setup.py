@@ -225,13 +225,14 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
         steps.append({"key": "sessions_have_periods", "label": "Assign sessions to program periods",
                       "done": squadron["sessions_have_periods"],
                       "count": squadron["sessions_with_period"], "link_page": "parade-nights"})
-        # Flight is a local, optional cadet-organisation grouping, not a
-        # required setup action (see Flight model docstring / architecture.md)
-        # -- surfaced as guidance in the fuller sequence but excluded from the
-        # `complete` calculation below via its own "optional" flag.
-        steps.append({"key": "flights_created", "label": "Organise cadets into flights",
-                      "done": squadron["flights_created"] > 0, "count": squadron["flights_created"],
-                      "link_page": "settings", "optional": True})
+        # "Organise cadets into flights" was removed from the checklist on
+        # 2026-08-25 at the user's request. Flight is a local, optional
+        # cadet-organisation grouping and not a tenancy level or a setup
+        # prerequisite (see the Flight model docstring and architecture.md), so
+        # listing it as a step -- even an optional one -- implied it was part of
+        # getting set up. The capability is untouched: flights are still created
+        # and managed in Unit Setup, and squadron["flights_created"] is still
+        # returned for anything that reports on them.
 
     complete = bool(steps) and all(st["done"] for st in steps if not st.get("optional"))
     return {"national": national, "squadron": squadron, "steps": steps, "complete": complete}
