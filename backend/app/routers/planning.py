@@ -2907,7 +2907,19 @@ def get_class_forecasts(
         unplanned_count = len(unplanned)
 
         # Determine status
-        if remaining_count == 0:
+        if c.training_stage_id is None:
+            # The five classes auto-created with a planning year carry a
+            # stage_code (ORI/INI/...) but no training_stage_id, and
+            # _class_curriculum_progress keys off the stage, so they have zero
+            # requirements for a reason that has nothing to do with progress.
+            # Reporting "All requirements delivered." there is a green light
+            # for work nobody has scoped yet -- say what is actually true.
+            status = "not_configured"
+            message = (
+                "No Training Stage assigned, so this class has no curriculum "
+                "requirements to track. Assign a stage to see its forecast."
+            )
+        elif remaining_count == 0:
             status = "on_track"
             message = "All requirements delivered."
         elif remaining_pns == 0 and unplanned_count > 0:
@@ -2929,7 +2941,7 @@ def get_class_forecasts(
                 f"capacity ({available_per_class} slot(s) across {remaining_pns} remaining nights)."
             )
 
-        stage = db.get(CurriculumPhase, c.training_stage_id)
+        stage = db.get(CurriculumPhase, c.training_stage_id) if c.training_stage_id else None
         forecasts.append({
             "class_id": c.id,
             "class_name": c.display_name,

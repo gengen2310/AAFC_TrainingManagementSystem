@@ -2560,7 +2560,7 @@ _ITEM_STATUS_PRIORITY = ["delivered", "delivered_with_issue", "not_delivered",
 
 
 def _class_curriculum_progress(db: DBSession, c: TrainingClass) -> dict:
-    stage = db.get(CurriculumPhase, c.training_stage_id)
+    stage = db.get(CurriculumPhase, c.training_stage_id) if c.training_stage_id else None
     stage_name = stage.name if stage else None
     s = db.get(Squadron, c.squadron_id)
     wing_id = s.wing_id if s else None

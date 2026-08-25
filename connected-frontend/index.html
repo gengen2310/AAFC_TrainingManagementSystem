@@ -938,6 +938,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .fc-card.on-track{border-top-color:var(--ok);}
 .fc-card.planning-risk{border-top-color:var(--warn);}
 .fc-card.critical{border-top-color:var(--red);}
+.fc-card.not-configured{border-top-color:var(--lgrey);}
 .fc-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;}
 .fc-class-name{font-weight:700;font-size:var(--fs-base);color:var(--text);line-height:1.3;}
 .fc-stage{font-size:var(--fs-2xs);color:var(--muted);margin-top:1px;}
@@ -945,6 +946,8 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .fc-pill.on-track{background:var(--ok-bg);color:var(--ok-text);}
 .fc-pill.planning-risk{background:var(--warn-bg);color:var(--warn-text);} /* DES-H04: --warn fails 3.1:1; --warn-text passes 5.4:1 */
 .fc-pill.critical{background:#fde8e8;color:var(--red);}
+/* Neutral, not green: an unassigned stage is 'not assessed', not 'healthy'. */
+.fc-pill.not-configured{background:var(--surface-2);color:var(--text-2);}
 .fc-stats{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:var(--fs-xs);}
 .fc-stat-label{color:var(--muted);}
 .fc-stat-val{font-weight:700;color:var(--text);}
@@ -8798,8 +8801,8 @@ async function _loadClassForecasts(yearId){
       card.style.display='none';
       return;
     }
-    const _pillLabel={'on_track':'On Track','planning_risk':'Planning Risk','critical':'Critical'};
-    const _cssClass={'on_track':'on-track','planning_risk':'planning-risk','critical':'critical'};
+    const _pillLabel={'on_track':'On Track','planning_risk':'Planning Risk','critical':'Critical','not_configured':'Stage not set'};
+    const _cssClass={'on_track':'on-track','planning_risk':'planning-risk','critical':'critical','not_configured':'not-configured'};
     body.innerHTML=forecasts.map(fc=>{
       const css=_cssClass[fc.status]||'';
       const pill=_pillLabel[fc.status]||esc(fc.status||'');
@@ -8807,7 +8810,7 @@ async function _loadClassForecasts(yearId){
         <div class="fc-card-header">
           <div>
             <div class="fc-class-name">${esc(fc.class_name||'')}</div>
-            <div class="fc-stage">${esc(fc.stage_name||'')}</div>
+            <div class="fc-stage">${fc.stage_name?esc(fc.stage_name):'<span class="muted">No stage assigned</span>'}</div>
           </div>
           <span class="fc-pill ${css}">${pill}</span>
         </div>
