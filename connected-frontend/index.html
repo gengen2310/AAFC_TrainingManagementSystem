@@ -1886,7 +1886,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <span id="res-refresh-status" style="font-size:var(--fs-2xs);color:var(--muted)"></span>
             <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('res-refresh-status',async()=>{await loadData();renderRooms();})">Refresh</button>
             <button class="btn btn-dk admin-el" style="display:none" onclick="openAddRoomModal()">+ Add Room</button>
-            <button class="btn btn-out admin-el" style="display:none" onclick="openModal('m-add-equip')">+ Add Equipment</button>
+            <button class="btn btn-out admin-el" style="display:none" onclick="openAddEquipModal()">+ Add Equipment</button>
           </div>
         </div>
         <div class="dash-grid">
@@ -13977,6 +13977,19 @@ async function saveEquip(){
     await reloadAndRender(); showToast(isEditEquip?'Equipment updated.':'Equipment added.'); closeModal('m-add-equip');
     document.getElementById('equip-modal-title').textContent='+ Add Equipment';
   }catch(e){ showToast(apiErr(e),true); }
+}
+// Mirrors openAddRoomModal() directly above. Without it, "+ Add Equipment"
+// opened the modal still holding the item editEquip() last loaded, with
+// editEquipId still set -- so Save issued a PATCH and renamed that item instead
+// of adding a new one. Rooms already had this; equipment did not. Same defect
+// as REM-147 on activities.
+function openAddEquipModal(){
+  editEquipId=null;
+  document.getElementById('equip-modal-title').textContent='+ Add Equipment';
+  document.getElementById('equip-name').value='';
+  document.getElementById('equip-qty').value='1';
+  document.getElementById('equip-notes').value='';
+  openModal('m-add-equip');
 }
 function editEquip(id){
   const eq=S.equip.find(x=>x.id===id);if(!eq)return;editEquipId=id;
