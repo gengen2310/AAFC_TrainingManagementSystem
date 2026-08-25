@@ -97,7 +97,7 @@ def upgrade() -> None:
             conn.execute(
                 sa.text(
                     "INSERT INTO activity_type_tags (id, scope, display_name, normalised_name, is_active, created_at, updated_at) "
-                    "VALUES (:id, 'global', :dn, :nn, 1, :ts, :ts)"
+                    "VALUES (:id, 'global', :dn, :nn, true, :ts, :ts)"
                 ),
                 {"id": str(uuid.uuid4()), "dn": name, "nn": norm, "ts": now},
             )
@@ -112,7 +112,7 @@ def upgrade() -> None:
             conn.execute(
                 sa.text(
                     "INSERT INTO training_area_capability_tags (id, scope, display_name, normalised_name, is_active, created_at, updated_at) "
-                    "VALUES (:id, 'global', :dn, :nn, 1, :ts, :ts)"
+                    "VALUES (:id, 'global', :dn, :nn, true, :ts, :ts)"
                 ),
                 {"id": str(uuid.uuid4()), "dn": name, "nn": norm, "ts": now},
             )
