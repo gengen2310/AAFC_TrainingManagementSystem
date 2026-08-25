@@ -6271,16 +6271,16 @@ async function scLoadScopeMap(){
       const chips=(w.squadrons||[]).map(s=>{
         const sArchived=s.is_archived===true;
         const archiveOrRestoreBtn=sArchived
-          ?`<button class="btn-icon" style="font-size:var(--fs-3xs);padding:2px 8px;margin-left:4px;background:transparent;border:1px solid #bbb;cursor:pointer;border-radius:3px;line-height:1" onclick="scRestoreSquadron('${s.id}','${esc(s.name||s.id)}')">Restore</button>`
-          :`<button style="font-size:var(--fs-3xs);padding:1px 4px;margin-left:4px;background:transparent;border:1px solid #bbb;cursor:pointer;border-radius:3px;line-height:1" onclick="scArchiveSquadron('${s.id}','${esc(s.name||s.id)}')">Archive</button>`;
+          ?`<button class="btn-icon" style="font-size:var(--fs-3xs);padding:2px 8px;margin-left:4px;background:transparent;border:1px solid #bbb;cursor:pointer;border-radius:3px;line-height:1" onclick="scRestoreSquadron('${s.id}','${_jsAttr(s.name||s.id)}')">Restore</button>`
+          :`<button style="font-size:var(--fs-3xs);padding:1px 4px;margin-left:4px;background:transparent;border:1px solid #bbb;cursor:pointer;border-radius:3px;line-height:1" onclick="scArchiveSquadron('${s.id}','${_jsAttr(s.name||s.id)}')">Archive</button>`;
         return `<span class="sc-sqn-chip${sArchived?' inactive':''}" title="${esc(s.unit_type||'')}">
           ${esc(s.name||s.id)}${sArchived?' <span class="muted" style="font-size:var(--fs-3xs)">(archived)</span>':''}
           ${archiveOrRestoreBtn}
         </span>`;
       }).join('');
       const archiveWingBtn=wingArchived
-        ?`<button class="btn btn-sm" style="font-size:var(--fs-2xs);padding:2px 7px;margin-left:8px;background:#fff;border:1px solid #ccc;color:var(--dark);cursor:pointer" onclick="scRestoreWing('${w.wing_id}','${esc(w.wing_code||w.wing_id)}')">Restore</button>`
-        :`<button class="btn btn-sm" style="font-size:var(--fs-2xs);padding:2px 7px;margin-left:8px;background:#fff;border:1px solid #ccc;color:var(--dark);cursor:pointer" onclick="scArchiveWing('${w.wing_id}','${esc(w.wing_code||w.wing_id)}')">Archive…</button>`;
+        ?`<button class="btn btn-sm" style="font-size:var(--fs-2xs);padding:2px 7px;margin-left:8px;background:#fff;border:1px solid #ccc;color:var(--dark);cursor:pointer" onclick="scRestoreWing('${w.wing_id}','${_jsAttr(w.wing_code||w.wing_id)}')">Restore</button>`
+        :`<button class="btn btn-sm" style="font-size:var(--fs-2xs);padding:2px 7px;margin-left:8px;background:#fff;border:1px solid #ccc;color:var(--dark);cursor:pointer" onclick="scArchiveWing('${w.wing_id}','${_jsAttr(w.wing_code||w.wing_id)}')">Archive…</button>`;
       h+=`<div class="sc-wing-row"${wingArchived?' style="opacity:.5"':''}>
         <div class="sc-wing-name">${esc(w.wing_name||w.wing_id)} <span class="muted" style="font-size:var(--fs-xs);font-weight:400">${esc(w.wing_code||'')}</span>${wingArchived?' <span class="muted" style="font-size:var(--fs-2xs)">(archived)</span>':''}${archiveWingBtn}</div>
         <div class="sc-sqn-chips">${chips||'<span class="muted" style="font-size:var(--fs-xs)">No units</span>'}</div>
@@ -9619,7 +9619,7 @@ function _wizRenderCurrList(q){
   if(!items.length){list.innerHTML='<span class="muted" style="font-size:var(--fs-sm)">No matching items.</span>';return;}
   list.innerHTML=items.map(c=>{
     const sel=_wizState.currId===c.id;
-    return `<div class="wiz-curr-item${sel?' sel':''}" onclick="_wizSelectCurr('${esc(c.id)}','${esc(c.title)}')">${esc(c.code)} — ${esc(c.title)}</div>`;
+    return `<div class="wiz-curr-item${sel?' sel':''}" onclick="_wizSelectCurr('${esc(c.id)}','${_jsAttr(c.title)}')">${esc(c.code)} — ${esc(c.title)}</div>`;
   }).join('');
 }
 
@@ -15583,7 +15583,7 @@ function renderMissions() {
         <td style="font-size:var(--fs-base)">${esc(locName)}</td>
         <td>${badge}</td>
         ${classTd}
-        ${canWrite ? `<td><button class="btn-xs" onclick="openAssignModal('${esc(m.curriculum_id)}','${esc(m.title)}','${esc(m.code)}',${m.part_count||1})">Assign</button></td>` : ''}
+        ${canWrite ? `<td><button class="btn-xs" onclick="openAssignModal('${esc(m.curriculum_id)}','${_jsAttr(m.title)}','${_jsAttr(m.code)}',${m.part_count||1})">Assign</button></td>` : ''}
       </tr>`;
     }).join('') +
     `</tbody></table></div>`;
