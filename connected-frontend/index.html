@@ -5110,6 +5110,14 @@ async function loadData(){
   const p_facs=_apiT('/api/facilitators'+_sqq,null,'Facilitators');
   const p_cur=_apiT('/api/curriculum'+_sqq,null,'Curriculum');
   const p_phases=_apiT('/api/curriculum/phases',null,'Curriculum phases');
+  // Custom training phases are ad-hoc scheduling groups (Wing Band, Biathlon
+  // Team). They had a full CRUD screen in Unit Setup and NOTHING read them --
+  // reported 2026-08-25 as "did not show up in the Phase in TMS". Loaded here
+  // so a session can be scheduled against one. Deliberately kept out of
+  // /api/curriculum/phases: that list also backs the Training Class stage
+  // picker, where training_stage_id is a FK to curriculum_phases.id, so a
+  // custom phase offered there would violate it.
+  const p_customph=api('/api/custom-training-phases').catch(()=>[]);
   const p_ta=_apiT('/api/training-areas',null,'Training Areas');
   const p_eq=_apiT('/api/equipment',null,'Equipment');
   const p_ai=_apiT('/api/action-items',null,'Action Items');
@@ -5236,6 +5244,14 @@ async function loadData(){
   // fallback _populateCurrPhases() uses for the curriculum-item form.
   S.phases=(Array.isArray(phases)&&phases.length)?phases.map(p=>({name:p.name,displayName:p.display_name})):
     ['A. Orientation','B. Initial','C. Junior','D. Intermediate','E. Senior','I. Bronze','J. Silver','K. Gold'].map(n=>({name:n,displayName:n}));
+  // Appended, not merged: S.phases feeds the SESSION phase pickers only, where the
+  // value is a name string stored as Session.phase_at_time. The Training Class and
+  // curriculum-item pickers call /api/curriculum/phases directly and are untouched.
+  const _cph=await p_customph.catch(()=>[]);
+  if(Array.isArray(_cph)&&_cph.length){
+    S.customPhases=_cph.map(c=>({name:c.name,displayName:c.name+' (custom)'}));
+    S.phases=S.phases.concat(S.customPhases);
+  }else{ S.customPhases=[]; }
   S.rooms=(ta||[]).map(r=>({id:r.training_area_id||r.id,name:r.name,capacity:r.capacity,type:r.type,notes:r.notes||''}));
   S.equip=(eq||[]).map(x=>({id:x.equipment_id||x.id,name:x.name,qty:x.quantity||x.qty,notes:x.notes||''}));
   S.actionItems=(ai||[]).map(a=>({id:a.action_id,title:a.title,description:a.description,owner:a.owner,due:a.due_date,status:a.status,severity:a.severity,source:a.source}));
@@ -9263,7 +9279,7 @@ function buildPNCard(pn){
       <div style="display:flex;gap:6px;align-items:center" class="no-print">
         ${allDel?stBadge('delivered'):stBadge('planned')}
         ${pn.published?'<span class="badge b-ok" title="Weekly Program published">Published</span>':''}
-        <button class="btn btn-xs btn-sky" onclick="showPNDetail('${pn.date}')">Detail</button>
+        <button class="btn btn-xs btn-sky" onclick="showPNDetail('${pn.date}')" title="Open this parade night to edit its sessions, facilitators, rooms and periods">Open / edit</button>
         ${canWriteSquadron()?`<button class="btn btn-xs btn-out" aria-expanded="false" aria-controls="pnmore-${esc(pn.id)}" title="More actions for ${esc(fmtDL(pn.date))}" onclick="togglePNMore(this,'${esc(pn.id)}')">More ▾</button>`:''}
         ${canWriteSquadron()?`<span class="pn-more" id="pnmore-${esc(pn.id)}">
           ${tplName?`<button class="btn btn-xs" onclick="openPNTimingOverrideModal('${esc(pn.id)}')" title="Change template">📋 ${esc(tplName)} ▾</button>`:`<button class="btn btn-xs" style="color:var(--muted)" onclick="openPNTimingOverrideModal('${esc(pn.id)}')" title="Set template">+ Template</button>`}
@@ -11441,6 +11457,15 @@ async function doCreatePhaseInline(){
     if(sel)sel.value=r.name||name;
     document.getElementById('c-phase-new').style.display='none';
     nameInput.value='';
+    // POST /curriculum/phases is idempotent on name+scope and returns the existing
+    // row with existed:true. Nothing read that, so a second stage with a name
+    // already in use silently selected the first one and looked like "you can only
+    // create one training stage" (reported 2026-08-25).
+    if(r&&r.existed){
+      showToast('A training stage named "'+name+'" already exists at this level, so it was selected rather than created again.',true);
+    }else{
+      showToast('Training stage created.');
+    }
   }catch(e){msgEl.textContent=apiErr(e);}
 }
 function openAddCurr(){
