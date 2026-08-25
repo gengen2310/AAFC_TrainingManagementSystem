@@ -1778,7 +1778,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div class="ph-actions no-print">
             <span id="act-refresh-status" style="font-size:var(--fs-2xs);color:var(--muted)"></span>
             <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('act-refresh-status',_loadActivitiesPage)">Refresh</button>
-            <button class="btn btn-dk admin-el" style="display:none" onclick="openModal('m-add-act')">+ Add Activity</button>
+            <button class="btn btn-dk admin-el" style="display:none" onclick="openAddActModal()">+ Add Activity</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openGenerateActivitiesModal()">Generate Activities</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddHolidayModal()">+ Add Holiday</button>
             <button class="btn btn-secondary btn-sm" id="actImportCeaBtn" style="display:none" onclick="openCeaImportModal()">Import CEA &#8593;</button>
@@ -13162,13 +13162,28 @@ async function saveAct(){
     if(_editActId){ await api('/api/activities/'+_editActId,{method:'PATCH',body:JSON.stringify(payload)}); _editActId=null; }
     else { await api('/api/activities',{method:'POST',body:JSON.stringify(payload)}); }
     await reloadAndRender(); closeModal('m-add-act');
-    document.getElementById('act-modal-title')&&(document.getElementById('act-modal-title').textContent='+ Add Activity');
+    document.getElementById('m-add-act-title')&&(document.getElementById('m-add-act-title').textContent='+ Add Activity');
   }catch(e){ showToast(apiErr(e),true); }
+}
+// Opening "+ Add Activity" must clear any state left by a previous editAct().
+// _editActId was only ever cleared on a successful save, so Edit -> close ->
+// "+ Add Activity" -> Save silently PATCHED the activity you had opened
+// earlier instead of creating a new one, with the form still showing its
+// values. Mirrors the reset the "+ Add Facilitator" button already does inline.
+function openAddActModal(){
+  _editActId=null;
+  const t=document.getElementById('m-add-act-title'); if(t)t.textContent='+ Add Activity';
+  document.getElementById('act-name').value='';
+  document.getElementById('act-date').value='';
+  document.getElementById('act-type').value='Optional';
+  document.getElementById('act-notes').value='';
+  ['ori','ini','jun','int','sen'].forEach(k=>{const el=document.getElementById('aa-'+k);if(el)el.checked=false;});
+  openModal('m-add-act');
 }
 function editAct(id){
   const act=S.acts.find(a=>a.id===id); if(!act)return;
   _editActId=id;
-  if(document.getElementById('act-modal-title'))document.getElementById('act-modal-title').textContent='Edit Activity';
+  if(document.getElementById('m-add-act-title'))document.getElementById('m-add-act-title').textContent='Edit Activity';
   document.getElementById('act-name').value=act.name||'';
   document.getElementById('act-date').value=act.date||'';
   document.getElementById('act-type').value=act.type||'Optional';
