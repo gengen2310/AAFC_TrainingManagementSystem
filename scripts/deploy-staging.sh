@@ -420,6 +420,39 @@ staging_api_call() {
   STAGING_API_BODY=$(echo "$raw" | sed 's/__STATUS__[0-9]*$//')
 }
 
+# ── Build fingerprint stamping ────────────────────────────────────────────────
+# docker-entrypoint.sh builds the app-build meta from APP_BUILD_COMMIT, which is a
+# plain Railway variable — nothing derives it from the code being deployed. It was
+# never set here, so it simply kept whatever value it last had. On 2026-08-23 the
+# staging services were serving code from that morning while reporting commits from
+# 11 August, 413 commits behind.
+stamp_build_commit() {
+  local svc_id="$1" svc_label="$2"
+  railway variable set --set "APP_BUILD_COMMIT=${CURRENT_HEAD_FULL}" \
+    --service "$svc_id" \
+    --environment "$ACTUAL_STAGING_ENV_ID" \
+    --project "$EXPECTED_PROJECT_ID" \
+    --skip-deploys >/dev/null 2>&1 \
+    || die "Could not set APP_BUILD_COMMIT on $svc_label — refusing to deploy an unidentifiable build."
+  ok "$svc_label APP_BUILD_COMMIT stamped: ${CURRENT_HEAD}"
+}
+
+# Assert a served build fingerprint really is the commit we deployed. The previous
+# check only asserted that SOME fingerprint existed and was not the literal
+# __APP_BUILD__ placeholder, so it passed against a months-old build. The dry-run
+# output claimed it compared the SHA; it did not.
+assert_fingerprint_matches() {
+  local raw="$1" svc_label="$2"
+  local sha
+  sha=$(printf '%s' "$raw" | sed -E 's/.*content="([^"|]*).*/\1/')
+  case "$sha" in
+    "$CURRENT_HEAD_FULL"|"$CURRENT_HEAD"*)
+      ok "$svc_label fingerprint matches deployed commit ($CURRENT_HEAD)" ;;
+    *)
+      die "$svc_label fingerprint is ${sha:-empty}, expected $CURRENT_HEAD_FULL — the running build is NOT the commit just deployed. HARD FAIL." ;;
+  esac
+}
+
 # ── Playwright smoke (hard gate) ──────────────────────────────────────────────
 require_playwright_smoke() {
   local pattern="$1" desc="$2" project="${3:-chromium}"
@@ -637,6 +670,7 @@ CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "UNKNOWN")
   && [ "$CURRENT_BRANCH" != "$EXPECTED_BRANCH" ] \
   && die "Protected branch."
 CURRENT_HEAD=$(git rev-parse --short HEAD 2>/dev/null || echo "UNKNOWN")
+CURRENT_HEAD_FULL=$(git rev-parse HEAD 2>/dev/null || echo "UNKNOWN")
 info "HEAD: $CURRENT_HEAD — $(git log -1 --format='%s')"
 git merge-base --is-ancestor "$REQUIRED_ANCESTOR" HEAD 2>/dev/null \
   && ok "Fix commit $REQUIRED_ANCESTOR is ancestor of $CURRENT_HEAD" \
@@ -809,7 +843,8 @@ if [ "${DRY_RUN:-0}" = "1" ]; then
   echo "               --environment $ACTUAL_STAGING_ENV_ID --detach"
   echo "    Gate 1: poll / HTTP 200 (${FRONTEND_GATE_TIMEOUT}s)"
   echo "    Gate 2: wait for NEW deployment (newer than PRE_FRONTEND_LATEST=$PRE_FRONTEND_LATEST)"
-  echo "    Gate 3: root HTML contains app-build meta with SHA $CURRENT_HEAD"
+  echo "    Pre-step: APP_BUILD_COMMIT stamped to $CURRENT_HEAD_FULL"
+  echo "    Gate 3: app-build meta SHA == $CURRENT_HEAD (hard fail on mismatch)"
   echo "    Gate 4: Playwright — [Dashboard], [Nav] Mobile, [Network]"
   echo
   echo "  [3/3] PW       (UUID: $ACTUAL_PW_SVC_ID)"
@@ -818,7 +853,8 @@ if [ "${DRY_RUN:-0}" = "1" ]; then
   echo "               --environment $ACTUAL_STAGING_ENV_ID --detach"
   echo "    Gate 1: poll /healthz HTTP 200 (${PW_GATE_TIMEOUT}s)"
   echo "    Gate 2: wait for NEW deployment (newer than PRE_PW_LATEST=$PRE_PW_LATEST)"
-  echo "    Gate 3: root HTML contains React markers + SHA $CURRENT_HEAD"
+  echo "    Pre-step: APP_BUILD_COMMIT stamped to $CURRENT_HEAD_FULL"
+  echo "    Gate 3: React markers + app-build meta SHA == $CURRENT_HEAD (hard fail on mismatch)"
   echo "    Gate 4: Playwright — [Mission Backlog / PW], [PW]"
   echo
   echo "  Cleanup: logout called; cookie jar deleted; credential unset."
@@ -835,6 +871,8 @@ info "  Service UUID: $ACTUAL_BACKEND_SVC_ID"
 info "  PRE_LATEST:   $PRE_BACKEND_LATEST"
 info "  PRE_ACTIVE:   $PRE_BACKEND_ACTIVE"
 echo
+
+stamp_build_commit "$ACTUAL_BACKEND_SVC_ID" "Backend"
 
 railway up ./backend --path-as-root \
   --project "$EXPECTED_PROJECT_ID" \
@@ -918,6 +956,8 @@ info "  Service UUID: $ACTUAL_FRONTEND_SVC_ID"
 info "  PRE_LATEST:   $PRE_FRONTEND_LATEST"
 echo
 
+stamp_build_commit "$ACTUAL_FRONTEND_SVC_ID" "Frontend"
+
 railway up ./connected-frontend --path-as-root \
   --project "$EXPECTED_PROJECT_ID" \
   --service "$ACTUAL_FRONTEND_SVC_ID" \
@@ -956,6 +996,7 @@ while [ "$_fp_elapsed" -lt 180 ]; do
 done
 [ -z "$FRONTEND_BUILD" ] && die 'Build fingerprint meta (name="app-build") NOT found after 180s — HARD FAIL.'
 ok "Frontend build fingerprint: $FRONTEND_BUILD"
+assert_fingerprint_matches "$FRONTEND_BUILD" "Frontend"
 
 echo
 echo "  ── Frontend gate 4/4: Playwright smoke ──────────────────────────────"
@@ -972,6 +1013,8 @@ echo "  [Deploy 3/3] $EXPECTED_PW_SVC_NAME"
 info "  Service UUID: $ACTUAL_PW_SVC_ID"
 info "  PRE_LATEST:   $PRE_PW_LATEST"
 echo
+
+stamp_build_commit "$ACTUAL_PW_SVC_ID" "PW"
 
 railway up ./frontend --path-as-root \
   --project "$EXPECTED_PROJECT_ID" \
@@ -1011,8 +1054,10 @@ done
 ok "PW HTML contains React app markers (id=root / type=module / /assets/)"
 PW_BUILD=$(curl -s --connect-timeout 15 --max-time 60 \
   "https://$EXPECTED_STAGING_PW_DOMAIN/" 2>/dev/null \
-  | grep -o 'name="app-build" content="[^"]*"' | head -1 || echo "no fingerprint")
+  | grep -o 'name="app-build" content="[^"]*"' | head -1 || echo "")
+[ -z "$PW_BUILD" ] && die 'PW build fingerprint meta (name="app-build") NOT found — HARD FAIL.'
 ok "PW build fingerprint: $PW_BUILD"
+assert_fingerprint_matches "$PW_BUILD" "PW"
 
 echo
 echo "  ── PW gate 4/4: Playwright smoke ────────────────────────────────────"
