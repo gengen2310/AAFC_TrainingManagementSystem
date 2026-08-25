@@ -431,25 +431,26 @@ def test_plain_parade_night_create_links_to_active_planning_year(client):
     Workspace -- reported live as "created in TMS, not showing in Planning
     Workspace even after a refresh"."""
     hdr = _sqn_admin_hdr(client)
-    # A unique, unambiguously-highest year value -- squadron 703 already has a
-    # seeded active planning year (and other tests in this file create more),
-    # and create_parade's auto-link picks the most recent active year by
-    # `year` number when several exist for the same squadron. Using a year far
-    # beyond anything else in this suite keeps the fix's own tie-break
-    # deterministic for this test, rather than assuming _make_year's fixed
-    # year=2026 is the only (or most recent) one for this squadron.
+    # The night is dated INSIDE this year. The auto-link used to pick the
+    # highest-numbered active year and ignore the date entirely, so this test
+    # previously worked by giving its year an unambiguously-highest number and
+    # dating the night 2029 -- unrelated to it. That tie-break was the defect
+    # reported on 2026-08-25 (nights invisible in Planning Workspace), and the
+    # linkage is now driven by the date.
     r = client.post("/api/planning/years", json={"year": next_test_year(), "name": "REM-129 test year"}, headers=hdr)
     assert r.status_code == 200, r.text
     year = r.json()
     yr_id = year["planning_year_id"]
     assert year["active_status"] is True
 
-    r = client.post("/api/parade-nights", json={"date": "2029-03-14", "term": "T2"}, headers=hdr)
+    night_date = f"{year['year']}-03-14"
+    r = client.post("/api/parade-nights", json={"date": night_date, "term": "T2"}, headers=hdr)
     assert r.status_code == 200, r.text
+    assert r.json()["linked_to_planning_year"] is True
     pn_id = r.json()["parade_night_id"]
 
     dates = client.get(f"/api/planning/years/{yr_id}/parade-dates", headers=hdr).json()
-    matching = [d for d in dates if d["parade_date"] == "2029-03-14"]
+    matching = [d for d in dates if d["parade_date"] == night_date]
     assert len(matching) == 1, f"expected exactly one ParadeDate for this date, got {matching}"
     assert matching[0]["parade_night_id"] == pn_id, (
         "the ParadeDate must link back to the newly created ParadeNight, "
@@ -1897,7 +1898,18 @@ def test_notices_same_squadron_admin_allowed(client):
 # are exercised unchanged (no new logic there).
 # ─────────────────────────────────────────────────────────────
 
-def _create_plain_parade_night(client, hdr, date_str):
+def _create_plain_parade_night(client, hdr, date_str, year=None):
+    """Create a night via the plain TMS flow.
+
+    `year` dates the night inside that planning year. The auto-link is
+    date-driven since 2026-08-25: a night dated outside every active year is
+    created but left unlinked, so anything reached through ParadeDate -- notices,
+    Planning Workspace, the Weekly Program -- cannot see it. These dates used to
+    be fixed 2099 literals and linked anyway, because the old rule ignored the
+    date and took the highest-numbered active year.
+    """
+    if year is not None:
+        date_str = f"{year}{date_str[4:]}"
     r = client.post("/api/parade-nights", json={"date": date_str}, headers=hdr)
     assert r.status_code == 200, r.text
     return r.json()["parade_night_id"]
@@ -1908,8 +1920,8 @@ def test_night_notice_create_auto_links_parade_date(client):
     frontend-created Parade Night even though it never explicitly created a
     ParadeDate -- the endpoint resolves/creates one transparently."""
     hdr = _sqn_admin_hdr(client)
-    _make_year(client, hdr)  # ensures squadron 703 has an active Training Year
-    pnid = _create_plain_parade_night(client, hdr, "2099-03-06")
+    _y = _make_year(client, hdr)  # ensures squadron 703 has an active Training Year
+    pnid = _create_plain_parade_night(client, hdr, "2099-03-06", year=_y["year"])
 
     r = client.post(f"/api/parade-nights/{pnid}/notices",
                      json={"notice_text": "Bring wet-weather gear", "priority": "high"}, headers=hdr)
@@ -1964,8 +1976,8 @@ def test_night_notice_edit_and_archive_via_existing_notice_id_endpoints(client):
     Planning Workspace already uses -- same underlying record, no parallel
     notice concept."""
     hdr = _sqn_admin_hdr(client)
-    _make_year(client, hdr)
-    pnid = _create_plain_parade_night(client, hdr, "2099-04-03")
+    _y = _make_year(client, hdr)
+    pnid = _create_plain_parade_night(client, hdr, "2099-04-03", year=_y["year"])
     r = client.post(f"/api/parade-nights/{pnid}/notices",
                      json={"notice_text": "original", "priority": "normal"}, headers=hdr)
     notice_id = r.json()["notice_id"]
