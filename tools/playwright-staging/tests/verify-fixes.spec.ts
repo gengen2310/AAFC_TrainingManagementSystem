@@ -12,39 +12,25 @@ const SYS_ADMIN = ROLES.find((r) => r.role === "system_admin")!;
 const WING_ADMIN = ROLES.find((r) => r.role === "wing_admin")!;
 const NATIONAL_ADMIN = ROLES.find((r) => r.role === "national_admin")!;
 
-// Navigate to Activities page and select the first available planning year.
-// Returns false if no planning years exist on staging.
+// Navigate to Activities page and confirm an active planning year is loaded.
+// Returns false if no planning years exist on staging (P.currentYearId is null).
+// The Activities page uses a year-nav arrow control, not a dropdown — this
+// function previously looked for #py-select which never exists on this page
+// and therefore always returned false, causing all HOL tests to skip.
 async function navToActivitiesYear(page: Page): Promise<boolean> {
   await page.evaluate(() => (window as any).nav("activities"));
   await page.waitForTimeout(2000);
 
-  const pySelect = page.locator("#py-select");
-  // #py-select is inside the active page — it resolves but CSS hides the whole page
-  // if it's not active. Wait for the select to be inside a visible context.
-  const isVis = await pySelect.isVisible().catch(() => false);
-  if (!isVis) {
-    // The Activities page might not be active yet — check via evaluate
-    const activeId = await page.evaluate(() => document.querySelector(".page.active")?.id ?? "none");
-    console.log("Active page after nav('activities'):", activeId);
-  }
+  const activeId = await page.evaluate(() => document.querySelector(".page.active")?.id ?? "none");
+  console.log("Active page after nav('activities'):", activeId);
 
-  // Use evaluate to read select options — avoids strict visibility check
-  const optVals: string[] = await page.evaluate(() => {
-    const sel = document.getElementById("py-select") as HTMLSelectElement | null;
-    if (!sel) return [];
-    return Array.from(sel.options).map((o) => o.value).filter((v) => v.trim());
+  // P.currentYearId is set during loadData() at boot — non-null means a year is active.
+  const currentYearId: string | null = await page.evaluate(() => {
+    return (window as any).P?.currentYearId ?? null;
   });
+  const optVals = currentYearId ? [currentYearId] : [];
   console.log("Planning year options:", optVals);
-  if (optVals.length === 0) return false;
-
-  // Use evaluate to select the year and trigger loadYearMap
-  await page.evaluate((id) => {
-    const sel = document.getElementById("py-select") as HTMLSelectElement;
-    sel.value = id;
-    sel.dispatchEvent(new Event("change"));
-  }, optVals[0]);
-  await page.waitForTimeout(2500);
-  return true;
+  return optVals.length > 0;
 }
 
 // ── PW-CTX-01 ─────────────────────────────────────────────────────────────────

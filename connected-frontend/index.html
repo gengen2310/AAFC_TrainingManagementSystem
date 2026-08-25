@@ -1807,6 +1807,14 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </table>
         </div>
 
+        <!-- Holiday periods for the active planning year -->
+        <div class="card" id="act-holidays-wrap" style="margin-top:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+            <h2 class="ctitle" style="margin:0">Holiday Periods</h2>
+          </div>
+          <div id="py-holidays-body"><p class="muted" style="font-size:var(--fs-xs)">No holiday periods for this year.</p></div>
+        </div>
+
         <!-- VH-02: section break before inherited activities -->
         <div class="pg-sec-brk no-print"><span class="pg-sec-lbl">Inherited Activities</span></div>
 
@@ -11871,12 +11879,14 @@ async function _loadActivitiesPage(){
   } else {
     ynInit();
   }
+  if (P.currentYearId) _renderHolidays(P.currentYearId);
 }
 
 // ── Year nav control ──────────────────────────────────────────────────────────
 
 function ynInit() {
   if (!P.years || !P.years.length) return;
+  _ynPopulateYearSelects();
   // Set currentYearInt from the already-selected currentYearId
   if (P.currentYearId && !P.currentYearInt) {
     const cur = P.years.find(y => y.planning_year_id === P.currentYearId);
@@ -15233,46 +15243,50 @@ function _pickDefaultYear(list){
 }
 
 // ── Populate year selects; auto-select active/first year and return its ID ──
+function _ynPopulateYearSelects() {
+  if (!P.years) return;
+  // Wing admin: filter by selected squadron if filter is active
+  const sqnFilterSel = document.getElementById('py-sqn-filter');
+  const filterSqnId = sqnFilterSel ? sqnFilterSel.value : '';
+  const visibleYears = filterSqnId
+    ? P.years.filter(y=>y.unit_id===filterSqnId)
+    : P.years;
+  // YR-3: prefer the year actually being run today. The list arrives ordered
+  // year DESC, so "first active" meant "highest year ever created" -- open a
+  // year for a future season and the whole app silently jumped to it.
+  if(!P.currentYearId && visibleYears.length) {
+    const active = _pickDefaultYear(visibleYears);
+    P.currentYearId = active.planning_year_id;
+  }
+  const selIds = [
+    'mission-year-sel','py-select','anch-year-sel','term-year-sel',
+    'builder-year-sel','lr-year-sel','checks-year-sel'
+  ];
+  const showUnitPrefix = ['wing_admin','national_admin','system_admin'].includes(S.role||'');
+  selIds.forEach(sid=>{
+    const el = document.getElementById(sid);
+    if(!el) return;
+    el.innerHTML = '<option value="">— select a year —</option>';
+    // py-select respects squadron filter; other selectors show all
+    const yrs = (sid==='py-select') ? visibleYears : P.years;
+    yrs.forEach(y=>{
+      const o = document.createElement('option');
+      o.value = y.planning_year_id;
+      const prefix = showUnitPrefix
+        ? (y.unit_code ? `${y.unit_code} — ` : y.wing_code ? `${y.wing_code} — ` : '')
+        : '';
+      o.textContent = prefix + (y.name || String(y.year)) + (y.active_status?'':' (archived)');
+      el.appendChild(o);
+    });
+    if(P.currentYearId) el.value = P.currentYearId;
+  });
+  _renderPyActionBtns();
+}
+
 async function _loadPlanningYears() {
   try {
     const data = await api('/api/planning/years');
     P.years = data || [];
-    // Wing admin: filter by selected squadron if filter is active
-    const sqnFilterSel = document.getElementById('py-sqn-filter');
-    const filterSqnId = sqnFilterSel ? sqnFilterSel.value : '';
-    const visibleYears = filterSqnId
-      ? P.years.filter(y=>y.unit_id===filterSqnId)
-      : P.years;
-    // YR-3: prefer the year actually being run today. The list arrives ordered
-    // year DESC, so "first active" meant "highest year ever created" -- open a
-    // year for a future season and the whole app silently jumped to it.
-    if(!P.currentYearId && visibleYears.length) {
-      const active = _pickDefaultYear(visibleYears);
-      P.currentYearId = active.planning_year_id;
-    }
-    const selIds = [
-      'mission-year-sel','py-select','anch-year-sel','term-year-sel',
-      'builder-year-sel','lr-year-sel','checks-year-sel'
-    ];
-    const showUnitPrefix = ['wing_admin','national_admin','system_admin'].includes(S.role||'');
-    selIds.forEach(sid=>{
-      const el = document.getElementById(sid);
-      if(!el) return;
-      el.innerHTML = '<option value="">— select a year —</option>';
-      // py-select respects squadron filter; other selectors show all
-      const yrs = (sid==='py-select') ? visibleYears : P.years;
-      yrs.forEach(y=>{
-        const o = document.createElement('option');
-        o.value = y.planning_year_id;
-        const prefix = showUnitPrefix
-          ? (y.unit_code ? `${y.unit_code} — ` : y.wing_code ? `${y.wing_code} — ` : '')
-          : '';
-        o.textContent = prefix + (y.name || String(y.year)) + (y.active_status?'':' (archived)');
-        el.appendChild(o);
-      });
-      if(P.currentYearId) el.value = P.currentYearId;
-    });
-    _renderPyActionBtns();
     if (document.getElementById('ynLabel')) ynInit();
     return P.currentYearId || null;
   } catch(e) { console.warn('planning years load failed', e); return null; }
@@ -15949,6 +15963,7 @@ async function _renderParadeDates(yearId){
 
 async function _renderHolidays(yearId){
   const el = document.getElementById('py-holidays-body');
+  if (!el) return;
   try {
     const rows = await api(`/api/planning/years/${yearId}/holidays`);
     if(!rows.length){ el.innerHTML='<p class="muted">No holiday periods added yet.</p>'; return; }
