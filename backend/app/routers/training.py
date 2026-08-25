@@ -885,9 +885,16 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
     if initial_status not in ("draft", "planned"):
         raise HTTPException(400, detail={"error": "invalid_initial_status",
                                          "message": "New sessions must be created with status 'draft' or 'planned'."})
+    # timing_block_id was declared on SessionIn and never written here, so a
+    # session created with a program period silently had none. The printed
+    # Weekly Program lays sessions out BY block -- the block is the row -- so
+    # such a session fell through to the "Unlinked periods" footnote and never
+    # appeared in the grid. Found 2026-08-26; edit_session honoured the field all
+    # along, which is why this survived: anything edited once looked correct.
     s = Session(parade_night_id=pn.id, squadron_id=pn.squadron_id, period_number=body.period_number,
                 cadet_group=body.cadet_group, phase_at_time=body.phase_at_time, custom_title=body.custom_title,
-                expected_attendance=body.expected_attendance, status=initial_status, created_by=p.user_id)
+                expected_attendance=body.expected_attendance, status=initial_status,
+                timing_block_id=body.timing_block_id, created_by=p.user_id)
     _denormalise(db, s, body.curriculum_item_id, body.facilitator_id, body.training_area_id)
     db.add(s); db.commit()
     _recompute(db, pn)

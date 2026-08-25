@@ -10351,20 +10351,17 @@ async function savePNDetail(ds,cnt){
       const facId=document.getElementById('d-fa-'+i)?.value||null;
       const roomName=document.getElementById('d-rm-'+i)?.value||'';
       const phase=document.getElementById('d-ph-'+i)?.value||s.phase||'B. Initial';
-      const ci=S.curr.find(c=>c.title===expTitle);
-      const room=S.rooms.find(r=>r.name===roomName);
-      // TB-1: send the program period. PUT replaces the session, so omitting
+          // TB-1: send the program period. PUT replaces the session, so omitting
       // this cleared timing_block_id on every save -- latent until something
       // could set it.
       const tbEl=document.getElementById('d-tb-'+i);
-      const body={
-        parade_night_id:pn.id, period_number:s.period_number||i+1,
-        phase_at_time:phase, curriculum_item_id:ci?ci.id:null,
-        facilitator_id:facId||null, training_area_id:room?room.id:null,
-        custom_title:expTitle&&!ci?expTitle:null,
-        timing_block_id: tbEl ? (tbEl.value||null) : (s.timingBlockId||null)
-      };
-      if(newSt&&newSt!==s.status){ body.status=newSt; body.reason=reason||null; }
+      const body=_sessBuildBody({
+        __pnId:pn.id, period_number:s.period_number||i+1,
+        phase:phase, exp:expTitle, facId:facId, room:roomName,
+        // this screen offers a period selector, so the DOM value wins over the
+        // session's stored one
+        timingBlockId: tbEl ? (tbEl.value||null) : (s.timingBlockId||null),
+      }, (newSt&&newSt!==s.status) ? {status:newSt, reason:reason||null} : undefined);
       // Single atomic PUT: fields + status transition committed together server-side —
       // no partial-update window between a field save and a separate status save.
       //
@@ -10689,8 +10686,6 @@ async function saveSessEdit(){
   const expTitle=document.getElementById('qe-ex').value;
   const facId=document.getElementById('qe-fa').value||null;
   const roomName=document.getElementById('qe-rm').value;
-  const ci=S.curr.find(c=>c.title===expTitle);
-  const room=S.rooms.find(r=>r.name===roomName);
   const sessErrEl=document.getElementById('sess-edit-err');
   // Collect the reason (if this transition needs one) BEFORE saving anything, so
   // cancelling the reason panel leaves the session completely untouched rather than
@@ -10702,13 +10697,17 @@ async function saveSessEdit(){
   }
   if(sessErrEl){sessErrEl.textContent='Saving…';sessErrEl.style.color='var(--muted)';}
   try{
-    const body={
-      parade_night_id:pn.id, period_number:s.period_number||editSessRef.idx+1,
-      phase_at_time:s.phase||'B. Initial', curriculum_item_id:ci?ci.id:null,
-      facilitator_id:facId||null, training_area_id:room?room.id:null,
-      custom_title:expTitle&&!ci?expTitle:null
-    };
-    if(newSt!==s.status){ body.status=newSt; body.reason=reason||null; }
+    // Built by _sessBuildBody() rather than by hand. This copy omitted
+    // timing_block_id, and PUT replaces the whole session, so every quick edit
+    // silently cleared the session's program period and dropped it out of the
+    // printed Weekly Program. Two other copies of this object carried a comment
+    // warning about exactly that; writing the warning twice did not stop the
+    // third copy getting it wrong, which is why there is now only one.
+    const body=_sessBuildBody({
+      __pnId:pn.id, period_number:s.period_number||editSessRef.idx+1,
+      phase:s.phase, exp:expTitle, facId:facId, room:roomName,
+      timingBlockId:s.timingBlockId,
+    }, (newSt!==s.status) ? {status:newSt, reason:reason||null} : undefined);
     // Single atomic PUT — see savePNDetail()'s comment for why this replaced the
     // previous separate PUT-then-POST(/status) two-call sequence.
     await api('/api/sessions/'+s.id,{method:'PUT',body:JSON.stringify(body)});
