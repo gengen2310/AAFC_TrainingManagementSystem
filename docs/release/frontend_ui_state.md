@@ -128,6 +128,13 @@ Filter bar: type selector (All / Must Attend / Key Event / Optional / Holiday),
 date range, term, search.  
 Section: squadron activity tab (`act-tab-squadron`).
 
+> **USER-AUTHORISED CHANGE (2026-08-27, REM-146):** Class Forecasts card
+> (`#py-forecasts-card`) added after Holiday Periods, above the inherited
+> activities section. Visible to squadron scope only; hidden automatically by
+> `_loadClassForecasts()` for wing/national roles, empty years, or 403 responses.
+> Backend endpoint `/api/planning/class-forecasts` and renderer pre-existed —
+> this adds the HTML mount point to expose them.
+
 > **Lock:** `Generate Activities` and `+ Add Holiday` must remain in `#page-activities`.
 > Tests `[Activities] Title … required buttons present`, `[Activities] Holiday create`,
 > and `[Activities] Generate Activities modal` assert their presence. Removing them

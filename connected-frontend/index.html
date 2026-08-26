@@ -1818,6 +1818,15 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div id="py-holidays-body"><p class="muted" style="font-size:var(--fs-xs)">No holiday periods for this year.</p></div>
         </div>
 
+        <!-- REM-146: Class forecast card — squadron scope only; hidden by default,
+             shown and populated by _loadClassForecasts() when a year is selected.
+             USER-AUTHORISED CHANGE (2026-08-27): exposed class forecast UI. -->
+        <div class="card" id="py-forecasts-card" style="display:none;margin-top:0">
+          <h2 class="ctitle">Class Forecasts</h2>
+          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 10px">Planning status per training class — unplanned requirements, nights remaining, and available time blocks.</p>
+          <div id="fc-cards-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px"></div>
+        </div>
+
         <!-- VH-02: section break before inherited activities -->
         <div class="pg-sec-brk no-print"><span class="pg-sec-lbl">Inherited Activities</span></div>
 
@@ -11882,7 +11891,10 @@ async function _loadActivitiesPage(){
   } else {
     ynInit();
   }
-  if (P.currentYearId) _renderHolidays(P.currentYearId);
+  if (P.currentYearId) {
+    _renderHolidays(P.currentYearId);
+    _loadClassForecasts(P.currentYearId);
+  }
 }
 
 // ── Year nav control ──────────────────────────────────────────────────────────
