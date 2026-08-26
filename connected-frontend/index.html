@@ -14283,7 +14283,14 @@ async function changeMyCode(){
 //  TIMING TEMPLATES
 // ═══════════════════════════════════════════════════════════
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
-function safeUrl(u){try{const p=new URL(String(u||''),location.href).protocol;return(p==='https:'||p==='http:')?String(u):'#';}catch(e){return '#';}}
+// Returns a value safe to drop straight into an href="..." attribute.
+// Two jobs, and it used to do only the first: reject non-http(s) schemes
+// (javascript:, data:) AND escape the result. Returning the raw string meant a
+// learning_hub_url of  https://x/" onmouseover="...  closed the attribute and
+// installed a handler on the <a>. Both call sites are href="${safeUrl(...)}",
+// so escaping here is correct for every consumer; entities decode back to the
+// original URL when the link is followed.
+function safeUrl(u){try{const p=new URL(String(u||''),location.href).protocol;return(p==='https:'||p==='http:')?esc(String(u)):'#';}catch(e){return '#';}}
 // Capitalise a raw lowercase enum value for display (e.g. severity "high" -> "High") --
 // never use on a value that's already a proper label (e.g. from a *_LABEL map).
 function _cap(s){s=String(s||'');return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
