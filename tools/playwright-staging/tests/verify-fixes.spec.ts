@@ -13,24 +13,26 @@ const WING_ADMIN = ROLES.find((r) => r.role === "wing_admin")!;
 const NATIONAL_ADMIN = ROLES.find((r) => r.role === "national_admin")!;
 
 // Navigate to Activities page and confirm an active planning year is loaded.
-// Returns false if no planning years exist on staging (P.currentYearId is null).
-// The Activities page uses a year-nav arrow control, not a dropdown — this
-// function previously looked for #py-select which never exists on this page
-// and therefore always returned false, causing all HOL tests to skip.
+// Returns false if no planning years exist on staging (P.currentYearId stays null).
+//
+// P (const) and S (let) are global lexical bindings in the SPA's non-module
+// <script>, so they are NOT properties of window. window.P / window.S are always
+// undefined. Use eval() to reach them through the global lexical scope instead.
+// nav("activities") fires _loadActivitiesPage() without await; waitForTimeout gives
+// the background fetch time to settle before we read P.currentYearId.
 async function navToActivitiesYear(page: Page): Promise<boolean> {
   await page.evaluate(() => (window as any).nav("activities"));
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(2500);
 
+  // eval() is the only way to reach let/const globals from an injected Playwright
+  // callback — these SPA variables are NOT window properties. The string is a
+  // static literal (no user input), so there is no injection risk.
+  const currentYearId: string | null = await page.evaluate(() =>
+    eval('typeof P !== "undefined" ? (P.currentYearId ?? null) : null')  // eslint-disable-line no-eval
+  );
   const activeId = await page.evaluate(() => document.querySelector(".page.active")?.id ?? "none");
-  console.log("Active page after nav('activities'):", activeId);
-
-  // P.currentYearId is set during loadData() at boot — non-null means a year is active.
-  const currentYearId: string | null = await page.evaluate(() => {
-    return (window as any).P?.currentYearId ?? null;
-  });
-  const optVals = currentYearId ? [currentYearId] : [];
-  console.log("Planning year options:", optVals);
-  return optVals.length > 0;
+  console.log("navToActivitiesYear: active:", activeId, "yearId:", currentYearId);
+  return !!currentYearId;
 }
 
 // ── PW-CTX-01 ─────────────────────────────────────────────────────────────────
