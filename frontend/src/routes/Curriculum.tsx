@@ -6,6 +6,7 @@ import { StatusBadge } from "../components/status/StatusBadge";
 import { DrilldownPanel } from "../components/DrilldownPanel";
 import { useScopedSquadron } from "../layout/SquadronViewContext";
 import type { CurriculumItem } from "../api/types";
+import { safeExternalUrl } from "../utils/safeExternalUrl";
 
 export function Curriculum() {
   const { needsSelection, squadronId, scoped } = useScopedSquadron();
@@ -61,7 +62,7 @@ export function Curriculum() {
                 <td><button className="link-btn" onClick={() => setDrill(i)}>{i.code}</button></td>
                 <td>{i.title}</td><td>{i.element}</td><td>{i.duration_minutes}m</td><td>{i.session_count}</td>
                 <td><StatusBadge status={i.progress === "complete" ? "delivered" : i.progress === "in_progress" ? "planned" : "draft"} /></td>
-                <td>{i.learning_hub_url ? <a className="lh" href={i.learning_hub_url} target="_blank" rel="noopener">↗ open</a> : <span className="muted">—</span>}</td>
+                <td>{safeExternalUrl(i.learning_hub_url) ? <a className="lh" href={safeExternalUrl(i.learning_hub_url)!} target="_blank" rel="noopener noreferrer">↗ open</a> : <span className="muted">—</span>}</td>
               </tr>))}</tbody>
           </table>
         </Card>
@@ -75,7 +76,7 @@ function CurriculumDrill({ item, onClose }: { item: CurriculumItem; onClose: () 
   const q = useQuery({ queryKey: ["cur-sessions", item.curriculum_id], queryFn: () => trainingApi.curriculumSessions(item.curriculum_id) });
   return (
     <DrilldownPanel title={`${item.code} — sessions`} onClose={onClose}>
-      {item.learning_hub_url && <p><a className="lh" href={item.learning_hub_url} target="_blank" rel="noopener">↗ Learning Hub resource</a></p>}
+      {safeExternalUrl(item.learning_hub_url) && <p><a className="lh" href={safeExternalUrl(item.learning_hub_url)!} target="_blank" rel="noopener noreferrer">↗ Learning Hub resource</a></p>}
       {q.isLoading ? <Loading /> : ((q.data ?? []).length ? (
         <table><thead><tr><th>Item</th><th>Status</th></tr></thead>
           <tbody>{q.data!.map((s) => <tr key={s.id}><td>{s.curriculum_title_at_time ?? s.custom_title ?? "—"}</td><td><StatusBadge status={s.status} /></td></tr>)}</tbody></table>
