@@ -1947,6 +1947,21 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <thead><tr><th style="width:80px">Category</th><th style="width:260px">Item</th><th style="width:90px">Date</th><th style="width:130px">Issue</th><th class="no-print" style="width:80px">Action</th></tr></thead>
           <tbody id="action-tbody"></tbody>
         </table></div>
+        <!-- Planning Checks: conflict detection and decision guide.
+             checks-empty is shown when no year is selected; checks-card when data loads.
+             USER-AUTHORISED CHANGE (2026-08-27): exposed planning checks on Needs Attention. -->
+        <div id="checks-empty" style="margin-top:18px">
+          <p class="muted" style="font-size:var(--fs-xs)">No training year selected — visit Activities and select a year to run planning checks.</p>
+        </div>
+        <div class="card" id="checks-card" style="display:none;margin-top:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+            <h2 class="ctitle" style="margin:0">Planning Checks</h2>
+            <button class="btn btn-out btn-sm plan-write-el" style="display:none" onclick="runAllChecks()" title="Detect scheduling conflicts for the active training year">Run All Checks</button>
+          </div>
+          <div id="checks-guide-body"></div>
+          <div id="checks-conflicts-body" style="margin-top:14px"></div>
+        </div>
+
         <!-- HELP-05: What Changed? activity feed -->
         <div class="card" style="margin-top:18px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -15453,6 +15468,7 @@ const _origNav = nav;
 nav = function(pg) {
   _origNav(pg);
   if(pg === 'wing-calendar') { loadWingCalendar(); }
+  if(pg === 'action-items') { loadPlanningChecks(P.currentYearId||null); }
 };
 
 function _autoSelectFirstDate(selId, loadFnName) {

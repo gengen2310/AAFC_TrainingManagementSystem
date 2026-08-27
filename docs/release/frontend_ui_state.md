@@ -154,7 +154,14 @@ Header: `Refresh`, `+ Add Facilitator` (admin-el). Loaded by `loadFacilitatorSta
 Header: `Refresh`, `+ Add Room` (admin-el), `+ Add Equipment` (admin-el).
 
 ### page-action-items — Needs Attention
-Header: `Run checks`, `Refresh`. Loaded by `loadRecentChanges()`.
+Header: `Run checks` (calls `runExceptionChecks()` — session/room gap check), `Refresh`. Loaded by `loadRecentChanges()`.
+
+> **USER-AUTHORISED CHANGE (2026-08-27, Planning Checks):** Planning Checks section
+> added above "What Changed?" — `#checks-empty` (shown when no year selected) and
+> `#checks-card` (shown after load) with `#checks-guide-body`, `#checks-conflicts-body`,
+> and a "Run All Checks" button (plan-write-el). Loaded via the nav hook when
+> `action-items` is visited. Backend endpoints `/run-checks` and `/conflicts/{id}/override`
+> and renderer `loadPlanningChecks()` pre-existed; this adds the HTML mount point.
 
 ### page-help — Help & Reference
 Cards: Getting Started (→ `nav('getting-started')` button), Getting Help (admin-editable
