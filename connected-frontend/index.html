@@ -1845,6 +1845,76 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div id="py-wing-events-body"></div>
         </div>
 
+        <!-- Anchor Events — always visible; body shows "Select a year" until one is chosen.
+             USER-AUTHORISED CHANGE (2026-08-27): exposed anchor events on Activities page. -->
+        <div class="card" style="margin-top:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+            <h2 class="ctitle" style="margin:0">Anchor Events</h2>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="anch-show-archived" onchange="loadAnchors(P.currentYearId)"> Show archived</label>
+              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddAnchorModal()">+ Add Anchor</button>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <select id="anch-filter-importance" aria-label="Filter by importance" onchange="renderAnchors()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
+              <option value="">All Importance</option>
+              <option value="must_attend">Must Attend</option>
+              <option value="key_event">Key Event</option>
+              <option value="optional">Optional</option>
+            </select>
+            <select id="anch-filter-type" aria-label="Filter by event type" onchange="renderAnchors()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
+              <option value="">All Types</option>
+              <option value="ceremonial">Ceremonial</option>
+              <option value="fieldcraft">Fieldcraft</option>
+              <option value="adventure_training">Adventure Training</option>
+              <option value="dining_in">Dining In</option>
+              <option value="inspection">Inspection</option>
+              <option value="sport">Sport</option>
+              <option value="community">Community</option>
+              <option value="admin">Admin</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div id="anchors-body"><p class="muted" style="font-size:var(--fs-xs)">Select a year above.</p></div>
+        </div>
+
+        <!-- Mission Backlog — missions-empty shown when no year; filter + table shown when loaded.
+             USER-AUTHORISED CHANGE (2026-08-27): exposed Mission Backlog on Activities page. -->
+        <div id="missions-empty" style="margin-top:0">
+          <p class="muted" style="font-size:var(--fs-xs)">Select a year above to load the Mission Backlog.</p>
+        </div>
+        <div class="card" id="missions-filters-card" style="display:none;margin-top:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+            <h2 class="ctitle" style="margin:0">Mission Backlog</h2>
+            <span id="missions-count" style="font-size:var(--fs-xs);color:var(--muted)"></span>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select id="mission-filter-phase" aria-label="Filter by training phase" onchange="renderMissions()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
+              <option value="">All Phases</option>
+              <option value="A. Orientation">Orientation</option>
+              <option value="B. Initial">Initial</option>
+              <option value="C. Junior">Junior</option>
+              <option value="D. Intermediate">Intermediate</option>
+              <option value="E. Senior">Senior</option>
+              <option value="I. Bronze">Bronze</option>
+              <option value="J. Silver">Silver</option>
+              <option value="K. Gold">Gold</option>
+            </select>
+            <select id="mission-filter-status" aria-label="Filter by schedule status" onchange="renderMissions()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
+              <option value="">All Status</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="unscheduled">Unscheduled</option>
+            </select>
+            <select id="mission-filter-class" aria-label="Filter by training class" onchange="renderMissions()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
+              <option value="">All Classes</option>
+            </select>
+            <input id="mission-search" placeholder="Search code or title…" oninput="renderMissions()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm);min-width:160px" aria-label="Search missions by code or title">
+          </div>
+        </div>
+        <div class="card" id="missions-table-card" style="display:none;margin-top:0">
+          <div id="missions-body"></div>
+        </div>
+
         <!-- VH-02: section break before inherited activities -->
         <div class="pg-sec-brk no-print"><span class="pg-sec-lbl">Inherited Activities</span></div>
 
@@ -11930,6 +12000,11 @@ async function _loadActivitiesPage(){
     _renderHolidays(P.currentYearId);
     _loadClassForecasts(P.currentYearId);
     if(_actWid) _loadAndRenderWingEventsOverlay(_actWid, _actYr.year||new Date().getFullYear());
+    loadAnchors(P.currentYearId);
+    loadMissions(P.currentYearId);
+  } else {
+    loadAnchors(null);
+    loadMissions(null);
   }
 }
 

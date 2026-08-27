@@ -141,6 +141,19 @@ Section: squadron activity tab (`act-tab-squadron`).
 > returns no events. Renderer `_loadAndRenderWingEventsOverlay()`, backend endpoint
 > `/api/wing-calendar/squadron-overlay`, and importance filter already existed —
 > this adds the HTML mount point and wires the call into `_loadActivitiesPage()`.
+>
+> **USER-AUTHORISED CHANGE (2026-08-27, Anchor Events):** Anchor Events card added
+> after Wing HQ Events — `#anchors-body`, `#anch-filter-importance`, `#anch-filter-type`,
+> `#anch-show-archived`. `loadAnchors()` wired into `_loadActivitiesPage()`.
+> Backend (5 anchor endpoints), renderer `loadAnchors()`/`renderAnchors()`, and
+> modal `#m-add-anchor` all pre-existed.
+>
+> **USER-AUTHORISED CHANGE (2026-08-27, Mission Backlog):** Mission Backlog section
+> added after Anchor Events — `#missions-empty`, `#missions-filters-card`,
+> `#missions-table-card`, `#missions-body`, `#missions-count`, and filter/search
+> controls. `loadMissions()` wired into `_loadActivitiesPage()`. Backend endpoints
+> `/missions` and `/assign-mission`, renderer `loadMissions()`/`renderMissions()`,
+> and assignment modal all pre-existed.
 
 > **Lock:** `Generate Activities` and `+ Add Holiday` must remain in `#page-activities`.
 > Tests `[Activities] Title … required buttons present`, `[Activities] Holiday create`,
