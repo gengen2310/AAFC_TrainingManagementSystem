@@ -134,6 +134,13 @@ Section: squadron activity tab (`act-tab-squadron`).
 > `_loadClassForecasts()` for wing/national roles, empty years, or 403 responses.
 > Backend endpoint `/api/planning/class-forecasts` and renderer pre-existed —
 > this adds the HTML mount point to expose them.
+>
+> **USER-AUTHORISED CHANGE (2026-08-27, Wing Events Overlay):** Wing HQ Events
+> card (`#py-wing-events-card`) added after Class Forecasts. Shown for squadron
+> accounts that have a `wing_id`; hidden when no wing is associated or the API
+> returns no events. Renderer `_loadAndRenderWingEventsOverlay()`, backend endpoint
+> `/api/wing-calendar/squadron-overlay`, and importance filter already existed —
+> this adds the HTML mount point and wires the call into `_loadActivitiesPage()`.
 
 > **Lock:** `Generate Activities` and `+ Add Holiday` must remain in `#page-activities`.
 > Tests `[Activities] Title … required buttons present`, `[Activities] Holiday create`,

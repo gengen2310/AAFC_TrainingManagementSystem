@@ -1827,6 +1827,24 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div id="fc-cards-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px"></div>
         </div>
 
+        <!-- Wing HQ Events overlay — squadron scope; hidden until _loadAndRenderWingEventsOverlay()
+             populates it. USER-AUTHORISED CHANGE (2026-08-27): exposed wing events overlay UI. -->
+        <div class="card" id="py-wing-events-card" style="display:none;margin-top:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+            <h2 class="ctitle" style="margin:0">Wing HQ Events</h2>
+            <select id="py-we-imp-filter" aria-label="Filter by planning importance" onchange="_renderWingEventsOverlay()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
+              <option value="">All Importance</option>
+              <option value="must_attend">Must Attend</option>
+              <option value="key_event">Key Event</option>
+              <option value="recommended">Recommended</option>
+              <option value="optional">Optional</option>
+              <option value="home_parade">Home Parade</option>
+              <option value="noting">Noting</option>
+            </select>
+          </div>
+          <div id="py-wing-events-body"></div>
+        </div>
+
         <!-- VH-02: section break before inherited activities -->
         <div class="pg-sec-brk no-print"><span class="pg-sec-lbl">Inherited Activities</span></div>
 
@@ -11892,8 +11910,11 @@ async function _loadActivitiesPage(){
     ynInit();
   }
   if (P.currentYearId) {
+    const _actYr = (P.years||[]).find(y=>y.planning_year_id===P.currentYearId)||{};
+    const _actWid = _actYr.wing_id||(S.session&&S.session.wing_id)||'';
     _renderHolidays(P.currentYearId);
     _loadClassForecasts(P.currentYearId);
+    if(_actWid) _loadAndRenderWingEventsOverlay(_actWid, _actYr.year||new Date().getFullYear());
   }
 }
 
