@@ -47,18 +47,23 @@ async function loginSquadron(page: Page, code = "ADMIN703") {
   await page.locator("#auth-btn").click();
   await expect(page.locator("#app")).toBeVisible({ timeout: 15000 });
   await page.evaluate(() => nav("accounts"));
-  await expect(page.locator("#acct-refdata-card")).toBeVisible({ timeout: 15000 });
-  // Two waits, because there are two stages. The card becomes visible before
-  // _renderRefData() draws the rows (else getElementById returns null), and the
-  // rows draw with a "counting..." placeholder before _refDataCounts() fills in
-  // the real number. Waiting only for the first made a test race look like a
-  // product bug.
+  await expect(page.locator("#acct-tabs")).toBeVisible({ timeout: 15000 });
+}
+
+// Reference Data now lives behind the Configuration tab, so tests that touch it
+// must open the tab first. Two further waits are needed after that: the rows are
+// drawn by _renderRefData() (before which getElementById returns null), and they
+// render a "counting..." placeholder before _refDataCounts() supplies the number.
+// Waiting for only one of the three stages made a test race look like a product bug.
+async function openConfigTab(page: Page) {
+  await page.click("#acct-tab-config");
   await expect(page.locator("#refdata-count-subjarea")).toBeVisible({ timeout: 15000 });
   await expect(page.locator("#refdata-count-subjarea")).toHaveText(/\d+\s*active/, { timeout: 15000 });
 }
 
 test("REFDATA-01: all six datasets appear as grouped summary rows, not stacked editors", async ({ page }) => {
   await loginSquadron(page);
+  await openConfigTab(page);
 
   // Every dataset has a summary row with a count.
   const keys = await page.evaluate(() => _REFDATA_TYPES.map((t) => t.key));
@@ -81,6 +86,7 @@ test("REFDATA-01: all six datasets appear as grouped summary rows, not stacked e
 
 test("REFDATA-02: Manage opens the editor, and add / archive / show-archived all still work", async ({ page }) => {
   await loginSquadron(page);
+  await openConfigTab(page);
 
   const name = `Probe Area ${Date.now()}`;
 
@@ -131,6 +137,7 @@ test("REFDATA-02: Manage opens the editor, and add / archive / show-archived all
 
 test("REFDATA-03: a squadron admin still cannot archive a value owned by a higher scope", async ({ page }) => {
   await loginSquadron(page);
+  await openConfigTab(page);
 
   // Training Stages ships national/global entries a squadron must not touch.
   await page.evaluate(() => openRefDataManager("phase"));
@@ -154,4 +161,64 @@ test("REFDATA-03: a squadron admin still cannot archive a value owned by a highe
   const archiveButtons = await page.locator('#refdata-list-phase [onclick^="_archiveRefItem"]').count();
   const ownRows = rows.filter((r: any) => r.scope === "squadron" && r.ownedByMe).length;
   expect(archiveButtons).toBeLessThanOrEqual(ownRows);
+});
+
+// ── Nesting / containment ────────────────────────────────────────────────────
+// Three cards on this page opened a <div> inside an <h2> and then wrote
+// </h2></div> in that order. The parser force-closed the div at </h2>, leaving
+// the </div> to close #page-accounts early -- so the Units, Flights and
+// Reference Data cards were siblings of the page rather than children of it.
+//
+// Reference Data ended up a direct child of <body>, which meant nav() could not
+// hide it: once you opened Account Management it stayed on screen on Curriculum,
+// Activities, Parade Nights and Dashboard. Measured on the unfixed build, that
+// is what "I don't like having the screen below" was describing.
+//
+// getComputedStyle(child).display does NOT become "none" when an ancestor is
+// hidden, so these assertions use real visibility (offsetParent + box height).
+// The first version of this check used computed display and reported the bug as
+// still present after it was fixed.
+test("REFDATA-04: the configuration cards live inside the Accounts page and leave with it", async ({ page }) => {
+  await loginSquadron(page);
+
+  for (const id of ["acct-units-card", "acct-flights-card", "acct-refdata-card"]) {
+    const inside = await page.evaluate(
+      (i) => !!document.getElementById("page-accounts")?.contains(document.getElementById(i)),
+      id,
+    );
+    expect(inside, `${id} must be inside #page-accounts`).toBe(true);
+  }
+
+  const reallyVisible = () =>
+    page.evaluate(() => {
+      const e = document.getElementById("acct-refdata-card");
+      if (!e) return false;
+      return e.offsetParent !== null && e.getBoundingClientRect().height > 0;
+    });
+
+  await page.click("#acct-tab-config");
+  await expect.poll(reallyVisible, { timeout: 10000 }).toBe(true);
+
+  // Navigating away must take it with the page.
+  for (const p2 of ["curriculum", "activities", "dashboard"]) {
+    await page.evaluate((x) => nav(x), p2);
+    await expect.poll(reallyVisible, { timeout: 5000 }).toBe(false);
+  }
+});
+
+test("REFDATA-05: the Configuration tab is scoped and does not fight other tab bars", async ({ page }) => {
+  await loginSquadron(page);
+
+  await page.click("#acct-tab-config");
+  await expect(page.locator("#acct-tab-config")).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#acct-tab-accounts")).toHaveAttribute("aria-selected", "false");
+
+  // Curriculum's setCurrTab clears .active on EVERY .tab-btn in the document.
+  // These buttons must not be collateral damage, and vice versa.
+  await page.evaluate(() => nav("curriculum"));
+  const curriculumActive = await page.locator("#page-curriculum .tab-btn.active").count();
+  expect(curriculumActive).toBe(1);
+
+  await page.evaluate(() => nav("accounts"));
+  await expect(page.locator("#acct-tabs .tab-btn.active")).toHaveCount(1);
 });

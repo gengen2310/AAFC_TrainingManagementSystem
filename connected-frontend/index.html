@@ -2280,6 +2280,16 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('acct-refresh-status',renderAccounts)">Refresh</button>
           </div>
         </div>
+        <!-- Account Management tabs. Reference Data used to sit ~935px down this
+             page, so it was something you scrolled to; it is now one click.
+             NOTE: setAcctTab scopes its querySelectorAll to #acct-tabs. The older
+             setCurrTab/openCurrMatrix pattern clears .active on EVERY .tab-btn in
+             the document, which would fight these buttons across pages. -->
+        <div class="tabs no-print" id="acct-tabs" role="tablist" aria-label="Account Management sections" style="display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:14px">
+          <button class="tab-btn active" role="tab" aria-selected="true" aria-controls="acct-pane-accounts" id="acct-tab-accounts" onclick="setAcctTab('accounts',this)">Accounts</button>
+          <button class="tab-btn" role="tab" aria-selected="false" aria-controls="acct-pane-config" id="acct-tab-config" onclick="setAcctTab('config',this)">Configuration</button>
+        </div>
+        <div id="acct-pane-accounts" role="tabpanel" aria-labelledby="acct-tab-accounts">
         <!-- filter + create -->
         <div class="card">
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
@@ -2304,8 +2314,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <div style="display:flex;align-items:center;gap:10px">
               <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="wings-show-archived" onchange="_orgToggleShowArchived('wing')"> Show archived</label>
               <button class="btn btn-xs btn-sky" id="wing-create-btn-2" style="display:none" onclick="openCreateWingModal()">+ Add Wing</button>
-            </h2>
           </div>
+            </h2>
           <div id="wings-table"></div>
         </div>
         <!-- Units sub-section: Squadrons / Specialist Units (Wing + NAT HQ) -->
@@ -2323,8 +2333,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
               <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="units-show-archived" onchange="_orgToggleShowArchived('squadron')"> Show archived</label>
               <button class="btn btn-xs btn-sky" id="wing-create-btn" style="display:none" onclick="openCreateWingModal()">+ Add Wing</button>
               <button class="btn btn-xs btn-sky" id="sqn-create-btn" style="display:none" onclick="openCreateSqnModal()">+ Add Squadron / Specialist Unit</button>
-            </h2>
           </div>
+            </h2>
           <div id="units-table"></div>
         </div>
         <!-- Flights sub-section -->
@@ -2334,8 +2344,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <div style="display:flex;align-items:center;gap:10px">
               <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="flights-show-archived" onchange="_flightsToggleShowArchived()"> Show archived</label>
               <button class="btn btn-xs btn-sky acct-write-el" id="flight-create-btn" style="display:none" onclick="openCreateFlightModal()">+ Add Flight</button>
-            </h2>
           </div>
+            </h2>
           <div class="alert a-info" style="font-size:var(--fs-xs);margin:6px 0 10px">Flights are local squadron groupings only. They do not create separate tenancy or change permissions. A user assigned to a Flight still belongs entirely to the Squadron.</div>
           <div id="flight-table"></div>
         </div>
@@ -2347,11 +2357,14 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
              creators elsewhere (Add Curriculum modal's "+ New" phase creator,
              the Facilitator Tags modal) -- this card covers the common
              "create at my own level" case, not a full cross-scope picker. -->
+        </div><!-- /acct-pane-accounts -->
+        <div id="acct-pane-config" role="tabpanel" aria-labelledby="acct-tab-config" style="display:none">
         <div class="card acct-write-el" id="acct-refdata-card" style="display:none">
           <h2 class="ctitle">Reference Data</h2>
           <p class="muted" style="font-size:var(--fs-xs);margin:0 0 10px">Configuration values used by the operational pages. Everything here is created at your own scope (<span id="refdata-scope-label"></span>).</p>
           <div id="refdata-sections" style="display:grid;gap:18px"></div>
         </div>
+        </div><!-- /acct-pane-config -->
       </div>
 
       <!-- WING OVERVIEW -->
@@ -6872,6 +6885,13 @@ async function renderAccounts(){
   _renderFlightTable();
   const refCard=document.getElementById('acct-refdata-card');
   if(refCard){ refCard.style.display=canWrite?'':'none'; if(canWrite)_renderRefData(); }
+  // Same gate on the tab itself -- an empty Configuration tab is worse than none.
+  const cfgTab=document.getElementById('acct-tab-config');
+  if(cfgTab){
+    cfgTab.style.display=canWrite?'':'none';
+    if(!canWrite && cfgTab.classList.contains('active'))
+      setAcctTab('accounts',document.getElementById('acct-tab-accounts'));
+  }
 }
 
 // ── Reference Data (Training Stages / Facilitator Types / Subject Areas) ──
@@ -6913,6 +6933,26 @@ const _REFDATA_TYPES=[
    restoreUrl:id=>`/api/training-area-capability-tags/${id}/restore`,
    idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
 ];
+// Account Management tabs. Scoped deliberately: setCurrTab/openCurrMatrix clear
+// .active on every .tab-btn in the document, so an unscoped copy here would make
+// the Curriculum tabs and these fight each other.
+function setAcctTab(key,btn){
+  const bar=document.getElementById('acct-tabs');
+  if(bar)bar.querySelectorAll('.tab-btn').forEach(b=>{
+    b.classList.remove('active');
+    b.setAttribute('aria-selected','false');
+  });
+  if(btn){ btn.classList.add('active'); btn.setAttribute('aria-selected','true'); }
+  const panes={accounts:'acct-pane-accounts',config:'acct-pane-config'};
+  Object.entries(panes).forEach(([k,id])=>{
+    const el=document.getElementById(id);
+    if(el)el.style.display=(k===key)?'':'none';
+  });
+  // The Configuration tab is only meaningful to a user who can write reference
+  // data; renderAccounts() already gates the card itself on canWrite.
+  if(key==='config')_renderRefData();
+}
+
 const _REFDATA_GROUPS=[
   {key:'training',label:'Training Configuration'},
   {key:'people',  label:'People Configuration'},
