@@ -2349,8 +2349,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
              "create at my own level" case, not a full cross-scope picker. -->
         <div class="card acct-write-el" id="acct-refdata-card" style="display:none">
           <h2 class="ctitle">Reference Data</h2>
-          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 10px">Training stages, facilitator types, and subject areas are created here at your own scope (<span id="refdata-scope-label"></span>).</p>
-          <div id="refdata-sections" style="display:grid;gap:14px"></div>
+          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 10px">Configuration values used by the operational pages. Everything here is created at your own scope (<span id="refdata-scope-label"></span>).</p>
+          <div id="refdata-sections" style="display:grid;gap:18px"></div>
         </div>
       </div>
 
@@ -3682,6 +3682,18 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
 </div>
 
 <!-- Add Activity -->
+<!-- Reference Data manager. One modal shared by all six datasets: the body is
+     the SAME per-type markup the card used to stack inline, with the same
+     refdata-*-${key} ids, so _loadRefList/_addRefItem/_archiveRefItem/
+     _restoreRefItem keep working untouched (including their esc()/_jsAttr
+     escaping). Only where the markup lives changed. -->
+<div class="modal-bg" id="m-refdata" role="dialog" aria-modal="true" aria-labelledby="refdata-modal-title">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="refdata-modal-title">Manage</div><button class="modal-x" aria-label="Close" onclick="closeRefDataManager()">&times;</button></div>
+    <div class="modal-body" id="refdata-modal-body"></div>
+    <div class="modal-ftr"><button class="btn btn-out" onclick="closeRefDataManager()">Done</button></div>
+  </div>
+</div>
 <div class="modal-bg" id="m-add-act" role="dialog" aria-modal="true" aria-labelledby="m-add-act-title">
   <div class="modal">
     <div class="modal-hdr"><div class="modal-title" id="m-add-act-title">+ Add Activity</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-act')">×</button></div>
@@ -6877,30 +6889,55 @@ function _naturalRefScope(){
   return null;
 }
 const _REFDATA_TYPES=[
-  {key:'phase',label:'Training Stages',listUrl:'/api/curriculum/phases',createUrl:'/api/curriculum/phases',
+  {key:'phase',group:'training',label:'Training Stages',listUrl:'/api/curriculum/phases',createUrl:'/api/curriculum/phases',
    archiveUrl:id=>`/api/curriculum/phases/${id}/archive`,archiveMethod:'POST',
    idField:'phase_id',nameField:'display_name',scopeField:'scope_level',ownScopeName:s=>s==='global'?'national':s},
-  {key:'factype',label:'Facilitator Types',listUrl:'/api/facilitator-type-tags',createUrl:'/api/facilitator-type-tags',
+  {key:'factype',group:'people',label:'Facilitator Types',listUrl:'/api/facilitator-type-tags',createUrl:'/api/facilitator-type-tags',
    archiveUrl:id=>`/api/facilitator-type-tags/${id}`,archiveMethod:'DELETE',
    restoreUrl:id=>`/api/facilitator-type-tags/${id}/restore`,
    idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
-  {key:'subjarea',label:'Subject Areas',listUrl:'/api/subject-area-tags',createUrl:'/api/subject-area-tags',
+  {key:'subjarea',group:'training',label:'Subject Areas',listUrl:'/api/subject-area-tags',createUrl:'/api/subject-area-tags',
    archiveUrl:id=>`/api/subject-area-tags/${id}`,archiveMethod:'DELETE',
    restoreUrl:id=>`/api/subject-area-tags/${id}/restore`,
    idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
-  {key:'reason',label:'Session Status Reasons',listUrl:'/api/session-status-reason-tags',createUrl:'/api/session-status-reason-tags',
+  {key:'reason',group:'training',label:'Session Status Reasons',listUrl:'/api/session-status-reason-tags',createUrl:'/api/session-status-reason-tags',
    archiveUrl:id=>`/api/session-status-reason-tags/${id}`,archiveMethod:'DELETE',
    restoreUrl:id=>`/api/session-status-reason-tags/${id}/restore`,
    idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
-  {key:'acttype',label:'Activity Types',listUrl:'/api/activity-type-tags',createUrl:'/api/activity-type-tags',
+  {key:'acttype',group:'training',label:'Activity Types',listUrl:'/api/activity-type-tags',createUrl:'/api/activity-type-tags',
    archiveUrl:id=>`/api/activity-type-tags/${id}`,archiveMethod:'DELETE',
    restoreUrl:id=>`/api/activity-type-tags/${id}/restore`,
    idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
-  {key:'roomcap',label:'Training Area Capabilities',listUrl:'/api/training-area-capability-tags',createUrl:'/api/training-area-capability-tags',
+  {key:'roomcap',group:'resource',label:'Training Area Capabilities',listUrl:'/api/training-area-capability-tags',createUrl:'/api/training-area-capability-tags',
    archiveUrl:id=>`/api/training-area-capability-tags/${id}`,archiveMethod:'DELETE',
    restoreUrl:id=>`/api/training-area-capability-tags/${id}/restore`,
    idField:'tag_id',nameField:'display_name',scopeField:'scope',ownScopeName:s=>s},
 ];
+const _REFDATA_GROUPS=[
+  {key:'training',label:'Training Configuration'},
+  {key:'people',  label:'People Configuration'},
+  {key:'resource',label:'Resource Configuration'},
+];
+
+// The card used to stack all six editors, producing the same
+// tags -> input -> "+ Add" -> "Show archived" block six times down one page.
+// It now shows a summary row per dataset and opens the editor in a modal.
+// The editor markup itself is unchanged and still carries the same
+// refdata-*-${key} ids, so every function below keeps working as-is.
+function _refDataRowHtml(t,counts){
+  const c=counts||{};
+  const detail=(c.active==null)
+    ? '<span class="muted" style="font-size:var(--fs-2xs)">counting…</span>'
+    : `<span style="font-size:var(--fs-2xs);color:var(--muted)">${c.active} active${c.archived?` · ${c.archived} archived`:''}</span>`;
+  return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border-light);border-radius:6px;background:var(--surface)">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:var(--fs-xs);font-weight:700;color:var(--text)">${esc(t.label)}</div>
+      <div id="refdata-count-${t.key}">${detail}</div>
+    </div>
+    <button class="btn btn-out btn-sm" onclick="openRefDataManager('${_jsAttr(t.key)}')" aria-label="Manage ${esc(t.label)}">Manage</button>
+  </div>`;
+}
+
 async function _renderRefData(){
   const natScope=_naturalRefScope();
   const lbl=document.getElementById('refdata-scope-label');
@@ -6908,18 +6945,56 @@ async function _renderRefData(){
   if(!natScope)return;
   const wrap=document.getElementById('refdata-sections');
   if(!wrap)return;
-  wrap.innerHTML=_REFDATA_TYPES.map(t=>`
-    <div>
-      <div style="font-size:var(--fs-xs);font-weight:800;color:var(--steel);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;align-items:center">${esc(t.label)}${t.restoreUrl?`<label style="font-size:var(--fs-2xs);font-weight:400;text-transform:none;letter-spacing:0;display:flex;align-items:center;gap:4px;margin-left:auto;cursor:pointer"><input type="checkbox" id="refdata-show-archived-${t.key}" onchange="_loadRefByKey('${t.key}')"> Show archived</label>`:''}</div>
-      <div id="refdata-list-${t.key}" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"><span class="muted" style="font-size:var(--fs-xs)">Loading…</span></div>
-      <div style="display:flex;gap:6px">
-        <input id="refdata-new-${t.key}" placeholder="New ${esc(t.label.replace(/s$/,''))} name…" style="flex:1;min-width:160px;padding:6px 9px;border:1px solid var(--border);border-radius:7px;font-size:var(--fs-sm)">
-        <button id="refdata-add-${t.key}" class="btn btn-sky btn-sm" onclick="_addRefItem('${t.key}')">+ Add</button>
-      </div>
-      <p id="refdata-msg-${t.key}" style="color:var(--error);font-size:var(--fs-xs);margin:4px 0 0"></p>
-    </div>`).join('');
-  await Promise.all(_REFDATA_TYPES.map(t=>_loadRefList(t)));
+  wrap.innerHTML=_REFDATA_GROUPS.map(g=>{
+    const types=_REFDATA_TYPES.filter(t=>t.group===g.key);
+    if(!types.length)return '';
+    return `<div>
+      <div style="font-size:var(--fs-2xs);font-weight:800;color:var(--steel);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">${esc(g.label)}</div>
+      <div style="display:grid;gap:6px">${types.map(t=>_refDataRowHtml(t,null)).join('')}</div>
+    </div>`;
+  }).join('');
+  await Promise.all(_REFDATA_TYPES.map(t=>_refDataCounts(t)));
 }
+
+// Counts for the summary row. Types with a restoreUrl support ?include_archived,
+// so active and archived are both real numbers; the rest report active only.
+async function _refDataCounts(t){
+  const el=document.getElementById(`refdata-count-${t.key}`);
+  if(!el)return;
+  try{
+    const items=await api(t.restoreUrl?`${t.listUrl}?include_archived=true`:t.listUrl);
+    const archived=t.restoreUrl?items.filter(i=>i.is_active===false).length:0;
+    el.innerHTML=`<span style="font-size:var(--fs-2xs);color:var(--muted)">${items.length-archived} active${archived?` · ${archived} archived`:''}</span>`;
+  }catch(_){ el.innerHTML='<span class="muted" style="font-size:var(--fs-2xs)">Could not load.</span>'; }
+}
+
+// Opens the shared modal for one dataset. The body is the per-type editor that
+// used to sit inline on the card -- same ids, same handlers, same escaping.
+function openRefDataManager(key){
+  const t=_REFDATA_TYPES.find(x=>x.key===key); if(!t)return;
+  const title=document.getElementById('refdata-modal-title');
+  if(title)title.textContent=t.label;
+  const body=document.getElementById('refdata-modal-body');
+  if(!body)return;
+  body.innerHTML=`
+    <div id="refdata-list-${t.key}" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"><span class="muted" style="font-size:var(--fs-xs)">Loading…</span></div>
+    <div style="display:flex;gap:6px">
+      <input id="refdata-new-${t.key}" placeholder="New ${esc(t.label.replace(/s$/,''))} name…" style="flex:1;min-width:160px;padding:6px 9px;border:1px solid var(--border);border-radius:5px;font-size:var(--fs-xs)">
+      <button id="refdata-add-${t.key}" class="btn btn-sky btn-sm" onclick="_addRefItem('${_jsAttr(t.key)}')">+ Add</button>
+    </div>
+    <p id="refdata-msg-${t.key}" style="color:var(--error);font-size:var(--fs-xs);margin:6px 0 0"></p>
+    ${t.restoreUrl?`<label style="display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-2xs);font-weight:400;text-transform:none;letter-spacing:0;margin-top:10px;color:var(--muted)"><input type="checkbox" id="refdata-show-archived-${t.key}" onchange="_loadRefByKey('${_jsAttr(t.key)}')"> Show archived</label>`:''}
+  `;
+  openModal('m-refdata');
+  _loadRefList(t);
+}
+
+// Closing refreshes the summary counts, so the card reflects what you just did.
+function closeRefDataManager(){
+  closeModal('m-refdata');
+  _REFDATA_TYPES.forEach(t=>_refDataCounts(t));
+}
+
 async function _loadRefList(t){
   const el=document.getElementById(`refdata-list-${t.key}`);
   if(!el)return;
