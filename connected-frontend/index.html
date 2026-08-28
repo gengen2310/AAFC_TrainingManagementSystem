@@ -2202,7 +2202,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <div class="card admin-el" id="settings-training-years-wrap">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
             <h2 class="ctitle" style="margin:0">Training Years</h2>
-            <button class="btn btn-sky admin-el" onclick="ynCreateYear()">+ Create <span id="ynCreateLabelCard">next year</span></button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-sky admin-el" onclick="ynCreateYear()">+ Create <span id="ynCreateLabelCard">next year</span></button>
+              <button class="btn btn-out admin-el" id="btn-create-draft-year" style="display:none" onclick="ynCreateDraftYear()">+ Create Draft Year</button>
+            </div>
           </div>
           <p class="muted" style="font-size:var(--fs-xs);margin:0 0 12px">
             Each training year holds its own parade dates, training classes and holiday periods.
@@ -5311,7 +5314,7 @@ async function loadData(){
           if(d){ P.currentYearId=d.planning_year_id; P.currentYearInt=d.year; }
         }
       }
-      const activeIds=(years||[]).filter(y=>y.active_status).map(y=>y.planning_year_id);
+      const activeIds=(years||[]).filter(y=>y.status==='active'||(!y.status&&y.active_status)).map(y=>y.planning_year_id);
       const lists=await Promise.all(activeIds.map(id=>api('/api/planning/years/'+id+'/holidays').catch(()=>[])));
       return lists.flat();
     }catch(_){ return []; }
@@ -11373,7 +11376,7 @@ async function openCurrMatrix(btn){
     if(!sqnId){if(status)status.textContent='No squadron selected.';return;}
     let yearId=null;
     const years=await api('/api/planning/years?unit_id='+encodeURIComponent(sqnId)).catch(()=>[]);
-    const active=(years||[]).find(y=>y.active_status);
+    const active=(years||[]).find(y=>y.status==='active'||(!y.status&&y.active_status));
     yearId=active?active.planning_year_id:(years&&years[0]?years[0].planning_year_id:null);
     if(!yearId){if(status)status.textContent='No year found.';return;}
     _cmData=await api('/api/curriculum/class-matrix?year_id='+encodeURIComponent(yearId));
@@ -11599,7 +11602,7 @@ async function _loadCurriculumClassBreakdown(){
     let yearId=P&&P.currentYearId;
     if(!yearId){
       const years=await api('/api/planning/years?unit_id='+encodeURIComponent(sqnId)).catch(()=>[]);
-      const active=(years||[]).find(y=>y.active_status);
+      const active=(years||[]).find(y=>y.status==='active'||(!y.status&&y.active_status));
       if(!active) return;
       yearId=active.planning_year_id;
     }
@@ -12293,9 +12296,10 @@ function _ynRenderYearList(el, years, opts){
   // year, and this list is otherwise unbounded -- the dev database holds 118,
   // which would make the card taller than the rest of Unit Setup combined.
   const showArch = !!opts.showArchived;
-  const active = years.filter(function(y){return y.active_status;});
-  const archived = years.filter(function(y){return !y.active_status;});
-  const visible = showArch ? years : active;
+  const active   = years.filter(function(y){ return y.status==='active'   || (!y.status && y.active_status); });
+  const draft    = years.filter(function(y){ return y.status==='draft'; });
+  const archived = years.filter(function(y){ return y.status==='archived' || (!y.status && !y.active_status && y.status!=='draft'); });
+  const visible = showArch ? years : active.concat(draft);
   const archNote = archived.length
     ? '<button class="btn btn-xs btn-out" style="align-self:flex-start;margin-top:4px" '
       + 'onclick="ynToggleArchived(this)" aria-expanded="'+(showArch?'true':'false')+'">'
@@ -12310,26 +12314,32 @@ function _ynRenderYearList(el, years, opts){
   el.innerHTML = '<div class="yn-year-list">' + visible.map(function(y){
     const id = y.planning_year_id;
     const isCur = id === curId;
-    const active = !!y.active_status;
-    const cls = 'yn-year-row' + (isCur?' is-current':'') + (active?'':' is-arch');
+    const ySt = y.status || (y.active_status ? 'active' : 'archived');
+    const isActive = ySt === 'active';
+    const isDraft  = ySt === 'draft';
+    const cls = 'yn-year-row' + (isCur?' is-current':'') + (isActive?'':' is-arch');
     // The name is only worth a line of its own when it says something the year
     // number does not.
     const nameLine = (y.name && String(y.name) !== String(y.year))
       ? '<div class="yn-year-name">'+esc(String(y.name))+'</div>' : '';
     const created = y.created_at ? fmtD(String(y.created_at).slice(0,10),{day:'numeric',month:'short',year:'numeric'}) : '';
-    const meta = [ active?'Active':'Archived', created?('Created '+created):'' ]
+    const stLabel = isDraft ? 'Draft' : isActive ? 'Active' : 'Archived';
+    const meta = [ stLabel, created?('Created '+created):'' ]
       .filter(Boolean).join(' \u00b7 ');
     let acts = '';
-    if(canWrite && active){
+    if(canWrite && isActive){
       acts += '<button class="btn btn-xs btn-sky" title="Copy this year\u2019s parade dates, holidays and training classes into a new year" '
            +  'onclick="ynOpenRollover(\''+esc(id)+'\','+(+y.year)+')">Roll over \u2192</button>';
     }
     acts += '<button class="btn btn-xs btn-out" onclick="ynExportYear(\''+esc(id)+'\','+(+y.year)+')">Export</button>';
     if(canWrite){
-      acts += active
-        ? '<button class="btn btn-xs btn-out" onclick="ynArchiveYear(\''+esc(id)+'\')">Archive</button>'
-        : '<button class="btn btn-xs btn-out" onclick="ynRestoreYear(\''+esc(id)+'\')">Restore</button>';
-      if(!active){
+      if(isActive){
+        acts += '<button class="btn btn-xs btn-out" onclick="ynArchiveYear(\''+esc(id)+'\')">Archive</button>';
+      } else if(isDraft){
+        acts += '<button class="btn btn-xs btn-sky" onclick="ynPromoteYear(\''+esc(id)+'\')">Promote to Active</button>';
+        acts += '<button class="btn btn-xs btn-red" onclick="ynDeleteYear(\''+esc(id)+'\','+(+y.year)+')">Delete</button>';
+      } else {
+        acts += '<button class="btn btn-xs btn-out" onclick="ynRestoreYear(\''+esc(id)+'\')">Restore</button>';
         acts += '<button class="btn btn-xs btn-red" onclick="ynDeleteYear(\''+esc(id)+'\','+(+y.year)+')">Delete</button>';
       }
     }
@@ -12372,6 +12382,12 @@ async function ynRefreshAllYearViews(){
   if(lbl) lbl.textContent = String(_ynNextYearNumber());
   const lbl2 = document.getElementById('ynCreateLabelCard');
   if(lbl2) lbl2.textContent = String(_ynNextYearNumber());
+  // Show "Create Draft Year" only for sqn_admin when no draft already exists
+  const draftBtn = document.getElementById('btn-create-draft-year');
+  if(draftBtn){
+    const hasDraft = (years||[]).some(y=>y.status==='draft');
+    draftBtn.style.display = (S.role==='sqn_admin' && !hasDraft) ? '' : 'none';
+  }
   if(typeof _syncCalYearOptions==='function') _syncCalYearOptions();
 }
 
@@ -12463,18 +12479,40 @@ async function ynCreateYear(){
   } catch(e){ showToast('Could not create year '+next+': '+apiErr(e),true); }
 }
 
+async function ynCreateDraftYear(){
+  const active=(P.years||[]).find(y=>y.status==='active'||(!y.status&&y.active_status));
+  if(!active){showToast('No active year found to base the draft on.',true);return;}
+  const nextYr=active.year+1;
+  const name=String(nextYr)+' Training Year';
+  try{
+    await api('/api/planning/years/draft',{method:'POST',body:{year:nextYr,name,source_year_id:active.planning_year_id}});
+    showToast('Draft year '+nextYr+' created.');
+    await ynRefreshAllYearViews();
+  }catch(e){showToast('Could not create draft: '+apiErr(e),true);}
+}
+
 async function ynArchiveYear(id){
   try{
-    await api('/api/planning/years/'+id,{method:'PATCH',body:{active_status:false}});
+    await api('/api/planning/years/'+id+'/archive',{method:'POST'});
     const all=await api('/api/planning/years');
     P.years=(all||[]);
     await ynRefreshAllYearViews();
   } catch(e){ showToast('Archive failed: '+apiErr(e),true); }
 }
 
+async function ynPromoteYear(id){
+  try{
+    await api('/api/planning/years/'+id+'/promote',{method:'POST'});
+    const all=await api('/api/planning/years');
+    P.years=(all||[]);
+    await ynRefreshAllYearViews();
+    showToast('Year promoted to active.');
+  } catch(e){ showToast('Promote failed: '+apiErr(e),true); }
+}
+
 async function ynRestoreYear(id){
   try{
-    await api('/api/planning/years/'+id,{method:'PATCH',body:{active_status:true}});
+    await api('/api/planning/years/'+id+'/promote',{method:'POST'});
     const all=await api('/api/planning/years');
     P.years=(all||[]);
     await ynRefreshAllYearViews();
@@ -12732,7 +12770,8 @@ async function _loadSettingsTrainingClasses(){
     (P.years||[]).forEach(y=>{
       const o=document.createElement('option');
       o.value=y.planning_year_id;
-      o.textContent=(y.name||String(y.year))+(y.active_status?'':' (archived)');
+      const _tcSuffix = y.status==='draft'?' (Draft)':y.status==='archived'?' (Archived)':(!y.status&&!y.active_status?' (Archived)':'');
+      o.textContent=(y.name||String(y.year))+_tcSuffix;
       sel.appendChild(o);
     });
     // Auto-select active year
@@ -15512,7 +15551,7 @@ const _CADET_GROUPS = ['orientation','initial','junior','intermediate','senior']
 function _pickDefaultYear(list){
   const yrs=(list||[]).filter(Boolean);
   if(!yrs.length) return null;
-  const act=yrs.filter(y=>y.active_status);
+  const act=yrs.filter(y=>y.status==='active'||(!y.status&&y.active_status));
   const pool=act.length?act:yrs;
   const now=new Date().getFullYear();
   const exact=pool.find(y=>parseInt(y.year,10)===now);
@@ -15557,7 +15596,8 @@ function _ynPopulateYearSelects() {
       const prefix = showUnitPrefix
         ? (y.unit_code ? `${y.unit_code} — ` : y.wing_code ? `${y.wing_code} — ` : '')
         : '';
-      o.textContent = prefix + (y.name || String(y.year)) + (y.active_status?'':' (archived)');
+      const _pySuffix = y.status==='draft'?' (Draft)':y.status==='archived'?' (Archived)':(!y.status&&!y.active_status?' (Archived)':'');
+      o.textContent = prefix + (y.name || String(y.year)) + _pySuffix;
       el.appendChild(o);
     });
     if(P.currentYearId) el.value = P.currentYearId;
@@ -15569,6 +15609,16 @@ async function _loadPlanningYears() {
   try {
     const data = await api('/api/planning/years');
     P.years = data || [];
+    // Year-changed notice: detect if the active year rolled over under the user's session
+    const newActive = (P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));
+    if(!P._yearSnapshotId && newActive){ P._yearSnapshotId = newActive.planning_year_id; }
+    else if(P._yearSnapshotId && newActive && newActive.planning_year_id !== P._yearSnapshotId){
+      showToast(
+        'Your training year has automatically updated to "' + esc(String(newActive.name||newActive.year)) + '". Reload to see the updated plan.',
+        false
+      );
+      P._yearSnapshotId = newActive.planning_year_id;
+    }
     if (document.getElementById('ynLabel')) ynInit();
     return P.currentYearId || null;
   } catch(e) { console.warn('planning years load failed', e); return null; }
@@ -15585,9 +15635,11 @@ function _renderPyActionBtns(){
     `<button class="btn btn-out btn-xs" onclick="exportAnnualProgram()" title="Export annual program to Excel">Export Annual</button>`+
     `<button class="btn btn-out btn-xs" onclick="exportSchedule()" title="Export schedule to Excel">Export Schedule</button>`+
     `<button class="btn btn-out btn-xs plan-write-el" style="display:none" onclick="doRenamePlanningYear()">Rename</button>`+
-    (y.active_status
+    (y.status==='active'||((!y.status)&&y.active_status)
       ? `<button class="btn btn-out btn-xs plan-write-el" style="display:none;border-color:var(--red);color:var(--status-text-danger)" onclick="doArchivePlanningYear()">Archive</button>`
-      : `<button class="btn btn-ok btn-xs plan-write-el" style="display:none" onclick="doRestorePlanningYear()">Restore</button>`)+
+      : y.status==='draft'
+        ? `<button class="btn btn-sky btn-xs plan-write-el" style="display:none" onclick="doPromotePlanningYear()">Promote to Active</button>`
+        : `<button class="btn btn-ok btn-xs plan-write-el" style="display:none" onclick="doRestorePlanningYear()">Restore</button>`)+
     `<button class="btn btn-out btn-xs plan-write-el" style="display:none;border-color:var(--red);color:var(--status-text-danger)" onclick="doDeletePlanningYear()">Delete…</button>`;
   document.querySelectorAll('#py-action-btns .plan-write-el').forEach(b=>{b.style.display=canWritePlan()?'inline-flex':'none';});
 }
@@ -15609,17 +15661,26 @@ async function doArchivePlanningYear(){
   if(!y)return;
   confirmAction(`Archive the ${y.name||y.year} year? It disappears from active selectors. Historical records are preserved and it can be restored later.`,async()=>{
     try{
-      await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({active_status:false,version:y.version})});
+      await api('/api/planning/years/'+P.currentYearId+'/archive',{method:'POST'});
       showToast('Year archived.');
       await _loadPlanningYears();
     }catch(e){ showToast('Could not archive: '+apiErr(e), true); }
   });
 }
+async function doPromotePlanningYear(){
+  const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
+  if(!y)return;
+  try{
+    await api('/api/planning/years/'+P.currentYearId+'/promote',{method:'POST'});
+    showToast('Year promoted to active.');
+    await _loadPlanningYears();
+  }catch(e){ showToast('Could not promote: '+apiErr(e), true); }
+}
 async function doRestorePlanningYear(){
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
   if(!y)return;
   try{
-    await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({active_status:true,version:y.version})});
+    await api('/api/planning/years/'+P.currentYearId+'/promote',{method:'POST'});
     showToast('Year restored.');
     await _loadPlanningYears();
   }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
@@ -16074,7 +16135,7 @@ async function loadYearMap(yearId){
       annualHtml = `<div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
         <div><span class="muted">Year:</span> <strong>${esc(String(ap.year||''))}</strong></div>
         <div><span class="muted">Name:</span> <strong>${esc(ap.name||'')}</strong></div>
-        <div><span class="muted">Status:</span> <span class="badge ${yr.active_status?'badge-green':'badge-grey'}">${yr.active_status?'Active':'Inactive'}</span></div>
+        <div><span class="muted">Status:</span> <span class="badge ${yr.status==='active'||((!yr.status)&&yr.active_status)?'badge-green':yr.status==='draft'?'badge-blue':'badge-grey'}">${yr.status==='draft'?'Draft':yr.status==='active'||((!yr.status)&&yr.active_status)?'Active':'Archived'}</span></div>
         <div><span class="muted">Parade Nights:</span> <strong>${ap.active_parade_dates}</strong></div>
         <div><span class="muted">Sessions Scheduled:</span> <strong>${ap.filled_session_slots} / ${ap.total_session_slots} (${pct}%)</strong></div>
       </div>` + _renderAnnualCalendar(ap);
@@ -16082,7 +16143,7 @@ async function loadYearMap(yearId){
       annualHtml = `<div style="display:flex;gap:24px;flex-wrap:wrap">
         <div><span class="muted">Year:</span> <strong>${esc(String(yr.year||''))}</strong></div>
         <div><span class="muted">Name:</span> <strong>${esc(yr.name||'')}</strong></div>
-        <div><span class="muted">Status:</span> <span class="badge ${yr.active_status?'badge-green':'badge-grey'}">${yr.active_status?'Active':'Inactive'}</span></div>
+        <div><span class="muted">Status:</span> <span class="badge ${yr.status==='active'||((!yr.status)&&yr.active_status)?'badge-green':yr.status==='draft'?'badge-blue':'badge-grey'}">${yr.status==='draft'?'Draft':yr.status==='active'||((!yr.status)&&yr.active_status)?'Active':'Archived'}</span></div>
       </div>`;
     }
     body.innerHTML = annualHtml;
