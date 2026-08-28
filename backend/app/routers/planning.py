@@ -454,7 +454,7 @@ def list_planning_years(
     if p.role in ("sqn_admin", "sqn_general") and p.squadron_id and p.wing_id:
         try:
             from ..services_year import resolve_active_year
-            resolve_active_year(p.squadron_id, p.wing_id, db)
+            resolve_active_year(p.squadron_id, p.wing_id, db, principal=p)
         except RuntimeError as e:
             logger.error("year rollover skipped for squadron %s: %s", p.squadron_id, e)
     q = db.query(PlanningYear)
@@ -624,10 +624,10 @@ def update_planning_year(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True)
-    # Structural edits to the year entity itself (name/status) require Proxy Mode
-    # when a wing_admin targets a squadron-scoped year — content operations (CEA
-    # imports, parade dates) do not carry this extra requirement.
-    if p.role == "wing_admin" and py.unit_id:
+    # Structural edits require Proxy/Delegated-Intervention for all roles above
+    # sqn_admin. require_can_write_squadron handles the full matrix:
+    # sqn_admin → same-squadron check; wing_admin → proxy; national_admin/system_admin → intervention.
+    if py.unit_id:
         require_can_write_squadron(p, py.unit_id, py.wing_id)
     _check_version(py, body.version)
     if body.name is not None:

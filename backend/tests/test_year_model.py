@@ -767,3 +767,96 @@ def test_archive_requires_auth_from_different_squadron(client):
     r = client.post(f"/api/planning/years/{yr['planning_year_id']}/archive",
                     headers=h_other)
     assert r.status_code == 403, r.text
+
+
+# ── national_admin without intervention — 403 on all writes ───────────────
+
+def test_national_admin_cannot_create_squadron_year_without_intervention(client):
+    """national_admin needs Delegated Intervention to create a squadron year."""
+    h_nat = _nat_admin_hdr(client)
+    h_admin = _sqn_admin_hdr(client)
+    # Resolve the squadron's unit_id via an existing year
+    years_r = client.get("/api/planning/years", headers=h_admin)
+    assert years_r.status_code == 200
+    unit_id = years_r.json()[0]["unit_id"]
+    wing_id = years_r.json()[0]["wing_id"]
+
+    base = next_test_year()
+    r = client.post("/api/planning/years",
+                    json={"year": base, "name": f"Nat {base}",
+                          "unit_id": unit_id, "wing_id": wing_id},
+                    headers=h_nat)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "intervention_required"
+
+
+def test_national_admin_cannot_promote_without_intervention(client):
+    """national_admin needs Delegated Intervention to promote a draft year."""
+    h_admin = _sqn_admin_hdr(client)
+    h_nat = _nat_admin_hdr(client)
+    _archive_existing_drafts(client, h_admin)
+    base = next_test_year()
+    active = client.post("/api/planning/years",
+                         json={"year": base, "name": f"Active {base}"},
+                         headers=h_admin).json()
+    draft = client.post("/api/planning/years/draft",
+                        json={"year": base + 1, "name": f"Draft {base + 1}",
+                              "source_year_id": active["planning_year_id"]},
+                        headers=h_admin).json()
+
+    r = client.post(f"/api/planning/years/{draft['planning_year_id']}/promote",
+                    headers=h_nat)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "intervention_required"
+
+
+def test_national_admin_cannot_archive_without_intervention(client):
+    """national_admin needs Delegated Intervention to archive a year."""
+    h_admin = _sqn_admin_hdr(client)
+    h_nat = _nat_admin_hdr(client)
+    base = next_test_year()
+    yr = client.post("/api/planning/years",
+                     json={"year": base, "name": f"Active {base}"},
+                     headers=h_admin).json()
+
+    r = client.post(f"/api/planning/years/{yr['planning_year_id']}/archive",
+                    headers=h_nat)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "intervention_required"
+
+
+def test_national_admin_cannot_restore_without_intervention(client):
+    """national_admin needs Delegated Intervention to restore an archived year."""
+    h_admin = _sqn_admin_hdr(client)
+    h_nat = _nat_admin_hdr(client)
+    base = next_test_year()
+    yr = client.post("/api/planning/years",
+                     json={"year": base, "name": f"Active {base}"},
+                     headers=h_admin).json()
+    yr_id = yr["planning_year_id"]
+    # Archive it first (as sqn_admin)
+    client.post(f"/api/planning/years/{yr_id}/archive", headers=h_admin)
+
+    r = client.post(f"/api/planning/years/{yr_id}/restore", headers=h_nat)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "intervention_required"
+
+
+def test_national_admin_cannot_patch_active_status_without_intervention(client):
+    """national_admin needs Delegated Intervention to PATCH active_status."""
+    h_admin = _sqn_admin_hdr(client)
+    h_nat = _nat_admin_hdr(client)
+    _archive_existing_drafts(client, h_admin)
+    base = next_test_year()
+    yr = client.post("/api/planning/years",
+                     json={"year": base, "name": f"Active {base}"},
+                     headers=h_admin).json()
+    yr_id = yr["planning_year_id"]
+    # Archive so we can try to restore via PATCH
+    client.post(f"/api/planning/years/{yr_id}/archive", headers=h_admin)
+
+    r = client.patch(f"/api/planning/years/{yr_id}",
+                     json={"active_status": True},
+                     headers=h_nat)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "intervention_required"

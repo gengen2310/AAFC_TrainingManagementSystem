@@ -45,6 +45,7 @@ def resolve_active_year(
     wing_id: str,
     db: Session,
     *,
+    principal=None,
     _today: "date_type | None" = None,
 ):
     """Return the active PlanningYear for this squadron; run rollover if due.
@@ -60,6 +61,7 @@ def resolve_active_year(
     """
     from .models.planning import PlanningYear
     from .database import utcnow
+    from .services import audit
     from sqlalchemy import exc
 
     tz = get_wing_timezone(wing_id, db)
@@ -87,12 +89,16 @@ def resolve_active_year(
                     active.active_status = False   # dual-write compat
                     active.updated_at = utcnow()
                     db.flush()  # BL-1: archive must reach DB before activate to satisfy unique index
-                    logger.info(
-                        "auto-archive for squadron %s: year %s → archived",
-                        squadron_id, active.id,
-                    )
+                    audit(db, principal, object_type="planning_year",
+                          object_id=active.id, action="auto_archived",
+                          old={"status": "active", "year": active.year},
+                          new={"status": "archived"}, commit=False)
                 draft.status = "active"
                 draft.active_status = True         # dual-write compat
+                audit(db, principal, object_type="planning_year",
+                      object_id=draft.id, action="auto_promoted",
+                      old={"status": "draft", "year": draft.year},
+                      new={"status": "active"}, commit=False)
                 db.commit()
                 db.refresh(draft)
                 return draft
