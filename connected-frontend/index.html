@@ -12483,9 +12483,10 @@ async function ynCreateDraftYear(){
   const active=(P.years||[]).find(y=>y.status==='active'||(!y.status&&y.active_status));
   if(!active){showToast('No active year found to base the draft on.',true);return;}
   const nextYr=active.year+1;
-  const name=String(nextYr)+' Training Year';
+  const name=prompt('Name for the draft year?',String(nextYr)+' Training Year');
+  if(!name)return;
   try{
-    await api('/api/planning/years/draft',{method:'POST',body:{year:nextYr,name,source_year_id:active.planning_year_id}});
+    await api('/api/planning/years/draft',{method:'POST',body:{year:nextYr,name:name.trim(),source_year_id:active.planning_year_id}});
     showToast('Draft year '+nextYr+' created.');
     await ynRefreshAllYearViews();
   }catch(e){showToast('Could not create draft: '+apiErr(e),true);}
