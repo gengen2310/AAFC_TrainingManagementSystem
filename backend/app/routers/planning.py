@@ -245,7 +245,9 @@ def _year_out(py: PlanningYear, unit_code: str | None = None,
               unit_name: str | None = None, wing_code: str | None = None) -> dict:
     return {
         "planning_year_id": py.id, "unit_id": py.unit_id, "wing_id": py.wing_id,
-        "year": py.year, "name": py.name, "active_status": py.active_status,
+        "year": py.year, "name": py.name,
+        "status": py.status,                      # Phase A: new canonical field
+        "active_status": py.active_status,        # backward-compat: keep until Phase A-2
         "unit_code": unit_code, "unit_name": unit_name, "wing_code": wing_code,
         "created_by": py.created_by, "updated_by": py.updated_by,
         "created_at": iso_z(py.created_at) if py.created_at else None,
@@ -515,9 +517,12 @@ def create_planning_year(
                 "existing_id": dupe.id,
                 "message": f"Training year {body.year} already exists for this unit.",
             })
+    _active = body.active_status if body.active_status is not None else True
     py = PlanningYear(
         id=str(uuid.uuid4()), year=body.year, name=body.name,
-        unit_id=unit_id, wing_id=wing_id, active_status=body.active_status,
+        unit_id=unit_id, wing_id=wing_id,
+        status="active" if _active else "archived",  # new canonical field
+        active_status=_active,
         created_by=p.user_id, created_at=utcnow(), updated_at=utcnow(),
     )
     db.add(py); db.commit()
@@ -591,6 +596,9 @@ def update_planning_year(
         py.name = body.name
     if body.active_status is not None:
         py.active_status = body.active_status
+        # Dual-write: keep status in sync with active_status for compat callers.
+        # archived → archived; restored → active. Draft is set only via lifecycle endpoints.
+        py.status = "active" if body.active_status else "archived"
     py.updated_by = p.user_id; py.updated_at = utcnow()
     py.version += 1
     db.commit()
