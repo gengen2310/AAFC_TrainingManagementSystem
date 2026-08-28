@@ -390,8 +390,13 @@ Raised in the same conversation, deliberately not designed here:
    it waits on question 6.
 2. What happens to the two parade nights whose squadrons have no active year —
    create a year, attach to an archived one, or leave them out of the merge?
-3. Should a draft year be visible in Planning Workspace at all, or only in TMS
-   until it becomes active?
+3. ~~Should a draft year be visible in Planning Workspace at all, or only in TMS
+   until it becomes active?~~ **ANSWERED 2026-08-28: PW shows the draft year for
+   planning; TMS controls the lifecycle.** PW's year selector exposes both the
+   active year and the draft year (clearly labelled) so the Training Cell can
+   pre-plan the next year before rollover. TMS Settings is the only place where
+   lifecycle actions exist (create draft, promote, archive). PW has no lifecycle
+   controls — it is a planning surface for whichever year the user selects.
 4. ~~The draft lifecycle is undefined.~~ **ANSWERED 2026-08-28:** one active year,
    next year drafted manually, promoted automatically on rollover with the
    outgoing year archived in the same transaction. Written up under Lifecycle.
@@ -404,7 +409,6 @@ Raised in the same conversation, deliberately not designed here:
    wing and holds all 18 squadrons, so that one value covers everything. The
    per-squadron override is dropped from the design.
 
-   **Nothing now blocks implementation of Phase A.** Questions 2 and 3 remain but
-   neither gates it: 2 concerns two orphaned parade nights at a squadron with no
-   planning year, which is a Phase B precondition; 3 is a UI decision that can be
-   made while Phase A is built.
+   **Nothing now blocks implementation of Phase A.** Question 2 remains open but
+   does not gate it: it concerns two orphaned parade nights at a squadron with no
+   planning year, which is a Phase B precondition. Questions 3–6 are all answered.
