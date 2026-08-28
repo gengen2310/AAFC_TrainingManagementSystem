@@ -6,9 +6,11 @@ builder, scheduled sessions, locations, facilitators (planning view),
 conflict detection, and weekly/long-range program output.
 """
 from __future__ import annotations
-import csv as _csv, io, json as _json, re, uuid
+import csv as _csv, io, json as _json, logging, re, uuid
 from datetime import date, timedelta
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
@@ -431,7 +433,10 @@ def get_wing_timezone_endpoint(
     from ..services_year import get_wing_timezone
     if not p.wing_id:
         raise HTTPException(400, detail={"error": "no_wing"})
-    tz = get_wing_timezone(p.wing_id, db)
+    try:
+        tz = get_wing_timezone(p.wing_id, db)
+    except RuntimeError as e:
+        raise HTTPException(409, detail={"error": "wing_timezone_unset", "message": str(e)})
     return {"timezone": str(tz)}
 
 
@@ -450,9 +455,8 @@ def list_planning_years(
         try:
             from ..services_year import resolve_active_year
             resolve_active_year(p.squadron_id, p.wing_id, db)
-        except RuntimeError:
-            # Wing has no timezone configured — rollover silently skipped.
-            pass
+        except RuntimeError as e:
+            logger.error("year rollover skipped for squadron %s: %s", p.squadron_id, e)
     q = db.query(PlanningYear)
     if p.role in ("sqn_admin", "sqn_general"):
         q = q.filter(PlanningYear.unit_id == p.squadron_id)
@@ -513,14 +517,15 @@ def create_planning_year(
     # the two creation paths disagreed, and repeated calls silently produced
     # duplicates that every downstream year selector then listed several times.
     # 409 matches rollover rather than inventing a second status for one condition.
-    _active = body.active_status if body.active_status is not None else True
+    _active = body.active_status  # MN-3: PlanningYearIn.active_status: bool = True is non-Optional
+    prev_active = None  # MJ-4: track for response annotation
     if unit_id:
-        # Block an exact same-year-number duplicate (active only -- an archived
-        # year of the same number is a supported replacement workflow).
+        # MN-10: Block a same-year-number duplicate for both active AND draft — a
+        # draft 2027 must also block an active 2027 creation to keep things clean.
         dupe = db.query(PlanningYear).filter(
             PlanningYear.unit_id == unit_id,
             PlanningYear.year == body.year,
-            PlanningYear.status == "active",
+            PlanningYear.status.in_(("active", "draft")),
         ).first()
         if dupe:
             raise HTTPException(409, detail={
@@ -550,6 +555,10 @@ def create_planning_year(
         created_by=p.user_id, created_at=utcnow(), updated_at=utcnow(),
     )
     db.add(py); db.commit()
+    # MJ-3: audit the auto-archive that accompanied this creation (if any)
+    if prev_active:
+        audit(db, p, object_type="planning_year", object_id=prev_active.id,
+              action="archive", new={"status": "archived", "superseded_by": py.id})
     audit(db, p, object_type="planning_year", object_id=py.id, action="create",
           new={"year": body.year, "name": body.name})
     # Auto-create the 5 standard training classes when creating a squadron-scoped year.
@@ -581,9 +590,14 @@ def create_planning_year(
         db.commit()
     sq = db.get(Squadron, py.unit_id) if py.unit_id else None
     wg = db.get(Wing, py.wing_id) if py.wing_id else None
-    return _year_out(py,
+    resp = _year_out(py,
         unit_code=sq.code if sq else None, unit_name=sq.name if sq else None,
         wing_code=wg.code if wg else None)
+    # MJ-4: surface the auto-archived year so the frontend can show a toast
+    if prev_active:
+        resp["archived_year_id"] = prev_active.id
+        resp["archived_year_name"] = prev_active.name
+    return resp
 
 
 @router.get("/years/{year_id}")
@@ -619,6 +633,21 @@ def update_planning_year(
     if body.name is not None:
         py.name = body.name
     if body.active_status is not None:
+        # BL-4: When transitioning to active via PATCH, archive any incumbent first
+        # to avoid IntegrityError from the unique-active-per-squadron index.
+        if body.active_status is True and py.status != "active" and py.unit_id:
+            cur = db.query(PlanningYear).filter(
+                PlanningYear.unit_id == py.unit_id,
+                PlanningYear.status == "active",
+            ).first()
+            if cur:
+                cur.status = "archived"
+                cur.active_status = False
+                cur.updated_by = p.user_id
+                cur.updated_at = utcnow()
+                db.flush()
+                audit(db, p, object_type="planning_year", object_id=cur.id,
+                      action="archive", new={"status": "archived", "superseded_by": py.id})
         py.active_status = body.active_status
         # Dual-write: keep status in sync with active_status for compat callers.
         # archived → archived; restored → active. Draft is set only via lifecycle endpoints.
@@ -640,7 +669,7 @@ def update_planning_year(
 class DraftYearIn(BaseModel):
     year: int
     name: str
-    source_year_id: str  # the active year this draft follows
+    source_year_id: Optional[str] = None  # MN-5: only required for wing/national paths
 
 
 @router.post("/years/draft")
@@ -667,19 +696,23 @@ def create_draft_year(
             raise HTTPException(404, detail={"error": "source_year_not_found"})
         unit_id = src.unit_id
         wing_id = src.wing_id
-        if unit_id:
-            require_can_write_squadron(p, unit_id, wing_id)
+    # MN-6: require_can_write_squadron runs unconditionally when unit_id is set,
+    # matching create_planning_year's shape (not only in the else branch).
+    if unit_id:
+        require_can_write_squadron(p, unit_id, wing_id)
 
-    existing_draft = (
-        db.query(PlanningYear)
-        .filter(PlanningYear.unit_id == unit_id,
-                PlanningYear.status == "draft")
-        .first()
-    )
+    # MJ-5: scope the duplicate check properly — unit_id path vs. wing_id path.
+    q = db.query(PlanningYear).filter(PlanningYear.status == "draft")
+    if unit_id:
+        q = q.filter(PlanningYear.unit_id == unit_id)
+    else:
+        q = q.filter(PlanningYear.unit_id.is_(None), PlanningYear.wing_id == wing_id)
+    existing_draft = q.first()
     if existing_draft:
+        # MJ-5: drop existing_id — the caller should fetch their own drafts to find it;
+        # returning an out-of-scope ID could leak a cross-tenant ID.
         raise HTTPException(409, detail={
             "error": "draft_already_exists",
-            "existing_id": existing_draft.id,
             "message": "A draft year already exists for this unit. Promote or archive it first.",
         })
 
@@ -701,9 +734,18 @@ def create_draft_year(
         wing_code=wg.code if wg else None)
 
 
+class PromoteDraftIn(BaseModel):
+    version: Optional[int] = None  # MJ-6: optional optimistic-lock version
+
+
+class ArchiveYearIn(BaseModel):
+    version: Optional[int] = None  # MJ-6: optional optimistic-lock version
+
+
 @router.post("/years/{year_id}/promote")
 def promote_draft_year(
     year_id: str,
+    body: PromoteDraftIn = PromoteDraftIn(),
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -711,10 +753,17 @@ def promote_draft_year(
     _require_plan_write(p)
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True)
+    # BL-2: proxy/intervention gate — every structural year write requires it
+    if py.unit_id:
+        require_can_write_squadron(p, py.unit_id, py.wing_id)
     if py.status != "draft":
         raise HTTPException(409, detail={"error": "not_a_draft",
                                          "message": "Only a draft year can be promoted."})
+    # MJ-6: optimistic locking — check version if provided
+    if body.version is not None:
+        _check_version(py, body.version)
     # Archive the current active year (if any) in the same transaction.
+    current_active = None
     if py.unit_id:
         current_active = (
             db.query(PlanningYear)
@@ -732,7 +781,12 @@ def promote_draft_year(
     py.active_status = True
     py.updated_by = p.user_id
     py.updated_at = utcnow()
+    py.version = (py.version or 0) + 1  # MJ-6
     db.commit()
+    # MJ-3: audit the auto-archive that accompanied this promotion (if any)
+    if current_active:
+        audit(db, p, object_type="planning_year", object_id=current_active.id,
+              action="archive", new={"status": "archived", "superseded_by": py.id})
     audit(db, p, object_type="planning_year", object_id=py.id, action="promote",
           new={"status": "active"})
     sq = db.get(Squadron, py.unit_id) if py.unit_id else None
@@ -745,6 +799,7 @@ def promote_draft_year(
 @router.post("/years/{year_id}/archive")
 def archive_year(
     year_id: str,
+    body: ArchiveYearIn = ArchiveYearIn(),
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -752,15 +807,74 @@ def archive_year(
     _require_plan_write(p)
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True)
+    # BL-2: proxy/intervention gate — every structural year write requires it
+    if py.unit_id:
+        require_can_write_squadron(p, py.unit_id, py.wing_id)
     if py.status == "archived":
         raise HTTPException(409, detail={"error": "already_archived"})
+    # MJ-6: optimistic locking — check version if provided
+    if body.version is not None:
+        _check_version(py, body.version)
     py.status = "archived"
     py.active_status = False
     py.updated_by = p.user_id
     py.updated_at = utcnow()
+    py.version = (py.version or 0) + 1  # MJ-6
     db.commit()
     audit(db, p, object_type="planning_year", object_id=py.id, action="archive",
           new={"status": "archived"})
+    sq = db.get(Squadron, py.unit_id) if py.unit_id else None
+    wg = db.get(Wing, py.wing_id) if py.wing_id else None
+    return _year_out(py,
+        unit_code=sq.code if sq else None, unit_name=sq.name if sq else None,
+        wing_code=wg.code if wg else None)
+
+
+@router.post("/years/{year_id}/restore")
+def restore_year(
+    year_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Restore an archived year to active (BL-3).
+
+    This is distinct from promote (which only accepts drafts). Restoring an
+    archived year atomically archives the current active year, the same as promote.
+    Draft years must use /promote instead.
+    """
+    _require_plan_write(p)
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py, write=True)
+    if py.unit_id:
+        require_can_write_squadron(p, py.unit_id, py.wing_id)
+    if py.status == "active":
+        raise HTTPException(409, detail={"error": "already_active",
+                                         "message": "Year is already active."})
+    if py.status == "draft":
+        raise HTTPException(409, detail={"error": "use_promote",
+                                         "message": "Draft years must be promoted, not restored."})
+    # Auto-archive current active year (atomic swap, same as promote)
+    if py.unit_id:
+        cur = db.query(PlanningYear).filter(
+            PlanningYear.unit_id == py.unit_id,
+            PlanningYear.status == "active",
+        ).first()
+        if cur:
+            cur.status = "archived"
+            cur.active_status = False
+            cur.updated_by = p.user_id
+            cur.updated_at = utcnow()
+            db.flush()
+            audit(db, p, object_type="planning_year", object_id=cur.id,
+                  action="archive", new={"status": "archived", "superseded_by": py.id})
+    py.status = "active"
+    py.active_status = True
+    py.updated_by = p.user_id
+    py.updated_at = utcnow()
+    py.version = (py.version or 0) + 1
+    db.commit()
+    audit(db, p, object_type="planning_year", object_id=py.id, action="restore",
+          new={"status": "active"})
     sq = db.get(Squadron, py.unit_id) if py.unit_id else None
     wg = db.get(Wing, py.wing_id) if py.wing_id else None
     return _year_out(py,
@@ -3833,6 +3947,7 @@ def rollover_year(
                                          "existing_id": existing.id})
 
     # Phase A: archive the existing active year before rolling into the new one.
+    old_active = None  # MJ-3: track for audit
     if py.unit_id:
         old_active = (
             db.query(PlanningYear)
@@ -3857,6 +3972,11 @@ def rollover_year(
     )
     db.add(new_py)
     db.flush()
+    # MJ-3: audit the auto-archive that accompanied this rollover (if any)
+    if old_active:
+        audit(db, p, object_type="planning_year", object_id=old_active.id,
+              action="archive", new={"status": "archived", "superseded_by": new_py.id},
+              commit=False)
 
     # Copy holiday periods
     holidays_copied = 0

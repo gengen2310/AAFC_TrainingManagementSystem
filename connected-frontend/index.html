@@ -1263,6 +1263,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   <div class="scope-banner" id="scope-banner" style="display:none"><span class="sb-tag" id="sb-tag">SQN</span><span id="sb-text"></span></div>
   <div class="mode-banner" id="mode-banner"><span id="mode-text"></span><button onclick="exitMode()">Exit mode</button></div>
   <div class="maint-banner" id="maint-banner"><span class="maint-icon" id="maint-icon">🔒</span><span class="maint-msg" id="maint-msg">System under maintenance.</span></div>
+  <div class="mode-banner" id="year-notice-banner"><span id="year-notice-msg"></span><button onclick="document.getElementById('year-notice-banner').className='mode-banner'">Dismiss</button></div>
   <!-- System Administrator scope selector: browse National (default) / a Wing / a Squadron.
        Viewing never requires Proxy/Intervention Mode (view is broad by design — the backend's
        can_view_squadron/can_view_wing already grant system_admin unconditional read access).
@@ -5305,6 +5306,11 @@ async function loadData(){
       // year did not appear there.
       if(typeof P!=='undefined'){
         P.years=years||[];
+        // MN-9: ensure snapshot is initialised here too, not only in _loadPlanningYears
+        if(!P._yearSnapshotId){
+          const _na=(P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));
+          if(_na) P._yearSnapshotId=_na.planning_year_id;
+        }
         // YR-4: P.currentYearId was only ever set by _loadPlanningYears(), which
         // runs when the planning page opens. At boot it stayed null, so the
         // Dashboard showed "No active training year" while the unit had active
@@ -12298,7 +12304,7 @@ function _ynRenderYearList(el, years, opts){
   const showArch = !!opts.showArchived;
   const active   = years.filter(function(y){ return y.status==='active'   || (!y.status && y.active_status); });
   const draft    = years.filter(function(y){ return y.status==='draft'; });
-  const archived = years.filter(function(y){ return y.status==='archived' || (!y.status && !y.active_status && y.status!=='draft'); });
+  const archived = years.filter(function(y){ return y.status==='archived' || (!y.status && !y.active_status); });
   const visible = showArch ? years : active.concat(draft);
   const archNote = archived.length
     ? '<button class="btn btn-xs btn-out" style="align-self:flex-start;margin-top:4px" '
@@ -12460,9 +12466,14 @@ async function ynDoRollover(){
 async function ynCreateYear(){
   const next=_ynNextYearNumber();
   try{
-    await api('/api/planning/years',{method:'POST',body:{year:next,name:String(next),active_status:true}});
+    const data=await api('/api/planning/years',{method:'POST',body:{year:next,name:String(next),active_status:true}});
+    // MJ-4: surface the auto-archived year if the backend silently archived one
+    if(data && data.archived_year_id){
+      showToast(data.archived_year_name+' has been archived and '+data.name+' is now the active year.');
+    }
     const all=await api('/api/planning/years');
     P.years=(all||[]);
+    {const _na=(P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));if(_na)P._yearSnapshotId=_na.planning_year_id;}
     const newY=(all||[]).find(y=>y.year===next);
     if(newY) setCurrentYear(newY);
     await ynRefreshAllYearViews();
@@ -12497,6 +12508,7 @@ async function ynArchiveYear(id){
     await api('/api/planning/years/'+id+'/archive',{method:'POST'});
     const all=await api('/api/planning/years');
     P.years=(all||[]);
+    {const _na=(P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));if(_na)P._yearSnapshotId=_na.planning_year_id;}
     await ynRefreshAllYearViews();
   } catch(e){ showToast('Archive failed: '+apiErr(e),true); }
 }
@@ -12506,6 +12518,7 @@ async function ynPromoteYear(id){
     await api('/api/planning/years/'+id+'/promote',{method:'POST'});
     const all=await api('/api/planning/years');
     P.years=(all||[]);
+    {const _na=(P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));if(_na)P._yearSnapshotId=_na.planning_year_id;}
     await ynRefreshAllYearViews();
     showToast('Year promoted to active.');
   } catch(e){ showToast('Promote failed: '+apiErr(e),true); }
@@ -12513,9 +12526,10 @@ async function ynPromoteYear(id){
 
 async function ynRestoreYear(id){
   try{
-    await api('/api/planning/years/'+id+'/promote',{method:'POST'});
+    await api('/api/planning/years/'+id+'/restore',{method:'POST'});
     const all=await api('/api/planning/years');
     P.years=(all||[]);
+    {const _na=(P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));if(_na)P._yearSnapshotId=_na.planning_year_id;}
     await ynRefreshAllYearViews();
   } catch(e){ showToast('Restore failed: '+apiErr(e),true); }
 }
@@ -12526,6 +12540,7 @@ function ynDeleteYear(id,yearNum){
       await api('/api/planning/years/'+id,{method:'DELETE'});
       const all=await api('/api/planning/years');
       P.years=(all||[]);
+      {const _na=(P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));if(_na)P._yearSnapshotId=_na.planning_year_id;}
       await ynRefreshAllYearViews();
     } catch(e){ showToast('Delete failed: '+apiErr(e),true); }
   },true);
@@ -15614,10 +15629,13 @@ async function _loadPlanningYears() {
     const newActive = (P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));
     if(!P._yearSnapshotId && newActive){ P._yearSnapshotId = newActive.planning_year_id; }
     else if(P._yearSnapshotId && newActive && newActive.planning_year_id !== P._yearSnapshotId){
-      showToast(
-        'Your training year has automatically updated to "' + esc(String(newActive.name||newActive.year)) + '". Reload to see the updated plan.',
-        false
-      );
+      // MN-9: show a dismissible banner instead of a 4-second toast
+      const nb=document.getElementById('year-notice-banner');
+      const nm=document.getElementById('year-notice-msg');
+      if(nb && nm){
+        nm.textContent='Your training year has automatically updated to "'+String(newActive.name||newActive.year)+'". Reload to see the updated plan.';
+        nb.className='mode-banner show';
+      }
       P._yearSnapshotId = newActive.planning_year_id;
     }
     if (document.getElementById('ynLabel')) ynInit();
@@ -15681,7 +15699,7 @@ async function doRestorePlanningYear(){
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
   if(!y)return;
   try{
-    await api('/api/planning/years/'+P.currentYearId+'/promote',{method:'POST'});
+    await api('/api/planning/years/'+P.currentYearId+'/restore',{method:'POST'});
     showToast('Year restored.');
     await _loadPlanningYears();
   }catch(e){ showToast('Could not restore: '+apiErr(e), true); }

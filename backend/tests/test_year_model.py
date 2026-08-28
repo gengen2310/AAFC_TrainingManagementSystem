@@ -17,12 +17,9 @@ def _nat_admin_hdr(client):
 
 # ── Wing.timezone ─────────────────────────────────────────────
 
-def test_wing_timezone_returned_in_year_list(client):
+def test_wing_timezone_endpoint_returns_perth(client):
     """Wing.timezone must be set for 7WG so rollover is computable."""
     h = _wing_admin_hdr(client)
-    r = client.get("/api/planning/years?wing_id=", headers=h)
-    # Wing timezone is not in year list — test via a dedicated endpoint
-    # This test verifies the endpoint exists and returns Perth.
     r = client.get("/api/planning/wing-timezone", headers=h)
     assert r.status_code == 200, r.text
     assert r.json()["timezone"] == "Australia/Perth"
@@ -440,28 +437,48 @@ def test_parade_night_attaches_to_active_not_draft(client):
 
 def test_cannot_have_two_active_years_for_same_squadron(client):
     """The DB-level unique index must prevent a second active year per squadron."""
+    from app.database import SessionLocal
+    from app.models.planning import PlanningYear
+
     h = _sqn_admin_hdr(client)
     base = next_test_year()
-    # First active year — succeeds
-    yr1 = client.post("/api/planning/years",
-                      json={"year": base, "name": f"Year {base}"},
-                      headers=h).json()
-    assert yr1["status"] == "active"
+    yr1_id = None
+    yr2_id = None
+    try:
+        # First active year — succeeds
+        yr1 = client.post("/api/planning/years",
+                          json={"year": base, "name": f"Year {base}"},
+                          headers=h).json()
+        assert yr1["status"] == "active"
+        yr1_id = yr1["planning_year_id"]
 
-    # Try to create a second active year via the old PATCH restore path
-    # (bypassing the new lifecycle endpoints to simulate the invariant test)
-    yr2 = client.post("/api/planning/years",
-                      json={"year": base + 1, "name": f"Year {base + 1}"},
-                      headers=h).json()
-    # The second POST creates a year — but the index means restoring an
-    # archived year while one is already active must fail.
-    # Archive yr2 first, then try to restore it while yr1 is still active.
-    yr2_id = yr2["planning_year_id"]
-    client.post(f"/api/planning/years/{yr2_id}/archive", headers=h)
-    r = client.post(f"/api/planning/years/{yr2_id}/promote", headers=h)
-    # promote of an archived year is not allowed (only draft can be promoted)
-    assert r.status_code == 409
-    assert r.json()["detail"]["error"] == "not_a_draft"
+        # Try to create a second active year via the old PATCH restore path
+        # (bypassing the new lifecycle endpoints to simulate the invariant test)
+        yr2 = client.post("/api/planning/years",
+                          json={"year": base + 1, "name": f"Year {base + 1}"},
+                          headers=h).json()
+        # The second POST creates a year — but the index means restoring an
+        # archived year while one is already active must fail.
+        # Archive yr2 first, then try to restore it while yr1 is still active.
+        yr2_id = yr2["planning_year_id"]
+        client.post(f"/api/planning/years/{yr2_id}/archive", headers=h)
+        r = client.post(f"/api/planning/years/{yr2_id}/promote", headers=h)
+        # promote of an archived year is not allowed (only draft can be promoted)
+        assert r.status_code == 409
+        assert r.json()["detail"]["error"] == "not_a_draft"
+    finally:
+        # MJ-9: restore squadron 703 to having an active year so subsequent
+        # tests that expect one don't fail with IndexError.
+        db = SessionLocal()
+        try:
+            if yr1_id:
+                yr1_obj = db.get(PlanningYear, yr1_id)
+                if yr1_obj and yr1_obj.status != "active":
+                    yr1_obj.status = "active"
+                    yr1_obj.active_status = True
+                    db.commit()
+        finally:
+            db.close()
 
 
 def test_promote_replaces_old_active_atomically(client):
@@ -484,3 +501,269 @@ def test_promote_replaces_old_active_atomically(client):
         f"Expected exactly one active year after promotion, got {len(active_years)}: "
         f"{[y['planning_year_id'] for y in active_years]}"
     )
+
+
+# ── BL-1: resolve_active_year UUID-order regression ──────────────
+
+
+def test_resolve_active_year_promotes_across_uuid_orderings(client):
+    """Loop ≥20 year-pairs through resolve_active_year() to catch UUID-ordering failures.
+
+    The bug: SQLAlchemy batches both UPDATEs and orders by UUID; when the draft's
+    UUID sorts before the active year's UUID, the activate fires first and hits the
+    unique index. The db.flush() fix in BL-1 ensures the archive always precedes the
+    activate regardless of UUID order. A single pair has a ~50% chance of picking
+    the safe ordering — 20 pairs reduces the false-pass probability to <1-in-a-million.
+    """
+    from app.database import SessionLocal
+    from app.services_year import resolve_active_year
+    from app.models.planning import PlanningYear
+
+    h = _sqn_admin_hdr(client)
+
+    for i in range(20):
+        base = next_test_year()
+        # Create source active year
+        active_yr = client.post(
+            "/api/planning/years",
+            json={"year": base, "name": f"BL1-Active-{i}"},
+            headers=h,
+        ).json()
+        squadron_id = active_yr["unit_id"]
+        wing_id = active_yr["wing_id"]
+        active_yr_id = active_yr["planning_year_id"]
+
+        # Create draft year (next year number)
+        draft_yr = client.post(
+            "/api/planning/years/draft",
+            json={"year": base + 1, "name": f"BL1-Draft-{i}",
+                  "source_year_id": active_yr_id},
+            headers=h,
+        ).json()
+        draft_yr_id = draft_yr["planning_year_id"]
+
+        # Run resolve_active_year with rollover date reached
+        db = SessionLocal()
+        try:
+            result = resolve_active_year(
+                squadron_id, wing_id, db,
+                _today=date(base + 1, 1, 1),
+            )
+            assert result is not None, f"iteration {i}: resolve_active_year returned None"
+            assert result.status == "active", f"iteration {i}: result status is {result.status!r}"
+            assert result.id == draft_yr_id, (
+                f"iteration {i}: expected draft {draft_yr_id} to be promoted, got {result.id}"
+            )
+            old = db.get(PlanningYear, active_yr_id)
+            db.refresh(old)
+            assert old.status == "archived", (
+                f"iteration {i}: old active year should be archived, got {old.status!r}"
+            )
+        finally:
+            db.close()
+
+
+# ── BL-2: proxy gate on promote and archive ───────────────────────
+
+
+def test_promote_requires_proxy_for_wing_admin(client):
+    """wing_admin without Proxy Mode must get 403 proxy_required on promote."""
+    h_admin = _sqn_admin_hdr(client)
+    h_wing = _wing_admin_hdr(client)
+    _archive_existing_drafts(client, h_admin)
+    base = next_test_year()
+    active_yr = client.post("/api/planning/years",
+                            json={"year": base, "name": f"Active {base}"},
+                            headers=h_admin).json()
+    draft_yr = client.post("/api/planning/years/draft",
+                           json={"year": base + 1, "name": f"Draft {base + 1}",
+                                 "source_year_id": active_yr["planning_year_id"]},
+                           headers=h_admin).json()
+    # wing_admin without proxy — must 403
+    r = client.post(f"/api/planning/years/{draft_yr['planning_year_id']}/promote",
+                    headers=h_wing)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "proxy_required"
+
+
+def test_archive_requires_proxy_for_wing_admin(client):
+    """wing_admin without Proxy Mode must get 403 proxy_required on archive."""
+    h_admin = _sqn_admin_hdr(client)
+    h_wing = _wing_admin_hdr(client)
+    base = next_test_year()
+    yr = client.post("/api/planning/years",
+                     json={"year": base, "name": f"Active {base}"},
+                     headers=h_admin).json()
+    # wing_admin without proxy — must 403
+    r = client.post(f"/api/planning/years/{yr['planning_year_id']}/archive",
+                    headers=h_wing)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "proxy_required"
+
+
+# ── BL-3: restore archived year ───────────────────────────────────
+
+
+def test_restore_archived_year(client):
+    """Restore archived year A while year B is active: A becomes active, B is archived."""
+    h = _sqn_admin_hdr(client)
+    _archive_existing_active_and_drafts(client, h)
+    base = next_test_year()
+    # Create year A as active
+    yr_a = client.post("/api/planning/years",
+                       json={"year": base, "name": f"Year A {base}"},
+                       headers=h).json()
+    yr_a_id = yr_a["planning_year_id"]
+    # Archive A
+    client.post(f"/api/planning/years/{yr_a_id}/archive", headers=h)
+
+    # Create year B as active
+    yr_b = client.post("/api/planning/years",
+                       json={"year": base + 1, "name": f"Year B {base + 1}"},
+                       headers=h).json()
+    yr_b_id = yr_b["planning_year_id"]
+    assert yr_b["status"] == "active"
+
+    # Restore A via /restore
+    r = client.post(f"/api/planning/years/{yr_a_id}/restore", headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "active"
+
+    # B should now be archived
+    b_check = client.get(f"/api/planning/years/{yr_b_id}", headers=h).json()
+    assert b_check["status"] == "archived", f"Year B should be archived, got {b_check['status']!r}"
+
+
+def test_restore_draft_returns_409(client):
+    """Restoring a draft must return 409 use_promote."""
+    h = _sqn_admin_hdr(client)
+    _archive_existing_drafts(client, h)
+    base = next_test_year()
+    active_yr = client.post("/api/planning/years",
+                            json={"year": base, "name": f"Active {base}"},
+                            headers=h).json()
+    draft_yr = client.post("/api/planning/years/draft",
+                           json={"year": base + 1, "name": f"Draft {base + 1}",
+                                 "source_year_id": active_yr["planning_year_id"]},
+                           headers=h).json()
+    r = client.post(f"/api/planning/years/{draft_yr['planning_year_id']}/restore",
+                    headers=h)
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"]["error"] == "use_promote"
+
+
+# ── BL-4: PATCH active_status=True while another year is active ──
+
+
+def test_patch_active_status_true_while_another_year_is_active(client):
+    """PATCH archived year with active_status=true while another year is active.
+
+    Before BL-4, this raised IntegrityError (HTTP 500) because update_planning_year
+    did not archive the incumbent before activating the target.
+    """
+    h = _sqn_admin_hdr(client)
+    _archive_existing_active_and_drafts(client, h)
+    base = next_test_year()
+    # Create an active year
+    yr1 = client.post("/api/planning/years",
+                      json={"year": base, "name": f"Year {base}"},
+                      headers=h).json()
+    yr1_id = yr1["planning_year_id"]
+    assert yr1["status"] == "active"
+
+    # Create a second year (auto-archives yr1)
+    yr2 = client.post("/api/planning/years",
+                      json={"year": base + 1, "name": f"Year {base + 1}"},
+                      headers=h).json()
+    yr2_id = yr2["planning_year_id"]
+    assert yr2["status"] == "active"
+
+    # yr1 should now be archived
+    yr1_check = client.get(f"/api/planning/years/{yr1_id}", headers=h).json()
+    assert yr1_check["status"] == "archived"
+
+    # PATCH yr1 back to active — this must succeed (no IntegrityError)
+    r = client.patch(f"/api/planning/years/{yr1_id}",
+                     json={"active_status": True, "version": yr1_check["version"]},
+                     headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "active"
+
+    # yr2 should now be archived
+    yr2_check = client.get(f"/api/planning/years/{yr2_id}", headers=h).json()
+    assert yr2_check["status"] == "archived"
+
+
+# ── MJ-1: wing_timezone_unset → 409 ──────────────────────────────
+
+
+def test_wing_timezone_unset_returns_409(client):
+    """Wing timezone unset must return 409 wing_timezone_unset, not 500."""
+    from app.database import SessionLocal
+    from app.models.organisations import Wing
+
+    h = _wing_admin_hdr(client)
+    # Find the wing and temporarily null its timezone
+    db = SessionLocal()
+    try:
+        r = client.get("/api/planning/wing-timezone", headers=h)
+        wing_tz = r.json().get("timezone")
+        # Get wing_id from login
+        import json, base64
+        token = h["Authorization"].split()[1]
+        payload = json.loads(base64.b64decode(token.split(".")[1] + "==").decode())
+        wing_id = payload.get("wing_id")
+
+        if not wing_id:
+            # Can't find wing_id from token — skip but don't fail
+            return
+
+        wing = db.get(Wing, wing_id)
+        if not wing:
+            return
+        original_tz = wing.timezone
+        try:
+            wing.timezone = None
+            db.commit()
+            r2 = client.get("/api/planning/wing-timezone", headers=h)
+            assert r2.status_code == 409, f"Expected 409, got {r2.status_code}: {r2.text}"
+            assert r2.json()["detail"]["error"] == "wing_timezone_unset"
+        finally:
+            wing.timezone = original_tz
+            db.commit()
+    finally:
+        db.close()
+
+
+# ── MJ-10: 403 tenancy tests for promote/archive ─────────────────
+
+
+def test_promote_requires_auth_from_different_squadron(client):
+    """sqn_admin from a different squadron must get 403 on promote."""
+    h_admin = _sqn_admin_hdr(client)   # ADMIN703
+    h_other = login(client, "ADMIN704")  # different squadron
+    _archive_existing_drafts(client, h_admin)
+    base = next_test_year()
+    active_yr = client.post("/api/planning/years",
+                            json={"year": base, "name": f"Active {base}"},
+                            headers=h_admin).json()
+    draft_yr = client.post("/api/planning/years/draft",
+                           json={"year": base + 1, "name": f"Draft {base + 1}",
+                                 "source_year_id": active_yr["planning_year_id"]},
+                           headers=h_admin).json()
+    r = client.post(f"/api/planning/years/{draft_yr['planning_year_id']}/promote",
+                    headers=h_other)
+    assert r.status_code == 403, r.text
+
+
+def test_archive_requires_auth_from_different_squadron(client):
+    """sqn_admin from a different squadron must get 403 on archive."""
+    h_admin = _sqn_admin_hdr(client)   # ADMIN703
+    h_other = login(client, "ADMIN704")  # different squadron
+    base = next_test_year()
+    yr = client.post("/api/planning/years",
+                     json={"year": base, "name": f"Active {base}"},
+                     headers=h_admin).json()
+    r = client.post(f"/api/planning/years/{yr['planning_year_id']}/archive",
+                    headers=h_other)
+    assert r.status_code == 403, r.text

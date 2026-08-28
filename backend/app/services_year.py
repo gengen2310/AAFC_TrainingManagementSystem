@@ -5,9 +5,12 @@ Two hard rules from the spec (2026-08-27):
   - resolve_active_year() promotes a draft year on the first read on/after
     1 January of the draft year's own `year` number, in wing-local time.
 """
+import logging
 from datetime import datetime, date as date_type
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 
 def get_wing_timezone(wing_id: str, db: Session) -> ZoneInfo:
@@ -48,14 +51,15 @@ def resolve_active_year(
 
     If there is a draft year and today >= 1 January of the draft year's own
     `year` number (in wing-local time), promote the draft to active and archive
-    the outgoing active year — all in one transaction. The unique index on
-    (unit_id, year) WHERE active_status=true makes concurrent promotions safe:
-    the loser gets an IntegrityError and retries after reading the winner.
+    the outgoing active year — all in one transaction. The unique partial index
+    on (unit_id) WHERE status='active' makes concurrent promotions safe: the
+    loser gets an IntegrityError and retries after reading the winner.
 
     The `_today` parameter is for test injection only — never pass it in
     production code.
     """
     from .models.planning import PlanningYear
+    from .database import utcnow
     from sqlalchemy import exc
 
     tz = get_wing_timezone(wing_id, db)
@@ -81,6 +85,12 @@ def resolve_active_year(
                 if active:
                     active.status = "archived"
                     active.active_status = False   # dual-write compat
+                    active.updated_at = utcnow()
+                    db.flush()  # BL-1: archive must reach DB before activate to satisfy unique index
+                    logger.info(
+                        "auto-archive for squadron %s: year %s → archived",
+                        squadron_id, active.id,
+                    )
                 draft.status = "active"
                 draft.active_status = True         # dual-write compat
                 db.commit()
@@ -88,6 +98,10 @@ def resolve_active_year(
                 return draft
             except exc.IntegrityError:
                 db.rollback()
+                logger.warning(
+                    "year rollover concurrent race for squadron %s — returning winner",
+                    squadron_id,
+                )
                 # Another request won the promotion race — re-read the winner.
                 return (
                     db.query(PlanningYear)

@@ -20,14 +20,6 @@ def _mk_year(client, hdr, year, name):
     return r.json()["planning_year_id"]
 
 
-def _archive_all_active(client, hdr):
-    """Archive every active/draft year for this user's squadron."""
-    years = client.get("/api/planning/years", headers=hdr).json()
-    for yr in years:
-        if yr.get("status") in ("active", "draft"):
-            client.post(f"/api/planning/years/{yr['planning_year_id']}/archive", headers=hdr)
-
-
 def _year_of_parade_date(client, hdr, year_id, date):
     """Is there a ParadeDate for `date` under this planning year?"""
     r = client.get(f"/api/planning/years/{year_id}/parade-dates", headers=hdr)
@@ -135,5 +127,45 @@ def test_the_resolver_reports_none_when_it_cannot_tell(client):
     try:
         # A squadron that has no years at all always returns None.
         assert _year_for_date(db, "no-such-squadron", "2026-05-15") is None
+    finally:
+        db.close()
+
+
+def test_far_out_of_range_date_attaches_to_active_year(client):
+    """Phase A: a far-out-of-range date attaches to the active year.
+
+    Phase A semantic (deliberate): the unique-active-per-squadron index guarantees
+    at most one active year exists. The resolver simply returns it — there is no
+    rung chain, and dates outside any parade-date span or calendar-year number
+    still attach to the sole active year rather than returning None.
+
+    This test documents that behaviour explicitly. Pre-Phase-A rung 4 (return None
+    when no rung fires) has been removed because with exactly one active year,
+    rung 3 (sole active year) always fires. A far-out-of-range date like 1900-01-01
+    will link to the active year — this is acceptable Phase A behaviour because a
+    real parade night on that date is impossible in practice.
+    """
+    from app.database import SessionLocal
+    from app.routers.training import _year_for_date
+    from conftest import login, next_test_year
+
+    hdr = login(client, "ADMIN703")
+    base = next_test_year()
+    yr_id = _mk_year(client, hdr, base, f"{base} Far-date Year")
+
+    db = SessionLocal()
+    try:
+        from app.models.planning import PlanningYear
+        py = db.get(PlanningYear, yr_id)
+        squadron_id = py.unit_id
+
+        # Far-out-of-range date — still returns the active year in Phase A
+        result = _year_for_date(db, squadron_id, "1900-01-01")
+        assert result is not None, (
+            "Phase A: sole active year should be returned even for an out-of-range date"
+        )
+        assert result.id == yr_id, (
+            "Phase A: the returned year must be the active year for this squadron"
+        )
     finally:
         db.close()
