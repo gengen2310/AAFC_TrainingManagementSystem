@@ -621,6 +621,139 @@ def update_planning_year(
         wing_code=wg.code if wg else None)
 
 
+# ── Year lifecycle endpoints (Phase A Task 4) ─────────────────
+
+
+class DraftYearIn(BaseModel):
+    year: int
+    name: str
+    source_year_id: str  # the active year this draft follows
+
+
+@router.post("/years/draft")
+def create_draft_year(
+    body: DraftYearIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Create a draft year for the next season.
+
+    A squadron can hold at most one draft year at a time (enforced here).
+    Drafts are created manually; they are promoted automatically on rollover
+    via resolve_active_year() or manually via POST /years/{id}/promote.
+    """
+    _require_plan_write(p)
+    if p.role == "sqn_admin":
+        unit_id = p.squadron_id
+        wing_id = p.wing_id
+    elif p.role in ("wing_admin", "national_admin", "system_admin"):
+        src = db.get(PlanningYear, body.source_year_id)
+        if not src:
+            raise HTTPException(404, detail={"error": "source_year_not_found"})
+        unit_id = src.unit_id
+        wing_id = src.wing_id
+        if unit_id:
+            require_can_write_squadron(p, unit_id, wing_id)
+    else:
+        raise HTTPException(403, detail={"error": "forbidden"})
+
+    existing_draft = (
+        db.query(PlanningYear)
+        .filter(PlanningYear.unit_id == unit_id,
+                PlanningYear.status == "draft")
+        .first()
+    )
+    if existing_draft:
+        raise HTTPException(409, detail={
+            "error": "draft_already_exists",
+            "existing_id": existing_draft.id,
+            "message": "A draft year already exists for this unit. Promote or archive it first.",
+        })
+
+    py = PlanningYear(
+        id=str(uuid.uuid4()), year=body.year, name=body.name,
+        unit_id=unit_id, wing_id=wing_id,
+        status="draft",
+        active_status=False,
+        created_by=p.user_id, created_at=utcnow(), updated_at=utcnow(),
+    )
+    db.add(py)
+    db.commit()
+    audit(db, p, object_type="planning_year", object_id=py.id, action="create_draft",
+          new={"year": body.year, "name": body.name, "status": "draft"})
+    sq = db.get(Squadron, py.unit_id) if py.unit_id else None
+    wg = db.get(Wing, py.wing_id) if py.wing_id else None
+    return _year_out(py,
+        unit_code=sq.code if sq else None, unit_name=sq.name if sq else None,
+        wing_code=wg.code if wg else None)
+
+
+@router.post("/years/{year_id}/promote")
+def promote_draft_year(
+    year_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Manually promote a draft year to active, archiving the current active year."""
+    _require_plan_write(p)
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py, write=True)
+    if py.status != "draft":
+        raise HTTPException(409, detail={"error": "not_a_draft",
+                                         "message": "Only a draft year can be promoted."})
+    # Archive the current active year (if any) in the same transaction.
+    if py.unit_id:
+        current_active = (
+            db.query(PlanningYear)
+            .filter(PlanningYear.unit_id == py.unit_id,
+                    PlanningYear.status == "active")
+            .first()
+        )
+        if current_active:
+            current_active.status = "archived"
+            current_active.active_status = False
+            current_active.updated_by = p.user_id
+            current_active.updated_at = utcnow()
+    py.status = "active"
+    py.active_status = True
+    py.updated_by = p.user_id
+    py.updated_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="planning_year", object_id=py.id, action="promote",
+          new={"status": "active"})
+    sq = db.get(Squadron, py.unit_id) if py.unit_id else None
+    wg = db.get(Wing, py.wing_id) if py.wing_id else None
+    return _year_out(py,
+        unit_code=sq.code if sq else None, unit_name=sq.name if sq else None,
+        wing_code=wg.code if wg else None)
+
+
+@router.post("/years/{year_id}/archive")
+def archive_year(
+    year_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Archive an active or draft year."""
+    _require_plan_write(p)
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py, write=True)
+    if py.status == "archived":
+        raise HTTPException(409, detail={"error": "already_archived"})
+    py.status = "archived"
+    py.active_status = False
+    py.updated_by = p.user_id
+    py.updated_at = utcnow()
+    db.commit()
+    audit(db, p, object_type="planning_year", object_id=py.id, action="archive",
+          new={"status": "archived"})
+    sq = db.get(Squadron, py.unit_id) if py.unit_id else None
+    wg = db.get(Wing, py.wing_id) if py.wing_id else None
+    return _year_out(py,
+        unit_code=sq.code if sq else None, unit_name=sq.name if sq else None,
+        wing_code=wg.code if wg else None)
+
+
 @router.delete("/years/{year_id}")
 def delete_planning_year(
     year_id: str,

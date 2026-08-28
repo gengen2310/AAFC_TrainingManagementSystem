@@ -245,3 +245,127 @@ def test_rollover_does_not_trigger_before_rollover_date(client):
         )
     finally:
         db.close()
+
+
+# ── Lifecycle endpoints ───────────────────────────────────────
+
+
+def _archive_existing_drafts(client, h):
+    """Archive any lingering draft years for this user's squadron.
+
+    The rollover tests directly set years to 'draft' status via the DB and may
+    leave them behind. This helper ensures a clean slate before lifecycle tests
+    that need to create a new draft (one-draft-per-squadron rule).
+    """
+    years = client.get("/api/planning/years", headers=h).json()
+    for yr in years:
+        if yr.get("status") == "draft":
+            client.post(f"/api/planning/years/{yr['planning_year_id']}/archive", headers=h)
+
+
+def _archive_existing_active_and_drafts(client, h):
+    """Archive all active and draft years for this user's squadron.
+
+    Used before promote tests: ensures exactly the year created in the test is
+    the current active year when the promote happens, so the post-promote
+    assertion can check the correct year_id.
+    """
+    years = client.get("/api/planning/years", headers=h).json()
+    for yr in years:
+        if yr.get("status") in ("active", "draft"):
+            client.post(f"/api/planning/years/{yr['planning_year_id']}/archive", headers=h)
+
+
+def test_create_draft_year(client):
+    h = _sqn_admin_hdr(client)
+    _archive_existing_drafts(client, h)
+    base = next_test_year()
+    active_yr = client.post("/api/planning/years",
+                            json={"year": base, "name": f"Active {base}"},
+                            headers=h).json()
+    r = client.post("/api/planning/years/draft",
+                    json={"year": base + 1, "name": f"Draft {base + 1}",
+                          "source_year_id": active_yr["planning_year_id"]},
+                    headers=h)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "draft"
+    assert body["active_status"] is False
+    assert body["year"] == base + 1
+
+
+def test_create_draft_fails_if_draft_already_exists(client):
+    h = _sqn_admin_hdr(client)
+    _archive_existing_drafts(client, h)
+    base = next_test_year()
+    active_yr = client.post("/api/planning/years",
+                            json={"year": base, "name": f"Active {base}"},
+                            headers=h).json()
+    client.post("/api/planning/years/draft",
+                json={"year": base + 1, "name": f"Draft {base + 1}",
+                      "source_year_id": active_yr["planning_year_id"]},
+                headers=h)
+    # Second draft should be rejected
+    r = client.post("/api/planning/years/draft",
+                    json={"year": base + 2, "name": f"Draft {base + 2}",
+                          "source_year_id": active_yr["planning_year_id"]},
+                    headers=h)
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"]["error"] == "draft_already_exists"
+
+
+def test_promote_draft_to_active(client):
+    h = _sqn_admin_hdr(client)
+    _archive_existing_active_and_drafts(client, h)
+    base = next_test_year()
+    active_yr = client.post("/api/planning/years",
+                            json={"year": base, "name": f"Active {base}"},
+                            headers=h).json()
+    draft_yr = client.post("/api/planning/years/draft",
+                           json={"year": base + 1, "name": f"Draft {base + 1}",
+                                 "source_year_id": active_yr["planning_year_id"]},
+                           headers=h).json()
+    r = client.post(f"/api/planning/years/{draft_yr['planning_year_id']}/promote",
+                    headers=h)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "active"
+    assert body["active_status"] is True
+    # Old active should now be archived
+    old = client.get(f"/api/planning/years/{active_yr['planning_year_id']}", headers=h).json()
+    assert old["status"] == "archived"
+    assert old["active_status"] is False
+
+
+def test_promote_fails_if_not_draft(client):
+    h = _sqn_admin_hdr(client)
+    yr = client.post("/api/planning/years",
+                     json={"year": next_test_year(), "name": "Active"},
+                     headers=h).json()
+    r = client.post(f"/api/planning/years/{yr['planning_year_id']}/promote", headers=h)
+    assert r.status_code == 409
+    assert r.json()["detail"]["error"] == "not_a_draft"
+
+
+def test_archive_year(client):
+    h = _sqn_admin_hdr(client)
+    yr = client.post("/api/planning/years",
+                     json={"year": next_test_year(), "name": "To archive"},
+                     headers=h).json()
+    r = client.post(f"/api/planning/years/{yr['planning_year_id']}/archive", headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "archived"
+    assert r.json()["active_status"] is False
+
+
+def test_lifecycle_requires_sqn_admin(client):
+    h = login(client, "703SQN2026")  # sqn_general
+    yr_id = client.get("/api/planning/years", headers=login(client, "ADMIN703")).json()[0]["planning_year_id"]
+    r = client.post(f"/api/planning/years/{yr_id}/archive", headers=h)
+    assert r.status_code == 403
+
+
+def test_lifecycle_requires_auth(client):
+    r = client.post("/api/planning/years/draft",
+                    json={"year": 2099, "name": "Unauth", "source_year_id": "fake-id"})
+    assert r.status_code == 401
