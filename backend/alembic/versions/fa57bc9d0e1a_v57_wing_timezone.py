@@ -17,10 +17,32 @@ def upgrade():
     with op.batch_alter_table("wings") as batch_op:
         batch_op.add_column(sa.Column("timezone", sa.String(60), nullable=True))
 
-    # Seed 7WG immediately — production has exactly one wing (7WG) and this
-    # value is required for resolve_active_year() to function at all.
+    # Backfill EVERY existing wing, not just 7WG.
+    #
+    # The original comment here said "production has exactly one wing (7WG)",
+    # which is true of production and false of staging: staging holds 15 wings,
+    # including ten LVW* load-test wings with 12 squadrons each. get_wing_timezone
+    # raises on NULL by design -- correctly, since a wrong zone is invisible in
+    # date arithmetic -- and that raise reaches every endpoint that resolves a
+    # year. A 7WG-only backfill therefore 500s roughly 120 squadrons the moment
+    # the deploy completes.
+    #
+    # Backfilling rows that predate the column is not the silent defaulting the
+    # fail-loudly rule forbids: the value is written to the row, visible and
+    # editable, and a wing that is not actually in Perth can be corrected. New
+    # wings are unaffected -- there is deliberately no server_default.
     bind = op.get_bind()
-    bind.execute(sa.text("UPDATE wings SET timezone = 'Australia/Perth' WHERE code = '7WG'"))
+    bind.execute(sa.text(
+        "UPDATE wings SET timezone = 'Australia/Perth' WHERE timezone IS NULL"))
+
+    left = bind.execute(
+        sa.text("SELECT count(*) FROM wings WHERE timezone IS NULL")).scalar()
+    if left:
+        raise RuntimeError(
+            f"{left} wing(s) still have no timezone after the backfill; refusing "
+            f"to complete a deploy that leaves those wings' squadrons unable to "
+            f"resolve a training year."
+        )
 
 
 def downgrade():
