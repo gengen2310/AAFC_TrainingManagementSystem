@@ -144,8 +144,12 @@ test.describe("Account Management — Reference Data", () => {
   test("sqn_admin can create a Training Stage at squadron scope", async ({ page }) => {
     await loginSquadron(page, "ADMIN703");
     await page.evaluate(() => (window as any).nav("accounts"));
+    // Reference Data now sits behind the Configuration tab, and each dataset's
+    // editor opens from its Manage button rather than being stacked inline.
+    await page.locator("#acct-tab-config").click();
     await expect(page.locator("#acct-refdata-card")).toBeVisible();
     await expect(page.locator("#refdata-scope-label")).toHaveText("squadron");
+    await page.locator('button[aria-label="Manage Training Stages"]').click();
     const stageName = `E2E Stage ${Date.now()}`;
     await page.locator("#refdata-new-phase").fill(stageName);
     await page.locator("#refdata-add-phase").click();
@@ -155,7 +159,9 @@ test.describe("Account Management — Reference Data", () => {
   test("sqn_general (read-only) does not see the Reference Data card", async ({ page }) => {
     await loginSquadron(page, "703SQN2026", "sqn_general");
     await page.evaluate(() => (window as any).nav("accounts"));
+    // The card is gated on canWrite, and so is the Configuration tab that reveals it.
     await expect(page.locator("#acct-refdata-card")).toBeHidden();
+    await expect(page.locator("#acct-tab-config")).toBeHidden();
   });
 });
 
