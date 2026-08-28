@@ -65,10 +65,12 @@ def test_squadron_block_timing_template_confirmed_true_for_seeded_703(client):
 
 _SQUADRON_STEP_KEYS = {
     "planning_year_active", "training_classes_created", "facilitators_added", "training_areas_added",
-    "equipment_added", "timing_template_confirmed", "crest_set", "cadets_added", "holidays_configured",
+    "equipment_added", "timing_template_confirmed", "crest_set", "holidays_configured",
     "cea_imported", "activities_classified", "anchor_events_reviewed", "parade_nights_generated",
     "parade_night_published", "curriculum_coverage",
     "sessions_have_periods",   # added 2026-08-23
+    # "cadets_added" removed 2026-08-28 — not a prerequisite for planning
+    # "flights_created" removed 2026-08-25 — optional grouping, not a setup step
 }
 
 
@@ -78,8 +80,7 @@ def test_steps_list_scoped_to_squadron_only_for_sqn_admin(client):
     d = r.json()
     step_keys = {s["key"] for s in d["steps"]}
     assert step_keys == _SQUADRON_STEP_KEYS
-    assert len(d["steps"]) == 16  # 15 original + training_classes_created + sessions_have_periods,
-                                  # minus flights_created (removed 2026-08-25 at user request)
+    assert len(d["steps"]) == 15  # 16 at 2026-08-23, minus cadets_added (removed 2026-08-28)
 
 
 def test_flights_step_is_no_longer_in_the_checklist(client):
@@ -110,6 +111,36 @@ def test_removing_the_flights_step_did_not_remove_the_capability(client):
     r = client.get("/api/flights", headers=hdr)
     assert r.status_code == 200, "the flights endpoint must still serve"
     assert len(r.json()) >= 2, "the seeded flights must still exist"
+
+
+def test_cadets_step_is_no_longer_in_the_checklist(client):
+    """Removed 2026-08-28 per TMS ↔ PW Integration Program §7.
+
+    Adding cadets is a core capability but not a prerequisite for planning.
+    Listing it as a required step blocked Getting Started completion for every
+    squadron that chose to defer cadet rostering until after the planning cycle
+    was underway — a common operational pattern.
+    """
+    d = client.get("/api/setup/status", headers=_sqn_admin_703(client)).json()
+    keys = {st["key"] for st in d["steps"]}
+    assert "cadets_added" not in keys, "the cadets step should no longer be a checklist item"
+
+
+def test_removing_the_cadets_step_did_not_remove_the_capability(client):
+    """USER-AUTHORISED REMOVAL of a checklist step, not of a feature.
+
+    703's seed has cadets. The count stays in the squadron block so anything
+    reporting on cadet numbers still works, and cadets are still managed via
+    the Accounts / Settings pages.
+    """
+    hdr = _sqn_admin_703(client)
+    d = client.get("/api/setup/status", headers=hdr).json()
+    assert "cadets_added" in d["squadron"], "the cadets count must still be reported"
+    assert d["squadron"]["cadets_added"] > 0, "703's seed data includes cadets"
+
+    r = client.get("/api/cadets", headers=hdr)
+    assert r.status_code == 200, "the cadets endpoint must still serve"
+    assert len(r.json()) > 0, "the seeded cadets must still exist"
 
 
 def test_squadron_id_query_param_lets_national_admin_view_a_squadron(client):

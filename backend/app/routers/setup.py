@@ -193,9 +193,12 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
                       "done": squadron["timing_template_confirmed"], "count": None, "link_page": "settings"})
         steps.append({"key": "crest_set", "label": "Set the squadron crest",
                       "done": squadron["crest_set"], "count": None, "link_page": "settings"})
-        steps.append({"key": "cadets_added", "label": "Add cadets to the squadron roster",
-                      "done": squadron["cadets_added"] > 0, "count": squadron["cadets_added"],
-                      "link_page": "settings"})
+        # "Add cadets to the squadron roster" was removed from the checklist on
+        # 2026-08-28 per the TMS ↔ PW Integration Program §7. Cadet rostering is
+        # a core capability that continues to work via the Accounts / Settings
+        # pages -- it is not a prerequisite for planning and should not gate
+        # Getting Started completion. squadron["cadets_added"] is still returned
+        # in the response body for any caller that wants the count.
         steps.append({"key": "holidays_configured", "label": "Add or import holidays",
                       "done": squadron["holidays_configured"], "count": None, "link_page": "activities"})
         steps.append({"key": "cea_imported", "label": "Import CEA activities", "done": squadron["cea_imported"],
