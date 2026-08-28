@@ -26,7 +26,7 @@ def upgrade():
     bind = op.get_bind()
     bind.execute(sa.text(
         "UPDATE planning_years SET status = CASE "
-        "  WHEN active_status = 1 THEN 'active' "
+        "  WHEN active_status THEN 'active' "
         "  ELSE 'archived' "
         "END"
     ))
