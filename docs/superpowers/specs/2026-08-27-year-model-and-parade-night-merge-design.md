@@ -142,17 +142,28 @@ Checked, not assumed: there is **no timezone field on `Squadron`, `Wing` or
 `UTCDateTime` in `database.py`. So squadron-local time is not expressible today
 and **this is a prerequisite, not a detail**.
 
-It matters because AAFC spans Australian states. On 1 January, southern states
-are on daylight saving and Perth is not: Australia/Perth is UTC+8 while
-Australia/Sydney is UTC+11. A UTC comparison therefore rolls some squadrons over
-on 31 December — "the training year changed a day early" is precisely the kind of
-report this spec exists to stop producing.
+**Decided 2026-08-28: `Australia/Perth` on 7WG. Squadrons cannot override it.**
 
-Proposed: an IANA `timezone` string on `Wing` (states map to wings cleanly), a
-nullable per-`Squadron` override for the exceptions, and a national default as
-the final fallback. `zoneinfo` is in the standard library on Python 3.13, so this
-adds no dependency. Seeds and existing rows need real values — an unset timezone
-must fail loudly rather than silently defaulting to UTC.
+An IANA `timezone` string on `Wing`, and nothing on `Squadron` — the override I
+originally proposed is dropped, which removes a fallback chain and a column.
+`zoneinfo` is in the standard library on Python 3.13, so this adds no dependency.
+
+**Scope check, and a correction to the earlier framing in this section.** I
+argued this mattered because AAFC spans Australian states, with Perth on UTC+8
+against Sydney's UTC+11 on 1 January. That is true of AAFC as an organisation but
+**not of this deployment**: production has exactly one wing, 7 Wing – Western
+Australia, holding all 18 squadrons with none unassigned. So a single value
+covers 100% of production and the multi-state daylight-saving hazard is
+**latent, not live**.
+
+It stays on `Wing` rather than becoming one global constant precisely because it
+is latent. Adding a second wing then becomes a data change instead of a schema
+change plus a migration.
+
+**And this makes the fail-loudly rule more important, not less.** With one wing,
+a missing-timezone bug is invisible — every lookup finds Perth. It first bites
+when wing two is created, which is exactly when nobody is watching for it. An
+unset `timezone` must raise, never silently fall back to UTC or to Perth.
 
 Same defect class as the naive-UTC timestamps fixed on 2026-08-25.
 
@@ -388,8 +399,12 @@ Raised in the same conversation, deliberately not designed here:
    year's own `year`, in squadron-local time.** Consistent with the data, where a
    seeded training year spans a calendar year — note the Session Structure help
    text claimed July–June and was found wrong on 2026-08-25.
-6. **Who sets the timezones, and what are they?** The decision above requires a
-   timezone field that does not exist yet (see Lifecycle). Someone must supply a
-   real IANA zone per wing, and decide whether squadrons may override it. Until
-   then the rollover date cannot be evaluated for any squadron. **This is now the
-   last thing blocking implementation.**
+6. ~~Who sets the timezones, and what are they?~~ **ANSWERED 2026-08-28:
+   `Australia/Perth` on 7WG; squadrons cannot override.** 7WG is production's only
+   wing and holds all 18 squadrons, so that one value covers everything. The
+   per-squadron override is dropped from the design.
+
+   **Nothing now blocks implementation of Phase A.** Questions 2 and 3 remain but
+   neither gates it: 2 concerns two orphaned parade nights at a squadron with no
+   planning year, which is a Phase B precondition; 3 is a UI decision that can be
+   made while Phase A is built.
