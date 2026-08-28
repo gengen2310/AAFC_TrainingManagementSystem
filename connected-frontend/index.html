@@ -294,7 +294,11 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .yn-display input:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;}
 .yn-gear{background:transparent;border:none;border-left:1px solid rgba(255,255,255,.2);color:#fff;font-size:var(--fs-lg);padding:0 11px;cursor:pointer;height:100%}
 .yn-gear:hover{background:rgba(255,255,255,.12)}
-.yn-wrap{display:flex;flex-direction:column;align-items:flex-end;margin-left:auto}
+.yn-wrap{display:flex;flex-direction:column;align-items:flex-end;margin-left:auto;position:relative}
+/* The menu lives OUTSIDE .year-nav-ctrl on purpose: that pill is
+   overflow:hidden to keep its rounded ends, which silently clipped an
+   absolutely-positioned child to nothing. Playwright still called it
+   visible -- it had a box -- so only a screenshot showed it was gone. */
 .yn-toast{font-size:var(--fs-xs);color:var(--red);margin-top:3px;min-height:14px}
 /* One quiet line, no chips. The current year carries no arrow: the arrows
    mean "away from now", so their absence is what says you are in it. */
@@ -306,6 +310,19 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .yn-notice .yn-notice-actions{display:flex;gap:10px;flex-wrap:wrap}
 .yn-notice.yn-notice-locked{border-style:solid;background:var(--surface-2)}
 .yn-notice.yn-notice-locked p{margin:0}
+.yn-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:60;min-width:190px;background:var(--surface);
+  border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.16);padding:4px;margin:0;list-style:none}
+.yn-menu[hidden]{display:none}
+.yn-menu li{margin:0}
+.yn-menu button{display:flex;width:100%;align-items:center;justify-content:space-between;gap:14px;
+  min-height:44px;padding:0 12px;background:transparent;border:0;border-radius:7px;cursor:pointer;
+  font-family:inherit;font-size:var(--fs-sm);color:var(--text);text-align:left;font-variant-numeric:tabular-nums}
+.yn-menu button:hover,.yn-menu button:focus-visible{background:var(--surface-2)}
+.yn-menu button[aria-current="true"]{font-weight:700}
+/* The tag says what the year is FOR, not where it sits in time -- and RECORD is
+   the same word the read-only notice uses, so the vocabulary holds across the flow. */
+.yn-tag{font-size:var(--fs-3xs,10px);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.yn-caret{margin-left:6px;font-size:var(--fs-xs)}
 .yn-mgmt-table{width:100%;border-collapse:collapse;}
 .yn-mgmt-table th{font-size:var(--fs-3xs);font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 12px;border-bottom:1px solid var(--border);text-align:left;}
 .yn-mgmt-table td{padding:10px 12px;font-size:var(--fs-sm);border-bottom:1px solid var(--border-light,#e4edf5);color:var(--text);}
@@ -1799,9 +1816,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <div class="yn-wrap" id="actYnWrap">
               <div class="year-nav-ctrl">
                 <button class="yn-arrow" id="ynPrev" onclick="ynNav(-1)" disabled aria-label="Previous year">‹</button>
-                <div class="yn-display" id="ynDisplay" onclick="ynStartEdit()" title="Click to enter year directly"><span id="ynLabel">—</span></div>
+                <button class="yn-display" id="ynDisplay" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="ynMenu" onclick="ynToggleMenu()"><span id="ynLabel">—</span><span class="yn-caret" aria-hidden="true">&#9662;</span></button>
                 <button class="yn-arrow" id="ynNext" onclick="ynNav(1)" disabled aria-label="Next year">›</button>
               </div>
+              <ul class="yn-menu" id="ynMenu" role="menu" aria-label="Choose training year" hidden></ul>
               <div class="yn-state" id="ynState"></div>
               <div class="yn-toast" id="ynToast"></div>
             </div>
@@ -12249,6 +12267,75 @@ function _ynUpdateDisplay() {
 // The year is real; only its configuration is empty. Never say the year does
 // not exist, and never offer more than the two things that can usefully be
 // done from here.
+// Past years appear because they hold records; the current year and two ahead
+// appear because those can be planned. RECORD rather than PAST: it says what
+// the year is FOR, and it is the word the read-only notice uses.
+const _YN_TAG = { past: 'RECORD', current: 'CURRENT', future: 'FUTURE' };
+
+function ynToggleMenu(force) {
+  const menu = document.getElementById('ynMenu');
+  const btn = document.getElementById('ynDisplay');
+  if (!menu || !btn) return;
+  const open = (force === undefined) ? menu.hasAttribute('hidden') : !!force;
+  if (!open) {
+    menu.setAttribute('hidden', '');
+    btn.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  _ynRenderMenu();
+  menu.removeAttribute('hidden');
+  btn.setAttribute('aria-expanded', 'true');
+  const first = menu.querySelector('button[aria-current="true"]') || menu.querySelector('button');
+  if (first) first.focus();
+}
+
+function _ynRenderMenu() {
+  const menu = document.getElementById('ynMenu');
+  if (!menu) return;
+  menu.textContent = '';
+  const rows = _ynYears().slice().sort((a, b) => b.year - a.year);
+  rows.forEach(function (row) {
+    const li = document.createElement('li');
+    li.setAttribute('role', 'none');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'menuitem');
+    if (row.year === P.currentYearInt) b.setAttribute('aria-current', 'true');
+    const num = document.createElement('span');
+    num.textContent = String(row.year);
+    const tag = document.createElement('span');
+    tag.className = 'yn-tag';
+    tag.textContent = _YN_TAG[row.state] || '';
+    b.appendChild(num);
+    b.appendChild(tag);
+    b.addEventListener('click', function () {
+      setCurrentYear(row);
+      ynToggleMenu(false);
+      const d = document.getElementById('ynDisplay');
+      if (d) d.focus();
+    });
+    li.appendChild(b);
+    menu.appendChild(li);
+  });
+}
+
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  const menu = document.getElementById('ynMenu');
+  if (menu && !menu.hasAttribute('hidden')) {
+    ynToggleMenu(false);
+    const d = document.getElementById('ynDisplay');
+    if (d) d.focus();
+  }
+});
+
+document.addEventListener('click', function (e) {
+  const menu = document.getElementById('ynMenu');
+  if (!menu || menu.hasAttribute('hidden')) return;
+  if (e.target.closest && e.target.closest('#ynMenu, #ynDisplay')) return;
+  ynToggleMenu(false);
+});
+
 function _ynRenderYearNotice() {
   const el = document.getElementById('yn-year-notice');
   if (!el) return;
@@ -12347,7 +12434,6 @@ function _ynUpdateArrows() {
 }
 
 function ynNav(dir) {
-  if (P._ynEditing) return;
   const sorted = _ynYears();
   if (!sorted.length) return;
   const idx = sorted.findIndex(y => y.year === P.currentYearInt);
@@ -12356,57 +12442,10 @@ function ynNav(dir) {
   setCurrentYear(target);
 }
 
-function ynStartEdit() {
-  if (P._ynEditing) return;
-  const disp = document.getElementById('ynDisplay');
-  if (!disp) return;
-  P._ynEditing = true;
-  // Disable arrows and gear while editing
-  const prev = document.getElementById('ynPrev'), next = document.getElementById('ynNext');
-  if (prev) prev.disabled = true;
-  if (next) next.disabled = true;
-  const cur = P.currentYearInt || '';
-  disp.innerHTML = `<input type="text" maxlength="4" value="${esc(String(cur))}" id="ynInput" aria-label="Enter year">`;
-  const inp = document.getElementById('ynInput');
-  if (!inp) return;
-  inp.focus(); inp.select();
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); ynCommitEdit(inp.value); }
-    if (e.key === 'Escape') { e.preventDefault(); ynCancelEdit(); }
-  });
-  setTimeout(() => inp.addEventListener('blur', () => setTimeout(() => {
-    if (P._ynEditing) ynCancelEdit();
-  }, 120)), 0);
-}
-
-function ynCancelEdit() {
-  if (!P._ynEditing) return;
-  P._ynEditing = false;
-  const disp = document.getElementById('ynDisplay');
-  if (disp) disp.innerHTML = `<span id="ynLabel">${esc(String(P.currentYearInt || '—'))}</span>`;
-  _ynUpdateArrows();
-  _ynUpdateDisplay();
-}
-
-function ynCommitEdit(val) {
-  const yr = parseInt(val, 10);
-  if (isNaN(yr) || yr < 1900 || yr > 2200) {
-    ynToast('Enter a valid year (e.g. 2026)');
-    ynCancelEdit();
-    return;
-  }
-  const match = (P.years || []).find(y => y.year === yr);
-  if (!match) {
-    const sel=(P.years||[]).map(y=>y.year).sort((a,b)=>a-b);
-    ynToast(sel.length
-      ? `You can plan ${sel[0]}\u2013${sel[sel.length-1]}.`
-      : 'No training years are available yet.');
-    ynCancelEdit();
-    return;
-  }
-  ynCancelEdit();
-  setCurrentYear(match);
-}
+// The year is chosen from the menu (ynToggleMenu). The old click-to-type
+// editor is gone: it let you type any year at all, including ones outside
+// what can be planned, and its cancel path rebuilt #ynDisplay's innerHTML,
+// which would now destroy the caret and the menu's aria wiring.
 
 let _ynToastTimer = null;
 function ynToast(msg) {
@@ -15661,7 +15700,6 @@ const P = {
   locations: [],
   facilitators: [],
   builderSessions: [],
-  _ynEditing: false,   // true while the year inline-input is open
 };
 
 const _IMPORTANCE_LABELS = { must_attend:'Must Attend', key_event:'Key Event', optional:'Optional' };

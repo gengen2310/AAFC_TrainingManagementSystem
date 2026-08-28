@@ -242,3 +242,88 @@ test("a past year states it is read-only and names the way to correct it", async
     await deleteYear(page, past);
   }
 });
+
+// --- phase 3: the year menu --------------------------------------------------
+
+test("the year menu lists what can be selected, tagged by what each year is for", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await openYearBar(page);
+
+  const btn = page.locator("#ynDisplay");
+  await expect(btn).toHaveAttribute("aria-expanded", "false");
+  await btn.click();
+  await expect(btn).toHaveAttribute("aria-expanded", "true");
+
+  const items = page.locator("#ynMenu button");
+  await expect(items.first()).toBeVisible();
+  const count = await items.count();
+  expect(count).toBeGreaterThanOrEqual(3);
+
+  // RECORD, not PAST: it says what the year is for, and it is the word the
+  // read-only notice uses.
+  const tags = await page.locator("#ynMenu .yn-tag").allTextContents();
+  expect(new Set(tags.filter(Boolean))).toEqual(
+    new Set(tags.filter(Boolean).filter(t => ["CURRENT", "FUTURE", "RECORD"].includes(t))));
+  expect(tags).toContain("CURRENT");
+
+  // exactly one year is marked current, and it is the one on the bar
+  const current = page.locator('#ynMenu button[aria-current="true"]');
+  await expect(current).toHaveCount(1);
+  await expect(current).toContainText(String(await page.locator("#ynLabel").textContent()));
+});
+
+test("choosing a year from the menu moves the bar and closes the menu", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await openYearBar(page);
+  const start = Number(await page.locator("#ynLabel").textContent());
+
+  await page.locator("#ynDisplay").click();
+  await page.locator("#ynMenu button", { hasText: String(start + 1) }).click();
+
+  await expect(page.locator("#ynMenu")).toBeHidden();
+  await expect(page.locator("#ynDisplay")).toHaveAttribute("aria-expanded", "false");
+  expect(Number(await page.locator("#ynLabel").textContent())).toBe(start + 1);
+});
+
+test("Escape closes the year menu and returns focus to the control", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await openYearBar(page);
+  await page.locator("#ynDisplay").click();
+  await expect(page.locator("#ynMenu")).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#ynMenu")).toBeHidden();
+  expect(await page.evaluate("document.activeElement.id")).toBe("ynDisplay");
+});
+
+test("every year-menu item meets the 44px hit target", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await openYearBar(page);
+  await page.locator("#ynDisplay").click();
+  const items = page.locator("#ynMenu button");
+  for (let i = 0; i < await items.count(); i++) {
+    const box = (await items.nth(i).boundingBox())!;
+    expect.soft(Math.round(box.height), `item ${i} height`).toBeGreaterThanOrEqual(44);
+  }
+});
+
+test("the year menu is actually on screen, not clipped by its container", async ({ page }) => {
+  // toBeVisible only asks whether the element has a box and is not display:none.
+  // An absolutely-positioned child of an overflow:hidden parent passes that and
+  // renders nothing -- which is exactly what happened. Hit-test instead.
+  await loginSquadron(page, "ADMIN703");
+  await openYearBar(page);
+  await page.locator("#ynDisplay").click();
+
+  const first = page.locator("#ynMenu button").first();
+  const box = (await first.boundingBox())!;
+  const vp = page.viewportSize()!;
+  expect(box.x, "menu runs off the left edge").toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width, "menu runs off the right edge").toBeLessThanOrEqual(vp.width);
+
+  const hit = await page.evaluate(([x, y]) => {
+    const el = document.elementFromPoint(x as number, y as number);
+    return el ? !!el.closest("#ynMenu") : false;
+  }, [box.x + box.width / 2, box.y + box.height / 2]);
+  expect(hit, "the point at the centre of a menu item does not belong to the menu").toBe(true);
+});
