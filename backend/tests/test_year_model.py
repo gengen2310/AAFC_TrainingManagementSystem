@@ -403,3 +403,42 @@ def test_archive_requires_auth(client):
     fake_id = "00000000-0000-0000-0000-000000000000"
     r = client.post(f"/api/planning/years/{fake_id}/archive")
     assert r.status_code == 401
+
+
+# ── Backend readers use status ────────────────────────────────
+
+def test_parade_night_attaches_to_active_not_draft(client):
+    """A draft year must never attract a parade night — only the active year does."""
+    h = _sqn_admin_hdr(client)
+    base = next_test_year()
+    active_yr = client.post("/api/planning/years",
+                            json={"year": base, "name": f"Active {base}"},
+                            headers=h).json()
+    draft_yr = client.post("/api/planning/years/draft",
+                           json={"year": base + 1, "name": f"Draft {base + 1}",
+                                 "source_year_id": active_yr["planning_year_id"]},
+                           headers=h).json()
+    assert draft_yr["status"] == "draft"
+
+    night_date = f"{base}-06-15"
+    r = client.post("/api/parade-nights",
+                    json={"date": night_date, "term": "T2"},
+                    headers=h)
+    assert r.status_code == 200, r.text
+    pn_id = r.json()["parade_night_id"]
+    assert r.json()["linked_to_planning_year"] is True
+
+    # The night's ParadeDate must be under the ACTIVE year, not the draft
+    active_dates = client.get(
+        f"/api/planning/years/{active_yr['planning_year_id']}/parade-dates",
+        headers=h).json()
+    draft_dates = client.get(
+        f"/api/planning/years/{draft_yr['planning_year_id']}/parade-dates",
+        headers=h).json()
+
+    assert any(d["parade_night_id"] == pn_id for d in active_dates), (
+        "Night must be under the active year"
+    )
+    assert not any(d["parade_night_id"] == pn_id for d in draft_dates), (
+        "Night must NOT be under the draft year"
+    )

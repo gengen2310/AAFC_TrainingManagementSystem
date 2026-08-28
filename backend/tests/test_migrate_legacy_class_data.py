@@ -52,7 +52,7 @@ def _setup_squadron_year_stage_session(db, sqn, *, year_num, stage_display, cade
     """
     py = PlanningYear(
         unit_id=sqn.id, wing_id=sqn.wing_id, year=year_num, name=_unique("CLASS-14-TEST-YEAR"),
-        active_status=False,
+        active_status=False, status="archived",
     )
     db.add(py)
     db.flush()

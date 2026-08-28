@@ -520,7 +520,7 @@ def create_planning_year(
         dupe = db.query(PlanningYear).filter(
             PlanningYear.unit_id == unit_id,
             PlanningYear.year == body.year,
-            PlanningYear.active_status == True,  # noqa: E712
+            PlanningYear.status == "active",
         ).first()
         if dupe:
             raise HTTPException(409, detail={
@@ -2735,7 +2735,7 @@ def get_command_centre(
             q = q.filter(PlanningYear.unit_id == p.squadron_id)
         elif p.role in ("wing_admin", "wing_viewer"):
             q = q.filter(PlanningYear.wing_id == p.wing_id)
-        py = q.filter(PlanningYear.active_status == True).order_by(PlanningYear.year.desc()).first()  # noqa: E712
+        py = q.filter(PlanningYear.status == "active").order_by(PlanningYear.year.desc()).first()
         if py is None:
             py = q.order_by(PlanningYear.year.desc()).first()
 

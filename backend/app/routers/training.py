@@ -469,7 +469,7 @@ def _year_for_date(db: DBSession, squadron_id: str, date: str):
     years = (
         db.query(PlanningYear)
         .filter(PlanningYear.unit_id == squadron_id,
-                PlanningYear.active_status == True)  # noqa: E712
+                PlanningYear.status == "active")
         .order_by(PlanningYear.year.desc())
         .all()
     )
