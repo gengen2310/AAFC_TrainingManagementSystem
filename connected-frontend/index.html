@@ -323,6 +323,11 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
    the same word the read-only notice uses, so the vocabulary holds across the flow. */
 .yn-tag{font-size:var(--fs-3xs,10px);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
 .yn-caret{margin-left:6px;font-size:var(--fs-xs)}
+/* One line, and it does NOT move the user. Explicit and reversible: a session
+   open across midnight must never have the data swapped underneath it. */
+.yn-rollover{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;
+  border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:8px;background:var(--surface-2)}
+.yn-rollover p{margin:0;font-size:var(--fs-sm);color:var(--text)}
 .yn-mgmt-table{width:100%;border-collapse:collapse;}
 .yn-mgmt-table th{font-size:var(--fs-3xs);font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 12px;border-bottom:1px solid var(--border);text-align:left;}
 .yn-mgmt-table td{padding:10px 12px;font-size:var(--fs-sm);border-bottom:1px solid var(--border-light,#e4edf5);color:var(--text);}
@@ -1825,6 +1830,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             </div>
           </div>
         </div>
+        <div id="yn-rollover" class="no-print" role="status" hidden></div>
         <div id="yn-year-notice" class="no-print"></div>
         <div class="fbar no-print">
           <select id="act-f-type" aria-label="Filter by activity type" onchange="renderActs()">
@@ -12214,6 +12220,9 @@ function setCurrentYear(yearObj, reload) {
   // state for that year rather than "no year".
   P.currentYearId = yearObj.planning_year_id || null;
   P.currentYearInt = yearObj.year;
+  // Which year was current AT THE TIME of selection. Without it, any past year
+  // the user deliberately opened would claim the year had just rolled over.
+  if (yearObj.state === 'current') P._ynWasCurrentYear = yearObj.year;
   // CAL-2: the Training Calendar follows the training year. Without this,
   // creating or switching a year left the calendar sitting on whatever year it
   // booted with, which is what "the calendar doesn't update" looked like.
@@ -12262,6 +12271,7 @@ function _ynUpdateDisplay() {
     st.textContent = (row && _YN_STATE_TEXT[row.state]) || '';
   }
   _ynRenderYearNotice();
+  _ynRenderRolloverNotice();
 }
 
 // The year is real; only its configuration is empty. Never say the year does
@@ -12271,6 +12281,57 @@ function _ynUpdateDisplay() {
 // appear because those can be planned. RECORD rather than PAST: it says what
 // the year is FOR, and it is the word the read-only notice uses.
 const _YN_TAG = { past: 'RECORD', current: 'CURRENT', future: 'FUTURE' };
+
+// 1 January performs no database write: it changes a derived value. So a
+// session left open across midnight is quietly looking at last year. Say so,
+// offer the switch, and do not take it -- swapping the data underneath someone
+// mid-task is the thing this notice exists to avoid.
+function _ynRenderRolloverNotice() {
+  const el = document.getElementById('yn-rollover');
+  if (!el) return;
+  const rows = _ynYears();
+  const current = rows.find(function (y) { return y.state === 'current'; });
+  const mine = rows.find(function (y) { return y.year === P.currentYearInt; });
+
+  // Only when the year the user is on has JUST stopped being the current one.
+  const rolled = !!current && !!mine && mine.state === 'past' &&
+                 P._ynWasCurrentYear === mine.year;
+  if (!rolled) { el.setAttribute('hidden', ''); el.textContent = ''; return; }
+
+  el.textContent = '';
+  const box = document.createElement('div');
+  box.className = 'yn-rollover';
+  const para = document.createElement('p');
+  para.textContent = current.year + ' is now the current training year.';
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-dk';
+  btn.type = 'button';
+  btn.textContent = 'Switch to ' + current.year;
+  btn.addEventListener('click', function () {
+    P._ynWasCurrentYear = current.year;
+    setCurrentYear(current);
+    _ynRenderRolloverNotice();
+  });
+  box.appendChild(para);
+  box.appendChild(btn);
+  el.appendChild(box);
+  el.removeAttribute('hidden');
+}
+
+let _ynLastRolloverCheck = 0;
+async function ynCheckYearRollover(force) {
+  const now = Date.now();
+  if (!force && now - _ynLastRolloverCheck < 60000) return;   // never hammer the API
+  _ynLastRolloverCheck = now;
+  try { await _ynFetchYears(); } catch (_) { return; }
+  _ynUpdateArrows();
+  _ynRenderRolloverNotice();
+}
+
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden) ynCheckYearRollover();
+});
+window.addEventListener('focus', function () { ynCheckYearRollover(); });
 
 function ynToggleMenu(force) {
   const menu = document.getElementById('ynMenu');

@@ -327,3 +327,67 @@ test("the year menu is actually on screen, not clipped by its container", async 
   }, [box.x + box.width / 2, box.y + box.height / 2]);
   expect(hit, "the point at the centre of a menu item does not belong to the menu").toBe(true);
 });
+
+// --- phase 4: the year rolling over mid-session ------------------------------
+
+/** Simulate midnight: the year the user is on becomes past, the next becomes
+ *  current. Nothing is written -- that is the point -- so this is exactly what
+ *  the server's derived state would return the moment the date changes. */
+async function simulateMidnight(page: Page, from: number) {
+  await page.evaluate(`
+    P._ynWasCurrentYear = ${from};
+    P.currentYearInt = ${from};
+    P.years = P.years.map(y =>
+      y.year === ${from} ? { ...y, state: 'past' }
+      : y.year === ${from + 1} ? { ...y, state: 'current' }
+      : y);
+    _ynUpdateDisplay();
+  `);
+}
+
+test("when the year rolls over mid-session the bar says so and offers the switch", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await openYearBar(page);
+  const on = Number(await page.locator("#ynLabel").textContent());
+  await simulateMidnight(page, on);
+
+  const notice = page.locator("#yn-rollover .yn-rollover");
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText(`${on + 1} is now the current training year.`);
+  await expect(notice.locator("button")).toHaveText(`Switch to ${on + 1}`);
+
+  // and it does NOT move the user
+  expect(Number(await page.locator("#ynLabel").textContent())).toBe(on);
+});
+
+test("taking the switch moves to the new year and clears the notice", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await openYearBar(page);
+  const on = Number(await page.locator("#ynLabel").textContent());
+  await simulateMidnight(page, on);
+
+  await page.locator("#yn-rollover button").click();
+  expect(Number(await page.locator("#ynLabel").textContent())).toBe(on + 1);
+  await expect(page.locator("#yn-rollover")).toBeHidden();
+});
+
+test("deliberately opening a past year does not claim the year just rolled over", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await openYearBar(page);
+  const token = await apiToken(page);
+  const past = 2018;
+  await page.request.post(`${LOCAL_API_BASE}/api/planning/years`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { year: past, name: `${past} Training Year` } });
+
+  try {
+    await page.evaluate("_ynFetchYears()");
+    await page.evaluate(`setCurrentYear(P.years.find(y => y.year === ${past}))`);
+    await expect(page.locator("#ynState")).toHaveText("← Previous year · training record");
+    // The read-only notice is right; the rollover notice would be a lie.
+    await expect(page.locator("#yn-year-notice .yn-notice-locked")).toBeVisible();
+    await expect(page.locator("#yn-rollover")).toBeHidden();
+  } finally {
+    await deleteYear(page, past);
+  }
+});
