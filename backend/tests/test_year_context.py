@@ -300,3 +300,36 @@ def test_the_default_listing_stays_materialised_only(client):
     assert rows, "the listing must not be empty"
     assert all(r["materialised"] for r in rows)
     assert all(r["planning_year_id"] is not None for r in rows)
+
+
+# --- wing creation must store a zone, or every year derivation 500s ---------
+def test_a_newly_created_wing_stores_a_timezone(client):
+    """Regression: a wing created through the API had no timezone, so every
+    endpoint deriving the current year raised MissingTimezone and returned 500.
+    Caught by nine setup-status tests at once."""
+    from tests.conftest import login as _login
+    hdr = _login(client, "SYSADMIN2026")
+    r = client.post("/api/wings", json={"code": "TZWG1", "name": "Timezone Test Wing"},
+                    headers=hdr)
+    assert r.status_code == 200, r.text
+    assert r.json()["timezone"], "a new wing must arrive with a stored zone"
+
+    db = SessionLocal()
+    try:
+        w = db.query(Wing).filter(Wing.code == "TZWG1").first()
+        assert w.timezone == "Australia/Perth"   # inherited from its sibling
+    finally:
+        db.close()
+
+
+def test_an_explicit_timezone_is_honoured_and_a_bogus_one_rejected(client):
+    from tests.conftest import login as _login
+    hdr = _login(client, "SYSADMIN2026")
+    ok = client.post("/api/wings", json={"code": "TZWG2", "name": "Eastern Test Wing",
+                                         "timezone": "Australia/Sydney"}, headers=hdr)
+    assert ok.status_code == 200, ok.text
+    assert ok.json()["timezone"] == "Australia/Sydney"
+
+    bad = client.post("/api/wings", json={"code": "TZWG3", "name": "Bogus Zone Wing",
+                                          "timezone": "Mars/Olympus_Mons"}, headers=hdr)
+    assert bad.status_code == 400, bad.text

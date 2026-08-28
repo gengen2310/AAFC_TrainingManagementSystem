@@ -123,3 +123,29 @@ def ensure_year_context(db: DBSession, squadron_id: str, year: int,
             raise
         return raced
     return py
+
+
+DEFAULT_WING_TIMEZONE = "Australia/Perth"
+
+
+def timezone_for_new_wing(db: DBSession, national_id: str,
+                          requested: str | None = None) -> str:
+    """The IANA zone to STORE on a wing at creation.
+
+    Resolving here, once, is not the silent defaulting wing_timezone refuses.
+    That refusal is about date arithmetic: a wrong zone used to derive "today"
+    is invisible and corrupts every year boundary. This value is written to the
+    row, shown in the UI, and editable -- an admin who creates an eastern-states
+    wing can see it is wrong and change it.
+
+    Preference order: what the caller asked for, then a sibling wing's zone,
+    then the national default.
+    """
+    if requested:
+        ZoneInfo(requested)          # validate; raises for an unknown zone
+        return requested
+    sibling = (db.query(Wing)
+                 .filter(Wing.national_id == national_id,
+                         Wing.timezone.isnot(None))
+                 .first())
+    return sibling.timezone if sibling else DEFAULT_WING_TIMEZONE
