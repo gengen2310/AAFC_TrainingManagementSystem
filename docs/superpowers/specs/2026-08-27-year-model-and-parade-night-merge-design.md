@@ -1,7 +1,7 @@
 # Training year model, and merging ParadeNight with ParadeDate
 
 Date: 2026-08-27
-Status: design, awaiting review
+Status: design, reviewed 2026-08-28 — one blocking defect found and resolved; see REVIEW notes
 
 ## Why
 
@@ -110,6 +110,18 @@ prep plans). Keeping the nights table moves 30 rows instead of 86.
 and `term`, `week_number`, `is_active`, `cancellation_reason` carried over from
 the date row.
 
+**REVIEW 2026-08-28 — this contradicted the orphan handling below, and the spec
+could not have been implemented as written.** `parade_nights` is the surviving
+table, so all 154 nights — including the 8 orphans — are *already rows in it*.
+"Not migrated" is meaningless for a row that is already there, and a NOT NULL
+column cannot be added while two rows have no value for it.
+
+Resolved by making it a **precondition rather than a migration branch**, the same
+treatment the six multi-active squadrons already get: the migration refuses to run
+while any parade night lacks a resolvable year. The two unresolvable nights are
+reported and fixed by a human *before* Phase B starts, not during it. That keeps
+the spec's rule — nothing invents a year — and removes the impossible state.
+
 `ParadeNight.training_year` (a bare integer) is superseded by
 `planning_year_id` and is dropped in the same migration. Keeping both would
 reintroduce the ambiguity this design exists to remove.
@@ -145,11 +157,13 @@ other planning tables and was not audited.
 |---|---|---|
 | a year's parade dates span the date | 2 | attach to that year |
 | a year matches the date's calendar year | 4 | attach to that year |
-| squadron has no active year at all | 2 | **not migrated; reported to the user** |
+| squadron has no active year at all | 2 | **blocks the migration; fixed by a human first** |
 
-The final two are left unmigrated and unarchived, in a review list. Guessing a
-year for them would be the same inference this design removes, run once over
-historical data where nobody can check the answer.
+The final two are reported for a human decision **before Phase B runs at all**
+(see the REVIEW note under Columns — they cannot be "skipped" mid-migration,
+because they are already rows in the surviving table). Guessing a year for them
+would be the same inference this design removes, run once over historical data
+where nobody can check the answer.
 
 ### Rollback
 
@@ -178,7 +192,18 @@ One record. One year. No inference between the two applications.
 
 ## Compatibility
 
-Phase A changes a column that many queries filter on. Sequence:
+Phase A changes a column that many queries filter on. **REVIEW 2026-08-28: "many"
+was doing far too much work.** Measured on main, `active_status` is referenced
+**296 times** — 156 in `backend/app`, 63 in tests, 31 in migrations, 24 in
+connected-frontend and 22 in the React app.
+
+The last two matter most: **46 of those references are in two independently
+deployed frontends**, so there is a window where an old frontend talks to a new
+backend. The API must keep returning `active_status` alongside `status` until both
+frontends have shipped and been verified. The sequence below is correct but step 3
+is not one step; it is the bulk of Phase A.
+
+Sequence:
 
 1. Add `status`, backfill from `active_status`, keep `active_status` derived.
 2. Ship. Both columns readable; nothing reads `status` yet.
@@ -193,8 +218,8 @@ Phase B begins only after step 5 holds in production.
 
 - Backend: a squadron cannot hold two active years; a parade night attaches to
   the active year and never to a draft; the eight orphan resolutions each
-  produce the documented outcome; the two unresolvable ones are reported and
-  not migrated.
+  produce the documented outcome; and the migration REFUSES TO RUN while any
+  night lacks a resolvable year, rather than skipping those rows.
 - Migration: run forward and backward against a disposable PostgreSQL restored
   from a production dump, asserting row counts and FK integrity per table before
   and after. Never against production directly.
@@ -202,6 +227,22 @@ Phase B begins only after step 5 holds in production.
   the same year, verified in a browser rather than by API round-trip.
 - Regression: the REM-139 tests are rewritten against the new model rather than
   deleted, so the original reported symptom stays covered.
+
+## Integrity assumptions, now verified
+
+The first draft assumed these and did not check them. Re-verified read-only
+against production on 2026-08-28, all clean:
+
+| assumption | result |
+|---|---|
+| every `parade_date` links to a night | 0 unlinked |
+| no night has two `parade_date` rows | 0 duplicates |
+| paired rows agree on the date | 0 mismatches |
+| paired rows agree on the squadron | 0 mismatches |
+| no notice points at a date whose night is missing | 0 |
+
+The migration should **assert** these rather than trust this table: they were true
+on 2026-08-28, not necessarily on the day it runs.
 
 ## Risks
 
@@ -233,3 +274,9 @@ Raised in the same conversation, deliberately not designed here:
    create a year, attach to an archived one, or leave them out of the merge?
 3. Should a draft year be visible in Planning Workspace at all, or only in TMS
    until it becomes active?
+4. **REVIEW 2026-08-28 — the draft lifecycle is undefined and the spec depends on
+   it.** "draft" appears throughout, but nothing here says how a year *becomes*
+   draft (created that way? demoted from active?), who may promote draft to
+   active, or what happens to the outgoing active year at rollover — archived
+   automatically, or left for someone to archive? Decision 1 cannot be
+   implemented without answers. This is the largest remaining gap.
