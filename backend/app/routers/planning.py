@@ -442,6 +442,17 @@ def list_planning_years(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
+    # Lazy rollover: promote a draft year to active on first read on/after its
+    # 1 January, in wing-local time. Only runs for squadron-scoped users where
+    # both squadron_id and wing_id are set — wing/national scopes have no draft
+    # rollover concept yet.
+    if p.role in ("sqn_admin", "sqn_general") and p.squadron_id and p.wing_id:
+        try:
+            from ..services_year import resolve_active_year
+            resolve_active_year(p.squadron_id, p.wing_id, db)
+        except RuntimeError:
+            # Wing has no timezone configured — rollover silently skipped.
+            pass
     q = db.query(PlanningYear)
     if p.role in ("sqn_admin", "sqn_general"):
         q = q.filter(PlanningYear.unit_id == p.squadron_id)
