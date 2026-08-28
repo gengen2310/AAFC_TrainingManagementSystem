@@ -1,3 +1,13 @@
+> ## ⚠️ SUPERSEDED IN PART — 2026-08-28
+>
+> See `docs/superpowers/specs/2026-08-28-training-year-context-model.md`.
+>
+> Any create-year, manage-years, rename-year, archive or restore user experience
+> described below no longer stands. A Training Year is calendar context: the user
+> selects a year, and the canonical row is materialised on first write.
+>
+> Kept unedited below as decision history.
+
 # Year UX — Design Spec
 **Sub-project 1 of POST-GAP TRAINING CELL PRODUCT REVIEW**
 Date: 2026-08-18 | Status: Approved for implementation
