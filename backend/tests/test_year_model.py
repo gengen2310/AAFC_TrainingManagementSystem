@@ -369,3 +369,37 @@ def test_lifecycle_requires_auth(client):
     r = client.post("/api/planning/years/draft",
                     json={"year": 2099, "name": "Unauth", "source_year_id": "fake-id"})
     assert r.status_code == 401
+
+
+def test_create_draft_requires_sqn_admin(client):
+    """sqn_general must not be able to create a draft year (403)."""
+    h = login(client, "703SQN2026")  # sqn_general
+    r = client.post("/api/planning/years/draft",
+                    json={"year": 2099, "name": "Forbidden draft",
+                          "source_year_id": "00000000-0000-0000-0000-000000000000"},
+                    headers=h)
+    assert r.status_code == 403
+
+
+def test_promote_requires_sqn_admin(client):
+    """sqn_general must not be able to promote a year (403)."""
+    h_admin = login(client, "ADMIN703")
+    h_gen = login(client, "703SQN2026")  # sqn_general
+    # Get a real year_id from the seeded data to hit the scope check
+    yr_id = client.get("/api/planning/years", headers=h_admin).json()[0]["planning_year_id"]
+    r = client.post(f"/api/planning/years/{yr_id}/promote", headers=h_gen)
+    assert r.status_code == 403
+
+
+def test_promote_requires_auth(client):
+    """Unauthenticated promote must return 401."""
+    fake_id = "00000000-0000-0000-0000-000000000000"
+    r = client.post(f"/api/planning/years/{fake_id}/promote")
+    assert r.status_code == 401
+
+
+def test_archive_requires_auth(client):
+    """Unauthenticated archive must return 401."""
+    fake_id = "00000000-0000-0000-0000-000000000000"
+    r = client.post(f"/api/planning/years/{fake_id}/archive")
+    assert r.status_code == 401

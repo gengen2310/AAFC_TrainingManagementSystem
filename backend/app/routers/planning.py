@@ -646,7 +646,9 @@ def create_draft_year(
     if p.role == "sqn_admin":
         unit_id = p.squadron_id
         wing_id = p.wing_id
-    elif p.role in ("wing_admin", "national_admin", "system_admin"):
+    else:
+        # wing_admin / national_admin / system_admin: resolve unit_id from source year.
+        # _require_plan_write() above already blocked sqn_general and viewer roles.
         src = db.get(PlanningYear, body.source_year_id)
         if not src:
             raise HTTPException(404, detail={"error": "source_year_not_found"})
@@ -654,8 +656,6 @@ def create_draft_year(
         wing_id = src.wing_id
         if unit_id:
             require_can_write_squadron(p, unit_id, wing_id)
-    else:
-        raise HTTPException(403, detail={"error": "forbidden"})
 
     existing_draft = (
         db.query(PlanningYear)
