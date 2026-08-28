@@ -39,19 +39,28 @@ export function GuidedYearSetupModal({ years, squadronId, onClose, onDone }: Pro
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const mostRecent = years.length > 0 ? years[years.length - 1] : null;
+  // Only a year with a row can be rolled over -- a logical year has nothing to
+  // copy from. (The design retires this modal's opening question entirely, since
+  // under the context model both "new year" and "roll over" are the wrong
+  // framing: the year already exists. That redesign is its own change; this
+  // keeps the existing flow correct in the meantime.)
+  const rollable = years.filter(y => y.planning_year_id);
+  const mostRecent = rollable.length > 0 ? rollable[rollable.length - 1] : null;
 
   // ── Step: start (create new year OR roll over from most recent) ──────────────
   const [method, setMethod] = useState<"new" | "rollover">(mostRecent ? "rollover" : "new");
   const thisYear = new Date().getFullYear();
   const [newYearNum, setNewYearNum] = useState(thisYear);
-  const [newYearName, setNewYearName] = useState(`${thisYear}–${thisYear + 1} Training Year`);
+  // Derived from the single year it is, not hyphenated across two: a training
+  // year IS 2026, and "2026–2027 Training Year" invited exactly the
+  // ambiguity the context model removes.
+  const [newYearName, setNewYearName] = useState(`${thisYear} Training Year`);
 
   async function runStart() {
     setLoading(true); setErr("");
     try {
       if (method === "rollover" && mostRecent) {
-        const r = await planningApi.rolloverYear(mostRecent.planning_year_id, {});
+        const r = await planningApi.rolloverYear(mostRecent.planning_year_id!, {});
         setYearId(r.new_planning_year_id);
         setYearLabel(r.name);
         setDatesAlreadyDone(true);
