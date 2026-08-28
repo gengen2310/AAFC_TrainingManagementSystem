@@ -179,9 +179,23 @@ export interface ImportCommitResult { ok: boolean; import_id: string; accepted: 
 
 // ─── Planning Workspace types ───────────────────────────────────────────────
 export interface PlanningYear {
-  planning_year_id: string; unit_id: string | null; wing_id: string | null;
-  year: number; name: string; active_status: boolean;
-  unit_code?: string | null; unit_name?: string | null; wing_code?: string | null;
+  planning_year_id: string;
+  unit_id: string | null;
+  wing_id: string | null;
+  year: number;
+  name: string;
+  /** Phase A: canonical status field. draft | active | archived. */
+  status: 'draft' | 'active' | 'archived';
+  /** Backward-compat: kept until Phase A-2 drops it from the API. */
+  active_status: boolean;
+  unit_code?: string | null;
+  unit_name?: string | null;
+  wing_code?: string | null;
+  created_by?: string | null;
+  updated_by?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  version?: number;
 }
 export interface ParadeDate {
   parade_date_id: string; planning_year_id: string; unit_id: string | null;
