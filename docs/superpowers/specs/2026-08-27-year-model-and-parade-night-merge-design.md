@@ -114,10 +114,28 @@ anything, the year changes by itself — with no new infrastructure.
 
 Three consequences that must be handled, not assumed:
 
-**Timezone.** "Today" must be evaluated in the squadron's local timezone. Perth
-is UTC+8, so a UTC comparison rolls the year over eight hours early. This is the
-same defect class as the naive-UTC timestamps fixed on 2026-08-25; see
-`UTCDateTime` in `database.py`.
+**Timezone — and the system does not currently know it.** Rollover is
+**1 January of the draft year's own `year`, in squadron-local time** (decided
+2026-08-28).
+
+Checked, not assumed: there is **no timezone field on `Squadron`, `Wing` or
+`NationalEntity`**, and the only timezone-aware code in the backend is
+`UTCDateTime` in `database.py`. So squadron-local time is not expressible today
+and **this is a prerequisite, not a detail**.
+
+It matters because AAFC spans Australian states. On 1 January, southern states
+are on daylight saving and Perth is not: Australia/Perth is UTC+8 while
+Australia/Sydney is UTC+11. A UTC comparison therefore rolls some squadrons over
+on 31 December — "the training year changed a day early" is precisely the kind of
+report this spec exists to stop producing.
+
+Proposed: an IANA `timezone` string on `Wing` (states map to wings cleanly), a
+nullable per-`Squadron` override for the exceptions, and a national default as
+the final fallback. `zoneinfo` is in the standard library on Python 3.13, so this
+adds no dependency. Seeds and existing rows need real values — an unset timezone
+must fail loudly rather than silently defaulting to UTC.
+
+Same defect class as the naive-UTC timestamps fixed on 2026-08-25.
 
 **It mutates on a read.** Two concurrent requests can both see an un-promoted
 draft. The promotion must run in one transaction and rely on the
@@ -321,11 +339,12 @@ Raised in the same conversation, deliberately not designed here:
 4. ~~The draft lifecycle is undefined.~~ **ANSWERED 2026-08-28:** one active year,
    next year drafted manually, promoted automatically on rollover with the
    outgoing year archived in the same transaction. Written up under Lifecycle.
-5. **What date is "rollover"?** Not yet decided. Proposed: 1 January of the draft
-   year's own `year` value, evaluated in the squadron's local timezone — it is
-   predictable and matches the data, where a seeded training year spans a calendar
-   year. (Note the Session Structure help text claimed July–June; that was checked
-   on 2026-08-25 and is wrong for the seeded data.) The alternative is the day
-   after the outgoing year's last parade date, which follows real squadron
-   activity but is unpredictable and breaks if the dates are edited. **Confirm
-   before implementing — the whole lifecycle hangs off it.**
+5. ~~What date is "rollover"?~~ **ANSWERED 2026-08-28: 1 January of the draft
+   year's own `year`, in squadron-local time.** Consistent with the data, where a
+   seeded training year spans a calendar year — note the Session Structure help
+   text claimed July–June and was found wrong on 2026-08-25.
+6. **Who sets the timezones, and what are they?** The decision above requires a
+   timezone field that does not exist yet (see Lifecycle). Someone must supply a
+   real IANA zone per wing, and decide whether squadrons may override it. Until
+   then the rollover date cannot be evaluated for any squadron. **This is now the
+   last thing blocking implementation.**
