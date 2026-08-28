@@ -86,6 +86,50 @@ correct and is preserved from the existing index.
 - TMS and Planning Workspace both default to the active year, so they cannot
   disagree about which year is "current".
 
+### Lifecycle
+
+Decided by the user, 2026-08-28: **one active year; the next year is drafted
+manually; the draft is promoted automatically on rollover, and the outgoing year
+is archived in the same moment.**
+
+**There is no scheduler on this system, so "automatic" cannot mean a cron job.**
+Verified: `workers/celery_app.py` configures a broker but declares no
+`beat_schedule`, there are no periodic tasks, and Railway has no Redis service —
+so `dispatcher.py` always takes its documented fallback and runs work
+synchronously in-process. Nothing exists that can fire at midnight on 1 January.
+
+Implemented instead as **lazy evaluation on read**. The helper that resolves "the
+active year for this squadron" performs the rollover itself, the first time it is
+called on or after the rollover date:
+
+    resolve_active_year(squadron):
+        active = the squadron's active year
+        draft  = the squadron's draft year, if any
+        if draft and today >= rollover_date(draft):
+            promote draft -> active, archive the outgoing year   # one transaction
+        return the active year
+
+The user-visible behaviour is exactly what was asked for — nobody presses
+anything, the year changes by itself — with no new infrastructure.
+
+Three consequences that must be handled, not assumed:
+
+**Timezone.** "Today" must be evaluated in the squadron's local timezone. Perth
+is UTC+8, so a UTC comparison rolls the year over eight hours early. This is the
+same defect class as the naive-UTC timestamps fixed on 2026-08-25; see
+`UTCDateTime` in `database.py`.
+
+**It mutates on a read.** Two concurrent requests can both see an un-promoted
+draft. The promotion must run in one transaction and rely on the
+one-active-year-per-squadron unique index to make the loser fail and retry,
+rather than on checking first and writing after.
+
+**It is silent.** The active year changing under a user mid-session is the same
+class of surprise as the original defect this spec exists to remove. Both
+frontends already display the year; they should additionally notice that it
+changed since the page loaded and say so, rather than swapping the data
+underneath. This is a requirement, not a nicety.
+
 ### Data to resolve
 
 Six squadrons hold more than one active year. One stays active; the others
@@ -274,9 +318,14 @@ Raised in the same conversation, deliberately not designed here:
    create a year, attach to an archived one, or leave them out of the merge?
 3. Should a draft year be visible in Planning Workspace at all, or only in TMS
    until it becomes active?
-4. **REVIEW 2026-08-28 — the draft lifecycle is undefined and the spec depends on
-   it.** "draft" appears throughout, but nothing here says how a year *becomes*
-   draft (created that way? demoted from active?), who may promote draft to
-   active, or what happens to the outgoing active year at rollover — archived
-   automatically, or left for someone to archive? Decision 1 cannot be
-   implemented without answers. This is the largest remaining gap.
+4. ~~The draft lifecycle is undefined.~~ **ANSWERED 2026-08-28:** one active year,
+   next year drafted manually, promoted automatically on rollover with the
+   outgoing year archived in the same transaction. Written up under Lifecycle.
+5. **What date is "rollover"?** Not yet decided. Proposed: 1 January of the draft
+   year's own `year` value, evaluated in the squadron's local timezone — it is
+   predictable and matches the data, where a seeded training year spans a calendar
+   year. (Note the Session Structure help text claimed July–June; that was checked
+   on 2026-08-25 and is wrong for the seeded data.) The alternative is the day
+   after the outgoing year's last parade date, which follows real squadron
+   activity but is unpredictable and breaks if the dates are edited. **Confirm
+   before implementing — the whole lifecycle hangs off it.**
