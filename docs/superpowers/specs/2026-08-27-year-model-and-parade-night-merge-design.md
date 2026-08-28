@@ -361,7 +361,22 @@ Raised in the same conversation, deliberately not designed here:
 
 ## Open questions
 
-1. Which year stays active for each of the six squadrons?
+1. ~~Which year stays active for each of the six squadrons?~~ **ANSWERED AND DONE
+   2026-08-28 — see REM-156.** Resolved directly on production rather than by
+   migration: 703 and 721 had an empty duplicate archived; 704 kept the row
+   holding its 16 parade dates, was renamed "2026 test 1.0" → "2026 Training
+   Year", and had its two empties plus its 2027 row archived; 708 had both empty
+   2026 rows archived, leaving the row that actually holds its 15 dates. 702 and
+   TEST were reviewed and need no change — each is already a populated current
+   year plus an empty next year, which is this spec's own model rather than a
+   duplicate.
+
+   **This removes a Phase A precondition.** The per-squadron adjudication that
+   had to happen before the one-active-year index could be tightened is complete.
+   Production now holds at most one active year per squadron except 702 and TEST,
+   whose second year becomes the *draft* under the new `status` column rather
+   than needing to be archived at all. Phase A no longer waits on a data cleanup;
+   it waits on question 6.
 2. What happens to the two parade nights whose squadrons have no active year —
    create a year, attach to an archived one, or leave them out of the merge?
 3. Should a draft year be visible in Planning Workspace at all, or only in TMS
