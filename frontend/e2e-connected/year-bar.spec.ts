@@ -1,9 +1,19 @@
 import { test, expect, Page } from "@playwright/test";
+import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // The Training Year is a time context, not a workflow object. These tests hold
 // the design in docs/design/training-year-frontend-design.md to its own gates.
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
+
+// The general limiter's 300 req/60s budget is crossed partway through this
+// file: each test logs in and the page then fans out a dozen year-scoped
+// loads. globalSetup's single reset is necessary but not sufficient -- the
+// same reason main-tms.spec.ts carries its own reset.
+test.beforeEach(async () => {
+  await resetBackendRateLimits(
+    process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+});
 
 async function loginSquadron(page: Page, code: string) {
   if (LOCAL_API_BASE) {
@@ -121,4 +131,114 @@ test("no request is ever made for a null planning year", async ({ page }) => {
 
   expect(bad, "requests for /years/null/...").toEqual([]);
   expect(errors, "uncaught page errors").toEqual([]);
+});
+
+// --- phase 2: the empty future year, and the past year -----------------------
+
+async function apiToken(page: Page): Promise<string> {
+  return await page.evaluate("sessionStorage.getItem('aafc_token')") as string;
+}
+
+/** Remove a year's row again so these tests do not poison the shared database
+ *  for the "no row at all" test above, which needs 2027 unmaterialised. */
+async function deleteYear(page: Page, year: number) {
+  const token = await apiToken(page);
+  const base = LOCAL_API_BASE!;
+  const rows = await (await page.request.get(
+    `${base}/api/planning/years`, { headers: { Authorization: `Bearer ${token}` } })).json();
+  const row = rows.find((r: any) => r.year === year);
+  if (row?.planning_year_id) {
+    await page.request.delete(`${base}/api/planning/years/${row.planning_year_id}`,
+      { headers: { Authorization: `Bearer ${token}` } });
+  }
+}
+
+test("an empty future year offers exactly the two things that can be done", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await openYearBar(page);
+  const current = Number(await page.locator("#ynLabel").textContent());
+  await page.locator("#ynNext").click();
+  const target = current + 1;
+
+  const notice = page.locator("#yn-year-notice .yn-notice");
+  await expect(notice).toBeVisible();
+  // Never say the year does not exist.
+  await expect(notice).not.toContainText("does not exist");
+  await expect(notice).toContainText(`Nothing has been set up for ${target} yet`);
+
+  const buttons = notice.locator("button");
+  await expect(buttons).toHaveCount(2);
+  await expect(buttons.nth(0)).toHaveText(`Set up ${target}`);
+  // Names the source year, not "copy previous".
+  await expect(buttons.nth(1)).toHaveText(`Copy setup from ${current}`);
+});
+
+test("Set up materialises the year and the panel goes away", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await openYearBar(page);
+  const current = Number(await page.locator("#ynLabel").textContent());
+  const target = current + 1;
+  await page.locator("#ynNext").click();
+  await expect(page.locator("#yn-year-notice .yn-notice")).toBeVisible();
+
+  try {
+    await page.locator("#yn-year-notice button", { hasText: `Set up ${target}` }).click();
+    await expect(page.locator("#yn-year-notice .yn-notice")).toHaveCount(0);
+    expect(await page.evaluate("P.currentYearId")).not.toBeNull();
+    expect(Number(await page.locator("#ynLabel").textContent())).toBe(target);
+  } finally {
+    await deleteYear(page, target);
+  }
+});
+
+test("Copy setup brings the class structure across and says how much it copied", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await openYearBar(page);
+  const current = Number(await page.locator("#ynLabel").textContent());
+  const target = current + 1;
+  await page.locator("#ynNext").click();
+
+  try {
+    await page.locator("#yn-year-notice button", { hasText: `Copy setup from ${current}` }).click();
+    await expect(page.locator("#yn-year-notice .yn-notice")).toHaveCount(0);
+
+    const token = await apiToken(page);
+    const id = await page.evaluate("P.currentYearId");
+    const classes = await (await page.request.get(
+      `${LOCAL_API_BASE}/api/training-classes?training_year_id=${id}`,
+      { headers: { Authorization: `Bearer ${token}` } })).json();
+    expect(classes.length).toBeGreaterThan(0);
+  } finally {
+    await deleteYear(page, target);
+  }
+});
+
+test("a past year states it is read-only and names the way to correct it", async ({ page }) => {
+  await loginSquadron(page, "ADMIN703");
+  await openYearBar(page);
+  const token = await apiToken(page);
+  const past = 2019;
+
+  await page.request.post(`${LOCAL_API_BASE}/api/planning/years`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { year: past, name: `${past} Training Year` },
+  });
+
+  try {
+    // Refresh the year list in place rather than reloading: a reload restarts
+    // the app's bootstrap and the bar is not mounted when nav() is called.
+    await page.evaluate("_ynFetchYears()");
+    await page.evaluate(`setCurrentYear(P.years.find(y => y.year === ${past}))`);
+
+    await expect(page.locator("#ynState")).toHaveText("← Previous year · training record");
+    const notice = page.locator("#yn-year-notice .yn-notice-locked");
+    await expect(notice).toBeVisible();
+    // Read-only is the message; it leads, and it is not carried by an icon.
+    await expect(notice.locator("strong")).toHaveText("Read-only.");
+    await expect(notice).toContainText("Delegated Intervention");
+    // A wall that does not say what to do instead is not acceptable.
+    await expect(notice.locator("button")).toHaveCount(0);
+  } finally {
+    await deleteYear(page, past);
+  }
 });

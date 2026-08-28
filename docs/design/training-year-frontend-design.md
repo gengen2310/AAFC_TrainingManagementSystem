@@ -211,3 +211,32 @@ as one optional step rather than as the premise.
 `SetupPanel` loses step 1 ("create planning year") and the generated
 `2026–2027 Training Year` name that produced the hyphenated wording §13 objects
 to.
+
+
+---
+
+## 11. Known gaps found while implementing (2026-08-28)
+
+**Inherited Activities is not year-scoped.** The card on the Activities page
+mounts the shared activities component, which calls
+`/api/activities?scope_type=squadron&scope_id=…` with no year at all. Selecting
+2027 therefore leaves 2026's holiday-sourced rows on screen under the heading
+2027.
+
+This is pre-existing — the panel was never year-scoped — but navigable years
+make it visible, because you can now select a year the panel has no data for.
+Not fixed here: it is outside this phase, and the phase's own scope discipline
+matters more than the convenience of a drive-by change.
+
+The fix is small and frontend-only. `/api/activities` already accepts
+`date_from` and `date_end` (`backend/app/routers/training.py:3554-3555`), so
+the squadron mount can pass `date_from=<year>-01-01&date_end=<year>-12-31`.
+It must be passed only for the squadron mount on the Activities page: the same
+component also backs the Wing and National activity pages, which have no year
+bar and must not be silently narrowed.
+
+**Every other year-scoped panel does clear.** Holiday Periods, Class
+Forecasts, Wing HQ Events, Anchor Events and the Mission Backlog were all
+verified against a screenshot of a row-less 2027, which is how the stale-panel
+defect was found in the first place — the tests passed while the page was
+quietly wrong.

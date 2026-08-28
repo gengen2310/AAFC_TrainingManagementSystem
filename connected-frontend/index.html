@@ -299,6 +299,13 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 /* One quiet line, no chips. The current year carries no arrow: the arrows
    mean "away from now", so their absence is what says you are in it. */
 .yn-state{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;min-height:13px;white-space:nowrap}
+/* A dashed border, not a solid card: the year is real, its configuration is
+   empty. A solid card would read as a thing that is missing. */
+.yn-notice{border:1px dashed var(--line);border-radius:10px;padding:16px 18px;margin:0 0 14px;background:transparent}
+.yn-notice p{margin:0 0 12px;font-size:var(--fs-sm);color:var(--text);max-width:62ch}
+.yn-notice .yn-notice-actions{display:flex;gap:10px;flex-wrap:wrap}
+.yn-notice.yn-notice-locked{border-style:solid;background:var(--surface-2)}
+.yn-notice.yn-notice-locked p{margin:0}
 .yn-mgmt-table{width:100%;border-collapse:collapse;}
 .yn-mgmt-table th{font-size:var(--fs-3xs);font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 12px;border-bottom:1px solid var(--border);text-align:left;}
 .yn-mgmt-table td{padding:10px 12px;font-size:var(--fs-sm);border-bottom:1px solid var(--border-light,#e4edf5);color:var(--text);}
@@ -1800,6 +1807,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             </div>
           </div>
         </div>
+        <div id="yn-year-notice" class="no-print"></div>
         <div class="fbar no-print">
           <select id="act-f-type" aria-label="Filter by activity type" onchange="renderActs()">
             <option value="all">All Types</option>
@@ -12139,8 +12147,17 @@ async function _loadActivitiesPage(){
     loadAnchors(P.currentYearId);
     loadMissions(P.currentYearId);
   } else {
+    // The year is selected but has no row. Every year-scoped panel must clear:
+    // leaving 2026's holidays and forecasts on screen under the heading 2027
+    // is worse than showing nothing, because it is quietly wrong.
+    _renderHolidays(null);
+    _loadClassForecasts(null);
     loadAnchors(null);
     loadMissions(null);
+    // Wing HQ events are keyed by the year NUMBER, not a planning-year row, so
+    // they are still meaningful for a year nobody has configured.
+    const _wid = (S.session && S.session.wing_id) || '';
+    if (_wid && P.currentYearInt) _loadAndRenderWingEventsOverlay(_wid, P.currentYearInt);
   }
 }
 
@@ -12226,6 +12243,93 @@ function _ynUpdateDisplay() {
     const row = _ynYears().find(y => y.year === P.currentYearInt);
     st.textContent = (row && _YN_STATE_TEXT[row.state]) || '';
   }
+  _ynRenderYearNotice();
+}
+
+// The year is real; only its configuration is empty. Never say the year does
+// not exist, and never offer more than the two things that can usefully be
+// done from here.
+function _ynRenderYearNotice() {
+  const el = document.getElementById('yn-year-notice');
+  if (!el) return;
+  const rows = _ynYears();
+  const row = rows.find(y => y.year === P.currentYearInt);
+  el.textContent = '';
+  if (!row) return;
+  const yr = Number(row.year);
+
+  if (row.state === 'past') {
+    // Read-only stated in words, first, and the notice names the way out --
+    // blocking someone without saying what to do instead is just a wall.
+    const box = document.createElement('div');
+    box.className = 'yn-notice yn-notice-locked';
+    const para = document.createElement('p');
+    const lead = document.createElement('strong');
+    lead.textContent = 'Read-only.';
+    para.appendChild(lead);
+    para.appendChild(document.createTextNode(
+      ` ${yr} is complete. Its records stay available to review. To correct ` +
+      `something, a Wing administrator can open Delegated Intervention.`));
+    box.appendChild(para);
+    el.appendChild(box);
+    return;
+  }
+
+  if (row.materialised === false) {
+    const prev = rows.filter(y => y.year < yr && y.materialised)
+                     .sort((a, b) => b.year - a.year)[0];
+    const box = document.createElement('div');
+    box.className = 'yn-notice';
+    const para = document.createElement('p');
+    para.textContent = prev
+      ? `Nothing has been set up for ${yr} yet. You can start from scratch, or ` +
+        `bring across the class structure you used in ${prev.year}.`
+      : `Nothing has been set up for ${yr} yet.`;
+    box.appendChild(para);
+
+    const actions = document.createElement('div');
+    actions.className = 'yn-notice-actions';
+    const setUp = document.createElement('button');
+    setUp.className = 'btn btn-dk';
+    setUp.textContent = `Set up ${yr}`;
+    setUp.addEventListener('click', () => ynSetUpYear(yr));
+    actions.appendChild(setUp);
+    if (prev) {
+      // Names the source year rather than "copy previous", so the sentence is
+      // true without the reader reconstructing context.
+      const copy = document.createElement('button');
+      copy.className = 'btn btn-secondary';
+      copy.textContent = `Copy setup from ${prev.year}`;
+      copy.addEventListener('click', () => ynCopySetupFrom(Number(prev.year), yr));
+      actions.appendChild(copy);
+    }
+    box.appendChild(actions);
+    el.appendChild(box);
+  }
+}
+
+async function ynSetUpYear(year) {
+  try {
+    await api('/api/planning/years', {
+      method: 'POST', body: { year: year, name: year + ' Training Year' } });
+    await _ynFetchYears();
+    const row = _ynYears().find(y => y.year === year);
+    if (row) setCurrentYear(row);
+    showToast(`Set up ${year}.`);
+  } catch (e) { showToast(`Could not set up ${year}: ` + apiErr(e), true); }
+}
+
+async function ynCopySetupFrom(src, tgt) {
+  try {
+    const r = await api('/api/planning/years/copy-setup', { method: 'POST', body: {
+      source_year: src, target_year: tgt,
+      copy_classes: true, copy_parade_pattern: false } });
+    await _ynFetchYears();
+    const row = _ynYears().find(y => y.year === tgt);
+    if (row) setCurrentYear(row);
+    const n = (r && r.classes_copied != null) ? r.classes_copied : 0;
+    showToast(`Copied ${n} training ${n === 1 ? 'class' : 'classes'} from ${src} into ${tgt}.`);
+  } catch (e) { showToast('Could not copy setup: ' + apiErr(e), true); }
 }
 
 function _ynUpdateArrows() {
@@ -16314,6 +16418,13 @@ async function _renderParadeDates(yearId){
 async function _renderHolidays(yearId){
   const el = document.getElementById('py-holidays-body');
   if (!el) return;
+  if (!yearId){
+    // A year with no row has no holidays, and asking for them would build
+    // /api/planning/years/null/holidays. Say so rather than leaving the
+    // previous year's list sitting under a different year number.
+    el.innerHTML = '<p class="muted">No holiday periods added yet.</p>';
+    return;
+  }
   try {
     const rows = await api(`/api/planning/years/${yearId}/holidays`);
     if(!rows.length){ el.innerHTML='<p class="muted">No holiday periods added yet.</p>'; return; }
