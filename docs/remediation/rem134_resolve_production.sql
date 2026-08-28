@@ -1,3 +1,37 @@
+-- ============================================================================
+-- SUPERSEDED 2026-08-28 — DO NOT RUN. Kept for the record only.
+--
+-- This runbook was written on 2026-08-23 and never executed. The work it
+-- describes was done instead on 2026-08-28, directly and interactively, on the
+-- user's instruction squadron by squadron (see REM-156). Production no longer
+-- matches the state this script expects.
+--
+-- Running it now would FAIL its own verification block. Check 4 asserts that
+-- ec1a2a05 is still active; it was archived on 2026-08-28. It would also try to
+-- archive rows that are already archived, which is harmless, and would NOT
+-- archive 704's 2027 row or rename anything, which is the part that mattered.
+--
+-- What actually happened, and why it differs:
+--
+--   703  archived 57b5c229 (empty)                         — as planned here
+--   721  archived 6ea1640f (empty)                         — as planned here
+--   704  KEPT 420e1d56 and RENAMED it "2026 test 1.0" ->
+--        "2026 Training Year"; archived 0d39e637, c4aa3393,
+--        and additionally its 2027 row 637247a9             — beyond this script
+--   708  archived BOTH 2026 rows, INCLUDING ec1a2a05        — REVERSES the
+--        decision recorded on line 24 below
+--
+-- The 708 reversal was deliberate. This script's note says nothing in the
+-- database distinguished 708's two 2026 rows, so the choice was arbitrary. By
+-- 2026-08-28 more was known: 708's only row holding parade dates is the one
+-- numbered 2027 (b482b6ed, 15 dates), and both 2026 rows were empty. Keeping an
+-- empty row and discarding the populated one would have been the wrong call.
+--
+-- Remaining after 2026-08-28: 702 and TEST still hold two active years each.
+-- Both already match the intended model (a populated current year plus an empty
+-- next year), so neither is a duplicate to archive.
+-- ============================================================================
+
 -- REM-134 planning-year resolution — PRODUCTION
 -- Verified against production 2026-08-23; alembic revision f6a7b8c9d0e1.
 -- 4 duplicate ACTIVE (unit_id, year) groups, 9 active rows, all year 2026.
