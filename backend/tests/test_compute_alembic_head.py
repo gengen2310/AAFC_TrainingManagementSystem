@@ -30,7 +30,7 @@ def test_computes_the_real_repo_head():
     diff (unlike the workflow-level hardcoding this script replaced, which
     failed silently and was found stale by ~9 migrations in production)."""
     head = compute_head("alembic/versions")
-    assert head == "e2f3a4b5c6d7"
+    assert head == "d5f81a3c9e27"
 
 
 def test_single_linear_chain(tmp_path):

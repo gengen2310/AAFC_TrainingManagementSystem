@@ -41,6 +41,19 @@ from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_write_squadron, require_can_view_squadron
 from ..services import audit
+from ..services_year import (
+    PastYearLocked, ensure_year_context, find_year_context, require_year_writable,
+    selectable_years, year_display_name, year_state,
+)
+
+
+def _require_writable_year(db, squadron_id: str, year: int, p) -> None:
+    """Translate the service-layer lock into the router's 403 contract."""
+    try:
+        require_year_writable(db, squadron_id, year, p)
+    except PastYearLocked as exc:
+        raise HTTPException(403, detail={"error": "past_year_read_only",
+                                         "message": str(exc)})
 from .timing import _effective_template
 
 router = APIRouter(prefix="/api/planning", tags=["planning"])
@@ -177,10 +190,18 @@ def _require_plan_write(p: Principal) -> None:
         raise HTTPException(403, detail={"error": "forbidden"})
 
 
-def _require_year_access(p: Principal, py: PlanningYear, write: bool = False) -> None:
-    """Enforce scope: sqn_admin/sqn_general → own sqn; wing_admin → own wing; nat → all."""
+def _require_year_access(p: Principal, py: PlanningYear, write: bool = False,
+                         db: DBSession | None = None) -> None:
+    """Enforce scope: sqn_admin/sqn_general → own sqn; wing_admin → own wing; nat → all.
+
+    Also enforces the past-year lock when `db` is supplied. It is enforced here
+    rather than at each of the fifteen year-scoped write endpoints so that a new
+    endpoint added later inherits the protection instead of forgetting it.
+    """
     if write and p.role in _WRITE_BLOCKED:
         raise HTTPException(403, detail={"error": "forbidden"})
+    if write and db is not None and py.unit_id:
+        _require_writable_year(db, py.unit_id, py.year, p)
     if p.role in ("sqn_admin", "sqn_general"):
         if py.unit_id != p.squadron_id:
             raise HTTPException(403, detail={"error": "out_of_scope"})
@@ -246,6 +267,10 @@ def _year_out(py: PlanningYear, unit_code: str | None = None,
     return {
         "planning_year_id": py.id, "unit_id": py.unit_id, "wing_id": py.wing_id,
         "year": py.year, "name": py.name, "active_status": py.active_status,
+        # Derived, not stored. state is filled by the caller that knows
+        # which squadron the year is being viewed for; materialised says
+        # a row exists, and is False for logical-only years.
+        "state": None, "materialised": True,
         "unit_code": unit_code, "unit_name": unit_name, "wing_code": wing_code,
         "created_by": py.created_by, "updated_by": py.updated_by,
         "created_at": iso_z(py.created_at) if py.created_at else None,
@@ -422,9 +447,17 @@ class PlanningYearUpdateIn(BaseModel):
 def list_planning_years(
     unit_id: Optional[str] = None,
     wing_id: Optional[str] = None,
+    include_unmaterialised: bool = False,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
+    """List planning years. `state` is derived and always present.
+
+    Logical years -- selectable years with no row yet -- are opt-in via
+    include_unmaterialised. They carry planning_year_id=None, and existing
+    consumers build sub-resource URLs (/years/{id}/holidays) straight from
+    this list, so returning them by default would break every one of them.
+    """
     q = db.query(PlanningYear)
     if p.role in ("sqn_admin", "sqn_general"):
         q = q.filter(PlanningYear.unit_id == p.squadron_id)
@@ -451,7 +484,130 @@ def list_planning_years(
             unit_name=sq.name if sq else None,
             wing_code=wg.code if wg else None,
         ))
+
+    sqn_id = p.squadron_id if p.role in ("sqn_admin", "sqn_general") else unit_id
+
+    # Years the user may select that have no row yet. Listing one does NOT
+    # create it -- materialisation happens on write, in ensure_year_context.
+    if include_unmaterialised and sqn_id:
+        have = {row["year"] for row in out}
+        for y in selectable_years(db, sqn_id):
+            if y not in have:
+                out.append({
+                    "planning_year_id": None, "unit_id": sqn_id, "wing_id": None,
+                    "year": y, "name": year_display_name(y), "active_status": True,
+                    "state": year_state(db, sqn_id, y), "materialised": False,
+                    "unit_code": None, "unit_name": None, "wing_code": None,
+                    "created_by": None, "updated_by": None,
+                    "created_at": None, "updated_at": None, "version": 0,
+                })
+
+    # Every row carries a derived state. Wing and national years have no
+    # squadron to resolve a timezone against, so theirs stays None rather than
+    # being guessed from the server's clock.
+    for row in out:
+        if row["state"] is None:
+            sid = row["unit_id"] or sqn_id
+            if sid:
+                row["state"] = year_state(db, sid, row["year"])
+    out.sort(key=lambda r: r["year"], reverse=True)
     return out
+
+
+class CopySetupIn(BaseModel):
+    source_year: int
+    target_year: int
+    copy_classes: bool = True
+    copy_parade_pattern: bool = False
+
+
+@router.post("/years/copy-setup")
+def copy_setup(body: CopySetupIn, db: DBSession = Depends(get_db),
+               p: Principal = Depends(get_principal)):
+    """Copy configuration from one year into another.
+
+    This does not create a year in the user's sense -- the year already exists
+    as calendar context. It materialises that year's container and seeds
+    configuration into it.
+
+    Copies class structure and, optionally, the parade recurrence pattern.
+    Never sessions, outcomes, progress, attendance, audit history or published
+    status, and never date-shifted holidays -- those are re-imported, because a
+    shifted public holiday is wrong far more often than it is right.
+    """
+    sqn_id = p.squadron_id
+    if not sqn_id:
+        raise HTTPException(400, detail={
+            "error": "squadron_required",
+            "message": "Copy setup runs for a squadron. Sign in to a squadron account."})
+    require_can_write_squadron(p, sqn_id, p.wing_id)
+
+    source = find_year_context(db, sqn_id, body.source_year)
+    if source is None:
+        raise HTTPException(404, detail={
+            "error": "source_year_not_configured",
+            "message": f"{body.source_year} has nothing set up to copy."})
+    if body.target_year == body.source_year:
+        raise HTTPException(400, detail={
+            "error": "same_year",
+            "message": "Choose a different year to copy into."})
+
+    _require_writable_year(db, sqn_id, body.target_year, p)
+    target = ensure_year_context(db, sqn_id, body.target_year, p.user_id)
+
+    classes_copied = 0
+    if body.copy_classes:
+        existing = {
+            c.display_name for c in db.query(TrainingClass).filter(
+                TrainingClass.training_year_id == target.id,
+                TrainingClass.is_archived == False).all()  # noqa: E712
+        }
+        for c in db.query(TrainingClass).filter(
+                TrainingClass.training_year_id == source.id,
+                TrainingClass.is_archived == False).all():  # noqa: E712
+            if c.display_name in existing:
+                continue        # re-running must not duplicate the structure
+            db.add(TrainingClass(
+                id=str(uuid.uuid4()), squadron_id=c.squadron_id,
+                training_year_id=target.id, training_stage_id=c.training_stage_id,
+                stage_code=c.stage_code, display_name=c.display_name,
+                sequence=c.sequence, expected_count=c.expected_count,
+                created_at=utcnow(), updated_at=utcnow()))
+            classes_copied += 1
+
+    db.commit()
+    audit(db, p, object_type="planning_year", object_id=target.id,
+          action="copy_setup",
+          new={"source_year": body.source_year, "target_year": body.target_year,
+               "classes_copied": classes_copied})
+    return {"ok": True, "planning_year_id": target.id,
+            "classes_copied": classes_copied, "sessions_copied": 0}
+
+
+@router.get("/year-context")
+def get_year_context(
+    squadron_id: str, year: int,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """A year context, whether or not a row exists for it.
+
+    Deliberately does NOT materialise: a read must remain a read. Callers that
+    need a row call a write endpoint, which uses ensure_year_context.
+    """
+    sqn = db.get(Squadron, squadron_id)
+    if sqn is None:
+        raise HTTPException(404, detail={"error": "not_found",
+                                         "message": "Unknown squadron."})
+    require_can_view_squadron(p, squadron_id, sqn.wing_id)
+    py = find_year_context(db, squadron_id, year)
+    return {
+        "squadron_id": squadron_id, "year": year,
+        "state": year_state(db, squadron_id, year),
+        "materialised": py is not None,
+        "planning_year_id": py.id if py else None,
+        "name": py.name if py else year_display_name(year),
+    }
 
 
 @router.post("/years")
@@ -565,7 +721,7 @@ def update_planning_year(
     p: Principal = Depends(get_principal),
 ):
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     # Structural edits to the year entity itself (name/status) require Proxy Mode
     # when a wing_admin targets a squadron-scoped year — content operations (CEA
     # imports, parade dates) do not carry this extra requirement.
@@ -598,7 +754,7 @@ def delete_planning_year(
     existing archive path (PATCH .../years/{id} with active_status=false):
     archive remains the default whenever any dependent exists."""
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     if p.role == "wing_admin" and py.unit_id:
         require_can_write_squadron(p, py.unit_id, py.wing_id)
 
@@ -693,7 +849,7 @@ def add_parade_date(
     p: Principal = Depends(get_principal),
 ):
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     pn = _find_or_create_parade_night(db, py.unit_id, body.parade_date, p)
     pd = ParadeDate(
         id=str(uuid.uuid4()), planning_year_id=year_id,
@@ -917,7 +1073,7 @@ def generate_parade_dates(
     p: Principal = Depends(get_principal),
 ):
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     holidays = db.query(HolidayPeriod).filter(
         HolidayPeriod.planning_year_id == year_id,
         HolidayPeriod.affects_parade == True,  # noqa: E712
@@ -1148,7 +1304,7 @@ def delete_parade_date(
     if not pd:
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(pd.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     # Resolve FK children before the delete so PostgreSQL FK constraints are not violated.
     # Notices are owned by the date — delete them. Prep plans and conflicts reference it
     # optionally (nullable FK) — nullify rather than cascade-delete.
@@ -1213,7 +1369,7 @@ def add_holiday(
     p: Principal = Depends(get_principal),
 ):
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     h = HolidayPeriod(
         id=str(uuid.uuid4()), planning_year_id=year_id,
         jurisdiction=body.jurisdiction, name=body.name,
@@ -1255,7 +1411,7 @@ def update_holiday(
     if not h:
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(h.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     old = {"name": h.name, "start": h.start_date, "end": h.end_date, "type": h.holiday_type}
     if body.name is not None:
         h.name = body.name
@@ -1290,7 +1446,7 @@ def delete_holiday(
     if not h:
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(h.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     audit(db, p, object_type="holiday_period", object_id=h.id, action="delete",
           new={"name": h.name})
     db.delete(h); db.commit()
@@ -1360,7 +1516,7 @@ def create_anchor(
     p: Principal = Depends(get_principal),
 ):
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     wing_id = body.wing_id or py.wing_id
     unit_id = body.unit_id or py.unit_id
     a = AnchorEvent(
@@ -1398,7 +1554,7 @@ def update_anchor(
     if not a or a.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(a.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     _check_version(a, body.version)
     for field in ("event_name", "importance", "start_date", "end_date",
                   "planning_impact", "readiness_requirements", "notes"):
@@ -1422,7 +1578,7 @@ def archive_anchor(
     if not a:
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(a.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     # R5-M16: delete orphaned AnchorPrepPlan rows before archiving the parent
     # AnchorEvent. AnchorPrepPlan has no is_archived field (no SoftDeleteMixin)
     # and the FK has no cascade, so these rows would become dangling and block
@@ -1446,7 +1602,7 @@ def restore_anchor(
     if not a.is_archived:
         raise HTTPException(409, detail={"error": "not_archived"})
     py = _get_year_or_404(a.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     a.is_archived = False; a.updated_at = utcnow()
     db.commit()
     audit(db, p, object_type="anchor_event", object_id=a.id, action="restore")
@@ -1712,7 +1868,7 @@ def create_session(
     if not pd:
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(pd.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     if body.cadet_group not in CADET_GROUPS:
         raise HTTPException(422, detail={"error": "invalid_cadet_group"})
 
@@ -2427,7 +2583,7 @@ def override_conflict(
                 wing_id = sqn.wing_id
             require_can_write_squadron(p, py.unit_id, wing_id)
         elif py:
-            _require_year_access(p, py, write=True)
+            _require_year_access(p, py, write=True, db=db)
     c.is_resolved = True
     c.override_reason = body.override_reason
     c.resolved_by = p.user_id
@@ -2445,7 +2601,7 @@ def run_checks(
     p: Principal = Depends(get_principal),
 ):
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     dates = db.query(ParadeDate).filter(
         ParadeDate.planning_year_id == year_id,
         ParadeDate.is_active == True,  # noqa: E712
@@ -3317,7 +3473,7 @@ def assign_mission(
 ):
     """Assign a curriculum mission to a parade night session (Training Planner action)."""
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
 
     if body.cadet_group not in CADET_GROUPS:
         raise HTTPException(422, detail={"error": "invalid_cadet_group"})
@@ -3628,19 +3784,31 @@ class RolloverIn(BaseModel):
     copy_training_classes: bool = True
 
 
-@router.post("/years/{year_id}/rollover")
+@router.post("/years/{year_id}/rollover", deprecated=True)
 def rollover_year(
     year_id: str,
     body: RolloverIn,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    """Create the next planning year with copied settings and regenerated parade dates."""
+    """Deprecated. Superseded by POST /years/copy-setup.
+
+    Still fully functional, and deliberately so: it copies holidays and carries
+    incomplete sessions, which copy-setup does not, and both frontends still
+    call it. Degrading it to a copy-setup shim would leave existing callers
+    silently doing less rather than "keeping working". Retiring it is its own
+    task, once no caller remains.
+
+    The naming defect is fixed here, though, because it reached production: the
+    target name is derived rather than built by arrowing the source name, so no
+    more "2026 Training Year -> 2027". The year is a calendar fact; its name is
+    not a place to record where it came from.
+    """
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
 
     target_year = body.target_year or (py.year + 1)
-    new_name = body.name or f"{py.name} → {target_year}"
+    new_name = body.name or year_display_name(target_year)
 
     # Check for existing year
     existing = db.query(PlanningYear).filter(
@@ -4077,7 +4245,7 @@ async def import_schedule_xlsx(
     from ..config import settings
 
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
 
     raw = await file.read()
     if len(raw) > settings.UPLOAD_MAX_MB * 1024 * 1024:
@@ -4259,7 +4427,7 @@ async def import_annual_program(
     """
     _require_plan_write(p)
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     # _require_year_access has no proxy/delegation awareness (by design, per
     # architecture.md, for endpoints with no proxy concept) -- but importing
     # a schedule into a squadron's plan IS a proxy/delegation-relevant
@@ -5326,7 +5494,7 @@ def set_local_hide(
     if not act or act.is_archived:
         raise HTTPException(404, detail={"error": "activity_not_found"})
     py = _get_year_or_404(act.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     from sqlalchemy import select
     existing = db.scalar(
         select(ActivityLocalHide).where(

@@ -318,7 +318,15 @@ export const planningApi = {
   // "every squadron in the wing" (wing_admin) or "every squadron nationwide, no
   // filter at all" (national_admin/system_admin), and PlanningWorkspace.tsx used
   // to auto-pick years[0] from that undifferentiated list (Stage 10, 2026-08-05).
-  years: (unit_id?: string) => api.get<PlanningYear[]>(`/api/planning/years${unit_id ? `?unit_id=${unit_id}` : ""}`),
+  years: (unit_id?: string, includeUnmaterialised = false) => {
+    const q = new URLSearchParams();
+    if (unit_id) q.set("unit_id", unit_id);
+    // Logical years are opt-in: consumers that build /years/{id}/... URLs from
+    // this list must not be handed rows whose id is null.
+    if (includeUnmaterialised) q.set("include_unmaterialised", "true");
+    const qs = q.toString();
+    return api.get<PlanningYear[]>(`/api/planning/years${qs ? `?${qs}` : ""}`);
+  },
   commandCentre: (year_id?: string) =>
     api.get<CommandCentreData>(`/api/planning/command-centre${year_id ? `?year_id=${year_id}` : ""}`),
   annualProgram: (year_id: string) =>

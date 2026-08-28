@@ -67,16 +67,16 @@ interface Props {
 }
 
 export function SetupPanel({ squadronId, onYearCreated }: Props) {
-  const [step, setStep] = useState<"year" | "dates">("year");
+  // There is no "create the year" step any more. The Training Year is calendar
+  // context: it already exists, so asking someone to create and name it was
+  // asking them to do administration for a fact. Its container is materialised
+  // silently when the first thing is written into it -- here, the parade dates.
   const [createdYearId, setCreatedYearId] = useState<string | null>(null);
+  // The current year as the SERVER derives it (wing-local), not as this
+  // browser's clock happens to see it.
+  const [yearNum, setYearNum] = useState<number>(new Date().getFullYear());
 
-  // Step 1 – create planning year
-  const [yearNum, setYearNum] = useState(new Date().getFullYear());
-  const [yearName, setYearName] = useState(`${new Date().getFullYear()}–${new Date().getFullYear() + 1} Training Year`);
-  const [savingYear, setSavingYear] = useState(false);
-  const [yearErr, setYearErr] = useState<string | null>(null);
-
-  // Step 2 – generate parade dates
+  // Generate parade dates
   const [weekday, setWeekday] = useState(3); // Thursday, until the squadron's own setting loads (below)
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -103,29 +103,51 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
     return () => { cancelled = true; };
   }, [squadronId]);
 
-  async function handleCreateYear() {
-    if (!yearName.trim()) { setYearErr("Name is required."); return; }
-    setSavingYear(true); setYearErr(null);
+  // Which year is "now" is the server's decision, derived from the wing's
+  // timezone. Reading it here also tells us whether a container already exists.
+  useEffect(() => {
+    let cancelled = false;
+    planningApi.years(squadronId, true).then(rows => {
+      if (cancelled || !rows) return;
+      const current = rows.find(y => y.state === "current") ?? null;
+      if (current) {
+        setYearNum(current.year);
+        if (current.planning_year_id) setCreatedYearId(current.planning_year_id);
+      }
+    }).catch(() => { /* fall back to this browser's year */ });
+    return () => { cancelled = true; };
+  }, [squadronId]);
+
+  /** The container for the current year, materialising it if this is the first
+   *  thing written into it. Never asks the user to name it: the name is derived
+   *  from the year, which is the only thing it could truthfully be. */
+  async function ensureYearContainer(): Promise<string> {
+    if (createdYearId) return createdYearId;
     try {
-      const year = await planningApi.createYear({ year: yearNum, name: yearName.trim(), unit_id: squadronId });
-      // createYear returns a PlanningYear — extract the ID from the response
+      const year = await planningApi.createYear({
+        year: yearNum, name: `${yearNum} Training Year`, unit_id: squadronId });
       const id = (year as unknown as Record<string, unknown>).planning_year_id as string;
       setCreatedYearId(id);
-      setStep("dates");
       onYearCreated();
+      return id;
     } catch (e: unknown) {
-      setYearErr(friendlyMessage(e, "Failed to create planning year"));
-    } finally {
-      setSavingYear(false);
+      // Someone else may have materialised it between the read above and now.
+      const rows = await planningApi.years(squadronId, true).catch(() => null);
+      const existing = rows?.find(y => y.year === yearNum && y.planning_year_id) ?? null;
+      if (existing?.planning_year_id) {
+        setCreatedYearId(existing.planning_year_id);
+        return existing.planning_year_id;
+      }
+      throw e;
     }
   }
 
   async function handleGenerateDates() {
     if (!startDate || !endDate) { setDatesErr("Start and end dates are required."); return; }
-    if (!createdYearId) return;
     setSavingDates(true); setDatesErr(null);
     try {
-      const result = await planningApi.generateParadeDates(createdYearId, {
+      const yearId = await ensureYearContainer();
+      const result = await planningApi.generateParadeDates(yearId, {
         weekday,
         start_date: startDate,
         end_date: endDate,
@@ -146,75 +168,25 @@ export function SetupPanel({ squadronId, onYearCreated }: Props) {
   return (
     <div className="pw-setup-panel">
       <div className="pw-setup-header">
-        <h2>Set Up Planning Workspace</h2>
+        <h2>Set up {yearNum}</h2>
         <p>
-          Planning Workspace is where you schedule parade nights, assign curriculum, and track training delivery.
-          Before you can schedule training, you need a <strong>Training Year</strong>.
+          Planning Workspace is where you schedule parade nights, assign curriculum, and track
+          training delivery. Nothing has been scheduled for {yearNum} yet.
         </p>
         <p style={{ marginTop: 6 }}>
-          A <strong>Training Year</strong> is a container for all your parade nights and training records for one academic year — typically July to June.
-          Once you create one and generate your parade dates, the planning calendar appears.
+          Choose your regular parade weekday and the dates training runs between, and the
+          planning calendar appears.
         </p>
       </div>
 
       <div className="pw-setup-steps">
-        {/* Step 1 */}
-        <div className={`pw-setup-step${step === "year" ? " active" : step === "dates" ? " done" : ""}`}>
-          <div className="pw-setup-step-num">{step === "dates" || datesResult ? "✓" : "1"}</div>
-          <div className="pw-setup-step-body">
-            <div className="pw-setup-step-title">Create Training Year</div>
-            {step === "year" && (
-              <div className="pw-drawer-form" style={{ maxWidth: 480 }}>
-                <p style={{ fontSize: 'var(--fs-sm)', color: "var(--muted-text)", margin: "0 0 12px" }}>
-                  Name the training year. The name will appear on all reports and in the year selector.
-                  Use a format like <em>2025–2026 Training Year</em>.
-                </p>
-                <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 10 }}>
-                  <label>
-                    Year
-                    <input
-                      type="number"
-                      value={yearNum}
-                      min={2020}
-                      max={2040}
-                      onChange={e => {
-                        const y = Number(e.target.value);
-                        setYearNum(y);
-                        setYearName(`${y}–${y + 1} Training Year`);
-                      }}
-                    />
-                  </label>
-                  <label>
-                    Name
-                    <input
-                      value={yearName}
-                      onChange={e => setYearName(e.target.value)}
-                      placeholder="e.g. 2025–2026 Training Year"
-                    />
-                  </label>
-                </div>
-                {yearErr && <div className="pw-err">{yearErr}</div>}
-                <div style={{ marginTop: 12 }}>
-                  <button className="btn primary" onClick={handleCreateYear} disabled={savingYear}>
-                    {savingYear ? "Creating…" : "Create planning year →"}
-                  </button>
-                </div>
-              </div>
-            )}
-            {step === "dates" && (
-              <div style={{ fontSize: 'var(--fs-base)', color: "var(--success)", fontWeight: 700 }}>
-                ✓ Planning year created: {yearName}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Step 2 */}
-        <div className={`pw-setup-step${step === "dates" && !datesResult ? " active" : datesResult ? " done" : ""}`}>
-          <div className="pw-setup-step-num">{datesResult ? "✓" : "2"}</div>
+        {/* Parade nights: the only step. Generating them materialises the
+            year's container, so nobody has to create one first. */}
+        <div className={`pw-setup-step${!datesResult ? " active" : " done"}`}>
+          <div className="pw-setup-step-num">{datesResult ? "✓" : "1"}</div>
           <div className="pw-setup-step-body">
             <div className="pw-setup-step-title">Generate Parade Nights</div>
-            {step === "dates" && !datesResult && (() => {
+            {!datesResult && (() => {
               const preview = previewDates(weekday, startDate, endDate, frequency);
               return (
                 <div className="pw-drawer-form" style={{ maxWidth: 520 }}>

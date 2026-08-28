@@ -18,6 +18,9 @@ class Wing(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     code: Mapped[str] = mapped_column(String(20), unique=True, index=True)   # e.g. "7WG"
     name: Mapped[str] = mapped_column(String(120))
     short_name: Mapped[str] = mapped_column(String(40))
+    # IANA zone, e.g. "Australia/Perth". Squadrons deliberately cannot override:
+    # a wing is the smallest unit that spans a timezone in practice.
+    timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
     squadrons: Mapped[list["Squadron"]] = relationship(back_populates="wing")
 

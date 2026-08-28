@@ -64,7 +64,7 @@ def test_squadron_block_timing_template_confirmed_true_for_seeded_703(client):
 
 
 _SQUADRON_STEP_KEYS = {
-    "planning_year_active", "training_classes_created", "facilitators_added", "training_areas_added",
+    "training_classes_created", "facilitators_added", "training_areas_added",
     "equipment_added", "timing_template_confirmed", "crest_set", "holidays_configured",
     "cea_imported", "activities_classified", "anchor_events_reviewed", "parade_nights_generated",
     "parade_night_published", "curriculum_coverage",
@@ -80,7 +80,10 @@ def test_steps_list_scoped_to_squadron_only_for_sqn_admin(client):
     d = r.json()
     step_keys = {s["key"] for s in d["steps"]}
     assert step_keys == _SQUADRON_STEP_KEYS
-    assert len(d["steps"]) == 15  # 16 at 2026-08-23, minus cadets_added (removed 2026-08-28)
+    # 16 at 2026-08-23, minus cadets_added (removed 2026-08-28), minus
+    # planning_year_active (removed 2026-08-28: a year with no row is an
+    # empty year, not an unset-up squadron).
+    assert len(d["steps"]) == 14
 
 
 def test_flights_step_is_no_longer_in_the_checklist(client):
@@ -173,7 +176,6 @@ def test_new_squadron_with_nothing_set_up_is_not_complete(client):
     assert d["squadron"]["timing_template_confirmed"] is False
     assert d["squadron"]["parade_nights_generated"] == 0
     assert d["squadron"]["curriculum_coverage_pct"] == 0.0
-    assert d["squadron"]["planning_year_active"] is False
     assert d["squadron"]["crest_set"] is False
     assert d["squadron"]["equipment_added"] == 0
     assert d["squadron"]["cadets_added"] == 0
@@ -206,7 +208,7 @@ def test_holidays_configured_false_until_a_holiday_exists_for_the_active_year(cl
     enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "Holiday setup test"}, headers=hdr)
     assert enter.status_code == 200, enter.text
     year_id = client.post("/api/planning/years", json={
-        "year": next_test_year(), "name": "Holiday Setup Test Year", "unit_id": sqn_id,
+        "year": _wing_local_year(), "name": "Holiday Setup Test Year", "unit_id": sqn_id,
     }, headers=hdr).json()["planning_year_id"]
     client.post(f"/api/planning/years/{year_id}/holidays", json={
         "name": "Test School Holidays", "start_date": "2099-04-01", "end_date": "2099-04-14",
@@ -227,12 +229,26 @@ def test_cadets_added_count_matches_real_count_for_seeded_703(client):
     assert d["squadron"]["cadets_added"] > 0  # 703's seed data includes cadets
 
 
-def test_planning_year_active_true_for_seeded_703(client):
-    hdr = _sqn_admin_703(client)
+def test_planning_year_active_is_no_longer_a_setup_step(client):
+    """Replaces test_planning_year_active_true_for_seeded_703.
+
+    Under the calendar-context model a squadron is not "unset up" because no
+    PlanningYear row exists -- that is simply a year nobody has written to.
+    The step and the field are both gone.
+    """
+    hdr = login(client, "ADMIN703")
     d = client.get("/api/setup/status", headers=hdr).json()
-    assert d["squadron"]["planning_year_active"] is True
-    step = next(s for s in d["steps"] if s["key"] == "planning_year_active")
-    assert step["done"] is True
+    assert "planning_year_active" not in d["squadron"]
+    assert not any(s["key"] == "planning_year_active" for s in d["steps"])
+
+
+
+def _wing_local_year() -> int:
+    """The current year as 7 Wing experiences it -- the same derivation the
+    server uses, so the tests cannot disagree with it over New Year."""
+    import datetime as _dt
+    from zoneinfo import ZoneInfo
+    return _dt.datetime.now(ZoneInfo("Australia/Perth")).date().year
 
 
 def _fresh_squadron_with_active_year(client, hdr, wing_code, sqn_code):
@@ -242,8 +258,12 @@ def _fresh_squadron_with_active_year(client, hdr, wing_code, sqn_code):
                          headers=hdr).json()["squadron_id"]
     enter = client.post(f"/api/proxy/enter/{sqn_id}", json={"reason": "Setup status test"}, headers=hdr)
     assert enter.status_code == 200, enter.text
+    # The current wing-local year, not a synthetic far-future one: the setup
+    # checklist reports on THIS year's configuration, and a fresh squadron
+    # cannot collide on it.
     year_id = client.post("/api/planning/years", json={
-        "year": next_test_year(), "name": f"{sqn_code} Setup Test Year", "unit_id": sqn_id,
+        "year": _wing_local_year(), "name": f"{sqn_code} Setup Test Year",
+        "unit_id": sqn_id,
     }, headers=hdr).json()["planning_year_id"]
     return sqn_id, year_id
 
@@ -482,3 +502,16 @@ def test_timing_template_step_ignores_a_template_outside_its_effective_window(cl
         db.commit()
         db.close()
     assert _steps(client, hdr)["timing_template_confirmed"]["done"] is True
+
+
+def test_setup_status_does_not_require_a_materialised_year(client):
+    """Setup completion must reflect configured training, not row existence.
+
+    Under the calendar-context model a year with no container is simply a year
+    nobody has written to yet -- not evidence that the squadron is unset up.
+    """
+    hdr = login(client, "ADMIN703")
+    body = client.get("/api/setup/status", headers=hdr).json()
+    assert "planning_year_active" not in body["squadron"], \
+        "row existence is not a setup step under the calendar-context model"
+    assert not any(s["key"] == "planning_year_active" for s in body["steps"])
