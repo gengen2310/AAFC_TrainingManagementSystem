@@ -210,7 +210,6 @@ def second_wing_seed() -> None:
                     national_id=nat.id,
                     code=wing_code, name=wing_name, short_name=wing_short,
                     active_status=True,
-                    timezone="Australia/Perth",  # Required — get_wing_timezone() raises if unset
                 )
                 db.add(wing)
                 db.flush()

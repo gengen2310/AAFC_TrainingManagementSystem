@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const PW_YEAR_KEY = "aafc_pw_year_id";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -30,11 +30,10 @@ import type { PlanningSession, AnchorEvent } from "../api/types";
 // "newest year ever created" -- creating a year for a future season silently
 // moved the whole workspace to it. Prefer the active year matching today, then
 // the nearest active year ahead, then the most recent behind.
-// Phase A: prefer status === 'active'; fall back to active_status for pre-Phase-A rows.
-function pickDefaultYear<T extends { year: number; status?: string; active_status?: boolean }>(list: T[]): T | null {
+function pickDefaultYear<T extends { year: number; active_status?: boolean }>(list: T[]): T | null {
   const yrs = (list ?? []).filter(Boolean);
   if (!yrs.length) return null;
-  const act = yrs.filter(y => y.status === 'active' || (!y.status && y.active_status));
+  const act = yrs.filter(y => y.active_status);
   const pool = act.length ? act : yrs;
   const now = new Date().getFullYear();
   const exact = pool.find(y => Number(y.year) === now);
@@ -97,8 +96,6 @@ export function PlanningWorkspace() {
   // hamburger button in the context bar. Ignored (has no visual effect) above that width.
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const initialActiveYearId = useRef<string | null>(null);
-  const [yearChangedNotice, setYearChangedNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!leftPanelOpen) return;
@@ -130,24 +127,6 @@ export function PlanningWorkspace() {
     if (!active) return;
     if (active.planning_year_id !== selectedYearId) {
       persistYear(active.planning_year_id);
-    }
-  }, [years]);
-
-  // Year-changed notice: detect if the active year rolled over under the user's session.
-  useEffect(() => {
-    if (!years?.length) return;
-    const activeYear = years.find(y => y.status === 'active' || (!y.status && y.active_status));
-    if (!activeYear) return;
-    if (!initialActiveYearId.current) {
-      initialActiveYearId.current = activeYear.planning_year_id;
-      return;
-    }
-    if (activeYear.planning_year_id !== initialActiveYearId.current) {
-      setYearChangedNotice(
-        `Your training year has automatically updated to "${activeYear.name || activeYear.year}". ` +
-        `Reload the page to see the updated plan.`
-      );
-      initialActiveYearId.current = activeYear.planning_year_id;
     }
   }, [years]);
 
@@ -457,18 +436,6 @@ export function PlanningWorkspace() {
 
   return (
     <div className="pw-root" role="main" aria-label="Planning workspace">
-      {/* Year-changed notice */}
-      {yearChangedNotice && (
-        <div className="year-changed-notice" role="alert"
-             style={{background:'var(--warn-bg)',color:'var(--warn)',padding:'8px 16px',
-                     display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <span>{yearChangedNotice}</span>
-          <button onClick={() => setYearChangedNotice(null)}
-                  style={{border:'none',background:'none',cursor:'pointer',fontWeight:'bold'}}>
-            ×
-          </button>
-        </div>
-      )}
       {/* Context bar */}
       <PlanningContextBar
         session={session}
@@ -512,9 +479,7 @@ export function PlanningWorkspace() {
                   className={`pw-chip${selectedYearId === y.planning_year_id ? " on" : ""}`}
                   onClick={() => { persistYear(y.planning_year_id); setSelectedDateId(null); }}
                 >
-                  {y.name || String(y.year)}
-                  {y.status === 'draft' ? ' (Draft)' : ''}
-                  {y.status === 'archived' ? ' (Archived)' : ''}
+                  {y.name}
                 </button>
               ))}
               <span style={{ width: 1, height: 18, background: "var(--border)", margin: "0 4px" }} />

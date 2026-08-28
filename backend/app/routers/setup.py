@@ -64,7 +64,7 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
             cea_imported = db.query(CeaActivity).filter(CeaActivity.wing_id == s.wing_id).count() > 0
 
             active_year_ids = [y.id for y in db.query(PlanningYear).filter(
-                PlanningYear.unit_id == sq_id, PlanningYear.status == "active").all()]
+                PlanningYear.unit_id == sq_id, PlanningYear.active_status == True).all()]  # noqa: E712
             holidays_configured = bool(active_year_ids) and db.query(HolidayPeriod).filter(
                 HolidayPeriod.planning_year_id.in_(active_year_ids)).count() > 0
 
