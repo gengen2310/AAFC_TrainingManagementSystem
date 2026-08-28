@@ -539,6 +539,7 @@ def create_planning_year(
             if prev_active:
                 prev_active.status = "archived"
                 prev_active.active_status = False
+                prev_active.updated_by = p.user_id
                 prev_active.updated_at = utcnow()
                 db.flush()
     py = PlanningYear(
@@ -3842,6 +3843,7 @@ def rollover_year(
         if old_active:
             old_active.status = "archived"
             old_active.active_status = False
+            old_active.updated_by = p.user_id
             old_active.updated_at = utcnow()
             db.flush()
 

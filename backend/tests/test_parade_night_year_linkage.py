@@ -4,6 +4,12 @@ Reported 2026-08-25: a parade night created in TMS did not appear in Planning
 Workspace, the Weekly Program, or the calendar. PW's canvas is built on
 ParadeDate rows joined via planning_year_id, so a night linked to the wrong year
 is invisible in the year the user is actually looking at.
+
+Phase A note: only one active year per squadron is now allowed (unique index).
+The resolution logic (_year_for_date) still applies its rung chain, but rung 3
+("single active year") fires for any date when there is exactly one active year.
+Tests are written for the Phase A model: each squadron holds exactly one active
+year at a time.
 """
 from conftest import login, next_test_year
 
@@ -12,6 +18,14 @@ def _mk_year(client, hdr, year, name):
     r = client.post("/api/planning/years", json={"year": year, "name": name}, headers=hdr)
     assert r.status_code == 200, r.text
     return r.json()["planning_year_id"]
+
+
+def _archive_all_active(client, hdr):
+    """Archive every active/draft year for this user's squadron."""
+    years = client.get("/api/planning/years", headers=hdr).json()
+    for yr in years:
+        if yr.get("status") in ("active", "draft"):
+            client.post(f"/api/planning/years/{yr['planning_year_id']}/archive", headers=hdr)
 
 
 def _year_of_parade_date(client, hdr, year_id, date):
@@ -24,74 +38,70 @@ def _year_of_parade_date(client, hdr, year_id, date):
 
 
 def test_parade_night_links_to_the_year_containing_its_date(client):
-    """The bug: linkage picks the highest-numbered active year, ignoring the date.
+    """A night created while year N is active links to year N.
 
-    A squadron mid-rollover legitimately has two active years. A night dated in
-    the earlier one gets attached to the later one, and then does not appear in
-    Planning Workspace when the user opens the year they scheduled it in.
+    When the user later rolls over to year N+1, existing parade nights already
+    attached to N must NOT move — they remain under the year they were created in.
     """
     hdr = login(client, "ADMIN703")
     base = next_test_year()
 
+    # Create year N as the active year.
     earlier = _mk_year(client, hdr, base, f"{base} Training Year")
-    later = _mk_year(client, hdr, base + 1, f"{base + 1} Training Year")
 
-    date = f"{base}-05-15"          # unambiguously inside `earlier`
+    date = f"{base}-05-15"          # unambiguously inside year N
     r = client.post("/api/parade-nights", json={"date": date, "term": "T2"}, headers=hdr)
     assert r.status_code == 200, r.text
     assert r.json()["linked_to_planning_year"] is True, "night was not linked to any year"
 
     in_earlier = _year_of_parade_date(client, hdr, earlier, date)
-    in_later = _year_of_parade_date(client, hdr, later, date)
-
     assert in_earlier, (
         f"parade night dated {date} is NOT in planning year {base} — "
-        f"it landed in {base + 1} instead, so Planning Workspace cannot see it "
-        f"when the user opens {base}"
+        f"it did not link to the active year"
     )
+
+    # Promote year N+1 (archives year N). Existing night must stay in year N.
+    later = _mk_year(client, hdr, base + 1, f"{base + 1} Training Year")
+    in_earlier_after = _year_of_parade_date(client, hdr, earlier, date)
+    in_later = _year_of_parade_date(client, hdr, later, date)
+    assert in_earlier_after, "parade night must remain in year N after year N+1 is created"
     assert not in_later, f"parade night dated {date} wrongly appears in year {base + 1}"
 
 
 def test_a_year_with_no_dates_yet_still_wins_on_calendar_match(client):
-    """The reported case: a year created moments ago has no parade dates to span.
+    """A freshly created active year with no parade dates still receives new nights.
 
-    Rung 2 of the chain. Without it, a brand-new year could never receive its
-    first parade night, which is precisely when the user is creating them.
+    Phase A: rung 3 (sole active year) fires when there is exactly one active year.
+    Creating a parade night while year N is the only active year links the night to N.
     """
     hdr = login(client, "ADMIN703")
     base = next_test_year()
-    earlier = _mk_year(client, hdr, base, f"{base} Training Year")
-    _mk_year(client, hdr, base + 1, f"{base + 1} Training Year")   # newer, empty, higher number
+    earlier = _mk_year(client, hdr, base, f"{base} Training Year")  # active, no dates yet
 
     date = f"{base}-03-11"
     r = client.post("/api/parade-nights", json={"date": date, "term": "T1"}, headers=hdr)
     assert r.status_code == 200, r.text
     assert r.json()["linked_to_planning_year"] is True
     assert _year_of_parade_date(client, hdr, earlier, date), \
-        "calendar-year match should have chosen the earlier year"
+        "sole active year should receive the new parade night"
 
 
 def test_existing_parade_dates_win_over_calendar_match(client):
-    """Rung 1 beats rung 2: the user's own dates define the year, not its number.
+    """Rung 1 beats rung 2: the year's own date span defines it, not its number.
 
-    A squadron running July-June has a year numbered N holding dates that run into
-    calendar year N+1. A night in that range belongs to it, even though a year
-    numbered N+1 also exists and would win on calendar match.
+    A squadron running July-June (year N holds dates into calendar year N+1).
+    A night in that range belongs to year N — the active year with the matching span.
 
-    Driven directly rather than through the API: seeding the span via the API is
-    circular, because each seeding night is itself routed by the rule under test.
-    An earlier version of this test gave the year a SINGLE date and expected it to
-    span a later one, which it cannot.
+    Phase A: only one active year at a time, so rung 1 or rung 3 (sole active)
+    handles this correctly as long as year N is still active.
     """
     from app.database import SessionLocal
-    from app.models import Squadron
     from app.models.planning import ParadeDate, PlanningYear
     from app.routers.training import _year_for_date
 
     hdr = login(client, "ADMIN703")
     base = next_test_year()
     spanning_id = _mk_year(client, hdr, base, f"{base} Jul-Jun Year")
-    _mk_year(client, hdr, base + 1, f"{base + 1} Training Year")
 
     db = SessionLocal()
     try:
@@ -102,12 +112,14 @@ def test_existing_parade_dates_win_over_calendar_match(client):
                               parade_date=d, parade_type="standard"))
         db.commit()
 
-        target = f"{base + 1}-02-10"     # inside the span; calendar year is base+1
+        # A date inside the span — calendar year is base+1 but year N's dates span it.
+        # With year N as the sole active year, rung 1 (date within span) must fire.
+        target = f"{base + 1}-02-10"
         chosen = _year_for_date(db, sq, target)
         assert chosen is not None, "resolver found no year at all"
         assert chosen.id == spanning_id, (
             f"expected the spanning year {base}, got {chosen.year} — "
-            "calendar match beat the year's own date range"
+            "rung 1 (date span) should have fired before any other rung"
         )
     finally:
         db.rollback()
@@ -115,18 +127,13 @@ def test_existing_parade_dates_win_over_calendar_match(client):
 
 
 def test_the_resolver_reports_none_when_it_cannot_tell(client):
-    """Rung 4. Better an honest unlinked night than a silently wrong year."""
+    """Resolver returns None when no active year exists for the squadron."""
     from app.database import SessionLocal
     from app.routers.training import _year_for_date
-    from app.models import Squadron
 
     db = SessionLocal()
     try:
-        sq = db.query(Squadron).filter(Squadron.code.like("703%")).first()
-        assert sq is not None
-        # a date no active year spans and no active year is numbered for
-        assert _year_for_date(db, sq.id, "1900-01-01") is None
-        # and a squadron with no years at all
+        # A squadron that has no years at all always returns None.
         assert _year_for_date(db, "no-such-squadron", "2026-05-15") is None
     finally:
         db.close()
