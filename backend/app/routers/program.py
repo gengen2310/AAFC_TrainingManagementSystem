@@ -260,7 +260,20 @@ def promote_sq_to_wing(body: PromoteIn, db: DBSession = Depends(get_db), p: Prin
 
 @router.get("/program-promotion/requests")
 def list_promotions(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    rows = db.query(PromotionRequest).all()
+    # REM-155: scope filter — Option A (squadron/wing/national tiered access).
+    # Join to ProgramItem to get the owning squadron; filter by p's tenancy.
+    q = (db.query(PromotionRequest)
+         .join(ProgramItem, PromotionRequest.program_item_id == ProgramItem.id))
+    if p.role in ("sqn_admin", "sqn_general"):
+        q = q.filter(ProgramItem.squadron_id == p.squadron_id)
+    elif p.role == "wing_admin":
+        q = (q.join(Squadron, Squadron.id == ProgramItem.squadron_id)
+               .filter(Squadron.wing_id == p.wing_id))
+    elif p.role in ("national_admin", "national_viewer", "system_admin", "auditor"):
+        pass  # unrestricted — national-level oversight
+    else:
+        raise HTTPException(403, detail={"error": "forbidden"})
+    rows = q.all()
     return [{"id": r.id, "program_item_id": r.program_item_id, "from_scope": r.from_scope,
              "to_scope": r.to_scope, "status": r.status, "reason": r.reason} for r in rows]
 

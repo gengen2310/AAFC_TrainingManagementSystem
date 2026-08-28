@@ -112,6 +112,48 @@ def test_squadron_to_wing_promotion_flow(client):
     assert ap.status_code == 200 and ap.json()["new_item_id"]
 
 
+def test_promotion_list_scoped_by_role(client):
+    """REM-155: GET /program-promotion/requests must filter by requester's tenancy scope."""
+    h703 = login(client, "ADMIN703")
+    items = client.get("/api/program-items", headers=h703).json()
+    local = next(i for i in items if i["code"] == "703-LOC01")
+    item_id = local["id"]
+
+    # create a request
+    r = client.post("/api/program-promotion/squadron-to-wing", headers=h703,
+                    json={"program_item_id": item_id, "reason": "scope test"})
+    assert r.status_code == 200
+
+    # sqn_admin for 703 sees their own request
+    reqs = client.get("/api/program-promotion/requests", headers=h703).json()
+    assert any(x["program_item_id"] == item_id for x in reqs)
+
+    # sqn_general for 703 sees their squadron's requests
+    hgen = login(client, "703SQN2026")
+    reqs_gen = client.get("/api/program-promotion/requests", headers=hgen).json()
+    assert any(x["program_item_id"] == item_id for x in reqs_gen)
+
+    # sqn_admin for 704 (a different squadron) must NOT see 703's request
+    h704 = login(client, "ADMIN704")
+    reqs_704 = client.get("/api/program-promotion/requests", headers=h704).json()
+    assert not any(x["program_item_id"] == item_id for x in reqs_704)
+
+    # wing_admin for 7WG sees requests from squadrons in their wing (703 is in 7WG)
+    hwing = login(client, "ADMIN7WG")
+    reqs_wing = client.get("/api/program-promotion/requests", headers=hwing).json()
+    assert any(x["program_item_id"] == item_id for x in reqs_wing)
+
+    # national_admin sees all
+    hnat = login(client, "ADMINNATIONAL")
+    reqs_nat = client.get("/api/program-promotion/requests", headers=hnat).json()
+    assert any(x["program_item_id"] == item_id for x in reqs_nat)
+
+    # national_viewer (read-only national role) also sees all
+    hview = login(client, "NATIONAL2026")
+    reqs_view = client.get("/api/program-promotion/requests", headers=hview).json()
+    assert any(x["program_item_id"] == item_id for x in reqs_view)
+
+
 # ── LEARNING HUB ──
 def test_learning_hub_links_present_and_missing_report(client):
     h = login(client, "ADMIN703")
