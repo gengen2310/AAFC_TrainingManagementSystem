@@ -1,0 +1,169 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Training Year — context, not administration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#51b0e3; --dark:#002f65; --royal:#004b8d; --steel:#455560; --lgrey:#b0b7bb;
+  --bg:#f4f8fc; --surface:#fff; --surface-2:#f0f5fa; --border:#d1dce8; --border-light:#e4edf5;
+  --text:#1e2d3d; --text-2:#3a4a55; --muted:#5c6a76;
+  --warn-text:#7a5200; --warn-bg:#fff3cd; --ok-text:#145f38; --ok-bg:#d4f0e3;
+  --fs-4xs:.5rem; --fs-3xs:.5625rem; --fs-2xs:.625rem; --fs-xs:.6875rem; --fs-sm:.75rem;
+  --fs-base:.8125rem; --fs-md:.875rem; --fs-lg:1rem; --fs-xl:1.125rem; --fs-2xl:1.25rem;
+  --fs-4xl:1.75rem; --fs-5xl:2.25rem;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Montserrat,Arial,sans-serif;font-size:var(--fs-base)}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 20px 64px}
+h1.demo{font-size:var(--fs-lg);color:var(--steel);margin:34px 0 10px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.08em}
+.note{color:var(--muted);font-size:var(--fs-xs);margin:0 0 14px;max-width:62ch;line-height:1.55}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px 20px}
+
+/* ── the signature: the year is the page's subject, not a form field ── */
+.yearbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.stepper{display:flex;align-items:center;gap:2px}
+.step{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;
+  background:var(--surface);border:1px solid var(--border);border-radius:6px;cursor:pointer;
+  font-size:var(--fs-lg);color:var(--royal);font-family:inherit;line-height:1}
+.step:hover{background:var(--surface-2)}
+.step:focus-visible{outline:2px solid var(--royal);outline-offset:2px}
+/* --lgrey (#b0b7bb) on --surface-2 is 1.85:1. WCAG exempts disabled controls,
+   but the exemption is a technicality, not a reason. #7e8992 is 3.26:1 and
+   still reads as unavailable. State is also carried by [disabled] and the
+   aria-label, so it never depends on colour. */
+.step[disabled]{color:#7e8992;cursor:not-allowed;background:var(--surface-2)}
+.yearpick{display:flex;flex-direction:column;gap:1px;min-width:0}
+.yearnum{font-size:var(--fs-5xl);font-weight:800;color:var(--dark);line-height:1.05;
+  font-variant-numeric:tabular-nums;letter-spacing:-.01em;background:none;border:0;
+  font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:8px;
+  /* G5: the glyph is 38px tall; the HIT AREA must be >=44 regardless of type size */
+  min-height:44px;padding:0 2px;margin-left:-2px}
+.yearnum:focus-visible{outline:2px solid var(--royal);outline-offset:3px;border-radius:4px}
+.caret{font-size:var(--fs-md);color:var(--steel)}
+/* state line: text carries the meaning, never colour alone (G2) */
+.state{font-size:var(--fs-2xs);text-transform:uppercase;letter-spacing:.07em;font-weight:800;
+  color:var(--muted);display:flex;align-items:center;gap:6px}
+.state .mark{font-weight:800;letter-spacing:0}
+.sqn{font-size:var(--fs-sm);color:var(--muted);font-weight:600;margin-left:auto;white-space:nowrap}
+
+/* empty future year */
+.empty{margin-top:16px;padding:16px 18px;border:1px dashed var(--border);border-radius:8px;
+  background:var(--surface-2)}
+.empty p{margin:0 0 12px;color:var(--text-2);font-size:var(--fs-sm);line-height:1.6}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{min-height:44px;padding:0 16px;border-radius:6px;font-family:inherit;font-size:var(--fs-sm);
+  font-weight:700;cursor:pointer;border:1px solid transparent;display:inline-flex;align-items:center}
+.btn-primary{background:var(--dark);color:#fff}
+.btn-primary:hover{background:var(--royal)}
+.btn-out{background:var(--surface);color:var(--royal);border-color:var(--border)}
+.btn-out:hover{background:var(--surface-2)}
+.btn:focus-visible{outline:2px solid var(--royal);outline-offset:2px}
+
+/* configured year: what the year actually contains, not its status */
+.facts{margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+  background:var(--border-light);border:1px solid var(--border-light);border-radius:8px;overflow:hidden}
+.fact{background:var(--surface);padding:12px 14px}
+.fact dt{font-size:var(--fs-3xs);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);
+  font-weight:800;margin:0 0 3px}
+.fact dd{margin:0;font-size:var(--fs-md);font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.fact dd.none{font-weight:600;color:var(--muted)}
+
+/* past year: a stated condition, not a colour */
+.readonly{margin-top:14px;display:flex;gap:9px;align-items:flex-start;padding:10px 12px;
+  background:var(--warn-bg);border:1px solid #e6c66a;border-radius:6px}
+.readonly .mark{font-weight:800;color:var(--warn-text);font-size:var(--fs-sm);line-height:1.5}
+.readonly p{margin:0;font-size:var(--fs-xs);color:var(--warn-text);line-height:1.55}
+.menu{margin-top:10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);
+  padding:6px;max-width:230px}
+.menu button{display:flex;width:100%;justify-content:space-between;align-items:center;gap:10px;
+  min-height:44px;padding:0 10px;background:none;border:0;border-radius:5px;cursor:pointer;
+  font-family:inherit;font-size:var(--fs-md);font-weight:700;color:var(--text);
+  font-variant-numeric:tabular-nums}
+.menu button:hover{background:var(--surface-2)}
+.menu button:focus-visible{outline:2px solid var(--royal);outline-offset:-2px}
+.menu .tag{font-size:var(--fs-3xs);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:800}
+.menu button[aria-current="true"] .tag{color:var(--dark)}
+@media (max-width:520px){
+  .yearnum{font-size:var(--fs-4xl)}
+  .sqn{margin-left:0;width:100%}
+}
+</style></head><body><div class="wrap">
+
+<h1 class="demo">1 · Current year, configured</h1>
+<p class="note">The year is the subject of the page, so it is set at display size and steps in place — tabular numerals mean 2026→2027 does not shift the layout. The state is one quiet line, not a badge. The current year carries no arrow: the arrows mean “away from now”, so their absence is what says you are in it.</p>
+<div class="card">
+  <div class="yearbar">
+    <div class="stepper">
+      <button class="step" aria-label="Previous year, 2025">‹</button>
+      <button class="step" aria-label="Next year, 2027">›</button>
+    </div>
+    <div class="yearpick">
+      <button class="yearnum" aria-haspopup="listbox" aria-expanded="false">2026 <span class="caret" aria-hidden="true">▾</span></button>
+      <span class="state">Current year</span>
+    </div>
+    <span class="sqn">704 Squadron</span>
+  </div>
+  <dl class="facts">
+    <div class="fact"><dt>Training classes</dt><dd>5</dd></div>
+    <div class="fact"><dt>Parade nights</dt><dd>16</dd></div>
+    <div class="fact"><dt>Sessions planned</dt><dd>12</dd></div>
+    <div class="fact"><dt>Activities</dt><dd>3</dd></div>
+  </dl>
+</div>
+
+<h1 class="demo">2 · Future year, nothing configured</h1>
+<p class="note">2028 exists. It has not been set up. The empty state says what is true and offers the two actions that make sense — never “this year does not exist”.</p>
+<div class="card">
+  <div class="yearbar">
+    <div class="stepper">
+      <button class="step" aria-label="Previous year, 2027">‹</button>
+      <button class="step" disabled aria-label="No later year available">›</button>
+    </div>
+    <div class="yearpick">
+      <button class="yearnum" aria-haspopup="listbox" aria-expanded="false">2028 <span class="caret" aria-hidden="true">▾</span></button>
+      <span class="state"><span class="mark" aria-hidden="true">→</span> Future year · planning ahead</span>
+    </div>
+    <span class="sqn">704 Squadron</span>
+  </div>
+  <div class="empty">
+    <p>Nothing has been set up for 2028 yet. You can start from scratch, or bring across the class structure you used last year.</p>
+    <div class="actions">
+      <button class="btn btn-primary">Set up 2028</button>
+      <button class="btn btn-out">Copy setup from 2027</button>
+    </div>
+  </div>
+</div>
+
+<h1 class="demo">3 · Previous year</h1>
+<p class="note">History stays open. The read-only condition is stated in words with a glyph, so it survives greyscale and screen readers — never colour alone.</p>
+<div class="card">
+  <div class="yearbar">
+    <div class="stepper">
+      <button class="step" aria-label="Previous year, 2024">‹</button>
+      <button class="step" aria-label="Next year, 2026">›</button>
+    </div>
+    <div class="yearpick">
+      <button class="yearnum" aria-haspopup="listbox" aria-expanded="false">2025 <span class="caret" aria-hidden="true">▾</span></button>
+      <span class="state"><span class="mark" aria-hidden="true">←</span> Previous year · training record</span>
+    </div>
+    <span class="sqn">704 Squadron</span>
+  </div>
+  <div class="readonly">
+    <span class="mark" aria-hidden="true">🔒</span>
+    <p><strong>Read-only.</strong> 2025 is complete. Its records stay available to review. To correct something, a Wing administrator can open Delegated Intervention.</p>
+  </div>
+</div>
+
+<h1 class="demo">4 · The year menu</h1>
+<p class="note">Past years listed because they hold records; the current year and two ahead because those can be planned. The tag says which is which without relying on colour.</p>
+<div class="menu" role="listbox" aria-label="Choose training year">
+  <button role="option"><span>2028</span><span class="tag">Future</span></button>
+  <button role="option"><span>2027</span><span class="tag">Future</span></button>
+  <button role="option" aria-current="true"><span>2026</span><span class="tag">Current</span></button>
+  <button role="option"><span>2025</span><span class="tag">Record</span></button>
+  <button role="option"><span>2024</span><span class="tag">Record</span></button>
+</div>
+
+</div></body></html>
