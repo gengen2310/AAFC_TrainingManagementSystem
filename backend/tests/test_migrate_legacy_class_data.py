@@ -52,7 +52,7 @@ def _setup_squadron_year_stage_session(db, sqn, *, year_num, stage_display, cade
     """
     py = PlanningYear(
         unit_id=sqn.id, wing_id=sqn.wing_id, year=year_num, name=_unique("CLASS-14-TEST-YEAR"),
-        active_status=False,
+        active_status=False, status="archived",
     )
     db.add(py)
     db.flush()
@@ -212,7 +212,7 @@ def test_no_matching_stage_is_skipped_not_guessed():
         sqn = _sqn_703(db)
         py = PlanningYear(
             unit_id=sqn.id, wing_id=sqn.wing_id, year=9104, name=_unique("CLASS-14-TEST-YEAR"),
-            active_status=False,
+            active_status=False, status="archived",
         )
         db.add(py)
         db.flush()
@@ -301,9 +301,18 @@ def test_cadet_phase_creates_active_membership():
     db = SessionLocal()
     try:
         sqn = _sqn_703(db)
+        # Archive any existing active years first (unique index: one active per squadron).
+        others = db.query(PlanningYear).filter(
+            PlanningYear.unit_id == sqn.id, PlanningYear.status == "active",
+        ).all()
+        for o in others:
+            o.active_status = False
+            o.status = "archived"
+        db.flush()
+
         py = PlanningYear(
             unit_id=sqn.id, wing_id=sqn.wing_id, year=9107, name=_unique("CLASS-14-TEST-YEAR"),
-            active_status=True,
+            active_status=True, status="active",
         )
         db.add(py)
         db.flush()
@@ -315,16 +324,6 @@ def test_cadet_phase_creates_active_membership():
         db.flush()
         cadet = Cadet(squadron_id=sqn.id, first_name="Test", last_name=_unique("Cadet"), phase="Junior")
         db.add(cadet)
-        db.commit()
-
-        # Deactivate any other active years so this test's year is the
-        # unambiguous "current active year" the script resolves to.
-        others = db.query(PlanningYear).filter(
-            PlanningYear.unit_id == sqn.id, PlanningYear.active_status == True,  # noqa: E712
-            PlanningYear.id != py.id,
-        ).all()
-        for o in others:
-            o.active_status = False
         db.commit()
 
         try:
@@ -340,11 +339,14 @@ def test_cadet_phase_creates_active_membership():
             db.refresh(cadet)
             assert cadet.phase == "Junior"  # untouched
         finally:
+            # Delete the test year first (it is active); only then restore others
+            # as active — both cannot be active simultaneously (unique index).
+            _cleanup(db, planning_years=[py], stages=[stage], cadets=[cadet])
+            db.flush()
             for o in others:
                 o.active_status = True
+                o.status = "active"
             db.commit()
-
-        _cleanup(db, planning_years=[py], stages=[stage], cadets=[cadet])
     finally:
         db.close()
 

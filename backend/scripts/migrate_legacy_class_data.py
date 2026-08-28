@@ -247,7 +247,7 @@ def migrate_squadron(db, squadron: Squadron, *, dry_run: bool) -> MigrationRepor
     # this is an operational-membership backfill, not a historical reconstruction,
     # so an inactive Cadet's stale phase value is left alone.
     active_year = db.query(PlanningYear).filter(
-        PlanningYear.unit_id == squadron.id, PlanningYear.active_status == True,  # noqa: E712
+        PlanningYear.unit_id == squadron.id, PlanningYear.status == "active",
     ).order_by(PlanningYear.year.desc()).first()
 
     cadets = db.query(Cadet).filter(

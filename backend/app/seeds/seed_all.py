@@ -126,7 +126,13 @@ def seed_all():
     nat = NationalEntity(name="AAFC National Headquarters", short_name="NATIONAL")
     db.add(nat); db.commit()
 
-    wing = Wing(national_id=nat.id, code="7WG", name="7 Wing (Western Australia)", short_name="7WG")
+    wing = Wing(
+        national_id=nat.id,
+        code="7WG",
+        name="7 Wing (Western Australia)",
+        short_name="7WG",
+        timezone="Australia/Perth",
+    )
     db.add(wing); db.commit()
 
     sqn_by_code = {}
