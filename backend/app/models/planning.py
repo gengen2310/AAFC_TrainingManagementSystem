@@ -47,11 +47,11 @@ class PlanningYear(Base, UUIDMixin, TimestampMixin):
     # unconstrained -- correct, since they are not squadron-scoped.
     __table_args__ = (
         Index(
-            "uq_planning_years_unit_year_active",
-            "unit_id", "year",
+            "uq_planning_years_unit_active",
+            "unit_id",
             unique=True,
-            sqlite_where=text("active_status = 1"),
-            postgresql_where=text("active_status = true"),
+            sqlite_where=text("status = 'active'"),
+            postgresql_where=text("status = 'active'"),
         ),
     )
     unit_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)

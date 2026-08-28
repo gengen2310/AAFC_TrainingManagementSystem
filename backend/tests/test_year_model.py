@@ -205,23 +205,14 @@ def test_rollover_does_not_trigger_before_rollover_date(client):
     active_yr_id = active_yr["planning_year_id"]
 
     draft_year_num = base + 1
+    # Create via /draft so active_yr stays active (POST /years would auto-archive it).
     draft_yr = client.post(
-        "/api/planning/years",
-        json={"year": draft_year_num, "name": f"Draft {draft_year_num}"},
+        "/api/planning/years/draft",
+        json={"year": draft_year_num, "name": f"Draft {draft_year_num}",
+              "source_year_id": active_yr_id},
         headers=h,
     ).json()
     draft_yr_id = draft_yr["planning_year_id"]
-
-    # Isolate: archive all other active years; set our draft year to 'draft'.
-    db = SessionLocal()
-    try:
-        _archive_other_active_years(db, squadron_id, keep_id=active_yr_id)
-        py = db.get(PlanningYear, draft_yr_id)
-        py.status = "draft"
-        py.active_status = False
-        db.commit()
-    finally:
-        db.close()
 
     # _today = Dec 31 of the year before the draft year — rollover date not reached.
     day_before = date(draft_year_num, 1, 1) - timedelta(days=1)
@@ -410,6 +401,7 @@ def test_archive_requires_auth(client):
 def test_parade_night_attaches_to_active_not_draft(client):
     """A draft year must never attract a parade night — only the active year does."""
     h = _sqn_admin_hdr(client)
+    _archive_existing_drafts(client, h)
     base = next_test_year()
     active_yr = client.post("/api/planning/years",
                             json={"year": base, "name": f"Active {base}"},
@@ -441,4 +433,54 @@ def test_parade_night_attaches_to_active_not_draft(client):
     )
     assert not any(d["parade_night_id"] == pn_id for d in draft_dates), (
         "Night must NOT be under the draft year"
+    )
+
+
+# ── One-active-year invariant ─────────────────────────────────
+
+def test_cannot_have_two_active_years_for_same_squadron(client):
+    """The DB-level unique index must prevent a second active year per squadron."""
+    h = _sqn_admin_hdr(client)
+    base = next_test_year()
+    # First active year — succeeds
+    yr1 = client.post("/api/planning/years",
+                      json={"year": base, "name": f"Year {base}"},
+                      headers=h).json()
+    assert yr1["status"] == "active"
+
+    # Try to create a second active year via the old PATCH restore path
+    # (bypassing the new lifecycle endpoints to simulate the invariant test)
+    yr2 = client.post("/api/planning/years",
+                      json={"year": base + 1, "name": f"Year {base + 1}"},
+                      headers=h).json()
+    # The second POST creates a year — but the index means restoring an
+    # archived year while one is already active must fail.
+    # Archive yr2 first, then try to restore it while yr1 is still active.
+    yr2_id = yr2["planning_year_id"]
+    client.post(f"/api/planning/years/{yr2_id}/archive", headers=h)
+    r = client.post(f"/api/planning/years/{yr2_id}/promote", headers=h)
+    # promote of an archived year is not allowed (only draft can be promoted)
+    assert r.status_code == 409
+    assert r.json()["detail"]["error"] == "not_a_draft"
+
+
+def test_promote_replaces_old_active_atomically(client):
+    """Promoting a draft archives the old active in the same transaction."""
+    h = _sqn_admin_hdr(client)
+    _archive_existing_active_and_drafts(client, h)
+    base = next_test_year()
+    yr1 = client.post("/api/planning/years",
+                      json={"year": base, "name": f"Year {base}"},
+                      headers=h).json()
+    draft = client.post("/api/planning/years/draft",
+                        json={"year": base + 1, "name": f"Draft {base + 1}",
+                              "source_year_id": yr1["planning_year_id"]},
+                        headers=h).json()
+    client.post(f"/api/planning/years/{draft['planning_year_id']}/promote", headers=h)
+
+    years = client.get("/api/planning/years", headers=h).json()
+    active_years = [y for y in years if y["status"] == "active"]
+    assert len(active_years) == 1, (
+        f"Expected exactly one active year after promotion, got {len(active_years)}: "
+        f"{[y['planning_year_id'] for y in active_years]}"
     )

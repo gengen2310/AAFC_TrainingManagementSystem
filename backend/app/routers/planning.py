@@ -513,10 +513,10 @@ def create_planning_year(
     # the two creation paths disagreed, and repeated calls silently produced
     # duplicates that every downstream year selector then listed several times.
     # 409 matches rollover rather than inventing a second status for one condition.
+    _active = body.active_status if body.active_status is not None else True
     if unit_id:
-        # Active rows only, matching uq_planning_years_unit_year_active. An
-        # archived year of the same number is not a conflict -- archiving one and
-        # creating a replacement is a supported workflow.
+        # Block an exact same-year-number duplicate (active only -- an archived
+        # year of the same number is a supported replacement workflow).
         dupe = db.query(PlanningYear).filter(
             PlanningYear.unit_id == unit_id,
             PlanningYear.year == body.year,
@@ -528,7 +528,19 @@ def create_planning_year(
                 "existing_id": dupe.id,
                 "message": f"Training year {body.year} already exists for this unit.",
             })
-    _active = body.active_status if body.active_status is not None else True
+        # Phase A: at most one active year per squadron. If a different active year
+        # already exists, archive it before creating the new one (same atomic swap
+        # the /promote endpoint performs). Only applies when creating an active year.
+        if _active:
+            prev_active = db.query(PlanningYear).filter(
+                PlanningYear.unit_id == unit_id,
+                PlanningYear.status == "active",
+            ).first()
+            if prev_active:
+                prev_active.status = "archived"
+                prev_active.active_status = False
+                prev_active.updated_at = utcnow()
+                db.flush()
     py = PlanningYear(
         id=str(uuid.uuid4()), year=body.year, name=body.name,
         unit_id=unit_id, wing_id=wing_id,
@@ -714,6 +726,7 @@ def promote_draft_year(
             current_active.active_status = False
             current_active.updated_by = p.user_id
             current_active.updated_at = utcnow()
+            db.flush()  # archive must reach DB before activate to satisfy unique index
     py.status = "active"
     py.active_status = True
     py.updated_by = p.user_id
@@ -3818,10 +3831,25 @@ def rollover_year(
         raise HTTPException(409, detail={"error": "planning_year_already_exists",
                                          "existing_id": existing.id})
 
+    # Phase A: archive the existing active year before rolling into the new one.
+    if py.unit_id:
+        old_active = (
+            db.query(PlanningYear)
+            .filter(PlanningYear.unit_id == py.unit_id,
+                    PlanningYear.status == "active")
+            .first()
+        )
+        if old_active:
+            old_active.status = "archived"
+            old_active.active_status = False
+            old_active.updated_at = utcnow()
+            db.flush()
+
     new_py = PlanningYear(
         id=str(uuid.uuid4()),
         unit_id=py.unit_id, wing_id=py.wing_id,
         year=target_year, name=new_name,
+        status="active",
         active_status=True,
         created_by=p.user_id, created_at=utcnow(), updated_at=utcnow(),
     )
