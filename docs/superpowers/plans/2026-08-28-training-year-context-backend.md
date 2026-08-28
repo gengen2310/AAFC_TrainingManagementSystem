@@ -336,6 +336,34 @@ git commit -m "feat(year): derive past/current/future from the wing-local date"
 
 ### Task 3: Canonical uniqueness — one container per squadron and year
 
+> **CORRECTION 2026-08-28, after attempting this task — the index change is a
+> no-op and was NOT applied. The tests were.**
+>
+> Step 2 predicted the first test would fail because "today's index permits
+> it". It does not. `uq_planning_years_unit_year_active` is already
+> `unique(unit_id, year)` filtered to active rows, so a squadron already
+> cannot hold two live containers for one calendar year. All three tests pass
+> against the unmodified index — measured, not assumed.
+>
+> The rationale was also wrong. This task claimed the old index "allowed an
+> active 2026 AND an active 2027 — the REM-156 state". 2026 and 2027 are
+> different values of `year`, so no `(unit_id, year)` unique index would ever
+> have prevented both existing. That state was a violation of the *one active
+> year* rule, which lived in application code, not in this index. Under the
+> context model that state is not a defect at all: planning 2027 while 2026
+> runs is the feature.
+>
+> The proposed replacement has identical columns and an identical predicate —
+> the plan says so itself. Dropping and recreating a unique index on a
+> production table for a cosmetic rename is risk without benefit, so the
+> migration was not written. The three tests are kept: they pin behaviour that
+> was previously untested, including the new
+> `test_two_different_years_for_one_squadron_are_both_allowed`.
+>
+> Still open for the user: the predicate references `active_status`. If a
+> later task drops that column outright, this index must be rebuilt then —
+> and that is the migration worth writing, at the point it does something.
+
 **Files:**
 - Modify: `backend/app/models/planning.py` (`__table_args__`)
 - Create: `backend/alembic/versions/<rev>_canonical_year_per_squadron.py`
