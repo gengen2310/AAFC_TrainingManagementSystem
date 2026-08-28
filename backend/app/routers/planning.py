@@ -42,9 +42,18 @@ from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_write_squadron, require_can_view_squadron
 from ..services import audit
 from ..services_year import (
-    ensure_year_context, find_year_context, selectable_years, year_display_name,
-    year_state,
+    PastYearLocked, ensure_year_context, find_year_context, require_year_writable,
+    selectable_years, year_display_name, year_state,
 )
+
+
+def _require_writable_year(db, squadron_id: str, year: int, p) -> None:
+    """Translate the service-layer lock into the router's 403 contract."""
+    try:
+        require_year_writable(db, squadron_id, year, p)
+    except PastYearLocked as exc:
+        raise HTTPException(403, detail={"error": "past_year_read_only",
+                                         "message": str(exc)})
 from .timing import _effective_template
 
 router = APIRouter(prefix="/api/planning", tags=["planning"])
@@ -181,10 +190,18 @@ def _require_plan_write(p: Principal) -> None:
         raise HTTPException(403, detail={"error": "forbidden"})
 
 
-def _require_year_access(p: Principal, py: PlanningYear, write: bool = False) -> None:
-    """Enforce scope: sqn_admin/sqn_general → own sqn; wing_admin → own wing; nat → all."""
+def _require_year_access(p: Principal, py: PlanningYear, write: bool = False,
+                         db: DBSession | None = None) -> None:
+    """Enforce scope: sqn_admin/sqn_general → own sqn; wing_admin → own wing; nat → all.
+
+    Also enforces the past-year lock when `db` is supplied. It is enforced here
+    rather than at each of the fifteen year-scoped write endpoints so that a new
+    endpoint added later inherits the protection instead of forgetting it.
+    """
     if write and p.role in _WRITE_BLOCKED:
         raise HTTPException(403, detail={"error": "forbidden"})
+    if write and db is not None and py.unit_id:
+        _require_writable_year(db, py.unit_id, py.year, p)
     if p.role in ("sqn_admin", "sqn_general"):
         if py.unit_id != p.squadron_id:
             raise HTTPException(403, detail={"error": "out_of_scope"})
@@ -535,6 +552,7 @@ def copy_setup(body: CopySetupIn, db: DBSession = Depends(get_db),
             "error": "same_year",
             "message": "Choose a different year to copy into."})
 
+    _require_writable_year(db, sqn_id, body.target_year, p)
     target = ensure_year_context(db, sqn_id, body.target_year, p.user_id)
 
     classes_copied = 0
@@ -703,7 +721,7 @@ def update_planning_year(
     p: Principal = Depends(get_principal),
 ):
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     # Structural edits to the year entity itself (name/status) require Proxy Mode
     # when a wing_admin targets a squadron-scoped year — content operations (CEA
     # imports, parade dates) do not carry this extra requirement.
@@ -736,7 +754,7 @@ def delete_planning_year(
     existing archive path (PATCH .../years/{id} with active_status=false):
     archive remains the default whenever any dependent exists."""
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     if p.role == "wing_admin" and py.unit_id:
         require_can_write_squadron(p, py.unit_id, py.wing_id)
 
@@ -831,7 +849,7 @@ def add_parade_date(
     p: Principal = Depends(get_principal),
 ):
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     pn = _find_or_create_parade_night(db, py.unit_id, body.parade_date, p)
     pd = ParadeDate(
         id=str(uuid.uuid4()), planning_year_id=year_id,
@@ -1055,7 +1073,7 @@ def generate_parade_dates(
     p: Principal = Depends(get_principal),
 ):
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     holidays = db.query(HolidayPeriod).filter(
         HolidayPeriod.planning_year_id == year_id,
         HolidayPeriod.affects_parade == True,  # noqa: E712
@@ -1286,7 +1304,7 @@ def delete_parade_date(
     if not pd:
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(pd.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     # Resolve FK children before the delete so PostgreSQL FK constraints are not violated.
     # Notices are owned by the date — delete them. Prep plans and conflicts reference it
     # optionally (nullable FK) — nullify rather than cascade-delete.
@@ -1351,7 +1369,7 @@ def add_holiday(
     p: Principal = Depends(get_principal),
 ):
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     h = HolidayPeriod(
         id=str(uuid.uuid4()), planning_year_id=year_id,
         jurisdiction=body.jurisdiction, name=body.name,
@@ -1393,7 +1411,7 @@ def update_holiday(
     if not h:
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(h.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     old = {"name": h.name, "start": h.start_date, "end": h.end_date, "type": h.holiday_type}
     if body.name is not None:
         h.name = body.name
@@ -1428,7 +1446,7 @@ def delete_holiday(
     if not h:
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(h.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     audit(db, p, object_type="holiday_period", object_id=h.id, action="delete",
           new={"name": h.name})
     db.delete(h); db.commit()
@@ -1498,7 +1516,7 @@ def create_anchor(
     p: Principal = Depends(get_principal),
 ):
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     wing_id = body.wing_id or py.wing_id
     unit_id = body.unit_id or py.unit_id
     a = AnchorEvent(
@@ -1536,7 +1554,7 @@ def update_anchor(
     if not a or a.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(a.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     _check_version(a, body.version)
     for field in ("event_name", "importance", "start_date", "end_date",
                   "planning_impact", "readiness_requirements", "notes"):
@@ -1560,7 +1578,7 @@ def archive_anchor(
     if not a:
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(a.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     # R5-M16: delete orphaned AnchorPrepPlan rows before archiving the parent
     # AnchorEvent. AnchorPrepPlan has no is_archived field (no SoftDeleteMixin)
     # and the FK has no cascade, so these rows would become dangling and block
@@ -1584,7 +1602,7 @@ def restore_anchor(
     if not a.is_archived:
         raise HTTPException(409, detail={"error": "not_archived"})
     py = _get_year_or_404(a.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     a.is_archived = False; a.updated_at = utcnow()
     db.commit()
     audit(db, p, object_type="anchor_event", object_id=a.id, action="restore")
@@ -1850,7 +1868,7 @@ def create_session(
     if not pd:
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(pd.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     if body.cadet_group not in CADET_GROUPS:
         raise HTTPException(422, detail={"error": "invalid_cadet_group"})
 
@@ -2565,7 +2583,7 @@ def override_conflict(
                 wing_id = sqn.wing_id
             require_can_write_squadron(p, py.unit_id, wing_id)
         elif py:
-            _require_year_access(p, py, write=True)
+            _require_year_access(p, py, write=True, db=db)
     c.is_resolved = True
     c.override_reason = body.override_reason
     c.resolved_by = p.user_id
@@ -2583,7 +2601,7 @@ def run_checks(
     p: Principal = Depends(get_principal),
 ):
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     dates = db.query(ParadeDate).filter(
         ParadeDate.planning_year_id == year_id,
         ParadeDate.is_active == True,  # noqa: E712
@@ -3455,7 +3473,7 @@ def assign_mission(
 ):
     """Assign a curriculum mission to a parade night session (Training Planner action)."""
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
 
     if body.cadet_group not in CADET_GROUPS:
         raise HTTPException(422, detail={"error": "invalid_cadet_group"})
@@ -3787,7 +3805,7 @@ def rollover_year(
     not a place to record where it came from.
     """
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
 
     target_year = body.target_year or (py.year + 1)
     new_name = body.name or year_display_name(target_year)
@@ -4227,7 +4245,7 @@ async def import_schedule_xlsx(
     from ..config import settings
 
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
 
     raw = await file.read()
     if len(raw) > settings.UPLOAD_MAX_MB * 1024 * 1024:
@@ -4409,7 +4427,7 @@ async def import_annual_program(
     """
     _require_plan_write(p)
     py = _get_year_or_404(year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     # _require_year_access has no proxy/delegation awareness (by design, per
     # architecture.md, for endpoints with no proxy concept) -- but importing
     # a schedule into a squadron's plan IS a proxy/delegation-relevant
@@ -5476,7 +5494,7 @@ def set_local_hide(
     if not act or act.is_archived:
         raise HTTPException(404, detail={"error": "activity_not_found"})
     py = _get_year_or_404(act.planning_year_id, db)
-    _require_year_access(p, py, write=True)
+    _require_year_access(p, py, write=True, db=db)
     from sqlalchemy import select
     existing = db.scalar(
         select(ActivityLocalHide).where(

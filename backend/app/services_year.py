@@ -149,3 +149,30 @@ def timezone_for_new_wing(db: DBSession, national_id: str,
                          Wing.timezone.isnot(None))
                  .first())
     return sibling.timezone if sibling else DEFAULT_WING_TIMEZONE
+
+
+class PastYearLocked(RuntimeError):
+    """A write was attempted against a past training year without authority."""
+
+
+def require_year_writable(db: DBSession, squadron_id: str, year: int, p) -> None:
+    """Allow writes to the current and future years; protect the past.
+
+    Delivered training is history. Correction stays possible through Delegated
+    Intervention, which already creates a ProxySession and an audit trail, so
+    the escape hatch is authorised and recorded rather than absent.
+
+    Plain Proxy Mode is deliberately NOT sufficient: it exists so a wing admin
+    can act on a squadron's behalf in the ordinary course, and rewriting
+    delivered training is not the ordinary course.
+
+    Reads never call this.
+    """
+    if year_state(db, squadron_id, year) != "past":
+        return
+    if getattr(p, "proxy_mode", None) == "delegated_intervention":
+        return
+    raise PastYearLocked(
+        f"{year} is a past training year and is read-only. Use Delegated "
+        f"Intervention to correct historical records."
+    )

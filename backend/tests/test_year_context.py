@@ -333,3 +333,61 @@ def test_an_explicit_timezone_is_honoured_and_a_bogus_one_rejected(client):
     bad = client.post("/api/wings", json={"code": "TZWG3", "name": "Bogus Zone Wing",
                                           "timezone": "Mars/Olympus_Mons"}, headers=hdr)
     assert bad.status_code == 400, bad.text
+
+
+# --- Task 9: past years are read-only unless authorised --------------------
+from app.services_year import PastYearLocked, require_year_writable
+
+
+class _P:
+    """Minimal principal stand-in; mirrors permissions.Principal's fields."""
+    def __init__(self, role="sqn_admin", proxy_mode=None):
+        self.role, self.proxy_mode = role, proxy_mode
+        self.user_id = "u1"
+
+
+def test_writing_to_a_past_year_is_blocked():
+    db = SessionLocal()
+    try:
+        s = _sqn_id(db)
+        with patch("app.services_year.wing_local_date", return_value=dt.date(2026, 8, 28)):
+            with pytest.raises(PastYearLocked):
+                require_year_writable(db, s, 2025, _P())
+    finally:
+        db.close()
+
+
+def test_current_and_future_years_are_writable():
+    db = SessionLocal()
+    try:
+        s = _sqn_id(db)
+        with patch("app.services_year.wing_local_date", return_value=dt.date(2026, 8, 28)):
+            require_year_writable(db, s, 2026, _P())   # must not raise
+            require_year_writable(db, s, 2027, _P())   # must not raise
+    finally:
+        db.close()
+
+
+def test_delegated_intervention_may_correct_a_past_year():
+    """The authorised path: existing Delegated Intervention, already audited."""
+    db = SessionLocal()
+    try:
+        s = _sqn_id(db)
+        with patch("app.services_year.wing_local_date", return_value=dt.date(2026, 8, 28)):
+            require_year_writable(db, s, 2025,
+                                  _P(proxy_mode="delegated_intervention"))
+    finally:
+        db.close()
+
+
+def test_plain_proxy_mode_is_not_enough_to_edit_history():
+    """Proxy Mode lets a wing admin act in the ordinary course. Rewriting
+    delivered training is not the ordinary course."""
+    db = SessionLocal()
+    try:
+        s = _sqn_id(db)
+        with patch("app.services_year.wing_local_date", return_value=dt.date(2026, 8, 28)):
+            with pytest.raises(PastYearLocked):
+                require_year_writable(db, s, 2025, _P(proxy_mode="proxy"))
+    finally:
+        db.close()

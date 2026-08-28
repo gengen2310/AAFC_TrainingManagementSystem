@@ -91,3 +91,33 @@ def test_rollover_no_longer_arrows_the_year_name(client):
     new_row = next(y for y in rows if y["year"] == src + 1)
     assert new_row["name"] == f"{src + 1} Training Year"
     assert "→" not in new_row["name"]
+
+
+def test_copy_setup_into_a_past_year_is_403(client):
+    """The service-layer lock must reach the HTTP boundary, not just exist."""
+    hdr = login(client, "ADMIN703")
+    src, _ = _make_source(client, hdr)
+    r = client.post("/api/planning/years/copy-setup", headers=hdr, json={
+        "source_year": src, "target_year": 2020, "copy_classes": True})
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "past_year_read_only"
+
+
+def test_the_past_year_lock_covers_every_year_scoped_write_endpoint(client):
+    """The guard lives in _require_year_access rather than at each endpoint, so
+    a new endpoint inherits it. This proves it fires through a real route."""
+    hdr = login(client, "ADMIN703")
+    made = client.post("/api/planning/years",
+                       json={"year": 2019, "name": "2019 Training Year"}, headers=hdr)
+    assert made.status_code == 200, made.text
+    past_id = made.json()["planning_year_id"]
+
+    r = client.post(f"/api/planning/years/{past_id}/holidays", headers=hdr, json={
+        "name": "Backdated Holiday", "start_date": "2019-07-01",
+        "end_date": "2019-07-14", "jurisdiction": "WA"})
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "past_year_read_only"
+
+    # and the read of that same year is untouched
+    assert client.get(f"/api/planning/years/{past_id}/holidays",
+                      headers=hdr).status_code == 200
