@@ -225,3 +225,78 @@ def test_ensure_recovers_when_it_loses_the_insert_race():
     finally:
         db.rollback()
         db.close()
+
+
+# --- Task 5: listing and reading years that have no row --------------------
+from tests.conftest import login, next_test_year
+
+
+def _sqn_admin(client):
+    hdr = login(client, "ADMIN703")
+    sid = client.get("/api/auth/me", headers=hdr).json()["session"]["squadron_id"]
+    return hdr, sid
+
+
+def test_year_listing_includes_future_years_with_no_row(client):
+    hdr, _ = _sqn_admin(client)
+    rows = client.get("/api/planning/years?include_unmaterialised=true",
+                      headers=hdr).json()
+    unmaterialised = [r for r in rows if not r["materialised"]]
+    assert unmaterialised, "future years with no row must still be listed"
+    for r in unmaterialised:
+        assert r["planning_year_id"] is None
+        assert r["state"] in ("current", "future")
+
+
+def test_every_listed_year_carries_a_derived_state(client):
+    hdr, _ = _sqn_admin(client)
+    rows = client.get("/api/planning/years", headers=hdr).json()
+    assert rows, "the listing must not be empty"
+    assert all(r["state"] in ("past", "current", "future") for r in rows), \
+        [r for r in rows if r["state"] not in ("past", "current", "future")]
+
+
+def test_year_context_read_does_not_create_a_row(client):
+    # next_test_year() rather than a literal: the suite shares one database and
+    # never resets it, so a hardcoded year is only unused until another test
+    # claims it.
+    year = next_test_year()
+    hdr, sid = _sqn_admin(client)
+    db = SessionLocal()
+    before = db.query(PlanningYear).count()
+    db.close()
+
+    r = client.get(f"/api/planning/year-context?squadron_id={sid}&year={year}",
+                   headers=hdr)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["year"] == year
+    assert body["materialised"] is False
+    assert body["planning_year_id"] is None
+    assert body["name"] == f"{year} Training Year"
+
+    db = SessionLocal()
+    assert db.query(PlanningYear).count() == before, "a read must not write"
+    db.close()
+
+
+def test_year_context_rejects_another_squadrons_year(client):
+    """The read is not a permission hole: 703's admin cannot read 704."""
+    hdr, _ = _sqn_admin(client)
+    db = SessionLocal()
+    other = db.query(Squadron).filter(Squadron.code == "704").first().id
+    db.close()
+    r = client.get(f"/api/planning/year-context?squadron_id={other}&year=2026",
+                   headers=hdr)
+    assert r.status_code == 403, r.text
+
+
+def test_the_default_listing_stays_materialised_only(client):
+    """Contract preservation. Both frontends build /years/{id}/holidays style
+    URLs straight from this list, so a planning_year_id of None would break
+    them. Logical years must be opt-in, never default."""
+    hdr, _ = _sqn_admin(client)
+    rows = client.get("/api/planning/years", headers=hdr).json()
+    assert rows, "the listing must not be empty"
+    assert all(r["materialised"] for r in rows)
+    assert all(r["planning_year_id"] is not None for r in rows)

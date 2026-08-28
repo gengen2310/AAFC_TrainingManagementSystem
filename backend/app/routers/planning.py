@@ -41,6 +41,9 @@ from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_write_squadron, require_can_view_squadron
 from ..services import audit
+from ..services_year import (
+    find_year_context, selectable_years, year_display_name, year_state,
+)
 from .timing import _effective_template
 
 router = APIRouter(prefix="/api/planning", tags=["planning"])
@@ -246,6 +249,10 @@ def _year_out(py: PlanningYear, unit_code: str | None = None,
     return {
         "planning_year_id": py.id, "unit_id": py.unit_id, "wing_id": py.wing_id,
         "year": py.year, "name": py.name, "active_status": py.active_status,
+        # Derived, not stored. state is filled by the caller that knows
+        # which squadron the year is being viewed for; materialised says
+        # a row exists, and is False for logical-only years.
+        "state": None, "materialised": True,
         "unit_code": unit_code, "unit_name": unit_name, "wing_code": wing_code,
         "created_by": py.created_by, "updated_by": py.updated_by,
         "created_at": iso_z(py.created_at) if py.created_at else None,
@@ -422,9 +429,17 @@ class PlanningYearUpdateIn(BaseModel):
 def list_planning_years(
     unit_id: Optional[str] = None,
     wing_id: Optional[str] = None,
+    include_unmaterialised: bool = False,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
+    """List planning years. `state` is derived and always present.
+
+    Logical years -- selectable years with no row yet -- are opt-in via
+    include_unmaterialised. They carry planning_year_id=None, and existing
+    consumers build sub-resource URLs (/years/{id}/holidays) straight from
+    this list, so returning them by default would break every one of them.
+    """
     q = db.query(PlanningYear)
     if p.role in ("sqn_admin", "sqn_general"):
         q = q.filter(PlanningYear.unit_id == p.squadron_id)
@@ -451,7 +466,60 @@ def list_planning_years(
             unit_name=sq.name if sq else None,
             wing_code=wg.code if wg else None,
         ))
+
+    sqn_id = p.squadron_id if p.role in ("sqn_admin", "sqn_general") else unit_id
+
+    # Years the user may select that have no row yet. Listing one does NOT
+    # create it -- materialisation happens on write, in ensure_year_context.
+    if include_unmaterialised and sqn_id:
+        have = {row["year"] for row in out}
+        for y in selectable_years(db, sqn_id):
+            if y not in have:
+                out.append({
+                    "planning_year_id": None, "unit_id": sqn_id, "wing_id": None,
+                    "year": y, "name": year_display_name(y), "active_status": True,
+                    "state": year_state(db, sqn_id, y), "materialised": False,
+                    "unit_code": None, "unit_name": None, "wing_code": None,
+                    "created_by": None, "updated_by": None,
+                    "created_at": None, "updated_at": None, "version": 0,
+                })
+
+    # Every row carries a derived state. Wing and national years have no
+    # squadron to resolve a timezone against, so theirs stays None rather than
+    # being guessed from the server's clock.
+    for row in out:
+        if row["state"] is None:
+            sid = row["unit_id"] or sqn_id
+            if sid:
+                row["state"] = year_state(db, sid, row["year"])
+    out.sort(key=lambda r: r["year"], reverse=True)
     return out
+
+
+@router.get("/year-context")
+def get_year_context(
+    squadron_id: str, year: int,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """A year context, whether or not a row exists for it.
+
+    Deliberately does NOT materialise: a read must remain a read. Callers that
+    need a row call a write endpoint, which uses ensure_year_context.
+    """
+    sqn = db.get(Squadron, squadron_id)
+    if sqn is None:
+        raise HTTPException(404, detail={"error": "not_found",
+                                         "message": "Unknown squadron."})
+    require_can_view_squadron(p, squadron_id, sqn.wing_id)
+    py = find_year_context(db, squadron_id, year)
+    return {
+        "squadron_id": squadron_id, "year": year,
+        "state": year_state(db, squadron_id, year),
+        "materialised": py is not None,
+        "planning_year_id": py.id if py else None,
+        "name": py.name if py else year_display_name(year),
+    }
 
 
 @router.post("/years")
