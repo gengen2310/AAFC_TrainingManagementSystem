@@ -19,6 +19,7 @@ class Wing(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     name: Mapped[str] = mapped_column(String(120))
     short_name: Mapped[str] = mapped_column(String(40))
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
+    timezone: Mapped[str | None] = mapped_column(String(60), nullable=True)
     squadrons: Mapped[list["Squadron"]] = relationship(back_populates="wing")
 
 

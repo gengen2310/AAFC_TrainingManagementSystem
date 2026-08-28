@@ -418,6 +418,21 @@ class PlanningYearUpdateIn(BaseModel):
     version: Optional[int] = None
 
 
+@router.get("/wing-timezone")
+def get_wing_timezone_endpoint(
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Return the IANA timezone for the current user's wing.
+    Used by both frontends to localise rollover dates.
+    """
+    from ..services_year import get_wing_timezone
+    if not p.wing_id:
+        raise HTTPException(400, detail={"error": "no_wing"})
+    tz = get_wing_timezone(p.wing_id, db)
+    return {"timezone": str(tz)}
+
+
 @router.get("/years")
 def list_planning_years(
     unit_id: Optional[str] = None,
