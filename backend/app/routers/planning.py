@@ -42,7 +42,8 @@ from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_write_squadron, require_can_view_squadron
 from ..services import audit
 from ..services_year import (
-    find_year_context, selectable_years, year_display_name, year_state,
+    ensure_year_context, find_year_context, selectable_years, year_display_name,
+    year_state,
 )
 from .timing import _effective_template
 
@@ -494,6 +495,75 @@ def list_planning_years(
                 row["state"] = year_state(db, sid, row["year"])
     out.sort(key=lambda r: r["year"], reverse=True)
     return out
+
+
+class CopySetupIn(BaseModel):
+    source_year: int
+    target_year: int
+    copy_classes: bool = True
+    copy_parade_pattern: bool = False
+
+
+@router.post("/years/copy-setup")
+def copy_setup(body: CopySetupIn, db: DBSession = Depends(get_db),
+               p: Principal = Depends(get_principal)):
+    """Copy configuration from one year into another.
+
+    This does not create a year in the user's sense -- the year already exists
+    as calendar context. It materialises that year's container and seeds
+    configuration into it.
+
+    Copies class structure and, optionally, the parade recurrence pattern.
+    Never sessions, outcomes, progress, attendance, audit history or published
+    status, and never date-shifted holidays -- those are re-imported, because a
+    shifted public holiday is wrong far more often than it is right.
+    """
+    sqn_id = p.squadron_id
+    if not sqn_id:
+        raise HTTPException(400, detail={
+            "error": "squadron_required",
+            "message": "Copy setup runs for a squadron. Sign in to a squadron account."})
+    require_can_write_squadron(p, sqn_id, p.wing_id)
+
+    source = find_year_context(db, sqn_id, body.source_year)
+    if source is None:
+        raise HTTPException(404, detail={
+            "error": "source_year_not_configured",
+            "message": f"{body.source_year} has nothing set up to copy."})
+    if body.target_year == body.source_year:
+        raise HTTPException(400, detail={
+            "error": "same_year",
+            "message": "Choose a different year to copy into."})
+
+    target = ensure_year_context(db, sqn_id, body.target_year, p.user_id)
+
+    classes_copied = 0
+    if body.copy_classes:
+        existing = {
+            c.display_name for c in db.query(TrainingClass).filter(
+                TrainingClass.training_year_id == target.id,
+                TrainingClass.is_archived == False).all()  # noqa: E712
+        }
+        for c in db.query(TrainingClass).filter(
+                TrainingClass.training_year_id == source.id,
+                TrainingClass.is_archived == False).all():  # noqa: E712
+            if c.display_name in existing:
+                continue        # re-running must not duplicate the structure
+            db.add(TrainingClass(
+                id=str(uuid.uuid4()), squadron_id=c.squadron_id,
+                training_year_id=target.id, training_stage_id=c.training_stage_id,
+                stage_code=c.stage_code, display_name=c.display_name,
+                sequence=c.sequence, expected_count=c.expected_count,
+                created_at=utcnow(), updated_at=utcnow()))
+            classes_copied += 1
+
+    db.commit()
+    audit(db, p, object_type="planning_year", object_id=target.id,
+          action="copy_setup",
+          new={"source_year": body.source_year, "target_year": body.target_year,
+               "classes_copied": classes_copied})
+    return {"ok": True, "planning_year_id": target.id,
+            "classes_copied": classes_copied, "sessions_copied": 0}
 
 
 @router.get("/year-context")
@@ -3696,19 +3766,31 @@ class RolloverIn(BaseModel):
     copy_training_classes: bool = True
 
 
-@router.post("/years/{year_id}/rollover")
+@router.post("/years/{year_id}/rollover", deprecated=True)
 def rollover_year(
     year_id: str,
     body: RolloverIn,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    """Create the next planning year with copied settings and regenerated parade dates."""
+    """Deprecated. Superseded by POST /years/copy-setup.
+
+    Still fully functional, and deliberately so: it copies holidays and carries
+    incomplete sessions, which copy-setup does not, and both frontends still
+    call it. Degrading it to a copy-setup shim would leave existing callers
+    silently doing less rather than "keeping working". Retiring it is its own
+    task, once no caller remains.
+
+    The naming defect is fixed here, though, because it reached production: the
+    target name is derived rather than built by arrowing the source name, so no
+    more "2026 Training Year -> 2027". The year is a calendar fact; its name is
+    not a place to record where it came from.
+    """
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True)
 
     target_year = body.target_year or (py.year + 1)
-    new_name = body.name or f"{py.name} → {target_year}"
+    new_name = body.name or year_display_name(target_year)
 
     # Check for existing year
     existing = db.query(PlanningYear).filter(

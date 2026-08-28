@@ -909,6 +909,35 @@ def copy_setup(body: CopySetupIn, db: DBSession = Depends(get_db),
 
 - [ ] **Step 4: Retire `rollover_year`**
 
+> **CHANGED 2026-08-28 during implementation. The shim was NOT applied.**
+>
+> The plan's shim delegates rollover to copy-setup "so existing callers do not
+> break mid-transition". It would have done the opposite. copy-setup
+> deliberately does not copy holidays or carry incomplete sessions, and
+> rollover does both; a caller would have kept getting 200 while silently
+> receiving less. Silently doing less is worse than either keeping the
+> endpoint or removing it.
+>
+> `test_year_rollover_e2e.py:155-156` asserts holidays ARE date-shifted by a
+> year, which the target model forbids outright. Those tests encode the old
+> product model and must be migrated deliberately, not broken as a side effect
+> of adding a new endpoint.
+>
+> Applied instead:
+> - `POST /years/copy-setup` added, per Step 3 (with two additions: re-running
+>   does not duplicate the class structure, and copying a year into itself is
+>   rejected 400).
+> - `rollover_year` marked `deprecated=True` — visible in OpenAPI, unchanged
+>   in behaviour, every capability preserved.
+> - The one defect that reached production IS fixed: the target name is now
+>   derived by `year_display_name` rather than arrowed from the source, so no
+>   more "2026 Training Year → 2027". No test depended on the arrow; a
+>   regression test now pins the derived name.
+>
+> Retiring rollover is its own task, blocked on the frontend no longer calling
+> it (connected-frontend/index.html:4085 and :12386) and on migrating the ~70
+> rollover references across five test files.
+
 Leave the route registered but make it delegate, so existing callers keep working
 during the frontend transition:
 
