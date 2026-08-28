@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session as DBSession
 
-from .models import Squadron, Wing
+from .models import PlanningYear, Squadron, Wing
 
 
 class MissingTimezone(RuntimeError):
@@ -38,3 +38,40 @@ def squadron_timezone(db: DBSession, squadron_id: str) -> ZoneInfo:
 def wing_local_date(db: DBSession, squadron_id: str) -> _dt.date:
     """Today as the squadron's wing experiences it, not as the server does."""
     return _dt.datetime.now(squadron_timezone(db, squadron_id)).date()
+
+
+FUTURE_YEARS_SELECTABLE = 2  # user decision 2026-08-28: current + 2
+
+
+def current_year(db: DBSession, squadron_id: str) -> int:
+    """The current training year. Derived, never stored, never written."""
+    return wing_local_date(db, squadron_id).year
+
+
+def year_state(db: DBSession, squadron_id: str, year: int) -> str:
+    """"past" | "current" | "future" -- computed from the calendar, so no
+    scheduled job and no 1 January write is required to keep it truthful."""
+    now = current_year(db, squadron_id)
+    if year < now:
+        return "past"
+    return "current" if year == now else "future"
+
+
+def selectable_years(db: DBSession, squadron_id: str) -> list[int]:
+    """Years offered in the selector: every past year that has a row, the
+    current year, and FUTURE_YEARS_SELECTABLE ahead. Past is uncapped; future
+    is capped by user decision.
+
+    Past years are included whatever their active_status. Archiving is no
+    longer a concept in the year UX, and a past year's data remains history
+    that must stay reachable.
+    """
+    now = current_year(db, squadron_id)
+    past = {
+        year for (year,) in db.query(PlanningYear.year).filter(
+            PlanningYear.unit_id == squadron_id,
+            PlanningYear.year < now,
+        ).all()
+    }
+    ahead = {now + n for n in range(FUTURE_YEARS_SELECTABLE + 1)}
+    return sorted(past | ahead)
