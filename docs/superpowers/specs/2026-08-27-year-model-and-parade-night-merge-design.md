@@ -114,6 +114,25 @@ anything, the year changes by itself — with no new infrastructure.
 
 Three consequences that must be handled, not assumed:
 
+**The `year` number does not reliably describe the dates the year contains.**
+Found 2026-08-28 while listing the six squadrons, and it undermines the rollover
+rule. Three of them hold a year numbered **2027** whose parade dates are all in
+2026:
+
+    704  2027  "2026 Training Year -> 2027"   5 dates, 2026-08-07 .. 2026-09-04
+    708  2027  "2026 Training Year -> 2027"  15 dates, 2026-08-21 .. 2026-12-04
+    702  2027  "2026 Training Year -> 2027"   0 dates
+
+The names suggest a rollover or copy feature that renumbered the year without
+re-dating its contents. If such a row is the draft, "promote on 1 January of the
+draft's year" activates it on 1 Jan 2027 holding parade nights that finished in
+2026 — an active year whose entire programme is in the past.
+
+**This must be settled before the rollover rule can be implemented.** Either the
+rollover date comes from the year's own dates rather than its number, or these
+rows are corrected first and the number is made authoritative. The second is
+cleaner but needs the same per-squadron adjudication as everything else here.
+
 **Timezone — and the system does not currently know it.** Rollover is
 **1 January of the draft year's own `year`, in squadron-local time** (decided
 2026-08-28).
@@ -215,11 +234,22 @@ other planning tables and was not audited.
 
 ### The eight orphans
 
+**CORRECTED 2026-08-28.** The first breakdown counted overlapping categories: the
+"span" nights also have an active year numbered 2026, so they were counted twice
+and "calendar year" was inflated from 2 to 4. The mutually exclusive breakdown,
+from the per-row listing:
+
 | resolution | count | action |
 |---|---|---|
-| a year's parade dates span the date | 2 | attach to that year |
-| a year matches the date's calendar year | 4 | attach to that year |
-| squadron has no active year at all | 2 | **blocks the migration; fixed by a human first** |
+| a year's parade dates span the date | 2 | attach to that year (704, 708) |
+| a year matches the date's calendar year | 2 | attach to that year (713 x2) |
+| squadron has **no planning year at all** | 2 | **blocks the migration** (718 x2) |
+| active years exist but none span or match | 2 | **blocks the migration** (TEST x2) |
+
+So **four nights need a human decision, not two.** All eight carry zero sessions,
+so nothing is lost either way. 718 has no planning years whatsoever — not merely
+no active one — and its two nights are real events ("Exec and Band Night",
+"708SQN Grad Parade"), not test debris.
 
 The final two are reported for a human decision **before Phase B runs at all**
 (see the REVIEW note under Columns — they cannot be "skipped" mid-migration,
