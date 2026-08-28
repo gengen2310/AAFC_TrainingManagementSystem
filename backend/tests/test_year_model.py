@@ -35,6 +35,13 @@ def test_wing_timezone_sqn_returns_their_wing_tz(client):
     assert r.json()["timezone"] == "Australia/Perth"
 
 
+def test_wing_timezone_no_wing_returns_400(client):
+    h = _nat_admin_hdr(client)
+    r = client.get("/api/planning/wing-timezone", headers=h)
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"]["error"] == "no_wing"
+
+
 def test_wing_timezone_requires_auth(client):
     r = client.get("/api/planning/wing-timezone")
     assert r.status_code == 401

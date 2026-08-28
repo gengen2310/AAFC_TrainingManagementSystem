@@ -6,7 +6,6 @@ Two hard rules from the spec (2026-08-27):
     1 January of the draft year's own `year` number, in wing-local time.
 """
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from datetime import datetime, date as date_type
 from sqlalchemy.orm import Session
 
 
