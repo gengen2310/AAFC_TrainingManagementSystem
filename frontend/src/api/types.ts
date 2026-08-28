@@ -179,23 +179,15 @@ export interface ImportCommitResult { ok: boolean; import_id: string; accepted: 
 
 // ─── Planning Workspace types ───────────────────────────────────────────────
 export interface PlanningYear {
-  planning_year_id: string;
-  unit_id: string | null;
-  wing_id: string | null;
-  year: number;
-  name: string;
-  /** Phase A: canonical status field. draft | active | archived. */
-  status: 'draft' | 'active' | 'archived';
-  /** Backward-compat: kept until Phase A-2 drops it from the API. */
-  active_status: boolean;
-  unit_code?: string | null;
-  unit_name?: string | null;
-  wing_code?: string | null;
-  created_by?: string | null;
-  updated_by?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  version?: number;
+  // null when the year has no row yet. A Training Year is calendar context, so
+  // a year nobody has written to is still a real, selectable year -- it simply
+  // has nothing to point an id at. Typing this `string` was a lie the moment
+  // the API started returning logical years.
+  planning_year_id: string | null; unit_id: string | null; wing_id: string | null;
+  year: number; name: string; active_status: boolean;
+  state?: "past" | "current" | "future";
+  materialised?: boolean;
+  unit_code?: string | null; unit_name?: string | null; wing_code?: string | null;
 }
 export interface ParadeDate {
   parade_date_id: string; planning_year_id: string; unit_id: string | null;

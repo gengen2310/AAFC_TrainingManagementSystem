@@ -12,6 +12,7 @@ from ..models import (
 from ..models.organisations import UNIT_TYPES
 from ..dependencies import get_principal, client_meta
 from ..permissions import Principal, require_role, require_can_view_squadron, require_can_write_squadron, require_system_or_nat_admin
+from ..services_year import timezone_for_new_wing
 from ..services import audit, fk_dependents
 
 router = APIRouter(prefix="/api", tags=["organisations"])
@@ -48,6 +49,10 @@ class WingCreateIn(BaseModel):
     code: str
     name: str
     short_name: str | None = None
+    # IANA zone. Omitted, it is inherited from a sibling wing so the row always
+    # arrives with an explicit, editable value -- never NULL, which would make
+    # every training-year derivation for the wing raise.
+    timezone: str | None = None
 
 
 @router.post("/wings")
@@ -71,13 +76,20 @@ def create_wing(body: WingCreateIn, db: DBSession = Depends(get_db),
     nat = db.query(NationalEntity).first()
     if not nat:
         raise HTTPException(500, detail={"error": "no_national_entity"})
+    try:
+        tz = timezone_for_new_wing(db, nat.id, getattr(body, "timezone", None))
+    except Exception:
+        raise HTTPException(400, detail={
+            "error": "invalid_timezone",
+            "message": "Provide a valid IANA timezone, e.g. Australia/Perth."})
     w = Wing(national_id=nat.id, code=code, name=name,
              short_name=body.short_name or code, active_status=True,
-             created_by=p.user_id)
+             timezone=tz, created_by=p.user_id)
     db.add(w); db.commit()
     audit(db, p, object_type="wing", object_id=w.id, action="create",
           new={"code": code, "name": w.name})
-    return {"ok": True, "wing_id": w.id, "code": w.code, "name": w.name}
+    return {"ok": True, "wing_id": w.id, "code": w.code, "name": w.name,
+            "timezone": w.timezone}
 
 
 class WingUpdateIn(BaseModel):

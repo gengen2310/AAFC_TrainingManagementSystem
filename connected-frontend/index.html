@@ -278,11 +278,15 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .page-actions,.ph-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 
 /* ── YEAR NAV CONTROL ── */
-.year-nav-ctrl{display:inline-flex;align-items:center;background:var(--dark);border-radius:22px;overflow:hidden;height:36px;font-family:'Montserrat',Arial,sans-serif}
-.yn-arrow{background:transparent;border:none;color:#fff;font-size:var(--fs-xl);padding:0 12px;cursor:pointer;height:100%;opacity:1;transition:opacity .15s}
-.yn-arrow:disabled{opacity:.35;cursor:default}
+.year-nav-ctrl{display:inline-flex;align-items:center;background:var(--dark);border-radius:22px;overflow:hidden;min-height:44px;font-family:'Montserrat',Arial,sans-serif}
+/* G5: the hit area is 44px; the glyph is unchanged. Type size and touch
+   target are different measurements and the glyph must never set the target. */
+.yn-arrow{background:transparent;border:none;color:#fff;font-size:var(--fs-xl);padding:0 12px;cursor:pointer;min-width:44px;min-height:44px;opacity:1;transition:opacity .15s}
+.yn-arrow:disabled{color:#7e8992;opacity:1;cursor:default}
 .yn-arrow:not(:disabled):hover{background:rgba(255,255,255,.12)}
-.yn-display{color:#fff;font-size:var(--fs-md);font-weight:600;padding:0 10px;cursor:pointer;display:flex;align-items:center;min-width:52px;justify-content:center;height:100%}
+/* tabular-nums so stepping 2026 -> 2027 -> 2088 does not change the width
+   and shift everything to its right. Measured 120px -> 120px. */
+.yn-display{color:#fff;font-size:var(--fs-md);font-weight:600;padding:0 10px;cursor:pointer;display:flex;align-items:center;min-width:52px;min-height:44px;justify-content:center;font-variant-numeric:tabular-nums}
 .yn-display:hover{background:rgba(255,255,255,.1)}
 .yn-display input{background:transparent;border:none;border-bottom:2px solid var(--blue);color:#fff;font-size:var(--fs-md);font-weight:600;width:52px;text-align:center;font-family:inherit}
 /* AUDIT-2026-08 G4: the rule above previously set outline:none at specificity 0-1-1,
@@ -290,8 +294,40 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .yn-display input:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;}
 .yn-gear{background:transparent;border:none;border-left:1px solid rgba(255,255,255,.2);color:#fff;font-size:var(--fs-lg);padding:0 11px;cursor:pointer;height:100%}
 .yn-gear:hover{background:rgba(255,255,255,.12)}
-.yn-wrap{display:flex;flex-direction:column;align-items:flex-end;margin-left:auto}
+.yn-wrap{display:flex;flex-direction:column;align-items:flex-end;margin-left:auto;position:relative}
+/* The menu lives OUTSIDE .year-nav-ctrl on purpose: that pill is
+   overflow:hidden to keep its rounded ends, which silently clipped an
+   absolutely-positioned child to nothing. Playwright still called it
+   visible -- it had a box -- so only a screenshot showed it was gone. */
 .yn-toast{font-size:var(--fs-xs);color:var(--red);margin-top:3px;min-height:14px}
+/* One quiet line, no chips. The current year carries no arrow: the arrows
+   mean "away from now", so their absence is what says you are in it. */
+.yn-state{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;min-height:13px;white-space:nowrap}
+/* A dashed border, not a solid card: the year is real, its configuration is
+   empty. A solid card would read as a thing that is missing. */
+.yn-notice{border:1px dashed var(--line);border-radius:10px;padding:16px 18px;margin:0 0 14px;background:transparent}
+.yn-notice p{margin:0 0 12px;font-size:var(--fs-sm);color:var(--text);max-width:62ch}
+.yn-notice .yn-notice-actions{display:flex;gap:10px;flex-wrap:wrap}
+.yn-notice.yn-notice-locked{border-style:solid;background:var(--surface-2)}
+.yn-notice.yn-notice-locked p{margin:0}
+.yn-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:60;min-width:190px;background:var(--surface);
+  border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.16);padding:4px;margin:0;list-style:none}
+.yn-menu[hidden]{display:none}
+.yn-menu li{margin:0}
+.yn-menu button{display:flex;width:100%;align-items:center;justify-content:space-between;gap:14px;
+  min-height:44px;padding:0 12px;background:transparent;border:0;border-radius:7px;cursor:pointer;
+  font-family:inherit;font-size:var(--fs-sm);color:var(--text);text-align:left;font-variant-numeric:tabular-nums}
+.yn-menu button:hover,.yn-menu button:focus-visible{background:var(--surface-2)}
+.yn-menu button[aria-current="true"]{font-weight:700}
+/* The tag says what the year is FOR, not where it sits in time -- and RECORD is
+   the same word the read-only notice uses, so the vocabulary holds across the flow. */
+.yn-tag{font-size:var(--fs-3xs,10px);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.yn-caret{margin-left:6px;font-size:var(--fs-xs)}
+/* One line, and it does NOT move the user. Explicit and reversible: a session
+   open across midnight must never have the data swapped underneath it. */
+.yn-rollover{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;
+  border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:8px;background:var(--surface-2)}
+.yn-rollover p{margin:0;font-size:var(--fs-sm);color:var(--text)}
 .yn-mgmt-table{width:100%;border-collapse:collapse;}
 .yn-mgmt-table th{font-size:var(--fs-3xs);font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 12px;border-bottom:1px solid var(--border);text-align:left;}
 .yn-mgmt-table td{padding:10px 12px;font-size:var(--fs-sm);border-bottom:1px solid var(--border-light,#e4edf5);color:var(--text);}
@@ -1263,7 +1299,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   <div class="scope-banner" id="scope-banner" style="display:none"><span class="sb-tag" id="sb-tag">SQN</span><span id="sb-text"></span></div>
   <div class="mode-banner" id="mode-banner"><span id="mode-text"></span><button onclick="exitMode()">Exit mode</button></div>
   <div class="maint-banner" id="maint-banner"><span class="maint-icon" id="maint-icon">🔒</span><span class="maint-msg" id="maint-msg">System under maintenance.</span></div>
-  <div class="mode-banner" id="year-notice-banner"><span id="year-notice-msg"></span><button onclick="document.getElementById('year-notice-banner').className='mode-banner'">Dismiss</button></div>
   <!-- System Administrator scope selector: browse National (default) / a Wing / a Squadron.
        Viewing never requires Proxy/Intervention Mode (view is broad by design — the backend's
        can_view_squadron/can_view_wing already grant system_admin unconditional read access).
@@ -1785,15 +1820,18 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <button class="btn btn-secondary btn-sm" id="actImportCeaBtn" style="display:none" onclick="openCeaImportModal()">Import CEA &#8593;</button>
             <div class="yn-wrap" id="actYnWrap">
               <div class="year-nav-ctrl">
-                <button class="yn-arrow" id="ynPrev" onclick="ynNav(-1)" disabled title="Previous year">‹</button>
-                <div class="yn-display" id="ynDisplay" onclick="ynStartEdit()" title="Click to enter year directly"><span id="ynLabel">—</span></div>
-                <button class="yn-arrow" id="ynNext" onclick="ynNav(1)" disabled title="Next year">›</button>
-                <button class="yn-gear" id="ynGear" onclick="nav('settings')" style="display:none" title="Manage Training Years">⚙ Manage Years</button>
+                <button class="yn-arrow" id="ynPrev" onclick="ynNav(-1)" disabled aria-label="Previous year">‹</button>
+                <button class="yn-display" id="ynDisplay" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="ynMenu" onclick="ynToggleMenu()"><span id="ynLabel">—</span><span class="yn-caret" aria-hidden="true">&#9662;</span></button>
+                <button class="yn-arrow" id="ynNext" onclick="ynNav(1)" disabled aria-label="Next year">›</button>
               </div>
+              <ul class="yn-menu" id="ynMenu" role="menu" aria-label="Choose training year" hidden></ul>
+              <div class="yn-state" id="ynState"></div>
               <div class="yn-toast" id="ynToast"></div>
             </div>
           </div>
         </div>
+        <div id="yn-rollover" class="no-print" role="status" hidden></div>
+        <div id="yn-year-notice" class="no-print"></div>
         <div class="fbar no-print">
           <select id="act-f-type" aria-label="Filter by activity type" onchange="renderActs()">
             <option value="all">All Types</option>
@@ -2203,10 +2241,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <div class="card admin-el" id="settings-training-years-wrap">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
             <h2 class="ctitle" style="margin:0">Training Years</h2>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-              <button class="btn btn-sky admin-el" onclick="ynCreateYear()">+ Create <span id="ynCreateLabelCard">next year</span></button>
-              <button class="btn btn-out admin-el" id="btn-create-draft-year" style="display:none" onclick="ynCreateDraftYear()">+ Create Draft Year</button>
-            </div>
+            <button class="btn btn-sky admin-el" onclick="ynCreateYear()">+ Create <span id="ynCreateLabelCard">next year</span></button>
           </div>
           <p class="muted" style="font-size:var(--fs-xs);margin:0 0 12px">
             Each training year holds its own parade dates, training classes and holiday periods.
@@ -5299,28 +5334,31 @@ async function loadData(){
   // this squadron, flattened across years (usually just one).
   const p_holidays=_sqnId?(async()=>{
     try{
-      const years=await api('/api/planning/years?unit_id='+encodeURIComponent(_sqnId));
+      // include_unmaterialised: a selectable year with no row must appear in the
+      // bar, or an unconfigured year is unreachable. Those rows carry
+      // planning_year_id=null, so every consumer below filters on it.
+      const years=await api('/api/planning/years?include_unmaterialised=true&unit_id='+encodeURIComponent(_sqnId));
       // CAL-1: this fetch already had the year list and threw it away, so P.years
       // stayed empty until the planning page happened to load. The Training
       // Calendar's year selector is built from it, which is why a newly created
       // year did not appear there.
       if(typeof P!=='undefined'){
         P.years=years||[];
-        // MN-9: ensure snapshot is initialised here too, not only in _loadPlanningYears
-        if(!P._yearSnapshotId){
-          const _na=(P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));
-          if(_na) P._yearSnapshotId=_na.planning_year_id;
-        }
         // YR-4: P.currentYearId was only ever set by _loadPlanningYears(), which
         // runs when the planning page opens. At boot it stayed null, so the
         // Dashboard showed "No active training year" while the unit had active
         // years, and the calendar had no training year to follow.
-        if(!P.currentYearId && P.years.length && typeof _pickDefaultYear==='function'){
-          const d=_pickDefaultYear(P.years);
-          if(d){ P.currentYearId=d.planning_year_id; P.currentYearInt=d.year; }
+        if(!P.currentYearInt && P.years.length){
+          // Default to the current year, which is derived server-side. Falling
+          // back to _pickDefaultYear keeps older payloads working.
+          const cur=P.years.find(y=>y.state==='current');
+          const d=cur||(typeof _pickDefaultYear==='function'?_pickDefaultYear(P.years):null);
+          if(d){ P.currentYearId=d.planning_year_id||null; P.currentYearInt=d.year; }
         }
       }
-      const activeIds=(years||[]).filter(y=>y.status==='active'||(!y.status&&y.active_status)).map(y=>y.planning_year_id);
+      // planning_year_id is null for a year with no row -- requesting
+      // /years/null/holidays would 404 every boot.
+      const activeIds=(years||[]).filter(y=>y.active_status&&y.planning_year_id).map(y=>y.planning_year_id);
       const lists=await Promise.all(activeIds.map(id=>api('/api/planning/years/'+id+'/holidays').catch(()=>[])));
       return lists.flat();
     }catch(_){ return []; }
@@ -11382,7 +11420,7 @@ async function openCurrMatrix(btn){
     if(!sqnId){if(status)status.textContent='No squadron selected.';return;}
     let yearId=null;
     const years=await api('/api/planning/years?unit_id='+encodeURIComponent(sqnId)).catch(()=>[]);
-    const active=(years||[]).find(y=>y.status==='active'||(!y.status&&y.active_status));
+    const active=(years||[]).find(y=>y.active_status);
     yearId=active?active.planning_year_id:(years&&years[0]?years[0].planning_year_id:null);
     if(!yearId){if(status)status.textContent='No year found.';return;}
     _cmData=await api('/api/curriculum/class-matrix?year_id='+encodeURIComponent(yearId));
@@ -11608,7 +11646,7 @@ async function _loadCurriculumClassBreakdown(){
     let yearId=P&&P.currentYearId;
     if(!yearId){
       const years=await api('/api/planning/years?unit_id='+encodeURIComponent(sqnId)).catch(()=>[]);
-      const active=(years||[]).find(y=>y.status==='active'||(!y.status&&y.active_status));
+      const active=(years||[]).find(y=>y.active_status);
       if(!active) return;
       yearId=active.planning_year_id;
     }
@@ -12133,8 +12171,17 @@ async function _loadActivitiesPage(){
     loadAnchors(P.currentYearId);
     loadMissions(P.currentYearId);
   } else {
+    // The year is selected but has no row. Every year-scoped panel must clear:
+    // leaving 2026's holidays and forecasts on screen under the heading 2027
+    // is worse than showing nothing, because it is quietly wrong.
+    _renderHolidays(null);
+    _loadClassForecasts(null);
     loadAnchors(null);
     loadMissions(null);
+    // Wing HQ events are keyed by the year NUMBER, not a planning-year row, so
+    // they are still meaningful for a year nobody has configured.
+    const _wid = (S.session && S.session.wing_id) || '';
+    if (_wid && P.currentYearInt) _loadAndRenderWingEventsOverlay(_wid, P.currentYearInt);
   }
 }
 
@@ -12150,20 +12197,32 @@ function ynInit() {
   }
   _ynUpdateDisplay();
   _ynUpdateArrows();
-  const gear = document.getElementById('ynGear');
-  if (gear && ['system_admin','wing_admin','national_admin'].includes(S.role||'')) {
-    gear.style.display = '';
-  }
   const ceaBtn = document.getElementById('actImportCeaBtn');
   if (ceaBtn) {
     ceaBtn.style.display = ['system_admin','wing_admin','national_admin'].includes(S.role||'') ? '' : 'none';
   }
 }
 
+// A year the user can select may have no row yet. Anything that needs a row --
+// an import target, a sub-resource URL -- must say so plainly rather than
+// building /api/planning/years/null/... and failing with a 404.
+function _ynNeedsSetup(what) {
+  if (P && P.currentYearId) return false;
+  showToast('Set up ' + (P && P.currentYearInt ? P.currentYearInt : 'this year') +
+            ' before you can ' + what + '.', true);
+  return true;
+}
+
 function setCurrentYear(yearObj, reload) {
   if (!yearObj) return;
-  P.currentYearId = yearObj.planning_year_id;
+  // May be null: a selectable year that nobody has written to yet has no row.
+  // Downstream `if (P.currentYearId)` guards then correctly render the empty
+  // state for that year rather than "no year".
+  P.currentYearId = yearObj.planning_year_id || null;
   P.currentYearInt = yearObj.year;
+  // Which year was current AT THE TIME of selection. Without it, any past year
+  // the user deliberately opened would claim the year had just rolled over.
+  if (yearObj.state === 'current') P._ynWasCurrentYear = yearObj.year;
   // CAL-2: the Training Calendar follows the training year. Without this,
   // creating or switching a year left the calendar sitting on whatever year it
   // booted with, which is what "the calendar doesn't update" looked like.
@@ -12180,83 +12239,274 @@ function setCurrentYear(yearObj, reload) {
   if (reload !== false) _loadActivitiesPage();
 }
 
+// The year bar steps through YEAR INTEGERS, not planning_year_id. A year the
+// user can select may have no row at all -- that is the normal state of a year
+// nobody has written to -- and a UUID cannot express it. Keying navigation off
+// the id is what made an unconfigured year unreachable.
+function _ynYears() {
+  const rows = (P.years || []).filter(y => y && y.year != null);
+  const byYear = new Map();
+  for (const r of rows) {
+    // Prefer the materialised row when both are present for one year.
+    const prior = byYear.get(r.year);
+    if (!prior || (r.planning_year_id && !prior.planning_year_id)) byYear.set(r.year, r);
+  }
+  return [...byYear.values()].sort((a, b) => a.year - b.year);
+}
+
+// One quiet line, no chips. The current year deliberately has no arrow: the
+// arrows mean "away from now", so their absence is what says you are in it.
+const _YN_STATE_TEXT = {
+  past:    '\u2190 Previous year \u00b7 training record',
+  current: 'Current year',
+  future:  '\u2192 Future year \u00b7 planning ahead',
+};
+
 function _ynUpdateDisplay() {
   const lbl = document.getElementById('ynLabel');
-  if (lbl) lbl.textContent = P.currentYearInt || '—';
+  if (lbl) lbl.textContent = P.currentYearInt || '\u2014';
+  const st = document.getElementById('ynState');
+  if (st) {
+    const row = _ynYears().find(y => y.year === P.currentYearInt);
+    st.textContent = (row && _YN_STATE_TEXT[row.state]) || '';
+  }
+  _ynRenderYearNotice();
+  _ynRenderRolloverNotice();
+}
+
+// The year is real; only its configuration is empty. Never say the year does
+// not exist, and never offer more than the two things that can usefully be
+// done from here.
+// Past years appear because they hold records; the current year and two ahead
+// appear because those can be planned. RECORD rather than PAST: it says what
+// the year is FOR, and it is the word the read-only notice uses.
+const _YN_TAG = { past: 'RECORD', current: 'CURRENT', future: 'FUTURE' };
+
+// 1 January performs no database write: it changes a derived value. So a
+// session left open across midnight is quietly looking at last year. Say so,
+// offer the switch, and do not take it -- swapping the data underneath someone
+// mid-task is the thing this notice exists to avoid.
+function _ynRenderRolloverNotice() {
+  const el = document.getElementById('yn-rollover');
+  if (!el) return;
+  const rows = _ynYears();
+  const current = rows.find(function (y) { return y.state === 'current'; });
+  const mine = rows.find(function (y) { return y.year === P.currentYearInt; });
+
+  // Only when the year the user is on has JUST stopped being the current one.
+  const rolled = !!current && !!mine && mine.state === 'past' &&
+                 P._ynWasCurrentYear === mine.year;
+  if (!rolled) { el.setAttribute('hidden', ''); el.textContent = ''; return; }
+
+  el.textContent = '';
+  const box = document.createElement('div');
+  box.className = 'yn-rollover';
+  const para = document.createElement('p');
+  para.textContent = current.year + ' is now the current training year.';
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-dk';
+  btn.type = 'button';
+  btn.textContent = 'Switch to ' + current.year;
+  btn.addEventListener('click', function () {
+    P._ynWasCurrentYear = current.year;
+    setCurrentYear(current);
+    _ynRenderRolloverNotice();
+  });
+  box.appendChild(para);
+  box.appendChild(btn);
+  el.appendChild(box);
+  el.removeAttribute('hidden');
+}
+
+let _ynLastRolloverCheck = 0;
+async function ynCheckYearRollover(force) {
+  const now = Date.now();
+  if (!force && now - _ynLastRolloverCheck < 60000) return;   // never hammer the API
+  _ynLastRolloverCheck = now;
+  try { await _ynFetchYears(); } catch (_) { return; }
+  _ynUpdateArrows();
+  _ynRenderRolloverNotice();
+}
+
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden) ynCheckYearRollover();
+});
+window.addEventListener('focus', function () { ynCheckYearRollover(); });
+
+function ynToggleMenu(force) {
+  const menu = document.getElementById('ynMenu');
+  const btn = document.getElementById('ynDisplay');
+  if (!menu || !btn) return;
+  const open = (force === undefined) ? menu.hasAttribute('hidden') : !!force;
+  if (!open) {
+    menu.setAttribute('hidden', '');
+    btn.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  _ynRenderMenu();
+  menu.removeAttribute('hidden');
+  btn.setAttribute('aria-expanded', 'true');
+  const first = menu.querySelector('button[aria-current="true"]') || menu.querySelector('button');
+  if (first) first.focus();
+}
+
+function _ynRenderMenu() {
+  const menu = document.getElementById('ynMenu');
+  if (!menu) return;
+  menu.textContent = '';
+  const rows = _ynYears().slice().sort((a, b) => b.year - a.year);
+  rows.forEach(function (row) {
+    const li = document.createElement('li');
+    li.setAttribute('role', 'none');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'menuitem');
+    if (row.year === P.currentYearInt) b.setAttribute('aria-current', 'true');
+    const num = document.createElement('span');
+    num.textContent = String(row.year);
+    const tag = document.createElement('span');
+    tag.className = 'yn-tag';
+    tag.textContent = _YN_TAG[row.state] || '';
+    b.appendChild(num);
+    b.appendChild(tag);
+    b.addEventListener('click', function () {
+      setCurrentYear(row);
+      ynToggleMenu(false);
+      const d = document.getElementById('ynDisplay');
+      if (d) d.focus();
+    });
+    li.appendChild(b);
+    menu.appendChild(li);
+  });
+}
+
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  const menu = document.getElementById('ynMenu');
+  if (menu && !menu.hasAttribute('hidden')) {
+    ynToggleMenu(false);
+    const d = document.getElementById('ynDisplay');
+    if (d) d.focus();
+  }
+});
+
+document.addEventListener('click', function (e) {
+  const menu = document.getElementById('ynMenu');
+  if (!menu || menu.hasAttribute('hidden')) return;
+  if (e.target.closest && e.target.closest('#ynMenu, #ynDisplay')) return;
+  ynToggleMenu(false);
+});
+
+function _ynRenderYearNotice() {
+  const el = document.getElementById('yn-year-notice');
+  if (!el) return;
+  const rows = _ynYears();
+  const row = rows.find(y => y.year === P.currentYearInt);
+  el.textContent = '';
+  if (!row) return;
+  const yr = Number(row.year);
+
+  if (row.state === 'past') {
+    // Read-only stated in words, first, and the notice names the way out --
+    // blocking someone without saying what to do instead is just a wall.
+    const box = document.createElement('div');
+    box.className = 'yn-notice yn-notice-locked';
+    const para = document.createElement('p');
+    const lead = document.createElement('strong');
+    lead.textContent = 'Read-only.';
+    para.appendChild(lead);
+    para.appendChild(document.createTextNode(
+      ` ${yr} is complete. Its records stay available to review. To correct ` +
+      `something, a Wing administrator can open Delegated Intervention.`));
+    box.appendChild(para);
+    el.appendChild(box);
+    return;
+  }
+
+  if (row.materialised === false) {
+    const prev = rows.filter(y => y.year < yr && y.materialised)
+                     .sort((a, b) => b.year - a.year)[0];
+    const box = document.createElement('div');
+    box.className = 'yn-notice';
+    const para = document.createElement('p');
+    para.textContent = prev
+      ? `Nothing has been set up for ${yr} yet. You can start from scratch, or ` +
+        `bring across the class structure you used in ${prev.year}.`
+      : `Nothing has been set up for ${yr} yet.`;
+    box.appendChild(para);
+
+    const actions = document.createElement('div');
+    actions.className = 'yn-notice-actions';
+    const setUp = document.createElement('button');
+    setUp.className = 'btn btn-dk';
+    setUp.textContent = `Set up ${yr}`;
+    setUp.addEventListener('click', () => ynSetUpYear(yr));
+    actions.appendChild(setUp);
+    if (prev) {
+      // Names the source year rather than "copy previous", so the sentence is
+      // true without the reader reconstructing context.
+      const copy = document.createElement('button');
+      copy.className = 'btn btn-secondary';
+      copy.textContent = `Copy setup from ${prev.year}`;
+      copy.addEventListener('click', () => ynCopySetupFrom(Number(prev.year), yr));
+      actions.appendChild(copy);
+    }
+    box.appendChild(actions);
+    el.appendChild(box);
+  }
+}
+
+async function ynSetUpYear(year) {
+  try {
+    await api('/api/planning/years', {
+      method: 'POST', body: { year: year, name: year + ' Training Year' } });
+    await _ynFetchYears();
+    const row = _ynYears().find(y => y.year === year);
+    if (row) setCurrentYear(row);
+    showToast(`Set up ${year}.`);
+  } catch (e) { showToast(`Could not set up ${year}: ` + apiErr(e), true); }
+}
+
+async function ynCopySetupFrom(src, tgt) {
+  try {
+    const r = await api('/api/planning/years/copy-setup', { method: 'POST', body: {
+      source_year: src, target_year: tgt,
+      copy_classes: true, copy_parade_pattern: false } });
+    await _ynFetchYears();
+    const row = _ynYears().find(y => y.year === tgt);
+    if (row) setCurrentYear(row);
+    const n = (r && r.classes_copied != null) ? r.classes_copied : 0;
+    showToast(`Copied ${n} training ${n === 1 ? 'class' : 'classes'} from ${src} into ${tgt}.`);
+  } catch (e) { showToast('Could not copy setup: ' + apiErr(e), true); }
 }
 
 function _ynUpdateArrows() {
-  if (!P.years || !P.years.length) return;
-  const sorted = [...P.years].sort((a,b) => a.year - b.year);
-  const idx = sorted.findIndex(y => y.planning_year_id === P.currentYearId);
+  const sorted = _ynYears();
   const prev = document.getElementById('ynPrev');
   const next = document.getElementById('ynNext');
+  if (!sorted.length) {
+    if (prev) prev.disabled = true;
+    if (next) next.disabled = true;
+    return;
+  }
+  const idx = sorted.findIndex(y => y.year === P.currentYearInt);
   if (prev) prev.disabled = idx <= 0;
   if (next) next.disabled = idx < 0 || idx >= sorted.length - 1;
 }
 
 function ynNav(dir) {
-  if (P._ynEditing) return;
-  if (!P.years || !P.years.length) return;
-  const sorted = [...P.years].sort((a,b) => a.year - b.year);
-  const idx = sorted.findIndex(y => y.planning_year_id === P.currentYearId);
+  const sorted = _ynYears();
+  if (!sorted.length) return;
+  const idx = sorted.findIndex(y => y.year === P.currentYearInt);
   const target = sorted[idx + dir];
   if (!target) return;
   setCurrentYear(target);
 }
 
-function ynStartEdit() {
-  if (P._ynEditing) return;
-  const disp = document.getElementById('ynDisplay');
-  if (!disp) return;
-  P._ynEditing = true;
-  // Disable arrows and gear while editing
-  const prev = document.getElementById('ynPrev'), next = document.getElementById('ynNext');
-  const gear = document.getElementById('ynGear');
-  if (prev) prev.disabled = true;
-  if (next) next.disabled = true;
-  if (gear) gear.style.pointerEvents = 'none';
-  const cur = P.currentYearInt || '';
-  disp.innerHTML = `<input type="text" maxlength="4" value="${esc(String(cur))}" id="ynInput" aria-label="Enter year">`;
-  const inp = document.getElementById('ynInput');
-  if (!inp) return;
-  inp.focus(); inp.select();
-  inp.addEventListener('keydown', e => {
-    if (e.key === 'Enter') { e.preventDefault(); ynCommitEdit(inp.value); }
-    if (e.key === 'Escape') { e.preventDefault(); ynCancelEdit(); }
-  });
-  setTimeout(() => inp.addEventListener('blur', () => setTimeout(() => {
-    if (P._ynEditing) ynCancelEdit();
-  }, 120)), 0);
-}
-
-function ynCancelEdit() {
-  if (!P._ynEditing) return;
-  P._ynEditing = false;
-  const disp = document.getElementById('ynDisplay');
-  if (disp) disp.innerHTML = `<span id="ynLabel">${esc(String(P.currentYearInt || '—'))}</span>`;
-  // Restore arrows and gear
-  const gear = document.getElementById('ynGear');
-  if (gear) gear.style.pointerEvents = '';
-  _ynUpdateArrows();
-}
-
-function ynCommitEdit(val) {
-  const yr = parseInt(val, 10);
-  if (isNaN(yr) || yr < 1900 || yr > 2200) {
-    ynToast('Enter a valid year (e.g. 2026)');
-    ynCancelEdit();
-    return;
-  }
-  const match = (P.years || []).find(y => y.year === yr);
-  if (!match) {
-    ynToast(`No year ${yr} — create one in Manage years ⚙`);
-    ynCancelEdit();
-    return;
-  }
-  ynCancelEdit();
-  setCurrentYear(match);
-}
+// The year is chosen from the menu (ynToggleMenu). The old click-to-type
+// editor is gone: it let you type any year at all, including ones outside
+// what can be planned, and its cancel path rebuilt #ynDisplay's innerHTML,
+// which would now destroy the caret and the menu's aria wiring.
 
 let _ynToastTimer = null;
 function ynToast(msg) {
@@ -12297,15 +12547,21 @@ function _ynRenderYearList(el, years, opts){
     el.innerHTML = '<div class="yn-empty">No training years yet. Create one to start planning.</div>';
     return;
   }
+  // Logical years have no row, so archive/restore/export have nothing to act
+  // on. They belong in the year bar, not in this administrative list.
+  years = years.filter(function(y){ return y.planning_year_id; });
+  if(!years.length){
+    el.innerHTML = '<div class="yn-empty">No training years yet. Create one to start planning.</div>';
+    return;
+  }
   const curId = (typeof P!=='undefined') ? P.currentYearId : null;
   // Archived years are kept out of the way. A unit accumulates one year per
   // year, and this list is otherwise unbounded -- the dev database holds 118,
   // which would make the card taller than the rest of Unit Setup combined.
   const showArch = !!opts.showArchived;
-  const active   = years.filter(function(y){ return y.status==='active'   || (!y.status && y.active_status); });
-  const draft    = years.filter(function(y){ return y.status==='draft'; });
-  const archived = years.filter(function(y){ return y.status==='archived' || (!y.status && !y.active_status); });
-  const visible = showArch ? years : active.concat(draft);
+  const active = years.filter(function(y){return y.active_status;});
+  const archived = years.filter(function(y){return !y.active_status;});
+  const visible = showArch ? years : active;
   const archNote = archived.length
     ? '<button class="btn btn-xs btn-out" style="align-self:flex-start;margin-top:4px" '
       + 'onclick="ynToggleArchived(this)" aria-expanded="'+(showArch?'true':'false')+'">'
@@ -12320,32 +12576,26 @@ function _ynRenderYearList(el, years, opts){
   el.innerHTML = '<div class="yn-year-list">' + visible.map(function(y){
     const id = y.planning_year_id;
     const isCur = id === curId;
-    const ySt = y.status || (y.active_status ? 'active' : 'archived');
-    const isActive = ySt === 'active';
-    const isDraft  = ySt === 'draft';
-    const cls = 'yn-year-row' + (isCur?' is-current':'') + (isActive?'':' is-arch');
+    const active = !!y.active_status;
+    const cls = 'yn-year-row' + (isCur?' is-current':'') + (active?'':' is-arch');
     // The name is only worth a line of its own when it says something the year
     // number does not.
     const nameLine = (y.name && String(y.name) !== String(y.year))
       ? '<div class="yn-year-name">'+esc(String(y.name))+'</div>' : '';
     const created = y.created_at ? fmtD(String(y.created_at).slice(0,10),{day:'numeric',month:'short',year:'numeric'}) : '';
-    const stLabel = isDraft ? 'Draft' : isActive ? 'Active' : 'Archived';
-    const meta = [ stLabel, created?('Created '+created):'' ]
+    const meta = [ active?'Active':'Archived', created?('Created '+created):'' ]
       .filter(Boolean).join(' \u00b7 ');
     let acts = '';
-    if(canWrite && isActive){
+    if(canWrite && active){
       acts += '<button class="btn btn-xs btn-sky" title="Copy this year\u2019s parade dates, holidays and training classes into a new year" '
            +  'onclick="ynOpenRollover(\''+esc(id)+'\','+(+y.year)+')">Roll over \u2192</button>';
     }
     acts += '<button class="btn btn-xs btn-out" onclick="ynExportYear(\''+esc(id)+'\','+(+y.year)+')">Export</button>';
     if(canWrite){
-      if(isActive){
-        acts += '<button class="btn btn-xs btn-out" onclick="ynArchiveYear(\''+esc(id)+'\')">Archive</button>';
-      } else if(isDraft){
-        acts += '<button class="btn btn-xs btn-sky" onclick="ynPromoteYear(\''+esc(id)+'\')">Promote to Active</button>';
-        acts += '<button class="btn btn-xs btn-red" onclick="ynDeleteYear(\''+esc(id)+'\','+(+y.year)+')">Delete</button>';
-      } else {
-        acts += '<button class="btn btn-xs btn-out" onclick="ynRestoreYear(\''+esc(id)+'\')">Restore</button>';
+      acts += active
+        ? '<button class="btn btn-xs btn-out" onclick="ynArchiveYear(\''+esc(id)+'\')">Archive</button>'
+        : '<button class="btn btn-xs btn-out" onclick="ynRestoreYear(\''+esc(id)+'\')">Restore</button>';
+      if(!active){
         acts += '<button class="btn btn-xs btn-red" onclick="ynDeleteYear(\''+esc(id)+'\','+(+y.year)+')">Delete</button>';
       }
     }
@@ -12371,7 +12621,11 @@ function ynToggleArchived(btn){
 
 // Both year surfaces load through here.
 async function _ynFetchYears(){
-  const all = await api('/api/planning/years');
+  // include_unmaterialised: the bar steps through selectable years, and a year
+  // nobody has written to has no row. Every P.years assignment goes through
+  // here -- six call sites used to refetch without the flag, and the first one
+  // to run after a step silently dropped the future years back out of the bar.
+  const all = await api('/api/planning/years?include_unmaterialised=true');
   if(typeof P!=='undefined') P.years = all || [];
   return all || [];
 }
@@ -12388,12 +12642,6 @@ async function ynRefreshAllYearViews(){
   if(lbl) lbl.textContent = String(_ynNextYearNumber());
   const lbl2 = document.getElementById('ynCreateLabelCard');
   if(lbl2) lbl2.textContent = String(_ynNextYearNumber());
-  // Show "Create Draft Year" only for sqn_admin when no draft already exists
-  const draftBtn = document.getElementById('btn-create-draft-year');
-  if(draftBtn){
-    const hasDraft = (years||[]).some(y=>y.status==='draft');
-    draftBtn.style.display = (S.role==='sqn_admin' && !hasDraft) ? '' : 'none';
-  }
   if(typeof _syncCalYearOptions==='function') _syncCalYearOptions();
 }
 
@@ -12466,14 +12714,8 @@ async function ynDoRollover(){
 async function ynCreateYear(){
   const next=_ynNextYearNumber();
   try{
-    const data=await api('/api/planning/years',{method:'POST',body:{year:next,name:String(next),active_status:true}});
-    // MJ-4: surface the auto-archived year if the backend silently archived one
-    if(data && data.archived_year_id){
-      showToast(data.archived_year_name+' has been archived and '+data.name+' is now the active year.');
-    }
-    const all=await api('/api/planning/years');
-    P.years=(all||[]);
-    {const _na=(P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));if(_na)P._yearSnapshotId=_na.planning_year_id;}
+    await api('/api/planning/years',{method:'POST',body:{year:next,name:String(next),active_status:true}});
+    const all=await _ynFetchYears();
     const newY=(all||[]).find(y=>y.year===next);
     if(newY) setCurrentYear(newY);
     await ynRefreshAllYearViews();
@@ -12490,46 +12732,18 @@ async function ynCreateYear(){
   } catch(e){ showToast('Could not create year '+next+': '+apiErr(e),true); }
 }
 
-async function ynCreateDraftYear(){
-  const active=(P.years||[]).find(y=>y.status==='active'||(!y.status&&y.active_status));
-  if(!active){showToast('No active year found to base the draft on.',true);return;}
-  const nextYr=active.year+1;
-  const name=prompt('Name for the draft year?',String(nextYr)+' Training Year');
-  if(!name)return;
-  try{
-    await api('/api/planning/years/draft',{method:'POST',body:{year:nextYr,name:name.trim(),source_year_id:active.planning_year_id}});
-    showToast('Draft year '+nextYr+' created.');
-    await ynRefreshAllYearViews();
-  }catch(e){showToast('Could not create draft: '+apiErr(e),true);}
-}
-
 async function ynArchiveYear(id){
   try{
-    await api('/api/planning/years/'+id+'/archive',{method:'POST'});
-    const all=await api('/api/planning/years');
-    P.years=(all||[]);
-    {const _na=(P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));if(_na)P._yearSnapshotId=_na.planning_year_id;}
+    await api('/api/planning/years/'+id,{method:'PATCH',body:{active_status:false}});
+    const all=await _ynFetchYears();
     await ynRefreshAllYearViews();
   } catch(e){ showToast('Archive failed: '+apiErr(e),true); }
 }
 
-async function ynPromoteYear(id){
-  try{
-    await api('/api/planning/years/'+id+'/promote',{method:'POST'});
-    const all=await api('/api/planning/years');
-    P.years=(all||[]);
-    {const _na=(P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));if(_na)P._yearSnapshotId=_na.planning_year_id;}
-    await ynRefreshAllYearViews();
-    showToast('Year promoted to active.');
-  } catch(e){ showToast('Promote failed: '+apiErr(e),true); }
-}
-
 async function ynRestoreYear(id){
   try{
-    await api('/api/planning/years/'+id+'/restore',{method:'POST'});
-    const all=await api('/api/planning/years');
-    P.years=(all||[]);
-    {const _na=(P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));if(_na)P._yearSnapshotId=_na.planning_year_id;}
+    await api('/api/planning/years/'+id,{method:'PATCH',body:{active_status:true}});
+    const all=await _ynFetchYears();
     await ynRefreshAllYearViews();
   } catch(e){ showToast('Restore failed: '+apiErr(e),true); }
 }
@@ -12538,9 +12752,7 @@ function ynDeleteYear(id,yearNum){
   confirmAction('Permanently delete '+yearNum+'? This fails if the year has any attached data.',async()=>{
     try{
       await api('/api/planning/years/'+id,{method:'DELETE'});
-      const all=await api('/api/planning/years');
-      P.years=(all||[]);
-      {const _na=(P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));if(_na)P._yearSnapshotId=_na.planning_year_id;}
+      const all=await _ynFetchYears();
       await ynRefreshAllYearViews();
     } catch(e){ showToast('Delete failed: '+apiErr(e),true); }
   },true);
@@ -12642,6 +12854,7 @@ async function ceaPreview(){
   if(!_ceaRows.length){ errEl.textContent='No rows found in file.'; btn.disabled=false; btn.textContent='Preview import'; return; }
 
   try{
+    if(_ynNeedsSetup('import CEA activities')){ btn.disabled=false; btn.textContent='Preview import'; return; }
     const existing=await api('/api/planning/years/'+P.currentYearId+'/cea/activities');
     _ceaExisting=existing||[];
   } catch(e){ _ceaExisting=[]; }
@@ -12719,6 +12932,7 @@ async function ceaConfirm(){
   if(_ceaKeepIds.size) formData.append('keep_existing',Array.from(_ceaKeepIds).join(','));
   try{
     const tok=sessionStorage.getItem('aafc_token')||'';
+    if(_ynNeedsSetup('import CEA activities')){ if(btn){btn.disabled=false;btn.innerHTML='Import';} return; }
     const resp=await fetch(API_BASE+'/api/planning/years/'+P.currentYearId+'/cea/import',{
       method:'POST',
       headers:tok?{Authorization:'Bearer '+tok}:{},
@@ -12786,8 +13000,7 @@ async function _loadSettingsTrainingClasses(){
     (P.years||[]).forEach(y=>{
       const o=document.createElement('option');
       o.value=y.planning_year_id;
-      const _tcSuffix = y.status==='draft'?' (Draft)':y.status==='archived'?' (Archived)':(!y.status&&!y.active_status?' (Archived)':'');
-      o.textContent=(y.name||String(y.year))+_tcSuffix;
+      o.textContent=(y.name||String(y.year))+(y.active_status?'':' (archived)');
       sel.appendChild(o);
     });
     // Auto-select active year
@@ -15548,7 +15761,6 @@ const P = {
   locations: [],
   facilitators: [],
   builderSessions: [],
-  _ynEditing: false,   // true while the year inline-input is open
 };
 
 const _IMPORTANCE_LABELS = { must_attend:'Must Attend', key_event:'Key Event', optional:'Optional' };
@@ -15567,7 +15779,7 @@ const _CADET_GROUPS = ['orientation','initial','junior','intermediate','senior']
 function _pickDefaultYear(list){
   const yrs=(list||[]).filter(Boolean);
   if(!yrs.length) return null;
-  const act=yrs.filter(y=>y.status==='active'||(!y.status&&y.active_status));
+  const act=yrs.filter(y=>y.active_status);
   const pool=act.length?act:yrs;
   const now=new Date().getFullYear();
   const exact=pool.find(y=>parseInt(y.year,10)===now);
@@ -15591,9 +15803,13 @@ function _ynPopulateYearSelects() {
   // YR-3: prefer the year actually being run today. The list arrives ordered
   // year DESC, so "first active" meant "highest year ever created" -- open a
   // year for a future season and the whole app silently jumped to it.
-  if(!P.currentYearId && visibleYears.length) {
-    const active = _pickDefaultYear(visibleYears);
-    P.currentYearId = active.planning_year_id;
+  // currentYearId null now has TWO meanings: nothing chosen yet, and "the year
+  // the user chose has no row". Only the first should trigger a default, so
+  // currentYearInt is what says a choice has been made. Without this, stepping
+  // onto an unconfigured year was instantly undone by the default-picker.
+  if(!P.currentYearId && !P.currentYearInt && visibleYears.length) {
+    const active = _pickDefaultYear(visibleYears.filter(y=>y.planning_year_id));
+    if(active) P.currentYearId = active.planning_year_id;
   }
   const selIds = [
     'mission-year-sel','py-select','anch-year-sel','term-year-sel',
@@ -15612,8 +15828,7 @@ function _ynPopulateYearSelects() {
       const prefix = showUnitPrefix
         ? (y.unit_code ? `${y.unit_code} — ` : y.wing_code ? `${y.wing_code} — ` : '')
         : '';
-      const _pySuffix = y.status==='draft'?' (Draft)':y.status==='archived'?' (Archived)':(!y.status&&!y.active_status?' (Archived)':'');
-      o.textContent = prefix + (y.name || String(y.year)) + _pySuffix;
+      o.textContent = prefix + (y.name || String(y.year)) + (y.active_status?'':' (archived)');
       el.appendChild(o);
     });
     if(P.currentYearId) el.value = P.currentYearId;
@@ -15623,21 +15838,7 @@ function _ynPopulateYearSelects() {
 
 async function _loadPlanningYears() {
   try {
-    const data = await api('/api/planning/years');
-    P.years = data || [];
-    // Year-changed notice: detect if the active year rolled over under the user's session
-    const newActive = (P.years).find(y=>y.status==='active'||(!y.status&&y.active_status));
-    if(!P._yearSnapshotId && newActive){ P._yearSnapshotId = newActive.planning_year_id; }
-    else if(P._yearSnapshotId && newActive && newActive.planning_year_id !== P._yearSnapshotId){
-      // MN-9: show a dismissible banner instead of a 4-second toast
-      const nb=document.getElementById('year-notice-banner');
-      const nm=document.getElementById('year-notice-msg');
-      if(nb && nm){
-        nm.textContent='Your training year has automatically updated to "'+String(newActive.name||newActive.year)+'". Reload to see the updated plan.';
-        nb.className='mode-banner show';
-      }
-      P._yearSnapshotId = newActive.planning_year_id;
-    }
+    await _ynFetchYears();
     if (document.getElementById('ynLabel')) ynInit();
     return P.currentYearId || null;
   } catch(e) { console.warn('planning years load failed', e); return null; }
@@ -15654,11 +15855,9 @@ function _renderPyActionBtns(){
     `<button class="btn btn-out btn-xs" onclick="exportAnnualProgram()" title="Export annual program to Excel">Export Annual</button>`+
     `<button class="btn btn-out btn-xs" onclick="exportSchedule()" title="Export schedule to Excel">Export Schedule</button>`+
     `<button class="btn btn-out btn-xs plan-write-el" style="display:none" onclick="doRenamePlanningYear()">Rename</button>`+
-    (y.status==='active'||((!y.status)&&y.active_status)
+    (y.active_status
       ? `<button class="btn btn-out btn-xs plan-write-el" style="display:none;border-color:var(--red);color:var(--status-text-danger)" onclick="doArchivePlanningYear()">Archive</button>`
-      : y.status==='draft'
-        ? `<button class="btn btn-sky btn-xs plan-write-el" style="display:none" onclick="doPromotePlanningYear()">Promote to Active</button>`
-        : `<button class="btn btn-ok btn-xs plan-write-el" style="display:none" onclick="doRestorePlanningYear()">Restore</button>`)+
+      : `<button class="btn btn-ok btn-xs plan-write-el" style="display:none" onclick="doRestorePlanningYear()">Restore</button>`)+
     `<button class="btn btn-out btn-xs plan-write-el" style="display:none;border-color:var(--red);color:var(--status-text-danger)" onclick="doDeletePlanningYear()">Delete…</button>`;
   document.querySelectorAll('#py-action-btns .plan-write-el').forEach(b=>{b.style.display=canWritePlan()?'inline-flex':'none';});
 }
@@ -15680,26 +15879,17 @@ async function doArchivePlanningYear(){
   if(!y)return;
   confirmAction(`Archive the ${y.name||y.year} year? It disappears from active selectors. Historical records are preserved and it can be restored later.`,async()=>{
     try{
-      await api('/api/planning/years/'+P.currentYearId+'/archive',{method:'POST'});
+      await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({active_status:false,version:y.version})});
       showToast('Year archived.');
       await _loadPlanningYears();
     }catch(e){ showToast('Could not archive: '+apiErr(e), true); }
   });
 }
-async function doPromotePlanningYear(){
-  const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
-  if(!y)return;
-  try{
-    await api('/api/planning/years/'+P.currentYearId+'/promote',{method:'POST'});
-    showToast('Year promoted to active.');
-    await _loadPlanningYears();
-  }catch(e){ showToast('Could not promote: '+apiErr(e), true); }
-}
 async function doRestorePlanningYear(){
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
   if(!y)return;
   try{
-    await api('/api/planning/years/'+P.currentYearId+'/restore',{method:'POST'});
+    await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({active_status:true,version:y.version})});
     showToast('Year restored.');
     await _loadPlanningYears();
   }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
@@ -16154,7 +16344,7 @@ async function loadYearMap(yearId){
       annualHtml = `<div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;align-items:center">
         <div><span class="muted">Year:</span> <strong>${esc(String(ap.year||''))}</strong></div>
         <div><span class="muted">Name:</span> <strong>${esc(ap.name||'')}</strong></div>
-        <div><span class="muted">Status:</span> <span class="badge ${yr.status==='active'||((!yr.status)&&yr.active_status)?'badge-green':yr.status==='draft'?'badge-blue':'badge-grey'}">${yr.status==='draft'?'Draft':yr.status==='active'||((!yr.status)&&yr.active_status)?'Active':'Archived'}</span></div>
+        <div><span class="muted">Status:</span> <span class="badge ${yr.active_status?'badge-green':'badge-grey'}">${yr.active_status?'Active':'Inactive'}</span></div>
         <div><span class="muted">Parade Nights:</span> <strong>${ap.active_parade_dates}</strong></div>
         <div><span class="muted">Sessions Scheduled:</span> <strong>${ap.filled_session_slots} / ${ap.total_session_slots} (${pct}%)</strong></div>
       </div>` + _renderAnnualCalendar(ap);
@@ -16162,7 +16352,7 @@ async function loadYearMap(yearId){
       annualHtml = `<div style="display:flex;gap:24px;flex-wrap:wrap">
         <div><span class="muted">Year:</span> <strong>${esc(String(yr.year||''))}</strong></div>
         <div><span class="muted">Name:</span> <strong>${esc(yr.name||'')}</strong></div>
-        <div><span class="muted">Status:</span> <span class="badge ${yr.status==='active'||((!yr.status)&&yr.active_status)?'badge-green':yr.status==='draft'?'badge-blue':'badge-grey'}">${yr.status==='draft'?'Draft':yr.status==='active'||((!yr.status)&&yr.active_status)?'Active':'Archived'}</span></div>
+        <div><span class="muted">Status:</span> <span class="badge ${yr.active_status?'badge-green':'badge-grey'}">${yr.active_status?'Active':'Inactive'}</span></div>
       </div>`;
     }
     body.innerHTML = annualHtml;
@@ -16327,6 +16517,13 @@ async function _renderParadeDates(yearId){
 async function _renderHolidays(yearId){
   const el = document.getElementById('py-holidays-body');
   if (!el) return;
+  if (!yearId){
+    // A year with no row has no holidays, and asking for them would build
+    // /api/planning/years/null/holidays. Say so rather than leaving the
+    // previous year's list sitting under a different year number.
+    el.innerHTML = '<p class="muted">No holiday periods added yet.</p>';
+    return;
+  }
   try {
     const rows = await api(`/api/planning/years/${yearId}/holidays`);
     if(!rows.length){ el.innerHTML='<p class="muted">No holiday periods added yet.</p>'; return; }

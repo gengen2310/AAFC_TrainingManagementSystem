@@ -47,11 +47,11 @@ class PlanningYear(Base, UUIDMixin, TimestampMixin):
     # unconstrained -- correct, since they are not squadron-scoped.
     __table_args__ = (
         Index(
-            "uq_planning_years_unit_active",
-            "unit_id",
+            "uq_planning_years_unit_year_active",
+            "unit_id", "year",
             unique=True,
-            sqlite_where=text("status = 'active'"),
-            postgresql_where=text("status = 'active'"),
+            sqlite_where=text("active_status = 1"),
+            postgresql_where=text("active_status = true"),
         ),
     )
     unit_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
@@ -59,10 +59,6 @@ class PlanningYear(Base, UUIDMixin, TimestampMixin):
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     active_status: Mapped[bool] = mapped_column(Boolean, default=True)
-    # Phase A: status replaces active_status. Values: draft | active | archived.
-    # active_status is kept in sync with status (active_status = status=='active')
-    # for backward-compat with old frontend until Phase A-2 (the drop migration).
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active", server_default="active")
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")

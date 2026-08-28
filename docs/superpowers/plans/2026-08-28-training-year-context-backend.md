@@ -336,6 +336,34 @@ git commit -m "feat(year): derive past/current/future from the wing-local date"
 
 ### Task 3: Canonical uniqueness — one container per squadron and year
 
+> **CORRECTION 2026-08-28, after attempting this task — the index change is a
+> no-op and was NOT applied. The tests were.**
+>
+> Step 2 predicted the first test would fail because "today's index permits
+> it". It does not. `uq_planning_years_unit_year_active` is already
+> `unique(unit_id, year)` filtered to active rows, so a squadron already
+> cannot hold two live containers for one calendar year. All three tests pass
+> against the unmodified index — measured, not assumed.
+>
+> The rationale was also wrong. This task claimed the old index "allowed an
+> active 2026 AND an active 2027 — the REM-156 state". 2026 and 2027 are
+> different values of `year`, so no `(unit_id, year)` unique index would ever
+> have prevented both existing. That state was a violation of the *one active
+> year* rule, which lived in application code, not in this index. Under the
+> context model that state is not a defect at all: planning 2027 while 2026
+> runs is the feature.
+>
+> The proposed replacement has identical columns and an identical predicate —
+> the plan says so itself. Dropping and recreating a unique index on a
+> production table for a cosmetic rename is risk without benefit, so the
+> migration was not written. The three tests are kept: they pin behaviour that
+> was previously untested, including the new
+> `test_two_different_years_for_one_squadron_are_both_allowed`.
+>
+> Still open for the user: the predicate references `active_status`. If a
+> later task drops that column outright, this index must be rebuilt then —
+> and that is the migration worth writing, at the point it does something.
+
 **Files:**
 - Modify: `backend/app/models/planning.py` (`__table_args__`)
 - Create: `backend/alembic/versions/<rev>_canonical_year_per_squadron.py`
@@ -880,6 +908,35 @@ def copy_setup(body: CopySetupIn, db: DBSession = Depends(get_db),
 ```
 
 - [ ] **Step 4: Retire `rollover_year`**
+
+> **CHANGED 2026-08-28 during implementation. The shim was NOT applied.**
+>
+> The plan's shim delegates rollover to copy-setup "so existing callers do not
+> break mid-transition". It would have done the opposite. copy-setup
+> deliberately does not copy holidays or carry incomplete sessions, and
+> rollover does both; a caller would have kept getting 200 while silently
+> receiving less. Silently doing less is worse than either keeping the
+> endpoint or removing it.
+>
+> `test_year_rollover_e2e.py:155-156` asserts holidays ARE date-shifted by a
+> year, which the target model forbids outright. Those tests encode the old
+> product model and must be migrated deliberately, not broken as a side effect
+> of adding a new endpoint.
+>
+> Applied instead:
+> - `POST /years/copy-setup` added, per Step 3 (with two additions: re-running
+>   does not duplicate the class structure, and copying a year into itself is
+>   rejected 400).
+> - `rollover_year` marked `deprecated=True` — visible in OpenAPI, unchanged
+>   in behaviour, every capability preserved.
+> - The one defect that reached production IS fixed: the target name is now
+>   derived by `year_display_name` rather than arrowed from the source, so no
+>   more "2026 Training Year → 2027". No test depended on the arrow; a
+>   regression test now pins the derived name.
+>
+> Retiring rollover is its own task, blocked on the frontend no longer calling
+> it (connected-frontend/index.html:4085 and :12386) and on migrating the ~70
+> rollover references across five test files.
 
 Leave the route registered but make it delegate, so existing callers keep working
 during the frontend transition:

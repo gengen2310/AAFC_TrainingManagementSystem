@@ -28,6 +28,7 @@ from ..models import (
 from ..permissions import Principal, require_system_admin, require_audit_access
 from ..security import generate_code, hash_code, reset_rate_limiter, reset_api_rate_limiter, reset_api_rate_limiter_db, reset_user_api_rate_limiter_db
 from ..services import audit
+from ..services_year import timezone_for_new_wing
 
 router = APIRouter(prefix="/api/system", tags=["system"])
 
@@ -632,6 +633,8 @@ def provision_wing(body: WingProvisionIn, db: DBSession = Depends(get_db),
         existing_wing = Wing(
             national_id=nat.id, code=body.wing_code, name=body.wing_name,
             short_name=wing_short, active_status=True, created_by=p.user_id,
+            timezone=timezone_for_new_wing(db, nat.id,
+                                           getattr(body, "timezone", None)),
         )
         db.add(existing_wing)
         db.flush()

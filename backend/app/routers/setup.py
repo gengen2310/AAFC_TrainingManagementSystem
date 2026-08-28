@@ -16,6 +16,7 @@ from ..models import (
     ParadeNight, Session as TrainingSession, CeaActivity, PlanningYear, HolidayPeriod,
     Equipment, Cadet, Activity, AnchorEvent, Flight, TrainingClass,
 )
+from ..services_year import current_year, find_year_context
 from ..dependencies import get_principal
 from ..permissions import Principal
 from .training import _view_squadron_id, _NAT_ADMIN_ROLES
@@ -63,12 +64,16 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
                 ParadeNight.date >= today).count()
             cea_imported = db.query(CeaActivity).filter(CeaActivity.wing_id == s.wing_id).count() > 0
 
-            active_year_ids = [y.id for y in db.query(PlanningYear).filter(
-                PlanningYear.unit_id == sq_id, PlanningYear.status == "active").all()]
+            # The current year's container, if anything has been written to it.
+            # A year with no row is a year nobody has configured yet -- an empty
+            # year, not an unset-up squadron -- so its absence is not a setup
+            # step. Scoped to the current year rather than every active row:
+            # holidays and anchor events describe THIS year's configuration.
+            _py = find_year_context(db, sq_id, current_year(db, sq_id))
+            active_year_ids = [_py.id] if _py else []
             holidays_configured = bool(active_year_ids) and db.query(HolidayPeriod).filter(
                 HolidayPeriod.planning_year_id.in_(active_year_ids)).count() > 0
 
-            planning_year_active = bool(active_year_ids)
             crest_set = bool(s.crest_url)
             equipment_added = db.query(Equipment).filter(
                 Equipment.squadron_id == sq_id, Equipment.is_archived == False).count()  # noqa: E712
@@ -145,7 +150,6 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
                 "cea_imported": cea_imported,
                 "curriculum_coverage_pct": curriculum_coverage_pct,
                 "holidays_configured": holidays_configured,
-                "planning_year_active": planning_year_active,
                 "crest_set": crest_set,
                 "equipment_added": equipment_added,
                 "cadets_added": cadets_added,
@@ -170,8 +174,6 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
         # Planning Year comes first among squadron steps -- Parade Nights,
         # Anchor Events, and Holidays are all scoped to it, so setting it up
         # is a genuine prerequisite, not just an arbitrary ordering choice.
-        steps.append({"key": "planning_year_active", "label": "Set up the active training year",
-                      "done": squadron["planning_year_active"], "count": None, "link_page": "settings"})
         # Training Classes: optional because a single-class squadron running one group per Stage
         # does not need to create named classes -- the legacy cadet_group field handles that.
         # Surfaced as guidance so squadrons running multiple parallel groups are prompted to set

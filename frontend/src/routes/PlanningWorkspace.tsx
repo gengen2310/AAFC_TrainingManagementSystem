@@ -1,9 +1,23 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 
-const PW_YEAR_KEY = "aafc_pw_year_id";
+// The YEAR NUMBER is what persists, not a row id. A year with no row is still a
+// real year, so a UUID cannot express the selection -- and TMS hands over a year
+// number, so storing an id here is what let the two applications disagree.
+const PW_YEAR_KEY = "aafc_pw_year";
+// The row id is cached only as a hint, so year-scoped queries can fire before
+// the /years response arrives (the ~1.6s waterfall this file already avoids).
+// It is always re-validated against /years, and never the source of truth.
+const PW_YEAR_ID_HINT = "aafc_pw_year_id";
+
+function readStoredYear(): number | null {
+  const raw = localStorage.getItem(PW_YEAR_KEY);
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthProvider";
 import { planningApi } from "../api";
+import type { PlanningYear } from "../api/types";
 import { PlanningContextBar, type ViewMode, type DisplayMode } from "../components/planning/PlanningContextBar";
 import { ListView } from "../components/planning/views/ListView";
 import { PlanningLeftPanel, defaultLayers, type LayerState } from "../components/planning/PlanningLeftPanel";
@@ -30,11 +44,10 @@ import type { PlanningSession, AnchorEvent } from "../api/types";
 // "newest year ever created" -- creating a year for a future season silently
 // moved the whole workspace to it. Prefer the active year matching today, then
 // the nearest active year ahead, then the most recent behind.
-// Phase A: prefer status === 'active'; fall back to active_status for pre-Phase-A rows.
-function pickDefaultYear<T extends { year: number; status?: string; active_status?: boolean }>(list: T[]): T | null {
+export function pickDefaultYear<T extends { year: number; active_status?: boolean }>(list: T[]): T | null {
   const yrs = (list ?? []).filter(Boolean);
   if (!yrs.length) return null;
-  const act = yrs.filter(y => y.status === 'active' || (!y.status && y.active_status));
+  const act = yrs.filter(y => y.active_status);
   const pool = act.length ? act : yrs;
   const now = new Date().getFullYear();
   const exact = pool.find(y => Number(y.year) === now);
@@ -44,6 +57,39 @@ function pickDefaultYear<T extends { year: number; status?: string; active_statu
   const behind = pool.filter(y => Number(y.year) < now).sort((a, b) => b.year - a.year);
   if (behind.length) return behind[0];
   return pool[0];
+}
+
+/**
+ * Which year PW should show, given what TMS handed over, what was stored, and
+ * what the API returned. Pure, because this decision is exactly what let TMS
+ * and PW disagree about the year, and it must be testable without a browser.
+ *
+ * Returns the year NUMBER plus the row id when one exists. The id may be null:
+ * a year nobody has written to is still a real, selectable year.
+ */
+export function resolveYearSelection(
+  years: Pick<PlanningYear, "year" | "planning_year_id" | "active_status">[],
+  requestedYear: number | null,
+  storedYear: number | null,
+): { year: number; id: string | null } | null {
+  const idFor = (y: number) =>
+    years.find(r => r.year === y)?.planning_year_id ?? null;
+
+  // 1. An explicit handover wins, even for a year with no row. Falling through
+  //    to the default here is what made PW show 2026 while TMS showed 2027.
+  if (requestedYear != null && Number.isFinite(requestedYear)) {
+    return { year: requestedYear, id: idFor(requestedYear) };
+  }
+
+  // 2. Keep the stored year while it is still on offer (or nothing is).
+  if (storedYear != null) {
+    const known = years.some(r => r.year === storedYear);
+    if (known || years.length === 0) return { year: storedYear, id: idFor(storedYear) };
+  }
+
+  // 3. Otherwise fall back to the default year.
+  const active = pickDefaultYear(years);
+  return active ? { year: active.year, id: active.planning_year_id ?? null } : null;
 }
 
 export function PlanningWorkspace() {
@@ -72,13 +118,17 @@ export function PlanningWorkspace() {
   const [customEnd, setCustomEnd] = useState("");
   // Initialise from localStorage so year-scoped queries fire immediately without waiting
   // for the /years response (eliminates ~1.6s waterfall on repeat visits).
+  const [selectedYearNum, setSelectedYearNum] = useState<number | null>(readStoredYear);
   const [selectedYearId, setSelectedYearId] = useState<string | null>(
-    () => localStorage.getItem(PW_YEAR_KEY),
+    () => localStorage.getItem(PW_YEAR_ID_HINT),
   );
   const [selectedDateId, setSelectedDateId] = useState<string | null>(null);
 
-  const persistYear = useCallback((id: string) => {
-    localStorage.setItem(PW_YEAR_KEY, id);
+  const persistYear = useCallback((year: number, id: string | null) => {
+    localStorage.setItem(PW_YEAR_KEY, String(year));
+    if (id) localStorage.setItem(PW_YEAR_ID_HINT, id);
+    else localStorage.removeItem(PW_YEAR_ID_HINT);
+    setSelectedYearNum(year);
     setSelectedYearId(id);
   }, []);
   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
@@ -97,8 +147,6 @@ export function PlanningWorkspace() {
   // hamburger button in the context bar. Ignored (has no visual effect) above that width.
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const initialActiveYearId = useRef<string | null>(null);
-  const [yearChangedNotice, setYearChangedNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!leftPanelOpen) return;
@@ -110,7 +158,7 @@ export function PlanningWorkspace() {
   // ── Data queries ──────────────────────────────────────────────────────────────
   const { data: years, isLoading: yearsLoading } = useQuery({
     queryKey: ["planning-years", resolvedSquadronId],
-    queryFn: () => planningApi.years(resolvedSquadronId),
+    queryFn: () => planningApi.years(resolvedSquadronId, true),
     enabled: scoped,
     staleTime: 5 * 60 * 1000,
   });
@@ -120,38 +168,20 @@ export function PlanningWorkspace() {
     if (!years) return;
     // Honor a year pre-selected by the TMS → PW handoff fragment (#t=...&y=YYYY)
     const reqYearStr = sessionStorage.getItem("aafc_requested_year");
+    let requested: number | null = null;
     if (reqYearStr) {
       sessionStorage.removeItem("aafc_requested_year");
-      const reqYear = parseInt(reqYearStr, 10);
-      const match = years.find(y => y.year === reqYear);
-      if (match) { persistYear(match.planning_year_id); return; }
+      const n = parseInt(reqYearStr, 10);
+      requested = Number.isFinite(n) ? n : null;
     }
-    const active = pickDefaultYear(years);
-    if (!active) return;
-    if (active.planning_year_id !== selectedYearId) {
-      persistYear(active.planning_year_id);
-    }
-  }, [years]);
-
-  // Year-changed notice: detect if the active year rolled over under the user's session.
-  useEffect(() => {
-    if (!years?.length) return;
-    const activeYear = years.find(y => y.status === 'active' || (!y.status && y.active_status));
-    if (!activeYear) return;
-    if (!initialActiveYearId.current) {
-      initialActiveYearId.current = activeYear.planning_year_id;
-      return;
-    }
-    if (activeYear.planning_year_id !== initialActiveYearId.current) {
-      setYearChangedNotice(
-        `Your training year has automatically updated to "${activeYear.name || activeYear.year}". ` +
-        `Reload the page to see the updated plan.`
-      );
-      initialActiveYearId.current = activeYear.planning_year_id;
+    const next = resolveYearSelection(years, requested, selectedYearNum);
+    if (!next) return;
+    if (next.year !== selectedYearNum || next.id !== selectedYearId) {
+      persistYear(next.year, next.id);
     }
   }, [years]);
 
-  const selectedYear = years?.find(y => y.planning_year_id === selectedYearId) ?? null;
+  const selectedYear = years?.find(y => y.year === selectedYearNum) ?? null;
 
   const { data: cc } = useQuery({
     queryKey: ["planning-cc", selectedYearId],
@@ -457,18 +487,6 @@ export function PlanningWorkspace() {
 
   return (
     <div className="pw-root" role="main" aria-label="Planning workspace">
-      {/* Year-changed notice */}
-      {yearChangedNotice && (
-        <div className="year-changed-notice" role="alert"
-             style={{background:'var(--warn-bg)',color:'var(--warn)',padding:'8px 16px',
-                     display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <span>{yearChangedNotice}</span>
-          <button onClick={() => setYearChangedNotice(null)}
-                  style={{border:'none',background:'none',cursor:'pointer',fontWeight:'bold'}}>
-            ×
-          </button>
-        </div>
-      )}
       {/* Context bar */}
       <PlanningContextBar
         session={session}
@@ -503,18 +521,20 @@ export function PlanningWorkspace() {
               <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: "var(--muted-text)" }}>Year:</span>
               {yearOptions.map(y => (
                 <button
-                  key={y.planning_year_id}
+                  // Keyed and selected by the YEAR, not the row id: a year with no
+                  // row has a null id, so two of them would collide as React keys
+                  // and -- worse -- every row-less year would read as selected at
+                  // once, because null === null.
+                  key={y.year}
                   type="button"
                   // PW-A1: selection was carried by the "on" class alone. The filter
                   // chips beside these already expose aria-pressed; the year chips did
                   // not, so which of 63 years was selected was visual-only.
-                  aria-pressed={selectedYearId === y.planning_year_id}
-                  className={`pw-chip${selectedYearId === y.planning_year_id ? " on" : ""}`}
-                  onClick={() => { persistYear(y.planning_year_id); setSelectedDateId(null); }}
+                  aria-pressed={selectedYearNum === y.year}
+                  className={`pw-chip${selectedYearNum === y.year ? " on" : ""}`}
+                  onClick={() => { persistYear(y.year, y.planning_year_id); setSelectedDateId(null); }}
                 >
-                  {y.name || String(y.year)}
-                  {y.status === 'draft' ? ' (Draft)' : ''}
-                  {y.status === 'archived' ? ' (Archived)' : ''}
+                  {y.name}
                 </button>
               ))}
               <span style={{ width: 1, height: 18, background: "var(--border)", margin: "0 4px" }} />

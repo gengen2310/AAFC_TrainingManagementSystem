@@ -436,25 +436,69 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
 
 
 def _year_for_date(db: DBSession, squadron_id: str, date: str):
-    """Phase A: the unique index guarantees at most one active year per squadron.
-    The night attaches to it or to nothing — rung chain from pre-Phase-A removed.
-    See spec 2026-08-27, §Year Resolution.
+    """The active PlanningYear a parade night on `date` belongs to.
 
-    Pre-Phase-A rungs 1-2 (parade-date span match; calendar-year number match)
-    have been deliberately removed: with the unique-active-per-squadron invariant
-    in force there is at most one candidate, so the disambiguation logic was dead
-    code. Rung-3 (sole active year) is now always the first and only rung.
-    Far-out-of-range dates (e.g. 1900-01-01) also attach to the active year —
-    this is documented Phase A behaviour.
+    Reported 2026-08-25: a parade night created in TMS did not appear in Planning
+    Workspace, the Weekly Program or the calendar. This picked
+    `order_by(year.desc()).first()` -- the highest-numbered active year -- and
+    never looked at the date. The moment a squadron has two active years, which
+    happens as soon as next year's is created, every new night attached to the
+    newest one regardless of when it fell. Planning Workspace builds its canvas
+    from ParadeDate rows joined on planning_year_id, so opening the year you
+    scheduled in showed nothing.
+
+    Resolution order, most specific first:
+
+      1. An active year whose EXISTING parade dates span this date. PlanningYear
+         has no start/end column -- its span is only ever implied by the dates it
+         holds -- so this is the closest thing to the user's own definition of
+         the year, and it is correct whether the squadron runs calendar years or
+         July-June ones.
+      2. An active year numbered the same as the date's calendar year. Needed for
+         a year created moments ago that has no dates yet, which is exactly the
+         reported case. Calendar alignment is what this system actually produces:
+         a freshly seeded 703 SQN year 2026 spans 2026-01-30 to 2026-12-11.
+      3. The only active year, if there is exactly one. No ambiguity to resolve.
+      4. None -- the caller reports the night as unlinked rather than guessing.
 
     Never reaches into a wing or national scoped year: unit_id must match.
     """
-    from ..models.planning import PlanningYear
+    from ..models.planning import ParadeDate, PlanningYear
+    from sqlalchemy import func
 
-    return db.query(PlanningYear).filter(
-        PlanningYear.unit_id == squadron_id,
-        PlanningYear.status == "active",
-    ).first()
+    years = (
+        db.query(PlanningYear)
+        .filter(PlanningYear.unit_id == squadron_id,
+                PlanningYear.active_status == True)  # noqa: E712
+        .order_by(PlanningYear.year.desc())
+        .all()
+    )
+    if not years:
+        return None
+
+    # 1. spanned by the year's own parade dates
+    for y in years:
+        bounds = db.query(func.min(ParadeDate.parade_date),
+                          func.max(ParadeDate.parade_date)) \
+                   .filter(ParadeDate.planning_year_id == y.id).first()
+        if bounds and bounds[0] and bounds[0] <= date <= bounds[1]:
+            return y
+
+    # 2. calendar-year match
+    try:
+        cal = int(str(date)[:4])
+    except (TypeError, ValueError):
+        cal = None
+    if cal is not None:
+        for y in years:
+            if y.year == cal:
+                return y
+
+    # 3. unambiguous single year
+    if len(years) == 1:
+        return years[0]
+
+    return None
 
 
 def _find_or_create_parade_date_for_night(db: DBSession, pn: "ParadeNight", term: str | None = None):

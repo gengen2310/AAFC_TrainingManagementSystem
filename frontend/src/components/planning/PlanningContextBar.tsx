@@ -59,11 +59,7 @@ export function PlanningContextBar({
         </button>
       )}
       {/* Identity */}
-      <span className="pw-ctx-scope">
-        {year ? year.name : "Training Planning"}
-        {year?.status === 'draft' && <span style={{marginLeft:6,fontSize:'0.8em',opacity:0.75}}>(Draft)</span>}
-        {year?.status === 'archived' && <span style={{marginLeft:6,fontSize:'0.8em',opacity:0.75}}>(Archived)</span>}
-      </span>
+      <span className="pw-ctx-scope">{year ? year.name : "Training Planning"}</span>
       <span className="pw-ctx-sep">·</span>
       <span className="pw-ctx-year">{year?.year ?? new Date().getFullYear()}</span>
       <span className="pw-ctx-role" title={roleLabel}>{roleLabel} · {scopeLabel}</span>

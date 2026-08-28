@@ -1,119 +1,178 @@
-"""Year model services: timezone resolution and active-year rollover.
+"""Every decision about which training year something belongs to.
 
-Two hard rules from the spec (2026-08-27):
-  - Wing.timezone must be set; fail loudly if unset — never fall back to UTC.
-  - resolve_active_year() promotes a draft year on the first read on/after
-    1 January of the draft year's own `year` number, in wing-local time.
+A Training Year is calendar context, not a workflow object. This module is the
+only place that derives the current year, classifies a year as past/current/
+future, or materialises a PlanningYear row.
 """
-import logging
-from datetime import datetime, date as date_type
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-from sqlalchemy.orm import Session
+from __future__ import annotations
 
-logger = logging.getLogger(__name__)
+import datetime as _dt
+import uuid as _uuid
+from zoneinfo import ZoneInfo
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session as DBSession
+
+from .models import PlanningYear, Squadron, Wing
 
 
-def get_wing_timezone(wing_id: str, db: Session) -> ZoneInfo:
-    """Return the ZoneInfo for a Wing. Raises RuntimeError if unset or invalid.
+class MissingTimezone(RuntimeError):
+    """A wing has no IANA timezone. Never defaulted; always raised."""
 
-    This must never silently fall back to UTC or Perth. The fail-loudly rule
-    is more important in a single-wing deployment than a multi-wing one:
-    with one wing, a missing timezone is invisible until wing two is added —
-    exactly when nobody is watching for it.
-    """
-    from .models.organisations import Wing
-    wing = db.get(Wing, wing_id)
-    if not wing:
-        raise RuntimeError(f"Wing {wing_id!r} not found")
-    if not wing.timezone:
-        raise RuntimeError(
-            f"Wing {wing_id!r} has no timezone configured. "
-            "Set Wing.timezone to a valid IANA string (e.g. 'Australia/Perth') "
-            "before using year rollover."
+
+def wing_timezone(db: DBSession, wing_id: str | None) -> ZoneInfo:
+    wing = db.get(Wing, wing_id) if wing_id else None
+    if wing is None or not wing.timezone:
+        raise MissingTimezone(
+            f"wing {wing_id} has no timezone set; refusing to assume UTC or "
+            f"Australia/Perth"
         )
+    return ZoneInfo(wing.timezone)
+
+
+def squadron_timezone(db: DBSession, squadron_id: str) -> ZoneInfo:
+    sqn = db.get(Squadron, squadron_id)
+    if sqn is None:
+        raise MissingTimezone(f"unknown squadron {squadron_id}")
+    return wing_timezone(db, sqn.wing_id)
+
+
+def wing_local_date(db: DBSession, squadron_id: str) -> _dt.date:
+    """Today as the squadron's wing experiences it, not as the server does."""
+    return _dt.datetime.now(squadron_timezone(db, squadron_id)).date()
+
+
+FUTURE_YEARS_SELECTABLE = 2  # user decision 2026-08-28: current + 2
+
+
+def current_year(db: DBSession, squadron_id: str) -> int:
+    """The current training year. Derived, never stored, never written."""
+    return wing_local_date(db, squadron_id).year
+
+
+def year_state(db: DBSession, squadron_id: str, year: int) -> str:
+    """"past" | "current" | "future" -- computed from the calendar, so no
+    scheduled job and no 1 January write is required to keep it truthful."""
+    now = current_year(db, squadron_id)
+    if year < now:
+        return "past"
+    return "current" if year == now else "future"
+
+
+def selectable_years(db: DBSession, squadron_id: str) -> list[int]:
+    """Years offered in the selector: every past year that has a row, the
+    current year, and FUTURE_YEARS_SELECTABLE ahead. Past is uncapped; future
+    is capped by user decision.
+
+    Past years are included whatever their active_status. Archiving is no
+    longer a concept in the year UX, and a past year's data remains history
+    that must stay reachable.
+    """
+    now = current_year(db, squadron_id)
+    past = {
+        year for (year,) in db.query(PlanningYear.year).filter(
+            PlanningYear.unit_id == squadron_id,
+            PlanningYear.year < now,
+        ).all()
+    }
+    ahead = {now + n for n in range(FUTURE_YEARS_SELECTABLE + 1)}
+    return sorted(past | ahead)
+
+
+def year_display_name(year: int) -> str:
+    """The only place a year's name is produced. Derived, never user-entered."""
+    return f"{year} Training Year"
+
+
+def find_year_context(db: DBSession, squadron_id: str, year: int) -> PlanningYear | None:
+    """Resolve the canonical container, or None. NEVER creates."""
+    return (db.query(PlanningYear)
+              .filter(PlanningYear.unit_id == squadron_id,
+                      PlanningYear.year == year,
+                      PlanningYear.active_status)
+              .first())
+
+
+def ensure_year_context(db: DBSession, squadron_id: str, year: int,
+                        user_id: str | None = None) -> PlanningYear:
+    """Resolve the canonical container, creating it if absent.
+
+    Write paths only. Idempotent under concurrency: two callers may both see
+    None, so the loser of the insert race is caught and re-read rather than
+    guarded by a check-then-write, which has no lock between the check and
+    the write and so cannot be correct.
+    """
+    existing = find_year_context(db, squadron_id, year)
+    if existing is not None:
+        return existing
+
+    sqn = db.get(Squadron, squadron_id)
+    py = PlanningYear(
+        id=str(_uuid.uuid4()), unit_id=squadron_id,
+        wing_id=sqn.wing_id if sqn else None,
+        year=year, name=year_display_name(year),
+        created_by=user_id, updated_by=user_id,
+    )
+    db.add(py)
     try:
-        return ZoneInfo(wing.timezone)
-    except ZoneInfoNotFoundError:
-        raise RuntimeError(
-            f"Wing {wing_id!r} has invalid IANA timezone {wing.timezone!r}. "
-            "Use a value from the IANA Time Zone Database (e.g. 'Australia/Perth')."
-        )
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raced = find_year_context(db, squadron_id, year)
+        if raced is None:
+            raise
+        return raced
+    return py
 
 
-def resolve_active_year(
-    squadron_id: str,
-    wing_id: str,
-    db: Session,
-    *,
-    principal=None,
-    _today: "date_type | None" = None,
-):
-    """Return the active PlanningYear for this squadron; run rollover if due.
+DEFAULT_WING_TIMEZONE = "Australia/Perth"
 
-    If there is a draft year and today >= 1 January of the draft year's own
-    `year` number (in wing-local time), promote the draft to active and archive
-    the outgoing active year — all in one transaction. The unique partial index
-    on (unit_id) WHERE status='active' makes concurrent promotions safe: the
-    loser gets an IntegrityError and retries after reading the winner.
 
-    The `_today` parameter is for test injection only — never pass it in
-    production code.
+def timezone_for_new_wing(db: DBSession, national_id: str,
+                          requested: str | None = None) -> str:
+    """The IANA zone to STORE on a wing at creation.
+
+    Resolving here, once, is not the silent defaulting wing_timezone refuses.
+    That refusal is about date arithmetic: a wrong zone used to derive "today"
+    is invisible and corrupts every year boundary. This value is written to the
+    row, shown in the UI, and editable -- an admin who creates an eastern-states
+    wing can see it is wrong and change it.
+
+    Preference order: what the caller asked for, then a sibling wing's zone,
+    then the national default.
     """
-    from .models.planning import PlanningYear
-    from .database import utcnow
-    from .services import audit
-    from sqlalchemy import exc
+    if requested:
+        ZoneInfo(requested)          # validate; raises for an unknown zone
+        return requested
+    sibling = (db.query(Wing)
+                 .filter(Wing.national_id == national_id,
+                         Wing.timezone.isnot(None))
+                 .first())
+    return sibling.timezone if sibling else DEFAULT_WING_TIMEZONE
 
-    tz = get_wing_timezone(wing_id, db)
-    today_local = _today or datetime.now(tz).date()
 
-    active = (
-        db.query(PlanningYear)
-        .filter(PlanningYear.unit_id == squadron_id,
-                PlanningYear.status == "active")
-        .first()
+class PastYearLocked(RuntimeError):
+    """A write was attempted against a past training year without authority."""
+
+
+def require_year_writable(db: DBSession, squadron_id: str, year: int, p) -> None:
+    """Allow writes to the current and future years; protect the past.
+
+    Delivered training is history. Correction stays possible through Delegated
+    Intervention, which already creates a ProxySession and an audit trail, so
+    the escape hatch is authorised and recorded rather than absent.
+
+    Plain Proxy Mode is deliberately NOT sufficient: it exists so a wing admin
+    can act on a squadron's behalf in the ordinary course, and rewriting
+    delivered training is not the ordinary course.
+
+    Reads never call this.
+    """
+    if year_state(db, squadron_id, year) != "past":
+        return
+    if getattr(p, "proxy_mode", None) == "delegated_intervention":
+        return
+    raise PastYearLocked(
+        f"{year} is a past training year and is read-only. Use Delegated "
+        f"Intervention to correct historical records."
     )
-    draft = (
-        db.query(PlanningYear)
-        .filter(PlanningYear.unit_id == squadron_id,
-                PlanningYear.status == "draft")
-        .first()
-    )
-
-    if draft:
-        rollover_date = date_type(draft.year, 1, 1)
-        if today_local >= rollover_date:
-            try:
-                if active:
-                    active.status = "archived"
-                    active.active_status = False   # dual-write compat
-                    active.updated_at = utcnow()
-                    db.flush()  # BL-1: archive must reach DB before activate to satisfy unique index
-                    audit(db, principal, object_type="planning_year",
-                          object_id=active.id, action="auto_archived",
-                          old={"status": "active", "year": active.year},
-                          new={"status": "archived"}, commit=False)
-                draft.status = "active"
-                draft.active_status = True         # dual-write compat
-                audit(db, principal, object_type="planning_year",
-                      object_id=draft.id, action="auto_promoted",
-                      old={"status": "draft", "year": draft.year},
-                      new={"status": "active"}, commit=False)
-                db.commit()
-                db.refresh(draft)
-                return draft
-            except exc.IntegrityError:
-                db.rollback()
-                logger.warning(
-                    "year rollover concurrent race for squadron %s — returning winner",
-                    squadron_id,
-                )
-                # Another request won the promotion race — re-read the winner.
-                return (
-                    db.query(PlanningYear)
-                    .filter(PlanningYear.unit_id == squadron_id,
-                            PlanningYear.status == "active")
-                    .first()
-                )
-
-    return active

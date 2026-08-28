@@ -32,7 +32,8 @@ def run():
     statuses = ["delivered", "planned", "not_delivered", "cancelled", "delivered_with_issue"]
     sess_total = audit_total = 0
     for wi in range(wings_n):
-        w = Wing(national_id=nat.id, code=f"{wi+1}WG", name=f"{wi+1} Wing", short_name=f"{wi+1}WG")
+        w = Wing(national_id=nat.id, code=f"{wi+1}WG", name=f"{wi+1} Wing",
+                 short_name=f"{wi+1}WG", timezone="Australia/Perth")
         db.add(w); db.commit()
         for si in range(sqn_n):
             s = Squadron(wing_id=w.id, code=f"{wi+1}{si:02d}", name=f"Sqn {wi+1}{si:02d}",
