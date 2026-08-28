@@ -138,3 +138,90 @@ def test_two_different_years_for_one_squadron_are_both_allowed():
         db.commit()      # must NOT raise
     finally:
         db.close()
+
+
+# --- Task 4: materialise on write, never on read --------------------------
+from app.services_year import ensure_year_context, find_year_context
+
+
+def test_find_does_not_create():
+    db = SessionLocal()
+    try:
+        s = _sqn_id(db)
+        before = db.query(PlanningYear).count()
+        assert find_year_context(db, s, 2071) is None
+        assert db.query(PlanningYear).count() == before, "a read must not write"
+    finally:
+        db.close()
+
+
+def test_ensure_creates_once_and_is_idempotent():
+    db = SessionLocal()
+    try:
+        s = _sqn_id(db)
+        a = ensure_year_context(db, s, 2072)
+        b = ensure_year_context(db, s, 2072)
+        assert a.id == b.id
+        assert db.query(PlanningYear).filter(
+            PlanningYear.unit_id == s, PlanningYear.year == 2072,
+            PlanningYear.active_status).count() == 1
+    finally:
+        db.close()
+
+
+def test_ensure_derives_the_name_and_never_invents_one():
+    db = SessionLocal()
+    try:
+        py = ensure_year_context(db, _sqn_id(db), 2073)
+        assert py.name == "2073 Training Year"
+        assert py.year == 2073
+    finally:
+        db.close()
+
+
+def test_ensure_reuses_a_retired_year_number_by_creating_a_new_live_row():
+    db = SessionLocal()
+    try:
+        s = _sqn_id(db)
+        dead = PlanningYear(unit_id=s, wing_id=None, year=2074, name="old")
+        dead.active_status = False
+        db.add(dead); db.commit()
+        live = ensure_year_context(db, s, 2074)
+        assert live.id != dead.id and live.active_status is True
+    finally:
+        db.close()
+
+
+def test_ensure_recovers_when_it_loses_the_insert_race():
+    """The branch that makes ensure_year_context correct under concurrency.
+
+    Simulates the interleaving directly: the first find returns None (as it
+    would for a caller whose competitor has not committed yet), the insert
+    then collides with the row that competitor committed, and the loser must
+    re-read rather than raise.
+    """
+    import app.services_year as sy
+
+    db = SessionLocal()
+    try:
+        s = _sqn_id(db)
+        winner = sy.ensure_year_context(db, s, 2075)
+        db.commit()
+
+        real, calls = sy.find_year_context, {"n": 0}
+
+        def blind_first_look(*a, **kw):
+            calls["n"] += 1
+            return None if calls["n"] == 1 else real(*a, **kw)
+
+        with patch.object(sy, "find_year_context", blind_first_look):
+            loser = sy.ensure_year_context(db, s, 2075)
+
+        assert calls["n"] == 2, "the race branch was never entered"
+        assert loser.id == winner.id, "the loser must return the winner's row"
+        assert db.query(PlanningYear).filter(
+            PlanningYear.unit_id == s, PlanningYear.year == 2075,
+            PlanningYear.active_status).count() == 1
+    finally:
+        db.rollback()
+        db.close()

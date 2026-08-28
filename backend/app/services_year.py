@@ -7,8 +7,10 @@ future, or materialises a PlanningYear row.
 from __future__ import annotations
 
 import datetime as _dt
+import uuid as _uuid
 from zoneinfo import ZoneInfo
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session as DBSession
 
 from .models import PlanningYear, Squadron, Wing
@@ -75,3 +77,49 @@ def selectable_years(db: DBSession, squadron_id: str) -> list[int]:
     }
     ahead = {now + n for n in range(FUTURE_YEARS_SELECTABLE + 1)}
     return sorted(past | ahead)
+
+
+def year_display_name(year: int) -> str:
+    """The only place a year's name is produced. Derived, never user-entered."""
+    return f"{year} Training Year"
+
+
+def find_year_context(db: DBSession, squadron_id: str, year: int) -> PlanningYear | None:
+    """Resolve the canonical container, or None. NEVER creates."""
+    return (db.query(PlanningYear)
+              .filter(PlanningYear.unit_id == squadron_id,
+                      PlanningYear.year == year,
+                      PlanningYear.active_status)
+              .first())
+
+
+def ensure_year_context(db: DBSession, squadron_id: str, year: int,
+                        user_id: str | None = None) -> PlanningYear:
+    """Resolve the canonical container, creating it if absent.
+
+    Write paths only. Idempotent under concurrency: two callers may both see
+    None, so the loser of the insert race is caught and re-read rather than
+    guarded by a check-then-write, which has no lock between the check and
+    the write and so cannot be correct.
+    """
+    existing = find_year_context(db, squadron_id, year)
+    if existing is not None:
+        return existing
+
+    sqn = db.get(Squadron, squadron_id)
+    py = PlanningYear(
+        id=str(_uuid.uuid4()), unit_id=squadron_id,
+        wing_id=sqn.wing_id if sqn else None,
+        year=year, name=year_display_name(year),
+        created_by=user_id, updated_by=user_id,
+    )
+    db.add(py)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raced = find_year_context(db, squadron_id, year)
+        if raced is None:
+            raise
+        return raced
+    return py
