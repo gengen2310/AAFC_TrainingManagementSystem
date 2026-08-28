@@ -27,6 +27,12 @@
 -- numbered 2027 (b482b6ed, 15 dates), and both 2026 rows were empty. Keeping an
 -- empty row and discarding the populated one would have been the wrong call.
 --
+-- Correction: an earlier note claimed 704 still had duplicate parade NIGHTS
+-- visible in TMS after its planning years were tidied. It does not. Measured
+-- 2026-08-28: 7 live nights in Aug-Sep 2026, one per date, 0 dates with more
+-- than one live night. The duplicates were already soft-archived. The claim
+-- came from counting parade_nights rows without filtering is_archived.
+--
 -- Remaining after 2026-08-28: 702 and TEST still hold two active years each.
 -- Both already match the intended model (a populated current year plus an empty
 -- next year), so neither is a duplicate to archive.
