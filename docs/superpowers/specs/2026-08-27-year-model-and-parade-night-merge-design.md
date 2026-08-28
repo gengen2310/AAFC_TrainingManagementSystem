@@ -1,3 +1,26 @@
+> ## ⚠️ SUPERSEDED IN PART — 2026-08-28
+>
+> See `docs/superpowers/specs/2026-08-28-training-year-context-model.md`.
+>
+> The Training Year is now treated as **calendar context, not a workflow object**.
+> These decisions below no longer stand:
+>
+> - the `draft | active | archived` status column
+> - promotion of a draft on rollover
+> - lazy promotion, its mutation-on-read and concurrency design
+> - the one-*active*-year unique index
+> - active-year defaulting
+> - archive as a normal lifecycle transition
+> - rollover as year creation
+>
+> **Still standing, and carried forward:** `Wing.timezone` (IANA, no squadron
+> override, fail-loud); the ParadeNight/ParadeDate merge objective, reworked so a
+> night's year comes from its date rather than from an active row; the REM-156
+> production consolidation; and the integrity assumptions verified against
+> production on 2026-08-28.
+>
+> This document is kept unedited below as decision history.
+
 # Training year model, and merging ParadeNight with ParadeDate
 
 Date: 2026-08-27

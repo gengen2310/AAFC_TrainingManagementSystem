@@ -37,13 +37,13 @@ patch, parade-dates, holidays, anchors, term planner, long-range, conflicts,
 missions, annual program, export and import endpoints — every `/years/{year_id}/…`
 route resolves a UUID to a row or returns 404.
 
-**Nine foreign keys point at `planning_years`**, three NOT NULL:
+**Nine foreign keys point at `planning_years`**, four NOT NULL and five
+nullable — counted, after a first draft of this document said three:
 
-- `ParadeDate.planning_year_id` — NOT NULL
-- `HolidayPeriod.planning_year_id` — NOT NULL
-- `TrainingClass.training_year_id` — NOT NULL
-- `PlanningNotice.planning_year_id`, `PlanningConflict`, `AnchorEvent`,
-  `AnchorPrepPlan` and two others — nullable
+- NOT NULL: `ParadeDate.planning_year_id`, `HolidayPeriod.planning_year_id`,
+  one further `planning_year_id`, and `TrainingClass.training_year_id`
+- nullable: five, including `PlanningNotice`, `PlanningConflict`, `AnchorEvent`
+  and `AnchorPrepPlan`
 
 So a year cannot be browsed, planned or written to unless a row already exists.
 
