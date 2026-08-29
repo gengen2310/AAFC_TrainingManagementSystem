@@ -7334,7 +7334,11 @@ function _renderAccountTable(){
     // UI convenience only, same framing as the role picker's own authority map.
     const changeScopeBtn=(u.scope_type!=='national'&&u.user_id!==myUid&&S.role!=='sqn_admin')
       ? `<button class="btn btn-xs" onclick="openChangeScopeModal('${u.user_id}')">Change Scope</button>` : '';
-    const deleteBtn=u.user_id===myUid?'':`<button class="btn btn-xs" style="border-color:var(--red);color:var(--status-text-danger)" onclick="doDeleteAccount('${u.user_id}','${dn}')" title="Archives the account — reversible via Restore">Delete</button>`;
+    // Labelled Archive, not Delete. It calls /archive, and the archived rows
+    // carry a separate "Delete Permanently…" -- so calling this one "Delete"
+    // made the same word mean two different things depending on the row, which
+    // is precisely the archive/delete confusion the design rules out.
+    const deleteBtn=u.user_id===myUid?'':`<button class="btn btn-xs btn-out" onclick="doArchiveAccount('${u.user_id}','${dn}')" title="Revokes access; reversible via Show archived → Restore">Archive</button>`;
     return `<div style="display:flex;gap:4px;flex-wrap:wrap">${editBtn}${changeScopeBtn}${resetBtn}${unlockBtn}${toggleBtn}${deleteBtn}</div>`;
   };
 
@@ -7914,13 +7918,13 @@ function doReactivateAccount(userId, displayName){
     }catch(e){ showToast('Could not reactivate: '+apiErr(e), true); }
   });
 }
-function doDeleteAccount(userId, displayName){
-  confirmAction('Delete account for '+displayName+'?\n\nThis archives the account: access is revoked immediately and it is removed from active views. It is reversible — use "Show archived" + Restore to undo.', async()=>{
+function doArchiveAccount(userId, displayName){
+  confirmAction('Archive the account for '+displayName+'?\n\nAccess is revoked immediately and the account leaves the active list. This is reversible — tick "Show archived", then Restore.', async()=>{
     try{
       await api('/api/accounts/'+userId+'/archive',{method:'POST'});
       S.accountList=null; renderAccounts();
-      showToast('Deleted (archived) '+displayName+'.');
-    }catch(e){ showToast('Could not delete: '+apiErr(e), true); }
+      showToast('Archived '+displayName+'.');
+    }catch(e){ showToast('Could not archive: '+apiErr(e), true); }
   }, true);
 }
 async function doPermanentlyDeleteAccount(userId, displayName){
