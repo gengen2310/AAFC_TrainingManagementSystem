@@ -60,6 +60,29 @@ export function pickDefaultYear<T extends { year: number; active_status?: boolea
 }
 
 /**
+ * Which body PW should render for the selected year. Pure, so the decision can
+ * be tested without mounting the page -- and because the previous form of it
+ * silently stopped being reachable.
+ *
+ *   "setup"       the year has no container and can still be planned
+ *   "past-empty"  the year has no container and is history; setup must not be offered
+ *   "workspace"   there is a container to show
+ *   "loading"     the list has not resolved yet
+ */
+export function pwYearView(
+  yearsLoaded: boolean,
+  selectedYear: { year: number; materialised?: boolean; state?: string } | null,
+  selectedYearId: string | null,
+): "loading" | "setup" | "past-empty" | "workspace" {
+  if (!yearsLoaded) return "loading";
+  if (selectedYear && selectedYear.materialised === false) {
+    return selectedYear.state === "past" ? "past-empty" : "setup";
+  }
+  if (!selectedYearId) return "loading";
+  return "workspace";
+}
+
+/**
  * Which year PW should show, given what TMS handed over, what was stored, and
  * what the API returned. Pure, because this decision is exactly what let TMS
  * and PW disagree about the year, and it must be testable without a browser.
@@ -317,8 +340,29 @@ export function PlanningWorkspace() {
         </div>
       );
     }
-    if (yearsLoading) return <div className="pw-loading">Loading planning years…</div>;
-    if (!yearsLoading && years && years.length === 0) {
+    // The year is REAL even with no container -- only its configuration is
+    // empty -- so never say it does not exist, and never send the user to an
+    // admin for something they can do themselves. The decision lives in
+    // pwYearView so it can be tested: its previous form gated on
+    // `years.length === 0`, which stopped being reachable the moment this page
+    // began listing logical years, silently orphaning SetupPanel.
+    const view = pwYearView(!yearsLoading && !!years, selectedYear, selectedYearId);
+
+    if (view === "loading") {
+      return <div className="pw-loading">Loading planning years…</div>;
+    }
+    if (view === "past-empty" && selectedYear) {
+      return (
+        <div className="pw-empty">
+          <span><strong>Read-only.</strong> {selectedYear.year} is complete.</span>
+          <span style={{ fontSize: 'var(--fs-xs)' }}>
+            Nothing was scheduled for {selectedYear.year}. To add records to a past
+            year, a Wing administrator can open Delegated Intervention.
+          </span>
+        </div>
+      );
+    }
+    if (view === "setup") {
       return (
         <SetupPanel
           session={session}
@@ -327,13 +371,11 @@ export function PlanningWorkspace() {
         />
       );
     }
+    // Unreachable once view === "workspace" -- pwYearView returns "loading"
+    // without an id -- but the compiler cannot see through the helper, and the
+    // queries below take a plain string.
     if (!selectedYearId) {
-      return (
-        <div className="pw-empty">
-          <span>No planning year available.</span>
-          <span style={{ fontSize: 'var(--fs-xs)' }}>Ask your wing or national admin to set up a planning year.</span>
-        </div>
-      );
+      return <div className="pw-loading">Loading planning year…</div>;
     }
     // DEF-02: selectedYearId may be a stale localStorage value from a previous
     // environment or database reset. If years have loaded and the cached id is
