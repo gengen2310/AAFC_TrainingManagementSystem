@@ -58,9 +58,16 @@ EXPECTED_BRANCH="main"
 REQUIRED_ANCESTOR="de27c42"
 REQUIRED_ALEMBIC_HEAD="d5f81a3c9e27"
 
-BACKEND_GATE_TIMEOUT=600
-FRONTEND_GATE_TIMEOUT=600
-PW_GATE_TIMEOUT=600
+# Railway's builder can sit in INITIALIZING for 8-9 minutes when its queue is
+# busy, against builds that normally take ~30s. Two staging deploys aborted at
+# backend gate 2 on 2026-08-28 purely on that latency, having redeployed code
+# that was already live. These are patience budgets for someone else's build
+# queue, not correctness budgets -- every gate still has to pass, and a genuine
+# hang still fails, just later. Overridable so a slow night does not need a
+# code change.
+BACKEND_GATE_TIMEOUT="${BACKEND_GATE_TIMEOUT:-1800}"
+FRONTEND_GATE_TIMEOUT="${FRONTEND_GATE_TIMEOUT:-1800}"
+PW_GATE_TIMEOUT="${PW_GATE_TIMEOUT:-1800}"
 POLL_INTERVAL=15
 
 # ── Colour helpers ─────────────────────────────────────────────────────────────
