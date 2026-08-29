@@ -11886,7 +11886,11 @@ function _actSourceBadge(item){
   return `<span class="badge ${cls}">${esc(lbl)}</span>`;
 }
 
-async function _actTabLoad(containerId, scopeType, scopeId){
+// `year` is optional and is passed ONLY by the squadron mount on the Activities
+// page, which sits under the year bar. The Wing and National pages mount this
+// same component and have no year bar, so they must keep seeing everything --
+// narrowing them silently would be a capability regression, not a fix.
+async function _actTabLoad(containerId, scopeType, scopeId, year){
   if(!scopeId){
     if(scopeType==='wing') scopeId=(S.role==='system_admin')?saBrowseWingId():(S.session&&S.session.wing_id);
     if(scopeType==='squadron') scopeId=S.currentSqnId||(S.session&&S.session.squadron_id);
@@ -11901,10 +11905,13 @@ async function _actTabLoad(containerId, scopeType, scopeId){
   host.innerHTML='<div class="card"><div class="muted">Loading activities…</div></div>';
   let url=`/api/activities?scope_type=${scopeType}&view=${view}`;
   if(scopeId) url+='&scope_id='+encodeURIComponent(scopeId);
+  // Without this the card shows the same rows whatever year is selected: pick
+  // 2027 and last year's holidays stay on screen under the new year's heading.
+  if(year) url+=`&date_from=${year}-01-01&date_end=${year}-12-31`;
   let d;
   try{ d=await api(url); }
   catch(e){ host.innerHTML=`<div class="card"><div class="sc-status-err">Could not load activities: ${esc(apiErr(e))}</div></div>`; return; }
-  _actTabState[containerId]={scopeType, scopeId, items:d.items||[], view, truncated:d.truncated};
+  _actTabState[containerId]={scopeType, scopeId, year, items:d.items||[], view, truncated:d.truncated};
   _actTabRender(containerId);
 }
 
@@ -11977,7 +11984,7 @@ function _actTabRender(containerId){
 function _actSetView(containerId, view){
   _actTabState[containerId].view=view;
   const st=_actTabState[containerId];
-  _actTabLoad(containerId, st.scopeType, st.scopeId);
+  _actTabLoad(containerId, st.scopeType, st.scopeId, st.year);
 }
 
 function _actShowDetail(containerId, activityId){
@@ -12035,7 +12042,7 @@ async function _actSaveEdit(){
     if(msg)msg.textContent='Saved.';
     showToast('Activity saved.', false);
     const st=_actTabState[c];
-    await _actTabLoad(c, st.scopeType, st.scopeId);
+    await _actTabLoad(c, st.scopeType, st.scopeId, st.year);
   }catch(e){ if(msg){msg.textContent=apiErr(e);msg.style.color='var(--red)';} else showToast(apiErr(e),true); }
 }
 
@@ -12045,7 +12052,7 @@ async function _actArchive(containerId, activityId){
       await api('/api/activities/'+activityId,{method:'DELETE'});
       showToast('Activity archived.', false);
       const st=_actTabState[containerId];
-      await _actTabLoad(containerId, st.scopeType, st.scopeId);
+      await _actTabLoad(containerId, st.scopeType, st.scopeId, st.year);
     }catch(e){ showToast(apiErr(e),true); }
   });
 }
@@ -12056,7 +12063,7 @@ async function _actRestore(containerId, activityId){
       await api('/api/activities/'+activityId+'/restore',{method:'POST'});
       showToast('Activity restored.', false);
       const st=_actTabState[containerId];
-      await _actTabLoad(containerId, st.scopeType, st.scopeId);
+      await _actTabLoad(containerId, st.scopeType, st.scopeId, st.year);
     }catch(e){ showToast('Could not restore: '+apiErr(e), true); }
   });
 }
@@ -12104,7 +12111,7 @@ async function _actSaveCreate(containerId){
   try{
     await api(path,{method:'POST',body});
     showToast((st.scopeType==='national'?'National':'Wing')+' activity created.', false);
-    await _actTabLoad(containerId, st.scopeType, st.scopeId);
+    await _actTabLoad(containerId, st.scopeType, st.scopeId, st.year);
   }catch(e){ if(msg){msg.textContent=apiErr(e);} else showToast(apiErr(e),true); }
 }
 
@@ -12114,7 +12121,7 @@ async function _actSaveCreate(containerId){
 let _activitiesPageLoaded=false;
 async function _loadActivitiesPage(){
   renderActs();
-  _actTabLoad('act-tab-squadron','squadron',null);
+  _actTabLoad('act-tab-squadron','squadron',null,P.currentYearInt||null);
   // Ensure year nav is initialised — fetch years if not yet loaded,
   // otherwise just refresh the display (avoids a redundant API call).
   if (!P.years || !P.years.length) {
@@ -12609,9 +12616,6 @@ async function ynLoadManagePanel(){
   tbl.innerHTML='<div class="yn-empty">Loading\u2026</div>';
   try{ await ynRefreshAllYearViews(); }
   catch(e){ tbl.innerHTML='<div class="sc-status-err">Could not load years: '+esc(apiErr(e))+'</div>'; }
-}
-
-  } catch(e){ showToast('Could not create year '+next+': '+apiErr(e),true); }
 }
 
 async function ynArchiveYear(id){
