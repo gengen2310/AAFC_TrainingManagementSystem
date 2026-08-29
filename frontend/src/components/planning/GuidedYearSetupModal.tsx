@@ -9,7 +9,7 @@ import type { PlanningYear, TimingTemplateFull, CurriculumItem } from "../../api
 // has zero PlanningYears -- see SetupPanel.tsx for the original cold-start-only flow,
 // left unchanged so its existing coverage/behaviour doesn't regress). Every step here
 // is optional except creating/selecting the target year; each write goes through the
-// same endpoints the rest of the app uses (rollover, timing-template apply-from-date,
+// same endpoints the rest of the app uses (copy-setup, timing-template apply-from-date,
 // generate-parade-dates, create-session), so the same conflict detection, optimistic
 // locking, and audit logging already enforced there applies here too -- nothing new
 // is invented, this is a guided sequence over existing, validated actions.
@@ -39,38 +39,27 @@ export function GuidedYearSetupModal({ years, squadronId, onClose, onDone }: Pro
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Only a year with a row can be rolled over -- a logical year has nothing to
-  // copy from. (The design retires this modal's opening question entirely, since
-  // under the context model both "new year" and "roll over" are the wrong
-  // framing: the year already exists. That redesign is its own change; this
-  // keeps the existing flow correct in the meantime.)
-  const rollable = years.filter(y => y.planning_year_id);
-  const mostRecent = rollable.length > 0 ? rollable[rollable.length - 1] : null;
+  // Years that already have a row can be offered as a copy-from source.
+  const materialised = years.filter(y => y.planning_year_id && y.year != null);
+  const mostRecent = materialised.length > 0 ? materialised[materialised.length - 1] : null;
 
-  // ── Step: start (create new year OR roll over from most recent) ──────────────
-  const [method, setMethod] = useState<"new" | "rollover">(mostRecent ? "rollover" : "new");
+  // ── Step: start (materialise year; optionally copy class structure) ──────────
+  const [copyClasses, setCopyClasses] = useState<boolean>(!!mostRecent);
   const thisYear = new Date().getFullYear();
   const [newYearNum, setNewYearNum] = useState(thisYear);
-  // Derived from the single year it is, not hyphenated across two: a training
-  // year IS 2026, and "2026–2027 Training Year" invited exactly the
-  // ambiguity the context model removes.
-  const [newYearName, setNewYearName] = useState(`${thisYear} Training Year`);
 
   async function runStart() {
     setLoading(true); setErr("");
     try {
-      if (method === "rollover" && mostRecent) {
-        const r = await planningApi.rolloverYear(mostRecent.planning_year_id!, {});
-        setYearId(r.new_planning_year_id);
-        setYearLabel(r.name);
-        setDatesAlreadyDone(true);
-      } else {
-        const y = await planningApi.createYear({ year: newYearNum, name: newYearName.trim() });
-        const id = (y as unknown as Record<string, unknown>).planning_year_id as string;
-        setYearId(id);
-        setYearLabel(newYearName.trim());
-        setDatesAlreadyDone(false);
+      // Materialise the row. Name derives from the year integer (spec §6).
+      const y = await planningApi.createYear({ year: newYearNum, name: String(newYearNum) });
+      const id = (y as unknown as Record<string, unknown>).planning_year_id as string;
+      setYearId(id);
+      setYearLabel(String(newYearNum));
+      if (copyClasses && mostRecent) {
+        await planningApi.copySetup({ source_year: Number(mostRecent.year), target_year: newYearNum, copy_classes: true, copy_parade_pattern: false });
       }
+      setDatesAlreadyDone(false);
       setStep("timing");
     } catch (e) {
       setErr(e instanceof ApiError ? e.friendly : "Could not set up the planning year.");
@@ -110,37 +99,30 @@ export function GuidedYearSetupModal({ years, squadronId, onClose, onDone }: Pro
         {step === "start" && (
           <>
             <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
-              Set up a new training year, then optionally apply a timing template, generate
+              Set up a training year, then optionally apply a timing template, generate
               parade dates, and bulk-place curriculum onto open slots.
             </p>
+            <div style={{ marginTop: 8 }}>
+              <label>Year
+                <input type="number" min={2020} max={2040} value={newYearNum}
+                  onChange={(e) => setNewYearNum(Number(e.target.value))}
+                  style={{ marginLeft: 8, width: 100 }} />
+              </label>
+            </div>
             {mostRecent && (
-              <div role="radiogroup" aria-label="Setup method" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400 }}>
-                  <input type="radio" name="ys-method" checked={method === "rollover"} onChange={() => setMethod("rollover")} />
-                  Roll over from {mostRecent.name} (copies holidays and the parade-date pattern; historical records are never changed)
-                </label>
-                <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400 }}>
-                  <input type="radio" name="ys-method" checked={method === "new"} onChange={() => setMethod("new")} />
-                  Create a blank new planning year
-                </label>
-              </div>
+              <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400, marginTop: 10 }}>
+                <input type="checkbox" checked={copyClasses} onChange={e => setCopyClasses(e.target.checked)} />
+                Copy training class structure from {mostRecent.year}
+              </label>
             )}
-            {method === "new" && (
-              <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 10, marginTop: 8 }}>
-                <label>Year
-                  <input type="number" min={2020} max={2040} value={newYearNum}
-                    onChange={(e) => { const y = Number(e.target.value); setNewYearNum(y); setNewYearName(`${y}–${y + 1} Training Year`); }} />
-                </label>
-                <label>Name
-                  <input value={newYearName} onChange={(e) => setNewYearName(e.target.value)} />
-                </label>
-              </div>
-            )}
+            <p className="muted" style={{ fontSize: 'var(--fs-2xs)', marginTop: 6 }}>
+              Parade nights, sessions, and cadet records are never copied.
+            </p>
             {err && <div className="err" role="alert">{err}</div>}
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <Button onClick={onClose} variant="out">Cancel</Button>
-              <Button onClick={runStart} disabled={loading || (method === "new" && !newYearName.trim())}>
-                {loading ? "Setting up…" : "Continue →"}
+              <Button onClick={runStart} disabled={loading}>
+                {loading ? "Setting up…" : "Set up " + newYearNum + " →"}
               </Button>
             </div>
           </>
@@ -278,7 +260,7 @@ const _DAY_NAME_TO_INDEX: Record<string, number> = {
   Monday: 0, Tuesday: 1, Wednesday: 2, Thursday: 3, Friday: 4, Saturday: 5, Sunday: 6,
 };
 
-// ── Step: generate parade dates (skipped/shown-as-done if rollover already copied them) ──
+// ── Step: generate parade dates ──────────────────────────────────────────────────────────
 function DatesStep({ yearId, squadronId, alreadyDone, onSkip, onDone }: {
   yearId: string; squadronId?: string; alreadyDone: boolean; onSkip: () => void; onDone: () => void;
 }) {

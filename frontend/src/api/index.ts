@@ -401,6 +401,8 @@ export const planningApi = {
     api.get<WingHQEvent>(`/api/wing-calendar/events/${event_id}`),
   createYear: (body: { year: number; name: string; unit_id?: string }) =>
     api.post<PlanningYear>("/api/planning/years", body),
+  copySetup: (body: { source_year: number; target_year: number; copy_classes?: boolean; copy_parade_pattern?: boolean }) =>
+    api.post<{ ok: boolean; classes_copied: number }>("/api/planning/years/copy-setup", body),
   generateParadeDates: (year_id: string, body: {
     weekday: number; start_date: string; end_date?: string;
     parade_type?: string; exclude_holidays?: boolean;

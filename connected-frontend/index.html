@@ -2241,7 +2241,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <div class="card admin-el" id="settings-training-years-wrap">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
             <h2 class="ctitle" style="margin:0">Training Years</h2>
-            <button class="btn btn-sky admin-el" onclick="ynCreateYear()">+ Create <span id="ynCreateLabelCard">next year</span></button>
           </div>
           <p class="muted" style="font-size:var(--fs-xs);margin:0 0 12px">
             Each training year holds its own parade dates, training classes and holiday periods.
@@ -4120,45 +4119,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
   </div>
 </div>
 
-<!-- ROLL OVER YEAR MODAL -->
-<div class="modal-bg" id="m-rollover-year" role="dialog" aria-modal="true" aria-labelledby="m-rollover-title" onclick="if(event.target===this)closeModal('m-rollover-year')">
-  <div class="modal" style="max-width:520px;width:96vw">
-    <div class="modal-hdr">
-      <span id="m-rollover-title" style="font-size:var(--fs-md);font-weight:800;letter-spacing:.03em">Roll over training year</span>
-      <button class="modal-x" onclick="closeModal('m-rollover-year')" aria-label="Close">&times;</button>
-    </div>
-    <div class="modal-body">
-      <p class="muted" style="font-size:var(--fs-xs);margin:0 0 16px">
-        Starts a new training year from <strong id="ro-source-year"></strong>. Parade dates move forward by
-        the same number of years. Nothing in the source year is changed.
-      </p>
-      <div class="form-group">
-        <label for="ro-target-year">New year</label>
-        <input type="number" id="ro-target-year" min="1990" max="2999" step="1" style="max-width:140px">
-      </div>
-      <div style="display:flex;flex-direction:column;gap:9px;margin:14px 0 4px">
-        <label class="chk-item" style="display:flex;align-items:center;gap:9px;font-size:var(--fs-sm);cursor:pointer">
-          <input type="checkbox" id="ro-copy-classes" checked> Copy training classes
-        </label>
-        <label class="chk-item" style="display:flex;align-items:center;gap:9px;font-size:var(--fs-sm);cursor:pointer">
-          <input type="checkbox" id="ro-copy-holidays" checked> Copy holiday periods
-        </label>
-        <label class="chk-item" style="display:flex;align-items:center;gap:9px;font-size:var(--fs-sm);cursor:pointer">
-          <input type="checkbox" id="ro-carry-sessions" checked> Note sessions not yet delivered
-        </label>
-      </div>
-      <p class="muted" style="font-size:var(--fs-2xs);margin:10px 0 0">
-        Anchor events are not copied \u2014 set those on the new year once its dates are confirmed.
-      </p>
-      <p id="ro-msg" style="font-size:var(--fs-sm);margin-top:10px"></p>
-      <div class="modal-actions" style="margin-top:16px">
-        <button class="btn btn-secondary" onclick="closeModal('m-rollover-year')">Cancel</button>
-        <button class="btn btn-primary" id="ro-confirm-btn" onclick="ynDoRollover()">Roll over</button>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- MANAGE YEARS MODAL -->
 <div class="modal-bg" id="m-manage-years" role="dialog" aria-modal="true" onclick="if(event.target===this)closeModal('m-manage-years')">
   <div class="modal" style="max-width:600px;width:96vw">
@@ -4167,7 +4127,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <button class="modal-x" onclick="closeModal('m-manage-years')" aria-label="Close">&times;</button>
     </div>
     <div class="modal-body" style="padding:20px 24px 28px">
-      <button class="btn btn-sky" id="ynCreateBtn" onclick="ynCreateYear()" style="margin-bottom:18px">+ Create <span id="ynCreateLabel">next year</span></button>
       <div id="ynManageTable"></div>
     </div>
   </div>
@@ -5472,7 +5431,7 @@ async function loadData(){
   S.holidays=(holidays||[]).map(h=>({id:h.holiday_id,name:h.name,start:h.start_date,end:h.end_date}));
   S.proxy=proxy||{active:false};
   S.pwUrl=(uicfg&&uicfg.planning_workspace_url)||null;
-  S.trainingYear=(uicfg&&uicfg.training_year)||2026;
+  S.trainingYear=(uicfg&&uicfg.training_year)||new Date().getFullYear();
   S.subjectAreaTags=Array.isArray(tags)?tags.filter(t=>t.is_active):[];
   S.facilitatorTypeTags=Array.isArray(factypes)?factypes.filter(t=>t.is_active):[];
   _populateFacTypeSelect();
@@ -6201,7 +6160,8 @@ async function _acLoadConflicts(){
   if(!card)return;
   const ctitle=card.querySelector('.ctitle');
   if(!P||!P.currentYearId){
-    if(el)el.outerHTML='<div style="font-size:var(--fs-sm);color:var(--muted)">No active year — select one from Training Plans first.</div>';
+    const _yrNote=P&&P.currentYearInt?'Nothing has been configured for '+P.currentYearInt+' yet.':'No training year selected.';
+    if(el)el.outerHTML='<div style="font-size:var(--fs-sm);color:var(--muted)">'+_yrNote+' Planning conflicts appear once the year has training data.</div>';
     return;
   }
   try{
@@ -12583,15 +12543,13 @@ function _ynRenderYearList(el, years, opts){
     const nameLine = (y.name && String(y.name) !== String(y.year))
       ? '<div class="yn-year-name">'+esc(String(y.name))+'</div>' : '';
     const created = y.created_at ? fmtD(String(y.created_at).slice(0,10),{day:'numeric',month:'short',year:'numeric'}) : '';
-    const meta = [ active?'Active':'Archived', created?('Created '+created):'' ]
+    const stateLabel = y.state==='current'?'Current':y.state==='past'?'Record':'Upcoming';
+    const meta = [ stateLabel, created?('Created '+created):'' ]
       .filter(Boolean).join(' \u00b7 ');
     let acts = '';
-    if(canWrite && active){
-      acts += '<button class="btn btn-xs btn-sky" title="Copy this year\u2019s parade dates, holidays and training classes into a new year" '
-           +  'onclick="ynOpenRollover(\''+esc(id)+'\','+(+y.year)+')">Roll over \u2192</button>';
-    }
     acts += '<button class="btn btn-xs btn-out" onclick="ynExportYear(\''+esc(id)+'\','+(+y.year)+')">Export</button>';
-    if(canWrite){
+    const canRemediate=['wing_admin','system_admin'].includes(S.role||'');
+    if(canRemediate){
       acts += active
         ? '<button class="btn btn-xs btn-out" onclick="ynArchiveYear(\''+esc(id)+'\')">Archive</button>'
         : '<button class="btn btn-xs btn-out" onclick="ynRestoreYear(\''+esc(id)+'\')">Restore</button>';
@@ -12653,82 +12611,6 @@ async function ynLoadManagePanel(){
   catch(e){ tbl.innerHTML='<div class="sc-status-err">Could not load years: '+esc(apiErr(e))+'</div>'; }
 }
 
-// ── Year rollover ───────────────────────────────────────────────────────────
-// POST /api/planning/years/{id}/rollover has existed and been covered by 21
-// backend tests for some time; nothing in this frontend ever called it, so
-// there was no way to start a year from the previous one without rebuilding it
-// by hand.
-let _ynRolloverSrcId=null;
-function ynOpenRollover(id, year){
-  _ynRolloverSrcId=id;
-  const target=(+year)+1;
-  const t=document.getElementById('ro-target-year'); if(t) t.value=target;
-  const src=document.getElementById('ro-source-year'); if(src) src.textContent=String(year);
-  ['ro-copy-holidays','ro-copy-classes','ro-carry-sessions'].forEach(function(k){
-    const c=document.getElementById(k); if(c) c.checked=true;
-  });
-  const msg=document.getElementById('ro-msg'); if(msg){msg.textContent='';msg.className='';}
-  openModal('m-rollover-year');
-}
-async function ynDoRollover(){
-  const msg=document.getElementById('ro-msg');
-  const btn=document.getElementById('ro-confirm-btn');
-  if(!_ynRolloverSrcId) return;
-  const target=parseInt((document.getElementById('ro-target-year')||{}).value,10);
-  if(!(target>=1990&&target<=2999)){
-    if(msg){msg.textContent='Enter a target year between 1990 and 2999.';msg.className='sc-status-err';}
-    return;
-  }
-  const body={
-    target_year: target,
-    copy_holidays: !!(document.getElementById('ro-copy-holidays')||{}).checked,
-    copy_training_classes: !!(document.getElementById('ro-copy-classes')||{}).checked,
-    carry_incomplete_sessions: !!(document.getElementById('ro-carry-sessions')||{}).checked,
-  };
-  if(btn){btn.disabled=true;btn.textContent='Rolling over\u2026';}
-  if(msg){msg.textContent='';msg.className='';}
-  try{
-    const r=await api('/api/planning/years/'+_ynRolloverSrcId+'/rollover',{method:'POST',body});
-    closeModal('m-rollover-year');
-    const bits=[
-      r.parade_dates_copied+' parade date'+(r.parade_dates_copied===1?'':'s'),
-      r.holidays_copied+' holiday period'+(r.holidays_copied===1?'':'s'),
-      r.training_classes_copied+' training class'+(r.training_classes_copied===1?'':'es'),
-    ];
-    showToast('Training year '+r.year+' created from '+ (document.getElementById('ro-source-year')||{}).textContent
-      +'. Copied '+bits.join(', ')+'.');
-    await ynRefreshAllYearViews();
-    const newY=(P.years||[]).find(function(y){return y.planning_year_id===r.new_planning_year_id;});
-    if(newY) setCurrentYear(newY);
-    await reloadAndRender();
-  }catch(e){
-    const d=e&&e.body&&e.body.detail;
-    if(d&&d.error==='planning_year_already_exists'){
-      if(msg){msg.textContent='Training year '+target+' already exists for this unit. Choose a different target year.';msg.className='sc-status-err';}
-    } else if(msg){ msg.textContent=apiErr(e); msg.className='sc-status-err'; }
-  } finally {
-    if(btn){btn.disabled=false;btn.textContent='Roll over';}
-  }
-}
-
-async function ynCreateYear(){
-  const next=_ynNextYearNumber();
-  try{
-    await api('/api/planning/years',{method:'POST',body:{year:next,name:String(next),active_status:true}});
-    const all=await _ynFetchYears();
-    const newY=(all||[]).find(y=>y.year===next);
-    if(newY) setCurrentYear(newY);
-    await ynRefreshAllYearViews();
-    const postWrap=document.getElementById('settings-yn-postcreate');
-    if(postWrap){
-      postWrap.innerHTML=`Year <strong>${esc(String(next))}</strong> created. ` +
-        `5 default training classes have been added. ` +
-        `<a href="#" onclick="document.getElementById('settings-training-classes-wrap')` +
-        `.scrollIntoView({behavior:'smooth'});return false;">Go to Training Classes ↓</a> to customise them, or ` +
-        `<a href="#" onclick="document.getElementById('settings-timing-templates-wrap')` +
-        `.scrollIntoView({behavior:'smooth'});return false;">Timing Templates ↓</a> to set up the parade night structure.`;
-      postWrap.style.display='block';
-    }
   } catch(e){ showToast('Could not create year '+next+': '+apiErr(e),true); }
 }
 
@@ -15779,16 +15661,18 @@ const _CADET_GROUPS = ['orientation','initial','junior','intermediate','senior']
 function _pickDefaultYear(list){
   const yrs=(list||[]).filter(Boolean);
   if(!yrs.length) return null;
-  const act=yrs.filter(y=>y.active_status);
-  const pool=act.length?act:yrs;
+  // Prefer the year the server marks 'current' (derived from wing-local timezone).
+  // Falls back to calendar arithmetic for entries from older API responses.
+  const cur=yrs.find(y=>y.state==='current');
+  if(cur) return cur;
   const now=new Date().getFullYear();
-  const exact=pool.find(y=>parseInt(y.year,10)===now);
+  const exact=yrs.find(y=>parseInt(y.year,10)===now);
   if(exact) return exact;
-  const ahead=pool.filter(y=>parseInt(y.year,10)>now).sort((a,b)=>a.year-b.year);
+  const ahead=yrs.filter(y=>y.state==='future'||parseInt(y.year,10)>now).sort((a,b)=>a.year-b.year);
   if(ahead.length) return ahead[0];
-  const behind=pool.filter(y=>parseInt(y.year,10)<now).sort((a,b)=>b.year-a.year);
+  const behind=yrs.filter(y=>y.state==='past'||parseInt(y.year,10)<now).sort((a,b)=>b.year-a.year);
   if(behind.length) return behind[0];
-  return pool[0];
+  return yrs[0];
 }
 
 // ── Populate year selects; auto-select active/first year and return its ID ──
@@ -15828,7 +15712,8 @@ function _ynPopulateYearSelects() {
       const prefix = showUnitPrefix
         ? (y.unit_code ? `${y.unit_code} — ` : y.wing_code ? `${y.wing_code} — ` : '')
         : '';
-      o.textContent = prefix + (y.name || String(y.year)) + (y.active_status?'':' (archived)');
+      const _stag = y.state==='past'?' — record':y.state==='future'?' — upcoming':'';
+      o.textContent = prefix + String(y.year) + _stag;
       el.appendChild(o);
     });
     if(P.currentYearId) el.value = P.currentYearId;
@@ -15851,14 +15736,16 @@ function _renderPyActionBtns(){
   const el=document.getElementById('py-action-btns'); if(!el)return;
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
   if(!y){ el.innerHTML=''; return; }
+  const canRemediate=['wing_admin','system_admin'].includes(S.role||'');
   el.innerHTML=
     `<button class="btn btn-out btn-xs" onclick="exportAnnualProgram()" title="Export annual program to Excel">Export Annual</button>`+
     `<button class="btn btn-out btn-xs" onclick="exportSchedule()" title="Export schedule to Excel">Export Schedule</button>`+
-    `<button class="btn btn-out btn-xs plan-write-el" style="display:none" onclick="doRenamePlanningYear()">Rename</button>`+
-    (y.active_status
-      ? `<button class="btn btn-out btn-xs plan-write-el" style="display:none;border-color:var(--red);color:var(--status-text-danger)" onclick="doArchivePlanningYear()">Archive</button>`
-      : `<button class="btn btn-ok btn-xs plan-write-el" style="display:none" onclick="doRestorePlanningYear()">Restore</button>`)+
-    `<button class="btn btn-out btn-xs plan-write-el" style="display:none;border-color:var(--red);color:var(--status-text-danger)" onclick="doDeletePlanningYear()">Delete…</button>`;
+    (canRemediate
+      ? (y.active_status
+          ? `<button class="btn btn-out btn-xs plan-write-el" style="display:none;border-color:var(--red);color:var(--status-text-danger)" onclick="doArchivePlanningYear()">Archive</button>`
+          : `<button class="btn btn-ok btn-xs plan-write-el" style="display:none" onclick="doRestorePlanningYear()">Restore</button>`)
+      : '')+
+    (canRemediate ? `<button class="btn btn-out btn-xs plan-write-el" style="display:none;border-color:var(--red);color:var(--status-text-danger)" onclick="doDeletePlanningYear()">Delete…</button>` : '');
   document.querySelectorAll('#py-action-btns .plan-write-el').forEach(b=>{b.style.display=canWritePlan()?'inline-flex':'none';});
 }
 async function doRenamePlanningYear(){
