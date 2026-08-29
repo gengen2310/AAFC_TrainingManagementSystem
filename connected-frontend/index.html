@@ -86,7 +86,15 @@
      Nothing may set a px font-size on html, or this silently stops working. */
   --fs-4xs:  0.5rem;     /*  8px */
   --fs-3xs:  0.5625rem;  /*  9px */
-  --fs-2xs:  0.625rem;   /* 10px */
+  --fs-2xs:  0.625rem;
+  /* Notification spacing. Declared once and shared with the React app so the
+     two implementations converge instead of drifting: connected-frontend was
+     10px/14px and React 9px/16px, both under a comfortable reading padding. */
+  --toast-pad-y: 14px;
+  --toast-pad-x: 18px;
+  --toast-gap:   10px;
+  --toast-edge:  20px;
+  --toast-max-w: 400px;   /* 10px */
   --fs-xs:   0.6875rem;  /* 11px */
   --fs-sm:   0.75rem;    /* 12px */
   --fs-base: 0.8125rem;  /* 13px */
@@ -278,16 +286,21 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .page-actions,.ph-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 
 /* ── YEAR NAV CONTROL ── */
-.year-nav-ctrl{display:inline-flex;align-items:center;background:var(--dark);border-radius:22px;overflow:hidden;min-height:44px;font-family:'Montserrat',Arial,sans-serif}
+/* NO overflow:hidden. It clipped the 44px ::after hit areas to the 36px box --
+   the same clip that had earlier hidden the year menu entirely. The end
+   children carry the rounding instead. */
+.year-nav-ctrl{display:inline-flex;align-items:stretch;background:var(--surface);border:1.5px solid var(--border);border-radius:6px;font-family:'Montserrat',Arial,sans-serif}
+.yn-arrow:first-child{border-radius:5px 0 0 5px}
+.yn-arrow:last-child{border-radius:0 5px 5px 0}
 /* G5: the hit area is 44px; the glyph is unchanged. Type size and touch
    target are different measurements and the glyph must never set the target. */
-.yn-arrow{background:transparent;border:none;color:#fff;font-size:var(--fs-xl);padding:0 12px;cursor:pointer;min-width:44px;min-height:44px;opacity:1;transition:opacity .15s}
-.yn-arrow:disabled{color:#7e8992;opacity:1;cursor:default}
-.yn-arrow:not(:disabled):hover{background:rgba(255,255,255,.12)}
+.yn-arrow{position:relative;background:transparent;border:0;color:var(--muted);font-size:var(--fs-md);line-height:1;padding:0 10px;min-height:36px;cursor:pointer;transition:background .12s,color .12s}
+.yn-arrow:disabled{color:#7e8992;cursor:default}
+.yn-arrow:not(:disabled):hover{background:var(--surface-2);color:var(--text)}
 /* tabular-nums so stepping 2026 -> 2027 -> 2088 does not change the width
    and shift everything to its right. Measured 120px -> 120px. */
-.yn-display{color:#fff;font-size:var(--fs-md);font-weight:600;padding:0 10px;cursor:pointer;display:flex;align-items:center;min-width:52px;min-height:44px;justify-content:center;font-variant-numeric:tabular-nums}
-.yn-display:hover{background:rgba(255,255,255,.1)}
+.yn-display{position:relative;display:flex;align-items:center;justify-content:center;gap:5px;background:transparent;border:0;border-left:1px solid var(--border);border-right:1px solid var(--border);color:var(--text);font-family:inherit;font-size:var(--fs-md);font-weight:700;font-variant-numeric:tabular-nums;padding:0 12px;min-height:36px;min-width:64px;cursor:pointer}
+.yn-display:hover{background:var(--surface-2)}
 .yn-display input{background:transparent;border:none;border-bottom:2px solid var(--blue);color:#fff;font-size:var(--fs-md);font-weight:600;width:52px;text-align:center;font-family:inherit}
 /* AUDIT-2026-08 G4: the rule above previously set outline:none at specificity 0-1-1,
    which outranks the global :focus-visible (0-1-0) — the field had no focus ring at all. */
@@ -322,7 +335,13 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 /* The tag says what the year is FOR, not where it sits in time -- and RECORD is
    the same word the read-only notice uses, so the vocabulary holds across the flow. */
 .yn-tag{font-size:var(--fs-3xs,10px);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
-.yn-caret{margin-left:6px;font-size:var(--fs-xs)}
+/* The control matches its neighbours at 36px; the TOUCH TARGET reaches 44px
+   through a transparent ::after that grows the hit area without growing the
+   box. Type size and touch target are different measurements, and the glyph
+   must never decide the target. */
+.yn-arrow::after,.yn-display::after{content:"";position:absolute;inset:-4px -6px}
+.yn-arrow:focus-visible,.yn-display:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-2px}
+.yn-caret{margin-left:2px;font-size:var(--fs-2xs);color:var(--muted)}
 /* One line, and it does NOT move the user. Explicit and reversible: a session
    open across midnight must never have the data swapped underneath it. */
 .yn-rollover{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;
@@ -866,8 +885,12 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .sd-unit-type-wing { background: #fff3cd; color: #7a4800; }
 
 /* ── TOAST (non-blocking, accessible replacement for alert()) ── */
-.toast-region{position:fixed;top:16px;right:16px;z-index:900;display:flex;flex-direction:column;gap:8px;max-width:340px;}
-.toast{background:white;border:1.5px solid var(--border);border-left:4px solid var(--steel);border-radius:8px;padding:10px 14px;font-size:var(--fs-sm);font-weight:600;box-shadow:var(--sh2);color:var(--text);}
+.toast-region{position:fixed;top:var(--toast-edge);right:var(--toast-edge);z-index:900;display:flex;flex-direction:column;gap:var(--toast-gap);max-width:min(var(--toast-max-w), calc(100vw - (var(--toast-edge) * 2)));}
+@media (max-width:480px){
+  /* Full-width minus a real margin, so a toast never sits against the edge. */
+  .toast-region{left:var(--toast-edge);right:var(--toast-edge);max-width:none}
+}
+.toast{background:white;border:1.5px solid var(--border);border-left:4px solid var(--steel);border-radius:8px;padding:var(--toast-pad-y) var(--toast-pad-x);font-size:var(--fs-sm);font-weight:600;box-shadow:var(--sh2);color:var(--text);}
 .toast.err{border-left-color:var(--red);color:#8b1a1a;}
 .toast.ok{border-left-color:var(--ok);color:#145f38;}
 @keyframes _spin{to{transform:rotate(360deg)}}
@@ -12231,7 +12254,12 @@ const _YN_STATE_TEXT = {
 
 function _ynUpdateDisplay() {
   const lbl = document.getElementById('ynLabel');
-  if (lbl) lbl.textContent = P.currentYearInt || '\u2014';
+  // Render nothing until a year resolves. The old placeholder made the control
+  // read as broken -- the reported screenshot showed the capsule containing an
+  // em-dash where the year should be.
+  const wrap = document.getElementById('actYnWrap');
+  if (wrap) wrap.style.visibility = P.currentYearInt ? '' : 'hidden';
+  if (lbl) lbl.textContent = P.currentYearInt || '';
   const st = document.getElementById('ynState');
   if (st) {
     const row = _ynYears().find(y => y.year === P.currentYearInt);
