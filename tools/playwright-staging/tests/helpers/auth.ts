@@ -18,24 +18,32 @@ export const ROLES: RoleCred[] = [
   { label: "System Admin",           unitType: "national", identifier: "",    role: "system_admin",  envVar: "STAGING_SYSADMIN_CODE" },
 ];
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /** Obtain a Bearer token via the two-step API auth flow (no code in source). */
 export async function getToken(role: RoleCred): Promise<string> {
   const code = process.env[role.envVar];
   if (!code) throw new Error(`Missing env var ${role.envVar} for ${role.label}`);
 
-  // Step 1: lookup
+  // Step 1: lookup — retry up to 3 times on 429 with exponential backoff.
   const lookupBody: Record<string, string> = { unit_type: role.unitType, role: role.role };
   if (role.identifier) lookupBody.identifier = role.identifier;
-  const lu = await fetch(`${API}/api/auth/lookup`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(lookupBody),
-  });
-  if (!lu.ok) {
-    const t = await lu.text();
-    throw new Error(`Lookup failed for ${role.label}: ${lu.status} ${t}`);
+
+  let lu: Response | undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await sleep(1000 * 2 ** (attempt - 1)); // 1s, 2s
+    lu = await fetch(`${API}/api/auth/lookup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(lookupBody),
+    });
+    if (lu.status !== 429) break;
   }
-  const { user_id } = (await lu.json()) as { user_id: string };
+  if (!lu!.ok) {
+    const t = await lu!.text();
+    throw new Error(`Lookup failed for ${role.label}: ${lu!.status} ${t}`);
+  }
+  const { user_id } = (await lu!.json()) as { user_id: string };
 
   // Step 2: login
   const li = await fetch(`${API}/api/auth/login`, {
