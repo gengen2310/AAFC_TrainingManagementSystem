@@ -200,6 +200,26 @@ def test_delete_planning_year_is_audited(client):
     assert found, "planning year delete not found in audit log"
 
 
+def test_national_admin_cannot_patch_squadron_year_without_intervention(client):
+    sqn_hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, sqn_hdr)
+    yr_id = year["planning_year_id"]
+    nat_hdr = _nat_admin_hdr(client)
+    r = client.patch(f"/api/planning/years/{yr_id}", json={"active_status": False}, headers=nat_hdr)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "intervention_required"
+
+
+def test_national_admin_cannot_delete_squadron_year_without_intervention(client):
+    sqn_hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, sqn_hdr)
+    yr_id = year["planning_year_id"]
+    nat_hdr = _nat_admin_hdr(client)
+    r = client.delete(f"/api/planning/years/{yr_id}", headers=nat_hdr)
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"]["error"] == "intervention_required"
+
+
 def test_get_nonexistent_year_returns_404(client):
     hdr = _sqn_admin_hdr(client)
     r = client.get("/api/planning/years/nonexistent-id", headers=hdr)

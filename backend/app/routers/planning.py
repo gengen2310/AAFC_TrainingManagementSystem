@@ -722,10 +722,11 @@ def update_planning_year(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
-    # Structural edits to the year entity itself (name/status) require Proxy Mode
-    # when a wing_admin targets a squadron-scoped year — content operations (CEA
-    # imports, parade dates) do not carry this extra requirement.
-    if p.role == "wing_admin" and py.unit_id:
+    # Structural edits to the year entity itself (name/active_status) require
+    # Proxy Mode (wing_admin) or Delegated Intervention (national_admin/system_admin)
+    # when the year is squadron-scoped. Content operations (CEA imports, parade
+    # dates) carry their own require_can_write_squadron calls at their endpoints.
+    if py.unit_id:
         require_can_write_squadron(p, py.unit_id, py.wing_id)
     _check_version(py, body.version)
     if body.name is not None:
@@ -755,7 +756,7 @@ def delete_planning_year(
     archive remains the default whenever any dependent exists."""
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
-    if p.role == "wing_admin" and py.unit_id:
+    if py.unit_id:
         require_can_write_squadron(p, py.unit_id, py.wing_id)
 
     dependents = {
