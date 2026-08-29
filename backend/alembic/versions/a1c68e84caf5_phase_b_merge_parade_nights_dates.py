@@ -18,21 +18,21 @@ depends_on = None
 
 
 def _abort_if_blockers(conn):
-    """Raise if any orphan or unresolvable nights exist."""
+    """Raise if any orphan or unresolvable nights exist (active OR archived)."""
     orphans = conn.execute(sa.text("""
         SELECT COUNT(*) FROM parade_nights pn
         LEFT JOIN parade_dates pd ON pd.parade_night_id = pn.id
-        WHERE pd.id IS NULL AND pn.is_archived = 0
+        WHERE pd.id IS NULL
     """)).scalar()
     if orphans:
         raise RuntimeError(
-            f"Phase B migration blocked: {orphans} active parade_night row(s) have no linked "
-            f"parade_date. Run scripts/phase_b_audit.py and resolve all blockers first."
+            f"Phase B migration blocked: {orphans} parade_night row(s) have no linked "
+            f"parade_date (including archived). Run scripts/phase_b_audit.py and resolve all blockers first."
         )
     null_year = conn.execute(sa.text("""
         SELECT COUNT(*) FROM parade_nights pn
         JOIN parade_dates pd ON pd.parade_night_id = pn.id
-        WHERE pd.planning_year_id IS NULL AND pn.is_archived = 0
+        WHERE pd.planning_year_id IS NULL
     """)).scalar()
     if null_year:
         raise RuntimeError(
@@ -100,7 +100,7 @@ def upgrade():
     # does not always reliably skip recreating indexes on dropped columns).
     op.drop_index("ix_planning_notices_planning_year_id", table_name="planning_notices")
     with op.batch_alter_table("planning_notices") as batch:
-        batch.alter_column("parade_date_id", new_column_name="parade_night_id")
+        batch.alter_column("parade_date_id", new_column_name="parade_night_id", nullable=False)
         batch.drop_column("planning_year_id")
 
     # ── 5. planning_conflicts: rename parade_date_id → parade_night_id ──
@@ -132,7 +132,9 @@ def upgrade():
 
 
 def downgrade():
-    # Restore table name
+    # NOTE: downgrade is a development-only escape hatch — schema structure is restored
+    # but FK data in planning_notices/planning_conflicts/anchor_prep_plans will point to
+    # parade_night IDs, not parade_date IDs. Data integrity is not recovered.
     op.rename_table("_parade_dates_deprecated", "parade_dates")
 
     # Restore anchor_prep_plans
