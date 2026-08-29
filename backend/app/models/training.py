@@ -44,7 +44,7 @@ class ParadeNight(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     squadron_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), index=True)
     wing_id: Mapped[str] = mapped_column(String(36), index=True)
     planning_year_id: Mapped[str] = mapped_column(ForeignKey("planning_years.id"), nullable=False, index=True)
-    planning_year = relationship("PlanningYear", back_populates="parade_nights", lazy="select")
+    planning_year: Mapped["PlanningYear"] = relationship("PlanningYear", back_populates="parade_nights", lazy="select")
     week_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     cancellation_reason: Mapped[str | None] = mapped_column(String, nullable=True)

@@ -64,7 +64,7 @@ class PlanningYear(Base, UUIDMixin, TimestampMixin):
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     # Back-reference to ParadeNight rows that belong to this planning year
     # (Phase B: parade_nights.planning_year_id FK added in migration a1c68e84caf5)
-    parade_nights = relationship("ParadeNight", back_populates="planning_year", lazy="select")
+    parade_nights: Mapped[list["ParadeNight"]] = relationship("ParadeNight", back_populates="planning_year", lazy="select")
 
 
 class HolidayPeriod(Base, UUIDMixin, TimestampMixin):
