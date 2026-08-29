@@ -1,7 +1,8 @@
 # Training Year as calendar context
 
 Date: 2026-08-28
-Status: design, awaiting review
+Confirmed: 2026-08-29
+Status: design, confirmed — backend implemented in PR #40 (530a47b); frontend plan at 2026-08-29-training-year-context-frontend.md
 
 **Supersedes in part** `2026-08-27-year-model-and-parade-night-merge-design.md`
 and `2026-08-18-year-ux-design.md`. See §10 for exactly which decisions fall.
@@ -29,12 +30,12 @@ named `2026 Training Year → 2027`, produced by `rollover_year`.
 
 ## 2. Decisions taken
 
-The user's, on 2026-08-28. Recorded because they are decisions, not derivations.
-**Two deliberately override the instruction's own recommendations**; they are
-marked, so the doc and the decision cannot drift apart.
+The user's, on 2026-08-28; confirmed 2026-08-29.
 
 1. **Year selection is capped at current + 2 future years.** Past years are not
-   capped. ⚠️ *Overrides §28 Q1's "do not impose a product cap".*
+   capped. *(Explicitly confirmed 2026-08-29 — overrides §28 Q1's "do not impose
+   a product cap". Rationale: two years ahead covers realistic squadron planning
+   horizons; unlimited navigation adds complexity without benefit.)*
 2. **An unconfigured future year opens empty and offers setup.** Nothing is
    copied unless the user explicitly asks.
 3. **Copy-forward is limited to the §28 list**, confirmed exactly: Training Class
@@ -45,10 +46,9 @@ marked, so the doc and the decision cannot drift apart.
    date-shifted by 365 days.
 4. **Past years are read-only by default**, with correction available through an
    authorised, audited path.
-5. **The wing/national year capability is retained, unused.** ⚠️ *Overrides §27's
-   lean toward removing it.* Production holds **zero** wing- or national-scoped
-   planning years — all 21 are squadron-scoped — so this costs nothing today and
-   removes nothing that exists.
+5. **The wing/national year capability is retained, unused.** *(Explicitly
+   confirmed 2026-08-29 — overrides §27's lean toward removing it. Rationale:
+   zero production rows exist; retention requires no migration and costs nothing.)*
 6. **A calendar year is 1 January to 31 December.** Not asked; confirmed from
    data (§1).
 7. **Copying class structure creates new canonical classes for the target year**,
@@ -147,12 +147,14 @@ year is no longer part of it, because the year already exists.
 
 ## 8. TMS and Planning Workspace share one context
 
-PW persists `aafc_pw_year_id` — a UUID (`PlanningWorkspace.tsx:3`). It should
-persist **squadron + year integer**, so that a year needing no row is still a
-valid context and the two apps cannot disagree.
+**Implemented** (`PlanningWorkspace.tsx`, PR #40): PW now persists `aafc_pw_year`
+(year integer, key `PW_YEAR_KEY`) with `aafc_pw_year_id` retained as a UUID hint
+only — not source of truth. `resolveYearSelection()` handles TMS handover using
+the year integer.
 
 TMS showing `704 · 2027` and opening PW must land on `704 · 2027`: no second
-selection, no activation, no create prompt.
+selection, no activation, no create prompt. ✅ Done on the PW side; TMS side is
+part of the frontend plan.
 
 ## 9. Migration
 
@@ -205,7 +207,11 @@ From `2026-08-18-year-ux-design.md`: any create/manage/rename/archive year UX.
    squadron admin writing to their own squadron's 2028 is clearly fine. A
    wing_admin acting through Proxy Mode is fine. Whether a national_admin may
    materialise a year for an arbitrary squadron is not settled.
+   *Interim: `_require_year_access` already restricts national_admin; the
+   PATCH/DELETE bypass fix (530a47b) closes the most dangerous gap. Deferred.*
 2. **What happens to the 2 nights at squadron 718**, which has no planning year
    at all? Carried over from the superseded spec's open question 2, still open.
+   *Out of scope for this change — no row, no dependents, no impact.*
 3. **Does the current+2 cap apply to Wing and National views**, which see many
-   squadrons at once?
+   squadrons at once? *Moot — wing/national year rows are retained but unused
+   (decision 5). No wing/national year nav is being built at this time.*
