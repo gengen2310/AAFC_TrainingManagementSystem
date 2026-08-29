@@ -342,6 +342,12 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .yn-arrow::after,.yn-display::after{content:"";position:absolute;inset:-4px -6px}
 .yn-arrow:focus-visible,.yn-display:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-2px}
 .yn-caret{margin-left:2px;font-size:var(--fs-2xs);color:var(--muted)}
+.auth-link-btn{display:block;width:100%;margin-top:10px;background:none;border:0;
+  color:var(--dark);font-family:inherit;font-size:var(--fs-xs);font-weight:700;
+  text-decoration:underline;cursor:pointer;padding:10px 4px;min-height:44px}
+.auth-link-btn:hover{color:var(--royal)}
+.auth-help{font-size:var(--fs-2xs);color:var(--muted);line-height:1.5;margin:0 0 12px}
+.auth-note{font-size:var(--fs-xs);color:var(--text);line-height:1.5;margin-top:12px;min-height:18px}
 /* One line, and it does NOT move the user. Explicit and reversible: a session
    open across midnight must never have the data swapped underneath it. */
 .yn-rollover{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;
@@ -1288,6 +1294,34 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <button class="btn-auth" id="auth-btn" onclick="doLogin()">Sign In</button>
       <div class="auth-progress" id="auth-progress"><div class="auth-progress-fill" id="auth-progress-bar"></div></div>
       <button type="button" class="auth-back-btn" onclick="showAuthStep1()">‹ Change selection</button>
+      <button type="button" class="auth-link-btn" id="auth-forgot-btn" onclick="showForgotCode()">Forgot access code?</button>
+    </div>
+
+    <!-- Recovery: request a link -->
+    <div id="auth-forgot" style="display:none">
+      <div class="fg">
+        <label for="forgot-email">Recovery email</label>
+        <input type="email" id="forgot-email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <p class="auth-help">Administrator accounts with a verified recovery email can reset their own access code.</p>
+      <button class="btn-auth" id="forgot-btn" onclick="doForgotCode()">Send recovery email</button>
+      <div class="auth-note" id="forgot-note" role="status"></div>
+      <button type="button" class="auth-back-btn" onclick="showAuthStep2()">‹ Back to sign in</button>
+    </div>
+
+    <!-- Recovery: set a new code -->
+    <div id="auth-reset" style="display:none">
+      <div class="fg">
+        <label for="reset-token">Recovery code</label>
+        <input type="text" id="reset-token" placeholder="From your recovery email" autocomplete="off">
+      </div>
+      <div class="fg">
+        <label for="reset-new">New access code</label>
+        <input type="password" id="reset-new" placeholder="At least 8 characters" autocomplete="new-password">
+      </div>
+      <button class="btn-auth" id="reset-btn" onclick="doRecoveryReset()">Set new access code</button>
+      <div class="auth-note" id="reset-note" role="status"></div>
+      <button type="button" class="auth-back-btn" onclick="showAuthStep2()">‹ Back to sign in</button>
     </div>
 
     <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:14px;line-height:1.55">Use is limited to authorised personnel. Access and administrative actions are recorded.</div>
@@ -5075,6 +5109,73 @@ async function doLookup(){
         :'No account found for that selection.';
     } else { err.textContent=apiErr(e); }
   }
+}
+
+// ── Account recovery ────────────────────────────────────────────────────────
+// The backend answers forgot-code identically whatever happened, so this UI must
+// too: it never reports whether an account matched, and it shows the same
+// message on success and on failure. Saying "no account with that address" here
+// would undo the enumeration resistance the endpoint is built around.
+function _authPanels(show){
+  ['auth-step1','auth-step2','auth-forgot','auth-reset'].forEach(function(id){
+    const el=document.getElementById(id);
+    if(el) el.style.display = (id===show) ? '' : 'none';
+  });
+  const err=document.getElementById('auth-err');
+  if(err) err.style.display='none';
+}
+
+function showForgotCode(){
+  _authPanels('auth-forgot');
+  const n=document.getElementById('forgot-note'); if(n) n.textContent='';
+  const f=document.getElementById('forgot-email'); if(f) f.focus();
+}
+
+function showAuthStep2(){ _authPanels('auth-step2'); }
+
+async function doForgotCode(){
+  const btn=document.getElementById('forgot-btn');
+  const note=document.getElementById('forgot-note');
+  const email=(document.getElementById('forgot-email')||{}).value||'';
+  btn.disabled=true; btn.textContent='Sending…';
+  try{
+    await api('/api/auth/forgot-code',{method:'POST',body:{email:email.trim()}});
+  }catch(_){ /* deliberately ignored: the outcome must not vary */ }
+  btn.disabled=false; btn.textContent='Send recovery email';
+  note.textContent='If an eligible account matches those details, recovery '
+    + 'instructions have been sent. Check your email, then enter the recovery '
+    + 'code below.';
+  setTimeout(function(){
+    _authPanels('auth-reset');
+    const t=document.getElementById('reset-token'); if(t) t.focus();
+  }, 2200);
+}
+
+// Named doRecoveryReset, not doResetCode: a doResetCode already exists further
+// down this file for the admin "reset access code" modal. Function declarations
+// hoist, so the later one silently won and this handler never ran -- the button
+// did nothing and reported nothing.
+async function doRecoveryReset(){
+  const btn=document.getElementById('reset-btn');
+  const note=document.getElementById('reset-note');
+  const token=(document.getElementById('reset-token')||{}).value||'';
+  const code=(document.getElementById('reset-new')||{}).value||'';
+  if(code.trim().length<8){
+    note.textContent='An access code must be at least 8 characters.';
+    return;
+  }
+  btn.disabled=true; btn.textContent='Saving…';
+  try{
+    await api('/api/auth/reset-code',{method:'POST',
+      body:{token:token.trim(),new_code:code.trim()}});
+    note.textContent='Your access code has been changed. Sign in with it now.';
+    setTimeout(function(){ _authPanels('auth-step2'); }, 1800);
+  }catch(e){
+    // One message for expired, consumed and unknown alike -- the backend does
+    // not distinguish them and neither should this.
+    note.textContent='That recovery code is not valid. Request a new one.';
+  }
+  btn.disabled=false; btn.textContent='Set new access code';
 }
 
 function showAuthStep1(){
