@@ -44,8 +44,13 @@ def _db(rows_708=None, year=2027):
 def _run(eng, monkeypatch):
     with eng.begin() as conn:
         monkeypatch.setattr(MIG.op, "get_bind", lambda: conn)
-        monkeypatch.setattr(MIG.op, "execute", lambda stmt, params=None:
-                            conn.execute(stmt, params or {}))
+
+        # The double takes ONE argument, matching Alembic's real op.execute.
+        # It previously accepted an optional params dict, which the real API
+        # does not -- so `op.execute(text, params)` passed here and raised
+        # TypeError against a real database. A double more permissive than the
+        # API it stands in for hides exactly the bug it should catch.
+        monkeypatch.setattr(MIG.op, "execute", lambda stmt: conn.execute(stmt))
         MIG.upgrade()
         return conn.execute(sa.text(
             "SELECT year, name FROM planning_years WHERE id = :i"),

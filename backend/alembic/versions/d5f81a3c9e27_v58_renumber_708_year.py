@@ -40,12 +40,16 @@ def upgrade() -> None:
             f"(year={year}, dates={dates}, non-2026 dates={non_2026}). "
             f"Refusing to renumber. Run tools/data-quality/year_container_audit.py."
         )
-    op.execute(sa.text(
+    # conn.execute, NOT op.execute: Alembic's op.execute() takes no parameter
+    # dict, so op.execute(text, params) raises TypeError at runtime. The unit
+    # tests missed it because their op.execute double accepted params -- a
+    # double that is more permissive than the real API hides exactly this.
+    conn.execute(sa.text(
         "UPDATE planning_years SET year = 2026, name = '2026 Training Year' "
         "WHERE id = :i"), {"i": TARGET})
 
 
 def downgrade() -> None:
-    op.execute(sa.text(
+    op.get_bind().execute(sa.text(
         "UPDATE planning_years SET year = 2027, "
         "name = '2026 Training Year → 2027' WHERE id = :i"), {"i": TARGET})
