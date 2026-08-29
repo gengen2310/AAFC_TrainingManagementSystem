@@ -260,6 +260,18 @@ def seed_all():
         if b.period_number
     }
 
+    # Phase B: create the 703 SQN 2026 planning year before demo parade nights so
+    # that planning_year_id (now NOT NULL) can be supplied at INSERT time.
+    from ..models.planning import PlanningYear as _PlanningYear
+    _py_now = datetime.now(timezone.utc)
+    py_703 = _PlanningYear(
+        unit_id=s703.id, wing_id=s703.wing_id, year=2026,
+        name="703 SQN Training Year 2026",
+        active_status=True,
+        created_at=_py_now, updated_at=_py_now,
+    )
+    db.add(py_703); db.commit()
+
     # Tuples: (period, cadet_group, curriculum_code, room, facilitator_last_name, status)
     demo_pns = [
         # Within one period a facilitator delivers one lesson and a room hosts one
@@ -325,6 +337,7 @@ def seed_all():
         published = all(x[5] in ("delivered", "not_delivered") for x in sessions)
         unique_periods = len({x[0] for x in sessions})
         pn = ParadeNight(squadron_id=s703.id, wing_id=wing.id, date=date, term=term,
+                         planning_year_id=py_703.id,
                          start_time=s703.default_start_time, end_time=s703.default_end_time,
                          session_count=unique_periods, published_status=published,
                          timing_template_id=tmpl_703.id)
@@ -435,7 +448,8 @@ def seed_planning_data(db, wing, sqn_by_code):
     """Seed 703 SQN 2026 planning year with WA holidays, parade dates, and prep rules."""
     from datetime import date, timedelta
     from ..models.planning import (
-        PlanningYear, ParadeDate, HolidayPeriod, AnchorEvent, AnchorPrepRule,
+        PlanningYear, HolidayPeriod, AnchorEvent, AnchorPrepRule,
+        # ParadeDate removed in Phase B (migration a1c68e84caf5)
     )
     from ..models import ParadeNight
 
@@ -445,14 +459,23 @@ def seed_planning_data(db, wing, sqn_by_code):
 
     now = datetime.now(timezone.utc)
 
-    # 2026 Planning Year for 703 SQN
-    py = PlanningYear(
-        unit_id=s703.id, wing_id=s703.wing_id, year=2026,
-        name="703 SQN Training Year 2026",
-        active_status=True,
-        created_at=now, updated_at=now,
-    )
-    db.add(py); db.commit()
+    # 2026 Planning Year for 703 SQN — find the one already created in seed_all()
+    # (Phase B: py is created before demo parade nights so planning_year_id NOT NULL
+    # can be satisfied at INSERT time; seed_planning_data reuses it rather than
+    # duplicating, since the unique-per-unit-year-active index would reject a second row)
+    py = db.query(PlanningYear).filter(
+        PlanningYear.unit_id == s703.id,
+        PlanningYear.year == 2026,
+        PlanningYear.active_status == True,  # noqa: E712
+    ).first()
+    if py is None:
+        py = PlanningYear(
+            unit_id=s703.id, wing_id=s703.wing_id, year=2026,
+            name="703 SQN Training Year 2026",
+            active_status=True,
+            created_at=now, updated_at=now,
+        )
+        db.add(py); db.commit()
 
     # The printed Weekly Program's columns ARE the Training Classes, and a session
     # only appears under one whose stage matches its cadet_group. Creating a year
@@ -513,14 +536,6 @@ def seed_planning_data(db, wing, sqn_by_code):
                 return t
         return None
 
-    # Get existing parade nights for 703 SQN (from demo data seeded above)
-    existing_pn_dates = {
-        pn.date for pn in db.query(ParadeNight).filter(
-            ParadeNight.squadron_id == s703.id,
-            ParadeNight.is_archived == False,
-        ).all()
-    }
-
     start_date = date(2026, 1, 30)  # First Friday
     end_date   = date(2026, 12, 11)
     d = start_date
@@ -528,8 +543,6 @@ def seed_planning_data(db, wing, sqn_by_code):
     while d <= end_date:
         if d.weekday() == 4 and not in_holiday(d):  # 4 = Friday
             ds = d.isoformat()
-            # Find linked parade night
-            pn_id = None
             pn = db.query(ParadeNight).filter(
                 ParadeNight.squadron_id == s703.id,
                 ParadeNight.date == ds,
@@ -538,19 +551,16 @@ def seed_planning_data(db, wing, sqn_by_code):
             if not pn:
                 pn = ParadeNight(
                     squadron_id=s703.id, wing_id=s703.wing_id,
+                    planning_year_id=py.id,
                     date=ds, term=get_term(ds),
+                    week_number=week_num,
+                    is_active=True,
                     start_time=s703.default_start_time, end_time=s703.default_end_time,
                     session_count=s703.default_session_count, parade_type="normal",
                 )
                 db.add(pn); db.flush()
-            pn_id = pn.id
-            db.add(ParadeDate(
-                planning_year_id=py.id, unit_id=s703.id,
-                parade_date=ds, parade_type="standard",
-                term=get_term(ds), week_number=week_num,
-                is_active=True, parade_night_id=pn_id,
-                created_at=now, updated_at=now,
-            ))
+            elif pn.planning_year_id is None:
+                pn.planning_year_id = py.id
             week_num += 1
         d += timedelta(days=1)
     db.commit()

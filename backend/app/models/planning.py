@@ -8,7 +8,7 @@ ScheduledSession and PlanningLocation were retired in migration v53
 (a1b2c3d4e5f6) — both superseded by TrainingSession and TrainingArea.
 """
 from sqlalchemy import String, Integer, Boolean, Text, Date, ForeignKey, JSON, UniqueConstraint, Index, text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
 
@@ -62,20 +62,9 @@ class PlanningYear(Base, UUIDMixin, TimestampMixin):
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
-
-
-class ParadeDate(Base, UUIDMixin, TimestampMixin):
-    __tablename__ = "parade_dates"
-    planning_year_id: Mapped[str] = mapped_column(ForeignKey("planning_years.id"), index=True)
-    unit_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
-    parade_date: Mapped[str] = mapped_column(String(10), nullable=False)  # ISO date YYYY-MM-DD
-    parade_type: Mapped[str] = mapped_column(String(30), default="standard")  # standard/special/cancelled
-    term: Mapped[str | None] = mapped_column(String(10), nullable=True)  # T1/T2/T3/T4
-    week_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    cancellation_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    parade_night_id: Mapped[str | None] = mapped_column(ForeignKey("parade_nights.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Back-reference to ParadeNight rows that belong to this planning year
+    # (Phase B: parade_nights.planning_year_id FK added in migration a1c68e84caf5)
+    parade_nights = relationship("ParadeNight", back_populates="planning_year", lazy="select")
 
 
 class HolidayPeriod(Base, UUIDMixin, TimestampMixin):
@@ -138,7 +127,7 @@ class AnchorPrepPlan(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "anchor_prep_plans"
     anchor_event_id: Mapped[str] = mapped_column(ForeignKey("anchor_events.id"), index=True)
     curriculum_id: Mapped[str | None] = mapped_column(ForeignKey("curriculum_items.id"), nullable=True)
-    planned_parade_date_id: Mapped[str | None] = mapped_column(ForeignKey("parade_dates.id"), nullable=True)
+    planned_parade_night_id: Mapped[str | None] = mapped_column(ForeignKey("parade_nights.id"), nullable=True)
     planned_session_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cadet_group: Mapped[str | None] = mapped_column(String(30), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="planned")
@@ -149,7 +138,7 @@ class PlanningConflict(Base, UUIDMixin, TimestampMixin):
     """A detected planning conflict, with optional override."""
     __tablename__ = "planning_conflicts"
     planning_year_id: Mapped[str | None] = mapped_column(ForeignKey("planning_years.id"), nullable=True, index=True)
-    parade_date_id: Mapped[str | None] = mapped_column(ForeignKey("parade_dates.id"), nullable=True)
+    parade_night_id: Mapped[str | None] = mapped_column(ForeignKey("parade_nights.id"), nullable=True)
     # R5-L05: proper FK (was bare String(36)). ondelete=SET NULL protects
     # against hard-delete; normal operation uses soft-delete so rows survive.
     scheduled_session_id: Mapped[str | None] = mapped_column(
@@ -177,10 +166,9 @@ class PlanningFacilitatorLeave(Base, UUIDMixin, TimestampMixin):
 
 
 class PlanningNotice(Base, UUIDMixin, TimestampMixin):
-    """A notice attached to a specific parade date (shown in planning views)."""
+    """A notice attached to a specific parade night (shown in planning views)."""
     __tablename__ = "planning_notices"
-    planning_year_id: Mapped[str | None] = mapped_column(ForeignKey("planning_years.id"), nullable=True, index=True)
-    parade_date_id: Mapped[str] = mapped_column(ForeignKey("parade_dates.id"), nullable=False, index=True)
+    parade_night_id: Mapped[str] = mapped_column(ForeignKey("parade_nights.id"), nullable=False, index=True)
     notice_text: Mapped[str] = mapped_column(Text, nullable=False)
     audience: Mapped[str | None] = mapped_column(String(60), nullable=True)
     priority: Mapped[str] = mapped_column(String(20), default="normal")

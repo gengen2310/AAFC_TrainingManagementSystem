@@ -21,12 +21,14 @@ from ..models import (
 )
 from ..models import Session as TrainingSession
 from ..models.planning import (
-    PlanningYear, ParadeDate, HolidayPeriod, AnchorEvent,
+    PlanningYear, HolidayPeriod, AnchorEvent,
     AnchorPrepRule, AnchorPrepPlan,
     PlanningConflict, PlanningFacilitatorLeave, PlanningNotice,
     CeaImportBatch, CeaActivity, ActivityLocalHide,
     CADET_GROUPS, IMPORTANCE_LEVELS, EVENT_TYPES,
 )
+# ParadeDate removed (Phase B migration a1c68e84caf5) — router endpoints that
+# reference ParadeDate are handled in Task 5.
 # ScheduledSession and PlanningLocation models are intentionally NOT imported here:
 # both are fully superseded (TrainingSession/TrainingArea are canonical -- see
 # docs/qualification/02_architecture_review.md, 03_data_integrity_review.md, and
