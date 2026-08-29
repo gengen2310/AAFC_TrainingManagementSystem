@@ -9,6 +9,7 @@ from .planning import (
     PlanningFacilitatorLeave, PlanningNotice,
     CeaImportBatch, CeaActivity, ActivityLocalHide, ActivityLocalOverride,
 )
+from .recovery import RecoveryToken  # noqa: F401
 from .organisations import (
     NationalEntity, Wing, Squadron, Flight, User, AccessCode, ProxySession, IpLoginAttempt,
     IpApiRequest, UserApiRequest,

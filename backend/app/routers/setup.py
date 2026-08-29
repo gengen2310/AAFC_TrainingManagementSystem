@@ -14,7 +14,7 @@ from ..database import get_db
 from ..models import (
     Wing, Squadron, Facilitator, TrainingArea, TimingTemplate, CurriculumItem,
     ParadeNight, Session as TrainingSession, CeaActivity, PlanningYear, HolidayPeriod,
-    Equipment, Cadet, Activity, AnchorEvent, Flight, TrainingClass,
+    Equipment, Cadet, Activity, AnchorEvent, Flight, TrainingClass, User,
 )
 from ..services_year import current_year, find_year_context
 from ..dependencies import get_principal
@@ -240,4 +240,19 @@ def setup_status(squadron_id: str | None = None, db: DBSession = Depends(get_db)
         # returned for anything that reports on them.
 
     complete = bool(steps) and all(st["done"] for st in steps if not st.get("optional"))
+    # Spec 2026-08-29 §3a: existing System Administrators are deliberately NOT
+    # given a recovery email by migration -- there is none to invent. The gap is
+    # surfaced instead. Reported as a COUNT, never as a checklist step: making it
+    # a step would repeat the cadet-row mistake of presenting something that is
+    # not setup work as setup work.
+    # `national` is None for squadron-scope callers, and this is national-level
+    # operational information -- so it is both a TypeError and a disclosure to
+    # attach it unconditionally.
+    if isinstance(national, dict):
+        national["system_admins_without_recovery_email"] = db.query(User).filter(
+            User.role == "system_admin",
+            User.active_status == True,          # noqa: E712
+            User.is_archived == False,           # noqa: E712
+            User.recovery_email_verified_at.is_(None),
+        ).count()
     return {"national": national, "squadron": squadron, "steps": steps, "complete": complete}
