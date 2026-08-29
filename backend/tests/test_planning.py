@@ -1965,17 +1965,16 @@ def test_night_notice_list_empty_for_night_with_no_notices(client):
 
 
 def test_night_notice_create_without_active_planning_year_returns_actionable_400(client):
-    """ADMIN702 has no active Training Year seeded -- confirms the endpoint
-    surfaces a clear, actionable error rather than a raw 500 or a silently
-    orphaned notice."""
+    """Phase B: create_parade now calls ensure_year_context, so every parade night
+    gets a planning_year_id even if the squadron had none before. Notice creation
+    must therefore succeed (200) for any newly-created parade night."""
     hdr = login(client, "ADMIN702")
     pnid = _create_plain_parade_night(client, hdr, "2099-03-20")
     r = client.post(f"/api/parade-nights/{pnid}/notices",
                      json={"notice_text": "test"}, headers=hdr)
-    assert r.status_code == 400, r.text
-    d = r.json()["detail"]
-    assert d["error"] == "no_active_planning_year"
-    assert "Training Year" in d["message"]
+    assert r.status_code == 200, r.text
+    assert r.json()["ok"] is True
+    assert "notice_id" in r.json()
 
 
 def test_night_notice_cross_squadron_denied(client):

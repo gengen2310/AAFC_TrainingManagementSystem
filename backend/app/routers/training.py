@@ -24,6 +24,7 @@ from ..permissions import (Principal, require_can_view_squadron, require_can_wri
                           NATIONAL_LEVEL)
 from ..services import (audit, score_parade, publish_blockers, close_blockers)
 from ..services_readiness import parade_night_readiness
+from ..services_year import ensure_year_context
 
 router = APIRouter(prefix="/api", tags=["training"])
 
@@ -416,144 +417,28 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
     else:
         session_count = body.session_count or s.default_session_count or 3
 
+    # Resolve the planning year — create it if absent (idempotent).
+    year = int(body.date[:4])
+    py = ensure_year_context(db, s.id, year, user_id=p.user_id)
+
     pn = ParadeNight(squadron_id=s.id, wing_id=s.wing_id, date=body.date, term=body.term,
+                     planning_year_id=py.id,
                      start_time=s.default_start_time, end_time=s.default_end_time,
                      session_count=session_count, parade_type=body.parade_type or "normal",
                      timing_template_id=effective_tmpl.id if effective_tmpl else None,
                      created_by=p.user_id)
-    db.add(pn); db.flush()
-
-    # R5-M10: capture whether a planning-year link was created. None means the
-    # squadron has no active PlanningYear; the parade night is created but won't
-    # appear in Planning Workspace's calendar (which keys on ParadeDate rows).
-    pd_linked = _find_or_create_parade_date_for_night(db, pn, body.term)
-
+    db.add(pn)
     db.commit()
     meta = client_meta(request)
     audit(db, p, object_type="parade_night", object_id=pn.id, action="create",
           new={"date": body.date}, ip=meta["ip"], ua=meta["ua"])
-    return {"ok": True, "parade_night_id": pn.id, "linked_to_planning_year": pd_linked is not None}
+    return {"ok": True, "parade_night_id": pn.id}
 
-
-def _year_for_date(db: DBSession, squadron_id: str, date: str):
-    """The active PlanningYear a parade night on `date` belongs to.
-
-    Reported 2026-08-25: a parade night created in TMS did not appear in Planning
-    Workspace, the Weekly Program or the calendar. This picked
-    `order_by(year.desc()).first()` -- the highest-numbered active year -- and
-    never looked at the date. The moment a squadron has two active years, which
-    happens as soon as next year's is created, every new night attached to the
-    newest one regardless of when it fell. Planning Workspace builds its canvas
-    from ParadeDate rows joined on planning_year_id, so opening the year you
-    scheduled in showed nothing.
-
-    Resolution order, most specific first:
-
-      1. An active year whose EXISTING parade dates span this date. PlanningYear
-         has no start/end column -- its span is only ever implied by the dates it
-         holds -- so this is the closest thing to the user's own definition of
-         the year, and it is correct whether the squadron runs calendar years or
-         July-June ones.
-      2. An active year numbered the same as the date's calendar year. Needed for
-         a year created moments ago that has no dates yet, which is exactly the
-         reported case. Calendar alignment is what this system actually produces:
-         a freshly seeded 703 SQN year 2026 spans 2026-01-30 to 2026-12-11.
-      3. The only active year, if there is exactly one. No ambiguity to resolve.
-      4. None -- the caller reports the night as unlinked rather than guessing.
-
-    Never reaches into a wing or national scoped year: unit_id must match.
-    """
-    from ..models.planning import ParadeDate, PlanningYear
-    from sqlalchemy import func
-
-    years = (
-        db.query(PlanningYear)
-        .filter(PlanningYear.unit_id == squadron_id,
-                PlanningYear.active_status == True)  # noqa: E712
-        .order_by(PlanningYear.year.desc())
-        .all()
-    )
-    if not years:
-        return None
-
-    # 1. spanned by the year's own parade dates
-    for y in years:
-        bounds = db.query(func.min(ParadeDate.parade_date),
-                          func.max(ParadeDate.parade_date)) \
-                   .filter(ParadeDate.planning_year_id == y.id).first()
-        if bounds and bounds[0] and bounds[0] <= date <= bounds[1]:
-            return y
-
-    # 2. calendar-year match
-    try:
-        cal = int(str(date)[:4])
-    except (TypeError, ValueError):
-        cal = None
-    if cal is not None:
-        for y in years:
-            if y.year == cal:
-                return y
-
-    # 3. unambiguous single year
-    if len(years) == 1:
-        return years[0]
-
-    return None
-
-
-def _find_or_create_parade_date_for_night(db: DBSession, pn: "ParadeNight", term: str | None = None):
-    """REM-129/REM-34: Planning Workspace's main canvas/command-centre view
-    (and PlanningNotice, which FKs to ParadeDate, not ParadeNight) is built
-    entirely around ParadeDate (joined via ParadeDate.planning_year_id) -- a
-    ParadeNight created through connected-frontend's plain "add one parade
-    night" flow had no matching ParadeDate row at all, so it was fully
-    visible via GET /api/parade-nights (and therefore inside TMS itself) but
-    invisible to anything keyed off ParadeDate. generate_parade_dates() and
-    the CSV import path already create this link correctly; this was the one
-    gap, now shared by both create_parade (REM-129) and the parade-night-
-    scoped Notices endpoints below (REM-34).
-
-    Returns the linked/created ParadeDate, or None if the squadron has no
-    active Planning Year to attach one to (a real, surfaceable state -- see
-    callers for how each handles it; this helper never invents a Planning
-    Year).
-
-    Only auto-links to a squadron-scoped active Planning Year (unit_id ==
-    this squadron) -- the same scope Planning Workspace's own
-    `GET /api/planning/years?unit_id=...` resolves for a squadron-role
-    session -- so this never silently reaches into a wing/national-scoped
-    year.
-    """
-    from ..models.planning import ParadeDate, PlanningYear
-
-    existing_link = db.query(ParadeDate).filter(ParadeDate.parade_night_id == pn.id).first()
-    if existing_link:
-        return existing_link
-
-    active_year = _year_for_date(db, pn.squadron_id, pn.date)
-    if not active_year:
-        return None
-
-    existing_pd = db.query(ParadeDate).filter(
-        ParadeDate.planning_year_id == active_year.id,
-        ParadeDate.parade_date == pn.date,
-    ).first()
-    if existing_pd:
-        if not existing_pd.parade_night_id:
-            existing_pd.parade_night_id = pn.id
-        return existing_pd
-
-    pd = ParadeDate(
-        planning_year_id=active_year.id, unit_id=pn.squadron_id, parade_date=pn.date,
-        parade_type="standard", term=term, parade_night_id=pn.id,
-    )
-    db.add(pd)
-    db.flush()
-    return pd
 
 
 def _pn_dict(pn: ParadeNight) -> dict:
     return {"parade_night_id": pn.id, "squadron_id": pn.squadron_id, "date": pn.date, "term": pn.term,
+            "planning_year_id": pn.planning_year_id,
             "start_time": pn.start_time, "end_time": pn.end_time, "session_count": pn.session_count,
             "parade_type": pn.parade_type, "notes": pn.notes, "published_status": pn.published_status,
             "readiness_score": pn.readiness_score, "closeout_status": pn.closeout_status,
@@ -641,14 +526,8 @@ def update_parade_night(pnid: str, body: ParadeNightUpdateIn, db: DBSession = De
 
 
 # ── PARADE NIGHT NOTICES ──
-# REM-34: connected-frontend has always worked in terms of ParadeNight, never
-# ParadeDate (the Planning-module concept PlanningNotice actually FKs to) --
-# these endpoints translate transparently via _find_or_create_parade_date_for_night
-# so connected-frontend never needs to know ParadeDate exists at all. Once a
-# notice is created, editing/archiving it goes through the existing notice_id-
-# based /api/planning/notices/{notice_id} endpoints unchanged (no new duplicate
-# logic needed there -- a notice's identity doesn't depend on which frontend
-# created it).
+# Phase B: PlanningNotice now FKs directly to parade_nights.id (parade_night_id).
+# These endpoints create/list notices for a given parade night directly.
 
 class NightNoticeIn(BaseModel):
     notice_text: str
@@ -658,20 +537,14 @@ class NightNoticeIn(BaseModel):
 
 @router.get("/parade-nights/{pnid}/notices")
 def list_night_notices(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
-    from ..models.planning import ParadeDate, PlanningNotice
+    from ..models.planning import PlanningNotice
     pn = db.get(ParadeNight, pnid)
     if not pn or pn.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     require_can_view_squadron(p, pn.squadron_id, pn.wing_id)
-    pd = db.query(ParadeDate).filter(ParadeDate.parade_night_id == pnid).first()
-    if not pd:
-        # No ParadeDate yet means no notice could ever have been created for
-        # this night (create_notice always resolves/creates one first) -- an
-        # empty list is correct, not an error.
-        return []
     notices = (
         db.query(PlanningNotice)
-        .filter(PlanningNotice.parade_date_id == pd.id, PlanningNotice.is_archived == False)  # noqa: E712
+        .filter(PlanningNotice.parade_night_id == pnid, PlanningNotice.is_archived == False)  # noqa: E712
         .order_by(PlanningNotice.created_at)
         .all()
     )
@@ -686,15 +559,13 @@ def create_night_notice(pnid: str, body: NightNoticeIn, db: DBSession = Depends(
     if not pn or pn.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
     require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
-    pd = _find_or_create_parade_date_for_night(db, pn, pn.term)
-    if not pd:
+    if not pn.planning_year_id:
         raise HTTPException(400, detail={
             "error": "no_active_planning_year",
-            "message": "This squadron has no active Training Year, so a notice cannot be attached to this Parade Night yet. Set up a Training Year first.",
+            "message": "This parade night has no planning year linked. Set up a Training Year first.",
         })
     notice = PlanningNotice(
-        planning_year_id=pd.planning_year_id,
-        parade_date_id=pd.id,
+        parade_night_id=pn.id,
         notice_text=body.notice_text.strip(),
         priority=body.priority,
         audience=body.audience,
@@ -710,8 +581,7 @@ def create_night_notice(pnid: str, body: NightNoticeIn, db: DBSession = Depends(
 def _notice_out(n) -> dict:
     return {
         "notice_id": n.id,
-        "planning_year_id": n.planning_year_id,
-        "parade_date_id": n.parade_date_id,
+        "parade_night_id": n.parade_night_id,
         "notice_text": n.notice_text,
         "audience": n.audience,
         "priority": n.priority,
@@ -2870,7 +2740,7 @@ def get_facilitator_suggestions(
 
     Returns [] with a "no_recommendation" flag when no usable data is available.
     """
-    from ..models.planning import PlanningFacilitatorLeave, ParadeDate
+    from ..models.planning import PlanningFacilitatorLeave
     from sqlalchemy import func, and_
 
     s = db.get(Session, sid)
