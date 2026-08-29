@@ -14,6 +14,29 @@ from ..models import User, AccessCode, Wing, Squadron, NationalEntity, ProxySess
 from ..dependencies import get_principal, client_meta, real_client_ip
 from ..permissions import Principal
 from ..services import audit
+from ..services_recovery import (
+    RESET_TTL_MINUTES, consume_token, hash_token, is_recovery_eligible, mint_token,
+)
+from ..email_service import send_mail
+from ..models import RecoveryToken
+
+# In-memory recovery limiter. Deliberately separate from the login limiter so a
+# recovery attempt never consumes a legitimate user's login budget.
+_recovery_hits: dict[str, list[float]] = {}
+
+
+def _recovery_rate_ok(key: str, limit_per_hour: int) -> bool:
+    import time
+    now = time.time()
+    hits = [t for t in _recovery_hits.get(key, []) if now - t < 3600]
+    hits.append(now)
+    _recovery_hits[key] = hits
+    return len(hits) <= limit_per_hour
+
+
+def reset_recovery_limiter() -> None:
+    _recovery_hits.clear()
+from ..services import audit
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -426,3 +449,120 @@ def _me(user: User, db: DBSession | None = None) -> dict:
             "national_id": user.national_id,
             "is_wing": user.role in ("wing_viewer", "wing_admin"),
             "is_national": user.role in ("national_viewer", "national_admin", "system_admin", "auditor")}
+
+
+# ── Recovery ─────────────────────────────────────────────────────────────────
+class VerifyRecoveryEmailIn(BaseModel):
+    token: str
+
+
+@router.post("/verify-recovery-email")
+def verify_recovery_email(body: VerifyRecoveryEmailIn, db: DBSession = Depends(get_db)):
+    """Confirm a recovery address using the emailed one-time token.
+
+    Unauthenticated on purpose: the token IS the proof, and it was delivered to
+    the address being proved. One generic failure for unknown, expired,
+    consumed and wrong-purpose alike, so this cannot be used as an oracle.
+    """
+    u = consume_token(db, body.token or "", "verify_email")
+    if u is None:
+        raise HTTPException(400, detail={
+            "error": "invalid_token",
+            "message": "That verification link is not valid. Request a new one."})
+    u.recovery_email_verified_at = utcnow()
+    db.commit()
+    audit(db, None, object_type="user", object_id=u.id,
+          action="recovery_email_verified", new={"verified": True})
+    return {"ok": True, "verified": True}
+
+
+class ForgotCodeIn(BaseModel):
+    email: str = ""
+
+
+class ResetByTokenIn(BaseModel):
+    token: str
+    new_code: str
+
+
+# One constant body for every outcome. Built once so no branch can drift from
+# another: an attacker distinguishing "account exists" from "it does not" is
+# the whole thing this endpoint is defending against.
+_FORGOT_RESPONSE = {
+    "ok": True,
+    "message": ("If an eligible account matches those details, recovery "
+                "instructions have been sent."),
+}
+
+
+@router.post("/forgot-code")
+def forgot_code(body: ForgotCodeIn, request: Request, db: DBSession = Depends(get_db)):
+    """Start recovery. ALWAYS returns the same body, whatever happens.
+
+    Rate limited on the client IP and on the submitted address, so neither
+    rotating IPs nor a fixed one can enumerate accounts.
+    """
+    ip = real_client_ip(request) or "unknown"
+    addr = (body.email or "").strip().lower()
+
+    if not _recovery_rate_ok(f"ip:{ip}", 5) or (addr and not _recovery_rate_ok(f"em:{addr}", 3)):
+        # Even the rate-limit response is the constant body: a distinct 429
+        # would itself confirm that an address is worth guessing at.
+        return _FORGOT_RESPONSE
+
+    u = db.query(User).filter(User.recovery_email == addr).first() if addr else None
+    if is_recovery_eligible(u):
+        raw = mint_token(db, u, "reset", RESET_TTL_MINUTES, ip)
+        db.commit()
+        sent = send_mail(
+            u.recovery_email,
+            "Reset your AAFC TMS access code",
+            "Use this code to set a new access code.\n\n"
+            f"Recovery code: {raw}\n\n"
+            "It expires in 20 minutes. If you did not request this, ignore "
+            "this email and your access code stays unchanged.",
+        )
+        if not sent:
+            # Roll the token back rather than leave one valid and undeliverable.
+            db.query(RecoveryToken).filter(
+                RecoveryToken.token_hash == hash_token(raw)).delete()
+            db.commit()
+        audit(db, None, object_type="user", object_id=u.id,
+              action="recovery_requested", new={"delivered": sent})
+    else:
+        # Do comparable work on the miss path so response time does not
+        # separate "no such account" from "eligible".
+        hash_token(addr or "-")
+
+    return _FORGOT_RESPONSE
+
+
+@router.post("/reset-code")
+def reset_code_by_token(body: ResetByTokenIn, db: DBSession = Depends(get_db)):
+    """Set a new access code using a recovery token."""
+    u = consume_token(db, body.token or "", "reset")
+    if u is None or not is_recovery_eligible(u):
+        # Re-checked after minting: the account may have been archived since.
+        raise HTTPException(400, detail={
+            "error": "invalid_token",
+            "message": "That recovery link is not valid. Request a new one."})
+
+    new_code = (body.new_code or "").strip()
+    if len(new_code) < 8:
+        raise HTTPException(400, detail={
+            "error": "code_too_short",
+            "message": "An access code must be at least 8 characters."})
+
+    # Retire every existing code before adding the new one. Two live codes for
+    # one account is one more than it can justify.
+    for ac in db.query(AccessCode).filter(AccessCode.user_id == u.id).all():
+        ac.active_status = False
+        ac.failed_attempts = 0
+        ac.locked_until = None
+    db.add(AccessCode(user_id=u.id, code_hash=hash_code(new_code), active_status=True))
+
+    # Every live JWT dies here: dependencies.py rejects a tv mismatch.
+    u.token_version = (u.token_version or 0) + 1
+    db.commit()
+    audit(db, None, object_type="user", object_id=u.id, action="recovery_completed")
+    return {"ok": True, "message": "Your access code has been changed. Sign in with it now."}
