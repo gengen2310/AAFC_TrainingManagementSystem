@@ -1,5 +1,58 @@
 # Changelog
 
+## Unreleased — UX consistency and System Administrator account recovery (2026-08-30)
+
+Staging: `df3fff6`. Not released to production.
+
+### System Administrator account recovery
+
+Closes the gap where a System Administrator who lost their access code had no
+way back in. Access codes are still stored only as hashes and are never
+retrieved — every route below *replaces* a code rather than revealing one.
+
+- **Forgot access code** on the sign-in screen. Sends a one-time link to a
+  **verified** recovery email; 20-minute expiry, single use, superseded by any
+  newer request. The response is byte-identical whether or not an account
+  matched, and is rate limited per IP and per submitted address.
+- **Recovery email** on privileged accounts (`system_admin`, `national_admin`,
+  `wing_admin`, `sqn_admin`). Setting one requires the caller's current access
+  code, since that address becomes a credential-reset channel. Always stored
+  unverified until a verification link is followed.
+- Completing a reset retires every existing code, clears lockout, and
+  increments `token_version`, which signs out all existing sessions.
+- **Archived and disabled accounts cannot self-recover** — an administrator
+  restores them first.
+- **Break-glass**: `backend/scripts/breakglass_reset_sa.py`, run by an operator
+  through Railway. No hard-coded secret, nothing in git, no HTTP route.
+- Migration `v59 c3a7f2e91b48`: four `users.recovery_email*` columns and the
+  `recovery_tokens` table. No backfill — existing administrators are surfaced
+  in `GET /api/setup/status` rather than given an invented address.
+- `docs/security/system-admin-recovery.md` documents all five procedures.
+
+### Last System Administrator
+
+Removal protection extended from demote and archive to **disable** and
+**permanent delete**.
+
+### Interface
+
+- **Training Year selector** rebuilt to match the controls beside it: 1.5px
+  border, 6px radius, light surface, 38px against a neighbouring button's 37px.
+  The 44px touch target is preserved through a transparent `::after` rather
+  than by making the control taller. Replaces a dark 22px capsule that read as
+  a separate module.
+- Fixed the selector rendering an em-dash placeholder before years resolved,
+  which looked like a broken control.
+- **Account Management**: an active account's button read *Delete* but archived
+  the account, while archived accounts carried *Delete Permanently…*. Renamed
+  to **Archive** so each word names one action.
+- **Notifications**: connected-frontend (10/14px) and the React app (9/16px)
+  now share `--toast-pad-y/-x/-gap/-edge/-max-w`, declared in both.
+- **Inherited Activities** is year-scoped; selecting 2027 no longer shows
+  2026's holidays.
+- Repaired a JavaScript syntax error that stopped the entire single-file SPA
+  from parsing, and added a test that parses every inline script block.
+
 ## v17.1.1 — Final System Assurance, Accelerated Release Qualification, and Public Release to Authorised Users (2026-08-02)
 
 Released to authorised AAFC users. Consolidates the full Final System Assurance
