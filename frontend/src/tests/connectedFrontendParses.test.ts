@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+// Vite raw import: loads the file's text at transform time, so this test needs
+// no node types (@types/node is not installed and tsconfig only carries
+// vitest/globals).
+import html from "../../../connected-frontend/index.html?raw";
 
 /**
  * connected-frontend is a single-file SPA whose entire application lives in one
@@ -8,17 +10,16 @@ import { resolve } from "node:path";
  * it stops the whole app from running, on every page, for every role.
  *
  * On 2026-08-29 `main` shipped exactly that: a cleanup commit deleted a
- * function's opening line and left its trailing `} catch(e){…}` behind, and
- * nothing in the suite noticed. This is the cheapest possible guard against a
- * repeat.
+ * function's opening line and left its trailing `} catch(e){…}` behind, and the
+ * suite stayed green because every test that would have caught it needs a
+ * RUNNING app. This is the cheapest guard against a repeat.
  */
+const source: string = html as unknown as string;
+
+const blocks = [...source.matchAll(
+  /<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+
 describe("connected-frontend/index.html", () => {
-  const html = readFileSync(
-    resolve(__dirname, "../../../connected-frontend/index.html"), "utf8");
-
-  const blocks = [...html.matchAll(
-    /<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
-
   it("has at least one inline script block", () => {
     expect(blocks.length).toBeGreaterThan(0);
   });
@@ -27,8 +28,8 @@ describe("connected-frontend/index.html", () => {
     const failures: string[] = [];
     blocks.forEach((src, i) => {
       try {
-        // Function() parses without executing — exactly the check a browser
-        // makes before it will run any of the file.
+        // Function() parses without executing -- the same check a browser makes
+        // before it will run any of the file.
         new Function(src);
       } catch (e) {
         failures.push(`block ${i}: ${(e as Error).message}`);
@@ -37,13 +38,11 @@ describe("connected-frontend/index.html", () => {
     expect(failures, failures.join("\n")).toEqual([]);
   });
 
-  it("declares no function that nothing references", () => {
-    // Narrow guard for the specific failure mode above: a deleted function
-    // leaving callers behind, or a caller left pointing at nothing.
+  it("leaves no function declared with nothing calling it", () => {
     for (const name of ["ynCreateYear", "ynDoRollover", "ynStartEdit"]) {
-      const declared = new RegExp(`function\\s+${name}\\s*\\(`).test(html);
+      const declared = new RegExp(`function\\s+${name}\\s*\\(`).test(source);
       const referenced = new RegExp(`${name}\\s*\\(`).test(
-        html.replace(new RegExp(`function\\s+${name}\\s*\\(`, "g"), ""));
+        source.replace(new RegExp(`function\\s+${name}\\s*\\(`, "g"), ""));
       expect(declared && !referenced,
         `${name} is declared but never called`).toBe(false);
     }
