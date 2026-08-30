@@ -780,6 +780,59 @@ def test_annual_program_empty_year_no_parade_nights(client):
         )
 
 
+def test_annual_program_out_of_term_dates_visible(client):
+    """Parade nights with dates outside WA term ranges must appear in annual-program.
+
+    Regression for P0-INTEG-01: nights in school-holiday breaks (e.g. Apr 12-27,
+    Jun 28-Jul 13) were fetched via planning_year_id but never assigned to a term
+    bucket, so they silently vanished from the PW calendar.
+    """
+    hdr = _sqn_admin(client)
+    year = next_test_year()
+    py_r = client.post(
+        "/api/planning/years",
+        json={"year": year, "name": f"OOT Regression {year}"},
+        headers=hdr,
+    )
+    assert py_r.status_code in (200, 201)
+    year_id = py_r.json()["planning_year_id"]
+
+    try:
+        # One date inside T1, one in the T1-T2 holiday break, one after T4 end
+        in_term_date    = f"{year}-03-10"   # Inside T1 (01-28 – 04-11)
+        break_date      = f"{year}-04-20"   # Between T1 end (04-11) and T2 start (04-28)
+        post_t4_date    = f"{year}-12-20"   # After T4 end (12-12)
+
+        for date in (in_term_date, break_date, post_t4_date):
+            r = client.post(
+                f"/api/planning/years/{year_id}/parade-dates",
+                json={"parade_date": date, "parade_type": "normal"},
+                headers=hdr,
+            )
+            assert r.status_code in (200, 201), f"Failed to create parade date {date}: {r.text}"
+
+        r2 = client.get(f"/api/planning/years/{year_id}/annual-program", headers=hdr)
+        assert r2.status_code == 200
+        d = r2.json()
+
+        all_dates_in_response = [
+            pd["parade_date"]
+            for term in d["terms"]
+            for pd in term["parade_dates"]
+        ]
+        assert in_term_date in all_dates_in_response,  f"{in_term_date} missing from annual program"
+        assert break_date in all_dates_in_response,    f"{break_date} (between T1/T2) missing from annual program"
+        assert post_t4_date in all_dates_in_response,  f"{post_t4_date} (after T4) missing from annual program"
+        assert d["total_parade_dates"] == 3
+
+    finally:
+        client.patch(
+            f"/api/planning/years/{year_id}",
+            json={"active_status": False, "version": 0},
+            headers=hdr,
+        )
+
+
 # ─────────────────────────────────────────────────────────────
 # POST /api/planning/years/{id}/rollover
 # ─────────────────────────────────────────────────────────────

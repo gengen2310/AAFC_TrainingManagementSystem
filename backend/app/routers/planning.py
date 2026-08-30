@@ -3687,12 +3687,14 @@ def get_annual_program(
     # Build term blocks using WA defaults
     yr = str(py.year)
     terms = []
+    assigned_pn_ids: set[str] = set()
     for t_num, (ts, te) in sorted(_WA_TERM_RANGES.items()):
         t_start = f"{yr}-{ts}"
         t_end   = f"{yr}-{te}"
         term_label = f"T{t_num}"
 
         t_dates = [d for d in all_dates if t_start <= d.date <= t_end]
+        assigned_pn_ids.update(d.id for d in t_dates)
         t_holidays = [h for h in all_holidays
                       if not (h.end_date < t_start or h.start_date > t_end)]
         t_anchors = [a for a in all_anchors
@@ -3759,6 +3761,49 @@ def get_annual_program(
             "holidays": [_holiday_v14_out(h) for h in t_holidays],
             "activities": [_anchor_v14_out(a) for a in t_anchors],
         })
+
+    # Parade nights outside the WA term ranges (school holidays, late Jan, late Dec)
+    # must still appear in the PW calendar. Assign each to the nearest preceding term
+    # (nights before T1 go to T1; nights in T1-T2 break go to T1; etc.).
+    if terms:
+        _term_end_dates = [f"{yr}-{te}" for _, (_, te) in sorted(_WA_TERM_RANGES.items())]
+        for pn_obj in all_dates:
+            if pn_obj.id in assigned_pn_ids:
+                continue
+            target_idx = 0
+            for i, t_end_str in enumerate(_term_end_dates):
+                if t_end_str < pn_obj.date:
+                    target_idx = i
+            sessions = ts_by_pn.get(pn_obj.id, [])
+            filled = len([s for s in sessions if s.curriculum_item_id or s.custom_title])
+            in_hol = any(_in_range(pn_obj.date, h.start_date, h.end_date)
+                         for h in all_holidays if h.affects_parade)
+            date_sessions = ts_by_date_id.get(pn_obj.id, [])
+            sessions_summary = [
+                {
+                    "session_id": s.id,
+                    "period": s.period_number,
+                    "cadet_group": s.cadet_group,
+                    "title": s.curriculum_title_at_time or s.custom_title,
+                    "curriculum_code": s.curriculum_code_at_time,
+                    "facilitator": s.facilitator_display_name_at_time,
+                    "location": s.training_area_name_at_time,
+                    "training_classes": classes_by_session.get(s.id, []),
+                    "core_status": ci_tier_ap.get(s.curriculum_item_id or "", {}).get("core_status"),
+                }
+                for s in date_sessions
+            ]
+            terms[target_idx]["parade_dates"].append({
+                **_night_out_as_date(pn_obj),
+                "term": terms[target_idx]["term"],
+                "session_count": pn_obj.session_count,
+                "filled_count": filled,
+                "in_holiday": in_hol,
+                "sessions_summary": sessions_summary,
+                "conflict_count": conflict_counts_map.get(pn_obj.id, 0),
+                "notices": [_notice_out(n) for n in notices_by_date_id.get(pn_obj.id, [])],
+            })
+            terms[target_idx]["parade_count"] += 1
 
     # Overall stats (uses pn_map / ts_by_pn already fetched above — no extra queries)
     total_dates = len(all_dates)
