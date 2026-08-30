@@ -2442,13 +2442,15 @@ def list_planning_facilitators(
 # Conflict Detection
 # ─────────────────────────────────────────────────────────────
 
-def _run_conflict_check(year_id: str, date_id: str, db: DBSession) -> list[PlanningConflict]:
-    """Detect conflicts for a single parade date, replacing previous non-resolved results."""
-    db.query(PlanningConflict).filter(
-        PlanningConflict.parade_date_id == date_id,
-        PlanningConflict.is_resolved == False,  # noqa: E712
-    ).delete(synchronize_session=False)
+def _detect_conflicts(year_id: str, date_id: str, db: DBSession) -> list[dict]:
+    """Detect conflicts for one parade date. Reads only -- writes nothing.
 
+    Split out of _run_conflict_check so the same rules can answer two
+    different questions: "record what is wrong" (the persisted conflicts,
+    which carry a user's override and reason) and "what is wrong right now"
+    (the derived plan review, which must not write anything to answer a
+    GET). Two copies of these rules would drift, and a review that
+    disagreed with the recorded conflicts would be worse than no review."""
     pd_obj = db.get(ParadeDate, date_id)
     # Use real TrainingSession records for conflict detection
     real_sessions: list = []
@@ -2458,17 +2460,13 @@ def _run_conflict_check(year_id: str, date_id: str, db: DBSession) -> list[Plann
             TrainingSession.is_archived == False,  # noqa: E712
         ).all()
 
-    conflicts = []
+    conflicts: list[dict] = []
 
     def _conflict(ctype: str, severity: str, msg: str, sess_id=None):
-        c = PlanningConflict(
-            id=str(uuid.uuid4()), planning_year_id=year_id,
-            parade_date_id=date_id, scheduled_session_id=sess_id,
-            conflict_type=ctype, severity=severity, message=msg,
-            is_resolved=False, created_at=utcnow(), updated_at=utcnow(),
-        )
-        conflicts.append(c)
-        db.add(c)
+        conflicts.append({
+            "conflict_type": ctype, "severity": severity, "message": msg,
+            "scheduled_session_id": sess_id,
+        })
 
     # Facilitator double-booking
     fac_map: dict[tuple, list] = {}
@@ -2542,8 +2540,34 @@ def _run_conflict_check(year_id: str, date_id: str, db: DBSession) -> list[Plann
                           f"Facilitator {name} is on leave on this date{reason_part}.",
                           affected[0].id if affected else None)
 
-    db.commit()
     return conflicts
+
+
+def _run_conflict_check(year_id: str, date_id: str, db: DBSession) -> list[PlanningConflict]:
+    """Persist the detected conflicts for one parade date.
+
+    Replaces previous UNRESOLVED results only: a conflict a user has overridden
+    carries their reason and who they are, and re-running checks must never
+    discard that."""
+    db.query(PlanningConflict).filter(
+        PlanningConflict.parade_date_id == date_id,
+        PlanningConflict.is_resolved == False,  # noqa: E712
+    ).delete(synchronize_session=False)
+
+    rows = []
+    for found in _detect_conflicts(year_id, date_id, db):
+        c = PlanningConflict(
+            id=str(uuid.uuid4()), planning_year_id=year_id,
+            parade_date_id=date_id,
+            scheduled_session_id=found["scheduled_session_id"],
+            conflict_type=found["conflict_type"], severity=found["severity"],
+            message=found["message"], is_resolved=False,
+            created_at=utcnow(), updated_at=utcnow(),
+        )
+        rows.append(c)
+        db.add(c)
+    db.commit()
+    return rows
 
 
 @router.get("/years/{year_id}/conflicts")
@@ -2603,6 +2627,74 @@ def override_conflict(
     audit(db, p, object_type="planning_conflict", object_id=c.id,
           action="conflict_override", reason=body.override_reason)
     return {"ok": True, "conflict_id": conflict_id}
+
+
+@router.get("/years/{year_id}/plan-review")
+def get_plan_review(
+    year_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """The current state of every planning check, derived on read.
+
+    Answers "what is wrong with this year right now" without the user having to
+    remember to press anything, and without writing a row to answer a GET.
+
+    It does not replace the persisted conflicts, and deliberately so: a
+    PlanningConflict carries a user's override and the reason they typed, and a
+    derived view has nowhere to put that. So each finding here reports whether
+    it is already overridden, by matching a resolved conflict of the same type
+    on the same date. Findings and recorded conflicts come from the same
+    detector, so the two can never disagree about what counts as a conflict.
+
+    Read-only: this endpoint needs view access, not write access, which is why
+    it is a GET and why a viewer can open it.
+    """
+    py = _get_year_or_404(year_id, db)
+    _require_year_access(p, py)
+
+    dates = db.query(ParadeDate).filter(
+        ParadeDate.planning_year_id == year_id,
+        ParadeDate.is_active == True,  # noqa: E712
+    ).order_by(ParadeDate.parade_date).all()
+
+    overridden = db.query(PlanningConflict).filter(
+        PlanningConflict.planning_year_id == year_id,
+        PlanningConflict.is_resolved == True,  # noqa: E712
+    ).all()
+    override_index: dict[tuple, PlanningConflict] = {}
+    for c in overridden:
+        override_index.setdefault((c.parade_date_id, c.conflict_type), c)
+
+    findings = []
+    counts = {"critical": 0, "warning": 0, "overridden": 0}
+    for pd_obj in dates:
+        for found in _detect_conflicts(year_id, pd_obj.id, db):
+            prior = override_index.get((pd_obj.id, found["conflict_type"]))
+            item = {
+                "parade_date_id": pd_obj.id,
+                "parade_date": pd_obj.parade_date,
+                "conflict_type": found["conflict_type"],
+                "severity": found["severity"],
+                "message": found["message"],
+                "scheduled_session_id": found["scheduled_session_id"],
+                "is_overridden": prior is not None,
+                "override_reason": prior.override_reason if prior else None,
+            }
+            findings.append(item)
+            if prior is not None:
+                counts["overridden"] += 1
+            elif found["severity"] == "critical":
+                counts["critical"] += 1
+            else:
+                counts["warning"] += 1
+
+    return {
+        "planning_year_id": year_id,
+        "parade_dates_reviewed": len(dates),
+        "counts": counts,
+        "findings": findings,
+    }
 
 
 @router.post("/years/{year_id}/run-checks")
