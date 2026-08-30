@@ -9,7 +9,7 @@ The chain holds **70 migrations**, not 27. It is linear — a single head
 (`f2c8e51d7a93`), no branches, no orphans; the harness asserts this and would
 refuse to run otherwise.
 
-Of the 70: 11 carry data logic (`UPDATE` / `INSERT` / `DELETE`), 6 carry a
+Of the 70: 12 carry data logic (`UPDATE` / `INSERT` / `DELETE`), 6 carry a
 self-check that raises on a failed backfill, and the rest are DDL only.
 
 ## Why PostgreSQL, and why the test suite could not have caught this
@@ -103,12 +103,64 @@ python backend/scripts/rehearse_migrations.py --quick  # skip the per-migration 
 Needs a local PostgreSQL and `createdb` rights. It creates and drops its own
 scratch database and never touches an existing one.
 
-## Not covered
+## Data paths
 
-- **Data-path rehearsal at scale.** The 11 data-bearing migrations run here
-  against an empty database, so their backfills execute but move no rows. v57,
-  v58, v60 and v61 have been rehearsed separately with representative data;
-  the other 7 have not.
+`scripts/rehearse_data_migrations.py` covers the second half of Part 93.
+
+Of the 12 data-bearing migrations, **nine seed their own reference data**, so the
+empty-database walk does exercise them. That is measured, not assumed — after a
+full chain run on an empty database:
+
+| table | rows |
+|---|---|
+| `curriculum_items` | 214 |
+| `curriculum_elements` | 15 |
+| `session_status_reason_tags` | 10 |
+| `curriculum_phases` | 8 |
+| `training_area_capability_tags` | 8 |
+| `activity_type_tags` | 3 |
+
+**Three transform rows only a real installation has**, so on an empty database
+their `UPDATE`/`DELETE` match nothing and the chain walk proves nothing about
+them. Each is now rehearsed against representative rows, at the migration's own
+parent revision, with a control row that must *not* change:
+
+| migration | exercised | result |
+|---|---|---|
+| `v54 a3b4c5d6e7f8` | dangling `parade_dates.parade_night_id` nulled; valid one kept | ok |
+| `v55 b4c5d6e7f8a9` | `session_audience` de-duplicated; dangling `planning_conflicts.scheduled_session_id` nulled; valid one kept | ok |
+| `821e 821e2a4bc3e6` | all six `block_type` remappings, `is_instructional_period` recomputed both ways, `service_desk_email_configs` NULL timestamps backfilled | ok |
+
+Verified non-vacuous by sabotage. Breaking v54's `WHERE` clause so it matches
+nothing makes the migration itself fail with the exact foreign-key violation a
+production deploy would hit; corrupting one entry in 821e's type map is caught
+by the block assertions.
+
+### Finding: v55's de-duplication is unreachable on the canonical chain
+
+`v49` (`af4a8639bc3a`) already made `(session_id, training_class_id)` unique, so
+duplicates cannot exist by the time `v55` runs, and its `DELETE` can never match
+a row. `v55` then adds `uq_session_audience_pair` — a **second unique constraint
+on the same column pair**, which the canonical schema now carries alongside
+`uq_session_audience_session_class`.
+
+Neither is a correctness fault: the data ends up right either way. The cost is a
+redundant index on every write to that table, and dead defensive code that reads
+as though it is protecting something.
+
+The rehearsal exercises the `DELETE` path deliberately, by dropping the v49
+constraint first. That reproduces a database which reached v54 without it —
+created by `create_all` rather than migrated, which is the population v55 was
+written to repair.
+
+Left as-is rather than fixed: removing a constraint from a shipped migration
+rewrites history for every environment that has already applied it, which is a
+worse risk than a redundant index. Recorded here for a future consolidation.
+
+## Not covered
+- **Volume.** The data cases use a handful of rows each: enough to prove the
+  transformation is correct, not enough to say what it costs. A backfill that is
+  right on six rows can still time out on six hundred thousand.
 - **A production-shaped dump.** No production data has been copied, per the
   standing constraint. Row counts, and the time the data migrations take
   against them, remain unmeasured.
