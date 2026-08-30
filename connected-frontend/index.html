@@ -301,12 +301,13 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
    and shift everything to its right. Measured 120px -> 120px. */
 .yn-display{position:relative;display:flex;align-items:center;justify-content:center;gap:5px;background:transparent;border:0;border-left:1px solid var(--border);border-right:1px solid var(--border);color:var(--text);font-family:inherit;font-size:var(--fs-md);font-weight:700;font-variant-numeric:tabular-nums;padding:0 12px;min-height:36px;min-width:64px;cursor:pointer}
 .yn-display:hover{background:var(--surface-2)}
-.yn-display input{background:transparent;border:none;border-bottom:2px solid var(--blue);color:#fff;font-size:var(--fs-md);font-weight:600;width:52px;text-align:center;font-family:inherit}
-/* AUDIT-2026-08 G4: the rule above previously set outline:none at specificity 0-1-1,
-   which outranks the global :focus-visible (0-1-0) — the field had no focus ring at all. */
-.yn-display input:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;}
-.yn-gear{background:transparent;border:none;border-left:1px solid rgba(255,255,255,.2);color:#fff;font-size:var(--fs-lg);padding:0 11px;cursor:pointer;height:100%}
-.yn-gear:hover{background:rgba(255,255,255,.12)}
+/* Removed 2026-08-30 (Part 62 audit): .yn-display input, its :focus-visible
+   partner, and .yn-gear. All three styled the old dark year capsule -- color:#fff
+   and rgba(255,255,255,…) borders -- and .year-nav-ctrl's surface is now
+   #ffffff, so the contrast register read them as white-on-white. Neither
+   element is rendered any more: the click-to-type year editor was removed (see
+   the note by ynToast) and no markup uses .yn-gear. Dead rules, and they were
+   generating false failures in the register. */
 .yn-wrap{display:flex;flex-direction:column;align-items:flex-end;margin-left:auto;position:relative}
 /* The menu lives OUTSIDE .year-nav-ctrl on purpose: that pill is
    overflow:hidden to keep its rounded ends, which silently clipped an
@@ -1010,7 +1011,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .fc-pill{font-size:var(--fs-2xs);font-weight:700;border-radius:12px;padding:2px 8px;white-space:nowrap;flex-shrink:0;}
 .fc-pill.on-track{background:var(--ok-bg);color:var(--ok-text);}
 .fc-pill.planning-risk{background:var(--warn-bg);color:var(--warn-text);} /* DES-H04: --warn fails 3.1:1; --warn-text passes 5.4:1 */
-.fc-pill.critical{background:#fde8e8;color:var(--red);}
+.fc-pill.critical{background:var(--red-bg);color:var(--status-text-danger);} /* G1: raw --red was 3.95:1 on this background and .fc-pill is --fs-2xs, so it needs 4.5. --status-text-danger is 4.51:1 here, 6.27:1 in high contrast. Its on-track/planning-risk siblings already used paired tokens; this one was missed. */
 /* Neutral, not green: an unassigned stage is 'not assessed', not 'healthy'. */
 .fc-pill.not-configured{background:var(--surface-2);color:var(--text-2);}
 .fc-stats{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:var(--fs-xs);}

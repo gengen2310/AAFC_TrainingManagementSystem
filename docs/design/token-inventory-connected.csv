@@ -1,0 +1,769 @@
+category,literal,occurrences,distinct_files,first_location
+color,#fff,42,1,connected-frontend/index.html:138
+color,#fde8e8,12,1,connected-frontend/index.html:60
+color,#e51937,10,1,connected-frontend/index.html:23
+color,#1a7f4b,10,1,connected-frontend/index.html:63
+color,#fff3cd,10,1,connected-frontend/index.html:64
+color,#8b1a1a,10,1,connected-frontend/index.html:232
+color,#51b0e3,9,1,connected-frontend/index.html:17
+color,#004b8d,9,1,connected-frontend/index.html:19
+color,#d4f0e3,9,1,connected-frontend/index.html:63
+color,#d1dce8,8,1,connected-frontend/index.html:28
+color,#7a5200,8,1,connected-frontend/index.html:64
+color,#002f65,7,1,connected-frontend/index.html:18
+color,#2e7d32,7,1,connected-frontend/index.html:6335
+color,#f57f17,7,1,connected-frontend/index.html:6335
+color,#145f38,6,1,connected-frontend/index.html:63
+color,#7c3aed,6,1,connected-frontend/index.html:65
+color,#c01530,6,1,connected-frontend/index.html:365
+color,#455560,5,1,connected-frontend/index.html:20
+color,#f4f8fc,5,1,connected-frontend/index.html:25
+color,#c97a00,5,1,connected-frontend/index.html:64
+color,#e0f0fa,5,1,connected-frontend/index.html:68
+color,#deeefa,5,1,connected-frontend/index.html:273
+color,#1a5c35,5,1,connected-frontend/index.html:513
+color,#b0b7bb,4,1,connected-frontend/index.html:21
+color,#f0f0f0,4,1,connected-frontend/index.html:153
+color,#001e42,4,1,connected-frontend/index.html:214
+color,#f0f7ff,4,1,connected-frontend/index.html:233
+color,#bee3f8,4,1,connected-frontend/index.html:233
+color,#101a26,4,1,connected-frontend/index.html:689
+color,#fac,4,1,connected-frontend/index.html:5705
+color,#7a8590,4,1,connected-frontend/index.html:18170
+color,"rgba(255,255,255,.18)",4,1,connected-frontend/index.html:250
+color,"rgba(255,255,255,.07)",4,1,connected-frontend/index.html:259
+color,#ffffff,3,1,connected-frontend/index.html:26
+color,#5c6a76,3,1,connected-frontend/index.html:34
+color,#ccc,3,1,connected-frontend/index.html:135
+color,#eef0f2,3,1,connected-frontend/index.html:514
+color,#e6f3fc,3,1,connected-frontend/index.html:675
+color,#fffbf0,3,1,connected-frontend/index.html:720
+color,#7a4800,3,1,connected-frontend/index.html:854
+color,#1a1a2e,3,1,connected-frontend/index.html:959
+color,#bbb,3,1,connected-frontend/index.html:1059
+color,#78909c,3,1,connected-frontend/index.html:6335
+color,#fde8ea,3,1,connected-frontend/index.html:16761
+color,#ede9fe,3,1,connected-frontend/index.html:18298
+color,"rgba(0,0,0,.35)",3,1,connected-frontend/index.html:171
+color,"rgba(0,75,141,.22)",3,1,connected-frontend/index.html:225
+color,"rgba(0,0,0,.20)",3,1,connected-frontend/index.html:226
+color,"rgba(255,255,255,.1)",3,1,connected-frontend/index.html:250
+color,"rgba(255,255,255,.9)",3,1,connected-frontend/index.html:260
+color,"rgba(255,255,255,.12)",3,1,connected-frontend/index.html:309
+color,#e4edf5,2,1,connected-frontend/index.html:29
+color,#1e2d3d,2,1,connected-frontend/index.html:31
+color,#888,2,1,connected-frontend/index.html:141
+color,#000000,2,1,connected-frontend/index.html:156
+color,#003a7a,2,1,connected-frontend/index.html:226
+color,#002050,2,1,connected-frontend/index.html:226
+color,#004590,2,1,connected-frontend/index.html:227
+color,#002a60,2,1,connected-frontend/index.html:227
+color,#00183a,2,1,connected-frontend/index.html:228
+color,#f5a5a5,2,1,connected-frontend/index.html:232
+color,#001b3d,2,1,connected-frontend/index.html:241
+color,#002550,2,1,connected-frontend/index.html:241
+color,#ffd700,2,1,connected-frontend/index.html:249
+color,#c8102e,2,1,connected-frontend/index.html:487
+color,#9a0b22,2,1,connected-frontend/index.html:487
+color,#fff7cc,2,1,connected-frontend/index.html:524
+color,#7a6000,2,1,connected-frontend/index.html:524
+color,#ffe8d4,2,1,connected-frontend/index.html:525
+color,#7a3a00,2,1,connected-frontend/index.html:525
+color,#f0e8ff,2,1,connected-frontend/index.html:526
+color,#5b1a8b,2,1,connected-frontend/index.html:526
+color,#f0f4f8,2,1,connected-frontend/index.html:640
+color,#f0faf5,2,1,connected-frontend/index.html:718
+color,#eef4fb,2,1,connected-frontend/index.html:1061
+color,#f5f7fa,2,1,connected-frontend/index.html:3936
+color,#7efff5,2,1,connected-frontend/index.html:4285
+color,#558b2f,2,1,connected-frontend/index.html:6335
+color,#e8f5e9,2,1,connected-frontend/index.html:8910
+color,#fff8e1,2,1,connected-frontend/index.html:8911
+color,#aaa,2,1,connected-frontend/index.html:11407
+color,#ddb,2,1,connected-frontend/index.html:16419
+color,#4c1d95,2,1,connected-frontend/index.html:18298
+color,"rgba(0,0,0,.25)",2,1,connected-frontend/index.html:170
+color,"rgba(0,30,65,.2)",2,1,connected-frontend/index.html:226
+color,"rgba(255,255,255,.10)",2,1,connected-frontend/index.html:226
+color,"rgba(0,30,65,.25)",2,1,connected-frontend/index.html:226
+color,"rgba(255,255,255,.06)",2,1,connected-frontend/index.html:241
+color,"rgba(255,255,255,.08)",2,1,connected-frontend/index.html:257
+color,"rgba(255,255,255,.55)",2,1,connected-frontend/index.html:265
+color,"rgba(255,255,255,.2)",2,1,connected-frontend/index.html:308
+color,"rgba(0,18,40,.55)",2,1,connected-frontend/index.html:735
+color,"rgba(255,255,255,.22)",2,1,connected-frontend/index.html:742
+color,#7db2ce,1,1,connected-frontend/index.html:22
+color,#f0f5fa,1,1,connected-frontend/index.html:27
+color,#3a4a55,1,1,connected-frontend/index.html:32
+color,#44506a,1,1,connected-frontend/index.html:33
+color,#6e7275,1,1,connected-frontend/index.html:36
+color,#7e9bbb,1,1,connected-frontend/index.html:37
+color,#d41733,1,1,connected-frontend/index.html:61
+color,#ddd,1,1,connected-frontend/index.html:129
+color,#e8f0f8,1,1,connected-frontend/index.html:139
+color,#f8f8f8,1,1,connected-frontend/index.html:140
+color,#555,1,1,connected-frontend/index.html:140
+color,#555555,1,1,connected-frontend/index.html:154
+color,#777777,1,1,connected-frontend/index.html:155
+color,#111111,1,1,connected-frontend/index.html:157
+color,#404040,1,1,connected-frontend/index.html:158
+color,#3a3a3a,1,1,connected-frontend/index.html:159
+color,#e0e0e0,1,1,connected-frontend/index.html:160
+color,#003399,1,1,connected-frontend/index.html:161
+color,#004d24,1,1,connected-frontend/index.html:162
+color,#c0f0d8,1,1,connected-frontend/index.html:163
+color,#003318,1,1,connected-frontend/index.html:164
+color,#6a3800,1,1,connected-frontend/index.html:165
+color,#ffe090,1,1,connected-frontend/index.html:166
+color,#cc0011,1,1,connected-frontend/index.html:167
+color,#b00010,1,1,connected-frontend/index.html:168
+color,#c8e6ff,1,1,connected-frontend/index.html:169
+color,#222,1,1,connected-frontend/index.html:193
+color,#d0d0d0,1,1,connected-frontend/index.html:193
+color,#000e26,1,1,connected-frontend/index.html:214
+color,#fdeaea,1,1,connected-frontend/index.html:232
+color,#7e8992,1,1,connected-frontend/index.html:298
+color,#f0fbf4,1,1,connected-frontend/index.html:421
+color,#eef6fc,1,1,connected-frontend/index.html:422
+color,#c4e4f5,1,1,connected-frontend/index.html:455
+color,#e01235,1,1,connected-frontend/index.html:488
+color,#b00d25,1,1,connected-frontend/index.html:488
+color,#d4f5f0,1,1,connected-frontend/index.html:523
+color,#0a5c50,1,1,connected-frontend/index.html:523
+color,#e8e8e8,1,1,connected-frontend/index.html:533
+color,#333,1,1,connected-frontend/index.html:533
+color,#eaf3d8,1,1,connected-frontend/index.html:537
+color,#4a5d1f,1,1,connected-frontend/index.html:537
+color,#f0f7fc,1,1,connected-frontend/index.html:556
+color,#e0eeff,1,1,connected-frontend/index.html:589
+color,#003d88,1,1,connected-frontend/index.html:589
+color,#e4eaf0,1,1,connected-frontend/index.html:640
+color,#5f5f5f,1,1,connected-frontend/index.html:655
+color,#8a9a3a,1,1,connected-frontend/index.html:689
+color,#fff5f5,1,1,connected-frontend/index.html:719
+color,#f8f9fa,1,1,connected-frontend/index.html:721
+color,#fafbff,1,1,connected-frontend/index.html:934
+color,#cce0ff,1,1,connected-frontend/index.html:940
+color,#a8d5bc,1,1,connected-frontend/index.html:945
+color,#f5b0b0,1,1,connected-frontend/index.html:946
+color,#fffbe6,1,1,connected-frontend/index.html:960
+color,#5a4200,1,1,connected-frontend/index.html:960
+color,#f0c800,1,1,connected-frontend/index.html:960
+color,#fef0f0,1,1,connected-frontend/index.html:961
+color,#7a1010,1,1,connected-frontend/index.html:961
+color,#e03,1,1,connected-frontend/index.html:961
+color,#f8f0f0,1,1,connected-frontend/index.html:983
+color,#b5002b,1,1,connected-frontend/index.html:983
+color,#fdf2d8,1,1,connected-frontend/index.html:987
+color,#7a4a00,1,1,connected-frontend/index.html:987
+color,#b3122c,1,1,connected-frontend/index.html:996
+color,#a06200,1,1,connected-frontend/index.html:1038
+color,#e6edf5,1,1,connected-frontend/index.html:1054
+color,#11202e,1,1,connected-frontend/index.html:1062
+color,#9fd0f0,1,1,connected-frontend/index.html:1062
+color,#ffd36b,1,1,connected-frontend/index.html:1063
+color,#dbeaf5,1,1,connected-frontend/index.html:1095
+color,#8593,1,1,connected-frontend/index.html:1877
+color,#9662,1,1,connected-frontend/index.html:1881
+color,#fffbeb,1,1,connected-frontend/index.html:2568
+color,#f59e0b,1,1,connected-frontend/index.html:2568
+color,#92400e,1,1,connected-frontend/index.html:2568
+color,#0678a0,1,1,connected-frontend/index.html:2692
+color,#8592,1,1,connected-frontend/index.html:4222
+color,#c07000,1,1,connected-frontend/index.html:4615
+color,#170,1,1,connected-frontend/index.html:5512
+color,#fce4e4,1,1,connected-frontend/index.html:8912
+color,#fff0f0,1,1,connected-frontend/index.html:11620
+color,#eef5ff,1,1,connected-frontend/index.html:11620
+color,#f5f0ff,1,1,connected-frontend/index.html:11620
+color,#fff5ec,1,1,connected-frontend/index.html:11620
+color,#f5f5f5,1,1,connected-frontend/index.html:11620
+color,#faf7e8,1,1,connected-frontend/index.html:11620
+color,#666,1,1,connected-frontend/index.html:11621
+color,#b8860b,1,1,connected-frontend/index.html:11621
+color,#c2ccd6,1,1,connected-frontend/index.html:15191
+color,#f57c00,1,1,connected-frontend/index.html:15299
+color,#8a93a6,1,1,connected-frontend/index.html:15300
+color,#f5a,1,1,connected-frontend/index.html:16420
+color,#fff7e8,1,1,connected-frontend/index.html:16456
+color,#ddd060,1,1,connected-frontend/index.html:16456
+color,#f1e8fd,1,1,connected-frontend/index.html:16851
+color,#5b21b6,1,1,connected-frontend/index.html:16851
+color,#eef1f4,1,1,connected-frontend/index.html:18217
+color,#9aa5ad,1,1,connected-frontend/index.html:18217
+color,#c4b5fd,1,1,connected-frontend/index.html:18536
+color,#8b5cf6,1,1,connected-frontend/index.html:18552
+color,#a78bfa,1,1,connected-frontend/index.html:18552
+color,#f5f3ff,1,1,connected-frontend/index.html:18553
+color,"rgba(0,47,101,.10)",1,1,connected-frontend/index.html:74
+color,"rgba(0,47,101,.14)",1,1,connected-frontend/index.html:75
+color,"rgba(81,176,227,.20)",1,1,connected-frontend/index.html:114
+color,"rgba(81,176,227,.05)",1,1,connected-frontend/index.html:215
+color,"rgba(0,47,101,.08)",1,1,connected-frontend/index.html:216
+color,"rgba(0,0,0,.28)",1,1,connected-frontend/index.html:216
+color,"rgba(0,47,101,.12)",1,1,connected-frontend/index.html:219
+color,"rgba(255,255,255,.25)",1,1,connected-frontend/index.html:245
+color,"rgba(255,255,255,.8)",1,1,connected-frontend/index.html:250
+color,"rgba(255,255,255,.03)",1,1,connected-frontend/index.html:257
+color,"rgba(255,255,255,.65)",1,1,connected-frontend/index.html:264
+color,"rgba(0,0,0,.16)",1,1,connected-frontend/index.html:327
+color,"rgba(0,47,101,.06)",1,1,connected-frontend/index.html:483
+color,"rgba(100,0,20,.3)",1,1,connected-frontend/index.html:487
+color,"rgba(150,0,30,.3)",1,1,connected-frontend/index.html:487
+color,"rgba(0,47,101,.035)",1,1,connected-frontend/index.html:630
+color,"rgba(81,176,227,.18)",1,1,connected-frontend/index.html:674
+color,"rgba(255,255,255,.6)",1,1,connected-frontend/index.html:713
+color,"rgba(0,0,0,.38)",1,1,connected-frontend/index.html:737
+color,"rgba(255,255,255,.15)",1,1,connected-frontend/index.html:756
+color,"rgba(255,255,255,.75)",1,1,connected-frontend/index.html:772
+color,"rgba(0,0,0,.06)",1,1,connected-frontend/index.html:970
+color,"rgba(0,0,0,.4)",1,1,connected-frontend/index.html:1068
+color,"rgba(255,255,255,.3)",1,1,connected-frontend/index.html:1347
+color,"rgba(0,30,60,.45)",1,1,connected-frontend/index.html:19359
+color,"rgba(0,30,60,.28)",1,1,connected-frontend/index.html:19360
+font-size,8pt,1,1,connected-frontend/index.html:134
+font-size,7pt,1,1,connected-frontend/index.html:141
+font-size,inherit,1,1,connected-frontend/index.html:468
+font-size,7.5pt,1,1,connected-frontend/index.html:11442
+spacing,8px,116,1,connected-frontend/index.html:141
+spacing,6px,62,1,connected-frontend/index.html:223
+spacing,10px,59,1,connected-frontend/index.html:95
+spacing,12px,43,1,connected-frontend/index.html:283
+spacing,4px,43,1,connected-frontend/index.html:327
+spacing,"8px"">",28,1,connected-frontend/index.html:1911
+spacing,0,24,1,connected-frontend/index.html:118
+spacing,"10px"">",22,1,connected-frontend/index.html:1954
+spacing,14px,20,1,connected-frontend/index.html:222
+spacing,3px 8px,19,1,connected-frontend/index.html:423
+spacing,16px,19,1,connected-frontend/index.html:441
+spacing,3px,17,1,connected-frontend/index.html:285
+spacing,5px,17,1,connected-frontend/index.html:302
+spacing,2px,15,1,connected-frontend/index.html:344
+spacing,"6px"">",15,1,connected-frontend/index.html:1451
+spacing,4px 4px,15,1,connected-frontend/index.html:4600
+spacing,4px 8px,14,1,connected-frontend/index.html:979
+spacing,"8px""></div>",14,1,connected-frontend/index.html:1511
+spacing,10px 12px,13,1,connected-frontend/index.html:224
+spacing,2px 4px,12,1,connected-frontend/index.html:2137
+spacing,2px 8px,10,1,connected-frontend/index.html:360
+spacing,6px 8px,10,1,connected-frontend/index.html:798
+spacing,"4px"">",10,1,connected-frontend/index.html:1346
+spacing,20px,9,1,connected-frontend/index.html:214
+spacing,7px,9,1,connected-frontend/index.html:442
+spacing,7px 10px,9,1,connected-frontend/index.html:563
+spacing,5px 8px,9,1,connected-frontend/index.html:975
+spacing,"10px"">`+",9,1,connected-frontend/index.html:6242
+spacing,10px 14px,8,1,connected-frontend/index.html:353
+spacing,"0"">",8,1,connected-frontend/index.html:1910
+spacing,4px 12px,7,1,connected-frontend/index.html:250
+spacing,"12px"">",7,1,connected-frontend/index.html:2123
+spacing,"6px""></div>",7,1,connected-frontend/index.html:3359
+spacing,9px,6,1,connected-frontend/index.html:266
+spacing,auto,6,1,connected-frontend/index.html:310
+spacing,"12px""></div>",6,1,connected-frontend/index.html:1465
+spacing,"18px"">",6,1,connected-frontend/index.html:2119
+spacing,"4px""><span style=""display:inline-block",6,1,connected-frontend/index.html:8937
+spacing,"8px 4px"">",6,1,connected-frontend/index.html:9371
+spacing,9px 12px,5,1,connected-frontend/index.html:232
+spacing,10px 16px,5,1,connected-frontend/index.html:480
+spacing,18px,5,1,connected-frontend/index.html:568
+spacing,6px 10px,5,1,connected-frontend/index.html:639
+spacing,6px 0,5,1,connected-frontend/index.html:648
+spacing,1px,5,1,connected-frontend/index.html:687
+spacing,8px 10px,5,1,connected-frontend/index.html:989
+spacing,4px 6px,5,1,connected-frontend/index.html:4601
+spacing,"14px"">`+",5,1,connected-frontend/index.html:6270
+spacing,2px 6px,4,1,connected-frontend/index.html:475
+spacing,8px 12px,4,1,connected-frontend/index.html:908
+spacing,5px 0,4,1,connected-frontend/index.html:991
+spacing,3px 0,4,1,connected-frontend/index.html:10760
+spacing,3px 4px,3,1,connected-frontend/index.html:135
+spacing,0 0 12px,3,1,connected-frontend/index.html:322
+spacing,6px 12px,3,1,connected-frontend/index.html:357
+spacing,5px 12px,3,1,connected-frontend/index.html:496
+spacing,1px 4px,3,1,connected-frontend/index.html:508
+spacing,24px,3,1,connected-frontend/index.html:626
+spacing,12px 16px,3,1,connected-frontend/index.html:707
+spacing,4px 10px,3,1,connected-frontend/index.html:1045
+spacing,12px 14px,3,1,connected-frontend/index.html:1046
+spacing,2px 7px,3,1,connected-frontend/index.html:1109
+spacing,0 0 10px,3,1,connected-frontend/index.html:1179
+spacing,3px 6px,3,1,connected-frontend/index.html:1366
+spacing,"auto""></span>",3,1,connected-frontend/index.html:1785
+spacing,"14px"">",3,1,connected-frontend/index.html:2400
+spacing,1px 0,3,1,connected-frontend/index.html:8980
+spacing,4px 0,2,1,connected-frontend/index.html:234
+spacing,0 12px,2,1,connected-frontend/index.html:302
+spacing,0 0 14px,2,1,connected-frontend/index.html:321
+spacing,22px,2,1,connected-frontend/index.html:412
+spacing,9px 16px,2,1,connected-frontend/index.html:447
+spacing,4px 9px,2,1,connected-frontend/index.html:461
+spacing,9px 11px,2,1,connected-frontend/index.html:571
+spacing,16px 20px,2,1,connected-frontend/index.html:739
+spacing,1px 5px,2,1,connected-frontend/index.html:886
+spacing,1px 7px,2,1,connected-frontend/index.html:993
+spacing,14px 16px,2,1,connected-frontend/index.html:1002
+spacing,10px 8px,2,1,connected-frontend/index.html:1073
+spacing,8px 0,2,1,connected-frontend/index.html:1106
+spacing,"0 0 12px"">",2,1,connected-frontend/index.html:2322
+spacing,"12px""></p>",2,1,connected-frontend/index.html:2811
+spacing,"8px 0 0"">leave the end date blank for an open-ended phase.</p>",2,1,connected-frontend/index.html:3197
+spacing,"10px""></p>",2,1,connected-frontend/index.html:3198
+spacing,16px 24px,2,1,connected-frontend/index.html:4193
+spacing,4px 14px,2,1,connected-frontend/index.html:4640
+spacing,"4px 0""><div style=""height:100%",2,1,connected-frontend/index.html:6371
+spacing,"2px"">",2,1,connected-frontend/index.html:8089
+spacing,5px 0 3px,2,1,connected-frontend/index.html:8796
+spacing,"3px 0 3px 16px"" role=""img"" aria-label=""${esc(cls.display_name)",2,1,connected-frontend/index.html:8808
+spacing,"10px"" role=""img"" aria-label=""${r.date",2,1,connected-frontend/index.html:9012
+spacing,"2px 3px""><input type=""time"" value=""${b.start_time||''",2,1,connected-frontend/index.html:14955
+spacing,"2px 3px""><input type=""time"" value=""${b.end_time||''",2,1,connected-frontend/index.html:14956
+spacing,0!important,1,1,connected-frontend/index.html:126
+spacing,12mm,1,1,connected-frontend/index.html:133
+spacing,32px 0 28px,1,1,connected-frontend/index.html:218
+spacing,10px auto 0,1,1,connected-frontend/index.html:221
+spacing,11px,1,1,connected-frontend/index.html:226
+spacing,3px 10px,1,1,connected-frontend/index.html:248
+spacing,6px 20px,1,1,connected-frontend/index.html:252
+spacing,30px,1,1,connected-frontend/index.html:271
+spacing,10px 18px 4px 30px,1,1,connected-frontend/index.html:274
+spacing,24px 28px,1,1,connected-frontend/index.html:279
+spacing,0 10px,1,1,connected-frontend/index.html:297
+spacing,0 11px,1,1,connected-frontend/index.html:308
+spacing,16px 18px,1,1,connected-frontend/index.html:321
+spacing,-4px -6px,1,1,connected-frontend/index.html:342
+spacing,10px 4px,1,1,connected-frontend/index.html:347
+spacing,0 6px 0 0,1,1,connected-frontend/index.html:363
+spacing,11px 14px,1,1,connected-frontend/index.html:377
+spacing,14px 0,1,1,connected-frontend/index.html:403
+spacing,-1px,1,1,connected-frontend/index.html:405
+spacing,15px 16px,1,1,connected-frontend/index.html:429
+spacing,18px 20px,1,1,connected-frontend/index.html:441
+spacing,0 2px,1,1,connected-frontend/index.html:476
+spacing,6px 4px,1,1,connected-frontend/index.html:503
+spacing,8px 14px,1,1,connected-frontend/index.html:582
+spacing,-2px,1,1,connected-frontend/index.html:582
+spacing,10px 13px,1,1,connected-frontend/index.html:588
+spacing,40px 20px,1,1,connected-frontend/index.html:603
+spacing,0 auto,1,1,connected-frontend/index.html:606
+spacing,10px 0 4px,1,1,connected-frontend/index.html:627
+spacing,-14px,1,1,connected-frontend/index.html:630
+spacing,24px 0 12px,1,1,connected-frontend/index.html:695
+spacing,8px 0 6px,1,1,connected-frontend/index.html:706
+spacing,0 0 16px,1,1,connected-frontend/index.html:748
+spacing,6px 14px,1,1,connected-frontend/index.html:777
+spacing,0 0 4px,1,1,connected-frontend/index.html:850
+spacing,0 16px 12px,1,1,connected-frontend/index.html:931
+spacing,0 0 8px,1,1,connected-frontend/index.html:968
+spacing,1px 6px,1,1,connected-frontend/index.html:970
+spacing,10px 16px 8px,1,1,connected-frontend/index.html:1048
+spacing,8px 16px 10px,1,1,connected-frontend/index.html:1049
+spacing,5px 4px,1,1,connected-frontend/index.html:1060
+spacing,10px 18px,1,1,connected-frontend/index.html:1137
+spacing,7px 11px,1,1,connected-frontend/index.html:1152
+spacing,18px 0 6px,1,1,connected-frontend/index.html:1176
+spacing,14px 0 4px,1,1,connected-frontend/index.html:1177
+spacing,12px 0 4px,1,1,connected-frontend/index.html:1178
+spacing,0 12px 12px 35px,1,1,connected-frontend/index.html:1208
+spacing,0 7px,1,1,connected-frontend/index.html:1217
+spacing,"18px 0"">checking your session…</div>",1,1,connected-frontend/index.html:1250
+spacing,3px 20px 0,1,1,connected-frontend/index.html:1427
+spacing,"8px"">at your current rate, how many planned sessions are at risk of not being delivered by year end?</div>",1,1,connected-frontend/index.html:1536
+spacing,"8px"">year-to-date rate and current vs previous term. set the training term on each parade night to enable this view.</div>",1,1,connected-frontend/index.html:1629
+spacing,"auto"" onclick=""_pnclearselection()"">clear selection</button>",1,1,connected-frontend/index.html:1749
+spacing,"8px""><input type=""checkbox"" id=""curr-show-archived"" onchange=""_currtoggleshowarchived()""> show archived</label>",1,1,connected-frontend/index.html:1852
+spacing,"0"">holiday periods</h2>",1,1,connected-frontend/index.html:1912
+spacing,"0 0 10px"">planning status per training class — unplanned requirements, nights remaining, and available time blocks.</p>",1,1,connected-frontend/index.html:1922
+spacing,"0"">wing hq events</h2>",1,1,connected-frontend/index.html:1930
+spacing,"0"">anchor events</h2>",1,1,connected-frontend/index.html:1948
+spacing,"4px""><input type=""checkbox"" id=""anch-show-archived"" onchange=""loadanchors(p.currentyearid)""> show archived</label>",1,1,connected-frontend/index.html:1950
+spacing,"0"">mission backlog</h2>",1,1,connected-frontend/index.html:1984
+spacing,"8px""><input type=""checkbox"" id=""fac-show-archived"" onchange=""_facstoggleshowarchived()""> show archived</label>",1,1,connected-frontend/index.html:2035
+spacing,"16px"">",1,1,connected-frontend/index.html:2039
+spacing,"8px"">rooms / training areas",1,1,connected-frontend/index.html:2087
+spacing,"auto""><input type=""checkbox"" id=""room-show-archived"" onchange=""_restoggleshowarchived('room')""> show archived</label>",1,1,connected-frontend/index.html:2088
+spacing,"8px"">equipment",1,1,connected-frontend/index.html:2096
+spacing,"auto""><input type=""checkbox"" id=""equip-show-archived"" onchange=""_restoggleshowarchived('equip')""> show archived</label>",1,1,connected-frontend/index.html:2097
+spacing,"0"">planning checks</h2>",1,1,connected-frontend/index.html:2124
+spacing,"14px""></div>",1,1,connected-frontend/index.html:2128
+spacing,"0"">what changed?</h2>",1,1,connected-frontend/index.html:2134
+spacing,"0 4px"" onchange=""loadrecentchanges()"">",1,1,connected-frontend/index.html:2137
+spacing,"0"">getting help</h2>",1,1,connected-frontend/index.html:2175
+spacing,"0"">frequently asked questions</h2>",1,1,connected-frontend/index.html:2184
+spacing,"6px""></span>",1,1,connected-frontend/index.html:2217
+spacing,"-4px 0 10px"">",1,1,connected-frontend/index.html:2232
+spacing,"3px"">link to an image hosted elsewhere — must start with http:// or https://. leave blank to use the default crest.</div>",1,1,connected-frontend/index.html:2240
+spacing,"0 0 10px"">",1,1,connected-frontend/index.html:2265
+spacing,"0 0 16px""></div>",1,1,connected-frontend/index.html:2274
+spacing,"10px"">named parade night schedules with ordered blocks. training period blocks generate schedulable curriculum sessions. new parade nights automatically use the template effective on their date.</div>",1,1,connected-frontend/index.html:2277
+spacing,"20px"">when no template applies</h3>",1,1,connected-frontend/index.html:2284
+spacing,"0 0 10px"">parade nights you have already created keep the periods they have.</div>",1,1,connected-frontend/index.html:2296
+spacing,"10px"">adjust spacing to fit more content on screen. both settings meet accessibility requirements at 200% zoom. your preference is saved for this browser session.</p>",1,1,connected-frontend/index.html:2305
+spacing,"8px"">comfortable is the default and recommended setting for most users.</p>",1,1,connected-frontend/index.html:2316
+spacing,"0"">training years</h2>",1,1,connected-frontend/index.html:2320
+spacing,12px 0,1,1,connected-frontend/index.html:2326
+spacing,"0"">training classes</h2>",1,1,connected-frontend/index.html:2332
+spacing,"4px""><input type=""checkbox"" id=""tc-show-archived"" onchange=""_tctoggleshowarchived(p.currentyearid)""> show archived</label>",1,1,connected-frontend/index.html:2334
+spacing,"0 0 8px"">",1,1,connected-frontend/index.html:2338
+spacing,"8px"" for=""tc-year-sel"">year:</label>",1,1,connected-frontend/index.html:2344
+spacing,"0"">custom training phases</h2>",1,1,connected-frontend/index.html:2356
+spacing,"10px"">to reset another user's code, use the user directory section below (admin only). all resets are recorded in the audit log.</div>",1,1,connected-frontend/index.html:2374
+spacing,"10px""><input id=""user-dir-filter"" placeholder=""filter by name, role, or unit…"" oninput=""renderuserdir()"" autocomplete=""off"" aria-label=""filter users by name, role, or unit""></div>",1,1,connected-frontend/index.html:2380
+spacing,"4px""><input type=""checkbox"" id=""wings-show-archived"" onchange=""_orgtoggleshowarchived('wing')""> show archived</label>",1,1,connected-frontend/index.html:2427
+spacing,"3px 6px"">",1,1,connected-frontend/index.html:2438
+spacing,"4px""><input type=""checkbox"" id=""units-show-archived"" onchange=""_orgtoggleshowarchived('squadron')""> show archived</label>",1,1,connected-frontend/index.html:2445
+spacing,"4px""><input type=""checkbox"" id=""flights-show-archived"" onchange=""_flightstoggleshowarchived()""> show archived</label>",1,1,connected-frontend/index.html:2457
+spacing,"6px 0 10px"">flights are local squadron groupings only. they do not create separate tenancy or change permissions. a user assigned to a flight still belongs entirely to the squadron.</div>",1,1,connected-frontend/index.html:2461
+spacing,"0 0 10px"">configuration values used by the operational pages. everything here is created at your own scope (<span id=""refdata-scope-label""></span>).</p>",1,1,connected-frontend/index.html:2476
+spacing,"18px""></div>",1,1,connected-frontend/index.html:2477
+spacing,"4px""><input type=""checkbox"" id=""wc-show-archived"" onchange=""_wctoggleshowarchived()""> show archived</label>",1,1,connected-frontend/index.html:2527
+spacing,"4px"">show archived",1,1,connected-frontend/index.html:2601
+spacing,"8px"">create new wing</div>",1,1,connected-frontend/index.html:2609
+spacing,"8px"">create new squadron / specialist unit</div>",1,1,connected-frontend/index.html:2624
+spacing,"6px"">access restrictions (after drain window)</div>",1,1,connected-frontend/index.html:2669
+spacing,"12px"">upload the aafc training schedule workbook (.xlsm) to import all curriculum items from <em>zz - program backend</em>. safe to run multiple times without creating duplicates.</div>",1,1,connected-frontend/index.html:2690
+spacing,"12px"">creates the first available squadron under the first active wing (if missing) and one account each for national_admin, wing_admin, and sqn_admin. codes are generated server-side, shown once, and never retrievable again. safe to re-run — only missing accounts are created. use optional body <code>{""wing_code"":""…"",""sqn_code"":""…""",1,1,connected-frontend/index.html:2705
+spacing,"10px""></div>",1,1,connected-frontend/index.html:2713
+spacing,"0 2px"">|</span>",1,1,connected-frontend/index.html:2762
+spacing,"0 0 16px"">",1,1,connected-frontend/index.html:3184
+spacing,"0""><label for=""cp-from-inp"">starts</label>",1,1,connected-frontend/index.html:3192
+spacing,"0""><label for=""cp-to-inp"">ends</label>",1,1,connected-frontend/index.html:3194
+spacing,"0""><label for=""cp-edit-from-inp"">starts</label>",1,1,connected-frontend/index.html:3219
+spacing,"0""><label for=""cp-edit-to-inp"">ends</label>",1,1,connected-frontend/index.html:3221
+spacing,"12px"">copies the planning details of each session (curriculum item, facilitator, room, training class audience) from this parade night to the selected night. sessions already at the same period in the target are not changed.</p>",1,1,connected-frontend/index.html:3296
+spacing,"12px"">applies the session structure of the selected template to this parade night. training class audiences are not copied — assign them after applying. periods already occupied are not changed.</p>",1,1,connected-frontend/index.html:3312
+spacing,"8px 0"">no templates saved yet. open a parade night with sessions and choose ""save as template"".</div>",1,1,connected-frontend/index.html:3314
+spacing,"1px"">step 1 of 6</div>",1,1,connected-frontend/index.html:3329
+spacing,"14px"" id=""wiz-progress"" aria-hidden=""true"">",1,1,connected-frontend/index.html:3335
+spacing,"6px"" aria-label=""search curriculum items"">",1,1,connected-frontend/index.html:3358
+spacing,"0"">ticket</h2>",1,1,connected-frontend/index.html:3462
+spacing,"2px""></div>",1,1,connected-frontend/index.html:3463
+spacing,"8px"">this move creates a conflict:</div>",1,1,connected-frontend/index.html:3684
+spacing,0 0 4px 18px,1,1,connected-frontend/index.html:3685
+spacing,"0 0 12px""></p>",1,1,connected-frontend/index.html:3714
+spacing,"4px 8px"" onclick=""opencreatephaseinline()"">+ new</button>",1,1,connected-frontend/index.html:3751
+spacing,"4px 8px"" onclick=""docreatephaseinline()"">create</button>",1,1,connected-frontend/index.html:3756
+spacing,"4px 8px"" onclick=""document.getelementbyid('c-phase-new').style.display='none'"">×</button>",1,1,connected-frontend/index.html:3757
+spacing,"4px 8px"" onclick=""opencreateelementinline()"">+ new</button>",1,1,connected-frontend/index.html:3766
+spacing,"4px 8px"" onclick=""docreateelementinline()"">create</button>",1,1,connected-frontend/index.html:3771
+spacing,"4px 8px"" onclick=""document.getelementbyid('c-el-new').style.display='none'"">×</button>",1,1,connected-frontend/index.html:3772
+spacing,"0"" id=""ga-preview-title"">preview</h2>",1,1,connected-frontend/index.html:3895
+spacing,"10px"">upload an edited schedule xlsx. expected columns: <strong>date, session, group, code, title</strong>. only curriculum code / title changes are imported — other session fields are unchanged. changes are role-permission-gated.</div>",1,1,connected-frontend/index.html:3961
+spacing,"8px""></p>",1,1,connected-frontend/index.html:3983
+spacing,"6px 0"">use the <strong>tags</strong> button in the facilitator list to manage subject areas.</div>",1,1,connected-frontend/index.html:4021
+spacing,"14px"">we found another facilitator with the same name in this squadron.</div>",1,1,connected-frontend/index.html:4038
+spacing,"12px"">this cannot be undone. the duplicate archives, and all sessions, leave records, and assistant/backup assignments transfer to the facilitator you keep.</div>",1,1,connected-frontend/index.html:4067
+spacing,"10px"">click a tag to toggle it. dashed border = unit-created tag. max 20 tags.</p>",1,1,connected-frontend/index.html:4087
+spacing,"6px"">create new unit tag</label>",1,1,connected-frontend/index.html:4091
+spacing,"10px"">the previous code cannot be recovered. share the new code directly with the user once set.</div>",1,1,connected-frontend/index.html:4111
+spacing,"10px"">this adjustment only affects how your squadron sees this activity — the original record is unchanged for every other unit.</div>",1,1,connected-frontend/index.html:4150
+spacing,"20px 24px 28px"">",1,1,connected-frontend/index.html:4197
+spacing,"20px 24px 24px"">",1,1,connected-frontend/index.html:4210
+spacing,"14px"">upload a cea export file (csv). the system checks for existing activities before importing.</p>",1,1,connected-frontend/index.html:4212
+spacing,"8px 0 16px"">",1,1,connected-frontend/index.html:4214
+spacing,"16px"" onclick=""closemodal('m-cea-import')",1,1,connected-frontend/index.html:4227
+spacing,"10px"">you can only create accounts within your permitted scope.</div>",1,1,connected-frontend/index.html:4238
+spacing,"8px"">🔑 initial access code</div>",1,1,connected-frontend/index.html:4259
+spacing,"12px"">⚠️ this code will not be shown again. copy it now before closing this window.</div>",1,1,connected-frontend/index.html:4284
+spacing,18px 12px,1,1,connected-frontend/index.html:4285
+spacing,"12px"" id=""m-new-code-value"">—</div>",1,1,connected-frontend/index.html:4285
+spacing,"10px"">for: <strong id=""m-new-code-for"">—</strong></div>",1,1,connected-frontend/index.html:4286
+spacing,"6px"" onclick=""copynewcode()"">copy to clipboard</button>",1,1,connected-frontend/index.html:4287
+spacing,"12px"">⚠️ these codes will not be shown again. copy all codes now before closing.</div>",1,1,connected-frontend/index.html:4301
+spacing,"10px"">the existing code will be invalidated immediately. the user must use the new code at next sign-in.</div>",1,1,connected-frontend/index.html:4315
+spacing,"8px"">flights are local display groupings only. they do not create separate permissions or tenancy.</div>",1,1,connected-frontend/index.html:4345
+spacing,"0""></p></div>",1,1,connected-frontend/index.html:4364
+spacing,"3px"">changing role within the same scope level only. the account will need to sign in again for the new role to take effect.</div>",1,1,connected-frontend/index.html:4399
+spacing,"6px 0""></div></div>",1,1,connected-frontend/index.html:4422
+spacing,"3px"">moving squadron also clears any assigned flight (flights are squadron-local). the account will need to sign in again for the new scope to take effect.</div>",1,1,connected-frontend/index.html:4429
+spacing,"10px"">nat hq admin only. creates a wing under the national headquarters. wing code must be unique (e.g. 7wg, 1wg).</div>",1,1,connected-frontend/index.html:4483
+spacing,"10px"">wing admin: own wing only. nat hq admin: any wing. unit code must be unique (e.g. 703, specflt01).</div>",1,1,connected-frontend/index.html:4503
+spacing,"14px 0 4px"">blocks <span style=""font-weight:400",1,1,connected-frontend/index.html:4596
+spacing,"10px"">change the timing for this parade night only. does not affect future parade nights.</div>",1,1,connected-frontend/index.html:4637
+spacing,"6px"">define the blocks for this parade night. a timing template named ""custom — {date",1,1,connected-frontend/index.html:4651
+spacing,"18px 0"">'",1,1,connected-frontend/index.html:5281
+spacing,"10px"">'+esc(apierr(e))+'</div>'",1,1,connected-frontend/index.html:5282
+spacing,"4px"">${np?'not planned':pct+'% ready'",1,1,connected-frontend/index.html:6249
+spacing,"6px"">${openitems.length",1,1,connected-frontend/index.html:6271
+spacing,"6px"">${signoffpns.length",1,1,connected-frontend/index.html:6283
+spacing,"8px"">published parade nights awaiting closeout.</div>`+",1,1,connected-frontend/index.html:6284
+spacing,"6px"">'+conflicts.length+'</span>'",1,1,connected-frontend/index.html:6304
+spacing,"6px"">unscheduled items (${unscheduled.length",1,1,connected-frontend/index.html:6355
+spacing,"5px"">`+",1,1,connected-frontend/index.html:6356
+spacing,"2px 7px"">${esc(u.code?u.code+' ':'')+(u.title||'')",1,1,connected-frontend/index.html:6357
+spacing,"2px 0"">+${unscheduled.length-20",1,1,connected-frontend/index.html:6358
+spacing,"8px""><span class=""badge ${decclass",1,1,connected-frontend/index.html:6392
+spacing,"6px"">${esc(s.label)",1,1,connected-frontend/index.html:6422
+spacing,"0"">squadron setup — ${esc(d.squadron.squadron_code||'')",1,1,connected-frontend/index.html:6441
+spacing,"12px""><h2 class=""ctitle"">recommended</h2>'+",1,1,connected-frontend/index.html:6450
+spacing,"0 0 10px"">not required for setup to count as complete, but most squadrons need these.</p>'+",1,1,connected-frontend/index.html:6451
+spacing,"4px"">write-block starts: ${esc(d.pending_until)",1,1,connected-frontend/index.html:6679
+spacing,"4px"">message: ${esc(d.message)",1,1,connected-frontend/index.html:6680
+spacing,"4px"">expected return: ${esc(d.until)",1,1,connected-frontend/index.html:6681
+spacing,6px 0 10px,1,1,connected-frontend/index.html:6682
+spacing,"10px"">maintenance mode is off. system is operating normally.</div>`",1,1,connected-frontend/index.html:6689
+spacing,"8px"">backup directory: <code>${esc(d.backup_dir)",1,1,connected-frontend/index.html:6743
+spacing,"5px 8px"" value=""${val",1,1,connected-frontend/index.html:6834
+spacing,"4px"">system admin</div>`",1,1,connected-frontend/index.html:6841
+spacing,"4px"">failures:<br>'+",1,1,connected-frontend/index.html:6892
+spacing,"14px""><thead>'",1,1,connected-frontend/index.html:6912
+spacing,"4px 8px"">type</th><th style=""text-align:left",1,1,connected-frontend/index.html:6913
+spacing,"4px 8px"">name / code</th><th style=""text-align:left",1,1,connected-frontend/index.html:6913
+spacing,"4px 8px"">result</th></tr></thead><tbody>'",1,1,connected-frontend/index.html:6913
+spacing,"4px 8px"">${esc(label)",1,1,connected-frontend/index.html:6917
+spacing,"4px 8px"">${created",1,1,connected-frontend/index.html:6917
+spacing,"10px"">access codes — copy all now, they will not appear again:</div>'",1,1,connected-frontend/index.html:6921
+spacing,"4px"">${esc(_role_labels[a.role]||a.role)",1,1,connected-frontend/index.html:6924
+spacing,"6px"">${esc(g.label)",1,1,connected-frontend/index.html:7140
+spacing,"6px"">${types.map(t=>_refdatarowhtml(t,null)).join('')",1,1,connected-frontend/index.html:7141
+spacing,6px 9px,1,1,connected-frontend/index.html:7170
+spacing,"6px 0 0""></p>",1,1,connected-frontend/index.html:7173
+spacing,"0"" title=""restore"">↩</button>`:''",1,1,connected-frontend/index.html:7205
+spacing,"5px"">${esc(it[t.namefield])",1,1,connected-frontend/index.html:7207
+spacing,"8px 0"">'+(!(s.accountlist||[]).length?'no accounts in scope.':'no accounts match the filter.')+'</div>'",1,1,connected-frontend/index.html:7299
+spacing,"3px"">locked</span>':''",1,1,connected-frontend/index.html:7322
+spacing,"8px 0"">no ${showarchived?'archived ':''",1,1,connected-frontend/index.html:7439
+spacing,"4px"">${actionscell(f)",1,1,connected-frontend/index.html:7451
+spacing,"8px 0"">no wings found.</div>'",1,1,connected-frontend/index.html:7484
+spacing,"8px 0"">no units found.</div>'",1,1,connected-frontend/index.html:7517
+spacing,"0 0 10px"">confirm the accounts to archive. remove any that should not be included before continuing.</p>",1,1,connected-frontend/index.html:8064
+spacing,"8px"">archiving immediately revokes sign-in for ${n",1,1,connected-frontend/index.html:8077
+spacing,"8px 0""><strong>reason:</strong> ${esc(w.reason.trim())",1,1,connected-frontend/index.html:8096
+spacing,"6px""><table><thead><tr><th>time</th><th>action</th><th>object</th></tr></thead><tbody>",1,1,connected-frontend/index.html:8116
+spacing,"8px 0"">${esc(kindlabel)",1,1,connected-frontend/index.html:8235
+spacing,"8px 0 4px"">select accounts to archive now to clear this block:</div>",1,1,connected-frontend/index.html:8249
+spacing,"6px"" disabled onclick=""_owzarchivenestedaccounts()"">archive selected accounts now</button>`",1,1,connected-frontend/index.html:8257
+spacing,"6px"">archive these squadrons / specialist units individually first (squadrons / specialist units table below):<br>${w.impact.subordinate_orgs.map(s=>esc(s.code)).join(', ')",1,1,connected-frontend/index.html:8259
+spacing,"8px"">no blocking conditions. this '+kindlabel.tolowercase()+' can be archived.</div>'",1,1,connected-frontend/index.html:8262
+spacing,"8px""><strong>also note:</strong><ul style=""margin:4px 0 0 18px",1,1,connected-frontend/index.html:8264
+spacing,"0"">${sw.map(x=>`<li>${esc(x.message||x.type)",1,1,connected-frontend/index.html:8264
+spacing,"8px 0"">'+(!(s.users||[]).length?'no users in scope.':'no users match the filter.')+'</div>'",1,1,connected-frontend/index.html:8558
+spacing,"16px"">no sessions</td></tr>`",1,1,connected-frontend/index.html:8679
+spacing,"16px 12px""><div class=""es"">${esc(msg)",1,1,connected-frontend/index.html:8691
+spacing,"5px"" role=""img"" aria-label=""${esc(lbl)",1,1,connected-frontend/index.html:8722
+spacing,"6px"" role=""img"" aria-label=""${esc(name)",1,1,connected-frontend/index.html:8880
+spacing,"circ-dash,...r",1,1,connected-frontend/index.html:8935
+spacing,"auto"">${r.count",1,1,connected-frontend/index.html:8937
+spacing,"4px"">no sessions scheduled for this parade night yet.</div>",1,1,connected-frontend/index.html:8957
+spacing,"3px""><span class=""badge ${cls",1,1,connected-frontend/index.html:8980
+spacing,"3px""><span class=""badge b-ok"" style=""width:16px",1,1,connected-frontend/index.html:8982
+spacing,"3px""><span class=""badge b-grey"" style=""width:16px",1,1,connected-frontend/index.html:8982
+spacing,"6px"">readiness checklist</div>${sesscheck",1,1,connected-frontend/index.html:8983
+spacing,"6px"">session plan</div>",1,1,connected-frontend/index.html:8994
+spacing,"10px"">${esc(d.insight)",1,1,connected-frontend/index.html:8997
+spacing,"12px"">`+",1,1,connected-frontend/index.html:9008
+spacing,"5px"">not planned</div>",1,1,connected-frontend/index.html:9014
+spacing,"5px 0""><div style=""height:100%",1,1,connected-frontend/index.html:9021
+spacing,"8px"">`+",1,1,connected-frontend/index.html:9047
+spacing,"4px"">next ${ur.data.length",1,1,connected-frontend/index.html:9251
+spacing,"8px"">${esc(ur.insight)",1,1,connected-frontend/index.html:9252
+spacing,"2px"">current rate</div>",1,1,connected-frontend/index.html:9372
+spacing,"2px"">remaining planned</div>",1,1,connected-frontend/index.html:9380
+spacing,"2px"">projected to deliver</div>",1,1,connected-frontend/index.html:9388
+spacing,"2px"">at risk</div>",1,1,connected-frontend/index.html:9393
+spacing,"2px"">${esc(label)",1,1,connected-frontend/index.html:9420
+spacing,"10px"">create a training year to activate your schedule, parade nights, and training program.</div><button class=""btn btn-primary btn-sm"" onclick=""nav(\'settings\')"">set up this year →</button></div></div>'",1,1,connected-frontend/index.html:9493
+spacing,"8px 0"">loading…</div>'",1,1,connected-frontend/index.html:9807
+spacing,"2px"">${esc(t.description)",1,1,connected-frontend/index.html:9822
+spacing,"3px"">${t.session_count",1,1,connected-frontend/index.html:9823
+spacing,"7px"">session ${i+1",1,1,connected-frontend/index.html:10263
+spacing,"7px"">notices</div>",1,1,connected-frontend/index.html:10416
+spacing,"10px"">this parade night is closed. its date, term, timing and type can no longer be edited.</div>`",1,1,connected-frontend/index.html:10428
+spacing,"7px"">parade night details</div>",1,1,connected-frontend/index.html:10432
+spacing,"6px"" onclick=""savepncoredetails('${ds",1,1,connected-frontend/index.html:10442
+spacing,"7px"">quick assign to all sessions</div>",1,1,connected-frontend/index.html:10447
+spacing,"5px"">changes take effect when you click save changes below.</div>",1,1,connected-frontend/index.html:10458
+spacing,"10px"" data-sess-card=""${i",1,1,connected-frontend/index.html:10464
+spacing,"4px 0"">",1,1,connected-frontend/index.html:10483
+spacing,"3px"">where this session appears on the printed weekly program.</div>",1,1,connected-frontend/index.html:10492
+spacing,"3px 0"">${esc(s.trainingclasses.map(c=>c.display_name).join(', '))",1,1,connected-frontend/index.html:10518
+spacing,"8px"" onclick=""domarkremainingdelivered('${ds",1,1,connected-frontend/index.html:10526
+spacing,"8px"" onclick=""docancelallsessions('${ds",1,1,connected-frontend/index.html:10527
+spacing,"8px"">locks the parade night once all outcomes are recorded.</span>",1,1,connected-frontend/index.html:10553
+spacing,"0 0 6px"">",1,1,connected-frontend/index.html:11051
+spacing,"8px"">${phbadge(ph)",1,1,connected-frontend/index.html:11696
+spacing,"5px"">'+bd.map(c=>{",1,1,connected-frontend/index.html:11732
+spacing,"12px"">${phbadge(e.phase)",1,1,connected-frontend/index.html:11767
+spacing,"12px""><a href=""${safeurl(e.lh)",1,1,connected-frontend/index.html:11768
+spacing,"12px""><b>instructor:</b> ${esc(e.instr||'—')",1,1,connected-frontend/index.html:11769
+spacing,"8px"">scheduled sessions (${sess.length",1,1,connected-frontend/index.html:11771
+spacing,"0"">${st.scopetype==='squadron'?'inherited activities':'activities'",1,1,connected-frontend/index.html:12085
+spacing,"10px 0"">",1,1,connected-frontend/index.html:12088
+spacing,"auto"">${viewbtns",1,1,connected-frontend/index.html:12098
+spacing,"6px"">showing the first results — narrow your filters to see more.</div>`",1,1,connected-frontend/index.html:12118
+spacing,"8px"">owned by ${esc(ownerlabel)",1,1,connected-frontend/index.html:12137
+spacing,"8px"">this will immediately appear in every subordinate ${st.scopetype==='national'?'wing and squadron':'squadron'",1,1,connected-frontend/index.html:12229
+spacing,"4px"" '",1,1,connected-frontend/index.html:12677
+spacing,"6px"">'+newcount+' new activities will be added</p>'",1,1,connected-frontend/index.html:12911
+spacing,"6px"">'+updcount+' existing activities — click to keep original</p>'",1,1,connected-frontend/index.html:12912
+spacing,"8px"">import complete</div>'",1,1,connected-frontend/index.html:12979
+spacing,"8px"">import failed: '+esc(e.message)+'</div>')",1,1,connected-frontend/index.html:12986
+spacing,"2px"">'+esc(c.hint)+'</span>'",1,1,connected-frontend/index.html:13403
+spacing,"14px"">no activities${typefilter!=='all'?' of this type':''",1,1,connected-frontend/index.html:13601
+spacing,"14px"">no ${showarchived?'archived ':''",1,1,connected-frontend/index.html:13879
+spacing,"14px"">session history</h2>",1,1,connected-frontend/index.html:14004
+spacing,"4px 0""></div>",1,1,connected-frontend/index.html:14035
+spacing,"4px 0"">loading past leave…</div>'",1,1,connected-frontend/index.html:14084
+spacing,3px 12px,1,1,connected-frontend/index.html:14199
+spacing,10px',1,1,connected-frontend/index.html:14242
+spacing,"14px"">no ${showrooms?'archived ':''",1,1,connected-frontend/index.html:14447
+spacing,"14px"">no ${showequip?'archived ':''",1,1,connected-frontend/index.html:14457
+spacing,"3px 8px""><input type=""checkbox"" value=""${esc(c.display_name)",1,1,connected-frontend/index.html:14477
+spacing,"0""> ${esc(c.display_name)",1,1,connected-frontend/index.html:14477
+spacing,"12px 0""><div class=""et"">no changes in this period.</div><div class=""es"">nothing was updated in the selected window.</div></div>'",1,1,connected-frontend/index.html:14687
+spacing,"1px"" title=""${esc(ts)",1,1,connected-frontend/index.html:14695
+spacing,"6px"">showing 80 most recent changes. narrow the date window to see earlier items.</div>` : '')",1,1,connected-frontend/index.html:14700
+spacing,"12px""><label for=""pday-prop-reason"">reason (required, audited)</label><input id=""pday-prop-reason"" placeholder=""e.g. squadron changed parade night to ${esc(dayname(_pdaypropnewweekday)||'')",1,1,connected-frontend/index.html:14784
+spacing,"4px 0"">no timing templates defined. click ""+ new template"" to create one.</div>'",1,1,connected-frontend/index.html:14899
+spacing,"8px"">from ${t.effective_from",1,1,connected-frontend/index.html:14908
+spacing,"2px 8px"" onclick=""opentimingtemplatemodal('${esc(t.timing_template_id)",1,1,connected-frontend/index.html:14910
+spacing,"2px 3px""><input class=""tt-block-name"" value=""${esc(b.block_name||'')",1,1,connected-frontend/index.html:14953
+spacing,"2px 3px""><select onchange=""_ttbset(${i",1,1,connected-frontend/index.html:14954
+spacing,2px 3px,1,1,connected-frontend/index.html:14960
+spacing,"2px 3px""><input value=""${esc(b.block_name)",1,1,connected-frontend/index.html:15094
+spacing,"2px 6px"" onclick=""var e=document.getelementbyid('${id",1,1,connected-frontend/index.html:15213
+spacing,"4px""><strong>measure:</strong> ${esc(chart.measure||'')",1,1,connected-frontend/index.html:15216
+spacing,"4px""><strong>action:</strong> ${esc(chart.action||'')",1,1,connected-frontend/index.html:15217
+spacing,"6px"">data confidence: ${c.units_reporting",1,1,connected-frontend/index.html:15228
+spacing,"6px"">${esc(c.note)",1,1,connected-frontend/index.html:15230
+spacing,"0"">${esc(chart.title||'')",1,1,connected-frontend/index.html:15235
+spacing,"6px 0 10px"">${esc(assessment)",1,1,connected-frontend/index.html:15238
+spacing,"10px"">trend vs previous parade night: ${_cmd_trend_symbol[r.trend]||'—'",1,1,connected-frontend/index.html:15289
+spacing,"3px"" title=""${esc(w.label)",1,1,connected-frontend/index.html:15313
+spacing,"10px""><table><thead><tr><th>date</th><th>unit</th><th>category</th><th style=""text-align:center"">sessions</th><th>severity</th></tr></thead><tbody>`+",1,1,connected-frontend/index.html:15321
+spacing,"4px"">showing 20 of ${items.length",1,1,connected-frontend/index.html:15324
+spacing,"6px"" role=""img"" aria-label=""${esc(row.label)",1,1,connected-frontend/index.html:15338
+spacing,"5px"" role=""img"" aria-label=""${esc(r.label)",1,1,connected-frontend/index.html:15360
+spacing,"14px 0 6px"">a — immediate training readiness</h2>`",1,1,connected-frontend/index.html:15397
+spacing,"18px 0 6px"">b — training delivery performance</h2>`",1,1,connected-frontend/index.html:15402
+spacing,"18px 0 6px"">c — system adoption</h2>`",1,1,connected-frontend/index.html:15409
+spacing,"12px 16px""><div style=""display:flex",1,1,connected-frontend/index.html:15410
+spacing,"4px 10px"" onclick=""_loadadoptiondata('${scope",1,1,connected-frontend/index.html:15418
+spacing,"10px""></div></div>`",1,1,connected-frontend/index.html:15420
+spacing,"8px"">${esc(since)",1,1,connected-frontend/index.html:15438
+spacing,"8px"">red = no facilitator in this squadron tagged for that subject area.</div></div>`",1,1,connected-frontend/index.html:15533
+spacing,"8px 0"">no cancelled sessions or stand-downs recorded. programme is on track.</div>`",1,1,connected-frontend/index.html:15552
+spacing,"6px"">enter proxy mode for a squadron to review and resolve not-delivered sessions.</div>`",1,1,connected-frontend/index.html:15570
+spacing,"8px 0"">no not-delivered sessions recorded across the wing.</div>`",1,1,connected-frontend/index.html:15572
+spacing,"10px"">read-only oversight view. ${s.role==='wing_admin'?'to change this squadron, enter proxy mode using the proxy button on the row.':'wing viewers are read-only.'",1,1,connected-frontend/index.html:15588
+spacing,"8px"">red = number of sqns in that wing with no facilitator tagged in the subject. refer to facilitator load and training balance for detail.</div></div>`",1,1,connected-frontend/index.html:15628
+spacing,"10px"">read-only national oversight. ${['national_admin','system_admin'].includes(s.role)?'deeper squadron changes require delegated intervention mode, where permitted.':'national viewers are read-only.'",1,1,connected-frontend/index.html:15640
+spacing,"2px"">${sym",1,1,connected-frontend/index.html:16122
+spacing,"1px 5px"" onclick=""navtoscheduledpn('${esc(scheddate)",1,1,connected-frontend/index.html:16138
+spacing,"10px"">`",1,1,connected-frontend/index.html:16426
+spacing,"1px"">`",1,1,connected-frontend/index.html:16444
+spacing,"2px 0"">${d",1,1,connected-frontend/index.html:16445
+spacing,"1px auto 0""></div>`",1,1,connected-frontend/index.html:16466
+spacing,2px 1px,1,1,connected-frontend/index.html:16470
+spacing,"3px""><span class=""badge badge-amber"">${esc(x.holiday_type||'holiday')",1,1,connected-frontend/index.html:16495
+spacing,"6px"">parade night</div>",1,1,connected-frontend/index.html:16505
+spacing,"8px"">`",1,1,connected-frontend/index.html:16514
+spacing,"5px"">",1,1,connected-frontend/index.html:16520
+spacing,"4px"">no scheduled events on this date.</p>`",1,1,connected-frontend/index.html:16528
+spacing,"4px"">edit</button>`:''",1,1,connected-frontend/index.html:16573
+spacing,"4px"">view progress</button>`",1,1,connected-frontend/index.html:16805
+spacing,"4px"">edit</button>`",1,1,connected-frontend/index.html:16807
+spacing,"4px"">split</button>`",1,1,connected-frontend/index.html:16808
+spacing,"4px"">merge into…</button>`",1,1,connected-frontend/index.html:16809
+spacing,"10px""><thead><tr><th>class</th><th>stage</th><th>order</th><th>expected</th>${showarchived?'':'<th>curriculum progress</th>'",1,1,connected-frontend/index.html:16814
+spacing,"14px"">no curriculum items in this stage yet.</td></tr>'",1,1,connected-frontend/index.html:16885
+spacing,"2px"">${esc(a.event_name)",1,1,connected-frontend/index.html:17701
+spacing,"10px"">no wing hq events for this year yet. use <strong>+ new event</strong> to add one, or import from your wing master schedule.</p>`",1,1,connected-frontend/index.html:18234
+spacing,"4px"">linked curriculum</div>`+",1,1,connected-frontend/index.html:18302
+spacing,"3px 0""><span class=""badge b-grey"">${esc(l.curriculum_code||'—')",1,1,connected-frontend/index.html:18303
+spacing,"4px"">your squadron's status</div>",1,1,connected-frontend/index.html:18311
+spacing,"6px"">${esc(ss.notes)",1,1,connected-frontend/index.html:18313
+spacing,"10px"">${srcbadge",1,1,connected-frontend/index.html:18317
+spacing,"8px"">${esc(e.title)",1,1,connected-frontend/index.html:18318
+spacing,"8px"">${esc(e.description)",1,1,connected-frontend/index.html:18325
+spacing,"8px"">${esc(e.notes)",1,1,connected-frontend/index.html:18326
+spacing,"8px"">this event requires squadron action. mark your preparation status below.</div>':''",1,1,connected-frontend/index.html:18327
+spacing,"8px"">'",1,1,connected-frontend/index.html:18550
+spacing,"4px"">${esc(e.title)",1,1,connected-frontend/index.html:18556
+spacing,"4px"">${esc(_wc_imp_label[e.planning_importance]||e.planning_importance)",1,1,connected-frontend/index.html:18557
+spacing,"6px"">${esc(r.cat)",1,1,connected-frontend/index.html:18732
+spacing,"6px"">${esc(r.sub)",1,1,connected-frontend/index.html:18734
+spacing,"6px"">'+esc(_entitycat(r.type))+'</span>'",1,1,connected-frontend/index.html:18749
+spacing,"6px"">'+esc(r.sub)+'</span>':'')",1,1,connected-frontend/index.html:18751
+spacing,"10vh"">",1,1,connected-frontend/index.html:19359
+spacing,"6px 0"">",1,1,connected-frontend/index.html:19368
+spacing,"auto"">",1,1,connected-frontend/index.html:19384
+radius,6px,48,1,connected-frontend/index.html:224
+radius,8px,34,1,connected-frontend/index.html:354
+radius,5px,18,1,connected-frontend/index.html:226
+radius,3px,16,1,connected-frontend/index.html:121
+radius,10px,13,1,connected-frontend/index.html:321
+radius,4px,12,1,connected-frontend/index.html:248
+radius,50%,12,1,connected-frontend/index.html:646
+radius,2px,9,1,connected-frontend/index.html:230
+radius,7px,6,1,connected-frontend/index.html:331
+radius,0 8px 8px 0,5,1,connected-frontend/index.html:634
+radius,"3px""></div></div></div>",4,1,connected-frontend/index.html:8799
+radius,"2px""></span>${esc(s.label)",4,1,connected-frontend/index.html:8854
+radius,1px,3,1,connected-frontend/index.html:221
+radius,20px,2,1,connected-frontend/index.html:512
+radius,0 6px 6px 0,2,1,connected-frontend/index.html:630
+radius,12px,2,1,connected-frontend/index.html:1010
+radius,"4px"">",2,1,connected-frontend/index.html:2632
+radius,"6px""></div>",2,1,connected-frontend/index.html:4151
+radius,"8px 8px 0 0"">",2,1,connected-frontend/index.html:4193
+radius,0,2,1,connected-frontend/index.html:4640
+radius,"3px""></div></div></td>'",2,1,connected-frontend/index.html:8764
+radius,3px 3px 0 0,2,1,connected-frontend/index.html:8859
+radius,"3px""></div></div>",2,1,connected-frontend/index.html:9021
+radius,"6px"">",2,1,connected-frontend/index.html:16504
+radius,5px 0 0 5px,1,1,connected-frontend/index.html:293
+radius,0 5px 5px 0,1,1,connected-frontend/index.html:294
+radius,3px 0 0 3px,1,1,connected-frontend/index.html:657
+radius,0 3px 3px 0,1,1,connected-frontend/index.html:658
+radius,10px 10px 0 0,1,1,connected-frontend/index.html:739
+radius,0 0 6px 0,1,1,connected-frontend/index.html:1137
+radius,999px,1,1,connected-frontend/index.html:1207
+radius,6px 6px 0 0,1,1,connected-frontend/index.html:1212
+radius,0 0 6px 6px,1,1,connected-frontend/index.html:1223
+radius,"4px"" onchange=""saselectwing(this.value)"">",1,1,connected-frontend/index.html:1366
+radius,"4px""><option value="""">select wing…</option></select>",1,1,connected-frontend/index.html:2627
+radius,"5px""></div></div>`:'')  +",1,1,connected-frontend/index.html:6391
+radius,"2px 2px 0 0"" title=""${esc(s.label)",1,1,connected-frontend/index.html:9053
+radius,"6px"">'",1,1,connected-frontend/index.html:12914
+radius,4px',1,1,connected-frontend/index.html:13160
+radius,"2px""></span>${esc(cc[1])",1,1,connected-frontend/index.html:15304
+radius,"4px"" aria-label=""reporting period"">",1,1,connected-frontend/index.html:15388
+radius,"4px"" aria-label=""adoption period"">",1,1,connected-frontend/index.html:15412
+radius,"3px""><div style=""height:100%",1,1,connected-frontend/index.html:15453
+radius,0 4px 4px 0,1,1,connected-frontend/index.html:18553
+shadow,"0 0 0 3px rgba(0,75,141,.22)",3,1,connected-frontend/index.html:225
+shadow,"0 1px 0 rgba(255,255,255,.10) inset,0 -1px 0 rgba(0,0,0,.20) inset,0 1px 3px rgba(0,30,65,.25)",2,1,connected-frontend/index.html:226
+shadow,none!important,1,1,connected-frontend/index.html:129
+shadow,none !important,1,1,connected-frontend/index.html:189
+shadow,"0 1px 3px rgba(0,47,101,.08),0 8px 32px rgba(0,0,0,.28)",1,1,connected-frontend/index.html:216
+shadow,none,1,1,connected-frontend/index.html:229
+shadow,"0 1px 0 rgba(255,255,255,.06),0 2px 12px rgba(0,0,0,.35)",1,1,connected-frontend/index.html:241
+shadow,"0 8px 24px rgba(0,0,0,.16)",1,1,connected-frontend/index.html:327
+shadow,"0 1px 2px rgba(0,47,101,.06)",1,1,connected-frontend/index.html:483
+shadow,"0 1px 0 rgba(255,255,255,.08) inset,0 -1px 0 rgba(0,0,0,.20) inset,0 1px 3px rgba(150,0,30,.3)",1,1,connected-frontend/index.html:487
+shadow,"0 2px 8px rgba(81,176,227,.18)",1,1,connected-frontend/index.html:674
+shadow,"0 22px 60px rgba(0,0,0,.38)",1,1,connected-frontend/index.html:737
+shadow,"4px 0 20px rgba(0,0,0,.4)",1,1,connected-frontend/index.html:1068
+shadow,"0 3px 10px rgba(0,0,0,.25)",1,1,connected-frontend/index.html:1154
+shadow,"0 8px 32px rgba(0,30,60,.28)",1,1,connected-frontend/index.html:19360
+z-index,200,2,1,connected-frontend/index.html:241
+z-index,500,2,1,connected-frontend/index.html:735
+z-index,60,1,1,connected-frontend/index.html:326
+z-index,1,1,1,connected-frontend/index.html:499
+z-index,900,1,1,connected-frontend/index.html:894
+z-index,2,1,1,connected-frontend/index.html:978
+z-index,9999,1,1,connected-frontend/index.html:1062
+z-index,300,1,1,connected-frontend/index.html:1068
+z-index,299,1,1,connected-frontend/index.html:1070
+z-index,999,1,1,connected-frontend/index.html:1137
+z-index,9000,1,1,connected-frontend/index.html:1154
+z-index,2000,1,1,connected-frontend/index.html:19359
+z-index,"1100"">",1,1,connected-frontend/index.html:19383
+duration,12s,12,1,connected-frontend/index.html:226
+duration,13s,7,1,connected-frontend/index.html:447
+duration,15s,5,1,connected-frontend/index.html:224
+duration,.01ms!important,2,1,connected-frontend/index.html:1159
+duration,3s,2,1,connected-frontend/index.html:656
+duration,18s,2,1,connected-frontend/index.html:1088
+duration,4s,1,1,connected-frontend/index.html:731

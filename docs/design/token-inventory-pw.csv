@@ -1,0 +1,422 @@
+category,literal,occurrences,distinct_files,first_location
+color,#fff,44,11,frontend/src/styles/planning.css:32
+color,#1a7f4b,19,5,frontend/src/styles/tokens.css:60
+color,#ffffff,15,1,frontend/src/styles/tokens.css:38
+color,#c97a00,14,5,frontend/src/styles/tokens.css:63
+color,#004b8d,13,4,frontend/src/styles/tokens.css:30
+color,#e51937,11,4,frontend/src/styles/tokens.css:34
+color,#51b0e3,10,4,frontend/src/styles/tokens.css:28
+color,#002f65,7,5,frontend/src/App.tsx:61
+color,#f0f0f0,7,3,frontend/src/styles/tokens.css:207
+color,"rgba(255,255,255,.25)",7,1,frontend/src/styles/planning.css:53
+color,#f4f8fc,6,3,frontend/src/App.tsx:58
+color,#455560,6,3,frontend/src/App.tsx:62
+color,#004d24,6,1,frontend/src/styles/tokens.css:211
+color,#6a3800,6,1,frontend/src/styles/tokens.css:212
+color,#7c3aed,5,3,frontend/src/styles/tokens.css:65
+color,#101a26,5,1,frontend/src/styles/tokens.css:126
+color,#000044,5,1,frontend/src/styles/tokens.css:203
+color,#fdecee,5,2,frontend/src/styles/planning.css:143
+color,#8a0f22,5,2,frontend/src/styles/planning.css:143
+color,#d1dce8,4,2,frontend/src/App.tsx:59
+color,#b0b7bb,4,3,frontend/src/styles/tokens.css:32
+color,#f0f5fa,4,4,frontend/src/styles/tokens.css:39
+color,#555555,4,1,frontend/src/styles/tokens.css:202
+color,#fff3e0,4,2,frontend/src/styles/planning.css:131
+color,#e8f5ee,4,2,frontend/src/styles/planning.css:144
+color,#f57c00,4,2,frontend/src/styles/planning.css:242
+color,#ffb300,4,2,frontend/src/styles/planning.css:243
+color,"rgba(255,255,255,.1)",4,1,frontend/src/styles/planning.css:56
+color,"rgba(255,255,255,.6)",4,2,frontend/src/styles/planning.css:57
+color,#f1f5f9,4,2,frontend/src/components/planning/PlanningBottomDrawer.tsx:71
+color,"rgba(0,47,101,.10)",3,2,frontend/src/App.tsx:59
+color,#fff3cd,3,3,frontend/src/styles/tokens.css:64
+color,#000099,3,1,frontend/src/styles/tokens.css:204
+color,#44007a,3,1,frontend/src/styles/tokens.css:226
+color,#0f5a33,3,2,frontend/src/styles/planning.css:144
+color,#ebf5ff,3,1,frontend/src/styles/planning.css:146
+color,#fff5f5,3,1,frontend/src/styles/planning.css:172
+color,#fff8e1,3,2,frontend/src/styles/planning.css:183
+color,#f0f7ff,3,1,frontend/src/styles/planning.css:217
+color,#eef4fb,3,3,frontend/src/styles/planning.css:708
+color,"rgba(255,255,255,.15)",3,1,frontend/src/styles/planning.css:40
+color,"rgba(255,255,255,.7)",3,1,frontend/src/styles/planning.css:53
+color,#d1fae5,3,2,frontend/src/components/planning/PlanningBottomDrawer.tsx:69
+color,#aaa,3,1,frontend/src/components/planning/ActivityDetailBlock.tsx:231
+color,#9fb2c6,2,1,frontend/src/styles/tokens.css:154
+color,#ff6b6b,2,1,frontend/src/styles/tokens.css:160
+color,#3eae77,2,1,frontend/src/styles/tokens.css:171
+color,#d9982e,2,1,frontend/src/styles/tokens.css:172
+color,#000000,2,1,frontend/src/styles/tokens.css:199
+color,#303030,2,1,frontend/src/styles/tokens.css:200
+color,#111111,2,1,frontend/src/styles/tokens.css:209
+color,#cc0011,2,1,frontend/src/styles/tokens.css:213
+color,#ad000e,2,1,frontend/src/styles/tokens.css:225
+color,#3a3a3a,2,1,frontend/src/styles/tokens.css:240
+color,"rgba(0,47,101,.14)",2,2,frontend/src/styles/tokens.css:77
+color,#fffbf0,2,1,frontend/src/styles/planning.css:173
+color,#7a3a00,2,1,frontend/src/styles/planning.css:182
+color,#5a4000,2,1,frontend/src/styles/planning.css:183
+color,#f2ebfe,2,2,frontend/src/styles/planning.css:300
+color,#4a1080,2,2,frontend/src/styles/planning.css:300
+color,#003a80,2,1,frontend/src/styles/planning.css:532
+color,#f5f7fa,2,1,frontend/src/styles/planning.css:595
+color,#fff0f0,2,2,frontend/src/styles/planning.css:776
+color,"rgba(255,255,255,.12)",2,1,frontend/src/styles/planning.css:569
+color,"rgba(255,255,255,.75)",2,1,frontend/src/styles/planning.css:576
+color,"rgba(255,255,255,.2)",2,1,frontend/src/styles/planning.css:584
+color,"rgba(255,255,255,.18)",2,2,frontend/src/styles/planning.css:650
+color,"rgba(255,255,255,.3)",2,1,frontend/src/styles/planning.css:879
+color,"rgba(0,47,101,.04)",2,1,frontend/src/styles/planning.css:1238
+color,#b91c1c,2,2,frontend/src/components/CadetClassMembershipModal.tsx:160
+color,#1a5276,2,2,frontend/src/components/planning/PlanningLeftPanel.tsx:25
+color,#fef3c7,2,2,frontend/src/components/planning/PlanningBottomDrawer.tsx:70
+color,#d97706,2,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:390
+color,#eef2f7,2,2,frontend/src/components/planning/PlanningBottomDrawer.tsx:755
+color,#8a93a6,2,1,frontend/src/components/charts/DashboardCharts.tsx:88
+color,#8592,1,1,frontend/src/layout/AppShell.tsx:158
+color,#7db2ce,1,1,frontend/src/styles/tokens.css:33
+color,#e4edf5,1,1,frontend/src/styles/tokens.css:41
+color,#1e2d3d,1,1,frontend/src/styles/tokens.css:44
+color,#3a4a55,1,1,frontend/src/styles/tokens.css:45
+color,#44506a,1,1,frontend/src/styles/tokens.css:46
+color,#5c6a76,1,1,frontend/src/styles/tokens.css:51
+color,#6e7275,1,1,frontend/src/styles/tokens.css:54
+color,#7e9bbb,1,1,frontend/src/styles/tokens.css:55
+color,#d41733,1,1,frontend/src/styles/tokens.css:57
+color,#d4f0e3,1,1,frontend/src/styles/tokens.css:61
+color,#145f38,1,1,frontend/src/styles/tokens.css:62
+color,#e0f0fa,1,1,frontend/src/styles/tokens.css:69
+color,#166c40,1,1,frontend/src/styles/tokens.css:142
+color,#8d5500,1,1,frontend/src/styles/tokens.css:143
+color,#c3152f,1,1,frontend/src/styles/tokens.css:144
+color,#6d2ed6,1,1,frontend/src/styles/tokens.css:145
+color,#0f1c30,1,1,frontend/src/styles/tokens.css:151
+color,#081426,1,1,frontend/src/styles/tokens.css:152
+color,#e7eef6,1,1,frontend/src/styles/tokens.css:153
+color,#1e3251,1,1,frontend/src/styles/tokens.css:156
+color,#16233a,1,1,frontend/src/styles/tokens.css:161
+color,#c7d4e3,1,1,frontend/src/styles/tokens.css:163
+color,#df68ff,1,1,frontend/src/styles/tokens.css:187
+color,#a3e4bd,1,1,frontend/src/styles/planning.css:47
+color,#ffd080,1,1,frontend/src/styles/planning.css:48
+color,#ffaaaa,1,1,frontend/src/styles/planning.css:49
+color,#ffb74d,1,1,frontend/src/styles/planning.css:131
+color,#fffbec,1,1,frontend/src/styles/planning.css:227
+color,#e0e0e0,1,1,frontend/src/styles/planning.css:466
+color,#fffaf2,1,1,frontend/src/styles/planning.css:516
+color,#f5c26b,1,1,frontend/src/styles/planning.css:516
+color,#ffd060,1,1,frontend/src/styles/planning.css:545
+color,#5a3d00,1,1,frontend/src/styles/planning.css:618
+color,#fafafa,1,1,frontend/src/styles/planning.css:671
+color,#fff8f0,1,1,frontend/src/styles/planning.css:777
+color,#f9fbfe,1,1,frontend/src/styles/planning.css:825
+color,#fffdf0,1,1,frontend/src/styles/planning.css:905
+color,"rgba(26,127,75,.3)",1,1,frontend/src/styles/planning.css:47
+color,"rgba(201,122,0,.35)",1,1,frontend/src/styles/planning.css:48
+color,"rgba(229,25,55,.35)",1,1,frontend/src/styles/planning.css:49
+color,"rgba(81,176,227,.08)",1,1,frontend/src/styles/planning.css:362
+color,"rgba(0,75,141,.1)",1,1,frontend/src/styles/planning.css:366
+color,"rgba(0,0,0,.14)",1,1,frontend/src/styles/planning.css:377
+color,"rgba(81,176,227,.1)",1,1,frontend/src/styles/planning.css:386
+color,"rgba(26,127,75,.05)",1,1,frontend/src/styles/planning.css:402
+color,"rgba(0,0,0,.06)",1,1,frontend/src/styles/planning.css:512
+color,"rgba(0,47,101,.12)",1,1,frontend/src/styles/planning.css:515
+color,"rgba(255,200,50,.2)",1,1,frontend/src/styles/planning.css:544
+color,"rgba(0,47,101,.18)",1,1,frontend/src/styles/planning.css:1005
+color,"rgba(0,0,0,.35)",1,1,frontend/src/styles/planning.css:1014
+color,"rgba(255,255,255,.4)",1,1,frontend/src/styles/planning.css:1041
+color,"rgba(81,176,227,.06)",1,1,frontend/src/styles/planning.css:1284
+color,#888,1,1,frontend/src/styles/print.css:8
+color,#555,1,1,frontend/src/styles/print.css:9
+color,#3a1620,1,1,frontend/src/styles/components.css:41
+color,#ffb4be,1,1,frontend/src/styles/components.css:41
+color,#cfead8,1,1,frontend/src/styles/components.css:121
+color,#14532d,1,1,frontend/src/styles/components.css:121
+color,#fde9c8,1,1,frontend/src/styles/components.css:122
+color,#7a4a00,1,1,frontend/src/styles/components.css:122
+color,#f7d0cc,1,1,frontend/src/styles/components.css:123
+color,#7a1d16,1,1,frontend/src/styles/components.css:123
+color,"rgba(8,20,38,.55)",1,1,frontend/src/styles/components.css:63
+color,"rgba(0,0,0,.3)",1,1,frontend/src/styles/components.css:64
+color,"rgba(0,0,0,.22)",1,1,frontend/src/components/Toast.tsx:44
+color,#21618c,1,1,frontend/src/components/planning/PlanningLeftPanel.tsx:26
+color,#92400e,1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:70
+color,#78909c,1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:80
+color,#f8fafd,1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:622
+color,#fff8e6,1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:685
+color,#1a4d8f,1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1394
+color,#b45309,1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1397
+color,#f0fff4,1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1892
+color,#f0f5ff,1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1910
+color,#f4f5f7,1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1969
+color,"rgba(0,0,0,.4)",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1476
+color,"rgba(0,0,0,0.35)",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:2099
+color,"rgba(0,0,0,0.2)",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:2100
+color,#e8f5e9,1,1,frontend/src/components/planning/ActivityDetailBlock.tsx:240
+color,#f5f5f5,1,1,frontend/src/components/planning/ActivityDetailBlock.tsx:242
+color,#856404,1,1,frontend/src/components/planning/ActivityDetailBlock.tsx:494
+color,#fee2e2,1,1,frontend/src/components/charts/DashboardCharts.tsx:263
+color,#e5e7eb,1,1,frontend/src/components/charts/DashboardCharts.tsx:325
+color,#1a1a2e,1,1,frontend/src/routes/Accounts.tsx:53
+color,#7efff5,1,1,frontend/src/routes/Accounts.tsx:53
+font-size,0.85rem,2,1,frontend/src/styles/components.css:98
+font-size,11px,1,1,frontend/src/styles/print.css:8
+font-size,10px,1,1,frontend/src/styles/print.css:9
+font-size,0.82rem,1,1,frontend/src/styles/components.css:88
+font-size,0.88rem,1,1,frontend/src/styles/components.css:90
+font-size,0.8rem,1,1,frontend/src/styles/components.css:116
+spacing,0,30,9,frontend/src/styles/planning.css:5
+spacing,4px,28,2,frontend/src/styles/planning.css:43
+spacing,10px,24,4,frontend/src/styles/tokens.css:23
+spacing,8,24,10,frontend/src/components/planning/PlanningBottomDrawer.tsx:711
+spacing,6px,19,3,frontend/src/styles/planning.css:41
+spacing,2px,19,2,frontend/src/styles/planning.css:136
+spacing,8px,17,3,frontend/src/styles/planning.css:123
+spacing,4,15,5,frontend/src/components/planning/PlanningBottomDrawer.tsx:284
+spacing,16px,12,2,frontend/src/styles/planning.css:110
+spacing,12px,11,3,frontend/src/styles/planning.css:149
+spacing,"""20px""",11,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:222
+spacing,6,9,7,frontend/src/components/planning/PlanningBottomDrawer.tsx:668
+spacing,3px,8,1,frontend/src/styles/planning.css:178
+spacing,14px,7,3,frontend/src/styles/planning.css:79
+spacing,7px,7,2,frontend/src/styles/planning.css:87
+spacing,8px 10px,7,2,frontend/src/styles/planning.css:126
+spacing,20px,7,3,frontend/src/styles/planning.css:395
+spacing,16,7,7,frontend/src/components/planning/PlanningBottomDrawer.tsx:226
+spacing,6px 8px,6,2,frontend/src/styles/planning.css:168
+spacing,8px 12px,6,3,frontend/src/styles/planning.css:382
+spacing,5px,6,2,frontend/src/styles/planning.css:615
+spacing,"8, marginbottom: 8",6,2,frontend/src/components/planning/PlanningBottomDrawer.tsx:692
+spacing,"8, margintop: 12",5,1,frontend/src/components/planning/GuidedYearSetupModal.tsx:122
+spacing,"""3px 8px""",5,3,frontend/src/components/planning/PlanningBottomDrawer.tsx:1033
+spacing,auto,4,1,frontend/src/styles/planning.css:41
+spacing,2px 7px,4,2,frontend/src/styles/planning.css:141
+spacing,1px 5px,4,2,frontend/src/styles/planning.css:179
+spacing,7px 10px,4,1,frontend/src/styles/planning.css:361
+spacing,0 0 8px,4,1,frontend/src/styles/planning.css:393
+spacing,10px 12px,4,2,frontend/src/styles/planning.css:1182
+spacing,18px,4,2,frontend/src/styles/planning.css:1252
+spacing,"""4px 2px 2px""",4,1,frontend/src/components/planning/PlanningLeftPanel.tsx:308
+spacing,"""1px 6px"", borderradius: 3, whitespace: ""nowrap""",4,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:372
+spacing,"4, flexwrap: ""wrap""",4,3,frontend/src/components/planning/PlanningBottomDrawer.tsx:455
+spacing,"""2px 8px""",4,2,frontend/src/components/planning/PlanningBottomDrawer.tsx:671
+spacing,"""1px 5px"",",4,1,frontend/src/components/planning/ActivityDetailBlock.tsx:248
+spacing,"""3px 10px""",4,2,frontend/src/components/planning/SetupPanel.tsx:241
+spacing,"""5px 8px"", textalign: ""center""",4,1,frontend/src/components/charts/DashboardCharts.tsx:442
+spacing,"6, alignitems: ""center""",4,1,frontend/src/routes/Overviews.tsx:56
+spacing,"""0 0 6px""",3,2,frontend/src/layout/ProxyControls.tsx:37
+spacing,7px 14px,3,1,frontend/src/styles/planning.css:30
+spacing,2px 8px,3,1,frontend/src/styles/planning.css:40
+spacing,3px 10px,3,1,frontend/src/styles/planning.css:52
+spacing,4px 0,3,2,frontend/src/styles/planning.css:138
+spacing,8px 14px,3,2,frontend/src/styles/planning.css:156
+spacing,12px 16px,3,2,frontend/src/styles/planning.css:262
+spacing,1px,3,1,frontend/src/styles/planning.css:477
+spacing,5px 6px,3,1,frontend/src/styles/planning.css:730
+spacing,4px 10px,3,2,frontend/src/styles/planning.css:918
+spacing,10,3,2,frontend/src/components/planning/GuidedYearSetupModal.tsx:327
+spacing,"""1px 5px"", borderradius: 3, whitespace: ""nowrap""",3,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:69
+spacing,"""2px 7px""",3,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:459
+spacing,"""4px 6px""",3,3,frontend/src/components/planning/PlanningBottomDrawer.tsx:806
+spacing,"""8px 14px 0"", display: ""flex"", justifycontent: ""flex-end""",3,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1005
+spacing,"""1px 5px""",3,1,frontend/src/components/planning/ActivityDetailBlock.tsx:324
+spacing,"""6px 8px"", fontweight: 700",3,1,frontend/src/routes/Settings.tsx:166
+spacing,"8, margintop: 6",3,2,frontend/src/routes/Settings.tsx:219
+spacing,10px 0,2,2,frontend/src/styles/planning.css:76
+spacing,3px 9px,2,2,frontend/src/styles/planning.css:94
+spacing,7px 9px,2,1,frontend/src/styles/planning.css:219
+spacing,0 4px,2,2,frontend/src/styles/planning.css:268
+spacing,14px 16px,2,1,frontend/src/styles/planning.css:270
+spacing,-1px,2,1,frontend/src/styles/planning.css:316
+spacing,4px 8px,2,1,frontend/src/styles/planning.css:340
+spacing,40px,2,1,frontend/src/styles/planning.css:350
+spacing,0 2px,2,1,frontend/src/styles/planning.css:371
+spacing,2px 4px,2,2,frontend/src/styles/planning.css:563
+spacing,6px 10px,2,1,frontend/src/styles/planning.css:752
+spacing,4px 6px,2,2,frontend/src/styles/planning.css:971
+spacing,10px 18px,2,1,frontend/src/styles/layout.css:2
+spacing,"8, justifycontent: ""flex-end""",2,2,frontend/src/components/ConfirmDialog.tsx:64
+spacing,"8, marginbottom: 6",2,2,frontend/src/components/CadetClassMembershipModal.tsx:117
+spacing,"8, alignitems: ""center"", fontweight: 400, margintop: 6",2,2,frontend/src/components/planning/GuidedYearSetupModal.tsx:357
+spacing,"""1px 6px""",2,1,frontend/src/components/planning/PlanningLeftPanel.tsx:363
+spacing,"""2px 4px""",2,1,frontend/src/components/planning/PlanningLeftPanel.tsx:401
+spacing,"6, alignitems: ""center"", flexwrap: ""wrap"",",2,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:242
+spacing,"""3px 8px"", whitespace: ""nowrap""",2,2,frontend/src/components/planning/PlanningBottomDrawer.tsx:294
+spacing,"8, margintop: 10, justifycontent: ""flex-end""",2,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1574
+spacing,"""2px 6px""",2,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:2016
+spacing,"""10px 0""",2,2,frontend/src/components/planning/PlanningBottomDrawer.tsx:2054
+spacing,"""1px 5px"", fontweight: 700",2,1,frontend/src/components/planning/ActivityDetailBlock.tsx:490
+spacing,"""0 0 12px""",2,2,frontend/src/components/planning/SetupPanel.tsx:193
+spacing,"10, marginbottom: 8, flexwrap: ""wrap""",2,1,frontend/src/components/charts/DashboardCharts.tsx:195
+spacing,"""6px 8px""",2,1,frontend/src/routes/Settings.tsx:169
+spacing,"""0 0 4px""",2,1,frontend/src/routes/Facilitators.tsx:272
+spacing,"""36px 40px"", maxwidth: 420, textalign: ""center"", boxshadow: ""0 4px 16px rgba(0,47,101,.10)""",1,1,frontend/src/App.tsx:59
+spacing,"""10px 24px"", borderradius: 6, textdecoration: ""none""",1,1,frontend/src/App.tsx:66
+spacing,"""36px 40px"", maxwidth: 480, textalign: ""center"", boxshadow: ""0 4px 16px rgba(0,47,101,.10)""",1,1,frontend/src/App.tsx:87
+spacing,"10, justifycontent: ""center"", flexwrap: ""wrap""",1,1,frontend/src/App.tsx:93
+spacing,"""10px 20px"", borderradius: 6, border: 0, cursor: ""pointer""",1,1,frontend/src/App.tsx:94
+spacing,"""10px 20px"", borderradius: 6, textdecoration: ""none"", border: ""1px solid #d1dce8""",1,1,frontend/src/App.tsx:97
+spacing,"""5px 7px""",1,1,frontend/src/layout/SquadronSelector.tsx:26
+spacing,0 12px,1,1,frontend/src/styles/planning.css:79
+spacing,6px 0 4px,1,1,frontend/src/styles/planning.css:83
+spacing,4px 2px,1,1,frontend/src/styles/planning.css:88
+spacing,5px 2px,1,1,frontend/src/styles/planning.css:101
+spacing,1px 2px 1px 0,1,1,frontend/src/styles/planning.css:141
+spacing,32px 40px,1,1,frontend/src/styles/planning.css:390
+spacing,0 auto,1,1,frontend/src/styles/planning.css:390
+spacing,28px,1,1,frontend/src/styles/planning.css:392
+spacing,18px 20px,1,1,frontend/src/styles/planning.css:397
+spacing,8px 0 10px,1,1,frontend/src/styles/planning.css:419
+spacing,2px 0,1,1,frontend/src/styles/planning.css:465
+spacing,10px 14px 9px,1,1,frontend/src/styles/planning.css:525
+spacing,1px 7px,1,1,frontend/src/styles/planning.css:547
+spacing,4px 12px,1,1,frontend/src/styles/planning.css:594
+spacing,5px 12px 7px,1,1,frontend/src/styles/planning.css:603
+spacing,5px 8px,1,1,frontend/src/styles/planning.css:631
+spacing,3px 6px,1,1,frontend/src/styles/planning.css:637
+spacing,3px 10px 5px,1,1,frontend/src/styles/planning.css:729
+spacing,5px 12px,1,1,frontend/src/styles/planning.css:740
+spacing,12px 18px,1,1,frontend/src/styles/planning.css:794
+spacing,8px 16px 4px,1,1,frontend/src/styles/planning.css:823
+spacing,14px 18px 12px,1,1,frontend/src/styles/planning.css:889
+spacing,6px 18px 8px,1,1,frontend/src/styles/planning.css:903
+spacing,3px 0,1,1,frontend/src/styles/planning.css:980
+spacing,3px 8px,1,1,frontend/src/styles/planning.css:1096
+spacing,9px 6px,1,1,frontend/src/styles/planning.css:1109
+spacing,-2px,1,1,frontend/src/styles/planning.css:1116
+spacing,18px 0 6px,1,1,frontend/src/styles/planning.css:1139
+spacing,0 0 12px,1,1,frontend/src/styles/planning.css:1161
+spacing,8px !important,1,1,frontend/src/styles/planning.css:1169
+spacing,10px 0 14px,1,1,frontend/src/styles/planning.css:1177
+spacing,8px 14px 12px,1,1,frontend/src/styles/planning.css:1241
+spacing,0 0 6px,1,1,frontend/src/styles/planning.css:1251
+spacing,7px 12px,1,1,frontend/src/styles/planning.css:1272
+spacing,10px 14px,1,1,frontend/src/styles/planning.css:1283
+spacing,8px 0 12px,1,1,frontend/src/styles/planning.css:1285
+spacing,9px 10px 9px 8px,1,1,frontend/src/styles/layout.css:22
+spacing,12px 6px 4px,1,1,frontend/src/styles/layout.css:25
+spacing,24px,1,1,frontend/src/styles/layout.css:26
+spacing,14px 18px,1,1,frontend/src/styles/layout.css:32
+spacing,5px 10px 5px 8px,1,1,frontend/src/styles/layout.css:33
+spacing,8px 6px 3px,1,1,frontend/src/styles/layout.css:34
+spacing,0 !important,1,1,frontend/src/styles/print.css:4
+spacing,8mm,1,1,frontend/src/styles/print.css:5
+spacing,0 0 4px,1,1,frontend/src/styles/print.css:6
+spacing,10mm,1,1,frontend/src/styles/print.css:9
+spacing,12mm,1,1,frontend/src/styles/print.css:10
+spacing,5px 10px,1,1,frontend/src/styles/components.css:10
+spacing,30px,1,1,frontend/src/styles/components.css:20
+spacing,32px,1,1,frontend/src/styles/components.css:22
+spacing,9px,1,1,frontend/src/styles/components.css:55
+spacing,40px 16px,1,1,frontend/src/styles/components.css:63
+spacing,16px 20px,1,1,frontend/src/styles/components.css:65
+spacing,6px 0,1,1,frontend/src/styles/components.css:74
+spacing,8px 0,1,1,frontend/src/styles/components.css:83
+spacing,12px auto 24px,1,1,frontend/src/styles/components.css:84
+spacing,-6px 0 4px,1,1,frontend/src/styles/components.css:88
+spacing,0 0 14px,1,1,frontend/src/styles/components.css:98
+spacing,2px 2px 2px 8px,1,1,frontend/src/styles/components.css:130
+spacing,2px 6px,1,1,frontend/src/styles/components.css:138
+spacing,10px 16px,1,1,frontend/src/styles/components.css:156
+spacing,"8, margintop: 4, flexwrap: ""wrap"", alignitems: ""center""",1,1,frontend/src/components/CadetClassMembershipModal.tsx:130
+spacing,"""32px 24px""",1,1,frontend/src/components/ErrorBoundary.tsx:20
+spacing,"""2px 8px"", borderradius: 999,",1,1,frontend/src/components/planning/GuidedYearSetupModal.tsx:92
+spacing,"8, alignitems: ""center"", fontweight: 400, margintop: 10",1,1,frontend/src/components/planning/GuidedYearSetupModal.tsx:113
+spacing,"3, marginbottom: 4",1,1,frontend/src/components/planning/PlanningLeftPanel.tsx:360
+spacing,"""6px 2px""",1,1,frontend/src/components/planning/PlanningLeftPanel.tsx:431
+spacing,"""5px 8px"", borderradius: 6,",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:55
+spacing,"4,",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:60
+spacing,"""1px 6px"", borderradius: 3, whitespace: ""nowrap"",",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:94
+spacing,"""2px 4px"", borderradius: 4,",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:218
+spacing,3,1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:433
+spacing,2,1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:646
+spacing,"""6px 10px"", marginbottom: 6",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:685
+spacing,"""10px 12px"", marginbottom: 8",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:691
+spacing,"""8px 14px 0"", display: ""flex"", justifycontent: ""flex-end"", gap: 6",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:889
+spacing,"4, marginbottom: 8",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1277
+spacing,"0, background: ""rgba(0,0,0,.4)"", zindex: 900, display: ""flex"", alignitems: ""center"", justifycontent: ""center""",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1476
+spacing,"24, width: 420, maxwidth: ""95vw""",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1479
+spacing,"6, marginbottom: 16",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1495
+spacing,"12, marginbottom: 8",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1561
+spacing,"6, cursor: ""pointer""",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1879
+spacing,"""3px 9px"", pointerevents: ""none"", whitespace: ""nowrap""",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1881
+spacing,"8, alignitems: ""flex-end""",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1934
+spacing,"""24px""",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1945
+spacing,"""2px 5px"", borderradius: 3,",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:1972
+spacing,"""0 14px 10px""",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:2052
+spacing,"0, background: ""rgba(0,0,0,0.35)"", display: ""flex"", alignitems: ""center"", justifycontent: ""center"", zindex: 200",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:2099
+spacing,"16, width: 360, boxshadow: ""0 8px 24px rgba(0,0,0,0.2)""",1,1,frontend/src/components/planning/PlanningBottomDrawer.tsx:2100
+spacing,"""6px 9px"",",1,1,frontend/src/components/planning/ActivityDetailBlock.tsx:285
+spacing,"4, flexwrap: ""wrap"", margintop: 4",1,1,frontend/src/components/planning/ActivityDetailBlock.tsx:322
+spacing,"""8px 11px"",",1,1,frontend/src/components/planning/ActivityDetailBlock.tsx:358
+spacing,"6, marginbottom: 4",1,1,frontend/src/components/planning/ActivityDetailBlock.tsx:367
+spacing,"""0 2px""",1,1,frontend/src/components/planning/ActivityDetailBlock.tsx:483
+spacing,"6, flexwrap: ""wrap"", marginbottom: 12",1,1,frontend/src/components/planning/ActivityDetailBlock.tsx:488
+spacing,"6, flexwrap: ""wrap"", margintop: 4",1,1,frontend/src/components/planning/ActivityDetailBlock.tsx:537
+spacing,"8, alignitems: ""center"", fontweight: 400",1,1,frontend/src/components/planning/PlanningRightDrawer.tsx:749
+spacing,"""12px 0"", paddingtop: 12",1,1,frontend/src/components/planning/PlanningRightDrawer.tsx:903
+spacing,"10, flexwrap: ""wrap""",1,1,frontend/src/components/planning/views/ParadeNightGridView.tsx:268
+spacing,"6, marginbottom: 14",1,1,frontend/src/components/planning/views/TermView.tsx:105
+spacing,"10, marginbottom: 14",1,1,frontend/src/components/planning/views/TwoWeekView.tsx:14
+spacing,{ item: 10,1,1,frontend/src/components/charts/FacilitatorTimeline.tsx:93
+spacing,"""14px 16px"", marginbottom: 12,",1,1,frontend/src/components/charts/DashboardCharts.tsx:15
+spacing,"""6px 10px"", margintop: 10,",1,1,frontend/src/components/charts/DashboardCharts.tsx:21
+spacing,"""12px 4px""",1,1,frontend/src/components/charts/DashboardCharts.tsx:23
+spacing,"12, overflowx: ""auto"", height: 90",1,1,frontend/src/components/charts/DashboardCharts.tsx:238
+spacing,"2, height: 70",1,1,frontend/src/components/charts/DashboardCharts.tsx:241
+spacing,"""2px 4px"", whitespace: ""nowrap""",1,1,frontend/src/components/charts/DashboardCharts.tsx:270
+spacing,"16, alignitems: ""flex-start""",1,1,frontend/src/components/charts/DashboardCharts.tsx:322
+spacing,"""5px 0""",1,1,frontend/src/components/charts/DashboardCharts.tsx:387
+spacing,"""5px 8px"", fontweight: 700, whitespace: ""nowrap""",1,1,frontend/src/components/charts/DashboardCharts.tsx:441
+spacing,"""6px 8px"", fontweight: 600",1,1,frontend/src/routes/Settings.tsx:180
+spacing,"""6px 8px"", textalign: ""right""",1,1,frontend/src/routes/Settings.tsx:185
+spacing,"""0 auto""",1,1,frontend/src/routes/PlanningWorkspace.tsx:336
+spacing,"""4px 14px"", display: ""flex"", flexwrap: ""wrap"", gap: 8, rowgap: 6, alignitems: ""center""",1,1,frontend/src/routes/PlanningWorkspace.tsx:560
+spacing,"""0 4px""",1,1,frontend/src/routes/PlanningWorkspace.tsx:582
+spacing,"""4px 12px"", fontweight: 600",1,1,frontend/src/routes/PlanningWorkspace.tsx:600
+spacing,"""5px 20px"", borderradius: ""8px 8px 0 0"",",1,1,frontend/src/routes/PlanningWorkspace.tsx:679
+spacing,"12, alignitems: ""center"", flexwrap: ""wrap""",1,1,frontend/src/routes/FacilitatorSchedule.tsx:56
+spacing,"""12px 0""",1,1,frontend/src/routes/Dashboard.tsx:172
+spacing,"6, alignitems: ""center"", fontweight: 400",1,1,frontend/src/routes/Curriculum.tsx:49
+spacing,"8, marginbottom: 10",1,1,frontend/src/routes/ParadeNightDetail.tsx:59
+spacing,"""4px 8px""",1,1,frontend/src/routes/Overviews.tsx:304
+spacing,"8, marginbottom: 16",1,1,frontend/src/routes/Overviews.tsx:315
+spacing,"""18px 12px"",",1,1,frontend/src/routes/Accounts.tsx:54
+spacing,"8, flexwrap: ""wrap"", marginbottom: 12",1,1,frontend/src/routes/Accounts.tsx:241
+spacing,"6, marginbottom: 8",1,1,frontend/src/routes/Accounts.tsx:710
+spacing,5,1,1,frontend/src/routes/Accounts.tsx:720
+spacing,14,1,1,frontend/src/routes/Accounts.tsx:758
+spacing,"6, flexwrap: ""wrap""",1,1,frontend/src/routes/Facilitators.tsx:64
+radius,8px,14,3,frontend/src/styles/planning.css:126
+radius,5px,11,2,frontend/src/styles/planning.css:632
+radius,50%,7,1,frontend/src/styles/planning.css:91
+radius,10px,7,3,frontend/src/styles/planning.css:151
+radius,20px,6,2,frontend/src/styles/planning.css:40
+radius,4px,6,2,frontend/src/styles/planning.css:179
+radius,7px,6,1,frontend/src/styles/planning.css:279
+radius,6px,5,2,frontend/src/styles/planning.css:52
+radius,2px,4,2,frontend/src/styles/planning.css:136
+radius,3px,3,2,frontend/src/styles/planning.css:566
+radius,12px,2,1,frontend/src/styles/planning.css:398
+radius,14px,2,1,frontend/src/styles/components.css:22
+radius,1px,1,1,frontend/src/styles/planning.css:981
+shadow,"0 4px 16px rgba(0,0,0,.14)",1,1,frontend/src/styles/planning.css:377
+shadow,"0 1px 4px rgba(0,0,0,.06)",1,1,frontend/src/styles/planning.css:512
+shadow,"0 3px 10px rgba(0,47,101,.12)",1,1,frontend/src/styles/planning.css:515
+shadow,"2px 0 12px rgba(0,47,101,.18)",1,1,frontend/src/styles/planning.css:1005
+shadow,"-4px 0 20px rgba(0,47,101,.14)",1,1,frontend/src/styles/planning.css:1068
+shadow,"0 20px 60px rgba(0,0,0,.3)",1,1,frontend/src/styles/components.css:64
+z-index,100,2,2,frontend/src/styles/planning.css:375
+z-index,5,1,1,frontend/src/styles/planning.css:263
+z-index,4,1,1,frontend/src/styles/planning.css:895
+z-index,300,1,1,frontend/src/styles/planning.css:1002
+z-index,299,1,1,frontend/src/styles/planning.css:1015
+z-index,310,1,1,frontend/src/styles/planning.css:1021
+z-index,350,1,1,frontend/src/styles/planning.css:1069
+z-index,50,1,1,frontend/src/styles/components.css:63
+duration,12s,9,2,frontend/src/styles/planning.css:54
+duration,1s,8,1,frontend/src/styles/planning.css:223
+duration,18s,2,1,frontend/src/styles/planning.css:65
+duration,15s,1,1,frontend/src/styles/planning.css:513
+duration,3s,1,1,frontend/src/components/charts/DashboardCharts.tsx:88
