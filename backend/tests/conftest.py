@@ -10,13 +10,19 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_tmp}/test.db"
 os.environ["ENVIRONMENT"] = "test"
 os.environ["JWT_SECRET"] = "test-secret"
 os.environ["SECRET_KEY"] = "test-secret"
+# K-001: raise the in-memory API rate limit in test mode so the timing test's
+# 244-iteration loop (plus login and bulk-schedule preamble) never trips the
+# 300-req/60s default. The login-spike tests have their own DB-backed rate limiter
+# that is independent of this setting.
+os.environ["API_RATE_LIMIT"] = "10000"
 
 from fastapi.testclient import TestClient  # noqa: E402
 from app.main import app                    # noqa: E402
+from app.main import _5xx_times             # noqa: E402
 from app.seeds.seed_all import seed_all     # noqa: E402
 from app.security import reset_rate_limiter, reset_api_rate_limiter, reset_api_rate_limiter_db, reset_user_api_rate_limiter_db # noqa: E402
 from app.database import SessionLocal, engine  # noqa: E402
-from app.models import IpLoginAttempt, IpApiRequest, UserApiRequest, AccessCode  # noqa: E402
+from app.models import IpLoginAttempt, IpApiRequest, UserApiRequest, AccessCode, PlanningYear  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -25,24 +31,47 @@ def _seed():
     yield
 
 
-@pytest.fixture()
-def client():
+# K-001: autouse reset that runs before EVERY test, not just those that use the
+# `client` fixture. This covers tests that call security functions directly via
+# _db() (e.g. test_rate_limiting.py) and tests that check for unmaterialised
+# future planning years (test_year_context.py).
+@pytest.fixture(autouse=True)
+def _reset_shared_state():
+    # In-process state reset.
     reset_rate_limiter()
     reset_api_rate_limiter()
-    # Clear DB-backed lockout state so tests are isolated
+    _5xx_times.clear()
+    # K-001: alembic.command.upgrade/stamp calls fileConfig('alembic.ini') which sets
+    # disable_existing_loggers=True by default, silencing any logger not listed in
+    # alembic.ini's [loggers] keys (including "security"). Re-enable it before each test.
+    import logging
+    logging.getLogger("security").disabled = False
+
     db = SessionLocal()
     try:
         db.query(IpLoginAttempt).delete()
-        reset_api_rate_limiter_db(db)      # DEF-10: clear DB-backed per-IP API rate limit rows
-        reset_user_api_rate_limiter_db(db) # DEF-11: clear DB-backed per-account API rate limit rows
-        # Reset per-account lockout fields on all access codes
+        reset_api_rate_limiter_db(db)
+        reset_user_api_rate_limiter_db(db)
         for ac in db.query(AccessCode).all():
             ac.failed_attempts = 0
             ac.locked_until = None
+        # K-001 year context: delete PlanningYear rows for near-future years
+        # materialised by other tests via ensure_year_context or direct API calls.
+        # Safe range: above the seed's 2026 year, below the test-year-counter floor
+        # (5000). Rows in this range are test artefacts, not seed data.
+        db.query(PlanningYear).filter(
+            PlanningYear.year >= 2027,
+            PlanningYear.year < 5000,
+        ).delete()
         db.commit()
     finally:
         db.close()
-    # Dispose pooled connections so the next request sees fresh DB state
+
+    yield
+
+
+@pytest.fixture()
+def client():
     engine.dispose()
     return TestClient(app)
 
