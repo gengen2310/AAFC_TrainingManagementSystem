@@ -70,3 +70,6 @@ connected-frontend/.local-dev/
 # Stress / smoke test scripts contain hardcoded dev seed codes — never commit
 tools/stress/
 frontend/test-results/
+backend/.venv
+frontend/node_modules
+tools/playwright-staging/node_modules
