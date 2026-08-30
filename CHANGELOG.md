@@ -29,6 +29,37 @@ entrypoint, so they are unaffected.
 - 8 tests in `backend/tests/test_pw_module_mode_fail_closed.py`, executing the
   real `frontend/docker-entrypoint.sh` (6 of them red before the fix).
 
+### Custom training phases are no longer shared across national entities
+
+`CustomTrainingPhase` carries a polymorphic scope pair — `scope_type` in
+{squadron, wing, national, system} and `scope_id` holding that scope entity's
+id. Squadron and wing scope populated `scope_id` correctly; national scope
+forced it to `None`, so visibility could only match on `scope_type` and every
+national saw every other national's phases, inherited all the way down to
+squadrons.
+
+`scope_id` now names the national entity, which is what the column already
+meant — no new column, and no change to the date window (`applies_from` /
+`applies_to`), which stays the phase's temporal scope.
+
+- `scope_type = "system"` is deliberately unchanged: it means installation-wide,
+  above any one national, and is the one scope that carries no `scope_id`.
+- A national admin can no longer edit or delete another national's phase.
+- Migration `v61 f2c8e51d7a93` is data-only. It attributes existing
+  national-scoped rows **only when exactly one `NationalEntity` exists**, where
+  the attribution is provable. With two or more it leaves them NULL and prints
+  a warning naming the count and the query to find them: the row records
+  nothing about who created it, and a NULL keeps the pre-v61 behaviour rather
+  than misfiling data under a guessed owner. Both branches rehearsed on
+  PostgreSQL, along with the downgrade.
+- 9 tests in `backend/tests/test_custom_phase_national_scope.py` (5 red before
+  the fix; the other 4 guard against over-filtering).
+
+The national resolver is now shared — `services.resolve_national_id` — so this
+and the tag tables derive a caller's national identically. They must not
+disagree, or one endpoint would file a caller under a different national than
+the other.
+
 ### Reference-data tags: sibling squadrons no longer collide, and "global" is per-national
 
 The five user-creatable reference-data tables — subject areas, facilitator

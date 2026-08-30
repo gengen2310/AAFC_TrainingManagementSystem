@@ -22,7 +22,8 @@ from ..dependencies import get_principal, client_meta
 from ..permissions import (Principal, require_can_view_squadron, require_can_write_squadron,
                           require_can_view_wing, require_can_write_activity, require_role, require_system_admin,
                           NATIONAL_LEVEL)
-from ..services import (audit, score_parade, publish_blockers, close_blockers)
+from ..services import (audit, score_parade, publish_blockers, close_blockers,
+                        resolve_national_id)
 from ..services_readiness import parade_night_readiness
 
 router = APIRouter(prefix="/api", tags=["training"])
@@ -5335,25 +5336,13 @@ def _can_create_tag(p: Principal, scope: str, wing_id: str | None = None, squadr
 
 
 def _tag_national_id(db: DBSession, p: Principal) -> str | None:
-    """The national entity this principal's reference data belongs to.
+    """The national entity this caller's reference data belongs to.
 
-    Squadron and wing users are seeded without User.national_id, so the value
-    has to be derived through the org tree: user -> wing -> national. Returns
-    None only when nothing in the chain resolves, which leaves the tag
-    national-agnostic rather than mis-filed under the wrong national."""
-    if p.national_id:
-        return p.national_id
-    wing_id = p.acting_wing_id or p.wing_id
-    if not wing_id:
-        sq_id = p.acting_squadron_id or p.squadron_id
-        if sq_id:
-            sq = db.get(Squadron, sq_id)
-            wing_id = sq.wing_id if sq else None
-    if wing_id:
-        w = db.get(Wing, wing_id)
-        if w:
-            return w.national_id
-    return None
+    Thin alias for services.resolve_national_id, which custom_phases.py also
+    uses -- the derivation (squadron -> wing -> national, honouring an acting
+    proxy scope) must stay identical between the two, or the same caller would
+    be filed under different nationals by different endpoints."""
+    return resolve_national_id(db, p)
 
 
 def _tag_global_visible(model, national_id: str | None):

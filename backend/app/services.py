@@ -4,9 +4,36 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session as DBSession
 
 from .database import Base
-from .models import AuditLog
+from .models import AuditLog, Squadron, Wing
 from .permissions import Principal
 from .services_readiness import parade_night_readiness
+
+
+def resolve_national_id(db: DBSession, p: Principal) -> str | None:
+    """The national entity this principal belongs to.
+
+    User.national_id is populated for national-level and wing accounts but not
+    for squadron accounts, so for those it has to be derived through the org
+    tree: squadron -> wing -> national. Proxy / Delegated Intervention is
+    honoured, since an acting scope is the scope the caller is working in.
+
+    Returns None only when nothing in the chain resolves. Callers must treat
+    that as "national unknown" and fall back to their pre-national behaviour
+    rather than filtering everything out.
+    """
+    if p.national_id:
+        return p.national_id
+    wing_id = p.acting_wing_id or p.wing_id
+    if not wing_id:
+        sq_id = p.acting_squadron_id or p.squadron_id
+        if sq_id:
+            sq = db.get(Squadron, sq_id)
+            wing_id = sq.wing_id if sq else None
+    if wing_id:
+        w = db.get(Wing, wing_id)
+        if w:
+            return w.national_id
+    return None
 
 
 def audit(db: DBSession, principal: Principal | None, *, object_type: str, object_id: str | None,

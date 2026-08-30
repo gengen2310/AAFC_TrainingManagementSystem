@@ -8,11 +8,33 @@ from ..dependencies import get_principal
 from ..permissions import Principal, require_role
 from ..models.custom_phases import CustomTrainingPhase, CUSTOM_PHASE_SCOPE_TYPES
 from .. import services
+from ..services import resolve_national_id
 
 router = APIRouter()
 
 _NATIONAL_ROLES = frozenset({"national_admin", "national_viewer", "auditor"})
 _WING_ROLES = frozenset({"wing_admin", "wing_viewer"})
+
+
+def _above_wing_visible(db, p: Principal):
+    """The system- and national-scoped phases this principal may see.
+
+    "system" is installation-wide and carries no scope_id, so it is visible to
+    everyone. "national" is pinned to one national entity via scope_id, and is
+    visible only inside it.
+
+    A national row with scope_id NULL predates v61. It stays visible to every
+    national: that is what it did before, and the row itself does not record
+    which national created it, so narrowing it would hide phases squadrons are
+    already scheduling against."""
+    national_id = resolve_national_id(db, p)
+    national_cond = CustomTrainingPhase.scope_type == "national"
+    if national_id:
+        national_cond = and_(national_cond, or_(
+            CustomTrainingPhase.scope_id == national_id,
+            CustomTrainingPhase.scope_id.is_(None),
+        ))
+    return or_(CustomTrainingPhase.scope_type == "system", national_cond)
 
 
 def _visible_phases(db, p: Principal) -> list[CustomTrainingPhase]:
@@ -22,16 +44,16 @@ def _visible_phases(db, p: Principal) -> list[CustomTrainingPhase]:
     if role == "system_admin":
         pass  # sees all
     elif role in _NATIONAL_ROLES:
-        q = q.filter(CustomTrainingPhase.scope_type.in_(["system", "national"]))
+        q = q.filter(_above_wing_visible(db, p))
     elif role in _WING_ROLES:
         q = q.filter(or_(
-            CustomTrainingPhase.scope_type.in_(["system", "national"]),
+            _above_wing_visible(db, p),
             and_(CustomTrainingPhase.scope_type == "wing",
                  CustomTrainingPhase.scope_id == p.wing_id),
         ))
     else:  # sqn_admin, sqn_general
         q = q.filter(or_(
-            CustomTrainingPhase.scope_type.in_(["system", "national"]),
+            _above_wing_visible(db, p),
             and_(CustomTrainingPhase.scope_type == "wing",
                  CustomTrainingPhase.scope_id == p.wing_id),
             and_(CustomTrainingPhase.scope_type == "squadron",
@@ -87,9 +109,23 @@ def create_custom_phase(body: CustomPhaseIn, db=Depends(get_db),
             scope_id = p.wing_id  # force to own wing; ignore body.scope_id
         else:
             scope_id = body.scope_id or p.wing_id  # national_admin/system_admin may specify
-    elif body.scope_type in ("national", "system"):
+    elif body.scope_type == "national":
         if p.role not in ("national_admin", "system_admin"):
             raise HTTPException(403, detail={"error": "insufficient_scope"})
+        # scope_id names the national entity. Forcing it to None (the pre-v61
+        # behaviour) left _visible_phases nothing to filter on, so every
+        # national saw every other national's phases.
+        if p.role == "system_admin":
+            scope_id = body.scope_id or resolve_national_id(db, p)
+        else:
+            scope_id = resolve_national_id(db, p)  # own national; body ignored
+        if not scope_id:
+            raise HTTPException(400, detail={"error": "national_unresolved"})
+    elif body.scope_type == "system":
+        if p.role not in ("national_admin", "system_admin"):
+            raise HTTPException(403, detail={"error": "insufficient_scope"})
+        # "system" is installation-wide, above any one national, so it is the
+        # one scope that deliberately carries no scope_id.
         scope_id = None
     ph = CustomTrainingPhase(
         name=body.name,
@@ -107,6 +143,29 @@ def create_custom_phase(body: CustomPhaseIn, db=Depends(get_db),
     return _phase_dict(ph)
 
 
+def _require_can_mutate(db, p: Principal, ph: CustomTrainingPhase) -> None:
+    """Ownership guard shared by update and delete.
+
+    sqn_admin may only mutate their own squadron's phases; wing_admin only
+    their own wing's; national_admin only their own national's. system_admin
+    has full access. Wing and national admins cannot mutate squadron-scoped
+    phases at all (spec §5e).
+
+    A national-scoped phase with scope_id NULL predates v61 and belongs to no
+    identifiable national, so only system_admin may mutate it -- guessing an
+    owner would let one national edit another's reference data."""
+    if ph.scope_type == "squadron":
+        if p.role == "sqn_admin" and ph.scope_id != p.squadron_id:
+            raise HTTPException(403, detail={"error": "insufficient_scope"})
+        if p.role in ("wing_admin", "national_admin"):
+            raise HTTPException(403, detail={"error": "insufficient_scope"})
+    if ph.scope_type == "wing" and p.role == "wing_admin" and ph.scope_id != p.wing_id:
+        raise HTTPException(403, detail={"error": "insufficient_scope"})
+    if ph.scope_type == "national" and p.role == "national_admin":
+        if ph.scope_id is None or ph.scope_id != resolve_national_id(db, p):
+            raise HTTPException(403, detail={"error": "insufficient_scope"})
+
+
 @router.patch("/custom-training-phases/{phase_id}")
 def update_custom_phase(phase_id: str, body: CustomPhaseUpdateIn,
                         db=Depends(get_db), p: Principal = Depends(get_principal)):
@@ -114,16 +173,7 @@ def update_custom_phase(phase_id: str, body: CustomPhaseUpdateIn,
     ph = db.get(CustomTrainingPhase, phase_id)
     if not ph or ph.is_deleted:
         raise HTTPException(404, detail={"error": "not_found"})
-    # Ownership guard: sqn_admin may only mutate their own squadron's phases;
-    # wing_admin may only mutate their own wing's phases;
-    # national_admin/system_admin have full access.
-    if ph.scope_type == "squadron" and p.role == "sqn_admin" and ph.scope_id != p.squadron_id:
-        raise HTTPException(403, detail={"error": "insufficient_scope"})
-    if ph.scope_type == "wing" and p.role == "wing_admin" and ph.scope_id != p.wing_id:
-        raise HTTPException(403, detail={"error": "insufficient_scope"})
-    # spec §5e: wing/national admins cannot mutate squadron-scoped phases
-    if ph.scope_type == "squadron" and p.role in ("wing_admin", "national_admin"):
-        raise HTTPException(403, detail={"error": "insufficient_scope"})
+    _require_can_mutate(db, p, ph)
     if body.name is not None:
         ph.name = body.name
     if body.applies_from is not None:
@@ -144,16 +194,7 @@ def delete_custom_phase(phase_id: str, db=Depends(get_db),
     ph = db.get(CustomTrainingPhase, phase_id)
     if not ph or ph.is_deleted:
         raise HTTPException(404, detail={"error": "not_found"})
-    # Ownership guard: sqn_admin may only mutate their own squadron's phases;
-    # wing_admin may only mutate their own wing's phases;
-    # national_admin/system_admin have full access.
-    if ph.scope_type == "squadron" and p.role == "sqn_admin" and ph.scope_id != p.squadron_id:
-        raise HTTPException(403, detail={"error": "insufficient_scope"})
-    if ph.scope_type == "wing" and p.role == "wing_admin" and ph.scope_id != p.wing_id:
-        raise HTTPException(403, detail={"error": "insufficient_scope"})
-    # spec §5e: wing/national admins cannot mutate squadron-scoped phases
-    if ph.scope_type == "squadron" and p.role in ("wing_admin", "national_admin"):
-        raise HTTPException(403, detail={"error": "insufficient_scope"})
+    _require_can_mutate(db, p, ph)
     # Dependency gate: check if any sessions reference this phase.
     # Sessions link via custom_phase_id when that field is added (Task 8 extension);
     # for now, soft-delete is always safe.
