@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./AuthProvider";
 
 /**
@@ -7,7 +8,9 @@ import { useAuth } from "./AuthProvider";
  *
  *  1. Location watcher — exits proxy in the background when a SPA navigation
  *     changes the pathname. Non-blocking: navigation proceeds immediately and
- *     the backend scope is cleared asynchronously (best-effort).
+ *     the backend scope is cleared asynchronously (best-effort). After exit,
+ *     all cached queries are invalidated so any data that loaded during the
+ *     race window is immediately refetched with the correct (non-proxy) scope.
  *     Note: useBlocker (blocking variant) requires a data router created with
  *     createBrowserRouter; BrowserRouter does not support it in RR v6.
  *
@@ -18,6 +21,7 @@ import { useAuth } from "./AuthProvider";
  */
 export function useProxyGuard(): void {
   const { session, exitProxy } = useAuth();
+  const qc = useQueryClient();
   const proxyActive = !!session?.proxy;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
@@ -27,10 +31,12 @@ export function useProxyGuard(): void {
     const prev = prevPathRef.current;
     const next = location.pathname;
     if (proxyActive && prev !== next) {
-      exitProxy().catch(() => { /* best-effort */ });
+      exitProxy()
+        .then(() => qc.invalidateQueries())
+        .catch(() => qc.invalidateQueries()); // best-effort: invalidate even on failure
     }
     prevPathRef.current = next;
-  }, [location.pathname, proxyActive, exitProxy]);
+  }, [location.pathname, proxyActive, exitProxy, qc]);
 
   // Guard 2: Hard navigation (tab close, reload, external link).
   useEffect(() => {

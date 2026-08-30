@@ -12748,10 +12748,6 @@ async function ynRefreshAllYearViews(){
   if(modalEl) _ynRenderYearList(modalEl, years, {canWrite:canWriteSquadron()});
   const cardEl = document.getElementById('settings-yn-table-wrap');
   if(cardEl) _ynRenderYearList(cardEl, years, {canWrite:canWriteSquadron()});
-  const lbl = document.getElementById('ynCreateLabel');
-  if(lbl) lbl.textContent = String(_ynNextYearNumber());
-  const lbl2 = document.getElementById('ynCreateLabelCard');
-  if(lbl2) lbl2.textContent = String(_ynNextYearNumber());
   if(typeof _syncCalYearOptions==='function') _syncCalYearOptions();
 }
 
@@ -15896,19 +15892,6 @@ function _renderPyActionBtns(){
       : '')+
     (canRemediate ? `<button class="btn btn-out btn-xs plan-write-el" style="display:none;border-color:var(--red);color:var(--status-text-danger)" onclick="doDeletePlanningYear()">Delete…</button>` : '');
   document.querySelectorAll('#py-action-btns .plan-write-el').forEach(b=>{b.style.display=canWritePlan()?'inline-flex':'none';});
-}
-async function doRenamePlanningYear(){
-  const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
-  if(!y)return;
-  const newName=await promptText('Rename year','New name',{defaultValue:y.name||String(y.year),okLabel:'Rename'});
-  if(!newName)return;
-  const trimmed=newName.trim();
-  if(!trimmed){ showToast('Name cannot be empty.', true); return; }
-  try{
-    await api('/api/planning/years/'+P.currentYearId,{method:'PATCH',body:JSON.stringify({name:trimmed,version:y.version})});
-    showToast('Year renamed.');
-    await _loadPlanningYears();
-  }catch(e){ showToast('Could not rename: '+apiErr(e), true); }
 }
 async function doArchivePlanningYear(){
   const y=(P.years||[]).find(x=>x.planning_year_id===P.currentYearId);
