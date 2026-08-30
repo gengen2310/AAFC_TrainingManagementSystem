@@ -4,6 +4,37 @@
 
 Staging: `df3fff6`. Not released to production.
 
+### Reference-data tags: sibling squadrons no longer collide, and "global" is per-national
+
+The five user-creatable reference-data tables — subject areas, facilitator
+types, session status reasons, activity types and training area capabilities —
+shared one copy-pasted create path, and with it one defect. The duplicate check
+ORed the scope columns independently, so `wing_id == <my wing>` matched every
+tag anywhere in the wing.
+
+- **A squadron could not name a tag that a sibling squadron had already used.**
+  703 creating "Aeromodelling" blocked all 14 other squadrons in 7 Wing.
+- **The resulting 409 returned the other squadron's tag id**, which the caller
+  has no right to see (Part 82: no cross-squadron IDOR).
+
+A tag now conflicts only with its own scope, or an ancestor scope that already
+covers it — never with a sibling. Genuine conflicts are unchanged: the same
+squadron twice is still a 409, and a global tag still blocks a squadron
+duplicate.
+
+- **`scope = "global"` now means global within one national entity.** The five
+  tables gained `national_id`, resolved through the org tree when the caller
+  does not carry one directly (squadron and wing users are not seeded with
+  `User.national_id`). This closes a cross-national leak that would have opened
+  the moment a second `NationalEntity` existed.
+- Migration `v60 e9b2d47a1c05`: `national_id` on all five tables, backfilled
+  through squadron → wing → national. Pre-v60 `global` rows keep `national_id`
+  NULL and stay visible to everyone: their origin is unrecoverable, and NULL
+  preserves exactly the pre-v60 behaviour rather than hiding data in use.
+  Rehearsed on PostgreSQL forward and back, including the self-check.
+- 30 tests in `backend/tests/test_reference_tag_scope.py`, parametrised across
+  all five endpoints (20 of them red before the fix).
+
 ### System Administrator account recovery
 
 Closes the gap where a System Administrator who lost their access code had no

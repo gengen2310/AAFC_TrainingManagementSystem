@@ -157,8 +157,15 @@ class FacilitatorRankHistory(Base, UUIDMixin):
 
 
 class SubjectAreaTag(Base, UUIDMixin, TimestampMixin):
-    """Canonical subject-area tags; user-creatable, scoped to squadron/wing/global."""
+    """Canonical subject-area tags; user-creatable, scoped to squadron/wing/global.
+
+    ``scope == "global"`` means global *within one national entity*, not across
+    the whole installation -- hence national_id. It is nullable so rows created
+    before v60 keep working; a NULL national_id reads as "every national", which
+    is the pre-v60 behaviour and the only safe interpretation of a row whose
+    origin we cannot recover."""
     __tablename__ = "subject_area_tags"
+    national_id: Mapped[str | None] = mapped_column(ForeignKey("national_entities.id"), nullable=True, index=True)
     squadron_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
     wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     scope: Mapped[str] = mapped_column(String(20), default="squadron")  # global / wing / squadron
@@ -176,6 +183,7 @@ class FacilitatorTypeTag(Base, UUIDMixin, TimestampMixin):
     tags are advisory/suggested, not a hard foreign key), so this table adds
     governance without a migration risk to existing Facilitator rows."""
     __tablename__ = "facilitator_type_tags"
+    national_id: Mapped[str | None] = mapped_column(ForeignKey("national_entities.id"), nullable=True, index=True)
     squadron_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
     wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     scope: Mapped[str] = mapped_column(String(20), default="squadron")  # global / wing / squadron
@@ -194,6 +202,7 @@ class SessionStatusReasonTag(Base, UUIDMixin, TimestampMixin):
     not a hard foreign key), so this table adds governance with zero
     migration risk to existing history rows."""
     __tablename__ = "session_status_reason_tags"
+    national_id: Mapped[str | None] = mapped_column(ForeignKey("national_entities.id"), nullable=True, index=True)
     squadron_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
     wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     scope: Mapped[str] = mapped_column(String(20), default="squadron")  # global / wing / squadron
@@ -210,6 +219,7 @@ class ActivityTypeTag(Base, UUIDMixin, TimestampMixin):
     column (advisory, not a hard FK), so this table adds governance with zero
     migration risk to existing Activity rows."""
     __tablename__ = "activity_type_tags"
+    national_id: Mapped[str | None] = mapped_column(ForeignKey("national_entities.id"), nullable=True, index=True)
     squadron_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
     wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     scope: Mapped[str] = mapped_column(String(20), default="squadron")  # global / wing / squadron
@@ -224,6 +234,7 @@ class TrainingAreaCapabilityTag(Base, UUIDMixin, TimestampMixin):
     to squadron/wing/global -- mirrors the same advisory tag pattern. TrainingArea.capabilities
     stays a JSON column storing display_name strings (advisory, not hard FKs)."""
     __tablename__ = "training_area_capability_tags"
+    national_id: Mapped[str | None] = mapped_column(ForeignKey("national_entities.id"), nullable=True, index=True)
     squadron_id: Mapped[str | None] = mapped_column(ForeignKey("squadrons.id"), nullable=True, index=True)
     wing_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     scope: Mapped[str] = mapped_column(String(20), default="squadron")  # global / wing / squadron

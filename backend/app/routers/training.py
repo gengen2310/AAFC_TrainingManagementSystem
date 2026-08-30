@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session as DBSession
 from ..database import get_db, utcnow, iso_z
 from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
                       Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, SessionStatusReasonTag, ActivityTypeTag, TrainingAreaCapabilityTag, TrainingArea, Equipment,
-                      Activity, Cadet, Squadron, TimingTemplate, TimingBlock, SystemSetting, TrainingClass, PlanningYear,
+                      Activity, Cadet, Squadron, Wing, TimingTemplate, TimingBlock, SystemSetting, TrainingClass, PlanningYear,
                       SessionAudience, CadetClassMembership,
                       ParadeNightTemplate, ParadeNightTemplateSession)
 from ..models.planning import ActivityLocalOverride
@@ -5334,6 +5334,59 @@ def _can_create_tag(p: Principal, scope: str, wing_id: str | None = None, squadr
             raise HTTPException(403, detail={"error": "forbidden"})
 
 
+def _tag_national_id(db: DBSession, p: Principal) -> str | None:
+    """The national entity this principal's reference data belongs to.
+
+    Squadron and wing users are seeded without User.national_id, so the value
+    has to be derived through the org tree: user -> wing -> national. Returns
+    None only when nothing in the chain resolves, which leaves the tag
+    national-agnostic rather than mis-filed under the wrong national."""
+    if p.national_id:
+        return p.national_id
+    wing_id = p.acting_wing_id or p.wing_id
+    if not wing_id:
+        sq_id = p.acting_squadron_id or p.squadron_id
+        if sq_id:
+            sq = db.get(Squadron, sq_id)
+            wing_id = sq.wing_id if sq else None
+    if wing_id:
+        w = db.get(Wing, wing_id)
+        if w:
+            return w.national_id
+    return None
+
+
+def _tag_global_visible(model, national_id: str | None):
+    """"global" means global within one national entity, not installation-wide.
+
+    A NULL national_id is a pre-v60 row whose origin cannot be recovered, so it
+    stays visible to everyone -- narrowing it would silently hide existing
+    reference data."""
+    cond = model.scope == "global"
+    if national_id:
+        cond = cond & (
+            (model.national_id == national_id) | (model.national_id.is_(None))
+        )
+    return cond
+
+
+def _tag_conflict_filter(model, scope: str, national_id: str | None,
+                         wing_id: str | None, squadron_id: str | None):
+    """Tags a new tag would collide with: its own scope, plus any ancestor
+    scope that already covers it -- never a sibling.
+
+    The pre-v60 form ORed the scope columns independently, so
+    ``wing_id == <my wing>`` matched every tag anywhere in the wing: 703 blocked
+    704 from reusing a name, and the 409 body handed 703's tag id to 704."""
+    from sqlalchemy import or_ as _or_tag_conflict
+    conditions = [_tag_global_visible(model, national_id)]
+    if scope in ("wing", "squadron") and wing_id:
+        conditions.append((model.scope == "wing") & (model.wing_id == wing_id))
+    if scope == "squadron" and squadron_id:
+        conditions.append((model.scope == "squadron") & (model.squadron_id == squadron_id))
+    return _or_tag_conflict(*conditions)
+
+
 def _visible_tag_scope(p: Principal) -> tuple[str | None, str | None]:
     """Resolve (wing_id, squadron_id) for tag-visibility filtering -- same
     acting-scope-first fallback _visible_phases uses, so a wing_admin/
@@ -5350,6 +5403,7 @@ def _tag_out(t: SubjectAreaTag) -> dict:
         "display_name": t.display_name,
         "normalised_name": t.normalised_name,
         "scope": t.scope,
+        "national_id": t.national_id,
         "squadron_id": t.squadron_id,
         "wing_id": t.wing_id,
         "is_active": t.is_active,
@@ -5374,7 +5428,7 @@ def list_subject_area_tags(
     """Return active (or all, when include_archived=true) tags visible to the caller."""
     wing_id, sq_id = _visible_tag_scope(p)
     require_can_view_squadron(p, sq_id or "", wing_id)
-    conditions = [SubjectAreaTag.scope == "global"]
+    conditions = [_tag_global_visible(SubjectAreaTag, _tag_national_id(db, p))]
     if wing_id:
         conditions.append((SubjectAreaTag.scope == "wing") & (SubjectAreaTag.wing_id == wing_id))
     elif p.role in _NAT_ADMIN_ROLES:
@@ -5414,16 +5468,13 @@ def create_subject_area_tag(
     wing_id = body.wing_id or ((p.acting_wing_id or p.wing_id) if scope in ("wing", "squadron") else None)
     squadron_id = body.squadron_id or ((p.acting_squadron_id or p.squadron_id) if scope == "squadron" else None)
 
+    national_id = _tag_national_id(db, p)
     existing = (
         db.query(SubjectAreaTag)
         .filter(
             SubjectAreaTag.normalised_name == norm,
             SubjectAreaTag.is_active == True,  # noqa: E712
-            (
-                (SubjectAreaTag.squadron_id == squadron_id) |
-                (SubjectAreaTag.wing_id == wing_id) |
-                (SubjectAreaTag.scope == "global")
-            ),
+            _tag_conflict_filter(SubjectAreaTag, scope, national_id, wing_id, squadron_id),
         )
         .first()
     )
@@ -5431,6 +5482,7 @@ def create_subject_area_tag(
         raise HTTPException(409, detail={"error": "tag_already_exists", "existing_id": existing.id})
 
     tag = SubjectAreaTag(
+        national_id=national_id,
         squadron_id=squadron_id,
         wing_id=wing_id,
         scope=scope,
@@ -5496,6 +5548,7 @@ def _fac_type_out(t: FacilitatorTypeTag) -> dict:
         "display_name": t.display_name,
         "normalised_name": t.normalised_name,
         "scope": t.scope,
+        "national_id": t.national_id,
         "squadron_id": t.squadron_id,
         "wing_id": t.wing_id,
         "is_active": t.is_active,
@@ -5520,7 +5573,7 @@ def list_facilitator_type_tags(
     """Return active (or all, when include_archived=true) facilitator-type tags."""
     wing_id, sq_id = _visible_tag_scope(p)
     require_can_view_squadron(p, sq_id or "", wing_id)
-    conditions = [FacilitatorTypeTag.scope == "global"]
+    conditions = [_tag_global_visible(FacilitatorTypeTag, _tag_national_id(db, p))]
     if wing_id:
         conditions.append((FacilitatorTypeTag.scope == "wing") & (FacilitatorTypeTag.wing_id == wing_id))
     elif p.role in _NAT_ADMIN_ROLES:
@@ -5560,16 +5613,13 @@ def create_facilitator_type_tag(
     wing_id = body.wing_id or ((p.acting_wing_id or p.wing_id) if scope in ("wing", "squadron") else None)
     squadron_id = body.squadron_id or ((p.acting_squadron_id or p.squadron_id) if scope == "squadron" else None)
 
+    national_id = _tag_national_id(db, p)
     existing = (
         db.query(FacilitatorTypeTag)
         .filter(
             FacilitatorTypeTag.normalised_name == norm,
             FacilitatorTypeTag.is_active == True,  # noqa: E712
-            (
-                (FacilitatorTypeTag.squadron_id == squadron_id) |
-                (FacilitatorTypeTag.wing_id == wing_id) |
-                (FacilitatorTypeTag.scope == "global")
-            ),
+            _tag_conflict_filter(FacilitatorTypeTag, scope, national_id, wing_id, squadron_id),
         )
         .first()
     )
@@ -5577,6 +5627,7 @@ def create_facilitator_type_tag(
         raise HTTPException(409, detail={"error": "tag_already_exists", "existing_id": existing.id})
 
     tag = FacilitatorTypeTag(
+        national_id=national_id,
         squadron_id=squadron_id,
         wing_id=wing_id,
         scope=scope,
@@ -5643,6 +5694,7 @@ def _reason_out(t: SessionStatusReasonTag) -> dict:
         "display_name": t.display_name,
         "normalised_name": t.normalised_name,
         "scope": t.scope,
+        "national_id": t.national_id,
         "squadron_id": t.squadron_id,
         "wing_id": t.wing_id,
         "is_active": t.is_active,
@@ -5667,7 +5719,7 @@ def list_session_status_reason_tags(
     """Return active (or all, when include_archived=true) session-status reason tags."""
     wing_id, sq_id = _visible_tag_scope(p)
     require_can_view_squadron(p, sq_id or "", wing_id)
-    conditions = [SessionStatusReasonTag.scope == "global"]
+    conditions = [_tag_global_visible(SessionStatusReasonTag, _tag_national_id(db, p))]
     if wing_id:
         conditions.append((SessionStatusReasonTag.scope == "wing") & (SessionStatusReasonTag.wing_id == wing_id))
     elif p.role in _NAT_ADMIN_ROLES:
@@ -5707,16 +5759,13 @@ def create_session_status_reason_tag(
     wing_id = body.wing_id or ((p.acting_wing_id or p.wing_id) if scope in ("wing", "squadron") else None)
     squadron_id = body.squadron_id or ((p.acting_squadron_id or p.squadron_id) if scope == "squadron" else None)
 
+    national_id = _tag_national_id(db, p)
     existing = (
         db.query(SessionStatusReasonTag)
         .filter(
             SessionStatusReasonTag.normalised_name == norm,
             SessionStatusReasonTag.is_active == True,  # noqa: E712
-            (
-                (SessionStatusReasonTag.squadron_id == squadron_id) |
-                (SessionStatusReasonTag.wing_id == wing_id) |
-                (SessionStatusReasonTag.scope == "global")
-            ),
+            _tag_conflict_filter(SessionStatusReasonTag, scope, national_id, wing_id, squadron_id),
         )
         .first()
     )
@@ -5724,6 +5773,7 @@ def create_session_status_reason_tag(
         raise HTTPException(409, detail={"error": "tag_already_exists", "existing_id": existing.id})
 
     tag = SessionStatusReasonTag(
+        national_id=national_id,
         squadron_id=squadron_id,
         wing_id=wing_id,
         scope=scope,
@@ -5787,6 +5837,7 @@ def _acttype_out(t: ActivityTypeTag) -> dict:
         "display_name": t.display_name,
         "normalised_name": t.normalised_name,
         "scope": t.scope,
+        "national_id": t.national_id,
         "squadron_id": t.squadron_id,
         "wing_id": t.wing_id,
         "is_active": t.is_active,
@@ -5811,7 +5862,7 @@ def list_activity_type_tags(
     """Return active (or all, when include_archived=true) activity-type tags."""
     wing_id, sq_id = _visible_tag_scope(p)
     require_can_view_squadron(p, sq_id or "", wing_id)
-    conditions = [ActivityTypeTag.scope == "global"]
+    conditions = [_tag_global_visible(ActivityTypeTag, _tag_national_id(db, p))]
     if wing_id:
         conditions.append((ActivityTypeTag.scope == "wing") & (ActivityTypeTag.wing_id == wing_id))
     elif p.role in _NAT_ADMIN_ROLES:
@@ -5845,22 +5896,20 @@ def create_activity_type_tag(
     norm = _normalise_tag(display)
     wing_id = body.wing_id or ((p.acting_wing_id or p.wing_id) if scope in ("wing", "squadron") else None)
     squadron_id = body.squadron_id or ((p.acting_squadron_id or p.squadron_id) if scope == "squadron" else None)
+    national_id = _tag_national_id(db, p)
     existing = (
         db.query(ActivityTypeTag)
         .filter(
             ActivityTypeTag.normalised_name == norm,
             ActivityTypeTag.is_active == True,  # noqa: E712
-            (
-                (ActivityTypeTag.squadron_id == squadron_id) |
-                (ActivityTypeTag.wing_id == wing_id) |
-                (ActivityTypeTag.scope == "global")
-            ),
+            _tag_conflict_filter(ActivityTypeTag, scope, national_id, wing_id, squadron_id),
         )
         .first()
     )
     if existing:
         raise HTTPException(409, detail={"error": "tag_already_exists", "existing_id": existing.id})
     tag = ActivityTypeTag(
+        national_id=national_id,
         squadron_id=squadron_id, wing_id=wing_id, scope=scope,
         display_name=display, normalised_name=norm, is_active=True, created_by=p.user_id,
     )
@@ -5920,6 +5969,7 @@ def _capability_out(t: TrainingAreaCapabilityTag) -> dict:
         "display_name": t.display_name,
         "normalised_name": t.normalised_name,
         "scope": t.scope,
+        "national_id": t.national_id,
         "squadron_id": t.squadron_id,
         "wing_id": t.wing_id,
         "is_active": t.is_active,
@@ -5944,7 +5994,7 @@ def list_training_area_capability_tags(
     """Return active (or all, when include_archived=true) training-area capability tags."""
     wing_id, sq_id = _visible_tag_scope(p)
     require_can_view_squadron(p, sq_id or "", wing_id)
-    conditions = [TrainingAreaCapabilityTag.scope == "global"]
+    conditions = [_tag_global_visible(TrainingAreaCapabilityTag, _tag_national_id(db, p))]
     if wing_id:
         conditions.append((TrainingAreaCapabilityTag.scope == "wing") & (TrainingAreaCapabilityTag.wing_id == wing_id))
     elif p.role in _NAT_ADMIN_ROLES:
@@ -5978,22 +6028,20 @@ def create_training_area_capability_tag(
     norm = _normalise_tag(display)
     wing_id = body.wing_id or ((p.acting_wing_id or p.wing_id) if scope in ("wing", "squadron") else None)
     squadron_id = body.squadron_id or ((p.acting_squadron_id or p.squadron_id) if scope == "squadron" else None)
+    national_id = _tag_national_id(db, p)
     existing = (
         db.query(TrainingAreaCapabilityTag)
         .filter(
             TrainingAreaCapabilityTag.normalised_name == norm,
             TrainingAreaCapabilityTag.is_active == True,  # noqa: E712
-            (
-                (TrainingAreaCapabilityTag.squadron_id == squadron_id) |
-                (TrainingAreaCapabilityTag.wing_id == wing_id) |
-                (TrainingAreaCapabilityTag.scope == "global")
-            ),
+            _tag_conflict_filter(TrainingAreaCapabilityTag, scope, national_id, wing_id, squadron_id),
         )
         .first()
     )
     if existing:
         raise HTTPException(409, detail={"error": "tag_already_exists", "existing_id": existing.id})
     tag = TrainingAreaCapabilityTag(
+        national_id=national_id,
         squadron_id=squadron_id, wing_id=wing_id, scope=scope,
         display_name=display, normalised_name=norm, is_active=True, created_by=p.user_id,
     )
