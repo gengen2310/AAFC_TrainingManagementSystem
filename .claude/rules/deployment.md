@@ -46,7 +46,7 @@ file, since the checkout gets renamed on every version bump.)
 
 - Managed PostgreSQL database (not SQLite)
 - HTTPS with valid TLS certificate
-- `COOKIE_SECURE=true`, `COOKIE_SAMESITE=strict`
+- `COOKIE_SECURE=true`, `COOKIE_SAMESITE=none` — `none` is required (not `strict`) because the TMS frontend and backend run on different Railway origins; `SameSite=strict` or `lax` completely breaks cookie-based auth across that boundary (empirically verified, DEFECT-004 in docs/beta/11_defect_register.md)
 - `CORS_ALLOWED_ORIGINS` set to the real frontend origin only (no localhost)
 - `JWT_SECRET` and `SECRET_KEY` set to cryptographically random values (≥32 chars)
 - `ENVIRONMENT=production`
