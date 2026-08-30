@@ -16,8 +16,13 @@ from .training import _view_squadron_id
 router = APIRouter(prefix="/api", tags=["ops"])
 
 
-def _active_squadron(p: Principal) -> str:
-    return p.acting_squadron_id or p.squadron_id
+def _active_squadron(p: Principal):
+    """The squadron a write should target: proxy/intervention target, else home.
+
+    Delegates to Principal.active_squadron_id so the three routers that each
+    defined this cannot drift apart -- they were identical, but nothing kept
+    them that way."""
+    return p.active_squadron_id
 
 
 def _all_sessions(db, sq_id):

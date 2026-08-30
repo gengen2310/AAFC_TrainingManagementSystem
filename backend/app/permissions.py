@@ -49,6 +49,22 @@ class Principal:
     def is_auditor(self) -> bool:
         return self.role == "auditor"
 
+    @property
+    def active_squadron_id(self) -> str | None:
+        """The squadron this caller is working ON, as opposed to who they are.
+
+        Authorisation uses the base identity -- can_write_squadron deliberately
+        checks self.squadron_id and the proxy mode. Data SELECTION uses this:
+        which squadron does an unqualified request mean?
+
+        For a squadron account that is their own squadron. For a wing or
+        national account it is the proxy / delegated-intervention target, and
+        None when no session is active -- those accounts have no home squadron,
+        so an endpoint that defaults from squadron_id alone silently resolves to
+        None for them and skips whatever guard sits behind `if squadron_id:`.
+        """
+        return self.acting_squadron_id or self.squadron_id
+
     def can_view_squadron(self, squadron_id: str, wing_id: str | None) -> bool:
         if self.role in ("national_viewer", "national_admin", "system_admin", "auditor"):
             return True

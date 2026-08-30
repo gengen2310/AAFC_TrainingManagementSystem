@@ -69,11 +69,13 @@ def _parse_json_list(val) -> list:
     return []
 
 
-def _active_squadron(p: Principal) -> str:
-    """The squadron a write should target: proxy/intervention target, else home."""
-    if p.acting_squadron_id:
-        return p.acting_squadron_id
-    return p.squadron_id
+def _active_squadron(p: Principal):
+    """The squadron a write should target: proxy/intervention target, else home.
+
+    Delegates to Principal.active_squadron_id so the three routers that each
+    defined this cannot drift apart -- they were identical, but nothing kept
+    them that way."""
+    return p.active_squadron_id
 
 
 def _view_squadron_id(p: Principal, squadron_id: str | None, db: DBSession) -> str | None:

@@ -2329,9 +2329,19 @@ def create_location(
     p: Principal = Depends(get_principal),
 ):
     _require_plan_write(p)
-    unit_id = body.unit_id or p.squadron_id
+    # active_squadron_id, not squadron_id: a wing or national caller has no home
+    # squadron, so the old default resolved to None, skipped the
+    # require_can_write_squadron block below, and failed on a NOT NULL
+    # constraint -- a 500 where the guard should have said "enter Proxy Mode".
+    unit_id = body.unit_id or p.active_squadron_id
     if p.role == "sqn_admin":
         unit_id = p.squadron_id
+    if not unit_id:
+        raise HTTPException(400, detail={
+            "error": "squadron_required",
+            "message": "Choose a squadron for this training area, "
+                       "or enter Proxy Mode to work within one.",
+        })
     # A squadron-scoped Training Area is a delegated write on that squadron's
     # data -- require Proxy/Delegated Intervention like every other squadron-
     # scoped write, not just a bare role check (REM-45, Stage 12 follow-up;

@@ -124,10 +124,13 @@ def _effective_template(db: DBSession, squadron_id: str, date: str) -> TimingTem
     return None
 
 
-def _active_squadron(p: Principal) -> str | None:
-    if p.acting_squadron_id:
-        return p.acting_squadron_id
-    return p.squadron_id
+def _active_squadron(p: Principal):
+    """The squadron a write should target: proxy/intervention target, else home.
+
+    Delegates to Principal.active_squadron_id so the three routers that each
+    defined this cannot drift apart -- they were identical, but nothing kept
+    them that way."""
+    return p.active_squadron_id
 
 
 def _validate_block_times(blocks) -> list[str]:

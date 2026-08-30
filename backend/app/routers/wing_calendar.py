@@ -709,8 +709,11 @@ def get_squadron_overlay(
     events = q.order_by(WingHQEvent.start_date).all()
 
     # Resolve which squadron's status to include; enforce scope.
-    sqn_id = squadron_id or p.squadron_id
-    if squadron_id and squadron_id != p.squadron_id:
+    # active_squadron_id so that a Wing Admin in Proxy Mode sees the proxied
+    # squadron's status rather than none at all -- wing accounts have no home
+    # squadron, so squadron_id alone resolved to None here.
+    sqn_id = squadron_id or p.active_squadron_id
+    if squadron_id and squadron_id != p.active_squadron_id:
         # Cross-squadron status lookup only allowed for wing/national/system scope
         if p.role in ("sqn_admin", "sqn_general"):
             raise HTTPException(403, detail={"error": "out_of_scope"})
