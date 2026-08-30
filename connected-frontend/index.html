@@ -10195,12 +10195,6 @@ function addPN(){
       document.getElementById('pn-date').value='';document.getElementById('pn-notes').value='';document.getElementById('pn-slots').innerHTML='';
       if(failures.length){
         showToast('Parade night created, but some sessions were not saved — '+failures.join('; '),true);
-      }else if(r&&r.linked_to_planning_year===false){
-        // The API reports this and nothing read it, so a night that will not appear
-        // in Planning Workspace looked like a clean success.
-        showToast('Parade night created, but it is not attached to a training year, '
-                 +'so it will not appear in Planning Workspace or the Weekly Program. '
-                 +'Check that an active training year covers '+date+'.',true);
       }else{
         showToast('Parade night created.');
       }
