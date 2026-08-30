@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased — UX consistency and System Administrator account recovery (2026-08-30)
+## Unreleased — UX consistency, accessibility hardening, and System Administrator account recovery (2026-08-30)
 
-Staging: `df3fff6`. Not released to production.
+Staging: `0e31203`. Not released to production.
 
 ### One Parade Night Structure card
 
@@ -163,6 +163,53 @@ retrieved — every route below *replaces* a code rather than revealing one.
 
 Removal protection extended from demote and archive to **disable** and
 **permanent delete**.
+
+### Accessibility
+
+- **Auth back button contrast**: `.auth-back-btn` was rendered in `#51b0e3` (AAFC blue) on a white
+  card — 2.33:1 against white, below the 4.5:1 WCAG AA threshold. Changed to `#004b8d` (royal
+  blue), which is 7.3:1. A full CSS and inline-style audit confirmed no other text-colour
+  instance of `#51b0e3` on a light surface; the only other usage is on the dark topbar where it
+  passes (~5:1).
+- **Minimum badge text size**: `--fs-4xs` (8px) was in use on seven readable-text elements — a
+  calendar chip, a bar-chart axis label, two type badges, a calendar day-of-week header, and two
+  planning-importance badges. All seven upgraded to `--fs-3xs` (9px, the defined minimum for
+  badges). The 8px token is now documented as decorative-only in its comment.
+- **Keyboard focus indicator coverage**: A full `:focus-visible` audit confirmed the global
+  rule at `index.html:493` (3px solid `--focus-ring`) covers all interactive elements. Six
+  `outline:none` overrides were verified: form inputs use a high-contrast `border-color` change
+  (satisfies WCAG 2.4.7); nav items use an inset box-shadow in `#004b8d`; the command palette
+  search input had a stale inline `outline:none` that was silently suppressing the global rule —
+  removed so the 3px ring now applies.
+
+### Curriculum
+
+- **Optional curriculum items**: `CurriculumItem` now has an `is_optional` boolean (migration
+  `v64 a4e9507a9c51`). The field is `NOT NULL` with a `false` default — no backfill is required
+  since no existing record can have been marked optional. The Planning Workspace optional-tier
+  filter, previously a no-op, now has a real field to read and filter on.
+
+### Planning
+
+- **Training area capabilities surface in PW**: `_location_out()` was missing the `capabilities`
+  field even though `TrainingArea.capabilities` existed in the model. Fixed; PW now receives the
+  full capabilities list when fetching sessions, enabling capability-badge display and
+  capability-based filtering.
+- **Combined sessions correctly identified**: `is_combined` was hardcoded `False` in
+  `_real_session_out()`. It now derives from the session's non-archived `SessionAudience` count:
+  `True` when more than one class is linked.
+- **Wing calendar pagination is now deterministic**: `list_wing_events` had two code paths —
+  a DB-native `OFFSET/LIMIT` for unfiltered requests, and a Python slice for audience-filtered
+  requests. Both paths now use `ORDER BY start_date, id`, so tie-breaking is stable and pages
+  never duplicate or drop events.
+
+### Test coverage
+
+- **Full suite now runs without deselections** (K-001): five tests were excluded from the deploy
+  gate due to cross-test state contamination — two rate-limiting log-dedup tests, two 429-cascade
+  tests, and one year-context materialisation test. All five root causes fixed in `conftest.py`;
+  the deselect list in `scripts/deploy-staging.sh` removed. The suite now runs 2130 tests (was
+  1553 in August, with 5 skipped rather than deselected).
 
 ### Interface
 
