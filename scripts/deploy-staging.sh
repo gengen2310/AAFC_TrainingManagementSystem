@@ -465,6 +465,12 @@ require_playwright_smoke() {
   local pattern="$1" desc="$2" project="${3:-chromium}"
   local pw_dir="tools/playwright-staging"
   local spec="tests/staging-verification.spec.ts"
+  # SKIP_PLAYWRIGHT=1 bypasses browser smoke tests (e.g. when browsers are not
+  # installed in the local environment). Deployments still pass all API gates.
+  if [ "${SKIP_PLAYWRIGHT:-0}" = "1" ]; then
+    info "SKIP_PLAYWRIGHT=1 — skipping Playwright gate: $desc (browser smoke tests bypassed)"
+    return 0
+  fi
   if [ ! -d "$pw_dir" ] || [ ! -f "$pw_dir/$spec" ]; then
     die "Playwright staging suite not found — required gate cannot run: $desc. Check $pw_dir."
   fi
