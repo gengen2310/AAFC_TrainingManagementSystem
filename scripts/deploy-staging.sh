@@ -56,7 +56,7 @@ EXPECTED_STAGING_PW_DOMAIN="aafc-tms-planning-workspace-preview-staging.up.railw
 
 EXPECTED_BRANCH="main"
 REQUIRED_ANCESTOR="de27c42"
-REQUIRED_ALEMBIC_HEAD="f2c8e51d7a93"
+REQUIRED_ALEMBIC_HEAD="b7e3f9c24a81"
 
 # Railway's builder can sit in INITIALIZING for 8-9 minutes when its queue is
 # busy, against builds that normally take ~30s. Two staging deploys aborted at

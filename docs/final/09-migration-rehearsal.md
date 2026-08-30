@@ -157,6 +157,48 @@ Left as-is rather than fixed: removing a constraint from a shipped migration
 rewrites history for every environment that has already applied it, which is a
 worse risk than a redundant index. Recorded here for a future consolidation.
 
+## Schema parity: the migrated schema vs the ORM's own metadata
+
+`scripts/schema_parity.py`
+
+The test suite builds its schema with `create_all()` from the models. Production
+builds it by running the chain. Nothing checked that those agree — and any
+divergence is invisible to every test *by construction*, because the tests
+cannot produce a row that only the migrated schema permits.
+
+They diverge on **68 of 1062 columns**, all in one direction: production is more
+permissive than the model. No column exists on only one side. 63 are nullability
+(production nullable, model `NOT NULL`); 5 are type — four `timestamptz` vs
+`timestamp`, and `facilitators.subject_areas` as `jsonb` vs `json`.
+
+### The eight that mattered — fixed in `v62 b7e3f9c24a81`
+
+Most of the 68 are harmless: a nullable `created_at` that every code path
+already guards. Eight boolean flags were not, because NULL there changes query
+*results* rather than merely permitting a bad value. SQL three-valued logic
+means a row with `is_archived = NULL` matches neither `= false` nor `= true`, so
+it vanishes from any list filtering on it — and `routers/training.py` filters
+the CEA activity list on exactly `is_removed_from_cea == False AND is_archived
+== False`.
+
+Demonstrated on PostgreSQL rather than argued: a `cea_activities` row with NULL
+flags was visible to **0 of 1** rows under either filter, and to 1 of 1 after
+v62. None of the eight had a database-level default, so nothing but ORM
+convention was keeping them populated.
+
+This was **latent, not live**: every row is created through the ORM, whose model
+declares `default=False`, and there are no raw inserts into these tables. v62
+closes the gap rather than repairing known damage — "should not exist" is not
+"cannot exist", and the `server_default` it adds stops any future raw-SQL path
+reopening it.
+
+### The remaining 60 are a ratchet, not a gate
+
+Forcing `NOT NULL` on timestamp columns across a live database is a much larger
+change than v62, and the failure mode is a wrong display rather than a vanished
+row. So the script fails only if the count **grows** above its baseline. When
+you close more, lower `BASELINE`; the script prints the number to use.
+
 ## Not covered
 - **Volume.** The data cases use a handful of rows each: enough to prove the
   transformation is correct, not enough to say what it costs. A backfill that is

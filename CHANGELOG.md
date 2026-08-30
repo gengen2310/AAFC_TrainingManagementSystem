@@ -4,6 +4,30 @@
 
 Staging: `df3fff6`. Not released to production.
 
+### Eight boolean flags could make a record invisible
+
+The migrated schema and the models disagreed on 68 of 1062 columns, always in
+the same direction: the database was more permissive than the model. Nothing
+could have caught this — the test suite builds its schema from the models and
+production builds it from the migration chain, so a row that only production
+permits cannot exist in a test.
+
+Most of the 68 are harmless. Eight boolean flags were not. In SQL, a row whose
+`is_archived` is NULL matches neither `is_archived = false` nor
+`is_archived = true`, so it disappears from any list filtering on it — and the
+CEA activity list filters on exactly that. Such a record would have been
+invisible in the interface with no error anywhere.
+
+- Migration `v62 b7e3f9c24a81` backfills any NULLs to false, adds a database
+  default, and makes the eight columns `NOT NULL`. Demonstrated on PostgreSQL:
+  a record with NULL flags was visible to **0 of 1** filters before, 1 of 1
+  after.
+- This was latent rather than live — every record is created through the ORM,
+  which already defaults these to false. The migration closes the gap so no
+  future direct-SQL path can reopen it.
+- `backend/scripts/schema_parity.py` locks the remaining 60 divergences as a
+  ratchet: the count may fall, never grow.
+
 ### Planning Workspace route split now fails closed
 
 `frontend/src/App.tsx` serves two route tables: module mode is `/planning` plus
