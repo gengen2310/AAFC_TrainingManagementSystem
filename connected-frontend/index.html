@@ -11071,8 +11071,8 @@ async function renderWP() {
     if (!wrap) return;
     wrap.innerHTML = '<p class="muted p-4">Loading\u2026</p>';
     try {
-        const yearQ = S.trainingYear
-            ? `?training_year=${encodeURIComponent(S.trainingYear)}` : '';
+        const yearQ = (typeof P !== 'undefined' && P.currentYearId)
+            ? `?planning_year_id=${encodeURIComponent(P.currentYearId)}` : '';
 
         // WP-1/WP-2: three requests for the whole page. This was previously two
         // plus one /schedule per parade night -- 244 locally -- issued serially
