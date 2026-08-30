@@ -830,6 +830,11 @@ def add_parade_date(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id is None:
+        raise HTTPException(400, detail={
+            "error": "wing_national_year_not_supported",
+            "message": "Parade dates cannot be added to wing or national planning years through this endpoint.",
+        })
     sq = db.get(Squadron, py.unit_id)
     if sq is None:
         raise HTTPException(400, detail={"error": "squadron_not_found"})
@@ -1067,6 +1072,11 @@ def generate_parade_dates(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id is None:
+        raise HTTPException(400, detail={
+            "error": "wing_national_year_not_supported",
+            "message": "Parade dates cannot be added to wing or national planning years through this endpoint.",
+        })
     holidays = db.query(HolidayPeriod).filter(
         HolidayPeriod.planning_year_id == year_id,
         HolidayPeriod.affects_parade == True,  # noqa: E712
@@ -1161,7 +1171,7 @@ def update_future_parade_day(
         ParadeNight.planning_year_id == year_id,
         ParadeNight.is_active == True,  # noqa: E712
         ParadeNight.date >= from_date,
-        ParadeNight.parade_type == "standard",
+        ParadeNight.parade_type.in_(["standard", "normal"]),
     ).order_by(ParadeNight.date).all()
 
     holidays = db.query(HolidayPeriod).filter(
@@ -1233,7 +1243,7 @@ def update_future_parade_day(
         ParadeNight.planning_year_id == year_id,
         ParadeNight.is_active == True,  # noqa: E712
         ParadeNight.date >= from_date,
-        ParadeNight.parade_type != "standard",
+        ~ParadeNight.parade_type.in_(["standard", "normal"]),
     ).count()
 
     if body.preview:
@@ -1283,6 +1293,19 @@ def delete_parade_date(
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(pn.planning_year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    # Check for training sessions — cannot delete a night that has sessions
+    session_count = db.query(TrainingSession).filter(
+        TrainingSession.parade_night_id == pn.id
+    ).count()
+    if session_count > 0:
+        raise HTTPException(409, detail={
+            "error": "parade_night_has_sessions",
+            "message": (
+                f"This parade night has {session_count} scheduled session(s). "
+                "Archive it from the TMS instead of deleting, or remove the sessions first."
+            ),
+            "session_count": session_count,
+        })
     # Resolve FK children before the delete so PostgreSQL FK constraints are not violated.
     # Notices are owned by the night — delete them. Prep plans and conflicts reference it
     # optionally (nullable FK) — nullify rather than cascade-delete.
