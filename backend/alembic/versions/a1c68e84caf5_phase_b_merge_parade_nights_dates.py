@@ -121,7 +121,7 @@ def upgrade():
             VALUES (:nid, :date, :sqn_id, :wing_id, :py_id,
                     COALESCE(:ptype, 'normal'),
                     :wknum, COALESCE(:active, 1), :notes, 0,
-                    datetime('now'), datetime('now'))
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """), {
             "nid": night_id, "date": row.parade_date,
             "sqn_id": sq_check.id, "wing_id": sq_check.wing_id,
