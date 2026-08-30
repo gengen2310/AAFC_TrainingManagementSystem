@@ -84,7 +84,7 @@
      default setting. Replaces a --text-* scale that was defined but never
      referenced (0 uses).
      Nothing may set a px font-size on html, or this silently stops working. */
-  --fs-4xs:  0.5rem;     /*  8px */
+  --fs-4xs:  0.5rem;     /*  8px — decorative only */
   --fs-3xs:  0.5625rem;  /*  9px */
   --fs-2xs:  0.625rem;
   /* Notification spacing. Declared once and shared with the React app so the
@@ -685,7 +685,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .cal-cell.other .cal-dt{color:var(--muted-text-on-light);}
 .cal-cell.parade .cal-dt{color:var(--dark);}
 .cal-cell.today .cal-dt{color:var(--royal);} /* DES-H01: --royal passes 8.4:1 on white */
-.cal-chip{display:block;font-size:var(--fs-4xs);margin-top:1px;padding:1px 4px;border-radius:3px;background:var(--dark);color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;}
+.cal-chip{display:block;font-size:var(--fs-3xs);margin-top:1px;padding:1px 4px;border-radius:3px;background:var(--dark);color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;}
 .cal-chip.delivered{background:var(--ok);}.cal-chip.cancelled{background:var(--red);}
 .cal-chip.delivered_with_issue{background:#8a9a3a;color:var(--on-warn,#101A26);}.cal-chip.cancelled_late{background:var(--red);}  /* AUDIT-2026-08 G1: white was 3.10:1 -> 5.65:1 */
 .cal-chip.not_delivered{background:var(--lgrey);color:var(--on-warn,#101A26);}  /* G1: white was 2.03:1 -> 8.63:1 */
@@ -8866,7 +8866,7 @@ function _chartStackedBar(chart){
       <div style="width:100%;max-width:36px;height:${hPx}px;display:flex;flex-direction:column-reverse;border-radius:3px 3px 0 0;overflow:hidden">
         ${series.map(se=>{const v=+(row[se.key])||0;return v?`<div style="flex:${v};width:100%;background:${se.color||'var(--royal)'}" title="${esc(se.label)}: ${v}"></div>`:''}).join('')}
       </div>
-      <div style="font-size:var(--fs-4xs);color:var(--muted);margin-top:3px;text-align:center;writing-mode:vertical-rl;transform:rotate(180deg);height:22px;overflow:hidden;white-space:nowrap" title="${esc(row.label||'')}">${esc((row.label||'').substring(0,8))}</div>
+      <div style="font-size:var(--fs-3xs);color:var(--muted);margin-top:3px;text-align:center;writing-mode:vertical-rl;transform:rotate(180deg);height:22px;overflow:hidden;white-space:nowrap" title="${esc(row.label||'')}">${esc((row.label||'').substring(0,8))}</div>
     </div>`;
   });
   html+=`</div></div>`;return html;
@@ -11628,7 +11628,7 @@ function sourceBadge(e){
     const wg=(S.wings&&S.wings.find(w=>w.wing_id===e.wingId)||{code:'Wing'}).code;
     return `<span class="badge b-purple" style="font-size:var(--fs-2xs)">${esc(wg)}</span>`;
   }
-  return '<span class="badge b-teal" style="font-size:var(--fs-4xs)">SQN</span>';
+  return '<span class="badge b-teal" style="font-size:var(--fs-3xs)">SQN</span>';
 }
 function canEditCurr(e){
   const role=S.role||'';
@@ -15307,7 +15307,7 @@ function _renderRiskTimeline(chart){
         <div style="width:100%;max-width:36px;height:${hPx}px;display:flex;flex-direction:column-reverse;border-radius:3px 3px 0 0;overflow:hidden">
           ${cats.map(cc=>{const v=w[cc[0]]||0;return v?`<div style="flex:${v};width:100%;background:${cc[2]}" title="${esc(cc[1])}: ${v}"></div>`:'';}).join('')}
         </div>
-        <div style="font-size:var(--fs-4xs);color:var(--muted);margin-top:3px" title="${esc(w.label)}">${esc(w.label)}</div>
+        <div style="font-size:var(--fs-3xs);color:var(--muted);margin-top:3px" title="${esc(w.label)}">${esc(w.label)}</div>
       </div>`;
     });
     html+='</div></div>';
@@ -16426,7 +16426,7 @@ function _renderApMonth(year,mIdx,PD,HOL,ACT,mName){
   let h=`<div style="background:white;border-radius:6px;border:1px solid var(--border);padding:8px">
     <div style="font-size:var(--fs-2xs);font-weight:800;color:var(--dark);margin-bottom:5px;letter-spacing:.02em">${mName}</div>
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px">`;
-  DOW.forEach(d=>{ h+=`<div style="text-align:center;font-size:var(--fs-4xs);font-weight:700;color:var(--muted);padding:2px 0">${d}</div>`; });
+  DOW.forEach(d=>{ h+=`<div style="text-align:center;font-size:var(--fs-3xs);font-weight:700;color:var(--muted);padding:2px 0">${d}</div>`; });
   for(let i=0;i<firstDow;i++) h+=`<div></div>`;
   for(let d=1;d<=lastD;d++){
     const ds=`${year}-${String(mIdx+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
@@ -18536,9 +18536,9 @@ function _apShowDateDetail(ds){
     const bc=e.planning_importance==='must_attend'?'#7c3aed':e.planning_importance==='key_event'?'#8b5cf6':'#a78bfa';
     h+=`<div style="padding:6px 8px;border-left:3px solid ${bc};margin-bottom:5px;background:#f5f3ff;border-radius:0 4px 4px 0;cursor:pointer"
       onclick="openWingEventDetail('${esc(e.id)}')">
-      <span class="badge" style="background:#ede9fe;color:#4c1d95;font-size:var(--fs-4xs)">${esc((S.session&&S.session.wing_code)||'Wing')} HQ</span>
+      <span class="badge" style="background:#ede9fe;color:#4c1d95;font-size:var(--fs-3xs)">${esc((S.session&&S.session.wing_code)||'Wing')} HQ</span>
       <strong style="font-size:var(--fs-xs);margin-left:4px">${esc(e.title)}</strong>
-      <span class="badge ${_WC_IMP_BADGE[e.planning_importance]||'b-grey'}" style="font-size:var(--fs-4xs);margin-left:4px">${esc(_WC_IMP_LABEL[e.planning_importance]||e.planning_importance)}</span>
+      <span class="badge ${_WC_IMP_BADGE[e.planning_importance]||'b-grey'}" style="font-size:var(--fs-3xs);margin-left:4px">${esc(_WC_IMP_LABEL[e.planning_importance]||e.planning_importance)}</span>
     </div>`;
   });
   h+='</div>';

@@ -351,9 +351,9 @@ def list_wing_events(
     # offset/limit before Python filtering produces pages shorter than requested.
     # Fix: fetch without pagination when audience is set, slice after Python filter.
     if audience:
-        db_events = q.order_by(WingHQEvent.start_date).all()
+        db_events = q.order_by(WingHQEvent.start_date, WingHQEvent.id).all()
     else:
-        db_events = q.order_by(WingHQEvent.start_date).offset(offset).limit(limit).all()
+        db_events = q.order_by(WingHQEvent.start_date, WingHQEvent.id).offset(offset).limit(limit).all()
 
     sqn_id = p.squadron_id
     links_map = _load_links_for_events([e.id for e in db_events], db)
