@@ -15,8 +15,20 @@ if [ -n "$API_BASE" ]; then
         /usr/share/nginx/html/index.html
 fi
 
-# Inject module mode — when MODULE_MODE=true, replace login form with "Return to TMS" message.
-if [ "${MODULE_MODE:-false}" = "true" ]; then
+# Inject module mode. App.tsx serves two route tables: module mode is /planning
+# plus a catch-all; otherwise it serves twenty routes, eighteen of which
+# duplicate surfaces the connected-frontend owns (/accounts, /admin, /settings,
+# /audit, /imports among them).
+#
+# This defaults CLOSED. An unset, cleared or misspelled MODULE_MODE previously
+# served the full duplicate admin surface -- a fail-open default on the single
+# control separating the two frontends. Serving the full table is now an
+# explicit opt-out, and only the exact string "false" opts out: "FALSE", "0"
+# and a typo all stay in module mode.
+#
+# Local development and the e2e suite run Vite directly and never execute this
+# script, so the meta tag stays empty there and the full app renders as before.
+if [ "${MODULE_MODE:-true}" != "false" ]; then
     sed -i \
         's|<meta name="aafc-module-mode" content="">|<meta name="aafc-module-mode" content="true">|' \
         /usr/share/nginx/html/index.html

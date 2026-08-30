@@ -4,6 +4,31 @@
 
 Staging: `df3fff6`. Not released to production.
 
+### Planning Workspace route split now fails closed
+
+`frontend/src/App.tsx` serves two route tables: module mode is `/planning` plus
+a catch-all; otherwise it serves twenty routes, eighteen of which duplicate
+surfaces the connected-frontend owns — `/accounts`, `/admin`, `/settings`,
+`/audit` and `/imports` among them.
+
+Which table a deployed container served was decided entirely by a Railway
+environment variable, and it defaulted **open**: unset, cleared, or spelled
+`TRUE` instead of `true`, the container served the full duplicate admin
+surface. A deployed container now defaults to module mode, and serving the full
+table is an explicit `MODULE_MODE=false` opt-out.
+
+Staging and production both set `MODULE_MODE=true` today, so no environment
+changes behaviour — only the failure mode does.
+
+The full-app routes are kept rather than deleted: `frontend/e2e/` holds 141
+tests across 25 spec files that reach planning, tenancy and proxy behaviour
+through them, and no equivalent coverage exists elsewhere yet. Local
+development and the e2e suite run Vite directly and never execute the
+entrypoint, so they are unaffected.
+
+- 8 tests in `backend/tests/test_pw_module_mode_fail_closed.py`, executing the
+  real `frontend/docker-entrypoint.sh` (6 of them red before the fix).
+
 ### Reference-data tags: sibling squadrons no longer collide, and "global" is per-national
 
 The five user-creatable reference-data tables — subject areas, facilitator
