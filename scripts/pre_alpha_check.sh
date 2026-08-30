@@ -33,17 +33,19 @@ echo "  File structure"
 # ── No access-code plaintext in frontend ──
 echo
 echo "  Security — access codes"
-MATCHES=$(grep -c "SYSADMIN2026\|ADMIN703\|ADMIN7WG\|ADMINNATIONAL\|703SQN2026\|AUDITOR2026" connected-frontend/index.html 2>/dev/null || echo 0)
-[ "$MATCHES" -eq 0 ] && ok "No seeded access codes in frontend" || fail "Seeded access codes found in frontend ($MATCHES matches)"
+MATCHES=$(grep -cE "SYSADMIN2026|ADMIN703|ADMIN7WG|ADMINNATIONAL|703SQN2026|AUDITOR2026" connected-frontend/index.html 2>/dev/null || true)
+[ "${MATCHES:-0}" -eq 0 ] && ok "No seeded access codes in frontend" || fail "Seeded access codes found in frontend (${MATCHES} matches)"
 
-MATCHES=$(grep -c "localStorage\b" connected-frontend/index.html 2>/dev/null || echo 0)
-[ "$MATCHES" -eq 0 ] && ok "No localStorage usage in frontend" || fail "localStorage found in frontend ($MATCHES matches)"
+# localStorage is permitted only for UI preferences (displayDensity, navCollapsed).
+# Operational data (tokens, role, session, access codes) must never go in localStorage.
+MATCHES=$(grep -cE "localStorage\.(setItem|getItem)\(['\"]+(token|jwt|role|session|user|scope|access_code|squadron|wing)" connected-frontend/index.html 2>/dev/null || true)
+[ "${MATCHES:-0}" -eq 0 ] && ok "No operational data in localStorage" || fail "Operational data found in localStorage (${MATCHES} matches)"
 
-MATCHES=$(grep -c "code_hash\|plain_code" connected-frontend/index.html 2>/dev/null || echo 0)
-[ "$MATCHES" -eq 0 ] && ok "No hash/plaintext references in frontend" || fail "code_hash/plain_code found in frontend"
+MATCHES=$(grep -cE "code_hash|plain_code" connected-frontend/index.html 2>/dev/null || true)
+[ "${MATCHES:-0}" -eq 0 ] && ok "No hash/plaintext references in frontend" || fail "code_hash/plain_code found in frontend"
 
-MATCHES=$(grep -c "JWT_SECRET\|SECRET_KEY" connected-frontend/index.html 2>/dev/null || echo 0)
-[ "$MATCHES" -eq 0 ] && ok "No JWT_SECRET in frontend" || fail "JWT_SECRET found in frontend"
+MATCHES=$(grep -cE "JWT_SECRET|SECRET_KEY" connected-frontend/index.html 2>/dev/null || true)
+[ "${MATCHES:-0}" -eq 0 ] && ok "No JWT_SECRET in frontend" || fail "JWT_SECRET found in frontend"
 
 # ── Backend security ──
 echo
