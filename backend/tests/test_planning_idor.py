@@ -523,7 +523,7 @@ class TestSqnGeneralYearScope:
         """sqn_general can read planning years that belong to their squadron."""
         hdr_admin = _hdr(client, "ADMIN703")
         hdr_gen = _hdr(client, "703SQN2026")
-        _make_year(client, hdr_admin, name="Gen Scope Year")
+        _make_year(client, hdr_admin, year=2088, name="Gen Scope Year")
 
         r = client.get("/api/planning/years", headers=hdr_gen)
         assert r.status_code == 200
