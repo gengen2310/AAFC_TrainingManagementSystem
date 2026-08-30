@@ -1,0 +1,21 @@
+source_id,original_filename,date_received,title,purpose,line_count,supersedes,superseded_by,applicable_sections,notes
+SRC-001,FINAL_WHOLE_SYSTEM_INSTRUCTION.md,2026-08-30,Final Whole-System Reconciliation and Release-Candidate Program,Master authoritative instruction for this program — defines all phases requirements and acceptance criteria,~2500,,,"ALL",Primary governing instruction for this entire program. Supersedes all prior program instructions in scope.
+SRC-002,docs/product-review/program-conclusion.md,2026-08-16,Post-Gap Review Program — Conclusion,Synthesis of 5-stage review program; 7 HIGH findings + Block 2-5 recommendations,~150,,SRC-001 (scope),"Security, Design, Architecture, Tests",HISTORICAL state — HEAD 6d45e22. Used as gap input. Do NOT treat as current truth.
+SRC-003,CLAUDE.md,ongoing,Claude Code Project Configuration,Project rules for AI assistance; security invariants; architecture description,~120,,,"Architecture, Security, Deploy, Testing",Authoritative project configuration. Maintained in-repo.
+SRC-004,.claude/rules/architecture.md,ongoing,Architecture Rules,Two-frontend design rules; permission helper selection; session/auth mechanism,~80,,,"Architecture, Auth, RBAC",Rules document — authoritative alongside CLAUDE.md
+SRC-005,.claude/rules/security.md,ongoing,Security Rules,Access code rules; secret management; role/scope invariants; security greps,~60,,,"Security, Auth",Authoritative security invariants
+SRC-006,.claude/rules/backend.md,ongoing,Backend Rules,FastAPI/SQLAlchemy conventions; permission model; migrations; audit; tests,~60,,,"Backend, Testing",
+SRC-007,.claude/rules/frontend.md,ongoing,Frontend Rules,SPA structure; design tokens; XSS prevention; state/scope rules,~120,,,"Frontend, Design, Auth",
+SRC-008,.claude/rules/testing.md,ongoing,Testing Rules,Test commands; patterns; naming; stress tests,~50,,,"Testing",
+SRC-009,.claude/rules/deployment.md,ongoing,Deployment Rules,Local demo; packaging; production requirements,~80,,,"Deploy",
+SRC-010,docs/product-review/review-2-synthesis.md,~2026-08-14,Architecture and Integration Review Synthesis,Identifies SYN-H01 (Safari auth) SYN-H02 (PostgreSQL FK crash) and other issues,~100,,SRC-002,"Architecture, Integration",HISTORICAL. Input to gap register.
+SRC-011,docs/product-review/review-3-synthesis.md,~2026-08-15,Design Review Synthesis,Identifies DES-H01-H04 design/contrast/accessibility findings,~80,,SRC-002,"Design, A11y",HISTORICAL. Input to gap register.
+SRC-012,docs/product-review/review-5-synthesis.md,~2026-08-16,Ultrareview Synthesis (Review 5),44 findings: 7 HIGH / 14 MEDIUM / 16 LOW,~200,,SRC-002,"Security, Architecture, All",HISTORICAL. Findings verified and used as gap input.
+SRC-013,docs/superpowers/plans/2026-08-18-year-ux.md,2026-08-18,Training Year Context Frontend Cleanup Plan,Plan for removing lifecycle UX and implementing calendar-context year model,~150,,,,"Training Year",COMPLETED — all tasks implemented.
+SRC-014,docs/superpowers/plans/2026-08-21-parade-night-structure.md,2026-08-21,Parade Night Structure Implementation Plan,Full 71-task plan for parade night structure implementation,~500,,,,"Parade Night",COMPLETED.
+SRC-015,docs/superpowers/plans/2026-08-28-training-year-context-backend.md,2026-08-28,Training Year Context Backend Plan,Backend training year context improvements,~200,,,,"Training Year",COMPLETED.
+SRC-016,docs/superpowers/plans/2026-08-29-account-recovery.md,2026-08-29,Account Recovery Plan,Full account recovery implementation including tests,~300,,,,"Auth, Recovery",COMPLETED — all 7 tasks implemented.
+SRC-017,docs/superpowers/plans/2026-08-29-training-year-context-frontend.md,2026-08-29,Training Year Context Frontend Plan,Frontend training year cleanup,~200,,,,"Training Year",COMPLETED.
+SRC-018,docs/product-review/ux-gap-register.md,~2026-08-14,UX Gap Register,Findability and IA gaps identified during review,~150,,,,"UX, IA",HISTORICAL. Gaps extracted to MASTER_FINAL_GAP_REGISTER.
+SRC-019,docs/product-review/findability-audit.md,~2026-08-14,Findability Audit,Navigation and discoverability audit,~100,,,,"UX, IA, Navigation",HISTORICAL.
+SRC-020,docs/product-review/recommended-information-architecture.md,~2026-08-14,Recommended Information Architecture,IA recommendations from Review 1,~150,,,,"IA, Navigation",HISTORICAL. To be verified against current state.

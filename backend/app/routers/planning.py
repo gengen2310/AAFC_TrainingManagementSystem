@@ -330,6 +330,7 @@ def _location_out(loc: TrainingArea) -> dict:
         "location_id": loc.id, "unit_id": loc.squadron_id, "name": loc.name,
         "location_type": loc.type, "capacity": loc.capacity,
         "notes": loc.notes, "active_status": loc.active_status,
+        "capabilities": loc.capabilities,
     }
 
 
@@ -382,7 +383,7 @@ def _real_session_out(
         "location_name": room_name,
         "status": s.status,
         "notes": s.delivery_notes,
-        "is_combined": False,
+        "is_combined": db.query(SessionAudience).filter(SessionAudience.session_id == s.id).count() > 1,
         "override_conflict": False,
         "created_at": iso_z(s.created_at) if s.created_at else None,
         "version": s.version,
