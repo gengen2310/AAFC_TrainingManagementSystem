@@ -33,7 +33,13 @@ from ..database import get_db, utcnow, iso_z
 from ..models import User, AccessCode, Wing, Squadron, Flight, NationalEntity, AuditLog
 from ..dependencies import get_principal
 from ..permissions import Principal
-from ..security import hash_code, generate_code
+import re
+
+from ..security import hash_code, generate_code, verify_code
+from ..services_recovery import (
+    RECOVERY_ROLES, VERIFY_TTL_MINUTES, mask_email, mint_token,
+)
+from ..email_service import send_mail
 from ..services import audit, fk_dependents
 from ..permissions import ROLES as _ALL_ROLES
 
@@ -224,6 +230,14 @@ class AccountCreateIn(BaseModel):
 class AccountUpdateIn(BaseModel):
     display_name: str | None = None
     flight_id: str | None = None  # pass "" or null to clear
+
+
+class RecoveryEmailIn(BaseModel):
+    email: str
+    # Re-authentication. This address becomes a credential-reset channel, so
+    # changing it is a credential-level act -- a stolen session must not be
+    # enough to redirect recovery to an attacker's mailbox.
+    current_code: str
 
 
 class ResetCodeIn(BaseModel):
@@ -626,6 +640,63 @@ def reset_code(uid: str, body: ResetCodeIn, db: DBSession = Depends(get_db),
     }
 
 
+@router.post("/accounts/{uid}/recovery-email")
+def set_recovery_email(uid: str, body: RecoveryEmailIn,
+                       db: DBSession = Depends(get_db),
+                       p: Principal = Depends(get_principal)):
+    """Set or change an account's recovery email. Always leaves it UNVERIFIED.
+
+    Entering an address must not by itself make it a trusted channel, so this
+    clears any existing verification and mails a fresh verification link. A new
+    address inherits nothing from the old one.
+    """
+    u = db.get(User, uid)
+    if not u or u.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    if uid != p.user_id:
+        _require_write_actor(p)
+        _require_manage_authority(p, u, db)
+
+    if u.role not in RECOVERY_ROLES:
+        raise HTTPException(400, detail={
+            "error": "role_not_recoverable",
+            "message": "Recovery email is only held for administrator accounts."})
+
+    addr = (body.email or "").strip().lower()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", addr) or len(addr) > 254:
+        raise HTTPException(400, detail={
+            "error": "invalid_email", "message": "Enter a valid email address."})
+
+    # Re-authenticate the CALLER against their own live code.
+    caller_codes = db.query(AccessCode).filter(
+        AccessCode.user_id == p.user_id, AccessCode.active_status == True).all()  # noqa: E712
+    if not any(verify_code(body.current_code or "", ac.code_hash) for ac in caller_codes):
+        raise HTTPException(403, detail={
+            "error": "reauth_failed",
+            "message": "Enter your current access code to change a recovery email."})
+
+    old_addr = u.recovery_email
+    u.recovery_email = addr
+    u.recovery_email_verified_at = None
+    u.recovery_email_updated_at = utcnow()
+    u.recovery_email_updated_by = p.user_id
+
+    raw = mint_token(db, u, "verify_email", VERIFY_TTL_MINUTES, None)
+    db.commit()
+
+    sent = send_mail(
+        addr,
+        "Verify your AAFC TMS recovery email",
+        "Confirm this address so it can be used to recover your access code.\n\n"
+        f"Verification code: {raw}\n\n"
+        "It expires in 24 hours. If you did not request this, ignore this email.",
+    )
+    audit(db, p, object_type="user", object_id=uid, action="recovery_email_changed",
+          old={"had_address": bool(old_addr)}, new={"verified": False})
+    return {"ok": True, "recovery_email": mask_email(addr),
+            "verified": False, "email_sent": sent}
+
+
 @router.post("/accounts/{uid}/disable")
 def disable_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
     _require_write_actor(p)
@@ -635,6 +706,13 @@ def disable_account(uid: str, db: DBSession = Depends(get_db), p: Principal = De
     if uid == p.user_id:
         raise HTTPException(400, detail={"error": "cannot_disable_self"})
     _require_manage_authority(p, u, db)
+    if (u.role == "system_admin" and u.active_status
+            and _last_active_system_admin_count(db) <= 1):
+        raise HTTPException(409, detail={
+            "error": "last_active_system_admin",
+            "message": "This is the last active System Administrator. Create or "
+                       "activate another System Administrator before removing "
+                       "this account."})
     u.active_status = False
     u.updated_by = p.user_id
     # Invalidate any live JWTs immediately by incrementing token_version — without
@@ -746,6 +824,16 @@ def delete_account(uid: str, db: DBSession = Depends(get_db), p: Principal = Dep
     if not u.is_archived:
         raise HTTPException(409, detail={"error": "not_archived",
                                           "message": "Archive this account first before permanently deleting it."})
+    # Protected transitively -- deletion requires archiving first, and archive is
+    # already guarded -- but stated locally so the invariant survives someone
+    # relaxing the archive-first rule later.
+    if (u.role == "system_admin" and u.active_status
+            and _last_active_system_admin_count(db) <= 1):
+        raise HTTPException(409, detail={
+            "error": "last_active_system_admin",
+            "message": "This is the last active System Administrator. Create or "
+                       "activate another System Administrator before removing "
+                       "this account."})
 
     # fk_dependents walks every real foreign key pointing at users.id (today:
     # ProxySession.actor_user_id; automatically covers anything added later)

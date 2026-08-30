@@ -44,10 +44,24 @@ def main() -> int:
     ap.add_argument("--dsn", required=True)
     args = ap.parse_args()
 
-    import psycopg
-    with psycopg.connect(args.dsn) as conn, conn.cursor() as cur:
-        cur.execute(SQL)
-        rows = cur.fetchall()
+    # psycopg3 if present, else psycopg2 -- which is what this project actually
+    # ships. Importing only psycopg3 made this tool fail on the project's own
+    # dependencies, at exactly the moment an operator reaches for it: immediately
+    # before a production year migration.
+    try:
+        import psycopg                      # psycopg 3
+        connect = psycopg.connect
+    except ModuleNotFoundError:
+        import psycopg2                     # what requirements.txt installs
+        connect = psycopg2.connect
+
+    conn = connect(args.dsn)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(SQL)
+            rows = cur.fetchall()
+    finally:
+        conn.close()
 
     flagged, total = audit(rows)
     for line in flagged:

@@ -14,6 +14,16 @@
 
 /* ── Inlined from shared/tokens.css (light-theme canonical tokens) ────────── */
 :root {
+  /* Notification spacing. Mirrors connected-frontend's declarations so both
+     frontends space notifications identically -- they were 10px/14px and
+     9px/16px respectively, which read as cramped and, worse, as two different
+     applications. */
+  --toast-pad-y: 14px;
+  --toast-pad-x: 18px;
+  --toast-gap:   10px;
+  --toast-edge:  20px;
+  --toast-max-w: 400px;
+
   /* ── AAFC VIG brand palette ──────────────────────────────────────────── */
   --blue:   #51b0e3;   /* AAFC blue — accent, active states, highlights */
   --dark:   #002f65;   /* AAFC dark blue — header, nav structure */

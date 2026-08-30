@@ -10,10 +10,18 @@ any major change, build/update a capability manifest, then re-diff it after.
 FastAPI app and SQLAlchemy `Base.metadata`, not regex over source text, so it
 cannot miss a route or table hidden behind unusual formatting the way the
 prior program's regex-based `docs/remediation/capability_manifest_before.json`
-could). At commit `4c5e384`:
+could). At commit `df3fff6`:
 
-- **258 API routes** across all routers.
-- **58 database tables.**
+- **347 API routes** across all routers.
+- **71 database tables.**
+
+Regenerated 2026-08-30 after the UX / account-recovery addendum. The committed
+file had drifted to 321 routes and 66 tables — more than this change added — so
+the figures above are the script's output, not an increment of the previous
+prose. Four of the new routes are the recovery surface:
+`POST /api/auth/forgot-code`, `POST /api/auth/reset-code`,
+`POST /api/auth/verify-recovery-email`, and
+`POST /api/accounts/{uid}/recovery-email`. The new table is `recovery_tokens`.
 
 Re-run the script (`cd backend && source .venv/bin/activate && PYTHONPATH=.
 python scripts/generate_capability_manifest.py`) before and after any change

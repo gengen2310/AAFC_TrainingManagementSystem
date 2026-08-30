@@ -99,14 +99,30 @@ test("the year numeral is tabular: stepping does not change its width", async ({
   expect(after, "a proportional font would shift every element to its right").toBe(before);
 });
 
-test("every year-bar control meets the 44px hit target", async ({ page }) => {
+test("every year-bar control offers a 44px hit target", async ({ page }) => {
+  // Measured by HIT-TESTING, not by boundingBox(). The control is deliberately
+  // 36px tall so it matches the buttons beside it, and reaches 44px through a
+  // transparent ::after. boundingBox() reports the layout box and cannot see
+  // that, so it would report a false failure -- and, on a control that grew its
+  // box instead, a false pass is just as possible.
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
 
   for (const sel of ["#ynPrev", "#ynNext", "#ynDisplay"]) {
     const box = (await page.locator(sel).boundingBox())!;
-    expect.soft(Math.round(box.height), `${sel} height`).toBeGreaterThanOrEqual(44);
-    expect.soft(Math.round(box.width), `${sel} width`).toBeGreaterThanOrEqual(44);
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    // the control must still be visually consistent with its neighbours
+    expect.soft(Math.round(box.height), `${sel} visual height`).toBeLessThanOrEqual(40);
+
+    for (const [dx, dy, edge] of [[0, -21, "top"], [0, 21, "bottom"]] as const) {
+      const hit = await page.evaluate(([x, y, want]) => {
+        const el = document.elementFromPoint(x as number, y as number);
+        return !!(el && el.closest(want as string));
+      }, [cx + dx, cy + dy, sel]);
+      expect.soft(hit, `${sel}: a tap ${edge} of centre (44px target) misses`).toBe(true);
+    }
   }
 });
 

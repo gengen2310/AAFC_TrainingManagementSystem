@@ -160,10 +160,10 @@ Steps emitted at HEAD (in order):
 | `planning_year_created` | Set up your training year | Yes | `PlanningYear` count > 0 |
 | `parade_dates_configured` | Configure your parade dates | Yes | `ParadeDate` count > 0 |
 | `training_classes_created` | Create your training classes | Yes | `TrainingClass` count > 0 |
-| **`cadets_added`** | **Add cadets to the squadron roster** | **Yes** | `Cadet` count > 0 |
+| ~~`cadets_added`~~ | ~~Add cadets to the squadron roster~~ | **Removed 2026-08-28** | no longer a checklist step; the count is still reported in the `squadron` payload |
 | `sessions_scheduled` | Schedule your first session | Yes | `Session` count > 0 |
 
-`cadets_added` is a non-optional step that blocks `complete=True`. **Section 7 of the
+`cadets_added` WAS a non-optional step that blocked `complete=True`. It was removed from the checklist on 2026-08-28: a Training Cell does not need to enter individual cadets before planning training. **Section 7 of the
 integration brief removes this step from the checklist UI** (capability is preserved —
 adding cadets remains a core function; it is simply not gated in the onboarding flow).
 
@@ -243,7 +243,7 @@ structure. Do not conflate the two when implementing that feature.
 
 | Method | Path | Owner | Notes |
 |---|---|---|---|
-| GET | `/api/setup/getting-started` | TMS | Returns checklist steps including `cadets_added` |
+| GET | `/api/setup/getting-started` | TMS | Returns checklist steps; `cadets_added` is no longer among them |
 | GET/POST | `/api/training-years` | TMS | Training year management |
 | GET/POST | `/api/training-classes` | TMS | Class management |
 | GET | `/api/curriculum-phases` | TMS/PW | Stages (ORI/INI/JNR/INT/SNR) |
@@ -262,7 +262,7 @@ structure. Do not conflate the two when implementing that feature.
 
 | Gap | Affected surface | Brief section |
 |---|---|---|
-| `cadets_added` blocks Getting Started unnecessarily | TMS | §7 |
+| ~~`cadets_added` blocks Getting Started unnecessarily~~ — RESOLVED 2026-08-28 | TMS | §7 |
 | "Session Structure" / "Default Training Periods" / "Timing Templates" = three cards | TMS settings | §8–12 |
 | Training Year + Training Class not passed seamlessly to PW | Context handoff | §13–14 |
 | `TrainingClass.training_stage_id` nullable — no enforcement | Backend | §15–16 |

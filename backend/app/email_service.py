@@ -5,6 +5,7 @@ Email failure never prevents ticket creation.
 """
 import logging
 import smtplib
+from email.message import EmailMessage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -73,3 +74,36 @@ def send_ticket_notification(ticket_data: dict, recipients: list[str]) -> None:
         logger.info("Ticket notification sent to %d recipients", len(recipients))
     except Exception as exc:
         logger.error("Failed to send ticket notification: %s", exc)
+
+
+def send_mail(to: str, subject: str, body: str) -> bool:
+    """Send one plain-text message. Returns success rather than raising.
+
+    Callers use the boolean to decide whether to keep a freshly minted recovery
+    token: a token nobody can receive is worse than no token, because it sits
+    valid and unusable until it expires.
+
+    Never logs the message body. A recovery mail body contains the token.
+    """
+    if not settings.SMTP_HOST:
+        # Local and staging default. The address is logged (it is operational
+        # data an operator needs) but the body -- which carries the token -- is
+        # not, and nothing is transmitted.
+        logger.info("SMTP not configured — not sending %r to %s", subject, to)
+        return False
+
+    msg = EmailMessage()
+    msg["Subject"] = subject
+    msg["From"] = settings.SMTP_FROM
+    msg["To"] = to
+    msg.set_content(body)
+    try:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as smtp:
+            smtp.starttls()
+            if settings.SMTP_USER:
+                smtp.login(settings.SMTP_USER, settings.SMTP_PASS)
+            smtp.send_message(msg)
+        return True
+    except Exception as exc:                      # noqa: BLE001 - report, never raise
+        logger.error("SMTP send failed for %s: %s", to, exc)
+        return False
