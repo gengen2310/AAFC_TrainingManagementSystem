@@ -49,7 +49,14 @@ def downgrade() -> None:
         sa.Column("phase_key", sa.String(40), nullable=False),
         sa.Column("name", sa.String(80), nullable=False),
         sa.Column("abbr", sa.String(20), nullable=True),
-        sa.Column("created_at", sa.DateTime, nullable=True),
-        sa.Column("updated_at", sa.DateTime, nullable=True),
+        # TimestampMixin columns as they actually stood when this migration
+        # dropped the table: created_at/updated_at NOT NULL, plus created_by
+        # and updated_by, all added by the v24/v47 timestamp patches. Recreating
+        # the table at its original v11 shape left the schema subtly different
+        # from the one this migration removed.
+        sa.Column("created_at", sa.DateTime, nullable=False),
+        sa.Column("updated_at", sa.DateTime, nullable=False),
+        sa.Column("created_by", sa.String(36), nullable=True),
+        sa.Column("updated_by", sa.String(36), nullable=True),
     )
     op.create_index("ix_custom_phases_squadron_id", "custom_phases", ["squadron_id"])

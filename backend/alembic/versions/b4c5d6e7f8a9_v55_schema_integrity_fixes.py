@@ -151,12 +151,20 @@ def downgrade():
             "DROP CONSTRAINT IF EXISTS uq_session_audience_pair"
         ))
         op.execute(sa.text("DROP INDEX IF EXISTS uq_pnto_active_per_night"))
-        op.execute(sa.text("DROP INDEX IF EXISTS ix_pnto_parade_night_id"))
-        op.execute(sa.text(
-            "ALTER TABLE parade_night_timing_overrides "
-            "ADD CONSTRAINT parade_night_timing_overrides_parade_night_id_key "
-            "UNIQUE (parade_night_id)"
-        ))
+        # ix_pnto_parade_night_id is NOT ours to drop. v8 created it, and this
+        # migration's upgrade only does CREATE INDEX IF NOT EXISTS, which is a
+        # no-op on the canonical chain. Dropping it here removed v8's index, so
+        # v8's own downgrade later failed with "index does not exist" -- the
+        # chain could not be walked back past this point.
+        #
+        # The unique constraint that used to be re-added here was invented
+        # rather than restored: the pre-v55 table carries ix_pnto_parade_night_id
+        # and uq_pnto_parade_night_id, and no ..._parade_night_id_key. Verified
+        # by building the chain to v54 on PostgreSQL and reading pg_indexes.
+        #
+        # Likewise the upgrade's DROP INDEX IF EXISTS
+        # ix_parade_night_timing_overrides_parade_night_id is a no-op on the
+        # canonical chain, so there is nothing to recreate here.
     else:
         with op.batch_alter_table("planning_conflicts") as batch_op:
             batch_op.drop_constraint("fk_planning_conflicts_session", type_="foreignkey")

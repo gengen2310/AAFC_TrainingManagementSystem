@@ -86,8 +86,12 @@ def downgrade():
     with op.batch_alter_table('service_desk_email_configs') as batch_op:
         batch_op.alter_column('updated_at', existing_type=sa.DATETIME(), nullable=True)
         batch_op.alter_column('created_at', existing_type=sa.DATETIME(), nullable=True)
-    op.drop_column('service_desk_email_configs', 'updated_by')
-    op.drop_column('service_desk_email_configs', 'created_by')
+    # NOT dropped: v45 (3197cd57cd98) created created_by/updated_by on this
+    # table, and this migration's upgrade only adds them when absent -- a no-op
+    # on the canonical chain. Dropping them here destroyed another migration's
+    # columns, and the attribution data in them, on any rollback past this
+    # point. Verified by fingerprinting the schema either side of this
+    # migration on PostgreSQL (scripts/rehearse_migrations.py).
     op.drop_index(op.f('ix_parade_night_timing_overrides_parade_night_id'),
                   table_name='parade_night_timing_overrides')
     op.create_index(op.f('uq_pnto_active_per_night'), 'parade_night_timing_overrides',
