@@ -66,12 +66,15 @@ Auth errors use structured detail, e.g. `{"error":"proxy_required"}` /
 - `new_code_notice` always accompanies a one-time code: `"This code will not be shown again. Copy it now."`
 
 ## V9.1 Cadet Program routes
-- Phases: `GET /api/phases`
-- Packages: `GET|POST /api/program-packages`, `POST /api/program-packages/{id}/submit-review|approve|publish|retire|archive`
-- Items: `GET /api/program-items?schedulable=…`, `GET /api/program-items/{id}`, `POST /api/program-items`, `POST /api/program-items/{id}/retire`
-- Learning Hub: `GET /api/learning-hub-resources`, `GET /api/learning-hub-resources/missing`
-- Coverage: `GET /api/program-coverage/squadron`, `GET /api/program-coverage/wing`
-- Promotion: `POST /api/program-promotion/squadron-to-wing`, `GET /api/program-promotion/requests`, `POST /api/program-promotion/{id}/approve`
+- **RETIRED (Part 41, 2026-08-30).** The Cadet Program endpoints — `/api/phases`,
+  `/api/program-packages`, `/api/program-items`, `/api/learning-hub-resources`,
+  `/api/program-coverage/*` and `/api/program-promotion/*` — no longer exist. They
+  served `ProgramItem`, a second curriculum entity that duplicated `CurriculumItem`
+  and disagreed with it about who may see a squadron-local item. `CurriculumItem`
+  is canonical; use `GET /api/curriculum`.
+- `GET /api/export/curriculum-items.{csv,xlsx,pdf}` exports the curriculum.
+  `program-items` still works as a deprecated alias for the same data, so existing
+  links do not break — it was the only export type the endpoints supported.
 - Export: `GET /api/export/{type}.csv|.xlsx|.pdf`
 - Program import: `POST /api/program-imports/preview`
 

@@ -368,7 +368,6 @@ def seed_all():
         gen703.flight_id = alpha.id
         db.commit()
 
-    seed_program(db, nat, wing, sqn_by_code, cur_by_code)
     seed_planning_data(db, wing, sqn_by_code)
     # Seed default curriculum elements (idempotent)
     for name, display_name, scope in _DEFAULT_ELEMENTS:
@@ -610,68 +609,3 @@ def seed_planning_data(db, wing, sqn_by_code):
         db.commit()
 
 
-def seed_program(db, nat, wing, sqn_by_code, cur_by_code):
-    """Seed phases, Learning Hub resources, and National/Wing/Squadron program packages."""
-    from ..models import (Phase, ProgramPackage, ProgramItem, LearningHubResource)
-    LH = "https://airforcecadets.net.au/lh/index.php/cadet-program/"
-    phases = [
-        ("Orientation", "ORI", 1, True, False), ("Initial", "INL", 2, True, False),
-        ("Junior", "JNR", 3, True, False), ("Intermediate", "INT", 4, True, False),
-        ("Senior", "SNR", 5, True, False), ("Bronze Extension", "BRZ", 6, False, True),
-        ("Silver Extension", "SLV", 7, False, True), ("Gold Extension", "GLD", 8, False, True),
-        ("Personal Development & Leadership", "PDL", 9, True, False), ("Custom / Local", "LOC", 10, False, False),
-    ]
-    phase_by_name = {}
-    for name, short, order, core, ext in phases:
-        ph = Phase(name=name, short_name=short, display_order=order, is_core=core,
-                   is_extension=ext, learning_hub_url=LH)
-        db.add(ph); db.commit(); phase_by_name[name] = ph
-
-    # Learning Hub resources (links only — never content)
-    lh_by_code = {}
-    for c in cur_by_code.values():
-        r = LearningHubResource(title=f"{c.code} — {c.title}", url=c.learning_hub_url or LH,
-                                phase=c.phase, resource_type="page", source="Learning Hub")
-        db.add(r); db.commit(); lh_by_code[c.code] = r
-
-    # National package — items mirror the national curriculum (code match drives coverage)
-    nat_pkg = ProgramPackage(title="National Cadet Program 2026", owning_scope="national",
-                             national_id=nat.id, program_year=2026, version=1, status="published",
-                             published_by=None)
-    db.add(nat_pkg); db.commit()
-    phase_name_map = {"A. Orientation": "Orientation", "B. Initial": "Initial", "C. Junior": "Junior",
-                      "D. Intermediate": "Intermediate", "E. Senior": "Senior", "I. Bronze": "Bronze Extension",
-                      "J. Silver": "Silver Extension", "K. Gold": "Gold Extension"}
-    for c in cur_by_code.values():
-        pname = phase_name_map.get(c.phase, c.phase)
-        ph = phase_by_name.get(pname)
-        core = "core" if c.core_status == "core" else "optional"
-        if ph and ph.is_extension:
-            core = "extension"
-        db.add(ProgramItem(package_id=nat_pkg.id, owning_scope="national", national_id=nat.id,
-                           code=c.code, title=c.title, phase_id=ph.id if ph else None,
-                           phase_name_at_time=pname, element=c.element, core_status=core,
-                           foundation_or_extension=("extension" if ph and ph.is_extension else "foundation"),
-                           duration_minutes=c.duration_minutes,
-                           learning_hub_resource_id=lh_by_code[c.code].id, status="active"))
-    db.commit()
-
-    # Wing package — one wing-specific item, visible only within 7 Wing
-    wing_pkg = ProgramPackage(title="7 Wing Supplementary Program 2026", owning_scope="wing",
-                              wing_id=wing.id, program_year=2026, status="published")
-    db.add(wing_pkg); db.commit()
-    db.add(ProgramItem(package_id=wing_pkg.id, owning_scope="wing", wing_id=wing.id,
-                       code="7WG-LOC01", title="7 Wing Field Navigation Day", phase_name_at_time="Intermediate",
-                       element="Field", core_status="wing_required", duration_minutes=300, status="active"))
-    db.commit()
-
-    # 703 squadron-local package — visible only to 703 (peers must not see it)
-    s703 = sqn_by_code["703"]
-    sq_pkg = ProgramPackage(title="703 Squadron Local Activities 2026", owning_scope="squadron",
-                            wing_id=wing.id, squadron_id=s703.id, program_year=2026, status="published")
-    db.add(sq_pkg); db.commit()
-    db.add(ProgramItem(package_id=sq_pkg.id, owning_scope="squadron", wing_id=wing.id, squadron_id=s703.id,
-                       code="703-LOC01", title="703 Heritage Visit", phase_name_at_time="Custom / Local",
-                       element="SQN", core_status="local", foundation_or_extension="local",
-                       duration_minutes=180, status="active"))
-    db.commit()

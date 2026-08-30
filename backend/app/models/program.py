@@ -1,6 +1,18 @@
-"""Cadet Program models: program packages/items with National→Wing→Squadron
-ownership and inheritance, Learning Hub resources, deployments (visibility),
-source-file ingestion + conflicts, and async job status.
+"""RETIRED — the Cadet Program subsystem (Part 41, user decision 2026-08-30).
+
+CurriculumItem is the canonical curriculum entity. ProgramItem duplicated it and
+disagreed with it about who may see a squadron-local item, so the API surface
+here (14 endpoints), its service layer and its seed data were removed.
+
+The MODELS and their tables are deliberately still here. Removing the API stops
+the duplicate entity being used; dropping the tables destroys whatever rows an
+environment already holds, and no production data can be inspected from here.
+Dropping them is a separate, explicit step that needs a row count per
+environment first -- see docs/final/10-curriculum-vs-program.md.
+
+Two things in this file are NOT retired and must stay:
+  * JobStatus  -- background jobs (routers/jobs.py, routers/system.py, workers/)
+  * ExportLog's SourceFile reference in routers/export_import.py
 """
 from sqlalchemy import String, Integer, ForeignKey, Boolean, Text, DateTime, Float
 from sqlalchemy.orm import Mapped, mapped_column

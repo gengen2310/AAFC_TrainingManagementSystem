@@ -1,7 +1,9 @@
 # Part 41 — CurriculumItem vs ProgramItem
 
-**Date:** 2026-08-30 · **Status:** analysed and pinned; the canonical choice is a
-product decision, not an engineering one.
+**Date:** 2026-08-30 · **Status:** DECIDED — `CurriculumItem` is canonical
+(user decision, 2026-08-30). `ProgramItem`'s API surface is retired; its tables
+are not yet dropped. Two follow-ups remain, both listed at the foot of this
+document.
 
 ## What each one is
 
@@ -71,9 +73,44 @@ anyway. The seeded dataset contains no row with `squadron_id` set and
 the pairing could therefore hide rows in a dataset that cannot be inspected from
 here, to fix something that is not causing harm. Left alone deliberately.
 
-## The decision
+## The decision — taken
 
-Three options, all of which need a product call:
+`CurriculumItem` is canonical (option 2 below). What was done:
+
+* Removed `routers/program.py` (14 endpoints), `services_program.py`,
+  `tests/test_program.py`, and the `seed_program` block.
+* Repointed the export. `program-items` was the **only** export type the
+  CSV/XLSX/PDF endpoints supported, so deleting it would have left all three
+  unable to export anything. They now serve curriculum items via
+  `services.visible_curriculum_items`, which applies the same scope rules as
+  `GET /api/curriculum` — an export with looser rules than the page it exports
+  would be a quiet disclosure channel, and a test asserts 704 cannot see 703's
+  local item through it. `program-items` remains as a deprecated alias so
+  existing links keep working.
+* Left the models and tables in place, marked retired in `models/program.py`.
+
+### Follow-up 1 — the tables are still there
+
+Dropping `program_items`, `program_packages`, `program_item_deployments`,
+`phases`, `learning_hub_resources`, `promotion_requests` and `source_conflicts`
+destroys whatever rows an environment holds, and no production data can be
+inspected from here. Removing the API stops the duplicate entity being *used*;
+dropping the tables is a separate, explicit step that needs a row count per
+environment first. `JobStatus` and `SourceFile` live in the same module and are
+**not** retired — background jobs and the workbook-preview endpoint still use
+them.
+
+### Follow-up 2 — spec §7 is now unimplemented
+
+`ProgramItem` implemented upward oversight: a Wing seeing its squadrons' local
+items without selecting a squadron. `CurriculumItem` does not. Retiring the
+model that implemented a doctrine does not decide the doctrine, so this is still
+open: **should a Wing Admin see a squadron's local curriculum without selecting
+that squadron?** If yes, the change belongs in `routers/training.py`'s curriculum
+filter, and `test_curriculum_hides_squadron_local_from_the_wing_by_default` is
+the test to update.
+
+## The options as they stood
 
 1. **`ProgramItem` is canonical.** Migrate `curriculum_items` into it and retire
    the simpler model. The largest option, and it adopts the design that already

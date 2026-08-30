@@ -1,14 +1,9 @@
-"""Part 41 — CurriculumItem and ProgramItem answer the same question differently.
+"""Part 41 — curriculum scope, after CurriculumItem became canonical.
 
-The installation carries two models for one concept:
+ProgramItem was retired on 2026-08-30 (user decision): its 14 endpoints, service
+layer and seed data are gone, and CurriculumItem is the single curriculum entity.
 
-  CurriculumItem  curriculum_items  ~117 router references, the model the whole
-                  scheduling flow actually uses.
-  ProgramItem     program_items     14 endpoints, its own service layer, tests
-                  and seed data -- and essentially no UI (one CSV export link).
-
-Both implement National -> Wing -> Squadron ownership. They do NOT agree on
-upward visibility, and both are live:
+Before that, the two disagreed about upward visibility, and both were live:
 
   services_program._can_see (spec §7, quoted in its own docstring):
       "Squadron-local items ... visible UPWARD to its Wing and to National for
@@ -17,15 +12,18 @@ upward visibility, and both are live:
       a wing user sees national + own-wing items. Squadron-local items appear
       only if the caller names a squadron via ?squadron_id=.
 
-These are characterisation tests. They lock the CURRENT behaviour of each so the
-divergence is visible and cannot drift further while the canonical doctrine is
-being decided. When one doctrine wins, the losing test here is the one to
+CurriculumItem's rule survived, so **spec §7's upward oversight is currently
+unimplemented**. That is a live question, not a settled one: retiring the model
+that implemented a doctrine does not decide the doctrine. It is recorded in
+docs/final/10-curriculum-vs-program.md and P41's traceability row.
+
+These tests pin the surviving behaviour. If upward oversight is later adopted,
+test_curriculum_hides_squadron_local_from_the_wing_by_default is the one to
 change -- deliberately, not by accident.
 
-Neither behaviour is a security fault. _view_squadron_id enforces
-require_can_view_squadron, so a squadron user cannot read a peer's items through
-either surface; the disagreement is about how much OVERSIGHT a wing gets by
-default.
+Neither behaviour was ever a security fault. _view_squadron_id enforces
+require_can_view_squadron, so a squadron account cannot read a peer's items;
+that is pinned below and must never change.
 """
 import pytest
 from conftest import login
@@ -79,18 +77,6 @@ def test_curriculum_shows_squadron_local_when_the_wing_names_the_squadron(client
     """The wing CAN see it -- it just has to select the squadron."""
     item_id, sqn_id = local_curriculum_item
     assert item_id in _curriculum_ids(client, login(client, "ADMIN7WG"), sqn_id)
-
-
-def test_program_items_show_squadron_local_to_the_wing_by_default(client):
-    """Current ProgramItem doctrine: upward oversight, no selection needed."""
-    r = client.get("/api/program-items", headers=login(client, "ADMIN7WG"))
-    assert r.status_code == 200, r.text
-    body = r.json()
-    items = body if isinstance(body, list) else body.get("items", [])
-    assert [i for i in items if i.get("owning_scope") == "squadron"], (
-        "program-items no longer shows squadron-local items to the wing -- "
-        "that is the CurriculumItem doctrine. See the note above."
-    )
 
 
 def test_a_squadron_cannot_read_a_peers_curriculum(client, local_curriculum_item):

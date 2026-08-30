@@ -9,6 +9,45 @@ from .permissions import Principal
 from .services_readiness import parade_night_readiness
 
 
+def visible_curriculum_items(db: DBSession, p: Principal) -> list:
+    """The curriculum items this principal may read.
+
+    Mirrors the scope rules GET /api/curriculum applies: national items always,
+    own-wing items, own-squadron items -- and, for a national admin with no wing
+    context, every wing's items for oversight.
+
+    It exists so the export surface cannot drift from the page. The CSV/XLSX/PDF
+    exports previously served ProgramItem through services_program; when
+    CurriculumItem became the canonical entity (Part 41) the export had to move
+    with it, and an export that applied different scope rules from the list it
+    exports would be a quiet disclosure channel.
+    """
+    from sqlalchemy import or_
+    from .models import CurriculumItem, Squadron
+
+    sq_id = p.active_squadron_id
+    wing_id = p.acting_wing_id or p.wing_id
+    if sq_id:
+        s = db.get(Squadron, sq_id)
+        if s:
+            wing_id = s.wing_id
+
+    conditions = [CurriculumItem.owning_level == "national"]
+    if wing_id:
+        conditions.append(
+            (CurriculumItem.owning_level == "wing") & (CurriculumItem.wing_id == wing_id))
+    elif p.role in ("national_admin", "national_viewer", "system_admin", "auditor"):
+        conditions.append(CurriculumItem.owning_level == "wing")
+    if sq_id:
+        conditions.append(
+            (CurriculumItem.owning_level == "squadron") & (CurriculumItem.squadron_id == sq_id))
+
+    return (db.query(CurriculumItem)
+            .filter(or_(*conditions), CurriculumItem.is_archived == False)  # noqa: E712
+            .order_by(CurriculumItem.recommended_sequence)
+            .all())
+
+
 def resolve_national_id(db: DBSession, p: Principal) -> str | None:
     """The national entity this principal belongs to.
 

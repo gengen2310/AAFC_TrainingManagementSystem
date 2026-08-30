@@ -6,21 +6,31 @@ from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db
 from ..config import settings
-from ..models import ProgramItem, ExportLog, SourceFile
+from ..models import ExportLog, SourceFile
 from ..dependencies import get_principal
 from ..permissions import Principal
-from ..services import audit
-from ..services_program import visible_items_for
+from ..services import audit, visible_curriculum_items
 
 router = APIRouter(prefix="/api", tags=["export-import"])
 
 
+# "program-items" is kept as an alias so existing links and bookmarks do not
+# start returning 400. It serves curriculum items now: ProgramItem was retired
+# when CurriculumItem became the canonical entity (Part 41), and this was the
+# only export type the CSV/XLSX/PDF endpoints supported -- deleting it outright
+# would have left all three unable to export anything at all.
+_CURRICULUM_EXPORT_TYPES = ("curriculum-items", "program-items")
+
+
 def _rows_for(export_type: str, db: DBSession, p: Principal) -> tuple[list[str], list[list]]:
-    if export_type == "program-items":
-        items = visible_items_for(db, p)
-        headers = ["code", "title", "scope", "phase", "core_status", "duration_minutes", "learning_hub_linked"]
-        rows = [[it.code, it.title, it.owning_scope, it.phase_name_at_time or "", it.core_status,
-                 it.duration_minutes, "yes" if it.learning_hub_resource_id else "no"] for it in items]
+    if export_type in _CURRICULUM_EXPORT_TYPES:
+        items = visible_curriculum_items(db, p)
+        headers = ["identifier", "code", "title", "owning_level", "phase", "element",
+                   "core_status", "duration_minutes", "recommended_term", "learning_hub_linked"]
+        rows = [[it.identifier or "", it.code, it.title, it.owning_level, it.phase,
+                 it.element or "", it.core_status, it.duration_minutes,
+                 it.recommended_term or "", "yes" if it.learning_hub_url else "no"]
+                for it in items]
         return headers, rows
     raise HTTPException(400, detail={"error": "unsupported_export_type"})
 
