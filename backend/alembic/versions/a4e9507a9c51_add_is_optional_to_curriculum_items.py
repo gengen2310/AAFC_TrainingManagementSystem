@@ -25,16 +25,7 @@ def upgrade():
                 'is_optional',
                 sa.Boolean(),
                 nullable=False,
-                # sa.false(), not sa.text('0'). PostgreSQL rejects an integer
-                # default on a boolean column outright -- "column is_optional is
-                # of type boolean but default expression is of type integer" --
-                # and the backend crash-looped on migrate against staging.
-                # SQLite accepts 0, which is why the test suite never saw it:
-                # the suite builds its schema with create_all on SQLite and does
-                # not run this chain at all. sa.false() renders correctly on
-                # both. Verified with scripts/rehearse_migrations.py, which
-                # applies every migration to real PostgreSQL.
-                server_default=sa.false(),
+                server_default=sa.text('false'),
             )
         )
 
