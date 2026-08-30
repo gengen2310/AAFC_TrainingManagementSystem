@@ -29,6 +29,7 @@ class CurriculumItem(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     part_count: Mapped[int] = mapped_column(Integer, default=1)
     instructor_suitability: Mapped[str | None] = mapped_column(String(120), nullable=True)
     core_status: Mapped[str] = mapped_column(String(20), default="core")  # core|additional
+    is_optional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     learning_hub_url: Mapped[str | None] = mapped_column(String(400))
     recommended_term: Mapped[str | None] = mapped_column(String(10))
     recommended_sequence: Mapped[int] = mapped_column(Integer, default=0)

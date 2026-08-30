@@ -349,21 +349,22 @@ def _real_session_out(
         af = db.get(Facilitator, s.assistant_facilitator_id)
         if af:
             asst_name = " ".join(x for x in [af.current_rank, af.first_name, af.last_name] if x)
-    # CLASS-21: curriculum core_status for Foundation/Extension PW filter.
+    # CLASS-21: curriculum core_status and is_optional for Foundation/Extension/Optional PW filters.
     # ci_tier pre-loaded by bulk callers (long-range endpoint); falls back to
     # identity-map PK lookup when not supplied (weekly-program, term-planner).
-    # CurriculumItem has no is_optional field — Optional tier filter requires
-    # a future migration to add that field.
     core_status: str | None = None
+    is_optional: bool = False
     if s.curriculum_item_id:
         if ci_tier is not None:
             t = ci_tier.get(s.curriculum_item_id)
             if t:
                 core_status = t["core_status"]
+                is_optional = t.get("is_optional", False)
         else:
             ci_obj = db.get(CurriculumItem, s.curriculum_item_id)
             if ci_obj:
                 core_status = ci_obj.core_status
+                is_optional = ci_obj.is_optional
     return {
         "session_id": s.id,
         "parade_night_id": s.parade_night_id,
@@ -388,6 +389,7 @@ def _real_session_out(
         "created_at": iso_z(s.created_at) if s.created_at else None,
         "version": s.version,
         "core_status": core_status,
+        "is_optional": is_optional,
     }
 
 
@@ -2201,7 +2203,7 @@ def get_long_range(
         ci_ids_lr = {s.curriculum_item_id for s in ts_lr_all if s.curriculum_item_id}
         if ci_ids_lr:
             for ci in db.query(CurriculumItem).filter(CurriculumItem.id.in_(ci_ids_lr)).all():
-                ci_tier_lr[ci.id] = {"core_status": ci.core_status}
+                ci_tier_lr[ci.id] = {"core_status": ci.core_status, "is_optional": ci.is_optional}
         # Index sessions by parade night id
         ts_by_night_lr: dict[str, list] = {}
         for s in ts_lr_all:
@@ -3658,7 +3660,7 @@ def get_annual_program(
         ci_ids_ap = {s.curriculum_item_id for s in ts_rows if s.curriculum_item_id}
         if ci_ids_ap:
             for ci in db.query(CurriculumItem).filter(CurriculumItem.id.in_(ci_ids_ap)).all():
-                ci_tier_ap[ci.id] = {"core_status": ci.core_status}
+                ci_tier_ap[ci.id] = {"core_status": ci.core_status, "is_optional": ci.is_optional}
 
     # Build per-date-id session index (pn_id == date_id now — same record)
     ts_by_date_id: dict[str, list] = ts_by_pn  # direct alias: same keys
