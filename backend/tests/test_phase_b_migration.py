@@ -206,6 +206,11 @@ def isolated_db(tmp_path, monkeypatch):
             VALUES ('notice-001', 'pd-linked-001', 'Test notice', 0, 0)
         """))
 
+    # Enable FK enforcement in SQLite so FK ordering bugs (like the PostgreSQL
+    # parade_date_id → parade_night_id UPDATE ordering) are caught locally.
+    with engine.connect() as conn:
+        conn.execute(text("PRAGMA foreign_keys = ON"))
+
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", url)
     command.stamp(alembic_cfg, "d5f81a3c9e27")

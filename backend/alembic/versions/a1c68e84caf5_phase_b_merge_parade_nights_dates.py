@@ -177,19 +177,10 @@ def upgrade():
         ), {"nid": night_id, "did": row.id})
 
     # ── 4. planning_notices: rename parade_date_id → parade_night_id; drop planning_year_id ──
-    conn.execute(sa.text("""
-        UPDATE planning_notices
-        SET parade_date_id = (
-            SELECT pd.parade_night_id FROM parade_dates pd
-            WHERE pd.id = planning_notices.parade_date_id LIMIT 1
-        )
-        WHERE parade_date_id IS NOT NULL
-    """))
-    # Drop index on column being removed before batch rebuild (SQLite batch mode
-    # does not always reliably skip recreating indexes on dropped columns).
-    op.drop_index("ix_planning_notices_planning_year_id", table_name="planning_notices")
-    # C1: On PostgreSQL, unnamed FKs created inline get auto-generated names. Drop them
-    # before the batch rename so they are not left pointing at _parade_dates_deprecated.
+    # C1: On PostgreSQL FK constraints are enforced per-statement (not just at commit).
+    # The UPDATEs below set parade_date_id to parade_night_id values, which are NOT valid
+    # parade_dates.id references — so the FK must be dropped BEFORE the UPDATE, not after.
+    # Drop all three affected FK constraints here so steps 5 and 6 are also covered.
     if conn.dialect.name == "postgresql":
         conn.execute(sa.text(
             "ALTER TABLE planning_notices DROP CONSTRAINT IF EXISTS "
@@ -203,6 +194,17 @@ def upgrade():
             "ALTER TABLE anchor_prep_plans DROP CONSTRAINT IF EXISTS "
             "anchor_prep_plans_planned_parade_date_id_fkey"
         ))
+    conn.execute(sa.text("""
+        UPDATE planning_notices
+        SET parade_date_id = (
+            SELECT pd.parade_night_id FROM parade_dates pd
+            WHERE pd.id = planning_notices.parade_date_id LIMIT 1
+        )
+        WHERE parade_date_id IS NOT NULL
+    """))
+    # Drop index on column being removed before batch rebuild (SQLite batch mode
+    # does not always reliably skip recreating indexes on dropped columns).
+    op.drop_index("ix_planning_notices_planning_year_id", table_name="planning_notices")
     with op.batch_alter_table("planning_notices") as batch:
         batch.alter_column("parade_date_id", new_column_name="parade_night_id", nullable=False)
         batch.drop_column("planning_year_id")
