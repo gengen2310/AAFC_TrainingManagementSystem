@@ -3,11 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { trainingApi } from "../api";
 import { Empty, Loading, ErrorNote, Button } from "../components/ui";
 import { StatusBadge } from "../components/status/StatusBadge";
+import { useScopedSquadron } from "../layout/SquadronViewContext";
 
 // Printable weekly program built from backend parade-night/session data. Print CSS hides nav.
 export function WeeklyProgram() {
-  const q = useQuery({ queryKey: ["parade-nights"], queryFn: () => trainingApi.paradeNights() });
+  const { needsSelection, squadronId, scoped } = useScopedSquadron();
+  const q = useQuery({ queryKey: ["parade-nights", squadronId], queryFn: () => trainingApi.paradeNights(squadronId), enabled: scoped });
   const [selected, setSelected] = useState<string>("");
+  if (needsSelection && !squadronId) return <div><h1>Weekly Program</h1><Empty msg="Select a squadron above to view its weekly program." /></div>;
   if (q.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
   const parades = q.data ?? [];

@@ -313,10 +313,10 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
    overflow:hidden to keep its rounded ends, which silently clipped an
    absolutely-positioned child to nothing. Playwright still called it
    visible -- it had a box -- so only a screenshot showed it was gone. */
-.yn-toast{font-size:var(--fs-xs);color:var(--red);margin-top:3px;min-height:14px}
+.yn-toast{font-size:var(--fs-xs);color:var(--red);position:absolute;top:calc(100% + 16px);right:0;white-space:nowrap}
 /* One quiet line, no chips. The current year carries no arrow: the arrows
    mean "away from now", so their absence is what says you are in it. */
-.yn-state{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;min-height:13px;white-space:nowrap}
+.yn-state{font-size:var(--fs-2xs);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;position:absolute;top:calc(100% + 3px);right:0}
 /* A dashed border, not a solid card: the year is real, its configuration is
    empty. A solid card would read as a thing that is missing. */
 .yn-notice{border:1px dashed var(--line);border-radius:10px;padding:16px 18px;margin:0 0 14px;background:transparent}
@@ -5488,7 +5488,10 @@ async function loadData(){
   const p_wcap=scope==='wing'?api('/api/reports/wing-capability'+_wgq).catch(()=>null):Promise.resolve(null);
   const p_wcancel=scope==='wing'?api('/api/reports/wing-cancellation-trend').catch(()=>null):Promise.resolve(null);
   const p_wndel=scope==='wing'?api('/api/reports/wing-not-delivered').catch(()=>null):Promise.resolve(null);
-  const p_wsqns=scope==='wing'?api('/api/squadrons'+_wgq).catch(()=>[]):Promise.resolve([]);
+  // ACC-3: sqn_admin also needs S.squadrons populated (their own squadron only) so
+  // _populateCreateSqns() can pre-select and lock it in the create-account modal.
+  // GET /api/squadrons for sqn_admin returns exactly [their own squadron] (organisations.py:281).
+  const p_wsqns=(scope==='wing'||scope==='squadron')?api('/api/squadrons'+_wgq).catch(()=>[]):Promise.resolve([]);
   const p_nat=(scope==='national'||scope==='system_admin')?api('/api/national/overview').catch(()=>null):Promise.resolve(null);
   const p_natov=(scope==='national'||scope==='system_admin')?api('/api/reports/national-overview').catch(()=>null):Promise.resolve(null);
   const p_natcap=(scope==='national'||scope==='system_admin')?api('/api/reports/national-capability').catch(()=>null):Promise.resolve(null);
@@ -5590,6 +5593,9 @@ async function loadData(){
   }
   S.timingTemplates=timing||[];
   S.audit=auditData||[];
+  if(scope==='squadron'){
+    S.squadrons=wsqns||[];
+  }
   if(scope==='wing'){
     S.wing={squadrons:(wov&&wov.squadrons)||[]};
     S.wingPhase=wph||null;
