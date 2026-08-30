@@ -223,7 +223,7 @@ def test_phase_b_forward(isolated_db):
     assert "training_year" in cols_before
     assert "parade_dates" in inspector.get_table_names()
 
-    command.upgrade(cfg, "head")
+    command.upgrade(cfg, "a1c68e84caf5")
 
     inspector2 = inspect(engine)
     cols = {c["name"] for c in inspector2.get_columns("parade_nights")}
@@ -313,18 +313,89 @@ def test_phase_b_forward(isolated_db):
         )
 
 
-def test_phase_b_aborts_on_orphan_night(isolated_db):
-    """_abort_if_blockers raises RuntimeError when a night has no linked parade_date."""
+def test_phase_b_step2b_orphan_night_uses_existing_year(isolated_db):
+    """Step 2b: an orphan parade night gets the planning_year_id of the existing year
+    whose year field matches the night's calendar year (date '9001-xx-xx' → year 9001).
+
+    The isolated_db fixture already contains py-test-001 for year 9001, so step 2b
+    must find it and assign it — no new planning_year row should be created.
+    """
     engine, cfg = isolated_db
-    # Insert a parade_night with no linked parade_date — this is the blocking condition
     with engine.begin() as conn:
         conn.execute(text("""
             INSERT INTO parade_nights (id, squadron_id, wing_id, training_year, date,
                                        parade_type, version, is_archived)
-            VALUES ('pn-orphan-blocker', 'sqn-test-001', 'wing-test-001', 9001,
+            VALUES ('pn-orphan-existing', 'sqn-test-001', 'wing-test-001', 9001,
                     '9001-10-10', 'normal', 0, 0)
         """))
-    # The migration must abort with RuntimeError on the orphan night
+
+    command.upgrade(cfg, "a1c68e84caf5")
+
+    with engine.connect() as conn:
+        row = conn.execute(text(
+            "SELECT planning_year_id FROM parade_nights WHERE id = 'pn-orphan-existing'"
+        )).fetchone()
+        assert row is not None, "pn-orphan-existing must survive the migration"
+        assert row[0] == "py-test-001", (
+            "orphan night dated in year 9001 must receive the existing py-test-001"
+        )
+        # The existing planning_year must not be duplicated
+        count = conn.execute(text(
+            "SELECT COUNT(*) FROM planning_years WHERE unit_id = 'sqn-test-001' AND year = 9001"
+        )).scalar()
+        assert count == 1, "step 2b must reuse the existing planning_year, not create a duplicate"
+
+
+def test_phase_b_step2b_orphan_night_creates_missing_year(isolated_db):
+    """Step 2b: an orphan parade night whose calendar year has no planning_year row
+    triggers auto-creation of a new planning_year for that (squadron, year) pair.
+    """
+    engine, cfg = isolated_db
+    # Year 8999 has no planning_year in the fixture
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO parade_nights (id, squadron_id, wing_id, training_year, date,
+                                       parade_type, version, is_archived)
+            VALUES ('pn-orphan-new-year', 'sqn-test-001', 'wing-test-001', 8999,
+                    '8999-05-15', 'normal', 0, 0)
+        """))
+
+    command.upgrade(cfg, "a1c68e84caf5")
+
+    with engine.connect() as conn:
+        row = conn.execute(text(
+            "SELECT planning_year_id FROM parade_nights WHERE id = 'pn-orphan-new-year'"
+        )).fetchone()
+        assert row is not None, "pn-orphan-new-year must survive the migration"
+        assert row[0] is not None, "orphan night must have planning_year_id set after step 2b"
+        # The auto-created year must exist and belong to the right squadron+year
+        py = conn.execute(text(
+            "SELECT unit_id, year, name FROM planning_years WHERE id = :pid"
+        ), {"pid": row[0]}).fetchone()
+        assert py is not None, "planning_year row must exist for the auto-assigned id"
+        assert py[0] == "sqn-test-001", "auto-created year must belong to the correct squadron"
+        assert py[1] == 8999, "auto-created year must have the correct calendar year"
+        assert "8999" in py[2], "auto-created year name must include the year number"
+
+
+def test_phase_b_aborts_on_null_year_in_linked_date(isolated_db):
+    """_abort_if_blockers raises RuntimeError when a linked parade_date has NULL
+    planning_year_id — this cannot be auto-resolved and requires manual intervention.
+    """
+    engine, cfg = isolated_db
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO parade_nights (id, squadron_id, wing_id, training_year, date,
+                                       parade_type, version, is_archived)
+            VALUES ('pn-null-year', 'sqn-test-001', 'wing-test-001', 9001,
+                    '9001-11-01', 'normal', 0, 0)
+        """))
+        conn.execute(text("""
+            INSERT INTO parade_dates (id, parade_night_id, unit_id, planning_year_id,
+                                      parade_date, parade_type, week_number, is_active)
+            VALUES ('pd-null-year', 'pn-null-year', 'sqn-test-001', NULL,
+                    '9001-11-01', 'normal', 5, 1)
+        """))
     import pytest as _pytest
     with _pytest.raises(RuntimeError, match="Phase B migration blocked"):
-        command.upgrade(cfg, "head")
+        command.upgrade(cfg, "a1c68e84caf5")

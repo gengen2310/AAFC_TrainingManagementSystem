@@ -26,7 +26,7 @@ else:
 
 # 1. Orphan nights — no linked parade_date row at all (active OR archived)
 cursor.execute("""
-    SELECT pn.id, pn.squadron_id, pn.date, pn.training_year
+    SELECT pn.id, pn.squadron_id, pn.date
     FROM parade_nights pn
     LEFT JOIN parade_dates pd ON pd.parade_night_id = pn.id
     WHERE pd.id IS NULL
@@ -77,10 +77,16 @@ print("Phase B Pre-migration Audit")
 print("=" * 60)
 
 if orphans:
-    print(f"\n[BLOCKER] {len(orphans)} active parade_nights with NO linked parade_date:")
-    for row in orphans:
-        print(f"  squadron={row[1]}  date={row[2]}  night_id={row[0]}  training_year={row[3]}")
-    blockers.extend(orphans)
+    print(f"\n[INFO] {len(orphans)} parade_nights have no linked parade_date.")
+    print("       The migration will auto-assign a planning_year by calendar year,")
+    print("       creating new planning_year rows as needed. No action required.")
+    if len(orphans) <= 20:
+        for row in orphans:
+            print(f"  squadron={row[1]}  date={row[2]}  night_id={row[0]}")
+    else:
+        print(f"  (showing first 20 of {len(orphans)})")
+        for row in orphans[:20]:
+            print(f"  squadron={row[1]}  date={row[2]}  night_id={row[0]}")
 else:
     print("\n[OK] No orphan parade_nights (all have a linked parade_date).")
 

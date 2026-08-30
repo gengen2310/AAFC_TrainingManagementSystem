@@ -25,9 +25,13 @@ class NoMigrationsError(Exception):
     pass
 
 
-def parse_revisions(versions_dir: str) -> dict[str, str | None]:
-    """Return {revision: down_revision} for every migration file in versions_dir."""
-    revisions: dict[str, str | None] = {}
+def parse_revisions(versions_dir: str) -> dict[str, str | tuple[str, ...] | None]:
+    """Return {revision: down_revision} for every migration file in versions_dir.
+
+    down_revision is None for the root migration, a single str for normal
+    migrations, or a tuple of strs for merge migrations.
+    """
+    revisions: dict[str, str | tuple[str, ...] | None] = {}
     for path in glob.glob(f"{versions_dir}/*.py"):
         text = open(path).read()
         rev_m = re.search(r"^revision\s*=\s*['\"]([^'\"]+)['\"]", text, re.M)
@@ -36,7 +40,13 @@ def parse_revisions(versions_dir: str) -> dict[str, str | None]:
             continue
         rev = rev_m.group(1)
         down_raw = down_m.group(1).strip() if down_m else "None"
-        down = None if down_raw == "None" else re.sub(r"^['\"]|['\"]$", "", down_raw)
+        if down_raw == "None":
+            down: str | tuple[str, ...] | None = None
+        elif down_raw.startswith(("(", "[")):
+            # merge migration: down_revision = ('abc123', 'def456')
+            down = tuple(re.findall(r"['\"]([^'\"]+)['\"]", down_raw))
+        else:
+            down = re.sub(r"^['\"]|['\"]$", "", down_raw)
         revisions[rev] = down
     return revisions
 
@@ -53,7 +63,14 @@ def compute_head(versions_dir: str) -> str:
         raise NoMigrationsError(f"No Alembic migration files found under {versions_dir}")
 
     all_revs = set(revisions.keys())
-    referenced = {v for v in revisions.values() if v}
+    referenced: set[str] = set()
+    for v in revisions.values():
+        if v is None:
+            continue
+        if isinstance(v, tuple):
+            referenced.update(v)
+        else:
+            referenced.add(v)
     heads = all_revs - referenced
 
     if len(heads) != 1:

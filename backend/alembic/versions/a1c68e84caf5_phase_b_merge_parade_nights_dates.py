@@ -18,17 +18,11 @@ depends_on = None
 
 
 def _abort_if_blockers(conn):
-    """Raise if any orphan or unresolvable nights exist (active OR archived)."""
-    orphans = conn.execute(sa.text("""
-        SELECT COUNT(*) FROM parade_nights pn
-        LEFT JOIN parade_dates pd ON pd.parade_night_id = pn.id
-        WHERE pd.id IS NULL
-    """)).scalar()
-    if orphans:
-        raise RuntimeError(
-            f"Phase B migration blocked: {orphans} parade_night row(s) have no linked "
-            f"parade_date (including archived). Run scripts/phase_b_audit.py and resolve all blockers first."
-        )
+    """Raise only if linked parade_dates have NULL planning_year_id (cannot be auto-resolved).
+
+    Orphan nights (no linked parade_date) are handled by step 2b — they get a
+    planning_year assigned by calendar year, with auto-creation if none exists.
+    """
     null_year = conn.execute(sa.text("""
         SELECT COUNT(*) FROM parade_nights pn
         JOIN parade_dates pd ON pd.parade_night_id = pn.id
@@ -42,6 +36,8 @@ def _abort_if_blockers(conn):
 
 
 def upgrade():
+    import uuid as _uuid_mod
+
     conn = op.get_bind()
     _abort_if_blockers(conn)
 
@@ -76,6 +72,54 @@ def upgrade():
         )
     """))
 
+    # ── 2b. Assign planning_year_id to orphan nights (no linked parade_date) ──
+    # TMS-only parade nights (created before Planning Workspace or never opened there)
+    # have no parade_date link. Assign planning_year_id by calendar year, creating
+    # a planning_year row if none exists for that squadron+year combination.
+    # SUBSTR(CAST(date AS TEXT), 1, 4) extracts the 4-digit year from both SQLite
+    # TEXT dates and PostgreSQL DATE types (both format as 'YYYY-MM-DD' when cast).
+    orphan_groups = conn.execute(sa.text("""
+        SELECT DISTINCT pn.squadron_id, pn.wing_id,
+               CAST(SUBSTR(CAST(pn.date AS TEXT), 1, 4) AS INTEGER) AS parade_year
+        FROM parade_nights pn
+        WHERE NOT EXISTS (SELECT 1 FROM parade_dates pd WHERE pd.parade_night_id = pn.id)
+          AND pn.planning_year_id IS NULL
+    """)).fetchall()
+
+    for grp in orphan_groups:
+        sq_id, wg_id, yr = grp.squadron_id, grp.wing_id, grp.parade_year
+        # Prefer the active planning year; fall back to any year for this (unit, year) pair.
+        py_row = conn.execute(sa.text("""
+            SELECT id FROM planning_years
+            WHERE unit_id = :uid AND year = :yr
+            ORDER BY active_status DESC, created_at DESC
+            LIMIT 1
+        """), {"uid": sq_id, "yr": yr}).fetchone()
+        if py_row is None:
+            py_id = str(_uuid_mod.uuid4())
+            conn.execute(sa.text("""
+                INSERT INTO planning_years
+                    (id, unit_id, wing_id, year, name, active_status, version,
+                     created_at, updated_at)
+                VALUES (:id, :uid, :wid, :yr, :name, 1, 0,
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """), {
+                "id": py_id, "uid": sq_id, "wid": wg_id,
+                "yr": yr, "name": f"{yr} Training Year",
+            })
+        else:
+            py_id = py_row.id
+        conn.execute(sa.text("""
+            UPDATE parade_nights
+            SET planning_year_id = :py_id
+            WHERE squadron_id = :sq_id
+              AND CAST(SUBSTR(CAST(date AS TEXT), 1, 4) AS INTEGER) = :yr
+              AND NOT EXISTS (
+                  SELECT 1 FROM parade_dates pd WHERE pd.parade_night_id = parade_nights.id
+              )
+              AND planning_year_id IS NULL
+        """), {"py_id": py_id, "sq_id": sq_id, "yr": yr})
+
     # ── 3. Drop training_year; make planning_year_id NOT NULL ──
     with op.batch_alter_table("parade_nights") as batch:
         batch.drop_index("ix_parade_nights_training_year")
@@ -101,7 +145,6 @@ def upgrade():
         WHERE pd.parade_night_id IS NULL
     """)).fetchall()
 
-    import uuid as _uuid_mod
     for row in orphan_dates:
         # Only create a night if unit_id matches a squadron (wing/national years skipped).
         sq_check = conn.execute(sa.text(
