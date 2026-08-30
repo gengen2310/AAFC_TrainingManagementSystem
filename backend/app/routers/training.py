@@ -160,7 +160,7 @@ def list_curriculum(squadron_id: str | None = None, include_archived: bool = Fal
                     "part_number": i.part_number, "title": i.title, "phase": i.phase,
                     "element": i.element, "duration_minutes": i.duration_minutes,
                     "part_count": i.part_count, "instructor_suitability": i.instructor_suitability,
-                    "core_status": i.core_status, "learning_hub_url": i.learning_hub_url,
+                    "core_status": i.core_status, "is_optional": i.is_optional, "learning_hub_url": i.learning_hub_url,
                     "recommended_term": i.recommended_term, "owning_level": i.owning_level,
                     "wing_id": i.wing_id, "squadron_id": i.squadron_id,
                     "session_count": len(statuses), "progress": _progress(statuses),
@@ -4390,6 +4390,7 @@ class CurriculumUpdateIn(BaseModel):
     part_count: int | None = None
     instructor_suitability: str | None = None
     learning_hub_url: str | None = None
+    is_optional: bool | None = None   # None means "not specified by caller" (leave unchanged)
 
     @field_validator("learning_hub_url")
     @classmethod
@@ -4600,6 +4601,8 @@ def update_curriculum(cid: str, body: CurriculumUpdateIn, db: DBSession = Depend
         ci.duration_minutes = body.duration_minutes
     if body.learning_hub_url is not None:
         ci.learning_hub_url = body.learning_hub_url
+    if body.is_optional is not None:
+        ci.is_optional = body.is_optional
     db.commit()
     audit(db, p, object_type="curriculum_item", object_id=ci.id, action="update")
     return {"ok": True}

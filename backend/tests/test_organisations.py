@@ -764,3 +764,32 @@ def test_national_viewer_audit_is_read_only(client):
     # Attempt to create a wing (write operation) — must still be denied
     r = client.post("/api/wings", headers=h, json={"code": "TEST", "name": "Test Wing"})
     assert r.status_code == 403
+
+
+# ── CurriculumItem.is_optional (K-007) ──
+
+def test_curriculum_list_includes_is_optional(client):
+    """GET /api/curriculum items include is_optional field (K-007)."""
+    h = login(client, "ADMIN703")
+    curr = client.get("/api/curriculum", headers=h).json()
+    assert curr["items"], "no curriculum items seeded"
+    for item in curr["items"]:
+        assert "is_optional" in item, "is_optional missing from curriculum response"
+        assert isinstance(item["is_optional"], bool), "is_optional must be a bool"
+
+
+def test_nat_admin_can_mark_curriculum_item_optional(client):
+    """PATCH /api/curriculum/{id} with is_optional=True persists (K-007)."""
+    h = login(client, "ADMINNATIONAL")
+    r = client.post("/api/curriculum/national", headers=h, json={
+        "code": "NAT-OPT-TEST-01", "title": "Optional Test Item"
+    })
+    assert r.status_code == 200, r.text
+    cid = r.json()["curriculum_id"]
+    patch = client.patch(f"/api/curriculum/{cid}", headers=h, json={"is_optional": True})
+    assert patch.status_code == 200, patch.text
+    curr = client.get("/api/curriculum", headers=h).json()
+    item = next((i for i in curr["items"] if i["curriculum_id"] == cid), None)
+    assert item is not None
+    assert item["is_optional"] is True, "is_optional was not persisted"
+    client.delete(f"/api/curriculum/{cid}", headers=h)

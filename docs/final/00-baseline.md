@@ -126,3 +126,59 @@ right, and it is a **release blocker for production**, not for staging.
 Parts 6 and 7 (requirement traceability, ownership matrix) are the next
 artefacts and are not written yet. Part 3's canonical entity register is not
 written yet. This document is Part 4 only.
+
+---
+
+## Programme Baseline — Reconciliation Session (SHA 7c342f9)
+
+**verified_against_sha:** 7c342f9  
+**verified_at:** 2026-08-30  
+**scope:** Full repository — backend, connected-frontend, frontend (PW), scripts, docs  
+**program:** Final Whole-System Reconciliation, Completion, Integration, Design Assurance, Ultrareview and Release-Candidate Program
+
+### Repository
+
+| Field | Value |
+|---|---|
+| Repository | gengen2310/AAFC_TrainingManagementSystem |
+| Branch | main |
+| HEAD (short) | 7c342f9 |
+| Working tree | Clean |
+| Open PRs | None |
+
+### Alembic
+
+| Field | Value |
+|---|---|
+| Alembic heads | 439ed68a5796 (single head — v60 merge: phase_b + account_recovery) |
+| Head count | 1 |
+
+### Backend
+
+| Metric | Count |
+|---|---|
+| Tests collected | 2080 |
+| Tests currently deselected in deploy gate | 5 |
+| API routes (@router.get/post/put/patch/delete) | 344 |
+| Database tables (__tablename__) | 70 |
+
+### Known test failures (pre-existing, deselected in deploy gate)
+
+1. `test_rate_limiting.py::test_login_spike_emits_security_log`
+2. `test_rate_limiting.py::test_login_spike_repeats_on_subsequent_multiples`
+3. `test_rate_limiting.py::test_5xx_spike_emits_security_log`
+4. `test_timing.py::test_bulk_schedules_match_single_endpoint_exactly`
+5. `test_year_context.py::test_year_listing_includes_future_years_with_no_row`
+
+### Main TMS (connected-frontend)
+
+| Metric | Count |
+|---|---|
+| Page IDs (page-*) | 46 |
+| File | connected-frontend/index.html (~400KB single file) |
+
+### Planning Workspace (frontend)
+
+| Metric | Count |
+|---|---|
+| React routes in App.tsx | 24 |
