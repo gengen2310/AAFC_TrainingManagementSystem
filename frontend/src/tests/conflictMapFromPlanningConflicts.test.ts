@@ -10,7 +10,7 @@ import type { PlanningConflict } from "../api/types";
 
 function conflict(overrides: Partial<PlanningConflict> = {}): PlanningConflict {
   return {
-    conflict_id: "c1", planning_year_id: "y1", parade_date_id: "d1",
+    conflict_id: "c1", planning_year_id: "y1", parade_night_id: "d1",
     scheduled_session_id: "s1", conflict_type: "room_double_booked", severity: "warning",
     message: "Room double-booked", is_resolved: false, override_reason: null,
     created_at: null,

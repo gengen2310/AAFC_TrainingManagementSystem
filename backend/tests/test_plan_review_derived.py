@@ -73,13 +73,13 @@ def test_plan_review_agrees_with_run_checks(client):
 
     review = client.get(f"/api/planning/years/{yr_id}/plan-review", headers=hdr).json()
     # GET /conflicts lists UNRESOLVED conflicts only, so compare like with like.
-    derived = sorted({(f["parade_date_id"], f["conflict_type"])
+    derived = sorted({(f["parade_night_id"], f["conflict_type"])
                       for f in review["findings"] if not f["is_overridden"]})
 
     assert client.post(f"/api/planning/years/{yr_id}/run-checks",
                        headers=hdr).status_code == 200
     recorded_resp = client.get(f"/api/planning/years/{yr_id}/conflicts", headers=hdr)
-    recorded = sorted({(c["parade_date_id"], c["conflict_type"])
+    recorded = sorted({(c["parade_night_id"], c["conflict_type"])
                        for c in recorded_resp.json()["conflicts"]})
     assert derived == recorded, (
         f"derived review and recorded conflicts disagree:\n"
@@ -105,7 +105,7 @@ def test_plan_review_reports_an_override_instead_of_hiding_it(client):
 
     review = client.get(f"/api/planning/years/{yr_id}/plan-review", headers=hdr).json()
     match = [f for f in review["findings"]
-             if f["parade_date_id"] == target["parade_date_id"]
+             if f["parade_night_id"] == target["parade_night_id"]
              and f["conflict_type"] == target["conflict_type"]]
     assert match, "the overridden finding vanished from the review"
     assert match[0]["is_overridden"] is True

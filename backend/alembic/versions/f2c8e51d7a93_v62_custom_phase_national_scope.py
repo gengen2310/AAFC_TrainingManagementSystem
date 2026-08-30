@@ -1,4 +1,4 @@
-"""v61 — attribute national-scoped custom training phases to their national
+"""v62 — attribute national-scoped custom training phases to their national
 
 No schema change. custom_training_phases already carries the polymorphic scope
 pair (scope_type, scope_id); the router simply discarded scope_id for

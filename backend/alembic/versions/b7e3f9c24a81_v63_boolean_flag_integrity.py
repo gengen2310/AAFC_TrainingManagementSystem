@@ -1,4 +1,4 @@
-"""v62 — make the boolean flags NOT NULL, matching the model
+"""v63 — make the boolean flags NOT NULL, matching the model
 
 The migrated schema and the ORM's own metadata disagreed on 68 columns, in one
 direction: production was more permissive than the model. Most of that is
@@ -57,7 +57,7 @@ def upgrade() -> None:
             f"UPDATE {table} SET {column} = false WHERE {column} IS NULL"
         )).rowcount
         if filled:
-            print(f"[v62] {table}.{column}: filled {filled} NULL(s) with false")
+            print(f"[v63] {table}.{column}: filled {filled} NULL(s) with false")
         with op.batch_alter_table(table) as b:
             b.alter_column(column, existing_type=sa.Boolean(),
                            server_default=sa.false(), nullable=False)
@@ -67,7 +67,7 @@ def upgrade() -> None:
             f"SELECT COUNT(*) FROM {table} WHERE {column} IS NULL"
         )).scalar()
         if left:
-            raise RuntimeError(f"v62 left {left} NULL(s) in {table}.{column}")
+            raise RuntimeError(f"v63 left {left} NULL(s) in {table}.{column}")
 
 
 def downgrade() -> None:

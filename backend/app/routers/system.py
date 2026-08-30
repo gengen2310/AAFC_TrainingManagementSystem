@@ -23,7 +23,8 @@ from ..dependencies import get_principal
 from ..database import utcnow
 from ..models import (
     User, Wing, Squadron, AuditLog, SystemSetting, AccessCode, IpLoginAttempt, IpApiRequest,
-    PlanningYear, ParadeDate, Session, CurriculumItem, NationalEntity, JobStatus,
+    PlanningYear, Session, CurriculumItem, NationalEntity, JobStatus,
+    # ParadeDate removed (Phase B migration a1c68e84caf5) — T5 handles router updates
 )
 from ..permissions import Principal, require_system_admin, require_audit_access
 from ..security import generate_code, hash_code, reset_rate_limiter, reset_api_rate_limiter, reset_api_rate_limiter_db, reset_user_api_rate_limiter_db

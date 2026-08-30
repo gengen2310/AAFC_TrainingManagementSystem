@@ -764,7 +764,7 @@ def get_parade_night_schedule(
 @router.get("/parade-night-schedules")
 def list_parade_night_schedules(
     squadron_id: str | None = None,
-    training_year: int | None = None,
+    planning_year_id: str | None = None,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
@@ -786,8 +786,9 @@ def list_parade_night_schedules(
         ParadeNight.squadron_id == sq_id,
         ParadeNight.is_archived == False,  # noqa: E712
     )
-    if training_year is not None:
-        q = q.filter(ParadeNight.training_year == training_year)
+    # Phase B: filter by planning_year_id (FK) instead of the removed training_year int column.
+    if planning_year_id is not None:
+        q = q.filter(ParadeNight.planning_year_id == planning_year_id)
     pns = q.order_by(ParadeNight.date).all()
     if not pns:
         return {"schedules": []}

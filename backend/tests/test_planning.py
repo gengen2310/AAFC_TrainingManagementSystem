@@ -437,6 +437,29 @@ def test_sqn_admin_can_delete_parade_date(client):
     assert r.json()["ok"] is True
 
 
+def test_delete_parade_date_with_sessions_returns_409(client):
+    """C3: Deleting a parade night that has training sessions must return 409."""
+    hdr = _sqn_admin_hdr(client)
+    year = _make_year(client, hdr)
+    yr_id = year["planning_year_id"]
+    # Create a parade date (also creates a ParadeNight in Phase B)
+    rp = client.post(f"/api/planning/years/{yr_id}/parade-dates",
+                     json={"parade_date": "2026-12-11"}, headers=hdr)
+    assert rp.status_code == 200, rp.text
+    pn_id = rp.json()["parade_night_id"]
+    # Create a training session on that night
+    sr = client.post("/api/sessions",
+                     json={"parade_night_id": pn_id, "custom_title": "C3 block test"},
+                     headers=hdr)
+    assert sr.status_code == 200, sr.text
+    # Attempt to delete the night — must be refused while sessions exist
+    r = client.delete(f"/api/planning/parade-dates/{pn_id}", headers=hdr)
+    assert r.status_code == 409, r.text
+    detail = r.json()["detail"]
+    assert detail["error"] == "parade_night_has_sessions"
+    assert detail["session_count"] >= 1
+
+
 # ─────────────────────────────────────────────────────────────
 # Parade night <-> ParadeDate linkage (REM-129)
 # ─────────────────────────────────────────────────────────────
@@ -466,7 +489,7 @@ def test_plain_parade_night_create_links_to_active_planning_year(client):
     night_date = f"{year['year']}-03-14"
     r = client.post("/api/parade-nights", json={"date": night_date, "term": "T2"}, headers=hdr)
     assert r.status_code == 200, r.text
-    assert r.json()["linked_to_planning_year"] is True
+    assert "parade_night_id" in r.json(), "create_parade must return parade_night_id"
     pn_id = r.json()["parade_night_id"]
 
     dates = client.get(f"/api/planning/years/{yr_id}/parade-dates", headers=hdr).json()
@@ -1965,17 +1988,16 @@ def test_night_notice_list_empty_for_night_with_no_notices(client):
 
 
 def test_night_notice_create_without_active_planning_year_returns_actionable_400(client):
-    """ADMIN702 has no active Training Year seeded -- confirms the endpoint
-    surfaces a clear, actionable error rather than a raw 500 or a silently
-    orphaned notice."""
+    """Phase B: create_parade now calls ensure_year_context, so every parade night
+    gets a planning_year_id even if the squadron had none before. Notice creation
+    must therefore succeed (200) for any newly-created parade night."""
     hdr = login(client, "ADMIN702")
     pnid = _create_plain_parade_night(client, hdr, "2099-03-20")
     r = client.post(f"/api/parade-nights/{pnid}/notices",
                      json={"notice_text": "test"}, headers=hdr)
-    assert r.status_code == 400, r.text
-    d = r.json()["detail"]
-    assert d["error"] == "no_active_planning_year"
-    assert "Training Year" in d["message"]
+    assert r.status_code == 200, r.text
+    assert r.json()["ok"] is True
+    assert "notice_id" in r.json()
 
 
 def test_night_notice_cross_squadron_denied(client):

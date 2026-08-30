@@ -224,7 +224,7 @@ export interface TimingTemplateFull {
   instructional_period_count: number;
 }
 export interface PlanningConflict {
-  conflict_id: string; planning_year_id: string | null; parade_date_id: string | null;
+  conflict_id: string; planning_year_id: string | null; parade_night_id: string | null;
   scheduled_session_id: string | null; conflict_type: string; severity: string;
   message: string; is_resolved: boolean; override_reason: string | null;
   created_at: string | null;
@@ -356,8 +356,7 @@ export interface NightSessionSummary {
 }
 export interface ParadeNotice {
   notice_id: string;
-  planning_year_id: string | null;
-  parade_date_id: string;
+  parade_night_id: string;
   notice_text: string;
   audience: string | null;
   priority: string;

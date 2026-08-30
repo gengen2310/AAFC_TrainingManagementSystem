@@ -756,36 +756,33 @@ def test_bulk_schedules_unknown_squadron_404(client):
 
 
 def test_training_year_filter_applies_to_list_and_bulk(client):
-    """WP-5: `training_year` was sent by the frontend but never declared, so
-    FastAPI dropped it and every night was returned regardless of year. Both
-    endpoints must now honour it, and must always agree with each other."""
+    """WP-5: `planning_year_id` filter on both parade-nights endpoints.
+
+    Phase B replaced the integer `training_year` field on ParadeNight with a
+    direct FK `planning_year_id`. The filter parameter on both list endpoints
+    was updated accordingly. Both endpoints must honour it and agree with each
+    other."""
     h = login(client, "ADMIN703")
     unfiltered = client.get("/api/parade-nights", headers=h).json()
     if not unfiltered:
         import pytest
         pytest.skip("No parade nights in test data")
 
-    # training_year is not exposed in the parade-night payload, so read the real
-    # value off the row rather than assuming the seed's default.
-    from app.database import SessionLocal
-    from app.models import ParadeNight
-    db = SessionLocal()
-    try:
-        year = db.get(ParadeNight, unfiltered[0]["parade_night_id"]).training_year
-    finally:
-        db.close()
+    # Read planning_year_id directly from the row (it IS in the payload since _pn_dict includes it).
+    planning_year_id = unfiltered[0]["planning_year_id"]
 
-    same_year = client.get(f"/api/parade-nights?training_year={year}", headers=h).json()
-    assert same_year, "filtering by a year that exists must not return nothing"
+    same_year = client.get(f"/api/parade-nights?planning_year_id={planning_year_id}", headers=h).json()
+    assert same_year, "filtering by a planning_year_id that exists must not return nothing"
 
-    # A year with no nights must return an empty list, not fall back to everything.
-    absent = client.get(f"/api/parade-nights?training_year={year + 500}", headers=h).json()
+    # A non-existent planning_year_id must return an empty list, not fall back to everything.
+    absent = client.get("/api/parade-nights?planning_year_id=00000000-0000-0000-0000-000000000000",
+                        headers=h).json()
     assert absent == []
 
     # The bulk endpoint must filter identically, or the page and its data diverge.
-    bulk_same = client.get(f"/api/parade-night-schedules?training_year={year}",
+    bulk_same = client.get(f"/api/parade-night-schedules?planning_year_id={planning_year_id}",
                            headers=h).json()["schedules"]
-    bulk_absent = client.get(f"/api/parade-night-schedules?training_year={year + 500}",
+    bulk_absent = client.get("/api/parade-night-schedules?planning_year_id=00000000-0000-0000-0000-000000000000",
                              headers=h).json()["schedules"]
     assert len(bulk_same) == len(same_year)
     assert bulk_absent == []

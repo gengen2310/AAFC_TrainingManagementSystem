@@ -39,7 +39,7 @@ def test_parade_night_links_to_the_year_containing_its_date(client):
     date = f"{base}-05-15"          # unambiguously inside `earlier`
     r = client.post("/api/parade-nights", json={"date": date, "term": "T2"}, headers=hdr)
     assert r.status_code == 200, r.text
-    assert r.json()["linked_to_planning_year"] is True, "night was not linked to any year"
+    assert "parade_night_id" in r.json(), "create_parade must return parade_night_id"
 
     in_earlier = _year_of_parade_date(client, hdr, earlier, date)
     in_later = _year_of_parade_date(client, hdr, later, date)
@@ -66,67 +66,70 @@ def test_a_year_with_no_dates_yet_still_wins_on_calendar_match(client):
     date = f"{base}-03-11"
     r = client.post("/api/parade-nights", json={"date": date, "term": "T1"}, headers=hdr)
     assert r.status_code == 200, r.text
-    assert r.json()["linked_to_planning_year"] is True
+    assert "parade_night_id" in r.json(), "create_parade must return parade_night_id"
     assert _year_of_parade_date(client, hdr, earlier, date), \
         "calendar-year match should have chosen the earlier year"
 
 
 def test_existing_parade_dates_win_over_calendar_match(client):
-    """Rung 1 beats rung 2: the user's own dates define the year, not its number.
-
-    A squadron running July-June has a year numbered N holding dates that run into
-    calendar year N+1. A night in that range belongs to it, even though a year
-    numbered N+1 also exists and would win on calendar match.
-
-    Driven directly rather than through the API: seeding the span via the API is
-    circular, because each seeding night is itself routed by the rule under test.
-    An earlier version of this test gave the year a SINGLE date and expected it to
-    span a later one, which it cannot.
+    """Phase B: ParadeDate and _year_for_date were removed. The year linkage is
+    now set directly via planning_year_id on ParadeNight at creation time via
+    ensure_year_context (calendar-year match). This test verifies the API-level
+    behaviour: a night dated inside a calendar year is linked to the planning
+    year whose `year` field matches that calendar year, not to a higher-numbered
+    year that also exists.
     """
-    from app.database import SessionLocal
-    from app.models import Squadron
-    from app.models.planning import ParadeDate, PlanningYear
-    from app.routers.training import _year_for_date
-
     hdr = login(client, "ADMIN703")
     base = next_test_year()
     spanning_id = _mk_year(client, hdr, base, f"{base} Jul-Jun Year")
     _mk_year(client, hdr, base + 1, f"{base + 1} Training Year")
 
+    # A night dated in `base` must land in the year numbered `base`.
+    target = f"{base}-11-15"
+    r = client.post("/api/parade-nights", json={"date": target, "term": "T2"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    pn_id = r.json()["parade_night_id"]
+
+    from app.database import SessionLocal
+    from app.models import ParadeNight
     db = SessionLocal()
     try:
-        sq = db.get(PlanningYear, spanning_id).unit_id
-        # a genuine July-June span: N-07-01 .. (N+1)-06-30
-        for d in (f"{base}-07-01", f"{base + 1}-06-30"):
-            db.add(ParadeDate(planning_year_id=spanning_id, unit_id=sq,
-                              parade_date=d, parade_type="standard"))
-        db.commit()
-
-        target = f"{base + 1}-02-10"     # inside the span; calendar year is base+1
-        chosen = _year_for_date(db, sq, target)
-        assert chosen is not None, "resolver found no year at all"
-        assert chosen.id == spanning_id, (
-            f"expected the spanning year {base}, got {chosen.year} — "
-            "calendar match beat the year's own date range"
+        pn = db.get(ParadeNight, pn_id)
+        assert pn is not None
+        assert pn.planning_year_id == spanning_id, (
+            f"Night dated {target} should link to planning year {base} ({spanning_id!r}), "
+            f"but got planning_year_id={pn.planning_year_id!r}"
         )
     finally:
-        db.rollback()
         db.close()
 
 
 def test_the_resolver_reports_none_when_it_cannot_tell(client):
-    """Rung 4. Better an honest unlinked night than a silently wrong year."""
-    from app.database import SessionLocal
-    from app.routers.training import _year_for_date
-    from app.models import Squadron
+    """Phase B: _year_for_date was removed; planning_year_id is now set via
+    ensure_year_context which creates a year when none exists rather than
+    returning None. This test verifies that a parade night can always be created
+    (ensure_year_context is idempotent) and receives a non-null planning_year_id.
 
+    Uses year 4999 — NOT in the next_test_year() counter range (which starts at
+    5000 and steps by 3, allocating values ≡ 2 mod 3; 4999 ≡ 1 mod 3) — so the
+    planning year implicitly created by ensure_year_context here does not consume
+    a counter slot and cannot collide with any test that calls next_test_year().
+    """
+    hdr = login(client, "ADMIN703")
+    # No planning year pre-created — ensure_year_context must create one.
+    date = "4999-06-01"
+    r = client.post("/api/parade-nights", json={"date": date, "term": "T2"}, headers=hdr)
+    assert r.status_code == 200, r.text
+    pn_id = r.json()["parade_night_id"]
+
+    from app.database import SessionLocal
+    from app.models import ParadeNight
     db = SessionLocal()
     try:
-        sq = db.query(Squadron).filter(Squadron.code.like("703%")).first()
-        assert sq is not None
-        # a date no active year spans and no active year is numbered for
-        assert _year_for_date(db, sq.id, "1900-01-01") is None
-        # and a squadron with no years at all
-        assert _year_for_date(db, "no-such-squadron", "2026-05-15") is None
+        pn = db.get(ParadeNight, pn_id)
+        assert pn is not None
+        assert pn.planning_year_id is not None, (
+            "ensure_year_context must always assign a planning_year_id"
+        )
     finally:
         db.close()

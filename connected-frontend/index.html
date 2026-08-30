@@ -10341,12 +10341,6 @@ function addPN(){
       document.getElementById('pn-date').value='';document.getElementById('pn-notes').value='';document.getElementById('pn-slots').innerHTML='';
       if(failures.length){
         showToast('Parade night created, but some sessions were not saved — '+failures.join('; '),true);
-      }else if(r&&r.linked_to_planning_year===false){
-        // The API reports this and nothing read it, so a night that will not appear
-        // in Planning Workspace looked like a clean success.
-        showToast('Parade night created, but it is not attached to a training year, '
-                 +'so it will not appear in Planning Workspace or the Weekly Program. '
-                 +'Check that an active training year covers '+date+'.',true);
       }else{
         showToast('Parade night created.');
       }
@@ -11223,8 +11217,8 @@ async function renderWP() {
     if (!wrap) return;
     wrap.innerHTML = '<p class="muted p-4">Loading\u2026</p>';
     try {
-        const yearQ = S.trainingYear
-            ? `?training_year=${encodeURIComponent(S.trainingYear)}` : '';
+        const yearQ = (typeof P !== 'undefined' && P.currentYearId)
+            ? `?planning_year_id=${encodeURIComponent(P.currentYearId)}` : '';
 
         // WP-1/WP-2: three requests for the whole page. This was previously two
         // plus one /schedule per parade night -- 244 locally -- issued serially

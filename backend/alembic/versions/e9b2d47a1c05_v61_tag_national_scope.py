@@ -1,4 +1,4 @@
-"""v60 — national scope for the five user-creatable reference-data tag tables
+"""v61 — national scope for the five user-creatable reference-data tag tables
 
 Adds national_id to subject_area_tags, facilitator_type_tags,
 session_status_reason_tags, activity_type_tags and
@@ -23,7 +23,13 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "e9b2d47a1c05"
-down_revision = "c3a7f2e91b48"
+# Re-parented 2026-08-30 onto 439ed68a5796, the migration that merges the
+# Phase B and account-recovery heads. This chain was written against
+# c3a7f2e91b48 (v59) before Phase B landed on main; leaving it there would
+# leave the versions directory with two heads and "alembic upgrade head"
+# would refuse to run. Safe to re-parent because no environment has ever
+# applied this revision.
+down_revision = "439ed68a5796"
 branch_labels = None
 depends_on = None
 

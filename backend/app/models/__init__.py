@@ -4,7 +4,7 @@ from .faq import FaqEntry
 from .service_desk_email_config import ServiceDeskEmailConfig
 from .wing_calendar import WingHQEvent, SquadronEventStatus, WingEventCurriculumLink
 from .planning import (
-    PlanningYear, ParadeDate, HolidayPeriod, AnchorEvent, AnchorPrepRule,
+    PlanningYear, HolidayPeriod, AnchorEvent, AnchorPrepRule,
     AnchorPrepPlan, PlanningConflict,
     PlanningFacilitatorLeave, PlanningNotice,
     CeaImportBatch, CeaActivity, ActivityLocalHide, ActivityLocalOverride,
@@ -38,7 +38,7 @@ __all__ = [
     "ActionItem", "Exception", "AuditLog", "ImportLog", "ExportLog", "SystemSetting",
     "Phase", "ProgramPackage", "ProgramItem", "LearningHubResource", "ProgramItemDeployment",
     "SourceFile", "SourceConflict", "PromotionRequest", "JobStatus",
-    "PlanningYear", "ParadeDate", "HolidayPeriod", "AnchorEvent", "AnchorPrepRule",
+    "PlanningYear", "HolidayPeriod", "AnchorEvent", "AnchorPrepRule",
     "AnchorPrepPlan", "PlanningConflict",
     "PlanningFacilitatorLeave", "PlanningNotice",
     "CeaImportBatch", "CeaActivity", "ActivityLocalHide", "ActivityLocalOverride",

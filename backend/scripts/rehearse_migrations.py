@@ -49,34 +49,63 @@ DECLARED_IRREVERSIBLE = {
     "d4e5f6a7b8c9": "v44 adds planning_facilitator_leave.updated_by; TimestampMixin requires it",
     "e5f6a7b8c9d0": "v45 adds TimestampMixin columns to activity_local_hides and squadron_event_status",
     "f6a7b8c9d0e1": "v46 adds parade_nights.version for optimistic locking; the model requires it",
+    # Different reason from the three above: this one's author scoped its own
+    # downgrade, in its docstring -- "downgrade is a development-only escape
+    # hatch ... Data integrity is not recovered." It restores training_year as
+    # nullable rather than NOT NULL and does not rebuild
+    # ix_planning_notices_planning_year_id. Declared rather than overridden:
+    # the full chain still walks down and back up to an identical schema, and
+    # rewriting another migration's deliberately partial downgrade would be
+    # changing a decision, not fixing a defect.
+    "a1c68e84caf5": "Phase B declares its downgrade a development-only escape hatch",
 }
 VERSIONS = BACKEND / "alembic" / "versions"
 
 
-def chain() -> list[tuple[str, str]]:
-    """The linear revision chain, base first, as (revision, filename)."""
-    revs: dict[str, tuple[str | None, str]] = {}
+def chain() -> list[tuple[str, str, tuple[str, ...]]]:
+    """Every revision in dependency order, base first, as (revision, filename, parents).
+
+    Not necessarily a straight line. A merge revision declares a TUPLE of
+    parents -- `down_revision = ('a1c68e84caf5', 'c3a7f2e91b48')` -- so the
+    history is a DAG, and an earlier version of this function read that tuple as
+    None and reported a phantom second root. Topologically sorted instead, with
+    the single-head requirement asserted explicitly rather than assumed by the
+    walk."""
+    revs: dict[str, tuple[tuple[str, ...], str]] = {}
     for f in VERSIONS.glob("*.py"):
         text = f.read_text()
         r = re.search(r'^revision = ["\']([^"\']+)', text, re.M)
-        d = re.search(r'^down_revision = ["\']([^"\']+)', text, re.M)
-        if r:
-            revs[r.group(1)] = (d.group(1) if d else None, f.name)
-    children: dict[str | None, list[str]] = {}
-    for rev, (down, _) in revs.items():
-        children.setdefault(down, []).append(rev)
-    order, cur = [], None
-    while True:
-        nxt = children.get(cur, [])
-        if not nxt:
-            break
-        if len(nxt) > 1:
-            raise SystemExit(f"chain branches at {cur}: {nxt} -- two heads, not one")
-        cur = nxt[0]
-        order.append((cur, revs[cur][1]))
-    if len(order) != len(revs):
-        raise SystemExit(f"chain reaches {len(order)} of {len(revs)} revisions -- orphans exist")
-    return order
+        if not r:
+            continue
+        d = re.search(r"^down_revision\s*=\s*(.+)$", text, re.M)
+        parents: tuple[str, ...] = ()
+        if d:
+            raw = d.group(1).strip()
+            if raw != "None":
+                parents = tuple(re.findall(r'["\']([^"\']+)["\']', raw))
+        revs[r.group(1)] = (parents, f.name)
+
+    # Kahn's algorithm: a revision is ready once every parent is placed.
+    placed: list[tuple[str, str, tuple[str, ...]]] = []
+    done: set[str] = set()
+    remaining = dict(revs)
+    while remaining:
+        ready = sorted(rev for rev, (par, _) in remaining.items()
+                       if all(pp in done or pp not in revs for pp in par))
+        if not ready:
+            raise SystemExit(f"cycle or missing parent among {sorted(remaining)}")
+        for rev in ready:
+            placed.append((rev, remaining[rev][1], remaining[rev][0]))
+            done.add(rev)
+            del remaining[rev]
+
+    parents_seen = {pp for par, _ in revs.values() for pp in par}
+    heads = [rev for rev in revs if rev not in parents_seen]
+    if len(heads) != 1:
+        raise SystemExit(f"{len(heads)} heads, expected 1: {sorted(heads)}")
+    if len(placed) != len(revs):
+        raise SystemExit(f"ordered {len(placed)} of {len(revs)} revisions -- orphans exist")
+    return placed
 
 
 def psql(db: str, sql: str) -> str:
@@ -130,9 +159,10 @@ def main() -> int:
     args = ap.parse_args()
 
     order = chain()
-    print(f"chain: {len(order)} migrations, linear, single head ({order[-1][0]})\n")
+    print(f"chain: {len(order)} migrations, single head ({order[-1][0]})\n")
     failures: list[str] = []
     declared: list[str] = []
+    skipped_probe: list[str] = []
 
     # ── 1. forward ────────────────────────────────────────────────────────────
     recreate(args.db)
@@ -157,13 +187,53 @@ def main() -> int:
         # own down->up cycle is clean even when the recreated table is missing a
         # column. The damage surfaces 27 migrations later, at v26's downgrade.
         fp_at: dict[str, str] = {"base": fingerprint(args.db)}
-        for i, (rev, name) in enumerate(order, 1):
+        for i, (rev, name, parents) in enumerate(order, 1):
             up = alembic(args.db, "upgrade", rev)
             if up.returncode:
                 failures.append(f"{rev} ({name}): upgrade failed")
                 print(f"  {i:2d}. {rev}  UPGRADE FAILED  {name}")
                 break
             fp_here = fingerprint(args.db)
+
+            if parents != (prev,):
+                # The probe steps back exactly one edge. On a branched history
+                # the previous entry in topological order is not necessarily
+                # this revision's parent -- a merge revision has two, and
+                # siblings of a branch have none in common with their
+                # predecessor in the ordering. Downgrading to `prev` there would
+                # unwind an unrelated part of the graph and report the
+                # difference as this migration's fault.
+                skipped_probe.append(f"{rev} ({name}): parents {parents or '(base)'} != preceding {prev}")
+                print(f"  {i:2d}. {rev}  not probed (branch point)  {name}")
+                fp_at[rev] = fp_here
+                prev = rev
+                continue
+
+            if parents != (prev,):
+                # The probe steps back exactly one edge. On a branched history
+                # the preceding entry in topological order is not necessarily
+                # this revision's parent -- a merge revision has two, and a
+                # branch sibling shares none with its predecessor. Downgrading
+                # to `prev` there unwinds an unrelated part of the graph and
+                # reports the difference as this migration's fault. The full
+                # head -> base -> head walk still covers these.
+                skipped_probe.append(
+                    f"{rev} ({name}): parents {parents or '(base)'} != preceding {prev}")
+                print(f"  {i:2d}. {rev}  not probed (branch point)  {name}")
+                fp_at[rev] = fp_here
+                prev = rev
+                continue
+
+            if rev in DECLARED_IRREVERSIBLE:
+                # Do not probe a revision we have already declared. Stepping
+                # down and back up leaves the schema in a state its own upgrade
+                # does not expect, and reporting that as a second, separate
+                # failure says nothing the declaration did not already say.
+                declared.append(f"{rev} ({name}): {DECLARED_IRREVERSIBLE[rev]}")
+                print(f"  {i:2d}. {rev}  declared irreversible  {name}")
+                fp_at[rev] = fp_here
+                prev = rev
+                continue
 
             down = alembic(args.db, "downgrade", prev)
             if down.returncode:
@@ -178,13 +248,10 @@ def main() -> int:
             restored = fingerprint(args.db)
             if restored != fp_at[prev]:
                 diff = _fp_diff(fp_at[prev], restored)
-                if rev in DECLARED_IRREVERSIBLE:
-                    declared.append(f"{rev} ({name}): {DECLARED_IRREVERSIBLE[rev]}")
-                    print(f"  {i:2d}. {rev}  declared irreversible  {name}")
-                else:
-                    failures.append(
-                        f"{rev} ({name}): downgrade does not restore the pre-migration schema -- {diff}")
-                    print(f"  {i:2d}. {rev}  DOWNGRADE LEAVES A DIFFERENT SCHEMA  {name}\n        {diff}")
+                failures.append(
+                    f"{rev} ({name}): downgrade does not restore the pre-migration schema -- {diff}")
+                print(f"  {i:2d}. {rev}  DOWNGRADE LEAVES A DIFFERENT SCHEMA  {name}\n        {diff}")
+
 
             back = alembic(args.db, "upgrade", rev)
             if back.returncode:
@@ -199,10 +266,11 @@ def main() -> int:
 
             fp_at[rev] = fp_here
             prev = rev
-        clean = len(order) - len(failures) - len(declared)
+        clean = len(order) - len(failures) - len(declared) - len(skipped_probe)
         if not failures:
             print(f"  {clean} of {len(order)} migrations round-trip to an identical schema; "
-                  f"{len(declared)} declared irreversible")
+                  f"{len(declared)} declared irreversible; "
+                  f"{len(skipped_probe)} not probed (branch points)")
 
     # ── 3. full down, then up again ──────────────────────────────────────────
     print("\nFULL DOWN  head -> base -> head")
@@ -230,6 +298,11 @@ def main() -> int:
                     f'DROP DATABASE IF EXISTS "{args.db}"'], capture_output=True, timeout=120)
 
     print()
+    if skipped_probe:
+        print(f"NOT PROBED -- {len(skipped_probe)} at branch points, covered by the full walk:")
+        for d in skipped_probe:
+            print(f"  - {d}")
+        print()
     if declared:
         print(f"DECLARED IRREVERSIBLE -- {len(declared)}, by design:")
         for d in declared:
