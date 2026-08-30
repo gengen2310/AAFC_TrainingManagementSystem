@@ -484,10 +484,10 @@ export const planningApi = {
     api.post<{ ok: boolean }>('/api/equipment', body),
 
   // ── Notices ─────────────────────────────────────────────────────────────────
-  listNotices: (date_id: string) =>
-    api.get<import("./types").ParadeNotice[]>(`/api/planning/parade-dates/${date_id}/notices`),
-  createNotice: (date_id: string, body: { notice_text: string; priority?: string; audience?: string }) =>
-    api.post<{ ok: boolean; notice_id: string }>(`/api/planning/parade-dates/${date_id}/notices`, body),
+  listNotices: (night_id: string) =>
+    api.get<import("./types").ParadeNotice[]>(`/api/planning/parade-nights/${night_id}/notices`),
+  createNotice: (night_id: string, body: { notice_text: string; priority?: string; audience?: string }) =>
+    api.post<{ ok: boolean; notice_id: string }>(`/api/planning/parade-nights/${night_id}/notices`, body),
   updateNotice: (notice_id: string, body: { notice_text?: string; priority?: string; audience?: string }) =>
     api.patch<{ ok: boolean }>(`/api/planning/notices/${notice_id}`, body),
   archiveNotice: (notice_id: string) =>

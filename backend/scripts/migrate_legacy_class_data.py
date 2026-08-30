@@ -204,22 +204,23 @@ def migrate_squadron(db, squadron: Squadron, *, dry_run: bool) -> MigrationRepor
         )
         .all()
     )
-    grouped: dict[tuple[int, str], list[TrainingSession]] = defaultdict(list)
+    # Phase B: ParadeNight now carries planning_year_id as a direct FK instead of
+    # the old integer training_year column. Group by the FK directly; the PlanningYear
+    # lookup is now a simple pk get rather than a year-number match.
+    grouped: dict[tuple[str, str], list[TrainingSession]] = defaultdict(list)
     for sess, pn in rows:
-        grouped[(pn.training_year, sess.cadet_group)].append(sess)
+        grouped[(pn.planning_year_id, sess.cadet_group)].append(sess)
 
-    for (training_year, cadet_group), sessions in grouped.items():
+    for (planning_year_id, cadet_group), sessions in grouped.items():
         label = _normalize_stage_label(cadet_group)
-        py = db.query(PlanningYear).filter(
-            PlanningYear.unit_id == squadron.id, PlanningYear.year == training_year,
-        ).first()
+        py = db.get(PlanningYear, planning_year_id)
         if not py:
-            report.skip("NO_MATCHING_PLANNING_YEAR", training_year=training_year, cadet_group=cadet_group,
+            report.skip("NO_MATCHING_PLANNING_YEAR", planning_year_id=planning_year_id, cadet_group=cadet_group,
                         session_count=len(sessions))
             continue
         stage = _find_matching_stage(db, squadron.id, squadron.wing_id, label)
         if not stage:
-            report.skip("NO_MATCHING_STAGE", training_year=training_year, cadet_group=cadet_group,
+            report.skip("NO_MATCHING_STAGE", planning_year_id=planning_year_id, cadet_group=cadet_group,
                         session_count=len(sessions))
             continue
         tclass_id = _find_or_create_class(

@@ -21,12 +21,14 @@ from ..models import (
 )
 from ..models import Session as TrainingSession
 from ..models.planning import (
-    PlanningYear, ParadeDate, HolidayPeriod, AnchorEvent,
+    PlanningYear, HolidayPeriod, AnchorEvent,
     AnchorPrepRule, AnchorPrepPlan,
     PlanningConflict, PlanningFacilitatorLeave, PlanningNotice,
     CeaImportBatch, CeaActivity, ActivityLocalHide,
     CADET_GROUPS, IMPORTANCE_LEVELS, EVENT_TYPES,
 )
+# ParadeDate removed (Phase B migration a1c68e84caf5) — router endpoints that
+# reference ParadeDate are handled in Task 5.
 # ScheduledSession and PlanningLocation models are intentionally NOT imported here:
 # both are fully superseded (TrainingSession/TrainingArea are canonical -- see
 # docs/qualification/02_architecture_review.md, 03_data_integrity_review.md, and
@@ -221,42 +223,6 @@ def _get_year_or_404(year_id: str, db: DBSession) -> PlanningYear:
     return py
 
 
-def _find_or_create_parade_night(
-    db: DBSession, unit_id: str, date_str: str, p: Principal,
-    start_time: str | None = None, end_time: str | None = None,
-) -> ParadeNight | None:
-    """Find an existing ParadeNight for unit+date, or create one using the effective timing template."""
-    if not unit_id:
-        return None
-    sq = db.get(Squadron, unit_id)
-    if not sq:
-        return None
-    pn = db.query(ParadeNight).filter(
-        ParadeNight.squadron_id == unit_id,
-        ParadeNight.date == date_str,
-        ParadeNight.is_archived == False,  # noqa: E712
-    ).first()
-    if pn:
-        return pn
-    # Create a new ParadeNight
-    tmpl = _effective_template(db, unit_id, date_str)
-    if tmpl:
-        ip_count = sum(1 for b in tmpl.blocks if b.is_instructional_period)
-        session_count = ip_count if ip_count > 0 else (sq.default_session_count or 3)
-    else:
-        session_count = sq.default_session_count or 3
-    pn = ParadeNight(
-        squadron_id=unit_id, wing_id=sq.wing_id, date=date_str, term=None,
-        start_time=start_time or sq.default_start_time,
-        end_time=end_time or sq.default_end_time,
-        session_count=session_count, parade_type="normal",
-        timing_template_id=tmpl.id if tmpl else None,
-        created_by=p.user_id,
-    )
-    db.add(pn)
-    db.flush()  # get ID without committing outer transaction
-    return pn
-
 
 # ─────────────────────────────────────────────────────────────
 # Serialisers
@@ -279,15 +245,26 @@ def _year_out(py: PlanningYear, unit_code: str | None = None,
     }
 
 
-def _date_out(pd: ParadeDate) -> dict:
+def _night_out_as_date(pn: ParadeNight) -> dict:
+    """Serialise a ParadeNight in the parade-dates response shape.
+
+    parade_date_id = pn.id — backward-compat alias used by the React PW's
+    ~40 references to pd.parade_date_id. Do not rename this field.
+    parade_night_id = pn.id — same value; kept for callers that used the
+    old linked-night field and now read the same record.
+    """
     return {
-        "parade_date_id": pd.id, "planning_year_id": pd.planning_year_id,
-        "unit_id": pd.unit_id, "parade_date": pd.parade_date,
-        "parade_type": pd.parade_type, "is_active": pd.is_active, "notes": pd.notes,
-        "term": getattr(pd, "term", None),
-        "week_number": getattr(pd, "week_number", None),
-        "cancellation_reason": getattr(pd, "cancellation_reason", None),
-        "parade_night_id": pd.parade_night_id,
+        "parade_date_id": pn.id,
+        "planning_year_id": pn.planning_year_id,
+        "unit_id": pn.squadron_id,
+        "parade_date": pn.date,
+        "parade_type": pn.parade_type,
+        "is_active": pn.is_active,
+        "notes": pn.notes,
+        "term": pn.term,
+        "week_number": pn.week_number,
+        "cancellation_reason": pn.cancellation_reason,
+        "parade_night_id": pn.id,
     }
 
 
@@ -416,7 +393,7 @@ def _real_session_out(
 def _conflict_out(c: PlanningConflict) -> dict:
     return {
         "conflict_id": c.id, "planning_year_id": c.planning_year_id,
-        "parade_date_id": c.parade_date_id,
+        "parade_night_id": c.parade_night_id,
         "scheduled_session_id": c.scheduled_session_id,
         "conflict_type": c.conflict_type, "severity": c.severity,
         "message": c.message, "is_resolved": c.is_resolved,
@@ -760,10 +737,12 @@ def delete_planning_year(
         require_can_write_squadron(p, py.unit_id, py.wing_id)
 
     dependents = {
-        "parade_dates": db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).count(),
+        "parade_dates": db.query(ParadeNight).filter(ParadeNight.planning_year_id == year_id).count(),
         "holidays": db.query(HolidayPeriod).filter(HolidayPeriod.planning_year_id == year_id).count(),
         "anchor_events": db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id).count(),
-        "notices": db.query(PlanningNotice).filter(PlanningNotice.planning_year_id == year_id).count(),
+        "notices": db.query(PlanningNotice).join(
+            ParadeNight, PlanningNotice.parade_night_id == ParadeNight.id
+        ).filter(ParadeNight.planning_year_id == year_id).count(),
         "cea_activities": db.query(CeaActivity).filter(CeaActivity.planning_year_id == year_id).count(),
         "cea_import_batches": db.query(CeaImportBatch).filter(CeaImportBatch.planning_year_id == year_id).count(),
         "facilitator_leave": db.query(PlanningFacilitatorLeave).filter(PlanningFacilitatorLeave.planning_year_id == year_id).count(),
@@ -822,8 +801,8 @@ def list_parade_dates(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py)
-    rows = db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id)\
-             .order_by(ParadeDate.parade_date).all()
+    rows = db.query(ParadeNight).filter(ParadeNight.planning_year_id == year_id)\
+             .order_by(ParadeNight.date).all()
     # Annotate with holiday flags
     holidays = db.query(HolidayPeriod).filter(
         HolidayPeriod.planning_year_id == year_id,
@@ -835,9 +814,9 @@ def list_parade_dates(
                 return True
         return False
     out = []
-    for pd in rows:
-        r = _date_out(pd)
-        r["in_holiday"] = in_holiday(pd.parade_date)
+    for pn in rows:
+        r = _night_out_as_date(pn)
+        r["in_holiday"] = in_holiday(pn.date)
         out.append(r)
     return out
 
@@ -851,18 +830,36 @@ def add_parade_date(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
-    pn = _find_or_create_parade_night(db, py.unit_id, body.parade_date, p)
-    pd = ParadeDate(
-        id=str(uuid.uuid4()), planning_year_id=year_id,
-        unit_id=py.unit_id, parade_date=body.parade_date,
-        parade_type=body.parade_type, is_active=body.is_active,
-        notes=body.notes, parade_night_id=pn.id if pn else None,
-        created_at=utcnow(), updated_at=utcnow(),
+    if py.unit_id is None:
+        raise HTTPException(400, detail={
+            "error": "wing_national_year_not_supported",
+            "message": "Parade dates cannot be added to wing or national planning years through this endpoint.",
+        })
+    sq = db.get(Squadron, py.unit_id)
+    if sq is None:
+        raise HTTPException(400, detail={"error": "squadron_not_found"})
+    # Idempotent: if a night already exists for this date in THIS year, return it.
+    # Two different planning years may share the same calendar date (valid scenario).
+    existing = db.query(ParadeNight).filter(
+        ParadeNight.planning_year_id == year_id,
+        ParadeNight.date == body.parade_date,
+        ParadeNight.is_archived == False,  # noqa: E712
+    ).first()
+    if existing:
+        return _night_out_as_date(existing)
+    pn = ParadeNight(
+        id=str(uuid.uuid4()),
+        squadron_id=py.unit_id, wing_id=sq.wing_id,
+        date=body.parade_date, planning_year_id=year_id,
+        parade_type=body.parade_type or "standard",
+        is_active=body.is_active if body.is_active is not None else True,
+        notes=body.notes,
+        created_by=p.user_id, created_at=utcnow(), updated_at=utcnow(),
     )
-    db.add(pd); db.commit()
-    audit(db, p, object_type="parade_date", object_id=pd.id, action="create",
-          new={"date": body.parade_date})
-    return _date_out(pd)
+    db.add(pn); db.commit()
+    audit(db, p, object_type="parade_night", object_id=pn.id, action="create",
+          new={"date": body.parade_date, "via": "planning_add_parade_date"})
+    return _night_out_as_date(pn)
 
 
 def _compute_candidate_dates(body: GenerateParadeDatesIn, holidays: list) -> list[str]:
@@ -1046,8 +1043,8 @@ def preview_parade_dates(
         HolidayPeriod.affects_parade == True,  # noqa: E712
     ).all() if body.exclude_holidays else []
     existing = {
-        pd.parade_date for pd in
-        db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).all()
+        pn.date for pn in
+        db.query(ParadeNight).filter(ParadeNight.planning_year_id == year_id).all()
     }
     classified = _compute_candidate_dates_classified(body, holidays)
     rows = []
@@ -1075,48 +1072,43 @@ def generate_parade_dates(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id is None:
+        raise HTTPException(400, detail={
+            "error": "wing_national_year_not_supported",
+            "message": "Parade dates cannot be added to wing or national planning years through this endpoint.",
+        })
     holidays = db.query(HolidayPeriod).filter(
         HolidayPeriod.planning_year_id == year_id,
         HolidayPeriod.affects_parade == True,  # noqa: E712
     ).all() if body.exclude_holidays else []
 
-    existing_rows = db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).all()
-    existing = {pd.parade_date for pd in existing_rows}
-    unlinked_by_date = {
-        pd.parade_date: pd for pd in existing_rows if pd.parade_night_id is None
+    sq = db.get(Squadron, py.unit_id)
+    existing_dates = {
+        pn.date for pn in db.query(ParadeNight).filter(
+            ParadeNight.planning_year_id == year_id
+        ).all()
     }
     candidates = _compute_candidate_dates(body, holidays)
     created = []
-    linked = []
     for ds in candidates:
-        if ds not in existing:
-            pn = _find_or_create_parade_night(
-                db, py.unit_id, ds, p,
-                start_time=body.parade_start_time, end_time=body.parade_end_time,
+        if ds not in existing_dates:
+            pn = ParadeNight(
+                id=str(uuid.uuid4()),
+                squadron_id=py.unit_id, wing_id=sq.wing_id if sq else None,
+                date=ds, planning_year_id=year_id,
+                parade_type=body.parade_type or "standard",
+                is_active=True,
+                start_time=body.parade_start_time or (sq.default_start_time if sq else None),
+                end_time=body.parade_end_time or (sq.default_end_time if sq else None),
+                created_by=p.user_id, created_at=utcnow(), updated_at=utcnow(),
             )
-            pd = ParadeDate(
-                id=str(uuid.uuid4()), planning_year_id=year_id,
-                unit_id=py.unit_id, parade_date=ds,
-                parade_type=body.parade_type, is_active=True,
-                parade_night_id=pn.id if pn else None,
-                created_at=utcnow(), updated_at=utcnow(),
-            )
-            db.add(pd)
-            existing.add(ds)
+            db.add(pn)
+            existing_dates.add(ds)
             created.append(ds)
-        elif py.unit_id and ds in unlinked_by_date:
-            # Backfill the parade night link for an existing unlinked date
-            pn = _find_or_create_parade_night(
-                db, py.unit_id, ds, p,
-                start_time=body.parade_start_time, end_time=body.parade_end_time,
-            )
-            if pn:
-                unlinked_by_date[ds].parade_night_id = pn.id
-                linked.append(ds)
     db.commit()
-    audit(db, p, object_type="planning_year", object_id=year_id, action="generate_parade_dates",
-          new={"created": len(created), "linked": len(linked)})
-    return {"ok": True, "created": len(created), "linked": len(linked), "dates": created}
+    audit(db, p, object_type="planning_year", object_id=year_id,
+          action="generate_parade_dates", new={"created": len(created)})
+    return {"ok": True, "created": len(created), "linked": 0, "dates": created}
 
 
 _SESSION_STATUS_SCOPES = {
@@ -1175,12 +1167,12 @@ def update_future_parade_day(
     allowed_statuses = _SESSION_STATUS_SCOPES.get(status_scope)
 
     from_date = body.from_date or date.today().isoformat()
-    rows = db.query(ParadeDate).filter(
-        ParadeDate.planning_year_id == year_id,
-        ParadeDate.is_active == True,  # noqa: E712
-        ParadeDate.parade_date >= from_date,
-        ParadeDate.parade_type == "standard",
-    ).order_by(ParadeDate.parade_date).all()
+    rows = db.query(ParadeNight).filter(
+        ParadeNight.planning_year_id == year_id,
+        ParadeNight.is_active == True,  # noqa: E712
+        ParadeNight.date >= from_date,
+        ParadeNight.parade_type.in_(["standard", "normal"]),
+    ).order_by(ParadeNight.date).all()
 
     holidays = db.query(HolidayPeriod).filter(
         HolidayPeriod.planning_year_id == year_id,
@@ -1191,39 +1183,39 @@ def update_future_parade_day(
         return any(h.start_date <= d <= h.end_date for h in holidays)
 
     # All active dates for this year, to detect a shift landing on an existing date.
-    existing_dates = {r.parade_date for r in
-                      db.query(ParadeDate.parade_date).filter(
-                          ParadeDate.planning_year_id == year_id,
-                          ParadeDate.is_active == True,  # noqa: E712
-                      ).all()}
+    existing_dates = {
+        pn.date for pn in db.query(ParadeNight).filter(
+            ParadeNight.planning_year_id == year_id,
+            ParadeNight.is_active == True,  # noqa: E712
+        ).all()
+    }
 
     plan: list[dict] = []
     status_excluded = 0
-    for pd_row in rows:
-        if pd_row.id in body.exclude_ids:
+    for pn_row in rows:
+        if pn_row.id in body.exclude_ids:
             continue
-        old_d = date.fromisoformat(pd_row.parade_date)
+        old_d = date.fromisoformat(pn_row.date)
         if old_d.weekday() == body.new_weekday:
             continue  # already on the target day -- nothing to do
         new_d = old_d - timedelta(days=old_d.weekday()) + timedelta(days=body.new_weekday)
         new_ds = new_d.isoformat()
 
         conflicts = []
-        if new_ds in existing_dates and new_ds != pd_row.parade_date:
+        if new_ds in existing_dates and new_ds != pn_row.date:
             conflicts.append("duplicate_date")
         if in_holiday(new_ds):
             conflicts.append("holiday")
 
         has_sessions = False
         session_statuses: list[str] = []
-        if pd_row.parade_night_id:
-            session_statuses = [
-                s.status for s in db.query(TrainingSession).filter(
-                    TrainingSession.parade_night_id == pd_row.parade_night_id,
-                    TrainingSession.is_archived == False,  # noqa: E712
-                ).all()
-            ]
-            has_sessions = len(session_statuses) > 0
+        session_statuses = [
+            s.status for s in db.query(TrainingSession).filter(
+                TrainingSession.parade_night_id == pn_row.id,
+                TrainingSession.is_archived == False,  # noqa: E712
+            ).all()
+        ]
+        has_sessions = len(session_statuses) > 0
 
         # A night whose sessions have progressed past the requested
         # scope (e.g. already published/delivered) is left alone entirely --
@@ -1236,22 +1228,22 @@ def update_future_parade_day(
                 continue
 
         plan.append({
-            "parade_date_id": pd_row.id,
-            "old_date": pd_row.parade_date,
+            "parade_date_id": pn_row.id,
+            "old_date": pn_row.date,
             "new_date": new_ds,
-            "term": pd_row.term,
-            "week_number": pd_row.week_number,
-            "parade_night_id": pd_row.parade_night_id,
+            "term": pn_row.term,
+            "week_number": pn_row.week_number,
+            "parade_night_id": pn_row.id,
             "has_sessions": has_sessions,
             "conflicts": conflicts,
             "blocked": len(conflicts) > 0,
         })
 
-    exceptions = db.query(ParadeDate).filter(
-        ParadeDate.planning_year_id == year_id,
-        ParadeDate.is_active == True,  # noqa: E712
-        ParadeDate.parade_date >= from_date,
-        ParadeDate.parade_type != "standard",
+    exceptions = db.query(ParadeNight).filter(
+        ParadeNight.planning_year_id == year_id,
+        ParadeNight.is_active == True,  # noqa: E712
+        ParadeNight.date >= from_date,
+        ~ParadeNight.parade_type.in_(["standard", "normal"]),
     ).count()
 
     if body.preview:
@@ -1270,16 +1262,11 @@ def update_future_parade_day(
         if r["blocked"]:
             skipped.append(r)
             continue
-        pd_row = db.get(ParadeDate, r["parade_date_id"])
-        old_date = pd_row.parade_date
-        pd_row.parade_date = r["new_date"]
-        pd_row.updated_at = utcnow()
-        if r["parade_night_id"]:
-            pn = db.get(ParadeNight, r["parade_night_id"])
-            if pn:
-                pn.date = r["new_date"]
-                pn.updated_at = utcnow()
-        audit(db, p, object_type="parade_date", object_id=r["parade_date_id"],
+        pn_row = db.get(ParadeNight, r["parade_date_id"])
+        old_date = pn_row.date
+        pn_row.date = r["new_date"]
+        pn_row.updated_at = utcnow()
+        audit(db, p, object_type="parade_night", object_id=r["parade_date_id"],
               action="update_future_parade_day",
               old={"date": old_date}, new={"date": r["new_date"]}, reason=body.reason)
         updated.append(r)
@@ -1301,22 +1288,35 @@ def delete_parade_date(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    pd = db.get(ParadeDate, date_id)
-    if not pd:
+    pn = db.get(ParadeNight, date_id)
+    if not pn:
         raise HTTPException(404, detail={"error": "not_found"})
-    py = _get_year_or_404(pd.planning_year_id, db)
+    py = _get_year_or_404(pn.planning_year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    # Check for training sessions — cannot delete a night that has sessions
+    session_count = db.query(TrainingSession).filter(
+        TrainingSession.parade_night_id == pn.id
+    ).count()
+    if session_count > 0:
+        raise HTTPException(409, detail={
+            "error": "parade_night_has_sessions",
+            "message": (
+                f"This parade night has {session_count} scheduled session(s). "
+                "Archive it from the TMS instead of deleting, or remove the sessions first."
+            ),
+            "session_count": session_count,
+        })
     # Resolve FK children before the delete so PostgreSQL FK constraints are not violated.
-    # Notices are owned by the date — delete them. Prep plans and conflicts reference it
+    # Notices are owned by the night — delete them. Prep plans and conflicts reference it
     # optionally (nullable FK) — nullify rather than cascade-delete.
-    db.query(PlanningNotice).filter(PlanningNotice.parade_date_id == pd.id).delete()
-    for app_row in db.query(AnchorPrepPlan).filter(AnchorPrepPlan.planned_parade_date_id == pd.id).all():
-        app_row.planned_parade_date_id = None
-    for pc in db.query(PlanningConflict).filter(PlanningConflict.parade_date_id == pd.id).all():
-        pc.parade_date_id = None
-    db.delete(pd)
-    audit(db, p, object_type="parade_date", object_id=pd.id, action="delete",
-          new={"date": pd.parade_date}, commit=False)
+    db.query(PlanningNotice).filter(PlanningNotice.parade_night_id == pn.id).delete()
+    for app_row in db.query(AnchorPrepPlan).filter(AnchorPrepPlan.planned_parade_night_id == pn.id).all():
+        app_row.planned_parade_night_id = None
+    for pc in db.query(PlanningConflict).filter(PlanningConflict.parade_night_id == pn.id).all():
+        pc.parade_night_id = None
+    db.delete(pn)
+    audit(db, p, object_type="parade_night", object_id=pn.id, action="delete",
+          new={"date": pn.date}, commit=False)
     db.commit()
     return {"ok": True}
 
@@ -1630,15 +1630,15 @@ def get_prep_suggestions(
         event_dt = None
     suggested_dates = []
     if event_dt:
-        parade_dates = db.query(ParadeDate).filter(
-            ParadeDate.planning_year_id == a.planning_year_id,
-            ParadeDate.is_active == True,  # noqa: E712
+        parade_nights = db.query(ParadeNight).filter(
+            ParadeNight.planning_year_id == a.planning_year_id,
+            ParadeNight.is_active == True,  # noqa: E712
         ).all()
         for r in rules:
             window_start = (event_dt - timedelta(weeks=r.weeks_before_max)).isoformat()
             window_end   = (event_dt - timedelta(weeks=r.weeks_before_min)).isoformat()
-            candidates   = [pd.parade_date for pd in parade_dates
-                            if window_start <= pd.parade_date <= window_end]
+            candidates   = [pn.date for pn in parade_nights
+                            if window_start <= pn.date <= window_end]
             suggested_dates.append({
                 "subject_area": r.subject_area,
                 "suggested_activity": r.suggested_activity,
@@ -1678,50 +1678,44 @@ def get_term_planner(
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py)
 
-    all_dates = db.query(ParadeDate).filter(
-        ParadeDate.planning_year_id == year_id,
-        ParadeDate.is_active == True,  # noqa: E712
-    ).order_by(ParadeDate.parade_date).all()
+    all_dates = db.query(ParadeNight).filter(
+        ParadeNight.planning_year_id == year_id,
+        ParadeNight.is_active == True,  # noqa: E712
+    ).order_by(ParadeNight.date).all()
 
     if term:
         t_start, t_end = _TERM_RANGES.get(term, ("01-01", "12-31"))
         yr = str(py.year)
         all_dates = [d for d in all_dates
-                     if f"{yr}-{t_start}" <= d.parade_date <= f"{yr}-{t_end}"]
+                     if f"{yr}-{t_start}" <= d.date <= f"{yr}-{t_end}"]
 
     anchors = db.query(AnchorEvent).filter(
         AnchorEvent.planning_year_id == year_id,
         AnchorEvent.is_archived == False,  # noqa: E712
     ).order_by(AnchorEvent.start_date).all()
 
-    # R5-L12: batch-load all linked parade nights in one query instead of
-    # calling db.get() once per date in the sessions loop and twice per date
-    # in the total_periods sum (O(2N) → O(1)).
-    pn_ids = {pd.parade_night_id for pd in all_dates if pd.parade_night_id}
-    pn_by_id: dict[str, ParadeNight] = (
-        {pn.id: pn for pn in db.query(ParadeNight).filter(ParadeNight.id.in_(pn_ids)).all()}
-        if pn_ids else {}
-    )
+    # Batch-load all sessions for parade nights in one query (avoids N+1).
+    # all_dates ARE the parade nights now (Phase B merge).
+    pn_ids = {pn.id for pn in all_dates}
 
     sessions_by_date: dict[str, list] = {}
-    for pd in all_dates:
-        real_sessions: list[dict] = []
-        if pd.parade_night_id:
-            pn_real = pn_by_id.get(pd.parade_night_id)
-            if pn_real:
-                ts = db.query(TrainingSession).filter(
-                    TrainingSession.parade_night_id == pn_real.id,
-                    TrainingSession.is_archived == False,  # noqa: E712
-                ).all()
-                real_sessions = [_real_session_out(s, db) for s in ts]
-        sessions_by_date[pd.id] = real_sessions
+    if pn_ids:
+        ts_rows = db.query(TrainingSession).filter(
+            TrainingSession.parade_night_id.in_(pn_ids),
+            TrainingSession.is_archived == False,  # noqa: E712
+        ).all()
+        ts_by_night: dict[str, list] = {}
+        for s in ts_rows:
+            ts_by_night.setdefault(s.parade_night_id, []).append(s)
+        for pn in all_dates:
+            sessions_by_date[pn.id] = [_real_session_out(s, db) for s in ts_by_night.get(pn.id, [])]
+    else:
+        for pn in all_dates:
+            sessions_by_date[pn.id] = []
 
     # Calculate per-term session capacity summary
     # capacity = parade nights × cadet groups × periods
-    total_periods = sum(
-        (pn_by_id[pd.parade_night_id].session_count if pd.parade_night_id and pd.parade_night_id in pn_by_id else 3)
-        for pd in all_dates
-    )
+    total_periods = sum(pn.session_count for pn in all_dates)
     capacity = total_periods * len(CADET_GROUPS)
     filled = sum(len(v) for v in sessions_by_date.values())
 
@@ -1729,7 +1723,7 @@ def get_term_planner(
         "planning_year_id": year_id,
         "year": py.year,
         "term": term,
-        "parade_dates": [_date_out(d) for d in all_dates],
+        "parade_dates": [_night_out_as_date(d) for d in all_dates],
         "parade_count": len(all_dates),
         "session_capacity": capacity,
         "sessions_filled": filled,
@@ -1749,26 +1743,20 @@ def get_builder(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    pd = db.get(ParadeDate, date_id)
-    if not pd:
+    pn = db.get(ParadeNight, date_id)
+    if not pn:
         raise HTTPException(404, detail={"error": "not_found"})
-    py = _get_year_or_404(pd.planning_year_id, db)
+    py = _get_year_or_404(pn.planning_year_id, db)
     _require_year_access(p, py)
-
-    # Use the linked real ParadeNight if available; otherwise fall back to planning-only data
-    pn: ParadeNight | None = None
-    if pd.parade_night_id:
-        pn = db.get(ParadeNight, pd.parade_night_id)
 
     # Timing template blocks
     timing_blocks: list[dict] = []
     session_count = 3
     tmpl = None
-    if pn and pn.timing_template_id:
+    if pn.timing_template_id:
         tmpl = db.get(TimingTemplate, pn.timing_template_id)
-    if not tmpl and (pd.unit_id or (pn and pn.squadron_id)):
-        unit_id = pd.unit_id or pn.squadron_id
-        tmpl = _effective_template(db, unit_id, pd.parade_date)
+    if not tmpl and pn.squadron_id:
+        tmpl = _effective_template(db, pn.squadron_id, pn.date)
     if tmpl:
         blocks = db.query(TimingBlock).filter(
             TimingBlock.timing_template_id == tmpl.id,
@@ -1786,29 +1774,27 @@ def get_builder(
         ip_count = sum(1 for b in blocks if b.is_instructional_period)
         if ip_count > 0:
             session_count = ip_count
-    if pn and pn.session_count:
+    if pn.session_count:
         session_count = pn.session_count
 
-    # Pull real sessions from the linked ParadeNight
-    real_sessions: list[dict] = []
-    if pn:
-        ts = db.query(TrainingSession).filter(
-            TrainingSession.parade_night_id == pn.id,
-            TrainingSession.is_archived == False,  # noqa: E712
-        ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
-        real_sessions = [_real_session_out(s, db) for s in ts]
+    # Pull real sessions from the ParadeNight
+    ts = db.query(TrainingSession).filter(
+        TrainingSession.parade_night_id == pn.id,
+        TrainingSession.is_archived == False,  # noqa: E712
+    ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
+    real_sessions = [_real_session_out(s, db) for s in ts]
 
     conflicts = db.query(PlanningConflict).filter(
-        PlanningConflict.parade_date_id == date_id,
+        PlanningConflict.parade_night_id == date_id,
         PlanningConflict.is_resolved == False,  # noqa: E712
     ).all()
 
     return {
         "parade_date_id": date_id,
-        "parade_night_id": pd.parade_night_id,
-        "parade_date": pd.parade_date,
-        "parade_type": pd.parade_type,
-        "unit_id": pd.unit_id,
+        "parade_night_id": pn.id,
+        "parade_date": pn.date,
+        "parade_type": pn.parade_type,
+        "unit_id": pn.squadron_id,
         "session_count": session_count,
         "timing_blocks": timing_blocks,
         "cadet_groups": list(CADET_GROUPS),
@@ -1865,31 +1851,13 @@ def create_session(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    pd = db.get(ParadeDate, date_id)
-    if not pd:
+    pn = db.get(ParadeNight, date_id)
+    if not pn:
         raise HTTPException(404, detail={"error": "not_found"})
-    py = _get_year_or_404(pd.planning_year_id, db)
+    py = _get_year_or_404(pn.planning_year_id, db)
     _require_year_access(p, py, write=True, db=db)
     if body.cadet_group not in CADET_GROUPS:
         raise HTTPException(422, detail={"error": "invalid_cadet_group"})
-
-    unit_id = pd.unit_id or (py.unit_id if py.unit_id else p.squadron_id)
-    if not pd.parade_night_id:
-        # Auto-link to a real ParadeNight
-        if unit_id:
-            pn = _find_or_create_parade_night(db, unit_id, pd.parade_date, p)
-            if pn:
-                pd.parade_night_id = pn.id
-                db.flush()
-
-    if not pd.parade_night_id:
-        raise HTTPException(400, detail={"error": "no_parade_night_linked",
-                                         "detail": "This planning date has no linked parade night. "
-                                                   "Generate parade dates to link them automatically."})
-
-    pn = db.get(ParadeNight, pd.parade_night_id)
-    if not pn:
-        raise HTTPException(404, detail={"error": "parade_night_not_found"})
 
     # Resolve room ID from location_id (which may be a PlanningLocation or TrainingArea id)
     training_area_id = None
@@ -2076,16 +2044,14 @@ def list_archived_sessions(
     rather than an include_archived param on get_weekly_program(), since that
     endpoint's `sessions` list is consumed directly as grid cells and mixing
     archived rows into it would risk them rendering as live schedule slots."""
-    pd = db.get(ParadeDate, date_id)
-    if not pd:
+    pn = db.get(ParadeNight, date_id)
+    if not pn:
         raise HTTPException(404, detail={"error": "not_found"})
-    py = _get_year_or_404(pd.planning_year_id, db)
+    py = _get_year_or_404(pn.planning_year_id, db)
     _require_year_access(p, py)
 
-    if not pd.parade_night_id:
-        return {"sessions": []}
     ts = db.query(TrainingSession).filter(
-        TrainingSession.parade_night_id == pd.parade_night_id,
+        TrainingSession.parade_night_id == pn.id,
         TrainingSession.is_archived == True,  # noqa: E712
     ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
     return {"sessions": [_real_session_out(s, db) for s in ts]}
@@ -2097,15 +2063,14 @@ def get_weekly_program(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    pd = db.get(ParadeDate, date_id)
-    if not pd:
+    pn = db.get(ParadeNight, date_id)
+    if not pn:
         raise HTTPException(404, detail={"error": "not_found"})
-    py = _get_year_or_404(pd.planning_year_id, db)
+    py = _get_year_or_404(pn.planning_year_id, db)
     _require_year_access(p, py)
 
-    # Pull real sessions from linked ParadeNight
+    # Pull real sessions from the ParadeNight
     real_sessions: list[dict] = []
-    pn = db.get(ParadeNight, pd.parade_night_id) if pd.parade_night_id else None
     if pn:
         ts = db.query(TrainingSession).filter(
             TrainingSession.parade_night_id == pn.id,
@@ -2142,8 +2107,8 @@ def get_weekly_program(
     tmpl = None
     if pn and pn.timing_template_id:
         tmpl = db.get(TimingTemplate, pn.timing_template_id)
-    if not tmpl and pd.unit_id:
-        tmpl = _effective_template(db, pd.unit_id, pd.parade_date)
+    if not tmpl and pn.squadron_id:
+        tmpl = _effective_template(db, pn.squadron_id, pn.date)
     if tmpl:
         blocks = db.query(TimingBlock).filter(
             TimingBlock.timing_template_id == tmpl.id,
@@ -2160,16 +2125,16 @@ def get_weekly_program(
         ]
 
     conflicts = db.query(PlanningConflict).filter(
-        PlanningConflict.parade_date_id == date_id,
+        PlanningConflict.parade_night_id == date_id,
         PlanningConflict.is_resolved == False,  # noqa: E712
     ).all()
 
     audit(db, p, object_type="parade_date", object_id=date_id, action="view_weekly_program")
     return {
         "parade_date_id": date_id,
-        "parade_night_id": pd.parade_night_id,
-        "parade_date": pd.parade_date,
-        "unit_id": pd.unit_id,
+        "parade_night_id": pn.id,
+        "parade_date": pn.date,
+        "unit_id": pn.squadron_id,
         "timing_blocks": timing_blocks,
         "sessions": real_sessions,
         "conflicts": [_conflict_out(c) for c in conflicts],
@@ -2210,12 +2175,12 @@ def get_long_range(
     else:
         end_dt = start_dt + timedelta(weeks=weeks)
 
-    parade_dates = db.query(ParadeDate).filter(
-        ParadeDate.planning_year_id == year_id,
-        ParadeDate.is_active == True,  # noqa: E712
-        ParadeDate.parade_date >= start_dt.isoformat(),
-        ParadeDate.parade_date <= end_dt.isoformat(),
-    ).order_by(ParadeDate.parade_date).all()
+    parade_dates = db.query(ParadeNight).filter(
+        ParadeNight.planning_year_id == year_id,
+        ParadeNight.is_active == True,  # noqa: E712
+        ParadeNight.date >= start_dt.isoformat(),
+        ParadeNight.date <= end_dt.isoformat(),
+    ).order_by(ParadeNight.date).all()
 
     anchors = db.query(AnchorEvent).filter(
         AnchorEvent.planning_year_id == year_id,
@@ -2225,7 +2190,7 @@ def get_long_range(
     ).order_by(AnchorEvent.start_date).all()
 
     # Pre-load CI tier data for all parade nights in range (avoids N+1 in loop).
-    pn_ids_lr = [pd_obj.parade_night_id for pd_obj in parade_dates if pd_obj.parade_night_id]
+    pn_ids_lr = [pn.id for pn in parade_dates]
     ci_tier_lr: dict[str, dict] = {}
     if pn_ids_lr:
         ts_lr_all = db.query(TrainingSession).filter(
@@ -2236,25 +2201,27 @@ def get_long_range(
         if ci_ids_lr:
             for ci in db.query(CurriculumItem).filter(CurriculumItem.id.in_(ci_ids_lr)).all():
                 ci_tier_lr[ci.id] = {"core_status": ci.core_status}
+        # Index sessions by parade night id
+        ts_by_night_lr: dict[str, list] = {}
+        for s in ts_lr_all:
+            ts_by_night_lr.setdefault(s.parade_night_id, []).append(s)
+    else:
+        ts_by_night_lr = {}
 
     rows = []
-    for pd_obj in parade_dates:
+    for pn_obj in parade_dates:
         real_sessions: list[dict] = []
-        pn_real = db.get(ParadeNight, pd_obj.parade_night_id) if pd_obj.parade_night_id else None
-        if pn_real:
-            ts = db.query(TrainingSession).filter(
-                TrainingSession.parade_night_id == pn_real.id,
-                TrainingSession.is_archived == False,  # noqa: E712
-            ).order_by(TrainingSession.period_number, TrainingSession.cadet_group).all()
-            real_sessions = [_real_session_out(s, db, ci_tier=ci_tier_lr) for s in ts]
+        ts = sorted(ts_by_night_lr.get(pn_obj.id, []),
+                    key=lambda s: (s.period_number, s.cadet_group or ""))
+        real_sessions = [_real_session_out(s, db, ci_tier=ci_tier_lr) for s in ts]
 
         conflicts = db.query(PlanningConflict).filter(
-            PlanningConflict.parade_date_id == pd_obj.id,
+            PlanningConflict.parade_night_id == pn_obj.id,
             PlanningConflict.is_resolved == False,  # noqa: E712
         ).all()
 
         rows.append({
-            "parade_date": _date_out(pd_obj),
+            "parade_date": _night_out_as_date(pn_obj),
             "sessions": real_sessions,
             "session_count": len(real_sessions),
             "filled_slots": len([s for s in real_sessions if s.get("curriculum_title") or s.get("activity_title")]),
@@ -2433,18 +2400,18 @@ def list_planning_facilitators(
 # ─────────────────────────────────────────────────────────────
 
 def _run_conflict_check(year_id: str, date_id: str, db: DBSession) -> list[PlanningConflict]:
-    """Detect conflicts for a single parade date, replacing previous non-resolved results."""
+    """Detect conflicts for a single parade night, replacing previous non-resolved results."""
     db.query(PlanningConflict).filter(
-        PlanningConflict.parade_date_id == date_id,
+        PlanningConflict.parade_night_id == date_id,
         PlanningConflict.is_resolved == False,  # noqa: E712
     ).delete(synchronize_session=False)
 
-    pd_obj = db.get(ParadeDate, date_id)
+    pn_obj = db.get(ParadeNight, date_id)
     # Use real TrainingSession records for conflict detection
     real_sessions: list = []
-    if pd_obj and pd_obj.parade_night_id:
+    if pn_obj:
         real_sessions = db.query(TrainingSession).filter(
-            TrainingSession.parade_night_id == pd_obj.parade_night_id,
+            TrainingSession.parade_night_id == pn_obj.id,
             TrainingSession.is_archived == False,  # noqa: E712
         ).all()
 
@@ -2453,7 +2420,7 @@ def _run_conflict_check(year_id: str, date_id: str, db: DBSession) -> list[Plann
     def _conflict(ctype: str, severity: str, msg: str, sess_id=None):
         c = PlanningConflict(
             id=str(uuid.uuid4()), planning_year_id=year_id,
-            parade_date_id=date_id, scheduled_session_id=sess_id,
+            parade_night_id=date_id, scheduled_session_id=sess_id,
             conflict_type=ctype, severity=severity, message=msg,
             is_resolved=False, created_at=utcnow(), updated_at=utcnow(),
         )
@@ -2498,26 +2465,26 @@ def _run_conflict_check(year_id: str, date_id: str, db: DBSession) -> list[Plann
     # Anchor event without prep (checked at year level - skip per-date)
 
     # Holiday conflict
-    if pd_obj:
+    if pn_obj:
         holidays = db.query(HolidayPeriod).filter(
             HolidayPeriod.planning_year_id == year_id,
             HolidayPeriod.affects_parade == True,  # noqa: E712
         ).all()
         for h in holidays:
-            if h.start_date <= pd_obj.parade_date <= h.end_date:
+            if h.start_date <= pn_obj.date <= h.end_date:
                 _conflict("holiday_conflict", "warning",
                           f"This parade date falls within the '{h.name}' holiday period.")
                 break
 
     # Facilitator on leave
-    if pd_obj:
+    if pn_obj:
         fac_ids = {s.facilitator_id for s in real_sessions if s.facilitator_id}
         if fac_ids:
             leave_records = db.query(PlanningFacilitatorLeave).filter(
                 PlanningFacilitatorLeave.facilitator_id.in_(fac_ids),
                 PlanningFacilitatorLeave.is_archived == False,  # noqa: E712
-                PlanningFacilitatorLeave.start_date <= pd_obj.parade_date,
-                PlanningFacilitatorLeave.end_date >= pd_obj.parade_date,
+                PlanningFacilitatorLeave.start_date <= pn_obj.date,
+                PlanningFacilitatorLeave.end_date >= pn_obj.date,
             ).all()
             warned_facs: set[str] = set()
             for lv in leave_records:
@@ -2603,13 +2570,13 @@ def run_checks(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
-    dates = db.query(ParadeDate).filter(
-        ParadeDate.planning_year_id == year_id,
-        ParadeDate.is_active == True,  # noqa: E712
+    nights = db.query(ParadeNight).filter(
+        ParadeNight.planning_year_id == year_id,
+        ParadeNight.is_active == True,  # noqa: E712
     ).all()
     total = 0
-    for pd_obj in dates:
-        results = _run_conflict_check(year_id, pd_obj.id, db)
+    for pn_obj in nights:
+        results = _run_conflict_check(year_id, pn_obj.id, db)
         total += len(results)
     return {"ok": True, "conflicts_detected": total}
 
@@ -2650,18 +2617,16 @@ def get_decision_guide(
 
     # 2. Unscheduled groups
     if date_id:
-        pd_obj = db.get(ParadeDate, date_id)
+        pd_obj = db.get(ParadeNight, date_id)
         if pd_obj:
-            scheduled = set()
-            if pd_obj.parade_night_id:
-                scheduled = {
-                    s.cadet_group for s in
-                    db.query(TrainingSession).filter(
-                        TrainingSession.parade_night_id == pd_obj.parade_night_id,
-                        TrainingSession.is_archived == False,  # noqa: E712
-                    ).all()
-                    if s.cadet_group
-                }
+            scheduled = {
+                s.cadet_group for s in
+                db.query(TrainingSession).filter(
+                    TrainingSession.parade_night_id == pd_obj.id,
+                    TrainingSession.is_archived == False,  # noqa: E712
+                ).all()
+                if s.cadet_group
+            }
             missing = [g for g in CADET_GROUPS if g not in scheduled]
             checks.append({
                 "rule": 3,
@@ -2851,12 +2816,12 @@ def get_command_centre(
     # ParadeDate -> ParadeNight -> TrainingSession join qualification-program Phase B,
     # 2026-08-08; see docs/qualification/03_data_integrity_review.md P1 finding #1.
     pd_rows_cc = (
-        db.query(ParadeDate)
-        .filter(ParadeDate.planning_year_id == py.id)
+        db.query(ParadeNight)
+        .filter(ParadeNight.planning_year_id == py.id)
         .all()
     )
-    pn_to_pd_cc: dict[str, ParadeDate] = {
-        pd_obj.parade_night_id: pd_obj for pd_obj in pd_rows_cc if pd_obj.parade_night_id
+    pn_to_pd_cc: dict[str, ParadeNight] = {
+        pn_obj.id: pn_obj for pn_obj in pd_rows_cc
     }
     # Active training classes for this planning year, joined to stage name for PW Stage focus
     active_class_rows = (
@@ -3021,13 +2986,10 @@ def get_class_forecasts(
     ).scalar() or 0
 
     # Average sessions per past parade night in this year
-    # "This year" scoped by ParadeDate.planning_year_id → ParadeNight
-    pdate_pn_ids = sa_select(ParadeDate.parade_night_id).where(
-        ParadeDate.planning_year_id == year_id,
-        ParadeDate.parade_night_id.isnot(None),
-    ).distinct()
+    # "This year" scoped by ParadeNight.planning_year_id (Phase B: direct FK)
     past_pn_ids_in_year = sa_select(ParadeNight.id).where(
-        ParadeNight.id.in_(pdate_pn_ids), ParadeNight.date <= today_str
+        ParadeNight.planning_year_id == year_id,
+        ParadeNight.date <= today_str,
     )
     total_sessions_this_year = db.query(func.count(TrainingSession.id)).filter(
         TrainingSession.parade_night_id.in_(past_pn_ids_in_year),
@@ -3202,15 +3164,12 @@ def list_missions(
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py)
 
-    # Get all parade date IDs and their linked parade night IDs for this year
-    pd_rows = db.query(ParadeDate).filter(
-        ParadeDate.planning_year_id == year_id,
-        ParadeDate.is_active == True,  # noqa: E712
+    # Get all parade nights for this year (Phase B: direct planning_year_id FK)
+    pn_rows = db.query(ParadeNight).filter(
+        ParadeNight.planning_year_id == year_id,
+        ParadeNight.is_active == True,  # noqa: E712
     ).all()
-    pn_to_pd: dict[str, ParadeDate] = {}
-    for pd_obj in pd_rows:
-        if pd_obj.parade_night_id:
-            pn_to_pd[pd_obj.parade_night_id] = pd_obj
+    pn_to_pd: dict[str, ParadeNight] = {pn_obj.id: pn_obj for pn_obj in pn_rows}
 
     # Pull all sessions for parade nights in this year
     pn_ids = list(pn_to_pd.keys())
@@ -3312,10 +3271,10 @@ def list_missions(
         return {
             "session_id": s.id,
             "parade_night_id": s.parade_night_id,
-            "parade_date": pd_obj.parade_date if pd_obj else None,
+            "parade_date": pd_obj.date if pd_obj else None,
             "parade_date_id": pd_obj.id if pd_obj else None,
             "term": (pd_obj.term if pd_obj and pd_obj.term else
-                     (_term_for_date(pd_obj.parade_date, py.year) if pd_obj else None)),
+                     (_term_for_date(pd_obj.date, py.year) if pd_obj else None)),
             "session_number": s.period_number,
             "part_number": s.part_number,
             "cadet_group": s.cadet_group,
@@ -3370,7 +3329,7 @@ def list_missions(
             in_range = False
             for s in scheduled:
                 pd_obj = pn_to_pd.get(s.parade_night_id)
-                d = pd_obj.parade_date if pd_obj else None
+                d = pd_obj.date if pd_obj else None
                 if not d:
                     continue
                 if start_date and d < start_date:
@@ -3386,7 +3345,7 @@ def list_missions(
         if term:
             matching = [s for s in scheduled
                         if pn_to_pd.get(s.parade_night_id) and
-                        (_term_for_date(pn_to_pd[s.parade_night_id].parade_date, py.year) == term or
+                        (_term_for_date(pn_to_pd[s.parade_night_id].date, py.year) == term or
                          (pn_to_pd[s.parade_night_id].term == term))]
             if not matching and status == "scheduled":
                 continue
@@ -3483,23 +3442,11 @@ def assign_mission(
     if not ci:
         raise HTTPException(404, detail={"error": "curriculum_item_not_found"})
 
-    pd_obj = db.get(ParadeDate, body.parade_date_id)
+    pd_obj = db.get(ParadeNight, body.parade_date_id)
     if not pd_obj or pd_obj.planning_year_id != year_id:
         raise HTTPException(404, detail={"error": "parade_date_not_found"})
 
-    unit_id = pd_obj.unit_id or py.unit_id
-    if not pd_obj.parade_night_id and unit_id:
-        pn_new = _find_or_create_parade_night(db, unit_id, pd_obj.parade_date, p)
-        if pn_new:
-            pd_obj.parade_night_id = pn_new.id
-            db.flush()
-
-    if not pd_obj.parade_night_id:
-        raise HTTPException(400, detail={"error": "no_parade_night_linked"})
-
-    pn = db.get(ParadeNight, pd_obj.parade_night_id)
-    if not pn:
-        raise HTTPException(404, detail={"error": "parade_night_not_found"})
+    pn = pd_obj  # parade_date_id is now the parade_night_id post-merge
 
     s = TrainingSession(
         parade_night_id=pn.id, squadron_id=pn.squadron_id,
@@ -3531,7 +3478,7 @@ def assign_mission(
     db.commit()
     _run_conflict_check(year_id, body.parade_date_id, db)
     audit(db, p, object_type="session", object_id=s.id, action="assign_mission",
-          new={"curriculum": ci.code, "date": pd_obj.parade_date, "session": body.session_number,
+          new={"curriculum": ci.code, "date": pd_obj.date, "session": body.session_number,
                "group": body.cadet_group})
     return _real_session_out(s, db)
 
@@ -3550,9 +3497,9 @@ def get_annual_program(
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py)
 
-    all_dates = db.query(ParadeDate).filter(
-        ParadeDate.planning_year_id == year_id,
-    ).order_by(ParadeDate.parade_date).all()
+    all_dates = db.query(ParadeNight).filter(
+        ParadeNight.planning_year_id == year_id,
+    ).order_by(ParadeNight.date).all()
 
     all_holidays = db.query(HolidayPeriod).filter(
         HolidayPeriod.planning_year_id == year_id,
@@ -3563,13 +3510,14 @@ def get_annual_program(
         AnchorEvent.is_archived == False,  # noqa: E712
     ).order_by(AnchorEvent.start_date).all()
 
-    # Bulk-fetch all parade nights and sessions in 2 queries (avoids N+1)
-    all_pn_ids_pre = [d.parade_night_id for d in all_dates if d.parade_night_id]
+    # Bulk-fetch sessions for all parade nights (all_dates ARE the parade nights now)
+    all_pn_ids_pre = [d.id for d in all_dates]
     pn_map: dict = {}
     ts_by_pn: dict = {}
+    ts_rows: list = []
+    # all_dates ARE the parade nights now (Phase B merge); pn_map maps id→night
+    pn_map = {d.id: d for d in all_dates}
     if all_pn_ids_pre:
-        pn_rows = db.query(ParadeNight).filter(ParadeNight.id.in_(all_pn_ids_pre)).all()
-        pn_map = {pn.id: pn for pn in pn_rows}
         ts_rows = db.query(TrainingSession).filter(
             TrainingSession.parade_night_id.in_(all_pn_ids_pre),
             TrainingSession.is_archived == False,  # noqa: E712
@@ -3603,29 +3551,24 @@ def get_annual_program(
             for ci in db.query(CurriculumItem).filter(CurriculumItem.id.in_(ci_ids_ap)).all():
                 ci_tier_ap[ci.id] = {"core_status": ci.core_status}
 
-    # Build per-date-id session index (eliminates need for a separate /night-summaries call)
-    pn_to_date_id = {d.parade_night_id: d.id for d in all_dates if d.parade_night_id}
-    ts_by_date_id: dict[str, list] = {}
-    for pn_id, sess_list in ts_by_pn.items():
-        date_id = pn_to_date_id.get(pn_id)
-        if date_id:
-            ts_by_date_id[date_id] = sess_list
+    # Build per-date-id session index (pn_id == date_id now — same record)
+    ts_by_date_id: dict[str, list] = ts_by_pn  # direct alias: same keys
 
-    # Bulk-load conflict counts and notices per parade date (2 extra queries, no N+1)
-    all_date_ids = [d.id for d in all_dates]
+    # Bulk-load conflict counts and notices per parade night (2 extra queries, no N+1)
+    all_pn_ids = all_pn_ids_pre
     conflict_counts_map: dict[str, int] = {}
     notices_by_date_id: dict[str, list] = {}
-    if all_date_ids:
+    if all_pn_ids:
         for c in db.query(PlanningConflict).filter(
-            PlanningConflict.parade_date_id.in_(all_date_ids),
+            PlanningConflict.parade_night_id.in_(all_pn_ids),
             PlanningConflict.is_resolved == False,  # noqa: E712
         ).all():
-            conflict_counts_map[c.parade_date_id] = conflict_counts_map.get(c.parade_date_id, 0) + 1
+            conflict_counts_map[c.parade_night_id] = conflict_counts_map.get(c.parade_night_id, 0) + 1
         for n in db.query(PlanningNotice).filter(
-            PlanningNotice.parade_date_id.in_(all_date_ids),
+            PlanningNotice.parade_night_id.in_(all_pn_ids),
             PlanningNotice.is_archived == False,  # noqa: E712
         ).all():
-            notices_by_date_id.setdefault(n.parade_date_id, []).append(n)
+            notices_by_date_id.setdefault(n.parade_night_id, []).append(n)
 
     def _in_range(d: str, start: str, end: str) -> bool:
         return start <= d <= end
@@ -3638,26 +3581,22 @@ def get_annual_program(
         t_end   = f"{yr}-{te}"
         term_label = f"T{t_num}"
 
-        t_dates = [d for d in all_dates if t_start <= d.parade_date <= t_end]
+        t_dates = [d for d in all_dates if t_start <= d.date <= t_end]
         t_holidays = [h for h in all_holidays
                       if not (h.end_date < t_start or h.start_date > t_end)]
         t_anchors = [a for a in all_anchors
                      if _in_range(a.start_date, t_start, t_end)]
 
-        # Per-date session fill summary (uses pre-fetched pn_map / ts_by_pn)
+        # Per-date session fill summary (all_dates ARE parade nights in Phase B)
         date_summaries = []
-        for pd_obj in t_dates:
-            session_count = 0
-            filled = 0
-            pn = pn_map.get(pd_obj.parade_night_id) if pd_obj.parade_night_id else None
-            if pn:
-                sessions = ts_by_pn.get(pn.id, [])
-                session_count = pn.session_count
-                filled = len([s for s in sessions if s.curriculum_item_id or s.custom_title])
-            in_hol = any(_in_range(pd_obj.parade_date, h.start_date, h.end_date)
+        for pn_obj in t_dates:
+            sessions = ts_by_pn.get(pn_obj.id, [])
+            session_count = pn_obj.session_count
+            filled = len([s for s in sessions if s.curriculum_item_id or s.custom_title])
+            in_hol = any(_in_range(pn_obj.date, h.start_date, h.end_date)
                          for h in t_holidays if h.affects_parade)
             # Inline session summaries — facilitator & location are denormalized on TrainingSession
-            date_sessions = ts_by_date_id.get(pd_obj.id, [])
+            date_sessions = ts_by_date_id.get(pn_obj.id, [])
             sessions_summary = [
                 {
                     "session_id": s.id,
@@ -3673,14 +3612,14 @@ def get_annual_program(
                 for s in date_sessions
             ]
             date_summaries.append({
-                **_date_out(pd_obj),
+                **_night_out_as_date(pn_obj),
                 "term": term_label,
                 "session_count": session_count,
                 "filled_count": filled,
                 "in_holiday": in_hol,
                 "sessions_summary": sessions_summary,
-                "conflict_count": conflict_counts_map.get(pd_obj.id, 0),
-                "notices": [_notice_out(n) for n in notices_by_date_id.get(pd_obj.id, [])],
+                "conflict_count": conflict_counts_map.get(pn_obj.id, 0),
+                "notices": [_notice_out(n) for n in notices_by_date_id.get(pn_obj.id, [])],
             })
 
         def _anchor_v14_out(a: AnchorEvent) -> dict:
@@ -3884,37 +3823,41 @@ def rollover_year(
             ))
             training_classes_copied += 1
 
-    # Copy parade dates (same weekday pattern, new year)
+    # Copy parade dates (same weekday pattern, new year) — Phase B: create ParadeNight rows
     dates_copied = 0
-    old_dates = db.query(ParadeDate).filter(
-        ParadeDate.planning_year_id == year_id,
-        ParadeDate.is_active == True,  # noqa: E712
-    ).order_by(ParadeDate.parade_date).all()
+    new_sq = db.get(Squadron, new_py.unit_id) if new_py.unit_id else None
+    old_dates = db.query(ParadeNight).filter(
+        ParadeNight.planning_year_id == year_id,
+        ParadeNight.is_active == True,  # noqa: E712
+    ).order_by(ParadeNight.date).all()
     year_delta = target_year - py.year
-    for old_pd in old_dates:
+    for old_pn in old_dates:
         try:
-            new_date_str = date.fromisoformat(old_pd.parade_date).replace(
-                year=date.fromisoformat(old_pd.parade_date).year + year_delta
+            new_date_str = date.fromisoformat(old_pn.date).replace(
+                year=date.fromisoformat(old_pn.date).year + year_delta
             ).isoformat()
         except (ValueError, AttributeError):
             continue
-        pn_new = _find_or_create_parade_night(db, new_py.unit_id, new_date_str, p)
-        npd = ParadeDate(
-            id=str(uuid.uuid4()), planning_year_id=new_py.id,
-            unit_id=new_py.unit_id, parade_date=new_date_str,
-            parade_type=old_pd.parade_type, is_active=True,
-            term=old_pd.term,
-            parade_night_id=pn_new.id if pn_new else None,
+        new_pn = ParadeNight(
+            id=str(uuid.uuid4()),
+            squadron_id=new_py.unit_id,
+            wing_id=new_sq.wing_id if new_sq else old_pn.wing_id,
+            date=new_date_str,
+            planning_year_id=new_py.id,
+            parade_type=old_pn.parade_type,
+            is_active=True,
+            term=old_pn.term,
+            created_by=p.user_id,
             created_at=utcnow(), updated_at=utcnow(),
         )
-        db.add(npd)
+        db.add(new_pn)
         dates_copied += 1
 
     # Carry forward incomplete sessions as draft assignments
     sessions_carried = 0
     if body.carry_incomplete_sessions:
         # Find sessions that were NOT delivered in the old year
-        old_pn_ids = [d.parade_night_id for d in old_dates if d.parade_night_id]
+        old_pn_ids = [d.id for d in old_dates]
         if old_pn_ids:
             incomplete = db.query(TrainingSession).filter(
                 TrainingSession.parade_night_id.in_(old_pn_ids),
@@ -3977,7 +3920,7 @@ def export_annual_program_xlsx(
     ws1.append(dates_headers)
     for cell in ws1[1]:
         cell.fill = hdr_fill; cell.font = hdr_font
-    all_dates = db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).order_by(ParadeDate.parade_date).all()
+    all_dates = db.query(ParadeNight).filter(ParadeNight.planning_year_id == year_id).order_by(ParadeNight.date).all()
     yr_str = str(py.year)
     def _term_label(ds: str) -> str:
         for t_num, (ts, te) in sorted(_WA_TERM_RANGES.items()):
@@ -3986,12 +3929,12 @@ def export_annual_program_xlsx(
         return ""
     for d in all_dates:
         try:
-            dow = date.fromisoformat(d.parade_date).strftime("%A")
+            dow = date.fromisoformat(d.date).strftime("%A")
         except Exception:
             dow = ""
-        ws1.append([d.parade_date, dow, d.parade_type or "standard",
+        ws1.append([d.date, dow, d.parade_type or "standard",
                     "Yes" if d.is_active else "No",
-                    _neutralise_cell(d.notes or ""), _term_label(d.parade_date)])
+                    _neutralise_cell(d.notes or ""), _term_label(d.date)])
 
     # Sheet 2 — Holidays
     ws2 = wb.create_sheet("Holidays")
@@ -4083,38 +4026,34 @@ async def export_year_csv(
     writer.writerow(["PARADE SCHEDULE"])
     writer.writerow(["date", "type", "term", "week", "notes"])
     parade_dates = (
-        db.query(ParadeDate)
-        .filter(ParadeDate.planning_year_id == year_id, ParadeDate.is_active.is_(True))
-        .order_by(ParadeDate.parade_date)
+        db.query(ParadeNight)
+        .filter(ParadeNight.planning_year_id == year_id, ParadeNight.is_active.is_(True))
+        .order_by(ParadeNight.date)
         .all()
     )
-    for pd_row in parade_dates:
+    for pn_row in parade_dates:
         writer.writerow([
-            pd_row.parade_date or "",
-            pd_row.parade_type or "",
-            pd_row.term or "",
-            pd_row.week_number or "",
-            (pd_row.notes or "").replace("\n", " "),
+            pn_row.date or "",
+            pn_row.parade_type or "",
+            pn_row.term or "",
+            pn_row.week_number or "",
+            (pn_row.notes or "").replace("\n", " "),
         ])
     writer.writerow([])
 
     # ── Sessions ──────────────────────────────────────────────────────────────
-    # Build a parade_night_id → parade_date lookup from the dates already loaded.
-    pn_to_date: dict[str, str] = {}
-    for pd_row in parade_dates:
-        if pd_row.parade_night_id and pd_row.parade_night_id not in pn_to_date:
-            pn_to_date[pd_row.parade_night_id] = pd_row.parade_date or ""
+    # Build a parade_night_id → parade_date lookup from the nights already loaded.
+    pn_to_date: dict[str, str] = {pn_row.id: pn_row.date or "" for pn_row in parade_dates}
 
     sessions = (
         db.query(TrainingSession)
         .join(ParadeNight, TrainingSession.parade_night_id == ParadeNight.id)
-        .join(ParadeDate, ParadeDate.parade_night_id == ParadeNight.id)
         .filter(
-            ParadeDate.planning_year_id == year_id,
-            ParadeDate.is_active.is_(True),
+            ParadeNight.planning_year_id == year_id,
+            ParadeNight.is_active.is_(True),
             TrainingSession.is_archived.is_(False),
         )
-        .order_by(ParadeDate.parade_date, TrainingSession.period_number)
+        .order_by(ParadeNight.date, TrainingSession.period_number)
         .all()
     )
 
@@ -4185,22 +4124,17 @@ def export_schedule_xlsx(
                 return f"T{t_num}"
         return ""
 
-    all_dates = db.query(ParadeDate).filter(
-        ParadeDate.planning_year_id == year_id,
-        ParadeDate.is_active == True,  # noqa: E712
-    ).order_by(ParadeDate.parade_date).all()
+    all_dates = db.query(ParadeNight).filter(
+        ParadeNight.planning_year_id == year_id,
+        ParadeNight.is_active == True,  # noqa: E712
+    ).order_by(ParadeNight.date).all()
 
-    for pd_obj in all_dates:
-        if not pd_obj.parade_night_id:
-            continue
-        pn = db.get(ParadeNight, pd_obj.parade_night_id)
-        if not pn:
-            continue
+    for pn in all_dates:
         try:
-            dow = date.fromisoformat(pd_obj.parade_date).strftime("%A")
+            dow = date.fromisoformat(pn.date).strftime("%A")
         except Exception:
             dow = ""
-        term = _term_lbl(pd_obj.parade_date)
+        term = _term_lbl(pn.date)
         sessions = db.query(TrainingSession).filter(
             TrainingSession.parade_night_id == pn.id,
             TrainingSession.is_archived == False,  # noqa: E712
@@ -4208,7 +4142,7 @@ def export_schedule_xlsx(
         ).order_by(TrainingSession.period_number).all()
         for s in sessions:
             ws.append([
-                pd_obj.parade_date, dow, term,
+                pn.date, dow, term,
                 _neutralise_cell(s.period_number),
                 _neutralise_cell(s.cadet_group or ""),
                 _neutralise_cell(s.phase_at_time or ""),
@@ -4277,9 +4211,9 @@ async def import_schedule_xlsx(
         raise HTTPException(400, detail={"error": "missing_required_columns",
                                          "message": "Sheet must have Date and Session columns"})
 
-    # Build parade-date → parade-night index for this year
-    all_pd = db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).all()
-    pd_by_date = {d.parade_date: d for d in all_pd}
+    # Phase B: query ParadeNight directly — pn.id == former parade_date_id alias
+    all_pd = db.query(ParadeNight).filter(ParadeNight.planning_year_id == year_id).all()
+    pd_by_date = {d.date: d for d in all_pd}
 
     sq_id = p.acting_squadron_id or p.squadron_id
 
@@ -4322,7 +4256,7 @@ async def import_schedule_xlsx(
             continue
 
         pd_obj = pd_by_date.get(date_str)
-        if not pd_obj or not pd_obj.parade_night_id:
+        if not pd_obj:
             not_found += 1
             preview_rows.append({"date": date_str, "session": period, "group": group_val,
                                   "code": code_val, "title": title_val,
@@ -4330,7 +4264,7 @@ async def import_schedule_xlsx(
             continue
 
         q = db.query(TrainingSession).filter(
-            TrainingSession.parade_night_id == pd_obj.parade_night_id,
+            TrainingSession.parade_night_id == pd_obj.id,
             TrainingSession.period_number == period,
             TrainingSession.is_archived == False,  # noqa: E712
         )
@@ -4468,10 +4402,10 @@ async def import_annual_program(
     if not rows:
         raise HTTPException(400, detail={"error": "empty_file"})
 
-    # Deduplication sets
+    # Deduplication sets — Phase B: query ParadeNight directly
     existing_pdate_keys: set[tuple[str, str | None]] = {
-        (pd.parade_date, pd.unit_id)
-        for pd in db.query(ParadeDate).filter(ParadeDate.planning_year_id == year_id).all()
+        (pn.date, pn.squadron_id)
+        for pn in db.query(ParadeNight).filter(ParadeNight.planning_year_id == year_id).all()
     }
     act_q = db.query(Activity.cea_seq_nr).filter(
         Activity.cea_seq_nr.isnot(None),
@@ -4561,21 +4495,25 @@ async def import_annual_program(
             continue
 
         if is_parade:
-            key = (date_start, resolved_sqn.id if resolved_sqn else None)
+            sqn_id_for_key = resolved_sqn.id if resolved_sqn else None
+            key = (date_start, sqn_id_for_key)
             if key in existing_pdate_keys:
                 skipped += 1
                 continue
-            pn = _find_or_create_parade_night(
-                db, resolved_sqn.id if resolved_sqn else None, date_start, p
-            )
-            pd_obj = ParadeDate(
-                id=str(uuid.uuid4()), planning_year_id=year_id,
-                unit_id=resolved_sqn.id if resolved_sqn else py.unit_id,
-                parade_date=date_start, parade_type="normal", is_active=True,
-                parade_night_id=pn.id if pn else None,
+            # Phase B: create ParadeNight directly with planning_year_id
+            sqn_for_pn = resolved_sqn or (db.get(Squadron, py.unit_id) if py.unit_id else None)
+            pn_import = ParadeNight(
+                id=str(uuid.uuid4()),
+                squadron_id=sqn_id_for_key or py.unit_id,
+                wing_id=sqn_for_pn.wing_id if sqn_for_pn else py.wing_id,
+                date=date_start,
+                planning_year_id=year_id,
+                parade_type="normal",
+                is_active=True,
+                created_by=p.user_id,
                 created_at=utcnow(), updated_at=utcnow(),
             )
-            db.add(pd_obj)
+            db.add(pn_import)
             existing_pdate_keys.add(key)
             created_parade_dates += 1
         else:
@@ -4709,20 +4647,20 @@ def add_facilitator_leave(
         .all()
     )
     parade_night_ids = {s.parade_night_id for s in sessions_with_fac if s.parade_night_id}
-    pd_by_night: dict[str, ParadeDate] = {}
+    pn_by_id: dict[str, ParadeNight] = {}
     if parade_night_ids:
-        pd_by_night = {
-            pd_obj.parade_night_id: pd_obj
-            for pd_obj in db.query(ParadeDate)
-            .filter(ParadeDate.parade_night_id.in_(list(parade_night_ids)))
+        pn_by_id = {
+            pn_obj.id: pn_obj
+            for pn_obj in db.query(ParadeNight)
+            .filter(ParadeNight.id.in_(list(parade_night_ids)))
             .all()
         }
     for s in sessions_with_fac:
-        pd_obj = pd_by_night.get(s.parade_night_id)
-        if pd_obj and body.start_date <= pd_obj.parade_date <= body.end_date:
+        pn_obj = pn_by_id.get(s.parade_night_id)
+        if pn_obj and body.start_date <= pn_obj.date <= body.end_date:
             affected.append({
                 "session_id": s.id,
-                "parade_date": pd_obj.parade_date,
+                "parade_date": pn_obj.date,
                 "session_number": s.period_number,
                 "cadet_group": s.cadet_group,
                 "title": s.curriculum_title_at_time or s.custom_title,
@@ -4806,36 +4744,26 @@ def facilitator_workload(
     if not fac:
         raise HTTPException(404, detail={"error": "facilitator_not_found"})
 
-    # Get all parade dates in this year, and their linked parade nights.
-    # NOTE: this endpoint originally queried `ScheduledSession` (parade_date_id
-    # FK), a model that is never populated by any live create/update path in
-    # this codebase (confirmed: no `ScheduledSession(...)` instantiation exists
-    # anywhere) — so it always silently returned zero workload. Rewritten to
-    # use the same ParadeDate -> ParadeNight -> TrainingSession join `list_missions`
-    # already uses for the real, live session data.
-    pd_rows = db.query(ParadeDate).filter(
-        ParadeDate.planning_year_id == year_id,
-        ParadeDate.is_active == True,  # noqa: E712
+    # Phase B: query ParadeNight directly — no more ParadeDate intermediary
+    pn_rows = db.query(ParadeNight).filter(
+        ParadeNight.planning_year_id == year_id,
+        ParadeNight.is_active == True,  # noqa: E712
     ).all()
-    pn_to_pd: dict[str, ParadeDate] = {
-        pd_obj.parade_night_id: pd_obj for pd_obj in pd_rows if pd_obj.parade_night_id
-    }
+    pn_by_id: dict[str, ParadeNight] = {pn_obj.id: pn_obj for pn_obj in pn_rows}
 
     sessions: list[TrainingSession] = []
-    if pn_to_pd:
+    if pn_by_id:
         sessions = db.query(TrainingSession).filter(
             TrainingSession.facilitator_id == fac_id,
-            TrainingSession.parade_night_id.in_(list(pn_to_pd.keys())),
+            TrainingSession.parade_night_id.in_(list(pn_by_id.keys())),
             TrainingSession.is_archived == False,  # noqa: E712
         ).all()
 
     total_scheduled = len(sessions)
-    # Group by parade date (each parade night maps to exactly one parade date here)
+    # Group by parade night
     by_night: dict[str, list] = {}
     for s in sessions:
-        pd_obj = pn_to_pd.get(s.parade_night_id)
-        if pd_obj:
-            by_night.setdefault(pd_obj.id, []).append(s)
+        by_night.setdefault(s.parade_night_id, []).append(s)
 
     nights_with_sessions = len(by_night)
     counts_per_night = [len(v) for v in by_night.values()]
@@ -4846,8 +4774,8 @@ def facilitator_workload(
     today = date.today().isoformat()
     upcoming: list[dict] = []
     for s in sessions:
-        pd_obj = pn_to_pd.get(s.parade_night_id)
-        pd_date = pd_obj.parade_date if pd_obj else ""
+        pn_obj = pn_by_id.get(s.parade_night_id)
+        pd_date = pn_obj.date if pn_obj else ""
         if pd_date >= today:
             title = s.curriculum_title_at_time or s.custom_title
             upcoming.append({
@@ -4875,8 +4803,7 @@ def facilitator_workload(
 def _notice_out(n: PlanningNotice) -> dict:
     return {
         "notice_id": n.id,
-        "planning_year_id": n.planning_year_id,
-        "parade_date_id": n.parade_date_id,
+        "parade_night_id": n.parade_night_id,
         "notice_text": n.notice_text,
         "audience": n.audience,
         "priority": n.priority,
@@ -4893,47 +4820,36 @@ def night_summaries(
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    """Return all parade dates with session/conflict/notice summary for the planning grid."""
+    """Return all parade nights with session/conflict/notice summary for the planning grid."""
     require_role(p, "sqn_admin", "sqn_general", "wing_admin", "national_admin", "system_admin")
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py)
 
+    # Phase B: query ParadeNight directly; pn.id == former parade_date_id alias
     all_dates = (
-        db.query(ParadeDate)
+        db.query(ParadeNight)
         .filter(
-            ParadeDate.planning_year_id == year_id,
-            ParadeDate.is_active == True,  # noqa: E712
+            ParadeNight.planning_year_id == year_id,
+            ParadeNight.is_active == True,  # noqa: E712
         )
-        .order_by(ParadeDate.parade_date)
+        .order_by(ParadeNight.date)
         .all()
     )
 
-    date_ids = [pd.id for pd in all_dates]
+    # pn.id is now the authoritative identifier (was parade_date_id in the old dual-table model)
+    night_ids = [pn.id for pn in all_dates]
 
-    # Bulk-fetch all linked ParadeNight records (avoids N+1 in loop below)
-    pn_ids = [pd.parade_night_id for pd in all_dates if pd.parade_night_id]
-    pn_map: dict[str, ParadeNight] = {}
-    if pn_ids:
-        for pn_row in db.query(ParadeNight).filter(ParadeNight.id.in_(pn_ids)).all():
-            pn_map[pn_row.id] = pn_row
-
-    # Map parade_night_id → parade_date_id for session grouping
-    pn_to_date_id = {pd.parade_night_id: pd.id for pd in all_dates if pd.parade_night_id}
-
-    # Batch-load sessions from TrainingSession (the real/current model, linked via parade_night_id)
-    # NOTE: legacy ScheduledSession records are not loaded — they predate the v14 rewrite
+    # Batch-load sessions — parade_night_id IS the pn.id directly
     all_ts: list[TrainingSession] = []
-    if pn_ids:
+    if night_ids:
         all_ts = db.query(TrainingSession).filter(
-            TrainingSession.parade_night_id.in_(pn_ids),
+            TrainingSession.parade_night_id.in_(night_ids),
             TrainingSession.is_archived == False,  # noqa: E712
         ).all()
 
-    ts_by_date: dict[str, list[TrainingSession]] = {}
+    ts_by_night: dict[str, list[TrainingSession]] = {}
     for s in all_ts:
-        date_id = pn_to_date_id.get(s.parade_night_id)
-        if date_id:
-            ts_by_date.setdefault(date_id, []).append(s)
+        ts_by_night.setdefault(s.parade_night_id, []).append(s)
 
     # Batch-load facilitator display names
     fac_ids = list({s.facilitator_id for s in all_ts if s.facilitator_id})
@@ -4951,27 +4867,27 @@ def night_summaries(
 
     # Batch-load unresolved conflict counts
     conflict_counts: dict[str, int] = {}
-    if date_ids:
+    if night_ids:
         for c in db.query(PlanningConflict).filter(
-            PlanningConflict.parade_date_id.in_(date_ids),
+            PlanningConflict.parade_night_id.in_(night_ids),
             PlanningConflict.is_resolved == False,  # noqa: E712
         ).all():
-            conflict_counts[c.parade_date_id] = conflict_counts.get(c.parade_date_id, 0) + 1
+            conflict_counts[c.parade_night_id] = conflict_counts.get(c.parade_night_id, 0) + 1
 
     # Batch-load notices
-    notices_by_date: dict[str, list[PlanningNotice]] = {}
-    if date_ids:
+    notices_by_night: dict[str, list[PlanningNotice]] = {}
+    if night_ids:
         for n in db.query(PlanningNotice).filter(
-            PlanningNotice.parade_date_id.in_(date_ids),
+            PlanningNotice.parade_night_id.in_(night_ids),
             PlanningNotice.is_archived == False,  # noqa: E712
         ).all():
-            notices_by_date.setdefault(n.parade_date_id, []).append(n)
+            notices_by_night.setdefault(n.parade_night_id, []).append(n)
 
     summaries = []
-    for pd in all_dates:
-        pd_sessions = ts_by_date.get(pd.id, [])
+    for pn in all_dates:
+        pn_sessions = ts_by_night.get(pn.id, [])
         session_summaries = []
-        for s in pd_sessions:
+        for s in pn_sessions:
             session_summaries.append({
                 "session_id": s.id,
                 "period": s.period_number,
@@ -4983,21 +4899,18 @@ def night_summaries(
                              if s.training_area_id else None,
             })
 
-        pn = pn_map.get(pd.parade_night_id) if pd.parade_night_id else None
-        pn_notes = getattr(pn, "notes", None) if pn else None
-
         summaries.append({
-            "parade_date_id": pd.id,
-            "parade_date": pd.parade_date,
-            "parade_type": pd.parade_type,
-            "term": getattr(pd, "term", None),
-            "week_number": getattr(pd, "week_number", None),
-            "notes": pd.notes,
-            "parade_night_notes": pn_notes,
-            "parade_night_id": pd.parade_night_id,
+            "parade_date_id": pn.id,  # backward-compat alias
+            "parade_night_id": pn.id,
+            "parade_date": pn.date,
+            "parade_type": pn.parade_type,
+            "term": pn.term,
+            "week_number": pn.week_number,
+            "notes": pn.notes,
+            "parade_night_notes": pn.notes,
             "sessions": session_summaries,
-            "conflict_count": conflict_counts.get(pd.id, 0),
-            "notices": [_notice_out(n) for n in notices_by_date.get(pd.id, [])],
+            "conflict_count": conflict_counts.get(pn.id, 0),
+            "notices": [_notice_out(n) for n in notices_by_night.get(pn.id, [])],
         })
 
     return {"planning_year_id": year_id, "summaries": summaries}
@@ -5011,21 +4924,22 @@ class NoticeIn(BaseModel):
     audience: str | None = Field(default=None, max_length=60)
 
 
-@router.get("/parade-dates/{date_id}/notices")
+@router.get("/parade-nights/{night_id}/notices")
+@router.get("/parade-dates/{night_id}/notices")  # backward-compat alias (date_id == pn.id after Phase B)
 def list_notices(
-    date_id: str,
+    night_id: str,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
     require_role(p, "sqn_admin", "wing_admin", "national_admin", "system_admin")
-    pd = db.get(ParadeDate, date_id)
-    if not pd:
-        raise HTTPException(404, detail={"error": "parade_date_not_found"})
-    _require_year_access(p, _get_year_or_404(pd.planning_year_id, db), write=False)
+    pn = db.get(ParadeNight, night_id)
+    if not pn:
+        raise HTTPException(404, detail={"error": "parade_night_not_found"})
+    _require_year_access(p, _get_year_or_404(pn.planning_year_id, db), write=False)
     notices = (
         db.query(PlanningNotice)
         .filter(
-            PlanningNotice.parade_date_id == date_id,
+            PlanningNotice.parade_night_id == night_id,
             PlanningNotice.is_archived == False,  # noqa: E712
         )
         .order_by(PlanningNotice.created_at)
@@ -5034,20 +4948,20 @@ def list_notices(
     return [_notice_out(n) for n in notices]
 
 
-@router.post("/parade-dates/{date_id}/notices")
+@router.post("/parade-nights/{night_id}/notices")
+@router.post("/parade-dates/{night_id}/notices")  # backward-compat alias (date_id == pn.id after Phase B)
 def create_notice(
-    date_id: str,
+    night_id: str,
     body: NoticeIn,
     db: DBSession = Depends(get_db),
     p: Principal = Depends(get_principal),
 ):
-    pd = db.get(ParadeDate, date_id)
-    if not pd:
-        raise HTTPException(404, detail={"error": "parade_date_not_found"})
-    _require_year_access(p, _get_year_or_404(pd.planning_year_id, db), write=True)
+    pn = db.get(ParadeNight, night_id)
+    if not pn:
+        raise HTTPException(404, detail={"error": "parade_night_not_found"})
+    _require_year_access(p, _get_year_or_404(pn.planning_year_id, db), write=True)
     notice = PlanningNotice(
-        planning_year_id=pd.planning_year_id,
-        parade_date_id=date_id,
+        parade_night_id=night_id,
         notice_text=body.notice_text.strip(),
         priority=body.priority,
         audience=body.audience,
@@ -5077,10 +4991,10 @@ def update_notice(
     notice = db.get(PlanningNotice, notice_id)
     if not notice or notice.is_archived:
         raise HTTPException(404, detail={"error": "notice_not_found"})
-    pd = db.get(ParadeDate, notice.parade_date_id)
-    if not pd:
-        raise HTTPException(404, detail={"error": "parade_date_not_found"})
-    _require_year_access(p, _get_year_or_404(pd.planning_year_id, db), write=True)
+    pn = db.get(ParadeNight, notice.parade_night_id)
+    if not pn:
+        raise HTTPException(404, detail={"error": "parade_night_not_found"})
+    _require_year_access(p, _get_year_or_404(pn.planning_year_id, db), write=True)
     _check_version(notice, body.version)
     if body.notice_text is not None:
         notice.notice_text = body.notice_text.strip()
@@ -5103,10 +5017,10 @@ def archive_notice(
     notice = db.get(PlanningNotice, notice_id)
     if not notice:
         raise HTTPException(404, detail={"error": "notice_not_found"})
-    pd = db.get(ParadeDate, notice.parade_date_id)
-    if not pd:
-        raise HTTPException(404, detail={"error": "parade_date_not_found"})
-    _require_year_access(p, _get_year_or_404(pd.planning_year_id, db), write=True)
+    pn = db.get(ParadeNight, notice.parade_night_id)
+    if not pn:
+        raise HTTPException(404, detail={"error": "parade_night_not_found"})
+    _require_year_access(p, _get_year_or_404(pn.planning_year_id, db), write=True)
     notice.is_archived = True
     db.commit()
     audit(db, p, object_type="PlanningNotice", object_id=notice_id, action="archive")

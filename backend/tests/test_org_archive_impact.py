@@ -173,7 +173,7 @@ def test_squadron_archive_impact_can_archive_matches_actual_archive_result(clien
 
 def test_squadron_archive_impact_surfaces_future_parade_night_soft_warning(client):
     from app.database import SessionLocal
-    from app.models import ParadeNight
+    from app.models import ParadeNight, PlanningYear
 
     hdr = _sysadmin(client)
     wing_id = _make_wing(client, hdr, "IMSW5")
@@ -182,7 +182,15 @@ def test_squadron_archive_impact_surfaces_future_parade_night_soft_warning(clien
     future_date = (date.today() + timedelta(days=30)).isoformat()
     db = SessionLocal()
     try:
-        pn = ParadeNight(squadron_id=sqn_id, wing_id=wing_id, training_year=date.today().year,
+        # Phase B: ParadeNight requires a planning_year_id FK. Create a year
+        # for this fresh squadron so the parade night can be attached to it.
+        py = PlanningYear(
+            unit_id=sqn_id, wing_id=wing_id, year=date.today().year,
+            name="IMS501 Archive Impact Test Year", active_status=True,
+        )
+        db.add(py)
+        db.flush()
+        pn = ParadeNight(squadron_id=sqn_id, wing_id=wing_id, planning_year_id=py.id,
                          date=future_date, term="1", session_count=3)
         db.add(pn); db.commit()
     finally:
