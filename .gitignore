@@ -48,6 +48,10 @@ connected-frontend/.local-dev/
 .DS_Store
 .AppleDouble
 .LSOverride
+# Finder duplicate copies (e.g. "filename 2.ext") created when a file is
+# dragged into a folder that already contains one with the same name.
+*\ 2.*
+*\ 2/
 
 # IDE
 .vscode/
