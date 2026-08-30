@@ -2041,6 +2041,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             </select>
             <label class="admin-el" style="display:none;font-size:var(--fs-xs);font-weight:400;align-items:center;gap:4px;margin-right:8px"><input type="checkbox" id="fac-show-archived" onchange="_facsToggleShowArchived()"> Show archived</label>
             <button class="btn btn-dk admin-el" style="display:none" onclick="editFacId=null;document.getElementById('fac-rank').value='';document.getElementById('fac-first').value='';document.getElementById('fac-last').value='';document.getElementById('fac-modal-title').textContent='+ Add Facilitator';document.getElementById('fa-areas-create').style.display='';document.getElementById('fa-areas-edit').style.display='none';_clearFacDupWarning();_resetFacSaveState();openModal('m-add-fac')">+ Add Facilitator</button>
+            <button class="btn btn-secondary btn-sm admin-el" style="display:none" onclick="openFacImportModal()">Import CSV &#8593;</button>
           </div>
         </div>
         <div class="dash-grid" style="margin-bottom:16px">
@@ -4033,6 +4034,38 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <button class="btn btn-out" onclick="closeModal('m-add-fac')">Cancel</button>
       <button class="btn btn-dk" id="fac-save-btn" onclick="saveFac()">Save Profile</button>
       <button class="btn btn-out" id="fac-save-anyway-btn" style="display:none" onclick="saveFac(true)">Add anyway</button>
+    </div>
+  </div>
+</div>
+
+<!-- Facilitator CSV Import (P1-IMPORT-02) -->
+<div class="modal-bg" id="m-fac-import" role="dialog" aria-labelledby="fac-import-title" aria-modal="true">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-hdr">
+      <div class="modal-title" id="fac-import-title">Import Facilitators from CSV</div>
+      <button class="modal-x" aria-label="Close" onclick="closeModal('m-fac-import')">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="alert a-info" style="margin-bottom:12px;font-size:var(--fs-xs)">Upload a CSV with columns: <strong>rank, first_name, last_name, type, subject_areas, active_status</strong>. Separate multiple subject areas with semicolons. Download the template to see the expected format.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+        <button class="btn btn-secondary btn-sm" onclick="_facImportTemplate()">&#x2B07; Download template</button>
+        <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0">&#x1F4C2; Choose CSV file<input type="file" id="fac-import-file" accept=".csv,text/csv" style="display:none" onchange="_facImportPreview()"></label>
+        <span id="fac-import-filename" style="font-size:var(--fs-xs);color:var(--muted)"></span>
+      </div>
+      <div id="fac-import-preview" style="display:none">
+        <div class="tw" style="max-height:260px;overflow-y:auto;margin-bottom:10px">
+          <table>
+            <thead><tr><th>Rank</th><th>Name</th><th>Type</th><th>Subject areas</th><th>Action</th><th title="Force-create despite duplicate">Force?</th></tr></thead>
+            <tbody id="fac-import-tbody"></tbody>
+          </table>
+        </div>
+        <div id="fac-import-summary" style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:6px"></div>
+      </div>
+      <div id="fac-import-result" style="display:none"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('m-fac-import')">Cancel</button>
+      <button class="btn btn-dk" id="fac-import-confirm-btn" style="display:none" onclick="_facImportConfirm()">Import</button>
     </div>
   </div>
 </div>
@@ -14104,6 +14137,139 @@ function _readFacAreas(){
   ['drill','air','field','pd','sc','sqn'].forEach(k=>{if(document.getElementById('fa-'+k)&&document.getElementById('fa-'+k).checked)areas.push({drill:'Drill',air:'Air_Space',field:'Field',pd:'Personal_Dev',sc:'Service_Community',sqn:'SQN_Affairs'}[k]);});
   return areas;
 }
+// ── Facilitator CSV Import (P1-IMPORT-02) ────────────────────────────────────
+// Raw fetch (not api()) because multipart/form-data requires the browser to set
+// Content-Type with its boundary string — api() always injects application/json.
+// Same pattern as the CEA import already uses.
+let _facImportRows=[];
+let _facImportConfirmIdx=new Set();
+
+function openFacImportModal(){
+  document.getElementById('fac-import-file').value='';
+  document.getElementById('fac-import-filename').textContent='';
+  document.getElementById('fac-import-preview').style.display='none';
+  document.getElementById('fac-import-result').style.display='none';
+  document.getElementById('fac-import-confirm-btn').style.display='none';
+  _facImportRows=[];
+  _facImportConfirmIdx=new Set();
+  openModal('m-fac-import');
+}
+
+function _facImportTemplate(){
+  // The backend sets Content-Disposition:attachment; session cookie handles auth.
+  const a=document.createElement('a');
+  a.href=API_BASE+'/api/facilitators/import/template.csv';
+  a.target='_blank'; a.rel='noopener'; a.click();
+}
+
+async function _facImportPreview(){
+  const fi=document.getElementById('fac-import-file');
+  if(!fi.files||!fi.files[0])return;
+  document.getElementById('fac-import-filename').textContent=fi.files[0].name;
+  document.getElementById('fac-import-preview').style.display='none';
+  document.getElementById('fac-import-result').style.display='none';
+  document.getElementById('fac-import-confirm-btn').style.display='none';
+  _facImportRows=[];
+  _facImportConfirmIdx=new Set();
+  const fd=new FormData(); fd.append('file',fi.files[0]);
+  try{
+    const tok=tokenGet();
+    const resp=await fetch(API_BASE+'/api/facilitators/import?preview=true',{
+      method:'POST',headers:tok?{Authorization:'Bearer '+tok}:{},credentials:'include',body:fd,
+    });
+    if(!resp.ok){
+      const err=await resp.json().catch(function(){return{};});
+      const msg=(err.detail&&err.detail.message)||(typeof err.detail==='string'&&err.detail)||('Preview failed ('+resp.status+')');
+      showToast(msg,true); return;
+    }
+    const data=await resp.json();
+    _facImportRows=data.rows||[];
+    _facImportRenderPreview(data);
+  }catch(e){showToast('Cannot reach the training system.',true);}
+}
+
+function _facImportRenderPreview(data){
+  const tbody=document.getElementById('fac-import-tbody');
+  tbody.innerHTML='';
+  _facImportRows.forEach(function(r){
+    const isDup=r.action==='duplicate'||r.action==='duplicate_in_file';
+    const badge=r.action==='create'?'<span class="badge b-ok">New</span>'
+      :isDup?'<span class="badge b-amber">Exists</span>'
+      :'<span class="badge b-red">Error</span>';
+    const forceCell=isDup?'<input type="checkbox" aria-label="Force create despite duplicate" onchange="_facImportToggleDup('+r.row+')">':'';
+    const msgCell=r.message?'<br><span style="color:var(--red);font-size:var(--fs-2xs)">'+esc(r.message)+'</span>':'';
+    const areas=(r.subject_areas||[]).join(', ');
+    const tr=document.createElement('tr');
+    tr.innerHTML='<td>'+esc(r.current_rank||'')+'</td>'
+      +'<td>'+esc((r.first_name?r.first_name+' ':'')+r.last_name)+'</td>'
+      +'<td>'+esc(r.type||'')+'</td>'
+      +'<td style="font-size:var(--fs-2xs)">'+esc(areas)+'</td>'
+      +'<td>'+badge+msgCell+'</td>'
+      +'<td>'+forceCell+'</td>';
+    tbody.appendChild(tr);
+  });
+  const toCreate=data.to_create||0;
+  document.getElementById('fac-import-summary').textContent=
+    toCreate+' to create · '+(data.duplicates||0)+' duplicate(s) · '+(data.errors||0)+' error(s)';
+  document.getElementById('fac-import-preview').style.display='';
+  const btn=document.getElementById('fac-import-confirm-btn');
+  if(toCreate>0){
+    btn.textContent='Import '+toCreate+' facilitator'+(toCreate===1?'':'s');
+    btn.disabled=false; btn.style.display='';
+  } else {
+    btn.style.display='none';
+  }
+}
+
+function _facImportToggleDup(rowIdx){
+  if(_facImportConfirmIdx.has(rowIdx))_facImportConfirmIdx.delete(rowIdx);
+  else _facImportConfirmIdx.add(rowIdx);
+  const autoCreate=_facImportRows.filter(function(r){return r.action==='create';}).length;
+  const total=autoCreate+_facImportConfirmIdx.size;
+  const btn=document.getElementById('fac-import-confirm-btn');
+  if(total>0){
+    btn.textContent='Import '+total+' facilitator'+(total===1?'':'s');
+    btn.style.display='';
+  } else {
+    btn.style.display='none';
+  }
+}
+
+async function _facImportConfirm(){
+  const fi=document.getElementById('fac-import-file');
+  if(!fi.files||!fi.files[0])return;
+  const btn=document.getElementById('fac-import-confirm-btn');
+  btn.disabled=true; btn.textContent='Importing…';
+  const fd=new FormData(); fd.append('file',fi.files[0]);
+  let url=API_BASE+'/api/facilitators/import?preview=false';
+  if(_facImportConfirmIdx.size)url+='&confirm_duplicate_rows='+Array.from(_facImportConfirmIdx).join(',');
+  try{
+    const tok=tokenGet();
+    const resp=await fetch(url,{
+      method:'POST',headers:tok?{Authorization:'Bearer '+tok}:{},credentials:'include',body:fd,
+    });
+    if(!resp.ok){
+      const err=await resp.json().catch(function(){return{};});
+      const msg=(err.detail&&err.detail.message)||(typeof err.detail==='string'&&err.detail)||('Import failed ('+resp.status+')');
+      btn.disabled=false; btn.textContent='Import';
+      showToast(msg,true); return;
+    }
+    const data=await resp.json();
+    document.getElementById('fac-import-preview').style.display='none';
+    btn.style.display='none';
+    const res=document.getElementById('fac-import-result');
+    res.style.display='';
+    res.innerHTML='<div class="alert a-ok">Imported <strong>'+data.created+'</strong> facilitator'+(data.created===1?'':'s')
+      +(data.skipped?'. Skipped: '+data.skipped+'.':'')+(data.errors?' Errors: '+data.errors+'.':'')+'</div>';
+    // Refresh facilitators page
+    await loadData(); renderFacs(); if(typeof loadFacilitatorStats==='function')await loadFacilitatorStats();
+  }catch(e){
+    btn.disabled=false; btn.textContent='Import';
+    showToast('Cannot reach the training system.',true);
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function _clearFacDupWarning(){
   const w=document.getElementById('fac-dup-warn'); if(w){w.style.display='none';w.textContent='';}
   const anyway=document.getElementById('fac-save-anyway-btn'); if(anyway)anyway.style.display='none';
