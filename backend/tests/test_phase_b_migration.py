@@ -77,9 +77,13 @@ def isolated_db(tmp_path, monkeypatch):
                 created_by VARCHAR,
                 updated_by VARCHAR,
                 parade_night_id VARCHAR,
+                unit_id VARCHAR,
                 planning_year_id VARCHAR,
+                parade_date VARCHAR(10),
+                parade_type VARCHAR,
                 week_number INTEGER,
                 is_active INTEGER NOT NULL DEFAULT 1,
+                notes TEXT,
                 cancellation_reason TEXT,
                 is_archived INTEGER NOT NULL DEFAULT 0
             )
@@ -148,6 +152,60 @@ def isolated_db(tmp_path, monkeypatch):
             )
         """))
 
+        # ── Seed pre-migration rows ──
+        # SQLite does not enforce FK constraints (no PRAGMA foreign_keys=ON), so we
+        # can insert minimal rows with fake FKs to avoid the full org hierarchy.
+        # We DO need a real squadron row because migration step 3c queries it.
+        conn.execute(text("""
+            INSERT INTO wings
+                (id, national_id, code, name, short_name, active_status, is_archived,
+                 created_at, updated_at)
+            VALUES ('wing-test-001', 'nat-test-001', 'TESTWG', 'Test Wing', 'TESTWG',
+                    1, 0, datetime('now'), datetime('now'))
+        """))
+        conn.execute(text("""
+            INSERT INTO squadrons
+                (id, wing_id, code, name, short_name, unit_type, default_session_count,
+                 active_status, is_archived, created_at, updated_at)
+            VALUES ('sqn-test-001', 'wing-test-001', 'TEST001', 'Test Squadron', 'TST',
+                    'standard_squadron', 3, 1, 0, datetime('now'), datetime('now'))
+        """))
+        conn.execute(text("""
+            INSERT INTO planning_years
+                (id, unit_id, year, name, active_status, version,
+                 created_at, updated_at)
+            VALUES ('py-test-001', 'sqn-test-001', 9001, 'Test Year 9001',
+                    1, 0, datetime('now'), datetime('now'))
+        """))
+
+        # A parade_night that has a linked parade_date (normal case)
+        conn.execute(text("""
+            INSERT INTO parade_nights (id, squadron_id, wing_id, training_year, date,
+                                       parade_type, version, is_archived)
+            VALUES ('pn-linked-001', 'sqn-test-001', 'wing-test-001', 9001, '9001-09-05',
+                    'normal', 0, 0)
+        """))
+        conn.execute(text("""
+            INSERT INTO parade_dates (id, parade_night_id, unit_id, planning_year_id,
+                                      parade_date, parade_type, week_number, is_active)
+            VALUES ('pd-linked-001', 'pn-linked-001', 'sqn-test-001', 'py-test-001',
+                    '9001-09-05', 'normal', 1, 1)
+        """))
+
+        # An orphan parade_date (parade_night_id IS NULL) — step 3c must create a night
+        conn.execute(text("""
+            INSERT INTO parade_dates (id, parade_night_id, unit_id, planning_year_id,
+                                      parade_date, parade_type, week_number, is_active)
+            VALUES ('pd-orphan-001', NULL, 'sqn-test-001', 'py-test-001',
+                    '9001-09-12', 'normal', 2, 1)
+        """))
+
+        # A planning_notice referencing pd-linked-001 (so FK rename is exercised)
+        conn.execute(text("""
+            INSERT INTO planning_notices (id, parade_date_id, notice_text, is_archived, version)
+            VALUES ('notice-001', 'pd-linked-001', 'Test notice', 0, 0)
+        """))
+
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", url)
     command.stamp(alembic_cfg, "d5f81a3c9e27")
@@ -195,3 +253,78 @@ def test_phase_b_forward(isolated_db):
     anchor_cols = {c["name"] for c in inspector2.get_columns("anchor_prep_plans")}
     assert "planned_parade_night_id" in anchor_cols
     assert "planned_parade_date_id" not in anchor_cols
+
+    # ── Verify backfill results ──
+    with engine.connect() as conn:
+        # 1. Linked night got planning_year_id from its parade_date
+        row = conn.execute(text(
+            "SELECT planning_year_id FROM parade_nights WHERE id = 'pn-linked-001'"
+        )).fetchone()
+        assert row is not None, "pn-linked-001 must still exist"
+        assert row[0] == "py-test-001", "linked night must have planning_year_id backfilled"
+
+        # 2. Orphan parade_date got a new parade_night row created for it
+        orphan_night = conn.execute(text("""
+            SELECT pn.id, pn.planning_year_id, pn.date
+            FROM parade_nights pn
+            WHERE pn.date = '9001-09-12' AND pn.id != 'pn-linked-001'
+        """)).fetchone()
+        assert orphan_night is not None, (
+            "A new parade_night must have been created for the orphan parade_date"
+        )
+        assert orphan_night[1] == "py-test-001", (
+            "The new night must have planning_year_id from the orphan parade_date"
+        )
+        # The orphan parade_date must now point at the new night
+        pd_link = conn.execute(text(
+            "SELECT parade_night_id FROM _parade_dates_deprecated WHERE id = 'pd-orphan-001'"
+        )).fetchone()
+        assert pd_link is not None and pd_link[0] == orphan_night[0], (
+            "orphan parade_date must now link to the newly created night"
+        )
+
+        # 3. PlanningNotice parade_night_id points to a parade_nights.id
+        notice = conn.execute(text(
+            "SELECT parade_night_id FROM planning_notices WHERE id = 'notice-001'"
+        )).fetchone()
+        assert notice is not None, "notice-001 must survive the migration"
+        # The notice parade_night_id must point to the linked parade_night (pn-linked-001)
+        assert notice[0] == "pn-linked-001", (
+            "planning_notice parade_night_id must point to parade_nights.id after rename"
+        )
+
+        # 4. Verify planning_notices.parade_night_id value is a real parade_nights.id
+        # (data-level FK integrity check — SQLite PRAGMA foreign_key_list may not
+        # reflect named batch-mode FKs, so we validate referential integrity directly)
+        ref_night = conn.execute(text(
+            "SELECT id FROM parade_nights WHERE id = 'pn-linked-001'"
+        )).fetchone()
+        assert ref_night is not None, (
+            "pn-linked-001 must exist in parade_nights so notice FK is satisfied"
+        )
+        # Verify the notice's parade_night_id matches an actual parade_nights row
+        notice_ref = conn.execute(text("""
+            SELECT pn.id FROM planning_notices n
+            JOIN parade_nights pn ON pn.id = n.parade_night_id
+            WHERE n.id = 'notice-001'
+        """)).fetchone()
+        assert notice_ref is not None, (
+            "planning_notices.parade_night_id must join successfully to parade_nights"
+        )
+
+
+def test_phase_b_aborts_on_orphan_night(isolated_db):
+    """_abort_if_blockers raises RuntimeError when a night has no linked parade_date."""
+    engine, cfg = isolated_db
+    # Insert a parade_night with no linked parade_date — this is the blocking condition
+    with engine.begin() as conn:
+        conn.execute(text("""
+            INSERT INTO parade_nights (id, squadron_id, wing_id, training_year, date,
+                                       parade_type, version, is_archived)
+            VALUES ('pn-orphan-blocker', 'sqn-test-001', 'wing-test-001', 9001,
+                    '9001-10-10', 'normal', 0, 0)
+        """))
+    # The migration must abort with RuntimeError on the orphan night
+    import pytest as _pytest
+    with _pytest.raises(RuntimeError, match="Phase B migration blocked"):
+        command.upgrade(cfg, "head")
