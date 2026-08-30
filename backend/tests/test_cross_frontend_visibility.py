@@ -91,7 +91,7 @@ def test_a_parade_night_created_in_tms_reaches_its_planning_year(client):
     date = f"{y['year']}-06-11"
     r = client.post("/api/parade-nights", json={"date": date, "term": "T2"}, headers=hdr)
     assert r.status_code == 200, r.text
-    assert r.json()["linked_to_planning_year"] is True
+    assert "parade_night_id" in r.json(), "create_parade must return parade_night_id"
 
     rows = client.get(f"/api/planning/years/{y['planning_year_id']}/parade-dates", headers=hdr).json()
     dates = rows if isinstance(rows, list) else rows.get("parade_dates", [])

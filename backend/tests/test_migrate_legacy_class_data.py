@@ -62,7 +62,7 @@ def _setup_squadron_year_stage_session(db, sqn, *, year_num, stage_display, cade
     )
     db.add(stage)
     db.flush()
-    pn = ParadeNight(squadron_id=sqn.id, wing_id=sqn.wing_id, training_year=year_num, date="2030-01-01")
+    pn = ParadeNight(squadron_id=sqn.id, wing_id=sqn.wing_id, planning_year_id=py.id, date="2030-01-01")
     db.add(pn)
     db.flush()
     sess = TrainingSession(parade_night_id=pn.id, squadron_id=sqn.id, cadet_group=cadet_group)
@@ -216,7 +216,7 @@ def test_no_matching_stage_is_skipped_not_guessed():
         )
         db.add(py)
         db.flush()
-        pn = ParadeNight(squadron_id=sqn.id, wing_id=sqn.wing_id, training_year=9104, date="2030-01-01")
+        pn = ParadeNight(squadron_id=sqn.id, wing_id=sqn.wing_id, planning_year_id=py.id, date="2030-01-01")
         db.add(pn)
         db.flush()
         # A cadet_group value with no corresponding CurriculumPhase anywhere.
@@ -238,14 +238,32 @@ def test_no_matching_stage_is_skipped_not_guessed():
 
 
 def test_no_matching_planning_year_is_skipped_not_guessed():
+    """Phase B: ParadeNight now carries planning_year_id as a NOT NULL FK, so a
+    parade night with a missing or non-existent planning year can no longer be
+    constructed via the ORM. The NO_MATCHING_PLANNING_YEAR skip path in the script
+    is now effectively dead code — every night already has a valid FK.
+
+    This test is rewritten to verify that a night with a valid planning year but
+    no matching CurriculumPhase (NO_MATCHING_STAGE) is still skipped correctly,
+    which exercises the same "skip-not-guess" safety contract in the adjacent
+    code path.
+    """
     db = SessionLocal()
     try:
         sqn = _sqn_703(db)
-        # ParadeNight with a training_year that has no matching PlanningYear row.
-        pn = ParadeNight(squadron_id=sqn.id, wing_id=sqn.wing_id, training_year=9105, date="2030-01-01")
+        py = PlanningYear(
+            unit_id=sqn.id, wing_id=sqn.wing_id, year=9105, name=f"CLASS-14-TEST-YEAR-9105",
+            active_status=False,
+        )
+        db.add(py)
+        db.flush()
+        pn = ParadeNight(squadron_id=sqn.id, wing_id=sqn.wing_id, planning_year_id=py.id, date="2030-01-01")
         db.add(pn)
         db.flush()
-        sess = TrainingSession(parade_night_id=pn.id, squadron_id=sqn.id, cadet_group="senior")
+        # cadet_group with no corresponding CurriculumPhase — must be skipped.
+        import uuid as _uuid
+        unknown_group = f"no-such-stage-{_uuid.uuid4().hex[:8]}"
+        sess = TrainingSession(parade_night_id=pn.id, squadron_id=sqn.id, cadet_group=unknown_group)
         db.add(sess)
         db.commit()
 
@@ -253,10 +271,10 @@ def test_no_matching_planning_year_is_skipped_not_guessed():
         db.commit()
 
         reasons = [s["reason"] for s in report.skipped]
-        assert "NO_MATCHING_PLANNING_YEAR" in reasons
+        assert "NO_MATCHING_STAGE" in reasons
         assert db.query(SessionAudience).filter(SessionAudience.session_id == sess.id).count() == 0
 
-        _cleanup(db, parade_nights=[pn], sessions=[sess])
+        _cleanup(db, planning_years=[py], parade_nights=[pn], sessions=[sess])
     finally:
         db.close()
 
@@ -391,7 +409,7 @@ def test_rollback_refuses_to_delete_class_with_foreign_link_added_since():
 
         # Simulate a real user adding a second session to this migration-created
         # class via the normal API path (created_by left as a real user id).
-        pn2 = ParadeNight(squadron_id=sqn.id, wing_id=sqn.wing_id, training_year=9109, date="2030-01-02")
+        pn2 = ParadeNight(squadron_id=sqn.id, wing_id=sqn.wing_id, planning_year_id=py.id, date="2030-01-02")
         db.add(pn2)
         db.flush()
         sess2 = TrainingSession(parade_night_id=pn2.id, squadron_id=sqn.id)

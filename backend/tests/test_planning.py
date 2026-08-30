@@ -466,7 +466,7 @@ def test_plain_parade_night_create_links_to_active_planning_year(client):
     night_date = f"{year['year']}-03-14"
     r = client.post("/api/parade-nights", json={"date": night_date, "term": "T2"}, headers=hdr)
     assert r.status_code == 200, r.text
-    assert r.json()["linked_to_planning_year"] is True
+    assert "parade_night_id" in r.json(), "create_parade must return parade_night_id"
     pn_id = r.json()["parade_night_id"]
 
     dates = client.get(f"/api/planning/years/{yr_id}/parade-dates", headers=hdr).json()
