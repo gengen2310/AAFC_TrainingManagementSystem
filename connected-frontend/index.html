@@ -2244,20 +2244,44 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             </div>
           </div>
         </div>
-        <div class="card">
-          <h2 class="ctitle">Session Structure</h2>
-          <!-- This paragraph used to explain the PRECEDENCE RULE in five sentences:
-               template wins, unless it has no Training Period blocks, unless you type
-               a number, and none of it touches existing nights. It was asked about
-               three times and rewritten twice, and still did not land.
-               The live note below (#s-sess-effect) already answers the only question
-               anyone actually has -- "what will happen when I add a night?" -- using
-               this squadron's real template. So the rule is gone and the outcome
-               stays. What remains here is the one thing the note cannot say: what a
+        <!-- Part 13: Session Structure and Timing Templates were two cards, four
+             apart on this page, deciding one outcome between them. The fallback
+             number sat above the templates that usually override it, so the note
+             below it had to end with "This setting is not used while that
+             template applies" -- an admission that the visible control was inert.
+             They are now one card, ordered: what happens now, what governs it,
+             what applies when nothing does. Every id is unchanged; saveSettings,
+             renderTimingTemplates and _renderSessionStructureNote all still find
+             what they look for. -->
+        <div class="card" id="settings-parade-night-structure">
+          <h2 class="ctitle">Parade Night Structure</h2>
+          <!-- The precedence RULE used to be spelled out in five sentences here.
+               It was asked about three times and rewritten twice, and still did
+               not land. #s-sess-effect answers the only question anyone actually
+               has -- "what will happen when I add a night?" -- using this
+               squadron's real template, so the rule is gone and the outcome
+               stays. What remains is the one thing the note cannot say: what a
                training period IS. -->
-          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 12px">
+          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 10px">
             A training period is one teaching slot on a parade night.
           </p>
+          <!-- The answer comes first, before either control that produces it. -->
+          <!-- display:block overrides .alert's flex layout. The note's text is
+               built with inline <b> runs, and each one becomes a flex item under
+               .alert{display:flex;gap:8px}, which inserted 8px gaps mid-sentence
+               and a space before the comma. Caught in the browser, not the
+               markup. -->
+          <div id="s-sess-effect" class="alert a-info" style="display:block;font-size:var(--fs-xs);margin:0 0 16px"></div>
+
+          <h3 class="ctitle">Timing templates</h3>
+          <div style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:10px">Named parade night schedules with ordered blocks. Training Period blocks generate schedulable curriculum sessions. New parade nights automatically use the template effective on their date.</div>
+          <div id="timing-templates-list" style="margin-bottom:12px"><div style="color:var(--muted);font-size:var(--fs-xs)">Loading…</div></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+            <button class="btn btn-sky admin-el" onclick="openTimingTemplateModal()">+ New Template</button>
+            <span id="timing-msg" style="font-size:var(--fs-xs);font-weight:700"></span>
+          </div>
+
+          <h3 class="ctitle" style="margin-top:20px">When no template applies</h3>
           <div class="form-row">
             <div class="ff"><label for="s-sess">Default Training Periods</label>
               <!-- The <label for> supplies the accessible name. The aria-label that
@@ -2269,10 +2293,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
               </select>
             </div>
           </div>
-          <!-- Asked three times what this does with the timing template. The rule
-               was written out above and did not land, so the page now states the
-               OUTCOME for this squadron rather than the rule. -->
-          <div id="s-sess-effect" class="muted" style="font-size:var(--fs-2xs);margin:-2px 0 4px"></div>
           <div class="muted" style="font-size:var(--fs-2xs);margin:0 0 10px">Parade nights you have already created keep the periods they have.</div>
           <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
             <button class="btn btn-dk admin-el" onclick="saveSettings()">Save Settings</button>
@@ -2305,15 +2325,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </p>
           <div id="settings-yn-table-wrap"><p class="muted" style="padding:12px 0;font-size:var(--fs-xs)">Loading…</p></div>
           <div id="settings-yn-postcreate" style="display:none" class="alert a-info mt-2"></div>
-        </div>
-        <div class="card" id="settings-timing-templates-wrap">
-          <h2 class="ctitle">Timing Templates</h2>
-          <div style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:10px">Named parade night schedules with ordered blocks. Training Period blocks generate schedulable curriculum sessions. New parade nights automatically use the template effective on their date.</div>
-          <div id="timing-templates-list" style="margin-bottom:12px"><div style="color:var(--muted);font-size:var(--fs-xs)">Loading…</div></div>
-          <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
-            <button class="btn btn-sky admin-el" onclick="openTimingTemplateModal()">+ New Template</button>
-            <span id="timing-msg" style="font-size:var(--fs-xs);font-weight:700"></span>
-          </div>
         </div>
         <!-- Training Classes (unit configuration per planning year) -->
         <div class="card admin-el" id="settings-training-classes-wrap" style="display:none">
@@ -10360,13 +10371,13 @@ function _renderSessionStructureNote(){
   if(tpl&&periods>0){
     el.innerHTML='In effect now: <b>'+esc(tpl.name||'your timing template')+'</b> defines <b>'+periods+
       ' training period'+(periods===1?'':'s')+'</b>, so new parade nights get '+periods+
-      '. This setting is not used while that template applies.';
+      '. The default below applies only when no template does.';
   }else if(tpl){
     el.innerHTML='In effect now: <b>'+esc(tpl.name||'your timing template')+
-      '</b> defines no training periods, so this setting is used — new parade nights get <b>'+
+      '</b> defines no training periods, so the default below applies — new parade nights get <b>'+
       fallback+'</b>.';
   }else{
-    el.innerHTML='No timing template covers today, so this setting is used — new parade nights get <b>'+
+    el.innerHTML='No timing template covers today, so the default below applies — new parade nights get <b>'+
       fallback+'</b>.';
   }
 }

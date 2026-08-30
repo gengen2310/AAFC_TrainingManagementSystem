@@ -4,6 +4,25 @@
 
 Staging: `df3fff6`. Not released to production.
 
+### One Parade Night Structure card
+
+Two settings cards decided one outcome between them, four cards apart on the
+page: **Session Structure** (holding the single Default Training Periods
+control) and **Timing Templates**, with Display Size and Training Years in
+between. The fallback number sat *above* the templates that usually override
+it, so the note beneath it had to end "This setting is not used while that
+template applies" — an admission that the visible control was inert.
+
+They are now one **Parade Night Structure** card, ordered by what you need to
+know: what happens now, what governs it, and what applies when nothing does.
+
+- The live note comes first, before either control that produces it, and now
+  reads "The default below applies only when no template does" — it points at
+  the section rather than saying "this setting", which was ambiguous once
+  several controls shared a card.
+- Nothing moved in the data model and no control changed behaviour. Timing
+  templates, the default, and Save Settings all work exactly as before.
+
 ### Eight boolean flags could make a record invisible
 
 The migrated schema and the models disagreed on 68 of 1062 columns, always in
