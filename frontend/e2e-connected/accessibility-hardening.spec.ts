@@ -239,7 +239,11 @@ test("VIS-04: pressing Enter on a nav item navigates to that page", async ({ pag
   // Enter/Space, so keyboard-only users can navigate without a pointer device.
   await loginSquadron(page);
   // Find the "Parade Nights" nav item (sqn_admin scope always includes it).
-  const pnNavItem = page.locator(".nav-item[data-page='parade-nights']");
+  // By role and name, not a data-page hook: the nav items never had one, so
+  // this test matched nothing and passed no judgement on anything for as long
+  // as it has existed. Selecting the way a user perceives the control also
+  // asserts its accessible name.
+  const pnNavItem = page.getByRole("link", { name: "Parade Nights", exact: true });
   await expect(pnNavItem).toBeVisible({ timeout: 8000 });
   // Focus it and press Enter.
   await pnNavItem.focus();
@@ -251,7 +255,7 @@ test("VIS-04: pressing Enter on a nav item navigates to that page", async ({ pag
 test("VIS-04: pressing Space on a nav item navigates to that page", async ({ page }) => {
   // Same keyboard wiring — Space should behave identically to Enter on nav items.
   await loginSquadron(page);
-  const dashNavItem = page.locator(".nav-item[data-page='dashboard']");
+  const dashNavItem = page.getByRole("link", { name: "Training Dashboard", exact: true });
   await expect(dashNavItem).toBeVisible({ timeout: 8000 });
   // First navigate away so we can confirm Space brings us back.
   await page.evaluate(() => (window as any).nav("parade-nights"));

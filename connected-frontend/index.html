@@ -1379,7 +1379,13 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <nav class="sidenav no-print">
       <!-- B-DS logo bar: unit name only, populated by bootApp() -->
       <div class="nav-logo-bar"><div id="nav-unit-name">Training System</div></div>
-      <div class="nav-items-wrap" role="link">
+      <!-- G11: role="link" removed 2026-08-30 (Part 91 browser matrix). This is
+           the scrolling container for the nav items (flex:1; overflow-y:auto).
+           It has no href, no handler, no tabindex and no accessible name, so a
+           screen reader announced a nameless link wrapping the entire menu. The
+           real links are the .nav-item children, which keep role="link". The
+           surrounding <nav class="sidenav"> already provides the landmark. -->
+      <div class="nav-items-wrap">
       <!-- REM-25: reorganised around the Training Officer's actual planning
            cycle (Overview -> Plan Training -> People and Resources -> Needs
            Attention -> Settings) instead of the prior ad-hoc feature-area
