@@ -24,24 +24,22 @@ else:
     cursor = conn.cursor()
     placeholder = "?"
 
-# 1. Orphan nights — no linked parade_date row at all
+# 1. Orphan nights — no linked parade_date row at all (active OR archived)
 cursor.execute("""
     SELECT pn.id, pn.squadron_id, pn.date, pn.training_year
     FROM parade_nights pn
     LEFT JOIN parade_dates pd ON pd.parade_night_id = pn.id
     WHERE pd.id IS NULL
-      AND pn.is_archived = 0
     ORDER BY pn.squadron_id, pn.date
 """)
 orphans = cursor.fetchall()
 
-# 2. Linked nights whose parade_date has no planning_year_id
+# 2. Linked nights whose parade_date has no planning_year_id (active OR archived)
 cursor.execute("""
     SELECT pn.id, pn.squadron_id, pn.date, pd.id as pd_id, pd.planning_year_id
     FROM parade_nights pn
     JOIN parade_dates pd ON pd.parade_night_id = pn.id
     WHERE pd.planning_year_id IS NULL
-      AND pn.is_archived = 0
     ORDER BY pn.squadron_id, pn.date
 """)
 null_year = cursor.fetchall()
@@ -51,20 +49,24 @@ cursor.execute("""
     SELECT pn.id, pn.squadron_id, pn.date, COUNT(pd.id) as n
     FROM parade_nights pn
     JOIN parade_dates pd ON pd.parade_night_id = pn.id
-    WHERE pn.is_archived = 0
     GROUP BY pn.id HAVING COUNT(pd.id) > 1
     ORDER BY pn.squadron_id, pn.date
 """)
 duplicates = cursor.fetchall()
 
-# 4. Notices pointing at a parade_date with no night
+# 4. Notices with parade_date_id that doesn't exist in parade_dates at all
 cursor.execute("""
-    SELECT n.id, n.parade_date_id, pd.parade_night_id
-    FROM planning_notices n
-    JOIN parade_dates pd ON pd.id = n.parade_date_id
-    WHERE pd.parade_night_id IS NULL
+    SELECT COUNT(*) FROM planning_notices pn
+    WHERE pn.parade_date_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM parade_dates WHERE id = pn.parade_date_id)
 """)
-notice_orphans = cursor.fetchall()
+notice_orphan_count = cursor.fetchone()[0]
+
+# 5. Orphan parade_dates — rows where parade_night_id IS NULL (would be stranded)
+cursor.execute("""
+    SELECT COUNT(*) FROM parade_dates WHERE parade_night_id IS NULL
+""")
+orphan_dates_count = cursor.fetchone()[0]
 
 conn.close()
 
@@ -98,12 +100,18 @@ if duplicates:
 else:
     print("[OK] No nights with duplicate parade_date links.")
 
-if notice_orphans:
-    print(f"\n[WARN] {len(notice_orphans)} PlanningNotices point at a parade_date with no night:")
-    for row in notice_orphans:
-        print(f"  notice_id={row[0]}  parade_date_id={row[1]}")
+if notice_orphan_count:
+    print(f"\n[FAIL] {notice_orphan_count} PlanningNotice row(s) have parade_date_id pointing to "
+          "a non-existent parade_dates row — migration will fail with NOT NULL constraint:")
+    blockers.append(("dangling_notices", notice_orphan_count))
 else:
-    print("[OK] All PlanningNotices link to a parade_date that has a night.")
+    print("[OK] All PlanningNotices link to an existing parade_dates row.")
+
+if orphan_dates_count:
+    print(f"\n[FAIL] {orphan_dates_count} parade_dates row(s) with NULL parade_night_id would be stranded.")
+    blockers.append(("orphan_parade_dates", orphan_dates_count))
+else:
+    print("[OK] No orphan parade_dates rows (all have a linked parade_night_id).")
 
 print()
 if blockers:
