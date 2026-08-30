@@ -54,22 +54,26 @@ this file records where it started.
     unresolved          721  (pairs this tool could not build — you must pair these by hand)
 ```
 
-**Read the coverage line before the result line.** 727 pairs could not be built
+**Read the coverage line before the result line.** 721 pairs could not be built
 by the tool at all — it cannot resolve `color-mix()`, `data-theme` blocks, or
 inline styles, and this codebase uses all three. "0 failures" would describe
 what was measured, not the artifact.
 
-Of the 51 FAIL rows in the register, classified by hand against the CSS:
+Of the 51 FAIL rows in the register, every one classified by hand against the
+CSS. The counts are rows, and they sum to 51:
 
-| class | count | verdict |
+| class | rows | verdict |
 |---|---|---|
-| boundary-advisory (borders, WCAG 1.4.11) | 35 | advisory, not G1 |
-| foreground identical to background | 6 | **tool mis-pairing** — e.g. `.btn-out:hover` is `background:var(--dark); color:white`, a genuine 16.6:1 |
-| `rgba()` overlay read as opaque | 3 | **artefact** — `.dash-sec-hero` is a 3.5%-alpha gradient over white |
+| boundary-advisory (borders, WCAG 1.4.11) | 37 | advisory, not G1 text contrast |
+| disabled controls | 4 | exempt under WCAG 1.4.3 |
+| foreground identical to background | 4 | **tool mis-pairing** — `.btn-out:hover` is `background:var(--dark); color:white`, genuinely 16.6:1 |
+| `rgba()` overlay read as opaque | 4 | **artefact** — `.dash-sec-hero` is a 3.5%-alpha gradient over white |
 | CSS variable resolved to its high-contrast override | 1 | **artefact** — `.cal-chip.rescheduled`, whose own comment records 5.23:1 |
 | decorative 1px rule treated as text | 1 | **artefact** — `.faq-cat-name::after` |
-| disabled controls | 2 | exempt under WCAG 1.4.3 |
 | **genuine text-contrast failures remaining** | **0** | |
+
+Nothing in that table is unclassified. If a future run produces a row that does
+not fall into one of these classes, it is a real failure until proven otherwise.
 
 ## Three defects the audit found, all fixed
 
@@ -98,7 +102,7 @@ here:
 - **G3 200% text**, **G4 keyboard operability**, **G5 hit targets**,
   **G6 gesture alternatives**, **G11 semantics** — structural audits not yet run
   against every screen.
-- **The 727 unresolved pairs.** Closing them means pairing by hand or teaching
+- **The 721 unresolved pairs.** Closing them means pairing by hand or teaching
   the tool `color-mix()` and `data-theme`.
 - **The Planning Workspace contrast register.** Its styling is largely inline and
   in component files, which `css_audit.py` cannot enumerate; its token inventory
