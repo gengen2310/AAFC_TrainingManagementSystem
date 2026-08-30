@@ -62,7 +62,7 @@ def upgrade():
         is_active = COALESCE((
             SELECT pd.is_active FROM parade_dates pd
             WHERE pd.parade_night_id = parade_nights.id LIMIT 1
-        ), 1),
+        ), TRUE),
         cancellation_reason = (
             SELECT pd.cancellation_reason FROM parade_dates pd
             WHERE pd.parade_night_id = parade_nights.id LIMIT 1
@@ -101,7 +101,7 @@ def upgrade():
                 INSERT INTO planning_years
                     (id, unit_id, wing_id, year, name, active_status, version,
                      created_at, updated_at)
-                VALUES (:id, :uid, :wid, :yr, :name, 1, 0,
+                VALUES (:id, :uid, :wid, :yr, :name, TRUE, 0,
                         CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             """), {
                 "id": py_id, "uid": sq_id, "wid": wg_id,
@@ -163,7 +163,7 @@ def upgrade():
                  week_number, is_active, notes, is_archived, created_at, updated_at)
             VALUES (:nid, :date, :sqn_id, :wing_id, :py_id,
                     COALESCE(:ptype, 'normal'),
-                    :wknum, COALESCE(:active, 1), :notes, 0,
+                    :wknum, COALESCE(:active, TRUE), :notes, FALSE,
                     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """), {
             "nid": night_id, "date": row.parade_date,
