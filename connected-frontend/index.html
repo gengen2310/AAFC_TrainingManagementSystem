@@ -108,6 +108,20 @@
   /* DES-M02: extended spacing scale (4px base, fills gaps in existing --space-N) */
   /* B-DS spacing system — all padding/gap/margin must use these */
   --sp-xs:8px;--sp-sm:12px;--sp-md:16px;--sp-lg:20px;--sp-xl:24px;
+
+  /* ── Control scale (spec 2026-09-01) ──────────────────────────────────
+     One scale for every interactive control. 44 sits on the 4px spacing
+     grid above, so the touch floor and the spacing rhythm agree.
+
+     THE RULE: a variant may change padding, font-size, weight and colour.
+     It may NEVER reduce the hit size below --ctl-min. .btn-xs broke exactly
+     that -- a visual variant that also shrank the target to 28x28. */
+  --ctl-min:       44px;   /* floor for ANY interactive control, BOTH axes */
+  --ctl-h:         44px;   /* default control height                       */
+  --ctl-h-lg:      52px;   /* text inputs, selects, textareas              */
+  --ctl-pad-x:     16px;   /* = --sp-md                                    */
+  --ctl-pad-x-sm:  12px;   /* = --sp-sm                                    */
+  --ctl-gap:        8px;   /* = --sp-xs, minimum gap between adjacent targets */
   --gap-cards:10px;
   --radius:6px;--radius-lg:10px;
   /* Nav active state */
