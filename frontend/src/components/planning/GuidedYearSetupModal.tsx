@@ -1,28 +1,24 @@
 import { useState, useEffect } from "react";
 import { Modal } from "../Modal";
 import { Button } from "../ui";
-import { planningApi, trainingApi, orgApi } from "../../api";
+import { planningApi, orgApi } from "../../api";
 import { ApiError } from "../../api/client";
-import type { PlanningYear, TimingTemplateFull, CurriculumItem } from "../../api/types";
+import type { PlanningYear, TimingTemplateFull } from "../../api/types";
 
 // TRGO-03: a guided year-setup flow reachable at any time (not just when a squadron
 // has zero PlanningYears -- see SetupPanel.tsx for the original cold-start-only flow,
 // left unchanged so its existing coverage/behaviour doesn't regress). Every step here
 // is optional except creating/selecting the target year; each write goes through the
 // same endpoints the rest of the app uses (copy-setup, timing-template apply-from-date,
-// generate-parade-dates, create-session), so the same conflict detection, optimistic
-// locking, and audit logging already enforced there applies here too -- nothing new
-// is invented, this is a guided sequence over existing, validated actions.
+// generate-parade-dates), so the same conflict detection, optimistic locking, and audit
+// logging already enforced there applies here too.
 //
-// Bulk placement is a genuine second, non-drag-and-drop way to assign curriculum to
-// slots (there is no drag-and-drop anywhere in this app today -- the existing method
-// is already a keyboard-accessible click-to-open-form flow). This adds a multi-select
-// "place one curriculum item across several open slots at once" method, reusing the
-// exact create-session call the single-slot form uses.
+// The former "placement" step (bulk curriculum scheduling via legacy cadet_group strings)
+// was removed: it conflated Training Period with Session and used the deprecated cadet_group
+// model incompatible with multi-class-per-stage squadrons. Curriculum planning now happens
+// from the Planning Workspace once parade nights are set up.
 
-type Step = "start" | "timing" | "dates" | "placement" | "done";
-const CADET_GROUPS = ["orientation", "initial", "junior", "intermediate", "senior"] as const;
-const PERIODS = [1, 2, 3, 4, 5, 6];
+type Step = "start" | "timing" | "dates" | "done";
 
 interface Props {
   years: PlanningYear[];
@@ -74,8 +70,9 @@ export function GuidedYearSetupModal({ years, squadronId, onClose, onDone }: Pro
         <div className="form">
           <p><strong>Setup complete for {yearLabel}.</strong></p>
           <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
-            You can keep refining timing, dates, and placements at any time from the Planning
-            Workspace toolbar or by reopening this guided setup.
+            You can keep refining timing and dates at any time from the Planning
+            Workspace toolbar or by reopening this guided setup. Plan curriculum sessions
+            from the Planning Workspace once your parade nights are set.
           </p>
           <Button onClick={() => { onDone(); onClose(); }}>Close</Button>
         </div>
@@ -87,7 +84,7 @@ export function GuidedYearSetupModal({ years, squadronId, onClose, onDone }: Pro
     <Modal title="Guided year setup" onClose={onClose}>
       <div className="form">
         <ol style={{ display: "flex", gap: 6, fontSize: 'var(--fs-xs)', listStyle: "none", padding: 0, margin: "0 0 10px" }}>
-          {(["start", "timing", "dates", "placement"] as Step[]).map((s) => (
+          {(["start", "timing", "dates"] as Step[]).map((s) => (
             <li key={s} style={{
               padding: "2px 8px", borderRadius: 999,
               background: s === step ? "var(--aafc-blue, #51b0e3)" : "var(--surface-2, #f0f5fa)",
@@ -99,8 +96,8 @@ export function GuidedYearSetupModal({ years, squadronId, onClose, onDone }: Pro
         {step === "start" && (
           <>
             <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
-              Set up a training year, then optionally apply a timing template, generate
-              parade dates, and bulk-place curriculum onto open slots.
+              Set up a training year, then optionally apply a timing template and generate
+              parade dates. Plan curriculum from the Planning Workspace once dates are set.
             </p>
             <div style={{ marginTop: 8 }}>
               <label>Year
@@ -140,14 +137,6 @@ export function GuidedYearSetupModal({ years, squadronId, onClose, onDone }: Pro
             yearId={yearId}
             squadronId={squadronId}
             alreadyDone={datesAlreadyDone}
-            onSkip={() => setStep("placement")}
-            onDone={() => setStep("placement")}
-          />
-        )}
-
-        {step === "placement" && yearId && (
-          <PlacementStep
-            yearId={yearId}
             onSkip={() => setStep("done")}
             onDone={() => setStep("done")}
           />
@@ -375,150 +364,3 @@ function DatesStep({ yearId, squadronId, alreadyDone, onSkip, onDone }: {
   );
 }
 
-// ── Step: bulk-place a curriculum item across multiple open slots ────────────
-// Non-drag-and-drop placement method: pick a curriculum item + cadet group + period,
-// find open (unoccupied) slots across a date range, multi-select which to fill, and
-// create them all in one action. Every created session goes through the same
-// POST .../sessions endpoint the single-slot click-to-open-form flow uses, so the
-// same facilitator/room conflict detection, optimistic locking, and audit logging
-// already enforced there applies automatically -- no parallel/bypassing write path.
-function PlacementStep({ yearId, onSkip, onDone }: { yearId: string; onSkip: () => void; onDone: () => void }) {
-  const [curriculumItems, setCurriculumItems] = useState<CurriculumItem[] | null>(null);
-  const [curriculumId, setCurriculumId] = useState("");
-  const [cadetGroup, setCadetGroup] = useState<typeof CADET_GROUPS[number]>("junior");
-  const [period, setPeriod] = useState(1);
-  const [rangeStart, setRangeStart] = useState("");
-  const [rangeEnd, setRangeEnd] = useState("");
-  const [slots, setSlots] = useState<{ dateId: string; date: string }[] | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState("");
-  const [result, setResult] = useState<{ placed: number; failed: number } | null>(null);
-
-  if (curriculumItems === null) {
-    void trainingApi.curriculum().then((r) => setCurriculumItems(r.items)).catch(() => setCurriculumItems([]));
-  }
-
-  async function findSlots() {
-    setLoading(true); setErr(""); setSlots(null); setSelected(new Set());
-    try {
-      const ns = await planningApi.nightSummaries(yearId);
-      const inRange = ns.summaries.filter((n) =>
-        (!rangeStart || n.parade_date >= rangeStart) && (!rangeEnd || n.parade_date <= rangeEnd));
-      const open = inRange
-        .filter((n) => !n.sessions.some((s) => s.period === period))
-        .map((n) => ({ dateId: n.parade_date_id, date: n.parade_date }));
-      setSlots(open);
-      setSelected(new Set(open.map((s) => s.dateId)));
-    } catch (e) {
-      setErr(e instanceof ApiError ? e.friendly : "Could not look up open slots.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  async function placeAll() {
-    if (!curriculumId || selected.size === 0) return;
-    setLoading(true); setErr("");
-    let placed = 0, failed = 0;
-    for (const dateId of selected) {
-      try {
-        await planningApi.createSession(dateId, {
-          cadet_group: cadetGroup, session_number: period, curriculum_id: curriculumId,
-        });
-        placed++;
-      } catch {
-        failed++;
-      }
-    }
-    setResult({ placed, failed });
-    setLoading(false);
-  }
-
-  return (
-    <>
-      <p className="muted" style={{ fontSize: 'var(--fs-sm)' }}>
-        Place one curriculum item across several open slots at once — an alternative to
-        placing sessions one at a time from the calendar view.
-      </p>
-      {!result && (
-        <>
-          <label htmlFor="ys-place-curric">Curriculum item</label>
-          <select id="ys-place-curric" value={curriculumId} onChange={(e) => setCurriculumId(e.target.value)}>
-            <option value="">Select…</option>
-            {(curriculumItems ?? []).map((c) => (
-              <option key={c.curriculum_id} value={c.curriculum_id}>{c.code} — {c.title}</option>
-            ))}
-          </select>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <label>Cadet group
-              <select value={cadetGroup} onChange={(e) => setCadetGroup(e.target.value as typeof cadetGroup)}>
-                {CADET_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
-              </select>
-            </label>
-            <label>Period
-              <select value={period} onChange={(e) => setPeriod(Number(e.target.value))}>
-                {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </label>
-            <label>From date
-              <input type="date" value={rangeStart} onChange={(e) => setRangeStart(e.target.value)} />
-            </label>
-            <label>To date
-              <input type="date" value={rangeEnd} onChange={(e) => setRangeEnd(e.target.value)} />
-            </label>
-          </div>
-          <div style={{ marginTop: 8 }}>
-            <Button variant="out" onClick={findSlots} disabled={loading}>{loading ? "Searching…" : "Find open slots"}</Button>
-          </div>
-
-          {slots && slots.length === 0 && (
-            <p style={{ fontSize: 'var(--fs-sm)', marginTop: 8 }}>No open slots for period {period} in this range.</p>
-          )}
-          {slots && slots.length > 0 && (
-            <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid var(--border)", borderRadius: 6, marginTop: 8 }}>
-              <table style={{ width: "100%", fontSize: 'var(--fs-sm)' }}>
-                <thead><tr><th>Include</th><th>Date</th></tr></thead>
-                <tbody>
-                  {slots.map((s) => (
-                    <tr key={s.dateId}>
-                      <td>
-                        <input type="checkbox" checked={selected.has(s.dateId)} onChange={() => toggle(s.dateId)}
-                          aria-label={`Place on ${s.date}`} />
-                      </td>
-                      <td>{s.date}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </>
-      )}
-      {result && (
-        <p style={{ fontSize: 'var(--fs-base)', fontWeight: 700, color: result.failed > 0 ? "var(--warn, #c97a00)" : "var(--success)" }}>
-          ✓ {result.placed} session{result.placed === 1 ? "" : "s"} placed.
-          {result.failed > 0 && ` ${result.failed} could not be placed (a conflict was detected — review them individually in the calendar view).`}
-        </p>
-      )}
-      {err && <div className="err" role="alert">{err}</div>}
-      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <Button variant="out" onClick={onSkip}>Skip this step</Button>
-        {!result && slots && slots.length > 0 && (
-          <Button onClick={placeAll} disabled={loading || !curriculumId || selected.size === 0}>
-            {loading ? "Placing…" : `Place on ${selected.size} slot${selected.size === 1 ? "" : "s"}`}
-          </Button>
-        )}
-        {result && <Button onClick={onDone}>Finish →</Button>}
-      </div>
-    </>
-  );
-}
