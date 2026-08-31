@@ -4,8 +4,8 @@ default,resting,body,#1e2d3d,#f4f8fc,text,13.14,4.5,PASS,same-rule; size unknown
 print,resting,.print-schedule-table .group-header,#fff,#002f65,text,13.17,4.5,PASS,same-rule; size unknown - assumed body
 print,resting,.print-schedule-table .non-period-row td,#555,#f8f8f8,text,7.02,4.5,PASS,same-rule; size unknown - assumed body
 (prefers-contrast: more),resting,.badge.b-grey,#222,#d0d0d0,text,10.32,4.5,PASS,same-rule; size unknown - assumed body
-(prefers-contrast: more),resting,.auth-wrap,#d1dce8,#fff,boundary-advisory,1.39,3.0,FAIL,same-rule
-default,resting,.auth-wrap,#d1dce8,#fff,boundary-advisory,1.39,3.0,FAIL,same-rule
+(prefers-contrast: more),resting,.auth-wrap,#555555,#fff,boundary-advisory,7.46,3.0,PASS,same-rule
+default,resting,.auth-wrap,#7d8ea8,#fff,boundary-advisory,3.33,3.0,PASS,same-rule
 (prefers-contrast: more),resting,.btn-auth,#fff,#003a7a,text,11.13,4.5,PASS,same-rule; size unknown - assumed body
 default,resting,.btn-auth,#fff,#003a7a,text,11.13,4.5,PASS,same-rule; size unknown - assumed body
 (prefers-contrast: more),disabled+hover,.btn-auth:hover:not(:disabled),#fff,#004590,text,9.32,4.5,PASS,inherited-fg + same-rule bg; size unknown - assumed body
@@ -13,9 +13,9 @@ default,disabled+hover,.btn-auth:hover:not(:disabled),#fff,#004590,text,9.32,4.5
 (prefers-contrast: more),active+disabled,.btn-auth:active:not(:disabled),#fff,#001e42,text,16.61,4.5,PASS,inherited-fg + same-rule bg; size unknown - assumed body
 default,active+disabled,.btn-auth:active:not(:disabled),#fff,#001e42,text,16.61,4.5,PASS,inherited-fg + same-rule bg; size unknown - assumed body
 (prefers-contrast: more),disabled,.btn-auth:disabled,#b0b7bb,#f4f8fc,text,1.9,4.5,FAIL,same-rule; size unknown - assumed body
-(prefers-contrast: more),disabled,.btn-auth:disabled,#d1dce8,#f4f8fc,boundary-advisory,1.3,3.0,FAIL,same-rule
+(prefers-contrast: more),disabled,.btn-auth:disabled,#555555,#f4f8fc,boundary-advisory,6.99,3.0,PASS,same-rule
 default,disabled,.btn-auth:disabled,#b0b7bb,#f4f8fc,text,1.9,4.5,FAIL,same-rule; size unknown - assumed body
-default,disabled,.btn-auth:disabled,#d1dce8,#f4f8fc,boundary-advisory,1.3,3.0,FAIL,same-rule
+default,disabled,.btn-auth:disabled,#7d8ea8,#f4f8fc,boundary-advisory,3.12,3.0,PASS,same-rule
 (prefers-contrast: more),resting,.auth-err,#8b1a1a,#fdeaea,text,8.02,4.5,PASS,same-rule; size unknown - assumed body
 (prefers-contrast: more),resting,.auth-err,#f5a5a5,#fdeaea,boundary-advisory,1.68,3.0,FAIL,same-rule
 default,resting,.auth-err,#8b1a1a,#fdeaea,text,8.02,4.5,PASS,same-rule; size unknown - assumed body
@@ -35,7 +35,7 @@ default,hover,.nav-subitem:hover,#002f65,#f4f8fc,text,12.34,4.5,PASS,same-rule; 
 default,resting,.nav-subitem.active,#002f65,#deeefa,text,11.11,4.5,PASS,same-rule; size unknown - assumed body
 default,resting,.nav-subitem.active,#51b0e3,#deeefa,boundary-advisory,2.04,3.0,FAIL,same-rule
 (prefers-contrast: more),resting,.year-nav-ctrl,#555555,#ffffff,boundary-advisory,7.46,3.0,PASS,same-rule
-default,resting,.year-nav-ctrl,#d1dce8,#ffffff,boundary-advisory,1.39,3.0,FAIL,same-rule
+default,resting,.year-nav-ctrl,#7d8ea8,#ffffff,boundary-advisory,3.33,3.0,PASS,same-rule
 (prefers-contrast: more),disabled+hover,.yn-arrow:not(:disabled):hover,#000000,#f0f0f0,text,18.43,4.5,PASS,same-rule; size unknown - assumed body
 default,disabled+hover,.yn-arrow:not(:disabled):hover,#1e2d3d,#f0f5fa,text,12.78,4.5,PASS,same-rule; size unknown - assumed body
 (prefers-contrast: more),hover,.yn-display:hover,#000000,#f0f0f0,text,18.43,4.5,PASS,inherited-fg + same-rule bg; size unknown - assumed body
@@ -44,7 +44,7 @@ default,resting,.yn-menu button,#1e2d3d,#ffffff,text,14.02,4.5,PASS,ancestor .yn
 (prefers-contrast: more),focus+hover,".yn-menu button:hover,.yn-menu button:focus-visible",#000000,#f0f0f0,text,18.43,4.5,PASS,inherited-fg + same-rule bg; size unknown - assumed body
 default,focus+hover,".yn-menu button:hover,.yn-menu button:focus-visible",#1e2d3d,#f0f5fa,text,12.78,4.5,PASS,inherited-fg + same-rule bg; size unknown - assumed body
 (prefers-contrast: more),resting,.yn-rollover,#555555,#f0f0f0,boundary-advisory,6.54,3.0,PASS,same-rule
-default,resting,.yn-rollover,#d1dce8,#f0f5fa,boundary-advisory,1.27,3.0,FAIL,same-rule
+default,resting,.yn-rollover,#7d8ea8,#f0f5fa,boundary-advisory,3.04,3.0,PASS,same-rule
 (prefers-contrast: more),resting,.yn-rollover p,#000000,#f0f0f0,text,18.43,4.5,PASS,ancestor .yn-rollover; size unknown - assumed body
 default,resting,.yn-rollover p,#1e2d3d,#f0f5fa,text,12.78,4.5,PASS,ancestor .yn-rollover; size unknown - assumed body
 (prefers-contrast: more),resting,.yn-chip-active,#003318,#c0f0d8,text,11.23,4.5,PASS,same-rule; size unknown - assumed body
@@ -59,7 +59,7 @@ default,resting,.yn-year-row.is-arch .yn-year-num,#5c6a76,#f0f5fa,text,5.07,4.5,
 (prefers-contrast: more),resting,.yn-current-tag,#51b0e3,#ffffff,boundary-advisory,2.42,3.0,FAIL,same-rule
 default,resting,.yn-current-tag,#004b8d,#ffffff,text,8.78,4.5,PASS,same-rule; size unknown - assumed body
 default,resting,.yn-current-tag,#51b0e3,#ffffff,boundary-advisory,2.42,3.0,FAIL,same-rule
-default,resting,.cea-conflict-toggle,#d1dce8,#f4f8fc,boundary-advisory,1.3,3.0,FAIL,same-rule
+default,resting,.cea-conflict-toggle,#7d8ea8,#f4f8fc,boundary-advisory,3.12,3.0,PASS,same-rule
 (prefers-contrast: more),hover,.btn-out:hover,#002f65,#002f65,text,1.0,4.5,FAIL,inherited-fg + same-rule bg; size unknown - assumed body
 default,hover,.btn-out:hover,#002f65,#002f65,text,1.0,4.5,FAIL,inherited-fg + same-rule bg; size unknown - assumed body
 (prefers-contrast: more),hover,.btn-red-out:hover,#cc0011,#cc0011,text,1.0,4.5,FAIL,inherited-fg + same-rule bg; size unknown - assumed body
@@ -213,7 +213,7 @@ default,resting,.faq-item,#e4edf5,#ffffff,boundary-advisory,1.18,3.0,FAIL,same-r
 (prefers-contrast: more),hover,.rte-btn:hover,#111111,#ffffff,text,18.88,4.5,PASS,inherited-fg + same-rule bg; size unknown - assumed body
 (prefers-contrast: more),hover,.rte-btn:hover,#555555,#ffffff,boundary-advisory,7.46,3.0,PASS,same-rule
 default,hover,.rte-btn:hover,#3a4a55,#ffffff,text,9.17,4.5,PASS,inherited-fg + same-rule bg; size unknown - assumed body
-default,hover,.rte-btn:hover,#d1dce8,#ffffff,boundary-advisory,1.39,3.0,FAIL,same-rule
+default,hover,.rte-btn:hover,#7d8ea8,#ffffff,boundary-advisory,3.33,3.0,PASS,same-rule
 default,resting,.rte-area,#5c6a76,#ffffff,text,5.56,4.5,PASS,inherited-fg + same-rule bg; size unknown - assumed body
 (prefers-contrast: more),resting,"const info=getCurrentUnitInfo();
   document.getElementById('dash-title').textContent=info.name+' — Training Dashboard';

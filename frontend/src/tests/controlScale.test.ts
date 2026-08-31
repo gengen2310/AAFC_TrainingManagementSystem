@@ -104,3 +104,17 @@ describe("adjacent targets are separated", () => {
     expect(html).toContain(".ctl-group{display:inline-flex;gap:var(--ctl-gap);");
   });
 });
+
+describe("border contrast", () => {
+  it("--border meets WCAG 1.4.11 at 3:1", () => {
+    // #7d8ea8 measures 3.33:1 on #ffffff and 3.12:1 on --bg #f4f8fc -- the first
+    // candidate clearing 3:1 against BOTH surfaces the app paints on.
+    expect(html).toContain("--border:       #7d8ea8;");
+  });
+
+  it("--border-light is left alone -- decoration is outside 1.4.11", () => {
+    // 1.4.11 covers information identifying components and states, not
+    // decorative graphics. Darkening hairline dividers would be styling.
+    expect(html).toContain("--border-light: #e4edf5;");
+  });
+});

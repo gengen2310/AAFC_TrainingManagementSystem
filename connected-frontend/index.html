@@ -25,7 +25,7 @@
   --bg:           #f4f8fc;
   --surface:      #ffffff;
   --surface-2:    #f0f5fa;
-  --border:       #d1dce8;
+  --border:       #7d8ea8;   /* 3.33:1 on #fff, 3.12:1 on --bg — WCAG 1.4.11 */
   --border-light: #e4edf5;
   /* Text hierarchy */
   --text:   #1e2d3d;
@@ -227,7 +227,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 /* ── AUTH ── */
 #auth-screen{min-height:100vh;background:linear-gradient(160deg,#001e42 0%,#000e26 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;position:relative;}
 #auth-screen::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(81,176,227,.05) 0%,transparent 55%);pointer-events:none;}
-.auth-wrap{background:#fff;border-radius:var(--radius-lg);padding:var(--sp-xl) var(--sp-xl) var(--sp-lg);width:360px;max-width:96vw;box-shadow:0 1px 3px rgba(0,47,101,.08),0 8px 32px rgba(0,0,0,.28);border:1px solid #d1dce8;position:relative;overflow:hidden;}
+.auth-wrap{background:#fff;border-radius:var(--radius-lg);padding:var(--sp-xl) var(--sp-xl) var(--sp-lg);width:360px;max-width:96vw;box-shadow:0 1px 3px rgba(0,47,101,.08),0 8px 32px rgba(0,0,0,.28);border:1px solid var(--border);position:relative;overflow:hidden;}
 .auth-wrap::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#002f65,#004b8d 50%,#51b0e3);opacity:.7;}
 .auth-logo{text-align:center;padding:32px 0 28px;margin-bottom:var(--sp-md);}
 .auth-logo-img{width:300px;max-width:100%;height:auto;display:block;margin:0 auto var(--sp-md);filter:drop-shadow(0 2px 12px rgba(0,47,101,.12));}
@@ -240,7 +240,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .btn-auth{width:100%;padding:11px;background:linear-gradient(180deg,#003a7a 0%,#002050 100%);color:#fff;border:1px solid rgba(0,30,65,.2);border-radius:5px;font-family:inherit;font-size:var(--fs-sm);font-weight:700;cursor:pointer;letter-spacing:.05em;transition:background .12s,box-shadow .12s;margin-top:var(--sp-xs);box-shadow:0 1px 0 rgba(255,255,255,.10) inset,0 -1px 0 rgba(0,0,0,.20) inset,0 1px 3px rgba(0,30,65,.25);}
 .btn-auth:hover:not(:disabled){background:linear-gradient(180deg,#004590 0%,#002a60 100%);}
 .btn-auth:active:not(:disabled){background:linear-gradient(180deg,#001e42 0%,#00183a 100%);transform:translateY(1px);}
-.btn-auth:disabled{background:#f4f8fc;color:#b0b7bb;border:1px solid #d1dce8;cursor:not-allowed;opacity:.7;box-shadow:none;}
+.btn-auth:disabled{background:#f4f8fc;color:#b0b7bb;border:1px solid var(--border);cursor:not-allowed;opacity:.7;box-shadow:none;}
 .auth-progress{height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;display:none;}
 .auth-progress-fill{height:100%;background:var(--royal);border-radius:2px;width:0%;transition:width .12s linear;}
 .auth-err{background:#fdeaea;border:1.5px solid #f5a5a5;border-radius:6px;padding:9px 12px;font-size:var(--fs-sm);color:#8b1a1a;margin-top:10px;display:none;}
@@ -2606,7 +2606,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <button class="btn btn-secondary" onclick="loadSystemConsole()">Refresh</button>
           </div>
         </div>
-        <div id="sc-build-info" style="background:#f4f8fc;border:1px solid #d1dce8;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:var(--fs-sm);color:#455560">
+        <div id="sc-build-info" style="background:#f4f8fc;border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:var(--fs-sm);color:#455560">
           <strong>Build Information</strong><br>
           Main TMS &bull; Commit: <span id="sc-build-commit">—</span> &bull; Source: connected-frontend &bull; Built: <span id="sc-build-time">—</span>
         </div>
@@ -11692,7 +11692,7 @@ function renderCurr(){
   // Group by phase
   const groups={};filtered.forEach(e=>{if(!groups[e.phase])groups[e.phase]=[];groups[e.phase].push(e);});
   list.innerHTML=Object.entries(groups).map(([ph,items])=>`
-    <div class="curr-card" style="border-color:${PH_BD[ph]||'#d1dce8'}">
+    <div class="curr-card" style="border-color:${PH_BD[ph]||'var(--border)'}">
       <div class="curr-hdr" style="background:${PH_BG[ph]||'#f4f8fc'}" onclick="toggleCC(this)">
         <div style="display:flex;align-items:center;gap:8px">${phBadge(ph)}<span style="font-size:var(--fs-sm);font-weight:800;color:var(--dark)">${items.length} item${items.length!==1?'s':''}</span></div>
         <span style="font-size:var(--fs-xs);color:var(--muted)">▾</span>
