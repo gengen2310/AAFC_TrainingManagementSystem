@@ -118,3 +118,15 @@ describe("border contrast", () => {
     expect(html).toContain("--border-light: #e4edf5;");
   });
 });
+
+describe("Display Size is retired", () => {
+  it("no density CSS, card, function or boot call remains", () => {
+    // A setting that can drive controls below the touch floor contradicts a
+    // single-scale system. Removed deliberately on 2026-09-01 (G8 capability
+    // removal, recorded in the spec).
+    expect(html).not.toContain("data-density");
+    expect(html).not.toContain('id="dens-card"');
+    expect(html).not.toContain("_setDensity");
+    expect(html).not.toContain("displayDensity");
+  });
+});

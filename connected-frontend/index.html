@@ -1062,16 +1062,6 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .maint-banner .maint-msg{flex:1;}
 
 /* DENS-01: compact density overrides — only spacing, never text that would fall below accessible minimum */
-body[data-density="compact"] .ff{margin-bottom:8px;}
-body[data-density="compact"] .form-row{gap:8px;margin-bottom:6px;}
-body[data-density="compact"] .btn:not(.btn-xs):not(.btn-sm){padding:4px 10px;font-size:var(--fs-sm);min-height:28px;}
-body[data-density="compact"] .card{padding:12px 14px;}
-body[data-density="compact"] .modal-body{padding:10px 14px;}
-body[data-density="compact"] .modal-hdr{padding:10px 16px 8px;}
-body[data-density="compact"] .modal-foot{padding:8px 16px 10px;}
-body[data-density="compact"] .nav-item{padding:8px var(--sp-md);font-size:var(--fs-sm);}
-body[data-density="compact"] .nav-item.active{padding-left:calc(var(--sp-md) - 2.5px);}
-body[data-density="compact"] .card+.card{margin-top:10px;}
 /* ── MISC CONNECTED-CLIENT ── */
 .mini{height:8px;border-radius:6px;background:#e6edf5;overflow:hidden;min-width:60px;}
 .mini>i{display:block;height:100%;border-radius:6px;background:var(--ok);}
@@ -2329,21 +2319,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </div>
         </div>
         <!-- DENS-01: Display size preference -->
-        <div class="card" id="dens-card">
-          <h2 class="ctitle">Display Size</h2>
-          <p style="font-size:var(--fs-xs);color:var(--muted);margin-bottom:10px">Adjust spacing to fit more content on screen. Both settings meet accessibility requirements at 200% zoom. Your preference is saved for this browser session.</p>
-          <div style="display:flex;gap:20px;align-items:center">
-            <label style="cursor:pointer;display:flex;align-items:center;gap:7px;font-size:var(--fs-base);font-weight:600">
-              <input type="radio" name="aafc-density" value="comfortable" id="dens-comfortable" onchange="_setDensity('comfortable')">
-              Comfortable
-            </label>
-            <label style="cursor:pointer;display:flex;align-items:center;gap:7px;font-size:var(--fs-base)">
-              <input type="radio" name="aafc-density" value="compact" id="dens-compact" onchange="_setDensity('compact')">
-              Compact
-            </label>
-          </div>
-          <p style="font-size:var(--fs-2xs);color:var(--muted);margin-top:8px">Comfortable is the default and recommended setting for most users.</p>
-        </div>
+        
         <div class="card admin-el" id="settings-training-years-wrap">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px">
             <h2 class="ctitle" style="margin:0">Training Years</h2>
@@ -8570,22 +8546,13 @@ async function doRenameFlight(){
 
 // ── Settings page: load user directory for admins ──────────────────────────
 // DENS-01: display density
-function _setDensity(val){
-  if(val==='compact') document.body.dataset.density='compact';
-  else delete document.body.dataset.density;
-  try{localStorage.setItem('displayDensity',val);}catch(_){} /* SP-02: persist across sessions */
-  // Sync radio buttons when called programmatically
-  const r=document.querySelector(`input[name="aafc-density"][value="${val}"]`);
-  if(r)r.checked=true;
-}
+
 // Apply stored preference early (runs when script parses, before any page render)
-(function(){_setDensity(localStorage.getItem('displayDensity')||'comfortable');})();
 
 async function renderSettings(){
   const card=document.getElementById('user-dir-card');
   if(!card)return;
   // Sync display size radio buttons with current preference
-  _setDensity(localStorage.getItem('displayDensity')||'comfortable');
   // Only show for admin roles
   const adminRoles=['sqn_admin','wing_admin','national_admin','system_admin'];
   if(!adminRoles.includes(S.role)){ card.style.display='none'; return; }
