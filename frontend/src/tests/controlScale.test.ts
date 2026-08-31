@@ -61,3 +61,14 @@ describe("button classes consume the scale", () => {
     expect(rule).toContain("min-width:var(--ctl-min)");
   });
 });
+
+describe("fields sit at the larger height", () => {
+  it("bare inputs, selects and textareas use --ctl-h-lg", () => {
+    const i = html.indexOf("input[type=date],input[type=search]");
+    expect(html.slice(i, i + 220)).toContain("min-height:var(--ctl-h-lg)");
+  });
+
+  it("checkbox and radio keep an 18px box -- the box is not the target", () => {
+    expect(html).toContain("input[type=checkbox],input[type=radio]{width:18px;height:18px;}");
+  });
+});

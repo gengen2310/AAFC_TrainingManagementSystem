@@ -482,7 +482,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
    padding and rendered 21-22px; [HIG] wants 28pt for a pointer target. Checkboxes and
    radios keep the UA size because their wrapping <label> is the real click target. */
 input[type=text],input[type=time],input[type=url],input[type=password],input[type=number],
-input[type=date],input[type=search],input[type=email],input:not([type]),select,textarea{min-height:28px;font-size:inherit;}
+input[type=date],input[type=search],input[type=email],input:not([type]),select,textarea{min-height:var(--ctl-h-lg);font-size:inherit;}
 /* AUDIT-2026-08 G5: the UA default checkbox/radio is 13x13. Where one sits inside a
    a label element carrying text, that label is the real click target and clears 28px;
    a bare one in a table cell does not, so raise the control itself and give any
@@ -585,7 +585,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .form-group,.ff{margin-bottom:18px;}
 .form-group label,.ff label{display:block;font-size:var(--fs-sm);font-weight:800;color:var(--steel);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;}
 .form-group select,.form-group input,.form-group textarea,
-.ff select,.ff input,.ff textarea{width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:var(--fs-sm);color:var(--text);background:white;transition:border-color .15s,box-shadow .15s;}
+.ff select,.ff input,.ff textarea{width:100%;min-height:var(--ctl-h-lg);padding:0 var(--ctl-pad-x-sm);border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:var(--fs-sm);color:var(--text);background:white;transition:border-color .15s,box-shadow .15s;}
 .form-group select:focus,.form-group input:focus,.form-group textarea:focus,
 .ff select:focus,.ff input:focus,.ff textarea:focus{outline:none;border-color:var(--focus-ring);box-shadow:0 0 0 3px rgba(0,75,141,.22);}
 .ff textarea{resize:vertical;min-height:68px;}

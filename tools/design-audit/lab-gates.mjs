@@ -42,30 +42,43 @@ await page.goto(URL, { waitUntil: "domcontentloaded" });
 await page.waitForSelector("body[data-lab-ready='true']", { timeout: 10000 });
 await page.waitForTimeout(400);
 
-const results = await page.evaluate((min) => {
-  const out = [];
-  for (const e of document.querySelectorAll("[data-lab-class]")) {
+// Measure one control at a time, scrolling it into view with Playwright first.
+//
+// scrollIntoView() called inside page.evaluate() does NOT reliably move the
+// viewport under device emulation -- controls stayed at document coordinates
+// (y=2848 on an ~800px viewport) and every probe landed out of range, reporting
+// correctly-sized controls as "not isolated". elementFromPoint only answers for
+// the visible viewport, so the scroll has to actually happen before the probe.
+const handles = await page.$$("[data-lab-class]");
+const results = [];
+for (const el of handles) {
+  await el.scrollIntoViewIfNeeded();
+  const row = await el.evaluate((e, min) => {
     const r = e.getBoundingClientRect();
-    const s = getComputedStyle(e);
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2, h = min / 2 - 1;
     const hit = [[cx, cy - h], [cx, cy + h], [cx - h, cy], [cx + h, cy]].every(([x, y]) => {
       if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return false;
       const t = document.elementFromPoint(x, y);
       return t && (t === e || e.contains(t));      // ancestors do NOT count
     });
-    out.push({
+    return {
       cls: e.getAttribute("data-lab-class"),
       state: e.getAttribute("data-lab-state"),
       content: e.getAttribute("data-lab-content"),
       w: Math.round(r.width), h: Math.round(r.height),
       boxOk: r.width >= min && r.height >= min,
       hitOk: hit,
-      overflow: e.scrollWidth > e.clientWidth + 2,
+      // Overflow means a CLIPPED LABEL. A text field whose value is longer
+      // than the box scrolls horizontally by design, so scrollWidth exceeding
+      // clientWidth there is correct behaviour, not a defect.
+      overflow: e.tagName === "INPUT" || e.tagName === "TEXTAREA"
+        ? false
+        : e.scrollWidth > e.clientWidth + 2,
       inGroup: !!e.closest("[data-lab-group]"),
-    });
-  }
-  return out;
-}, MIN);
+    };
+  }, MIN);
+  results.push(row);
+}
 
 const byClass = new Map();
 for (const r of results) {
