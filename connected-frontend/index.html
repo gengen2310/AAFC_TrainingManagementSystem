@@ -1494,7 +1494,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         <div class="card no-print">
           <h3 class="ctitle">Quick Actions</h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-dk" onclick="openModal('m-add-pn')">+ Parade Night</button>
+            <button class="btn btn-dk" onclick="openAddPN()">+ Parade Night</button>
             <button class="btn btn-sky" onclick="nav('calendar')">Calendar</button>
             <button class="btn btn-out" onclick="nav('action-items')">Needs Attention</button>
             <button class="btn btn-out" onclick="nav('weekly-program')">Weekly Program</button>
@@ -1718,7 +1718,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <div class="ph-actions no-print">
             <span id="pn-refresh-status" style="font-size:var(--fs-2xs);color:var(--muted)"></span>
             <button class="btn btn-secondary btn-sm" onclick="_pageRefresh('pn-refresh-status',async()=>{await loadData();renderPN();})">Refresh</button>
-            <button class="btn btn-dk" onclick="openModal('m-add-pn')">+ Add Parade Night</button>
+            <button class="btn btn-dk" onclick="openAddPN()">+ Add Parade Night</button>
             <button class="btn btn-sky plan-write-el" style="display:none" onclick="openGenerateDatesModal()">Generate Parade Nights</button>
             <button class="btn btn-out" onclick="nav('calendar')">Calendar</button>
             <button class="btn btn-out" onclick="nav('weekly-program')">Weekly Program</button>
@@ -9606,7 +9606,7 @@ function renderCal(){
   document.getElementById('cal-grid').innerHTML=cells;
 }
 function calMove(d){calMonth+=d;if(calMonth<0){calMonth=11;calYear--;}if(calMonth>11){calMonth=0;calYear++;}renderCal();}
-function openWithDate(ds){document.getElementById('pn-date').value=ds;buildSlots();openModal('m-add-pn');}
+function openWithDate(ds){openAddPN(ds);}
 
 // ═══════════════════════════════════════════════════════════
 //  PARADE NIGHTS
@@ -10295,32 +10295,47 @@ async function _bulkApplyConfirm(){
 }
 
 // ADD PARADE NIGHT
+let _pnClasses=[];
+
+async function openAddPN(date){
+  _pnClasses=[];
+  if(typeof P!=='undefined'&&P&&P.currentYearId){
+    try{ _pnClasses=await api('/api/training-classes?training_year_id='+encodeURIComponent(P.currentYearId)); }
+    catch(_){}
+  }
+  if(date)document.getElementById('pn-date').value=date;
+  buildSlots();
+  openModal('m-add-pn');
+}
+
 function buildSlots(){
   const n=parseInt(document.getElementById('pn-nsess').value);
   const currOpts=allCurr().map(e=>`<option value="${esc(e.title)}">${esc(e.code)} — ${esc(e.title)}</option>`).join('');
   const facOpts=S.facs.map(f=>`<option value="${f.id}">${facDisplay(f)}</option>`).join('');
   const roomOpts=S.rooms.map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('');
-  // Governed phase catalogue (master transformation plan Block 10) — S.phases
-  // is loaded at app-load time and already scope-filtered server-side.
-  const phaseOpts=(S.phases||[]).map(p=>`<option value="${esc(p.name)}">${esc(p.displayName)}</option>`).join('');
+  const classHtml=_pnClasses.length
+    ?_pnClasses.map(c=>`<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:400"><input type="checkbox" name="np-cls-SLOT" value="${esc(c.training_class_id)}"> ${esc(c.display_name)}</label>`)
+    :['<span style="color:var(--muted)">No classes configured for this year</span>'];
   let html='';
   for(let i=0;i<n;i++){
     html+=`<div style="border:1px solid var(--border);border-radius:7px;padding:10px;margin-bottom:8px;">
-      <div style="font-size:var(--fs-xs);font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Session ${i+1}</div>
-      <div class="form-row">
-        <div class="ff"><label for="np-ph-${i}">Phase</label>
-          <select id="np-ph-${i}" aria-label="Phase for session ${i+1}">${phaseOpts}</select>
-        </div>
-        <div class="ff"><label for="np-ex-${i}">Curriculum Item</label>
-          <select id="np-ex-${i}" aria-label="Curriculum item for session ${i+1}"><option value="">— Unassigned —</option>${currOpts}</select>
+      <div style="font-size:var(--fs-xs);font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Training Period ${i+1}</div>
+      <div class="ff" style="margin-bottom:8px"><label>Training Classes</label>
+        <div id="np-cls-${i}" style="display:flex;flex-wrap:wrap;gap:4px 14px;padding:4px 0;font-size:var(--fs-xs)">
+          ${classHtml.join('').replace(/name="np-cls-SLOT"/g,'name="np-cls-'+i+'"')}
         </div>
       </div>
       <div class="form-row">
-        <div class="ff"><label for="np-fa-${i}">Facilitator</label>
-          <select id="np-fa-${i}" aria-label="Facilitator for session ${i+1}"><option value="">— None —</option>${facOpts}</select>
+        <div class="ff"><label for="np-ex-${i}">Curriculum Item</label>
+          <select id="np-ex-${i}" aria-label="Curriculum item for training period ${i+1}"><option value="">— Unassigned —</option>${currOpts}</select>
         </div>
+        <div class="ff"><label for="np-fa-${i}">Facilitator</label>
+          <select id="np-fa-${i}" aria-label="Facilitator for training period ${i+1}"><option value="">— None —</option>${facOpts}</select>
+        </div>
+      </div>
+      <div class="form-row">
         <div class="ff"><label for="np-rm-${i}">Room</label>
-          <select id="np-rm-${i}" aria-label="Room for session ${i+1}"><option value="">— None —</option>${roomOpts}</select>
+          <select id="np-rm-${i}" aria-label="Room for training period ${i+1}"><option value="">— None —</option>${roomOpts}</select>
         </div>
       </div>
     </div>`;
@@ -10345,23 +10360,18 @@ function addPN(){
     const room=document.getElementById('np-rm-'+i)?.value||'';
     const expTitle=document.getElementById('np-ex-'+i)?.value||'';
     const m=allCurr().find(e=>e.title===expTitle);
+    const clsIds=[...document.querySelectorAll('input[name="np-cls-'+i+'"]:checked')].map(el=>el.value);
     // Clash detection
     sessions.forEach((s,j)=>{
-      if(room&&s.room===room)clashes.push(`Session ${i+1} and Session ${j+1} both use room "${room}"`);
-      if(facId&&s.facId===facId)clashes.push(`Session ${i+1} and Session ${j+1} both use the same facilitator`);
+      if(room&&s.room===room)clashes.push(`Period ${i+1} and Period ${j+1} both use room "${room}"`);
+      if(facId&&s.facId===facId)clashes.push(`Period ${i+1} and Period ${j+1} both use the same facilitator`);
     });
-    sessions.push({phase:document.getElementById('np-ph-'+i)?.value||'B. Initial',code:m?m.code:'',exp:expTitle,facId,facName:fac?facDisplay(fac):'',room,status:'planned'});
+    sessions.push({phase:'B. Initial',code:m?m.code:'',exp:expTitle,facId,facName:fac?facDisplay(fac):'',room,clsIds,status:'planned'});
   }
   if(clashes.length){
     document.getElementById('pn-clash-msg').textContent=clashes.join(' | ');
     document.getElementById('pn-clash-warn').style.display='flex';
   }
-  // The session rows the user filled in used to be collected here, clash-checked,
-  // assigned to S.pendingSessions and then silently discarded -- nothing ever read
-  // that variable, despite the comment claiming otherwise. Reported 2026-08-25 as
-  // "did input some data it did not show on the parade night". They are now
-  // created against the night, reusing _sessBuildBody so the field mapping cannot
-  // drift from the edit path.
   api('/api/parade-nights',{method:'POST',body:JSON.stringify({date,term,session_count:nsess,parade_type:notes||'normal'})})
     .then(async(r)=>{
       const pnId=r&&r.parade_night_id;
@@ -10369,17 +10379,22 @@ function addPN(){
       if(pnId){
         for(let i=0;i<sessions.length;i++){
           const s=sessions[i];
-          // An untouched row carries no content; creating it would add a blank session.
-          if(!s.exp&&!s.facId&&!s.room)continue;
+          // Skip a fully untouched period (no curriculum, no facilitator, no room, no classes selected).
+          if(!s.exp&&!s.facId&&!s.room&&!s.clsIds.length)continue;
           s.__pnId=pnId; s.period_number=i+1;
-          try{ await api('/api/sessions',{method:'POST',body:_sessBuildBody(s)}); }
-          catch(e){ failures.push(`Period ${i+1}: ${apiErr(e)}`); }
+          try{
+            const sr=await api('/api/sessions',{method:'POST',body:_sessBuildBody(s)});
+            if(s.clsIds.length&&sr&&sr.session_id){
+              try{ await api('/api/sessions/'+sr.session_id+'/audience',{method:'PUT',body:{training_class_ids:s.clsIds}}); }
+              catch(e){ failures.push(`Period ${i+1} class assignment: ${apiErr(e)}`); }
+            }
+          }catch(e){ failures.push(`Period ${i+1}: ${apiErr(e)}`); }
         }
       }
       await reloadAndRender(); closeModal('m-add-pn');
       document.getElementById('pn-date').value='';document.getElementById('pn-notes').value='';document.getElementById('pn-slots').innerHTML='';
       if(failures.length){
-        showToast('Parade night created, but some sessions were not saved — '+failures.join('; '),true);
+        showToast('Parade night created, but some details were not saved — '+failures.join('; '),true);
       }else{
         showToast('Parade night created.');
       }
@@ -11818,7 +11833,7 @@ function showCurrDetail(code){
         <td>${stBadge(s.status)}</td>
         <td class="no-print">${canWriteSquadron()?`<button class="btn btn-xs btn-sky" onclick="quickEdit('${s.date}',${s.si});closeModal('m-curr-detail')">Edit</button>`:'—'}</td>
       </tr>`).join('')}</tbody></table></div>`
-    :`<div class="alert a-warn">Not yet assigned to any parade night. <button class="btn btn-xs btn-sky no-print" onclick="closeModal('m-curr-detail');openModal('m-add-pn')">Schedule →</button></div>`}`;
+    :`<div class="alert a-warn">Not yet assigned to any parade night. <button class="btn btn-xs btn-sky no-print" onclick="closeModal('m-curr-detail');openAddPN()">Schedule →</button></div>`}`;
   openModal('m-curr-detail');
 }
 function drillCurr(code){

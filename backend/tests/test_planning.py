@@ -2931,3 +2931,54 @@ def test_assign_mission_also_creates_session_audience_row(client):
         assert tc.stage_code == "SNR"
     finally:
         db.close()
+
+
+def test_add_parade_night_flow_creates_session_audience(client):
+    """P0-PLAN-UX-01 regression: the Add Parade Night form flow
+    (POST /parade-nights → POST /sessions → PUT /sessions/{id}/audience)
+    must produce SessionAudience rows — the same two-step create-then-link
+    pattern the redesigned form uses."""
+    from app.database import SessionLocal
+    from app.models import SessionAudience, TrainingClass
+
+    hdr = _sqn_admin_hdr(client)
+    yr_id, pd_id = _setup_year_with_date(client, hdr)
+
+    # GET the TrainingClass list as the redesigned form would — classes auto-created
+    # when the planning year was created by _setup_year_with_date above.
+    classes_r = client.get(f"/api/training-classes?training_year_id={yr_id}", headers=hdr)
+    assert classes_r.status_code == 200, classes_r.text
+    classes = classes_r.json()
+    assert len(classes) == 5, f"Expected 5 auto-created classes, got {len(classes)}"
+    junior_cls = next(c for c in classes if c["stage_code"] == "JNR")
+
+    # Step 1: Create the parade night (training.py router — no planning year context).
+    pn_r = client.post("/api/parade-nights", json={
+        "date": "2200-06-01", "term": "T2", "session_count": 2, "parade_type": "normal"
+    }, headers=hdr)
+    assert pn_r.status_code == 200, pn_r.text
+    pn_id = pn_r.json()["parade_night_id"]
+
+    # Step 2: Create a session for period 1 (no cadet_group — the redesigned form omits it).
+    sess_r = client.post("/api/sessions", json={
+        "parade_night_id": pn_id, "period_number": 1
+    }, headers=hdr)
+    assert sess_r.status_code == 200, sess_r.text
+    sid = sess_r.json()["session_id"]
+
+    # Step 3: Set class audience — the redesigned form calls PUT /sessions/{id}/audience.
+    aud_r = client.put(f"/api/sessions/{sid}/audience", json={
+        "training_class_ids": [junior_cls["training_class_id"]]
+    }, headers=hdr)
+    assert aud_r.status_code == 200, aud_r.text
+
+    # Verify the SessionAudience row was created.
+    db = SessionLocal()
+    try:
+        rows = db.query(SessionAudience).filter(SessionAudience.session_id == sid).all()
+        assert len(rows) == 1, f"Expected 1 SessionAudience row, got {len(rows)}"
+        tc = db.get(TrainingClass, rows[0].training_class_id)
+        assert tc is not None
+        assert tc.stage_code == "JNR"
+    finally:
+        db.close()
