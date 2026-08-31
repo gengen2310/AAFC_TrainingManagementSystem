@@ -11,8 +11,33 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 
+// IDs of resources created during this run — cleaned up in afterAll.
+const _createdPnIds: string[] = [];
+const _createdItemIds: string[] = [];
+
 test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+});
+
+test.afterAll(async ({ request }) => {
+  const base = process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000";
+  const lookup = await request.post(`${base}/api/auth/lookup`, {
+    data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
+  });
+  if (!lookup.ok()) return;
+  const userId = (await lookup.json()).user_id as string;
+  const loginRes = await request.post(`${base}/api/auth/login`, {
+    data: { code: "ADMIN703", user_id: userId },
+  });
+  if (!loginRes.ok()) return;
+  const body = await loginRes.json();
+  const auth = { Authorization: `Bearer ${body.token || body.access_token}` };
+  for (const pnId of _createdPnIds) {
+    await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: auth });
+  }
+  for (const itemId of _createdItemIds) {
+    await request.delete(`${base}/api/curriculum/${itemId}`, { headers: auth });
+  }
 });
 
 async function loginSquadron(page: Page, code: string) {
@@ -56,6 +81,7 @@ test.describe("Squadron Dashboard — Progress by element (CLASS-12)", () => {
     });
     expect(ciRes.ok()).toBe(true);
     const ciId = (await ciRes.json()).curriculum_id as string;
+    _createdItemIds.push(ciId);
 
     const testDate = `2071-06-${String((Number(suffix.slice(-2)) % 27) + 1).padStart(2, "0")}`;
     const pnRes = await page.request.post(`${base}/api/parade-nights`, {
@@ -63,6 +89,7 @@ test.describe("Squadron Dashboard — Progress by element (CLASS-12)", () => {
     });
     expect(pnRes.ok()).toBe(true);
     const pnId = (await pnRes.json()).parade_night_id as string;
+    _createdPnIds.push(pnId);
 
     const sessRes = await page.request.post(`${base}/api/sessions`, {
       data: { parade_night_id: pnId, period_number: 1, cadet_group: "senior" },

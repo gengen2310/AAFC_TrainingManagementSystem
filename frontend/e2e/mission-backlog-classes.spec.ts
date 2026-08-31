@@ -161,9 +161,10 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
     await expect(chip).toBeVisible({ timeout: 8000 });
     await expect(chip).toHaveAttribute("title", new RegExp(`${className}: Scheduled`));
   } finally {
-    // Clean up -- archive the class and deactivate the year so nothing here
-    // lingers as an active high-`year` PlanningYear for a future test run.
+    // Clean up -- archive the class + phase and deactivate the year so nothing
+    // here lingers as an active high-`year` PlanningYear for a future test run.
     await page.request.delete(`${API_BASE}/api/training-classes/${classId}`, { headers: hdr });
+    await page.request.post(`${API_BASE}/api/curriculum/phases/${stageId}/archive`, { headers: hdr });
     const curYearRes = await page.request.get(`${API_BASE}/api/planning/years/${yearId}`, { headers: hdr });
     const curYear = await curYearRes.json();
     await page.request.patch(`${API_BASE}/api/planning/years/${yearId}`, {

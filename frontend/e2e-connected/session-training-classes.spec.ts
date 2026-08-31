@@ -19,8 +19,39 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 
+// IDs of resources created during this run — cleaned up in afterAll.
+const _createdPnIds: string[] = [];
+const _createdClassIds: string[] = [];
+
 test.beforeAll(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+});
+
+test.afterAll(async ({ request }) => {
+  const base = process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000";
+  const lookup = await request.post(`${base}/api/auth/lookup`, {
+    data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
+  });
+  if (!lookup.ok()) return;
+  const userId = (await lookup.json()).user_id as string;
+  const loginRes = await request.post(`${base}/api/auth/login`, {
+    data: { code: "ADMIN703", user_id: userId },
+  });
+  if (!loginRes.ok()) return;
+  const body = await loginRes.json();
+  const auth = { Authorization: `Bearer ${body.token || body.access_token}` };
+
+  // Archive parade nights first (also archives their sessions).
+  for (const pnId of _createdPnIds) {
+    await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: auth });
+  }
+  // Archive training classes.
+  for (const classId of _createdClassIds) {
+    await request.delete(`${base}/api/training-classes/${classId}`, { headers: auth });
+  }
+  // Planning year 2064 is left in place — it has archived dependents so
+  // cannot be permanently deleted, and far-future years don't appear in
+  // normal UI date pickers.
 });
 
 async function loginSquadron(page: Page, code: string) {
@@ -75,6 +106,8 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
     headers: auth,
   });
   expect(classRes.ok()).toBe(true);
+  const classId = (await classRes.json()).training_class_id as string;
+  _createdClassIds.push(classId);
 
   const me = await (await page.request.get(`${base}/api/auth/me`, { headers: auth })).json();
   const testDate = new Date(2065, 5, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
@@ -85,6 +118,7 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   });
   expect(pnRes.ok()).toBe(true);
   const pnId = (await pnRes.json()).parade_night_id as string;
+  _createdPnIds.push(pnId);
   // buildPNCard renders pn.notes in its header (.pn-meta) -- a unique marker
   // there lets the test locate exactly this card in the list, rather than
   // relying on date-formatting or list-ordering assumptions that would be

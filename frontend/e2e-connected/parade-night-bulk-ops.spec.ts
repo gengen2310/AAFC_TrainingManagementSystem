@@ -7,9 +7,30 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 const BASE = LOCAL_API_BASE || "http://localhost:8000";
+const EFFECTIVE_BASE = process.env.E2E_BACKEND_BASE_URL || BASE;
+
+// IDs of parade nights created during this run — cleaned up in afterAll.
+const _createdPnIds: string[] = [];
 
 test.beforeAll(async () => {
-  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || BASE);
+  await resetBackendRateLimits(EFFECTIVE_BASE);
+});
+
+test.afterAll(async ({ request }) => {
+  const lookup = await request.post(`${EFFECTIVE_BASE}/api/auth/lookup`, {
+    data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
+  });
+  if (!lookup.ok()) return;
+  const userId = (await lookup.json()).user_id as string;
+  const loginRes = await request.post(`${EFFECTIVE_BASE}/api/auth/login`, {
+    data: { code: "ADMIN703", user_id: userId },
+  });
+  if (!loginRes.ok()) return;
+  const body = await loginRes.json();
+  const auth = { Authorization: `Bearer ${body.token || body.access_token}` };
+  for (const pnId of _createdPnIds) {
+    await request.delete(`${EFFECTIVE_BASE}/api/parade-nights/${pnId}`, { headers: auth });
+  }
 });
 
 async function loginSquadron(page: Page, code = "ADMIN703") {
@@ -44,8 +65,10 @@ test("WORK-11: copy session modal opens from parade night card", async ({ page }
   // Create two parade nights to copy between
   const srcDate = `2099-10-${String(1 + (Date.now() % 25)).padStart(2, "0")}`;
   const tgtDate = `2099-11-${String(1 + (Date.now() % 25)).padStart(2, "0")}`;
-  await page.request.post(`${BASE}/api/parade-nights`, { data: { date: srcDate }, headers: hdr });
-  await page.request.post(`${BASE}/api/parade-nights`, { data: { date: tgtDate }, headers: hdr });
+  const srcR1 = await page.request.post(`${BASE}/api/parade-nights`, { data: { date: srcDate }, headers: hdr });
+  const tgtR1 = await page.request.post(`${BASE}/api/parade-nights`, { data: { date: tgtDate }, headers: hdr });
+  if (srcR1.ok()) _createdPnIds.push((await srcR1.json()).parade_night_id);
+  if (tgtR1.ok()) _createdPnIds.push((await tgtR1.json()).parade_night_id);
 
   await page.evaluate(() => (window as any).nav?.("parade-nights"));
   await page.waitForTimeout(1000);
@@ -72,6 +95,7 @@ test("WORK-11: copy sessions API endpoint returns ok:true", async ({ page }) => 
   const tgtR = await page.request.post(`${BASE}/api/parade-nights`, { data: { date: tgt }, headers: hdr });
   const srcId = (await srcR.json()).parade_night_id;
   const tgtId = (await tgtR.json()).parade_night_id;
+  _createdPnIds.push(srcId, tgtId);
 
   // Add a session to source
   await page.request.post(`${BASE}/api/sessions`, {
@@ -98,6 +122,7 @@ test("WORK-12: cancel all button is present in parade night detail", async ({ pa
   const date = `2099-08-${String(4 + (Date.now() % 23)).padStart(2, "0")}`;
   const pnR = await page.request.post(`${BASE}/api/parade-nights`, { data: { date }, headers: hdr });
   const pnId = (await pnR.json()).parade_night_id;
+  _createdPnIds.push(pnId);
   await page.request.post(`${BASE}/api/sessions`, {
     data: { parade_night_id: pnId, period_number: 1 },
     headers: hdr,
@@ -123,6 +148,7 @@ test("WORK-12: cancel-all API returns sessions_updated count", async ({ page }) 
   const date = `2099-08-${String(5 + (Date.now() % 23)).padStart(2, "0")}`;
   const pnR = await page.request.post(`${BASE}/api/parade-nights`, { data: { date }, headers: hdr });
   const pnId = (await pnR.json()).parade_night_id;
+  _createdPnIds.push(pnId);
   await page.request.post(`${BASE}/api/sessions`, {
     data: { parade_night_id: pnId, period_number: 1 },
     headers: hdr,
@@ -156,7 +182,8 @@ test("WORK-05: 'Timing…' button opens Override Parade Night Timing modal with 
 
   // Seed a parade night with a known date so we can find its card.
   const pnDate = `2099-12-${String(1 + (Date.now() % 28)).padStart(2, "0")}`;
-  await page.request.post(`${BASE}/api/parade-nights`, { data: { date: pnDate }, headers: hdr });
+  const pnR5 = await page.request.post(`${BASE}/api/parade-nights`, { data: { date: pnDate }, headers: hdr });
+  if (pnR5.ok()) _createdPnIds.push((await pnR5.json()).parade_night_id);
 
   await page.evaluate(() => (window as any).nav?.("parade-nights"));
 

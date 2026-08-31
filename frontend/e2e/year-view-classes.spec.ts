@@ -100,6 +100,7 @@ test("Year view shows a session's real Training Class assignment without opening
     await expect(classLine).toBeVisible({ timeout: 10000 });
   } finally {
     await page.request.delete(`${API_BASE}/api/training-classes/${classId}`, { headers: hdr });
+    await page.request.post(`${API_BASE}/api/curriculum/phases/${stageId}/archive`, { headers: hdr });
     const curYearRes = await page.request.get(`${API_BASE}/api/planning/years/${yearId}`, { headers: hdr });
     const curYear = await curYearRes.json();
     await page.request.patch(`${API_BASE}/api/planning/years/${yearId}`, {
