@@ -459,7 +459,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .muted{color:var(--muted);}
 
 /* ── BUTTONS ── */
-.btn{padding:9px 16px;border-radius:6px;font-family:inherit;font-size:var(--fs-sm);font-weight:700;cursor:pointer;border:none;letter-spacing:.04em;transition:all .13s;display:inline-flex;align-items:center;min-height:28px;gap:5px;white-space:nowrap;}
+.btn{padding:0 var(--ctl-pad-x);border-radius:6px;font-family:inherit;font-size:var(--fs-sm);font-weight:700;cursor:pointer;border:none;letter-spacing:.04em;transition:all .13s;display:inline-flex;align-items:center;min-height:var(--ctl-h);gap:5px;white-space:nowrap;}
 .btn-dk{background:var(--dark);color:white;}
 .btn-dk:hover{background:var(--royal);}
 .btn-out{background:white;color:var(--dark);border:1.5px solid var(--dark);}
@@ -472,8 +472,10 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .btn-danger:hover,.btn-red:hover{background:#c01530;}
 .btn-ok{background:var(--ok);color:white;}
 .btn-ok:hover{background:#145f38;}
-.btn-sm{padding:6px 12px;font-size:var(--fs-xs);min-height:28px;}
-.btn-xs{padding:4px 9px;font-size:var(--fs-xs);border-radius:5px;min-height:28px;min-width:28px;}  /* AUDIT-2026-08 G5: min-height alone left icon buttons 25px wide */
+.btn-sm{padding:0 var(--ctl-pad-x-sm);font-size:var(--fs-xs);min-height:var(--ctl-min);}
+/* A VISUAL variant only: smaller type and tighter padding, same 44x44 target.
+   It previously set 28x28 and was the clearest breach of the scale rule. */
+.btn-xs{padding:0 var(--ctl-pad-x-sm);font-size:var(--fs-xs);border-radius:5px;min-height:var(--ctl-min);min-width:var(--ctl-min);}  /* AUDIT-2026-08 G5: min-height alone left icon buttons 25px wide */
 /* AUDIT-2026-08 G5: icon-only controls were inline-styled down to ~16px tall.
    Shared floor for them - 28x28 pointer target [HIG]. */
 /* AUDIT-2026-08 G5: a floor for form controls. Several are inline-styled with small

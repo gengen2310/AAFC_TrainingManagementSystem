@@ -47,3 +47,17 @@ describe("component lab", () => {
     expect(lab).toContain('long: "A considerably longer control label than usual"');
   });
 });
+
+describe("button classes consume the scale", () => {
+  it(".btn uses --ctl-h, not a literal height", () => {
+    const rule = html.slice(html.indexOf(".btn{"), html.indexOf(".btn{") + 400);
+    expect(rule).toContain("min-height:var(--ctl-h)");
+    expect(rule).not.toContain("min-height:28px");
+  });
+
+  it(".btn-xs keeps both axes at the floor -- a visual variant, not a smaller target", () => {
+    const rule = html.slice(html.indexOf(".btn-xs{"), html.indexOf(".btn-xs{") + 260);
+    expect(rule).toContain("min-height:var(--ctl-min)");
+    expect(rule).toContain("min-width:var(--ctl-min)");
+  });
+});
