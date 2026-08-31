@@ -1,0 +1,99 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Control component lab</title>
+<!--
+  Measurement fixture for tools/design-audit/lab-gates.mjs.
+
+  It declares NO control styles of its own. It fetches index.html and injects
+  that file's <style> block, so a control here is the same control the app
+  ships. Copying the CSS would let the lab pass while the app fails.
+
+  Must be served over http (fetch is blocked on file://):
+      cd connected-frontend && python3 -m http.server 8123
+-->
+<style>
+  body { margin: 0; font-family: Montserrat, Arial, sans-serif; }
+  .lab-grid { display: flex; flex-wrap: wrap; gap: 24px; padding: 24px; align-items: flex-start; }
+  .lab-cell { display: flex; flex-direction: column; gap: 6px; }
+  .lab-cap { font: 600 10px/1.4 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; opacity: .6; }
+  .lab-ctx-surface { background: #ffffff; }
+  .lab-ctx-bg      { background: #f4f8fc; }
+  .lab-ctx-dark    { background: #002f65; }
+  .lab-ctx-dark .lab-cap { color: #fff; opacity: .75; }
+  .lab-row { display: flex; gap: 0; }
+</style>
+
+<div id="lab"></div>
+
+<script>
+(async function () {
+  // Same stylesheet as the app, fetched not copied.
+  const res = await fetch("index.html");
+  const text = await res.text();
+  const css = text.slice(text.indexOf("<style>") + 7, text.indexOf("</style>"));
+  const el = document.createElement("style");
+  el.textContent = css;
+  document.head.appendChild(el);
+
+  const CLASSES = [
+    { cls: "btn",      html: '<button class="btn btn-dk">Save Settings</button>' },
+    { cls: "btn-sm",   html: '<button class="btn btn-out btn-sm">Edit</button>' },
+    { cls: "btn-xs",   html: '<button class="btn btn-out btn-xs" aria-label="Delete">✕</button>' },
+    { cls: "tb-btn",   html: '<button class="tb-btn">Search</button>', ctx: "dark" },
+    { cls: "tab-btn",  html: '<button class="tab-btn">Sessions</button>' },
+    { cls: "lh-btn",   html: '<button class="lh-btn">Learning Hub</button>' },
+    { cls: "btn-lnk",  html: '<button class="btn-lnk">Show archived</button>' },
+    { cls: "input",    html: '<input type="text" value="703 Squadron">' },
+    { cls: "select",   html: '<select><option>Friday</option></select>' },
+    { cls: "ff-ro",    html: '<input type="text" class="ff-ro" value="Set by wing" readonly>' }
+  ];
+  const STATES  = ["resting", "hover", "focus", "disabled", "active"];
+  const CONTENT = { short: null, long: "A considerably longer control label than usual",
+                    numeric: "67%" };
+
+  const root = document.getElementById("lab");
+  for (const spec of CLASSES) {
+    const section = document.createElement("section");
+    section.className = "lab-grid lab-ctx-" + (spec.ctx || "surface");
+    for (const state of STATES) {
+      for (const contentName of Object.keys(CONTENT)) {
+        const contentText = CONTENT[contentName];
+        const cell = document.createElement("div");
+        cell.className = "lab-cell";
+        const cap = document.createElement("div");
+        cap.className = "lab-cap";
+        cap.textContent = spec.cls + " · " + state + " · " + contentName;
+        const holder = document.createElement("div");
+        holder.innerHTML = spec.html;
+        const ctl = holder.firstElementChild;
+        ctl.setAttribute("data-lab-class", spec.cls);
+        ctl.setAttribute("data-lab-state", state);
+        ctl.setAttribute("data-lab-content", contentName);
+        if (contentText && ctl.tagName !== "SELECT") {
+          if (ctl.tagName === "INPUT") ctl.value = contentText;
+          else ctl.textContent = contentText;
+        }
+        if (state === "disabled") ctl.disabled = true;
+        cell.appendChild(cap); cell.appendChild(ctl);
+        section.appendChild(cell);
+      }
+    }
+    root.appendChild(section);
+  }
+
+  // Adjacent-target pattern: three actions flush, the shape that fails not on
+  // size but on separation.
+  const adj = document.createElement("section");
+  adj.className = "lab-grid lab-ctx-surface";
+  adj.innerHTML =
+    '<div class="lab-cell"><div class="lab-cap">action group · adjacent</div>' +
+    '<div class="lab-row" data-lab-group="actions">' +
+    '<button class="btn btn-out btn-xs" data-lab-class="btn-xs" data-lab-state="resting" data-lab-content="short" aria-label="Mark delivered">✓</button>' +
+    '<button class="btn btn-out btn-xs" data-lab-class="btn-xs" data-lab-state="resting" data-lab-content="short" aria-label="Cancel">✕</button>' +
+    '<button class="btn btn-out btn-xs" data-lab-class="btn-xs" data-lab-state="resting" data-lab-content="short" aria-label="Edit">✎</button>' +
+    "</div></div>";
+  root.appendChild(adj);
+
+  document.body.setAttribute("data-lab-ready", "true");
+})();
+</script>
