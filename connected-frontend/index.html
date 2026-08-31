@@ -12915,7 +12915,7 @@ async function ceaPreview(){
   }
 
   try{ _ceaRows=_parseCSV(text); }
-  catch(e){ errEl.textContent='Parse error: '+e.message; btn.disabled=false; btn.textContent='Preview import'; return; }
+  catch(e){ errEl.textContent='Parse error: '+apiErr(e); btn.disabled=false; btn.textContent='Preview import'; return; }
 
   if(!_ceaRows.length){ errEl.textContent='No rows found in file.'; btn.disabled=false; btn.textContent='Preview import'; return; }
 
@@ -13019,7 +13019,7 @@ async function ceaConfirm(){
   } catch(e){
     if(btn){ btn.disabled=false; btn.innerHTML='Import all (<span id="ceaImportCount">'+_ceaRows.length+'</span>)'; }
     const errEl=document.getElementById('ceaPreviewBody');
-    errEl.insertAdjacentHTML('afterbegin','<div style="color:#c01530;font-size:var(--fs-sm);font-weight:700;margin-bottom:8px">Import failed: '+esc(e.message)+'</div>');
+    errEl.insertAdjacentHTML('afterbegin','<div style="color:#c01530;font-size:var(--fs-sm);font-weight:700;margin-bottom:8px">Import failed: '+esc(apiErr(e))+'</div>');
   }
 }
 
@@ -14185,7 +14185,7 @@ async function _facImportPreview(){
     const data=await resp.json();
     _facImportRows=data.rows||[];
     _facImportRenderPreview(data);
-  }catch(e){showToast('Cannot reach the training system.',true);}
+  }catch(e){showToast(apiErr(e),true);}
 }
 
 function _facImportRenderPreview(data){
@@ -14265,7 +14265,7 @@ async function _facImportConfirm(){
     await loadData(); renderFacs(); if(typeof loadFacilitatorStats==='function')await loadFacilitatorStats();
   }catch(e){
     btn.disabled=false; btn.textContent='Import';
-    showToast('Cannot reach the training system.',true);
+    showToast(apiErr(e),true);
   }
 }
 // ─────────────────────────────────────────────────────────────────────────────
