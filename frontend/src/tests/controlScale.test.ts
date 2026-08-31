@@ -72,3 +72,20 @@ describe("fields sit at the larger height", () => {
     expect(html).toContain("input[type=checkbox],input[type=radio]{width:18px;height:18px;}");
   });
 });
+
+describe("the remaining control classes", () => {
+  for (const [cls, token] of [["tb-btn", "--ctl-min"], ["tab-btn", "--ctl-h"],
+                              ["lh-btn", "--ctl-min"], ["btn-lnk", "--ctl-min"]] as const) {
+    it(`.${cls} consumes ${token} and keeps no literal fallback`, () => {
+      const i = html.indexOf(`.${cls}{`);
+      expect(i, `.${cls} rule not found`).toBeGreaterThan(-1);
+      const rule = html.slice(i, html.indexOf("}", i));
+      expect(rule).toContain(`min-height:var(${token})`);
+      // A rule may declare min-height twice; the LAST one wins. .btn-lnk carried
+      // a trailing min-height:28px that silently beat the token, and an
+      // assertion that only checked the token was present did not catch it.
+      expect(rule).not.toContain("min-height:28px");
+      expect(rule).not.toContain("min-width:28px");
+    });
+  }
+});
