@@ -60,6 +60,56 @@ from .timing import _effective_template
 
 router = APIRouter(prefix="/api/planning", tags=["planning"])
 
+# Maps the legacy cadet_group free-text strings to TrainingClass.stage_code values.
+# Used when creating SessionAudience rows alongside TrainingSession creation (K-006).
+_CADET_GROUP_STAGE_CODE: dict[str, str] = {
+    "orientation": "ORI",
+    "initial": "INI",
+    "junior": "JNR",
+    "intermediate": "INT",
+    "senior": "SNR",
+}
+
+
+def _upsert_session_audience(db: DBSession, session_id: str, cadet_group: str,
+                              squadron_id: str, training_year_id: str) -> None:
+    """Create a SessionAudience row linking session_id to the matching TrainingClass.
+
+    Only creates the row when exactly one active TrainingClass matches the cadet_group's
+    stage_code for this squadron/year — skips silently if zero or multiple match
+    (multiple classes per stage require an explicit frontend choice, not a guess).
+    Idempotent: the unique constraint on (session_id, training_class_id) prevents
+    duplicates if called more than once for the same pair.
+    """
+    stage_code = _CADET_GROUP_STAGE_CODE.get(cadet_group)
+    if not stage_code:
+        return
+    classes = (
+        db.query(TrainingClass)
+        .filter(
+            TrainingClass.squadron_id == squadron_id,
+            TrainingClass.training_year_id == training_year_id,
+            TrainingClass.stage_code == stage_code,
+            TrainingClass.is_archived == False,  # noqa: E712
+        )
+        .all()
+    )
+    if len(classes) != 1:
+        return
+    existing = (
+        db.query(SessionAudience)
+        .filter(
+            SessionAudience.session_id == session_id,
+            SessionAudience.training_class_id == classes[0].id,
+        )
+        .first()
+    )
+    if existing:
+        return
+    db.add(SessionAudience(session_id=session_id, training_class_id=classes[0].id))
+    db.commit()
+
+
 _VALID_SESSION_STATUS = {
     "draft", "planned", "published", "delivered", "delivered_with_issue",
     "cancelled", "cancelled_late", "rescheduled", "not_delivered",
@@ -1896,6 +1946,7 @@ def create_session(
             s.training_area_id = ra.id
             s.training_area_name_at_time = ra.name
     db.add(s); db.commit()
+    _upsert_session_audience(db, s.id, body.cadet_group, pn.squadron_id, py.id)
     _run_conflict_check(py.id, date_id, db)
     audit(db, p, object_type="session", object_id=s.id, action="create",
           new={"group": body.cadet_group, "session": body.session_number})
@@ -3587,6 +3638,7 @@ def assign_mission(
 
     db.add(s)
     db.commit()
+    _upsert_session_audience(db, s.id, body.cadet_group, pn.squadron_id, year_id)
     _run_conflict_check(year_id, body.parade_date_id, db)
     audit(db, p, object_type="session", object_id=s.id, action="assign_mission",
           new={"curriculum": ci.code, "date": pd_obj.date, "session": body.session_number,

@@ -73,14 +73,20 @@ def _get_weekly_program(client, hdr, pd_id):
     return r.json()
 
 
-def test_session_with_no_audience_has_empty_training_classes(client):
+def test_session_audience_auto_populated_from_cadet_group(client):
+    """K-006 regression: creating a session via cadet_group now auto-populates
+    SessionAudience from the planning year's auto-created TrainingClass rows.
+    A session created with cadet_group='senior' gets the SNR TrainingClass
+    ("Senior") in its training_classes list on the weekly program."""
     hdr = _sqn_admin_hdr(client)
     _py, pd_id = _setup_year_with_date(client, hdr, 2500, "2100-05-01")
     _create_session(client, hdr, pd_id)
 
     wp = _get_weekly_program(client, hdr, pd_id)
     assert len(wp["sessions"]) == 1
-    assert wp["sessions"][0]["training_classes"] == []
+    classes = wp["sessions"][0]["training_classes"]
+    assert len(classes) == 1
+    assert classes[0]["display_name"] == "Senior"
 
 
 def test_session_shows_its_real_training_class_assignment(client):

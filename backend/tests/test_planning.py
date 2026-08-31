@@ -2847,3 +2847,87 @@ def test_two_archived_years_with_the_same_number_are_allowed(client):
 
     listed = {y["planning_year_id"] for y in client.get("/api/planning/years", headers=hdr).json()}
     assert set(ids) <= listed, "both archived years should still be listed"
+
+
+# ─────────────────────────────────────────────────────────────
+# K-006 — SessionAudience created alongside TrainingSession
+# ─────────────────────────────────────────────────────────────
+
+def test_create_session_also_creates_session_audience_row(client):
+    """K-006 regression: creating a session must produce a SessionAudience row.
+
+    Planning year creation auto-creates 5 TrainingClass rows (one per stage).
+    When create_session is called with cadet_group='junior', _upsert_session_audience
+    should find the JNR TrainingClass and insert a SessionAudience row linking to it.
+    """
+    from app.database import SessionLocal
+    from app.models import SessionAudience, TrainingClass
+
+    hdr = _sqn_admin_hdr(client)
+    yr_id, pd_id = _setup_year_with_date(client, hdr)
+    r = client.post(
+        f"/api/planning/parade-dates/{pd_id}/sessions",
+        json={"cadet_group": "junior", "session_number": 1, "activity_title": "K-006 test"},
+        headers=hdr,
+    )
+    assert r.status_code == 200, r.text
+    session_id = r.json()["session_id"]
+
+    db = SessionLocal()
+    try:
+        audiences = db.query(SessionAudience).filter(
+            SessionAudience.session_id == session_id
+        ).all()
+        assert len(audiences) == 1, (
+            f"Expected 1 SessionAudience row for session {session_id}, got {len(audiences)}"
+        )
+        tc = db.get(TrainingClass, audiences[0].training_class_id)
+        assert tc is not None
+        assert tc.stage_code == "JNR"
+    finally:
+        db.close()
+
+
+def test_assign_mission_also_creates_session_audience_row(client):
+    """K-006 regression: assign_mission must also produce a SessionAudience row."""
+    from app.database import SessionLocal
+    from app.models import SessionAudience, TrainingClass, CurriculumItem
+
+    hdr = _sqn_admin_hdr(client)
+    yr_id, pd_id = _setup_year_with_date(client, hdr)
+
+    # Find any CurriculumItem to use for the mission assignment.
+    db = SessionLocal()
+    try:
+        ci = db.query(CurriculumItem).first()
+        assert ci is not None, "Need at least one CurriculumItem in the seed"
+        ci_id = ci.id
+    finally:
+        db.close()
+
+    r = client.post(
+        f"/api/planning/years/{yr_id}/assign-mission",
+        json={
+            "curriculum_id": ci_id,
+            "parade_date_id": pd_id,
+            "session_number": 2,
+            "cadet_group": "senior",
+        },
+        headers=hdr,
+    )
+    assert r.status_code == 200, r.text
+    session_id = r.json()["session_id"]
+
+    db = SessionLocal()
+    try:
+        audiences = db.query(SessionAudience).filter(
+            SessionAudience.session_id == session_id
+        ).all()
+        assert len(audiences) == 1, (
+            f"Expected 1 SessionAudience row for session {session_id}, got {len(audiences)}"
+        )
+        tc = db.get(TrainingClass, audiences[0].training_class_id)
+        assert tc is not None
+        assert tc.stage_code == "SNR"
+    finally:
+        db.close()
