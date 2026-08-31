@@ -56,7 +56,13 @@ def upgrade() -> None:
             WHERE squadron_id  = :sqn
               AND training_year_id = :yr
               AND stage_code   = :sc
-              AND is_archived  = 0
+              -- `= false`, not `= 0`. PostgreSQL has no boolean = integer
+              -- operator and errors outright. SQLite accepts 0, and this
+              -- statement sits inside the row loop below, so on an empty
+              -- database it is never parsed at all -- which is why the
+              -- deploy's migration rehearsal passed and staging still
+              -- crash-looped on real data.
+              AND is_archived  = false
         """), {"sqn": row.squadron_id, "yr": row.planning_year_id, "sc": stage_code}).fetchall()
 
         if len(tc_rows) != 1:
