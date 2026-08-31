@@ -3,7 +3,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
 import { friendlyMessage } from "../../../api/client";
-import type { AnchorEvent, NightSummary, PlanningConflict } from "../../../api/types";
+import type { AnchorEvent, NightSummary, PlanningConflict, TrainingClassSummary } from "../../../api/types";
 import { filterAnchors } from "../../../utils/planningFilters";
 import { ParadeNightBlock, fromNightSummary } from "../ParadeNightBlock";
 import { ActivityDetailBlock, anchorToDisplay } from "../ActivityDetailBlock";
@@ -26,11 +26,12 @@ interface Props {
   yearId: string;
   onDateClick: (dateId: string, date: string) => void;
   onSessionClick?: (sessionId: string, dateId: string, date: string) => void;
-  onEmptyCellClick?: (dateId: string, date: string, cadetGroup: string, period: number) => void;
+  onEmptyCellClick?: (dateId: string, date: string, cadetGroup: string, period: number, trainingClassId?: string) => void;
   onAnchorClick?: (anchor: AnchorEvent) => void;
   layers?: { holidays?: boolean; wingHQEvents?: boolean };
   audience?: Set<string>;
   priority?: Set<string>;
+  trainingClasses?: TrainingClassSummary[];
   focusClassId?: string | null;
   searchText?: string | null;
   tierFilter?: string | null;
@@ -46,7 +47,7 @@ function anchorsOnDate(date: string, all: AnchorEvent[]): AnchorEvent[] {
   return all.filter(a => a.start_date <= date && date <= (a.end_date ?? a.start_date));
 }
 
-export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick, layers, audience, priority, focusClassId, searchText, tierFilter, focusStageId, classStageMap, conflicts = [] }: Props) {
+export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick, layers, audience, priority, trainingClasses, focusClassId, searchText, tierFilter, focusStageId, classStageMap, conflicts = [] }: Props) {
   const showHolidays = layers?.holidays ?? true;
   const showAnchors  = layers?.wingHQEvents ?? true;
   const [termIndex, setTermIndex] = useState(0);
@@ -170,8 +171,9 @@ export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
                     onSessionClick={onSessionClick
                       ? (ds) => onSessionClick(ds.session_id, pd.parade_date_id, pd.parade_date)
                       : undefined}
+                    trainingClasses={trainingClasses}
                     onEmptyCellClick={onEmptyCellClick
-                      ? (cg, period) => onEmptyCellClick(pd.parade_date_id, pd.parade_date, cg, period)
+                      ? (cg, period, tcId) => onEmptyCellClick(pd.parade_date_id, pd.parade_date, cg, period, tcId)
                       : undefined}
                   />
                   {dateAnchors.length > 0 && (

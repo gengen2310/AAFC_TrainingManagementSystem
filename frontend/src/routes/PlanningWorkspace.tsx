@@ -16,8 +16,8 @@ function readStoredYear(): number | null {
 }
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthProvider";
-import { planningApi } from "../api";
-import type { PlanningYear } from "../api/types";
+import { planningApi, orgApi } from "../api";
+import type { PlanningYear, TrainingClassSummary } from "../api/types";
 import { PlanningContextBar, type ViewMode, type DisplayMode } from "../components/planning/PlanningContextBar";
 import { ListView } from "../components/planning/views/ListView";
 import { PlanningLeftPanel, defaultLayers, type LayerState } from "../components/planning/PlanningLeftPanel";
@@ -249,6 +249,13 @@ export function PlanningWorkspace() {
     staleTime: 10 * 60 * 1000,
   });
 
+  const { data: trainingClasses = [] } = useQuery<TrainingClassSummary[]>({
+    queryKey: ["training-classes", selectedYearId],
+    queryFn: () => orgApi.trainingClasses(selectedYearId!),
+    enabled: !!selectedYearId,
+    staleTime: 10 * 60 * 1000,
+  });
+
   // ── Handlers ───────────────────────────────────────────────────────────────────
   function handleLayerToggle(key: keyof LayerState) {
     setLayers(prev => ({ ...prev, [key]: !prev[key] }));
@@ -289,8 +296,8 @@ export function PlanningWorkspace() {
     setDrawerItem({ type: "session", session: s, dateId, date, conflicts: conflictsForSession(sessionId) });
   }
 
-  function handleEmptyCellClick(dateId: string, date: string, cadetGroup: string, period: number) {
-    setDrawerItem({ type: "new-session", cadetGroup, periodNumber: period, dateId });
+  function handleEmptyCellClick(dateId: string, date: string, cadetGroup: string, period: number, trainingClassId?: string) {
+    setDrawerItem({ type: "new-session", cadetGroup, periodNumber: period, dateId, trainingClassId });
   }
 
   function handleAnchorClick(anchor: AnchorEvent) {
@@ -412,6 +419,7 @@ export function PlanningWorkspace() {
           layers={layers}
           audience={audience}
           priority={priority}
+          trainingClasses={trainingClasses}
           conflicts={yearConflicts}
         />
       );
@@ -427,6 +435,7 @@ export function PlanningWorkspace() {
           layers={layers}
           audience={audience}
           priority={priority}
+          trainingClasses={trainingClasses}
           focusClassId={focusClassId}
           searchText={searchText || null}
           tierFilter={tierFilter}
@@ -449,6 +458,7 @@ export function PlanningWorkspace() {
           layers={layers}
           audience={audience}
           priority={priority}
+          trainingClasses={trainingClasses}
           focusClassId={focusClassId}
           searchText={searchText || null}
           tierFilter={tierFilter}
@@ -513,6 +523,7 @@ export function PlanningWorkspace() {
           layers={layers}
           audience={audience}
           priority={priority}
+          trainingClasses={trainingClasses}
           focusClassId={focusClassId}
           searchText={searchText || null}
           tierFilter={tierFilter}

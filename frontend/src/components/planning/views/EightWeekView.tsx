@@ -2,7 +2,7 @@ import { useMemo, useCallback, useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { planningApi, trainingApi } from "../../../api";
 import { friendlyMessage } from "../../../api/client";
-import type { PlanningSession, PlanningFacilitator, AnchorEvent, NightSummary } from "../../../api/types";
+import type { PlanningSession, PlanningFacilitator, AnchorEvent, NightSummary, TrainingClassSummary } from "../../../api/types";
 import { filterAnchors } from "../../../utils/planningFilters";
 import {
   ParadeNightBlock,
@@ -22,11 +22,12 @@ interface Props {
   facilitators: PlanningFacilitator[];
   onDateClick: (dateId: string, date: string) => void;
   onSessionClick: (session: PlanningSession, dateId: string, date: string) => void;
-  onEmptyCellClick?: (dateId: string, date: string, cadetGroup: string, period: number) => void;
+  onEmptyCellClick?: (dateId: string, date: string, cadetGroup: string, period: number, trainingClassId?: string) => void;
   onAnchorClick?: (anchor: AnchorEvent) => void;
   layers?: { conflicts?: boolean; wingHQEvents?: boolean };
   audience?: Set<string>;
   priority?: Set<string>;
+  trainingClasses?: TrainingClassSummary[];
   focusClassId?: string | null;
   searchText?: string | null;
   tierFilter?: string | null;
@@ -37,7 +38,7 @@ interface Props {
 export function EightWeekView({
   yearId, weeks = 8, customStart, customEnd, facilitators,
   onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick,
-  layers, audience, priority, focusClassId, searchText, tierFilter,
+  layers, audience, priority, trainingClasses, focusClassId, searchText, tierFilter,
   focusStageId, classStageMap,
 }: Props) {
   const showConflicts = layers?.conflicts ?? true;
@@ -217,8 +218,9 @@ export function EightWeekView({
             classStageMap={classStageMap}
             onHeaderClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
             onSessionClick={handleSessionClick}
+            trainingClasses={trainingClasses}
             onEmptyCellClick={onEmptyCellClick
-              ? (cg, period) => onEmptyCellClick(pd.parade_date_id, pd.parade_date, cg, period)
+              ? (cg, period, tcId) => onEmptyCellClick(pd.parade_date_id, pd.parade_date, cg, period, tcId)
               : undefined}
             onMoveSession={handleMoveSession}
             moveSource={moveSource}

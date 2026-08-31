@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { planningApi } from "../../api";
 import { friendlyMessage } from "../../api/client";
 import { useToast } from "../Toast";
-import type { NightSessionSummary, ParadeNotice, PlanningSession, PlanningFacilitator, PlanningConflict } from "../../api/types";
+import type { NightSessionSummary, ParadeNotice, PlanningSession, PlanningFacilitator, PlanningConflict, TrainingClassSummary } from "../../api/types";
 
 // ─── Group / period constants ─────────────────────────────────────────────────
 
@@ -219,6 +219,17 @@ function getCell(
   return sessions.find(s => s.period === period && s.cadet_group === null) ?? null;
 }
 
+function getCellByClassId(
+  sessions: DisplaySession[],
+  classId: string,
+  period: number,
+): DisplaySession | null {
+  return sessions.find(
+    s => s.period === period &&
+      (s.training_classes ?? []).some(c => c.training_class_id === classId),
+  ) ?? null;
+}
+
 function trunc(text: string | null, max: number): string {
   if (!text) return "—";
   return text.length > max ? text.slice(0, max - 1) + "…" : text;
@@ -307,9 +318,11 @@ interface ParadeNightBlockProps {
   focusStageId?: string | null;
   /** Maps training_class_id → training_stage_id for stageDimmed evaluation */
   classStageMap?: Record<string, string>;
+  /** When provided and non-empty, renders one row per TrainingClass instead of legacy BLOCK_GROUPS */
+  trainingClasses?: TrainingClassSummary[];
   onHeaderClick: () => void;
   onSessionClick?: (session: DisplaySession) => void;
-  onEmptyCellClick?: (cadetGroup: string, period: number) => void;
+  onEmptyCellClick?: (cadetGroup: string, period: number, trainingClassId?: string) => void;
   /** DND-01: called when a session is drag-dropped onto an empty cell */
   onMoveSession?: (payload: DragSessionPayload, targetDateId: string, targetPeriod: number, targetCadetGroup: string) => Promise<void>;
   /** A11Y-G6: the session currently "picked up" for a keyboard move, if any.
@@ -336,7 +349,7 @@ export function ParadeNightBlock({
   dateId, date, weekNumber, term, notices = [],
   sessions, sessionCount, filledSlots, conflictCount = 0,
   inHoliday = false, compact = false, blockSize = "md", focusClassId, searchText, tierFilter,
-  focusStageId, classStageMap,
+  focusStageId, classStageMap, trainingClasses = [],
   onHeaderClick, onSessionClick, onEmptyCellClick, onMoveSession,
   moveSource = null, onPickUpSession, onCancelMove,
 }: ParadeNightBlockProps) {
@@ -373,7 +386,35 @@ export function ParadeNightBlock({
     ? `Wk ${weekNumber}`
     : null;
 
-  const totalCells = (sessionCount ?? 0) * BLOCK_GROUPS.length;
+  // Build unified grid rows — one per TrainingClass when configured, else legacy BLOCK_GROUPS.
+  // GridRow abstracts the difference so the render loop is identical for both modes.
+  type GridRow = {
+    key: string;
+    shortLabel: string;
+    fullLabel: string;
+    getCellFn: (period: number) => DisplaySession | null;
+    emptyCellClickFn: (period: number) => void;
+    dropKeySuffix: (period: number) => string;
+  };
+  const gridRows: GridRow[] = trainingClasses.length > 0
+    ? trainingClasses.slice().sort((a, b) => a.sequence - b.sequence).map(tc => ({
+        key: tc.training_class_id,
+        shortLabel: tc.display_name,
+        fullLabel: tc.display_name,
+        getCellFn: (p: number) => getCellByClassId(sessions, tc.training_class_id, p),
+        emptyCellClickFn: (p: number) => { if (onEmptyCellClick) onEmptyCellClick("", p, tc.training_class_id); else onHeaderClick(); },
+        dropKeySuffix: (p: number) => `${p}-${tc.training_class_id}`,
+      }))
+    : BLOCK_GROUPS.map(g => ({
+        key: g.key,
+        shortLabel: g.label,
+        fullLabel: g.fullLabel,
+        getCellFn: (p: number) => getCell(sessions, g.cadetGroups, p),
+        emptyCellClickFn: (p: number) => { if (onEmptyCellClick) onEmptyCellClick(g.cadetGroups[0], p); else onHeaderClick(); },
+        dropKeySuffix: (p: number) => `${p}-${g.cadetGroups[0]}`,
+      }));
+
+  const totalCells = (sessionCount ?? 0) * gridRows.length;
   const fillLabel = totalCells > 0
     ? `${filledSlots ?? 0} / ${totalCells} classes planned`
     : null;
@@ -468,8 +509,8 @@ export function ParadeNightBlock({
       {compact ? (
         /* Compact mode: text rows */
         <div className="pw-block-compact-grid">
-          {BLOCK_GROUPS.map(g => {
-            const cells = BLOCK_PERIODS.map(p => getCell(sessions, g.cadetGroups, p));
+          {gridRows.map(row => {
+            const cells = BLOCK_PERIODS.map(p => row.getCellFn(p));
             const allEmpty = cells.every(c => c === null);
             return (
               // Mouse-only shortcut for the same action as the block header above
@@ -477,11 +518,11 @@ export function ParadeNightBlock({
               // — intentionally not a second tab stop for the identical action.
               // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
               <div
-                key={g.key}
+                key={row.key}
                 className={`pw-block-cg-row${allEmpty ? " all-empty" : ""}`}
                 onClick={onHeaderClick}
               >
-                <span className="pw-block-cg-lbl">{g.label}</span>
+                <span className="pw-block-cg-lbl">{row.shortLabel}</span>
                 <span className="pw-block-cg-periods">
                   {cells.map((cell, i) => (
                     <span key={i} className={`pw-block-cg-cell${!cell ? " empty" : ""}${cell?.conflict ? ` c-${cell.conflict}` : ""}`}>
@@ -505,30 +546,29 @@ export function ParadeNightBlock({
               </tr>
             </thead>
             <tbody>
-              {BLOCK_GROUPS.map(g => (
-                <tr key={g.key}>
-                  <th>{g.fullLabel}</th>
+              {gridRows.map(row => (
+                <tr key={row.key}>
+                  <th>{row.fullLabel}</th>
                   {BLOCK_PERIODS.map(period => {
-                    const cell = getCell(sessions, g.cadetGroups, period);
+                    const cell = row.getCellFn(period);
                     if (!cell) {
-                      const handleEmptyClick = onEmptyCellClick
-                        ? () => onEmptyCellClick(g.cadetGroups[0], period)
-                        : onHeaderClick;
-                      const cellKey = `${period}-${g.cadetGroups[0]}`;
+                      const cellKey = row.dropKeySuffix(period);
                       const isDropTarget = dropTargetKey === cellKey;
                       // A11Y-G6: while a session is picked up, every empty cell is a keyboard
                       // drop target and Enter places rather than adds.
                       const isArmed = !!moveSource && !!onMoveSession;
                       const placeHere = () => {
                         if (!moveSource || !onMoveSession) return;
-                        void onMoveSession(moveSource, dateId, period, g.cadetGroups[0]);
+                        // _targetCadetGroup is unused by EightWeekView's handleMoveSession
+                        // (it preserves payload.cadet_group), so passing "" is safe.
+                        void onMoveSession(moveSource, dateId, period, "");
                       };
                       return (
                         <td
                           key={period}
                           className={`pw-night-cell empty${isDropTarget ? " dnd-over" : ""}${isArmed ? " pw-move-target" : ""}`}
                           style={isDropTarget ? { outline: "2px dashed var(--aafc-blue, #51b0e3)", background: "var(--surface-2, #f0f5fa)" } : undefined}
-                          onClick={isArmed ? placeHere : handleEmptyClick}
+                          onClick={isArmed ? placeHere : () => row.emptyCellClickFn(period)}
                           role="button"
                           tabIndex={0}
                           onKeyDown={e => {
@@ -536,11 +576,11 @@ export function ParadeNightBlock({
                             if (isArmed && (e.key === "Enter" || e.key === "m" || e.key === "M")) {
                               e.preventDefault(); e.stopPropagation(); placeHere(); return;
                             }
-                            if (e.key === "Enter") handleEmptyClick();
+                            if (e.key === "Enter") row.emptyCellClickFn(period);
                           }}
                           aria-label={isArmed
-                            ? `Empty slot, ${g.fullLabel} period ${period}. Press Enter to move ${moveSource?.activity_title ?? "the session"} here, or Escape to cancel.`
-                            : (onEmptyCellClick ? `Empty slot, ${g.fullLabel} period ${period}. Press Enter to add a session.` : "No lesson — press Enter to open night detail")}
+                            ? `Empty slot, ${row.fullLabel} period ${period}. Press Enter to move ${moveSource?.activity_title ?? "the session"} here, or Escape to cancel.`
+                            : (onEmptyCellClick ? `Empty slot, ${row.fullLabel} period ${period}. Press Enter to add a session.` : "No lesson — press Enter to open night detail")}
                           onDragEnter={onMoveSession ? e => { e.preventDefault(); dropEnterCount.current++; setDropTargetKey(cellKey); } : undefined}
                           onDragLeave={onMoveSession ? () => { dropEnterCount.current = Math.max(0, dropEnterCount.current - 1); if (dropEnterCount.current === 0) setDropTargetKey(null); } : undefined}
                           onDragOver={onMoveSession ? e => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; } : undefined}
@@ -552,7 +592,7 @@ export function ParadeNightBlock({
                             if (!raw) return;
                             let payload: DragSessionPayload;
                             try { payload = JSON.parse(raw) as DragSessionPayload; } catch { return; }
-                            onMoveSession(payload, dateId, period, g.cadetGroups[0]);
+                            onMoveSession(payload, dateId, period, "");
                           } : undefined}
                         >
                           <div className="pw-night-cell-inner">
@@ -600,7 +640,7 @@ export function ParadeNightBlock({
                         aria-label={canDrag
                           ? (isMoveSource
                               ? `${cell.title ?? "Session"} — picked up to move. Tab to an empty slot and press Enter to place it, or press Escape to cancel.`
-                              : `${cell.title ?? "Session"}, ${g.fullLabel} period ${period}. Press Enter to open, or M to pick it up and move it.`)
+                              : `${cell.title ?? "Session"}, ${row.fullLabel} period ${period}. Press Enter to open, or M to pick it up and move it.`)
                           : undefined}
                         onKeyDown={e => {
                           // A11Y-G6: keyboard equivalent of dragging. Drag is a pointer-only
