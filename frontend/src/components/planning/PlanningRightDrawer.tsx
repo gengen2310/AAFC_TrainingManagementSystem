@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useId, useCallback, type KeyboardEvent } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { planningApi, trainingApi, orgApi } from "../../api";
+import { planningApi, trainingApi } from "../../api";
 import { friendlyMessage } from "../../api/client";
 import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent, NightSummary, TrainingClassSummary } from "../../api/types";
 import { ActivityFullDetail, anchorToDisplay } from "./ActivityDetailBlock";
@@ -108,7 +108,7 @@ function SessionForm({
 
   const { data: classesData } = useQuery({
     queryKey: ["training-classes", yearId],
-    queryFn: () => orgApi.trainingClasses(yearId!),
+    queryFn: () => trainingApi.trainingClasses(yearId!),
     enabled: !!yearId,
     staleTime: 5 * 60 * 1000,
   });
@@ -830,7 +830,7 @@ function ScheduleFromBacklogPanel({
 
   const { data: classesData } = useQuery({
     queryKey: ["training-classes", yearId],
-    queryFn: () => orgApi.trainingClasses(yearId),
+    queryFn: () => trainingApi.trainingClasses(yearId),
     staleTime: 5 * 60 * 1000,
   });
   const backlogClasses: TrainingClassSummary[] = (classesData as TrainingClassSummary[] | undefined) ?? [];

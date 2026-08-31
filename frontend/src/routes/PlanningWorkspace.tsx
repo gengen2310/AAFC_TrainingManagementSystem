@@ -16,7 +16,7 @@ function readStoredYear(): number | null {
 }
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthProvider";
-import { planningApi, orgApi } from "../api";
+import { planningApi, trainingApi } from "../api";
 import type { PlanningYear, TrainingClassSummary } from "../api/types";
 import { PlanningContextBar, type ViewMode, type DisplayMode } from "../components/planning/PlanningContextBar";
 import { ListView } from "../components/planning/views/ListView";
@@ -251,7 +251,7 @@ export function PlanningWorkspace() {
 
   const { data: trainingClasses = [] } = useQuery<TrainingClassSummary[]>({
     queryKey: ["training-classes", selectedYearId],
-    queryFn: () => orgApi.trainingClasses(selectedYearId!),
+    queryFn: () => trainingApi.trainingClasses(selectedYearId!),
     enabled: !!selectedYearId,
     staleTime: 10 * 60 * 1000,
   });
