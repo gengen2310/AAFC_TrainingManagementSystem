@@ -397,7 +397,7 @@ export function ParadeNightBlock({
     dropKeySuffix: (period: number) => string;
   };
   const gridRows: GridRow[] = trainingClasses.length > 0
-    ? trainingClasses.slice().sort((a, b) => a.sequence - b.sequence).map(tc => ({
+    ? trainingClasses.slice().sort((a, b) => a.class_number - b.class_number).map(tc => ({
         key: tc.training_class_id,
         shortLabel: tc.display_name,
         fullLabel: tc.display_name,

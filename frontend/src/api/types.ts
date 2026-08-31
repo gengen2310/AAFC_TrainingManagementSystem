@@ -112,7 +112,7 @@ export interface CadetClassMembership {
 }
 export interface TrainingClassSummary {
   training_class_id: string; squadron_id: string; training_year_id: string;
-  training_stage_id: string; display_name: string; sequence: number;
+  training_stage_id: string; display_name: string; class_number: number;
   start_date: string | null; end_date: string | null; expected_count: number | null;
   notes: string | null; is_archived: boolean; version: number;
 }

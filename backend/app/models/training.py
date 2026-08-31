@@ -458,13 +458,17 @@ class TrainingClass(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     a replacement, until every consumer has migrated (addendum §86-87).
     """
     __tablename__ = "training_classes"
+    __table_args__ = (
+        UniqueConstraint("squadron_id", "training_year_id", "class_number",
+                         name="uq_training_class_number_per_year"),
+    )
     squadron_id: Mapped[str] = mapped_column(ForeignKey("squadrons.id"), index=True)
     training_year_id: Mapped[str] = mapped_column(ForeignKey("planning_years.id"), index=True)
     training_stage_id: Mapped[str | None] = mapped_column(ForeignKey("curriculum_phases.id"), index=True, nullable=True)
     stage_code: Mapped[str | None] = mapped_column(String(10), nullable=True, index=True)
     # ORI | INI | JNR | INT | SNR — null for classes created before this feature
     display_name: Mapped[str] = mapped_column(String(80))
-    sequence: Mapped[int] = mapped_column(Integer, default=0)
+    class_number: Mapped[int] = mapped_column(Integer, default=1)
     start_date: Mapped[str | None] = mapped_column(String(10), nullable=True)  # ISO date
     end_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
     expected_count: Mapped[int | None] = mapped_column(Integer, nullable=True)

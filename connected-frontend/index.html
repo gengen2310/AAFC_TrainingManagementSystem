@@ -8810,11 +8810,12 @@ function _chartClassTable(progressChart, enrollmentChart){
       + '<td></td></tr>';
     (row.classes||[]).forEach(function(cls){
       const nm=cls.display_name||'';
+      const num=cls.class_number!=null?'C'+String(cls.class_number).padStart(2,'0')+' · ':'';
       const v=cls.coverage_pct;
       const n=counts[stage+'||'+nm];
       const behind=agg!=null&&v!=null&&v<=agg-15;
       body+='<tr>'
-        + '<td class="cls-name">'+esc(nm)+'</td>'
+        + '<td class="cls-name"><span class="cls-num-badge">'+esc(num)+'</span>'+esc(nm)+'</td>'
         + '<td class="cls-num">'+(n!=null?esc(String(n)):'\u2014')+'</td>'
         + '<td class="cls-prog"><div class="pbar"><div style="height:100%;width:'+(v!=null?Math.round(v):0)+'%;background:'+col(v)+';border-radius:3px"></div></div></td>'
         + '<td class="cls-num" style="color:'+col(v)+'">'+pct(v)+'</td>'
@@ -8849,8 +8850,9 @@ function _chartClassProgress(chart){
       const behind=agg!=null&&p!=null&&p<=agg-15;
       const clsColor=p==null?'var(--muted)':p>=80?'var(--ok)':p>=60?'var(--warn)':'var(--red)';
       const w=p!=null?Math.round(p):0;
-      html+=`<div style="display:flex;align-items:center;gap:8px;padding:3px 0 3px 16px" role="img" aria-label="${esc(cls.display_name)}: ${p!=null?p+'%':'no data'}">
-        <div style="font-size:var(--fs-xs);color:var(--text-2);min-width:114px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(cls.display_name)}">${esc(cls.display_name)}</div>
+      const clsNum=cls.class_number!=null?'C'+String(cls.class_number).padStart(2,'0')+' · ':'';
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:3px 0 3px 16px" role="img" aria-label="${esc(clsNum+cls.display_name)}: ${p!=null?p+'%':'no data'}">
+        <div style="font-size:var(--fs-xs);color:var(--text-2);min-width:114px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(clsNum+cls.display_name)}"><span style="font-weight:600;color:var(--steel)">${esc(clsNum)}</span>${esc(cls.display_name)}</div>
         <div style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${clsColor};border-radius:3px"></div></div></div>
         <div style="min-width:48px;text-align:right;font-size:var(--fs-xs);color:${clsColor}">${p!=null?p+'%':'—'}</div>
         ${behind?`<span style="font-size:var(--fs-xs);font-weight:800;color:var(--red);white-space:nowrap">NEEDS ATTENTION</span>`:''}
@@ -10710,8 +10712,8 @@ async function _populatePnDetailClasses(pn){
     catch(_){ return; }
   }
   if(!classes.length) return; // no classes configured — leave pickers hidden
-  // Sort by sequence then display_name, same order as the quickEdit picker.
-  classes.sort((a,b)=>(a.sequence||0)-(b.sequence||0)||(a.display_name||'').localeCompare(b.display_name||''));
+  // Sort by class_number then display_name (canonical order — sequence field renamed to class_number in v44).
+  classes.sort((a,b)=>(a.class_number||a.sequence||0)-(b.class_number||b.sequence||0)||(a.display_name||'').localeCompare(b.display_name||''));
   const sessions=pn.sessions||[];
   await Promise.all(sessions.map(async(s,i)=>{
     // Guard: if user closed the modal before audience fetches resolved, bail.

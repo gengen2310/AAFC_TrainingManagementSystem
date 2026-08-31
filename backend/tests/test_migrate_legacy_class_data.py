@@ -294,7 +294,7 @@ def test_ambiguous_existing_manual_class_is_never_auto_linked():
         # created_by is a real user id, not the migration tag.
         manual_class = TrainingClass(
             squadron_id=sqn.id, training_year_id=py.id, training_stage_id=stage.id,
-            display_name="Senior 1", sequence=1, created_by="some-real-user-id",
+            display_name="Senior 1", class_number=1, created_by="some-real-user-id",
         )
         db.add(manual_class)
         db.commit()
