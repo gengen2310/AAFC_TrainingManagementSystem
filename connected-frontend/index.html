@@ -475,7 +475,12 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .btn-sm{padding:0 var(--ctl-pad-x-sm);font-size:var(--fs-xs);min-height:var(--ctl-min);}
 /* A VISUAL variant only: smaller type and tighter padding, same 44x44 target.
    It previously set 28x28 and was the clearest breach of the scale rule. */
-.btn-xs{padding:0 var(--ctl-pad-x-sm);font-size:var(--fs-xs);border-radius:5px;min-height:var(--ctl-min);min-width:var(--ctl-min);}  /* AUDIT-2026-08 G5: min-height alone left icon buttons 25px wide */
+.btn-xs{padding:0 var(--ctl-pad-x-sm);font-size:var(--fs-xs);border-radius:5px;min-height:var(--ctl-min);min-width:var(--ctl-min);}
+/* Adjacent actions must not touch. The gate passes flush 44px controls, so
+   this is design judgement rather than a measured failure: a finger's
+   contact patch is wider than the 1px probe the runner uses, and spacing
+   between targets is a separate concern from the size of one. */
+.ctl-group{display:inline-flex;gap:var(--ctl-gap);align-items:center;flex-wrap:wrap;}  /* AUDIT-2026-08 G5: min-height alone left icon buttons 25px wide */
 /* AUDIT-2026-08 G5: icon-only controls were inline-styled down to ~16px tall.
    Shared floor for them - 28x28 pointer target [HIG]. */
 /* AUDIT-2026-08 G5: a floor for form controls. Several are inline-styled with small
@@ -741,7 +746,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .sess-num{font-size:var(--fs-2xs);font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;}
 .sess-title{font-size:var(--fs-sm);font-weight:700;color:var(--text);margin-bottom:3px;}
 .sess-info{font-size:var(--fs-2xs);color:var(--muted);}
-.sess-acts{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;}
+.sess-acts{display:flex;gap:var(--ctl-gap);margin-top:6px;flex-wrap:wrap;}  /* was 4px -- these were never flush, just tighter than the token */
 
 /* ── PROG BAR ── */
 .pbar{height:5px;background:var(--border);border-radius:3px;overflow:hidden;}

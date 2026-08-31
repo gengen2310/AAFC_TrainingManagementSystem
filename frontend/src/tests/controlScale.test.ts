@@ -89,3 +89,18 @@ describe("the remaining control classes", () => {
     });
   }
 });
+
+describe("adjacent targets are separated", () => {
+  it("declares .ctl-group with --ctl-gap", () => {
+    // NOTE ON WHY THIS EXISTS. The original justification was 23 controls that
+    // measured large enough and still failed the hit probe. That was at 28px,
+    // where a probe reaching +-21px from centre lands OUTSIDE the box and onto
+    // the neighbour. At 44px it lands inside, and the lab now passes flush
+    // buttons without any gap.
+    //
+    // The rule is kept as design judgement, not as a gate result: a finger's
+    // contact patch is wider than a 1px probe, and Apple treats spacing between
+    // targets as a separate concern from target size.
+    expect(html).toContain(".ctl-group{display:inline-flex;gap:var(--ctl-gap);");
+  });
+});
