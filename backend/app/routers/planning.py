@@ -11,7 +11,7 @@ from datetime import date, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db, utcnow, iso_z
@@ -69,6 +69,8 @@ _CADET_GROUP_STAGE_CODE: dict[str, str] = {
     "intermediate": "INT",
     "senior": "SNR",
 }
+# Reverse mapping: stage_code → cadet_group (for denormalising when class IDs are provided)
+_STAGE_CODE_CADET_GROUP: dict[str, str] = {v: k for k, v in _CADET_GROUP_STAGE_CODE.items()}
 
 
 def _upsert_session_audience(db: DBSession, session_id: str, cadet_group: str,
@@ -107,6 +109,34 @@ def _upsert_session_audience(db: DBSession, session_id: str, cadet_group: str,
     if existing:
         return
     db.add(SessionAudience(session_id=session_id, training_class_id=classes[0].id))
+    db.commit()
+
+
+def _create_audience_for_class_ids(
+    db: DBSession, session_id: str, class_ids: list[str],
+) -> None:
+    """Create SessionAudience rows for explicit training_class_id values.
+
+    Idempotent: existing rows for the same (session_id, training_class_id) pair are
+    skipped (the unique constraint would catch them anyway).  Invalid IDs (classes that
+    don't exist or belong to a different squadron/year) are silently skipped so a stale
+    frontend ID never hard-fails a save.
+    """
+    for tc_id in class_ids:
+        tc = db.get(TrainingClass, tc_id)
+        if not tc:
+            continue
+        exists = (
+            db.query(SessionAudience)
+            .filter(
+                SessionAudience.session_id == session_id,
+                SessionAudience.training_class_id == tc_id,
+            )
+            .first()
+        )
+        if exists:
+            continue
+        db.add(SessionAudience(session_id=session_id, training_class_id=tc_id))
     db.commit()
 
 
@@ -1861,7 +1891,8 @@ def get_builder(
 # ─────────────────────────────────────────────────────────────
 
 class SessionCreateIn(BaseModel):
-    cadet_group: str
+    cadet_group: Optional[str] = None  # legacy; mutually exclusive with training_class_ids
+    training_class_ids: Optional[list[str]] = None  # canonical; preferred over cadet_group
     session_number: int
     curriculum_id: Optional[str] = None
     activity_title: Optional[str] = None
@@ -1873,6 +1904,12 @@ class SessionCreateIn(BaseModel):
     override_reason: Optional[str] = None
     status: str = "draft"
     notes: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _require_group_or_classes(self) -> "SessionCreateIn":
+        if not self.cadet_group and not self.training_class_ids:
+            raise ValueError("Either cadet_group or training_class_ids must be provided")
+        return self
 
     @field_validator("status")
     @classmethod
@@ -1887,6 +1924,7 @@ class SessionUpdateIn(BaseModel):
     curriculum_id: Optional[str] = None
     activity_title: Optional[str] = None
     facilitator_id: Optional[str] = None
+    assistant_facilitator_id: Optional[str] = None
     location_id: Optional[str] = None
     is_combined: Optional[bool] = None
     combined_groups: Optional[list] = None
@@ -1895,6 +1933,9 @@ class SessionUpdateIn(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
     version: Optional[int] = None
+    cadet_group: Optional[str] = None  # legacy; updates TrainingSession.cadet_group
+    training_class_ids: Optional[list[str]] = None  # replaces all SessionAudience rows when provided
+    part_number: Optional[int] = None
 
 
 @router.post("/parade-dates/{date_id}/sessions")
@@ -1909,8 +1950,19 @@ def create_session(
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(pn.planning_year_id, db)
     _require_year_access(p, py, write=True, db=db)
-    if body.cadet_group not in CADET_GROUPS:
-        raise HTTPException(422, detail={"error": "invalid_cadet_group"})
+
+    # Resolve cadet_group and audience path.
+    # Canonical path: explicit training_class_ids (multi-class squadron support)
+    # Legacy path: cadet_group string auto-matched to a single TrainingClass
+    use_class_ids = bool(body.training_class_ids)
+    if use_class_ids:
+        # Derive cadet_group for denormalisation from the first class's stage_code.
+        first_tc = db.get(TrainingClass, body.training_class_ids[0]) if body.training_class_ids else None
+        resolved_cadet_group = _STAGE_CODE_CADET_GROUP.get(first_tc.stage_code) if first_tc else None
+    else:
+        if body.cadet_group not in CADET_GROUPS:
+            raise HTTPException(422, detail={"error": "invalid_cadet_group"})
+        resolved_cadet_group = body.cadet_group
 
     # Resolve room ID from location_id (which may be a PlanningLocation or TrainingArea id)
     training_area_id = None
@@ -1922,7 +1974,7 @@ def create_session(
     # Create a real Session record
     s = TrainingSession(
         parade_night_id=pn.id, squadron_id=pn.squadron_id,
-        period_number=body.session_number, cadet_group=body.cadet_group,
+        period_number=body.session_number, cadet_group=resolved_cadet_group,
         custom_title=body.activity_title, status=body.status,
         delivery_notes=body.notes, created_by=p.user_id,
     )
@@ -1946,10 +1998,13 @@ def create_session(
             s.training_area_id = ra.id
             s.training_area_name_at_time = ra.name
     db.add(s); db.commit()
-    _upsert_session_audience(db, s.id, body.cadet_group, pn.squadron_id, py.id)
+    if use_class_ids:
+        _create_audience_for_class_ids(db, s.id, body.training_class_ids)
+    else:
+        _upsert_session_audience(db, s.id, body.cadet_group, pn.squadron_id, py.id)
     _run_conflict_check(py.id, date_id, db)
     audit(db, p, object_type="session", object_id=s.id, action="create",
-          new={"group": body.cadet_group, "session": body.session_number})
+          new={"group": resolved_cadet_group, "session": body.session_number})
     return _real_session_out(s, db)
 
 
@@ -2024,6 +2079,21 @@ def update_session(
         s.status = body.status
     if body.notes is not None:
         s.delivery_notes = body.notes
+    if body.part_number is not None:
+        s.part_number = body.part_number if body.part_number > 0 else None
+    if body.cadet_group is not None:
+        if body.cadet_group and body.cadet_group not in CADET_GROUPS:
+            raise HTTPException(422, detail={"error": "invalid_cadet_group"})
+        s.cadet_group = body.cadet_group or None
+    if body.training_class_ids is not None:
+        # Replace all existing SessionAudience rows for this session with the new set.
+        db.query(SessionAudience).filter(SessionAudience.session_id == s.id).delete()
+        db.flush()
+        _create_audience_for_class_ids(db, s.id, body.training_class_ids)
+        # Derive cadet_group from the first class for backward compat denormalisation.
+        if body.training_class_ids:
+            first_tc = db.get(TrainingClass, body.training_class_ids[0])
+            s.cadet_group = _STAGE_CODE_CADET_GROUP.get(first_tc.stage_code) if first_tc else s.cadet_group
     s.version += 1
     db.commit()
     audit(db, p, object_type="session", object_id=s.id, action="update")
@@ -3579,11 +3649,18 @@ class MissionAssignIn(BaseModel):
     curriculum_id: str
     parade_date_id: str
     session_number: int
-    cadet_group: str
+    cadet_group: Optional[str] = None  # legacy
+    training_class_ids: Optional[list[str]] = None  # canonical
     part_number: Optional[int] = None
     facilitator_id: Optional[str] = None
     training_area_id: Optional[str] = None
     notes: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _require_group_or_classes(self) -> "MissionAssignIn":
+        if not self.cadet_group and not self.training_class_ids:
+            raise ValueError("Either cadet_group or training_class_ids must be provided")
+        return self
 
 
 @router.post("/years/{year_id}/assign-mission")
@@ -3597,8 +3674,14 @@ def assign_mission(
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
 
-    if body.cadet_group not in CADET_GROUPS:
-        raise HTTPException(422, detail={"error": "invalid_cadet_group"})
+    use_class_ids = bool(body.training_class_ids)
+    if use_class_ids:
+        first_tc = db.get(TrainingClass, body.training_class_ids[0]) if body.training_class_ids else None
+        resolved_cadet_group = _STAGE_CODE_CADET_GROUP.get(first_tc.stage_code) if first_tc else None
+    else:
+        if body.cadet_group not in CADET_GROUPS:
+            raise HTTPException(422, detail={"error": "invalid_cadet_group"})
+        resolved_cadet_group = body.cadet_group
 
     ci = db.get(CurriculumItem, body.curriculum_id)
     if not ci:
@@ -3613,7 +3696,7 @@ def assign_mission(
     s = TrainingSession(
         parade_night_id=pn.id, squadron_id=pn.squadron_id,
         period_number=body.session_number,
-        cadet_group=body.cadet_group,
+        cadet_group=resolved_cadet_group,
         part_number=body.part_number,
         curriculum_item_id=ci.id,
         curriculum_code_at_time=ci.code,
@@ -3638,11 +3721,14 @@ def assign_mission(
 
     db.add(s)
     db.commit()
-    _upsert_session_audience(db, s.id, body.cadet_group, pn.squadron_id, year_id)
+    if use_class_ids:
+        _create_audience_for_class_ids(db, s.id, body.training_class_ids)
+    else:
+        _upsert_session_audience(db, s.id, body.cadet_group, pn.squadron_id, year_id)
     _run_conflict_check(year_id, body.parade_date_id, db)
     audit(db, p, object_type="session", object_id=s.id, action="assign_mission",
           new={"curriculum": ci.code, "date": pd_obj.date, "session": body.session_number,
-               "group": body.cadet_group})
+               "group": resolved_cadet_group})
     return _real_session_out(s, db)
 
 

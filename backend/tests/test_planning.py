@@ -2888,6 +2888,63 @@ def test_create_session_also_creates_session_audience_row(client):
         db.close()
 
 
+def test_create_session_with_training_class_ids(client):
+    """P0-PLAN-UX-02: creating a session via training_class_ids (canonical path)
+    must produce a SessionAudience row for the specified class and NOT require
+    cadet_group in the request body."""
+    from app.database import SessionLocal
+    from app.models import SessionAudience, TrainingClass
+
+    hdr = _sqn_admin_hdr(client)
+    yr_id, pd_id = _setup_year_with_date(client, hdr)
+
+    # Fetch auto-created classes and pick the SNR one.
+    classes_r = client.get(f"/api/training-classes?training_year_id={yr_id}", headers=hdr)
+    assert classes_r.status_code == 200, classes_r.text
+    classes = classes_r.json()
+    senior_cls = next(c for c in classes if c["stage_code"] == "SNR")
+    tc_id = senior_cls["training_class_id"]
+
+    r = client.post(
+        f"/api/planning/parade-dates/{pd_id}/sessions",
+        json={"training_class_ids": [tc_id], "session_number": 1,
+              "activity_title": "Senior Navigation"},
+        headers=hdr,
+    )
+    assert r.status_code == 200, r.text
+    d = r.json()
+    session_id = d["session_id"]
+    # cadet_group should be derived from stage_code ("SNR" → "senior").
+    assert d["cadet_group"] == "senior"
+
+    db = SessionLocal()
+    try:
+        audiences = db.query(SessionAudience).filter(
+            SessionAudience.session_id == session_id
+        ).all()
+        assert len(audiences) == 1, (
+            f"Expected 1 SessionAudience row for session {session_id}, got {len(audiences)}"
+        )
+        tc = db.get(TrainingClass, audiences[0].training_class_id)
+        assert tc is not None
+        assert tc.id == tc_id
+        assert tc.stage_code == "SNR"
+    finally:
+        db.close()
+
+
+def test_create_session_requires_group_or_class_ids(client):
+    """Providing neither cadet_group nor training_class_ids must return 422."""
+    hdr = _sqn_admin_hdr(client)
+    yr_id, pd_id = _setup_year_with_date(client, hdr)
+    r = client.post(
+        f"/api/planning/parade-dates/{pd_id}/sessions",
+        json={"session_number": 1},
+        headers=hdr,
+    )
+    assert r.status_code == 422
+
+
 def test_assign_mission_also_creates_session_audience_row(client):
     """K-006 regression: assign_mission must also produce a SessionAudience row."""
     from app.database import SessionLocal

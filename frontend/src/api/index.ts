@@ -370,9 +370,9 @@ export const planningApi = {
   runChecks: (year_id: string) =>
     api.post<{ ok: boolean; conflicts_detected: number }>(`/api/planning/years/${year_id}/run-checks`, {}),
   createSession: (date_id: string, body: {
-    cadet_group: string; session_number: number; curriculum_id?: string;
-    activity_title?: string; facilitator_id?: string; location_id?: string;
-    part_number?: number; notes?: string;
+    cadet_group?: string; training_class_ids?: string[]; session_number: number;
+    curriculum_id?: string; activity_title?: string; facilitator_id?: string;
+    location_id?: string; part_number?: number; notes?: string;
   }) => api.post<Record<string, unknown>>(`/api/planning/parade-dates/${date_id}/sessions`, body),
   getSession: (session_id: string) =>
     api.get<PlanningSession>(`/api/planning/sessions/${session_id}`),
@@ -381,6 +381,7 @@ export const planningApi = {
     facilitator_id?: string | null; assistant_facilitator_id?: string | null;
     location_id?: string | null; cadet_group?: string | null;
     part_number?: number | null; notes?: string | null;
+    training_class_ids?: string[] | null;
   }) => api.patch<Record<string, unknown>>(`/api/planning/sessions/${session_id}`, body),
   deleteSession: (session_id: string) =>
     api.delete<{ ok: boolean }>(`/api/planning/sessions/${session_id}`),

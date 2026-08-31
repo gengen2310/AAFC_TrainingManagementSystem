@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useId, useCallback, type KeyboardEvent } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { planningApi, trainingApi } from "../../api";
+import { planningApi, trainingApi, orgApi } from "../../api";
 import { friendlyMessage } from "../../api/client";
-import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent, NightSummary } from "../../api/types";
+import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent, NightSummary, TrainingClassSummary } from "../../api/types";
 import { ActivityFullDetail, anchorToDisplay } from "./ActivityDetailBlock";
 import { getProgramType } from "../../utils/planningFilters";
 import { useConfirm } from "../ConfirmDialog";
@@ -14,7 +14,7 @@ import { useAutoSave } from "../../utils/useAutoSave";
 export type DrawerItem =
   | { type: "session"; session: PlanningSession; dateId: string; date: string; conflicts: PlanningConflict[] }
   | { type: "session-by-id"; sessionId: string; dateId: string; date: string }
-  | { type: "new-session"; cadetGroup: string; periodNumber: number; dateId: string }
+  | { type: "new-session"; cadetGroup: string; periodNumber: number; dateId: string; trainingClassId?: string }
   | { type: "wing-event"; event: WingHQEvent }
   | { type: "curriculum"; curriculum: { curriculum_id: string; code: string; title: string; phase: string } }
   | { type: "new-anchor"; yearId: string }
@@ -57,6 +57,12 @@ function SessionForm({
   const [cadetGroup, setCadetGroup] = useState(
     existing?.cadet_group ?? (item.type === "new-session" ? item.cadetGroup : "junior"),
   );
+  // Resolve initial trainingClassId from existing session's first class, or from
+  // the cell-click hint if the drawer was opened via trainingClassId on the DrawerItem.
+  const initClassId =
+    (existing?.training_classes?.[0]?.training_class_id) ??
+    (item.type === "new-session" ? (item.trainingClassId ?? null) : null);
+  const [trainingClassId, setTrainingClassId] = useState<string | null>(initClassId);
   const [periodNumber, setPeriodNumber] = useState(
     existing?.session_number ?? (item.type === "new-session" ? item.periodNumber : 1),
   );
@@ -90,13 +96,23 @@ function SessionForm({
       facilitator_id: facilitatorId || null,
       assistant_facilitator_id: asstFacId || null,
       location_id: locationId || null,
-      cadet_group: cadetGroup || null,
+      ...(trainingClassId
+        ? { training_class_ids: [trainingClassId] }
+        : { cadet_group: cadetGroup || null }),
       part_number: partNumber ? Number(partNumber) : null,
       notes: val || null,
     });
     await qc.invalidateQueries({ queryKey: ["planning-weekly"] });
-  }, [sessionId, curriculumId, title, facilitatorId, asstFacId, locationId, cadetGroup, partNumber, qc]);
+  }, [sessionId, curriculumId, title, facilitatorId, asstFacId, locationId, cadetGroup, trainingClassId, partNumber, qc]);
   const { onChange: onNotesAutoSave, status: notesSaveStatus } = useAutoSave(autoSaveNotesFn);
+
+  const { data: classesData } = useQuery({
+    queryKey: ["training-classes", yearId],
+    queryFn: () => orgApi.trainingClasses(yearId!),
+    enabled: !!yearId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const trainingClasses: TrainingClassSummary[] = (classesData as TrainingClassSummary[] | undefined) ?? [];
 
   const { data: missionsData } = useQuery({
     queryKey: ["planning-missions", yearId],
@@ -191,13 +207,17 @@ function SessionForm({
           facilitator_id: facilitatorId || null,
           assistant_facilitator_id: asstFacId || null,
           location_id: locationId || null,
-          cadet_group: cadetGroup || null,
+          ...(trainingClassId
+            ? { training_class_ids: [trainingClassId] }
+            : { cadet_group: cadetGroup || null }),
           part_number: partNumber ? Number(partNumber) : null,
           notes: notes || null,
         });
       } else {
         await planningApi.createSession(dateId, {
-          cadet_group: cadetGroup,
+          ...(trainingClassId
+            ? { training_class_ids: [trainingClassId] }
+            : { cadet_group: cadetGroup }),
           session_number: periodNumber,
           curriculum_id: curriculumId ?? undefined,
           activity_title: title || undefined,
@@ -254,6 +274,12 @@ function SessionForm({
         custom_title: title || null,
         status: existing.status,
       });
+      // After move, update the session audience via updateSession if a class is selected.
+      if (trainingClassId) {
+        await planningApi.updateSession(existing.session_id, {
+          training_class_ids: [trainingClassId],
+        });
+      }
       await qc.invalidateQueries({ queryKey: ["planning-weekly"] });
       await qc.invalidateQueries({ queryKey: ["planning-long-range"] });
       await qc.invalidateQueries({ queryKey: ["planning-annual"] });
@@ -411,10 +437,19 @@ function SessionForm({
           <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Navigation using compass" />
         </label>
         <label>
-          Cadet group
-          <select value={cadetGroup} onChange={e => setCadetGroup(e.target.value)}>
-            {CADET_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
-          </select>
+          {trainingClasses.length > 0 ? "Training class" : "Cadet group"}
+          {trainingClasses.length > 0 ? (
+            <select value={trainingClassId ?? ""} onChange={e => setTrainingClassId(e.target.value || null)}>
+              <option value="">— Select class —</option>
+              {trainingClasses.filter(c => !c.is_archived).map(c => (
+                <option key={c.training_class_id} value={c.training_class_id}>{c.display_name}</option>
+              ))}
+            </select>
+          ) : (
+            <select value={cadetGroup} onChange={e => setCadetGroup(e.target.value)}>
+              {CADET_GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
+            </select>
+          )}
         </label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <label>
@@ -784,6 +819,7 @@ function ScheduleFromBacklogPanel({
   const [dateId, setDateId] = useState("");
   const [period, setPeriod] = useState(1);
   const [cadetGroup, setCadetGroup] = useState("junior");
+  const [trainingClassId, setTrainingClassId] = useState<string | null>(null);
   const [facilitatorId, setFacilitatorId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [partNumber, setPartNumber] = useState("");
@@ -791,6 +827,13 @@ function ScheduleFromBacklogPanel({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const { data: classesData } = useQuery({
+    queryKey: ["training-classes", yearId],
+    queryFn: () => orgApi.trainingClasses(yearId),
+    staleTime: 5 * 60 * 1000,
+  });
+  const backlogClasses: TrainingClassSummary[] = (classesData as TrainingClassSummary[] | undefined) ?? [];
 
   const { data: missionsData } = useQuery({
     queryKey: ["planning-missions", yearId],
@@ -813,7 +856,9 @@ function ScheduleFromBacklogPanel({
     setSaving(true); setErr(null);
     try {
       await planningApi.createSession(dateId, {
-        cadet_group: cadetGroup,
+        ...(trainingClassId
+          ? { training_class_ids: [trainingClassId] }
+          : { cadet_group: cadetGroup }),
         session_number: period,
         curriculum_id: curriculum.curriculum_id,
         facilitator_id: facilitatorId || undefined,
@@ -934,12 +979,21 @@ function ScheduleFromBacklogPanel({
             )}
           </div>
           <label>
-            Cadet group
-            <select value={cadetGroup} onChange={e => setCadetGroup(e.target.value)}>
-              {Object.entries(CADET_GROUP_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
+            {backlogClasses.length > 0 ? "Training class" : "Cadet group"}
+            {backlogClasses.length > 0 ? (
+              <select value={trainingClassId ?? ""} onChange={e => setTrainingClassId(e.target.value || null)}>
+                <option value="">— Select class —</option>
+                {backlogClasses.filter(c => !c.is_archived).map(c => (
+                  <option key={c.training_class_id} value={c.training_class_id}>{c.display_name}</option>
+                ))}
+              </select>
+            ) : (
+              <select value={cadetGroup} onChange={e => setCadetGroup(e.target.value)}>
+                {Object.entries(CADET_GROUP_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            )}
           </label>
           <label>
             Facilitator
