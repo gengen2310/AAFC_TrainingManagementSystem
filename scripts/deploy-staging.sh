@@ -77,6 +77,7 @@ PASS_COUNT=0; FAIL_COUNT=0
 ok()   { echo -e "  ${GRN}[PASS]${NC} $1"; PASS_COUNT=$((PASS_COUNT+1)); }
 fail() { echo -e "  ${RED}[FAIL]${NC} $1"; FAIL_COUNT=$((FAIL_COUNT+1)); }
 info() { echo -e "  ${BLU}[INFO]${NC} $1"; }
+warn() { echo -e "  ${YLW}[WARN]${NC} $1"; }
 die()  { echo -e "\n  ${RED}══ ABORT ══${NC} $1\n"; exit 1; }
 
 # ── Temp-file globals (set in main, not at source time) ───────────────────────
@@ -730,6 +731,42 @@ info "Alembic code head: $ALEMBIC_CODE_HEAD"
 [ "$ALEMBIC_CODE_HEAD" = "$REQUIRED_ALEMBIC_HEAD" ] \
   && ok "Code head is $REQUIRED_ALEMBIC_HEAD (v64 is_optional on curriculum_items)" \
   || die "Code head is $ALEMBIC_CODE_HEAD, expected $REQUIRED_ALEMBIC_HEAD."
+
+# ── Migration rehearsal on real PostgreSQL ───────────────────────────────────
+# The head check above proves the code AGREES about which revision is last. It
+# does not prove the chain APPLIES. Nothing else here does either: the backend
+# suite builds its schema with create_all on SQLite and never runs the chain,
+# and the chain cannot run on SQLite at all (an early migration alters
+# constraints, which that dialect refuses).
+#
+# That gap took staging down on 2026-08-30. A migration used
+# server_default=sa.text('0') on a boolean column -- fine on SQLite, rejected
+# outright by PostgreSQL ("column is of type boolean but default expression is
+# of type integer") -- and the backend crash-looped on migrate with every gate
+# above it green.
+#
+# ~90 seconds against a throwaway local database. Fails closed: no PostgreSQL
+# means no rehearsal means no deploy, unless someone consciously sets
+# DEPLOY_SKIP_MIGRATION_REHEARSAL=1, which is logged loudly.
+if [ "${DEPLOY_SKIP_MIGRATION_REHEARSAL:-0}" = "1" ]; then
+  warn "MIGRATION REHEARSAL SKIPPED by DEPLOY_SKIP_MIGRATION_REHEARSAL=1."
+  warn "  The chain has NOT been applied to PostgreSQL. This is how staging"
+  warn "  went down on 2026-08-30. Re-run without it before trusting this deploy."
+else
+  command -v psql &>/dev/null \
+    || die "psql not found — the migration rehearsal cannot run.\n  Start PostgreSQL (brew services start postgresql), or set\n  DEPLOY_SKIP_MIGRATION_REHEARSAL=1 to deploy without applying the chain\n  to a real database. The latter is how staging went down on 2026-08-30."
+  pg_isready -q 2>/dev/null \
+    || die "PostgreSQL is not accepting connections — the migration rehearsal cannot run.\n  Start it (brew services start postgresql), or set\n  DEPLOY_SKIP_MIGRATION_REHEARSAL=1 to deploy unrehearsed."
+  info "Rehearsing the whole migration chain on PostgreSQL (~90s)…"
+  if python scripts/rehearse_migrations.py --quick --db deploy_gate_rehearsal > /tmp/deploy-rehearsal.log 2>&1; then
+    ok "Migration chain applies to PostgreSQL: $(grep -oE 'base -> head: [0-9]+/[0-9]+ applied' /tmp/deploy-rehearsal.log | head -1)"
+  else
+    echo "  ── rehearsal output ──"
+    tail -25 /tmp/deploy-rehearsal.log | sed 's/^/    /'
+    die "Migration rehearsal FAILED — the chain does not apply cleanly to PostgreSQL.\n  Deploying this would crash-loop the backend on migrate.\n  Full log: /tmp/deploy-rehearsal.log"
+  fi
+fi
+
 deactivate 2>/dev/null || true
 popd > /dev/null
 
