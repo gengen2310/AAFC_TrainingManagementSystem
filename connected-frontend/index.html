@@ -8947,7 +8947,7 @@ function _chartLine(chart){
   const yOf=v=>PT+(1-(v-minV)/(100-minV))*IH;
   const pts=rows.map((r,i)=>({x:xOf(i),y:vals[i]!=null?yOf(vals[i]):null}));
   let path='';pts.forEach((p,i)=>{if(p.y==null)return;const prev=pts[i-1];path+=(path===''||!prev||prev.y==null?`M${p.x.toFixed(1)},${p.y.toFixed(1)}`:`L${p.x.toFixed(1)},${p.y.toFixed(1)}`);});
-  const yg=yOf(tg).toFixed(1);const ya=yOf(ta).toFixed(1);
+  const yg=Math.max(PT,Math.min(PT+IH,yOf(tg))).toFixed(1);const ya=Math.max(PT,Math.min(PT+IH,yOf(ta))).toFixed(1);
   const step=Math.ceil(rows.length/8);
   return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:${H}px;font-family:inherit" role="img" aria-label="Delivery trend chart">
     <title>Delivery Reliability</title>
