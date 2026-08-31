@@ -3639,12 +3639,10 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <div class="ff"><label for="pn-notes">Notes</label><input id="pn-notes" placeholder="e.g. ANZAC prep"></div>
       </div>
-      <div id="pn-slots"></div>
-      <div id="pn-clash-warn" class="alert a-red" style="display:none"><span id="pn-clash-msg"></span></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-add-pn')">Cancel</button>
-      <button class="btn btn-dk" onclick="addPN()">Add Parade Night</button>
+      <button class="btn btn-dk" onclick="addPN()">Create Parade Night</button>
     </div>
   </div>
 </div>
@@ -10295,55 +10293,13 @@ async function _bulkApplyConfirm(){
 }
 
 // ADD PARADE NIGHT
-let _pnClasses=[];
+// Creates the night and its time structure only.
+// Sessions are planned into periods separately (one period can hold many concurrent sessions).
 
-async function openAddPN(date){
-  _pnClasses=[];
-  if(typeof P!=='undefined'&&P&&P.currentYearId){
-    try{ _pnClasses=await api('/api/training-classes?training_year_id='+encodeURIComponent(P.currentYearId)); }
-    catch(_){}
-  }
+function openAddPN(date){
   if(date)document.getElementById('pn-date').value=date;
-  buildSlots();
   openModal('m-add-pn');
 }
-
-function buildSlots(){
-  const n=parseInt(document.getElementById('pn-nsess').value);
-  const currOpts=allCurr().map(e=>`<option value="${esc(e.title)}">${esc(e.code)} — ${esc(e.title)}</option>`).join('');
-  const facOpts=S.facs.map(f=>`<option value="${f.id}">${facDisplay(f)}</option>`).join('');
-  const roomOpts=S.rooms.map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('');
-  const classHtml=_pnClasses.length
-    ?_pnClasses.map(c=>`<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:400"><input type="checkbox" name="np-cls-SLOT" value="${esc(c.training_class_id)}"> ${esc(c.display_name)}</label>`)
-    :['<span style="color:var(--muted)">No classes configured for this year</span>'];
-  let html='';
-  for(let i=0;i<n;i++){
-    html+=`<div style="border:1px solid var(--border);border-radius:7px;padding:10px;margin-bottom:8px;">
-      <div style="font-size:var(--fs-xs);font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Training Period ${i+1}</div>
-      <div class="ff" style="margin-bottom:8px"><label>Training Classes</label>
-        <div id="np-cls-${i}" style="display:flex;flex-wrap:wrap;gap:4px 14px;padding:4px 0;font-size:var(--fs-xs)">
-          ${classHtml.join('').replace(/name="np-cls-SLOT"/g,'name="np-cls-'+i+'"')}
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="ff"><label for="np-ex-${i}">Curriculum Item</label>
-          <select id="np-ex-${i}" aria-label="Curriculum item for training period ${i+1}"><option value="">— Unassigned —</option>${currOpts}</select>
-        </div>
-        <div class="ff"><label for="np-fa-${i}">Facilitator</label>
-          <select id="np-fa-${i}" aria-label="Facilitator for training period ${i+1}"><option value="">— None —</option>${facOpts}</select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="ff"><label for="np-rm-${i}">Room</label>
-          <select id="np-rm-${i}" aria-label="Room for training period ${i+1}"><option value="">— None —</option>${roomOpts}</select>
-        </div>
-      </div>
-    </div>`;
-  }
-  document.getElementById('pn-slots').innerHTML=html;
-  document.getElementById('pn-clash-warn').style.display='none';
-}
-document.getElementById('pn-nsess').addEventListener('change',buildSlots);
 
 function addPN(){
   const date=document.getElementById('pn-date').value;
@@ -10352,52 +10308,11 @@ function addPN(){
   const notes=document.getElementById('pn-notes').value;
   if(!date){showToast('Select a date.',true);return;}
   if(S.pns.find(p=>p.date===date)){showToast('A parade night already exists on this date.',true);return;}
-  const sessions=[];
-  const clashes=[];
-  for(let i=0;i<nsess;i++){
-    const facId=document.getElementById('np-fa-'+i)?.value||'';
-    const fac=facById(facId);
-    const room=document.getElementById('np-rm-'+i)?.value||'';
-    const expTitle=document.getElementById('np-ex-'+i)?.value||'';
-    const m=allCurr().find(e=>e.title===expTitle);
-    const clsIds=[...document.querySelectorAll('input[name="np-cls-'+i+'"]:checked')].map(el=>el.value);
-    // Clash detection
-    sessions.forEach((s,j)=>{
-      if(room&&s.room===room)clashes.push(`Period ${i+1} and Period ${j+1} both use room "${room}"`);
-      if(facId&&s.facId===facId)clashes.push(`Period ${i+1} and Period ${j+1} both use the same facilitator`);
-    });
-    sessions.push({phase:'B. Initial',code:m?m.code:'',exp:expTitle,facId,facName:fac?facDisplay(fac):'',room,clsIds,status:'planned'});
-  }
-  if(clashes.length){
-    document.getElementById('pn-clash-msg').textContent=clashes.join(' | ');
-    document.getElementById('pn-clash-warn').style.display='flex';
-  }
   api('/api/parade-nights',{method:'POST',body:JSON.stringify({date,term,session_count:nsess,parade_type:notes||'normal'})})
-    .then(async(r)=>{
-      const pnId=r&&r.parade_night_id;
-      const failures=[];
-      if(pnId){
-        for(let i=0;i<sessions.length;i++){
-          const s=sessions[i];
-          // Skip a fully untouched period (no curriculum, no facilitator, no room, no classes selected).
-          if(!s.exp&&!s.facId&&!s.room&&!s.clsIds.length)continue;
-          s.__pnId=pnId; s.period_number=i+1;
-          try{
-            const sr=await api('/api/sessions',{method:'POST',body:_sessBuildBody(s)});
-            if(s.clsIds.length&&sr&&sr.session_id){
-              try{ await api('/api/sessions/'+sr.session_id+'/audience',{method:'PUT',body:{training_class_ids:s.clsIds}}); }
-              catch(e){ failures.push(`Period ${i+1} class assignment: ${apiErr(e)}`); }
-            }
-          }catch(e){ failures.push(`Period ${i+1}: ${apiErr(e)}`); }
-        }
-      }
+    .then(async()=>{
       await reloadAndRender(); closeModal('m-add-pn');
-      document.getElementById('pn-date').value='';document.getElementById('pn-notes').value='';document.getElementById('pn-slots').innerHTML='';
-      if(failures.length){
-        showToast('Parade night created, but some details were not saved — '+failures.join('; '),true);
-      }else{
-        showToast('Parade night created.');
-      }
+      document.getElementById('pn-date').value='';document.getElementById('pn-notes').value='';
+      showToast('Parade night created. Open it to plan sessions.');
     })
     .catch(e=>showToast(apiErr(e),true));
 }
@@ -15954,7 +15869,7 @@ document.addEventListener('keydown',function(e){
   }
 });
 document.querySelectorAll('.modal-bg').forEach(bg=>{bg.addEventListener('click',function(e){if(e.target===this)this.classList.remove('active');});});
-document.getElementById('m-add-pn').addEventListener('click',function(e){if(e.target===this)return;if(!document.getElementById('pn-slots').innerHTML)buildSlots();});
+// m-add-pn: modal backdrop handled by the shared .modal-bg click handler above
 window.addEventListener('DOMContentLoaded',()=>{calYear=new Date().getFullYear();calMonth=new Date().getMonth();});
 // Warn on tab-close / hard reload when Proxy Mode or Delegated Intervention is active.
 window.addEventListener('beforeunload',function(e){ if(proxyActive()){ e.preventDefault(); e.returnValue=''; } });
