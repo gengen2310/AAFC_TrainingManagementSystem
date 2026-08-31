@@ -557,6 +557,16 @@ tbody tr:last-child{border-bottom:none;}
 tbody tr:hover{background:#f0f7fc;}
 tbody td{padding:9px 12px;vertical-align:middle;}
 .clk-row{cursor:pointer;}.clk-row:hover td{background:#deeefa!important;}
+/* Training Classes — stage-grouped redesign */
+.tc-stage-header td{background:var(--surface-2);font-weight:700;font-size:var(--fs-xs);color:var(--steel);padding:6px 12px;border-top:2px solid var(--border);border-bottom:1px solid var(--border-light);}
+tr.tc-archived{opacity:.6;}
+.tc-overflow{position:relative;display:inline-block;vertical-align:middle;}
+.tc-overflow>summary{list-style:none;cursor:pointer;padding:4px 9px;font-size:var(--fs-xs);border-radius:5px;min-height:28px;min-width:28px;border:1px solid var(--border);background:var(--surface);}
+.tc-overflow>summary::-webkit-details-marker{display:none;}
+.tc-overflow[open]>.tc-overflow-menu{position:absolute;right:0;top:calc(100% + 3px);background:var(--surface);border:1px solid var(--border);border-radius:6px;box-shadow:var(--sh2);padding:6px;min-width:140px;z-index:200;white-space:nowrap;}
+.tc-overflow-menu button{display:block;width:100%;text-align:left;margin-bottom:3px;}
+.tc-overflow-menu button:last-child{margin-bottom:0;}
+.tc-overflow-menu hr{border:none;border-top:1px solid var(--border);margin:4px 0;}
 
 /* ── FILTER BAR ── */
 .fbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
@@ -16898,62 +16908,82 @@ function _tcCoveragePill(pct){
 async function _renderTrainingClasses(yearId){
   const el=document.getElementById('py-classes-body'); if(!el) return;
   const showArchived=(document.getElementById('tc-show-archived')||{}).checked;
+  // Canonical labels and sort order for auto-created classes (training_stage_id=null, stage_code set)
+  const _CODE_LABEL={ORI:'Orientation',INI:'Initial',JNR:'Junior',INT:'Intermediate',SNR:'Senior'};
+  const _CODE_ORDER={ORI:1,INI:2,JNR:3,INT:4,SNR:5};
   try{
     const rows=await api(`/api/training-classes?training_year_id=${encodeURIComponent(yearId)}${showArchived?'&include_archived=true':''}`);
     _tcById={};
     rows.forEach(c=>{ _tcById[c.training_class_id]=c; });
     if(!rows.length){ el.innerHTML=`<p class="muted">No ${showArchived?'archived ':''}Training Classes${showArchived?'':' set up for this year yet'}.</p>`; return; }
-    // Group by Training Stage so parallel classes of the same Stage sit together --
-    // addendum's own "group by stage" guidance for exactly this kind of list.
-    const byStage={};
-    rows.forEach(c=>{ (byStage[c.training_stage_id]=byStage[c.training_stage_id]||[]).push(c); });
+    // Group by effective stage key. Auto-created classes have training_stage_id=null
+    // but a stage_code ("ORI","INI","JNR","INT","SNR"); use "__CODE__" prefix to
+    // distinguish from real UUIDs and keep them out of the progress-API calls below.
+    const byGroup={};
+    rows.forEach(c=>{
+      const key=c.training_stage_id||('__'+(c.stage_code||'NONE')+'__');
+      (byGroup[key]=byGroup[key]||[]).push(c);
+    });
     const canWrite=canWriteSquadron();
     const sqnId=S.currentSqnId||(S.session&&S.session.squadron_id);
-    // CLASS-04 dedicated UI: one call per Stage group (not per Class) via
-    // the existing stage-level aggregate endpoint gives every class's own
-    // coverage_pct in a single round trip, reusing CLASS-04/07's own
-    // _class_curriculum_progress computation rather than a new one. Skipped
-    // entirely in the archived view -- progress on an archived class isn't
-    // actionable here, and it's the one extra round trip Restore doesn't need.
-    const stageIds=Object.keys(byStage);
-    const progressByStage={};
-    if(sqnId && !showArchived){
-      await Promise.all(stageIds.map(async sid=>{
-        try{ progressByStage[sid]=await api(`/api/curriculum/phases/${sid}/class-progress?squadron_id=${encodeURIComponent(sqnId)}`); }
-        catch(_){ progressByStage[sid]=null; }
+    // CLASS-04: fetch stage-level progress only for groups with a real stage ID.
+    const progressByGroup={};
+    const realStageIds=Object.keys(byGroup).filter(k=>!k.startsWith('__'));
+    if(sqnId&&!showArchived){
+      await Promise.all(realStageIds.map(async sid=>{
+        try{ progressByGroup[sid]=await api(`/api/curriculum/phases/${sid}/class-progress?squadron_id=${encodeURIComponent(sqnId)}`); }
+        catch(_){ progressByGroup[sid]=null; }
       }));
     }
-    let html='';
-    Object.entries(byStage).forEach(([sid,classes])=>{
-      const stageProgress=progressByStage[sid];
-      const pctByClass={};
-      (stageProgress&&stageProgress.classes||[]).forEach(cp=>{ pctByClass[cp.training_class_id]=cp.coverage_pct; });
-      // CLASS-10: Split/Merge are only offered on active classes with at
-      // least one sibling class in the same Stage to merge into -- merge's
-      // target picker has nothing to offer otherwise.
-      const hasMergeTarget=c=>classes.some(o=>o.training_class_id!==c.training_class_id);
-      const actionsCell=c=>{
-        if(c.is_archived) return canWrite?`<button class="btn-xs btn-ok" onclick="doRestoreTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Restore</button>`:'';
-        let out=`<button class="btn-xs" onclick="openTrainingClassProgressModal('${esc(c.training_class_id)}')" style="margin-right:4px">View Progress</button>`;
-        if(canWrite){
-          out+=`<button class="btn-xs" onclick="openEditTrainingClassModal('${esc(c.training_class_id)}')" style="margin-right:4px">Edit</button>`;
-          out+=`<button class="btn-xs" onclick="openSplitTrainingClassModal('${esc(c.training_class_id)}')" style="margin-right:4px">Split</button>`;
-          if(hasMergeTarget(c)) out+=`<button class="btn-xs" onclick="openMergeTrainingClassModal('${esc(c.training_class_id)}')" style="margin-right:4px">Merge into…</button>`;
-          out+=`<button class="btn-xs btn-danger" onclick="archiveTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Archive</button>`;
-        }
-        return out;
-      };
-      html+=`<table class="data-table" style="margin-bottom:10px"><thead><tr><th>Class</th><th>Stage</th><th>Order</th><th>Expected</th>${showArchived?'':'<th>Curriculum Progress</th>'}<th></th></tr></thead><tbody>`+
-        classes.sort((a,b)=>(a.sequence||0)-(b.sequence||0)).map(c=>`<tr${c.is_archived?' style="opacity:.6"':''}>
+    // Sort groups: real stages by first class's class_number, code groups by canonical order, ungrouped last.
+    const groupKeys=Object.keys(byGroup).sort((a,b)=>{
+      const oA=a.startsWith('__')?(a==='__NONE__'?9999:(_CODE_ORDER[a.slice(2,-2)]||999)):(byGroup[a][0].class_number||0);
+      const oB=b.startsWith('__')?(b==='__NONE__'?9999:(_CODE_ORDER[b.slice(2,-2)]||999)):(byGroup[b][0].class_number||0);
+      return oA-oB;
+    });
+    const stageName=k=>{
+      if(!k.startsWith('__')) return (progressByGroup[k]&&progressByGroup[k].stage_name)||'Stage';
+      const code=k.slice(2,-2);
+      return code==='NONE'?'No Stage':(_CODE_LABEL[code]||code);
+    };
+    // Build per-class coverage map from stage progress responses
+    const pctByClass={};
+    Object.values(progressByGroup).forEach(sp=>{
+      if(sp&&sp.classes) sp.classes.forEach(cp=>{ pctByClass[cp.training_class_id]=cp.coverage_pct; });
+    });
+    const hasMergeTarget=(c,grp)=>grp.some(o=>o.training_class_id!==c.training_class_id);
+    const overflowMenu=(c,grp)=>{
+      if(c.is_archived) return canWrite?`<button class="btn btn-xs btn-ok" onclick="doRestoreTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Restore</button>`:'';
+      const tid=esc(c.training_class_id), yid=esc(yearId);
+      let items=`<button class="btn btn-xs" onclick="openSplitTrainingClassModal('${tid}')">Split</button>`;
+      if(hasMergeTarget(c,grp)) items+=`<button class="btn btn-xs" onclick="openMergeTrainingClassModal('${tid}')">Merge into…</button>`;
+      if(canWrite) items+=`<hr><button class="btn btn-xs btn-danger" onclick="archiveTrainingClass('${tid}','${yid}')">Archive</button>`;
+      return `<details class="tc-overflow"><summary title="More actions">⋮</summary><div class="tc-overflow-menu">${items}</div></details>`;
+    };
+    const cols=showArchived?4:5;
+    let html=`<table class="data-table"><thead><tr><th>Class</th><th>Code</th><th style="text-align:right">Expected</th>${showArchived?'':'<th>Progress</th>'}<th></th></tr></thead><tbody>`;
+    groupKeys.forEach(key=>{
+      const grp=byGroup[key];
+      const label=stageName(key);
+      const spct=(!showArchived&&!key.startsWith('__')&&progressByGroup[key])
+        ?progressByGroup[key].coverage_pct:null;
+      html+=`<tr class="tc-stage-header"><td colspan="${cols}"><span class="tc-stage-label">${esc(label)}</span>${spct!=null?' '+_tcCoveragePill(spct):''}</td></tr>`;
+      grp.sort((a,b)=>(a.class_number||0)-(b.class_number||0)).forEach(c=>{
+        const tid=esc(c.training_class_id);
+        html+=`<tr${c.is_archived?' class="tc-archived"':''}>
           <td>${esc(c.display_name)}${c.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
           <td>${c.stage_code?`<span class="badge">${esc(c.stage_code)}</span>`:'<span class="muted">—</span>'}</td>
-          <td>${c.sequence||0}</td>
-          <td>${c.expected_count!=null?esc(String(c.expected_count)):'—'}</td>
+          <td style="text-align:right">${c.expected_count!=null?esc(String(c.expected_count)):'—'}</td>
           ${showArchived?'':`<td>${_tcCoveragePill(pctByClass[c.training_class_id])}</td>`}
-          <td style="white-space:nowrap">${actionsCell(c)}</td>
-        </tr>`).join('')+
-        `</tbody></table>`;
+          <td style="white-space:nowrap;text-align:right">
+            ${!c.is_archived?`<button class="btn btn-xs" onclick="openTrainingClassProgressModal('${tid}')" style="margin-right:4px">Progress</button>`:''}
+            ${!c.is_archived&&canWrite?`<button class="btn btn-xs" onclick="openEditTrainingClassModal('${tid}')" style="margin-right:4px">Edit</button>`:''}
+            ${overflowMenu(c,grp)}
+          </td>
+        </tr>`;
+      });
     });
+    html+=`</tbody></table>`;
     el.innerHTML=html;
   } catch(e){ el.innerHTML='<p class="muted">Could not load Training Classes. Refresh the page to try again.</p>'; }
 }
