@@ -1779,9 +1779,13 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <option value="T3">Term 3</option><option value="T4">Term 4</option>
           </select>
           <label for="wp-sel" class="fbar-lbl">Night</label>
-          <select id="wp-sel" aria-label="Choose which parade night to show" onchange="_wpPaint()">
-            <option value="">All nights</option>
-          </select>
+          <div style="display:flex;align-items:center;gap:4px">
+            <button id="wp-prev" class="btn btn-out btn-sm" onclick="_wpPrev()" title="Previous parade night" aria-label="Previous parade night" disabled>&#8249;</button>
+            <select id="wp-sel" aria-label="Choose which parade night to show" onchange="_wpPaint()">
+              <option value="">No nights this term</option>
+            </select>
+            <button id="wp-next" class="btn btn-out btn-sm" onclick="_wpNext()" title="Next parade night" aria-label="Next parade night" disabled>&#8250;</button>
+          </div>
           <input id="wp-search" placeholder="Search facilitator, room, curriculum item…" oninput="_wpPaint()" style="min-width:220px" aria-label="Search facilitator, room, curriculum item">
           <select id="wp-f-status" aria-label="Filter Weekly Program by status" onchange="_wpPaint()">
             <option value="all">All Statuses</option>
@@ -11244,10 +11248,42 @@ function _wpSyncNightOptions(){
   if(!sel) return;
   const prev=sel.value;
   const nights=_wpNightsInTerm();
-  sel.innerHTML='<option value="">All nights</option>'+nights.map(function(pn){
-    return '<option value="'+esc(pn.date)+'">'+esc(fmtD(pn.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'}))+'</option>';
-  }).join('');
-  if(prev && nights.some(function(n){return n.date===prev;})) sel.value=prev;
+  sel.innerHTML=nights.length
+    ? nights.map(function(pn){
+        return '<option value="'+esc(pn.date)+'">'+esc(fmtD(pn.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'}))+'</option>';
+      }).join('')
+    : '<option value="">No nights this term</option>';
+  if(prev && nights.some(function(n){return n.date===prev;})){
+    sel.value=prev;
+  } else if(nights.length){
+    // Auto-select nearest upcoming night (or last night if all are past).
+    const today=new Date().toISOString().slice(0,10);
+    const upcoming=nights.filter(function(n){return n.date>=today;});
+    sel.value=(upcoming.length ? upcoming[0] : nights[nights.length-1]).date;
+  }
+  _wpUpdateNavBtns();
+}
+function _wpUpdateNavBtns(){
+  const sel=document.getElementById('wp-sel');
+  const prevBtn=document.getElementById('wp-prev');
+  const nextBtn=document.getElementById('wp-next');
+  if(!sel) return;
+  const n=sel.options.length;
+  const i=sel.selectedIndex;
+  if(prevBtn) prevBtn.disabled=(i<=0||n===0);
+  if(nextBtn) nextBtn.disabled=(i<0||i>=n-1||n===0);
+}
+function _wpPrev(){
+  const sel=document.getElementById('wp-sel');
+  if(!sel||sel.selectedIndex<=0) return;
+  sel.selectedIndex--;
+  _wpPaint();
+}
+function _wpNext(){
+  const sel=document.getElementById('wp-sel');
+  if(!sel||sel.selectedIndex>=sel.options.length-1) return;
+  sel.selectedIndex++;
+  _wpPaint();
 }
 function wpTermChanged(){
   const t=document.getElementById('wp-f-term');
@@ -11276,6 +11312,13 @@ function _wpPaint() {
     const term = (document.getElementById('wp-f-term')||{}).value || 'all';
     const oneNight = (document.getElementById('wp-sel')||{}).value || '';
 
+    // Always show exactly one night — no multi-night view.
+    if (!oneNight) {
+        wrap.innerHTML = '<p class="muted p-4">No parade nights for this term. Choose a different term above.</p>';
+        _wpUpdateNavBtns();
+        return;
+    }
+
     // Publish acts on the night being shown, so it only makes sense for one.
     const pubBtn = document.getElementById('wp-publish-btn');
     if (pubBtn) {
@@ -11286,7 +11329,7 @@ function _wpPaint() {
     let html = '', shown = 0;
     for (const pn of _wpData.pns) {
         if (term !== 'all' && pn.term !== term) continue;
-        if (oneNight && pn.date !== oneNight) continue;
+        if (pn.date !== oneNight) continue;
         const sched = _wpFilterSchedule(_wpData.schedByPn[pn.parade_night_id], q, status);
         if (!sched) continue;
         shown++;
@@ -11310,6 +11353,7 @@ function _wpPaint() {
     }
     const today = new Date().toLocaleDateString('en-AU', {day:'2-digit',month:'long',year:'numeric'});
     wrap.innerHTML = html + `<div class="print-footer">Generated ${esc(today)}</div>`;
+    _wpUpdateNavBtns();
 }
 
 // WP-4: the search box and status filter were wired to renderWP(), which never
