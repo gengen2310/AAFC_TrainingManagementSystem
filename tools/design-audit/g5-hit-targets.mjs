@@ -15,7 +15,10 @@ const { chromium, devices } = __req("@playwright/test");
 const BASE=process.env.AUDIT_BASE || 'https://aafc-tms-frontend-staging.up.railway.app';
 const CODE=process.env.STAGING_SQN_ADMIN_CODE;
 const SEL='button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=link], [tabindex]:not([tabindex="-1"])';
-const PAGES=['dashboard','parade-nights','curriculum','settings','facilitators'];
+// weekly-program was missing until 2026-09-01, so the whole printable
+// program -- a page with its own colour palette and its own controls --
+// was never measured by either gate. An unlisted page reports as passing.
+const PAGES=['dashboard','parade-nights','curriculum','settings','facilitators','weekly-program'];
 
 // THREE profiles, not two. The first version ran only the two obvious ones and
 // had a hole big enough to hide fourteen controls: the 44px touch threshold was
@@ -47,6 +50,13 @@ for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
   for (const nav of PAGES) {
     await page.evaluate(n=>{if(typeof window.nav==='function')window.nav(n);},nav);
     await page.waitForTimeout(1200);
+    // Weekly Program defaults to a single night; the per-night treatment only
+    // exists when several are stacked, so select "All nights" before measuring.
+    if (nav === 'weekly-program') {
+      await page.evaluate(()=>{const s=document.getElementById('wp-sel');
+        if(s){s.value=''; s.dispatchEvent(new Event('change',{bubbles:true}));}});
+      await page.waitForTimeout(1500);
+    }
     // SIZE is measured for every visible control -- getBoundingClientRect
     // returns dimensions regardless of scroll, so no scrolling is needed and
     // none is done. HIT-TESTING can only be answered for controls currently in

@@ -15,7 +15,10 @@ const { chromium, devices } = __req("@playwright/test");
 // deployed -- the rollout has to be measured before it ships, not after.
 const BASE=process.env.AUDIT_BASE || 'https://aafc-tms-frontend-staging.up.railway.app';
 const CODE=process.env.STAGING_SQN_ADMIN_CODE;
-const PAGES=['dashboard','parade-nights','curriculum','settings','facilitators'];
+// weekly-program was missing until 2026-09-01, so the whole printable
+// program -- a page with its own colour palette and its own controls --
+// was never measured by either gate. An unlisted page reports as passing.
+const PAGES=['dashboard','parade-nights','curriculum','settings','facilitators','weekly-program'];
 
 const browser=await chromium.launch();
 const page=await (await browser.newContext({...devices['Desktop Chrome']})).newPage();
@@ -32,6 +35,13 @@ const worst=new Map();
 for (const nav of PAGES) {
   await page.evaluate(n=>{if(typeof window.nav==='function')window.nav(n);},nav);
   await page.waitForTimeout(1200);
+  // Weekly Program defaults to a single night; the per-night treatment only
+  // exists when several are stacked, so select "All nights" before measuring.
+  if (nav === 'weekly-program') {
+    await page.evaluate(()=>{const s=document.getElementById('wp-sel');
+      if(s){s.value=''; s.dispatchEvent(new Event('change',{bubbles:true}));}});
+    await page.waitForTimeout(1500);
+  }
   const r=await page.evaluate(()=>{
     const parse=c=>{const m=c.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/);
       return m?{r:+m[1],g:+m[2],b:+m[3],a:m[4]===undefined?1:+m[4]}:null;};
