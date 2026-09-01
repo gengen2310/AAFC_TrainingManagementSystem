@@ -49,6 +49,11 @@ for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
         if(!vis(e))continue;
         const r=e.getBoundingClientRect();
         if(r.bottom<0||r.top>innerHeight||r.right<0||r.left>innerWidth)continue;  // off-screen: not judged
+        // Declared exemption, subtracted HERE rather than in the reader's head:
+        // a checkbox/radio box is 18x18 by design and carries its 44px target
+        // via the label wrapper. Reporting it as a failure means every quote of
+        // this number needs a caveat nobody remembers to apply.
+        if(e.type==='checkbox'||e.type==='radio')continue;
         const boxOk=r.width>=size&&r.height>=size;
         const cx=r.left+r.width/2, cy=r.top+r.height/2, h=size/2-1;
         const hitOk=[[cx,cy-h],[cx,cy+h],[cx-h,cy],[cx+h,cy]].every(([x,y])=>{

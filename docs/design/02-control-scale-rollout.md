@@ -8,30 +8,32 @@
 
 | gate | before | after |
 |---|---|---|
-| **G5 touch — controls below 44×44** | **83** | **4** |
-| G5 pointer — controls below 28×28 | 4 | 4 |
+| **G5 touch — controls below 44×44** | **83** | **0** |
+| **G5 pointer — controls below 28×28** | 22 | **0** |
 | G1 contrast | 1 fail of 1035 | **0 fail of 890** |
 | G4 keyboard | 35 reached, 0 ringless | 33 reached, **0 ringless** |
 | boundary-advisory borders | 37 | **29** |
 | **component lab, per class** | — | **10/10 pass, 153 variants** |
 
-The lab figure is the one that matters most: every control class passes hit,
-size and overflow across resting / hover / focus / disabled / active and
-short / long / numeric content. Disabled, hover, active and focus had never
-been measured before it existed.
+All counts are **non-exempt**: `g5-hit-targets.mjs` now subtracts the
+checkbox/radio exemption itself rather than leaving a caveat for whoever quotes
+the number. Two independent measurements — the audit script and a separate
+sweep of all five screens — agree at zero.
 
-## The four residual touch failures
+Verified non-vacuous: re-running the sweep with the threshold raised to 999px
+returns controls (`skip-link 179×44`, `btn-hamburger 44×44`), so an empty result
+means "nothing undersized", not "nothing measured".
 
-Named, not rounded away:
+## Three fixes the first pass missed
 
-| control | size | status |
+Found by sweeping all five screens for anything under 44×44 rather than trusting
+the class list:
+
+| control | was | issue |
 |---|---|---|
-| toggle, ×2 | `18×44` | **real** — tall enough, 18px wide. Needs `min-width:var(--ctl-min)`. Not on the parade-nights screen; not yet located. |
-| `Select parade night` checkbox | `16×16` | **exempt** — an 18px box with a 44px hit area via its label is correct, and that label wrapper now carries `--ctl-min`. |
-| one further control | — | not individually identified |
-
-The pointer count is unchanged at 4 because those four were never a height
-problem — they are the same exempt checkbox class.
+| `.btn` | `41×44` | **Systemic.** `padding:0 16px` plus a short label ("Edit") gives 41px WIDTH. The rule says both axes; only height was enforced. Every short-labelled button in the app was narrow. |
+| `.ht` | `14×14` | Dashboard help buttons, sized in `em` and never in any class list. |
+| `.skip-link` | `41px` | Exempt from the COUNT because it is off-screen at rest — but it is a real control once focused, and 41 is short. Exemption from measurement is not exemption from the requirement. |
 
 ## What the rollout found that the spec did not
 
@@ -66,6 +68,9 @@ reduction — stands as an estimate and is **not** confirmed here.
 
 ## Still to do
 
-1. Locate and fix the `18×44` toggle (`min-width`).
-2. Confirm the density cost against a realistic dataset.
-3. Re-run every gate against staging once deployed.
+1. **Confirm the density cost against a realistic dataset.** The local seed
+   carries 13 curriculum items against production's 214, so the draft's
+   estimate — eight rows becoming six, a 25% reduction — remains unconfirmed.
+   It is the cost that was accepted when the decision was made, so it deserves
+   a real measurement before rollout.
+2. **Re-run every gate against staging once deployed.**
