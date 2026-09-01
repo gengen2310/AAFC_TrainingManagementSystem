@@ -70,6 +70,33 @@ The fix in each case was the same — make the measurement report its own
 coverage. Every script now prints how many pages it measured, names any that
 rendered nothing, and prints how many controls needed the sub-pixel tolerance.
 
+## Current state — every role, every page
+
+Local stack, all 24 routable pages, one run per seeded role. `judged` and the
+failure columns are the Desktop (touch) profile at the 44px threshold; the
+Pixel 7 and pointer profiles were also run and are also clean.
+
+| role | controls judged | box < 44 | unreachable | passed within 2px | G1 nodes | G1 fail | unresolved |
+|---|---|---|---|---|---|---|---|
+| sqn_admin | 527 | 0 | 0 | 10 | 2790 | 0 | 0 |
+| sqn_general | 443 | 0 | 0 | 10 | 2491 | 0 | 0 |
+| wing_admin | 431 | 0 | 0 | 9 | 3607 | 0 | 0 |
+| wing_viewer | 386 | 0 | 0 | 9 | 2782 | 0 | 0 |
+| national_admin | 439 | 0 | 0 | 9 | 3004 | 0 | 0 |
+| national_viewer | 413 | 0 | 0 | 9 | 2510 | 0 | 0 |
+| system_admin | 451 | 0 | 0 | 9 | 3348 | 0 | 0 |
+| auditor | 291 | 0 | 0 | 9 | 2307 | 0 | 0 |
+
+3381 control-measurements and 22,839 text nodes, no failures in either gate at
+any role. The `passed within 2px` column is the sub-pixel edge allowance, held
+separate on purpose: it is nine or ten flush-stacked `.tab-btn` controls, and if
+that number starts climbing the tolerance is masking something.
+
+Coverage note: the role matters. `wing_admin` alone brings up `+ Create Wing`
+and `+ Create Squadron / Specialist` — controls no single-role run had ever
+measured. The earlier audits were all `sqn_admin`, for whom nine of the 24 pages
+render nothing at all.
+
 ## Standing limitations
 
 - **Hit-testing cannot answer for controls clipped by a scroll ancestor or the
