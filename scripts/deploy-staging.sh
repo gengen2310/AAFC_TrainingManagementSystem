@@ -54,7 +54,12 @@ EXPECTED_STAGING_BACKEND_DOMAIN="aafc-tms-backend-staging.up.railway.app"
 EXPECTED_STAGING_FRONTEND_DOMAIN="aafc-tms-frontend-staging.up.railway.app"
 EXPECTED_STAGING_PW_DOMAIN="aafc-tms-planning-workspace-preview-staging.up.railway.app"
 
-EXPECTED_BRANCH="finalise/release-candidate-v17-1"
+# main became the integration branch on 2026-09-02: the release-candidate
+# work was merged into it along with the design/audit branch, so main now
+# contains everything the RC had and 24 commits it did not. Deploying from
+# the RC branch would now ship LESS than what was reviewed and merged.
+# The guard below explicitly allows main when it is the declared expectation.
+EXPECTED_BRANCH="main"
 REQUIRED_ANCESTOR="de27c42"
 REQUIRED_ALEMBIC_HEAD="b1c2d3e4f5a6"
 
