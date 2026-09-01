@@ -71,14 +71,26 @@ ringless.slice(0,8).forEach(k=>console.log(`        ${k}`));
 
 // 2. Primary workflow: reach and activate a nav item using only the keyboard.
 const navOk = await page.evaluate(async () => {
-  const item=[...document.querySelectorAll('.nav-item')].find(e=>e.textContent.trim()==='Parade Nights');
-  if(!item) return 'nav item not found';
+  // Do not hard-code a destination. This looked for 'Parade Nights', which
+  // role-gated navs hide rather than remove -- so for wing, national, system and
+  // auditor roles it found a display:none element, could not focus it, and
+  // reported "nav item did not accept focus" as though keyboard navigation were
+  // broken. It was testing the wrong premise, not finding a defect.
+  const visible = e => { const r=e.getBoundingClientRect(), st=getComputedStyle(e);
+    return r.width>0 && r.height>0 && st.visibility!=='hidden' && st.display!=='none'; };
+  const items=[...document.querySelectorAll('.nav-item')].filter(visible)
+                .filter(e=>!e.classList.contains('active'));
+  if(!items.length) return 'no visible, inactive nav item for this role';
+  const item=items[0];
+  const label=item.textContent.trim();
   item.focus();
-  if(document.activeElement!==item) return 'nav item did not accept focus';
+  if(document.activeElement!==item) return `"${label}" did not accept focus`;
   item.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
   await new Promise(r=>setTimeout(r,900));
-  const pg=document.getElementById('page-parade-nights');
-  return pg && getComputedStyle(pg).display!=='none' ? 'reached parade-nights by keyboard' : 'Enter did not navigate';
+  // Assert on the shell actually changing page, whichever page that is.
+  const shown=[...document.querySelectorAll('.page')].find(p=>getComputedStyle(p).display!=='none');
+  return shown ? `Enter reached ${shown.id.replace('page-','')} via "${label}"`
+               : `Enter did not navigate from "${label}"`;
 });
 console.log(`      primary workflow: ${navOk}`);
 

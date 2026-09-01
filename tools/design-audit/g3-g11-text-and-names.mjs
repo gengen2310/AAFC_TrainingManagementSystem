@@ -100,12 +100,15 @@ async function session(device) {
         const name = (e.getAttribute('aria-label') || e.getAttribute('title') ||
                       (e.labels && e.labels[0]?.textContent) || e.textContent || e.value || '').trim();
         out.push({ named: name.length > 0, tag: e.tagName.toLowerCase(),
+                   id: e.id || '', type: e.getAttribute('type') || '',
                    cls: (e.className || '').toString().slice(0, 40) });
       }
       return out;
     }, SEL);
     total += r.length;
-    r.filter(x => !x.named).forEach(x => { unnamed++; const k=`${x.tag}.${x.cls}`; set.set(k,(set.get(k)||0)+1); });
+    r.filter(x => !x.named).forEach(x => { unnamed++;
+      const k=`${nav}  ${x.tag}${x.type?'[type='+x.type+']':''}${x.id?'#'+x.id:''}${x.cls?'.'+x.cls:''}`;
+      set.set(k,(set.get(k)||0)+1); });
   }
   console.log(`      controls ${total}   unnamed ${unnamed}`);
   [...set.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).forEach(([k,n])=>console.log(`        ${String(n).padStart(3)}x  ${k}`));
