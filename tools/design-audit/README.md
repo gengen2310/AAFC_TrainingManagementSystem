@@ -65,3 +65,46 @@ tool and was found by opening the app on a laptop. `Desktop (touch)` closes it.
 The general lesson is worth more than the fix: **a measurement that never
 renders a control reports it as passing.** Check coverage — how many controls
 were judged — before believing a failure count.
+
+## Coverage, and why it is printed next to every result (2026-09-01)
+
+The app has 24 routable pages (`id="page-*"` in `connected-frontend/index.html`).
+Before this date the scripts covered six, five, five and one respectively, and
+none of them said so. Three separate defects shipped behind that silence:
+
+| what shipped | why no gate saw it |
+|---|---|
+| 14 nav items at 214x41 | the 44px threshold only ever ran on a phone profile, where the sidenav is collapsed |
+| Weekly Program unstyled on screen | `weekly-program` was in no page list |
+| 7 controls below the floor | `activities`, `service-desk`, the login screen and the rich-text toolbar were in no page list |
+
+Two more measurement bugs were found the same way:
+
+- **`g3-g11` carried a second G5 implementation** that disagreed with
+  `g5-hit-targets.mjs` — 8 "too small" against 0 — because it never received the
+  checkbox exemption or the scroll-clipping fix. It has been removed. One gate,
+  one implementation.
+- **G4's escape-hatch check queried `.modal`**, but the id lives on `.modal-bg`,
+  so it returned "no modal in DOM" every run and never pressed Escape. A check
+  that always skips reads as a covered case.
+
+Every script now prints how many pages it measured and names any that rendered
+nothing, so a silent page has to announce itself. Several pages are role-gated
+and will legitimately render nothing for a squadron admin — run under more than
+one role to cover them.
+
+### Current state, all 24 pages, local stack, sqn_admin
+
+```
+G1  contrast     0 failures of 2790 text nodes, 0 unresolved
+G3  200% text    0 clipped elements, no horizontal overflow, 24/24 pages
+G4  keyboard     182 controls reached, 0 without a focus indicator,
+                 Enter navigates, Escape closes a modal
+G5  hit targets  0 below threshold on all three profiles, 527 judged
+G11 semantics    0 unnamed of 833 controls
+    print        computed styles identical (print-parity.mjs)
+```
+
+The G5 hit-probe still reports residual "not reachable" results on controls that
+measure well above the threshold; see the note above on why that figure is
+measurement-limited and should not be quoted as a defect count.

@@ -22,9 +22,24 @@ await page.evaluate(async ([api,code])=>{
 },[api,CODE]);
 await page.reload({waitUntil:'domcontentloaded'}); await page.waitForTimeout(3000);
 
+// EVERY routable page. This used to tab 80 times on whatever page happened to
+// load first and report a single number, so twenty-three screens' keyboard
+// behaviour was never exercised -- and the report did not say so.
+const PAGES=['accounts','action-centre','action-items','activities','audit','calendar',
+             'curriculum','dashboard','facilitators','getting-started','help','long-range',
+             'national','national-activities','parade-nights','program-audit','resources',
+             'service-desk','settings','system-console','weekly-program','wing-activities',
+             'wing-calendar','wing-overview'];
+
 // 1. Tab order reaches controls, and each focused element shows a visible ring.
 let reached=0, noRing=0; const seen=new Set(); const ringless=[];
-for (let i=0;i<80;i++){
+const perPage=new Map();
+for (const nav of PAGES){
+ await page.evaluate(n=>{if(typeof window.nav==='function')window.nav(n);},nav);
+ await page.waitForTimeout(900);
+ await page.evaluate(()=>{document.body.focus?.(); if(document.activeElement) document.activeElement.blur();});
+ const before=reached;
+ for (let i=0;i<60;i++){
   await page.keyboard.press('Tab');
   const info=await page.evaluate(()=>{
     const e=document.activeElement;
@@ -39,9 +54,14 @@ for (let i=0;i<80;i++){
   if(!info) continue;
   if(seen.has(info.key)) continue;
   seen.add(info.key); reached++;
-  if(!info.ring){ noRing++; ringless.push(info.key); }
+  if(!info.ring){ noRing++; ringless.push(nav+': '+info.key); }
+ }
+ perPage.set(nav, reached-before);
 }
 console.log(`G4  tab traversal — distinct controls reached ${reached}`);
+console.log(`      pages tabbed through: ${perPage.size}`);
+const quiet=[...perPage.entries()].filter(([,n])=>n===0).map(([p])=>p);
+if(quiet.length) console.log(`      reached NOTHING new on: ${quiet.join(', ')}`);
 console.log(`      focused with no visible indicator: ${noRing}`);
 ringless.slice(0,8).forEach(k=>console.log(`        ${k}`));
 
@@ -61,7 +81,11 @@ console.log(`      primary workflow: ${navOk}`);
 // 3. Escape closes a modal (agency / recoverability).
 const escOk = await page.evaluate(async () => {
   if (typeof window.openModal !== 'function') return 'no openModal() to test';
-  const ids=[...document.querySelectorAll('.modal')].map(m=>m.id).filter(Boolean);
+  // The id is on .modal-bg (the overlay); .modal is the inner box and mostly
+  // carries no id, so querying .modal returned an empty list and this check
+  // reported "no modal in DOM" every run without ever pressing Escape. A check
+  // that always skips is worse than no check -- it reads as a covered case.
+  const ids=[...document.querySelectorAll('.modal-bg')].map(m=>m.id).filter(Boolean);
   if(!ids.length) return 'no modal in DOM';
   window.openModal(ids[0]);
   await new Promise(r=>setTimeout(r,500));

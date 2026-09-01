@@ -1,7 +1,7 @@
-// apple-design gates against DEPLOYED STAGING.
-//   G5  hit targets — separating "too small" from "too close together"
+// apple-design gates. Runs against staging by default, or any AUDIT_BASE.
 //   G3  200% text   — clipping / overlap / horizontal overflow
 //   G11 semantics   — controls with no accessible name
+// G5 is measured by g5-hit-targets.mjs; see the note below.
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import nodePath from "node:path";
@@ -12,10 +12,20 @@ const __req = createRequire(nodePath.join(
   nodePath.dirname(fileURLToPath(import.meta.url)), "../playwright-staging/package.json"));
 const { chromium, devices } = __req("@playwright/test");
 
-const BASE = 'https://aafc-tms-frontend-staging.up.railway.app';
+// AUDIT_BASE lets this run against a local stack before anything is deployed.
+// The other scripts already took it; this one did not, which meant the G3 and
+// G11 gates could only ever be run after a deploy.
+const BASE = process.env.AUDIT_BASE || 'https://aafc-tms-frontend-staging.up.railway.app';
 const CODE = process.env.STAGING_SQN_ADMIN_CODE;
 const SEL = 'button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=link], [tabindex]:not([tabindex="-1"])';
-const PAGES = ['dashboard', 'parade-nights', 'curriculum', 'settings', 'facilitators'];
+// EVERY routable page, enumerated from the id="page-*" elements in
+// connected-frontend/index.html. Five of twenty-four was the coverage that let
+// undersized controls and a print-only stylesheet ship unnoticed.
+const PAGES = ['accounts','action-centre','action-items','activities','audit','calendar',
+               'curriculum','dashboard','facilitators','getting-started','help','long-range',
+               'national','national-activities','parade-nights','program-audit','resources',
+               'service-desk','settings','system-console','weekly-program','wing-activities',
+               'wing-calendar','wing-overview'];
 
 async function session(device) {
   const browser = await chromium.launch();
@@ -33,48 +43,15 @@ async function session(device) {
   return { browser, page };
 }
 
-// ── G5 ───────────────────────────────────────────────────────────────────────
-{
-  const { browser, page } = await session(devices['Pixel 7']);
-  let judged = 0, tooSmall = 0, tooClose = 0;
-  const smallSet = new Map(), closeSet = new Map();
-  for (const nav of PAGES) {
-    await page.evaluate(n => { if (typeof window.nav === 'function') window.nav(n); }, nav);
-    await page.waitForTimeout(1200);
-    const r = await page.evaluate(({ sel, size }) => {
-      const vis = e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
-        return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'&&s.opacity!=='0'; };
-      const out = [];
-      for (const e of document.querySelectorAll(sel)) {
-        if (!vis(e)) continue;
-        const r = e.getBoundingClientRect();
-        if (r.bottom < 0 || r.top > innerHeight) continue;
-        const boxOk = r.width >= size && r.height >= size;
-        const cx=r.left+r.width/2, cy=r.top+r.height/2, h=size/2-1;
-        const hitOk = [[cx,cy-h],[cx,cy+h],[cx-h,cy],[cx+h,cy]].every(([x,y])=>{
-          if (x<0||y<0||x>innerWidth||y>innerHeight) return false;
-          const t=document.elementFromPoint(x,y);
-          return t && (t===e||e.contains(t)||t.contains(e));
-        });
-        out.push({ label:(e.getAttribute('aria-label')||e.textContent||e.value||'').trim().slice(0,28),
-                   w:Math.round(r.width), h:Math.round(r.height), boxOk, hitOk });
-      }
-      return out;
-    }, { sel: SEL, size: 44 });
-    judged += r.length;
-    for (const c of r) {
-      if (!c.boxOk) { tooSmall++; const k=`${c.w}x${c.h}  ${c.label}`; smallSet.set(k,(smallSet.get(k)||0)+1); }
-      else if (!c.hitOk) { tooClose++; const k=`${c.w}x${c.h}  ${c.label}`; closeSet.set(k,(closeSet.get(k)||0)+1); }
-    }
-  }
-  console.log(`G5  Pixel 7, 44px — judged ${judged}`);
-  console.log(`      too small (box < 44):        ${tooSmall}`);
-  console.log(`      big enough but not isolated: ${tooClose}`);
-  console.log(`      pass:                        ${judged - tooSmall - tooClose}`);
-  console.log('      smallest offenders:');
-  [...smallSet.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).forEach(([k,n])=>console.log(`        ${String(n).padStart(2)}x  ${k}`));
-  await browser.close();
-}
+// G5 is NOT measured here. It used to be, with a second implementation that
+// disagreed with tools/design-audit/g5-hit-targets.mjs -- 8 "too small" against
+// that script's 0. The whole difference was two corrections this copy never
+// received: the checkbox/radio exemption (an 18x18 box carries its target via
+// the label), and skipping controls clipped by a scroll ancestor rather than
+// scoring them unreachable.
+//
+// Two implementations of one gate that report different numbers are worse than
+// one, because the disagreement discredits both. G5 lives in g5-hit-targets.mjs.
 
 // ── G3 ───────────────────────────────────────────────────────────────────────
 {
