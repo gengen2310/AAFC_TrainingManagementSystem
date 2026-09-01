@@ -308,12 +308,12 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .yn-arrow:last-child{border-radius:0 5px 5px 0}
 /* G5: the hit area is 44px; the glyph is unchanged. Type size and touch
    target are different measurements and the glyph must never set the target. */
-.yn-arrow{position:relative;background:transparent;border:0;color:var(--muted);font-size:var(--fs-md);line-height:1;padding:0 10px;min-height:36px;cursor:pointer;transition:background .12s,color .12s}
+.yn-arrow{position:relative;background:transparent;border:0;color:var(--muted);font-size:var(--fs-md);line-height:1;padding:0 10px;min-height:var(--ctl-min);cursor:pointer;transition:background .12s,color .12s}
 .yn-arrow:disabled{color:#7e8992;cursor:default}
 .yn-arrow:not(:disabled):hover{background:var(--surface-2);color:var(--text)}
 /* tabular-nums so stepping 2026 -> 2027 -> 2088 does not change the width
    and shift everything to its right. Measured 120px -> 120px. */
-.yn-display{position:relative;display:flex;align-items:center;justify-content:center;gap:5px;background:transparent;border:0;border-left:1px solid var(--border);border-right:1px solid var(--border);color:var(--text);font-family:inherit;font-size:var(--fs-md);font-weight:700;font-variant-numeric:tabular-nums;padding:0 12px;min-height:36px;min-width:64px;cursor:pointer}
+.yn-display{position:relative;display:flex;align-items:center;justify-content:center;gap:5px;background:transparent;border:0;border-left:1px solid var(--border);border-right:1px solid var(--border);color:var(--text);font-family:inherit;font-size:var(--fs-md);font-weight:700;font-variant-numeric:tabular-nums;padding:0 12px;min-height:var(--ctl-min);min-width:64px;cursor:pointer}
 .yn-display:hover{background:var(--surface-2)}
 /* Removed 2026-08-30 (Part 62 audit): .yn-display input, its :focus-visible
    partner, and .yn-gear. All three styled the old dark year capsule -- color:#fff
@@ -493,8 +493,8 @@ input[type=date],input[type=search],input[type=email],input:not([type]),select,t
    a bare one in a table cell does not, so raise the control itself and give any
    label that wraps one a 28px floor. */
 input[type=checkbox],input[type=radio]{width:18px;height:18px;}
-label:has(> input[type=checkbox]),label:has(> input[type=radio]){min-height:28px;display:inline-flex;align-items:center;}
-.btn-icon{min-width:28px;min-height:28px;display:inline-flex;align-items:center;justify-content:center;padding:2px 6px;font-size:var(--fs-sm);line-height:1;}
+label:has(> input[type=checkbox]),label:has(> input[type=radio]){min-height:var(--ctl-min);display:inline-flex;align-items:center;}
+.btn-icon{min-width:var(--ctl-min);min-height:var(--ctl-min);display:inline-flex;align-items:center;justify-content:center;padding:2px 6px;font-size:var(--fs-sm);line-height:1;}
 .btn-lnk{background:none;border:none;color:var(--royal);font-family:inherit;font-size:var(--fs-sm);font-weight:600;cursor:pointer;min-height:var(--ctl-min);padding:0 var(--ctl-pad-x-sm);min-width:var(--ctl-min);text-decoration:underline dotted;display:inline-flex;align-items:center;}
 .btn-lnk:hover{color:var(--dark);} /* DES-H01 */
 .btn:focus-visible,.btn-auth:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;}
@@ -515,7 +515,7 @@ a:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px;border-ra
 
 /* ── SEGMENTED TOGGLE (view switchers) ── */
 .seg{display:inline-flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
-.seg-btn{background:var(--surface);border:none;border-right:1.5px solid var(--border);padding:5px 12px;font-size:var(--fs-sm);font-weight:700;font-family:inherit;color:var(--steel);cursor:pointer;min-height:28px}/* AUDIT-2026-08 G5 */
+.seg-btn{background:var(--surface);border:none;border-right:1.5px solid var(--border);padding:5px 12px;font-size:var(--fs-sm);font-weight:700;font-family:inherit;color:var(--steel);cursor:pointer;min-height:var(--ctl-min)}/* AUDIT-2026-08 G5 */
 .seg-btn:last-child{border-right:none}
 .seg-btn.active{background:var(--dark);color:#fff}
 .seg-btn:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-2px;z-index:1;position:relative;}
@@ -582,7 +582,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 /* ── FILTER BAR ── */
 .fbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
 .fbar-lbl{font-size:var(--fs-2xs);font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);white-space:nowrap;}
-.fbar select,.fbar input{padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:var(--fs-sm);color:var(--text);background:white;min-height:28px;}
+.fbar select,.fbar input{padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:var(--fs-sm);color:var(--text);background:white;min-height:var(--ctl-min);}
 .fbar select:focus,.fbar input:focus{outline:none;border-color:var(--focus-ring);box-shadow:0 0 0 3px rgba(0,75,141,.22);}
 
 /* ── FORMS ── */
@@ -679,14 +679,14 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .stacked-seg:first-child{border-radius:3px 0 0 3px;}
 .stacked-seg:last-child{border-radius:0 3px 3px 0;}
 .dash-filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:white;border-radius:8px;box-shadow:var(--sh);border:1px solid var(--border);}
-.dash-filter-bar select{padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:var(--fs-sm);color:var(--text);min-height:28px;}
+.dash-filter-bar select{padding:6px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:var(--fs-sm);color:var(--text);min-height:var(--ctl-min);}
 .dash-filter-bar label{font-size:var(--fs-2xs);font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
 .drill-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
 .drill-title{font-size:var(--fs-sm);font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.04em;}
 
 /* ── CALENDAR ── */
 .cal-nav{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
-.cal-nbtn{background:none;border:1.5px solid var(--border);border-radius:6px;padding:4px 9px;min-width:28px;min-height:28px;cursor:pointer;font-size:var(--fs-sm);transition:all .13s;}
+.cal-nbtn{background:none;border:1.5px solid var(--border);border-radius:6px;padding:4px 9px;min-width:var(--ctl-min);min-height:var(--ctl-min);cursor:pointer;font-size:var(--fs-sm);transition:all .13s;}
 .cal-nbtn:hover{border-color:var(--blue);background:var(--accent-light);}
 .cal-mo{font-size:var(--fs-lg);font-weight:900;color:var(--dark);}
 .cal-hdr{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:3px;}
@@ -760,7 +760,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .modal-lg{max-width:780px;}.modal-xl{max-width:940px;}
 .modal-hdr{background:var(--dark);color:white;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:10px 10px 0 0;}
 .modal-title{font-size:var(--fs-md);font-weight:800;letter-spacing:.02em;}
-.modal-x{background:rgba(255,255,255,.12);border:none;color:white;width:1.75em;height:1.75em;min-width:28px;min-height:28px;flex-shrink:0;border-radius:50%;cursor:pointer;font-size:var(--fs-lg);display:flex;align-items:center;justify-content:center;transition:background .13s;}
+.modal-x{background:rgba(255,255,255,.12);border:none;color:white;width:1.75em;height:1.75em;min-width:28px;min-height:var(--ctl-min);flex-shrink:0;border-radius:50%;cursor:pointer;font-size:var(--fs-lg);display:flex;align-items:center;justify-content:center;transition:background .13s;}
 .modal-x:hover{background:rgba(255,255,255,.22);}
 .modal-body{padding:20px;}
 /* Modals written before the .modal-hdr/.modal-body pattern have no padding of
@@ -771,7 +771,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .modal-foot{padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
 /* ── Service Desk modal ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,18,40,.55);backdrop-filter:blur(3px);z-index:500;align-items:center;justify-content:center;padding:16px;}
-.modal-close{background:rgba(255,255,255,.12);border:none;color:white;width:1.75em;height:1.75em;min-width:28px;min-height:28px;flex-shrink:0;border-radius:50%;cursor:pointer;font-size:var(--fs-lg);display:flex;align-items:center;justify-content:center;transition:background .13s;}
+.modal-close{background:rgba(255,255,255,.12);border:none;color:white;width:1.75em;height:1.75em;min-width:28px;min-height:var(--ctl-min);flex-shrink:0;border-radius:50%;cursor:pointer;font-size:var(--fs-lg);display:flex;align-items:center;justify-content:center;transition:background .13s;}
 .modal-close:hover{background:rgba(255,255,255,.22);}
 .login-help-card {
   margin-top: var(--sp-md);
@@ -982,7 +982,7 @@ tbody td{padding:9px 12px;vertical-align:middle;}
 .mode-banner{display:none;align-items:center;justify-content:space-between;gap:12px;padding:7px var(--sp-lg);font-size:var(--fs-xs);font-weight:800;letter-spacing:.06em;text-transform:uppercase;background:#fffbe6;color:#5a4200;border-bottom:2px solid #f0c800;}
 .mode-banner.intervention{background:#fef0f0;color:#7a1010;border-bottom:2px solid #e03;}
 .mode-banner.show{display:flex;}
-.mode-banner button{font:inherit;font-size:var(--fs-xs);border:1px solid currentColor;background:transparent;color:inherit;border-radius:5px;padding:4px 12px;min-height:28px;cursor:pointer;text-transform:uppercase;font-weight:700;letter-spacing:.04em;}
+.mode-banner button{font:inherit;font-size:var(--fs-xs);border:1px solid currentColor;background:transparent;color:inherit;border-radius:5px;padding:4px 12px;min-height:var(--ctl-min);cursor:pointer;text-transform:uppercase;font-weight:700;letter-spacing:.04em;}
 .save-ind{display:inline-block;font-size:var(--fs-xs);font-weight:600;margin-left:8px;color:var(--muted);vertical-align:middle;}
 .save-ind.saving{color:var(--steel);}
 .save-ind.saved{color:var(--ok);}
@@ -2765,7 +2765,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <button onclick="sdSetFilter('in_progress', this)">In Progress</button>
           <button onclick="sdSetFilter('resolved', this)">Resolved</button>
           <span style="color:var(--border);padding:0 2px">|</span>
-          <select id="sd-cat-filter" class="fbar" style="font-size:var(--fs-xs);padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;min-height:28px" onchange="sdSetCategoryFilter(this.value)">
+          <select id="sd-cat-filter" class="fbar" style="font-size:var(--fs-xs);padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:inherit;min-height:var(--ctl-min)" onchange="sdSetCategoryFilter(this.value)">
             <option value="">All Categories</option>
             <option value="account_access">Account Access</option>
             <option value="training_data">Training Data</option>
@@ -2773,7 +2773,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <option value="feature_request">Feature Request</option>
             <option value="other">Other</option>
           </select>
-          <select id="sd-unit-filter" class="fbar" aria-label="Filter by unit" style="font-size:var(--fs-xs);padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius);min-height:28px" onchange="sdSetUnitFilter(this.value)">
+          <select id="sd-unit-filter" class="fbar" aria-label="Filter by unit" style="font-size:var(--fs-xs);padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius);min-height:var(--ctl-min)" onchange="sdSetUnitFilter(this.value)">
             <option value="">All units</option>
           </select>
           <span class="sd-count" id="sd-count"></span>
@@ -3502,7 +3502,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div id="faq-editor-mount"></div>
     </div>
     <div class="form-group">
-      <label style="display:inline-flex;align-items:center;gap:8px;min-height:28px;cursor:pointer">
+      <label style="display:inline-flex;align-items:center;gap:8px;min-height:var(--ctl-min);cursor:pointer">
         <input type="checkbox" id="faq-pub-inp" checked>
         <span>Visible to everyone</span>
       </label>
@@ -4168,7 +4168,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
       </div>
       <div class="ff"><label for="room-notes">Notes</label><input id="room-notes" placeholder="Any relevant details"></div>
-      <div class="ff"><label>Capabilities</label><div id="room-capabilities" style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 0;min-height:28px"></div></div>
+      <div class="ff"><label>Capabilities</label><div id="room-capabilities" style="display:flex;flex-wrap:wrap;gap:6px;padding:6px 0;min-height:var(--ctl-min)"></div></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-add-room')">Cancel</button>
@@ -7395,11 +7395,11 @@ function _renderAccountTable(){
   };
 
   /* AUDIT-2026-08 G5: wrap bare checkboxes in a label so the click area meets 28px [HIG] */
-  const selCol=canBulk?`<th class="no-print" style="width:30px"><label style="display:flex;align-items:center;justify-content:center;min-height:28px;min-width:28px;cursor:pointer"><input type="checkbox" id="acct-select-all" ${allVisibleSelected?'checked':''} onchange="_acctToggleAll(this.checked)" aria-label="Select all accounts matching the current filter"></label></th>`:'';
+  const selCol=canBulk?`<th class="no-print" style="width:30px"><label style="display:flex;align-items:center;justify-content:center;min-height:var(--ctl-min);min-width:28px;cursor:pointer"><input type="checkbox" id="acct-select-all" ${allVisibleSelected?'checked':''} onchange="_acctToggleAll(this.checked)" aria-label="Select all accounts matching the current filter"></label></th>`:'';
   el.innerHTML='<div class="tw"><table><thead><tr>'+selCol+'<th>Name</th><th>Role</th><th>Scope</th><th>Unit</th><th>Status</th><th>Last Login</th><th>Code Last Changed</th>'+(canWrite?'<th class="no-print">Actions</th>':'')+'</tr></thead><tbody>'+
     rows.map(u=>{
       const isMe=u.user_id===myUid;
-      const cb=canBulk?`<td class="no-print">${(isMe||u.is_archived)?'':`<label style="display:flex;align-items:center;justify-content:center;min-height:28px;min-width:28px;cursor:pointer"><input type="checkbox" ${S.acctSelected.has(u.user_id)?'checked':''} onchange="_acctToggleOne('${u.user_id}',this.checked)" aria-label="Select ${esc(u.display_name||'')}"></label>`}</td>`:'';
+      const cb=canBulk?`<td class="no-print">${(isMe||u.is_archived)?'':`<label style="display:flex;align-items:center;justify-content:center;min-height:var(--ctl-min);min-width:28px;cursor:pointer"><input type="checkbox" ${S.acctSelected.has(u.user_id)?'checked':''} onchange="_acctToggleOne('${u.user_id}',this.checked)" aria-label="Select ${esc(u.display_name||'')}"></label>`}</td>`:'';
       return `<tr>${cb}
       <td style="font-weight:700">${esc(u.display_name||'—')}</td>
       <td><span class="badge ${_ROLE_CLS[u.role]||'b-grey'}">${_ROLE_LABELS[u.role]||u.role}</span></td>
@@ -9756,7 +9756,7 @@ function buildPNCard(pn){
     </div>`).join('');
   return `<div class="pn-card" id="pncard-${esc(pn.id)}">
     <div class="pn-hdr">
-      ${canWriteSquadron()?`<label class="no-print" style="display:flex;align-items:center;justify-content:center;min-width:28px;min-height:28px;padding-right:10px;cursor:pointer" onclick="event.stopPropagation()"><input type="checkbox" id="pnchk-${esc(pn.id)}" aria-label="Select parade night ${esc(fmtDL(pn.date))} for bulk actions" onchange="_pnToggle('${esc(pn.id)}')" style="width:16px;height:16px;cursor:pointer" ${_pnSelected.has(pn.id)?'checked':''}></label>`:''}
+      ${canWriteSquadron()?`<label class="no-print" style="display:flex;align-items:center;justify-content:center;min-width:28px;min-height:var(--ctl-min);padding-right:10px;cursor:pointer" onclick="event.stopPropagation()"><input type="checkbox" id="pnchk-${esc(pn.id)}" aria-label="Select parade night ${esc(fmtDL(pn.date))} for bulk actions" onchange="_pnToggle('${esc(pn.id)}')" style="width:16px;height:16px;cursor:pointer" ${_pnSelected.has(pn.id)?'checked':''}></label>`:''}
       <div><h2 class="pn-date">${fmtDL(pn.date)}</h2><div class="pn-meta">${esc(pn.term)} · ${(pn.sessions||[]).length} sessions${pn.notes?' · '+esc(pn.notes):''}</div></div>
       <div style="display:flex;gap:6px;align-items:center" class="no-print">
         ${allDel?stBadge('delivered'):stBadge('planned')}
@@ -19334,7 +19334,7 @@ function sdOpenDetail(ticketId) {
           const labels = {open:'Open', in_progress:'In progress', resolved:'Resolved'};
           const on = t.status === st;
           return `<button type="button" class="btn ${on ? 'btn-primary' : 'btn-secondary'}" id="sd-status-${st}"
-            aria-pressed="${on}" style="font-size:var(--fs-xs);padding:5px 12px;min-height:28px"
+            aria-pressed="${on}" style="font-size:var(--fs-xs);padding:5px 12px;min-height:var(--ctl-min)"
             onclick="sdSelectStatus('${st}')">${labels[st]}</button>`;
         }).join('')}
       </div>`
@@ -19384,7 +19384,7 @@ function sdSelectStatus(status) {
     if (!btn) return;
     const on = st === status;
     btn.className = 'btn ' + (on ? 'btn-primary' : 'btn-secondary');
-    btn.style.cssText = 'font-size:var(--fs-xs);padding:5px 12px;min-height:28px';
+    btn.style.cssText = 'font-size:var(--fs-xs);padding:5px 12px;min-height:var(--ctl-min)';
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
 }

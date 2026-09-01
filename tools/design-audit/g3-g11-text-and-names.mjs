@@ -2,7 +2,15 @@
 //   G5  hit targets — separating "too small" from "too close together"
 //   G3  200% text   — clipping / overlap / horizontal overflow
 //   G11 semantics   — controls with no accessible name
-import { chromium, devices } from '@playwright/test';
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import nodePath from "node:path";
+// Resolve @playwright/test out of tools/playwright-staging so these run from any
+// working directory. Not a symlink: a committed absolute-path symlink broke a
+// working checkout on 2026-08-31.
+const __req = createRequire(nodePath.join(
+  nodePath.dirname(fileURLToPath(import.meta.url)), "../playwright-staging/package.json"));
+const { chromium, devices } = __req("@playwright/test");
 
 const BASE = 'https://aafc-tms-frontend-staging.up.railway.app';
 const CODE = process.env.STAGING_SQN_ADMIN_CODE;

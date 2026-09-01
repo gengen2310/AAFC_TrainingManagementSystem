@@ -2,8 +2,18 @@
 // because it cannot follow color-mix(), data-theme or inline styles. Computed
 // style has no such problem: every visible text node is measured against the
 // first non-transparent background painted behind it.
-import { chromium, devices } from '@playwright/test';
-const BASE='https://aafc-tms-frontend-staging.up.railway.app';
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import nodePath from "node:path";
+// Resolve @playwright/test out of tools/playwright-staging so these run from any
+// working directory. Not a symlink: a committed absolute-path symlink broke a
+// working checkout on 2026-08-31.
+const __req = createRequire(nodePath.join(
+  nodePath.dirname(fileURLToPath(import.meta.url)), "../playwright-staging/package.json"));
+const { chromium, devices } = __req("@playwright/test");
+// AUDIT_BASE lets these run against a local stack before anything is
+// deployed -- the rollout has to be measured before it ships, not after.
+const BASE=process.env.AUDIT_BASE || 'https://aafc-tms-frontend-staging.up.railway.app';
 const CODE=process.env.STAGING_SQN_ADMIN_CODE;
 const PAGES=['dashboard','parade-nights','curriculum','settings','facilitators'];
 
