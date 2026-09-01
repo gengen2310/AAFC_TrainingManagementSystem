@@ -43,6 +43,8 @@ from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_write_squadron, require_can_view_squadron
 from ..services import audit
+from ..services import (visible_curriculum_item, scoped_facilitator,
+                        scoped_training_area)
 from ..services_year import (
     PastYearLocked, ensure_year_context, find_year_context, require_year_writable,
     selectable_years, year_display_name, year_state,
@@ -2009,7 +2011,7 @@ def create_session(
     # Resolve room ID from location_id (which may be a PlanningLocation or TrainingArea id)
     training_area_id = None
     if body.location_id:
-        ta = db.get(TrainingArea, body.location_id)
+        ta = scoped_training_area(db, body.location_id, pn.squadron_id)
         if ta:
             training_area_id = ta.id
 
@@ -2022,7 +2024,7 @@ def create_session(
     )
     # Denormalize curriculum and facilitator
     if body.curriculum_id:
-        ci = db.get(CurriculumItem, body.curriculum_id)
+        ci = visible_curriculum_item(db, p, body.curriculum_id)
         if ci:
             s.curriculum_item_id = ci.id
             s.curriculum_code_at_time = ci.code
@@ -2030,12 +2032,12 @@ def create_session(
             s.phase_at_time = ci.phase
             s.element_at_time = ci.element
     if body.facilitator_id:
-        f = db.get(Facilitator, body.facilitator_id)
+        f = scoped_facilitator(db, body.facilitator_id, pn.squadron_id)
         if f:
             s.facilitator_id = f.id
             s.facilitator_display_name_at_time = " ".join(x for x in [f.current_rank, f.first_name, f.last_name] if x)
     if training_area_id:
-        ra = db.get(TrainingArea, training_area_id)
+        ra = scoped_training_area(db, training_area_id, pn.squadron_id)
         if ra:
             s.training_area_id = ra.id
             s.training_area_name_at_time = ra.name
@@ -2084,7 +2086,7 @@ def update_session(
 
     if body.curriculum_id is not None:
         if body.curriculum_id:
-            ci = db.get(CurriculumItem, body.curriculum_id)
+            ci = visible_curriculum_item(db, p, body.curriculum_id)
             if ci:
                 s.curriculum_item_id = ci.id
                 s.curriculum_code_at_time = ci.code
@@ -2099,7 +2101,7 @@ def update_session(
         s.custom_title = body.activity_title
     if body.facilitator_id is not None:
         if body.facilitator_id:
-            f = db.get(Facilitator, body.facilitator_id)
+            f = scoped_facilitator(db, body.facilitator_id, s.squadron_id)
             if f:
                 s.facilitator_id = f.id
                 s.facilitator_display_name_at_time = " ".join(x for x in [f.current_rank, f.first_name, f.last_name] if x)
@@ -2108,7 +2110,7 @@ def update_session(
             s.facilitator_display_name_at_time = None
     if body.location_id is not None:
         if body.location_id:
-            ra = db.get(TrainingArea, body.location_id)
+            ra = scoped_training_area(db, body.location_id, s.squadron_id)
             if ra:
                 s.training_area_id = ra.id
                 s.training_area_name_at_time = ra.name
@@ -3728,7 +3730,9 @@ def assign_mission(
             raise HTTPException(422, detail={"error": "invalid_cadet_group"})
         resolved_cadet_group = body.cadet_group
 
-    ci = db.get(CurriculumItem, body.curriculum_id)
+    # Not visible to this principal reads as not-found: a distinct "exists but
+    # belongs to another squadron" answer would be an existence oracle.
+    ci = visible_curriculum_item(db, p, body.curriculum_id)
     if not ci:
         raise HTTPException(404, detail={"error": "curriculum_item_not_found"})
 
@@ -3754,12 +3758,12 @@ def assign_mission(
         created_at=utcnow(), updated_at=utcnow(),
     )
     if body.facilitator_id:
-        f = db.get(Facilitator, body.facilitator_id)
+        f = scoped_facilitator(db, body.facilitator_id, pn.squadron_id)
         if f:
             s.facilitator_id = f.id
             s.facilitator_display_name_at_time = " ".join(x for x in [f.current_rank, f.first_name, f.last_name] if x)
     if body.training_area_id:
-        ra = db.get(TrainingArea, body.training_area_id)
+        ra = scoped_training_area(db, body.training_area_id, pn.squadron_id)
         if ra:
             s.training_area_id = ra.id
             s.training_area_name_at_time = ra.name

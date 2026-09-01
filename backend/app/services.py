@@ -48,6 +48,92 @@ def visible_curriculum_items(db: DBSession, p: Principal) -> list:
             .all())
 
 
+def scoped_facilitator(db: DBSession, fid: str | None, squadron_id: str):
+    """A Facilitator the given squadron owns, or None.
+
+    Facilitator.squadron_id is a non-nullable FK -- facilitators are never
+    shared between squadrons -- so the rule is exact equality. Session create,
+    edit and assign-mission previously resolved caller-supplied facilitator_id
+    with a bare db.get() and copied the rank and name onto the session, so 703
+    could reference 705's facilitator and have 705's name written into 703's
+    record: a cross-tenant read surfaced as a write.
+
+    Out of scope returns None, the same as not-found, because these callers
+    already no-op on a missing id and a distinct refusal would be an existence
+    oracle. The same bug class was fixed for TrainingArea *edits* under REM-45;
+    these are the session-write paths that fix did not reach.
+    """
+    from .models import Facilitator
+
+    if not fid:
+        return None
+    f = db.get(Facilitator, fid)
+    return f if f is not None and f.squadron_id == squadron_id else None
+
+
+def scoped_training_area(db: DBSession, taid: str | None, squadron_id: str):
+    """A TrainingArea the given squadron owns, or None. See scoped_facilitator --
+    TrainingArea.squadron_id is likewise a non-nullable FK."""
+    from .models import TrainingArea
+
+    if not taid:
+        return None
+    ta = db.get(TrainingArea, taid)
+    return ta if ta is not None and ta.squadron_id == squadron_id else None
+
+
+def visible_curriculum_item(db: DBSession, p: Principal, cid: str | None):
+    """The single-item form of visible_curriculum_items' scope rule.
+
+    Lives next to the list version deliberately. That function's docstring makes
+    the argument already -- a surface applying different scope rules from the
+    list it mirrors is a quiet disclosure channel -- and a write path that
+    resolves one id by primary key is exactly such a surface. Session create,
+    session edit and assign-mission each did `db.get(CurriculumItem, id)` with
+    no scope test, so a squadron could reference another squadron's LOCAL item
+    and have its code and title denormalised onto their own session.
+
+    Returns the item when the principal may see it, otherwise None. Out of scope
+    is reported as not-found rather than as a distinct refusal: a separate
+    "exists but not yours" answer is an existence oracle, and callers already
+    treat a missing id as a no-op.
+
+    National items belong to no squadron and stay visible to everyone -- the
+    inheritance is the point, so scoping must not break it.
+    """
+    if not cid:
+        return None
+    from .models import CurriculumItem, Squadron
+
+    item = db.get(CurriculumItem, cid)
+    if item is None or item.is_archived:
+        return None
+
+    level = item.owning_level or "national"
+    if level == "national":
+        return item
+
+    sq_id = p.active_squadron_id
+    wing_id = p.acting_wing_id or p.wing_id
+    if sq_id:
+        sq = db.get(Squadron, sq_id)
+        if sq:
+            wing_id = sq.wing_id
+
+    if level == "wing":
+        if wing_id and item.wing_id == wing_id:
+            return item
+        # National-level oversight roles read every wing, as in the list form.
+        if p.role in ("national_admin", "national_viewer", "system_admin", "auditor"):
+            return item
+        return None
+
+    if level == "squadron":
+        return item if sq_id and item.squadron_id == sq_id else None
+
+    return None
+
+
 def resolve_national_id(db: DBSession, p: Principal) -> str | None:
     """The national entity this principal belongs to.
 

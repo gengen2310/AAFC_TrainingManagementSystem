@@ -23,7 +23,9 @@ from ..permissions import (Principal, require_can_view_squadron, require_can_wri
                           require_can_view_wing, require_can_write_activity, require_role, require_system_admin,
                           NATIONAL_LEVEL)
 from ..services import (audit, score_parade, publish_blockers, close_blockers,
-                        resolve_national_id)
+                        resolve_national_id,
+                        visible_curriculum_item, scoped_facilitator,
+                        scoped_training_area)
 from ..services_readiness import parade_night_readiness
 from ..services_year import ensure_year_context
 
@@ -816,11 +818,18 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
     _check_version(s, body.version)
 
     # ── Validate everything first — no mutation happens above this line ──
-    if body.curriculum_item_id and not db.get(CurriculumItem, body.curriculum_item_id):
+    # Scope, not just existence. These checked only that the row existed, so a
+    # caller could name another squadron's facilitator or room and _denormalise
+    # would store the id regardless -- it assigns s.<field>_id unconditionally
+    # and only the name copy depends on the lookup succeeding. Out of scope
+    # returns the SAME error as unknown, so the response is not an existence
+    # oracle. Curriculum uses visibility rather than ownership: national items
+    # belong to no squadron and must stay usable by everyone.
+    if body.curriculum_item_id and not visible_curriculum_item(db, p, body.curriculum_item_id):
         raise HTTPException(400, detail={"error": "invalid_curriculum_item"})
-    if body.facilitator_id and not db.get(Facilitator, body.facilitator_id):
+    if body.facilitator_id and not scoped_facilitator(db, body.facilitator_id, s.squadron_id):
         raise HTTPException(400, detail={"error": "invalid_facilitator"})
-    if body.training_area_id and not db.get(TrainingArea, body.training_area_id):
+    if body.training_area_id and not scoped_training_area(db, body.training_area_id, s.squadron_id):
         raise HTTPException(400, detail={"error": "invalid_training_area"})
     status_changing = body.status is not None and body.status != s.status
     if status_changing and body.status not in VALID_STATUS:
