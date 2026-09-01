@@ -130,3 +130,21 @@ describe("Display Size is retired", () => {
     expect(html).not.toContain("displayDensity");
   });
 });
+
+describe("no control keeps the old 28px floor, in any spelling", () => {
+  it("has no min-height or min-width of exactly 28px anywhere", () => {
+    // 28px was the previous control floor. The first sweep grepped for
+    // `min-height:28px` with no space and reported zero remaining, while
+    // `min-height: 28px` survived in two rules -- the service-desk filter chips
+    // and the login report link -- and shipped at 28px. Both pages were also
+    // absent from the audit scripts' page lists, so nothing measured them
+    // either. Match on the property and value, not on one way of typing it.
+    //
+    // There is deliberately no exception list. The checkbox exemption covers the
+    // 18x18 BOX; the label wrapper around it is the thing that carries the 44px
+    // target, so it belongs at the floor like everything else.
+    const matches = [...html.matchAll(/min-(?:height|width)\s*:\s*28px/g)];
+    expect(matches.map((m) => m[0]), "28px control floor still present").toEqual([]);
+  });
+
+});

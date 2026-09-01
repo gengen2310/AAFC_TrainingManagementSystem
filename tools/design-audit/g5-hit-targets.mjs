@@ -15,10 +15,20 @@ const { chromium, devices } = __req("@playwright/test");
 const BASE=process.env.AUDIT_BASE || 'https://aafc-tms-frontend-staging.up.railway.app';
 const CODE=process.env.STAGING_SQN_ADMIN_CODE;
 const SEL='button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=link], [tabindex]:not([tabindex="-1"])';
-// weekly-program was missing until 2026-09-01, so the whole printable
-// program -- a page with its own colour palette and its own controls --
-// was never measured by either gate. An unlisted page reports as passing.
-const PAGES=['dashboard','parade-nights','curriculum','settings','facilitators','weekly-program'];
+// EVERY routable page, not a hand-picked six. Twice now a control shipped
+// below standard because the page it lived on was not in this list, and an
+// unmeasured page is indistinguishable from a clean one in the output.
+// Enumerated from the id="page-*" elements in connected-frontend/index.html.
+//
+// Several of these are role-gated and will render nothing for a squadron
+// admin. That is fine and expected -- what matters is that the report SAYS
+// a page contributed nothing, rather than quietly averaging it away as a
+// pass. Run the suite under more than one role to cover the gated screens.
+const PAGES=['accounts','action-centre','action-items','activities','audit','calendar',
+             'curriculum','dashboard','facilitators','getting-started','help','long-range',
+             'national','national-activities','parade-nights','program-audit','resources',
+             'service-desk','settings','system-console','weekly-program','wing-activities',
+             'wing-calendar','wing-overview'];
 
 // THREE profiles, not two. The first version ran only the two obvious ones and
 // had a hole big enough to hide fourteen controls: the 44px touch threshold was
@@ -46,7 +56,12 @@ for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
   await page.reload({waitUntil:'domcontentloaded'}); await page.waitForTimeout(3000);
 
   let judged=0, boxFail=0, hitFail=0, savedByHitArea=0, hitJudged=0, hitSkipped=0;
+  const perPage=new Map();
   const off=new Map();
+  // Box failures need their own register. They are the trustworthy metric, and
+  // listing only hit-probe offenders meant a genuinely undersized control could
+  // sit in the count with nothing naming it.
+  const boxOff=new Map();
   for (const nav of PAGES) {
     await page.evaluate(n=>{if(typeof window.nav==='function')window.nav(n);},nav);
     await page.waitForTimeout(1200);
@@ -110,8 +125,10 @@ for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
       return out;
     },{sel:SEL,size});
     judged+=r.length;
+    perPage.set(nav, r.length);
     for(const c of r){
-      if(!c.boxOk) boxFail++;
+      if(!c.boxOk){ boxFail++;
+        const bk=`${c.w}x${c.h}  ${nav}  ${c.label}`; boxOff.set(bk,(boxOff.get(bk)||0)+1); }
       if(c.hitOk===null){ hitSkipped++; continue; }        // clipped by an edge
       hitJudged++;
       if(!c.hitOk){ hitFail++; const k=`${c.w}x${c.h}  ${c.label}`; off.set(k,(off.get(k)||0)+1); }
@@ -120,7 +137,12 @@ for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
   }
   console.log(`\n══ ${name} — threshold ${size}px ══`);
   console.log(`   judged                       ${judged}`);
+  const silent=[...perPage.entries()].filter(([,n])=>n===0).map(([p])=>p);
+  console.log(`   pages measured               ${perPage.size}  (${perPage.size-silent.length} rendered controls)`);
+  if(silent.length) console.log(`   rendered NOTHING for this role: ${silent.join(', ')}`);
   console.log(`   box below threshold          ${boxFail}`);
+  if(boxFail) [...boxOff.entries()].sort((a,b)=>b[1]-a[1]).slice(0,12)
+    .forEach(([k,n])=>console.log(`     ${String(n).padStart(2)}x  ${k}`));
   console.log(`   rescued by a larger hit area ${savedByHitArea}`);
   // Coverage is reported next to the result, because "0 failures" describes
   // what was measured and a reader hears it as describing the app.

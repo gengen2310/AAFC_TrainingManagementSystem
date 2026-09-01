@@ -15,10 +15,14 @@ const { chromium, devices } = __req("@playwright/test");
 // deployed -- the rollout has to be measured before it ships, not after.
 const BASE=process.env.AUDIT_BASE || 'https://aafc-tms-frontend-staging.up.railway.app';
 const CODE=process.env.STAGING_SQN_ADMIN_CODE;
-// weekly-program was missing until 2026-09-01, so the whole printable
-// program -- a page with its own colour palette and its own controls --
-// was never measured by either gate. An unlisted page reports as passing.
-const PAGES=['dashboard','parade-nights','curriculum','settings','facilitators','weekly-program'];
+// EVERY routable page, enumerated from the id="page-*" elements in
+// connected-frontend/index.html. A page absent from this list is not reported
+// as unmeasured -- it is simply absent from the totals, which reads as clean.
+const PAGES=['accounts','action-centre','action-items','activities','audit','calendar',
+             'curriculum','dashboard','facilitators','getting-started','help','long-range',
+             'national','national-activities','parade-nights','program-audit','resources',
+             'service-desk','settings','system-console','weekly-program','wing-activities',
+             'wing-calendar','wing-overview'];
 
 const browser=await chromium.launch();
 const page=await (await browser.newContext({...devices['Desktop Chrome']})).newPage();
