@@ -11,7 +11,11 @@ const { chromium, devices } = __req("@playwright/test");
 // AUDIT_BASE lets these run against a local stack before anything is
 // deployed -- the rollout has to be measured before it ships, not after.
 const BASE=process.env.AUDIT_BASE || 'https://aafc-tms-frontend-staging.up.railway.app';
-const CODE=process.env.STAGING_SQN_ADMIN_CODE;
+// AUDIT_CODE + AUDIT_ROLE let the same gate run under any role. Nine of the
+// 24 pages render nothing for a squadron admin, so a single-role sweep
+// measures them empty and reports the result as clean.
+const CODE = process.env.AUDIT_CODE || process.env.STAGING_SQN_ADMIN_CODE;
+const ROLE = process.env.AUDIT_ROLE || 'sqn_admin';
 const browser=await chromium.launch();
 const page=await (await browser.newContext({...devices['Desktop Chrome']})).newPage();
 await page.goto(BASE,{waitUntil:'domcontentloaded'});
@@ -58,7 +62,7 @@ for (const nav of PAGES){
  }
  perPage.set(nav, reached-before);
 }
-console.log(`G4  tab traversal — distinct controls reached ${reached}`);
+console.log(`G4 [${ROLE}] tab traversal — distinct controls reached ${reached}`);
 console.log(`      pages tabbed through: ${perPage.size}`);
 const quiet=[...perPage.entries()].filter(([,n])=>n===0).map(([p])=>p);
 if(quiet.length) console.log(`      reached NOTHING new on: ${quiet.join(', ')}`);

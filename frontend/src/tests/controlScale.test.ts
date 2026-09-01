@@ -148,3 +148,27 @@ describe("no control keeps the old 28px floor, in any spelling", () => {
   });
 
 });
+
+describe("hit-area extenders do not reach into neighbouring controls", () => {
+  it("has no ::after extender with a negative horizontal inset", () => {
+    // .yn-arrow::after and .yn-display::after used inset:-4px -6px, which
+    // reached 6px SIDEWAYS into the adjacent control -- the rightmost 6px of
+    // the Previous-year arrow activated the year display instead. Both controls
+    // now meet 44px on their own box, so the extender added no reach and only
+    // overlapped. A negative horizontal inset on an absolutely-positioned
+    // extender is the shape of that bug; a negative vertical one is usually
+    // harmless because controls stack with gaps.
+    const negativeHorizontal = /::after\{[^}]*position:absolute;[^}]*inset:\s*-?\d+px\s+-\d+px/;
+    expect(html).not.toMatch(negativeHorizontal);
+  });
+
+  it("keeps the year navigator's controls at the floor on their own box", () => {
+    // The extender was load-bearing until these two carried the size natively.
+    const arrow = html.slice(html.indexOf(".yn-arrow{"), html.indexOf("}", html.indexOf(".yn-arrow{")));
+    expect(arrow).toContain("min-height:var(--ctl-min)");
+    expect(arrow).toContain("min-width:var(--ctl-min)");
+    const display = html.slice(html.indexOf(".yn-display{"), html.indexOf("}", html.indexOf(".yn-display{")));
+    expect(display).toContain("min-height:var(--ctl-min)");
+    expect(display).toMatch(/min-width:\s*(64px|var\(--ctl-min\))/);
+  });
+});

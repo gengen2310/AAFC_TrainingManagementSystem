@@ -16,7 +16,11 @@ const { chromium, devices } = __req("@playwright/test");
 // The other scripts already took it; this one did not, which meant the G3 and
 // G11 gates could only ever be run after a deploy.
 const BASE = process.env.AUDIT_BASE || 'https://aafc-tms-frontend-staging.up.railway.app';
-const CODE = process.env.STAGING_SQN_ADMIN_CODE;
+// AUDIT_CODE + AUDIT_ROLE let the same gate run under any role. Nine of the
+// 24 pages render nothing for a squadron admin, so a single-role sweep
+// measures them empty and reports the result as clean.
+const CODE = process.env.AUDIT_CODE || process.env.STAGING_SQN_ADMIN_CODE;
+const ROLE = process.env.AUDIT_ROLE || 'sqn_admin';
 const SEL = 'button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=link], [tabindex]:not([tabindex="-1"])';
 // EVERY routable page, enumerated from the id="page-*" elements in
 // connected-frontend/index.html. Five of twenty-four was the coverage that let
@@ -56,7 +60,7 @@ async function session(device) {
 // ── G3 ───────────────────────────────────────────────────────────────────────
 {
   const { browser, page } = await session(devices['Desktop Chrome']);
-  console.log('\nG3  text at 200%');
+  console.log(`\nG3 [${ROLE}] text at 200%`);
   for (const nav of PAGES) {
     await page.evaluate(n => { if (typeof window.nav === 'function') window.nav(n); }, nav);
     await page.waitForTimeout(1000);
@@ -82,7 +86,7 @@ async function session(device) {
 // ── G11 ──────────────────────────────────────────────────────────────────────
 {
   const { browser, page } = await session(devices['Desktop Chrome']);
-  console.log('\nG11 controls with no accessible name');
+  console.log(`\nG11 [${ROLE}] controls with no accessible name`);
   let total = 0, unnamed = 0; const set = new Map();
   for (const nav of PAGES) {
     await page.evaluate(n => { if (typeof window.nav === 'function') window.nav(n); }, nav);

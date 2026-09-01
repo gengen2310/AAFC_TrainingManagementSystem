@@ -14,7 +14,11 @@ const { chromium, devices } = __req("@playwright/test");
 // AUDIT_BASE lets these run against a local stack before anything is
 // deployed -- the rollout has to be measured before it ships, not after.
 const BASE=process.env.AUDIT_BASE || 'https://aafc-tms-frontend-staging.up.railway.app';
-const CODE=process.env.STAGING_SQN_ADMIN_CODE;
+// AUDIT_CODE + AUDIT_ROLE let the same gate run under any role. Nine of the
+// 24 pages render nothing for a squadron admin, so a single-role sweep
+// measures them empty and reports the result as clean.
+const CODE = process.env.AUDIT_CODE || process.env.STAGING_SQN_ADMIN_CODE;
+const ROLE = process.env.AUDIT_ROLE || 'sqn_admin';
 // EVERY routable page, enumerated from the id="page-*" elements in
 // connected-frontend/index.html. A page absent from this list is not reported
 // as unmeasured -- it is simply absent from the totals, which reads as clean.
@@ -105,7 +109,7 @@ for (const nav of PAGES) {
     if(!c.pass){fail++;const k=`${c.cr}:1 need ${c.need}  ${c.sel}  "${c.text}"`;worst.set(k,(worst.get(k)||0)+1);}
   }
 }
-console.log(`G1 rendered — text nodes measured ${measured}, unresolved ${unresolved}`);
+console.log(`G1 [${ROLE}] rendered — text nodes measured ${measured}, unresolved ${unresolved}`);
 console.log(`   FAIL ${fail}  (${measured?Math.round(100*fail/measured):0}%)`);
 console.log('   worst:');
 [...worst.entries()].sort((a,b)=>parseFloat(a[0])-parseFloat(b[0])).slice(0,12)

@@ -396,7 +396,14 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
    through a transparent ::after that grows the hit area without growing the
    box. Type size and touch target are different measurements, and the glyph
    must never decide the target. */
-.yn-arrow::after,.yn-display::after{content:"";position:absolute;inset:-4px -6px}
+/* Hit-area extenders removed 2026-09-01. inset:-4px -6px reached 6px sideways
+   into the NEIGHBOURING control, so the rightmost 6px of the Previous-year
+   arrow activated the year display instead. They were added when these
+   controls were below the target size; both now meet 44px on their own box
+   (.yn-arrow min-width:var(--ctl-min), .yn-display min-width:64px), so the
+   extenders had stopped adding reach and only overlapped. Found by the G5 hit
+   probe, which is the one check a box-size measurement cannot replace: the
+   arrow measures a clean 44x44 and was still not fully clickable. */
 .yn-arrow:focus-visible,.yn-display:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-2px}
 .yn-caret{margin-left:2px;font-size:var(--fs-2xs);color:var(--muted)}
 .auth-link-btn{display:block;width:100%;margin-top:10px;background:none;border:0;

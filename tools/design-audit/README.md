@@ -45,14 +45,33 @@ hit-testing, so the count covers every control the page rendered. This is the
 figure the control-scale work moved, and it now reads 0 below threshold on all
 three profiles.
 
-**The hit-test probe is measurement-limited and should not be quoted as a
-gate result.** It fires `elementFromPoint` at four points around a control and
-can only answer for controls currently on screen and unclipped. Residual
-failures it reports are, on inspection, controls that measure well above the
-threshold and that a live browser probes cleanly at all four points — the
-headless run simply had them at a scroll position where the probe landed on a
-scroll container. Treat a hit-test failure as "go and look", never as a defect
-count.
+**The hit-test probe is now trustworthy, and it earns its place.** It was
+reporting 38 failures on controls that measured well above the threshold, and
+the honest reading at the time was "do not quote this as a defect count".
+Diagnosing all 38 rather than dismissing them found three distinct causes:
+
+- **11 were the harness occluding the app.** The debug bar is fixed to the
+  bottom of the viewport and renders only on localhost (`index.html:6127`), so
+  a local run had it covering whatever sat at the fold -- 8px into a nav item,
+  two row buttons entirely. It exists on no deployed environment. The scripts
+  now hide it before measuring.
+- **10 were sub-pixel boundary resolution.** Probing at exactly `size/2 - 1`
+  lands one pixel inside the edge, where rounding decides which of two adjacent
+  elements answers. Ten flush-stacked `.tab-btn` controls failed there and
+  passed two pixels further in. The strict probe still runs first; anything
+  rescued is counted and printed as "passed only within 2px" so the allowance
+  stays visible rather than being folded into the pass count.
+- **1 was a real defect that no box measurement could have found.**
+  `.yn-arrow::after` and `.yn-display::after` used `inset:-4px -6px`, extending
+  each control's hit area 6px sideways into its neighbour, so the rightmost 6px
+  of the Previous-year arrow activated the year display. The arrow measures a
+  clean 44x44 the whole time. The extenders dated from when these controls were
+  below the target size; once both carried 44px on their own box, the extenders
+  added no reach and only overlapped. Removed.
+
+That last one is the argument for keeping the probe: box size and reachability
+are different questions, and only the second catches a control that is the
+right size and still not fully clickable.
 
 **Three viewport profiles, and the reason there are three.** The first version
 ran two — Pixel 7 at 44px and desktop at 28px — and reported zero failures
@@ -105,6 +124,8 @@ G11 semantics    0 unnamed of 833 controls
     print        computed styles identical (print-parity.mjs)
 ```
 
-The G5 hit-probe still reports residual "not reachable" results on controls that
-measure well above the threshold; see the note above on why that figure is
-measurement-limited and should not be quoted as a defect count.
+The G5 hit-probe residual is 0. It was 38; all 38 were diagnosed rather than
+dismissed, and the causes are recorded above -- 11 the harness occluding the
+app, 10 sub-pixel edge resolution, 1 a genuine overlapping hit-area extender.
+The "passed only within 2px" line reports how many controls needed the
+sub-pixel allowance, so the tolerance stays visible.

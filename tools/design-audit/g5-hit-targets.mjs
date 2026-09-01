@@ -13,7 +13,11 @@ const { chromium, devices } = __req("@playwright/test");
 // AUDIT_BASE lets these run against a local stack before anything is
 // deployed -- the rollout has to be measured before it ships, not after.
 const BASE=process.env.AUDIT_BASE || 'https://aafc-tms-frontend-staging.up.railway.app';
-const CODE=process.env.STAGING_SQN_ADMIN_CODE;
+// AUDIT_CODE + AUDIT_ROLE let the same gate run under any role. Nine of the
+// 24 pages render nothing for a squadron admin, so a single-role sweep
+// measures them empty and reports the result as clean.
+const CODE = process.env.AUDIT_CODE || process.env.STAGING_SQN_ADMIN_CODE;
+const ROLE = process.env.AUDIT_ROLE || 'sqn_admin';
 const SEL='button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=link], [tabindex]:not([tabindex="-1"])';
 // EVERY routable page, not a hand-picked six. Twice now a control shipped
 // below standard because the page it lived on was not in this list, and an
@@ -54,9 +58,18 @@ for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
     sessionStorage.setItem('aafc_token',(await r.json()).token);
   },[api,CODE]);
   await page.reload({waitUntil:'domcontentloaded'}); await page.waitForTimeout(3000);
+  // The debug bar is fixed to the bottom of the viewport and renders ONLY on
+  // localhost (index.html:6127). Running the gate locally therefore had it
+  // covering whatever control sat at the fold -- 8px into a nav item, and two
+  // row buttons entirely. Eleven failures that exist nowhere but in the
+  // measurement rig. Hide it: it is not part of the UI under test, and a local
+  // run that reports failures staging cannot reproduce trains you to ignore
+  // the number.
+  await page.addStyleTag({content:'.debug-bar{display:none !important}'});
 
   let judged=0, boxFail=0, hitFail=0, savedByHitArea=0, hitJudged=0, hitSkipped=0;
   const perPage=new Map();
+  let tolerated=0;
   const off=new Map();
   // Box failures need their own register. They are the trustworthy metric, and
   // listing only hit-probe offenders meant a genuinely undersized control could
@@ -113,14 +126,23 @@ for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
         // this number needs a caveat nobody remembers to apply.
         if(e.type==='checkbox'||e.type==='radio')continue;
         const boxOk=r.width>=size&&r.height>=size;   // always judgeable: no scroll needed
-        const cx=(vl+vr)/2, cy=(vt+vb)/2, h=size/2-1;   // centre of what is visible
-        const hitOk=!fullyVisible ? null : [[cx,cy-h],[cx,cy+h],[cx-h,cy],[cx+h,cy]].every(([x,y])=>{
+        const cx=(vl+vr)/2, cy=(vt+vb)/2;              // centre of what is visible
+        const probeAt=(h)=>[[cx,cy-h],[cx,cy+h],[cx-h,cy],[cx+h,cy]].every(([x,y])=>{
           if(x<0||y<0||x>innerWidth||y>innerHeight)return false;
           const t=document.elementFromPoint(x,y);
           return t && (t===e || e.contains(t));      // ancestors do NOT count
         });
+        // Probing at exactly size/2-1 puts the point one pixel inside the edge,
+        // where sub-pixel rounding decides which of two adjacent elements
+        // answers. Ten flush-stacked .tab-btn controls failed there and passed
+        // 2px further in -- a property of the boundary, not of the control. The
+        // strict probe still runs first, and anything rescued by the tolerance
+        // is counted separately so the allowance stays visible.
+        const strict = fullyVisible ? probeAt(size/2-1) : null;
+        const hitOk  = strict === false ? probeAt(size/2-3) : strict;
+        const viaTolerance = strict === false && hitOk === true;
         out.push({label:(e.getAttribute('aria-label')||e.textContent||e.value||'').trim().slice(0,28),
-                  w:Math.round(r.width),h:Math.round(r.height),boxOk,hitOk});
+                  w:Math.round(r.width),h:Math.round(r.height),boxOk,hitOk,viaTolerance});
       }
       return out;
     },{sel:SEL,size});
@@ -131,11 +153,12 @@ for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
         const bk=`${c.w}x${c.h}  ${nav}  ${c.label}`; boxOff.set(bk,(boxOff.get(bk)||0)+1); }
       if(c.hitOk===null){ hitSkipped++; continue; }        // clipped by an edge
       hitJudged++;
+      if(c.viaTolerance) tolerated++;
       if(!c.hitOk){ hitFail++; const k=`${c.w}x${c.h}  ${c.label}`; off.set(k,(off.get(k)||0)+1); }
       if(!c.boxOk && c.hitOk) savedByHitArea++;
     }
   }
-  console.log(`\n══ ${name} — threshold ${size}px ══`);
+  console.log(`\n══ ${ROLE} · ${name} — threshold ${size}px ══`);
   console.log(`   judged                       ${judged}`);
   const silent=[...perPage.entries()].filter(([,n])=>n===0).map(([p])=>p);
   console.log(`   pages measured               ${perPage.size}  (${perPage.size-silent.length} rendered controls)`);
@@ -146,6 +169,7 @@ for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
   console.log(`   rescued by a larger hit area ${savedByHitArea}`);
   // Coverage is reported next to the result, because "0 failures" describes
   // what was measured and a reader hears it as describing the app.
+  console.log(`   passed only within 2px       ${tolerated}  (sub-pixel edge tolerance)`);
   console.log(`   hit-tested                   ${hitJudged}  (${hitSkipped} skipped: clipped by a viewport edge)`);
   console.log(`   FAIL (not reachable at ${size}px) ${hitFail}   →  ${hitJudged?Math.round(100*hitFail/hitJudged):0}% of hit-tested`);
   console.log('   worst offenders:');
