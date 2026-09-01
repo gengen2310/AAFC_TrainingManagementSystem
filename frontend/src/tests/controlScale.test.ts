@@ -30,8 +30,17 @@ describe("component lab", () => {
     // The attributes are applied via setAttribute at runtime, so assert on the
     // CLASSES table that drives them rather than on rendered markup. Only the
     // adjacency block carries literal data-lab-* attributes.
-    for (const cls of ["btn", "btn-sm", "btn-xs", "tb-btn", "tab-btn",
-                       "lh-btn", "btn-lnk", "ff-ro", "input", "select"]) {
+    // Ten of these were the original list. The other fourteen were added on
+    // 2026-09-01 after both defects found that day turned out to be classes the
+    // lab did not cover: .nav-item shipped at 214x41, and .yn-arrow measured a
+    // clean 44x44 with an adjacent extender over its edge. Component
+    // measurement only prevents a bad class reaching a screen if the list is
+    // complete, so a new control class belongs here as well as in the app.
+    for (const cls of ["btn", "btn-sm", "btn-xs", "btn-icon", "tb-btn", "tab-btn",
+                       "seg-btn", "lh-btn", "btn-lnk", "nav-item", "cal-nbtn",
+                       "rte-btn", "modal-x", "sd-filter", "login-report",
+                       "ff-ro", "input", "date", "search", "textarea", "select",
+                       "cb-label"]) {
       expect(lab).toContain(`cls: "${cls}"`);
     }
     expect(lab).toContain('ctl.setAttribute("data-lab-class", spec.cls)');
@@ -170,5 +179,32 @@ describe("hit-area extenders do not reach into neighbouring controls", () => {
     const display = html.slice(html.indexOf(".yn-display{"), html.indexOf("}", html.indexOf(".yn-display{")));
     expect(display).toContain("min-height:var(--ctl-min)");
     expect(display).toMatch(/min-width:\s*(64px|var\(--ctl-min\))/);
+  });
+});
+
+describe("the lab covers the adjacency case that size measurement cannot see", () => {
+  it("renders the year navigator as a flush group", () => {
+    // .yn-arrow and .yn-display sat flush and each carried an ::after extender
+    // reaching 6px into the other, so the arrow's edge activated the display.
+    // Both measured 44x44 throughout. Only a hit probe against adjacent
+    // controls catches that, so the pair belongs in the lab as a group.
+    expect(lab).toContain('data-lab-group="year-nav"');
+    expect(lab).toContain('data-lab-class="yn-arrow"');
+    expect(lab).toContain('data-lab-class="yn-display"');
+  });
+
+  it("supplies ancestor markup for rules scoped to one", () => {
+    // #page-service-desk .sd-filter-bar button never matches without its
+    // ancestors, and an unstyled control measures as a pass.
+    expect(lab).toContain('wrap: [');
+    expect(lab).toContain('id="page-service-desk"');
+  });
+
+  it("does not destroy element children when applying long content", () => {
+    // Assigning textContent wiped the <input> out of the checkbox label, so
+    // label:has(> input[type=checkbox]) stopped matching and the control
+    // measured 22px -- a failure the lab had manufactured.
+    expect(lab).toContain("nodeType === 3");
+    expect(lab).not.toContain("else ctl.textContent = contentText;");
   });
 });

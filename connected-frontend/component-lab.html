@@ -35,17 +35,42 @@
   el.textContent = css;
   document.head.appendChild(el);
 
+  // Every control class that consumes a --ctl-* token. The list used to hold ten
+  // of them, and BOTH defects found on 2026-09-01 were classes it did not cover:
+  // .nav-item shipped at 214x41, and .yn-arrow measured a clean 44x44 while an
+  // adjacent hit-area extender covered its right edge. The apple-design build
+  // order puts component measurement before screen rollout precisely so a class
+  // cannot reach a screen unmeasured -- that only works if the list is complete.
+  //
+  // `wrap` supplies ancestor markup for rules that are scoped to one, e.g.
+  // #page-service-desk .sd-filter-bar button. Without it the rule never matches
+  // and the control renders unstyled, which measures as a pass.
   const CLASSES = [
     { cls: "btn",      html: '<button class="btn btn-dk">Save Settings</button>' },
     { cls: "btn-sm",   html: '<button class="btn btn-out btn-sm">Edit</button>' },
-    { cls: "btn-xs",   html: '<button class="btn btn-out btn-xs" aria-label="Delete">✕</button>' },
+    { cls: "btn-xs",   html: '<button class="btn btn-out btn-xs" aria-label="Delete">✕</button>', contents: ["short"] },
+    { cls: "btn-icon", html: '<button class="btn-icon" aria-label="More options">⋯</button>' , contents: ["short"] },
     { cls: "tb-btn",   html: '<button class="tb-btn">Search</button>', ctx: "dark" },
     { cls: "tab-btn",  html: '<button class="tab-btn">Sessions</button>' },
+    { cls: "seg-btn",  html: '<button class="seg-btn">Term</button>' },
     { cls: "lh-btn",   html: '<button class="lh-btn">Learning Hub</button>' },
     { cls: "btn-lnk",  html: '<button class="btn-lnk">Show archived</button>' },
+    { cls: "nav-item", html: '<div class="nav-item" role="link" tabindex="0">Training Dashboard</div>', ctx: "dark" },
+    { cls: "cal-nbtn", html: '<button class="cal-nbtn" aria-label="Next month">›</button>' , contents: ["short"] },
+    { cls: "rte-btn",  html: '<button class="rte-btn" aria-label="Bold">B</button>' , contents: ["short"] },
+    { cls: "modal-x",  html: '<button class="modal-x" aria-label="Close">✕</button>', ctx: "dark" , contents: ["short"] },
+    { cls: "sd-filter", html: '<button class="active">Open</button>',
+      wrap: ['<div id="page-service-desk"><div class="sd-filter-bar">', '</div></div>'] },
+    { cls: "login-report", html: '<button class="login-report-link">Report a problem</button>', ctx: "dark" },
     { cls: "input",    html: '<input type="text" value="703 Squadron">' },
+    { cls: "date",     html: '<input type="date" value="2026-07-24">' },
+    { cls: "search",   html: '<input type="search" value="drill">' },
+    { cls: "textarea", html: '<textarea rows="2">Notes for the night</textarea>' },
     { cls: "select",   html: '<select><option>Friday</option></select>' },
-    { cls: "ff-ro",    html: '<input type="text" class="ff-ro" value="Set by wing" readonly>' }
+    { cls: "ff-ro",    html: '<input type="text" class="ff-ro" value="Set by wing" readonly>' },
+    // The checkbox exemption made visible: the BOX is 18x18 by design and the
+    // label around it carries the 44px target. Measuring the label is the point.
+    { cls: "cb-label", html: '<label><input type="checkbox"> Include archived</label>' }
   ];
   const STATES  = ["resting", "hover", "focus", "disabled", "active"];
   const CONTENT = { short: null, long: "A considerably longer control label than usual",
@@ -56,7 +81,7 @@
     const section = document.createElement("section");
     section.className = "lab-grid lab-ctx-" + (spec.ctx || "surface");
     for (const state of STATES) {
-      for (const contentName of Object.keys(CONTENT)) {
+      for (const contentName of (spec.contents || Object.keys(CONTENT))) {
         const contentText = CONTENT[contentName];
         const cell = document.createElement("div");
         cell.className = "lab-cell";
@@ -64,17 +89,30 @@
         cap.className = "lab-cap";
         cap.textContent = spec.cls + " · " + state + " · " + contentName;
         const holder = document.createElement("div");
-        holder.innerHTML = spec.html;
-        const ctl = holder.firstElementChild;
+        holder.innerHTML = spec.wrap ? spec.wrap[0] + spec.html + spec.wrap[1] : spec.html;
+        // With a wrapper the control is nested; find the element the spec meant.
+        const ctl = spec.wrap ? holder.querySelector("button, input, select, textarea, [role]")
+                              : holder.firstElementChild;
         ctl.setAttribute("data-lab-class", spec.cls);
         ctl.setAttribute("data-lab-state", state);
         ctl.setAttribute("data-lab-content", contentName);
         if (contentText && ctl.tagName !== "SELECT") {
-          if (ctl.tagName === "INPUT") ctl.value = contentText;
-          else ctl.textContent = contentText;
+          if (ctl.tagName === "INPUT" || ctl.tagName === "TEXTAREA") {
+            ctl.value = contentText;
+          } else {
+            // Replace only the TEXT, never the element children. Assigning
+            // textContent wiped the <input> out of a checkbox label, which made
+            // label:has(> input[type=checkbox]) stop matching -- the control
+            // then measured 22px and the lab reported a failure that existed
+            // only because the lab had dismantled the control.
+            let textNode = [...ctl.childNodes].find(n => n.nodeType === 3);
+            if (textNode) textNode.nodeValue = contentText;
+            else ctl.appendChild(document.createTextNode(contentText));
+          }
         }
         if (state === "disabled") ctl.disabled = true;
-        cell.appendChild(cap); cell.appendChild(ctl);
+        cell.appendChild(cap);
+        cell.appendChild(spec.wrap ? holder.firstElementChild : ctl);
         section.appendChild(cell);
       }
     }
@@ -93,6 +131,21 @@
     '<button class="btn btn-out btn-xs" data-lab-class="btn-xs" data-lab-state="resting" data-lab-content="short" aria-label="Edit">✎</button>' +
     "</div></div>";
   root.appendChild(adj);
+
+  // Year navigator: two flush controls that each once carried an ::after hit-area
+  // extender reaching 6px into the other, so the arrow's edge activated the
+  // display. Size measurement passes this; only a hit probe catches it. It is in
+  // the lab as an adjacency group because that is the shape of the bug.
+  const yn = document.createElement("section");
+  yn.className = "lab-grid lab-ctx-surface";
+  yn.innerHTML =
+    '<div class="lab-cell"><div class="lab-cap">year navigator · adjacent</div>' +
+    '<div class="lab-row" data-lab-group="year-nav">' +
+    '<button class="yn-arrow" data-lab-class="yn-arrow" data-lab-state="resting" data-lab-content="short" aria-label="Previous year">‹</button>' +
+    '<button class="yn-display" data-lab-class="yn-display" data-lab-state="resting" data-lab-content="numeric">2026</button>' +
+    '<button class="yn-arrow" data-lab-class="yn-arrow" data-lab-state="resting" data-lab-content="short" aria-label="Next year">›</button>' +
+    "</div></div>";
+  root.appendChild(yn);
 
   document.body.setAttribute("data-lab-ready", "true");
 })();
