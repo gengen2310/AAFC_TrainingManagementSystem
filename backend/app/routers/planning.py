@@ -112,19 +112,58 @@ def _upsert_session_audience(db: DBSession, session_id: str, cadet_group: str,
     db.commit()
 
 
+def _resolve_scoped_classes(
+    db: DBSession, class_ids: list[str] | None, squadron_id: str,
+) -> list:
+    """Resolve training class ids, refusing any that belong to another Squadron.
+
+    A TrainingClass belongs to exactly one Squadron's one Training Year (see the
+    model docstring). PUT /api/sessions/{id}/audience has always enforced that --
+    training.py rejects `c.squadron_id != s.squadron_id` with 400
+    invalid_training_class. This module's session-create, session-edit and
+    assign-mission paths did not: they passed body.training_class_ids straight
+    through, so the same resource had two doors and only one was locked. 703
+    could post 705's class id and mint a SessionAudience row across the tenancy
+    boundary (Part 82: no cross-squadron IDOR, tenancy enforced in the backend).
+
+    Rejecting rather than skipping, and with training.py's exact status and
+    error code, because two doors onto one resource answering differently is
+    how the gap survived review in the first place.
+
+    Validation happens BEFORE any write. create_session derived cadet_group from
+    the first class and committed the session before touching the audience, so a
+    late refusal would have left a committed session carrying a foreign class's
+    stage_code.
+    """
+    resolved = []
+    for cid in class_ids or []:
+        tc = db.get(TrainingClass, cid)
+        if not tc or tc.is_archived or tc.squadron_id != squadron_id:
+            raise HTTPException(400, detail={
+                "error": "invalid_training_class", "training_class_id": cid})
+        resolved.append(tc)
+    return resolved
+
+
 def _create_audience_for_class_ids(
-    db: DBSession, session_id: str, class_ids: list[str],
+    db: DBSession, session_id: str, class_ids: list[str], squadron_id: str,
 ) -> None:
     """Create SessionAudience rows for explicit training_class_id values.
 
     Idempotent: existing rows for the same (session_id, training_class_id) pair are
-    skipped (the unique constraint would catch them anyway).  Invalid IDs (classes that
-    don't exist or belong to a different squadron/year) are silently skipped so a stale
-    frontend ID never hard-fails a save.
+    skipped (the unique constraint would catch them anyway).
+
+    squadron_id is required, not optional. The previous signature took only the
+    ids and its docstring claimed classes "that don't exist or belong to a
+    different squadron/year are silently skipped" -- the code checked only
+    existence, so the tenancy half of that sentence described a check that was
+    never written. Callers validate up front via _resolve_scoped_classes; this
+    re-checks because a helper that writes tenancy-scoped rows should not depend
+    on every caller having remembered.
     """
     for tc_id in class_ids:
         tc = db.get(TrainingClass, tc_id)
-        if not tc:
+        if not tc or tc.squadron_id != squadron_id:
             continue
         exists = (
             db.query(SessionAudience)
@@ -1956,8 +1995,11 @@ def create_session(
     # Legacy path: cadet_group string auto-matched to a single TrainingClass
     use_class_ids = bool(body.training_class_ids)
     if use_class_ids:
+        # Scope-check every id BEFORE anything is written -- the session is
+        # committed further down, ahead of the audience rows.
+        scoped = _resolve_scoped_classes(db, body.training_class_ids, pn.squadron_id)
         # Derive cadet_group for denormalisation from the first class's stage_code.
-        first_tc = db.get(TrainingClass, body.training_class_ids[0]) if body.training_class_ids else None
+        first_tc = scoped[0] if scoped else None
         resolved_cadet_group = _STAGE_CODE_CADET_GROUP.get(first_tc.stage_code) if first_tc else None
     else:
         if body.cadet_group not in CADET_GROUPS:
@@ -1999,7 +2041,7 @@ def create_session(
             s.training_area_name_at_time = ra.name
     db.add(s); db.commit()
     if use_class_ids:
-        _create_audience_for_class_ids(db, s.id, body.training_class_ids)
+        _create_audience_for_class_ids(db, s.id, body.training_class_ids, pn.squadron_id)
     else:
         _upsert_session_audience(db, s.id, body.cadet_group, pn.squadron_id, py.id)
     _run_conflict_check(py.id, date_id, db)
@@ -2086,14 +2128,16 @@ def update_session(
             raise HTTPException(422, detail={"error": "invalid_cadet_group"})
         s.cadet_group = body.cadet_group or None
     if body.training_class_ids is not None:
+        # Scope-check before the delete: a refusal after it would drop the
+        # session's existing audience and leave nothing in its place.
+        scoped = _resolve_scoped_classes(db, body.training_class_ids, s.squadron_id)
         # Replace all existing SessionAudience rows for this session with the new set.
         db.query(SessionAudience).filter(SessionAudience.session_id == s.id).delete()
         db.flush()
-        _create_audience_for_class_ids(db, s.id, body.training_class_ids)
+        _create_audience_for_class_ids(db, s.id, body.training_class_ids, s.squadron_id)
         # Derive cadet_group from the first class for backward compat denormalisation.
-        if body.training_class_ids:
-            first_tc = db.get(TrainingClass, body.training_class_ids[0])
-            s.cadet_group = _STAGE_CODE_CADET_GROUP.get(first_tc.stage_code) if first_tc else s.cadet_group
+        if scoped:
+            s.cadet_group = _STAGE_CODE_CADET_GROUP.get(scoped[0].stage_code)
     s.version += 1
     db.commit()
     audit(db, p, object_type="session", object_id=s.id, action="update")
@@ -3676,7 +3720,8 @@ def assign_mission(
 
     use_class_ids = bool(body.training_class_ids)
     if use_class_ids:
-        first_tc = db.get(TrainingClass, body.training_class_ids[0]) if body.training_class_ids else None
+        scoped = _resolve_scoped_classes(db, body.training_class_ids, py.unit_id)
+        first_tc = scoped[0] if scoped else None
         resolved_cadet_group = _STAGE_CODE_CADET_GROUP.get(first_tc.stage_code) if first_tc else None
     else:
         if body.cadet_group not in CADET_GROUPS:
@@ -3722,7 +3767,7 @@ def assign_mission(
     db.add(s)
     db.commit()
     if use_class_ids:
-        _create_audience_for_class_ids(db, s.id, body.training_class_ids)
+        _create_audience_for_class_ids(db, s.id, body.training_class_ids, pn.squadron_id)
     else:
         _upsert_session_audience(db, s.id, body.cadet_group, pn.squadron_id, year_id)
     _run_conflict_check(year_id, body.parade_date_id, db)

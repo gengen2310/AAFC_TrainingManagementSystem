@@ -360,3 +360,56 @@ def test_different_classes_in_concurrent_sessions_no_clash(client):
 
     r_b = client.put(f"/api/sessions/{sid_b}/audience", json={"training_class_ids": [c2]}, headers=hdr)
     assert r_b.status_code == 200, r_b.text
+
+
+# ─────────────────────────────────────────────────────────────
+# Tenancy (Part 82: no cross-squadron IDOR; tenancy backend-enforced)
+# ─────────────────────────────────────────────────────────────
+
+def test_cannot_attach_another_squadrons_training_class(client):
+    """A TrainingClass belongs to exactly one Squadron's one Training Year.
+
+    PUT /api/sessions/{id}/audience (training.py) checks
+    `c.squadron_id != s.squadron_id` and returns 400. POST
+    /api/planning/parade-dates/{id}/sessions (planning.py) does not: it passes
+    body.training_class_ids straight to _create_audience_for_class_ids, which
+    resolves each id with db.get(TrainingClass, id) and skips only when the row
+    is missing. Same resource, two doors, one of them unlocked.
+
+    The helper's docstring claims the check -- "classes that ... belong to a
+    different squadron/year are silently skipped" -- and the sibling call on the
+    next line already takes scope, _upsert_session_audience(db, s.id,
+    cadet_group, pn.squadron_id, py.id), which is why this reads as an
+    oversight rather than a decision.
+    """
+    a703 = login(client, "ADMIN703")
+    a705 = login(client, "ADMIN705")
+
+    # 705 builds a class of its own.
+    y705 = _make_year(client, a705, next_test_year())
+    stage705 = _senior_stage_id(client, a705)
+    foreign_class = _make_class(client, a705, y705["planning_year_id"], stage705, "705 Senior 1")
+
+    # 703 opens a parade night of its own.
+    y703 = _make_year(client, a703, next_test_year())
+    me = client.get("/api/auth/me", headers=a703).json()["session"]
+    pn = client.post("/api/parade-nights", json={
+        "squadron_id": me["squadron_id"], "wing_id": me["wing_id"],
+        "date": "2041-03-06", "parade_type": "normal",
+    }, headers=a703)
+    assert pn.status_code in (200, 201), pn.text
+    pn_id = pn.json().get("parade_night_id") or pn.json().get("id")
+
+    # ...and creates a session pointed at 705's class through the planning door.
+    r = client.post(f"/api/planning/parade-dates/{pn_id}/sessions", json={
+        "session_number": 1, "training_class_ids": [foreign_class],
+    }, headers=a703)
+
+    assert r.status_code in (200, 201, 400, 403, 422), r.text
+    if r.status_code in (200, 201):
+        sid = r.json().get("session_id") or r.json().get("id")
+        listed = client.get(f"/api/sessions/{sid}/audience", headers=a703)
+        linked = [row["training_class_id"] for row in listed.json()] if listed.status_code == 200 else []
+        assert foreign_class not in linked, (
+            f"703's session is linked to 705's training class {foreign_class}: {linked}"
+        )
