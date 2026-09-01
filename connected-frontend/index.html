@@ -474,8 +474,8 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
   font-size:var(--fs-xs);}
 .cls-table .cls-prog{width:38%;min-width:110px;}
 .cls-table .cls-name{padding-left:22px;font-size:var(--fs-xs);color:var(--text-2);}
-.cls-table .cls-stage-row th{font-size:var(--fs-xs);font-weight:800;color:var(--text);text-align:left;}
-.cls-table .cls-stage-row td,.cls-table .cls-stage-row th{border-top:1px solid var(--border);}
+.cls-table .cls-stage-row th{font-size:var(--fs-sm);font-weight:800;color:var(--text);text-align:left;}
+.cls-table .cls-stage-row td,.cls-table .cls-stage-row th{border-top:2px solid var(--border);background:var(--surface-2);}
 .cls-flag{font-size:var(--fs-3xs);font-weight:800;letter-spacing:.05em;text-transform:uppercase;
   color:var(--red);white-space:nowrap;}
 @media(max-width:560px){
@@ -627,6 +627,21 @@ tbody tr:last-child{border-bottom:none;}
 tbody tr:hover{background:#f0f7fc;}
 tbody td{padding:9px 12px;vertical-align:middle;}
 .clk-row{cursor:pointer;}.clk-row:hover td{background:#deeefa!important;}
+/* Training Classes — stage-grouped redesign */
+.tc-stage-header td{background:var(--surface-2);font-weight:700;font-size:var(--fs-xs);color:var(--steel);padding:6px 12px;border-top:2px solid var(--border);border-bottom:1px solid var(--border-light);}
+tr.tc-archived{opacity:.6;}
+.tc-overflow{position:relative;display:inline-block;vertical-align:middle;}
+.tc-overflow>summary{list-style:none;cursor:pointer;padding:4px 9px;font-size:var(--fs-xs);border-radius:5px;min-height:var(--ctl-min);min-width:var(--ctl-min);display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:var(--surface);}
+/* Arrived on the release-candidate branch, which forked before the control
+   scale landed, so it carried the old 28px floor. A <summary> is a real
+   interactive control -- it opens the overflow list -- and it is the one
+   thing the merge brought in below the target size. Caught by the
+   spelling-insensitive test rather than by review. */
+.tc-overflow>summary::-webkit-details-marker{display:none;}
+.tc-overflow[open]>.tc-overflow-menu{position:absolute;right:0;top:calc(100% + 3px);background:var(--surface);border:1px solid var(--border);border-radius:6px;box-shadow:var(--sh2);padding:6px;min-width:140px;z-index:200;white-space:nowrap;}
+.tc-overflow-menu button{display:block;width:100%;text-align:left;margin-bottom:3px;}
+.tc-overflow-menu button:last-child{margin-bottom:0;}
+.tc-overflow-menu hr{border:none;border-top:1px solid var(--border);margin:4px 0;}
 
 /* ── FILTER BAR ── */
 .fbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
@@ -1844,9 +1859,13 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <option value="T3">Term 3</option><option value="T4">Term 4</option>
           </select>
           <label for="wp-sel" class="fbar-lbl">Night</label>
-          <select id="wp-sel" aria-label="Choose which parade night to show" onchange="_wpPaint()">
-            <option value="">All nights</option>
-          </select>
+          <div style="display:flex;align-items:center;gap:4px">
+            <button id="wp-prev" class="btn btn-out btn-sm" onclick="_wpPrev()" title="Previous parade night" aria-label="Previous parade night" disabled>&#8249;</button>
+            <select id="wp-sel" aria-label="Choose which parade night to show" onchange="_wpPaint()">
+              <option value="">No nights this term</option>
+            </select>
+            <button id="wp-next" class="btn btn-out btn-sm" onclick="_wpNext()" title="Next parade night" aria-label="Next parade night" disabled>&#8250;</button>
+          </div>
           <input id="wp-search" placeholder="Search facilitator, room, curriculum item…" oninput="_wpPaint()" style="min-width:220px" aria-label="Search facilitator, room, curriculum item">
           <select id="wp-f-status" aria-label="Filter Weekly Program by status" onchange="_wpPaint()">
             <option value="all">All Statuses</option>
@@ -3683,13 +3702,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
       </div>
       <div class="form-row">
-        <div class="ff"><label for="pn-nsess">Training Periods This Night</label>
-          <select id="pn-nsess" aria-label="Number of sessions this night" onchange="buildSlots()">
-            <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option>
-          </select>
-        </div>
-        <div class="ff"><label for="pn-notes">Notes</label><input id="pn-notes" placeholder="e.g. ANZAC prep"></div>
+        <div class="ff"><label for="pn-notes">Notes (optional)</label><input id="pn-notes" placeholder="e.g. ANZAC prep"></div>
       </div>
+      <div id="pn-tpl-preview" style="font-size:var(--fs-xs);color:var(--muted);margin-top:4px;padding:8px 10px;background:var(--surface-2);border-radius:6px;line-height:1.5"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-add-pn')">Cancel</button>
@@ -8851,7 +8866,7 @@ function _chartClassTable(progressChart, enrollmentChart){
   let body='';
   const source = pRows.length?pRows:eRows;
   source.forEach(function(row){
-    const stage=row.stage||'Unnamed stage';
+    const stage=row.stage||'No stage assigned';
     const agg=row.coverage_pct!=null?row.coverage_pct:null;
     const total=stageTotals[stage];
     body+='<tr class="cls-stage-row">'
@@ -8862,11 +8877,12 @@ function _chartClassTable(progressChart, enrollmentChart){
       + '<td></td></tr>';
     (row.classes||[]).forEach(function(cls){
       const nm=cls.display_name||'';
+      const num=cls.class_number!=null?'C'+String(cls.class_number).padStart(2,'0')+' · ':'';
       const v=cls.coverage_pct;
       const n=counts[stage+'||'+nm];
       const behind=agg!=null&&v!=null&&v<=agg-15;
       body+='<tr>'
-        + '<td class="cls-name">'+esc(nm)+'</td>'
+        + '<td class="cls-name"><span class="cls-num-badge">'+esc(num)+'</span>'+esc(nm)+'</td>'
         + '<td class="cls-num">'+(n!=null?esc(String(n)):'\u2014')+'</td>'
         + '<td class="cls-prog"><div class="pbar"><div style="height:100%;width:'+(v!=null?Math.round(v):0)+'%;background:'+col(v)+';border-radius:3px"></div></div></td>'
         + '<td class="cls-num" style="color:'+colText(v)+'">'+pct(v)+'</td>'
@@ -8878,66 +8894,6 @@ function _chartClassTable(progressChart, enrollmentChart){
     + '<thead><tr><th scope="col">Training class</th><th scope="col" class="cls-num">Cadets</th>'
     + '<th scope="col" colspan="2">Curriculum progress</th><th scope="col"><span class="sr-only">Status</span></th></tr></thead>'
     + '<tbody>'+body+'</tbody></table></div>';
-}
-
-function _chartClassProgress(chart){
-  const rows=chart.data||[];
-  if(!rows.length)return _dEmptyChart('No Training Classes configured for this squadron and year.');
-  let html='';
-  rows.forEach(row=>{
-    const agg=row.coverage_pct!=null?row.coverage_pct:null;
-    const aggW=agg!=null?Math.round(agg)+'%':'—';
-    const aggColor=agg==null?'var(--muted)':agg>=80?'var(--ok)':agg>=60?'var(--warn)':'var(--red)';
-    // Stage header row
-    html+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 0 3px;border-top:1px solid var(--b2);margin-top:4px">
-      <div style="font-size:var(--fs-xs);font-weight:800;color:var(--text);min-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(row.stage||'')}">
-        ${esc(row.stage||'Unnamed stage')}</div>
-      <div style="flex:1"><div class="pbar"><div style="height:100%;width:${agg!=null?Math.round(agg):0}%;background:${aggColor};border-radius:3px"></div></div></div>
-      <div style="min-width:48px;text-align:right;font-size:var(--fs-xs);font-weight:700;color:${aggColor}">${aggW}</div>
-    </div>`;
-    // Per-class rows
-    (row.classes||[]).forEach(cls=>{
-      const p=cls.coverage_pct;
-      const behind=agg!=null&&p!=null&&p<=agg-15;
-      const clsColor=p==null?'var(--muted)':p>=80?'var(--ok)':p>=60?'var(--warn)':'var(--red)';
-      const w=p!=null?Math.round(p):0;
-      html+=`<div style="display:flex;align-items:center;gap:8px;padding:3px 0 3px 16px" role="img" aria-label="${esc(cls.display_name)}: ${p!=null?p+'%':'no data'}">
-        <div style="font-size:var(--fs-xs);color:var(--text-2);min-width:114px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(cls.display_name)}">${esc(cls.display_name)}</div>
-        <div style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${clsColor};border-radius:3px"></div></div></div>
-        <div style="min-width:48px;text-align:right;font-size:var(--fs-xs);color:${clsColor}">${p!=null?p+'%':'—'}</div>
-        ${behind?`<span style="font-size:var(--fs-xs);font-weight:800;color:var(--red);white-space:nowrap">NEEDS ATTENTION</span>`:''}
-      </div>`;
-    });
-  });
-  return html;
-}
-
-// Class enrollment distribution — chart.data=[{stage,stage_id,classes:[{display_name,expected_count}]}]
-function _chartClassEnrollment(chart){
-  const rows=chart.data||[];
-  if(!rows.length)return _dEmptyChart(chart.empty_state||'No Training Classes configured.');
-  const maxCount=Math.max(...rows.flatMap(r=>r.classes.map(c=>c.expected_count||0)),1);
-  let html='';
-  rows.forEach(row=>{
-    const stageTotal=row.total_expected||0;
-    html+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 0 3px;border-top:1px solid var(--b2);margin-top:4px">
-      <div style="font-size:var(--fs-xs);font-weight:800;color:var(--text);min-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(row.stage||'Unnamed stage')}</div>
-      <div style="flex:1"></div>
-      <div style="min-width:64px;text-align:right;font-size:var(--fs-xs);color:var(--muted)">${stageTotal?stageTotal+' cadets':''}</div>
-    </div>`;
-    (row.classes||[]).forEach(cls=>{
-      const n=cls.expected_count;
-      const w=n!=null?Math.round((n/maxCount)*100):0;
-      const label=n!=null?n+' cadets':'Not set';
-      const color=n!=null?'var(--royal)':'var(--muted)'; /* DES-H04: --lgrey 2.0:1 fails; --muted passes */
-      html+=`<div style="display:flex;align-items:center;gap:8px;padding:3px 0 3px 16px" role="img" aria-label="${esc(cls.display_name)}: ${label}">
-        <div style="font-size:var(--fs-xs);color:var(--text-2);min-width:114px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cls.display_name)}</div>
-        <div style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${color};border-radius:3px"></div></div></div>
-        <div style="min-width:64px;text-align:right;font-size:var(--fs-xs);color:${color}">${n!=null?n:'—'}</div>
-      </div>`;
-    });
-  });
-  return html;
 }
 
 // Stacked vertical bar — chart.data rows have per-series keys; chart.series=[{key,label,color}]
@@ -10348,25 +10304,40 @@ async function _bulkApplyConfirm(){
 // Creates the night and its time structure only.
 // Sessions are planned into periods separately (one period can hold many concurrent sessions).
 
+function _pnUpdateTplPreview(){
+  const el=document.getElementById('pn-tpl-preview');
+  if(!el)return;
+  const tpl=_effectiveTimingTemplate();
+  if(tpl){
+    const periods=(tpl.blocks||[]).filter(b=>b.is_instructional_period).length;
+    el.innerHTML='<b>'+esc(tpl.name||'Timing template')+'</b> is in effect — <b>'+periods+
+      ' training period'+(periods===1?'':'s')+'</b> will be created automatically. '+
+      'You can change the template after opening the night.';
+  }else{
+    el.innerHTML='No timing template is currently in effect. Your unit\'s default session count will be used.';
+  }
+}
+
 function openAddPN(date){
   if(date)document.getElementById('pn-date').value=date;
+  _pnUpdateTplPreview();
   openModal('m-add-pn');
 }
 
-function addPN(){
+async function addPN(){
   const date=document.getElementById('pn-date').value;
   const term=document.getElementById('pn-term').value;
-  const nsess=parseInt(document.getElementById('pn-nsess').value);
   const notes=document.getElementById('pn-notes').value;
   if(!date){showToast('Select a date.',true);return;}
   if(S.pns.find(p=>p.date===date)){showToast('A parade night already exists on this date.',true);return;}
-  api('/api/parade-nights',{method:'POST',body:JSON.stringify({date,term,session_count:nsess,parade_type:notes||'normal'})})
-    .then(async()=>{
-      await reloadAndRender(); closeModal('m-add-pn');
-      document.getElementById('pn-date').value='';document.getElementById('pn-notes').value='';
-      showToast('Parade night created. Open it to plan sessions.');
-    })
-    .catch(e=>showToast(apiErr(e),true));
+  try{
+    await api('/api/parade-nights',{method:'POST',body:JSON.stringify({date,term,parade_type:notes||'normal'})});
+    await reloadAndRender();
+    closeModal('m-add-pn');
+    document.getElementById('pn-date').value='';
+    document.getElementById('pn-notes').value='';
+    showPNDetail(date);
+  }catch(e){showToast(apiErr(e),true);}
 }
 
 // PN DETAIL MODAL
@@ -10762,8 +10733,8 @@ async function _populatePnDetailClasses(pn){
     catch(_){ return; }
   }
   if(!classes.length) return; // no classes configured — leave pickers hidden
-  // Sort by sequence then display_name, same order as the quickEdit picker.
-  classes.sort((a,b)=>(a.sequence||0)-(b.sequence||0)||(a.display_name||'').localeCompare(b.display_name||''));
+  // Sort by class_number then display_name (canonical order — sequence field renamed to class_number in v44).
+  classes.sort((a,b)=>(a.class_number||a.sequence||0)-(b.class_number||b.sequence||0)||(a.display_name||'').localeCompare(b.display_name||''));
   const sessions=pn.sessions||[];
   await Promise.all(sessions.map(async(s,i)=>{
     // Guard: if user closed the modal before audience fetches resolved, bail.
@@ -11294,10 +11265,42 @@ function _wpSyncNightOptions(){
   if(!sel) return;
   const prev=sel.value;
   const nights=_wpNightsInTerm();
-  sel.innerHTML='<option value="">All nights</option>'+nights.map(function(pn){
-    return '<option value="'+esc(pn.date)+'">'+esc(fmtD(pn.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'}))+'</option>';
-  }).join('');
-  if(prev && nights.some(function(n){return n.date===prev;})) sel.value=prev;
+  sel.innerHTML=nights.length
+    ? nights.map(function(pn){
+        return '<option value="'+esc(pn.date)+'">'+esc(fmtD(pn.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'}))+'</option>';
+      }).join('')
+    : '<option value="">No nights this term</option>';
+  if(prev && nights.some(function(n){return n.date===prev;})){
+    sel.value=prev;
+  } else if(nights.length){
+    // Auto-select nearest upcoming night (or last night if all are past).
+    const today=new Date().toISOString().slice(0,10);
+    const upcoming=nights.filter(function(n){return n.date>=today;});
+    sel.value=(upcoming.length ? upcoming[0] : nights[nights.length-1]).date;
+  }
+  _wpUpdateNavBtns();
+}
+function _wpUpdateNavBtns(){
+  const sel=document.getElementById('wp-sel');
+  const prevBtn=document.getElementById('wp-prev');
+  const nextBtn=document.getElementById('wp-next');
+  if(!sel) return;
+  const n=sel.options.length;
+  const i=sel.selectedIndex;
+  if(prevBtn) prevBtn.disabled=(i<=0||n===0);
+  if(nextBtn) nextBtn.disabled=(i<0||i>=n-1||n===0);
+}
+function _wpPrev(){
+  const sel=document.getElementById('wp-sel');
+  if(!sel||sel.selectedIndex<=0) return;
+  sel.selectedIndex--;
+  _wpPaint();
+}
+function _wpNext(){
+  const sel=document.getElementById('wp-sel');
+  if(!sel||sel.selectedIndex>=sel.options.length-1) return;
+  sel.selectedIndex++;
+  _wpPaint();
 }
 function wpTermChanged(){
   const t=document.getElementById('wp-f-term');
@@ -11326,6 +11329,13 @@ function _wpPaint() {
     const term = (document.getElementById('wp-f-term')||{}).value || 'all';
     const oneNight = (document.getElementById('wp-sel')||{}).value || '';
 
+    // Always show exactly one night — no multi-night view.
+    if (!oneNight) {
+        wrap.innerHTML = '<p class="muted p-4">No parade nights for this term. Choose a different term above.</p>';
+        _wpUpdateNavBtns();
+        return;
+    }
+
     // Publish acts on the night being shown, so it only makes sense for one.
     const pubBtn = document.getElementById('wp-publish-btn');
     if (pubBtn) {
@@ -11336,7 +11346,7 @@ function _wpPaint() {
     let html = '', shown = 0;
     for (const pn of _wpData.pns) {
         if (term !== 'all' && pn.term !== term) continue;
-        if (oneNight && pn.date !== oneNight) continue;
+        if (pn.date !== oneNight) continue;
         const sched = _wpFilterSchedule(_wpData.schedByPn[pn.parade_night_id], q, status);
         if (!sched) continue;
         shown++;
@@ -11360,6 +11370,7 @@ function _wpPaint() {
     }
     const today = new Date().toLocaleDateString('en-AU', {day:'2-digit',month:'long',year:'numeric'});
     wrap.innerHTML = html + `<div class="print-footer">Generated ${esc(today)}</div>`;
+    _wpUpdateNavBtns();
 }
 
 // WP-4: the search box and status filter were wired to renderWP(), which never
@@ -16232,87 +16243,142 @@ function renderMissions() {
   const search = (document.getElementById('mission-search').value||'').toLowerCase();
   const classFilter = (document.getElementById('mission-filter-class')||{}).value||'';
   _saveMissionFilters(phase,status,search,classFilter);
+  const classSelectEl = document.getElementById('mission-filter-class');
+  const className = classFilter && classSelectEl
+    ? ((classSelectEl.options[classSelectEl.selectedIndex]||{}).text||'') : '';
   let rows = _missionState.missions.filter(m => {
     if(phase  && m.phase !== phase) return false;
     if(status === 'scheduled'   && !m.is_scheduled) return false;
     if(status === 'unscheduled' && m.is_scheduled)  return false;
     if(search && !m.code.toLowerCase().includes(search) && !m.title.toLowerCase().includes(search)) return false;
-    // MBACK-02: class filter — show only missions where the selected class
-    // is not resolved (either not in class_breakdown at all, or backlog_status !== 'resolved').
     if(classFilter){
-      const bd=(m.class_breakdown||[]).find(c=>c.training_class_id===classFilter);
-      if(bd && bd.backlog_status==='resolved') return false;
+      // Class-focused: show all missions tracked for this class (resolved included, dimmed below)
+      return !!(m.class_breakdown||[]).find(c=>c.training_class_id===classFilter);
     }
     return true;
   });
-  document.getElementById('missions-count').textContent =
-    `${rows.filter(m=>m.is_scheduled).length} of ${rows.length} scheduled`;
-  if(!rows.length) {
+  const canWrite = _canWrite();
+  if(classFilter){
+    // Sort: needs-action → scheduled → resolved
+    const _classPriority = s => s==='unscheduled'||s==='cancelled'||s==='not_delivered'?0:s==='scheduled'?1:s==='resolved'?2:3;
+    rows = rows.slice().sort((a,b)=>{
+      const bdA=(a.class_breakdown||[]).find(c=>c.training_class_id===classFilter);
+      const bdB=(b.class_breakdown||[]).find(c=>c.training_class_id===classFilter);
+      return _classPriority(bdA?bdA.backlog_status:'') - _classPriority(bdB?bdB.backlog_status:'');
+    });
+    // Banner counts
+    let nResolved=0,nScheduled=0,nAction=0;
+    rows.forEach(m=>{
+      const bd=(m.class_breakdown||[]).find(c=>c.training_class_id===classFilter);
+      const s=bd?(bd.backlog_status||'unscheduled'):'unscheduled';
+      if(s==='resolved') nResolved++; else if(s==='scheduled') nScheduled++; else nAction++;
+    });
+    const parts=[];
+    if(nResolved) parts.push(`<span style="color:var(--muted)">${nResolved} resolved</span>`);
+    if(nScheduled) parts.push(`<span style="color:var(--ok)">${nScheduled} scheduled</span>`);
+    if(nAction) parts.push(`<span style="color:var(--red);font-weight:700">${nAction} need action</span>`);
+    document.getElementById('missions-count').innerHTML = parts.join(' · ');
+  } else {
+    document.getElementById('missions-count').textContent =
+      `${rows.filter(m=>m.is_scheduled).length} of ${rows.length} scheduled`;
+  }
+  if(!rows.length){
     body.innerHTML='<p class="muted">No missions match the selected filters.</p>';
     return;
   }
-  const canWrite = _canWrite();
-  // CLASS-06: whether to show the Training Class breakdown column (only when any mission
-  // has class_breakdown data, i.e. Training Classes are configured for this squadron/year).
-  const hasClassData = rows.some(m => (m.class_breakdown||[]).length > 0);
-  body.innerHTML = `<div style="overflow-x:auto"><table class="data-table" style="min-width:${hasClassData?'980px':'900px'}">
-    <thead><tr>
-      <th>Code</th><th>Mission Title</th><th>Level</th><th>Subject</th>
-      <th>Suitability</th><th>Parts</th><th>Rec. Term</th>
-      <th>Scheduled</th><th>Facilitator</th><th>Location</th><th>Status</th>
-      ${hasClassData ? '<th>Training Classes</th>' : ''}
-      ${canWrite ? '<th></th>' : ''}
-    </tr></thead><tbody>` +
-    rows.map(m => {
-      const sched = m.scheduled_sessions[0];
-      const schedDate = sched ? sched.parade_date : '';
-      const schedSess = sched ? `P${sched.session_number}` : '';
-      const facName   = sched ? (sched.facilitator_name||'—') : '';
-      const locName   = sched ? (sched.location_name||'—') : '';
-      const badge = m.is_scheduled
-        ? '<span class="badge badge-green">Scheduled</span>'
-        : '<span class="badge badge-grey">Unscheduled</span>';
-      const extraRows = m.scheduled_sessions.length > 1
-        ? `<br><span class="muted" style="font-size:var(--fs-sm)">+${m.scheduled_sessions.length-1} more</span>`
-        : '';
-      // CLASS-06: compact Training Class status summary.
-      // backlog_status values: scheduled, unscheduled, cancelled, not_delivered, resolved.
-      let classTd = '';
-      if(hasClassData){
-        const bd = m.class_breakdown||[];
-        if(!bd.length){
-          classTd = '<td><span class="muted" style="font-size:var(--fs-sm)">—</span></td>';
-        } else {
-          const needsAction = bd.filter(c=>c.backlog_status==='unscheduled'||c.backlog_status==='cancelled'||c.backlog_status==='not_delivered');
-          const dots = bd.map(c=>{
-            const s=c.backlog_status;
-            const col=s==='scheduled'||s==='resolved'?'var(--ok)':s==='unscheduled'?'var(--muted)':'var(--red)';
-            const sym=s==='scheduled'||s==='resolved'?'✓':s==='unscheduled'?'·':'✗';
-            return `<span title="${esc(c.display_name)}: ${esc(s||'unknown')}" style="color:${col};font-size:var(--fs-xs);font-weight:700;margin-right:2px">${sym}</span>`;
-          }).join('');
-          const summary = needsAction.length
-            ? `<div style="font-size:var(--fs-xs);color:var(--red);font-weight:700">${needsAction.length} class${needsAction.length===1?'':'es'} need action</div>`
-            : '';
-          classTd = `<td style="white-space:nowrap">${dots}${summary}</td>`;
+  if(classFilter){
+    // Class-focused table: 6 columns + optional action
+    body.innerHTML = `<div style="overflow-x:auto"><table class="data-table" style="min-width:680px">
+      <thead><tr>
+        <th>Code</th><th>Mission Title</th><th>Level</th><th>Rec. Term</th>
+        <th>Class Status</th><th>Scheduled</th>
+        ${canWrite?'<th></th>':''}
+      </tr></thead><tbody>`+
+      rows.map(m=>{
+        const bd=(m.class_breakdown||[]).find(c=>c.training_class_id===classFilter);
+        const classStatus=bd?(bd.backlog_status||'unscheduled'):'unscheduled';
+        const isNeedsAction=classStatus==='unscheduled'||classStatus==='cancelled'||classStatus==='not_delivered';
+        const isResolved=classStatus==='resolved';
+        const rowStyle=isResolved?'opacity:0.45':'';
+        const statusBadge=classStatus==='resolved'
+          ?'<span class="badge badge-green">Resolved</span>'
+          :classStatus==='scheduled'
+          ?'<span class="badge badge-green">Scheduled</span>'
+          :classStatus==='cancelled'
+          ?'<span class="badge" style="background:var(--warn-bg);color:var(--warn)">Cancelled</span>'
+          :classStatus==='not_delivered'
+          ?'<span class="badge" style="background:#fee2e2;color:var(--red)">Not Delivered</span>'
+          :'<span class="badge badge-grey">Unscheduled</span>';
+        const sched=m.scheduled_sessions[0];
+        const schedDate=sched?sched.parade_date:'';
+        const schedSess=sched?`P${sched.session_number}`:'';
+        const extraRows=m.scheduled_sessions.length>1
+          ?`<br><span class="muted" style="font-size:var(--fs-sm)">+${m.scheduled_sessions.length-1} more</span>`:'';
+        const schedCell=schedDate
+          ?`${esc(schedDate)} ${esc(schedSess)}${extraRows}<br><button class="btn-xs btn-out no-print" style="font-size:var(--fs-3xs);margin-top:3px;padding:1px 5px" onclick="navToScheduledPN('${esc(schedDate)}')" title="Go to this parade night">↗ View PN</button>`
+          :'<span class="muted">—</span>';
+        return `<tr style="${rowStyle}">
+          <td><code>${esc(m.code)}</code></td>
+          <td>${esc(m.title)}</td>
+          <td><span class="muted" style="font-size:var(--fs-base)">${esc(_phaseShort(m.phase))}</span></td>
+          <td>${esc(m.recommended_term||'')}</td>
+          <td>${statusBadge}</td>
+          <td>${schedCell}</td>
+          ${canWrite?`<td>${isNeedsAction?`<button class="btn-xs" onclick="openAssignModal('${esc(m.curriculum_id)}','${_jsAttr(m.title)}','${_jsAttr(m.code)}',${m.part_count||1})">Assign</button>`:'</td>'}`:''}
+        </tr>`;
+      }).join('')+
+      `</tbody></table></div>`;
+  } else {
+    // Flat view: 8 columns (Suitability + Parts removed), class summary as text
+    const hasClassData=rows.some(m=>(m.class_breakdown||[]).length>0);
+    body.innerHTML=`<div style="overflow-x:auto"><table class="data-table" style="min-width:${hasClassData?'860px':'760px'}">
+      <thead><tr>
+        <th>Code</th><th>Mission Title</th><th>Level</th><th>Subject</th>
+        <th>Rec. Term</th><th>Scheduled</th><th>Facilitator</th><th>Status</th>
+        ${hasClassData?'<th>Training Classes</th>':''}
+        ${canWrite?'<th></th>':''}
+      </tr></thead><tbody>`+
+      rows.map(m=>{
+        const sched=m.scheduled_sessions[0];
+        const schedDate=sched?sched.parade_date:'';
+        const schedSess=sched?`P${sched.session_number}`:'';
+        const facName=sched?(sched.facilitator_name||'—'):'—';
+        const extraRows=m.scheduled_sessions.length>1
+          ?`<br><span class="muted" style="font-size:var(--fs-sm)">+${m.scheduled_sessions.length-1} more</span>`:'';
+        const badge=m.is_scheduled
+          ?'<span class="badge badge-green">Scheduled</span>'
+          :'<span class="badge badge-grey">Unscheduled</span>';
+        let classTd='';
+        if(hasClassData){
+          const bd=m.class_breakdown||[];
+          if(!bd.length){
+            classTd='<td><span class="muted" style="font-size:var(--fs-sm)">—</span></td>';
+          } else {
+            const needsAction=bd.filter(c=>c.backlog_status==='unscheduled'||c.backlog_status==='cancelled'||c.backlog_status==='not_delivered');
+            const allResolved=bd.every(c=>c.backlog_status==='resolved'||c.backlog_status==='scheduled');
+            const summary=needsAction.length
+              ?`<span style="font-size:var(--fs-xs);color:var(--red);font-weight:700">${needsAction.length} class${needsAction.length===1?'':'es'} need action</span>`
+              :allResolved
+              ?`<span style="font-size:var(--fs-xs);color:var(--muted)">All on track</span>`
+              :`<span style="font-size:var(--fs-xs);color:var(--ok)">Scheduled</span>`;
+            classTd=`<td>${summary}</td>`;
+          }
         }
-      }
-      return `<tr>
-        <td><code>${esc(m.code)}</code></td>
-        <td>${esc(m.title)}</td>
-        <td><span class="muted" style="font-size:var(--fs-base)">${esc(_phaseShort(m.phase))}</span></td>
-        <td>${esc(m.element||'')}</td>
-        <td style="font-size:var(--fs-base)">${esc(m.instructor_suitability||'')}</td>
-        <td style="text-align:center">${m.part_count||1}</td>
-        <td>${esc(m.recommended_term||'')}</td>
-        <td>${esc(schedDate)} ${esc(schedSess)}${extraRows}${schedDate?`<br><button class="btn-xs btn-out no-print" style="font-size:var(--fs-3xs);margin-top:3px;padding:1px 5px" onclick="navToScheduledPN('${esc(schedDate)}')" title="Go to this parade night">↗ View PN</button>`:''}</td>
-        <td style="font-size:var(--fs-base)">${esc(facName)}</td>
-        <td style="font-size:var(--fs-base)">${esc(locName)}</td>
-        <td>${badge}</td>
-        ${classTd}
-        ${canWrite ? `<td><button class="btn-xs" onclick="openAssignModal('${esc(m.curriculum_id)}','${_jsAttr(m.title)}','${_jsAttr(m.code)}',${m.part_count||1})">Assign</button></td>` : ''}
-      </tr>`;
-    }).join('') +
-    `</tbody></table></div>`;
+        return `<tr>
+          <td><code>${esc(m.code)}</code></td>
+          <td>${esc(m.title)}</td>
+          <td><span class="muted" style="font-size:var(--fs-base)">${esc(_phaseShort(m.phase))}</span></td>
+          <td>${esc(m.element||'')}</td>
+          <td>${esc(m.recommended_term||'')}</td>
+          <td>${esc(schedDate)} ${esc(schedSess)}${extraRows}${schedDate?`<br><button class="btn-xs btn-out no-print" style="font-size:var(--fs-3xs);margin-top:3px;padding:1px 5px" onclick="navToScheduledPN('${esc(schedDate)}')" title="Go to this parade night">↗ View PN</button>`:''}</td>
+          <td style="font-size:var(--fs-base)">${esc(facName)}</td>
+          <td>${badge}</td>
+          ${classTd}
+          ${canWrite?`<td><button class="btn-xs" onclick="openAssignModal('${esc(m.curriculum_id)}','${_jsAttr(m.title)}','${_jsAttr(m.code)}',${m.part_count||1})">Assign</button></td>`:''}
+        </tr>`;
+      }).join('')+
+      `</tbody></table></div>`;
+  }
 }
 
 // MBACK-06: per-class delivery summary export — pivots loaded mission data
@@ -16935,62 +17001,82 @@ function _tcCoveragePill(pct){
 async function _renderTrainingClasses(yearId){
   const el=document.getElementById('py-classes-body'); if(!el) return;
   const showArchived=(document.getElementById('tc-show-archived')||{}).checked;
+  // Canonical labels and sort order for auto-created classes (training_stage_id=null, stage_code set)
+  const _CODE_LABEL={ORI:'Orientation',INI:'Initial',JNR:'Junior',INT:'Intermediate',SNR:'Senior'};
+  const _CODE_ORDER={ORI:1,INI:2,JNR:3,INT:4,SNR:5};
   try{
     const rows=await api(`/api/training-classes?training_year_id=${encodeURIComponent(yearId)}${showArchived?'&include_archived=true':''}`);
     _tcById={};
     rows.forEach(c=>{ _tcById[c.training_class_id]=c; });
     if(!rows.length){ el.innerHTML=`<p class="muted">No ${showArchived?'archived ':''}Training Classes${showArchived?'':' set up for this year yet'}.</p>`; return; }
-    // Group by Training Stage so parallel classes of the same Stage sit together --
-    // addendum's own "group by stage" guidance for exactly this kind of list.
-    const byStage={};
-    rows.forEach(c=>{ (byStage[c.training_stage_id]=byStage[c.training_stage_id]||[]).push(c); });
+    // Group by effective stage key. Auto-created classes have training_stage_id=null
+    // but a stage_code ("ORI","INI","JNR","INT","SNR"); use "__CODE__" prefix to
+    // distinguish from real UUIDs and keep them out of the progress-API calls below.
+    const byGroup={};
+    rows.forEach(c=>{
+      const key=c.training_stage_id||('__'+(c.stage_code||'NONE')+'__');
+      (byGroup[key]=byGroup[key]||[]).push(c);
+    });
     const canWrite=canWriteSquadron();
     const sqnId=S.currentSqnId||(S.session&&S.session.squadron_id);
-    // CLASS-04 dedicated UI: one call per Stage group (not per Class) via
-    // the existing stage-level aggregate endpoint gives every class's own
-    // coverage_pct in a single round trip, reusing CLASS-04/07's own
-    // _class_curriculum_progress computation rather than a new one. Skipped
-    // entirely in the archived view -- progress on an archived class isn't
-    // actionable here, and it's the one extra round trip Restore doesn't need.
-    const stageIds=Object.keys(byStage);
-    const progressByStage={};
-    if(sqnId && !showArchived){
-      await Promise.all(stageIds.map(async sid=>{
-        try{ progressByStage[sid]=await api(`/api/curriculum/phases/${sid}/class-progress?squadron_id=${encodeURIComponent(sqnId)}`); }
-        catch(_){ progressByStage[sid]=null; }
+    // CLASS-04: fetch stage-level progress only for groups with a real stage ID.
+    const progressByGroup={};
+    const realStageIds=Object.keys(byGroup).filter(k=>!k.startsWith('__'));
+    if(sqnId&&!showArchived){
+      await Promise.all(realStageIds.map(async sid=>{
+        try{ progressByGroup[sid]=await api(`/api/curriculum/phases/${sid}/class-progress?squadron_id=${encodeURIComponent(sqnId)}`); }
+        catch(_){ progressByGroup[sid]=null; }
       }));
     }
-    let html='';
-    Object.entries(byStage).forEach(([sid,classes])=>{
-      const stageProgress=progressByStage[sid];
-      const pctByClass={};
-      (stageProgress&&stageProgress.classes||[]).forEach(cp=>{ pctByClass[cp.training_class_id]=cp.coverage_pct; });
-      // CLASS-10: Split/Merge are only offered on active classes with at
-      // least one sibling class in the same Stage to merge into -- merge's
-      // target picker has nothing to offer otherwise.
-      const hasMergeTarget=c=>classes.some(o=>o.training_class_id!==c.training_class_id);
-      const actionsCell=c=>{
-        if(c.is_archived) return canWrite?`<button class="btn-xs btn-ok" onclick="doRestoreTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Restore</button>`:'';
-        let out=`<button class="btn-xs" onclick="openTrainingClassProgressModal('${esc(c.training_class_id)}')" style="margin-right:4px">View Progress</button>`;
-        if(canWrite){
-          out+=`<button class="btn-xs" onclick="openEditTrainingClassModal('${esc(c.training_class_id)}')" style="margin-right:4px">Edit</button>`;
-          out+=`<button class="btn-xs" onclick="openSplitTrainingClassModal('${esc(c.training_class_id)}')" style="margin-right:4px">Split</button>`;
-          if(hasMergeTarget(c)) out+=`<button class="btn-xs" onclick="openMergeTrainingClassModal('${esc(c.training_class_id)}')" style="margin-right:4px">Merge into…</button>`;
-          out+=`<button class="btn-xs btn-danger" onclick="archiveTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Archive</button>`;
-        }
-        return out;
-      };
-      html+=`<table class="data-table" style="margin-bottom:10px"><thead><tr><th>Class</th><th>Stage</th><th>Order</th><th>Expected</th>${showArchived?'':'<th>Curriculum Progress</th>'}<th></th></tr></thead><tbody>`+
-        classes.sort((a,b)=>(a.sequence||0)-(b.sequence||0)).map(c=>`<tr${c.is_archived?' style="opacity:.6"':''}>
+    // Sort groups: real stages by first class's class_number, code groups by canonical order, ungrouped last.
+    const groupKeys=Object.keys(byGroup).sort((a,b)=>{
+      const oA=a.startsWith('__')?(a==='__NONE__'?9999:(_CODE_ORDER[a.slice(2,-2)]||999)):(byGroup[a][0].class_number||0);
+      const oB=b.startsWith('__')?(b==='__NONE__'?9999:(_CODE_ORDER[b.slice(2,-2)]||999)):(byGroup[b][0].class_number||0);
+      return oA-oB;
+    });
+    const stageName=k=>{
+      if(!k.startsWith('__')) return (progressByGroup[k]&&progressByGroup[k].stage_name)||'Stage';
+      const code=k.slice(2,-2);
+      return code==='NONE'?'No Stage':(_CODE_LABEL[code]||code);
+    };
+    // Build per-class coverage map from stage progress responses
+    const pctByClass={};
+    Object.values(progressByGroup).forEach(sp=>{
+      if(sp&&sp.classes) sp.classes.forEach(cp=>{ pctByClass[cp.training_class_id]=cp.coverage_pct; });
+    });
+    const hasMergeTarget=(c,grp)=>grp.some(o=>o.training_class_id!==c.training_class_id);
+    const overflowMenu=(c,grp)=>{
+      if(c.is_archived) return canWrite?`<button class="btn btn-xs btn-ok" onclick="doRestoreTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Restore</button>`:'';
+      const tid=esc(c.training_class_id), yid=esc(yearId);
+      let items=`<button class="btn btn-xs" onclick="openSplitTrainingClassModal('${tid}')">Split</button>`;
+      if(hasMergeTarget(c,grp)) items+=`<button class="btn btn-xs" onclick="openMergeTrainingClassModal('${tid}')">Merge into…</button>`;
+      if(canWrite) items+=`<hr><button class="btn btn-xs btn-danger" onclick="archiveTrainingClass('${tid}','${yid}')">Archive</button>`;
+      return `<details class="tc-overflow"><summary title="More actions">⋮</summary><div class="tc-overflow-menu">${items}</div></details>`;
+    };
+    const cols=showArchived?4:5;
+    let html=`<table class="data-table"><thead><tr><th>Class</th><th>Code</th><th style="text-align:right">Expected</th>${showArchived?'':'<th>Progress</th>'}<th></th></tr></thead><tbody>`;
+    groupKeys.forEach(key=>{
+      const grp=byGroup[key];
+      const label=stageName(key);
+      const spct=(!showArchived&&!key.startsWith('__')&&progressByGroup[key])
+        ?progressByGroup[key].coverage_pct:null;
+      html+=`<tr class="tc-stage-header"><td colspan="${cols}"><span class="tc-stage-label">${esc(label)}</span>${spct!=null?' '+_tcCoveragePill(spct):''}</td></tr>`;
+      grp.sort((a,b)=>(a.class_number||0)-(b.class_number||0)).forEach(c=>{
+        const tid=esc(c.training_class_id);
+        html+=`<tr${c.is_archived?' class="tc-archived"':''}>
           <td>${esc(c.display_name)}${c.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
           <td>${c.stage_code?`<span class="badge">${esc(c.stage_code)}</span>`:'<span class="muted">—</span>'}</td>
-          <td>${c.sequence||0}</td>
-          <td>${c.expected_count!=null?esc(String(c.expected_count)):'—'}</td>
+          <td style="text-align:right">${c.expected_count!=null?esc(String(c.expected_count)):'—'}</td>
           ${showArchived?'':`<td>${_tcCoveragePill(pctByClass[c.training_class_id])}</td>`}
-          <td style="white-space:nowrap">${actionsCell(c)}</td>
-        </tr>`).join('')+
-        `</tbody></table>`;
+          <td style="white-space:nowrap;text-align:right">
+            ${!c.is_archived?`<button class="btn btn-xs" onclick="openTrainingClassProgressModal('${tid}')" style="margin-right:4px">Progress</button>`:''}
+            ${!c.is_archived&&canWrite?`<button class="btn btn-xs" onclick="openEditTrainingClassModal('${tid}')" style="margin-right:4px">Edit</button>`:''}
+            ${overflowMenu(c,grp)}
+          </td>
+        </tr>`;
+      });
     });
+    html+=`</tbody></table>`;
     el.innerHTML=html;
   } catch(e){ el.innerHTML='<p class="muted">Could not load Training Classes. Refresh the page to try again.</p>'; }
 }

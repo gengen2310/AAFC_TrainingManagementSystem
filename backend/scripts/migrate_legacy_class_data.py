@@ -176,10 +176,18 @@ def _find_or_create_class(
             "training_year_id": training_year_id, "stage": stage.display_name, "would_create": True,
         })
         return placeholder_id
+    existing_nums = {r.class_number for r in db.query(TrainingClass.class_number).filter(
+        TrainingClass.squadron_id == squadron_id,
+        TrainingClass.training_year_id == training_year_id,
+        TrainingClass.is_archived == False,  # noqa: E712
+    ).all()}
+    n = 1
+    while n in existing_nums:
+        n += 1
     new_class = TrainingClass(
         squadron_id=squadron_id, training_year_id=training_year_id, training_stage_id=stage.id,
         display_name=stage.display_name.split(". ", 1)[-1] if ". " in stage.display_name else stage.display_name,
-        sequence=1, created_by=MIGRATION_TAG, updated_by=MIGRATION_TAG,
+        class_number=n, created_by=MIGRATION_TAG, updated_by=MIGRATION_TAG,
     )
     db.add(new_class)
     db.flush()

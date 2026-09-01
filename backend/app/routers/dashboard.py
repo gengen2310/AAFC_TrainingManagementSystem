@@ -468,7 +468,7 @@ def _class_curriculum_progress_summary(db: DBSession, sq_id: str) -> dict:
     per addendum §44."""
     classes = db.query(TrainingClass).filter(
         TrainingClass.squadron_id == sq_id, TrainingClass.is_archived == False,  # noqa: E712
-    ).order_by(TrainingClass.sequence, TrainingClass.display_name).all()
+    ).order_by(TrainingClass.class_number, TrainingClass.display_name).all()
 
     stages: dict[str, dict] = {}
     for c in classes:
@@ -482,7 +482,9 @@ def _class_curriculum_progress_summary(db: DBSession, sq_id: str) -> dict:
         })
         delivered, total = prog["summary"]["delivered"], prog["summary"]["total"]
         entry["classes"].append({
-            "training_class_id": c.id, "display_name": c.display_name,
+            "training_class_id": c.id,
+            "display_name": c.display_name,
+            "class_number": c.class_number,
             "delivered": delivered, "total": total,
             "coverage_pct": round(100 * delivered / total) if total else None,
         })
@@ -550,7 +552,7 @@ def _class_enrollment_distribution(db: DBSession, sq_id: str) -> dict:
     classes = db.query(TrainingClass).filter(
         TrainingClass.squadron_id == sq_id,
         TrainingClass.is_archived == False,  # noqa: E712
-    ).order_by(TrainingClass.sequence, TrainingClass.display_name).all()
+    ).order_by(TrainingClass.class_number, TrainingClass.display_name).all()
 
     if not classes:
         return {

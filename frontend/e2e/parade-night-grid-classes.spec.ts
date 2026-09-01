@@ -118,9 +118,10 @@ test("Planning Workspace Night view grid cell shows a session's real Training Cl
     const cell = page.locator(".pn-cell-classes", { hasText: className });
     await expect(cell).toBeVisible({ timeout: 10000 });
   } finally {
-    // Clean up -- archive the class and deactivate the year so nothing
+    // Clean up -- archive the class + phase and deactivate the year so nothing
     // lingers as an active PlanningYear for a future test run.
     await page.request.delete(`${API_BASE}/api/training-classes/${classId}`, { headers: hdr });
+    await page.request.post(`${API_BASE}/api/curriculum/phases/${stageId}/archive`, { headers: hdr });
     const curYearRes = await page.request.get(`${API_BASE}/api/planning/years/${yearId}`, { headers: hdr });
     const curYear = await curYearRes.json();
     await page.request.patch(`${API_BASE}/api/planning/years/${yearId}`, {

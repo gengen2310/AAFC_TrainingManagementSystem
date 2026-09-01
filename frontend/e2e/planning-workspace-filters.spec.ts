@@ -76,6 +76,7 @@ async function buildFixture(page: Page, hdr: Record<string, string>, testYear: n
 
   async function cleanup() {
     await page.request.delete(`${API_BASE}/api/training-classes/${classId}`, { headers: hdr });
+    await page.request.post(`${API_BASE}/api/curriculum/phases/${stageId}/archive`, { headers: hdr });
     const yr = await (await page.request.get(`${API_BASE}/api/planning/years/${yearId}`, { headers: hdr })).json();
     await page.request.patch(`${API_BASE}/api/planning/years/${yearId}`, {
       data: { active_status: false, version: yr.version }, headers: hdr,
@@ -293,6 +294,8 @@ test("CLASS-22: stage focus — clicking a stage chip dims sessions from other s
   } finally {
     await page.request.delete(`${API_BASE}/api/training-classes/${classAId}`, { headers: hdr });
     await page.request.delete(`${API_BASE}/api/training-classes/${classBId}`, { headers: hdr });
+    await page.request.post(`${API_BASE}/api/curriculum/phases/${stageAId}/archive`, { headers: hdr });
+    await page.request.post(`${API_BASE}/api/curriculum/phases/${stageBId}/archive`, { headers: hdr });
     const yr = await (await page.request.get(`${API_BASE}/api/planning/years/${yearId}`, { headers: hdr })).json();
     await page.request.patch(`${API_BASE}/api/planning/years/${yearId}`, {
       data: { active_status: false, version: yr.version }, headers: hdr,

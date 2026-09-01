@@ -31,10 +31,10 @@ def _senior_stage_id(client, hdr):
     return senior["phase_id"]
 
 
-def _make_class(client, hdr, year_id, stage_id, name, sequence=0):
+def _make_class(client, hdr, year_id, stage_id, name, class_number=None):
     r = client.post("/api/training-classes", json={
         "training_year_id": year_id, "training_stage_id": stage_id,
-        "display_name": name, "sequence": sequence,
+        "display_name": name, "class_number": class_number,
     }, headers=hdr)
     assert r.status_code == 200, r.text
     return r.json()["training_class_id"]

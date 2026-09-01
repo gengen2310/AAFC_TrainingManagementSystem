@@ -11,8 +11,42 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 
+// IDs of resources created during this run — cleaned up in afterAll.
+const _createdPnIds: string[] = [];
+const _createdClassIds: string[] = [];
+const _createdItemIds: string[] = [];
+const _createdPhaseIds: string[] = [];
+
 test.beforeAll(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
+});
+
+test.afterAll(async ({ request }) => {
+  const base = process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000";
+  const lookup = await request.post(`${base}/api/auth/lookup`, {
+    data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
+  });
+  if (!lookup.ok()) return;
+  const userId = (await lookup.json()).user_id as string;
+  const loginRes = await request.post(`${base}/api/auth/login`, {
+    data: { code: "ADMIN703", user_id: userId },
+  });
+  if (!loginRes.ok()) return;
+  const body = await loginRes.json();
+  const auth = { Authorization: `Bearer ${body.token || body.access_token}` };
+
+  for (const pnId of _createdPnIds) {
+    await request.delete(`${base}/api/parade-nights/${pnId}`, { headers: auth });
+  }
+  for (const classId of _createdClassIds) {
+    await request.delete(`${base}/api/training-classes/${classId}`, { headers: auth });
+  }
+  for (const itemId of _createdItemIds) {
+    await request.delete(`${base}/api/curriculum/${itemId}`, { headers: auth });
+  }
+  for (const phaseId of _createdPhaseIds) {
+    await request.post(`${base}/api/curriculum/phases/${phaseId}/archive`, { headers: auth });
+  }
 });
 
 // A pure Date.now()-derived offset (the pattern used elsewhere in this
@@ -82,6 +116,7 @@ async function seedHalfDeliveredClass(page: Page, token: string, yearId: string,
   });
   expect(stageRes.ok()).toBe(true);
   const stageId = (await stageRes.json()).phase_id as string;
+  _createdPhaseIds.push(stageId);
 
   const className = `CLASS-04 UI Test Class ${suffix}`;
   const classRes = await page.request.post(`${base}/api/training-classes`, {
@@ -90,6 +125,7 @@ async function seedHalfDeliveredClass(page: Page, token: string, yearId: string,
   });
   expect(classRes.ok()).toBe(true);
   const classId = (await classRes.json()).training_class_id as string;
+  _createdClassIds.push(classId);
 
   const item1Res = await page.request.post(`${base}/api/curriculum`, {
     data: { code: `C04A${suffix.slice(-5)}`, title: "Delivered Item", phase: stageName,
@@ -98,6 +134,7 @@ async function seedHalfDeliveredClass(page: Page, token: string, yearId: string,
   });
   expect(item1Res.ok()).toBe(true);
   const item1Id = (await item1Res.json()).curriculum_id as string;
+  _createdItemIds.push(item1Id);
 
   const item2Res = await page.request.post(`${base}/api/curriculum`, {
     data: { code: `C04B${suffix.slice(-5)}`, title: "Not Started Item", phase: stageName,
@@ -105,6 +142,8 @@ async function seedHalfDeliveredClass(page: Page, token: string, yearId: string,
     headers: auth,
   });
   expect(item2Res.ok()).toBe(true);
+  const item2Id = (await item2Res.json()).curriculum_id as string;
+  _createdItemIds.push(item2Id);
   const item2Title = "Not Started Item"; // POST /api/curriculum doesn't echo the title back
 
   const dayOffset = (_dayCounter++) * 5 + (Date.now() % 3000);
@@ -115,6 +154,7 @@ async function seedHalfDeliveredClass(page: Page, token: string, yearId: string,
   });
   expect(pnRes.ok()).toBe(true);
   const pnId = (await pnRes.json()).parade_night_id as string;
+  _createdPnIds.push(pnId);
 
   const sessRes = await page.request.post(`${base}/api/sessions`, {
     data: { parade_night_id: pnId, period_number: 1, cadet_group: "senior", curriculum_item_id: item1Id },

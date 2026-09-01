@@ -80,4 +80,9 @@ test("Weekly Program (/weekly-program) shows a session's real Training Class in 
 
   const row = page.locator("table tr").filter({ hasText: className });
   await expect(row).toBeVisible({ timeout: 8000 });
+
+  // Cleanup — archive parade night (also archives its sessions), class, phase.
+  await page.request.delete(`${API_BASE}/api/parade-nights/${pnId}`, { headers: hdr });
+  await page.request.delete(`${API_BASE}/api/training-classes/${classId}`, { headers: hdr });
+  await page.request.post(`${API_BASE}/api/curriculum/phases/${stageId}/archive`, { headers: hdr });
 });

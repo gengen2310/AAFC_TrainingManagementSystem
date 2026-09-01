@@ -631,7 +631,7 @@ def copy_setup(body: CopySetupIn, db: DBSession = Depends(get_db),
                 id=str(uuid.uuid4()), squadron_id=c.squadron_id,
                 training_year_id=target.id, training_stage_id=c.training_stage_id,
                 stage_code=c.stage_code, display_name=c.display_name,
-                sequence=c.sequence, expected_count=c.expected_count,
+                class_number=c.class_number, expected_count=c.expected_count,
                 created_at=utcnow(), updated_at=utcnow()))
             classes_copied += 1
 
@@ -743,7 +743,7 @@ def create_planning_year(
                 training_stage_id=None,
                 stage_code=code,
                 display_name=name,
-                sequence=seq,
+                class_number=seq,
                 start_date=start,
                 end_date=None,
                 created_at=utcnow(),
@@ -3063,7 +3063,7 @@ def get_command_centre(
             TrainingClass.training_year_id == py.id,
             TrainingClass.is_archived == False,  # noqa: E712
         )
-        .order_by(TrainingClass.sequence, TrainingClass.display_name)
+        .order_by(TrainingClass.class_number, TrainingClass.display_name)
         .all()
     )
     active_classes = [tc for tc, _phase in active_class_rows]
@@ -3203,7 +3203,7 @@ def get_class_forecasts(
     classes = db.query(TrainingClass).filter(
         TrainingClass.training_year_id == year_id,
         TrainingClass.is_archived == False,  # noqa: E712
-    ).order_by(TrainingClass.sequence, TrainingClass.display_name).all()
+    ).order_by(TrainingClass.class_number, TrainingClass.display_name).all()
 
     if not classes:
         return []
@@ -3451,7 +3451,7 @@ def list_missions(
             db.query(TrainingClass, CurriculumPhase)
             .join(CurriculumPhase, TrainingClass.training_stage_id == CurriculumPhase.id)
             .filter(TrainingClass.squadron_id == py.unit_id, TrainingClass.is_archived == False)  # noqa: E712
-            .order_by(TrainingClass.sequence, TrainingClass.display_name)
+            .order_by(TrainingClass.class_number, TrainingClass.display_name)
             .all()
         )
         for tc, stage in class_rows:
@@ -4107,7 +4107,7 @@ def rollover_year(
             db.add(TrainingClass(
                 squadron_id=oc.squadron_id, training_year_id=new_py.id,
                 training_stage_id=oc.training_stage_id, display_name=oc.display_name,
-                sequence=oc.sequence, expected_count=oc.expected_count, notes=oc.notes,
+                class_number=oc.class_number, expected_count=oc.expected_count, notes=oc.notes,
                 # start_date/end_date are deliberately NOT copied -- they're
                 # specific calendar dates within the source year's own
                 # season and would be wrong (stale) in the new year, unlike

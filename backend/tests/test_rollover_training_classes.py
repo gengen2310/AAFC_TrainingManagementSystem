@@ -63,8 +63,8 @@ def test_rollover_copies_active_training_classes_by_default(client):
     py = _make_year(client, hdr, 2660, "CLASS-11 Rollover Source A")
     year_id = py["planning_year_id"]
     stage_id = _make_stage(client, hdr, py["unit_id"])
-    _make_class(client, hdr, year_id, stage_id, "Senior 1", sequence=1, expected_count=12, notes="Test note")
-    _make_class(client, hdr, year_id, stage_id, "Senior 2", sequence=2)
+    _make_class(client, hdr, year_id, stage_id, "Senior 1", expected_count=12, notes="Test note")
+    _make_class(client, hdr, year_id, stage_id, "Senior 2")
 
     r = client.post(f"/api/planning/years/{year_id}/rollover", json={}, headers=hdr)
     assert r.status_code == 200, r.text
@@ -80,7 +80,7 @@ def test_rollover_copies_active_training_classes_by_default(client):
 
     s1 = next(c for c in new_classes if c["display_name"] == "Senior 1")
     assert s1["training_stage_id"] == stage_id
-    assert s1["sequence"] == 1
+    assert s1["class_number"] == 6  # auto-assigned after ORI=1..SNR=5
     assert s1["expected_count"] == 12
     assert s1["notes"] == "Test note"
     # start_date/end_date are deliberately not carried over -- they're
@@ -152,11 +152,12 @@ def test_copied_training_class_is_independently_editable(client):
     assert r.status_code == 200, r.text
     new_year_id = r.json()["new_planning_year_id"]
 
-    new_class = _get_classes(client, hdr, new_year_id)[0]
+    new_class = next(c for c in _get_classes(client, hdr, new_year_id) if c["display_name"] == "Original Name")
     edit = client.patch(f"/api/training-classes/{new_class['training_class_id']}", json={
         "display_name": "Renamed In New Year", "client_version": new_class["version"],
     }, headers=hdr)
     assert edit.status_code == 200, edit.text
 
     old_classes = _get_classes(client, hdr, year_id)
-    assert old_classes[0]["display_name"] == "Original Name"
+    orig = next(c for c in old_classes if c["display_name"] == "Original Name")
+    assert orig["display_name"] == "Original Name"

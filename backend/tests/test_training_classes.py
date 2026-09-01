@@ -50,7 +50,6 @@ def test_sqn_admin_can_create_training_class(client):
         "training_year_id": year["planning_year_id"],
         "training_stage_id": stage_id,
         "display_name": "Senior 1",
-        "sequence": 1,
     }, headers=hdr)
     assert r.status_code == 200, r.text
     cid = r.json()["training_class_id"]
@@ -79,7 +78,6 @@ def test_five_parallel_senior_classes_are_independent(client):
             "training_year_id": year["planning_year_id"],
             "training_stage_id": stage_id,
             "display_name": f"Senior {i}",
-            "sequence": i,
         }, headers=hdr)
         assert r.status_code == 200, r.text
         created_ids.append(r.json()["training_class_id"])

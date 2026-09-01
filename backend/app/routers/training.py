@@ -2104,7 +2104,7 @@ def _training_class_dict(c: TrainingClass) -> dict:
         "training_stage_id": c.training_stage_id,
         "stage_code": c.stage_code,
         "display_name": c.display_name,
-        "sequence": c.sequence,
+        "class_number": c.class_number,
         "start_date": c.start_date,
         "end_date": c.end_date,
         "expected_count": c.expected_count,
@@ -2141,7 +2141,7 @@ class TrainingClassIn(BaseModel):
     training_stage_id: str
     display_name: str = Field(max_length=80)
     stage_code: str | None = None  # ORI|INI|JNR|INT|SNR
-    sequence: int = 0
+    class_number: int | None = None  # None = auto-assign next available
     start_date: str | None = None
     end_date: str | None = None
     expected_count: int | None = None
@@ -2152,7 +2152,7 @@ class TrainingClassUpdateIn(BaseModel):
     display_name: str | None = Field(default=None, max_length=80)
     training_stage_id: str | None = None
     stage_code: str | None = None  # ORI|INI|JNR|INT|SNR
-    sequence: int | None = None
+    class_number: int | None = None
     start_date: str | None = None
     end_date: str | None = None
     expected_count: int | None = None
@@ -2172,7 +2172,7 @@ def list_training_classes(squadron_id: str | None = None, training_year_id: str 
         q = q.filter(TrainingClass.training_year_id == training_year_id)
     if not include_archived:
         q = q.filter(TrainingClass.is_archived == False)  # noqa: E712
-    rows = q.order_by(TrainingClass.sequence, TrainingClass.display_name).all()
+    rows = q.order_by(TrainingClass.class_number, TrainingClass.display_name).all()
     return [_training_class_dict(c) for c in rows]
 
 
@@ -2193,11 +2193,38 @@ def create_training_class(body: TrainingClassIn, db: DBSession = Depends(get_db)
     if body.stage_code and body.stage_code not in STAGE_CODES:
         raise HTTPException(400, detail={"error": "invalid_stage_code",
                                          "valid": sorted(STAGE_CODES)})
+    # Auto-assign next available class_number if not provided
+    if body.class_number is None:
+        existing_numbers = {
+            r.class_number for r in
+            db.query(TrainingClass.class_number)
+            .filter(
+                TrainingClass.squadron_id == s.id,
+                TrainingClass.training_year_id == body.training_year_id,
+                TrainingClass.is_archived == False,  # noqa: E712
+            ).all()
+        }
+        n = 1
+        while n in existing_numbers:
+            n += 1
+        assigned_number = n
+    else:
+        assigned_number = body.class_number
+    # Validate uniqueness (archived classes do not block numbering)
+    conflict = db.query(TrainingClass).filter(
+        TrainingClass.squadron_id == s.id,
+        TrainingClass.training_year_id == body.training_year_id,
+        TrainingClass.class_number == assigned_number,
+        TrainingClass.is_archived == False,  # noqa: E712
+    ).first()
+    if conflict:
+        raise HTTPException(400, detail={"error": "class_number_already_in_use",
+                                         "class_number": assigned_number})
     c = TrainingClass(
         squadron_id=s.id, training_year_id=body.training_year_id,
         training_stage_id=body.training_stage_id, display_name=body.display_name,
         stage_code=body.stage_code,
-        sequence=body.sequence, start_date=body.start_date, end_date=body.end_date,
+        class_number=assigned_number, start_date=body.start_date, end_date=body.end_date,
         expected_count=body.expected_count, notes=body.notes,
         created_by=p.user_id, updated_by=p.user_id,
     )
@@ -2226,8 +2253,19 @@ def update_training_class(cid: str, body: TrainingClassUpdateIn, db: DBSession =
         c.stage_code = body.stage_code
     if body.display_name is not None:
         c.display_name = body.display_name
-    if body.sequence is not None:
-        c.sequence = body.sequence
+    if body.class_number is not None:
+        # Validate uniqueness before applying the new number
+        conflict = db.query(TrainingClass).filter(
+            TrainingClass.squadron_id == c.squadron_id,
+            TrainingClass.training_year_id == c.training_year_id,
+            TrainingClass.class_number == body.class_number,
+            TrainingClass.is_archived == False,  # noqa: E712
+            TrainingClass.id != c.id,
+        ).first()
+        if conflict:
+            raise HTTPException(400, detail={"error": "class_number_already_in_use",
+                                             "class_number": body.class_number})
+        c.class_number = body.class_number
     if body.start_date is not None:
         c.start_date = body.start_date
     if body.end_date is not None:
@@ -2524,7 +2562,7 @@ def get_class_matrix(
     classes = db.query(TrainingClass).filter(
         TrainingClass.training_year_id == year_id,
         TrainingClass.is_archived == False,  # noqa: E712
-    ).order_by(TrainingClass.sequence, TrainingClass.display_name).all()
+    ).order_by(TrainingClass.class_number, TrainingClass.display_name).all()
 
     if not classes:
         return {"year_id": year_id, "year": py.year, "classes": [], "stages": []}
@@ -2655,7 +2693,7 @@ def get_stage_class_progress(stage_id: str, squadron_id: str, db: DBSession = De
     classes = db.query(TrainingClass).filter(
         TrainingClass.squadron_id == sq_id, TrainingClass.training_stage_id == stage_id,
         TrainingClass.is_archived == False,  # noqa: E712
-    ).order_by(TrainingClass.sequence, TrainingClass.display_name).all()
+    ).order_by(TrainingClass.class_number, TrainingClass.display_name).all()
 
     per_class = []
     total_delivered = 0

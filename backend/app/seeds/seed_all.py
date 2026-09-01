@@ -488,7 +488,7 @@ def seed_planning_data(db, wing, sqn_by_code):
                                ("SNR", "Senior", 5)]:
         db.add(TrainingClass(
             squadron_id=s703.id, training_year_id=py.id, training_stage_id=None,
-            stage_code=_code, display_name=_name, sequence=_seq,
+            stage_code=_code, display_name=_name, class_number=_seq,
             start_date=f"{py.year}-01-01", end_date=None,
             created_at=now, updated_at=now,
         ))

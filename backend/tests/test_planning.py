@@ -2676,7 +2676,7 @@ def test_class_matrix_structure_with_classes(client):
     # Create a Training Class for this year
     tc_r = client.post("/api/training-classes",
                        json={"training_year_id": year_id, "training_stage_id": stage_id,
-                             "display_name": "Matrix Test Class", "sequence": 1},
+                             "display_name": "Matrix Test Class"},
                        headers=hdr)
     assert tc_r.status_code == 200, tc_r.text
 
@@ -2777,7 +2777,7 @@ def test_class_forecasts_structure_with_class(client):
 
     tc_r = client.post("/api/training-classes",
                        json={"training_year_id": year_id, "training_stage_id": stage_id,
-                             "display_name": "Forecast Test Class", "sequence": 1},
+                             "display_name": "Forecast Test Class"},
                        headers=hdr)
     assert tc_r.status_code == 200, tc_r.text
 
@@ -2785,7 +2785,8 @@ def test_class_forecasts_structure_with_class(client):
     assert r.status_code == 200, r.text
     forecasts = r.json()
     assert len(forecasts) >= 1
-    fc = forecasts[0]
+    fc = next((f for f in forecasts if f.get("class_name") == "Forecast Test Class"), None)
+    assert fc is not None, "Forecast Test Class not found in forecasts"
     for field in ("class_id", "class_name", "remaining_requirements", "planned_requirements",
                   "unplanned_requirements", "remaining_parade_nights", "available_time_blocks",
                   "status", "message"):

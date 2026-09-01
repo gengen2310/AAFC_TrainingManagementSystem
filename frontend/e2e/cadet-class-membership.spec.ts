@@ -73,4 +73,5 @@ test("Cadets page: Manage opens the membership modal, adding a class shows it, e
 
   // Cleanup.
   await page.request.delete(`${API_BASE}/api/training-classes/${classId}`, { headers: hdr });
+  await page.request.post(`${API_BASE}/api/curriculum/phases/${stageId}/archive`, { headers: hdr });
 });
