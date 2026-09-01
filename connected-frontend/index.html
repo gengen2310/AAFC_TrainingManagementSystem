@@ -3646,13 +3646,9 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
       </div>
       <div class="form-row">
-        <div class="ff"><label for="pn-nsess">Training Periods This Night</label>
-          <select id="pn-nsess" aria-label="Number of sessions this night" onchange="buildSlots()">
-            <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option>
-          </select>
-        </div>
-        <div class="ff"><label for="pn-notes">Notes</label><input id="pn-notes" placeholder="e.g. ANZAC prep"></div>
+        <div class="ff"><label for="pn-notes">Notes (optional)</label><input id="pn-notes" placeholder="e.g. ANZAC prep"></div>
       </div>
+      <div id="pn-tpl-preview" style="font-size:var(--fs-xs);color:var(--muted);margin-top:4px;padding:8px 10px;background:var(--surface-2);border-radius:6px;line-height:1.5"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-add-pn')">Cancel</button>
@@ -10251,25 +10247,40 @@ async function _bulkApplyConfirm(){
 // Creates the night and its time structure only.
 // Sessions are planned into periods separately (one period can hold many concurrent sessions).
 
+function _pnUpdateTplPreview(){
+  const el=document.getElementById('pn-tpl-preview');
+  if(!el)return;
+  const tpl=_effectiveTimingTemplate();
+  if(tpl){
+    const periods=(tpl.blocks||[]).filter(b=>b.is_instructional_period).length;
+    el.innerHTML='<b>'+esc(tpl.name||'Timing template')+'</b> is in effect — <b>'+periods+
+      ' training period'+(periods===1?'':'s')+'</b> will be created automatically. '+
+      'You can change the template after opening the night.';
+  }else{
+    el.innerHTML='No timing template is currently in effect. Your unit\'s default session count will be used.';
+  }
+}
+
 function openAddPN(date){
   if(date)document.getElementById('pn-date').value=date;
+  _pnUpdateTplPreview();
   openModal('m-add-pn');
 }
 
-function addPN(){
+async function addPN(){
   const date=document.getElementById('pn-date').value;
   const term=document.getElementById('pn-term').value;
-  const nsess=parseInt(document.getElementById('pn-nsess').value);
   const notes=document.getElementById('pn-notes').value;
   if(!date){showToast('Select a date.',true);return;}
   if(S.pns.find(p=>p.date===date)){showToast('A parade night already exists on this date.',true);return;}
-  api('/api/parade-nights',{method:'POST',body:JSON.stringify({date,term,session_count:nsess,parade_type:notes||'normal'})})
-    .then(async()=>{
-      await reloadAndRender(); closeModal('m-add-pn');
-      document.getElementById('pn-date').value='';document.getElementById('pn-notes').value='';
-      showToast('Parade night created. Open it to plan sessions.');
-    })
-    .catch(e=>showToast(apiErr(e),true));
+  try{
+    await api('/api/parade-nights',{method:'POST',body:JSON.stringify({date,term,parade_type:notes||'normal'})});
+    await reloadAndRender();
+    closeModal('m-add-pn');
+    document.getElementById('pn-date').value='';
+    document.getElementById('pn-notes').value='';
+    showPNDetail(date);
+  }catch(e){showToast(apiErr(e),true);}
 }
 
 // PN DETAIL MODAL
