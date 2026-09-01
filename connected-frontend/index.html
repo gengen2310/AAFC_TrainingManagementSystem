@@ -16155,87 +16155,142 @@ function renderMissions() {
   const search = (document.getElementById('mission-search').value||'').toLowerCase();
   const classFilter = (document.getElementById('mission-filter-class')||{}).value||'';
   _saveMissionFilters(phase,status,search,classFilter);
+  const classSelectEl = document.getElementById('mission-filter-class');
+  const className = classFilter && classSelectEl
+    ? ((classSelectEl.options[classSelectEl.selectedIndex]||{}).text||'') : '';
   let rows = _missionState.missions.filter(m => {
     if(phase  && m.phase !== phase) return false;
     if(status === 'scheduled'   && !m.is_scheduled) return false;
     if(status === 'unscheduled' && m.is_scheduled)  return false;
     if(search && !m.code.toLowerCase().includes(search) && !m.title.toLowerCase().includes(search)) return false;
-    // MBACK-02: class filter — show only missions where the selected class
-    // is not resolved (either not in class_breakdown at all, or backlog_status !== 'resolved').
     if(classFilter){
-      const bd=(m.class_breakdown||[]).find(c=>c.training_class_id===classFilter);
-      if(bd && bd.backlog_status==='resolved') return false;
+      // Class-focused: show all missions tracked for this class (resolved included, dimmed below)
+      return !!(m.class_breakdown||[]).find(c=>c.training_class_id===classFilter);
     }
     return true;
   });
-  document.getElementById('missions-count').textContent =
-    `${rows.filter(m=>m.is_scheduled).length} of ${rows.length} scheduled`;
-  if(!rows.length) {
+  const canWrite = _canWrite();
+  if(classFilter){
+    // Sort: needs-action → scheduled → resolved
+    const _classPriority = s => s==='unscheduled'||s==='cancelled'||s==='not_delivered'?0:s==='scheduled'?1:s==='resolved'?2:3;
+    rows = rows.slice().sort((a,b)=>{
+      const bdA=(a.class_breakdown||[]).find(c=>c.training_class_id===classFilter);
+      const bdB=(b.class_breakdown||[]).find(c=>c.training_class_id===classFilter);
+      return _classPriority(bdA?bdA.backlog_status:'') - _classPriority(bdB?bdB.backlog_status:'');
+    });
+    // Banner counts
+    let nResolved=0,nScheduled=0,nAction=0;
+    rows.forEach(m=>{
+      const bd=(m.class_breakdown||[]).find(c=>c.training_class_id===classFilter);
+      const s=bd?(bd.backlog_status||'unscheduled'):'unscheduled';
+      if(s==='resolved') nResolved++; else if(s==='scheduled') nScheduled++; else nAction++;
+    });
+    const parts=[];
+    if(nResolved) parts.push(`<span style="color:var(--muted)">${nResolved} resolved</span>`);
+    if(nScheduled) parts.push(`<span style="color:var(--ok)">${nScheduled} scheduled</span>`);
+    if(nAction) parts.push(`<span style="color:var(--red);font-weight:700">${nAction} need action</span>`);
+    document.getElementById('missions-count').innerHTML = parts.join(' · ');
+  } else {
+    document.getElementById('missions-count').textContent =
+      `${rows.filter(m=>m.is_scheduled).length} of ${rows.length} scheduled`;
+  }
+  if(!rows.length){
     body.innerHTML='<p class="muted">No missions match the selected filters.</p>';
     return;
   }
-  const canWrite = _canWrite();
-  // CLASS-06: whether to show the Training Class breakdown column (only when any mission
-  // has class_breakdown data, i.e. Training Classes are configured for this squadron/year).
-  const hasClassData = rows.some(m => (m.class_breakdown||[]).length > 0);
-  body.innerHTML = `<div style="overflow-x:auto"><table class="data-table" style="min-width:${hasClassData?'980px':'900px'}">
-    <thead><tr>
-      <th>Code</th><th>Mission Title</th><th>Level</th><th>Subject</th>
-      <th>Suitability</th><th>Parts</th><th>Rec. Term</th>
-      <th>Scheduled</th><th>Facilitator</th><th>Location</th><th>Status</th>
-      ${hasClassData ? '<th>Training Classes</th>' : ''}
-      ${canWrite ? '<th></th>' : ''}
-    </tr></thead><tbody>` +
-    rows.map(m => {
-      const sched = m.scheduled_sessions[0];
-      const schedDate = sched ? sched.parade_date : '';
-      const schedSess = sched ? `P${sched.session_number}` : '';
-      const facName   = sched ? (sched.facilitator_name||'—') : '';
-      const locName   = sched ? (sched.location_name||'—') : '';
-      const badge = m.is_scheduled
-        ? '<span class="badge badge-green">Scheduled</span>'
-        : '<span class="badge badge-grey">Unscheduled</span>';
-      const extraRows = m.scheduled_sessions.length > 1
-        ? `<br><span class="muted" style="font-size:var(--fs-sm)">+${m.scheduled_sessions.length-1} more</span>`
-        : '';
-      // CLASS-06: compact Training Class status summary.
-      // backlog_status values: scheduled, unscheduled, cancelled, not_delivered, resolved.
-      let classTd = '';
-      if(hasClassData){
-        const bd = m.class_breakdown||[];
-        if(!bd.length){
-          classTd = '<td><span class="muted" style="font-size:var(--fs-sm)">—</span></td>';
-        } else {
-          const needsAction = bd.filter(c=>c.backlog_status==='unscheduled'||c.backlog_status==='cancelled'||c.backlog_status==='not_delivered');
-          const dots = bd.map(c=>{
-            const s=c.backlog_status;
-            const col=s==='scheduled'||s==='resolved'?'var(--ok)':s==='unscheduled'?'var(--muted)':'var(--red)';
-            const sym=s==='scheduled'||s==='resolved'?'✓':s==='unscheduled'?'·':'✗';
-            return `<span title="${esc(c.display_name)}: ${esc(s||'unknown')}" style="color:${col};font-size:var(--fs-xs);font-weight:700;margin-right:2px">${sym}</span>`;
-          }).join('');
-          const summary = needsAction.length
-            ? `<div style="font-size:var(--fs-xs);color:var(--red);font-weight:700">${needsAction.length} class${needsAction.length===1?'':'es'} need action</div>`
-            : '';
-          classTd = `<td style="white-space:nowrap">${dots}${summary}</td>`;
+  if(classFilter){
+    // Class-focused table: 6 columns + optional action
+    body.innerHTML = `<div style="overflow-x:auto"><table class="data-table" style="min-width:680px">
+      <thead><tr>
+        <th>Code</th><th>Mission Title</th><th>Level</th><th>Rec. Term</th>
+        <th>Class Status</th><th>Scheduled</th>
+        ${canWrite?'<th></th>':''}
+      </tr></thead><tbody>`+
+      rows.map(m=>{
+        const bd=(m.class_breakdown||[]).find(c=>c.training_class_id===classFilter);
+        const classStatus=bd?(bd.backlog_status||'unscheduled'):'unscheduled';
+        const isNeedsAction=classStatus==='unscheduled'||classStatus==='cancelled'||classStatus==='not_delivered';
+        const isResolved=classStatus==='resolved';
+        const rowStyle=isResolved?'opacity:0.45':'';
+        const statusBadge=classStatus==='resolved'
+          ?'<span class="badge badge-green">Resolved</span>'
+          :classStatus==='scheduled'
+          ?'<span class="badge badge-green">Scheduled</span>'
+          :classStatus==='cancelled'
+          ?'<span class="badge" style="background:var(--warn-bg);color:var(--warn)">Cancelled</span>'
+          :classStatus==='not_delivered'
+          ?'<span class="badge" style="background:#fee2e2;color:var(--red)">Not Delivered</span>'
+          :'<span class="badge badge-grey">Unscheduled</span>';
+        const sched=m.scheduled_sessions[0];
+        const schedDate=sched?sched.parade_date:'';
+        const schedSess=sched?`P${sched.session_number}`:'';
+        const extraRows=m.scheduled_sessions.length>1
+          ?`<br><span class="muted" style="font-size:var(--fs-sm)">+${m.scheduled_sessions.length-1} more</span>`:'';
+        const schedCell=schedDate
+          ?`${esc(schedDate)} ${esc(schedSess)}${extraRows}<br><button class="btn-xs btn-out no-print" style="font-size:var(--fs-3xs);margin-top:3px;padding:1px 5px" onclick="navToScheduledPN('${esc(schedDate)}')" title="Go to this parade night">↗ View PN</button>`
+          :'<span class="muted">—</span>';
+        return `<tr style="${rowStyle}">
+          <td><code>${esc(m.code)}</code></td>
+          <td>${esc(m.title)}</td>
+          <td><span class="muted" style="font-size:var(--fs-base)">${esc(_phaseShort(m.phase))}</span></td>
+          <td>${esc(m.recommended_term||'')}</td>
+          <td>${statusBadge}</td>
+          <td>${schedCell}</td>
+          ${canWrite?`<td>${isNeedsAction?`<button class="btn-xs" onclick="openAssignModal('${esc(m.curriculum_id)}','${_jsAttr(m.title)}','${_jsAttr(m.code)}',${m.part_count||1})">Assign</button>`:'</td>'}`:''}
+        </tr>`;
+      }).join('')+
+      `</tbody></table></div>`;
+  } else {
+    // Flat view: 8 columns (Suitability + Parts removed), class summary as text
+    const hasClassData=rows.some(m=>(m.class_breakdown||[]).length>0);
+    body.innerHTML=`<div style="overflow-x:auto"><table class="data-table" style="min-width:${hasClassData?'860px':'760px'}">
+      <thead><tr>
+        <th>Code</th><th>Mission Title</th><th>Level</th><th>Subject</th>
+        <th>Rec. Term</th><th>Scheduled</th><th>Facilitator</th><th>Status</th>
+        ${hasClassData?'<th>Training Classes</th>':''}
+        ${canWrite?'<th></th>':''}
+      </tr></thead><tbody>`+
+      rows.map(m=>{
+        const sched=m.scheduled_sessions[0];
+        const schedDate=sched?sched.parade_date:'';
+        const schedSess=sched?`P${sched.session_number}`:'';
+        const facName=sched?(sched.facilitator_name||'—'):'—';
+        const extraRows=m.scheduled_sessions.length>1
+          ?`<br><span class="muted" style="font-size:var(--fs-sm)">+${m.scheduled_sessions.length-1} more</span>`:'';
+        const badge=m.is_scheduled
+          ?'<span class="badge badge-green">Scheduled</span>'
+          :'<span class="badge badge-grey">Unscheduled</span>';
+        let classTd='';
+        if(hasClassData){
+          const bd=m.class_breakdown||[];
+          if(!bd.length){
+            classTd='<td><span class="muted" style="font-size:var(--fs-sm)">—</span></td>';
+          } else {
+            const needsAction=bd.filter(c=>c.backlog_status==='unscheduled'||c.backlog_status==='cancelled'||c.backlog_status==='not_delivered');
+            const allResolved=bd.every(c=>c.backlog_status==='resolved'||c.backlog_status==='scheduled');
+            const summary=needsAction.length
+              ?`<span style="font-size:var(--fs-xs);color:var(--red);font-weight:700">${needsAction.length} class${needsAction.length===1?'':'es'} need action</span>`
+              :allResolved
+              ?`<span style="font-size:var(--fs-xs);color:var(--muted)">All on track</span>`
+              :`<span style="font-size:var(--fs-xs);color:var(--ok)">Scheduled</span>`;
+            classTd=`<td>${summary}</td>`;
+          }
         }
-      }
-      return `<tr>
-        <td><code>${esc(m.code)}</code></td>
-        <td>${esc(m.title)}</td>
-        <td><span class="muted" style="font-size:var(--fs-base)">${esc(_phaseShort(m.phase))}</span></td>
-        <td>${esc(m.element||'')}</td>
-        <td style="font-size:var(--fs-base)">${esc(m.instructor_suitability||'')}</td>
-        <td style="text-align:center">${m.part_count||1}</td>
-        <td>${esc(m.recommended_term||'')}</td>
-        <td>${esc(schedDate)} ${esc(schedSess)}${extraRows}${schedDate?`<br><button class="btn-xs btn-out no-print" style="font-size:var(--fs-3xs);margin-top:3px;padding:1px 5px" onclick="navToScheduledPN('${esc(schedDate)}')" title="Go to this parade night">↗ View PN</button>`:''}</td>
-        <td style="font-size:var(--fs-base)">${esc(facName)}</td>
-        <td style="font-size:var(--fs-base)">${esc(locName)}</td>
-        <td>${badge}</td>
-        ${classTd}
-        ${canWrite ? `<td><button class="btn-xs" onclick="openAssignModal('${esc(m.curriculum_id)}','${_jsAttr(m.title)}','${_jsAttr(m.code)}',${m.part_count||1})">Assign</button></td>` : ''}
-      </tr>`;
-    }).join('') +
-    `</tbody></table></div>`;
+        return `<tr>
+          <td><code>${esc(m.code)}</code></td>
+          <td>${esc(m.title)}</td>
+          <td><span class="muted" style="font-size:var(--fs-base)">${esc(_phaseShort(m.phase))}</span></td>
+          <td>${esc(m.element||'')}</td>
+          <td>${esc(m.recommended_term||'')}</td>
+          <td>${esc(schedDate)} ${esc(schedSess)}${extraRows}${schedDate?`<br><button class="btn-xs btn-out no-print" style="font-size:var(--fs-3xs);margin-top:3px;padding:1px 5px" onclick="navToScheduledPN('${esc(schedDate)}')" title="Go to this parade night">↗ View PN</button>`:''}</td>
+          <td style="font-size:var(--fs-base)">${esc(facName)}</td>
+          <td>${badge}</td>
+          ${classTd}
+          ${canWrite?`<td><button class="btn-xs" onclick="openAssignModal('${esc(m.curriculum_id)}','${_jsAttr(m.title)}','${_jsAttr(m.code)}',${m.part_count||1})">Assign</button></td>`:''}
+        </tr>`;
+      }).join('')+
+      `</tbody></table></div>`;
+  }
 }
 
 // MBACK-06: per-class delivery summary export — pivots loaded mission data
