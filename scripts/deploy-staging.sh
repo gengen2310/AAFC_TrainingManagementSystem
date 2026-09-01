@@ -21,7 +21,7 @@
 #   AUTH        : login + /api/auth/me role=system_admin is_national=True
 #   PRE-DEPLOY  : capture PRE_LATEST and PRE_ACTIVE for all three services
 #   AUTHZ       : deployment phrase prompt
-#   BACKEND     : railway up → health → new-deploy ID → DB revision b2c3d4e5f6a7 →
+#   BACKEND     : railway up → health → new-deploy ID → DB revision == REQUIRED_ALEMBIC_HEAD →
 #                 [reauth if session expired] → subject-area-tags CRUD
 #   FRONTEND    : railway up → HTTP 200 → new-deploy ID → build fingerprint → Playwright
 #   PW          : railway up → HTTP 200/healthz → new-deploy ID → fingerprint → Playwright
@@ -984,7 +984,7 @@ import json,sys; print(json.load(sys.stdin).get('is_single_head',False))" 2>/dev
 info "is_single_head: $IS_SINGLE  revision: $DB_REVISION"
 [ "$IS_SINGLE" = "True" ] || die "Multiple Alembic heads — HARD FAIL."
 [ "$DB_REVISION" = "$REQUIRED_ALEMBIC_HEAD" ] \
-  && ok "DB revision: $DB_REVISION — exact match (v52 planning_year_unique_only_when_active)" \
+  && ok "DB revision: $DB_REVISION — exact match to REQUIRED_ALEMBIC_HEAD" \
   || die "DB revision '$DB_REVISION' ≠ '$REQUIRED_ALEMBIC_HEAD' — HARD FAIL."
 
 echo
