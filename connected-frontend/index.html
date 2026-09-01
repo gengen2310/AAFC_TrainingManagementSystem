@@ -411,8 +411,8 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
   font-size:var(--fs-xs);}
 .cls-table .cls-prog{width:38%;min-width:110px;}
 .cls-table .cls-name{padding-left:22px;font-size:var(--fs-xs);color:var(--text-2);}
-.cls-table .cls-stage-row th{font-size:var(--fs-xs);font-weight:800;color:var(--text);text-align:left;}
-.cls-table .cls-stage-row td,.cls-table .cls-stage-row th{border-top:1px solid var(--border);}
+.cls-table .cls-stage-row th{font-size:var(--fs-sm);font-weight:800;color:var(--text);text-align:left;}
+.cls-table .cls-stage-row td,.cls-table .cls-stage-row th{border-top:2px solid var(--border);background:var(--surface-2);}
 .cls-flag{font-size:var(--fs-3xs);font-weight:800;letter-spacing:.05em;text-transform:uppercase;
   color:var(--red);white-space:nowrap;}
 @media(max-width:560px){
@@ -8813,7 +8813,7 @@ function _chartClassTable(progressChart, enrollmentChart){
   let body='';
   const source = pRows.length?pRows:eRows;
   source.forEach(function(row){
-    const stage=row.stage||'Unnamed stage';
+    const stage=row.stage||'No stage assigned';
     const agg=row.coverage_pct!=null?row.coverage_pct:null;
     const total=stageTotals[stage];
     body+='<tr class="cls-stage-row">'
@@ -8841,67 +8841,6 @@ function _chartClassTable(progressChart, enrollmentChart){
     + '<thead><tr><th scope="col">Training class</th><th scope="col" class="cls-num">Cadets</th>'
     + '<th scope="col" colspan="2">Curriculum progress</th><th scope="col"><span class="sr-only">Status</span></th></tr></thead>'
     + '<tbody>'+body+'</tbody></table></div>';
-}
-
-function _chartClassProgress(chart){
-  const rows=chart.data||[];
-  if(!rows.length)return _dEmptyChart('No Training Classes configured for this squadron and year.');
-  let html='';
-  rows.forEach(row=>{
-    const agg=row.coverage_pct!=null?row.coverage_pct:null;
-    const aggW=agg!=null?Math.round(agg)+'%':'—';
-    const aggColor=agg==null?'var(--muted)':agg>=80?'var(--ok)':agg>=60?'var(--warn)':'var(--red)';
-    // Stage header row
-    html+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 0 3px;border-top:1px solid var(--b2);margin-top:4px">
-      <div style="font-size:var(--fs-xs);font-weight:800;color:var(--text);min-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(row.stage||'')}">
-        ${esc(row.stage||'Unnamed stage')}</div>
-      <div style="flex:1"><div class="pbar"><div style="height:100%;width:${agg!=null?Math.round(agg):0}%;background:${aggColor};border-radius:3px"></div></div></div>
-      <div style="min-width:48px;text-align:right;font-size:var(--fs-xs);font-weight:700;color:${aggColor}">${aggW}</div>
-    </div>`;
-    // Per-class rows
-    (row.classes||[]).forEach(cls=>{
-      const p=cls.coverage_pct;
-      const behind=agg!=null&&p!=null&&p<=agg-15;
-      const clsColor=p==null?'var(--muted)':p>=80?'var(--ok)':p>=60?'var(--warn)':'var(--red)';
-      const w=p!=null?Math.round(p):0;
-      const clsNum=cls.class_number!=null?'C'+String(cls.class_number).padStart(2,'0')+' · ':'';
-      html+=`<div style="display:flex;align-items:center;gap:8px;padding:3px 0 3px 16px" role="img" aria-label="${esc(clsNum+cls.display_name)}: ${p!=null?p+'%':'no data'}">
-        <div style="font-size:var(--fs-xs);color:var(--text-2);min-width:114px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(clsNum+cls.display_name)}"><span style="font-weight:600;color:var(--steel)">${esc(clsNum)}</span>${esc(cls.display_name)}</div>
-        <div style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${clsColor};border-radius:3px"></div></div></div>
-        <div style="min-width:48px;text-align:right;font-size:var(--fs-xs);color:${clsColor}">${p!=null?p+'%':'—'}</div>
-        ${behind?`<span style="font-size:var(--fs-xs);font-weight:800;color:var(--red);white-space:nowrap">NEEDS ATTENTION</span>`:''}
-      </div>`;
-    });
-  });
-  return html;
-}
-
-// Class enrollment distribution — chart.data=[{stage,stage_id,classes:[{display_name,expected_count}]}]
-function _chartClassEnrollment(chart){
-  const rows=chart.data||[];
-  if(!rows.length)return _dEmptyChart(chart.empty_state||'No Training Classes configured.');
-  const maxCount=Math.max(...rows.flatMap(r=>r.classes.map(c=>c.expected_count||0)),1);
-  let html='';
-  rows.forEach(row=>{
-    const stageTotal=row.total_expected||0;
-    html+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 0 3px;border-top:1px solid var(--b2);margin-top:4px">
-      <div style="font-size:var(--fs-xs);font-weight:800;color:var(--text);min-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(row.stage||'Unnamed stage')}</div>
-      <div style="flex:1"></div>
-      <div style="min-width:64px;text-align:right;font-size:var(--fs-xs);color:var(--muted)">${stageTotal?stageTotal+' cadets':''}</div>
-    </div>`;
-    (row.classes||[]).forEach(cls=>{
-      const n=cls.expected_count;
-      const w=n!=null?Math.round((n/maxCount)*100):0;
-      const label=n!=null?n+' cadets':'Not set';
-      const color=n!=null?'var(--royal)':'var(--muted)'; /* DES-H04: --lgrey 2.0:1 fails; --muted passes */
-      html+=`<div style="display:flex;align-items:center;gap:8px;padding:3px 0 3px 16px" role="img" aria-label="${esc(cls.display_name)}: ${label}">
-        <div style="font-size:var(--fs-xs);color:var(--text-2);min-width:114px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(cls.display_name)}</div>
-        <div style="flex:1"><div class="pbar"><div style="height:100%;width:${w}%;background:${color};border-radius:3px"></div></div></div>
-        <div style="min-width:64px;text-align:right;font-size:var(--fs-xs);color:${color}">${n!=null?n:'—'}</div>
-      </div>`;
-    });
-  });
-  return html;
 }
 
 // Stacked vertical bar — chart.data rows have per-series keys; chart.series=[{key,label,color}]
