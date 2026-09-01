@@ -17,7 +17,20 @@ const CODE=process.env.STAGING_SQN_ADMIN_CODE;
 const SEL='button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=link], [tabindex]:not([tabindex="-1"])';
 const PAGES=['dashboard','parade-nights','curriculum','settings','facilitators'];
 
+// THREE profiles, not two. The first version ran only the two obvious ones and
+// had a hole big enough to hide fourteen controls: the 44px touch threshold was
+// only ever applied to a PHONE viewport, where the sidenav is collapsed behind
+// the hamburger and never renders. Desktop ran at the 28px pointer threshold,
+// so the 41px .nav-item passed there. Nothing measured a desktop-width layout
+// against 44px, so every desktop-only control was unjudged at the touch floor
+// while the report read "0 failures". Found by opening the app on a laptop.
+//
+// The third profile closes it, and it is not hypothetical hardware: a
+// touchscreen laptop, a Surface, or an iPad in landscape all render the wide
+// layout AND get touched.
+const DESKTOP_TOUCH = { ...devices['Desktop Chrome'], hasTouch: true, isMobile: false };
 for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
+                                    ['Desktop (touch)', DESKTOP_TOUCH, 44],
                                     ['Desktop (pointer)', devices['Desktop Chrome'], 28]]) {
   const browser=await chromium.launch();
   const page=await (await browser.newContext({...device})).newPage();
@@ -29,7 +42,7 @@ for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
   },[api,CODE]);
   await page.reload({waitUntil:'domcontentloaded'}); await page.waitForTimeout(3000);
 
-  let judged=0, boxFail=0, hitFail=0, savedByHitArea=0;
+  let judged=0, boxFail=0, hitFail=0, savedByHitArea=0, hitJudged=0, hitSkipped=0;
   const off=new Map();
   for (const nav of PAGES) {
     await page.evaluate(n=>{if(typeof window.nav==='function')window.nav(n);},nav);
@@ -49,14 +62,34 @@ for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
         if(!vis(e))continue;
         const r=e.getBoundingClientRect();
         if(r.bottom<0||r.top>innerHeight||r.right<0||r.left>innerWidth)continue;  // off-screen: not judged
+        // What is actually touchable is the element's VISIBLE region: its own
+        // rect intersected with the viewport AND with every scrollable
+        // ancestor that clips it. The sidebar scrolls, so a 219x44 nav item
+        // sitting half under its edge was probed at a point that landed on the
+        // scroll container -- an ancestor, which correctly does not count as a
+        // hit -- and fifteen perfectly reachable controls were reported as
+        // failures. Clipping is a function of scroll position, not of design,
+        // so it is skipped rather than failed.
+        let vt=Math.max(r.top,0), vl=Math.max(r.left,0),
+            vb=Math.min(r.bottom,innerHeight), vr=Math.min(r.right,innerWidth);
+        for(let a=e.parentElement; a; a=a.parentElement){
+          const as=getComputedStyle(a);
+          if(as.overflow==='visible'&&as.overflowX==='visible'&&as.overflowY==='visible') continue;
+          const ar=a.getBoundingClientRect();
+          vt=Math.max(vt,ar.top); vl=Math.max(vl,ar.left);
+          vb=Math.min(vb,ar.bottom); vr=Math.min(vr,ar.right);
+        }
+        // Judgeable only if the visible region is itself big enough to hold the
+        // probe -- otherwise the answer describes the scroll offset, not the app.
+        const fullyVisible = (vb-vt)>=size && (vr-vl)>=size;
         // Declared exemption, subtracted HERE rather than in the reader's head:
         // a checkbox/radio box is 18x18 by design and carries its 44px target
         // via the label wrapper. Reporting it as a failure means every quote of
         // this number needs a caveat nobody remembers to apply.
         if(e.type==='checkbox'||e.type==='radio')continue;
-        const boxOk=r.width>=size&&r.height>=size;
-        const cx=r.left+r.width/2, cy=r.top+r.height/2, h=size/2-1;
-        const hitOk=[[cx,cy-h],[cx,cy+h],[cx-h,cy],[cx+h,cy]].every(([x,y])=>{
+        const boxOk=r.width>=size&&r.height>=size;   // always judgeable: no scroll needed
+        const cx=(vl+vr)/2, cy=(vt+vb)/2, h=size/2-1;   // centre of what is visible
+        const hitOk=!fullyVisible ? null : [[cx,cy-h],[cx,cy+h],[cx-h,cy],[cx+h,cy]].every(([x,y])=>{
           if(x<0||y<0||x>innerWidth||y>innerHeight)return false;
           const t=document.elementFromPoint(x,y);
           return t && (t===e || e.contains(t));      // ancestors do NOT count
@@ -69,6 +102,8 @@ for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
     judged+=r.length;
     for(const c of r){
       if(!c.boxOk) boxFail++;
+      if(c.hitOk===null){ hitSkipped++; continue; }        // clipped by an edge
+      hitJudged++;
       if(!c.hitOk){ hitFail++; const k=`${c.w}x${c.h}  ${c.label}`; off.set(k,(off.get(k)||0)+1); }
       if(!c.boxOk && c.hitOk) savedByHitArea++;
     }
@@ -77,7 +112,10 @@ for (const [name, device, size] of [['Pixel 7 (touch)', devices['Pixel 7'], 44],
   console.log(`   judged                       ${judged}`);
   console.log(`   box below threshold          ${boxFail}`);
   console.log(`   rescued by a larger hit area ${savedByHitArea}`);
-  console.log(`   FAIL (not reachable at ${size}px) ${hitFail}   →  ${judged?Math.round(100*hitFail/judged):0}%`);
+  // Coverage is reported next to the result, because "0 failures" describes
+  // what was measured and a reader hears it as describing the app.
+  console.log(`   hit-tested                   ${hitJudged}  (${hitSkipped} skipped: clipped by a viewport edge)`);
+  console.log(`   FAIL (not reachable at ${size}px) ${hitFail}   →  ${hitJudged?Math.round(100*hitFail/hitJudged):0}% of hit-tested`);
   console.log('   worst offenders:');
   [...off.entries()].sort((a,b)=>b[1]-a[1]).slice(0,8).forEach(([k,n])=>console.log(`     ${String(n).padStart(2)}x  ${k}`));
   await browser.close();

@@ -277,7 +277,11 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 /* Nav footer */
 .nav-footer{padding:var(--sp-sm) var(--sp-md);border-top:1px solid rgba(255,255,255,.07);font-size:var(--fs-xs);color:rgba(255,255,255,.65);font-weight:600;letter-spacing:.06em;text-transform:uppercase;flex-shrink:0;}
 .nav-lbl{font-size:var(--fs-2xs);font-weight:700;color:rgba(255,255,255,.55);letter-spacing:.12em;text-transform:uppercase;padding:12px var(--sp-md) 4px;}
-.nav-item{display:flex;align-items:center;padding:11px var(--sp-md);font-size:var(--fs-sm);font-weight:600;color:rgba(255,255,255,.9);cursor:pointer;transition:background .12s,color .12s;border-left:2.5px solid transparent;gap:9px;user-select:none;letter-spacing:.01em;}
+.nav-item{display:flex;align-items:center;padding:11px var(--sp-md);font-size:var(--fs-sm);font-weight:600;color:rgba(255,255,255,.9);cursor:pointer;transition:background .12s,color .12s;border-left:2.5px solid transparent;gap:9px;user-select:none;letter-spacing:.01em;min-height:var(--ctl-min);/* 214x41 before. Missed by the whole first pass because every hit-target
+   measurement ran on a Pixel 7 profile, where the sidenav is collapsed
+   behind the hamburger -- these were never rendered, so they were never
+   measured and never entered the class inventory. Found by opening the
+   app on a desktop viewport. */}
 .nav-item:hover:not(.active){background:rgba(255,255,255,.07);color:#fff;}
 .nav-item:focus-visible{outline:none;box-shadow:0 0 0 2px var(--focus-ring) inset;}
 .nav-item.active{background:var(--nav-active-bg);color:#fff;border-left-color:var(--nav-active-border);padding-left:calc(var(--sp-md) - 2.5px);font-weight:700;}
