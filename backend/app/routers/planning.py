@@ -2108,6 +2108,24 @@ def update_session(
         else:
             s.facilitator_id = None
             s.facilitator_display_name_at_time = None
+    # SessionUpdateIn has accepted assistant_facilitator_id since it was added,
+    # and nothing ever assigned it: the Planning Workspace drawer offers the
+    # control, sends the id on save and on notes autosave, and got a 200 back
+    # while the value was dropped. The read path resolves and returns the column,
+    # so it advertised a field that could never be non-null. A field the API
+    # accepts and discards is worse than one it rejects -- the user is told the
+    # change was saved.
+    #
+    # No *_display_name_at_time column here by design: unlike the primary
+    # facilitator, the assistant's name is resolved live on read, so only the id
+    # is stored. Same scope rule -- Facilitator.squadron_id is a non-nullable FK.
+    if body.assistant_facilitator_id is not None:
+        if body.assistant_facilitator_id:
+            af = scoped_facilitator(db, body.assistant_facilitator_id, s.squadron_id)
+            if af:
+                s.assistant_facilitator_id = af.id
+        else:
+            s.assistant_facilitator_id = None
     if body.location_id is not None:
         if body.location_id:
             ra = scoped_training_area(db, body.location_id, s.squadron_id)

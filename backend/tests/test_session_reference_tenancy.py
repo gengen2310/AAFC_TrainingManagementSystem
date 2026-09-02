@@ -168,3 +168,60 @@ def test_edit_cannot_swap_in_another_squadrons_facilitator(client):
         "PATCH swapped 705's facilitator onto 703's session"
     assert "EditForeign705" not in (row.get("facilitator_name") or ""), \
         "705's facilitator name was denormalised onto 703's session via PATCH"
+
+
+# ─────────────────────────────────────────────────────────────
+# assistant_facilitator_id: accepted, returned, never stored
+# ─────────────────────────────────────────────────────────────
+
+def test_assistant_facilitator_is_persisted(client):
+    """The Planning Workspace drawer offers an assistant facilitator, puts
+    assistant_facilitator_id in the save payload (PlanningRightDrawer.tsx) and
+    pre-populates from existing?.assistant_facilitator_id. SessionUpdateIn
+    accepts the field and nothing ever assigns it, so the save returned 200 and
+    dropped the value; the read path resolves and returns a column that could
+    never be non-null. A field the API accepts and discards is worse than one it
+    rejects -- the user is told the change was saved."""
+    hdr = login(client, "ADMIN703")
+    own = client.post("/api/facilitators",
+                      json={"last_name": "Assist703", "current_rank": "CIV"}, headers=hdr)
+    assert own.status_code in (200, 201), own.text
+    fid = own.json()["facilitator_id"]
+
+    pn = _pn_for(client, hdr, "2041-06-05")
+    created = _create_session(client, hdr, pn)
+    sid = created.json().get("session_id") or created.json().get("id")
+    version = _stored(client, hdr, pn, sid).get("version")
+
+    r = client.patch(f"/api/planning/sessions/{sid}",
+                     json={"assistant_facilitator_id": fid, "version": version}, headers=hdr)
+    assert r.status_code in (200, 201), r.text
+
+    row = _stored(client, hdr, pn, sid)
+    assert row.get("assistant_facilitator_id") == fid, \
+        "assistant facilitator was accepted with 200 and silently discarded"
+    assert "Assist703" in (row.get("assistant_facilitator_name") or ""), \
+        "assistant facilitator name not resolved on read-back"
+
+
+def test_assistant_facilitator_is_scoped(client):
+    """Same tenancy rule as the primary facilitator -- squadron_id is a
+    non-nullable FK, so an assistant from another squadron is never valid."""
+    a703, a705 = login(client, "ADMIN703"), login(client, "ADMIN705")
+    foreign = client.post("/api/facilitators",
+                          json={"last_name": "AsstForeign705", "current_rank": "CIV"},
+                          headers=a705)
+    fid = foreign.json()["facilitator_id"]
+
+    pn = _pn_for(client, a703, "2041-06-12")
+    created = _create_session(client, a703, pn)
+    sid = created.json().get("session_id") or created.json().get("id")
+    version = _stored(client, a703, pn, sid).get("version")
+
+    r = client.patch(f"/api/planning/sessions/{sid}",
+                     json={"assistant_facilitator_id": fid, "version": version}, headers=a703)
+    assert r.status_code in (200, 201, 400, 403, 409, 422), r.text
+
+    row = _stored(client, a703, pn, sid)
+    assert row.get("assistant_facilitator_id") != fid, \
+        "703's session stored 705's facilitator as its assistant"
