@@ -86,7 +86,7 @@ export DATABASE_URL=postgresql://user:pass@host:5432/aafc_tms
 export JWT_SECRET=<random 64-char string>
 export SECRET_KEY=<random 64-char string>
 export COOKIE_SECURE=true
-export COOKIE_SAMESITE=lax
+export COOKIE_SAMESITE=none   # MUST be 'none' (not 'lax'): TMS frontend and backend run on different Railway origins; SameSite=lax breaks the cross-origin session cookie handoff
 export CORS_ALLOWED_ORIGINS=https://tms.staging.example.com
 export FRONTEND_ORIGIN=https://tms.staging.example.com
 ```
