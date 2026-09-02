@@ -792,6 +792,14 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
     # appeared in the grid. Found 2026-08-26; edit_session honoured the field all
     # along, which is why this survived: anything edited once looked correct.
     _validate_timing_block(db, pn, body.timing_block_id)
+    # Scope checks mirror edit_session — _denormalise trusts its caller to have
+    # validated that the referenced objects are visible/owned by this squadron.
+    if body.curriculum_item_id and not visible_curriculum_item(db, p, body.curriculum_item_id):
+        raise HTTPException(400, detail={"error": "invalid_curriculum_item"})
+    if body.facilitator_id and not scoped_facilitator(db, body.facilitator_id, pn.squadron_id):
+        raise HTTPException(400, detail={"error": "invalid_facilitator"})
+    if body.training_area_id and not scoped_training_area(db, body.training_area_id, pn.squadron_id):
+        raise HTTPException(400, detail={"error": "invalid_training_area"})
     s = Session(parade_night_id=pn.id, squadron_id=pn.squadron_id, period_number=body.period_number,
                 cadet_group=body.cadet_group, phase_at_time=body.phase_at_time, custom_title=body.custom_title,
                 expected_attendance=body.expected_attendance, status=initial_status,
