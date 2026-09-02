@@ -90,7 +90,7 @@ export function GapHeatmap({ rows, cols, label }: {
     return "hm-red";
   };
   return (
-    <div className="heatmap-wrap">
+    <div className="heatmap-wrap" tabIndex={0}>
       <table className="heatmap">
         <caption className="vis-hidden">{label}</caption>
         <thead>
@@ -133,7 +133,7 @@ export function HeatmapGrid({ rows, cols, label }: {
 }) {
   const tone = (v: number | undefined) => v == null ? "hm-na" : v >= 67 ? "hm-ok" : v >= 34 ? "hm-warn" : "hm-red";
   return (
-    <div className="heatmap-wrap">
+    <div className="heatmap-wrap" tabIndex={0}>
       <table className="heatmap">
         <caption className="vis-hidden">{label}</caption>
         <thead>

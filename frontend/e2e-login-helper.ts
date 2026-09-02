@@ -38,9 +38,24 @@ function resolveLoginParams(code: string): LoginParams {
 
 /** Drives the real rendered multi-step login UI (not a direct API call) --
  * for specs that need to specifically exercise the UI, or as the default
- * "get into the app" helper. `page.goto("/")` is NOT called here -- callers
- * that need AAFC_API_BASE set via addInitScript must navigate first. */
+ * "get into the app" helper.
+ *
+ * Clears both the aafc_session cookie AND the aafc_token sessionStorage
+ * entry, then re-navigates to "/" so AuthProvider's GET /api/auth/me call
+ * fires with no auth state and returns 401, forcing the login form to
+ * render.  Playwright shares the browser context (and therefore cookies
+ * and sessionStorage) across tests in the same worker, so without both
+ * clears the prior test's session bypasses the login page entirely.
+ *
+ * callers that need AAFC_API_BASE set via addInitScript should register
+ * their script before calling loginPW — addInitScript fires on every
+ * navigation including the one this function performs. */
 export async function loginPW(page: Page, code: string) {
+  await page.context().clearCookies();
+  // sessionStorage persists across same-tab navigations; clear the
+  // Bearer token so AuthProvider's me() call has no auth whatsoever.
+  await page.evaluate(() => sessionStorage.clear());
+  await page.goto("/");
   const { unitType, identifier, role } = resolveLoginParams(code);
   await page.getByLabel("Login as").selectOption(unitType);
   if (unitType !== "national") {

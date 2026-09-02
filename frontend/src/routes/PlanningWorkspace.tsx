@@ -213,12 +213,6 @@ export function PlanningWorkspace() {
     staleTime: 2 * 60 * 1000,
   });
 
-  // CLASS-22: map class_id → stage_id for stage focus dimming in ParadeNightBlock.
-  const classStageMap: Record<string, string> = {};
-  for (const tc of cc?.training_classes ?? []) {
-    if (tc.training_stage_id) classStageMap[tc.training_class_id] = tc.training_stage_id;
-  }
-
   // REM-39 follow-up: previously only ParadeNightGridView (the single-night
   // detail grid) ever received real conflict data -- Year/Term/8-Week/2-Week/
   // custom-range views (including the default landing view) hardcoded
@@ -255,6 +249,14 @@ export function PlanningWorkspace() {
     enabled: !!selectedYearId,
     staleTime: 10 * 60 * 1000,
   });
+
+  // CLASS-22: map class_id → stage_id for stage focus dimming in ParadeNightBlock.
+  // Use the trainingClasses query result (which carries training_stage_id) rather than
+  // cc?.training_classes (which only carries training_class_id + display_name).
+  const classStageMap: Record<string, string> = {};
+  for (const tc of trainingClasses) {
+    if (tc.training_stage_id) classStageMap[tc.training_class_id] = tc.training_stage_id;
+  }
 
   // ── Handlers ───────────────────────────────────────────────────────────────────
   function handleLayerToggle(key: keyof LayerState) {
@@ -420,6 +422,11 @@ export function PlanningWorkspace() {
           audience={audience}
           priority={priority}
           trainingClasses={trainingClasses}
+          focusClassId={focusClassId}
+          focusStageId={focusStageId}
+          classStageMap={classStageMap}
+          searchText={searchText || null}
+          tierFilter={tierFilter}
           conflicts={yearConflicts}
         />
       );
@@ -558,17 +565,20 @@ export function PlanningWorkspace() {
       />
 
       {/* Year selector + quick actions.
-          AUDIT-2026-08 G10 / WCAG 1.4.10 — flexWrap here is load-bearing. This row renders one
-          chip per planning year and the action buttons ("+ Anchor event" and siblings) come
-          AFTER them, so without wrapping a unit with many years pushes those actions off-screen.
-          .pw-root is overflow:hidden, so they cannot be scrolled to at any viewport width.
-          Measured at 1440px against 131 seeded years: 12,918px of content in a 1,195px box.
-          A maxHeight cap was tried here and removed: capping the row pushed those same action
-          buttons below its scroll fold, which is the defect this fix exists to prevent. Wrapping
-          alone keeps every control reachable. A realistic unit has a handful of years; the 687px
-          height only appears against seeded data with 131 of them. */}
+          AUDIT-2026-08 G10 / WCAG 1.4.10 — flexWrap is load-bearing: action buttons come
+          after all year chips in DOM order so they wrap to the last row, always reachable.
+          maxHeight + overflowY:auto caps the bar at ~2.5 chip rows (80px) and makes it
+          vertically scrollable. Prior attempt used maxHeight without overflow-y:auto, which
+          clipped the action buttons entirely — that is why it was removed. With overflow-y:auto
+          the buttons are scrollable, not hidden. flexShrink:0 ensures the bar never collapses
+          below its natural height when pw-body (flex:1) competes for space.
+          Pointer-event note: Firefox resolves hit targets against DOM coordinates, not the
+          visual clip imposed by .pw-root overflow:hidden. Without the maxHeight cap, action
+          buttons placed hundreds of pixels below by flex-wrap can land at DOM coordinates that
+          overlap .pw-left filter chips, causing Playwright's Firefox run to report the button
+          as intercepting the chip click. The 80px cap prevents that overlap. */}
       {selectedYearId && (
-        <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)", padding: "4px 14px", display: "flex", flexWrap: "wrap", gap: 8, rowGap: 6, alignItems: "center" }}>
+        <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--border)", padding: "4px 14px", display: "flex", flexWrap: "wrap", gap: 8, rowGap: 6, alignItems: "center", maxHeight: "80px", overflowY: "auto", flexShrink: 0 }}>
           {yearOptions && (
             <>
               <span style={{ fontSize: 'var(--fs-xs)', fontWeight: 700, color: "var(--muted-text)" }}>Year:</span>

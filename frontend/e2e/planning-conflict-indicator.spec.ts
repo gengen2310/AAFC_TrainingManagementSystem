@@ -31,7 +31,8 @@ async function seedRoomConflict(page: Page, hdr: Record<string, string>) {
   const suffix = String(Date.now());
   // Term 3's real WA date range for this test year (_WA_TERM_RANGES) --
   // matches the pattern already established in year-view-classes.spec.ts.
-  const testYear = 2650 + (Date.now() % 50);
+  // % 7000: keeps testYear ≤ 9649 (backend date.fromisoformat rejects years > 9999).
+  const testYear = 2650 + (Date.now() % 7000);
   const yearName = `REM-39 Conflict Test ${suffix}`;
   const yearRes = await page.request.post(`${API_BASE}/api/planning/years`, {
     data: { year: testYear, name: yearName }, headers: hdr,
@@ -145,7 +146,15 @@ test("Custom range view (same component as 8-Week/2-Week) shows the canonical-da
     await page.getByRole("button", { name: "Custom", exact: true }).click();
 
     await page.getByLabel("Custom range start date").fill(rangeStart);
+    // Wait for the long-range query triggered by filling the end date.
+    // EightWeekView only renders once both dates are set and the API responds;
+    // waitForResponse guarantees the data is in the DOM before we assert.
+    const longRangeLoad = page.waitForResponse(
+      r => r.url().includes("/long-range") && r.status() === 200,
+      { timeout: 15000 },
+    );
     await page.getByLabel("Custom range end date").fill(rangeEnd);
+    await longRangeLoad;
 
     const dot = page.locator(".pn-conflict-dot.room").first();
     await expect(dot).toBeVisible({ timeout: 10000 });

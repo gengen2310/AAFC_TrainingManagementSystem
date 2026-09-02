@@ -2210,7 +2210,9 @@ def create_training_class(body: TrainingClassIn, db: DBSession = Depends(get_db)
     if body.stage_code and body.stage_code not in STAGE_CODES:
         raise HTTPException(400, detail={"error": "invalid_stage_code",
                                          "valid": sorted(STAGE_CODES)})
-    # Auto-assign next available class_number if not provided
+    # Auto-assign next available class_number if not provided.
+    # Include archived classes because the DB unique constraint covers all rows
+    # regardless of is_archived — skipping archived numbers caused IntegrityError 500s.
     if body.class_number is None:
         existing_numbers = {
             r.class_number for r in
@@ -2218,7 +2220,6 @@ def create_training_class(body: TrainingClassIn, db: DBSession = Depends(get_db)
             .filter(
                 TrainingClass.squadron_id == s.id,
                 TrainingClass.training_year_id == body.training_year_id,
-                TrainingClass.is_archived == False,  # noqa: E712
             ).all()
         }
         n = 1
@@ -2227,16 +2228,17 @@ def create_training_class(body: TrainingClassIn, db: DBSession = Depends(get_db)
         assigned_number = n
     else:
         assigned_number = body.class_number
-    # Validate uniqueness (archived classes do not block numbering)
+    # Validate uniqueness against all rows (including archived) so the DB
+    # unique constraint is never violated.
     conflict = db.query(TrainingClass).filter(
         TrainingClass.squadron_id == s.id,
         TrainingClass.training_year_id == body.training_year_id,
         TrainingClass.class_number == assigned_number,
-        TrainingClass.is_archived == False,  # noqa: E712
     ).first()
     if conflict:
         raise HTTPException(400, detail={"error": "class_number_already_in_use",
-                                         "class_number": assigned_number})
+                                         "class_number": assigned_number,
+                                         "archived": conflict.is_archived})
     c = TrainingClass(
         squadron_id=s.id, training_year_id=body.training_year_id,
         training_stage_id=body.training_stage_id, display_name=body.display_name,
