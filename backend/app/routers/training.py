@@ -4752,6 +4752,11 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
     owning_level = body.owning_level if body.owning_level in {"national", "wing", "squadron"} else "national"
     sqn_id = body.squadron_id
 
+    if sqn_id:
+        if not db.get(Squadron, sqn_id):
+            raise HTTPException(404, detail={"error": "squadron_not_found",
+                                             "message": "The referenced squadron does not exist."})
+
     created = updated = skipped = failed = 0
     results = []
 
