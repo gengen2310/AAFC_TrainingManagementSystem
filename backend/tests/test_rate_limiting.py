@@ -127,6 +127,43 @@ def _db():
     return SessionLocal()
 
 
+def _seed_ip(db, ip: str, count: int) -> None:
+    """Put an IpApiRequest row at `count` inside a FRESH window.
+
+    These tests used to establish the precondition by making API_RATE_LIMIT + 1
+    real calls -- 10001 commits under the test settings. That is a wall-clock
+    race against the very thing under test: check_api_rate_db uses a FIXED
+    window, so if the loop takes longer than API_RATE_WINDOW_SEC the counter
+    resets mid-loop and the row never crosses the limit. The assertion that
+    then fails is `is True`, which is exactly the failure seen once in a full
+    suite run on 2026-09-02.
+
+    Measured margin on an idle machine is about 9.6x (6.3s loop, 60s window),
+    so it takes a severe stall -- but this machine is shared, and the mechanism
+    was confirmed by shrinking the window until the loop outran it. Seeding the
+    row removes the race entirely, and removes ~35s from the suite.
+
+    test_user_rate_limiter_window_reset already used this technique; these six
+    simply did not.
+    """
+    import datetime
+    from app.models import IpApiRequest
+    db.query(IpApiRequest).filter(IpApiRequest.ip == ip).delete()
+    db.add(IpApiRequest(ip=ip, request_count=count,
+                        window_start=datetime.datetime.now(datetime.timezone.utc)))
+    db.commit()
+
+
+def _seed_user(db, uid: str, count: int) -> None:
+    """Per-account equivalent of _seed_ip. See its docstring for why."""
+    import datetime
+    from app.models import UserApiRequest
+    db.query(UserApiRequest).filter(UserApiRequest.user_id == uid).delete()
+    db.add(UserApiRequest(user_id=uid, request_count=count,
+                          window_start=datetime.datetime.now(datetime.timezone.utc)))
+    db.commit()
+
+
 def test_db_rate_limiter_unit_check():
     """DEF-10: check_api_rate_db counts correctly and blocks over the limit."""
     from app.security import check_api_rate_db, reset_api_rate_limiter_db
@@ -135,9 +172,14 @@ def test_db_rate_limiter_unit_check():
         reset_api_rate_limiter_db(db)
         ip = "10.0.0.20"
         limit = settings.API_RATE_LIMIT
-        for _ in range(limit):
-            assert check_api_rate_db(ip, db) is False
-        assert check_api_rate_db(ip, db) is True
+        # real increments prove it counts...
+        assert check_api_rate_db(ip, db) is False
+        assert check_api_rate_db(ip, db) is False
+        # ...and seeding to the edge pins the exact threshold, which the old
+        # loop never did: it only showed "somewhere below the limit is False".
+        _seed_ip(db, ip, limit - 1)
+        assert check_api_rate_db(ip, db) is False   # -> limit: at it, not over
+        assert check_api_rate_db(ip, db) is True    # -> limit + 1: over
     finally:
         db.close()
 
@@ -168,8 +210,7 @@ def test_db_rate_limiter_different_ips_independent():
     try:
         reset_api_rate_limiter_db(db)
         ip_a, ip_b = "10.0.0.22", "10.0.0.23"
-        for _ in range(settings.API_RATE_LIMIT + 1):
-            check_api_rate_db(ip_a, db)
+        _seed_ip(db, ip_a, settings.API_RATE_LIMIT)
         assert check_api_rate_db(ip_a, db) is True
         assert check_api_rate_db(ip_b, db) is False
     finally:
@@ -183,8 +224,7 @@ def test_db_rate_limiter_reset_clears_table():
     try:
         reset_api_rate_limiter_db(db)
         ip = "10.0.0.24"
-        for _ in range(settings.API_RATE_LIMIT + 1):
-            check_api_rate_db(ip, db)
+        _seed_ip(db, ip, settings.API_RATE_LIMIT)
         assert check_api_rate_db(ip, db) is True
         reset_api_rate_limiter_db(db)
         assert check_api_rate_db(ip, db) is False
@@ -204,9 +244,11 @@ def test_user_rate_limiter_unit_check():
         reset_user_api_rate_limiter_db(db)
         uid = "user-rate-test-001"
         limit = settings.API_RATE_LIMIT
-        for _ in range(limit):
-            assert check_user_api_rate_db(uid, db) is False
-        assert check_user_api_rate_db(uid, db) is True
+        assert check_user_api_rate_db(uid, db) is False
+        assert check_user_api_rate_db(uid, db) is False
+        _seed_user(db, uid, limit - 1)
+        assert check_user_api_rate_db(uid, db) is False   # -> limit: at it, not over
+        assert check_user_api_rate_db(uid, db) is True    # -> limit + 1: over
     finally:
         db.close()
 
@@ -237,8 +279,7 @@ def test_user_rate_limiter_different_users_independent():
     try:
         reset_user_api_rate_limiter_db(db)
         uid_a, uid_b = "user-rate-test-003a", "user-rate-test-003b"
-        for _ in range(settings.API_RATE_LIMIT + 1):
-            check_user_api_rate_db(uid_a, db)
+        _seed_user(db, uid_a, settings.API_RATE_LIMIT)
         assert check_user_api_rate_db(uid_a, db) is True
         assert check_user_api_rate_db(uid_b, db) is False
     finally:
@@ -252,8 +293,7 @@ def test_user_rate_limiter_reset_clears_table():
     try:
         reset_user_api_rate_limiter_db(db)
         uid = "user-rate-test-004"
-        for _ in range(settings.API_RATE_LIMIT + 1):
-            check_user_api_rate_db(uid, db)
+        _seed_user(db, uid, settings.API_RATE_LIMIT)
         assert check_user_api_rate_db(uid, db) is True
         reset_user_api_rate_limiter_db(db)
         assert check_user_api_rate_db(uid, db) is False
