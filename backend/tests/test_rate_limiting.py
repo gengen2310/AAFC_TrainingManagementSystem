@@ -109,13 +109,32 @@ def test_rate_limit_does_not_count_options_preflight(client):
 
 def test_rate_limit_options_does_not_advance_the_counter(client):
     """A burst of OPTIONS requests alone must never trip the limiter for the
-    real requests that follow."""
+    real requests that follow.
+
+    This used to fire API_RATE_LIMIT + 50 -- 10050 -- real OPTIONS requests and
+    then assert one GET succeeded. Twenty seconds, and weaker than it looked:
+    check_api_rate is a SLIDING window, so had the burst ever taken longer than
+    API_RATE_WINDOW_SEC the earliest hits would have aged out and the GET would
+    have succeeded even if OPTIONS were being counted. A slow machine turned it
+    into a false pass rather than a failure.
+
+    The claim is "OPTIONS do not advance the counter", so read the counter.
+    """
     ip = "testclient"
-    for _ in range(settings.API_RATE_LIMIT + 50):
+    reset_api_rate_limiter()
+    before = len(_api_hits.get(ip, []))
+    for _ in range(25):
         client.options("/api/auth/me")
+    assert len(_api_hits.get(ip, [])) == before, \
+        "OPTIONS advanced the rate-limit counter"
+
+    # Positive control: without it, the assertion above would also pass if the
+    # limiter never recorded anything for this ip -- a test that cannot fail.
     hdr = login(client, "ADMIN703")
     r = client.get("/api/auth/me", headers=hdr)
     assert r.status_code == 200
+    assert len(_api_hits.get(ip, [])) > before, \
+        "a real request did not advance the counter either -- the probe is blind"
 
 
 # ─────────────────────────────────────────────────────────────
