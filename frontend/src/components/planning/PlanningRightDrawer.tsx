@@ -222,6 +222,11 @@ function SessionForm({
           curriculum_id: curriculumId ?? undefined,
           activity_title: title || undefined,
           facilitator_id: facilitatorId || undefined,
+          // The drawer has always collected asstFacId and sent it on UPDATE but
+          // not on CREATE, so an assistant chosen while creating a session was
+          // dropped before the request left the browser. The backend discarded
+          // it too until 2026-09-02; both halves are needed for the field to work.
+          assistant_facilitator_id: asstFacId || undefined,
           location_id: locationId || undefined,
           part_number: partNumber ? Number(partNumber) : undefined,
           notes: notes || undefined,

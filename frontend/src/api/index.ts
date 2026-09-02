@@ -372,6 +372,7 @@ export const planningApi = {
   createSession: (date_id: string, body: {
     cadet_group?: string; training_class_ids?: string[]; session_number: number;
     curriculum_id?: string; activity_title?: string; facilitator_id?: string;
+    assistant_facilitator_id?: string;
     location_id?: string; part_number?: number; notes?: string;
   }) => api.post<Record<string, unknown>>(`/api/planning/parade-dates/${date_id}/sessions`, body),
   getSession: (session_id: string) =>

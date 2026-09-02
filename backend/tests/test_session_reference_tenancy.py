@@ -225,3 +225,45 @@ def test_assistant_facilitator_is_scoped(client):
     row = _stored(client, a703, pn, sid)
     assert row.get("assistant_facilitator_id") != fid, \
         "703's session stored 705's facilitator as its assistant"
+
+
+def test_assistant_facilitator_can_be_set_at_creation(client):
+    """Set on create, not only on edit.
+
+    SessionUpdateIn now persists assistant_facilitator_id, but SessionCreateIn
+    never declared it, so Pydantic dropped it silently -- picking an assistant
+    while CREATING a session lost it, while picking one while editing kept it.
+    Same field, two paths, two different outcomes is worse than either.
+    """
+    hdr = login(client, "ADMIN703")
+    own = client.post("/api/facilitators",
+                      json={"last_name": "AsstAtCreate", "current_rank": "CIV"}, headers=hdr)
+    fid = own.json()["facilitator_id"]
+
+    pn = _pn_for(client, hdr, "2041-07-03")
+    r = _create_session(client, hdr, pn, assistant_facilitator_id=fid)
+    assert r.status_code in (200, 201), r.text
+    sid = r.json().get("session_id") or r.json().get("id")
+
+    row = _stored(client, hdr, pn, sid)
+    assert row.get("assistant_facilitator_id") == fid, \
+        "assistant facilitator chosen at creation was dropped"
+
+
+def test_assistant_facilitator_at_creation_is_scoped(client):
+    """The create path needs the same tenancy rule as the edit path."""
+    a703, a705 = login(client, "ADMIN703"), login(client, "ADMIN705")
+    foreign = client.post("/api/facilitators",
+                          json={"last_name": "CreateForeign705", "current_rank": "CIV"},
+                          headers=a705)
+    fid = foreign.json()["facilitator_id"]
+
+    pn = _pn_for(client, a703, "2041-07-10")
+    r = _create_session(client, a703, pn, assistant_facilitator_id=fid)
+    assert r.status_code in (200, 201, 400, 403, 422), r.text
+    if r.status_code not in (200, 201):
+        return
+    sid = r.json().get("session_id") or r.json().get("id")
+    row = _stored(client, a703, pn, sid)
+    assert row.get("assistant_facilitator_id") != fid, \
+        "703's new session stored 705's facilitator as its assistant"

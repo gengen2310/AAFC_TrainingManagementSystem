@@ -1938,6 +1938,11 @@ class SessionCreateIn(BaseModel):
     curriculum_id: Optional[str] = None
     activity_title: Optional[str] = None
     facilitator_id: Optional[str] = None
+    # Mirrors SessionUpdateIn. Absent here until 2026-09-02, so Pydantic dropped
+    # it silently: an assistant chosen while CREATING a session was lost, while
+    # the same choice made while editing was kept. Same field, two paths, two
+    # outcomes.
+    assistant_facilitator_id: Optional[str] = None
     location_id: Optional[str] = None
     is_combined: bool = False
     combined_groups: Optional[list] = None
@@ -2036,6 +2041,10 @@ def create_session(
         if f:
             s.facilitator_id = f.id
             s.facilitator_display_name_at_time = " ".join(x for x in [f.current_rank, f.first_name, f.last_name] if x)
+    if body.assistant_facilitator_id:
+        af = scoped_facilitator(db, body.assistant_facilitator_id, pn.squadron_id)
+        if af:
+            s.assistant_facilitator_id = af.id
     if training_area_id:
         ra = scoped_training_area(db, training_area_id, pn.squadron_id)
         if ra:
