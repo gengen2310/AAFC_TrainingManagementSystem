@@ -688,6 +688,17 @@ info "HEAD: $CURRENT_HEAD — $(git log -1 --format='%s')"
 git merge-base --is-ancestor "$REQUIRED_ANCESTOR" HEAD 2>/dev/null \
   && ok "Fix commit $REQUIRED_ANCESTOR is ancestor of $CURRENT_HEAD" \
   || die "Fix commit $REQUIRED_ANCESTOR NOT in HEAD's history."
+# Refresh the index's cached stat data BEFORE asking whether the tree is dirty.
+# git diff-index compares stat info and does not refresh; git status does. So a
+# file whose mtime changed while its content did not -- which is every file git
+# pull just rewrote -- reads as modified here while `git status` reports a clean
+# tree. On 2026-09-02 a deploy run immediately after a fast-forward pull aborted
+# with "Uncommitted changes" against a tree that had none, and looked clean by
+# the time anyone checked, because checking refreshed the index.
+#
+# update-index --refresh exits non-zero when it updates entries, which is the
+# normal case here and not an error, so its status is deliberately discarded.
+git update-index -q --refresh 2>/dev/null || true
 git diff-index --quiet HEAD -- 2>/dev/null && ok "Working tree clean" || die "Uncommitted changes."
 UNPUSHED=$(git log "origin/${EXPECTED_BRANCH}..HEAD" --oneline 2>/dev/null || echo "ERROR")
 [ -n "$UNPUSHED" ] && die "Unpushed commits — push to origin/$EXPECTED_BRANCH first."
