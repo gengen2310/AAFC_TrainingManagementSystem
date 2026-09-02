@@ -77,3 +77,10 @@ frontend/test-results/
 backend/.venv
 frontend/node_modules
 tools/playwright-staging/node_modules
+
+# Rotated access-code exports. rotate_access_codes.py has always told the
+# operator these are "git-ignored by name pattern"; until 2026-09-02 they were
+# not, so following the tool's own instructions could commit every credential
+# in the installation.
+secret_codes*.csv
+aafc-staging-codes-*.csv
