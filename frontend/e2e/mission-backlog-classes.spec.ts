@@ -46,7 +46,6 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   const meRes = await page.request.get(`${API_BASE}/api/auth/me`, { headers: hdr });
   const me = await meRes.json();
   const sqnId = me.session.squadron_id as string;
-  const wingId = me.session.wing_id as string;
 
   // create_parade()'s plain-ParadeNight-create path (REM-129) auto-links to
   // whichever active PlanningYear has the HIGHEST `year` value for the
@@ -94,14 +93,14 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
   expect(ciRes.ok()).toBe(true);
   const ciId = (await ciRes.json()).curriculum_id as string;
 
-  // A fixed date risks colliding with another squadron-703 parade night
-  // already seeded/created by an earlier run against this long-lived local
-  // dev backend -- derive one from the current time instead, matching the
-  // date-uniqueness approach already used elsewhere in this program's own
-  // test suites (e.g. e2e-connected/session-training-classes.spec.ts).
-  const pnDate = new Date(2100, 3, 1 + (Date.now() % 300)).toISOString().slice(0, 10);
-  const pnRes = await page.request.post(`${API_BASE}/api/parade-nights`, {
-    data: { squadron_id: sqnId, wing_id: wingId, date: pnDate, parade_type: "normal" },
+  // Use the year-scoped endpoint instead of POST /api/parade-nights so that
+  // planning_year_id is set directly to this test's yearId — the plain PN
+  // create path uses REM-129 auto-link (highest active year for the squadron),
+  // which would silently steal the link if any other higher-year test left an
+  // active year behind, causing the missions endpoint to find no sessions here.
+  const pnDate = `${uniqueYear}-08-15`;
+  const pnRes = await page.request.post(`${API_BASE}/api/planning/years/${yearId}/parade-dates`, {
+    data: { parade_date: pnDate },
     headers: hdr,
   });
   expect(pnRes.ok()).toBe(true);
@@ -146,7 +145,7 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
 
     await page.getByRole("button", { name: yearName }).click();
 
-    await page.getByText("Activities ▲").click();
+    await page.getByText("Planning Tools ▲").click();
     await page.getByRole("button", { name: "Mission Backlog" }).click();
     await expect(page.getByText("Rec. Term")).toBeVisible({ timeout: 8000 });
 
@@ -155,7 +154,9 @@ test("Mission Backlog shows a per-Training-Class chip for a session's real audie
     await page.locator("select").first().selectOption("");
     await page.getByPlaceholder("Search code or title…").fill(code);
 
-    const row = page.locator("table tr").filter({ hasText: code });
+    // Use td:first-child to match only the curriculum-item row (code in first cell),
+    // not the class-group header rows that also contain the code as substring text.
+    const row = page.locator("table tr").filter({ has: page.locator("td:first-child", { hasText: code }) });
     await expect(row).toBeVisible({ timeout: 8000 });
     const chip = row.getByText(className, { exact: true });
     await expect(chip).toBeVisible({ timeout: 8000 });

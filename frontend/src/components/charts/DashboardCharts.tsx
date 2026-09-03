@@ -166,7 +166,7 @@ export function LineChart({ chart }: { chart: DashboardChart }) {
   if (current.length) segments.push(current.join(" "));
   const th = chart.thresholds;
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div style={{ overflowX: "auto" }} tabIndex={0}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: W, height: H }} role="img" aria-label={chart.title ?? "Trend"}>
         {/* Threshold lines carry their own visible value label — a dashed
             line's colour alone doesn't tell a reader what "80" or "60" means. */}
@@ -235,7 +235,7 @@ export function GroupedBarChart({ chart }: { chart: DashboardChart }) {
           </span>
         ))}
       </div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, overflowX: "auto", height: 90 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, overflowX: "auto", height: 90 }} tabIndex={0}>
         {rows.map((r, i) => (
           <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 70 }}>
@@ -262,7 +262,7 @@ export function HeatmapChart({ chart }: { chart: DashboardChart }) {
   const cols = rows[0]?.cells.map(c => c.label) ?? [];
   const riskColor = (risk: string) => risk === "ok" ? "#d1fae5" : risk === "warn" ? "#fef3c7" : risk === "critical" ? "#fee2e2" : "#f1f5f9";
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div style={{ overflowX: "auto" }} tabIndex={0}>
       <table style={{ fontSize: 'var(--fs-2xs)', borderCollapse: "separate", borderSpacing: 3 }}>
         <thead>
           <tr>
@@ -424,7 +424,7 @@ export function ReadinessMatrixChart({ chart }: { chart: DashboardChart }) {
   }>;
   if (!rows.length) return <EmptyState chart={chart} />;
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div style={{ overflowX: "auto" }} tabIndex={0}>
       <table style={{ fontSize: 'var(--fs-xs)', width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr style={{ borderBottom: "1px solid var(--border)" }}>

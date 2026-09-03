@@ -24,6 +24,11 @@ interface Props {
    * through to fromNightSummary() so each session cell can show a real,
    * canonical (not client-heuristic) conflict indicator without a second fetch. */
   conflicts?: PlanningConflict[];
+  focusClassId?: string | null;
+  focusStageId?: string | null;
+  classStageMap?: Record<string, string>;
+  searchText?: string | null;
+  tierFilter?: string | null;
 }
 
 function fmtDay(iso: string): string {
@@ -42,7 +47,7 @@ function anchorsOnDate(date: string, all: AnchorEvent[]): AnchorEvent[] {
   return all.filter(a => a.start_date <= date && date <= (a.end_date ?? a.start_date));
 }
 
-export function YearView({ yearId, onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick, layers, audience, priority, trainingClasses, conflicts = [] }: Props) {
+export function YearView({ yearId, onDateClick, onSessionClick, onEmptyCellClick, onAnchorClick, layers, audience, priority, trainingClasses, conflicts = [], focusClassId, focusStageId, classStageMap, searchText, tierFilter }: Props) {
   const showHolidays = layers?.holidays ?? true;
   const showAnchors  = layers?.wingHQEvents ?? true;
 
@@ -201,6 +206,11 @@ export function YearView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
                             onEmptyCellClick={onEmptyCellClick
                               ? (cg, period, tcId) => onEmptyCellClick(pd.parade_date_id, pd.parade_date, cg, period, tcId)
                               : undefined}
+                            focusClassId={focusClassId}
+                            focusStageId={focusStageId}
+                            classStageMap={classStageMap}
+                            searchText={searchText}
+                            tierFilter={tierFilter}
                           />
                           {dateAnchors.length > 0 && (
                             <div className="pw-anchor-strip" style={{ marginTop: 4 }}>

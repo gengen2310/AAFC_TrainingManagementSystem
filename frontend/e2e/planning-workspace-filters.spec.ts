@@ -9,14 +9,40 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 const API_BASE = process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000";
 
-test.beforeAll(async () => {
+// These tests navigate a planning workspace that may have many accumulated years
+// from prior runs (long-lived local dev DB). Loading + assertions can exceed the
+// 30-second default; 120 seconds gives reliable headroom on a busy DB.
+test.describe.configure({ timeout: 120000 });
+
+// Per-test reset: 3 parallel browsers × 4 tests = 12 concurrent tests consuming
+// 10+ requests each, which can exhaust the 300 req/60s budget before the 4th
+// test runs in a given browser. beforeEach gives every test its own fresh budget
+// regardless of what other workers have consumed.
+test.beforeEach(async () => {
   await resetBackendRateLimits(API_BASE);
+});
+
+// ---------------------------------------------------------------------------
+// Cleanup registry — test bodies register closures here; test.afterEach drains
+// them with its own fresh 60-second timeout budget so cleanup never competes
+// with the test body for the same 120-second allowance.
+// ---------------------------------------------------------------------------
+const cleanupFns: (() => Promise<void>)[] = [];
+
+test.afterEach(async ({}, testInfo) => {
+  // Give cleanup its own 60-second budget regardless of how long the test body ran.
+  testInfo.setTimeout(60_000);
+  const fns = cleanupFns.splice(0);
+  for (const fn of fns) {
+    try { await fn(); } catch { /* best-effort: never block the next test */ }
+  }
 });
 
 const ADMIN_CODE = "ADMIN703";
 
 async function authHeader(page: Page, code: string): Promise<Record<string, string>> {
   const r = await page.request.post(`${API_BASE}/api/auth/login`, { data: { code } });
+  expect(r.ok(), `auth/login failed (${r.status()}) — likely rate limit; check beforeEach reset`).toBe(true);
   const token = (await r.json()).token as string;
   return { Authorization: `Bearer ${token}` };
 }
@@ -91,7 +117,8 @@ async function buildFixture(page: Page, hdr: Record<string, string>, testYear: n
 // ---------------------------------------------------------------------------
 test("CLASS-19: class focus chip — clicking a class chip dims sessions not assigned to that class", async ({ page }) => {
   const hdr = await authHeader(page, ADMIN_CODE);
-  const testYear = 2700 + (Date.now() % 50);
+  // % 7000: keeps testYear ≤ 9699 (backend date.fromisoformat rejects years > 9999).
+  const testYear = 2700 + (Date.now() % 7000);
   const f = await buildFixture(page, hdr, testYear, "C19");
 
   // Second class in the same stage — session 2 will NOT have this class assigned.
@@ -101,6 +128,13 @@ test("CLASS-19: class focus chip — clicking a class chip dims sessions not ass
   });
   expect(class2Res.ok()).toBe(true);
   const class2Id = (await class2Res.json()).training_class_id as string;
+
+  // Register cleanup in afterEach so it runs with its own 60 s budget, separate
+  // from the 120 s test body budget (avoids cleanup timing out on a busy dev DB).
+  cleanupFns.push(async () => {
+    await page.request.delete(`${API_BASE}/api/training-classes/${class2Id}`, { headers: hdr });
+    await f.cleanup();
+  });
 
   // Session 2 assigned to class2 only.
   const sess2Res = await page.request.post(`${API_BASE}/api/sessions`, {
@@ -112,35 +146,34 @@ test("CLASS-19: class focus chip — clicking a class chip dims sessions not ass
     data: { training_class_ids: [class2Id] }, headers: hdr,
   });
 
-  try {
-    await page.goto("/planning");
-    await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
-    await page.getByRole("button", { name: f.yearLabel }).click();
+  await page.goto("/planning");
+  await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
+  await page.getByRole("button", { name: f.yearLabel }).click();
 
-    // Left panel "Class focus" section is only rendered when >1 class exists.
-    // It uses aria-pressed on each chip button.
-    const classChip = page.getByRole("button", { name: f.className, exact: true }).filter({ has: page.locator('[aria-pressed]') });
-    await expect(classChip).toBeVisible({ timeout: 10000 });
+  // Left panel "Class focus" section is only rendered when >1 class exists.
+  // Scope to the "Class focus" .pw-section to avoid the strict-mode violation
+  // caused by the backlog class filter chips (same button name, also aria-pressed).
+  const classFocusSection = page.locator('.pw-section').filter({
+    has: page.locator('.pw-section-hdr', { hasText: 'Class focus' }),
+  });
+  const classChip = classFocusSection.getByRole("button", { name: f.className, exact: true });
+  await expect(classChip).toBeVisible({ timeout: 10000 });
 
-    // Initially "All" is pressed, none of the period cells are dimmed.
-    const allChip = page.locator('.pw-filter-chips button[aria-pressed="true"]').first();
-    await expect(allChip).toContainText("All");
+  // Initially "All" is pressed, none of the period cells are dimmed.
+  const allChip = page.locator('.pw-filter-chips button[aria-pressed="true"]').first();
+  await expect(allChip).toContainText("All");
 
-    // Click the first class chip.
-    await page.getByRole("button", { name: f.className }).filter({ has: page.locator('[aria-pressed]') }).click();
+  // Click the first class chip.
+  await classChip.click();
 
-    // The clicked chip should now be selected (aria-pressed="true").
-    const pressedChip = page.locator(`button[aria-pressed="true"]`).filter({ hasText: f.className });
-    await expect(pressedChip).toBeVisible({ timeout: 5000 });
+  // The clicked chip should now be selected (aria-pressed="true").
+  const pressedChip = page.locator(`button[aria-pressed="true"]`).filter({ hasText: f.className });
+  await expect(pressedChip).toBeVisible({ timeout: 5000 });
 
-    // Sessions NOT assigned to classId should be dimmed (opacity 0.22 inline style).
-    // We verify that at least one cell carries the dimmed style.
-    const dimmedCell = page.locator('td[style*="opacity: 0.22"]');
-    await expect(dimmedCell.first()).toBeVisible({ timeout: 5000 });
-  } finally {
-    await page.request.delete(`${API_BASE}/api/training-classes/${class2Id}`, { headers: hdr });
-    await f.cleanup();
-  }
+  // Sessions NOT assigned to classId should be dimmed (opacity 0.22 inline style).
+  // We verify that at least one cell carries the dimmed style.
+  const dimmedCell = page.locator('td[style*="opacity: 0.22"]');
+  await expect(dimmedCell.first()).toBeVisible({ timeout: 5000 });
 });
 
 // ---------------------------------------------------------------------------
@@ -148,7 +181,7 @@ test("CLASS-19: class focus chip — clicking a class chip dims sessions not ass
 // ---------------------------------------------------------------------------
 test("CLASS-21: tier filter — 'Foundation' chip dims a session with core_status=additional", async ({ page }) => {
   const hdr = await authHeader(page, ADMIN_CODE);
-  const testYear = 2750 + (Date.now() % 50);
+  const testYear = 2750 + (Date.now() % 7000);
   const f = await buildFixture(page, hdr, testYear, "C21");
 
   // Create a squadron curriculum item — POST /api/curriculum always creates
@@ -167,40 +200,41 @@ test("CLASS-21: tier filter — 'Foundation' chip dims a session with core_statu
   });
   expect(sessUpdateRes.ok(), `session update: ${await sessUpdateRes.text()}`).toBe(true);
 
-  try {
-    await page.goto("/planning");
-    await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
-    await page.getByRole("button", { name: f.yearLabel }).click();
-
-    // "Session tier" section should be in the left panel.
-    const tierSection = page.locator('.pw-section-hdr', { hasText: 'Session tier' });
-    await expect(tierSection).toBeVisible({ timeout: 10000 });
-
-    // Initially "All" is pressed (aria-pressed="true") for the tier section.
-    const tierAllChip = page.locator('.pw-filter-chips button', { hasText: 'All' }).first();
-    await expect(tierAllChip).toHaveAttribute('aria-pressed', 'true');
-
-    // Click "Foundation" chip.
-    const foundationChip = page.locator('.pw-filter-chips button', { hasText: 'Foundation' });
-    await foundationChip.click();
-    await expect(foundationChip).toHaveAttribute('aria-pressed', 'true');
-
-    // Our session has core_status="additional" (not "core"), so it should be dimmed.
-    const dimmedCell = page.locator('td[style*="opacity: 0.22"]');
-    await expect(dimmedCell.first()).toBeVisible({ timeout: 5000 });
-
-    // Clicking "Extension" should un-dim the "additional" session.
-    const extensionChip = page.locator('.pw-filter-chips button', { hasText: 'Extension' });
-    await extensionChip.click();
-    await expect(extensionChip).toHaveAttribute('aria-pressed', 'true');
-    // The "additional" session is now NOT dimmed (it matches "extension" = "additional").
-    // Verify no dimmed cells are visible in the block.
-    const dimmedAfterExt = page.locator('td[style*="opacity: 0.22"]');
-    await expect(dimmedAfterExt).toHaveCount(0);
-  } finally {
+  cleanupFns.push(async () => {
     await page.request.delete(`${API_BASE}/api/curriculum/${ciId}`, { headers: hdr });
     await f.cleanup();
-  }
+  });
+
+  await page.goto("/planning");
+  await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
+  await page.getByRole("button", { name: f.yearLabel }).click();
+
+  // "Training Period tier" section should be in the left panel.
+  // (PlanningLeftPanel.tsx line 131 uses "Training Period tier", not "Session tier")
+  const tierSection = page.locator('.pw-section-hdr', { hasText: 'Training Period tier' });
+  await expect(tierSection).toBeVisible({ timeout: 10000 });
+
+  // Initially "All" is pressed (aria-pressed="true") for the tier section.
+  const tierAllChip = page.locator('.pw-filter-chips button', { hasText: 'All' }).first();
+  await expect(tierAllChip).toHaveAttribute('aria-pressed', 'true');
+
+  // Click "Foundation" chip.
+  const foundationChip = page.locator('.pw-filter-chips button', { hasText: 'Foundation' });
+  await foundationChip.click();
+  await expect(foundationChip).toHaveAttribute('aria-pressed', 'true');
+
+  // Our session has core_status="additional" (not "core"), so it should be dimmed.
+  const dimmedCell = page.locator('td[style*="opacity: 0.22"]');
+  await expect(dimmedCell.first()).toBeVisible({ timeout: 5000 });
+
+  // Clicking "Extension" should un-dim the "additional" session.
+  const extensionChip = page.locator('.pw-filter-chips button', { hasText: 'Extension' });
+  await extensionChip.click();
+  await expect(extensionChip).toHaveAttribute('aria-pressed', 'true');
+  // The "additional" session is now NOT dimmed (it matches "extension" = "additional").
+  // Verify no dimmed cells are visible in the block.
+  const dimmedAfterExt = page.locator('td[style*="opacity: 0.22"]');
+  await expect(dimmedAfterExt).toHaveCount(0);
 });
 
 // ---------------------------------------------------------------------------
@@ -208,7 +242,7 @@ test("CLASS-21: tier filter — 'Foundation' chip dims a session with core_statu
 // ---------------------------------------------------------------------------
 test("CLASS-22: stage focus — clicking a stage chip dims sessions from other stages", async ({ page }) => {
   const hdr = await authHeader(page, ADMIN_CODE);
-  const testYear = 2800 + (Date.now() % 50);
+  const testYear = 2800 + (Date.now() % 7000);
   const me = await (await page.request.get(`${API_BASE}/api/auth/me`, { headers: hdr })).json();
   const sqnId = me.session.squadron_id as string;
   const suffix = String(Date.now());
@@ -273,25 +307,7 @@ test("CLASS-22: stage focus — clicking a stage chip dims sessions from other s
     data: { training_class_ids: [classBId] }, headers: hdr,
   });
 
-  try {
-    await page.goto("/planning");
-    await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
-    await page.getByRole("button", { name: yearLabel }).click();
-
-    // "Stage focus" section visible only when multiStage (>1 distinct stage).
-    const stageFocusSection = page.locator('.pw-section-hdr', { hasText: 'Stage focus' });
-    await expect(stageFocusSection).toBeVisible({ timeout: 10000 });
-
-    // Click Stage A chip.
-    const stageAChip = page.locator('.pw-filter-chips button[aria-pressed]', { hasText: stageAName });
-    await expect(stageAChip).toBeVisible({ timeout: 5000 });
-    await stageAChip.click();
-    await expect(stageAChip).toHaveAttribute('aria-pressed', 'true');
-
-    // Session 2 (Stage B) should now be dimmed.
-    const dimmedCells = page.locator('td[style*="opacity: 0.22"]');
-    await expect(dimmedCells.first()).toBeVisible({ timeout: 5000 });
-  } finally {
+  cleanupFns.push(async () => {
     await page.request.delete(`${API_BASE}/api/training-classes/${classAId}`, { headers: hdr });
     await page.request.delete(`${API_BASE}/api/training-classes/${classBId}`, { headers: hdr });
     await page.request.post(`${API_BASE}/api/curriculum/phases/${stageAId}/archive`, { headers: hdr });
@@ -300,7 +316,27 @@ test("CLASS-22: stage focus — clicking a stage chip dims sessions from other s
     await page.request.patch(`${API_BASE}/api/planning/years/${yearId}`, {
       data: { active_status: false, version: yr.version }, headers: hdr,
     });
-  }
+  });
+
+  await page.goto("/planning");
+  await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
+  await page.getByRole("button", { name: yearLabel }).click();
+
+  // "Stage focus" section visible only when multiStage (>1 distinct stage).
+  // Waiting for it implicitly confirms the trainingClasses query has resolved
+  // (the section only renders once multiple stages are available).
+  const stageFocusSection = page.locator('.pw-section-hdr', { hasText: 'Stage focus' });
+  await expect(stageFocusSection).toBeVisible({ timeout: 10000 });
+
+  // Click Stage A chip.
+  const stageAChip = page.locator('.pw-filter-chips button[aria-pressed]', { hasText: stageAName });
+  await expect(stageAChip).toBeVisible({ timeout: 5000 });
+  await stageAChip.click();
+  await expect(stageAChip).toHaveAttribute('aria-pressed', 'true');
+
+  // Session 2 (Stage B) should now be dimmed.
+  const dimmedCells = page.locator('td[style*="opacity: 0.22"]');
+  await expect(dimmedCells.first()).toBeVisible({ timeout: 5000 });
 });
 
 // ---------------------------------------------------------------------------
@@ -308,37 +344,37 @@ test("CLASS-22: stage focus — clicking a stage chip dims sessions from other s
 // ---------------------------------------------------------------------------
 test("CLASS-23: collapse button — clicking collapse hides block body; clicking again expands", async ({ page }) => {
   const hdr = await authHeader(page, ADMIN_CODE);
-  const testYear = 2850 + (Date.now() % 50);
+  const testYear = 2850 + (Date.now() % 7000);
   const f = await buildFixture(page, hdr, testYear, "C23");
 
-  try {
-    await page.goto("/planning");
-    await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
-    await page.getByRole("button", { name: f.yearLabel }).click();
-
-    // Wait for at least one parade night block to appear.
-    const collapseBtn = page.locator('.pw-block-collapse-btn').first();
-    await expect(collapseBtn).toBeVisible({ timeout: 10000 });
-
-    // Initially expanded: aria-expanded="true".
-    await expect(collapseBtn).toHaveAttribute('aria-expanded', 'true');
-
-    // Block body contains the period grid table (.pw-night-grid), hidden on collapse.
-    const blockGrid = page.locator('.pw-night-grid').first();
-    await expect(blockGrid).toBeVisible({ timeout: 5000 });
-
-    // Collapse.
-    await collapseBtn.click();
-    await expect(collapseBtn).toHaveAttribute('aria-expanded', 'false');
-
-    // Grid should be hidden.
-    await expect(blockGrid).not.toBeVisible({ timeout: 5000 });
-
-    // Expand again.
-    await collapseBtn.click();
-    await expect(collapseBtn).toHaveAttribute('aria-expanded', 'true');
-    await expect(blockGrid).toBeVisible({ timeout: 5000 });
-  } finally {
+  cleanupFns.push(async () => {
     await f.cleanup();
-  }
+  });
+
+  await page.goto("/planning");
+  await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
+  await page.getByRole("button", { name: f.yearLabel }).click();
+
+  // Wait for at least one parade night block to appear.
+  const collapseBtn = page.locator('.pw-block-collapse-btn').first();
+  await expect(collapseBtn).toBeVisible({ timeout: 10000 });
+
+  // Initially expanded: aria-expanded="true".
+  await expect(collapseBtn).toHaveAttribute('aria-expanded', 'true');
+
+  // Block body contains the period grid table (.pw-night-grid), hidden on collapse.
+  const blockGrid = page.locator('.pw-night-grid').first();
+  await expect(blockGrid).toBeVisible({ timeout: 5000 });
+
+  // Collapse.
+  await collapseBtn.click();
+  await expect(collapseBtn).toHaveAttribute('aria-expanded', 'false');
+
+  // Grid should be hidden.
+  await expect(blockGrid).not.toBeVisible({ timeout: 5000 });
+
+  // Expand again.
+  await collapseBtn.click();
+  await expect(collapseBtn).toHaveAttribute('aria-expanded', 'true');
+  await expect(blockGrid).toBeVisible({ timeout: 5000 });
 });

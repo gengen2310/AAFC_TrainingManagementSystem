@@ -118,7 +118,7 @@ test("clicking Open shows parade night detail modal", async ({ page }) => {
   await expect(dialog).toBeVisible({ timeout: 8000 });
   await expect(dialog.getByText("2099-12-12")).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Publish" })).toBeVisible();
-  await expect(dialog.getByRole("button", { name: "Add session" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Add Training Period" })).toBeVisible();
 });
 
 // ── 5. Add a session to a parade night ───────────────────────────────────────
@@ -140,8 +140,8 @@ test("sqn_admin can add a session to a parade night", async ({ page }) => {
   const dialog = page.getByRole("dialog", { name: "Parade night" });
   await expect(dialog).toBeVisible({ timeout: 8000 });
 
-  await dialog.getByRole("button", { name: "Add session" }).click();
-  await expect(page.getByRole("heading", { name: "Add session" })).toBeVisible({ timeout: 5000 });
+  await dialog.getByRole("button", { name: "Add Training Period" }).click();
+  await expect(page.getByRole("heading", { name: "Add Training Period" })).toBeVisible({ timeout: 5000 });
 
   // Fill in period number (minimum required field)
   await page.locator("#s-period").fill("1");

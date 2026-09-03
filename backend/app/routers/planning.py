@@ -2402,8 +2402,28 @@ def get_long_range(
         ts_by_night_lr: dict[str, list] = {}
         for s in ts_lr_all:
             ts_by_night_lr.setdefault(s.parade_night_id, []).append(s)
+
+        # Bulk-load training_classes for all sessions in range (mirrors weekly-program endpoint).
+        # Without this, EightWeekView renders in training-class mode (every new planning year
+        # auto-creates 5 default TrainingClass rows) but getCellByClassId() never finds any
+        # session because training_classes was absent from the response — all cells rendered as
+        # "Empty slot" and conflict dots were invisible even for sessions with real conflicts.
+        from collections import defaultdict
+        classes_by_session_lr: dict[str, list[dict]] = {}
+        if ts_lr_all:
+            aud_rows_lr = (
+                db.query(SessionAudience, TrainingClass)
+                .join(TrainingClass, SessionAudience.training_class_id == TrainingClass.id)
+                .filter(SessionAudience.session_id.in_([s.id for s in ts_lr_all]))
+                .all()
+            )
+            _cb: dict[str, list[dict]] = defaultdict(list)
+            for aud, tc in aud_rows_lr:
+                _cb[aud.session_id].append({"training_class_id": tc.id, "display_name": tc.display_name})
+            classes_by_session_lr = dict(_cb)
     else:
         ts_by_night_lr = {}
+        classes_by_session_lr = {}
 
     rows = []
     for pn_obj in parade_dates:
@@ -2411,6 +2431,8 @@ def get_long_range(
         ts = sorted(ts_by_night_lr.get(pn_obj.id, []),
                     key=lambda s: (s.period_number, s.cadet_group or ""))
         real_sessions = [_real_session_out(s, db, ci_tier=ci_tier_lr) for s in ts]
+        for sess_out, s in zip(real_sessions, ts):
+            sess_out["training_classes"] = classes_by_session_lr.get(s.id, [])
 
         conflicts = db.query(PlanningConflict).filter(
             PlanningConflict.parade_night_id == pn_obj.id,

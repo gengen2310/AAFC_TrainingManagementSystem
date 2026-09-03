@@ -127,6 +127,17 @@ class Settings(BaseSettings):
             problems.append("JWT_SECRET must be a strong value (>=32 chars) in production.")
         if not self.COOKIE_SECURE:
             problems.append("COOKIE_SECURE must be true in production (HTTPS).")
+        if self.COOKIE_SAMESITE.lower() == "none" and not self.COOKIE_SECURE:
+            problems.append(
+                "COOKIE_SAMESITE=none requires COOKIE_SECURE=true; "
+                "browsers reject SameSite=None cookies over HTTP."
+            )
+        if self.COOKIE_SAMESITE.lower() in ("lax", "strict"):
+            problems.append(
+                "COOKIE_SAMESITE must be 'none' in production: the TMS frontend and "
+                "backend run on different Railway origins and require cross-origin cookie "
+                "delivery. SameSite=lax or strict blocks the session cookie entirely."
+            )
         origins = self.cors_origins
         if not origins:
             problems.append("CORS_ALLOWED_ORIGINS must list the real frontend origin in production.")

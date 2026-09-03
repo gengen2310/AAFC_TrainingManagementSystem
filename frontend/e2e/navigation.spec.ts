@@ -72,7 +72,7 @@ test("Mission Backlog Rec. Term column is not double-prefixed", async ({ page })
   await page.goto("/planning");
   await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
 
-  await page.getByText("Activities ▲").click();
+  await page.getByText("Planning Tools ▲").click();
   await page.getByRole("button", { name: "Mission Backlog" }).click();
   await expect(page.getByText("Rec. Term")).toBeVisible({ timeout: 8000 });
 
@@ -87,7 +87,7 @@ test("Activities tab shows Getting Help section, Edit hidden for sqn_admin", asy
   await page.goto("/planning");
   await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
 
-  await page.getByText("Activities ▲").click();
+  await page.getByText("Planning Tools ▲").click();
   const helpHeading = page.getByRole("heading", { name: "Getting Help" });
   await expect(helpHeading).toBeVisible({ timeout: 8000 });
   // sqn_admin is not system_admin -- the Edit control must not render.

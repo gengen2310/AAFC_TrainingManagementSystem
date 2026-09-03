@@ -51,7 +51,7 @@ cd frontend && npm run dev
 cd backend && source .venv/bin/activate && python -m pytest tests/ -q
 ```
 
-Baseline as of 2026-08-30 (commit 38c16c7): 2130 passed, 9 skipped — re-run and record the real pass/fail/skip count rather than trusting any number written here; it goes stale fast.
+Baseline as of 2026-09-02 (fix/v17-1-pre-release-remediation): 2215 passed, 9 skipped — re-run and record the real pass/fail/skip count rather than trusting any number written here; it goes stale fast.
 
 ## Deployment
 

@@ -11,8 +11,24 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 const API_BASE = process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000";
 
+// UI navigation to /planning + multiple interactions can approach 30 s on a
+// slow CI runner; 60 s gives reliable headroom.
+test.describe.configure({ timeout: 60000 });
+
 test.beforeAll(async () => {
   await resetBackendRateLimits(API_BASE);
+});
+
+// Cleanup registry — registered closures run with their own 30-second budget
+// in afterEach, separate from the test body's 60-second budget.
+const cleanupFns: (() => Promise<void>)[] = [];
+
+test.afterEach(async ({}, testInfo) => {
+  testInfo.setTimeout(30_000);
+  const fns = cleanupFns.splice(0);
+  for (const fn of fns) {
+    try { await fn(); } catch { /* best-effort */ }
+  }
 });
 
 const ADMIN_CODE = "ADMIN703";
@@ -43,33 +59,33 @@ test("an archived leave period is hidden by default, visible via Show archived, 
   const deleteRes = await page.request.delete(`${API_BASE}/api/planning/facilitator-leave/${leaveId}`, { headers: hdr });
   expect(deleteRes.ok()).toBe(true);
 
-  try {
-    await page.goto("/planning");
-    await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
-
-    await page.getByText("Activities ▲").click();
-    await page.getByRole("button", { name: "Facilitators" }).click();
-    await expect(page.getByText(`RestoreTest ${suffix}`)).toBeVisible({ timeout: 8000 });
-
-    // Expand this facilitator's profile panel.
-    await page.getByText(`RestoreTest ${suffix}`).click();
-    await expect(page.getByText("Leave / Unavailability")).toBeVisible({ timeout: 5000 });
-
-    // Hidden by default.
-    await expect(page.getByText(`E2E REM-133 ${suffix}`)).not.toBeVisible();
-
-    // Visible with "Show archived" clicked, flagged as archived.
-    await page.getByRole("button", { name: "Show archived" }).click();
-    const row = page.locator("div", { hasText: `E2E REM-133 ${suffix}` }).filter({ hasText: "Archived" }).last();
-    await expect(row).toBeVisible({ timeout: 5000 });
-
-    // Restore brings it back into the active (non-archived) list.
-    await row.getByRole("button", { name: "Restore" }).click();
-    await expect(page.getByRole("button", { name: "Hide archived" })).toBeVisible({ timeout: 5000 });
-    await page.getByRole("button", { name: "Hide archived" }).click();
-    await expect(page.getByText(`E2E REM-133 ${suffix}`)).toBeVisible({ timeout: 5000 });
-  } finally {
+  cleanupFns.push(async () => {
     await page.request.delete(`${API_BASE}/api/planning/facilitator-leave/${leaveId}`, { headers: hdr });
     await page.request.delete(`${API_BASE}/api/facilitators/${facId}`, { headers: hdr });
-  }
+  });
+
+  await page.goto("/planning");
+  await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
+
+  await page.getByText("Planning Tools ▲").click();
+  await page.getByRole("button", { name: "Facilitators" }).click();
+  await expect(page.getByText(`RestoreTest ${suffix}`)).toBeVisible({ timeout: 8000 });
+
+  // Expand this facilitator's profile panel.
+  await page.getByText(`RestoreTest ${suffix}`).click();
+  await expect(page.getByText("Leave / Unavailability")).toBeVisible({ timeout: 5000 });
+
+  // Hidden by default.
+  await expect(page.getByText(`E2E REM-133 ${suffix}`)).not.toBeVisible();
+
+  // Visible with "Show archived" clicked, flagged as archived.
+  await page.getByRole("button", { name: "Show archived" }).click();
+  const row = page.locator("div", { hasText: `E2E REM-133 ${suffix}` }).filter({ hasText: "Archived" }).last();
+  await expect(row).toBeVisible({ timeout: 5000 });
+
+  // Restore brings it back into the active (non-archived) list.
+  await row.getByRole("button", { name: "Restore" }).click();
+  await expect(page.getByRole("button", { name: "Hide archived" })).toBeVisible({ timeout: 5000 });
+  await page.getByRole("button", { name: "Hide archived" }).click();
+  await expect(page.getByText(`E2E REM-133 ${suffix}`)).toBeVisible({ timeout: 5000 });
 });

@@ -35,7 +35,8 @@ def test_production_config_fails_closed_on_dev_secrets():
 
 def test_production_config_passes_when_hardened():
     s = Settings(ENVIRONMENT="production",
-                 SECRET_KEY="x" * 40, JWT_SECRET="y" * 40, COOKIE_SECURE=True,
+                 SECRET_KEY="x" * 40, JWT_SECRET="y" * 40,
+                 COOKIE_SECURE=True, COOKIE_SAMESITE="none",
                  CORS_ALLOWED_ORIGINS="https://tms.example.org",
                  DATABASE_URL="postgresql://u:p@db:5432/tms")
     assert s.validate_for_production() == []
@@ -44,3 +45,29 @@ def test_production_config_passes_when_hardened():
 def test_development_config_is_not_blocked():
     s = Settings(ENVIRONMENT="development")
     assert s.validate_for_production() == []
+
+
+def test_production_cookie_samesite_none_requires_secure():
+    """SYN-H01: COOKIE_SAMESITE=none without COOKIE_SECURE=true must be rejected."""
+    s = Settings(ENVIRONMENT="production",
+                 SECRET_KEY="x" * 40, JWT_SECRET="y" * 40,
+                 COOKIE_SECURE=False, COOKIE_SAMESITE="none",
+                 CORS_ALLOWED_ORIGINS="https://tms.example.org",
+                 DATABASE_URL="postgresql://u:p@db:5432/tms")
+    problems = s.validate_for_production()
+    assert any("samesite" in p.lower() or "cookie_secure" in p.lower() for p in problems), (
+        f"Expected a COOKIE_SAMESITE/COOKIE_SECURE error, got: {problems}"
+    )
+
+
+def test_production_cookie_samesite_lax_is_rejected():
+    """SYN-H01: COOKIE_SAMESITE=lax breaks cross-origin Railway session delivery."""
+    s = Settings(ENVIRONMENT="production",
+                 SECRET_KEY="x" * 40, JWT_SECRET="y" * 40,
+                 COOKIE_SECURE=True, COOKIE_SAMESITE="lax",
+                 CORS_ALLOWED_ORIGINS="https://tms.example.org",
+                 DATABASE_URL="postgresql://u:p@db:5432/tms")
+    problems = s.validate_for_production()
+    assert any("samesite" in p.lower() for p in problems), (
+        f"Expected COOKIE_SAMESITE=lax to produce a problem, got: {problems}"
+    )

@@ -792,6 +792,14 @@ def create_session(body: SessionIn, db: DBSession = Depends(get_db), p: Principa
     # appeared in the grid. Found 2026-08-26; edit_session honoured the field all
     # along, which is why this survived: anything edited once looked correct.
     _validate_timing_block(db, pn, body.timing_block_id)
+    # Scope checks mirror edit_session — _denormalise trusts its caller to have
+    # validated that the referenced objects are visible/owned by this squadron.
+    if body.curriculum_item_id and not visible_curriculum_item(db, p, body.curriculum_item_id):
+        raise HTTPException(400, detail={"error": "invalid_curriculum_item"})
+    if body.facilitator_id and not scoped_facilitator(db, body.facilitator_id, pn.squadron_id):
+        raise HTTPException(400, detail={"error": "invalid_facilitator"})
+    if body.training_area_id and not scoped_training_area(db, body.training_area_id, pn.squadron_id):
+        raise HTTPException(400, detail={"error": "invalid_training_area"})
     s = Session(parade_night_id=pn.id, squadron_id=pn.squadron_id, period_number=body.period_number,
                 cadet_group=body.cadet_group, phase_at_time=body.phase_at_time, custom_title=body.custom_title,
                 expected_attendance=body.expected_attendance, status=initial_status,
@@ -2202,7 +2210,9 @@ def create_training_class(body: TrainingClassIn, db: DBSession = Depends(get_db)
     if body.stage_code and body.stage_code not in STAGE_CODES:
         raise HTTPException(400, detail={"error": "invalid_stage_code",
                                          "valid": sorted(STAGE_CODES)})
-    # Auto-assign next available class_number if not provided
+    # Auto-assign next available class_number if not provided.
+    # Include archived classes because the DB unique constraint covers all rows
+    # regardless of is_archived — skipping archived numbers caused IntegrityError 500s.
     if body.class_number is None:
         existing_numbers = {
             r.class_number for r in
@@ -2210,7 +2220,6 @@ def create_training_class(body: TrainingClassIn, db: DBSession = Depends(get_db)
             .filter(
                 TrainingClass.squadron_id == s.id,
                 TrainingClass.training_year_id == body.training_year_id,
-                TrainingClass.is_archived == False,  # noqa: E712
             ).all()
         }
         n = 1
@@ -2219,16 +2228,17 @@ def create_training_class(body: TrainingClassIn, db: DBSession = Depends(get_db)
         assigned_number = n
     else:
         assigned_number = body.class_number
-    # Validate uniqueness (archived classes do not block numbering)
+    # Validate uniqueness against all rows (including archived) so the DB
+    # unique constraint is never violated.
     conflict = db.query(TrainingClass).filter(
         TrainingClass.squadron_id == s.id,
         TrainingClass.training_year_id == body.training_year_id,
         TrainingClass.class_number == assigned_number,
-        TrainingClass.is_archived == False,  # noqa: E712
     ).first()
     if conflict:
         raise HTTPException(400, detail={"error": "class_number_already_in_use",
-                                         "class_number": assigned_number})
+                                         "class_number": assigned_number,
+                                         "archived": conflict.is_archived})
     c = TrainingClass(
         squadron_id=s.id, training_year_id=body.training_year_id,
         training_stage_id=body.training_stage_id, display_name=body.display_name,
@@ -4743,6 +4753,11 @@ def import_curriculum(body: CurriculumImportIn, db: DBSession = Depends(get_db),
 
     owning_level = body.owning_level if body.owning_level in {"national", "wing", "squadron"} else "national"
     sqn_id = body.squadron_id
+
+    if sqn_id:
+        if not db.get(Squadron, sqn_id):
+            raise HTTPException(404, detail={"error": "squadron_not_found",
+                                             "message": "The referenced squadron does not exist."})
 
     created = updated = skipped = failed = 0
     results = []
