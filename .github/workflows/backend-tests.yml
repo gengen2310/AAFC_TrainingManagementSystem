@@ -96,6 +96,9 @@ jobs:
         working-directory: backend
         run: pip install -r requirements.txt
 
+      - name: Install psycopg2 for PostgreSQL driver
+        run: pip install psycopg2-binary
+
       - name: Run Alembic migrations against PostgreSQL
         working-directory: backend
         run: alembic upgrade head
