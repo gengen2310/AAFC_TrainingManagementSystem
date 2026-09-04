@@ -6770,7 +6770,7 @@ async function scSaveSdEmail(scope, email, wingId){
   try {
     const body={scope, notification_email:email};
     if(wingId) body.wing_id=wingId;
-    await api('PUT','/api/service-desk/email-config',body);
+    await api('/api/service-desk/email-config',{method:'PUT',body});
     showToast('Notification email saved.');
     scLoadSdEmailConfig();
   } catch(e){ showToast(apiErr(e),true); }
@@ -7277,8 +7277,8 @@ function _renderAccountTable(){
       const cb=canBulk?`<td class="no-print">${(isMe||u.is_archived)?'':`<label style="display:flex;align-items:center;justify-content:center;min-height:var(--ctl-min);min-width:var(--ctl-min);cursor:pointer"><input type="checkbox" ${S.acctSelected.has(u.user_id)?'checked':''} onchange="_acctToggleOne('${u.user_id}',this.checked)" aria-label="Select ${esc(u.display_name||'')}"></label>`}</td>`:'';
       return `<tr>${cb}
       <td style="font-weight:700">${esc(u.display_name||'—')}</td>
-      <td><span class="badge ${_ROLE_CLS[u.role]||'b-grey'}">${_ROLE_LABELS[u.role]||u.role}</span></td>
-      <td><span class="badge ${_SCOPE_CLS[u.scope_type]||'b-grey'}">${_SCOPE_LABELS[u.scope_type]||u.scope_type||'—'}</span></td>
+      <td><span class="badge ${_ROLE_CLS[u.role]||'b-grey'}">${esc(_ROLE_LABELS[u.role]||u.role)}</span></td>
+      <td><span class="badge ${_SCOPE_CLS[u.scope_type]||'b-grey'}">${esc(_SCOPE_LABELS[u.scope_type]||u.scope_type||'—')}</span></td>
       <td style="font-size:var(--fs-xs);color:var(--muted)">${unit(u)}</td>
       <td>${statusBadge(u)}</td>
       <td style="font-size:var(--fs-xs)">${lastLogin(u)}</td>
@@ -7981,7 +7981,7 @@ function _wizRender(){
       <div class="tw" style="max-height:280px;overflow:auto"><table><thead><tr><th>Name</th><th>Role</th><th>Unit</th><th class="no-print"></th></tr></thead><tbody>
       ${w.accounts.map(u=>`<tr>
         <td style="font-weight:700">${esc(u.display_name||'—')}</td>
-        <td><span class="badge ${_ROLE_CLS[u.role]||'b-grey'}">${_ROLE_LABELS[u.role]||u.role}</span></td>
+        <td><span class="badge ${_ROLE_CLS[u.role]||'b-grey'}">${esc(_ROLE_LABELS[u.role]||u.role)}</span></td>
         <td style="font-size:var(--fs-xs);color:var(--muted)">${esc(u.squadron_code?('SQN '+u.squadron_code):(u.wing_code?('Wing '+u.wing_code):(u.scope_type==='national'?'NAT HQ':'—')))}</td>
         <td class="no-print"><button class="btn btn-xs btn-out" onclick="_wizRemove('${u.user_id}')">Remove</button></td>
       </tr>`).join('')}
@@ -8024,8 +8024,8 @@ function _wizRender(){
       <div class="tw" style="max-height:240px;overflow:auto"><table><thead><tr><th>Name</th><th>Role</th><th>Result</th></tr></thead><tbody>
       ${results.map(r=>`<tr>
         <td style="font-weight:700">${esc(r.display_name||r.account_id)}</td>
-        <td>${r.role?`<span class="badge ${_ROLE_CLS[r.role]||'b-grey'}">${_ROLE_LABELS[r.role]||r.role}</span>`:'—'}</td>
-        <td><span class="badge ${_WIZ_RESULT_BADGE[r.result]||'b-grey'}">${_WIZ_RESULT_LABEL[r.result]||r.result}</span>${r.reason&&_WIZ_SKIP_REASON[r.reason]?` <span style="font-size:var(--fs-2xs);color:var(--muted)">${_WIZ_SKIP_REASON[r.reason]}</span>`:''}</td>
+        <td>${r.role?`<span class="badge ${_ROLE_CLS[r.role]||'b-grey'}">${esc(_ROLE_LABELS[r.role]||r.role)}</span>`:'—'}</td>
+        <td><span class="badge ${_WIZ_RESULT_BADGE[r.result]||'b-grey'}">${esc(_WIZ_RESULT_LABEL[r.result]||r.result)}</span>${r.reason&&_WIZ_SKIP_REASON[r.reason]?` <span style="font-size:var(--fs-2xs);color:var(--muted)">${esc(_WIZ_SKIP_REASON[r.reason])}</span>`:''}</td>
       </tr>`).join('')}
       </tbody></table></div>
       <div style="margin-top:10px">
@@ -8167,7 +8167,7 @@ function _owzRender(){
             ${w.impact.active_accounts.map(a=>`<tr>
               <td><input type="checkbox" onchange="_owzNestedToggle('${a.user_id}',this.checked)" aria-label="Select ${esc(a.display_name||'')}"></td>
               <td style="font-weight:700">${esc(a.display_name||'—')}</td>
-              <td><span class="badge ${_ROLE_CLS[a.role]||'b-grey'}">${_ROLE_LABELS[a.role]||a.role}</span></td>
+              <td><span class="badge ${_ROLE_CLS[a.role]||'b-grey'}">${esc(_ROLE_LABELS[a.role]||a.role)}</span></td>
             </tr>`).join('')}
             </tbody></table></div>
             <button class="btn btn-xs btn-dk" id="owz-nested-archive-btn" style="margin-top:6px" disabled onclick="_owzArchiveNestedAccounts()">Archive selected accounts now</button>`;
@@ -19112,7 +19112,7 @@ function sdFmtDate(iso) {
 
 function sdStatusBadge(status) {
   const labels = {open: 'Open', in_progress: 'In Progress', resolved: 'Resolved'};
-  const cls = 'badge-' + status;
+  const cls = {open: 'badge-open', in_progress: 'badge-in_progress', resolved: 'badge-resolved'}[status] || 'b-grey';
   return `<span class="badge ${cls}" style="font-size:var(--fs-3xs);padding:2px 6px;border-radius:4px;font-weight:700">${esc(labels[status] || status)}</span>`;
 }
 
