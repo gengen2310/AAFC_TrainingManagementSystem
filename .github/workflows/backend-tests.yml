@@ -122,6 +122,12 @@ jobs:
           fi
         env:
           DATABASE_URL: postgresql://aafc_test:aafc_test@localhost:5432/aafc_test
+          # PGUSER/PGPASSWORD/PGHOST let psql connect without -U/-h flags.
+          # Without these, psql defaults to the OS user (runner/root) which has
+          # no PostgreSQL role, causing the data-migration rehearsal to fail.
+          PGUSER: aafc_test
+          PGPASSWORD: aafc_test
+          PGHOST: localhost
           ENVIRONMENT: development
           JWT_SECRET: dev-only-change-me-jwt-secret-aafc-tms
           SECRET_KEY: dev-only-change-me-in-production-aafc
