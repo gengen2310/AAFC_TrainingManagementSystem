@@ -241,7 +241,8 @@ class RecoveryEmailIn(BaseModel):
 
 
 class ResetCodeIn(BaseModel):
-    new_code: str | None = None   # if omitted, auto-generated
+    new_code: str | None = None      # if omitted, auto-generated
+    current_code: str | None = None  # required when resetting own code
 
 
 class FlightIn(BaseModel):
@@ -603,8 +604,19 @@ def reset_code(uid: str, body: ResetCodeIn, db: DBSession = Depends(get_db),
     if not u or u.is_archived:
         raise HTTPException(404, detail={"error": "not_found"})
 
-    # Self-service: any authenticated user may reset their own code
-    if uid != p.user_id:
+    # Self-service: any authenticated user may reset their own code,
+    # but must re-authenticate with the current code first — a stolen JWT
+    # alone must not be sufficient to rotate the access credential.
+    if uid == p.user_id:
+        caller_codes = db.query(AccessCode).filter(
+            AccessCode.user_id == p.user_id,
+            AccessCode.active_status == True  # noqa: E712
+        ).all()
+        if not any(verify_code(body.current_code or "", ac.code_hash) for ac in caller_codes):
+            raise HTTPException(403, detail={
+                "error": "reauth_required",
+                "message": "Enter your current access code to change it."})
+    else:
         _require_manage_authority(p, u, db)
 
     raw = (body.new_code or "").strip()
@@ -618,7 +630,10 @@ def reset_code(uid: str, body: ResetCodeIn, db: DBSession = Depends(get_db),
         plain = raw
     else:
         plain = generate_code()
-    ac = db.query(AccessCode).filter(AccessCode.user_id == u.id).first()
+    ac = db.query(AccessCode).filter(
+        AccessCode.user_id == u.id,
+        AccessCode.active_status == True  # noqa: E712
+    ).first()
     if not ac:
         ac = AccessCode(user_id=u.id, code_hash="", created_by=p.user_id)
         db.add(ac)
@@ -770,6 +785,7 @@ def archive_account(uid: str, reason: str | None = None, db: DBSession = Depends
     u.is_archived = True
     u.archived_at = utcnow()
     u.updated_by = p.user_id
+    u.token_version = (u.token_version or 0) + 1  # invalidate pre-archive JWTs
     for ac in db.query(AccessCode).filter(AccessCode.user_id == u.id).all():
         ac.active_status = False
     db.commit()
@@ -792,6 +808,7 @@ def restore_account(uid: str, db: DBSession = Depends(get_db), p: Principal = De
     u.archived_at = None
     u.active_status = True
     u.updated_by = p.user_id
+    u.token_version = (u.token_version or 0) + 1  # prevent pre-archive JWTs resurrecting
     for ac in db.query(AccessCode).filter(AccessCode.user_id == u.id).all():
         ac.active_status = True
     db.commit()
@@ -921,6 +938,7 @@ def batch_archive_accounts(body: BatchArchiveIn, db: DBSession = Depends(get_db)
             u.is_archived = True
             u.archived_at = utcnow()
             u.updated_by = p.user_id
+            u.token_version = (u.token_version or 0) + 1  # invalidate pre-archive JWTs
             for ac in db.query(AccessCode).filter(AccessCode.user_id == u.id).all():
                 ac.active_status = False
             audit(db, p, object_type="account", object_id=u.id, action="account_archived",

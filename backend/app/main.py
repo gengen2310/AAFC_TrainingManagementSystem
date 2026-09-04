@@ -315,11 +315,14 @@ async def api_rate_limit(request: Request, call_next):
         if settings.ENVIRONMENT.lower() in ("production", "prod", "staging"):
             from .security import check_api_rate_db
             from .database import SessionLocal
-            db = SessionLocal()
-            try:
-                over = check_api_rate_db(ip, db)
-            finally:
-                db.close()
+            import asyncio as _asyncio
+            def _check_rate_db():
+                db = SessionLocal()
+                try:
+                    return check_api_rate_db(ip, db)
+                finally:
+                    db.close()
+            over = await _asyncio.get_event_loop().run_in_executor(None, _check_rate_db)
         else:
             from .security import check_api_rate
             over = check_api_rate(ip)

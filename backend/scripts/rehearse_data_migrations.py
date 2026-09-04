@@ -34,8 +34,17 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 BACKEND = Path(__file__).resolve().parent.parent
+
+# Parse credentials from DATABASE_URL so psql-based and alembic-based helpers
+# both use the same user/password/host rather than falling back to the OS user.
+_url = urlparse(os.environ.get("DATABASE_URL", ""))
+_PG_USER = _url.username or os.environ.get("PGUSER") or os.environ.get("USER", "postgres")
+_PG_PASS = _url.password or os.environ.get("PGPASSWORD", "")
+_PG_HOST = _url.hostname or os.environ.get("PGHOST", "localhost")
+_PG_PORT = str(_url.port or os.environ.get("PGPORT", "5432"))
 
 
 def sh(db: str, sql: str, fetch: bool = False) -> str:
@@ -48,8 +57,8 @@ def sh(db: str, sql: str, fetch: bool = False) -> str:
 
 def alembic(db: str, *args: str) -> None:
     env = dict(os.environ)
-    env["DATABASE_URL"] = (
-        f"postgresql+psycopg2://{os.environ.get('USER','postgres')}@localhost:5432/{db}")
+    userinfo = f"{_PG_USER}:{_PG_PASS}@" if _PG_PASS else f"{_PG_USER}@"
+    env["DATABASE_URL"] = f"postgresql+psycopg2://{userinfo}{_PG_HOST}:{_PG_PORT}/{db}"
     r = subprocess.run([sys.executable, "-m", "alembic", *args],
                        cwd=BACKEND, env=env, capture_output=True, text=True, timeout=600)
     if r.returncode:

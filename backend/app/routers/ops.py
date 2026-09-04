@@ -456,9 +456,12 @@ def close_action(aid: str, db: DBSession = Depends(get_db), p: Principal = Depen
 # ── EXCEPTIONS / AUTOMATION ──
 @router.post("/exceptions/run-checks")
 def run_checks(db: DBSession = Depends(get_db), p: Principal = Depends(get_principal)):
+    from ..permissions import require_can_write_squadron
     sq = _active_squadron(p)
     if not sq:
         return {"created": 0}
+    s = db.get(Squadron, sq)
+    require_can_write_squadron(p, sq, s.wing_id if s else None)
     today = date.today()
     # clear prior automation items
     db.query(ActionItem).filter(ActionItem.squadron_id == sq, ActionItem.source == "automation",
