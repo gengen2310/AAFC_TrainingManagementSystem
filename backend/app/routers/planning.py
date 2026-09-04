@@ -962,6 +962,7 @@ def add_parade_date(
     sq = db.get(Squadron, py.unit_id)
     if sq is None:
         raise HTTPException(400, detail={"error": "squadron_not_found"})
+    require_can_write_squadron(p, py.unit_id, sq.wing_id)
     # Idempotent: if a night already exists for this date in THIS year, return it.
     # Two different planning years may share the same calendar date (valid scenario).
     existing = db.query(ParadeNight).filter(
@@ -1201,12 +1202,13 @@ def generate_parade_dates(
             "error": "wing_national_year_not_supported",
             "message": "Parade dates cannot be added to wing or national planning years through this endpoint.",
         })
+    sq = db.get(Squadron, py.unit_id)
+    require_can_write_squadron(p, py.unit_id, sq.wing_id if sq else py.wing_id)
     holidays = db.query(HolidayPeriod).filter(
         HolidayPeriod.planning_year_id == year_id,
         HolidayPeriod.affects_parade == True,  # noqa: E712
     ).all() if body.exclude_holidays else []
 
-    sq = db.get(Squadron, py.unit_id)
     existing_dates = {
         pn.date for pn in db.query(ParadeNight).filter(
             ParadeNight.planning_year_id == year_id
@@ -1280,6 +1282,9 @@ def update_future_parade_day(
     from sqlalchemy import or_
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=not body.preview)
+    if not body.preview and py.unit_id:
+        _sq = db.get(Squadron, py.unit_id)
+        require_can_write_squadron(p, py.unit_id, _sq.wing_id if _sq else py.wing_id)
     if not body.preview and not (body.reason or "").strip():
         raise HTTPException(400, detail={"error": "reason_required",
                                           "message": "A reason is required to update future parade nights."})
@@ -1417,6 +1422,7 @@ def delete_parade_date(
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(pn.planning_year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
     # Check for training sessions — cannot delete a night that has sessions
     session_count = db.query(TrainingSession).filter(
         TrainingSession.parade_night_id == pn.id
@@ -1495,6 +1501,9 @@ def add_holiday(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id:
+        _sq = db.get(Squadron, py.unit_id)
+        require_can_write_squadron(p, py.unit_id, _sq.wing_id if _sq else py.wing_id)
     h = HolidayPeriod(
         id=str(uuid.uuid4()), planning_year_id=year_id,
         jurisdiction=body.jurisdiction, name=body.name,
@@ -1537,6 +1546,9 @@ def update_holiday(
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(h.planning_year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id:
+        _sq = db.get(Squadron, py.unit_id)
+        require_can_write_squadron(p, py.unit_id, _sq.wing_id if _sq else py.wing_id)
     old = {"name": h.name, "start": h.start_date, "end": h.end_date, "type": h.holiday_type}
     if body.name is not None:
         h.name = body.name
@@ -1572,6 +1584,9 @@ def delete_holiday(
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(h.planning_year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id:
+        _sq = db.get(Squadron, py.unit_id)
+        require_can_write_squadron(p, py.unit_id, _sq.wing_id if _sq else py.wing_id)
     audit(db, p, object_type="holiday_period", object_id=h.id, action="delete",
           new={"name": h.name})
     db.delete(h); db.commit()
@@ -1642,6 +1657,9 @@ def create_anchor(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id:
+        _sq = db.get(Squadron, py.unit_id)
+        require_can_write_squadron(p, py.unit_id, _sq.wing_id if _sq else py.wing_id)
     wing_id = body.wing_id or py.wing_id
     unit_id = body.unit_id or py.unit_id
     a = AnchorEvent(
@@ -1680,6 +1698,9 @@ def update_anchor(
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(a.planning_year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id:
+        _sq = db.get(Squadron, py.unit_id)
+        require_can_write_squadron(p, py.unit_id, _sq.wing_id if _sq else py.wing_id)
     _check_version(a, body.version)
     for field in ("event_name", "importance", "start_date", "end_date",
                   "planning_impact", "readiness_requirements", "notes"):
@@ -1704,6 +1725,9 @@ def archive_anchor(
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(a.planning_year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id:
+        _sq = db.get(Squadron, py.unit_id)
+        require_can_write_squadron(p, py.unit_id, _sq.wing_id if _sq else py.wing_id)
     # R5-M16: delete orphaned AnchorPrepPlan rows before archiving the parent
     # AnchorEvent. AnchorPrepPlan has no is_archived field (no SoftDeleteMixin)
     # and the FK has no cascade, so these rows would become dangling and block
@@ -1728,6 +1752,9 @@ def restore_anchor(
         raise HTTPException(409, detail={"error": "not_archived"})
     py = _get_year_or_404(a.planning_year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id:
+        _sq = db.get(Squadron, py.unit_id)
+        require_can_write_squadron(p, py.unit_id, _sq.wing_id if _sq else py.wing_id)
     a.is_archived = False; a.updated_at = utcnow()
     db.commit()
     audit(db, p, object_type="anchor_event", object_id=a.id, action="restore")
@@ -1996,6 +2023,7 @@ def create_session(
         raise HTTPException(404, detail={"error": "not_found"})
     py = _get_year_or_404(pn.planning_year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
 
     # Resolve cadet_group and audience path.
     # Canonical path: explicit training_class_ids (multi-class squadron support)
@@ -2897,6 +2925,9 @@ def run_checks(
 ):
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id:
+        _sq = db.get(Squadron, py.unit_id)
+        require_can_write_squadron(p, py.unit_id, _sq.wing_id if _sq else py.wing_id)
     nights = db.query(ParadeNight).filter(
         ParadeNight.planning_year_id == year_id,
         ParadeNight.is_active == True,  # noqa: E712
@@ -3768,6 +3799,9 @@ def assign_mission(
     """Assign a curriculum mission to a parade night session (Training Planner action)."""
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id:
+        _sq = db.get(Squadron, py.unit_id)
+        require_can_write_squadron(p, py.unit_id, _sq.wing_id if _sq else py.wing_id)
 
     use_class_ids = bool(body.training_class_ids)
     if use_class_ids:
@@ -4138,6 +4172,9 @@ def rollover_year(
     """
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id:
+        _sq = db.get(Squadron, py.unit_id)
+        require_can_write_squadron(p, py.unit_id, _sq.wing_id if _sq else py.wing_id)
 
     target_year = body.target_year or (py.year + 1)
     new_name = body.name or year_display_name(target_year)
@@ -4573,6 +4610,9 @@ async def import_schedule_xlsx(
 
     py = _get_year_or_404(year_id, db)
     _require_year_access(p, py, write=True, db=db)
+    if py.unit_id:
+        _sq = db.get(Squadron, py.unit_id)
+        require_can_write_squadron(p, py.unit_id, _sq.wing_id if _sq else py.wing_id)
 
     raw = await file.read()
     if len(raw) > settings.UPLOAD_MAX_MB * 1024 * 1024:
@@ -5352,6 +5392,7 @@ def create_notice(
     if not pn:
         raise HTTPException(404, detail={"error": "parade_night_not_found"})
     _require_year_access(p, _get_year_or_404(pn.planning_year_id, db), write=True)
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
     notice = PlanningNotice(
         parade_night_id=night_id,
         notice_text=body.notice_text.strip(),
@@ -5387,6 +5428,7 @@ def update_notice(
     if not pn:
         raise HTTPException(404, detail={"error": "parade_night_not_found"})
     _require_year_access(p, _get_year_or_404(pn.planning_year_id, db), write=True)
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
     _check_version(notice, body.version)
     if body.notice_text is not None:
         notice.notice_text = body.notice_text.strip()
@@ -5413,6 +5455,7 @@ def archive_notice(
     if not pn:
         raise HTTPException(404, detail={"error": "parade_night_not_found"})
     _require_year_access(p, _get_year_or_404(pn.planning_year_id, db), write=True)
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
     notice.is_archived = True
     db.commit()
     audit(db, p, object_type="PlanningNotice", object_id=notice_id, action="archive")
