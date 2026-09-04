@@ -117,3 +117,31 @@ def test_run_checks_audited(client):
     assert r.status_code == 200
     audit = client.get("/api/audit", headers=hdr).json()
     assert any(e.get("action") == "run_checks" and e.get("object_type") == "automation" for e in audit)
+
+
+# ── Finding 6: write guard regression ────────────────────────────────────────
+
+def test_run_checks_wing_admin_with_proxy_can_write(client):
+    """Wing Admin in Proxy Mode must be able to run checks on the proxied squadron."""
+    wing_hdr = login(client, _ADM7WG)
+    sqn_id = _me(client, login(client, _ADM703))["squadron_id"]
+    r = client.post(f"/api/proxy/enter/{sqn_id}",
+                    json={"reason": "Finding 6 regression test"},
+                    headers=wing_hdr)
+    assert r.status_code == 200, f"proxy/enter failed: {r.text}"
+    try:
+        r = client.post("/api/exceptions/run-checks", headers=wing_hdr)
+        assert r.status_code == 200, (
+            f"Wing Admin in Proxy Mode was denied run-checks — status {r.status_code}: {r.text}"
+        )
+        assert "created" in r.json()
+    finally:
+        client.post("/api/proxy/exit", headers=wing_hdr)
+
+
+def test_run_checks_sqn_admin_not_in_proxy_can_write_own_squadron(client):
+    """Sqn Admin can run checks on their own squadron (no proxy needed)."""
+    hdr = login(client, _ADM703)
+    r = client.post("/api/exceptions/run-checks", headers=hdr)
+    assert r.status_code == 200
+    assert isinstance(r.json()["created"], int)
