@@ -175,14 +175,6 @@ def login(body: LoginIn, request: Request, response: Response, db: DBSession = D
         if ac:
             _raise_if_locked(ac)
         if not ac or not verify_code(code, ac.code_hash):
-            # R5-M19/M21: increment both per-account and per-IP counters on failure.
-            # Per-account lockout guards targeted single-account attacks; IP throttle
-            # guards high-volume scanning across multiple accounts from one source.
-            if ac:
-                ac.failed_attempts = (ac.failed_attempts or 0) + 1
-                if ac.failed_attempts >= _LOCKOUT_THRESHOLD:
-                    ac.locked_until = utcnow() + timedelta(hours=_LOCKOUT_HOURS)
-                db.commit()
             record_login_failure_db(key, db)
             # Fallback: /lookup uses .first() which may return an older sibling
             # account when multiple active accounts share the same role in a
@@ -190,6 +182,14 @@ def login(body: LoginIn, request: Request, response: Response, db: DBSession = D
             # cross-scope escalation is possible.
             matched = _scoped_fallback_scan(body.user_id, code, db)
             if matched is None:
+                # R5-M19/M21: increment the primary account counter only after
+                # confirming no sibling matched. Incrementing before the fallback
+                # scan incorrectly penalised A when B's code was valid (Finding 4).
+                if ac:
+                    ac.failed_attempts = (ac.failed_attempts or 0) + 1
+                    if ac.failed_attempts >= _LOCKOUT_THRESHOLD:
+                        ac.locked_until = utcnow() + timedelta(hours=_LOCKOUT_HOURS)
+                    db.commit()
                 raise HTTPException(401, detail={"error": "invalid_code"})
         else:
             matched = ac
@@ -387,7 +387,10 @@ def change_code(body: ChangeCodeIn, db: DBSession = Depends(get_db),
     if len(plain) > 128:
         raise HTTPException(422, detail={"error": "invalid_code",
                                          "message": "Access code is too long (maximum 128 characters)."})
-    ac = db.query(AccessCode).filter(AccessCode.user_id == target.id).first()
+    ac = db.query(AccessCode).filter(
+        AccessCode.user_id == target.id,
+        AccessCode.active_status == True  # noqa: E712
+    ).first()
     if not ac:
         ac = AccessCode(user_id=target.id, code_hash="", created_by=p.user_id)
         db.add(ac)
