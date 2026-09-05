@@ -299,6 +299,10 @@ class ParadeIn(BaseModel):
     term: str | None = Field(default="T1", max_length=10)
     session_count: int | None = None  # None = use effective timing template or default
     parade_type: _VALID_PARADE_TYPE | None = "normal"
+    timing_template_id: str | None = None  # Explicit template; if None, auto-resolved
+    notes: str | None = None
+    start_time: str | None = None   # Derived from template when not provided
+    end_time: str | None = None     # Derived from template when not provided
 
     @field_validator("date")
     @classmethod
@@ -387,6 +391,44 @@ def get_parade(pnid: str, db: DBSession = Depends(get_db), p: Principal = Depend
             "publish_blockers": publish_blockers(sess)}
 
 
+def _materialise_snapshot(db: DBSession, parade_night_id: str, timing_template_id: str) -> None:
+    """Write ParadeNightTimingSnapshot rows for a parade night from its template.
+
+    Deletes any existing snapshots for this night first, so this function is
+    safe to call on both creation and template change.
+    """
+    from ..models.training import ParadeNightTimingSnapshot, TimingTemplate
+
+    # Remove any existing snapshot rows for this night
+    db.query(ParadeNightTimingSnapshot).filter_by(
+        parade_night_id=parade_night_id
+    ).delete(synchronize_session=False)
+
+    tmpl = db.get(TimingTemplate, timing_template_id)
+    if tmpl is None:
+        return
+
+    blocks = sorted(tmpl.blocks, key=lambda b: b.display_order)
+    period_counter = 0
+    for display_idx, block in enumerate(blocks):
+        if block.is_instructional_period:
+            period_counter += 1
+            period_number = period_counter
+        else:
+            period_number = None
+
+        snap = ParadeNightTimingSnapshot(
+            parade_night_id=parade_night_id,
+            period_number=period_number,
+            block_label=block.block_name,
+            start_time=block.start_time,
+            end_time=block.end_time,
+            is_instructional=block.is_instructional_period,
+            display_order=display_idx,
+        )
+        db.add(snap)
+
+
 @router.post("/parade-nights")
 def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_db),
                   p: Principal = Depends(get_principal)):
@@ -409,14 +451,42 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
     ).first()
     if existing:
         raise HTTPException(409, detail={"error": "duplicate_date", "existing_id": existing.id})
-    # Determine session count from effective timing template if one exists.
-    # session_count in the body can still override (e.g. user explicitly changes it).
-    effective_tmpl = _effective_template(db, s.id, body.date)
-    if effective_tmpl and body.session_count is None:
-        ip_count = sum(1 for b in effective_tmpl.blocks if b.is_instructional_period)
-        session_count = ip_count if ip_count > 0 else (s.default_session_count or 3)
+    # Determine the effective timing template:
+    # 1. If caller supplies timing_template_id explicitly, look it up and validate it.
+    # 2. Otherwise, auto-resolve from the squadron's configured templates for this date.
+    # 3. If no template is found either way, reject with 422 — all new parade nights
+    #    must have a timing template to enable snapshot materialisation.
+    if body.timing_template_id:
+        explicit_tmpl = db.get(TimingTemplate, body.timing_template_id)
+        if explicit_tmpl is None or explicit_tmpl.is_archived:
+            raise HTTPException(422, detail={"error": "timing_template_not_found"})
+        effective_tmpl = explicit_tmpl
+    else:
+        effective_tmpl = _effective_template(db, s.id, body.date)
+
+    # Determine session count — prefer template's instructional block count; fall back to
+    # body.session_count, squadron default, or 3 for legacy nights with no template.
+    if effective_tmpl is not None:
+        if body.session_count is None:
+            ip_count = sum(1 for b in effective_tmpl.blocks if b.is_instructional_period)
+            session_count = ip_count if ip_count > 0 else (s.default_session_count or 3)
+        else:
+            session_count = body.session_count
     else:
         session_count = body.session_count or s.default_session_count or 3
+
+    # Derive start/end times from template blocks when not overridden
+    if effective_tmpl is not None and (body.start_time is None or body.end_time is None):
+        all_blocks = sorted(effective_tmpl.blocks, key=lambda b: b.display_order)
+        derived_start = body.start_time or next(
+            (b.start_time for b in all_blocks if b.start_time), s.default_start_time
+        )
+        derived_end = body.end_time or next(
+            (b.end_time for b in reversed(all_blocks) if b.end_time), s.default_end_time
+        )
+    else:
+        derived_start = body.start_time or s.default_start_time
+        derived_end = body.end_time or s.default_end_time
 
     # Resolve the planning year — create it if absent (idempotent).
     year = int(body.date[:4])
@@ -424,11 +494,15 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
 
     pn = ParadeNight(squadron_id=s.id, wing_id=s.wing_id, date=body.date, term=body.term,
                      planning_year_id=py.id,
-                     start_time=s.default_start_time, end_time=s.default_end_time,
+                     start_time=derived_start, end_time=derived_end,
                      session_count=session_count, parade_type=body.parade_type or "normal",
                      timing_template_id=effective_tmpl.id if effective_tmpl else None,
+                     notes=body.notes,
                      created_by=p.user_id)
     db.add(pn)
+    db.flush()  # get pn.id before materialising snapshot
+    if pn.timing_template_id:
+        _materialise_snapshot(db, pn.id, pn.timing_template_id)
     db.commit()
     meta = client_meta(request)
     audit(db, p, object_type="parade_night", object_id=pn.id, action="create",
@@ -524,6 +598,127 @@ def update_parade_night(pnid: str, body: ParadeNightUpdateIn, db: DBSession = De
     db.commit()
     audit(db, p, object_type="parade_night", object_id=pn.id, action="update", new={"date": pn.date})
     return _pn_dict(pn)
+
+
+# ── TEMPLATE IMPACT + APPLY ──
+
+@router.get("/parade-nights/{night_id}/template-impact")
+def parade_night_template_impact(
+    night_id: str,
+    new_template_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Return the period diff if the timing template were changed to new_template_id."""
+    from ..models.training import ParadeNightTimingSnapshot
+
+    pn = db.get(ParadeNight, night_id)
+    if pn is None or pn.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_view_squadron(p, pn.squadron_id, pn.wing_id)
+
+    new_tmpl = db.get(TimingTemplate, new_template_id)
+    if new_tmpl is None or new_tmpl.is_archived:
+        raise HTTPException(404, detail={"error": "template_not_found"})
+
+    # Current instructional period numbers from snapshot
+    current_snaps = db.query(ParadeNightTimingSnapshot).filter(
+        ParadeNightTimingSnapshot.parade_night_id == night_id,
+        ParadeNightTimingSnapshot.is_instructional.is_(True),
+    ).all()
+    current_periods = {s.period_number for s in current_snaps if s.period_number is not None}
+
+    # New instructional period numbers from new template
+    new_instr_blocks = [b for b in new_tmpl.blocks if b.is_instructional_period]
+    new_periods = set(range(1, len(new_instr_blocks) + 1))
+
+    retained = sorted(current_periods & new_periods)
+    removed = sorted(current_periods - new_periods)
+    added = sorted(new_periods - current_periods)
+
+    # Sessions that would be affected (on removed periods)
+    affected = []
+    if removed:
+        sessions = db.query(Session).filter(
+            Session.parade_night_id == night_id,
+            Session.period_number.in_(removed),
+            Session.is_archived.is_(False),
+        ).all()
+        affected = [
+            {
+                "session_id": s.id,
+                "period_number": s.period_number,
+                "has_curriculum": s.curriculum_item_id is not None,
+                "has_facilitator": s.facilitator_id is not None,
+            }
+            for s in sessions
+        ]
+
+    return {
+        "retained_periods": retained,
+        "removed_periods": removed,
+        "added_periods": added,
+        "affected_sessions": affected,
+    }
+
+
+class TemplateChangeIn(BaseModel):
+    timing_template_id: str
+    confirmed: bool = False
+
+
+@router.patch("/parade-nights/{night_id}/template")
+def apply_parade_night_template(
+    night_id: str,
+    body: TemplateChangeIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Replace the timing template for a parade night and re-materialise the snapshot."""
+    pn = db.get(ParadeNight, night_id)
+    if pn is None or pn.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+
+    new_tmpl = db.get(TimingTemplate, body.timing_template_id)
+    if new_tmpl is None or new_tmpl.is_archived:
+        raise HTTPException(404, detail={"error": "template_not_found"})
+
+    # If sessions exist on periods that would be removed, require confirmation
+    if not body.confirmed:
+        new_period_count = sum(1 for b in new_tmpl.blocks if b.is_instructional_period)
+        existing_sessions = db.query(Session).filter(
+            Session.parade_night_id == night_id,
+            Session.period_number > new_period_count,
+            Session.is_archived.is_(False),
+        ).count()
+        if existing_sessions > 0:
+            raise HTTPException(
+                409,
+                detail={
+                    "error": "confirmation_required",
+                    "message": f"{existing_sessions} session(s) exist on periods that would be removed. "
+                               "Send confirmed=true to proceed.",
+                }
+            )
+
+    # Apply template change
+    pn.timing_template_id = body.timing_template_id
+    instr_blocks = [b for b in new_tmpl.blocks if b.is_instructional_period]
+    pn.session_count = len(instr_blocks)
+    if new_tmpl.blocks:
+        all_blocks = sorted(new_tmpl.blocks, key=lambda b: b.display_order)
+        pn.start_time = next((b.start_time for b in all_blocks if b.start_time), pn.start_time)
+        pn.end_time = next((b.end_time for b in reversed(all_blocks) if b.end_time), pn.end_time)
+    pn.version += 1
+
+    _materialise_snapshot(db, night_id, body.timing_template_id)
+    audit(db, p, object_type="parade_night", object_id=night_id, action="template_change",
+          new={"timing_template_id": body.timing_template_id})
+    db.commit()
+
+    return {"id": pn.id, "timing_template_id": pn.timing_template_id,
+            "session_count": pn.session_count, "version": pn.version}
 
 
 # ── PARADE NIGHT NOTICES ──
@@ -712,8 +907,11 @@ def _resource_conflicts(db: DBSession, parade_night_id: str, period_number, body
     """Facilitator/room double-bookings against other sessions in the same period.
 
     Shared by create_session and edit_session, which previously carried two
-    identical copies of this loop.
+    identical copies of this loop. Also checks assistant-facilitator double-booking
+    via the SessionAssistantFacilitator join table.
     """
+    from ..models.training import SessionAssistantFacilitator
+
     q = db.query(Session).filter(
         Session.parade_night_id == parade_night_id,
         Session.period_number == period_number,
@@ -721,8 +919,10 @@ def _resource_conflicts(db: DBSession, parade_night_id: str, period_number, body
     )
     if exclude_session_id:
         q = q.filter(Session.id != exclude_session_id)
+    sibling_sessions = q.all()
+
     conflicts: list[dict] = []
-    for sib in q.all():
+    for sib in sibling_sessions:
         if _is_parallel_delivery(body, sib):
             continue
         if body.facilitator_id and sib.facilitator_id == body.facilitator_id:
@@ -733,6 +933,38 @@ def _resource_conflicts(db: DBSession, parade_night_id: str, period_number, body
             conflicts.append({"type": "room_clash", "session_id": sib.id,
                               "resource_id": sib.training_area_id,
                               "resource_name": sib.training_area_name_at_time})
+
+    # Check assistant facilitator double-booking if we have a session to check against
+    if exclude_session_id:
+        our_asst_rows = db.query(SessionAssistantFacilitator).filter_by(
+            session_id=exclude_session_id
+        ).all()
+        our_asst_ids = {row.user_id for row in our_asst_rows}
+        if our_asst_ids:
+            sib_ids = [s.id for s in sibling_sessions]
+            # Check if any of our assistants are main facilitators on sibling sessions
+            for sib in sibling_sessions:
+                if sib.facilitator_id in our_asst_ids:
+                    conflicts.append({
+                        "type": "facilitator_double_booked",
+                        "session_id": sib.id,
+                        "resource_id": sib.facilitator_id,
+                        "resource_name": sib.facilitator_display_name_at_time,
+                    })
+            # Check if any of our assistants are assistant facilitators on sibling sessions
+            if sib_ids:
+                other_asst_rows = db.query(SessionAssistantFacilitator).filter(
+                    SessionAssistantFacilitator.session_id.in_(sib_ids),
+                    SessionAssistantFacilitator.user_id.in_(our_asst_ids),
+                ).all()
+                for row in other_asst_rows:
+                    conflicts.append({
+                        "type": "facilitator_double_booked",
+                        "session_id": row.session_id,
+                        "resource_id": row.user_id,
+                        "resource_name": row.user_id,
+                    })
+
     return conflicts
 
 
@@ -904,6 +1136,92 @@ def edit_session(sid: str, body: SessionIn, db: DBSession = Depends(get_db), p: 
     if target_pn and target_pn.id != (pn.id if pn else None):
         _recompute(db, target_pn)
     return {"ok": True, "version": s.version}
+
+
+# ── SESSION ASSISTANT FACILITATORS ──
+
+class AddAssistantIn(BaseModel):
+    user_id: str
+
+
+@router.get("/training/sessions/{session_id}")
+def get_session_detail(
+    session_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Return session detail including assistant_facilitators list."""
+    from ..models.training import SessionAssistantFacilitator
+    s = db.get(Session, session_id)
+    if s is None or s.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id)
+    require_can_view_squadron(p, s.squadron_id, pn.wing_id if pn else None)
+
+    # Build assistant_facilitators list from the join table
+    asst_rows = db.query(SessionAssistantFacilitator).filter_by(session_id=s.id).all()
+    assistant_facilitators = []
+    for row in asst_rows:
+        f = db.get(Facilitator, row.user_id)
+        if f:
+            display_name = f"{f.current_rank or ''} {f.last_name}".strip()
+        else:
+            display_name = row.user_id
+        assistant_facilitators.append({"user_id": row.user_id, "display_name": display_name})
+
+    result = _sess_dict(s)
+    result["assistant_facilitators"] = assistant_facilitators
+    # Keep legacy field for backwards compatibility
+    result["assistant_facilitator_id"] = s.assistant_facilitator_id
+    return result
+
+
+@router.post("/training/sessions/{session_id}/assistants")
+def add_session_assistant(
+    session_id: str,
+    body: AddAssistantIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Add an assistant facilitator to a session (idempotent)."""
+    from ..models.training import SessionAssistantFacilitator
+    s = db.get(Session, session_id)
+    if s is None or s.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id)
+    require_can_write_squadron(p, s.squadron_id, pn.wing_id if pn else None)
+
+    # Idempotent: get_or_create
+    existing = db.query(SessionAssistantFacilitator).filter_by(
+        session_id=session_id, user_id=body.user_id
+    ).first()
+    if not existing:
+        saf = SessionAssistantFacilitator(session_id=session_id, user_id=body.user_id)
+        db.add(saf)
+        db.commit()
+    return {"session_id": session_id, "user_id": body.user_id, "ok": True}
+
+
+@router.delete("/training/sessions/{session_id}/assistants/{user_id}")
+def remove_session_assistant(
+    session_id: str,
+    user_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Remove an assistant facilitator from a session."""
+    from ..models.training import SessionAssistantFacilitator
+    s = db.get(Session, session_id)
+    if s is None or s.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id)
+    require_can_write_squadron(p, s.squadron_id, pn.wing_id if pn else None)
+
+    db.query(SessionAssistantFacilitator).filter_by(
+        session_id=session_id, user_id=user_id
+    ).delete()
+    db.commit()
+    return {"removed": True}
 
 
 @router.post("/sessions/{sid}/status")

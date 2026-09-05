@@ -38,7 +38,7 @@ from ..models.planning import (
 # planning_locations) still exist -- retiring them is a schema change requiring
 # explicit user authorisation per .claude/rules/capability-preservation.md, not done
 # here.
-from ..models.training import TimingTemplate, TimingBlock, Activity
+from ..models.training import TimingTemplate, TimingBlock, Activity, ParadeNightTimingSnapshot
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_write_squadron, require_can_view_squadron
@@ -5315,6 +5315,18 @@ def night_summaries(
         ).all():
             notices_by_night.setdefault(n.parade_night_id, []).append(n)
 
+    # Batch-load timing snapshots for all nights
+    snapshots_by_night: dict[str, list] = {}
+    if night_ids:
+        all_snaps = db.query(ParadeNightTimingSnapshot).filter(
+            ParadeNightTimingSnapshot.parade_night_id.in_(night_ids)
+        ).order_by(
+            ParadeNightTimingSnapshot.parade_night_id,
+            ParadeNightTimingSnapshot.display_order,
+        ).all()
+        for snap in all_snaps:
+            snapshots_by_night.setdefault(snap.parade_night_id, []).append(snap)
+
     summaries = []
     for pn in all_dates:
         pn_sessions = ts_by_night.get(pn.id, [])
@@ -5331,6 +5343,34 @@ def night_summaries(
                              if s.training_area_id else None,
             })
 
+        # Build instructional_periods and timing_strip from snapshots
+        snaps = snapshots_by_night.get(pn.id, [])
+        instructional_periods = [
+            {
+                "period_number": s.period_number,
+                "label": s.block_label,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+            }
+            for s in snaps if s.is_instructional and s.period_number is not None
+        ]
+        timing_strip = [
+            {
+                "label": s.block_label,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+                "is_instructional": s.is_instructional,
+                "display_order": s.display_order,
+            }
+            for s in snaps
+        ]
+        # Fallback for legacy nights without snapshots
+        if not instructional_periods and pn.session_count:
+            instructional_periods = [
+                {"period_number": i, "label": f"Period {i}", "start_time": None, "end_time": None}
+                for i in range(1, pn.session_count + 1)
+            ]
+
         summaries.append({
             "parade_date_id": pn.id,  # backward-compat alias
             "parade_night_id": pn.id,
@@ -5340,9 +5380,12 @@ def night_summaries(
             "week_number": pn.week_number,
             "notes": pn.notes,
             "parade_night_notes": pn.notes,
+            "timing_template_id": pn.timing_template_id,
             "sessions": session_summaries,
             "conflict_count": conflict_counts.get(pn.id, 0),
             "notices": [_notice_out(n) for n in notices_by_night.get(pn.id, [])],
+            "instructional_periods": instructional_periods,
+            "timing_strip": timing_strip,
         })
 
     return {"planning_year_id": year_id, "summaries": summaries}
