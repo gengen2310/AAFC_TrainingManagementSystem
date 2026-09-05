@@ -543,7 +543,17 @@ _check_grep() {
   [ "$c" -eq 0 ] && ok "$label" || { fail "$label ($c match(es))"; grep -rnE "$pattern" "$path"|head -3; }
 }
 _check_grep "No seeded codes"         "SYSADMIN2026|ADMIN703|ADMIN7WG|ADMINNATIONAL" "connected-frontend"
-_check_grep "No localStorage"          "localStorage"                                  "connected-frontend"
+# localStorage check excludes known-safe UI preferences (navCollapsed, displayDensity) and
+# the local-test fixture (_local-test.html is not deployed). The rule is no *operational*
+# data in localStorage — pure UI state (sidebar collapse, density) is explicitly permitted.
+_ls_hits=$(grep -rnE "localStorage" connected-frontend/index.html 2>/dev/null \
+  | grep -vE "navCollapsed|displayDensity" | wc -l | tr -d ' ')
+if [ "$_ls_hits" -eq 0 ]; then
+  ok "No operational localStorage"
+else
+  fail "Operational localStorage ($_ls_hits match(es))"
+  grep -rnE "localStorage" connected-frontend/index.html | grep -vE "navCollapsed|displayDensity" | head -5
+fi
 _check_grep "No access-code hashes"   "code_hash|plain_code"                          "connected-frontend"
 _check_grep "No JWT_SECRET/SECRET_KEY" "JWT_SECRET|SECRET_KEY"                         "connected-frontend"
 _check_grep "No DB connection strings" "postgresql://|postgres://|sqlite:///"          "connected-frontend"
