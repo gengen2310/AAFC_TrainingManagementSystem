@@ -3,18 +3,18 @@ import { useQueryClient } from "@tanstack/react-query";
 import { planningApi } from "../../api";
 import { friendlyMessage } from "../../api/client";
 import { useToast } from "../Toast";
-import type { NightSessionSummary, ParadeNotice, PlanningSession, PlanningFacilitator, PlanningConflict, TrainingClassSummary } from "../../api/types";
+import type { NightSessionSummary, ParadeNotice, PlanningSession, PlanningFacilitator, PlanningConflict, TrainingClassSummary, InstructionalPeriod } from "../../api/types";
 
-// ─── Group / period constants ─────────────────────────────────────────────────
-
-export const BLOCK_GROUPS = [
-  { key: "oi",     label: "O&I",    fullLabel: "Ori & Initial",       cadetGroups: ["orientation", "initial"] },
-  { key: "bronze", label: "Bronze", fullLabel: "Junior & Bronze CLP", cadetGroups: ["junior"] },
-  { key: "silver", label: "Silver", fullLabel: "Inter. & Silver CLP", cadetGroups: ["intermediate"] },
-  { key: "gold",   label: "Gold",   fullLabel: "Senior & Gold CLP",   cadetGroups: ["senior"] },
-] as const;
-
-export const BLOCK_PERIODS = [1, 2, 3] as const;
+// ─── Internal period fallback (not exported) ──────────────────────────────────
+// Used when caller does not pass a periods prop (legacy nights without snapshot).
+// BLOCK_PERIODS and BLOCK_GROUPS have been removed — period count is now derived
+// from night.instructional_periods (Task 3). Phase grouping moves to Task 4.
+const _DEFAULT_PERIODS: InstructionalPeriod[] = [1, 2, 3].map(n => ({
+  period_number: n,
+  label: `P${n}`,
+  start_time: null,
+  end_time: null,
+}));
 
 // ─── Normalised display session ───────────────────────────────────────────────
 
@@ -318,7 +318,10 @@ interface ParadeNightBlockProps {
   focusStageId?: string | null;
   /** Maps training_class_id → training_stage_id for stageDimmed evaluation */
   classStageMap?: Record<string, string>;
-  /** When provided and non-empty, renders one row per TrainingClass instead of legacy BLOCK_GROUPS */
+  /** Instructional periods from the night snapshot — column count derived from this.
+   *  Falls back to [P1, P2, P3] for legacy nights with no snapshot. */
+  periods?: InstructionalPeriod[];
+  /** When provided and non-empty, renders one row per TrainingClass instead of legacy cadet groups */
   trainingClasses?: TrainingClassSummary[];
   onHeaderClick: () => void;
   onSessionClick?: (session: DisplaySession) => void;
@@ -349,10 +352,14 @@ export function ParadeNightBlock({
   dateId, date, weekNumber, term, notices = [],
   sessions, sessionCount, filledSlots, conflictCount = 0,
   inHoliday = false, compact = false, blockSize = "md", focusClassId, searchText, tierFilter,
-  focusStageId, classStageMap, trainingClasses = [],
+  focusStageId, classStageMap, periods, trainingClasses = [],
   onHeaderClick, onSessionClick, onEmptyCellClick, onMoveSession,
   moveSource = null, onPickUpSession, onCancelMove,
 }: ParadeNightBlockProps) {
+  // Effective period list: from prop (API-driven) or internal fallback for legacy nights.
+  const effectivePeriods: InstructionalPeriod[] = (periods && periods.length > 0)
+    ? periods
+    : _DEFAULT_PERIODS;
   const [addingNotice, setAddingNotice] = useState(false);
   // CLASS-23: per-block collapsed state. Collapsed shows only the header bar.
   const [collapsed, setCollapsed] = useState(false);
@@ -405,14 +412,10 @@ export function ParadeNightBlock({
         emptyCellClickFn: (p: number) => { if (onEmptyCellClick) onEmptyCellClick("", p, tc.training_class_id); else onHeaderClick(); },
         dropKeySuffix: (p: number) => `${p}-${tc.training_class_id}`,
       }))
-    : BLOCK_GROUPS.map(g => ({
-        key: g.key,
-        shortLabel: g.label,
-        fullLabel: g.fullLabel,
-        getCellFn: (p: number) => getCell(sessions, g.cadetGroups, p),
-        emptyCellClickFn: (p: number) => { if (onEmptyCellClick) onEmptyCellClick(g.cadetGroups[0], p); else onHeaderClick(); },
-        dropKeySuffix: (p: number) => `${p}-${g.cadetGroups[0]}`,
-      }));
+    // TODO: Task 4 — phase grouping from curriculum phases replaces BLOCK_GROUPS.
+    // For now, render no rows when no training classes are provided — phase grouping
+    // wires in via ParadeNightGridView (which has useQuery for training classes).
+    : [];
 
   const totalCells = (sessionCount ?? 0) * gridRows.length;
   const fillLabel = totalCells > 0
@@ -510,7 +513,7 @@ export function ParadeNightBlock({
         /* Compact mode: text rows */
         <div className="pw-block-compact-grid">
           {gridRows.map(row => {
-            const cells = BLOCK_PERIODS.map(p => row.getCellFn(p));
+            const cells = effectivePeriods.map(p => row.getCellFn(p.period_number));
             const allEmpty = cells.every(c => c === null);
             return (
               // Mouse-only shortcut for the same action as the block header above
@@ -525,8 +528,8 @@ export function ParadeNightBlock({
                 <span className="pw-block-cg-lbl">{row.shortLabel}</span>
                 <span className="pw-block-cg-periods">
                   {cells.map((cell, i) => (
-                    <span key={i} className={`pw-block-cg-cell${!cell ? " empty" : ""}${cell?.conflict ? ` c-${cell.conflict}` : ""}`}>
-                      <span className="pw-block-cg-p">P{BLOCK_PERIODS[i]}</span>
+                    <span key={effectivePeriods[i].period_number} className={`pw-block-cg-cell${!cell ? " empty" : ""}${cell?.conflict ? ` c-${cell.conflict}` : ""}`}>
+                      <span className="pw-block-cg-p">{effectivePeriods[i].label}</span>
                       {cell ? trunc(cell.title, 24) : "—"}
                     </span>
                   ))}
@@ -542,14 +545,15 @@ export function ParadeNightBlock({
             <thead>
               <tr>
                 <th className="pw-ng-grp-col">Group</th>
-                {BLOCK_PERIODS.map(p => <th key={p}>P{p}</th>)}
+                {effectivePeriods.map(p => <th key={p.period_number}>{p.label}</th>)}
               </tr>
             </thead>
             <tbody>
               {gridRows.map(row => (
                 <tr key={row.key}>
                   <th>{row.fullLabel}</th>
-                  {BLOCK_PERIODS.map(period => {
+                  {effectivePeriods.map(p => {
+                    const period = p.period_number;
                     const cell = row.getCellFn(period);
                     if (!cell) {
                       const cellKey = row.dropKeySuffix(period);

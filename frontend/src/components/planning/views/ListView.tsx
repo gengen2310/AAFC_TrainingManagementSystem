@@ -3,8 +3,8 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
 import { friendlyMessage } from "../../../api/client";
-import type { AnchorEvent, NightSummary, PlanningConflict } from "../../../api/types";
-import { BLOCK_GROUPS, BLOCK_PERIODS, fromNightSummary } from "../ParadeNightBlock";
+import type { AnchorEvent, NightSummary, PlanningConflict, InstructionalPeriod } from "../../../api/types";
+import { fromNightSummary } from "../ParadeNightBlock";
 import type { DisplaySession } from "../ParadeNightBlock";
 import { ActivityDetailBlock, anchorToDisplay } from "../ActivityDetailBlock";
 
@@ -41,21 +41,31 @@ const RANGE_LABELS: Record<ViewRange, string> = {
   custom:         "Custom range",
 };
 
-const GROUP_LABELS: Record<string, string> = {
-  oi: "O&I", bronze: "Bronze", silver: "Silver", gold: "Gold",
-};
+// TODO: Task 4 — phase grouping. GROUP_LABELS removed with BLOCK_GROUPS.
+// Period columns are now derived from instructional_periods or session data.
 
-function findCell(
+function findCellByPeriod(
   sessions: DisplaySession[],
-  cadetGroups: readonly string[],
   period: number,
 ): DisplaySession | null {
-  const hit = sessions.find(
-    s => s.period === period &&
-      s.cadet_group !== null &&
-      (cadetGroups as string[]).includes(s.cadet_group as string),
-  );
-  return hit ?? sessions.find(s => s.period === period && s.cadet_group === null) ?? null;
+  return sessions.find(s => s.period === period) ?? null;
+}
+
+/** Derive display periods for a night. Uses instructional_periods if available,
+ *  falls back to unique period numbers from sessions, then [1,2,3] default. */
+function derivePeriods(s: NightSummary): InstructionalPeriod[] {
+  if (s.instructional_periods && s.instructional_periods.length > 0) {
+    return s.instructional_periods;
+  }
+  const nums = Array.from(new Set(s.sessions.map(sess => sess.period))).sort((a, b) => a - b);
+  if (nums.length > 0) {
+    return nums.map(n => ({ period_number: n, label: `P${n}`, start_time: null, end_time: null }));
+  }
+  // Fallback: session_count periods or 3
+  const count = s.session_count ?? 3;
+  return Array.from({ length: count }, (_, i) => ({
+    period_number: i + 1, label: `P${i + 1}`, start_time: null, end_time: null,
+  }));
 }
 
 function fmt(dateStr: string): string {
@@ -136,6 +146,19 @@ export function ListView({ yearId, viewRange, customStart, customEnd, conflicts 
       .sort((a, b) => a.start_date.localeCompare(b.start_date));
   }, [anchorData, viewRange, today, customStart, customEnd]);
 
+  // Derive a consistent set of period columns for the table header from all nights.
+  // Uses the union of all period numbers across all visible summaries.
+  const tableColumns = useMemo((): InstructionalPeriod[] => {
+    const allNums = new Set<number>();
+    for (const s of summaries) {
+      for (const p of derivePeriods(s)) allNums.add(p.period_number);
+    }
+    if (allNums.size === 0) return [1, 2, 3].map(n => ({ period_number: n, label: `P${n}`, start_time: null, end_time: null }));
+    return Array.from(allNums).sort((a, b) => a - b).map(n => ({
+      period_number: n, label: `P${n}`, start_time: null, end_time: null,
+    }));
+  }, [summaries]);
+
   const isLoading = nightLoading || anchorLoading;
   if (isLoading) return <div className="pw-loading">Loading…</div>;
 
@@ -202,9 +225,10 @@ export function ListView({ yearId, viewRange, customStart, customEnd, conflicts 
                 <th className="pw-lv-th" style={{ position: "sticky", left: 0, zIndex: 2 }}>Date</th>
                 <th className="pw-lv-th">Status</th>
                 <th className="pw-lv-th">Notices</th>
-                {BLOCK_GROUPS.map(g => (
-                  <th key={g.key} className="pw-lv-th" style={{ minWidth: 200 }}>
-                    {GROUP_LABELS[g.key]}
+                {/* Period columns derived from instructional_periods — TODO Task 4 phase grouping */}
+                {tableColumns.map(p => (
+                  <th key={p.period_number} className="pw-lv-th" style={{ minWidth: 200 }}>
+                    {p.label}
                   </th>
                 ))}
                 <th className="pw-lv-th">Warnings</th>
@@ -260,38 +284,36 @@ export function ListView({ yearId, viewRange, customStart, customEnd, conflicts 
                       )}
                     </td>
 
-                    {BLOCK_GROUPS.map(g => (
-                      <td key={g.key} className="pw-lv-td pw-lv-td-group">
-                        {BLOCK_PERIODS.map((period, pi) => {
-                          const cell = findCell(displaySessions, g.cadetGroups, period);
-                          return (
-                            <div
-                              key={period}
-                              className="pw-lv-period-row"
-                              style={pi === BLOCK_PERIODS.length - 1 ? { borderBottom: "none" } : undefined}
-                            >
-                              <span className="pw-lv-p-num">P{period}</span>
-                              {cell ? (
-                                <div className="pw-lv-p-content">
-                                  <span className="pw-lv-p-title">
-                                    {cell.conflict === "room" && <span className="pn-conflict-dot room" style={{ marginRight: 4 }} title="Room double-booked" />}
-                                    {cell.conflict === "fac" && <span className="pn-conflict-dot fac" style={{ marginRight: 4 }} title="Facilitator double-booked" />}
-                                    {cell.title ?? "—"}
+                    {/* Period cells — TODO Task 4 adds phase grouping dimension back */}
+                    {tableColumns.map((col, ci) => {
+                      const cell = findCellByPeriod(displaySessions, col.period_number);
+                      return (
+                        <td key={col.period_number} className="pw-lv-td pw-lv-td-group">
+                          <div
+                            className="pw-lv-period-row"
+                            style={ci === tableColumns.length - 1 ? { borderBottom: "none" } : undefined}
+                          >
+                            <span className="pw-lv-p-num">{col.label}</span>
+                            {cell ? (
+                              <div className="pw-lv-p-content">
+                                <span className="pw-lv-p-title">
+                                  {cell.conflict === "room" && <span className="pn-conflict-dot room" style={{ marginRight: 4 }} title="Room double-booked" />}
+                                  {cell.conflict === "fac" && <span className="pn-conflict-dot fac" style={{ marginRight: 4 }} title="Facilitator double-booked" />}
+                                  {cell.title ?? "—"}
+                                </span>
+                                {(cell.location || cell.facilitator) && (
+                                  <span className="pw-lv-p-detail">
+                                    {[cell.location, cell.facilitator].filter(Boolean).join(" · ")}
                                   </span>
-                                  {(cell.location || cell.facilitator) && (
-                                    <span className="pw-lv-p-detail">
-                                      {[cell.location, cell.facilitator].filter(Boolean).join(" · ")}
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="pw-lv-empty-period">—</span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </td>
-                    ))}
+                                )}
+                              </div>
+                            ) : (
+                              <span className="pw-lv-empty-period">—</span>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
 
                     <td className="pw-lv-td" style={{ textAlign: "center" }}>
                       {s.conflict_count > 0 ? (

@@ -6,12 +6,10 @@ import { friendlyMessage } from "../../../api/client";
 import type { PlanningSession, PlanningFacilitator, PlanningConflict, TimingBlock, ParadeNotice } from "../../../api/types";
 import type { DrawerItem } from "../PlanningRightDrawer";
 
-const DISPLAY_GROUPS = [
-  { label: "Orientation & Initial", groups: ["orientation", "initial"] },
-  { label: "Junior & Bronze CLP", groups: ["junior"] },
-  { label: "Intermediate & Silver CLP", groups: ["intermediate"] },
-  { label: "Senior & Gold CLP", groups: ["senior"] },
-] as const;
+// TODO: Task 4 — DISPLAY_GROUPS deleted. Phase grouping from curriculum phases
+// (training_stage_id → phase_name) replaces the hard-coded group list.
+// ParadeNightGridView now uses useQuery for training classes + groupByPhase helper.
+// Rows are empty until Task 4 wires in the phase data.
 
 interface CellConflict {
   room: boolean;
@@ -329,96 +327,84 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
             </tr>
           </thead>
           <tbody>
-            {DISPLAY_GROUPS.map(dg => (
-              <tr key={dg.label}>
-                <th>{dg.label}</th>
-                {blocks.map(b => {
-                  if (b.block_type === "break" || !b.is_instructional || b.period_number === null) {
-                    return (
-                      <td key={b.sequence} className="pn-grid-cell">
-                        <div className="pn-cell-inner break-cell">{b.name}</div>
-                      </td>
+            {/* TODO: Task 4 — phase grouping rows go here.
+              * DISPLAY_GROUPS removed; rows now driven by trainingClasses + groupByPhase.
+              * See ParadeNightGridView Task 4 implementation. */}
+            {([] as { phase_id: string; phase_name: string; training_classes: { training_class_id: string; display_name: string; active_status?: boolean }[] }[]).map(group => (
+              group.training_classes.map(tc => (
+                <tr key={tc.training_class_id}>
+                  <th style={!tc.active_status ? { opacity: 0.5 } : undefined}>{tc.display_name}</th>
+                  {blocks.map(b => {
+                    if (b.block_type === "break" || !b.is_instructional || b.period_number === null) {
+                      return (
+                        <td key={b.sequence} className="pn-grid-cell">
+                          <div className="pn-cell-inner break-cell">{b.name}</div>
+                        </td>
+                      );
+                    }
+                    const session = data.sessions.find(
+                      s => s.session_number === b.period_number &&
+                        (s.training_classes ?? []).some(c => c.training_class_id === tc.training_class_id)
                     );
-                  }
-
-                  const session = sessionForCell(data.sessions, dg.groups, b);
-
-                  if (!session) {
+                    if (!session) {
+                      return (
+                        <td key={b.sequence} className="pn-grid-cell">
+                          {tc.active_status !== false && (
+                            <button
+                              className="pn-add-btn"
+                              onClick={() => onCellClick({ type: "new-session", cadetGroup: "", periodNumber: b.period_number!, dateId })}
+                              aria-label={`Add session for ${tc.display_name}, period ${b.period_number}`}
+                            >
+                              + Add
+                            </button>
+                          )}
+                        </td>
+                      );
+                    }
+                    const c = conflicts.get(session.session_id);
+                    const cellCls = c?.room ? "conflict-room" : c?.fac ? "conflict-fac" : "";
+                    const sessionConflicts = unresolvedConflicts.filter(x => x.scheduled_session_id === session.session_id);
                     return (
                       <td key={b.sequence} className="pn-grid-cell">
-                        <button
-                          className="pn-add-btn"
-                          onClick={() =>
-                            onCellClick({
-                              type: "new-session",
-                              cadetGroup: dg.groups[0],
-                              periodNumber: b.period_number!,
-                              dateId,
-                            })
-                          }
-                          aria-label={`Add session for ${dg.label}, period ${b.period_number}`}
+                        <div
+                          className={`pn-cell-inner ${cellCls}`}
+                          onClick={() => onCellClick({ type: "session", session, dateId, date: data.parade_date, conflicts: sessionConflicts })}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={e => e.key === "Enter" && onCellClick({ type: "session", session, dateId, date: data.parade_date, conflicts: sessionConflicts })}
+                          aria-label={`${session.activity_title ?? "Session"} — ${tc.display_name}`}
                         >
-                          + Add
-                        </button>
+                          {c && (
+                            <div className="pn-cell-conflict">
+                              {c.room && <span className="pn-conflict-dot room" title="Room double-booked" aria-label="Room conflict" />}
+                              {c.fac && <span className="pn-conflict-dot fac" title="Facilitator double-booked" aria-label="Facilitator conflict" />}
+                              {c.load && <span className="pn-conflict-dot load" title="Facilitator overloaded" aria-label="Facilitator overload" />}
+                            </div>
+                          )}
+                          {session.curriculum_code && <div className="pn-cell-code">{session.curriculum_code}</div>}
+                          <div className="pn-cell-title">{session.activity_title ?? "—"}</div>
+                          {!!session.training_classes?.length && (
+                            <div className="pn-cell-classes" style={{ fontSize: 'var(--fs-2xs)', color: "var(--aafc-dark-blue, #002f65)" }}>
+                              {session.training_classes.map(cl => cl.display_name).join(", ")}
+                            </div>
+                          )}
+                          {session.location_name && <div className="pn-cell-room">{session.location_name}</div>}
+                          <div className="pn-cell-fac">
+                            {session.facilitator_name ?? "No facilitator"}
+                            {session.assistant_facilitator_name && ` + ${session.assistant_facilitator_name}`}
+                            {/* Assistant facilitators (Task 6) */}
+                            {(session.assistant_facilitators ?? []).length > 0 && (
+                              <span style={{ fontSize: 'var(--fs-2xs)', marginLeft: 4 }}>
+                                +{session.assistant_facilitators!.length} asst
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </td>
                     );
-                  }
-
-                  const c = conflicts.get(session.session_id);
-                  const cellCls = c?.room ? "conflict-room" : c?.fac ? "conflict-fac" : "";
-                  const sessionConflicts = unresolvedConflicts.filter(
-                    x => x.scheduled_session_id === session.session_id,
-                  );
-
-                  return (
-                    <td key={b.sequence} className="pn-grid-cell">
-                      <div
-                        className={`pn-cell-inner ${cellCls}`}
-                        onClick={() =>
-                          onCellClick({
-                            type: "session",
-                            session,
-                            dateId,
-                            date: data.parade_date,
-                            conflicts: sessionConflicts,
-                          })
-                        }
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={e =>
-                          e.key === "Enter" &&
-                          onCellClick({ type: "session", session, dateId, date: data.parade_date, conflicts: sessionConflicts })
-                        }
-                        aria-label={`${session.activity_title ?? "Session"} — ${dg.label}`}
-                      >
-                        {c && (
-                          <div className="pn-cell-conflict">
-                            {c.room && <span className="pn-conflict-dot room" title="Room double-booked" aria-label="Room conflict" />}
-                            {c.fac && <span className="pn-conflict-dot fac" title="Facilitator double-booked" aria-label="Facilitator conflict" />}
-                            {c.load && <span className="pn-conflict-dot load" title="Facilitator overloaded" aria-label="Facilitator overload" />}
-                          </div>
-                        )}
-                        {session.curriculum_code && (
-                          <div className="pn-cell-code">{session.curriculum_code}</div>
-                        )}
-                        <div className="pn-cell-title">{session.activity_title ?? "—"}</div>
-                        {!!session.training_classes?.length && (
-                          <div className="pn-cell-classes" style={{ fontSize: 'var(--fs-2xs)', color: "var(--aafc-dark-blue, #002f65)" }}>
-                            {session.training_classes.map(c => c.display_name).join(", ")}
-                          </div>
-                        )}
-                        {session.location_name && (
-                          <div className="pn-cell-room">{session.location_name}</div>
-                        )}
-                        <div className="pn-cell-fac">
-                          {session.facilitator_name ?? "No facilitator"}
-                          {session.assistant_facilitator_name && ` + ${session.assistant_facilitator_name}`}
-                        </div>
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
+                  })}
+                </tr>
+              ))
             ))}
           </tbody>
         </table>

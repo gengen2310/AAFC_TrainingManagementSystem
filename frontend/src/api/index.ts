@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, ApiError } from "./client";
 import type {
   SessionInfo, Squadron, Wing, UserRecord, AccountRecord, AccountCreateResult, Flight,
   CurriculumItem, ParadeNightWithSessions, ParadeNightDetail,
@@ -14,6 +14,7 @@ import type {
   FacilitatorWorkload, EquipmentItem, AnchorEvent, PlanningSession,
   DashboardChartsResponse, CadetClassMembership, TrainingClassSummary,
   LoginOrganisations, LoginUnitType,
+  TemplateImpactResult, TrainingClassWithPhase,
 } from "./types";
 
 /** Handles both legacy array shape `[...]` and current `{"conflicts":[...]}` shape. */
@@ -508,4 +509,38 @@ export const planningApi = {
     api.post<{ ok: boolean }>(`/api/planning/cea/${activity_id}/local-hide`, body),
   createManualActivity: (year_id: string, body: Record<string, unknown>) =>
     api.post<{ ok: boolean; id: string }>(`/api/planning/years/${year_id}/cea/activities`, body),
+
+  // ── Template impact + application ───────────────────────────────────────────
+  getTemplateImpact: (nightId: string, newTemplateId: string): Promise<TemplateImpactResult> =>
+    api.get<TemplateImpactResult>(
+      `/api/training/parade-nights/${nightId}/template-impact?new_template_id=${encodeURIComponent(newTemplateId)}`
+    ),
+
+  applyTemplate: async (nightId: string, templateId: string, confirmed: boolean): Promise<{ id: string; session_count: number }> => {
+    try {
+      return await api.patch<{ id: string; session_count: number }>(
+        `/api/training/parade-nights/${nightId}/template`,
+        { timing_template_id: templateId, confirmed }
+      );
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        throw Object.assign(new Error('confirmation_required'), { detail: e.data?.detail });
+      }
+      throw e;
+    }
+  },
+
+  // ── Assistant facilitators ───────────────────────────────────────────────────
+  addAssistantFacilitator: (sessionId: string, userId: string): Promise<void> =>
+    api.post<void>(`/api/training/sessions/${sessionId}/assistants`, { user_id: userId }),
+
+  removeAssistantFacilitator: (sessionId: string, userId: string): Promise<void> =>
+    api.delete<void>(`/api/training/sessions/${sessionId}/assistants/${encodeURIComponent(userId)}`),
+
+  // ── Training classes with phase ─────────────────────────────────────────────
+  getTrainingClasses: (squadronId: string, options?: { includeArchived?: boolean }): Promise<TrainingClassWithPhase[]> => {
+    const params = new URLSearchParams({ squadron_id: squadronId });
+    if (options?.includeArchived) params.set('include_archived', 'true');
+    return api.get<TrainingClassWithPhase[]>(`/api/training/classes?${params}`);
+  },
 };

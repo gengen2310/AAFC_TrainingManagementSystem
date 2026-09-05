@@ -60,11 +60,60 @@ export interface SessionRow {
   training_classes: { training_class_id: string; display_name: string }[];
   [k: string]: unknown;
 }
+/** One schedulable instructional period from a timing template snapshot. */
+export interface InstructionalPeriod {
+  period_number: number;
+  label: string;
+  start_time: string | null;
+  end_time: string | null;
+}
+
+/** One block in the timing strip (instructional + non-instructional). */
+export interface TimingStripEntry {
+  label: string;
+  start_time: string | null;
+  end_time: string | null;
+  is_instructional: boolean;
+  display_order: number;
+}
+
+/** One assistant facilitator on a session. */
+export interface AssistantFacilitator {
+  user_id: string;
+  display_name: string;
+}
+
+export interface TemplateImpactSession {
+  session_id: string;
+  period_number: number;
+  has_curriculum: boolean;
+  has_facilitator: boolean;
+}
+
+export interface TemplateImpactResult {
+  retained_periods: number[];
+  removed_periods: number[];
+  added_periods: number[];
+  affected_sessions: TemplateImpactSession[];
+}
+
+/** Training class with curriculum phase name joined from training_stages. */
+export interface TrainingClassWithPhase {
+  training_class_id: string;
+  display_name: string;
+  training_stage_id: string;
+  phase_name: string;
+  active_status: boolean;
+  cadet_count?: number | null;
+}
+
 export interface ParadeNight {
   parade_night_id: string; squadron_id: string; date: string; term: string | null;
   start_time: string | null; end_time: string | null; session_count: number;
   parade_type: string; published_status: boolean; readiness_score: number | null; closeout_status: string | null;
   timing_template_id: string | null;
+  instructional_periods: InstructionalPeriod[];  // [] for legacy nights without snapshot
+  timing_strip: TimingStripEntry[];               // [] for legacy nights
 }
 export interface ParadeNightWithSessions extends ParadeNight { sessions: SessionRow[]; }
 export interface ParadeNightDetail extends ParadeNightWithSessions {
@@ -202,7 +251,8 @@ export interface PlanningSession {
   curriculum_title: string | null; element: string | null;
   activity_title: string | null;
   facilitator_id: string | null; facilitator_name: string | null;
-  assistant_facilitator_id: string | null; assistant_facilitator_name: string | null;
+  assistant_facilitator_id?: string | null; assistant_facilitator_name: string | null;
+  assistant_facilitators?: AssistantFacilitator[];  // [] when none assigned
   location_id: string | null; location_name: string | null;
   status: string; notes: string | null; is_combined: boolean;
   override_conflict: boolean; created_at: string | null;
@@ -377,6 +427,10 @@ export interface NightSummary {
   sessions: NightSessionSummary[];
   conflict_count: number;
   notices: ParadeNotice[];
+  /** Available when Plan A backend is deployed; [] for legacy nights. */
+  instructional_periods?: InstructionalPeriod[];
+  /** Total session slots for this night (from timing template or legacy count). */
+  session_count?: number;
 }
 export interface NightSummariesResponse {
   planning_year_id: string;
