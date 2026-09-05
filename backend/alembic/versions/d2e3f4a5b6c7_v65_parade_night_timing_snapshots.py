@@ -52,7 +52,7 @@ def upgrade():
             "SELECT block_name, block_type, start_time, end_time, "
             "       is_instructional_period, display_order "
             "FROM timing_blocks "
-            "WHERE timing_template_id = :tid AND is_archived = false "
+            "WHERE timing_template_id = :tid "
             "ORDER BY display_order"
         ), {"tid": tmpl_id}).fetchall()
 
