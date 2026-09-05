@@ -385,7 +385,6 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
                       </span>
                     )}
                   </th>
-                  <th style={!tc.active_status ? { opacity: 0.5 } : undefined}>{tc.display_name}</th>
                   {blocks.map(b => {
                     if (b.block_type === "break" || !b.is_instructional || b.period_number === null) {
                       return (
@@ -443,10 +442,22 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
                           {session.location_name && <div className="pn-cell-room">{session.location_name}</div>}
                           <div className="pn-cell-fac">
                             {session.facilitator_name ?? "No facilitator"}
-                            {session.assistant_facilitator_name && ` + ${session.assistant_facilitator_name}`}
-                            {/* Assistant facilitators (Task 6) */}
-                            {(session.assistant_facilitators ?? []).length > 0 && (
-                              <span style={{ fontSize: 'var(--fs-2xs)', marginLeft: 4 }}>
+                            {/* Task 6: multi-assistant display — names if ≤2, count chip if more */}
+                            {(session.assistant_facilitators ?? []).length === 0 && session.assistant_facilitator_name && (
+                              ` + ${session.assistant_facilitator_name}`
+                            )}
+                            {(session.assistant_facilitators ?? []).length === 1 && (
+                              <span style={{ fontSize: 'var(--fs-2xs)', marginLeft: 4, color: "var(--muted-text)" }}>
+                                + {session.assistant_facilitators![0].display_name}
+                              </span>
+                            )}
+                            {(session.assistant_facilitators ?? []).length === 2 && (
+                              <span style={{ fontSize: 'var(--fs-2xs)', marginLeft: 4, color: "var(--muted-text)" }}>
+                                + {session.assistant_facilitators!.map(a => a.display_name).join(", ")}
+                              </span>
+                            )}
+                            {(session.assistant_facilitators ?? []).length > 2 && (
+                              <span style={{ fontSize: 'var(--fs-2xs)', marginLeft: 4, color: "var(--muted-text)" }}>
                                 +{session.assistant_facilitators!.length} asst
                               </span>
                             )}

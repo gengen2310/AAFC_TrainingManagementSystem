@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useId, useCallback, type KeyboardEvent } f
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { planningApi, trainingApi } from "../../api";
 import { friendlyMessage } from "../../api/client";
-import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent, NightSummary, TrainingClassSummary } from "../../api/types";
+import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent, NightSummary, TrainingClassSummary, AssistantFacilitator } from "../../api/types";
 import { ActivityFullDetail, anchorToDisplay } from "./ActivityDetailBlock";
 import { getProgramType } from "../../utils/planningFilters";
 import { useConfirm } from "../ConfirmDialog";
@@ -69,6 +69,15 @@ function SessionForm({
   const [partNumber, setPartNumber] = useState(existing?.part_number?.toString() ?? "");
   const [facilitatorId, setFacilitatorId] = useState(existing?.facilitator_id ?? "");
   const [asstFacId, setAsstFacId] = useState(existing?.assistant_facilitator_id ?? "");
+  // Task 6: multi-assistant facilitator list (edit mode).
+  // Seeded from session.assistant_facilitators; mutated immediately via API.
+  const [assistants, setAssistants] = useState<AssistantFacilitator[]>(
+    existing?.assistant_facilitators ?? [],
+  );
+  const [addAsstId, setAddAsstId] = useState("");
+  const [asstAdding, setAsstAdding] = useState(false);
+  const [asstRemoving, setAsstRemoving] = useState<string | null>(null);
+  const [asstErr, setAsstErr] = useState<string | null>(null);
   const [locationId, setLocationId] = useState(existing?.location_id ?? "");
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
@@ -105,6 +114,41 @@ function SessionForm({
     await qc.invalidateQueries({ queryKey: ["planning-weekly"] });
   }, [sessionId, curriculumId, title, facilitatorId, asstFacId, locationId, cadetGroup, trainingClassId, partNumber, qc]);
   const { onChange: onNotesAutoSave, status: notesSaveStatus } = useAutoSave(autoSaveNotesFn);
+
+  // Task 6: immediate-mutation handlers for multi-assistant facilitators.
+  async function handleAddAssistant() {
+    if (!addAsstId || !sessionId) return;
+    setAsstAdding(true);
+    setAsstErr(null);
+    try {
+      await planningApi.addAssistantFacilitator(sessionId, addAsstId);
+      const added = facilitators.find(f => f.facilitator_id === addAsstId);
+      if (added) {
+        setAssistants(prev => [...prev, { user_id: added.facilitator_id, display_name: added.display_name }]);
+      }
+      setAddAsstId("");
+      await qc.invalidateQueries({ queryKey: ["planning-weekly"] });
+    } catch (e: unknown) {
+      setAsstErr(friendlyMessage(e, "Failed to add assistant"));
+    } finally {
+      setAsstAdding(false);
+    }
+  }
+
+  async function handleRemoveAssistant(userId: string) {
+    if (!sessionId) return;
+    setAsstRemoving(userId);
+    setAsstErr(null);
+    try {
+      await planningApi.removeAssistantFacilitator(sessionId, userId);
+      setAssistants(prev => prev.filter(a => a.user_id !== userId));
+      await qc.invalidateQueries({ queryKey: ["planning-weekly"] });
+    } catch (e: unknown) {
+      setAsstErr(friendlyMessage(e, "Failed to remove assistant"));
+    } finally {
+      setAsstRemoving(null);
+    }
+  }
 
   const { data: classesData } = useQuery({
     queryKey: ["training-classes", yearId],
@@ -473,13 +517,85 @@ function SessionForm({
             {facilitators.map(f => <option key={f.facilitator_id} value={f.facilitator_id}>{f.display_name}</option>)}
           </select>
         </label>
-        <label>
-          Assistant facilitator
-          <select value={asstFacId} onChange={e => setAsstFacId(e.target.value)}>
-            <option value="">— None —</option>
-            {facilitators.map(f => <option key={f.facilitator_id} value={f.facilitator_id}>{f.display_name}</option>)}
-          </select>
-        </label>
+        {/* Task 6: multi-assistant facilitators (edit mode) / legacy single-select (create mode) */}
+        {isEdit ? (
+          <div>
+            <div style={{ fontSize: 'var(--fs-sm)', fontWeight: 600, marginBottom: 4 }}>
+              Assistant facilitators
+            </div>
+            {assistants.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+                {assistants.map(a => (
+                  <span
+                    key={a.user_id}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      background: "var(--surface-2, #f0f5fa)",
+                      border: "1px solid var(--border-light, #e4edf5)",
+                      borderRadius: 4,
+                      padding: "2px 6px",
+                      fontSize: 'var(--fs-xs)',
+                    }}
+                  >
+                    {a.display_name}
+                    <button
+                      type="button"
+                      aria-label={`Remove ${a.display_name}`}
+                      disabled={asstRemoving === a.user_id}
+                      onClick={() => handleRemoveAssistant(a.user_id)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "0 2px",
+                        color: "var(--muted, #5c6a76)",
+                        lineHeight: 1,
+                        fontSize: 13,
+                      }}
+                    >
+                      {asstRemoving === a.user_id ? "…" : "×"}
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <select
+                value={addAsstId}
+                onChange={e => setAddAsstId(e.target.value)}
+                style={{ flex: 1, fontSize: 'var(--fs-sm)' }}
+              >
+                <option value="">— Add assistant —</option>
+                {facilitators
+                  .filter(f => !assistants.some(a => a.user_id === f.facilitator_id))
+                  .map(f => (
+                    <option key={f.facilitator_id} value={f.facilitator_id}>{f.display_name}</option>
+                  ))
+                }
+              </select>
+              <button
+                type="button"
+                className="btn sm primary"
+                onClick={handleAddAssistant}
+                disabled={!addAsstId || asstAdding}
+                style={{ whiteSpace: "nowrap" }}
+              >
+                {asstAdding ? "…" : "Add"}
+              </button>
+            </div>
+            {asstErr && <div className="pw-err" style={{ marginTop: 4, fontSize: 'var(--fs-xs)' }}>{asstErr}</div>}
+          </div>
+        ) : (
+          <label>
+            Assistant facilitator
+            <select value={asstFacId} onChange={e => setAsstFacId(e.target.value)}>
+              <option value="">— None —</option>
+              {facilitators.map(f => <option key={f.facilitator_id} value={f.facilitator_id}>{f.display_name}</option>)}
+            </select>
+          </label>
+        )}
         <label>
           Room / Location
           <select value={locationId} onChange={e => setLocationId(e.target.value)}>
