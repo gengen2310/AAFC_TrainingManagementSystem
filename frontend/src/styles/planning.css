@@ -198,6 +198,10 @@ body.pw-active .main {
   background: var(--aafc-dark-blue); color: #fff;
   padding: 8px 10px; text-align: center;
   font-size: var(--fs-xs); font-weight: 700; white-space: nowrap;
+  /* Sticky column headers so training class names stay visible on horizontal scroll */
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 .pn-grid thead th.break-col {
   background: var(--aafc-gunmetal); font-style: italic;
@@ -208,6 +212,30 @@ body.pw-active .main {
   font-weight: 700; font-size: var(--fs-xs); white-space: nowrap;
   min-width: 130px; vertical-align: middle;
 }
+
+/* ── Task 4 + 9: Phase group header rows ─────────────────
+   One full-width header per curriculum phase (e.g. Orientation,
+   Phase 1, Advanced). Uses AAFC dark blue per brand guidelines.
+   The inline style in the JSX also sets this; the class is here
+   so the contrast and typography are declared in CSS, not scattered
+   across component files. ───────────────────────────────── */
+.pn-phase-header td {
+  background: var(--aafc-dark-blue, #002f65) !important;
+  color: #fff;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 5px 12px;
+  border-top: 2px solid rgba(255,255,255,0.1);
+}
+
+/* Archived training-class rows — dimmed but still present */
+.pn-grid tbody tr.archived-class-row th,
+.pn-grid tbody tr.archived-class-row td {
+  opacity: 0.5;
+}
+
 .pn-grid-cell {
   padding: 0;
   min-width: 160px;
@@ -222,12 +250,19 @@ body.pw-active .main {
   position: relative;
   transition: background .1s;
 }
+/* Focus ring on interactive cells — keyboard + pointer parity */
+.pn-cell-inner[role="button"]:focus-visible {
+  outline: 2px solid var(--accent, #51b0e3);
+  outline-offset: -2px;
+  border-radius: 2px;
+}
 .pn-cell-inner.empty { background: var(--background); }
 .pn-cell-inner.conflict-room { background: #FFF5F5; }
 .pn-cell-inner.conflict-fac { background: #FFFBEC; }
 .pn-cell-inner.break-cell { background: var(--surface-2); text-align: center; color: var(--muted-on-sunk); font-style: italic; vertical-align: middle; display: flex; align-items: center; justify-content: center; }
 .pn-cell-title { font-weight: 700; font-size: var(--fs-sm); margin-bottom: 3px; line-height: 1.3; }
 .pn-cell-code { font-size: var(--fs-2xs); color: var(--aafc-royal-blue); font-weight: 700; margin-bottom: 2px; }
+.pn-cell-classes { font-size: var(--fs-2xs); color: var(--aafc-dark-blue); margin-bottom: 2px; }
 .pn-cell-room { font-size: var(--fs-2xs); color: var(--muted-text); margin-bottom: 2px; }
 .pn-cell-fac { font-size: var(--fs-2xs); color: var(--text); }
 .pn-cell-conflict {
@@ -249,6 +284,17 @@ body.pw-active .main {
   transition: background .1s;
 }
 .pn-add-btn:hover { background: #EBF5FF; color: var(--aafc-dark-blue); }
+.pn-add-btn:focus-visible {
+  outline: 2px solid var(--accent, #51b0e3);
+  outline-offset: -2px;
+}
+
+/* ── TimingStrip integration with the grid ──────────────── */
+.pn-timing-strip-wrap {
+  padding: 6px 18px 2px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
 
 /* ── Right drawer ────────────────────────────────────────── */
 .pw-right {

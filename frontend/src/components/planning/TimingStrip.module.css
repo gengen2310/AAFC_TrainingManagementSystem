@@ -1,51 +1,91 @@
 /* TimingStrip.module.css — visual timing bar above the planning grid.
-   DESIGN: Task 9 will apply frontend-design + apple-design polish. */
+ * Uses AAFC VIG design tokens (var(--accent), var(--surface-2), etc.).
+ * Dark and high-contrast themes are inherited from tokens.css — no
+ * hardcoded hex values here that bypass the token system.
+ *
+ * DESIGN: Task 9 — frontend-design + apple-design polish applied.
+ * Browser verification required before packaging (PENDING_BACKEND tag in commit).
+ */
 
 .strip {
   display: flex;
   align-items: stretch;
-  gap: 2px;
-  padding: 4px 0;
-  min-height: 40px;
+  gap: 4px;
+  padding: 8px 0 6px;
+  min-height: 48px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  /* Prevent the strip from shrinking the column it sits in */
+  width: 100%;
 }
+
+/* Hide the scrollbar visually but keep it functional */
+.strip::-webkit-scrollbar { height: 3px; }
+.strip::-webkit-scrollbar-track { background: transparent; }
+.strip::-webkit-scrollbar-thumb { background: var(--border-light, #e4edf5); border-radius: 2px; }
 
 .block {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 11px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-size: var(--fs-xs, 0.6875rem);
   font-weight: 600;
   text-align: center;
   white-space: nowrap;
   min-width: 80px;
-  background: var(--surface-2, #f0f5fa);
-  border: 1px solid var(--border-light, #e4edf5);
-  color: var(--muted, #5c6a76);
   flex: 1;
   cursor: default;
+  /* Token-driven surface */
+  background: var(--surface-2, #f0f5fa);
+  border: 1.5px solid var(--border-light, #e4edf5);
+  color: var(--muted, #5c6a76);
+  /* Subtle elevation */
+  box-shadow: 0 1px 2px rgba(0, 47, 101, 0.05);
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+  /* Remove default browser button styling if rendered as button */
+  appearance: none;
+  -webkit-appearance: none;
 }
 
+/* Instructional periods: AAFC accent blue treatment */
 .block[data-instructional='true'] {
   background: var(--accent-light, #e0f0fa);
   border-color: var(--accent, #51b0e3);
   color: var(--text, #1e2d3d);
   font-weight: 700;
+  /* Slightly stronger elevation for the "active" blocks */
+  box-shadow: 0 1px 4px rgba(81, 176, 227, 0.18);
+}
+
+/* Non-instructional blocks (breaks, assembly, etc.) get subdued treatment */
+.block[data-instructional='false'] {
+  opacity: 0.82;
+  font-style: italic;
+}
+
+/* Focus ring — keyboard users can tab to the strip when blocks are interactive */
+.block:focus-visible {
+  outline: 2px solid var(--accent, #51b0e3);
+  outline-offset: 2px;
 }
 
 .blockLabel {
   display: block;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
 }
 
 .blockTime {
   display: block;
-  font-size: 10px;
+  font-size: var(--fs-2xs, 0.625rem);
   font-weight: 400;
-  opacity: 0.75;
-  margin-top: 1px;
+  opacity: 0.72;
+  margin-top: 2px;
+  /* Ensure time always fits on one line */
+  white-space: nowrap;
+  letter-spacing: 0;
 }
