@@ -30,7 +30,7 @@ def upgrade():
         sa.Column('block_label', sa.String(120), nullable=False),
         sa.Column('start_time', sa.String(10), nullable=True),
         sa.Column('end_time', sa.String(10), nullable=True),
-        sa.Column('is_instructional', sa.Boolean, nullable=False, server_default='0'),
+        sa.Column('is_instructional', sa.Boolean, nullable=False, server_default=sa.false()),
         sa.Column('display_order', sa.Integer, nullable=False, server_default='0'),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False,
                   server_default=sa.text("CURRENT_TIMESTAMP")),
@@ -44,7 +44,7 @@ def upgrade():
     bind = op.get_bind()
     nights = bind.execute(sa.text(
         "SELECT id, timing_template_id FROM parade_nights "
-        "WHERE timing_template_id IS NOT NULL AND is_archived = 0"
+        "WHERE timing_template_id IS NOT NULL AND is_archived = false"
     )).fetchall()
 
     for night_id, tmpl_id in nights:
@@ -52,7 +52,7 @@ def upgrade():
             "SELECT block_name, block_type, start_time, end_time, "
             "       is_instructional_period, display_order "
             "FROM timing_blocks "
-            "WHERE timing_template_id = :tid AND is_archived = 0 "
+            "WHERE timing_template_id = :tid AND is_archived = false "
             "ORDER BY display_order"
         ), {"tid": tmpl_id}).fetchall()
 
@@ -77,7 +77,7 @@ def upgrade():
                 "label": block_name,
                 "st": start_t,
                 "et": end_t,
-                "instr": 1 if is_instr else 0,
+                "instr": True if is_instr else False,
                 "disp": display_idx,
             })
 
