@@ -12,15 +12,24 @@ import {
 // the session detail. These tests pin the keyboard equivalent so it cannot regress to
 // pointer-only again.
 
-const session = (id: string, group: string, period: number, title: string): DisplaySession => ({
+// Plan B Task 4 migrated ParadeNightBlock from cadet_group strings to TrainingClass
+// objects. Tests that render sessions must now supply trainingClasses and sessions
+// with matching training_classes membership.
+const TC_JUNIOR = { training_class_id: "tc-j1", display_name: "Junior", class_number: 1,
+  squadron_id: "s1", training_year_id: "y1", training_stage_id: "st1",
+  start_date: null, end_date: null, expected_count: null, notes: null,
+  is_archived: false, version: 1 };
+
+const session = (id: string, _group: string, period: number, title: string): DisplaySession => ({
   session_id: id,
   period,
-  cadet_group: group,
+  cadet_group: _group,
   title,
   code: "SVC-101",
   location: "Hut 3",
   facilitator: "FSGT Rowe",
   conflict: null,
+  training_classes: [{ training_class_id: TC_JUNIOR.training_class_id, display_name: TC_JUNIOR.display_name }],
   source: {
     curriculum_id: "c1",
     facilitator_id: "f1",
@@ -47,10 +56,12 @@ function Harness({ onMove }: { onMove: (p: DragSessionPayload, d: string, per: n
     <div>
       <div data-testid="night-a">
         <ParadeNightBlock {...shared} dateId="night-A" date="2026-09-04"
+          trainingClasses={[TC_JUNIOR]}
           sessions={[session("s1", "junior", 1, "Drill Fundamentals")]} />
       </div>
       <div data-testid="night-b">
-        <ParadeNightBlock {...shared} dateId="night-B" date="2026-09-11" sessions={[]} />
+        <ParadeNightBlock {...shared} dateId="night-B" date="2026-09-11"
+          trainingClasses={[TC_JUNIOR]} sessions={[]} />
       </div>
     </div>
   );
