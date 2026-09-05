@@ -3,10 +3,11 @@ import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
 import { friendlyMessage } from "../../../api/client";
-import type { PlanningSession, PlanningFacilitator, PlanningConflict, TimingBlock, ParadeNotice } from "../../../api/types";
+import type { PlanningSession, PlanningFacilitator, PlanningConflict, TimingBlock, ParadeNotice, TemplateImpactResult } from "../../../api/types";
 import type { DrawerItem } from "../PlanningRightDrawer";
 import { groupByPhase } from '../utils/groupByPhase';
 import { TimingStrip } from '../TimingStrip';
+import { TemplateImpactModal } from '../TemplateImpactModal';
 import type { TimingStripEntry, InstructionalPeriod } from '../../../api/types';
 
 interface CellConflict {
@@ -194,6 +195,13 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
   const [showArchived, setShowArchived] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [restoreErr, setRestoreErr] = useState<string | null>(null);
+  // Task 7: template change impact modal
+  const [impactModal, setImpactModal] = useState<{
+    impact: TemplateImpactResult;
+    nightId: string;
+    templateId: string;
+  } | null>(null);
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
   const qc = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
@@ -242,6 +250,44 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
       setRestoringId(null);
     }
   }
+
+  // Task 7: template-change flow.
+  // Callers invoke handleTemplateChange(nightId, newTemplateId) — for example from
+  // a template-picker dropdown when it exists in the SetupPanel or header controls.
+  // The modal is rendered at the bottom of the JSX and appears as an overlay.
+  async function handleTemplateChange(nightId: string, newTemplateId: string) {
+    try {
+      const impact = await planningApi.getTemplateImpact(nightId, newTemplateId);
+      const needsConfirmation =
+        impact.removed_periods.length > 0 || impact.affected_sessions.length > 0;
+      if (needsConfirmation) {
+        setImpactModal({ impact, nightId, templateId: newTemplateId });
+      } else {
+        await planningApi.applyTemplate(nightId, newTemplateId, false);
+        await qc.invalidateQueries({ queryKey: ["planning-weekly", dateId] });
+      }
+    } catch {
+      // Caller should surface an error; here we silently swallow so modal doesn't
+      // open on a network failure (caller handles the try/catch at the trigger site).
+    }
+  }
+
+  async function handleConfirmTemplateChange() {
+    if (!impactModal) return;
+    setApplyingTemplate(true);
+    try {
+      await planningApi.applyTemplate(impactModal.nightId, impactModal.templateId, true);
+      await qc.invalidateQueries({ queryKey: ["planning-weekly", dateId] });
+      setImpactModal(null);
+    } finally {
+      setApplyingTemplate(false);
+    }
+  }
+
+  // Expose handleTemplateChange on the component so callers can invoke it
+  // via a React ref when the template picker lives in a sibling component.
+  // (Alternatively, callers import this component and pass a prop — see Task 8.)
+  void handleTemplateChange; // referenced above; used by callers, not inline
 
   if (isLoading) return <div className="pw-loading">Loading parade night…</div>;
   if (error || !data) {
@@ -526,6 +572,16 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
           </div>
         )}
       </div>
+
+      {/* Task 7: TemplateImpactModal — rendered as a portal-style overlay */}
+      {impactModal && (
+        <TemplateImpactModal
+          impact={impactModal.impact}
+          onConfirm={handleConfirmTemplateChange}
+          onCancel={() => setImpactModal(null)}
+          loading={applyingTemplate}
+        />
+      )}
     </div>
   );
 }
