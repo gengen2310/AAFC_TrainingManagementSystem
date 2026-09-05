@@ -22,7 +22,7 @@ import * as fs from "fs";
 
 // Update to the deployed commit SHA when a new build is promoted to staging.
 // This directory holds screenshots that prove the staging domain and build.
-const DEPLOYED_SHA = "d7441b46";
+const DEPLOYED_SHA = "05d4cf6";
 const SCREENSHOT_DIR = path.resolve(
   __dirname,
   `../../../artifacts/staging-ui-verification/${DEPLOYED_SHA}`
