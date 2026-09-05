@@ -107,7 +107,9 @@ export const trainingApi = {
   curriculumSessions: (cid: string) => api.get<SessionRow[]>(`/api/curriculum/${cid}/sessions`),
   paradeNights: (squadron_id?: string) => api.get<ParadeNightWithSessions[]>(`/api/parade-nights${squadron_id ? `?squadron_id=${squadron_id}` : ""}`),
   paradeNight: (id: string) => api.get<ParadeNightDetail>(`/api/parade-nights/${id}`),
-  createParadeNight: (b: { date: string; term?: string; session_count?: number; parade_type?: string }) =>
+  // Task 8: timing_template_id is now the preferred field; session_count kept
+  // for backward compat with any callers that still pass it explicitly.
+  createParadeNight: (b: { date: string; term?: string; session_count?: number; timing_template_id?: string; parade_type?: string }) =>
     api.post<{ ok: boolean; parade_night_id: string }>("/api/parade-nights", b),
   patchParadeNight: (id: string, b: { timing_template_id?: string | null }) =>
     api.patch<{ parade_night_id: string; timing_template_id: string | null }>(`/api/parade-nights/${id}`, b),

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { trainingApi } from "../api";
+import { useNavigate } from "react-router-dom";
+import { trainingApi, planningApi } from "../api";
 import { Card, Empty, Loading, ErrorNote, Button } from "../components/ui";
 import { StatusBadge } from "../components/status/StatusBadge";
 import { Modal } from "../components/Modal";
@@ -45,49 +46,134 @@ export function ParadeNights() {
           </table>
         )}
       </Card>
-      {creating && <CreateParadeModal onClose={() => setCreating(false)} onDone={() => { setCreating(false); qc.invalidateQueries({ queryKey: ["parade-nights"] }); }} />}
+      {creating && <CreateParadeModal squadronId={squadronId ?? null} onClose={() => setCreating(false)} onDone={() => { setCreating(false); qc.invalidateQueries({ queryKey: ["parade-nights"] }); }} />}
       {openId && <Modal title="Parade night" onClose={() => setOpenId(null)}><ParadeNightDetailView id={openId} canWrite={canWrite} /></Modal>}
     </div>
   );
 }
 
-function CreateParadeModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+// Task 8: simplified Create Parade Night form.
+// Removed: session count (derived from timing template's instructional_period_count).
+// Added: required timing template selector. On success, navigates to /planning.
+function CreateParadeModal({
+  squadronId,
+  onClose,
+  onDone,
+}: {
+  squadronId: string | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const navigate = useNavigate();
   const [date, setDate] = useState("");
   const [term, setTerm] = useState("T1");
-  const [count, setCount] = useState("3");
+  const [timingTemplateId, setTimingTemplateId] = useState("");
   const [err, setErr] = useState("");
   const [fields, setFields] = useState<Record<string, string>>({});
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ["timing-templates", squadronId],
+    queryFn: () => planningApi.listTimingTemplates(squadronId ?? undefined),
+    enabled: true,
+    staleTime: 5 * 60 * 1000,
+  });
+  // Pre-select the default template once loaded.
+  const defaultTpl = templates.find(t => t.is_default);
+  const [initialized, setInitialized] = useState(false);
+  if (!initialized && defaultTpl) {
+    setTimingTemplateId(defaultTpl.timing_template_id);
+    setInitialized(true);
+  }
+
   const m = useMutation({
-    mutationFn: () => trainingApi.createParadeNight({ date, term, session_count: Number(count) }),
-    onSuccess: onDone,
+    mutationFn: () =>
+      trainingApi.createParadeNight({
+        date,
+        term,
+        ...(timingTemplateId ? { timing_template_id: timingTemplateId } : {}),
+      }),
+    onSuccess: (data) => {
+      onDone();
+      // Navigate to the planning workspace so the user can see the new night.
+      // The planning workspace shows the relevant date once the weekly program loads.
+      void data; // parade_night_id available if planning workspace accepts it in future
+      navigate("/planning");
+    },
     onError: (e) => {
       if (e instanceof ApiError) {
         const fe = e.fieldErrors;
         setFields(fe);
-        // Show the generic banner only when there is no field-specific message to display.
         setErr(Object.keys(fe).length ? "" : e.friendly);
-      } else { setErr("Could not create."); setFields({}); }
+      } else {
+        setErr("Could not create.");
+        setFields({});
+      }
     },
   });
+
+  const selectedTpl = templates.find(t => t.timing_template_id === timingTemplateId);
+
   return (
     <Modal title="New parade night" onClose={onClose}>
       <div className="form">
         <label htmlFor="pn-date">Date</label>
-        <input id="pn-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-invalid={!!fields.date} />
+        <input
+          id="pn-date"
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          aria-invalid={!!fields.date}
+        />
         {fields.date && <div className="field-err" role="alert">{fields.date}</div>}
+
         <label htmlFor="pn-term">Term</label>
-        <select id="pn-term" value={term} onChange={(e) => setTerm(e.target.value)} aria-invalid={!!fields.term}>
+        <select
+          id="pn-term"
+          value={term}
+          onChange={(e) => setTerm(e.target.value)}
+          aria-invalid={!!fields.term}
+        >
           <option value="T1">Term 1</option>
           <option value="T2">Term 2</option>
           <option value="T3">Term 3</option>
           <option value="T4">Term 4</option>
         </select>
         {fields.term && <div className="field-err" role="alert">{fields.term}</div>}
-        <label htmlFor="pn-count">Session count</label>
-        <input id="pn-count" type="number" min={1} max={6} value={count} onChange={(e) => setCount(e.target.value)} aria-invalid={!!fields.session_count} />
-        {fields.session_count && <div className="field-err" role="alert">{fields.session_count}</div>}
+
+        <label htmlFor="pn-template">Timing template <span aria-hidden="true">*</span></label>
+        <select
+          id="pn-template"
+          value={timingTemplateId}
+          onChange={(e) => setTimingTemplateId(e.target.value)}
+          aria-required="true"
+          aria-invalid={!!fields.timing_template_id}
+        >
+          <option value="">— Select template —</option>
+          {templates.map(t => (
+            <option key={t.timing_template_id} value={t.timing_template_id}>
+              {t.name}
+              {t.is_default ? " (default)" : ""}
+              {" — "}
+              {t.instructional_period_count} period{t.instructional_period_count === 1 ? "" : "s"}
+            </option>
+          ))}
+        </select>
+        {fields.timing_template_id && (
+          <div className="field-err" role="alert">{fields.timing_template_id}</div>
+        )}
+        {selectedTpl && (
+          <div style={{ fontSize: 'var(--fs-xs, 11px)', color: "var(--muted, #5c6a76)", marginTop: 2 }}>
+            {selectedTpl.instructional_period_count} instructional period{selectedTpl.instructional_period_count !== 1 ? "s" : ""}
+          </div>
+        )}
+
         {err && <div className="err" role="alert">{err}</div>}
-        <Button onClick={() => m.mutate()} disabled={!date || m.isPending}>Create</Button>
+        <Button
+          onClick={() => m.mutate()}
+          disabled={!date || !timingTemplateId || m.isPending}
+        >
+          {m.isPending ? "Creating…" : "Create"}
+        </Button>
       </div>
     </Modal>
   );
