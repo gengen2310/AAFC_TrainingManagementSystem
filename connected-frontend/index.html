@@ -9558,6 +9558,7 @@ function renderPN(){
 function buildPNCard(pn){
   const allDel=(pn.sessions||[]).length>0&&(pn.sessions||[]).every(s=>s.status==='delivered');
   const tplName=pn.timing_template_name||((S.timingTemplates||[]).find(t=>t.timing_template_id===pn.timing_template_id)||{}).name||'';
+  const tmplBadge=pn.timing_template_id?'<span class="badge b-blue" title="Timing template">'+esc(tplName)+'</span>':'<span class="badge b-grey" title="No timing template assigned">Legacy</span>';
   const sessCards=(pn.sessions||[]).map((s,i)=>`
     <div class="sess-card ${stCls(s.status)||(!s.exp?'unassigned':'')}" onclick="showPNDetail('${pn.date}')">
       <div class="sess-hdr"><span class="sess-num">Sess ${i+1}</span>${stBadge(s.status||'planned')}</div>
@@ -9573,7 +9574,7 @@ function buildPNCard(pn){
   return `<div class="pn-card" id="pncard-${esc(pn.id)}">
     <div class="pn-hdr">
       ${canWriteSquadron()?`<label class="no-print" style="display:flex;align-items:center;justify-content:center;min-width:var(--ctl-min);min-height:var(--ctl-min);padding-right:10px;cursor:pointer" onclick="event.stopPropagation()"><input type="checkbox" id="pnchk-${esc(pn.id)}" aria-label="Select parade night ${esc(fmtDL(pn.date))} for bulk actions" onchange="_pnToggle('${esc(pn.id)}')" style="width:16px;height:16px;cursor:pointer" ${_pnSelected.has(pn.id)?'checked':''}></label>`:''}
-      <div><h2 class="pn-date">${fmtDL(pn.date)}</h2><div class="pn-meta">${esc(pn.term)} · ${(pn.sessions||[]).length} sessions${pn.notes?' · '+esc(pn.notes):''}</div></div>
+      <div><h2 class="pn-date">${fmtDL(pn.date)}</h2><div class="pn-meta">${esc(pn.term)} · ${(pn.sessions||[]).length} sessions${pn.notes?' · '+esc(pn.notes):''}</div><div style="margin-top:3px">${tmplBadge}</div></div>
       <div style="display:flex;gap:6px;align-items:center" class="no-print">
         ${allDel?stBadge('delivered'):stBadge('planned')}
         ${pn.published?'<span class="badge b-ok" title="Weekly Program published">Published</span>':''}
@@ -11978,7 +11979,7 @@ function _actTabRender(containerId){
         <td style="font-weight:700">${esc(i.activity_name)}${i.is_archived?' <span class="badge b-grey">Archived</span>':''}</td>
         <td style="white-space:nowrap">${fmtD(i.date_start)}${i.date_end&&i.date_end!==i.date_start?' – '+fmtD(i.date_end):''}</td>
         <td style="font-size:var(--fs-xs)">${esc(i.activity_type||'—')}</td>
-        <td style="font-size:var(--fs-xs)">${esc(i.location||'—')}</td>
+        <td style="font-size:var(--fs-xs)"><span title="CEA event venue — not a training room">${esc(i.location||'—')}</span></td>
         <td class="no-print">${i.read_only?'<span class="muted" title="Owned by another scope — view only">🔒</span>':
           (st.view==='archived'?`<button class="btn btn-xs btn-ok" onclick="event.stopPropagation();_actRestore('${containerId}','${i.activity_id}')">Restore</button>`:'')}</td>
       </tr>`;
@@ -12778,16 +12779,18 @@ async function ceaPreview(){
   if(updCount) html+='<p style="font-size:var(--fs-sm);color:var(--royal);font-weight:700;margin-bottom:6px">'+updCount+' existing activities — click to keep original</p>';
 
   html+='<div style="overflow-x:auto;max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">'
-    +'<table class="yn-mgmt-table"><thead><tr><th>CEA ID</th><th>Name</th><th>Action</th></tr></thead><tbody>';
+    +'<table class="yn-mgmt-table"><thead><tr><th>CEA ID</th><th>Name</th><th>CEA Location<br><small style="color:var(--muted,#5c6a76);font-weight:400">event venue — not a training room</small></th><th>Action</th></tr></thead><tbody>';
 
   categorised.forEach(function(c){
     const rowCls=c.isUpdate?'cea-row-update':'cea-row-new';
     const decision=c.isUpdate
       ?'<button class="cea-conflict-toggle replace" data-ceaid="'+esc(c.ceaId)+'" onclick="ceaToggleKeep(this)">Replace</button>'
       :'<span style="color:var(--ok,#1a7f4b);font-size:var(--fs-xs);font-weight:700">New</span>';
+    const loc=_ceaGetField(c.row,['Location','location','Venue','venue','City','city']);
     html+='<tr class="'+rowCls+'">'
       +'<td style="font-size:var(--fs-xs);color:var(--muted)">'+esc(c.ceaId)+'</td>'
       +'<td style="font-weight:600">'+esc(c.name)+'</td>'
+      +'<td style="font-size:var(--fs-xs);color:var(--muted)">'+esc(loc||'—')+'</td>'
       +'<td>'+decision+'</td>'
       +'</tr>';
   });
