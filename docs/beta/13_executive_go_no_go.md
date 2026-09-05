@@ -1,9 +1,60 @@
 # AAFC TMS — Executive GO / NO-GO
 
 v17.1 Beta Release Decision Record.
-Created: 2026-07-14. **Substantially rewritten 2026-08-05** — see "Current Status" below.
-Everything from "Historical Record (2026-07-14/15 snapshot)" onward is preserved for audit trail but
-is superseded; do not cite it as current.
+Created: 2026-07-14. **Substantially rewritten 2026-08-05**; updated 2026-09-05 with pre-release
+security remediation results and staging qualification evidence. The 2026-08-05 section below is
+preserved and accurate for its date; the 2026-09-05 section is the current authoritative status.
+
+---
+
+## Current Status (2026-09-05)
+
+**Production is live; staging carries the remediation build.** This update records the
+completion of the pre-release security remediation program (Findings 1–10, commit `30d43111`)
+and the staging qualification pass that followed it.
+
+### Remediation summary
+
+Ten findings from the Phase A–E adversarial qualification were fixed in commit `30d43111`
+(branch `main`, 2026-09-05):
+
+| Finding | Severity | Area | Status |
+|---|---|---|---|
+| DEFECT-011 | CRITICAL | Access-code lifecycle: deactivated code usable for auth | **Fixed** |
+| DEFECT-012 | CRITICAL | Self-service reset without current-code re-auth | **Fixed** |
+| DEFECT-013 | CRITICAL | Archive/restore did not revoke existing JWTs | **Fixed** |
+| DEFECT-014 | HIGH | Sibling-fallback lockout counter per candidate, not per attempt | **Fixed** |
+| DEFECT-015 | HIGH | 19 planning write endpoints missing proxy-aware scope guard | **Fixed** |
+| DEFECT-016 | HIGH | /exceptions/run-checks missing write scope guard | **Fixed** |
+| DEFECT-017 | HIGH | Service desk email save silently misdirected (api() arg order) | **Fixed** |
+| DEFECT-018 | HIGH | Role/scope labels rendered as raw innerHTML | **Fixed** |
+| DEFECT-019 | MEDIUM | Async rate limiter blocking event loop | **Fixed** |
+| DEFECT-020 | MEDIUM | Status badge class rendered from unvalidated API string | **Fixed** |
+
+No BLOCKER or HIGH severity defect is open in the defect register as of 2026-09-05.
+
+### Staging qualification evidence (2026-09-05)
+
+| Gate | Result | Evidence |
+|---|---|---|
+| Backend test suite | PASS | 2258 passed, 9 skipped, 0 failed (`pytest tests/ -q`) |
+| Playwright E2E — Chromium | PASS | 62/62 passed, 0 failed |
+| Playwright E2E — Firefox | PASS | 62/62 passed, 0 failed |
+| Playwright E2E — Mobile | PASS | 63/63 passed (mobile-specific), 0 failed |
+| Playwright E2E — skipped | 8 by design | `a11y-local` tests require a local server; correctly skipped against staging |
+| Security greps (all 5 checks) | PASS | 0 matches |
+| Migration chain | PASS | 76/76 applied, single head `b1c2d3e4f5a6` on staging PostgreSQL |
+| Staging deployment | SUCCESS | Railway deployment `2fb8b2ad`, 2026-09-05 |
+| Health check | PASS | `GET /api/health/ready` → `{"status":"ready"}` |
+
+### Outstanding gate items (unchanged from 2026-08-05)
+
+Gate 10 (human/organisational) remains pending — it cannot be completed by an automated system.
+See the 2026-08-05 section below for the full list. No new technical blockers have been added.
+
+**Recommendation**: commit `30d43111` is staged, qualified, and ready for production deployment
+subject to Gate 10 sign-off and an explicit `AUTHORISE PRODUCTION DEPLOYMENT 30d43111`
+instruction per the governing authorization constraint.
 
 ---
 

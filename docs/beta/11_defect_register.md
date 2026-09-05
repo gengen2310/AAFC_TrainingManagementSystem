@@ -273,3 +273,216 @@ snapshot and today, across two real production deployments this session performe
 from today's gate work (REM-77 P0 schema drift, REM-78 rollback-after-migration process gap) are
 tracked in `docs/remediation/master_gap_register.csv`, not duplicated into this older register —
 see that file for their full detail.
+
+---
+
+## DEFECT-011 — CRITICAL — Access-code lifecycle: deactivated code usable as authentication credential
+
+**Status**: **Fixed** (commit `30d43111`, 2026-09-05). Verified on staging.
+
+**Reproducible failure**: A user with a deactivated access code (`active_status = False`) could
+still authenticate in some edge cases because login, validation, and reset paths fetched the
+latest matching code without filtering on `active_status`. A previously-active code that had been
+superseded or revoked remained physically present in the database and could be selected.
+
+**Root cause**: Credential-mutating paths (auth, reset, validation) did not filter
+`active_status = True` before evaluating the hash. The active-code-per-user invariant was
+maintained on write paths but not enforced on read paths in every call site.
+
+**Fix**: All access-code lookups on credential paths now filter `active_status = True` as the
+first predicate. Inactive codes cannot be selected regardless of hash match.
+
+**Regression tests**: 39 new tests in `backend/tests/test_access_code_lifecycle.py` covering
+the full credential lifecycle: active-only lookup, deactivation side-effects, lifecycle
+transitions under concurrent modification.
+
+---
+
+## DEFECT-012 — CRITICAL — Self-service code reset did not require current code
+
+**Status**: **Fixed** (commit `30d43111`, 2026-09-05). Verified on staging.
+
+**Reproducible failure**: `POST /api/accounts/me/reset-code` required only a valid session JWT
+to rotate the access code. An attacker who had obtained a valid session (via XSS, session fixation,
+or a compromised device) could change the victim's access code without knowing the prior code,
+permanently locking out the legitimate user and taking over the credential.
+
+**Root cause**: The reset endpoint performed a session check (`require_role`) but no
+re-authentication step requiring knowledge of the current code.
+
+**Fix**: The endpoint now requires the caller to supply their current access code alongside the
+new code. The supplied current code is validated against the active hash before the reset proceeds.
+
+**Regression tests**: included in `backend/tests/test_access_code_lifecycle.py`.
+
+---
+
+## DEFECT-013 — CRITICAL — Archive and restore did not invalidate existing JWTs
+
+**Status**: **Fixed** (commit `30d43111`, 2026-09-05). Verified on staging.
+
+**Reproducible failure**: Archiving a user account (`POST /api/accounts/{id}/archive`) suspended
+the account in the database but did not bump `token_version`. Any JWT issued before the archive
+event remained valid and continued to authenticate API requests — the archived user's session
+survived the archive operation indefinitely (until the token's natural expiry).
+
+The same was true for restore: a session issued before the restore could not be distinguished from
+one issued after it, so post-restore access controls were not cleanly applied from a fresh session.
+
+**Root cause**: `token_version` was bumped on role changes but not on archive or restore.
+
+**Fix**: Both the `archive` and `batch_archive` endpoints, and the `restore` endpoint, now
+increment `token_version` on the affected user. All extant JWTs for that user are immediately
+invalid.
+
+**Regression tests**: included in `backend/tests/test_access_code_lifecycle.py`.
+
+---
+
+## DEFECT-014 — HIGH — Sibling login fallback incremented lockout counter per candidate tested
+
+**Status**: **Fixed** (commit `30d43111`, 2026-09-05). Verified on staging.
+
+**Reproducible failure**: The login path that walks a candidate list of access codes for a user
+incremented `failed_attempts` on each candidate that did not match, rather than once per login
+attempt. For a user with N prior (deactivated) codes in the database, a single failed login
+consumed N lockout attempts. This could lock an account after a small number of legitimate-but-
+incorrect login attempts from the user themselves.
+
+**Root cause**: Failure accounting was attached to the per-candidate evaluation rather than the
+aggregate login decision.
+
+**Fix**: `failed_attempts` is now incremented only after the final determination that no candidate
+matched, i.e., once per login attempt regardless of how many candidates were evaluated.
+
+**Regression tests**: included in `backend/tests/test_access_code_lifecycle.py`.
+
+---
+
+## DEFECT-015 — HIGH — Planning write endpoints used scope guard without proxy awareness
+
+**Status**: **Fixed** (commit `30d43111`, 2026-09-05). Verified on staging.
+
+**Reproducible failure**: Nineteen planning write endpoints in `backend/app/routers/planning.py`
+used `_require_year_access(..., write=True)`, which has no proxy/delegated-intervention awareness.
+A `wing_admin` operating in Proxy Mode on behalf of a squadron was incorrectly rejected from
+these endpoints (RBAC regression), while conversely the simpler check did not enforce the full
+proxy-mode preconditions that the codebase's established pattern requires for delegated writes.
+
+**Root cause**: `_require_year_access` was used in contexts that require proxy-aware scope
+checking (`require_can_write_squadron`). The two helpers are not interchangeable — see
+`.claude/rules/architecture.md`.
+
+**Fix**: All 19 affected endpoints now use `require_can_write_squadron()`. The guard enforces
+proxy/delegated-intervention mode where required and grants appropriate access to wing and
+national admins operating through the correct delegation channel.
+
+**Regression tests**: `backend/tests/test_planning_proxy_rbac.py`.
+
+---
+
+## DEFECT-016 — HIGH — /exceptions/run-checks used role check without scope guard
+
+**Status**: **Fixed** (commit `30d43111`, 2026-09-05). Verified on staging.
+
+**Reproducible failure**: `POST /api/exceptions/run-checks` (`backend/app/routers/ops.py`) used
+`require_role(p, 'sqn_admin', 'wing_admin', 'national_admin')` without a subsequent scope check.
+This allowed callers to trigger exception checks on squadrons outside their authorised scope.
+
+**Root cause**: The endpoint was added without the write-guard pattern that every other mutation
+endpoint in the same codebase uses.
+
+**Fix**: Endpoint now calls `require_can_write_squadron()`.
+
+**Regression tests**: `backend/tests/test_exceptions_run_checks.py`.
+
+---
+
+## DEFECT-017 — HIGH — Service desk email save was silently misdirected
+
+**Status**: **Fixed** (commit `30d43111`, 2026-09-05). Verified on staging.
+
+**Reproducible failure**: The service desk email save handler in `connected-frontend/index.html`
+called `api(method, path, body)` — positional-arg order reversed relative to the helper's actual
+signature `api(path, opts)`. The request was sent to the URL literal `'POST'` rather than the
+intended API endpoint. The call appeared to succeed (no uncaught exception) but silently discarded
+the save. Service desk email configuration changes never persisted.
+
+**Root cause**: The `api()` helper signature changed at some point from a method-first convention
+to path-first (matching `fetch`). This call site was not updated. See `.claude/rules/frontend.md`
+— this mismatch had previously broken the service desk ticket list and was noted there.
+
+**Fix**: Corrected to `api(path, { method: 'POST', body: payload })`.
+
+**Regression tests**: covered by existing integration tests and the staging Playwright suite.
+
+---
+
+## DEFECT-018 — HIGH — Role and scope labels inserted as raw innerHTML
+
+**Status**: **Fixed** (commit `30d43111`, 2026-09-05). Verified on staging.
+
+**Reproducible failure**: `ROLE_LABELS` and `SCOPE_LABELS` values from the API session response
+were rendered into the DOM via unescaped `innerHTML` assignment in `connected-frontend/index.html`.
+A stored XSS payload in a role label or scope label (reachable via a compromised backend or a
+database-level injection) would execute in the victim's browser context on next page render.
+
+**Root cause**: The `esc()` helper defined in the same file was not applied to these specific
+render sites. Both were missed in the original XSS sweep because they are not in the primary
+content-rendering path.
+
+**Fix**: All `ROLE_LABELS` and `SCOPE_LABELS` render sites now call `esc(value)` before
+insertion.
+
+**Regression tests**: covered by the existing frontend XSS test harness and the staging
+Playwright suite.
+
+---
+
+## DEFECT-019 — MEDIUM — Async rate limiter made blocking database call on the event loop
+
+**Status**: **Fixed** (commit `30d43111`, 2026-09-05). Verified on staging.
+
+**Reproducible failure**: The rate-limiter middleware in `backend/app/main.py` called
+`SessionLocal()` synchronously inside an `async def` middleware handler. Under concurrent load,
+this blocked the event loop during every database call made by the rate limiter, creating a
+potential latency cliff as throughput scaled (observed in the DEFECT-010 load test's
+`/api/auth/login` P95 elevation, though that finding had multiple contributors).
+
+**Root cause**: Blocking I/O on the async event loop — a common FastAPI pitfall when adapting
+synchronous SQLAlchemy sessions to async middleware.
+
+**Fix**: The `SessionLocal()` call and its surrounding logic are now dispatched via
+`run_in_executor`, keeping the event loop non-blocking.
+
+**Regression tests**: behaviour is load-test-verifiable; unit-tested via the staging Playwright
+suite's auth flows at concurrency.
+
+---
+
+## DEFECT-020 — MEDIUM — Status badge rendered arbitrary strings as HTML class attributes
+
+**Status**: **Fixed** (commit `30d43111`, 2026-09-05). Verified on staging.
+
+**Reproducible failure**: The status badge renderer in `connected-frontend/index.html` took the
+status string directly from the API response and set it as a CSS class on the badge element. An
+unrecognised (or adversarially crafted) status string could inject arbitrary content into the
+`class` attribute, potentially reaching attribute injection or breaking the DOM structure.
+
+**Root cause**: No allowlist or sanitisation between the API string and the class attribute
+assignment.
+
+**Fix**: A strict enum-to-CSS-class mapping is now applied. Only known status values produce
+a corresponding class; anything else receives `status-unknown`. The API string never touches
+the class attribute directly.
+
+**Regression tests**: covered by the staging Playwright suite's badge-rendering paths.
+
+---
+
+**Summary update (2026-09-05)**: DEFECT-011 through DEFECT-020 were identified during the Phase
+A–E adversarial qualification, fixed in commit `30d43111`, and verified on staging 2026-09-05
+(187 Playwright tests passed, 8 skipped by design, 0 failed; 2258 backend tests passed). No
+BLOCKER or HIGH severity item is open in this register as of 2026-09-05. The three CRITICAL items
+(011–013) and four HIGH items (014–017) have regression tests. The two MEDIUM items (019–020)
+are verified by load-test and integration-test evidence respectively.

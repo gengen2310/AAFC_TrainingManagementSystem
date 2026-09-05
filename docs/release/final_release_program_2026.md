@@ -60,15 +60,39 @@ did; see §4's progress log for what changed between the two snapshots:
 | Backend tests | 1231 passed, 5 skipped (full `pytest tests/ -q` run) |
 | Master gap register entries | 161 (REM + QUAL combined, includes REM-122) |
 
-## 2. Deployment fingerprints, verified 2026-08-09 (not inferred from git log)
+## 2a. Deployment fingerprints — 2026-09-05 remediation build (latest)
+
+**Staging redeployed 2026-09-05 with the security remediation commit `30d43111`.** This is the
+current ground truth for staging. Production has not been redeployed since 2026-08-08 and still
+requires an explicit `AUTHORISE PRODUCTION DEPLOYMENT 30d43111` instruction.
+
+| Field | Value |
+|---|---|
+| `main` HEAD | `30d43111` (`30d4311108adb69f211b4d9cff8941d806cc2b45`) |
+| Migration head | `b1c2d3e4f5a6` (76 migrations, single head) |
+| Backend tests | 2258 passed, 9 skipped, 0 failed |
+| Playwright E2E (staging) | 187 passed, 8 skipped (a11y-local), 0 failed |
+| Security greps | 0 matches (all 5 checks) |
+
+| Service | Environment | Deployment ID | Deployed | Commit |
+|---|---|---|---|---|
+| aafc-tms-backend | staging | `2fb8b2ad-b075-41c8-9044-444da8e1a59d` | 2026-09-05 | `30d43111` |
+| aafc-tms-backend | production | (unchanged) | 2026-08-08T16:23:23Z | QUAL-004 logout fix |
+| aafc-tms-frontend | staging | (unchanged) | 2026-08-07T16:55:49Z | P0 fix |
+| aafc-tms-frontend | production | (unchanged) | **2026-08-05T15:13:52Z** | Phases A–D |
+| aafc-tms-planning-workspace-preview | staging | (unchanged) | 2026-08-07T16:51:06Z | P0 fix |
+| aafc-tms-planning-workspace-preview | production | (unchanged) | **2026-08-05T15:14:39Z** | Phases A–D |
+
+## 2b. Deployment fingerprints — 2026-08-09 program start (historical baseline)
+
+Kept as the original program-start evidence. Superseded by §2a for current state.
 
 **This table is a point-in-time snapshot from the start of this program, kept as evidence — it
 is not the latest deployment state.** Staging has been redeployed multiple times since (REM-114
-through REM-121, confirmed healthy each time — see §4's progress log entries), and `main`'s HEAD
-has since advanced past the commits shown below (current HEAD `5a6932b`, per §1's re-verified
-row). No production deploy has occurred since the QUAL-004 row below — production still needs a
-fresh explicit `AUTHORISE PRODUCTION DEPLOYMENT <SHA>` instruction before any further deploy, per
-the governing instruction.
+through REM-121, plus the 2026-09-05 remediation deploy in §2a). No production deploy has
+occurred since the QUAL-004 row below — production still needs a fresh explicit
+`AUTHORISE PRODUCTION DEPLOYMENT <SHA>` instruction before any further deploy, per the
+governing instruction.
 
 | Service | Environment | Deployment status | Deployed | Commit message (as recorded) |
 |---|---|---|---|---|

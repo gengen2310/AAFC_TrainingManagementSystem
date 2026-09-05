@@ -1,5 +1,94 @@
 # Changelog
 
+## Unreleased — Auth/RBAC/security remediation — Findings 1–10 (2026-09-05)
+
+Staging: `30d43111`. Not released to production.
+
+This entry closes the pre-release security remediation program. Ten findings from the Phase A–E
+adversarial qualification — spanning authentication, RBAC, XSS, and async safety — were fixed,
+regression-tested, and qualified on staging. The staging Playwright suite (187 passed, 8 skipped
+by design, 0 failed) was run across Chromium, Firefox, and Mobile to confirm no regressions
+against the broader product.
+
+Backend test count moved from ≈2215 to 2258 passed (+43: 39 new access-code lifecycle regression
+tests + new proxy RBAC tests + new /exceptions/run-checks tests), 9 skipped.
+
+### Access-code lifecycle hardened
+
+The active-code-per-user invariant is now enforced server-side on every credential-mutating path.
+All login, reset, and validation endpoints filter `active_status = True` before evaluating any
+credential, so a deactivated code can never be used even if its hash is physically present.
+
+Previously, a deactivated sibling code could in some edge cases become a successful authentication
+path — an unintended bypass. That path is now closed by the database filter, not by application
+logic that could be accidentally omitted in a future endpoint.
+
+### Self-service code reset requires proof of current code
+
+A user resetting their own access code must now supply their current code as part of the request
+(re-authentication). Previously the self-service reset endpoint required only a valid session — an
+authenticated but compromised session could rotate the credential without needing the prior secret.
+
+### Archive and restore revoke existing sessions
+
+`token_version` is now bumped when a user account is archived and again when it is restored.
+Any JWT issued before the version bump is immediately invalid, preventing a session from surviving
+across an account lifecycle event it was not supposed to survive.
+
+### Sibling-fallback failure accounting deferred correctly
+
+When a login attempt walks a list of candidate access codes (e.g. where a user has previously
+had multiple codes), `failed_attempts` is now incremented only on the final determination of
+failure — not per candidate tested. Previously, testing N codes could consume N lockout attempts
+for a single user login attempt.
+
+### Planning proxy RBAC bypass closed
+
+Nineteen planning write endpoints that were using `_require_year_access` (no proxy awareness)
+have been changed to `require_can_write_squadron()` (proxy/delegated-intervention-aware). This
+closes a gap where a `wing_admin` acting through a proxy session could be incorrectly rejected
+from endpoints that legitimately require proxy access, and conversely where the check order
+differed from the codebase's established pattern for delegated writes.
+
+### /exceptions/run-checks now uses the correct write guard
+
+`POST /api/exceptions/run-checks` now uses `require_can_write_squadron()`, consistent with the
+other mutation endpoints in the same module.
+
+### Service desk email save fixed
+
+The `api()` helper call in the connected-frontend's service desk save handler had its arguments
+in the wrong order (`api(method, path)` instead of `api(path, {method})`). The POST request was
+silently misdirected, so service desk email configuration changes never persisted. The arg order
+now matches the helper's documented signature.
+
+### Role and scope labels escaped against XSS
+
+`ROLE_LABELS` and `SCOPE_LABELS` values rendered via innerHTML in the connected frontend are now
+wrapped in `esc()`. Previously, a role or scope string from the API response was inserted raw into
+the DOM; a stored XSS payload in that field could have executed.
+
+### Async rate limiter moved off the event loop
+
+`SessionLocal()` inside the rate-limiter middleware was called on the async event loop, causing
+blocking I/O. Moved to `run_in_executor` so the event loop is not held during the DB call.
+
+### Status badge class hardened against attribute injection
+
+The status badge renderer now uses a strict enum-to-CSS-class allowlist. Previously, an
+unrecognised status string was passed directly as a class attribute, allowing a stored payload
+to inject arbitrary HTML attributes via the class value. Unknown statuses now fall back to a
+safe `status-unknown` class.
+
+### CI fix: PostgreSQL migration rehearsal credentials
+
+The CI migration-rehearsal step was failing when `psql` fell back to the OS user (the GitHub
+Actions runner) rather than the configured PostgreSQL role. `PGUSER`, `PGPASSWORD`, and `PGHOST`
+are now explicitly set in the `migration-rehearsal` job's env block, matching the `DATABASE_URL`
+credentials already used by Alembic in the same step.
+
+---
+
 ## Unreleased — UX consistency, accessibility hardening, and System Administrator account recovery (2026-08-30)
 
 Staging: `0e31203`. Not released to production.

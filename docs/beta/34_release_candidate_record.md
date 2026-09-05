@@ -1,9 +1,61 @@
 # AAFC TMS — Release Candidate Record
 
-Phase 2 (Operational Release Gate). Immutable record of the release candidate.
-Created: 2026-07-14.
+Phase 2 (Operational Release Gate). Immutable record of release candidates.
+Created: 2026-07-14. RC-2 added 2026-09-05.
 
 ---
+
+## Release Candidate 2 — Security Remediation Build (2026-09-05)
+
+| Field | Value |
+|---|---|
+| Tag | `remediation-2026-09-05-rc1` |
+| Commit SHA | `30d4311108adb69f211b4d9cff8941d806cc2b45` |
+| Short SHA | `30d43111` |
+| Branch | `main` |
+| Author | Jenny DV |
+| Timestamp | 2026-09-05 |
+| Description | "fix: release-blocking auth/RBAC/security remediation (Findings 1–10)" |
+
+### Changes from RC-1 (`e918f3e`)
+
+Commits between `e918f3e` and `30d43111` include the full remediation program: multiple
+intermediate commits across the `fix/release-auth-rbac-remediation` branch, merged to `main`
+via fast-forward. Key categories:
+
+| Area | Changes |
+|---|---|
+| `backend/app/routers/auth.py` | Active-code filter, deferred lockout accounting, self-reset reauth |
+| `backend/app/routers/accounts.py` | token_version bump on archive/restore; self-reset reauth |
+| `backend/app/routers/planning.py` | 19 write endpoints changed to `require_can_write_squadron()` |
+| `backend/app/routers/ops.py` | /exceptions/run-checks now uses `require_can_write_squadron` |
+| `backend/app/main.py` | Async rate limiter moved to `run_in_executor` |
+| `connected-frontend/index.html` | api() arg order, `esc()` on role/scope labels, badge allowlist |
+| `backend/tests/test_access_code_lifecycle.py` | 39 new regression tests (new file) |
+| `backend/tests/test_planning_proxy_rbac.py` | New proxy RBAC tests (new file) |
+| `backend/tests/test_exceptions_run_checks.py` | New tests (new file) |
+| `.github/workflows/backend-tests.yml` | CI: PGUSER/PGPASSWORD/PGHOST for migration rehearsal |
+| `backend/scripts/rehearse_data_migrations.py` | CI: psql credential handling fixed |
+
+### Migrations
+
+No new migrations. Alembic head: `b1c2d3e4f5a6` (unchanged from prior staging deployments).
+76 migrations applied on staging PostgreSQL.
+
+### Pre-Tag Verification
+
+| Check | Result |
+|---|---|
+| Backend tests | 2258 passed, 9 skipped, 0 failed |
+| Security greps (5 checks) | All 0 matches |
+| Playwright E2E on staging | 187 passed, 8 skipped (a11y-local by design), 0 failed |
+| Migration chain on PostgreSQL | 76/76 applied, single head |
+| Staging deployment | Railway `2fb8b2ad` — SUCCESS, 2026-09-05 |
+| Health check | `/api/health/ready` → `{"status":"ready"}` |
+
+---
+
+## Release Candidate 1 — Original Beta Build (2026-07-14)
 
 ## Release Candidate
 
