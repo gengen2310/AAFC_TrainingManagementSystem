@@ -1,15 +1,11 @@
 import { ErrorRemedy } from "../../ui";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { planningApi } from "../../../api";
 import { friendlyMessage } from "../../../api/client";
 import type { PlanningSession, PlanningFacilitator, PlanningConflict, TimingBlock, ParadeNotice } from "../../../api/types";
 import type { DrawerItem } from "../PlanningRightDrawer";
-
-// TODO: Task 4 — DISPLAY_GROUPS deleted. Phase grouping from curriculum phases
-// (training_stage_id → phase_name) replaces the hard-coded group list.
-// ParadeNightGridView now uses useQuery for training classes + groupByPhase helper.
-// Rows are empty until Task 4 wires in the phase data.
+import { groupByPhase } from '../utils/groupByPhase';
 
 interface CellConflict {
   room: boolean;
@@ -209,6 +205,17 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
     staleTime: 60 * 1000,
   });
 
+  // Task 4 — phase grouping from curriculum phases (replaces DISPLAY_GROUPS).
+  // Derive squadronId from the weekly program's unit_id (available after data loads).
+  const squadronId = data?.unit_id ?? null;
+  const { data: trainingClassesRaw = [] } = useQuery({
+    queryKey: ['training-classes-with-phase', squadronId],
+    queryFn: () => planningApi.getTrainingClasses(squadronId!, { includeArchived: true }),
+    enabled: !!squadronId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const phaseGroups = useMemo(() => groupByPhase(trainingClassesRaw), [trainingClassesRaw]);
+
   // REM-133: session delete existed with no way to see or restore an
   // archived session -- lazy-fetched only once "Show archived sessions" is
   // opened, matching this codebase's established show-archived pattern.
@@ -327,12 +334,35 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
             </tr>
           </thead>
           <tbody>
-            {/* TODO: Task 4 — phase grouping rows go here.
-              * DISPLAY_GROUPS removed; rows now driven by trainingClasses + groupByPhase.
-              * See ParadeNightGridView Task 4 implementation. */}
-            {([] as { phase_id: string; phase_name: string; training_classes: { training_class_id: string; display_name: string; active_status?: boolean }[] }[]).map(group => (
-              group.training_classes.map(tc => (
+            {/* Task 4: phase grouping from curriculum phases — replaces DISPLAY_GROUPS. */}
+            {phaseGroups.length === 0 && (
+              <tr>
+                <td colSpan={blocks.length + 1} style={{ padding: 12, color: "var(--muted-text)", fontSize: 'var(--fs-sm)', fontStyle: "italic" }}>
+                  No training classes configured for this squadron. Add training classes to see the planning grid.
+                </td>
+              </tr>
+            )}
+            {phaseGroups.map(group => (
+              <>
+                {/* Phase group header row */}
+                <tr key={`phase-${group.phase_id}`} className="pn-phase-header">
+                  <td
+                    colSpan={blocks.length + 1}
+                    style={{ background: "var(--aafc-dark, #002f65)", color: "#fff", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", padding: "4px 12px" }}
+                  >
+                    {group.phase_name}
+                  </td>
+                </tr>
+                {group.training_classes.map(tc => (
                 <tr key={tc.training_class_id}>
+                  <th style={!tc.active_status ? { opacity: 0.5 } : undefined}>
+                    {tc.display_name}
+                    {!tc.active_status && (
+                      <span style={{ marginLeft: 4, fontSize: 9, background: "var(--lgrey, #b0b7bb)", borderRadius: 3, padding: "1px 4px", fontWeight: 400 }}>
+                        Archived
+                      </span>
+                    )}
+                  </th>
                   <th style={!tc.active_status ? { opacity: 0.5 } : undefined}>{tc.display_name}</th>
                   {blocks.map(b => {
                     if (b.block_type === "break" || !b.is_instructional || b.period_number === null) {
@@ -404,7 +434,8 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
                     );
                   })}
                 </tr>
-              ))
+              ))}
+              </>
             ))}
           </tbody>
         </table>

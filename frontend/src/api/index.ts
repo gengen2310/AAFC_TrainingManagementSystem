@@ -538,9 +538,23 @@ export const planningApi = {
     api.delete<void>(`/api/training/sessions/${sessionId}/assistants/${encodeURIComponent(userId)}`),
 
   // ── Training classes with phase ─────────────────────────────────────────────
-  getTrainingClasses: (squadronId: string, options?: { includeArchived?: boolean }): Promise<TrainingClassWithPhase[]> => {
+  // GET /api/training-classes does not include phase_name from the join, so we
+  // merge with GET /api/curriculum/phases client-side using training_stage_id → phase_id.
+  getTrainingClasses: async (squadronId: string, options?: { includeArchived?: boolean }): Promise<TrainingClassWithPhase[]> => {
     const params = new URLSearchParams({ squadron_id: squadronId });
     if (options?.includeArchived) params.set('include_archived', 'true');
-    return api.get<TrainingClassWithPhase[]>(`/api/training/classes?${params}`);
+    const [classes, phases] = await Promise.all([
+      api.get<TrainingClassSummary[]>(`/api/training-classes?${params}`),
+      api.get<PhaseRecord[]>('/api/curriculum/phases'),
+    ]);
+    const phaseNameMap = new Map(phases.map(p => [p.phase_id, p.display_name || p.name]));
+    return classes.map(c => ({
+      training_class_id: c.training_class_id,
+      display_name: c.display_name,
+      training_stage_id: c.training_stage_id,
+      phase_name: phaseNameMap.get(c.training_stage_id) ?? c.training_stage_id,
+      active_status: !c.is_archived,
+      cadet_count: null,
+    }));
   },
 };
