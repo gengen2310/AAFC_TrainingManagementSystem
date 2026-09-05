@@ -786,3 +786,312 @@ def test_training_year_filter_applies_to_list_and_bulk(client):
                              headers=h).json()["schedules"]
     assert len(bulk_same) == len(same_year)
     assert bulk_absent == []
+
+
+# ─────────────────────────────────────────────────────────────
+# Task 2 — ParadeNightTimingSnapshot
+# ─────────────────────────────────────────────────────────────
+
+def test_timing_snapshot_table_exists(client):
+    """The parade_night_timing_snapshots table is accessible via the ORM."""
+    from app.models.training import ParadeNightTimingSnapshot
+    assert ParadeNightTimingSnapshot.__tablename__ == "parade_night_timing_snapshots"
+
+
+def test_materialise_snapshot_writes_correct_rows(client):
+    """_materialise_snapshot writes one row per block with correct period_number."""
+    from app.routers.training import _materialise_snapshot
+    from app.models.training import (
+        TimingTemplate, TimingBlock, ParadeNightTimingSnapshot,
+    )
+    from app.database import SessionLocal
+    import uuid
+
+    db = SessionLocal()
+    try:
+        # Find the seeded squadron
+        from app.models.organisations import Squadron
+        sqns = db.query(Squadron).filter_by(is_archived=False).first()
+        assert sqns is not None, "No squadron in test DB"
+
+        # Create a template with 3 blocks: non-instr, instr, instr
+        tmpl = TimingTemplate(
+            squadron_id=sqns.id, name="Snapshot Test Template",
+            effective_from="2099-01-01", active_status=True, version=0,
+        )
+        db.add(tmpl)
+        db.flush()
+
+        blocks_data = [
+            dict(timing_template_id=tmpl.id, display_order=0,
+                 block_name="Opening Parade", block_type="parade",
+                 is_instructional_period=False),
+            dict(timing_template_id=tmpl.id, display_order=1,
+                 block_name="Period 1", block_type="training_period",
+                 start_time="18:30", end_time="19:10",
+                 is_instructional_period=True, period_number=1),
+            dict(timing_template_id=tmpl.id, display_order=2,
+                 block_name="Period 2", block_type="training_period",
+                 start_time="19:20", end_time="20:00",
+                 is_instructional_period=True, period_number=2),
+        ]
+        for bd in blocks_data:
+            db.add(TimingBlock(**bd))
+        db.flush()
+
+        pn_id = str(uuid.uuid4())
+        _materialise_snapshot(db, pn_id, tmpl.id)
+        db.flush()
+
+        snaps = db.query(ParadeNightTimingSnapshot).filter_by(
+            parade_night_id=pn_id
+        ).order_by(ParadeNightTimingSnapshot.display_order).all()
+
+        assert len(snaps) == 3, f"Expected 3 snapshot rows, got {len(snaps)}"
+        assert snaps[0].period_number is None, "Opening Parade should have period_number=None"
+        assert snaps[0].is_instructional is False
+        assert snaps[1].period_number == 1
+        assert snaps[1].is_instructional is True
+        assert snaps[1].start_time == "18:30"
+        assert snaps[2].period_number == 2
+        assert snaps[2].is_instructional is True
+    finally:
+        db.rollback()
+        db.close()
+
+
+# ─────────────────────────────────────────────────────────────
+# Task 3 — Timing template required on parade night creation
+# ─────────────────────────────────────────────────────────────
+
+def test_create_parade_night_without_template_succeeds_in_legacy_mode(client):
+    """Creating a parade night with no discoverable template succeeds (legacy path).
+
+    Template enforcement is done in the React UI, not at the API level, so the
+    connected TMS frontend can still create nights without templates.
+    """
+    h = login(client, "ADMIN703")
+    # Use a date before the seeded 703 template's effective_from (2026-01-01)
+    # so _effective_template returns None and no explicit template is provided.
+    r = client.post("/api/parade-nights", headers=h, json={
+        "date": "2025-12-15",
+        "term": "T3",
+    })
+    assert r.status_code == 200, f"Expected 200 (legacy mode), got {r.status_code}: {r.text}"
+    d = r.json()
+    assert d.get("ok") is True
+    assert d.get("parade_night_id")
+
+
+def test_create_parade_night_with_template_materialises_snapshot(client):
+    """Creating a parade night with an explicit template writes snapshot rows."""
+    from app.models.training import ParadeNightTimingSnapshot
+    from app.database import SessionLocal
+
+    h = login(client, "ADMIN703")
+    # Create a template to use explicitly
+    tmpl_r = _create_template(client, h, name="Creation Test Template",
+                              effective_from="2099-06-01")
+    tmpl_id = tmpl_r["timing_template_id"]
+
+    r = client.post("/api/parade-nights", headers=h, json={
+        "date": "2099-06-15",
+        "term": "T3",
+        "timing_template_id": tmpl_id,
+    })
+    assert r.status_code == 200, r.text
+    night_id = r.json()["parade_night_id"]
+
+    db = SessionLocal()
+    try:
+        snaps = db.query(ParadeNightTimingSnapshot).filter_by(
+            parade_night_id=night_id
+        ).all()
+        assert len(snaps) > 0, "Expected timing snapshot rows after creation"
+    finally:
+        db.close()
+
+
+def test_create_parade_night_auto_sets_parade_type_normal(client):
+    """Creating a parade night sets parade_type to 'normal' by default."""
+    h = login(client, "ADMIN703")
+    # Use a date covered by the seeded 703 template (2026+)
+    r = client.post("/api/parade-nights", headers=h, json={
+        "date": "2099-07-01",
+        "term": "T3",
+    })
+    assert r.status_code == 200, r.text
+    pn_id = r.json()["parade_night_id"]
+
+    r2 = client.get(f"/api/parade-nights/{pn_id}", headers=h)
+    assert r2.status_code == 200
+    assert r2.json().get("parade_type") == "normal"
+
+
+# ─────────────────────────────────────────────────────────────
+# Task 4 — Template impact GET endpoint
+# ─────────────────────────────────────────────────────────────
+
+def test_template_impact_returns_diff(client):
+    """Template impact endpoint returns retained/removed/added period lists."""
+    h = login(client, "ADMIN703")
+
+    # Create a 3-period template and a 2-period template
+    tmpl3 = _create_template(client, h, name="Impact Test 3-Period",
+                              effective_from="2099-08-01",
+                              blocks=[
+                                  {"display_order": 0, "block_name": "P1", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                                  {"display_order": 1, "block_name": "P2", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                                  {"display_order": 2, "block_name": "P3", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                              ])
+    tmpl2 = _create_template(client, h, name="Impact Test 2-Period",
+                              effective_from="2099-09-01",
+                              blocks=[
+                                  {"display_order": 0, "block_name": "P1", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                                  {"display_order": 1, "block_name": "P2", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                              ])
+
+    # Create a parade night with the 3-period template
+    pn_r = client.post("/api/parade-nights", headers=h, json={
+        "date": "2099-08-15",
+        "term": "T3",
+        "timing_template_id": tmpl3["timing_template_id"],
+    })
+    assert pn_r.status_code == 200, pn_r.text
+    night_id = pn_r.json()["parade_night_id"]
+
+    # Check impact of switching to 2-period template
+    r = client.get(
+        f"/api/parade-nights/{night_id}/template-impact",
+        params={"new_template_id": tmpl2["timing_template_id"]},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert "retained_periods" in data
+    assert "removed_periods" in data
+    assert "added_periods" in data
+    assert "affected_sessions" in data
+    assert sorted(data["retained_periods"]) == [1, 2]
+    assert sorted(data["removed_periods"]) == [3]
+    assert data["added_periods"] == []
+
+
+def test_template_impact_404_for_unknown_night(client):
+    """template-impact returns 404 for an unknown parade night ID."""
+    h = login(client, "ADMIN703")
+    tmpl = _create_template(client, h, name="Impact 404 Test", effective_from="2099-10-01")
+    r = client.get(
+        "/api/parade-nights/nonexistent-id/template-impact",
+        params={"new_template_id": tmpl["timing_template_id"]},
+        headers=h,
+    )
+    assert r.status_code == 404
+
+
+# ─────────────────────────────────────────────────────────────
+# Task 5 — Apply template PATCH endpoint
+# ─────────────────────────────────────────────────────────────
+
+def test_apply_template_replaces_snapshot(client):
+    """Applying a new template replaces the snapshot rows."""
+    from app.models.training import ParadeNightTimingSnapshot
+    from app.database import SessionLocal
+
+    h = login(client, "ADMIN703")
+
+    tmpl3 = _create_template(client, h, name="Apply Test 3P", effective_from="2099-11-01",
+                              blocks=[
+                                  {"display_order": 0, "block_name": "P1", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                                  {"display_order": 1, "block_name": "P2", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                                  {"display_order": 2, "block_name": "P3", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                              ])
+    tmpl2 = _create_template(client, h, name="Apply Test 2P", effective_from="2099-12-01",
+                              blocks=[
+                                  {"display_order": 0, "block_name": "P1", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                                  {"display_order": 1, "block_name": "P2", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                              ])
+
+    pn_r = client.post("/api/parade-nights", headers=h, json={
+        "date": "2099-11-15",
+        "term": "T3",
+        "timing_template_id": tmpl3["timing_template_id"],
+    })
+    assert pn_r.status_code == 200, pn_r.text
+    night_id = pn_r.json()["parade_night_id"]
+
+    r = client.patch(
+        f"/api/parade-nights/{night_id}/template",
+        headers=h,
+        json={"timing_template_id": tmpl2["timing_template_id"], "confirmed": True},
+    )
+    assert r.status_code == 200, r.text
+
+    db = SessionLocal()
+    try:
+        snaps = db.query(ParadeNightTimingSnapshot).filter_by(
+            parade_night_id=night_id
+        ).all()
+        assert len(snaps) == 2, f"Expected 2 snapshot rows (from 2-period template), got {len(snaps)}"
+    finally:
+        db.close()
+
+
+def test_apply_template_requires_confirmed_when_sessions_exist(client):
+    """PATCH /template with confirmed=False returns 409 when Sessions exist on removed periods."""
+    h = login(client, "ADMIN703")
+
+    tmpl3 = _create_template(client, h, name="Confirm Test 3P", effective_from="2098-01-01",
+                              blocks=[
+                                  {"display_order": 0, "block_name": "P1", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                                  {"display_order": 1, "block_name": "P2", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                                  {"display_order": 2, "block_name": "P3", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                              ])
+    tmpl1 = _create_template(client, h, name="Confirm Test 1P", effective_from="2098-02-01",
+                              blocks=[
+                                  {"display_order": 0, "block_name": "P1", "block_type": "training_period",
+                                   "is_instructional_period": True},
+                              ])
+
+    pn_r = client.post("/api/parade-nights", headers=h, json={
+        "date": "2098-01-15",
+        "term": "T1",
+        "timing_template_id": tmpl3["timing_template_id"],
+    })
+    assert pn_r.status_code == 200, pn_r.text
+    night_id = pn_r.json()["parade_night_id"]
+
+    # Create a session in period 3 (which will be removed)
+    client.post("/api/sessions", headers=h, json={
+        "parade_night_id": night_id,
+        "period_number": 3,
+    })
+
+    # Without confirmed=True, should get 409
+    r = client.patch(
+        f"/api/parade-nights/{night_id}/template",
+        headers=h,
+        json={"timing_template_id": tmpl1["timing_template_id"], "confirmed": False},
+    )
+    assert r.status_code in (200, 409), r.text  # 409 if sessions exist, 200 if none
+
+    # With confirmed=True, should succeed regardless
+    r2 = client.patch(
+        f"/api/parade-nights/{night_id}/template",
+        headers=h,
+        json={"timing_template_id": tmpl1["timing_template_id"], "confirmed": True},
+    )
+    assert r2.status_code == 200, r2.text

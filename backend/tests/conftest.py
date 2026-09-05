@@ -28,6 +28,26 @@ from app.models import IpLoginAttempt, IpApiRequest, UserApiRequest, AccessCode,
 @pytest.fixture(scope="session", autouse=True)
 def _seed():
     seed_all()
+    # v64 backfill: the test DB is created from SQLAlchemy metadata (not Alembic),
+    # so the migration's INSERT is never run. Replicate it here so SAF-aware tests
+    # find the expected rows without having to skip.
+    import uuid
+    import sqlalchemy as sa
+    db = SessionLocal()
+    try:
+        rows = db.execute(sa.text(
+            "SELECT id, assistant_facilitator_id FROM sessions "
+            "WHERE assistant_facilitator_id IS NOT NULL AND is_archived = 0"
+        )).fetchall()
+        for row in rows:
+            db.execute(sa.text(
+                "INSERT OR IGNORE INTO session_assistant_facilitators "
+                "(id, session_id, user_id, created_at) "
+                "VALUES (:id, :sid, :uid, CURRENT_TIMESTAMP)"
+            ), {"id": str(uuid.uuid4()), "sid": row[0], "uid": row[1]})
+        db.commit()
+    finally:
+        db.close()
     yield
 
 
