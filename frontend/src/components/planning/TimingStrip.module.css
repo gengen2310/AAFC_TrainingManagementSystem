@@ -1,0 +1,51 @@
+/* TimingStrip.module.css — visual timing bar above the planning grid.
+   DESIGN: Task 9 will apply frontend-design + apple-design polish. */
+
+.strip {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 0;
+  min-height: 40px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  min-width: 80px;
+  background: var(--surface-2, #f0f5fa);
+  border: 1px solid var(--border-light, #e4edf5);
+  color: var(--muted, #5c6a76);
+  flex: 1;
+  cursor: default;
+}
+
+.block[data-instructional='true'] {
+  background: var(--accent-light, #e0f0fa);
+  border-color: var(--accent, #51b0e3);
+  color: var(--text, #1e2d3d);
+  font-weight: 700;
+}
+
+.blockLabel {
+  display: block;
+  font-weight: 600;
+}
+
+.blockTime {
+  display: block;
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.75;
+  margin-top: 1px;
+}

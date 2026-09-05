@@ -6,6 +6,8 @@ import { friendlyMessage } from "../../../api/client";
 import type { PlanningSession, PlanningFacilitator, PlanningConflict, TimingBlock, ParadeNotice } from "../../../api/types";
 import type { DrawerItem } from "../PlanningRightDrawer";
 import { groupByPhase } from '../utils/groupByPhase';
+import { TimingStrip } from '../TimingStrip';
+import type { TimingStripEntry, InstructionalPeriod } from '../../../api/types';
 
 interface CellConflict {
   room: boolean;
@@ -314,6 +316,26 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
         <span className="pw-block-equip-lbl">Equipment:</span>
         <span className="pw-block-equip-val">not set</span>
       </div>
+
+      {/* ── TimingStrip — shows all timing blocks above column headers ─────── */}
+      {/* DESIGN: Task 9 will apply visual polish */}
+      {blocks.length > 0 && (
+        <TimingStrip
+          blocks={blocks.map((b): TimingStripEntry => ({
+            label: b.name,
+            start_time: b.start_time,
+            end_time: b.end_time,
+            is_instructional: b.is_instructional,
+            display_order: b.sequence,
+          }))}
+          periods={blocks.filter(b => b.is_instructional && b.period_number !== null).map((b): InstructionalPeriod => ({
+            period_number: b.period_number!,
+            label: b.name,
+            start_time: b.start_time,
+            end_time: b.end_time,
+          }))}
+        />
+      )}
 
       {/* ── Timing grid ────────────────────────────────────────────────────── */}
       <div className="pn-grid-wrap">
