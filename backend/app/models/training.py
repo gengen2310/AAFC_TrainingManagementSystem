@@ -125,6 +125,25 @@ class Session(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # ON DELETE behaviour: set to null when the timing template is changed.
 
 
+class SessionAssistantFacilitator(Base, UUIDMixin):
+    """Zero-to-many assistant facilitators for a Session.
+
+    Replaces the single assistant_facilitator_id column going forward.
+    The old column is retained as a deprecated nullable field — do not drop it.
+    """
+    __tablename__ = "session_assistant_facilitators"
+    __table_args__ = (
+        UniqueConstraint("session_id", "user_id", name="uq_saf_session_user"),
+    )
+    session_id: Mapped[str] = mapped_column(
+        ForeignKey("sessions.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    user_id: Mapped[str] = mapped_column(String(36), index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+
 class SessionStatusHistory(Base, UUIDMixin):
     __tablename__ = "session_status_history"
     session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), index=True)
@@ -387,6 +406,34 @@ class ParadeNightTimingOverride(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin
         ForeignKey("timing_templates.id"), nullable=True, index=True,
     )
     reason: Mapped[str] = mapped_column(Text)
+
+
+class ParadeNightTimingSnapshot(Base, UUIDMixin):
+    """Materialised instructional period data for one Parade Night.
+
+    Written once when a Parade Night is created (or when its template is
+    deliberately changed via the PATCH /template endpoint). Changes to the
+    master TimingTemplate after this point do not affect existing snapshots.
+
+    period_number is 1-based and counts instructional periods only.
+    is_instructional is always True for the period-numbered rows;
+    non-instructional blocks (breaks, opening/closing parade) are stored
+    with period_number=None and is_instructional=False so the frontend
+    can render the timing strip.
+    """
+    __tablename__ = "parade_night_timing_snapshots"
+    parade_night_id: Mapped[str] = mapped_column(
+        ForeignKey("parade_nights.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    period_number: Mapped[int | None] = mapped_column(Integer, nullable=True)  # NULL for non-instructional
+    block_label: Mapped[str] = mapped_column(String(120), nullable=False)
+    start_time: Mapped[str | None] = mapped_column(String(10), nullable=True)  # HH:MM
+    end_time: Mapped[str | None] = mapped_column(String(10), nullable=True)    # HH:MM
+    is_instructional: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
 
 # Scope constants (also used by the endpoint and migration)

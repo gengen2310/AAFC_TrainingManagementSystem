@@ -16,8 +16,9 @@ from .organisations import (
 )
 from .training import (
     CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
+    SessionAssistantFacilitator,
     Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, SessionStatusReasonTag, ActivityTypeTag, TrainingAreaCapabilityTag, TrainingArea, Equipment, Activity, Cadet,
-    TimingTemplate, TimingBlock, ParadeNightTimingOverride, TrainingClass, SessionAudience,
+    TimingTemplate, TimingBlock, ParadeNightTimingOverride, ParadeNightTimingSnapshot, TrainingClass, SessionAudience,
     CadetClassMembership, ParadeNightTemplate, ParadeNightTemplateSession,
 )
 from .operations import (
@@ -32,8 +33,9 @@ from .custom_phases import CustomTrainingPhase  # noqa: F401
 __all__ = [
     "NationalEntity", "Wing", "Squadron", "Flight", "User", "AccessCode", "ProxySession", "IpLoginAttempt", "IpApiRequest", "UserApiRequest",
     "CurriculumItem", "CurriculumElement", "CurriculumPhase", "ParadeNight", "Session", "SessionStatusHistory",
+    "SessionAssistantFacilitator",
     "Facilitator", "FacilitatorRankHistory", "SubjectAreaTag", "FacilitatorTypeTag", "SessionStatusReasonTag", "ActivityTypeTag", "TrainingAreaCapabilityTag", "TrainingArea", "Equipment", "Activity", "Cadet",
-    "TimingTemplate", "TimingBlock", "ParadeNightTimingOverride", "TrainingClass", "SessionAudience",
+    "TimingTemplate", "TimingBlock", "ParadeNightTimingOverride", "ParadeNightTimingSnapshot", "TrainingClass", "SessionAudience",
     "CadetClassMembership", "ParadeNightTemplate", "ParadeNightTemplateSession",
     "ActionItem", "Exception", "AuditLog", "ImportLog", "ExportLog", "SystemSetting",
     "Phase", "ProgramPackage", "ProgramItem", "LearningHubResource", "ProgramItemDeployment",
