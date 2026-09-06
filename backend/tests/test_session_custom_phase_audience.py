@@ -23,7 +23,7 @@ def _general_hdr(client):
 
 def _make_parade_night(client, hdr, days_ahead=0):
     """Create a parade night for 703's squadron, avoiding Fridays."""
-    base = date(2041, 3, 1) + timedelta(days=days_ahead)
+    base = date(2042, 6, 1) + timedelta(days=days_ahead)
     if base.weekday() == 4:
         base += timedelta(days=1)
     target = base.isoformat()
