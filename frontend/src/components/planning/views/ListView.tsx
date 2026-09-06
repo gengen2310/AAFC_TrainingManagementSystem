@@ -58,14 +58,9 @@ function derivePeriods(s: NightSummary): InstructionalPeriod[] {
     return s.instructional_periods;
   }
   const nums = Array.from(new Set(s.sessions.map(sess => sess.period))).sort((a, b) => a - b);
-  if (nums.length > 0) {
-    return nums.map(n => ({ period_number: n, label: `P${n}`, start_time: null, end_time: null }));
-  }
-  // Fallback: session_count periods or 3
-  const count = s.session_count ?? 3;
-  return Array.from({ length: count }, (_, i) => ({
-    period_number: i + 1, label: `P${i + 1}`, start_time: null, end_time: null,
-  }));
+  // Infer columns from existing sessions if no snapshot; return empty for legacy nights
+  // with neither snapshot nor sessions (block renders a legacy placeholder instead).
+  return nums.map(n => ({ period_number: n, label: `P${n}`, start_time: null, end_time: null }));
 }
 
 function fmt(dateStr: string): string {

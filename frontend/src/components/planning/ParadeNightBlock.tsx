@@ -5,16 +5,10 @@ import { friendlyMessage } from "../../api/client";
 import { useToast } from "../Toast";
 import type { NightSessionSummary, ParadeNotice, PlanningSession, PlanningFacilitator, PlanningConflict, TrainingClassSummary, InstructionalPeriod } from "../../api/types";
 
-// ─── Internal period fallback (not exported) ──────────────────────────────────
-// Used when caller does not pass a periods prop (legacy nights without snapshot).
-// BLOCK_PERIODS and BLOCK_GROUPS have been removed — period count is now derived
-// from night.instructional_periods (Task 3). Phase grouping moves to Task 4.
-const _DEFAULT_PERIODS: InstructionalPeriod[] = [1, 2, 3].map(n => ({
-  period_number: n,
-  label: `P${n}`,
-  start_time: null,
-  end_time: null,
-}));
+// BLOCK_PERIODS and BLOCK_GROUPS have been removed — period count is derived
+// from night.instructional_periods (the snapshot taken at creation). Legacy
+// nights with no snapshot show a placeholder rather than a hardcoded 3-column
+// fallback. Phase grouping moves to Task 4.
 
 // ─── Normalised display session ───────────────────────────────────────────────
 
@@ -356,10 +350,9 @@ export function ParadeNightBlock({
   onHeaderClick, onSessionClick, onEmptyCellClick, onMoveSession,
   moveSource = null, onPickUpSession, onCancelMove,
 }: ParadeNightBlockProps) {
-  // Effective period list: from prop (API-driven) or internal fallback for legacy nights.
-  const effectivePeriods: InstructionalPeriod[] = (periods && periods.length > 0)
-    ? periods
-    : _DEFAULT_PERIODS;
+  // Effective period list: always from the prop (snapshot-driven). An empty
+  // array means no template snapshot — the block renders a legacy placeholder.
+  const effectivePeriods: InstructionalPeriod[] = periods ?? [];
   const [addingNotice, setAddingNotice] = useState(false);
   // CLASS-23: per-block collapsed state. Collapsed shows only the header bar.
   const [collapsed, setCollapsed] = useState(false);
@@ -509,7 +502,11 @@ export function ParadeNightBlock({
       </div>
 
       {/* ── Session grid ────────────────────────────────────────────────────── */}
-      {compact ? (
+      {effectivePeriods.length === 0 ? (
+        <div style={{ padding: "8px 12px", fontSize: "var(--fs-xs)", color: "var(--muted-text)" }}>
+          Legacy parade night — no timing template
+        </div>
+      ) : compact ? (
         /* Compact mode: text rows */
         <div className="pw-block-compact-grid">
           {gridRows.map(row => {
