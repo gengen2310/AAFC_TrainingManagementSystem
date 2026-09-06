@@ -38,7 +38,11 @@ from ..models.planning import (
 # planning_locations) still exist -- retiring them is a schema change requiring
 # explicit user authorisation per .claude/rules/capability-preservation.md, not done
 # here.
-from ..models.training import TimingTemplate, TimingBlock, Activity, ParadeNightTimingSnapshot
+from ..models.training import (
+    TimingTemplate, TimingBlock, Activity, ParadeNightTimingSnapshot,
+    SessionCustomPhaseAudience,
+)
+from ..models.custom_phases import CustomTrainingPhase
 from ..models.wing_calendar import WingHQEvent, SquadronEventStatus
 from ..dependencies import get_principal
 from ..permissions import Principal, require_role, require_can_write_squadron, require_can_view_squadron
@@ -506,6 +510,13 @@ def _real_session_out(
         "status": s.status,
         "notes": s.delivery_notes,
         "is_combined": db.query(SessionAudience).filter(SessionAudience.session_id == s.id).count() > 1,
+        "custom_phase_audiences": [
+            {"custom_phase_id": cp.id, "name": cp.name}
+            for _, cp in db.query(SessionCustomPhaseAudience, CustomTrainingPhase)
+            .join(CustomTrainingPhase, SessionCustomPhaseAudience.custom_phase_id == CustomTrainingPhase.id)
+            .filter(SessionCustomPhaseAudience.session_id == s.id)
+            .all()
+        ],
         "override_conflict": False,
         "created_at": iso_z(s.created_at) if s.created_at else None,
         "version": s.version,
@@ -2251,6 +2262,98 @@ def restore_session(
     s.is_archived = False
     db.commit()
     audit(db, p, object_type="session", object_id=s.id, action="restore")
+    return {"ok": True}
+
+
+def _phase_visible_to(ph: CustomTrainingPhase, p: Principal, db: DBSession) -> bool:
+    """Return True if this principal can see (and therefore schedule) a phase."""
+    if ph.is_deleted:
+        return False
+    if ph.scope_type == "system":
+        return True
+    if ph.scope_type == "national":
+        # scope_id None = pre-v61 row visible to all nationals
+        if ph.scope_id is None:
+            return True
+        return ph.scope_id == resolve_national_id(db, p)
+    if ph.scope_type == "wing":
+        return ph.scope_id == p.wing_id
+    if ph.scope_type == "squadron":
+        return ph.scope_id == p.squadron_id
+    return False
+
+
+class CustomPhaseAudienceIn(BaseModel):
+    custom_phase_id: str
+
+
+@router.post("/sessions/{session_id}/custom-phase-audiences")
+def add_custom_phase_audience(
+    session_id: str,
+    body: CustomPhaseAudienceIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    s = db.get(TrainingSession, session_id)
+    if not s or s.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id) if s.parade_night_id else None
+    if not pn:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+
+    ph = db.get(CustomTrainingPhase, body.custom_phase_id)
+    if not ph or not _phase_visible_to(ph, p, db):
+        raise HTTPException(404, detail={"error": "custom_phase_not_found"})
+
+    existing = (
+        db.query(SessionCustomPhaseAudience)
+        .filter(
+            SessionCustomPhaseAudience.session_id == session_id,
+            SessionCustomPhaseAudience.custom_phase_id == body.custom_phase_id,
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(409, detail={"error": "already_linked"})
+
+    db.add(SessionCustomPhaseAudience(session_id=session_id, custom_phase_id=body.custom_phase_id))
+    db.commit()
+    audit(db, p, object_type="session_custom_phase_audience", object_id=session_id,
+          action="add", new={"custom_phase_id": body.custom_phase_id})
+    return _real_session_out(s, db)
+
+
+@router.delete("/sessions/{session_id}/custom-phase-audiences/{custom_phase_id}")
+def remove_custom_phase_audience(
+    session_id: str,
+    custom_phase_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    s = db.get(TrainingSession, session_id)
+    if not s or s.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id) if s.parade_night_id else None
+    if not pn:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_write_squadron(p, pn.squadron_id, pn.wing_id)
+
+    row = (
+        db.query(SessionCustomPhaseAudience)
+        .filter(
+            SessionCustomPhaseAudience.session_id == session_id,
+            SessionCustomPhaseAudience.custom_phase_id == custom_phase_id,
+        )
+        .first()
+    )
+    if not row:
+        raise HTTPException(404, detail={"error": "not_found"})
+
+    db.delete(row)
+    db.commit()
+    audit(db, p, object_type="session_custom_phase_audience", object_id=session_id,
+          action="remove", old={"custom_phase_id": custom_phase_id})
     return {"ok": True}
 
 
