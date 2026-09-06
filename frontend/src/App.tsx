@@ -1,32 +1,9 @@
 import { Component, type ReactNode } from "react";
-import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./auth/AuthProvider";
-import { RequireAuth } from "./auth/RequireAuth";
-import { AppShell } from "./layout/AppShell";
 import { SquadronViewProvider } from "./layout/SquadronViewContext";
-import { isNational, isWing, isAuditor, isAdmin, canViewCadets } from "./auth/permissions";
-import type { SessionInfo } from "./api/types";
-import { Dashboard } from "./routes/Dashboard";
-import { Calendar } from "./routes/Calendar";
-import { ParadeNights } from "./routes/ParadeNights";
-import { WeeklyProgram } from "./routes/WeeklyProgram";
-import { Curriculum } from "./routes/Curriculum";
-import { Facilitators } from "./routes/Facilitators";
-import { FacilitatorSchedule } from "./routes/FacilitatorSchedule";
-import { Resources } from "./routes/Resources";
-import { Cadets } from "./routes/Cadets";
-import { Reports } from "./routes/Reports";
-import { ActionItems } from "./routes/ActionItems";
-import { Imports } from "./routes/Imports";
-import { Audit } from "./routes/Audit";
-import { Admin } from "./routes/Admin";
-import { Accounts } from "./routes/Accounts";
-import { Settings } from "./routes/Settings";
-import { ReportCatalogue } from "./routes/ReportCatalogue";
-import { WingOverview, NationalOverview } from "./routes/Overviews";
 import { PlanningWorkspace } from "./routes/PlanningWorkspace";
-import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/Toast";
 import { ConfirmProvider } from "./components/ConfirmDialog";
 
@@ -37,21 +14,16 @@ import { ConfirmProvider } from "./components/ConfirmDialog";
 // Refresh buttons are built to satisfy.
 const qc = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: true, refetchOnReconnect: true } } });
 
-const USE_HASH = import.meta.env.VITE_HASH_ROUTER === "true";
-const BASENAME = USE_HASH ? "/" : (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "/";
+const BASENAME = (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "/";
 
 const TMS_URL =
   (document.querySelector('meta[name="aafc-tms-base"]') as HTMLMetaElement | null)
     ?.content || "https://aafc-tms-frontend-production.up.railway.app";
-const MODULE_MODE =
-  (document.querySelector('meta[name="aafc-module-mode"]') as HTMLMetaElement | null)
-    ?.content === "true";
 
-// ── Module mode ───────────────────────────────────────────────────────────────
-// Used when this app is opened as a standalone Planning Workspace preview tab
-// (launched from the connected-frontend). AppShell is intentionally skipped so
-// the full TMS layout/nav does not render. Auth comes from the shared backend
-// session cookie (SameSite=None; Secure) — no login form is shown.
+// Planning Workspace is MODULE-ONLY by architecture — it is always opened
+// as a standalone tab from the connected-frontend TMS, never as a full app
+// with its own shell and nav. Auth comes from the shared backend session
+// cookie (SameSite=None; Secure) — no login form is shown.
 
 function NotAuthenticated() {
   return (
@@ -138,84 +110,17 @@ function ModuleEntry() {
   );
 }
 
-// Route-level permission gate — supplements sidebar nav hiding so a user who types
-// the URL directly is blocked, not just hidden from the nav.
-function RequireRole({ check, children }: { check: (s: SessionInfo | null) => boolean; children: ReactNode }) {
-  const { session } = useAuth();
-  if (!check(session)) return <div className="empty">Page not found or access not permitted.</div>;
-  return <>{children}</>;
-}
-
-// ── Normal full-app mode ──────────────────────────────────────────────────────
-
-function Home() {
-  const { session } = useAuth();
-  if (isAuditor(session)) return <Navigate to="/audit" replace />;
-  if (isNational(session)) return <Navigate to="/national-overview" replace />;
-  if (isWing(session)) return <Navigate to="/wing-overview" replace />;
-  return <Navigate to="/dashboard" replace />;
-}
-
 export default function App() {
-  const Router = USE_HASH ? HashRouter : BrowserRouter;
-
-  if (MODULE_MODE) {
-    return (
-      <QueryClientProvider client={qc}>
-        <ToastProvider>
-          <ConfirmProvider>
-            <AuthProvider>
-              <BrowserRouter basename={BASENAME}>
-                <ModuleEntry />
-              </BrowserRouter>
-            </AuthProvider>
-          </ConfirmProvider>
-        </ToastProvider>
-      </QueryClientProvider>
-    );
-  }
-
   return (
     <QueryClientProvider client={qc}>
       <ToastProvider>
-      <ConfirmProvider>
-      <AuthProvider>
-        <Router basename={BASENAME}>
-          <RequireAuth>
-            <SquadronViewProvider>
-            <AppShell>
-              <ErrorBoundary>
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/calendar" element={<Calendar />} />
-                <Route path="/parade-nights" element={<ParadeNights />} />
-                <Route path="/weekly-program" element={<WeeklyProgram />} />
-                <Route path="/curriculum" element={<Curriculum />} />
-                <Route path="/facilitators" element={<Facilitators />} />
-                <Route path="/facilitator-schedule" element={<FacilitatorSchedule />} />
-                <Route path="/resources" element={<Resources />} />
-                <Route path="/cadets" element={<RequireRole check={canViewCadets}><Cadets /></RequireRole>} />
-                <Route path="/reports" element={<Reports />} />
-                <Route path="/report-catalogue" element={<ReportCatalogue />} />
-                <Route path="/action-items" element={<ActionItems />} />
-                <Route path="/imports" element={<RequireRole check={isAdmin}><Imports /></RequireRole>} />
-                <Route path="/audit" element={<RequireRole check={s => isAdmin(s) || isAuditor(s)}><Audit /></RequireRole>} />
-                <Route path="/admin" element={<Admin />} />
-                <Route path="/accounts" element={<Accounts />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/wing-overview" element={<WingOverview />} />
-                <Route path="/national-overview" element={<NationalOverview />} />
-                <Route path="/planning" element={<PlanningWorkspace />} />
-                <Route path="*" element={<div className="empty">Page not found or access not permitted.</div>} />
-              </Routes>
-              </ErrorBoundary>
-            </AppShell>
-            </SquadronViewProvider>
-          </RequireAuth>
-        </Router>
-      </AuthProvider>
-      </ConfirmProvider>
+        <ConfirmProvider>
+          <AuthProvider>
+            <BrowserRouter basename={BASENAME}>
+              <ModuleEntry />
+            </BrowserRouter>
+          </AuthProvider>
+        </ConfirmProvider>
       </ToastProvider>
     </QueryClientProvider>
   );
