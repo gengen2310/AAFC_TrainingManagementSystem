@@ -10150,7 +10150,7 @@ async function addPN(){
   if(!tmplId){showToast('Select a timing template for this parade night.',true);return;}
   if(S.pns.find(p=>p.date===date)){showToast('A parade night already exists on this date.',true);return;}
   try{
-    await api('/api/parade-nights',{method:'POST',body:JSON.stringify({date,term,timing_template_id:tmplId,parade_type:notes||'normal'})});
+    await api('/api/parade-nights',{method:'POST',body:JSON.stringify({date,term,timing_template_id:tmplId,notes:notes||null,parade_type:'normal'})});
     await reloadAndRender();
     closeModal('m-add-pn');
     document.getElementById('pn-date').value='';
@@ -10203,196 +10203,267 @@ function _pnPeriodLabel(b){
   return (b.block_name||'Period')+(t?' \u00b7 '+t:'');
 }
 
-function showPNDetail(ds){
+async function showPNDetail(ds){
   const pn=S.pns.find(p=>p.date===ds);if(!pn)return;
   document.getElementById('pn-det-title').textContent=fmtDL(ds);
+  openModal('m-pn-detail');
+  document.getElementById('pn-det-body').innerHTML='<div class="muted" style="padding:20px;text-align:center;font-size:var(--fs-sm)">Loading…</div>';
+  let plan;
+  try{plan=await api('/api/parade-nights/'+pn.id+'/planner');}
+  catch(e){document.getElementById('pn-det-body').innerHTML='<div style="color:var(--red);padding:20px;font-size:var(--fs-sm)">'+esc(apiErr(e))+'</div>';return;}
+  const pnd=plan.parade_night;
+  const timing=plan.timing;
+  const groups=plan.groups;
+  const sessions=plan.sessions;
+  // sessMap: "period:classId" → session  |  "period:custom:customPhaseId" → session
+  const sessMap=new Map();
+  for(const s of sessions){
+    const p=s.period_number;if(p==null)continue;
+    for(const a of(s.training_class_audiences||[])) sessMap.set(p+':'+a.training_class_id,s);
+    for(const a of(s.custom_phase_audiences||[])) sessMap.set(p+':custom:'+a.custom_phase_id,s);
+  }
+  window._pnPlan={pnd,timing,groups,sessions,sessMap,ds};
+  const instrPeriods=timing.instructional_periods||[];
+  const tcGroups=groups.filter(g=>g.type==='training_phase'&&(g.classes||[]).length>0);
+  const customGroups=groups.filter(g=>g.type==='custom_training');
+  let html='';
+
+  // ── Header strip ──────────────────────────────────────────────────────────
+  const tmplName=timing.timing_template_name;
+  html+=`<div style="border:1.5px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:10px;background:var(--surface-2)">`;
+  html+=`<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:${instrPeriods.length?'6':'0'}px">`;
+  if(pnd.term) html+=`<span class="badge b-info">${esc(pnd.term)}</span>`;
+  if(tmplName) html+=`<span style="font-size:var(--fs-xs);color:var(--muted)">Template:</span><span style="font-size:var(--fs-xs);font-weight:700;margin-left:4px">${esc(tmplName)}</span>`;
+  html+=`</div>`;
+  if(instrPeriods.length){
+    html+=`<div style="display:flex;flex-wrap:wrap;gap:4px">`;
+    for(const b of timing.blocks){
+      const isInstr=b.is_instructional;
+      const timeStr=b.start_time?` <span style="color:var(--muted);font-size:9px">${esc(b.start_time.slice(0,5))}</span>`:'';
+      html+=`<span style="font-size:10px;padding:2px 7px;border-radius:10px;border:1px solid ${isInstr?'var(--blue)':'var(--border)'};color:${isInstr?'var(--blue)':'var(--muted)'}">${esc(b.block_label)}${timeStr}</span>`;
+    }
+    html+=`</div>`;
+  }
+  html+=`</div>`;
+
+  // ── Legacy banner ─────────────────────────────────────────────────────────
+  if(!pnd.timing_template_id){
+    html+=`<div class="alert a-warn" style="margin-bottom:10px"><b>Legacy timing</b> — no Timing Template assigned to this Parade Night.`;
+    if(canWriteSquadron()) html+=` <button class="btn btn-xs btn-sky" style="margin-left:8px" onclick="openPNTimingOverrideModal('${esc(pnd.parade_night_id)}')">Choose Timing Template</button>`;
+    html+=`</div>`;
+  }
+
+  // ── Notes ─────────────────────────────────────────────────────────────────
+  html+=`<div style="margin-bottom:10px">`;
+  html+=`<label for="pnd-notes" style="font-size:var(--fs-xs);font-weight:700;color:var(--dark);text-transform:uppercase;letter-spacing:.08em">Notes <span class="save-ind" id="pnd-notes-status"></span></label>`;
+  html+=`<input id="pnd-notes" value="${esc(pnd.notes||'')}" placeholder="Add notes for this parade night…" style="margin-top:4px" ${canWriteSquadron()?'':'disabled'}>`;
+  html+=`</div>`;
+
+  // ── Notices card ──────────────────────────────────────────────────────────
+  // REM-34: kept deliberately simple (text + priority only) -- see loadPNNotices.
+  html+=`<div id="pn-notices-card" style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">`;
+  html+=`<div style="font-size:var(--fs-xs);font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Notices</div>`;
+  html+=`<div id="pn-notices-list"><div class="muted" style="font-size:var(--fs-xs)">Loading…</div></div>`;
+  if(canWriteSquadron()) html+=`<div style="margin-top:8px;display:flex;gap:6px;align-items:flex-start">
+    <input id="pn-notice-text" placeholder="Notice text…" style="flex:1" maxlength="500" aria-label="New notice text">
+    <select id="pn-notice-priority" aria-label="Notice priority" style="width:auto">
+      <option value="normal">Normal</option>
+      <option value="urgent">Urgent</option>
+    </select>
+    <button class="btn btn-xs btn-sky" onclick="addPNNotice('${esc(pnd.parade_night_id)}')">Add</button>
+  </div>`;
+  html+=`</div>`;
+
+  // ── Timetable matrix ──────────────────────────────────────────────────────
+  if(instrPeriods.length&&(tcGroups.length||customGroups.length)){
+    html+=`<div style="overflow-x:auto;margin-bottom:10px">`;
+    html+=`<table style="width:100%;border-collapse:collapse;font-size:var(--fs-xs)">`;
+    html+=`<thead><tr><th style="text-align:left;padding:6px 8px;background:var(--surface-2);border:1px solid var(--border);min-width:140px">Training Class</th>`;
+    for(const ip of instrPeriods){
+      const timeStr=ip.start_time?`<div style="font-size:9px;color:var(--muted);font-weight:400">${esc(ip.start_time.slice(0,5))}</div>`:'';
+      html+=`<th style="text-align:center;padding:6px 8px;background:var(--surface-2);border:1px solid var(--border);min-width:80px;font-weight:700">${esc(ip.block_label)}${timeStr}</th>`;
+    }
+    html+=`</tr></thead><tbody>`;
+    for(const g of tcGroups){
+      html+=`<tr><td colspan="${instrPeriods.length+1}" style="padding:4px 8px;background:var(--surface-2);border:1px solid var(--border);font-weight:700;color:var(--dark);font-size:10px;text-transform:uppercase;letter-spacing:.06em">${esc(g.name)}</td></tr>`;
+      for(const cls of g.classes){
+        html+=`<tr><td style="padding:5px 8px;border:1px solid var(--border);color:var(--text-2)">${esc(cls.display_name)}</td>`;
+        for(const ip of instrPeriods) html+=_pnMatrixCell(pnd.parade_night_id,ds,ip.period_number,cls.training_class_id,null,sessMap.get(ip.period_number+':'+cls.training_class_id));
+        html+=`</tr>`;
+      }
+    }
+    for(const cg of customGroups){
+      html+=`<tr><td style="padding:5px 8px;border:1px solid var(--border);color:var(--text-2);font-style:italic">${esc(cg.name)}</td>`;
+      for(const ip of instrPeriods) html+=_pnMatrixCell(pnd.parade_night_id,ds,ip.period_number,null,cg.custom_phase_id,sessMap.get(ip.period_number+':custom:'+cg.custom_phase_id));
+      html+=`</tr>`;
+    }
+    html+=`</tbody></table></div>`;
+  }else if(instrPeriods.length&&!tcGroups.length&&!customGroups.length){
+    html+=`<div class="alert a-info" style="margin-bottom:10px">No Training Classes are configured for this Parade Night date. Add Training Classes in Unit Setup → Training Classes to enable the planning matrix.</div>`;
+  }
+
+  // ── Inline cell editor (hidden until a cell is clicked) ───────────────────
+  html+=`<div id="pn-cell-editor" style="display:none;border:1.5px solid var(--blue);border-radius:8px;padding:12px;margin-bottom:10px;background:var(--accent-light)"></div>`;
+
+  // ── Operational buttons ───────────────────────────────────────────────────
+  if(canWriteSquadron()){
+    html+=`<div class="no-print" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light);display:flex;flex-wrap:wrap;gap:8px;align-items:center">`;
+    if(sessions.length>0){
+      html+=`<button class="btn btn-out" onclick="doMarkRemainingDelivered('${esc(ds)}')" title="Mark every Planned session as Delivered.">Mark remaining delivered</button>`;
+      html+=`<button class="btn btn-red-out" onclick="doCancelAllSessions('${esc(ds)}')" title="Cancel every Planned session.">Cancel all remaining</button>`;
+    }
+    if(pnd.closeout_status!=='closed'){
+      html+=`<button class="btn btn-xs btn-red-out" onclick="doClosePN('${esc(pnd.parade_night_id)}')" title="Closes this Parade Night once all outcomes are recorded.">Close Parade Night</button>`;
+      html+=`<span style="font-size:var(--fs-xs);color:var(--muted);margin-left:4px">Locks the night once all outcomes are recorded.</span>`;
+    }else{
+      html+=`<span class="badge b-amber">Closed</span> <span style="font-size:var(--fs-xs);color:var(--muted)">This Parade Night is closed.</span>`;
+    }
+    html+=`</div>`;
+  }
+
+  document.getElementById('pn-det-body').innerHTML=html;
+
+  // Wire autosave for notes
+  const notesEl=document.getElementById('pnd-notes');
+  if(notesEl&&canWriteSquadron()){
+    notesEl.addEventListener('input',_mkAutoSave(async(val)=>{
+      const livePn=S.pns.find(p=>p.id===pnd.parade_night_id);
+      await api('/api/parade-nights/'+pnd.parade_night_id,{method:'PATCH',body:JSON.stringify({
+        notes:val,version:livePn?livePn.version:undefined
+      })});
+      if(livePn)livePn.notes=val;
+    },'pnd-notes-status'));
+  }
+  loadPNNotices(pnd.parade_night_id);
+}
+
+// ── Matrix cell renderer ──────────────────────────────────────────────────────
+function _pnMatrixCell(pnId,ds,period,classId,customPhaseId,sess){
+  const canWrite=canWriteSquadron();
+  const cArg=classId?`'${esc(classId)}'`:'null';
+  const cpArg=customPhaseId?`'${esc(customPhaseId)}'`:'null';
+  if(sess){
+    const sc={planned:'var(--blue)',delivered:'var(--ok)',cancelled:'var(--red)',not_delivered:'var(--red)',delivered_with_issue:'var(--warn)',cancelled_late:'var(--red)',rescheduled:'var(--warn)'};
+    const col=sc[sess.status]||'var(--muted)';
+    const lb={planned:'Planned',delivered:'✓',cancelled:'✗',not_delivered:'✗',delivered_with_issue:'!',cancelled_late:'✗',rescheduled:'↻'}[sess.status]||sess.status;
+    if(canWrite) return `<td style="border:1px solid var(--border);padding:4px;text-align:center;cursor:pointer" onclick="_pnCellClick('${esc(pnId)}','${esc(ds)}',${period},${cArg},${cpArg},'${esc(sess.session_id)}')"><div style="font-size:9px;font-weight:700;color:${col}">${lb}</div></td>`;
+    return `<td style="border:1px solid var(--border);padding:4px;text-align:center"><div style="font-size:9px;font-weight:700;color:${col}">${lb}</div></td>`;
+  }
+  if(canWrite) return `<td style="border:1px solid var(--border);padding:4px;text-align:center;cursor:pointer;opacity:.4" onclick="_pnCellClick('${esc(pnId)}','${esc(ds)}',${period},${cArg},${cpArg},null)"><div style="font-size:11px;color:var(--blue)">+</div></td>`;
+  return `<td style="border:1px solid var(--border);padding:4px;text-align:center"><div style="font-size:10px;color:var(--lgrey)">—</div></td>`;
+}
+
+// ── Cell click: open inline editor pre-filled with period + class ─────────────
+async function _pnCellClick(pnId,ds,period,classId,customPhaseId,sessionId){
+  if(!canWriteSquadron())return;
+  const editorEl=document.getElementById('pn-cell-editor');if(!editorEl)return;
+  const plan=window._pnPlan;if(!plan)return;
+  const sess=sessionId?plan.sessions.find(s=>s.session_id===sessionId):null;
   const currOpts=allCurr().map(e=>`<option value="${esc(e.title)}">${esc(e.code)} — ${esc(e.title)}</option>`).join('');
   const facOpts=S.facs.map(f=>`<option value="${f.id}">${facDisplay(f)}</option>`).join('');
   const roomOpts=S.rooms.map(r=>`<option value="${esc(r.name)}">${esc(r.name)}</option>`).join('');
-  // Governed phase catalogue (master transformation plan Block 10) — falls
-  // back to PH_S's short label for the 8 built-in names, else uses the
-  // phase's own display_name (a custom wing/squadron phase).
   const phOpts=(S.phases||[]).map(p=>`<option value="${esc(p.name)}">${esc(PH_S[p.name]||p.displayName)}</option>`).join('');
-  let html=`<div class="alert a-info"><b>${esc(pn.term)}</b> · ${esc(pn.notes||'No notes')}</div>`;
-  // REM-34: Notices existed only in Planning Workspace (keyed to ParadeDate,
-  // not ParadeNight) -- /api/parade-nights/{id}/notices resolves/creates the
-  // ParadeDate link transparently, so this card never needs to know that
-  // concept exists, matching Planning Workspace's own normal/urgent priority
-  // vocabulary (ParadeNightGridView.tsx).
-  html+=`<div id="pn-notices-card" style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">
-    <div style="font-size:var(--fs-xs);font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Notices</div>
-    <div id="pn-notices-list"><div class="muted" style="font-size:var(--fs-xs)">Loading…</div></div>
-    ${canWriteSquadron()?`<div style="margin-top:8px;display:flex;gap:6px;align-items:flex-start">
-      <input id="pn-notice-text" placeholder="Notice text…" style="flex:1" maxlength="500" aria-label="New notice text">
-      <select id="pn-notice-priority" aria-label="Notice priority" style="width:auto">
-        <option value="normal">Normal</option>
-        <option value="urgent">Urgent</option>
-      </select>
-      <button class="btn btn-xs btn-sky" onclick="addPNNotice('${esc(pn.id)}')">Add</button>
-    </div>`:''}
-  </div>`;
-  if(pn.closeout_status==='closed'){
-    html+=`<div class="alert a-warn" style="margin-bottom:10px">This Parade Night is closed. Its date, term, timing and type can no longer be edited.</div>`;
-  }else if(canWriteSquadron()){
-    const typeOpts=['normal','activity','ceremonial','admin','stand_down','cancelled'].map(v=>`<option value="${v}" ${pn.parade_type===v?'selected':''}>${v.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase())}</option>`).join('');
-    html+=`<div style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px">
-      <div style="font-size:var(--fs-xs);font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Parade Night Details</div>
-      <div class="form-row">
-        <div class="ff"><label for="pnd-term">Term</label><input id="pnd-term" value="${esc(pn.term||'')}"></div>
-        <div class="ff"><label for="pnd-type">Type</label><select id="pnd-type" aria-label="Parade night type">${typeOpts}</select></div>
-      </div>
-      <div class="form-row">
-        <div class="ff"><label for="pnd-start">Start Time</label><input type="time" id="pnd-start" value="${esc(pn.start_time||'')}"></div>
-        <div class="ff"><label for="pnd-end">End Time</label><input type="time" id="pnd-end" value="${esc(pn.end_time||'')}"></div>
-      </div>
-      <div class="ff"><label for="pnd-notes">Notes<span class="save-ind" id="pnd-notes-status"></span></label><input id="pnd-notes" value="${esc(pn.notes||'')}"></div>
-      <button class="btn btn-xs btn-sky" style="margin-top:6px" onclick="savePNCoreDetails('${ds}')">Save Details</button>
-    </div>`;
-  }
-  if(canWriteSquadron()&&(pn.sessions||[]).length>1){
-    html+=`<div class="no-print" style="border:1.5px solid var(--border-light);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--surface-2)">
-      <div style="font-size:var(--fs-xs);font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Quick Assign to All Sessions</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
-        <div style="flex:1;min-width:180px"><label style="font-size:var(--fs-sm)" for="qa-fac">Facilitator</label>
-          <select id="qa-fac" aria-label="Facilitator to assign to all sessions"><option value="">— No change —</option>${facOpts}</select>
-        </div>
-        <div style="flex:1;min-width:180px"><label style="font-size:var(--fs-sm)" for="qa-room">Room</label>
-          <select id="qa-room" aria-label="Room to assign to all sessions"><option value="">— No change —</option>${roomOpts}</select>
-        </div>
-        <button class="btn btn-xs btn-sky" onclick="_qaApplyAll(${(pn.sessions||[]).length})">Apply to all</button>
-        <button class="btn btn-xs btn-out" onclick="_qaClearFacs()">Clear facilitators</button>
-      </div>
-      <div style="font-size:var(--fs-xs);color:var(--muted);margin-top:5px">Changes take effect when you click Save Changes below.</div>
-    </div>`;
-  }
-  (pn.sessions||[]).forEach((s,i)=>{
-    const stOpts=['planned','delivered','delivered_with_issue','cancelled','cancelled_late','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${s.status===v?'selected':''}>${{planned:'Planned',delivered:'Delivered',delivered_with_issue:'Delivered (issue)',cancelled:'Cancelled',cancelled_late:'Cancelled late',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
-    const dragAttrs=canWriteSquadron()?`ondragover="_sessDragOver(event,'${ds}',${i})" ondragleave="_sessDragLeave(event)" ondrop="_sessDrop(event,'${ds}',${i})"`:'';
-    html+=`<div style="border:1.5px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px" data-sess-card="${i}" ${dragAttrs}>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div style="display:flex;align-items:center;gap:6px">
-          ${canWriteSquadron()?`<span class="no-print sess-drag-handle" draggable="true" ondragstart="_sessDragStart(event,'${ds}',${i})" ondragend="_sessDragEnd(event)" title="Drag to reorder" aria-hidden="true">⠿</span>`:''}
-          <div style="font-size:var(--fs-xs);font-weight:900;color:var(--dark);text-transform:uppercase;letter-spacing:.08em">Session ${i+1} · Period ${s.period_number||1}</div>
-        </div>
-        <div class="no-print" style="display:flex;gap:4px">
-          ${canWriteSquadron()?`<button class="btn btn-xs btn-out" ${(s.period_number||1)<=1?'disabled':''} onclick="_sessMoveUpDown('${ds}',${i},'up')" title="Move to the previous period" aria-label="Move Session ${i+1} to the previous period">↑</button>
-          <button class="btn btn-xs btn-out" onclick="_sessMoveUpDown('${ds}',${i},'down')" title="Move to the next period" aria-label="Move Session ${i+1} to the next period">↓</button>
-          <button class="btn btn-xs btn-out" onclick="_sessOpenMoveTo('${ds}',${i})" aria-label="Move Session ${i+1} to a different Parade Night">Move to…</button>`:''}
-          ${s.id?`<button class="btn btn-xs btn-out" onclick="_toggleSessHistory('${s.id}',${i})" aria-label="Show status history for Session ${i+1}">History</button>`:''}
-        </div>
-      </div>
-      <div id="sess-hist-${i}" style="display:none;font-size:var(--fs-xs);color:var(--muted);margin-bottom:8px;padding:8px;background:var(--surface-2);border-radius:6px"></div>
-      <div style="${!canWriteSquadron()?'pointer-events:none;opacity:.85':''}">
-      ${(function(){
-        const blocks=_pnPeriodBlocks(pn);
-        if(!blocks.length){
-          return `<div class="ff"><label>Program period</label>
-            <div style="font-size:var(--fs-xs);color:var(--muted);padding:4px 0">
-              This night has no timing template, so it has no periods to place sessions in.
-              Set one in Unit Setup &rarr; Timing Templates.</div></div>`;
-        }
-        const opts=blocks.map(b=>`<option value="${esc(b.timing_block_id)}" ${s.timingBlockId===b.timing_block_id?'selected':''}>${esc(_pnPeriodLabel(b))}</option>`).join('');
-        return `<div class="ff"><label for="d-tb-${i}">Program period</label>
-          <select id="d-tb-${i}" aria-label="Program period for session ${i+1}" ${!canWriteSquadron()?'disabled':''}>
-            <option value="">\u2014 Not placed \u2014</option>${opts}
-          </select>
-          <div style="font-size:var(--fs-2xs);color:var(--muted);margin-top:3px">Where this session appears on the printed Weekly Program.</div>
-        </div>`;
-      })()}
-      <div class="form-row">
-        <div class="ff"><label for="d-ph-${i}">Phase</label><select id="d-ph-${i}" aria-label="Phase for session ${i+1}" ${!canWriteSquadron()?'disabled':''}>${phOpts}</select></div>
-        <div class="ff"><label for="d-st-${i}">Status</label><select id="d-st-${i}" aria-label="Status for session ${i+1}" ${!canWriteSquadron()?'disabled':''}>${stOpts}</select></div>
-      </div>
-      <div class="ff"><label for="d-ex-${i}">Curriculum Item</label>
-        <select id="d-ex-${i}" aria-label="Curriculum item for session ${i+1}" ${!canWriteSquadron()?'disabled':''}><option value="">— Unassigned —</option>${currOpts}</select>
-      </div>
-      <div class="form-row">
-        <div class="ff"><label for="d-fa-${i}">Facilitator</label>
-          <select id="d-fa-${i}" aria-label="Facilitator for session ${i+1}" ${!canWriteSquadron()?'disabled':''}><option value="">— None —</option>${facOpts}</select>
-        </div>
-        <div class="ff"><label for="d-rm-${i}">Room</label>
-          <select id="d-rm-${i}" aria-label="Room for session ${i+1}" ${!canWriteSquadron()?'disabled':''}><option value="">— None —</option>${roomOpts}</select>
-        </div>
-      </div>
-      ${canWriteSquadron()
-        ? `<div class="ff pnd-tc-group" id="d-tc-grp-${i}" style="margin-top:8px;display:none">
-             <label>Training Classes</label>
-             <div id="d-tc-${i}" style="max-height:120px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:7px;font-size:var(--fs-sm)">
-               <span class="muted">Loading…</span>
-             </div>
-           </div>`
-        : (s.trainingClasses&&s.trainingClasses.length
-             ? `<div class="ff" style="margin-top:8px"><label>Training Classes</label><div style="font-size:var(--fs-sm);padding:3px 0">${esc(s.trainingClasses.map(c=>c.display_name).join(', '))}</div></div>`
-             : '')
-      }
-      </div>
-    </div>`;
-  });
-  if(canWriteSquadron()&&(pn.sessions||[]).length>0){
-    html+=`<button class="btn btn-dk" onclick="savePNDetail('${ds}',${(pn.sessions||[]).length})">Save Changes</button>
-    <button class="btn btn-out" style="margin-left:8px" onclick="doMarkRemainingDelivered('${ds}')" title="Marks every session still Planned/Published as Delivered. Flag any exceptions (cancelled, not delivered, rescheduled) individually first — this only fills in the rest.">Mark remaining delivered</button>
-    <button class="btn btn-red-out" style="margin-left:8px" onclick="doCancelAllSessions('${ds}')" title="Cancels every session still Planned/Published in this parade night. Records a reason.">Cancel all remaining</button>`;
-  }
-  if(canWriteSquadron()&&pn.closeout_status!=='closed'){
-    const qeCurrOpts=(S.curr||[]).map(c=>`<option value="${esc(c.id)}">${esc(c.code)} — ${esc(c.title)}</option>`).join('');
-    const qeFacOpts=(S.facs||[]).map(f=>`<option value="${esc(f.id)}">${esc(facDisplay(f))}</option>`).join('');
-    const qeRoomOpts=(S.rooms||[]).map(r=>`<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');
-    html+=`<div class="add-sess-bar no-print">
-      <span style="font-size:var(--fs-sm);color:var(--muted);font-weight:600">Add session:</span>
-      <button class="btn btn-xs btn-out" onclick="document.getElementById('pn-quick-entry').style.display=document.getElementById('pn-quick-entry').style.display==='none'?'block':'none'">Quick entry</button>
-      <button class="btn btn-xs btn-sky" onclick="_wizOpen('${esc(pn.id)}','${esc(pn.date)}')">Guided mode</button>
+  const stOpts=['planned','delivered','delivered_with_issue','cancelled','cancelled_late','rescheduled','not_delivered'].map(v=>`<option value="${v}" ${sess&&sess.status===v?'selected':''}>${{planned:'Planned',delivered:'Delivered',delivered_with_issue:'Delivered (issue)',cancelled:'Cancelled',cancelled_late:'Cancelled late',rescheduled:'Rescheduled',not_delivered:'Not Delivered'}[v]}</option>`).join('');
+  const ip=(plan.timing.instructional_periods||[]).find(x=>x.period_number===period);
+  const periodLabel=ip?(ip.block_label+(ip.start_time?` (${ip.start_time.slice(0,5)})`:'')):`Period ${period}`;
+  let classLabel='';
+  if(classId){const cl=plan.groups.flatMap(g=>g.classes||[]).find(c=>c.training_class_id===classId);if(cl)classLabel=cl.display_name;}
+  else if(customPhaseId){const cg=plan.groups.find(g=>g.custom_phase_id===customPhaseId);if(cg)classLabel=cg.name;}
+  const cArg=classId?`'${esc(classId)}'`:'null';
+  const cpArg=customPhaseId?`'${esc(customPhaseId)}'`:'null';
+  const sessArg=sess?`'${esc(sess.session_id)}'`:'null';
+  editorEl.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:var(--fs-xs);font-weight:700;color:var(--dark)">${esc(periodLabel)} — ${esc(classLabel)}</div>
+      <button class="btn btn-xs btn-out" onclick="document.getElementById('pn-cell-editor').style.display='none'">Dismiss</button>
     </div>
-    <div id="pn-quick-entry" class="qe-form no-print" style="display:none">
-      <div style="display:grid;grid-template-columns:70px 1fr 1fr 1fr;gap:8px;align-items:end">
-        <div><label style="font-size:var(--fs-xs);font-weight:600" for="qe-period">Period</label><input type="number" id="qe-period" min="1" max="20" value="1" style="width:100%"></div>
-        <div><label style="font-size:var(--fs-xs);font-weight:600" for="qe-curr-sel">Curriculum</label><select id="qe-curr-sel" style="width:100%"><option value="">— None —</option>${qeCurrOpts}</select></div>
-        <div><label style="font-size:var(--fs-xs);font-weight:600" for="qe-fac-sel">Facilitator</label><select id="qe-fac-sel" style="width:100%"><option value="">— None —</option>${qeFacOpts}</select></div>
-        <div><label style="font-size:var(--fs-xs);font-weight:600" for="qe-room-sel">Room</label><select id="qe-room-sel" style="width:100%"><option value="">— None —</option>${qeRoomOpts}</select></div>
-      </div>
-      <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
-        <button class="btn btn-sm btn-primary" onclick="_qeSubmit('${esc(pn.id)}','${esc(pn.date)}')">Add Session</button>
-        <button class="btn btn-sm btn-secondary" onclick="document.getElementById('pn-quick-entry').style.display='none'">Cancel</button>
-        <span id="qe-msg" style="font-size:var(--fs-xs);color:var(--red)"></span>
-      </div>
+    <div class="form-row" style="margin-bottom:8px">
+      <div class="ff"><label for="pce-ph" style="font-size:var(--fs-xs)">Phase</label><select id="pce-ph" aria-label="Phase">${phOpts}</select></div>
+      <div class="ff"><label for="pce-st" style="font-size:var(--fs-xs)">Status</label><select id="pce-st" aria-label="Status">${stOpts}</select></div>
+    </div>
+    <div class="ff" style="margin-bottom:8px"><label for="pce-ex" style="font-size:var(--fs-xs)">Curriculum Item</label>
+      <select id="pce-ex" aria-label="Curriculum item"><option value="">— Unassigned —</option>${currOpts}</select>
+    </div>
+    <div class="form-row" style="margin-bottom:8px">
+      <div class="ff"><label for="pce-fa" style="font-size:var(--fs-xs)">Facilitator</label><select id="pce-fa" aria-label="Facilitator"><option value="">— None —</option>${facOpts}</select></div>
+      <div class="ff"><label for="pce-rm" style="font-size:var(--fs-xs)">Room</label><select id="pce-rm" aria-label="Room"><option value="">— None —</option>${roomOpts}</select></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-sm btn-dk" onclick="_pnCellSave('${esc(pnId)}','${esc(ds)}',${period},${cArg},${cpArg},${sessArg})">${sess?'Save Session':'Create Session'}</button>
+      ${sess?`<button class="btn btn-sm btn-red-out" onclick="_pnCellDelete('${esc(sess.session_id)}','${esc(ds)}')">Delete</button>`:''}
+      <span id="pce-err" style="font-size:var(--fs-xs);color:var(--red)"></span>
     </div>`;
-    html+=`<div class="no-print" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light)">
-      <button class="btn btn-xs btn-red-out" onclick="doClosePN('${esc(pn.id)}')" title="Close this Parade Night after all sessions have been recorded. All sessions must be in a final status.">Close Parade Night</button>
-      <span style="font-size:var(--fs-xs);color:var(--muted);margin-left:8px">Locks the parade night once all outcomes are recorded.</span>
-    </div>`;
-  }
-  document.getElementById('pn-det-body').innerHTML=html;
+  editorEl.style.display='';
   setTimeout(()=>{
-    (pn.sessions||[]).forEach((s,i)=>{
-      const ph=document.getElementById('d-ph-'+i);
-      if(ph){
-        // A session's recorded phase may predate the governed catalogue —
-        // add it as a one-off option rather than silently switching it to
-        // whatever option happens to be first when Save is clicked.
-        if(s.phase && ![...ph.options].some(o=>o.value===s.phase)){
-          ph.appendChild(new Option(s.phase+' (not in catalogue)', s.phase));
-        }
-        ph.value=s.phase||'B. Initial';
-      }
-      const ex=document.getElementById('d-ex-'+i);if(ex)ex.value=s.exp||'';
-      const fa=document.getElementById('d-fa-'+i);if(fa)fa.value=s.facId||'';
-      const rm=document.getElementById('d-rm-'+i);if(rm)rm.value=s.room||'';
-    });
-    // AUTO-01 Class A: wire autosave to the parade night notes field.
-    const notesEl=document.getElementById('pnd-notes');
-    if(notesEl&&canWriteSquadron()){
-      notesEl.addEventListener('input',_mkAutoSave(async(val)=>{
-        const livePn=S.pns.find(p=>p.id===pn.id);
-        await api('/api/parade-nights/'+pn.id,{method:'PATCH',body:JSON.stringify({
-          notes:val, version:livePn?livePn.version:undefined
-        })});
-        if(livePn)livePn.notes=val;
-      },'pnd-notes-status'));
+    const phEl=document.getElementById('pce-ph');
+    if(phEl){
+      if(sess&&sess.phase_at_time&&![...phEl.options].some(o=>o.value===sess.phase_at_time)) phEl.appendChild(new Option(sess.phase_at_time+' (not in catalogue)',sess.phase_at_time));
+      phEl.value=sess?sess.phase_at_time||'B. Initial':'B. Initial';
     }
-  },30);
-  loadPNNotices(pn.id);
-  openModal('m-pn-detail');
-  if(canWriteSquadron()) _populatePnDetailClasses(pn);
+    const exEl=document.getElementById('pce-ex');if(exEl)exEl.value=sess?sess.curriculum_title_at_time||sess.custom_title||'':'';
+    const faEl=document.getElementById('pce-fa');if(faEl)faEl.value=sess?sess.facilitator_id||'':'';
+    const rmEl=document.getElementById('pce-rm');if(rmEl)rmEl.value=sess?sess.training_area_name_at_time||'':'';
+    editorEl.scrollIntoView({behavior:'smooth',block:'nearest'});
+  },20);
 }
+
+// ── Cell save: create or update a session from the inline editor ──────────────
+async function _pnCellSave(pnId,ds,period,classId,customPhaseId,sessionId){
+  const errEl=document.getElementById('pce-err');
+  const phase=document.getElementById('pce-ph')?.value||'B. Initial';
+  const expTitle=document.getElementById('pce-ex')?.value||'';
+  const facId=document.getElementById('pce-fa')?.value||null;
+  const roomName=document.getElementById('pce-rm')?.value||'';
+  const newSt=document.getElementById('pce-st')?.value||'planned';
+  // Collect outcome reason if the status transition requires one
+  let reason=null;
+  if(sessionId){
+    const plan=window._pnPlan;
+    const oldSess=plan?plan.sessions.find(s=>s.session_id===sessionId):null;
+    if(oldSess&&newSt!==oldSess.status&&OUTCOME_REASON_REQUIRED[newSt]){
+      reason=await collectOutcomeReason(newSt);
+      if(reason===null)return;
+    }
+  }
+  if(errEl){errEl.textContent='Saving…';errEl.style.color='var(--muted)';}
+  try{
+    let sessId=sessionId;
+    if(!sessId){
+      const r=await api('/api/sessions',{method:'POST',body:JSON.stringify({parade_night_id:pnId,period_number:period,cadet_group:'senior'})});
+      sessId=r.session_id||r.id;
+    }
+    const statusOverrides={status:newSt};
+    if(reason)statusOverrides.reason=reason;
+    const body=_sessBuildBody({__pnId:pnId,period_number:period,phase,exp:expTitle,facId,room:roomName,timingBlockId:null},statusOverrides);
+    await api('/api/sessions/'+sessId,{method:'PUT',body:JSON.stringify(body)});
+    if(classId) await _saveSessionAudience(sessId,[classId],false);
+    else if(customPhaseId){
+      try{await api('/api/planning/sessions/'+sessId+'/custom-phase-audiences',{method:'POST',body:JSON.stringify({custom_phase_id:customPhaseId})});}
+      catch(e2){if(!(e2&&e2.code==='already_linked')) throw e2;}
+    }
+    if(errEl)errEl.textContent='';
+    document.getElementById('pn-cell-editor').style.display='none';
+    await reloadAndRender();
+    showPNDetail(ds);
+  }catch(e){if(errEl){errEl.textContent=apiErr(e);errEl.style.color='var(--red)';}}
+}
+
+// ── Cell delete: archive a session (reversible via Planning Workspace) ────────
+async function _pnCellDelete(sessionId,ds){
+  if(!confirm('Delete this session? It can be restored from the Planning Workspace.'))return;
+  try{
+    await api('/api/planning/sessions/'+sessionId,{method:'DELETE'});
+    document.getElementById('pn-cell-editor').style.display='none';
+    await reloadAndRender();
+    showPNDetail(ds);
+  }catch(e){showToast(apiErr(e),true);}
+}
+
+// ── (Legacy stubs — kept so old call-sites remain safe) ───────────────────────
+// showPNDetail now reads directly from the planner endpoint; the following
+// helpers are no longer called from the new UI but remain for any external
+// callers that may not yet have been updated.
+function _pnDetailLegacyHtml(){}
 // REM-34: Parade Night Notices. Kept deliberately simple (text + priority
 // only, no audience picker) -- matches this card's minimal-footprint intent;
 // audience targeting already exists in the API (NightNoticeIn.audience) for

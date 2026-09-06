@@ -624,12 +624,22 @@ def parade_night_template_impact(
     if new_tmpl is None or new_tmpl.is_archived:
         raise HTTPException(404, detail={"error": "template_not_found"})
 
-    # Current instructional period numbers from snapshot
+    # Current instructional period numbers from snapshot; fall back to session
+    # rows for legacy nights that pre-date the snapshot feature.
     current_snaps = db.query(ParadeNightTimingSnapshot).filter(
         ParadeNightTimingSnapshot.parade_night_id == night_id,
         ParadeNightTimingSnapshot.is_instructional.is_(True),
     ).all()
     current_periods = {s.period_number for s in current_snaps if s.period_number is not None}
+
+    if not current_periods:
+        # Legacy night: no snapshot; derive from actual session period_numbers.
+        existing_sessions = db.query(Session).filter(
+            Session.parade_night_id == night_id,
+            Session.is_archived == False,  # noqa: E712
+            Session.period_number.isnot(None),
+        ).all()
+        current_periods = {s.period_number for s in existing_sessions}
 
     # New instructional period numbers from new template
     new_instr_blocks = [b for b in new_tmpl.blocks if b.is_instructional_period]
@@ -2257,7 +2267,7 @@ def get_parade_night_planner(pnid: str, db: DBSession = Depends(get_db),
                         CurriculumPhase.squadron_id.is_(None)),
             ),
             CurriculumPhase.active_status == True,  # noqa: E712
-            CurriculumPhase.is_deleted == False,  # noqa: E712
+            CurriculumPhase.is_archived == False,  # noqa: E712
         )
         .order_by(CurriculumPhase.sort_order, CurriculumPhase.name)
         .all()
@@ -2268,7 +2278,7 @@ def get_parade_night_planner(pnid: str, db: DBSession = Depends(get_db),
         q = db.query(TrainingClass).filter(
             TrainingClass.squadron_id == pn.squadron_id,
             TrainingClass.training_stage_id == phase.id,
-            TrainingClass.is_deleted == False,  # noqa: E712
+            TrainingClass.is_archived == False,  # noqa: E712
         )
         # Apply date bounds using the parade night date (never today's date)
         q = q.filter(
@@ -2331,6 +2341,38 @@ def get_parade_night_planner(pnid: str, db: DBSession = Depends(get_db),
             "display_order": 9999,
         })
 
+    # Training classes not linked to any phase (training_stage_id IS NULL).
+    # These are shown as a flat group so the matrix still renders.
+    _unlinked_q = db.query(TrainingClass).filter(
+        TrainingClass.squadron_id == pn.squadron_id,
+        TrainingClass.training_stage_id.is_(None),
+        TrainingClass.is_archived == False,  # noqa: E712
+        sa.or_(TrainingClass.start_date.is_(None),
+               TrainingClass.start_date <= pn.date),
+        sa.or_(TrainingClass.end_date.is_(None),
+               TrainingClass.end_date >= pn.date),
+    ).order_by(TrainingClass.class_number).all()
+    if _unlinked_q:
+        groups.insert(0, {
+            "type": "training_phase",
+            "phase_id": None,
+            "name": "Training Classes",
+            "display_order": -1,
+            "classes": [
+                {
+                    "training_class_id": c.id,
+                    "display_name": c.display_name,
+                    "class_number": c.class_number,
+                    "start_date": c.start_date,
+                    "end_date": c.end_date,
+                    "stage_code": c.stage_code,
+                }
+                for c in _unlinked_q
+            ],
+        })
+    # Remove phase groups that ended up with no classes (avoids empty section headers)
+    groups = [g for g in groups if g.get("type") != "training_phase" or (g.get("classes") or [])]
+
     # ── Sessions ──────────────────────────────────────────────────────────────
     sessions_q = (
         db.query(Session)
@@ -2375,16 +2417,13 @@ def get_parade_night_planner(pnid: str, db: DBSession = Depends(get_db),
     asst_rows = (
         db.query(SessionAssistantFacilitator)
         .filter(SessionAssistantFacilitator.session_id.in_(session_ids))
-        .order_by(SessionAssistantFacilitator.display_order)
+        .order_by(SessionAssistantFacilitator.created_at)
         .all()
     ) if session_ids else []
     asst_by_session: dict[str, list[dict]] = {}
     for a in asst_rows:
         asst_by_session.setdefault(a.session_id, []).append({
-            "facilitator_id": a.facilitator_id,
-            "display_order": a.display_order,
-            "rank_at_time": a.rank_at_time,
-            "display_name_at_time": a.display_name_at_time,
+            "facilitator_id": a.user_id,
         })
 
     sessions_out = []
