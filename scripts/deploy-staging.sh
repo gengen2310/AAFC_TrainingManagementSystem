@@ -61,7 +61,7 @@ EXPECTED_STAGING_PW_DOMAIN="aafc-tms-planning-workspace-preview-staging.up.railw
 # The guard below explicitly allows main when it is the declared expectation.
 EXPECTED_BRANCH="main"
 REQUIRED_ANCESTOR="de27c42"
-REQUIRED_ALEMBIC_HEAD="d2e3f4a5b6c7"
+REQUIRED_ALEMBIC_HEAD="d61e0844186f"
 
 # Railway's builder can sit in INITIALIZING for 8-9 minutes when its queue is
 # busy, against builds that normally take ~30s. Two staging deploys aborted at
