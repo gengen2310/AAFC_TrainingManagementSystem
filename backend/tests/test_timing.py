@@ -379,7 +379,7 @@ def test_effective_template_endpoint(client):
 
 def test_one_night_override_created(client):
     h = login(client, "ADMIN703")
-    pnid = _create_pn(client, h, date="2026-10-05")
+    pnid = _create_pn(client, h, date="2044-06-05")
     # Create a short template
     short = _create_template(client, h, name="Short Night", effective_from="2026-01-01",
                               blocks=[
