@@ -558,6 +558,20 @@ class SessionAudience(Base, UUIDMixin, TimestampMixin):
     outcome_override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class SessionCustomPhaseAudience(Base, UUIDMixin):
+    """Relational join between a Session and a CustomTrainingPhase audience.
+
+    Replaces free-text custom phase targeting. A session can target multiple
+    custom phases (e.g., Wing Band + Drill Team sharing one lesson slot).
+    """
+    __tablename__ = "session_custom_phase_audiences"
+    __table_args__ = (
+        UniqueConstraint("session_id", "custom_phase_id", name="uq_scpa_session_custom_phase"),
+    )
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id", ondelete="CASCADE"), index=True)
+    custom_phase_id: Mapped[str] = mapped_column(ForeignKey("custom_training_phases.id", ondelete="CASCADE"), index=True)
+
+
 class CadetClassMembership(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     """Which Training Class(es) a Cadet belongs to, currently or historically
     (CLASS-09). Explicitly product-scope-confirmed by the user before this

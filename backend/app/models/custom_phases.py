@@ -14,3 +14,4 @@ class CustomTrainingPhase(Base, UUIDMixin, TimestampMixin):
     applies_from: Mapped[str] = mapped_column(String(10))   # ISO YYYY-MM-DD
     applies_to: Mapped[str | None] = mapped_column(String(10), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    active_status: Mapped[bool] = mapped_column(Boolean, default=True)

@@ -18,7 +18,7 @@ from .training import (
     CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
     SessionAssistantFacilitator,
     Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, SessionStatusReasonTag, ActivityTypeTag, TrainingAreaCapabilityTag, TrainingArea, Equipment, Activity, Cadet,
-    TimingTemplate, TimingBlock, ParadeNightTimingOverride, ParadeNightTimingSnapshot, TrainingClass, SessionAudience,
+    TimingTemplate, TimingBlock, ParadeNightTimingOverride, ParadeNightTimingSnapshot, TrainingClass, SessionAudience, SessionCustomPhaseAudience,
     CadetClassMembership, ParadeNightTemplate, ParadeNightTemplateSession,
 )
 from .operations import (
@@ -35,7 +35,7 @@ __all__ = [
     "CurriculumItem", "CurriculumElement", "CurriculumPhase", "ParadeNight", "Session", "SessionStatusHistory",
     "SessionAssistantFacilitator",
     "Facilitator", "FacilitatorRankHistory", "SubjectAreaTag", "FacilitatorTypeTag", "SessionStatusReasonTag", "ActivityTypeTag", "TrainingAreaCapabilityTag", "TrainingArea", "Equipment", "Activity", "Cadet",
-    "TimingTemplate", "TimingBlock", "ParadeNightTimingOverride", "ParadeNightTimingSnapshot", "TrainingClass", "SessionAudience",
+    "TimingTemplate", "TimingBlock", "ParadeNightTimingOverride", "ParadeNightTimingSnapshot", "TrainingClass", "SessionAudience", "SessionCustomPhaseAudience",
     "CadetClassMembership", "ParadeNightTemplate", "ParadeNightTemplateSession",
     "ActionItem", "Exception", "AuditLog", "ImportLog", "ExportLog", "SystemSetting",
     "Phase", "ProgramPackage", "ProgramItem", "LearningHubResource", "ProgramItemDeployment",
