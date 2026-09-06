@@ -2361,20 +2361,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
             <span id="timing-msg" style="font-size:var(--fs-xs);font-weight:700"></span>
           </div>
 
-          <h3 class="ctitle" style="margin-top:20px">When no template applies</h3>
-          <div class="form-row">
-            <div class="ff"><label for="s-sess">Default Training Periods</label>
-              <!-- The <label for> supplies the accessible name. The aria-label that
-                   used to sit here said "Default sessions per night", which overrode
-                   the visible label and announced something different from what is
-                   on screen (WCAG 2.5.3, Label in Name). -->
-              <select id="s-sess" onchange="_renderSessionStructureNote()">
-                <option value="1">1 training period</option><option value="2">2 training periods</option><option value="3" selected>3 training periods</option>
-              </select>
-            </div>
-          </div>
-          <div class="muted" style="font-size:var(--fs-2xs);margin:0 0 10px">Parade nights you have already created keep the periods they have.</div>
-          <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
+          <div style="display:flex;align-items:center;gap:12px;margin-top:16px">
             <button class="btn btn-dk admin-el" onclick="saveSettings()">Save Settings</button>
             <span id="settings-msg" style="font-size:var(--fs-xs);font-weight:700"></span>
           </div>
@@ -3684,15 +3671,22 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
     <div class="modal-hdr"><div class="modal-title" id="m-add-pn-title">+ Add Parade Night</div><button class="modal-x" aria-label="Close" onclick="closeModal('m-add-pn')">×</button></div>
     <div class="modal-body">
       <div class="form-row">
-        <div class="ff"><label for="pn-date">Date</label><input type="date" id="pn-date"></div>
+        <div class="ff"><label for="pn-date">Date</label><input type="date" id="pn-date" onchange="_pnLoadTplOptions(this.value)"></div>
         <div class="ff"><label for="pn-term">Term</label>
           <select id="pn-term" aria-label="Parade night term"><option value="T1">Term 1 (Feb–Mar)</option><option value="T2">Term 2 (Apr–Jun)</option><option value="T3">Term 3 (Jul–Sep)</option><option value="T4">Term 4 (Oct–Dec)</option></select>
         </div>
       </div>
       <div class="form-row">
+        <div class="ff"><label for="pn-tpl-sel">Timing Template</label>
+          <select id="pn-tpl-sel" aria-label="Timing template for this parade night">
+            <option value="">— select a date first —</option>
+          </select>
+        </div>
+      </div>
+      <div id="pn-tpl-msg" style="font-size:var(--fs-xs);margin-top:4px;min-height:1.4em"></div>
+      <div class="form-row">
         <div class="ff"><label for="pn-notes">Notes (optional)</label><input id="pn-notes" placeholder="e.g. ANZAC prep"></div>
       </div>
-      <div id="pn-tpl-preview" style="font-size:var(--fs-xs);color:var(--muted);margin-top:4px;padding:8px 10px;background:var(--surface-2);border-radius:6px;line-height:1.5"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-out" onclick="closeModal('m-add-pn')">Cancel</button>
@@ -6240,7 +6234,7 @@ function bootApp(){
   // Settings page mirrors unit config; access codes are never shown/editable here.
   const setVal=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v;};
   setVal('s-sqn',S.scopeName||info.name); setVal('s-addr',S.cfg.addr||''); setVal('s-pday',S.cfg.day||'');
-  setVal('s-start',S.cfg.start||''); setVal('s-end',S.cfg.end||''); setVal('s-sess',S.cfg.sess||3);
+  setVal('s-start',S.cfg.start||''); setVal('s-end',S.cfg.end||'');
   _renderSessionStructureNote();
   setVal('s-crest',S.cfg.crestUrl||''); setVal('s-unit-type',S.cfg.unitType||'standard_squadron'); _renderCrestPreview();
   const _utSel = document.getElementById('s-unit-type');
@@ -10111,23 +10105,39 @@ async function _bulkApplyConfirm(){
 // Creates the night and its time structure only.
 // Sessions are planned into periods separately (one period can hold many concurrent sessions).
 
-function _pnUpdateTplPreview(){
-  const el=document.getElementById('pn-tpl-preview');
-  if(!el)return;
-  const tpl=_effectiveTimingTemplate();
-  if(tpl){
-    const periods=(tpl.blocks||[]).filter(b=>b.is_instructional_period).length;
-    el.innerHTML='<b>'+esc(tpl.name||'Timing template')+'</b> is in effect — <b>'+periods+
-      ' training period'+(periods===1?'':'s')+'</b> will be created automatically. '+
-      'You can change the template after opening the night.';
-  }else{
-    el.innerHTML='No timing template is currently in effect. Your unit\'s default session count will be used.';
+function _pnLoadTplOptions(date){
+  const sel=document.getElementById('pn-tpl-sel');
+  const msg=document.getElementById('pn-tpl-msg');
+  if(!sel)return;
+  if(!date){
+    sel.innerHTML='<option value="">— select a date first —</option>';
+    if(msg){msg.textContent='';msg.style.color='';}
+    return;
   }
+  // Mirror backend _effective_template: active, not archived, effective_from <= date,
+  // effective_to is null or >= date. Sort most-recent effective_from first so the
+  // auto-selected option matches what the backend would resolve.
+  const templates=((typeof S!=='undefined'&&S.timingTemplates)||[])
+    .filter(t=>t.active_status!==false&&!t.is_archived
+               &&(t.effective_from||'')<=date
+               &&(!t.effective_to||t.effective_to>=date))
+    .sort((a,b)=>String(b.effective_from||'').localeCompare(String(a.effective_from||'')));
+  if(!templates.length){
+    sel.innerHTML='<option value="">No template covers this date</option>';
+    if(msg){msg.textContent='Create a timing template in Unit Settings that covers '+date+'.';msg.style.color='var(--red)';}
+    return;
+  }
+  sel.innerHTML=templates.map(t=>{
+    const periods=(t.blocks||[]).filter(b=>b.is_instructional_period).length;
+    return '<option value="'+esc(t.timing_template_id)+'">'+esc(t.name)+
+           ' · '+periods+' period'+(periods===1?'':'s')+'</option>';
+  }).join('');
+  if(msg){msg.textContent='';msg.style.color='';}
 }
 
 function openAddPN(date){
   if(date)document.getElementById('pn-date').value=date;
-  _pnUpdateTplPreview();
+  _pnLoadTplOptions(document.getElementById('pn-date').value);
   openModal('m-add-pn');
 }
 
@@ -10135,10 +10145,12 @@ async function addPN(){
   const date=document.getElementById('pn-date').value;
   const term=document.getElementById('pn-term').value;
   const notes=document.getElementById('pn-notes').value;
+  const tmplId=document.getElementById('pn-tpl-sel').value;
   if(!date){showToast('Select a date.',true);return;}
+  if(!tmplId){showToast('Select a timing template for this parade night.',true);return;}
   if(S.pns.find(p=>p.date===date)){showToast('A parade night already exists on this date.',true);return;}
   try{
-    await api('/api/parade-nights',{method:'POST',body:JSON.stringify({date,term,parade_type:notes||'normal'})});
+    await api('/api/parade-nights',{method:'POST',body:JSON.stringify({date,term,timing_template_id:tmplId,parade_type:notes||'normal'})});
     await reloadAndRender();
     closeModal('m-add-pn');
     document.getElementById('pn-date').value='';
@@ -10165,20 +10177,15 @@ function _effectiveTimingTemplate(){
 function _renderSessionStructureNote(){
   const el=document.getElementById('s-sess-effect');
   if(!el)return;
-  const fallback=parseInt((document.getElementById('s-sess')||{}).value,10)||3;
   const tpl=_effectiveTimingTemplate();
-  const periods=tpl?(tpl.blocks||[]).filter(b=>b.is_instructional_period).length:0;
-  if(tpl&&periods>0){
-    el.innerHTML='In effect now: <b>'+esc(tpl.name||'your timing template')+'</b> defines <b>'+periods+
-      ' training period'+(periods===1?'':'s')+'</b>, so new parade nights get '+periods+
-      '. The default below applies only when no template does.';
-  }else if(tpl){
-    el.innerHTML='In effect now: <b>'+esc(tpl.name||'your timing template')+
-      '</b> defines no training periods, so the default below applies — new parade nights get <b>'+
-      fallback+'</b>.';
+  if(tpl){
+    const periods=(tpl.blocks||[]).filter(b=>b.is_instructional_period).length;
+    el.className='alert a-info';
+    el.innerHTML='In effect now: <b>'+esc(tpl.name||'your timing template')+'</b> defines <b>'+
+      periods+' training period'+(periods===1?'':'s')+'</b>. New parade nights use this template automatically.';
   }else{
-    el.innerHTML='No timing template covers today, so the default below applies — new parade nights get <b>'+
-      fallback+'</b>.';
+    el.className='alert a-warn';
+    el.innerHTML='<b>No timing template covers today.</b> A timing template is required to create new parade nights — add one below.';
   }
 }
 
@@ -14728,7 +14735,6 @@ async function saveSettings(){
     default_parade_day:newDay,
     default_start_time:document.getElementById('s-start').value||null,
     default_end_time:document.getElementById('s-end').value||null,
-    default_session_count:+document.getElementById('s-sess').value||3,
     crest_url:document.getElementById('s-crest').value||'',
     unit_type:document.getElementById('s-unit-type').value||null
   };
