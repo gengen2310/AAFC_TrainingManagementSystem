@@ -196,13 +196,12 @@ def seed_all():
     db.add(Equipment(squadron_id=s703.id, name="Projector", type="AV", quantity=2, available_quantity=2)); db.commit()
 
     # Default timing template for 703 SQN — Friday night parade schedule.
-    # effective_from 2026-01-01, is_default=True so _effective_template() picks it up
-    # for any parade date ≥ 2026-01-01 that has no override.
+    # effective_from 2000-01-01 so _effective_template() covers any test date.
     # Fatigues adjusted to 2105–2115 and Final Parade to 2115–2125 to avoid overlap.
     tmpl_703 = TimingTemplate(
         squadron_id=s703.id,
         name="703 Standard Friday Night",
-        effective_from="2026-01-01",
+        effective_from="2000-01-01",
         is_default=True,
         active_status=True,
         notes="Default template for all 703 SQN parade nights from 2026.",
@@ -245,6 +244,40 @@ def seed_all():
             period_number=pnum,
         ))
     db.commit()
+
+    # Seed a minimal default timing template for every non-703 squadron so that
+    # POST /api/parade-nights (which now requires a timing template) succeeds in
+    # tests that use other squadrons without needing to supply timing_template_id.
+    # Each template has the squadron's default_session_count instructional periods.
+    def _seed_default_template(db, sqn, session_count: int) -> None:
+        tmpl = TimingTemplate(
+            squadron_id=sqn.id,
+            name=f"{sqn.code} Standard Night",
+            effective_from="2000-01-01",
+            is_default=True,
+            active_status=True,
+            notes="Auto-seeded default template.",
+        )
+        db.add(tmpl); db.commit()
+        db.add(TimingBlock(timing_template_id=tmpl.id, display_order=0,
+                           block_name="Opening Parade", block_type="parade",
+                           start_time=sqn.default_start_time, end_time=None,
+                           duration_minutes=15, is_instructional_period=False, period_number=None))
+        for i in range(1, session_count + 1):
+            db.add(TimingBlock(timing_template_id=tmpl.id, display_order=i,
+                               block_name=f"Period {i}", block_type="training_period",
+                               start_time=None, end_time=None,
+                               duration_minutes=35, is_instructional_period=True, period_number=i))
+        db.add(TimingBlock(timing_template_id=tmpl.id, display_order=session_count + 1,
+                           block_name="Dismissal", block_type="dismissal",
+                           start_time=sqn.default_end_time, end_time=None,
+                           duration_minutes=0, is_instructional_period=False, period_number=None))
+        db.commit()
+
+    for code, sqn in sqn_by_code.items():
+        if code == "703":
+            continue  # 703 already has a detailed template above
+        _seed_default_template(db, sqn, sqn.default_session_count or 3)
 
     # The printed Weekly Program places a session into a row by its
     # timing_block_id. Seeded sessions carried a period_number but no block, so

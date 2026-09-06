@@ -352,6 +352,12 @@ def test_parade_night_published_true_once_a_parade_night_is_published(client):
     assert d0["squadron"]["parade_night_published"] is False
     assert d0["squadron"]["parade_nights_generated"] == 0
 
+    # New squadrons have no seeded template; create a minimal one before creating the PN.
+    client.post("/api/timing-templates", json={
+        "name": "PB01 Test Template", "effective_from": "2000-01-01",
+        "blocks": [{"display_order": 0, "block_name": "Period 1",
+                    "block_type": "training_period", "is_instructional_period": True}],
+    }, headers=hdr)
     pn_id = client.post("/api/parade-nights", json={
         "squadron_id": sqn_id, "date": "2099-08-01",
     }, headers=hdr).json()["parade_night_id"]

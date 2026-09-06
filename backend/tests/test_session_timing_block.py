@@ -24,7 +24,6 @@ def _night_with_blocks(client, hdr):
     r = client.post("/api/timing-templates", json={
         "name": f"Timing-block test {year}",
         "effective_from": f"{year}-01-01",
-        "is_default": True,
         "blocks": [
             {"display_order": 0, "block_name": "Period 1", "block_type": "training_period",
              "is_instructional_period": True, "period_number": 1,

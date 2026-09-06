@@ -43,6 +43,27 @@ def _exit_di(client, hdr):
     client.post("/api/proxy/exit", headers=hdr)
 
 
+def _create_test_template(client, hdr, n_sessions=1):
+    """Create a minimal timing template for the currently-proxied squadron.
+
+    Required because dynamically-created squadrons have no seeded template and
+    POST /api/parade-nights now mandates a resolvable Timing Template.
+    n_sessions=0 creates a template with only a non-instructional block (for
+    tests that specifically need session_count=0 stored in the parade night).
+    """
+    if n_sessions == 0:
+        blocks = [{"display_order": 0, "block_name": "Parade", "block_type": "parade",
+                   "is_instructional_period": False}]
+    else:
+        blocks = [{"display_order": i, "block_name": f"Period {i+1}",
+                   "block_type": "training_period", "is_instructional_period": True}
+                  for i in range(n_sessions)]
+    r = client.post("/api/timing-templates", json={
+        "name": "Test Template", "effective_from": "2000-01-01", "blocks": blocks,
+    }, headers=hdr)
+    assert r.status_code == 200, f"Could not create test template: {r.text}"
+
+
 def _session_id(resp_json):
     return resp_json.get("session_id") or resp_json.get("id")
 
@@ -160,8 +181,9 @@ def test_zero_session_next_pn_does_not_report_fabricated_100_pct(client):
     hdr = _sysadmin(client)
     wing_id, sqn_id = _make_test_wing_and_squadron(client, hdr, "ZSW1", "ZS01")
     _enter_di(client, hdr, sqn_id)
+    _create_test_template(client, hdr, n_sessions=0)  # 0-IP template → session_count=0
     future_date = (date.today() + timedelta(days=3)).isoformat()
-    r = client.post("/api/parade-nights", json={"date": future_date, "term": "T3", "session_count": 0}, headers=hdr)
+    r = client.post("/api/parade-nights", json={"date": future_date, "term": "T3"}, headers=hdr)
     assert r.status_code == 200, r.text
     _exit_di(client, hdr)
 
@@ -178,8 +200,9 @@ def test_risk_forecast_detects_understaffed_session(client):
     hdr = _sysadmin(client)
     wing_id, sqn_id = _make_test_wing_and_squadron(client, hdr, "RFW1", "RF01")
     _enter_di(client, hdr, sqn_id)
+    _create_test_template(client, hdr, n_sessions=1)
     future_date = (date.today() + timedelta(weeks=3)).isoformat()
-    pn = client.post("/api/parade-nights", json={"date": future_date, "term": "T3", "session_count": 1}, headers=hdr)
+    pn = client.post("/api/parade-nights", json={"date": future_date, "term": "T3"}, headers=hdr)
     assert pn.status_code == 200, pn.text
     pn_id = pn.json()["parade_night_id"]
     s = client.post("/api/sessions", json={"parade_night_id": pn_id}, headers=hdr)
@@ -207,8 +230,9 @@ def test_risk_forecast_out_of_horizon_session_not_included(client):
     hdr = _sysadmin(client)
     wing_id, sqn_id = _make_test_wing_and_squadron(client, hdr, "OHW1", "OH01")
     _enter_di(client, hdr, sqn_id)
+    _create_test_template(client, hdr, n_sessions=1)
     far_date = (date.today() + timedelta(weeks=10)).isoformat()
-    pn = client.post("/api/parade-nights", json={"date": far_date, "term": "T4", "session_count": 1}, headers=hdr)
+    pn = client.post("/api/parade-nights", json={"date": far_date, "term": "T4"}, headers=hdr)
     pn_id = pn.json()["parade_night_id"]
     client.post("/api/sessions", json={"parade_night_id": pn_id}, headers=hdr)
     _exit_di(client, hdr)
@@ -222,8 +246,9 @@ def test_immediate_issues_ranks_units_with_near_term_risk(client):
     hdr = _sysadmin(client)
     wing_id, sqn_id = _make_test_wing_and_squadron(client, hdr, "IIW1", "II01")
     _enter_di(client, hdr, sqn_id)
+    _create_test_template(client, hdr, n_sessions=1)
     near_date = (date.today() + timedelta(days=5)).isoformat()
-    pn = client.post("/api/parade-nights", json={"date": near_date, "term": "T3", "session_count": 1}, headers=hdr)
+    pn = client.post("/api/parade-nights", json={"date": near_date, "term": "T3"}, headers=hdr)
     pn_id = pn.json()["parade_night_id"]
     client.post("/api/sessions", json={"parade_night_id": pn_id}, headers=hdr)
     _exit_di(client, hdr)
@@ -250,8 +275,9 @@ def test_delivered_session_reflected_in_outcomes_by_unit(client):
     hdr = _sysadmin(client)
     wing_id, sqn_id = _make_test_wing_and_squadron(client, hdr, "DLW1", "DL01")
     _enter_di(client, hdr, sqn_id)
+    _create_test_template(client, hdr, n_sessions=1)
     past_date = (date.today() - timedelta(days=3)).isoformat()
-    pn = client.post("/api/parade-nights", json={"date": past_date, "term": "T3", "session_count": 1}, headers=hdr)
+    pn = client.post("/api/parade-nights", json={"date": past_date, "term": "T3"}, headers=hdr)
     pn_id = pn.json()["parade_night_id"]
     s = client.post("/api/sessions", json={"parade_night_id": pn_id}, headers=hdr)
     sid = _session_id(s.json())
@@ -269,8 +295,9 @@ def test_cancellation_pareto_has_cumulative_percentage(client):
     hdr = _sysadmin(client)
     wing_id, sqn_id = _make_test_wing_and_squadron(client, hdr, "CPW1", "CP01")
     _enter_di(client, hdr, sqn_id)
+    _create_test_template(client, hdr, n_sessions=1)
     past_date = (date.today() - timedelta(days=3)).isoformat()
-    pn = client.post("/api/parade-nights", json={"date": past_date, "term": "T3", "session_count": 1}, headers=hdr)
+    pn = client.post("/api/parade-nights", json={"date": past_date, "term": "T3"}, headers=hdr)
     pn_id = pn.json()["parade_night_id"]
     s = client.post("/api/sessions", json={"parade_night_id": pn_id}, headers=hdr)
     sid = _session_id(s.json())

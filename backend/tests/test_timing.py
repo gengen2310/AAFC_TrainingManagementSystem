@@ -289,36 +289,49 @@ def test_future_parade_nights_use_new_template(client):
 
 
 def test_past_parade_nights_preserve_old_session_count(client):
-    """Changing the future template must not alter already-created parade nights."""
+    """Creating a new retroactive template must not alter already-created parade nights.
+
+    session_count is set at parade-night creation time from the then-effective template
+    and must be immutable — a new template that would have applied cannot reach back and
+    change it.
+    """
     h = login(client, "ADMIN703")
 
-    # Create a parade night BEFORE any template is in effect for the far future date.
-    # Use 2028-06-15: a fixed date in a gap no other test occupies, avoiding the
-    # today+145 dynamic date in test_facilitator_schedule.py that otherwise lands
-    # on this date when the suite runs in mid-August 2026.
-    pnid = _create_pn(client, h, date="2028-06-15", session_count=3)
+    # Create a parade night for a far future date.  Whatever template is effective
+    # for that date at creation time determines the stored session_count.
+    pnid = _create_pn(client, h, date="2045-06-15")
 
-    # Now create a 2-session template effective from the past (before that date)
-    blocks = [
-        {"display_order": 0, "block_name": "Period A", "block_type": "training_period",
-         "is_instructional_period": True},
-        {"display_order": 1, "block_name": "Period B", "block_type": "training_period",
-         "is_instructional_period": True},
-    ]
-    _create_template(client, h, name="Retroactive Test", effective_from="2028-06-01",
-                     blocks=blocks)
+    # Capture the count that was stored at creation time.
+    r0 = client.get("/api/parade-nights", headers=h)
+    pn0 = next((p for p in r0.json() if p["parade_night_id"] == pnid), None)
+    assert pn0 is not None, "Could not find the newly-created parade night"
+    original_count = pn0["session_count"]
 
-    # The parade night was created with session_count=3; it must not be silently changed
+    # Create a retroactive template effective before the PN date (different IP count).
+    # Use a count one higher than whatever the original was to guarantee it differs.
+    new_count = original_count + 1
+    blocks = [{"display_order": i, "block_name": f"P{i+1}", "block_type": "training_period",
+               "is_instructional_period": True} for i in range(new_count)]
+    _create_template(client, h, name="Retroactive Preserve Test",
+                     effective_from="2045-06-01", blocks=blocks)
+
+    # The stored session_count must remain unchanged — the new template cannot retroact.
     r = client.get("/api/parade-nights", headers=h)
     pn = next((p for p in r.json() if p["parade_night_id"] == pnid), None)
     assert pn is not None
-    assert pn["session_count"] == 3, (
-        "Past parade night session_count must not be overwritten by a new template"
+    assert pn["session_count"] == original_count, (
+        f"Past parade night session_count was {original_count} at creation; "
+        f"a retroactive template must not change it (got {pn['session_count']})"
     )
 
 
-def test_explicit_session_count_overrides_template(client):
-    """If user passes session_count=2 explicitly, the template's count is not used."""
+def test_body_session_count_ignored_when_template_resolves(client):
+    """Body session_count is always ignored — template instructional blocks win.
+
+    Supplying session_count=2 in the body when a 3-IP template is effective
+    must NOT cause the stored session_count to be 2.  The template is the
+    single source of truth for session structure.
+    """
     h = login(client, "ADMIN703")
     blocks = [
         {"display_order": 0, "block_name": "Period 1", "block_type": "training_period",
@@ -328,14 +341,18 @@ def test_explicit_session_count_overrides_template(client):
         {"display_order": 2, "block_name": "Period 3", "block_type": "training_period",
          "is_instructional_period": True},
     ]
-    _create_template(client, h, name="3-Session Override Test", effective_from="2026-12-01",
+    _create_template(client, h, name="3-IP Body-Ignored Test", effective_from="2026-12-01",
                      blocks=blocks)
 
     pnid = _create_pn(client, h, date="2026-12-15", session_count=2)
     r = client.get("/api/parade-nights", headers=h)
     pn = next((p for p in r.json() if p["parade_night_id"] == pnid), None)
     assert pn is not None
-    assert pn["session_count"] == 2
+    # Template has 3 IPs — body value 2 must NOT win.
+    assert pn["session_count"] == 3, (
+        f"Body session_count=2 must be ignored; template-derived count 3 must win. "
+        f"Got {pn['session_count']}"
+    )
 
 
 def test_effective_template_endpoint(client):

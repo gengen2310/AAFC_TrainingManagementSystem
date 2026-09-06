@@ -451,42 +451,46 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
     ).first()
     if existing:
         raise HTTPException(409, detail={"error": "duplicate_date", "existing_id": existing.id})
-    # Determine the effective timing template:
-    # 1. If caller supplies timing_template_id explicitly, look it up and validate it.
-    # 2. Otherwise, auto-resolve from the squadron's configured templates for this date.
-    # 3. If no template is found either way, reject with 422 — all new parade nights
-    #    must have a timing template to enable snapshot materialisation.
+    # Determine the effective timing template.
+    # A timing template is COMPULSORY for every new Parade Night.
+    # 1. Caller supplies timing_template_id → validate it explicitly.
+    # 2. Otherwise auto-resolve from the squadron's configured templates for the date.
+    # 3. If no valid template resolves either way → 422 (no fallback to session_count/default).
     if body.timing_template_id:
         explicit_tmpl = db.get(TimingTemplate, body.timing_template_id)
         if explicit_tmpl is None or explicit_tmpl.is_archived:
             raise HTTPException(422, detail={"error": "timing_template_not_found"})
+        if not explicit_tmpl.active_status:
+            raise HTTPException(422, detail={"error": "timing_template_inactive"})
+        if explicit_tmpl.effective_from and explicit_tmpl.effective_from > body.date:
+            raise HTTPException(422, detail={"error": "timing_template_not_yet_effective"})
+        if explicit_tmpl.effective_to and explicit_tmpl.effective_to < body.date:
+            raise HTTPException(422, detail={"error": "timing_template_expired"})
         effective_tmpl = explicit_tmpl
     else:
         effective_tmpl = _effective_template(db, s.id, body.date)
 
-    # Determine session count — prefer template's instructional block count; fall back to
-    # body.session_count, squadron default, or 3 for legacy nights with no template.
-    if effective_tmpl is not None:
-        if body.session_count is None:
-            ip_count = sum(1 for b in effective_tmpl.blocks if b.is_instructional_period)
-            session_count = ip_count if ip_count > 0 else (s.default_session_count or 3)
-        else:
-            session_count = body.session_count
-    else:
-        session_count = body.session_count or s.default_session_count or 3
+    if effective_tmpl is None:
+        raise HTTPException(422, detail={
+            "error": "timing_template_required",
+            "detail": (
+                "No active Timing Template is available for this date. "
+                "Create or activate a Timing Template before creating this Parade Night."
+            ),
+        })
 
-    # Derive start/end times from template blocks when not overridden
-    if effective_tmpl is not None and (body.start_time is None or body.end_time is None):
-        all_blocks = sorted(effective_tmpl.blocks, key=lambda b: b.display_order)
-        derived_start = body.start_time or next(
-            (b.start_time for b in all_blocks if b.start_time), s.default_start_time
-        )
-        derived_end = body.end_time or next(
-            (b.end_time for b in reversed(all_blocks) if b.end_time), s.default_end_time
-        )
-    else:
-        derived_start = body.start_time or s.default_start_time
-        derived_end = body.end_time or s.default_end_time
+    # session_count is always derived from instructional blocks in the template.
+    # body.session_count and squadron.default_session_count are not used for new nights.
+    session_count = sum(1 for b in effective_tmpl.blocks if b.is_instructional_period)
+
+    # Derive start/end times from template blocks
+    all_blocks = sorted(effective_tmpl.blocks, key=lambda b: b.display_order)
+    derived_start = body.start_time or next(
+        (b.start_time for b in all_blocks if b.start_time), s.default_start_time
+    )
+    derived_end = body.end_time or next(
+        (b.end_time for b in reversed(all_blocks) if b.end_time), s.default_end_time
+    )
 
     # Resolve the planning year — create it if absent (idempotent).
     year = int(body.date[:4])
@@ -496,13 +500,12 @@ def create_parade(body: ParadeIn, request: Request, db: DBSession = Depends(get_
                      planning_year_id=py.id,
                      start_time=derived_start, end_time=derived_end,
                      session_count=session_count, parade_type=body.parade_type or "normal",
-                     timing_template_id=effective_tmpl.id if effective_tmpl else None,
+                     timing_template_id=effective_tmpl.id,
                      notes=body.notes,
                      created_by=p.user_id)
     db.add(pn)
     db.flush()  # get pn.id before materialising snapshot
-    if pn.timing_template_id:
-        _materialise_snapshot(db, pn.id, pn.timing_template_id)
+    _materialise_snapshot(db, pn.id, pn.timing_template_id)
     db.commit()
     meta = client_meta(request)
     audit(db, p, object_type="parade_night", object_id=pn.id, action="create",
@@ -2144,6 +2147,260 @@ def parade_night_builder(pnid: str, db: DBSession = Depends(get_db), p: Principa
         "timing_blocks": timing_blocks,
         "cadet_groups": ["orientation", "initial", "junior", "intermediate", "senior"],
         "sessions": [_sess_dict(s) for s in sessions],
+    }
+
+
+# ── CANONICAL PLANNER PAYLOAD ────────────────────────────────────────────────
+@router.get("/parade-nights/{pnid}/planner")
+def get_parade_night_planner(pnid: str, db: DBSession = Depends(get_db),
+                              p: Principal = Depends(get_principal)):
+    """Canonical planner payload consumed by both TMS and Planning Workspace.
+
+    Returns timing structure (from snapshot when available, else template),
+    date-aware phase/class groups, and sessions — in a single response so
+    neither frontend needs its own filtering logic.
+
+    Groups:
+      - type=training_phase → CurriculumPhase with date-applicable TrainingClasses
+      - type=custom_training → date-applicable CustomTrainingPhase
+
+    Date-awareness uses pn.date (the Parade Night date), NOT today's date.
+    """
+    from ..models.training import ParadeNightTimingSnapshot, SessionAssistantFacilitator
+    from ..models.custom_phases import CustomTrainingPhase
+    import sqlalchemy as sa
+
+    pn = db.get(ParadeNight, pnid)
+    if not pn:
+        raise HTTPException(404, detail={"error": "not_found"})
+    require_can_view_squadron(p, pn.squadron_id, pn.wing_id)
+
+    # ── Timing ────────────────────────────────────────────────────────────────
+    snaps = (
+        db.query(ParadeNightTimingSnapshot)
+        .filter_by(parade_night_id=pn.id)
+        .order_by(ParadeNightTimingSnapshot.display_order)
+        .all()
+    )
+    tmpl_name = None
+    if pn.timing_template_id:
+        _tmpl = db.get(TimingTemplate, pn.timing_template_id)
+        tmpl_name = _tmpl.name if _tmpl else None
+
+    if snaps:
+        blocks = [
+            {
+                "period_number": s.period_number,
+                "block_label": s.block_label,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+                "is_instructional": s.is_instructional,
+                "display_order": s.display_order,
+            }
+            for s in snaps
+        ]
+    elif pn.timing_template_id:
+        # No snapshot yet — derive from template blocks
+        _tmpl = db.get(TimingTemplate, pn.timing_template_id)
+        if _tmpl:
+            raw = db.query(TimingBlock).filter_by(
+                timing_template_id=_tmpl.id
+            ).order_by(TimingBlock.display_order).all()
+            ip_idx = 0
+            blocks = []
+            for b in raw:
+                pnum = None
+                if b.is_instructional_period:
+                    ip_idx += 1
+                    pnum = ip_idx
+                blocks.append({
+                    "period_number": pnum,
+                    "block_label": b.block_name,
+                    "start_time": b.start_time,
+                    "end_time": b.end_time,
+                    "is_instructional": b.is_instructional_period,
+                    "display_order": b.display_order,
+                })
+        else:
+            blocks = []
+    else:
+        # Bare legacy: synthesise from session_count
+        blocks = [
+            {
+                "period_number": i + 1, "block_label": f"Period {i + 1}",
+                "start_time": None, "end_time": None, "is_instructional": True,
+                "display_order": i,
+            }
+            for i in range(pn.session_count or 0)
+        ]
+    instructional_periods = [b for b in blocks if b["is_instructional"]]
+    timing = {
+        "timing_template_id": pn.timing_template_id,
+        "timing_template_name": tmpl_name,
+        "blocks": blocks,
+        "instructional_periods": instructional_periods,
+    }
+
+    # ── Groups (date-aware) ────────────────────────────────────────────────────
+    groups: list[dict] = []
+
+    # Standard Training Phases (CurriculumPhase → TrainingClass hierarchy)
+    phases = (
+        db.query(CurriculumPhase)
+        .filter(
+            sa.or_(
+                CurriculumPhase.squadron_id == pn.squadron_id,
+                sa.and_(CurriculumPhase.scope_level == "national",
+                        CurriculumPhase.squadron_id.is_(None)),
+                sa.and_(CurriculumPhase.scope_level == "wing",
+                        CurriculumPhase.wing_id == pn.wing_id,
+                        CurriculumPhase.squadron_id.is_(None)),
+            ),
+            CurriculumPhase.active_status == True,  # noqa: E712
+            CurriculumPhase.is_deleted == False,  # noqa: E712
+        )
+        .order_by(CurriculumPhase.sort_order, CurriculumPhase.name)
+        .all()
+    )
+
+    for phase in phases:
+        # Date-aware TrainingClass filter: class active on the parade night date
+        q = db.query(TrainingClass).filter(
+            TrainingClass.squadron_id == pn.squadron_id,
+            TrainingClass.training_stage_id == phase.id,
+            TrainingClass.is_deleted == False,  # noqa: E712
+        )
+        # Apply date bounds using the parade night date (never today's date)
+        q = q.filter(
+            sa.or_(TrainingClass.start_date.is_(None),
+                   TrainingClass.start_date <= pn.date)
+        ).filter(
+            sa.or_(TrainingClass.end_date.is_(None),
+                   TrainingClass.end_date >= pn.date)
+        )
+        classes = q.order_by(TrainingClass.class_number).all()
+
+        groups.append({
+            "type": "training_phase",
+            "phase_id": phase.id,
+            "name": phase.display_name or phase.name,
+            "display_order": phase.sort_order,
+            "classes": [
+                {
+                    "training_class_id": c.id,
+                    "display_name": c.display_name,
+                    "class_number": c.class_number,
+                    "start_date": c.start_date,
+                    "end_date": c.end_date,
+                    "stage_code": c.stage_code,
+                }
+                for c in classes
+            ],
+        })
+
+    # Custom Training Phases — date-aware
+    custom_phases = (
+        db.query(CustomTrainingPhase)
+        .filter(
+            CustomTrainingPhase.is_deleted == False,  # noqa: E712
+            CustomTrainingPhase.active_status == True,  # noqa: E712
+            sa.or_(
+                CustomTrainingPhase.applies_from.is_(None),
+                CustomTrainingPhase.applies_from <= pn.date,
+            ),
+            sa.or_(
+                CustomTrainingPhase.applies_to.is_(None),
+                CustomTrainingPhase.applies_to >= pn.date,
+            ),
+            sa.or_(
+                CustomTrainingPhase.scope_type == "national",
+                sa.and_(CustomTrainingPhase.scope_type == "wing",
+                        CustomTrainingPhase.scope_id == pn.wing_id),
+                sa.and_(CustomTrainingPhase.scope_type == "squadron",
+                        CustomTrainingPhase.scope_id == pn.squadron_id),
+                sa.and_(CustomTrainingPhase.scope_type == "system"),
+            ),
+        )
+        .all()
+    )
+    for cp in custom_phases:
+        groups.append({
+            "type": "custom_training",
+            "custom_phase_id": cp.id,
+            "name": cp.name,
+            "display_order": 9999,
+        })
+
+    # ── Sessions ──────────────────────────────────────────────────────────────
+    sessions_q = (
+        db.query(Session)
+        .filter(
+            Session.parade_night_id == pnid,
+            Session.is_archived == False,  # noqa: E712
+        )
+        .order_by(Session.period_number)
+        .all()
+    )
+    session_ids = [s.id for s in sessions_q]
+
+    # Fetch Training Class audiences
+    from ..models.training import SessionAudience as _SA
+    aud_rows = (
+        db.query(_SA, TrainingClass)
+        .join(TrainingClass, _SA.training_class_id == TrainingClass.id)
+        .filter(_SA.session_id.in_(session_ids))
+        .all()
+    ) if session_ids else []
+    audiences_by_session: dict[str, list[dict]] = {}
+    for aud, tc in aud_rows:
+        audiences_by_session.setdefault(aud.session_id, []).append(
+            {"training_class_id": tc.id, "display_name": tc.display_name}
+        )
+
+    # Fetch Custom Phase audiences
+    from ..models.training import SessionCustomPhaseAudience as _SCPA
+    cp_aud_rows = (
+        db.query(_SCPA, CustomTrainingPhase)
+        .join(CustomTrainingPhase, _SCPA.custom_phase_id == CustomTrainingPhase.id)
+        .filter(_SCPA.session_id.in_(session_ids))
+        .all()
+    ) if session_ids else []
+    cp_audiences_by_session: dict[str, list[dict]] = {}
+    for scpa, cp in cp_aud_rows:
+        cp_audiences_by_session.setdefault(scpa.session_id, []).append(
+            {"custom_phase_id": cp.id, "name": cp.name}
+        )
+
+    # Fetch assistant facilitators
+    asst_rows = (
+        db.query(SessionAssistantFacilitator)
+        .filter(SessionAssistantFacilitator.session_id.in_(session_ids))
+        .order_by(SessionAssistantFacilitator.display_order)
+        .all()
+    ) if session_ids else []
+    asst_by_session: dict[str, list[dict]] = {}
+    for a in asst_rows:
+        asst_by_session.setdefault(a.session_id, []).append({
+            "facilitator_id": a.facilitator_id,
+            "display_order": a.display_order,
+            "rank_at_time": a.rank_at_time,
+            "display_name_at_time": a.display_name_at_time,
+        })
+
+    sessions_out = []
+    for s in sessions_q:
+        sessions_out.append({
+            **_sess_dict(s),
+            "training_class_audiences": audiences_by_session.get(s.id, []),
+            "custom_phase_audiences": cp_audiences_by_session.get(s.id, []),
+            "assistant_facilitators": asst_by_session.get(s.id, []),
+        })
+
+    return {
+        "parade_night": _pn_dict(pn),
+        "timing": timing,
+        "groups": groups,
+        "sessions": sessions_out,
     }
 
 
