@@ -108,7 +108,7 @@ def test_cadet_training_record_not_found(client):
 
 
 def test_cadet_training_record_unauthenticated(client):
-    r = client.get("/api/cadets/x/training-record", headers=h)
+    r = client.get("/api/cadets/x/training-record")
     assert r.status_code == 401
 
 
