@@ -11,7 +11,7 @@ from ..database import get_db, utcnow, iso_z
 from ..models import (CurriculumItem, CurriculumElement, CurriculumPhase, ParadeNight, Session, SessionStatusHistory,
                       Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, SessionStatusReasonTag, ActivityTypeTag, TrainingAreaCapabilityTag, TrainingArea, Equipment,
                       Activity, Cadet, Squadron, Wing, TimingTemplate, TimingBlock, SystemSetting, TrainingClass, PlanningYear,
-                      SessionAudience, CadetClassMembership,
+                      SessionAudience, SessionCustomPhaseAudience, CadetClassMembership,
                       ParadeNightTemplate, ParadeNightTemplateSession)
 from ..models.planning import ActivityLocalOverride
 from ..models.faq import FaqEntry
@@ -7222,6 +7222,13 @@ def reschedule_session(
     orig_audience = db.query(SessionAudience).filter(SessionAudience.session_id == session_id).all()
     for a in orig_audience:
         db.add(SessionAudience(session_id=new_session.id, training_class_id=a.training_class_id))
+
+    # copy custom phase audiences
+    orig_cpa = db.query(SessionCustomPhaseAudience).filter(
+        SessionCustomPhaseAudience.session_id == session_id
+    ).all()
+    for cpa in orig_cpa:
+        db.add(SessionCustomPhaseAudience(session_id=new_session.id, custom_phase_id=cpa.custom_phase_id))
 
     original.rescheduled_to_session_id = new_session.id
     db.commit()
