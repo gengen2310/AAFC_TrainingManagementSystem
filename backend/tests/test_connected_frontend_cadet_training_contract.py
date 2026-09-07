@@ -67,6 +67,14 @@ def test_move_to_class_uses_one_atomic_backend_move_not_remove_then_add():
     )
 
 
+def test_move_to_class_does_not_require_user_to_type_internal_class_uuid():
+    src = _html()
+    move = _slice(src, "async function moveCadetsToClass", "function openAddCadetModal")
+    assert "Enter target Training Class ID" not in move, (
+        "Training Officers must choose a visible Training Class by name/context; internal UUIDs are not a user workflow"
+    )
+
+
 def test_add_cadet_button_is_not_an_alias_for_add_existing_membership_prompt():
     src = _html()
     add = _slice(src, "function openAddCadetModal", "// ═══════════════════════════════════════════════════════════\n// TRAINING RECORDS")
@@ -96,4 +104,31 @@ def test_individual_training_record_renders_attempt_history_not_summary_only():
     assert "attempts" in detail, (
         "Each curriculum item in the individual Training Record must expose all delivery attempts/outcomes, "
         "not only the summary completion date"
+    )
+
+
+def test_individual_training_record_completion_date_has_non_colour_completed_cue():
+    src = _html()
+    detail = _slice(src, "async function showCadetTrainingRecord", "async function exportTrainingRecords")
+    assert "summary_completion_date" in detail
+    assert "Completed" in detail or "aria-label" in detail, (
+        "Individual Training Record completion dates must not rely on green colour alone; "
+        "include a visible or accessible Completed cue"
+    )
+
+
+def test_cea_preview_uses_backend_row_number_contract():
+    src = _html()
+    preview = _slice(src, "function _renderCeaPreview", "async function previewCeaImport")
+    assert "r.row" in preview, (
+        "CEA preview backend returns the source CSV row as `row`; the UI must render that field "
+        "instead of silently leaving the row-number column blank"
+    )
+
+
+def test_reschedule_does_not_require_user_to_type_internal_parade_night_uuid():
+    src = _html()
+    reschedule = _slice(src, "async function sessionReschedule", "// ═══════════════════════════════════════════════════════════", limit=5000)
+    assert "Enter Parade Night ID" not in reschedule, (
+        "Needs Attention reschedule must present real Parade Night choices rather than ask a Training Officer for an internal UUID"
     )
