@@ -67,6 +67,14 @@ test("capture Planning Workspace mobile viewport", async ({ page }) => {
 });
 
 test("EVIDENCE: /facilitator-schedule redirects to /planning on the deployed module-mode build (GAP-14)", async ({ page }) => {
+  // Facilitator Schedule Explorer (FacilitatorSchedule.tsx, FacilitatorTimeline.tsx,
+  // GET /api/dashboard/facilitator-schedule) is fully built and tested at the API
+  // layer (see backend/tests/test_facilitator_schedule.py), but the deployed
+  // Planning Workspace preview service always runs MODULE_MODE=true, whose
+  // ModuleEntry only registers "/planning" + a catch-all redirect back to it
+  // (frontend/src/App.tsx:110-122) -- so this route is unreachable in production,
+  // the same class of defect as GAP-13 (TRGO-05's CSV import UI). This test
+  // captures the actual observed behaviour as evidence, not a synthetic claim.
   await loginViaMainTms(page, "ADMIN703");
   await page.goto(`${PLANNING}/facilitator-schedule`);
   await page.waitForTimeout(2000);
@@ -75,6 +83,10 @@ test("EVIDENCE: /facilitator-schedule redirects to /planning on the deployed mod
 });
 
 test("capture Planning Workspace high-contrast theme (forced, no discoverable UI toggle)", async ({ page }) => {
+  // tokens.css defines a data-theme="hc" variant, but no UI control to activate it
+  // was found anywhere in frontend/src -- forcing it via JS to at least capture
+  // that the theme itself renders correctly, and noting the missing toggle
+  // separately as a smaller, distinct finding.
   await loginViaMainTms(page, "ADMIN703");
   await page.goto(PLANNING);
   await page.waitForTimeout(1500);
