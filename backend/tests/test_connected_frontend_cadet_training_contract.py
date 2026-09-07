@@ -9,6 +9,7 @@ remediation brief.
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 import pytest
 
@@ -120,7 +121,7 @@ def test_individual_training_record_completion_date_has_non_colour_completed_cue
 def test_cea_preview_uses_backend_row_number_contract():
     src = _html()
     preview = _slice(src, "function _renderCeaPreview", "async function previewCeaImport")
-    assert "r.row" in preview, (
+    assert re.search(r"\br\.row\b", preview), (
         "CEA preview backend returns the source CSV row as `row`; the UI must render that field "
         "instead of silently leaving the row-number column blank"
     )
