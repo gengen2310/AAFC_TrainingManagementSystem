@@ -7456,9 +7456,10 @@ def bulk_class_membership(
                     )
                     db.add(m)
                 processed += 1
-        db.commit()
         audit(db, p, object_type="class_membership", object_id=class_id, action="bulk_move",
-              new={"target_class_id": body.target_class_id, "cadet_ids": body.cadet_ids, "processed": processed})
+              new={"target_class_id": body.target_class_id, "cadet_ids": body.cadet_ids, "processed": processed},
+              commit=False)
+        db.commit()
 
     return {"ok": True, "processed": processed}
 
