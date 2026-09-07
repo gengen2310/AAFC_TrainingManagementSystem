@@ -23,7 +23,7 @@ async function loginNational(page: Page, code: string, role: "system_admin" = "s
   await page.locator("#auth-continue-btn").click();
   await page.locator("#auth-code").fill(code);
   await page.locator("#auth-btn").click();
-  await expect(page.getByText("System Overview")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText("System Overview", { exact: true })).toBeVisible({ timeout: 10000 });
 }
 
 async function loginSquadron(page: Page, code: string) {
