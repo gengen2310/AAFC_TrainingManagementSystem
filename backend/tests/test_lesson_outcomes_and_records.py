@@ -587,14 +587,30 @@ def test_individual_cadet_outcome_override(client):
 
 
 def test_individual_override_requires_reason(client):
-    """Override without a reason should fail."""
+    """Override without a reason should fail (422). Session must be delivered first."""
+    hdr = _hdr(client, ADM703)
+    cadet_id = _first_cadet(client, hdr)
+    sid, _ = _first_planned_session(client, hdr)
+
+    # deliver the session so the state guard passes
+    client.post(f"/api/sessions/{sid}/deliver",
+                json={"delivery_note": "Test delivery."}, headers=hdr)
+
+    r = client.post(f"/api/cadets/{cadet_id}/session-outcomes/{sid}",
+                    json={"status": "absent", "override_reason": ""}, headers=hdr)
+    assert r.status_code in (400, 422), r.text
+
+
+def test_individual_override_requires_delivered_session(client):
+    """Outcome override must be rejected (409) if session is not delivered."""
     hdr = _hdr(client, ADM703)
     cadet_id = _first_cadet(client, hdr)
     sid, _ = _first_planned_session(client, hdr)
 
     r = client.post(f"/api/cadets/{cadet_id}/session-outcomes/{sid}",
-                    json={"status": "absent", "override_reason": ""}, headers=hdr)
-    assert r.status_code in (400, 422), r.text
+                    json={"status": "absent", "override_reason": "test"}, headers=hdr)
+    assert r.status_code == 409, r.text
+    assert "delivered" in r.json().get("detail", {}).get("error", "")
 
 
 # ─── SECURITY ────────────────────────────────────────────────────────────────

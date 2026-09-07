@@ -7811,6 +7811,8 @@ def override_cadet_session_outcome(
         CadetSessionOutcome.session_id == session_id,
     ).first()
 
+    if sess.status != "delivered":
+        raise HTTPException(409, detail={"error": "session_must_be_delivered_to_override_outcome"})
     if not (body.override_reason or "").strip():
         raise HTTPException(422, detail={"error": "override_reason_required"})
 
