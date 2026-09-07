@@ -19665,12 +19665,23 @@ async function sessionCancel(sessionId,btn){
 }
 
 async function sessionReschedule(sessionId,btn){
-  const pnid=prompt('Enter Parade Night ID to reschedule to:');
-  if(!pnid||!pnid.trim())return;
+  // Load available parade nights so the officer can pick by date, not by internal UUID
+  let nights=[];
+  try{
+    const data=await api('/api/parade-nights');
+    nights=(data.parade_nights||data||[]).filter(pn=>!pn.is_archived&&pn.date>=(new Date().toISOString().slice(0,10)));
+  }catch(e){alert(apiErr(e));return;}
+  if(nights.length===0){alert('No upcoming Parade Nights found. Please create a Parade Night first.');return;}
+  const opts=nights.map((pn,i)=>`${i+1}: ${pn.date}${pn.term?' ('+pn.term+')':''}`).join('\n');
+  const choice=prompt(`Select a Parade Night for the rescheduled session:\n${opts}`);
+  if(!choice)return;
+  const idx=parseInt(choice,10)-1;
+  if(isNaN(idx)||idx<0||idx>=nights.length){alert('Invalid selection.');return;}
+  const pnid=nights[idx].id||nights[idx].parade_night_id;
   const period=prompt('Period number:','1');
   btn.disabled=true;
   try{
-    await api(`/api/sessions/${sessionId}/reschedule`,{method:'POST',body:JSON.stringify({parade_night_id:pnid.trim(),period_number:parseInt(period)||1})});
+    await api(`/api/sessions/${sessionId}/reschedule`,{method:'POST',body:JSON.stringify({parade_night_id:pnid,period_number:parseInt(period)||1})});
     loadNeedsAttentionSessions();
   }catch(e){alert(apiErr(e));btn.disabled=false;}
 }
@@ -19718,20 +19729,23 @@ async function loadCadetRoster(){
     const canWrite=S.role!=='sqn_general';
     wrap.innerHTML=`<div class="tw"><table>
       <thead><tr>
-        <th>Service #</th><th>Rank</th><th>Last Name</th><th>First Name</th><th>Status</th>
+        ${canWrite?'<th class="no-print" style="width:32px"><input type="checkbox" id="roster-check-all" onchange="(function(v){document.querySelectorAll(\'#cadets-roster-wrap .roster-row-check\').forEach(cb=>cb.checked=v);})(this.checked)"></th>':''}
+        <th>CEA Number</th><th>Rank</th><th>Last Name</th><th>First Name</th><th>Status</th>
         ${canWrite?'<th class="no-print">Actions</th>':''}
       </tr></thead>
       <tbody>${cadets.map(c=>`<tr>
-        <td>${esc(c.service_number||'')}</td>
+        ${canWrite?`<td class="no-print"><input type="checkbox" class="roster-row-check" data-cadet-id="${esc(c.cadet_id||c.id)}"></td>`:''}
+        <td style="font-family:monospace;font-size:var(--fs-xs)">${esc(c.service_number||'')}</td>
         <td>${esc(c.rank||'')}</td>
         <td>${esc(c.last_name||'')}</td>
         <td>${esc(c.first_name||'')}</td>
         <td>${c.active_status?'Active':'Inactive'}</td>
-        ${canWrite?`<td class="no-print"><button class="btn btn-danger btn-xs" onclick="removeCadetFromClass('${esc(classId)}','${esc(c.cadet_id||c.id)}',this)">Remove</button></td>`:''}
+        ${canWrite?`<td class="no-print"><button class="btn btn-danger btn-xs" onclick="removeCadetFromClass('${esc(classId)}','${esc(c.cadet_id||c.id)}',this)">Remove from Class</button></td>`:''}
       </tr>`).join('')}</tbody>
     </table></div>
     ${canWrite?`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-primary btn-sm" onclick="bulkAddCadetsToClass('${esc(classId)}')">Add Cadet(s)</button>
+      <button class="btn btn-primary btn-sm" onclick="openAddCadetModal()">Add Cadet</button>
+      <button class="btn btn-out btn-sm" onclick="bulkAddCadetsToClass('${esc(classId)}')">Add to Class</button>
       <button class="btn btn-out btn-sm" onclick="moveCadetsToClass('${esc(classId)}')">Move to Class</button>
     </div>`:''}`;
   }catch(e){wrap.innerHTML=`<p class="warn">${esc(apiErr(e))}</p>`;}
@@ -19764,30 +19778,57 @@ async function bulkAddCadetsToClass(classId){
 }
 
 async function moveCadetsToClass(fromClassId){
-  const sel=document.getElementById('cadets-class-select');
-  const toClassId=prompt('Enter target Training Class ID to move cadets to:');
-  if(!toClassId||!toClassId.trim())return;
-  const ids=prompt('Enter Service Number(s) to move, comma-separated:');
-  if(!ids||!ids.trim())return;
-  const snList=ids.split(',').map(s=>s.trim()).filter(Boolean);
+  // Get cadets selected via checkboxes
+  const checked=Array.from(document.querySelectorAll('#cadets-roster-wrap .roster-row-check:checked'));
+  const cadetIds=checked.map(cb=>cb.dataset.cadetId).filter(Boolean);
+  if(cadetIds.length===0){alert('Select cadets to move using the row checkboxes first.');return;}
+
+  // Load available classes for this squadron so the officer can pick by name
+  let classes=[];
   try{
-    const allCadets=await api('/api/cadets');
-    const cadetIds=snList.map(sn=>{
-      const found=allCadets.find(c=>c.service_number===sn);
-      return found?(found.cadet_id||found.id):null;
-    }).filter(Boolean);
-    if(cadetIds.length===0){alert('No matching cadets found.');return;}
-    await api(`/api/training-classes/${fromClassId}/bulk-membership`,{method:'POST',body:JSON.stringify({action:'remove',cadet_ids:cadetIds})});
-    await api(`/api/training-classes/${toClassId.trim()}/bulk-membership`,{method:'POST',body:JSON.stringify({action:'add',cadet_ids:cadetIds})});
+    const years=await api('/api/planning/years');
+    const yearList=Array.isArray(years)?years:(years.planning_years||[]);
+    for(const yr of yearList){
+      const cls=await api(`/api/training-classes?training_year_id=${yr.planning_year_id}`);
+      const cl=Array.isArray(cls)?cls:(cls.training_classes||[]);
+      classes.push(...cl.filter(c=>(c.training_class_id||c.id)!==fromClassId));
+    }
+  }catch(e){alert(apiErr(e));return;}
+  if(classes.length===0){alert('No other Training Classes available to move to.');return;}
+
+  const opts=classes.map((c,i)=>`${i+1}: ${c.display_name}`).join('\n');
+  const choice=prompt(`Select a target Training Class by number:\n${opts}`);
+  if(!choice)return;
+  const idx=parseInt(choice,10)-1;
+  if(isNaN(idx)||idx<0||idx>=classes.length){alert('Invalid selection.');return;}
+  const target_class_id=classes[idx].training_class_id||classes[idx].id;
+
+  try{
+    await api(`/api/training-classes/${fromClassId}/bulk-membership`,{method:'POST',body:JSON.stringify({action:'move',cadet_ids:cadetIds,target_class_id})});
     loadCadetRoster();
   }catch(e){alert(apiErr(e));}
 }
 
 function openAddCadetModal(){
+  // Open a form to create a new Cadet record (not to add an existing one to a class)
   const sel=document.getElementById('cadets-class-select');
   const classId=sel?sel.value:'';
-  if(!classId){alert('Please select a Training Class first.');return;}
-  bulkAddCadetsToClass(classId);
+  const sn=prompt('New cadet CEA number (service number):');
+  if(!sn||!sn.trim())return;
+  const rank=prompt('Rank (e.g. Cdt):','Cdt')||'Cdt';
+  const firstName=prompt('First name:');
+  if(!firstName||!firstName.trim())return;
+  const lastName=prompt('Last name:');
+  if(!lastName||!lastName.trim())return;
+  api('/api/cadets',{method:'POST',body:JSON.stringify({service_number:sn.trim(),rank,first_name:firstName.trim(),last_name:lastName.trim()})})
+    .then(cadet=>{
+      const cadetId=cadet.cadet_id||cadet.id;
+      if(classId&&cadetId){
+        return api(`/api/training-classes/${classId}/bulk-membership`,{method:'POST',body:JSON.stringify({action:'add',cadet_ids:[cadetId]})});
+      }
+    })
+    .then(()=>loadCadetRoster())
+    .catch(e=>alert(apiErr(e)));
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -19863,12 +19904,33 @@ async function showCadetTrainingRecord(cadetId){
   try{
     const data=await api(`/api/cadets/${cadetId}/training-record`);
     const name=`${data.rank||''} ${data.last_name||''}, ${data.first_name||''}`.trim();
-    let html=`<b>${esc(name)}</b><br>`;
+    const service_number=data.service_number||'';
+    const memberships=data.memberships||[];
+    let html=`<b>${esc(name)}</b>`;
+    if(service_number) html+=` <span style="font-family:monospace;font-size:var(--fs-xs);color:var(--muted)">${esc(service_number)}</span>`;
+    html+=`<br>`;
+    // Current and historical class memberships
+    if(memberships.length){
+      html+=`<p style="font-size:var(--fs-xs);color:var(--muted);margin:4px 0">Classes: ${memberships.map(m=>`${esc(m.display_name)}${m.active_status?' (active)':' (past)'}`).join(', ')}</p>`;
+    }
     for(const phase of (data.phases||[])){
-      html+=`<b>${esc(phase.name)}</b><ul>`;
+      html+=`<b style="font-size:var(--fs-sm)">${esc(phase.name)}</b><ul style="margin:4px 0 8px 16px;padding:0">`;
       for(const item of (phase.items||[])){
-        const dateStr=item.summary_completion_date?`<span style="color:var(--ok-text)">${esc(item.summary_completion_date)}</span>`:'—';
-        html+=`<li>${esc(item.code)}: ${esc(item.title)} — ${dateStr}</li>`;
+        const summary_completion_date=item.summary_completion_date;
+        const dateStr=summary_completion_date
+          ?`<span style="color:var(--ok-text)" aria-label="Completed ${esc(summary_completion_date)}">Completed ${esc(summary_completion_date)}</span>`
+          :'<span style="color:var(--muted)">—</span>';
+        html+=`<li style="font-size:var(--fs-xs);margin:2px 0">${esc(item.code||'')}${item.code?': ':''}${esc(item.title)} — ${dateStr}`;
+        // Show all delivery attempts
+        const attempts=item.attempts||[];
+        if(attempts.length>0){
+          html+=`<ul style="margin:2px 0 2px 12px">`;
+          for(const a of attempts){
+            html+=`<li style="font-size:var(--fs-2xs);color:var(--muted)">${esc(a.parade_night_date||'')} — ${esc(a.status||'')}${a.training_class?' · '+esc(a.training_class):''}</li>`;
+          }
+          html+=`</ul>`;
+        }
+        html+=`</li>`;
       }
       html+='</ul>';
     }
@@ -19929,7 +19991,7 @@ function _renderCeaPreview(data){
     const actionColor={NEW:'var(--ok-text)',UPDATE:'var(--warn)',UNCHANGED:'var(--muted)',ERROR:'var(--red)'}[r.action]||'var(--text)';
     const actionBg={NEW:'var(--ok-bg)',UPDATE:'var(--warn-bg)',UNCHANGED:'',ERROR:'#fde8ec'}[r.action]||'';
     return `<tr style="${actionBg?'background:'+actionBg:''}">
-      <td style="font-size:var(--fs-xs);color:var(--muted)">${r.row_number||''}</td>
+      <td style="font-size:var(--fs-xs);color:var(--muted)">${r.row||r.row_number||''}</td>
       <td style="font-family:monospace;font-size:var(--fs-xs)">${esc(r.service_number||r.id||'')}</td>
       <td style="font-size:var(--fs-xs)">${esc(r.rank||'')}</td>
       <td style="font-size:var(--fs-sm)">${esc(r.first_name||'')} ${esc(r.last_name||'')}</td>

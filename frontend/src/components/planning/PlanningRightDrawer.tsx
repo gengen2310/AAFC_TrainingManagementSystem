@@ -500,12 +500,19 @@ function SessionForm({
             <div style={{ fontWeight: 700, color: "var(--warning-dark, #c97a00)", marginBottom: 4 }}>
               Previous delivery
             </div>
-            {prevDeliveries.slice(0, 3).map(d => (
+            {[...prevDeliveries]
+              .sort((a, b) => {
+                const aMatch = trainingClassId && a.training_classes.some((tc: { training_class_id: string }) => tc.training_class_id === trainingClassId) ? 0 : 1;
+                const bMatch = trainingClassId && b.training_classes.some((tc: { training_class_id: string }) => tc.training_class_id === trainingClassId) ? 0 : 1;
+                return aMatch - bMatch;
+              })
+              .slice(0, 3)
+              .map(d => (
               <div key={d.session_id} style={{ marginBottom: 4, color: "var(--text)" }}>
                 <span style={{ fontWeight: 600 }}>{d.parade_night_date}</span>
                 {d.training_classes.length > 0 && (
                   <span style={{ color: "var(--muted-text, #5c6a76)" }}>
-                    {" · "}{d.training_classes.map(tc => tc.display_name).join(", ")}
+                    {" · "}{d.training_classes.map((tc: { display_name: string }) => tc.display_name).join(", ")}
                   </span>
                 )}
                 {d.delivery_note && (
@@ -522,6 +529,14 @@ function SessionForm({
             )}
             <div style={{ color: "var(--warning-dark, #c97a00)", marginTop: 4 }}>
               This lesson has been delivered previously. You can still schedule it again.
+            </div>
+            <div style={{ marginTop: 4 }}>
+              <a
+                href={curriculumId ? `/planning/lesson-history/${curriculumId}` : "#"}
+                style={{ color: "var(--warning-dark, #c97a00)", textDecoration: "underline" }}
+              >
+                View lesson history
+              </a>
             </div>
           </div>
         )}

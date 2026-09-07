@@ -723,6 +723,10 @@ def cea_member_preview(
     if not rows:
         raise HTTPException(400, detail={"error": "no_data_rows"})
 
+    # First pass: find all duplicate service_numbers so both occurrences are marked ERROR
+    all_sns = [_cea_field(r, "id") for r in rows]
+    duplicate_sns = {sn for sn in all_sns if sn and all_sns.count(sn) > 1}
+
     seen_ids = set()
     result = []
     for i, row in enumerate(rows):
@@ -730,18 +734,26 @@ def cea_member_preview(
         if not sn:
             result.append({"row": i + 2, "action": "ERROR", "error": "missing_id"})
             continue
+        if sn in duplicate_sns:
+            result.append({"row": i + 2, "service_number": sn, "action": "ERROR", "error": "duplicate_id"})
+            seen_ids.add(sn)
+            continue
         if sn in seen_ids:
             result.append({"row": i + 2, "service_number": sn, "action": "ERROR", "error": "duplicate_id"})
             continue
         seen_ids.add(sn)
+        rank = _cea_field(row, "rank")
+        first_name = _cea_field(row, "name")
+        last_name = _cea_field(row, "family name")
+        # Missing family name is a malformed row
+        if not last_name:
+            result.append({"row": i + 2, "service_number": sn, "action": "ERROR", "error": "missing_family_name"})
+            continue
         existing = db.query(Cadet).filter(
             Cadet.squadron_id == sq_id,
             Cadet.service_number == sn,
             Cadet.is_archived == False,  # noqa: E712
         ).first()
-        rank = _cea_field(row, "rank")
-        first_name = _cea_field(row, "name")
-        last_name = _cea_field(row, "family name")
         if existing:
             changed = (
                 (rank and existing.rank != rank)
@@ -792,15 +804,37 @@ def cea_member_commit(
     delta = []
     seen_ids: set[str] = set()
 
+    # First pass: find duplicates within the file
+    all_sns_commit = [_cea_field(r, "id") for r in rows]
+    duplicate_sns_commit = {sn for sn in all_sns_commit if sn and all_sns_commit.count(sn) > 1}
+
     for row in rows:
         sn = _cea_field(row, "id")
-        if not sn or sn in seen_ids:
+        if not sn or sn in seen_ids or sn in duplicate_sns_commit:
             error_count += 1
+            if sn:
+                seen_ids.add(sn)
             continue
         seen_ids.add(sn)
         rank = _cea_field(row, "rank") or None
         first_name = _cea_field(row, "name") or None
         last_name = _cea_field(row, "family name") or None
+
+        # Missing family name = malformed row, do not commit
+        if not last_name:
+            error_count += 1
+            continue
+
+        # Check for cross-squadron identity conflict: same CEA Id in another squadron
+        foreign = db.query(Cadet).filter(
+            Cadet.service_number == sn,
+            Cadet.squadron_id != sq_id,
+            Cadet.is_archived == False,  # noqa: E712
+        ).first()
+        if foreign:
+            # CEA Id belongs to another squadron — skip, do not create a duplicate identity
+            error_count += 1
+            continue
 
         existing = db.query(Cadet).filter(
             Cadet.squadron_id == sq_id,
@@ -885,6 +919,19 @@ def cea_member_rollback(
         if entry["action"] == "NEW":
             cadet.is_archived = True
             cadet.archived_at = utcnow()
+            # Deactivate all class memberships for this newly-imported Cadet
+            # to avoid leaving live memberships pointing at an archived Cadet.
+            from app.models import CadetClassMembership as _CCM
+            now_str = str(utcnow().date())
+            for m in db.query(_CCM).filter(
+                _CCM.cadet_id == cadet.id,
+                _CCM.is_archived == False,  # noqa: E712
+                _CCM.active_status == True,  # noqa: E712
+            ).all():
+                m.active_status = False
+                m.end_date = m.end_date or now_str
+                m.is_archived = True
+                m.archived_at = utcnow()
             archived += 1
         elif entry["action"] == "UPDATE":
             cadet.rank = entry["prev_rank"]

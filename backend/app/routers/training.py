@@ -7019,12 +7019,13 @@ def sessions_needs_attention(
             Session.is_archived == False,  # noqa: E712
             ParadeNight.is_archived == False,  # noqa: E712
             ParadeNight.date < today_str,
-            Session.status.in_(["planned", "published"]),
+            Session.status.in_(["draft", "planned", "published", "not_delivered"]),
         )
         .order_by(ParadeNight.date.desc(), Session.period_number)
         .all()
     )
 
+    # Cancelled sessions: include ALL (past and future) that haven't been rescheduled
     cancelled_unresolved = (
         db.query(Session, ParadeNight)
         .join(ParadeNight, Session.parade_night_id == ParadeNight.id)
@@ -7032,7 +7033,6 @@ def sessions_needs_attention(
             Session.squadron_id == sq_id,
             Session.is_archived == False,  # noqa: E712
             ParadeNight.is_archived == False,  # noqa: E712
-            ParadeNight.date < today_str,
             Session.status.in_(["cancelled", "cancelled_late"]),
             Session.rescheduled_to_session_id == None,  # noqa: E711
         )
@@ -7079,9 +7079,12 @@ def _auto_complete_session(db: DBSession, s: Session, pn: ParadeNight, p: Princi
     """Create CadetSessionOutcome rows (status=completed) for every active member of the session's audience classes on the parade night date."""
     from ..models.training import CadetSessionOutcome
     audience = db.query(SessionAudience).filter(SessionAudience.session_id == s.id).all()
+    # Only auto-complete for classes with no per-class outcome override.
+    # Any override (cancelled, cancelled_late, not_delivered, etc.) means
+    # that class did not receive the lesson normally.
     tc_ids = [
         a.training_class_id for a in audience
-        if a.outcome_override not in ("not_delivered", "cancelled")
+        if not a.outcome_override
     ]
     if not tc_ids:
         return 0
@@ -7143,6 +7146,8 @@ def deliver_session(
     if not (body.delivery_note or "").strip():
         raise HTTPException(400, detail={"error": "delivery_note_required"})
     s = _require_session_write(db, p, session_id)
+    if s.status in ("delivered", "cancelled", "cancelled_late"):
+        raise HTTPException(409, detail={"error": "terminal_state_transition_forbidden"})
     pn = db.get(ParadeNight, s.parade_night_id)
     old_status = s.status
     s.status = "delivered"
@@ -7170,6 +7175,8 @@ def cancel_session_outcome(
     if not (body.cancellation_reason or "").strip():
         raise HTTPException(400, detail={"error": "cancellation_reason_required"})
     s = _require_session_write(db, p, session_id)
+    if s.status in ("delivered",):
+        raise HTTPException(409, detail={"error": "terminal_state_transition_forbidden"})
     old_status = s.status
     s.status = "cancelled"
     s.cancelled_reason = body.cancellation_reason.strip()
@@ -7196,11 +7203,17 @@ def reschedule_session(
     original = _require_session_write(db, p, session_id)
     if original.status not in ("cancelled", "cancelled_late"):
         raise HTTPException(409, detail={"error": "only_cancelled_can_be_rescheduled"})
+    # Idempotent: if already rescheduled, return existing replacement
+    if original.rescheduled_to_session_id:
+        return {"ok": True, "original_session_id": session_id, "new_session_id": original.rescheduled_to_session_id}
     target_pn = db.get(ParadeNight, body.parade_night_id)
     if not target_pn or target_pn.is_archived:
         raise HTTPException(404, detail={"error": "parade_night_not_found"})
+    if target_pn.squadron_id != original.squadron_id:
+        raise HTTPException(403, detail={"error": "cross_squadron_parade_night_forbidden"})
     require_can_write_squadron(p, original.squadron_id, target_pn.wing_id)
 
+    from ..models.training import SessionAssistantFacilitator as _SAF
     new_session = Session(
         parade_night_id=body.parade_night_id,
         squadron_id=original.squadron_id,
@@ -7212,6 +7225,12 @@ def reschedule_session(
         phase_at_time=original.phase_at_time,
         element_at_time=original.element_at_time,
         cadet_group=original.cadet_group,
+        facilitator_id=original.facilitator_id,
+        assistant_facilitator_id=original.assistant_facilitator_id,
+        training_area_id=original.training_area_id,
+        equipment_required=original.equipment_required,
+        expected_attendance=original.expected_attendance,
+        part_number=original.part_number,
         status="planned",
         created_by=p.user_id,
     )
@@ -7229,6 +7248,10 @@ def reschedule_session(
     ).all()
     for cpa in orig_cpa:
         db.add(SessionCustomPhaseAudience(session_id=new_session.id, custom_phase_id=cpa.custom_phase_id))
+
+    # copy assistant facilitators
+    for saf in db.query(_SAF).filter(_SAF.session_id == session_id).all():
+        db.add(_SAF(session_id=new_session.id, user_id=saf.user_id))
 
     original.rescheduled_to_session_id = new_session.id
     db.commit()
@@ -7390,6 +7413,9 @@ def bulk_class_membership(
 
     if body.action == "add":
         for cid in body.cadet_ids:
+            cadet = db.get(Cadet, cid)
+            if not cadet or cadet.is_archived or cadet.squadron_id != tc.squadron_id:
+                raise HTTPException(403, detail={"error": "cross_squadron_cadet_add_forbidden"})
             existing = db.query(CadetClassMembership).filter(
                 CadetClassMembership.cadet_id == cid,
                 CadetClassMembership.training_class_id == class_id,
@@ -7431,6 +7457,10 @@ def bulk_class_membership(
         target = db.get(TrainingClass, body.target_class_id)
         if not target or target.is_archived:
             raise HTTPException(404, detail={"error": "target_class_not_found"})
+        if target.squadron_id != tc.squadron_id:
+            raise HTTPException(403, detail={"error": "cross_squadron_move_forbidden"})
+        if target.training_stage_id != tc.training_stage_id:
+            raise HTTPException(409, detail={"error": "cross_stage_move_forbidden"})
         for cid in body.cadet_ids:
             src = db.query(CadetClassMembership).filter(
                 CadetClassMembership.cadet_id == cid,
@@ -7498,20 +7528,35 @@ def training_records_matrix(
     )
     cadet_ids = [c.id for _, c in members]
 
-    # Curriculum items ordered by phase.sort_order → item.recommended_sequence → item.code
-    items = (
-        db.query(CurriculumItem, CurriculumPhase)
-        .join(CurriculumPhase, CurriculumItem.phase == CurriculumPhase.name)
-        .filter(
-            CurriculumPhase.squadron_id == tc.squadron_id,
-            CurriculumItem.is_archived == False,  # noqa: E712
+    # Curriculum items: scoped to the class's training_stage_id phase if set,
+    # otherwise all visible phases (national + wing + squadron).
+    # "Visible" means: national phases (squadron_id IS NULL) or this squadron's own phases.
+    from sqlalchemy import or_ as _or
+    if tc.training_stage_id:
+        items = (
+            db.query(CurriculumItem, CurriculumPhase)
+            .join(CurriculumPhase, CurriculumItem.phase == CurriculumPhase.name)
+            .filter(
+                CurriculumPhase.id == tc.training_stage_id,
+                CurriculumItem.is_archived == False,  # noqa: E712
+            )
+            .order_by(CurriculumPhase.sort_order, CurriculumItem.recommended_sequence, CurriculumItem.code, CurriculumItem.part_number)
+            .all()
         )
-        .order_by(CurriculumPhase.sort_order, CurriculumItem.recommended_sequence, CurriculumItem.code)
-        .all()
-    )
+    else:
+        items = (
+            db.query(CurriculumItem, CurriculumPhase)
+            .join(CurriculumPhase, CurriculumItem.phase == CurriculumPhase.name)
+            .filter(
+                _or(CurriculumPhase.squadron_id == tc.squadron_id, CurriculumPhase.squadron_id == None),  # noqa: E711
+                CurriculumItem.is_archived == False,  # noqa: E712
+            )
+            .order_by(CurriculumPhase.sort_order, CurriculumItem.recommended_sequence, CurriculumItem.code, CurriculumItem.part_number)
+            .all()
+        )
 
-    # Outcomes: for each cadet, per curriculum_item → most recent completed date
-    # We need to join outcomes → sessions to get curriculum_item_id and parade_night date
+    # Outcomes: for each cadet, per curriculum_item → most recent successful parade night date
+    # The Parade Night date is the authoritative completion date, NOT CadetSessionOutcome.completion_date.
     outcomes_raw = (
         db.query(CadetSessionOutcome, Session, ParadeNight)
         .join(Session, CadetSessionOutcome.session_id == Session.id)
@@ -7533,7 +7578,7 @@ def training_records_matrix(
         key = (o.cadet_id, ci_id)
         existing = outcome_map.get(key)
         if o.status == "completed":
-            date_val = o.completion_date or pn.date
+            date_val = pn.date  # authoritative: use parade night date, not denormalised completion_date
             if not existing or existing.get("status") != "completed" or (date_val and date_val > (existing.get("completion_date") or "")):
                 outcome_map[key] = {"status": "completed", "completion_date": date_val}
         elif not existing or existing.get("status") == "not_started":
@@ -7600,16 +7645,29 @@ def training_records_export(
     )
     cadet_ids = [c.id for _, c in members]
 
-    items_q = (
-        db.query(CurriculumItem, CurriculumPhase)
-        .join(CurriculumPhase, CurriculumItem.phase == CurriculumPhase.name)
-        .filter(
-            CurriculumPhase.squadron_id == tc.squadron_id,
-            CurriculumItem.is_archived == False,  # noqa: E712
+    from sqlalchemy import or_ as _or_exp
+    if tc.training_stage_id:
+        items_q = (
+            db.query(CurriculumItem, CurriculumPhase)
+            .join(CurriculumPhase, CurriculumItem.phase == CurriculumPhase.name)
+            .filter(
+                CurriculumPhase.id == tc.training_stage_id,
+                CurriculumItem.is_archived == False,  # noqa: E712
+            )
+            .order_by(CurriculumPhase.sort_order, CurriculumItem.recommended_sequence, CurriculumItem.code, CurriculumItem.part_number)
+            .all()
         )
-        .order_by(CurriculumPhase.sort_order, CurriculumItem.recommended_sequence, CurriculumItem.code)
-        .all()
-    )
+    else:
+        items_q = (
+            db.query(CurriculumItem, CurriculumPhase)
+            .join(CurriculumPhase, CurriculumItem.phase == CurriculumPhase.name)
+            .filter(
+                _or_exp(CurriculumPhase.squadron_id == tc.squadron_id, CurriculumPhase.squadron_id == None),  # noqa: E711
+                CurriculumItem.is_archived == False,  # noqa: E712
+            )
+            .order_by(CurriculumPhase.sort_order, CurriculumItem.recommended_sequence, CurriculumItem.code, CurriculumItem.part_number)
+            .all()
+        )
 
     outcomes_raw = (
         db.query(CadetSessionOutcome, Session, ParadeNight)
@@ -7623,13 +7681,13 @@ def training_records_export(
         .all()
     ) if cadet_ids else []
 
-    # best completion per (cadet_id, ci_id)
+    # best completion per (cadet_id, ci_id) — use parade night date as authoritative
     best: dict[tuple[str, str], str] = {}
     for o, sess, pn in outcomes_raw:
         if not sess.curriculum_item_id:
             continue
         key = (o.cadet_id, sess.curriculum_item_id)
-        date_val = o.completion_date or pn.date
+        date_val = pn.date  # parade night date is authoritative, not denormalised completion_date
         if key not in best or date_val > best[key]:
             best[key] = date_val
 
@@ -7706,29 +7764,52 @@ def cadet_training_record(
     )
 
     # group by curriculum_item_id
+    from sqlalchemy import or_ as _or_ind
     by_item: dict[str, list[dict]] = {}
     for o, sess, pn in outcomes_raw:
         ci_id = sess.curriculum_item_id
         if not ci_id:
             continue
-        audience = db.query(SessionAudience, TrainingClass).join(
+        # Resolve the training class from the Cadet's membership on the parade night date,
+        # not from the first SessionAudience row (which may be for a different class).
+        cadet_audience = db.query(SessionAudience, TrainingClass).join(
             TrainingClass, SessionAudience.training_class_id == TrainingClass.id
-        ).filter(SessionAudience.session_id == sess.id).first()
-        tc_name = audience[1].display_name if audience else None
+        ).join(
+            CadetClassMembership,
+            (CadetClassMembership.training_class_id == SessionAudience.training_class_id) &
+            (CadetClassMembership.cadet_id == cadet_id)
+        ).filter(
+            SessionAudience.session_id == sess.id,
+            CadetClassMembership.is_archived == False,  # noqa: E712
+            CadetClassMembership.start_date <= pn.date,
+        ).filter(
+            _or_ind(CadetClassMembership.end_date == None, CadetClassMembership.end_date >= pn.date)  # noqa: E711
+        ).first()
+        if cadet_audience:
+            tc_name = cadet_audience[1].display_name
+        else:
+            # fallback: first audience row if membership date matching fails
+            fallback = db.query(SessionAudience, TrainingClass).join(
+                TrainingClass, SessionAudience.training_class_id == TrainingClass.id
+            ).filter(SessionAudience.session_id == sess.id).first()
+            tc_name = fallback[1].display_name if fallback else None
         by_item.setdefault(ci_id, []).append({
             "session_id": sess.id,
             "parade_night_date": pn.date,
             "status": o.status,
-            "completion_date": o.completion_date,
+            "completion_date": pn.date if o.status == "completed" else None,
             "delivery_note": sess.delivery_notes,
             "training_class": tc_name,
             "source": o.source,
         })
 
-    # curriculum ordered phases
+    # curriculum ordered phases — include national (squadron_id=NULL) and own-squadron phases
     phases = (
         db.query(CurriculumPhase)
-        .filter(CurriculumPhase.squadron_id == cadet.squadron_id, CurriculumPhase.is_archived == False)  # noqa: E712
+        .filter(
+            _or_ind(CurriculumPhase.squadron_id == cadet.squadron_id, CurriculumPhase.squadron_id == None),  # noqa: E711
+            CurriculumPhase.is_archived == False,  # noqa: E712
+        )
         .order_by(CurriculumPhase.sort_order)
         .all()
     )
@@ -7748,7 +7829,8 @@ def cadet_training_record(
         item_rows = []
         for ci in phase_items:
             attempts = by_item.get(ci.id, [])
-            completed_dates = [a["completion_date"] or a["parade_night_date"] for a in attempts if a["status"] == "completed"]
+            # Use parade night date as authoritative completion date
+            completed_dates = [a["parade_night_date"] for a in attempts if a["status"] == "completed"]
             if completed_dates:
                 summary_status = "completed"
                 summary_date = max(completed_dates)
@@ -7807,6 +7889,10 @@ def override_cadet_session_outcome(
     pn = db.get(ParadeNight, sess.parade_night_id)
     require_can_write_squadron(p, cadet.squadron_id, pn.wing_id if pn else None)
 
+    # Session must belong to the same squadron as the cadet
+    if sess.squadron_id != cadet.squadron_id:
+        raise HTTPException(403, detail={"error": "cross_squadron_outcome_forbidden"})
+
     existing = db.query(CadetSessionOutcome).filter(
         CadetSessionOutcome.cadet_id == cadet_id,
         CadetSessionOutcome.session_id == session_id,
@@ -7814,6 +7900,32 @@ def override_cadet_session_outcome(
 
     if sess.status != "delivered":
         raise HTTPException(409, detail={"error": "session_must_be_delivered_to_override_outcome"})
+
+    # Validate that the cadet's membership in the session's audience class was valid on the parade night date
+    if pn:
+        pn_date = pn.date
+        audience_class_ids = [
+            a.training_class_id for a in db.query(SessionAudience).filter(
+                SessionAudience.session_id == session_id
+            ).all()
+        ]
+        if not audience_class_ids:
+            # Legacy cadet_group sessions have no class audience; allow any same-squadron cadet.
+            # Sessions with neither a cadet_group nor explicit audience have no identifiable
+            # target — reject overrides for arbitrary cadets.
+            if not sess.cadet_group:
+                raise HTTPException(409, detail={"error": "cadet_not_in_audience_on_parade_night"})
+        else:
+            valid_membership = db.query(CadetClassMembership).filter(
+                CadetClassMembership.cadet_id == cadet_id,
+                CadetClassMembership.training_class_id.in_(audience_class_ids),
+                CadetClassMembership.is_archived == False,  # noqa: E712
+                CadetClassMembership.start_date <= pn_date,
+            ).filter(
+                (CadetClassMembership.end_date == None) | (CadetClassMembership.end_date >= pn_date)  # noqa: E711
+            ).first()
+            if not valid_membership:
+                raise HTTPException(409, detail={"error": "cadet_not_in_audience_on_parade_night"})
     if not (body.override_reason or "").strip():
         raise HTTPException(422, detail={"error": "override_reason_required"})
 
