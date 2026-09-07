@@ -174,6 +174,13 @@ function SessionForm({
     (n: NightSummary) => n.parade_night_id !== null,
   );
 
+  const { data: prevDeliveries } = useQuery({
+    queryKey: ["curriculum-previous-deliveries", curriculumId],
+    queryFn: () => planningApi.getPreviousDeliveries(curriculumId!),
+    enabled: !!curriculumId,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const allMissions: MissionItem[] = missionsData?.missions ?? [];
   const linkedMission = curriculumId ? allMissions.find(m => m.curriculum_id === curriculumId) : null;
   const searchResults = currSearch.length >= 2
@@ -481,6 +488,26 @@ function SessionForm({
             </>
           )}
         </div>
+        {prevDeliveries && prevDeliveries.deliveries.length > 0 && (
+          <div style={{
+            background: "var(--warning-bg, #fff3cd)",
+            border: "1px solid var(--warning, #c97a00)",
+            borderRadius: 6,
+            padding: "8px 12px",
+            marginBottom: 10,
+            fontSize: "var(--fs-xs)",
+            color: "var(--warning, #c97a00)",
+          }}>
+            <strong>Previously delivered</strong> — this item was taught on{" "}
+            {prevDeliveries.deliveries.map((d, i) => (
+              <span key={d.session_id}>
+                {i > 0 ? ", " : ""}{d.parade_night_date}
+                {d.class_names?.length > 0 ? ` (${d.class_names.join(", ")})` : ""}
+              </span>
+            ))}.{" "}
+            You can still schedule it again.
+          </div>
+        )}
         <label>
           Activity title
           <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Navigation using compass" />

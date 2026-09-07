@@ -395,6 +395,10 @@ export const planningApi = {
     api.get<{ sessions: PlanningSession[] }>(`/api/planning/parade-dates/${date_id}/archived-sessions`),
   overrideConflict: (conflict_id: string, override_reason: string) =>
     api.post<{ ok: boolean }>(`/api/planning/conflicts/${conflict_id}/override`, { override_reason }),
+  getPreviousDeliveries: (curriculum_item_id: string) =>
+    api.get<{ curriculum_item_id: string; deliveries: Array<{ session_id: string; parade_night_date: string; training_year: number; class_names: string[]; status: string }> }>(
+      `/api/curriculum-items/${curriculum_item_id}/previous-deliveries`
+    ),
   wingEvents: (wing_id: string, year: number, squadron_id?: string) => {
     const p = new URLSearchParams({ wing_id, year: String(year) });
     if (squadron_id) p.set("squadron_id", squadron_id);

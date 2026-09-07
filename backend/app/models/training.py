@@ -106,6 +106,11 @@ class Session(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     not_delivered_reason: Mapped[str | None] = mapped_column(Text)
     cancelled_reason: Mapped[str | None] = mapped_column(Text)
     rescheduled_to_date: Mapped[str | None] = mapped_column(String(10))
+    rescheduled_to_session_id: Mapped[str | None] = mapped_column(
+        String(36), nullable=True, index=True
+    )
+    # Self-referential: the Session that was created to replace this cancelled Session.
+    # Enforced at the app layer; no DB-level FK to avoid SQLite circular-reference issues.
     cadet_group: Mapped[str | None] = mapped_column(String(30), nullable=True)  # orientation/initial/junior/intermediate/senior
     part_number: Mapped[int | None] = mapped_column(Integer, nullable=True)  # which part of multi-part curriculum
     follow_up_required: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -618,6 +623,40 @@ class CadetClassMembership(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     # edited (closing out with an end_date), unlike SessionAudience's
     # replace-the-whole-set model, so the same ParadeNight/PlanningYear/
     # TrainingClass conflict-protection pattern applies here too.
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+
+class CadetSessionOutcome(Base, UUIDMixin, TimestampMixin):
+    """Per-cadet outcome for a single Session (REM-200).
+
+    Populated automatically when a Session is marked Delivered (source='derived')
+    for every Cadet whose CadetClassMembership was active in the Session's audience
+    Training Classes on the Parade Night date. A Training Officer may later override
+    any individual row (source='manual') to record an exception: absent, not_completed,
+    or a later completed.
+
+    Unique constraint on (cadet_id, session_id) — a Cadet has at most one outcome
+    record per Session. Changing the outcome updates the single row in place
+    (version-tracked) rather than appending a new one; the history is preserved in
+    SessionStatusHistory for the Session level and in the AuditLog for overrides.
+
+    Completion date (completion_date) is the Parade Night's date (ISO YYYY-MM-DD),
+    not the record creation timestamp, not the current date, not the import date.
+    """
+    __tablename__ = "cadet_session_outcomes"
+    __table_args__ = (
+        UniqueConstraint("cadet_id", "session_id", name="uq_cadet_session_outcome"),
+    )
+    cadet_id: Mapped[str] = mapped_column(ForeignKey("cadets.id"), index=True, nullable=False)
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    # status values: completed | absent | not_completed
+    completion_date: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # ISO date of the Parade Night on which completion occurred — null for absent/not_completed
+    source: Mapped[str] = mapped_column(String(20), default="derived", server_default="derived")
+    # derived = auto-set when Session delivered; manual = Training Officer override
+    override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    changed_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 

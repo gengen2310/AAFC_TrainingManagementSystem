@@ -19,10 +19,10 @@ from .training import (
     SessionAssistantFacilitator,
     Facilitator, FacilitatorRankHistory, SubjectAreaTag, FacilitatorTypeTag, SessionStatusReasonTag, ActivityTypeTag, TrainingAreaCapabilityTag, TrainingArea, Equipment, Activity, Cadet,
     TimingTemplate, TimingBlock, ParadeNightTimingOverride, ParadeNightTimingSnapshot, TrainingClass, SessionAudience, SessionCustomPhaseAudience,
-    CadetClassMembership, ParadeNightTemplate, ParadeNightTemplateSession,
+    CadetClassMembership, CadetSessionOutcome, ParadeNightTemplate, ParadeNightTemplateSession,
 )
 from .operations import (
-    ActionItem, Exception, AuditLog, ImportLog, ExportLog, SystemSetting,
+    ActionItem, Exception, AuditLog, ImportLog, ExportLog, SystemSetting, CadetMemberImportBatch,
 )
 from .program import (
     Phase, ProgramPackage, ProgramItem, LearningHubResource, ProgramItemDeployment,
@@ -36,8 +36,8 @@ __all__ = [
     "SessionAssistantFacilitator",
     "Facilitator", "FacilitatorRankHistory", "SubjectAreaTag", "FacilitatorTypeTag", "SessionStatusReasonTag", "ActivityTypeTag", "TrainingAreaCapabilityTag", "TrainingArea", "Equipment", "Activity", "Cadet",
     "TimingTemplate", "TimingBlock", "ParadeNightTimingOverride", "ParadeNightTimingSnapshot", "TrainingClass", "SessionAudience", "SessionCustomPhaseAudience",
-    "CadetClassMembership", "ParadeNightTemplate", "ParadeNightTemplateSession",
-    "ActionItem", "Exception", "AuditLog", "ImportLog", "ExportLog", "SystemSetting",
+    "CadetClassMembership", "CadetSessionOutcome", "ParadeNightTemplate", "ParadeNightTemplateSession",
+    "ActionItem", "Exception", "AuditLog", "ImportLog", "ExportLog", "SystemSetting", "CadetMemberImportBatch",
     "Phase", "ProgramPackage", "ProgramItem", "LearningHubResource", "ProgramItemDeployment",
     "SourceFile", "SourceConflict", "PromotionRequest", "JobStatus",
     "PlanningYear", "HolidayPeriod", "AnchorEvent", "AnchorPrepRule",

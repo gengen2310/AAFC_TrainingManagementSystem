@@ -1,5 +1,5 @@
 """Action items, exceptions, immutable audit log, import/export logs."""
-from sqlalchemy import String, Integer, Text, DateTime, ForeignKey
+from sqlalchemy import String, Integer, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, timezone
 
@@ -87,6 +87,31 @@ class ImportLog(Base, UUIDMixin, TimestampMixin):
     validation_errors: Mapped[str | None] = mapped_column(Text)
     committed: Mapped[int] = mapped_column(Integer, default=0)
     rollback_status: Mapped[str | None] = mapped_column(String(20))
+
+
+class CadetMemberImportBatch(Base, UUIDMixin, TimestampMixin):
+    """Tracks each CEA member (Cadet identity) import/upsert run.
+
+    Distinct from CeaImportBatch (planning.py) which tracks CEA *activity* imports.
+    This one tracks Cadet identity upserts (rank/name changes keyed on service_number).
+    The import_delta JSON column stores enough data to restore previous values:
+    [{"cadet_id": "...", "action": "NEW"|"UPDATE",
+      "prev_rank": null, "prev_first_name": null, "prev_last_name": null}]
+    Rollback: for NEW rows, archive the Cadet; for UPDATE rows, restore prev_* values.
+    """
+    __tablename__ = "cadet_member_import_batches"
+    squadron_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    imported_by: Mapped[str] = mapped_column(String(36), nullable=False)
+    source_file_name: Mapped[str | None] = mapped_column(String(260), nullable=True)
+    row_count: Mapped[int] = mapped_column(Integer, default=0)
+    new_count: Mapped[int] = mapped_column(Integer, default=0)
+    update_count: Mapped[int] = mapped_column(Integer, default=0)
+    unchanged_count: Mapped[int] = mapped_column(Integer, default=0)
+    error_count: Mapped[int] = mapped_column(Integer, default=0)
+    committed: Mapped[bool] = mapped_column(Boolean, default=False)
+    rollback_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    import_delta: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # JSON: list of per-row delta dicts for rollback restoration
 
 
 class ExportLog(Base, UUIDMixin, TimestampMixin):

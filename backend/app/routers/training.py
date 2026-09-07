@@ -6978,3 +6978,853 @@ def bulk_apply_template(
         "sessions_added": sessions_added,
         "sessions_skipped": sessions_skipped,
     }
+
+
+# ── NEEDS ATTENTION / OUTCOMES / RESCHEDULE (REM-200) ───────────────────────
+
+from datetime import date as _date, datetime as _datetime
+
+class SessionDeliverIn(BaseModel):
+    delivery_note: str
+
+class SessionCancelIn(BaseModel):
+    cancellation_reason: str
+
+class SessionRescheduleIn(BaseModel):
+    parade_night_id: str
+    period_number: int = 1
+
+class CadetOutcomeOverrideIn(BaseModel):
+    status: Literal["completed", "absent", "not_completed"]
+    override_reason: str = ""
+
+
+@router.get("/sessions/needs-attention")
+def sessions_needs_attention(
+    squadron_id: str | None = None,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    """Past Sessions (parade_night.date < today) still in planned/published/cancelled-unresolved state."""
+    if p.role == "sqn_general":
+        raise HTTPException(403, detail={"error": "forbidden"})
+    sq_id = _view_squadron_id(p, squadron_id, db)
+    today_str = str(_date.today())
+
+    planned_sessions = (
+        db.query(Session, ParadeNight)
+        .join(ParadeNight, Session.parade_night_id == ParadeNight.id)
+        .filter(
+            Session.squadron_id == sq_id,
+            Session.is_archived == False,  # noqa: E712
+            ParadeNight.is_archived == False,  # noqa: E712
+            ParadeNight.date < today_str,
+            Session.status.in_(["planned", "published"]),
+        )
+        .order_by(ParadeNight.date.desc(), Session.period_number)
+        .all()
+    )
+
+    cancelled_unresolved = (
+        db.query(Session, ParadeNight)
+        .join(ParadeNight, Session.parade_night_id == ParadeNight.id)
+        .filter(
+            Session.squadron_id == sq_id,
+            Session.is_archived == False,  # noqa: E712
+            ParadeNight.is_archived == False,  # noqa: E712
+            ParadeNight.date < today_str,
+            Session.status.in_(["cancelled", "cancelled_late"]),
+            Session.rescheduled_to_session_id == None,  # noqa: E711
+        )
+        .order_by(ParadeNight.date.desc(), Session.period_number)
+        .all()
+    )
+
+    all_pairs = planned_sessions + cancelled_unresolved
+
+    # audience per session
+    session_ids = [s.id for s, _ in all_pairs]
+    audience_rows = db.query(SessionAudience, TrainingClass).join(
+        TrainingClass, SessionAudience.training_class_id == TrainingClass.id
+    ).filter(SessionAudience.session_id.in_(session_ids)).all() if session_ids else []
+
+    audience_map: dict[str, list[dict]] = {}
+    for sa, tc in audience_rows:
+        audience_map.setdefault(sa.session_id, []).append(
+            {"training_class_id": tc.id, "display_name": tc.display_name}
+        )
+
+    result = []
+    for s, pn in all_pairs:
+        ci = db.get(CurriculumItem, s.curriculum_item_id) if s.curriculum_item_id else None
+        result.append({
+            "session_id": s.id,
+            "parade_night_id": pn.id,
+            "parade_night_date": pn.date,
+            "period_number": s.period_number,
+            "curriculum_item_id": s.curriculum_item_id,
+            "curriculum_code": ci.code if ci else s.curriculum_code_at_time,
+            "curriculum_title": ci.title if ci else s.curriculum_title_at_time or s.custom_title,
+            "status": s.status,
+            "cancelled_reason": s.cancelled_reason,
+            "delivery_notes": s.delivery_notes,
+            "rescheduled_to_session_id": s.rescheduled_to_session_id,
+            "training_classes": audience_map.get(s.id, []),
+            "cancellation_reason_needed": s.status in ("cancelled", "cancelled_late") and not s.rescheduled_to_session_id,
+        })
+    return result
+
+
+def _auto_complete_session(db: DBSession, s: Session, pn: ParadeNight, p: Principal) -> int:
+    """Create CadetSessionOutcome rows (status=completed) for every active member of the session's audience classes on the parade night date."""
+    from ..models.training import CadetSessionOutcome
+    audience = db.query(SessionAudience).filter(SessionAudience.session_id == s.id).all()
+    tc_ids = [
+        a.training_class_id for a in audience
+        if a.outcome_override not in ("not_delivered", "cancelled")
+    ]
+    if not tc_ids:
+        return 0
+
+    pn_date = pn.date  # ISO string YYYY-MM-DD
+
+    memberships = db.query(CadetClassMembership).filter(
+        CadetClassMembership.training_class_id.in_(tc_ids),
+        CadetClassMembership.is_archived == False,  # noqa: E712
+        CadetClassMembership.active_status == True,  # noqa: E712
+    ).all()
+
+    # keep only members active on the parade night date
+    eligible_cadet_ids: set[str] = set()
+    for m in memberships:
+        start_ok = (not m.start_date) or m.start_date <= pn_date
+        end_ok = (not m.end_date) or m.end_date >= pn_date
+        if start_ok and end_ok:
+            eligible_cadet_ids.add(m.cadet_id)
+
+    if not eligible_cadet_ids:
+        return 0
+
+    # existing outcomes for this session
+    existing = {
+        o.cadet_id
+        for o in db.query(CadetSessionOutcome).filter(
+            CadetSessionOutcome.session_id == s.id
+        ).all()
+    }
+
+    created = 0
+    for cid in eligible_cadet_ids:
+        if cid in existing:
+            continue
+        outcome = CadetSessionOutcome(
+            cadet_id=cid,
+            session_id=s.id,
+            status="completed",
+            completion_date=pn_date,
+            source="derived",
+            changed_by=p.user_id,
+        )
+        db.add(outcome)
+        created += 1
+    return created
+
+
+@router.post("/sessions/{session_id}/deliver")
+def deliver_session(
+    session_id: str,
+    body: SessionDeliverIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    if p.role == "sqn_general":
+        raise HTTPException(403, detail={"error": "forbidden"})
+    if not (body.delivery_note or "").strip():
+        raise HTTPException(400, detail={"error": "delivery_note_required"})
+    s = _require_session_write(db, p, session_id)
+    pn = db.get(ParadeNight, s.parade_night_id)
+    old_status = s.status
+    s.status = "delivered"
+    s.delivery_notes = body.delivery_note.strip()
+    db.add(SessionStatusHistory(
+        session_id=s.id, old_status=old_status, new_status="delivered",
+        changed_by=p.user_id, reason="Training Officer: delivered via Needs Attention"
+    ))
+    created = _auto_complete_session(db, s, pn, p)
+    db.commit()
+    audit(db, p, object_type="session", object_id=s.id, action="deliver",
+          old={"status": old_status}, new={"status": "delivered", "outcomes_created": created})
+    return {"ok": True, "session_id": s.id, "outcomes_created": created}
+
+
+@router.post("/sessions/{session_id}/cancel")
+def cancel_session_outcome(
+    session_id: str,
+    body: SessionCancelIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    if p.role == "sqn_general":
+        raise HTTPException(403, detail={"error": "forbidden"})
+    if not (body.cancellation_reason or "").strip():
+        raise HTTPException(400, detail={"error": "cancellation_reason_required"})
+    s = _require_session_write(db, p, session_id)
+    old_status = s.status
+    s.status = "cancelled"
+    s.cancelled_reason = body.cancellation_reason.strip()
+    db.add(SessionStatusHistory(
+        session_id=s.id, old_status=old_status, new_status="cancelled",
+        changed_by=p.user_id, reason=body.cancellation_reason.strip()
+    ))
+    db.commit()
+    audit(db, p, object_type="session", object_id=s.id, action="cancel",
+          old={"status": old_status}, new={"status": "cancelled"})
+    return {"ok": True, "session_id": s.id}
+
+
+@router.post("/sessions/{session_id}/reschedule")
+def reschedule_session(
+    session_id: str,
+    body: SessionRescheduleIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    import uuid as _uuid_mod
+    if p.role == "sqn_general":
+        raise HTTPException(403, detail={"error": "forbidden"})
+    original = _require_session_write(db, p, session_id)
+    if original.status not in ("cancelled", "cancelled_late"):
+        raise HTTPException(409, detail={"error": "only_cancelled_can_be_rescheduled"})
+    target_pn = db.get(ParadeNight, body.parade_night_id)
+    if not target_pn or target_pn.is_archived:
+        raise HTTPException(404, detail={"error": "parade_night_not_found"})
+    require_can_write_squadron(p, original.squadron_id, target_pn.wing_id)
+
+    new_session = Session(
+        parade_night_id=body.parade_night_id,
+        squadron_id=original.squadron_id,
+        period_number=body.period_number,
+        curriculum_item_id=original.curriculum_item_id,
+        curriculum_code_at_time=original.curriculum_code_at_time,
+        curriculum_title_at_time=original.curriculum_title_at_time,
+        custom_title=original.custom_title,
+        phase_at_time=original.phase_at_time,
+        element_at_time=original.element_at_time,
+        cadet_group=original.cadet_group,
+        status="planned",
+        created_by=p.user_id,
+    )
+    db.add(new_session)
+    db.flush()
+
+    # copy audience
+    orig_audience = db.query(SessionAudience).filter(SessionAudience.session_id == session_id).all()
+    for a in orig_audience:
+        db.add(SessionAudience(session_id=new_session.id, training_class_id=a.training_class_id))
+
+    original.rescheduled_to_session_id = new_session.id
+    db.commit()
+    audit(db, p, object_type="session", object_id=session_id, action="reschedule",
+          new={"replacement_session_id": new_session.id, "parade_night_id": body.parade_night_id})
+    return {"ok": True, "original_session_id": session_id, "new_session_id": new_session.id}
+
+
+@router.get("/sessions/{session_id}/history")
+def session_history(
+    session_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    s = db.get(Session, session_id)
+    if not s or s.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    pn = db.get(ParadeNight, s.parade_night_id)
+    require_can_view_squadron(p, s.squadron_id, pn.wing_id if pn else None)
+    ci = db.get(CurriculumItem, s.curriculum_item_id) if s.curriculum_item_id else None
+    audience = db.query(SessionAudience, TrainingClass).join(
+        TrainingClass, SessionAudience.training_class_id == TrainingClass.id
+    ).filter(SessionAudience.session_id == session_id).all()
+    history = db.query(SessionStatusHistory).filter(
+        SessionStatusHistory.session_id == session_id
+    ).order_by(SessionStatusHistory.timestamp.asc()).all()
+    return {
+        "session_id": s.id,
+        "status": s.status,
+        "delivery_notes": s.delivery_notes,
+        "cancelled_reason": s.cancelled_reason,
+        "rescheduled_to_session_id": s.rescheduled_to_session_id,
+        "parade_night": {"id": pn.id, "date": pn.date, "term": pn.term} if pn else None,
+        "curriculum_item": {"id": ci.id, "code": ci.code, "title": ci.title} if ci else {
+            "code": s.curriculum_code_at_time, "title": s.curriculum_title_at_time
+        },
+        "audience": [{"training_class_id": tc.id, "display_name": tc.display_name} for _, tc in audience],
+        "history": [
+            {
+                "old_status": h.old_status, "new_status": h.new_status,
+                "reason": h.reason, "changed_by": h.changed_by,
+                "timestamp": iso_z(h.timestamp) if h.timestamp else None,
+            }
+            for h in history
+        ],
+    }
+
+
+@router.get("/curriculum-items/{item_id}/previous-deliveries")
+def curriculum_item_previous_deliveries(
+    item_id: str,
+    squadron_id: str | None = None,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    sq_id = _view_squadron_id(p, squadron_id, db)
+    sessions = (
+        db.query(Session, ParadeNight)
+        .join(ParadeNight, Session.parade_night_id == ParadeNight.id)
+        .filter(
+            Session.curriculum_item_id == item_id,
+            Session.squadron_id == sq_id,
+            Session.is_archived == False,  # noqa: E712
+            Session.status.in_(["delivered", "delivered_with_issue"]),
+        )
+        .order_by(ParadeNight.date.desc())
+        .all()
+    )
+    session_ids = [s.id for s, _ in sessions]
+    audience_rows = db.query(SessionAudience, TrainingClass).join(
+        TrainingClass, SessionAudience.training_class_id == TrainingClass.id
+    ).filter(SessionAudience.session_id.in_(session_ids)).all() if session_ids else []
+    audience_map: dict[str, list[dict]] = {}
+    for sa, tc in audience_rows:
+        audience_map.setdefault(sa.session_id, []).append({"training_class_id": tc.id, "display_name": tc.display_name})
+
+    return [
+        {
+            "session_id": s.id,
+            "parade_night_date": pn.date,
+            "delivery_note": s.delivery_notes,
+            "status": s.status,
+            "training_classes": audience_map.get(s.id, []),
+        }
+        for s, pn in sessions
+    ]
+
+
+# ── TRAINING CLASS ROSTER + BULK MEMBERSHIP ─────────────────────────────────
+
+class BulkMembershipIn(BaseModel):
+    action: Literal["add", "move", "remove"]
+    cadet_ids: List[str]
+    target_class_id: str | None = None
+
+
+@router.get("/training-classes/{class_id}/roster")
+def training_class_roster(
+    class_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    if p.role == "sqn_general":
+        raise HTTPException(403, detail={"error": "forbidden"})
+    tc = db.get(TrainingClass, class_id)
+    if not tc or tc.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, tc.squadron_id)
+    require_can_view_squadron(p, tc.squadron_id, s.wing_id if s else None)
+
+    rows = (
+        db.query(CadetClassMembership, Cadet)
+        .join(Cadet, CadetClassMembership.cadet_id == Cadet.id)
+        .filter(
+            CadetClassMembership.training_class_id == class_id,
+            CadetClassMembership.is_archived == False,  # noqa: E712
+            CadetClassMembership.active_status == True,  # noqa: E712
+            Cadet.is_archived == False,  # noqa: E712
+        )
+        .order_by(Cadet.last_name, Cadet.first_name)
+        .all()
+    )
+    return {
+        "training_class_id": tc.id,
+        "display_name": tc.display_name,
+        "cadets": [
+            {
+                "cadet_id": c.id,
+                "service_number": c.service_number,
+                "rank": c.rank,
+                "first_name": c.first_name,
+                "last_name": c.last_name,
+                "membership_id": m.id,
+                "start_date": m.start_date,
+                "active_status": m.active_status,
+            }
+            for m, c in rows
+        ],
+    }
+
+
+@router.post("/training-classes/{class_id}/bulk-membership")
+def bulk_class_membership(
+    class_id: str,
+    body: BulkMembershipIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    if p.role in ("sqn_general", "wing_viewer", "national_viewer", "auditor"):
+        raise HTTPException(403, detail={"error": "forbidden"})
+    tc = db.get(TrainingClass, class_id)
+    if not tc or tc.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, tc.squadron_id)
+    require_can_write_squadron(p, tc.squadron_id, s.wing_id if s else None)
+
+    today = str(_date.today())
+    processed = 0
+
+    if body.action == "add":
+        for cid in body.cadet_ids:
+            existing = db.query(CadetClassMembership).filter(
+                CadetClassMembership.cadet_id == cid,
+                CadetClassMembership.training_class_id == class_id,
+                CadetClassMembership.is_archived == False,  # noqa: E712
+                CadetClassMembership.active_status == True,  # noqa: E712
+            ).first()
+            if not existing:
+                m = CadetClassMembership(
+                    cadet_id=cid, training_class_id=class_id,
+                    start_date=today, source="manual",
+                    created_by=p.user_id, updated_by=p.user_id,
+                )
+                db.add(m)
+                processed += 1
+        db.commit()
+        audit(db, p, object_type="class_membership", object_id=class_id, action="bulk_add",
+              new={"cadet_ids": body.cadet_ids, "processed": processed})
+
+    elif body.action == "remove":
+        for cid in body.cadet_ids:
+            active = db.query(CadetClassMembership).filter(
+                CadetClassMembership.cadet_id == cid,
+                CadetClassMembership.training_class_id == class_id,
+                CadetClassMembership.is_archived == False,  # noqa: E712
+                CadetClassMembership.active_status == True,  # noqa: E712
+            ).first()
+            if active:
+                active.active_status = False
+                active.end_date = today
+                active.updated_by = p.user_id
+                processed += 1
+        db.commit()
+        audit(db, p, object_type="class_membership", object_id=class_id, action="bulk_remove",
+              new={"cadet_ids": body.cadet_ids, "processed": processed})
+
+    elif body.action == "move":
+        if not body.target_class_id:
+            raise HTTPException(422, detail={"error": "target_class_id_required_for_move"})
+        target = db.get(TrainingClass, body.target_class_id)
+        if not target or target.is_archived:
+            raise HTTPException(404, detail={"error": "target_class_not_found"})
+        for cid in body.cadet_ids:
+            src = db.query(CadetClassMembership).filter(
+                CadetClassMembership.cadet_id == cid,
+                CadetClassMembership.training_class_id == class_id,
+                CadetClassMembership.is_archived == False,  # noqa: E712
+                CadetClassMembership.active_status == True,  # noqa: E712
+            ).first()
+            if src:
+                src.active_status = False
+                src.end_date = today
+                src.updated_by = p.user_id
+                existing_target = db.query(CadetClassMembership).filter(
+                    CadetClassMembership.cadet_id == cid,
+                    CadetClassMembership.training_class_id == body.target_class_id,
+                    CadetClassMembership.is_archived == False,  # noqa: E712
+                    CadetClassMembership.active_status == True,  # noqa: E712
+                ).first()
+                if not existing_target:
+                    m = CadetClassMembership(
+                        cadet_id=cid, training_class_id=body.target_class_id,
+                        start_date=today, source="manual",
+                        created_by=p.user_id, updated_by=p.user_id,
+                    )
+                    db.add(m)
+                processed += 1
+        db.commit()
+        audit(db, p, object_type="class_membership", object_id=class_id, action="bulk_move",
+              new={"target_class_id": body.target_class_id, "cadet_ids": body.cadet_ids, "processed": processed})
+
+    return {"ok": True, "processed": processed}
+
+
+# ── TRAINING RECORDS (REM-201) ───────────────────────────────────────────────
+
+@router.get("/training-records")
+def training_records_matrix(
+    class_id: str,
+    squadron_id: str | None = None,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    if p.role == "sqn_general":
+        raise HTTPException(403, detail={"error": "forbidden"})
+    from ..models.training import CadetSessionOutcome
+
+    tc = db.get(TrainingClass, class_id)
+    if not tc or tc.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, tc.squadron_id)
+    require_can_view_squadron(p, tc.squadron_id, s.wing_id if s else None)
+
+    # Cadets in class
+    members = (
+        db.query(CadetClassMembership, Cadet)
+        .join(Cadet, CadetClassMembership.cadet_id == Cadet.id)
+        .filter(
+            CadetClassMembership.training_class_id == class_id,
+            CadetClassMembership.is_archived == False,  # noqa: E712
+            CadetClassMembership.active_status == True,  # noqa: E712
+            Cadet.is_archived == False,  # noqa: E712
+        )
+        .order_by(Cadet.last_name, Cadet.first_name)
+        .all()
+    )
+    cadet_ids = [c.id for _, c in members]
+
+    # Curriculum items ordered by phase.sort_order → item.recommended_sequence → item.code
+    items = (
+        db.query(CurriculumItem, CurriculumPhase)
+        .join(CurriculumPhase, CurriculumItem.phase == CurriculumPhase.name)
+        .filter(
+            CurriculumPhase.squadron_id == tc.squadron_id,
+            CurriculumItem.is_archived == False,  # noqa: E712
+        )
+        .order_by(CurriculumPhase.sort_order, CurriculumItem.recommended_sequence, CurriculumItem.code)
+        .all()
+    )
+
+    # Outcomes: for each cadet, per curriculum_item → most recent completed date
+    # We need to join outcomes → sessions to get curriculum_item_id and parade_night date
+    outcomes_raw = (
+        db.query(CadetSessionOutcome, Session, ParadeNight)
+        .join(Session, CadetSessionOutcome.session_id == Session.id)
+        .join(ParadeNight, Session.parade_night_id == ParadeNight.id)
+        .filter(
+            CadetSessionOutcome.cadet_id.in_(cadet_ids),
+            Session.is_archived == False,  # noqa: E712
+        )
+        .all()
+    ) if cadet_ids else []
+
+    # Build per-cadet per-curriculum_item outcome map
+    # key: (cadet_id, curriculum_item_id) → {status, completion_date}
+    outcome_map: dict[tuple[str, str], dict] = {}
+    for o, sess, pn in outcomes_raw:
+        ci_id = sess.curriculum_item_id
+        if not ci_id:
+            continue
+        key = (o.cadet_id, ci_id)
+        existing = outcome_map.get(key)
+        if o.status == "completed":
+            date_val = o.completion_date or pn.date
+            if not existing or existing.get("status") != "completed" or (date_val and date_val > (existing.get("completion_date") or "")):
+                outcome_map[key] = {"status": "completed", "completion_date": date_val}
+        elif not existing or existing.get("status") == "not_started":
+            outcome_map[key] = {"status": o.status, "completion_date": None}
+
+    ci_list = [
+        {"curriculum_item_id": ci.id, "code": ci.code, "title": ci.title, "phase_name": phase.display_name or phase.name}
+        for ci, phase in items
+    ]
+
+    rows = []
+    for _, cadet in members:
+        cells: dict[str, dict] = {}
+        for ci, phase in items:
+            cell = outcome_map.get((cadet.id, ci.id), {"status": None, "completion_date": None})
+            cells[ci.id] = cell
+        rows.append({
+            "cadet_id": cadet.id,
+            "service_number": cadet.service_number,
+            "rank": cadet.rank,
+            "first_name": cadet.first_name,
+            "last_name": cadet.last_name,
+            "cells": cells,
+        })
+
+    return {
+        "training_class_id": tc.id,
+        "display_name": tc.display_name,
+        "curriculum_items": ci_list,
+        "rows": rows,
+    }
+
+
+@router.get("/training-records/export")
+def training_records_export(
+    class_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    import io as _io
+    import csv as _csv
+    from fastapi.responses import StreamingResponse
+    from ..models.training import CadetSessionOutcome
+
+    if p.role == "sqn_general":
+        raise HTTPException(403, detail={"error": "forbidden"})
+    tc = db.get(TrainingClass, class_id)
+    if not tc or tc.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    s = db.get(Squadron, tc.squadron_id)
+    require_can_view_squadron(p, tc.squadron_id, s.wing_id if s else None)
+
+    members = (
+        db.query(CadetClassMembership, Cadet)
+        .join(Cadet, CadetClassMembership.cadet_id == Cadet.id)
+        .filter(
+            CadetClassMembership.training_class_id == class_id,
+            CadetClassMembership.is_archived == False,  # noqa: E712
+            CadetClassMembership.active_status == True,  # noqa: E712
+            Cadet.is_archived == False,  # noqa: E712
+        )
+        .order_by(Cadet.last_name, Cadet.first_name)
+        .all()
+    )
+    cadet_ids = [c.id for _, c in members]
+
+    items_q = (
+        db.query(CurriculumItem, CurriculumPhase)
+        .join(CurriculumPhase, CurriculumItem.phase == CurriculumPhase.name)
+        .filter(
+            CurriculumPhase.squadron_id == tc.squadron_id,
+            CurriculumItem.is_archived == False,  # noqa: E712
+        )
+        .order_by(CurriculumPhase.sort_order, CurriculumItem.recommended_sequence, CurriculumItem.code)
+        .all()
+    )
+
+    outcomes_raw = (
+        db.query(CadetSessionOutcome, Session, ParadeNight)
+        .join(Session, CadetSessionOutcome.session_id == Session.id)
+        .join(ParadeNight, Session.parade_night_id == ParadeNight.id)
+        .filter(
+            CadetSessionOutcome.cadet_id.in_(cadet_ids),
+            CadetSessionOutcome.status == "completed",
+            Session.is_archived == False,  # noqa: E712
+        )
+        .all()
+    ) if cadet_ids else []
+
+    # best completion per (cadet_id, ci_id)
+    best: dict[tuple[str, str], str] = {}
+    for o, sess, pn in outcomes_raw:
+        if not sess.curriculum_item_id:
+            continue
+        key = (o.cadet_id, sess.curriculum_item_id)
+        date_val = o.completion_date or pn.date
+        if key not in best or date_val > best[key]:
+            best[key] = date_val
+
+    phase_map = {ci.id: phase for ci, phase in items_q}
+    ci_map = {ci.id: ci for ci, _ in items_q}
+
+    output = _io.StringIO()
+    writer = _csv.writer(output)
+    writer.writerow(["CEA Number", "Rank", "First Name", "Last Name", "Training Phase", "Training Class", "Curriculum Code", "Curriculum Title", "Completion Date"])
+
+    for _, cadet in members:
+        for ci, phase in items_q:
+            completion_date = best.get((cadet.id, ci.id))
+            if completion_date:
+                writer.writerow([
+                    cadet.service_number or "",
+                    cadet.rank or "",
+                    cadet.first_name or "",
+                    cadet.last_name or "",
+                    phase.display_name or phase.name,
+                    tc.display_name,
+                    ci.code,
+                    ci.title,
+                    completion_date,
+                ])
+
+    output.seek(0)
+    audit(db, p, object_type="training_records_export", object_id=class_id, action="export")
+    return StreamingResponse(
+        _io.BytesIO(output.read().encode("utf-8")),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="tms-training-records-{tc.display_name}.csv"'},
+    )
+
+
+@router.get("/cadets/{cadet_id}/training-record")
+def cadet_training_record(
+    cadet_id: str,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    if p.role == "sqn_general":
+        raise HTTPException(403, detail={"error": "forbidden"})
+    from ..models.training import CadetSessionOutcome
+
+    cadet = db.get(Cadet, cadet_id)
+    if not cadet or cadet.is_archived:
+        raise HTTPException(404, detail={"error": "not_found"})
+    sq = db.get(Squadron, cadet.squadron_id)
+    require_can_view_squadron(p, cadet.squadron_id, sq.wing_id if sq else None)
+
+    memberships = db.query(CadetClassMembership, TrainingClass).join(
+        TrainingClass, CadetClassMembership.training_class_id == TrainingClass.id
+    ).filter(
+        CadetClassMembership.cadet_id == cadet_id,
+        CadetClassMembership.is_archived == False,  # noqa: E712
+    ).all()
+
+    outcomes_raw = (
+        db.query(CadetSessionOutcome, Session, ParadeNight)
+        .join(Session, CadetSessionOutcome.session_id == Session.id)
+        .join(ParadeNight, Session.parade_night_id == ParadeNight.id)
+        .filter(
+            CadetSessionOutcome.cadet_id == cadet_id,
+            Session.is_archived == False,  # noqa: E712
+        )
+        .order_by(ParadeNight.date.asc())
+        .all()
+    )
+
+    # group by curriculum_item_id
+    by_item: dict[str, list[dict]] = {}
+    for o, sess, pn in outcomes_raw:
+        ci_id = sess.curriculum_item_id
+        if not ci_id:
+            continue
+        audience = db.query(SessionAudience, TrainingClass).join(
+            TrainingClass, SessionAudience.training_class_id == TrainingClass.id
+        ).filter(SessionAudience.session_id == sess.id).first()
+        tc_name = audience[1].display_name if audience else None
+        by_item.setdefault(ci_id, []).append({
+            "session_id": sess.id,
+            "parade_night_date": pn.date,
+            "status": o.status,
+            "completion_date": o.completion_date,
+            "delivery_note": sess.delivery_notes,
+            "training_class": tc_name,
+            "source": o.source,
+        })
+
+    # curriculum ordered phases
+    phases = (
+        db.query(CurriculumPhase)
+        .filter(CurriculumPhase.squadron_id == cadet.squadron_id, CurriculumPhase.is_archived == False)  # noqa: E712
+        .order_by(CurriculumPhase.sort_order)
+        .all()
+    )
+    items_all = (
+        db.query(CurriculumItem)
+        .filter(CurriculumItem.is_archived == False)  # noqa: E712
+        .order_by(CurriculumItem.recommended_sequence, CurriculumItem.code)
+        .all()
+    )
+    items_by_phase_name: dict[str, list] = {}
+    for ci in items_all:
+        items_by_phase_name.setdefault(ci.phase or "", []).append(ci)
+
+    phase_data = []
+    for phase in phases:
+        phase_items = items_by_phase_name.get(phase.name, [])
+        item_rows = []
+        for ci in phase_items:
+            attempts = by_item.get(ci.id, [])
+            completed_dates = [a["completion_date"] or a["parade_night_date"] for a in attempts if a["status"] == "completed"]
+            if completed_dates:
+                summary_status = "completed"
+                summary_date = max(completed_dates)
+            elif attempts:
+                summary_status = attempts[-1]["status"]
+                summary_date = None
+            else:
+                summary_status = "not_started"
+                summary_date = None
+            item_rows.append({
+                "curriculum_item_id": ci.id,
+                "code": ci.code,
+                "title": ci.title,
+                "summary_status": summary_status,
+                "summary_completion_date": summary_date,
+                "attempts": attempts,
+            })
+        if item_rows:
+            phase_data.append({
+                "phase_id": phase.id, "name": phase.display_name or phase.name, "items": item_rows
+            })
+
+    return {
+        "cadet_id": cadet.id,
+        "service_number": cadet.service_number,
+        "rank": cadet.rank,
+        "first_name": cadet.first_name,
+        "last_name": cadet.last_name,
+        "memberships": [
+            {"membership_id": m.id, "training_class_id": tc.id, "display_name": tc.display_name,
+             "start_date": m.start_date, "active_status": m.active_status}
+            for m, tc in memberships
+        ],
+        "phases": phase_data,
+    }
+
+
+@router.post("/cadets/{cadet_id}/session-outcomes/{session_id}")
+def override_cadet_session_outcome(
+    cadet_id: str,
+    session_id: str,
+    body: CadetOutcomeOverrideIn,
+    db: DBSession = Depends(get_db),
+    p: Principal = Depends(get_principal),
+):
+    if p.role in ("sqn_general", "wing_viewer", "national_viewer", "auditor"):
+        raise HTTPException(403, detail={"error": "forbidden"})
+    from ..models.training import CadetSessionOutcome
+
+    cadet = db.get(Cadet, cadet_id)
+    if not cadet or cadet.is_archived:
+        raise HTTPException(404, detail={"error": "cadet_not_found"})
+    sess = db.get(Session, session_id)
+    if not sess or sess.is_archived:
+        raise HTTPException(404, detail={"error": "session_not_found"})
+    pn = db.get(ParadeNight, sess.parade_night_id)
+    require_can_write_squadron(p, cadet.squadron_id, pn.wing_id if pn else None)
+
+    existing = db.query(CadetSessionOutcome).filter(
+        CadetSessionOutcome.cadet_id == cadet_id,
+        CadetSessionOutcome.session_id == session_id,
+    ).first()
+
+    if not (body.override_reason or "").strip():
+        raise HTTPException(422, detail={"error": "override_reason_required"})
+
+    if existing:
+        old_status = existing.status
+        existing.status = body.status
+        existing.source = "manual"
+        existing.override_reason = body.override_reason or ""
+        existing.changed_by = p.user_id
+        existing.version += 1
+        if body.status == "completed":
+            existing.completion_date = pn.date if pn else None
+        else:
+            existing.completion_date = None
+        db.commit()
+        audit(db, p, object_type="cadet_session_outcome", object_id=existing.id, action="override",
+              old={"status": old_status}, new={"status": body.status, "reason": body.override_reason})
+        return {"ok": True, "outcome_id": existing.id}
+    else:
+        outcome = CadetSessionOutcome(
+            cadet_id=cadet_id, session_id=session_id,
+            status=body.status,
+            completion_date=pn.date if (body.status == "completed" and pn) else None,
+            source="manual", override_reason=body.override_reason or "", changed_by=p.user_id,
+        )
+        db.add(outcome)
+        db.commit()
+        audit(db, p, object_type="cadet_session_outcome", object_id=outcome.id, action="create",
+              new={"status": body.status, "cadet_id": cadet_id, "session_id": session_id})
+        return {"ok": True, "outcome_id": outcome.id}
