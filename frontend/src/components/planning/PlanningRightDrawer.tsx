@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useId, useCallback, type KeyboardEvent } f
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { planningApi, trainingApi } from "../../api";
 import { friendlyMessage } from "../../api/client";
-import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent, NightSummary, TrainingClassSummary, AssistantFacilitator } from "../../api/types";
+import type { PlanningSession, PlanningFacilitator, PlanningLocation, PlanningConflict, WingHQEvent, MissionItem, AnchorEvent, NightSummary, TrainingClassSummary, AssistantFacilitator, InstructionalPeriod } from "../../api/types";
 import { ActivityFullDetail, anchorToDisplay } from "./ActivityDetailBlock";
 import { getProgramType } from "../../utils/planningFilters";
 import { useConfirm } from "../ConfirmDialog";
@@ -63,6 +63,11 @@ function SessionForm({
     (existing?.training_classes?.[0]?.training_class_id) ??
     (item.type === "new-session" ? (item.trainingClassId ?? null) : null);
   const [trainingClassId, setTrainingClassId] = useState<string | null>(initClassId);
+  // Preserve the full original audience so a single-class picker doesn't silently
+  // collapse a multi-class session when the user saves without changing the audience.
+  const [originalClassIds] = useState<string[]>(
+    existing?.training_classes?.map((tc: { training_class_id: string }) => tc.training_class_id) ?? [],
+  );
   const [periodNumber, setPeriodNumber] = useState(
     existing?.session_number ?? (item.type === "new-session" ? item.periodNumber : 1),
   );
@@ -99,20 +104,13 @@ function SessionForm({
   const sessionId = existing?.session_id ?? null;
   const autoSaveNotesFn = useCallback(async (val: string) => {
     if (!sessionId) return; // create mode — no autosave
+    // Notes autosave only updates the notes field to avoid collapsing multi-class
+    // session audiences. Audience assignment happens on the explicit Save button.
     await planningApi.updateSession(sessionId, {
-      curriculum_id: curriculumId ?? null,
-      activity_title: title || null,
-      facilitator_id: facilitatorId || null,
-      assistant_facilitator_id: asstFacId || null,
-      location_id: locationId || null,
-      ...(trainingClassId
-        ? { training_class_ids: [trainingClassId] }
-        : { cadet_group: cadetGroup || null }),
-      part_number: partNumber ? Number(partNumber) : null,
       notes: val || null,
     });
     await qc.invalidateQueries({ queryKey: ["planning-weekly"] });
-  }, [sessionId, curriculumId, title, facilitatorId, asstFacId, locationId, cadetGroup, trainingClassId, partNumber, qc]);
+  }, [sessionId, qc]);
   const { onChange: onNotesAutoSave, status: notesSaveStatus } = useAutoSave(autoSaveNotesFn);
 
   // Task 6: immediate-mutation handlers for multi-assistant facilitators.
@@ -167,7 +165,7 @@ function SessionForm({
   const { data: nightData } = useQuery({
     queryKey: ["planning-night-summaries", yearId],
     queryFn: () => planningApi.nightSummaries(yearId!),
-    enabled: !!yearId && isEdit && showMove,
+    enabled: !!yearId,
     staleTime: 2 * 60 * 1000,
   });
   const movableNights: NightSummary[] = (nightData?.summaries ?? []).filter(
@@ -246,6 +244,18 @@ function SessionForm({
 
   const conflicts = item.type === "session" ? item.conflicts : [];
   const dateId = item.type === "session" ? item.dateId : item.dateId;
+  const LEGACY_PERIODS: InstructionalPeriod[] = [
+    { period_number: 1, label: "P1", start_time: null, end_time: null },
+    { period_number: 2, label: "P2", start_time: null, end_time: null },
+    { period_number: 3, label: "P3", start_time: null, end_time: null },
+  ];
+  const currentNight = (nightData?.summaries ?? []).find(
+    (n: NightSummary) => n.parade_date_id === dateId,
+  );
+  const availablePeriods: InstructionalPeriod[] =
+    currentNight?.instructional_periods?.length
+      ? currentNight.instructional_periods
+      : LEGACY_PERIODS;
 
   async function handleSave() {
     setSaving(true);
@@ -258,8 +268,16 @@ function SessionForm({
           facilitator_id: facilitatorId || null,
           assistant_facilitator_id: asstFacId || null,
           location_id: locationId || null,
+          // Preserve the full original audience if the class picker is unchanged.
+          // If the user changed the class, send the new single-class list.
+          // If no class is selected, fall back to cadet_group.
           ...(trainingClassId
-            ? { training_class_ids: [trainingClassId] }
+            ? {
+                training_class_ids:
+                  trainingClassId === initClassId && originalClassIds.length > 0
+                    ? originalClassIds
+                    : [trainingClassId],
+              }
             : { cadet_group: cadetGroup || null }),
           part_number: partNumber ? Number(partNumber) : null,
           notes: notes || null,
@@ -330,10 +348,12 @@ function SessionForm({
         custom_title: title || null,
         status: existing.status,
       });
-      // After move, update the session audience via updateSession if a class is selected.
-      if (trainingClassId) {
+      // After move, restore the full original audience. trainingApi.editSession only
+      // updates parade night / period / curriculum; the audience rows survive unchanged.
+      // Sending only [trainingClassId] would collapse a multi-class session to one class.
+      if (originalClassIds.length > 0) {
         await planningApi.updateSession(existing.session_id, {
-          training_class_ids: [trainingClassId],
+          training_class_ids: originalClassIds,
         });
       }
       await qc.invalidateQueries({ queryKey: ["planning-weekly"] });
@@ -562,11 +582,15 @@ function SessionForm({
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           <label>
             Session #
-            <input type="number" min={1} max={4} value={periodNumber} onChange={e => setPeriodNumber(Number(e.target.value))} />
+            <select value={periodNumber} onChange={e => setPeriodNumber(Number(e.target.value))}>
+              {availablePeriods.map(p => (
+                <option key={p.period_number} value={p.period_number}>{p.label}</option>
+              ))}
+            </select>
           </label>
           <label>
             Part # (optional)
-            <input type="number" min={1} max={4} value={partNumber} onChange={e => setPartNumber(e.target.value)} placeholder="—" />
+            <input type="number" min={1} value={partNumber} onChange={e => setPartNumber(e.target.value)} placeholder="—" />
           </label>
         </div>
         <label>
@@ -704,14 +728,24 @@ function SessionForm({
                 </label>
                 <label style={{ fontSize: 'var(--fs-sm)' }}>
                   Session number
-                  <input
-                    type="number"
-                    min={1}
-                    max={4}
-                    value={moveTargetPeriod}
-                    onChange={e => setMoveTargetPeriod(Number(e.target.value))}
-                    style={{ fontSize: 'var(--fs-sm)' }}
-                  />
+                  {(() => {
+                    const targetNight = movableNights.find(n => n.parade_night_id === moveTargetNightId);
+                    const targetPeriods: InstructionalPeriod[] =
+                      targetNight?.instructional_periods?.length
+                        ? targetNight.instructional_periods
+                        : LEGACY_PERIODS;
+                    return (
+                      <select
+                        value={moveTargetPeriod}
+                        onChange={e => setMoveTargetPeriod(Number(e.target.value))}
+                        style={{ fontSize: 'var(--fs-sm)' }}
+                      >
+                        {targetPeriods.map(p => (
+                          <option key={p.period_number} value={p.period_number}>{p.label}</option>
+                        ))}
+                      </select>
+                    );
+                  })()}
                 </label>
                 {moveErr && <div className="pw-err">{moveErr}</div>}
                 <button className="btn sm primary" onClick={handleMove} disabled={moving}>
@@ -1008,6 +1042,12 @@ function ScheduleFromBacklogPanel({
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // Reset period to first available when the selected night changes.
+  // Without this, selecting a 2-period night while P3 was chosen keeps an invalid period.
+  useEffect(() => {
+    if (dateId) setPeriod(1);
+  }, [dateId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const { data: classesData } = useQuery({
     queryKey: ["training-classes", yearId],
     queryFn: () => trainingApi.trainingClasses(yearId),
@@ -1030,6 +1070,16 @@ function ScheduleFromBacklogPanel({
   const allMissions: MissionItem[] = missionsData?.missions ?? [];
   const mission = allMissions.find(m => m.curriculum_id === curriculum.curriculum_id);
   const summaries = nightData?.summaries ?? [];
+  const BACKLOG_LEGACY_PERIODS: InstructionalPeriod[] = [
+    { period_number: 1, label: "P1", start_time: null, end_time: null },
+    { period_number: 2, label: "P2", start_time: null, end_time: null },
+    { period_number: 3, label: "P3", start_time: null, end_time: null },
+  ];
+  const selectedNight = summaries.find((s: NightSummary) => s.parade_date_id === dateId);
+  const backlogPeriods: InstructionalPeriod[] =
+    selectedNight?.instructional_periods?.length
+      ? selectedNight.instructional_periods
+      : BACKLOG_LEGACY_PERIODS;
 
   async function handleSave() {
     if (!dateId) { setErr("Select a parade night."); return; }
@@ -1145,9 +1195,9 @@ function ScheduleFromBacklogPanel({
             <label>
               Period
               <select value={period} onChange={e => setPeriod(Number(e.target.value))}>
-                <option value={1}>P1</option>
-                <option value={2}>P2</option>
-                <option value={3}>P3</option>
+                {backlogPeriods.map(p => (
+                  <option key={p.period_number} value={p.period_number}>{p.label}</option>
+                ))}
               </select>
             </label>
             {mission?.part_count && mission.part_count > 1 && (

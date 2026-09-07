@@ -61,7 +61,7 @@ EXPECTED_STAGING_PW_DOMAIN="aafc-tms-planning-workspace-preview-staging.up.railw
 # The guard below explicitly allows main when it is the declared expectation.
 EXPECTED_BRANCH="main"
 REQUIRED_ANCESTOR="de27c42"
-REQUIRED_ALEMBIC_HEAD="d61e0844186f"
+REQUIRED_ALEMBIC_HEAD="f842d63a1d6c"
 
 # Railway's builder can sit in INITIALIZING for 8-9 minutes when its queue is
 # busy, against builds that normally take ~30s. Two staging deploys aborted at
@@ -745,7 +745,7 @@ source .venv/bin/activate 2>/dev/null || true
 ALEMBIC_CODE_HEAD=$(python -m alembic heads 2>/dev/null | grep -oE '[a-f0-9]{12}' | head -1 || echo "unknown")
 info "Alembic code head: $ALEMBIC_CODE_HEAD"
 [ "$ALEMBIC_CODE_HEAD" = "$REQUIRED_ALEMBIC_HEAD" ] \
-  && ok "Code head is $REQUIRED_ALEMBIC_HEAD (v65 ParadeNightTimingSnapshot)" \
+  && ok "Code head is $REQUIRED_ALEMBIC_HEAD (v68 CadetOutcomesAndMemberImport)" \
   || die "Code head is $ALEMBIC_CODE_HEAD, expected $REQUIRED_ALEMBIC_HEAD."
 
 # ── Migration rehearsal on real PostgreSQL ───────────────────────────────────
