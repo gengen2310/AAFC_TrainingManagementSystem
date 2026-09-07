@@ -142,6 +142,7 @@ def test_training_class_roster_unauthenticated(client):
 
 def _make_cadet(db, sq_id, service_number):
     from app.models.training import Cadet
+    import uuid
     existing = db.query(Cadet).filter(Cadet.service_number == service_number).first()
     if existing:
         return existing.id
