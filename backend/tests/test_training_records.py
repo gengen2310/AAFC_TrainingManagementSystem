@@ -1,4 +1,7 @@
 """Tests for Training Records endpoints: matrix, individual cadet, CSV export, roster, bulk membership."""
+import csv
+import io
+
 import pytest
 from conftest import login
 
@@ -69,9 +72,14 @@ def test_training_records_export_ok(client):
     r = client.get(f"/api/training-records/export?class_id={class_id}", headers=h)
     assert r.status_code == 200
     assert "text/csv" in r.headers.get("content-type", "")
-    # CSV must have a header row
-    text = r.text
-    assert "CEA Number" in text or "Completion Date" in text or len(text.strip()) >= 0  # may be empty if no completions
+
+    # Even when there are no completion rows, the export must retain the
+    # operational columns Training Officers depend on for CEA entry.
+    rows = list(csv.reader(io.StringIO(r.text)))
+    assert rows, "CSV export must contain a header row"
+    headers = rows[0]
+    assert "CEA Number" in headers
+    assert "Completion Date" in headers
 
 
 def test_training_records_export_unauthenticated(client):
@@ -100,7 +108,7 @@ def test_cadet_training_record_not_found(client):
 
 
 def test_cadet_training_record_unauthenticated(client):
-    r = client.get("/api/cadets/x/training-record")
+    r = client.get("/api/cadets/x/training-record", headers=h)
     assert r.status_code == 401
 
 
@@ -134,7 +142,6 @@ def test_training_class_roster_unauthenticated(client):
 
 def _make_cadet(db, sq_id, service_number):
     from app.models.training import Cadet
-    import uuid
     existing = db.query(Cadet).filter(Cadet.service_number == service_number).first()
     if existing:
         return existing.id
