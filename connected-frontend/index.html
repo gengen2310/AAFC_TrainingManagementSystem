@@ -8615,6 +8615,7 @@ const MONTHS=['January','February','March','April','May','June','July','August',
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function fmtD(s,o){return s?new Date(s+'T00:00:00').toLocaleDateString('en-AU',o||{day:'numeric',month:'short',year:'numeric'}):'—';}
 function fmtDL(s){return s?new Date(s+'T00:00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'—';}
+const _fmtDate=fmtD;
 function today(){const d=new Date();d.setHours(0,0,0,0);return d;}
 
 const EL_L={Drill:'Drill',Air_Space:'Air & Space',Field:'Field Skills',Personal_Dev:'Personal Dev',Service_Community:'Service & Comm',SQN_Affairs:'SQN Affairs'}
@@ -19832,11 +19833,16 @@ async function loadTrainingRecords(){
     // Build matrix rows
     const bodyRows=rows.map(r=>{
       const cells=items.map(ci=>{
-        const outcome=r.outcomes&&r.outcomes[ci.curriculum_item_id];
-        if(outcome&&outcome.status==='completed'&&outcome.completion_date){
-          return `<td style="background:var(--ok-bg);color:var(--ok-text);text-align:center;font-size:var(--fs-2xs)" title="Completed ${esc(outcome.completion_date)}">${esc(outcome.completion_date)}</td>`;
-        }else if(outcome&&outcome.status==='absent'){
-          return `<td style="background:var(--warn-bg);text-align:center;font-size:var(--fs-2xs)">Absent</td>`;
+        const cell=r.cells&&r.cells[ci.curriculum_item_id||ci.id];
+        const status=cell&&cell.status;
+        const date=cell&&(cell.completion_date||cell.parade_date);
+        if(status==='completed'&&date){
+          const fmt=_fmtDate(date);
+          return `<td style="background:var(--ok-bg);color:var(--ok-text);text-align:center;font-size:var(--fs-2xs);font-weight:600" title="Completed ${esc(date)}" aria-label="Completed ${esc(fmt)}">${esc(fmt)}</td>`;
+        }else if(status==='absent'){
+          return `<td style="background:var(--warn-bg);color:var(--warn);text-align:center;font-size:var(--fs-2xs)">Absent</td>`;
+        }else if(status==='not_completed'){
+          return `<td style="text-align:center;color:var(--muted);font-size:var(--fs-2xs)">Not done</td>`;
         }else{
           return `<td style="text-align:center;color:var(--muted);font-size:var(--fs-2xs)">—</td>`;
         }

@@ -7088,13 +7088,14 @@ def _auto_complete_session(db: DBSession, s: Session, pn: ParadeNight, p: Princi
 
     pn_date = pn.date  # ISO string YYYY-MM-DD
 
+    # Historical membership: eligibility is determined by membership validity
+    # ON THE PARADE NIGHT DATE, not by today's active_status.
+    # A cadet moved to another class after the lesson still earned this completion.
     memberships = db.query(CadetClassMembership).filter(
         CadetClassMembership.training_class_id.in_(tc_ids),
         CadetClassMembership.is_archived == False,  # noqa: E712
-        CadetClassMembership.active_status == True,  # noqa: E712
     ).all()
 
-    # keep only members active on the parade night date
     eligible_cadet_ids: set[str] = set()
     for m in memberships:
         start_ok = (not m.start_date) or m.start_date <= pn_date
@@ -7627,6 +7628,11 @@ def training_records_export(
     phase_map = {ci.id: phase for ci, phase in items_q}
     ci_map = {ci.id: ci for ci, _ in items_q}
 
+    def _csv_safe(v: str) -> str:
+        """Neutralise spreadsheet formula injection: prefix dangerous chars."""
+        s = str(v) if v is not None else ""
+        return ("'" + s) if s and s[0] in ("=", "+", "-", "@", "\t", "\r") else s
+
     output = _io.StringIO()
     writer = _csv.writer(output)
     writer.writerow(["CEA Number", "Rank", "First Name", "Last Name", "Training Phase", "Training Class", "Curriculum Code", "Curriculum Title", "Completion Date"])
@@ -7636,14 +7642,14 @@ def training_records_export(
             completion_date = best.get((cadet.id, ci.id))
             if completion_date:
                 writer.writerow([
-                    cadet.service_number or "",
-                    cadet.rank or "",
-                    cadet.first_name or "",
-                    cadet.last_name or "",
-                    phase.display_name or phase.name,
-                    tc.display_name,
-                    ci.code,
-                    ci.title,
+                    _csv_safe(cadet.service_number or ""),
+                    _csv_safe(cadet.rank or ""),
+                    _csv_safe(cadet.first_name or ""),
+                    _csv_safe(cadet.last_name or ""),
+                    _csv_safe(phase.display_name or phase.name),
+                    _csv_safe(tc.display_name),
+                    _csv_safe(ci.code),
+                    _csv_safe(ci.title),
                     completion_date,
                 ])
 

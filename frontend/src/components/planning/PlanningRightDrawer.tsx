@@ -488,24 +488,41 @@ function SessionForm({
             </>
           )}
         </div>
-        {prevDeliveries && prevDeliveries.deliveries.length > 0 && (
+        {prevDeliveries && prevDeliveries.length > 0 && (
           <div style={{
             background: "var(--warning-bg, #fff3cd)",
-            border: "1px solid var(--warning, #c97a00)",
+            border: "1px solid var(--warning-dark, #c97a00)",
             borderRadius: 6,
             padding: "8px 12px",
             marginBottom: 10,
             fontSize: "var(--fs-xs)",
-            color: "var(--warning, #c97a00)",
           }}>
-            <strong>Previously delivered</strong> — this item was taught on{" "}
-            {prevDeliveries.deliveries.map((d, i) => (
-              <span key={d.session_id}>
-                {i > 0 ? ", " : ""}{d.parade_night_date}
-                {d.class_names?.length > 0 ? ` (${d.class_names.join(", ")})` : ""}
-              </span>
-            ))}.{" "}
-            You can still schedule it again.
+            <div style={{ fontWeight: 700, color: "var(--warning-dark, #c97a00)", marginBottom: 4 }}>
+              Previous delivery
+            </div>
+            {prevDeliveries.slice(0, 3).map(d => (
+              <div key={d.session_id} style={{ marginBottom: 4, color: "var(--text)" }}>
+                <span style={{ fontWeight: 600 }}>{d.parade_night_date}</span>
+                {d.training_classes.length > 0 && (
+                  <span style={{ color: "var(--muted-text, #5c6a76)" }}>
+                    {" · "}{d.training_classes.map(tc => tc.display_name).join(", ")}
+                  </span>
+                )}
+                {d.delivery_note && (
+                  <div style={{ fontStyle: "italic", color: "var(--muted-text, #5c6a76)", marginTop: 2 }}>
+                    &ldquo;{d.delivery_note}&rdquo;
+                  </div>
+                )}
+              </div>
+            ))}
+            {prevDeliveries.length > 3 && (
+              <div style={{ color: "var(--muted-text, #5c6a76)", marginTop: 2 }}>
+                + {prevDeliveries.length - 3} earlier delivery{prevDeliveries.length - 3 !== 1 ? "ies" : ""}
+              </div>
+            )}
+            <div style={{ color: "var(--warning-dark, #c97a00)", marginTop: 4 }}>
+              This lesson has been delivered previously. You can still schedule it again.
+            </div>
           </div>
         )}
         <label>

@@ -396,7 +396,13 @@ export const planningApi = {
   overrideConflict: (conflict_id: string, override_reason: string) =>
     api.post<{ ok: boolean }>(`/api/planning/conflicts/${conflict_id}/override`, { override_reason }),
   getPreviousDeliveries: (curriculum_item_id: string) =>
-    api.get<{ curriculum_item_id: string; deliveries: Array<{ session_id: string; parade_night_date: string; training_year: number; class_names: string[]; status: string }> }>(
+    api.get<Array<{
+      session_id: string;
+      parade_night_date: string;
+      delivery_note: string | null;
+      status: string;
+      training_classes: Array<{ training_class_id: string; display_name: string }>;
+    }>>(
       `/api/curriculum-items/${curriculum_item_id}/previous-deliveries`
     ),
   wingEvents: (wing_id: string, year: number, squadron_id?: string) => {
