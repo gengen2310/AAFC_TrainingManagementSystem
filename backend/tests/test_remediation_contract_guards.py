@@ -10,6 +10,7 @@ import uuid
 from datetime import date
 
 import pytest
+from sqlalchemy import func
 
 from tests.conftest import login
 
@@ -64,10 +65,20 @@ def _ensure_training_class(db, squadron_id: str, label: str):
         db.add(planning_year)
         db.flush()
 
+    # TrainingClass has a real unique constraint on
+    # (squadron_id, training_year_id, class_number). The seeded DB already
+    # contains class_number=1, so test data must allocate a collision-free
+    # number instead of relying on the model default.
+    max_class_number = db.query(func.max(TrainingClass.class_number)).filter(
+        TrainingClass.squadron_id == squadron_id,
+        TrainingClass.training_year_id == planning_year.id,
+    ).scalar()
+
     training_class = TrainingClass(
         squadron_id=squadron_id,
         training_year_id=planning_year.id,
         display_name=f"Contract Guard {label} {uuid.uuid4().hex[:6]}",
+        class_number=(max_class_number or 0) + 1,
         created_by="test",
         updated_by="test",
     )
