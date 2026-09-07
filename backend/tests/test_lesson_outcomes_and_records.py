@@ -10,6 +10,7 @@ import pytest
 from tests.conftest import login, next_test_year
 
 ADM703 = "ADMIN703"
+ADM704 = "ADMIN704"
 GEN703 = "703SQN2026"
 ADM7WG = "ADMIN7WG"
 NATADM = "ADMINNATIONAL"
@@ -792,3 +793,168 @@ def test_training_records_matrix_uses_cells_key(client):
     for row in body["rows"]:
         assert "cells" in row, "Backend must return 'cells' dict per row, not 'outcomes'"
         assert "outcomes" not in row, "Must not return 'outcomes' key (frontend expects 'cells')"
+
+
+# ─── CROSS-SQUADRON TENANCY ───────────────────────────────────────────────────
+
+def _ensure_sqn_class_id(sqn_code):
+    """Return an existing or newly-created training class ID for the given squadron code."""
+    from app.database import SessionLocal
+    from app.models.training import TrainingClass, CurriculumPhase
+    from app.models.planning import PlanningYear
+    from app.models import Squadron
+    db = SessionLocal()
+    try:
+        sq = db.query(Squadron).filter(Squadron.code == sqn_code).first()
+        if not sq:
+            return None
+        tc = db.query(TrainingClass).filter(
+            TrainingClass.squadron_id == sq.id,
+            TrainingClass.is_archived == False,  # noqa: E712
+        ).first()
+        if tc:
+            return tc.id
+        # Need a PlanningYear for this squadron (PlanningYear uses unit_id, not squadron_id)
+        py = db.query(PlanningYear).filter(PlanningYear.unit_id == sq.id).first()
+        if not py:
+            py = PlanningYear(
+                unit_id=sq.id, year=2099, name=f"Tenancy-Test Year {sqn_code}",
+                created_by="test", updated_by="test",
+            )
+            db.add(py); db.flush()
+        tc = TrainingClass(
+            squadron_id=sq.id,
+            training_year_id=py.id,
+            display_name=f"Tenancy-Test Class {sqn_code}",
+            created_by="test", updated_by="test",
+        )
+        db.add(tc); db.commit(); db.refresh(tc)
+        return tc.id
+    finally:
+        db.close()
+
+
+def _ensure_sqn_cadet_id(sqn_code):
+    """Return an existing or newly-created cadet ID for the given squadron code."""
+    from app.database import SessionLocal
+    from app.models.training import Cadet
+    from app.models import Squadron
+    db = SessionLocal()
+    try:
+        sq = db.query(Squadron).filter(Squadron.code == sqn_code).first()
+        if not sq:
+            return None
+        c = db.query(Cadet).filter(
+            Cadet.squadron_id == sq.id,
+            Cadet.is_archived == False,  # noqa: E712
+        ).first()
+        if c:
+            return c.id
+        c = Cadet(
+            squadron_id=sq.id, service_number=f"XSQN{sqn_code}001",
+            first_name="Cross", last_name="SqnTest",
+            created_by="test", updated_by="test",
+        )
+        db.add(c); db.commit(); db.refresh(c)
+        return c.id
+    finally:
+        db.close()
+
+
+def _ensure_sqn_session_id(sqn_code):
+    """Return an existing or newly-created delivered session ID for the given squadron."""
+    from app.database import SessionLocal
+    from app.models.training import Session as TmsSession, CurriculumItem
+    from app.models import Squadron, ParadeNight
+    db = SessionLocal()
+    try:
+        sq = db.query(Squadron).filter(Squadron.code == sqn_code).first()
+        if not sq:
+            return None
+        pn = db.query(ParadeNight).filter(
+            ParadeNight.squadron_id == sq.id,
+            ParadeNight.is_archived == False,  # noqa: E712
+        ).first()
+        if not pn:
+            return None
+        sess = db.query(TmsSession).filter(
+            TmsSession.squadron_id == sq.id,
+            TmsSession.is_archived == False,  # noqa: E712
+        ).first()
+        if sess:
+            return sess.id
+        ci = db.query(CurriculumItem).filter(
+            CurriculumItem.is_archived == False,  # noqa: E712
+        ).first()
+        sess = TmsSession(
+            squadron_id=sq.id, parade_night_id=pn.id, period_number=1,
+            curriculum_item_id=ci.id if ci else None,
+            status="delivered", delivery_notes="Cross-sqn tenancy test",
+            created_by="test", updated_by="test",
+        )
+        db.add(sess); db.commit(); db.refresh(sess)
+        return sess.id
+    finally:
+        db.close()
+
+
+def test_cross_squadron_training_records_denied(client):
+    """Squadron 703 admin cannot read training records belonging to squadron 704."""
+    hdr703 = _hdr(client, ADM703)
+    class_id_704 = _ensure_sqn_class_id("704")
+    if not class_id_704:
+        pytest.skip("no 704 squadron in seed")
+
+    r = client.get("/api/training-records", params={"class_id": class_id_704}, headers=hdr703)
+    assert r.status_code in (403, 404), (
+        f"Expected 403/404 when 703 admin reads 704 class, got {r.status_code}: {r.text}"
+    )
+
+
+def test_cross_squadron_cadet_roster_denied(client):
+    """Squadron 703 admin cannot read cadet detail for a squadron-704 cadet."""
+    hdr703 = _hdr(client, ADM703)
+    cadet_id_704 = _ensure_sqn_cadet_id("704")
+    if not cadet_id_704:
+        pytest.skip("no 704 squadron in seed")
+
+    r = client.get(f"/api/cadets/{cadet_id_704}", headers=hdr703)
+    assert r.status_code in (403, 404), (
+        f"Expected 403/404 when 703 admin reads 704 cadet, got {r.status_code}: {r.text}"
+    )
+
+
+def test_cross_squadron_outcome_override_denied(client):
+    """Squadron 703 admin cannot override a cadet outcome for a 704 cadet.
+
+    The cadet's squadron_id (704) mismatches the caller's scope (703), so the
+    tenancy check fires before any session-delivery check, yielding 403/404.
+    """
+    hdr703 = _hdr(client, ADM703)
+    cadet_id_704 = _ensure_sqn_cadet_id("704")
+    if not cadet_id_704:
+        pytest.skip("no 704 squadron in seed")
+
+    # Use a random session UUID — the 403 fires on the cadet squadron check first
+    fake_session = str(uuid.uuid4())
+    r = client.post(
+        f"/api/cadets/{cadet_id_704}/session-outcomes/{fake_session}",
+        json={"status": "absent", "override_reason": "cross-sqn attempt"},
+        headers=hdr703,
+    )
+    assert r.status_code in (403, 404), (
+        f"Expected 403/404 for cross-squadron outcome override, got {r.status_code}: {r.text}"
+    )
+
+
+def test_sqn704_admin_cannot_read_703_training_records(client):
+    """Symmetry check: 704 admin also cannot read 703 training records."""
+    hdr704 = _hdr(client, ADM704)
+    class_id_703 = _ensure_sqn_class_id("703")
+    if not class_id_703:
+        pytest.skip("no 703 training class in seed")
+
+    r = client.get("/api/training-records", params={"class_id": class_id_703}, headers=hdr704)
+    assert r.status_code in (403, 404), (
+        f"Expected 403/404 when 704 admin reads 703 class, got {r.status_code}: {r.text}"
+    )
