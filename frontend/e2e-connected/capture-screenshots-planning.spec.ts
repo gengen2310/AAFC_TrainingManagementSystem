@@ -1,4 +1,5 @@
 import { test, Page } from "@playwright/test";
+import { resolve } from "node:path";
 
 // Formal staging screenshot evidence for the Planning Workspace preview
 // service, captured against the ACTUAL deployed module-mode build (not a
@@ -15,7 +16,7 @@ import { test, Page } from "@playwright/test";
 // reproducing the actual production auth path rather than a same-origin
 // shortcut.
 const SHA = process.env.CAPTURE_SHA || "unknown-sha";
-const OUT = `/Users/jennydv/Desktop/AAFC_TMS_National_Connected_Pilot_Package_v17_1_source/artifacts/general-release/${SHA}/staging`;
+const OUT = resolve(process.cwd(), "artifacts", "general-release", SHA, "staging");
 const MAIN_TMS = "https://aafc-tms-frontend-staging.up.railway.app";
 const PLANNING = "https://aafc-tms-planning-workspace-preview-staging.up.railway.app";
 
