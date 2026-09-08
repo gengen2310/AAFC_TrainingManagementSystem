@@ -15,6 +15,7 @@ Configure a branch protection rule for `main` before beta/release approval.
     - `pytest (Python 3.13, SQLite)`
     - `TypeScript typecheck (Planning Workspace)`
     - `Frontend build (Planning Workspace)`
+    - `Release static checks`
     - `PostgreSQL migration rehearsal`
     - `Planning Workspace E2E (chromium)`
     - `Planning Workspace E2E (firefox)`
@@ -32,6 +33,7 @@ Configure a branch protection rule for `main` before beta/release approval.
 
 - `pytest` protects backend behaviour, tenancy and RBAC contracts and includes SQLite migration regressions.
 - TypeScript and build checks prove the Planning Workspace compiles as the module that is actually deployed.
+- `Release static checks` rejects whitespace errors, verifies shared design-token synchronisation, scans both production frontends for prohibited credential/session-storage patterns, and exercises the deployment-control unit tests.
 - PostgreSQL migration rehearsal exercises the production database dialect before a merge.
 - All three Planning Workspace browsers validate the `/planning` module contract rather than a retired React TMS shell.
 - All three Connected Frontend browsers validate the authoritative Main TMS surface and its cross-interface handoff.
@@ -39,7 +41,7 @@ Configure a branch protection rule for `main` before beta/release approval.
 
 ## Workflow ownership
 
-- `.github/workflows/backend-tests.yml`: pytest, typecheck, build, PostgreSQL migration rehearsal.
+- `.github/workflows/backend-tests.yml`: pytest, typecheck, build, release static checks, PostgreSQL migration rehearsal.
 - `.github/workflows/e2e-tests.yml`: Planning Workspace and Connected Frontend matrices for Chromium, Firefox and WebKit.
 - `.github/workflows/dependency-audit.yml`: pip-audit and npm audit.
 
