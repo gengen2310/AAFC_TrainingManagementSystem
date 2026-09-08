@@ -1,5 +1,6 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+import { selectConnectedPlanningYear } from "./year-context-helper";
 
 // ── Training Classes UI (first frontend consumer of CLASS-01/03/04/07) ──────
 // Real browser verification, per this program's own discipline (no live UI
@@ -10,24 +11,6 @@ const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 test.beforeAll(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 });
-
-// _loadActivitiesPage() (triggered by nav("activities")) populates #py-select
-// asynchronously and is not awaited by nav() itself -- poll rather than
-// assume it's already populated the instant nav() returns.
-async function selectFirstYear(page: Page): Promise<string> {
-  const yearSelect = page.locator("#py-select");
-  await expect(yearSelect).toBeVisible();
-  let firstRealValue = "";
-  await expect(async () => {
-    const options = await yearSelect.locator("option").all();
-    expect(options.length).toBeGreaterThan(1); // more than just the placeholder
-    firstRealValue = (await options[1].getAttribute("value")) || "";
-    expect(firstRealValue).not.toBe("");
-  }).toPass({ timeout: 8000 });
-  await yearSelect.selectOption(firstRealValue);
-  await page.waitForTimeout(600); // loadYearMap() is async
-  return firstRealValue;
-}
 
 async function loginSquadron(page: Page, code: string) {
   if (LOCAL_API_BASE) {
@@ -59,8 +42,7 @@ test.describe("Training Classes panel on the Activities page", () => {
 
   test("selecting a Training Year shows the Training Classes card and Add button", async ({ page }) => {
     await loginSquadron(page, "ADMIN703");
-    await page.evaluate(() => (window as any).nav("activities"));
-    await selectFirstYear(page);
+    await selectConnectedPlanningYear(page);
 
     await expect(page.locator("#py-classes-card")).toBeVisible();
     await expect(page.getByRole("button", { name: "+ Add Training Class" })).toBeVisible();
@@ -70,8 +52,7 @@ test.describe("Training Classes panel on the Activities page", () => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await loginSquadron(page, "ADMIN703");
-    await page.evaluate(() => (window as any).nav("activities"));
-    await selectFirstYear(page);
+    await selectConnectedPlanningYear(page);
 
     await page.getByRole("button", { name: "+ Add Training Class" }).click();
     const modal = page.locator("#m-add-training-class");
@@ -109,8 +90,7 @@ test.describe("Training Classes panel on the Activities page", () => {
 
   test("edit a Training Class: rename via the edit modal", async ({ page }) => {
     await loginSquadron(page, "ADMIN703");
-    await page.evaluate(() => (window as any).nav("activities"));
-    await selectFirstYear(page);
+    await selectConnectedPlanningYear(page);
 
     const originalName = `Playwright Edit Class ${Date.now()}`;
     await page.getByRole("button", { name: "+ Add Training Class" }).click();
@@ -151,8 +131,7 @@ test.describe("Training Classes panel on the Activities page", () => {
     await page.locator("#auth-btn").click();
     await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
 
-    await page.evaluate(() => (window as any).nav("activities"));
-    await selectFirstYear(page);
+    await selectConnectedPlanningYear(page);
     await expect(page.locator("#py-classes-card")).toBeVisible();
     await expect(page.getByRole("button", { name: "+ Add Training Class" })).toBeHidden();
   });
