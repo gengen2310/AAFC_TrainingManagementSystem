@@ -17,145 +17,55 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply release-qualification source fixes
+      - name: Correct CEA semantic danger styling and Weekly Program fixtures
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
 
-          def write_if_changed(path: str, before: str, after: str) -> None:
-              if before != after:
-                  Path(path).write_text(after, encoding="utf-8")
-
-          def replace_once(text: str, old: str, new: str, label: str) -> str:
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f"{label}: expected exactly one occurrence, found {count}")
-              return text.replace(old, new, 1)
-
-          path = "connected-frontend/index.html"
-          s = Path(path).read_text(encoding="utf-8")
-          before = s
-          if "--danger-text:" not in s:
-              m = re.search(r"(--red\s*:\s*#[0-9a-fA-F]{6}\s*;)", s)
-              if not m:
-                  raise SystemExit("connected index: --red token not found")
-              s = s[:m.end()] + "\n      --danger-text:#b5122f;" + s[m.end():]
-          block_match = re.search(r"\.cea-conflict-toggle\.replace\s*\{[^{}]*\}", s, flags=re.S)
-          if not block_match:
-              raise SystemExit("connected index: .cea-conflict-toggle.replace block not found")
-          block = block_match.group(0)
-          new_block, n = re.subn(r"(\bcolor\s*:\s*)var\(--red\)", r"\1var(--danger-text)", block, count=1)
-          if n != 1:
-              raise SystemExit(f"CEA replace block: expected one red foreground, found {n}: {block!r}")
-          s = s[:block_match.start()] + new_block + s[block_match.end():]
-          write_if_changed(path, before, s)
-
-          def rgb(hexv: str):
-              h = hexv.lstrip('#')
-              return tuple(int(h[i:i+2], 16) / 255 for i in (0,2,4))
-          def lum(hexv: str):
-              vals=[]
-              for c in rgb(hexv):
-                  vals.append(c/12.92 if c <= .04045 else ((c+.055)/1.055)**2.4)
-              r,g,b=vals
-              return .2126*r + .7152*g + .0722*b
-          def contrast(a: str,b: str):
-              la,lb=lum(a),lum(b)
-              return (max(la,lb)+.05)/(min(la,lb)+.05)
-          for bg in ("#ffffff", "#f4f8fc", "#fff2f4"):
-              ratio=contrast("#b5122f", bg)
-              if ratio < 4.5:
-                  raise SystemExit(f"danger contrast failed on {bg}: {ratio:.2f}:1")
-              print(f"danger-text contrast on {bg}: {ratio:.2f}:1")
-          print("CEA block after patch:", new_block.replace("\n", " "))
-
-          path = "frontend/e2e-connected/year-bar.spec.ts"
-          s = Path(path).read_text(encoding="utf-8")
-          before = s
-          s = replace_once(
-              s,
-              """  // Measured by HIT-TESTING, not by boundingBox(). The control is deliberately\n  // 36px tall so it matches the buttons beside it, and reaches 44px through a\n  // transparent ::after. boundingBox() reports the layout box and cannot see\n  // that, so it would report a false failure -- and, on a control that grew its\n  // box instead, a false pass is just as possible.\n""",
-              """  // The current control contract is a genuine 44px-or-larger layout box.\n  // Keep edge hit-testing as a second guard: minimum size alone would not catch\n  // a neighbouring element intercepting the top or bottom of the target.\n""",
-              "year-bar stale 36px commentary",
-          )
-          s = replace_once(
-              s,
-              '    expect.soft(Math.round(box.height), `${sel} visual height`).toBeLessThanOrEqual(40);',
-              '    expect.soft(Math.round(box.height), `${sel} layout-box height`).toBeGreaterThanOrEqual(44);',
-              "year-bar 40px assertion",
-          )
-          write_if_changed(path, before, s)
-
-          for path in (
-              "frontend/e2e-connected/training-class-progress.spec.ts",
-              "frontend/e2e-connected/training-class-split-merge.spec.ts",
-          ):
-              s = Path(path).read_text(encoding="utf-8")
-              before = s
-              if "./year-context-helper" not in s:
-                  marker='import { resetBackendRateLimits } from "../e2e-rate-limit-reset";\n'
-                  if marker not in s:
-                      raise SystemExit(f"{path}: import marker not found")
-                  helper_import = ('import { selectConnectedPlanningYear, refreshConnectedPlanningYear } from "./year-context-helper";\n'
-                                   if path.endswith("training-class-progress.spec.ts")
-                                   else 'import { selectConnectedPlanningYear } from "./year-context-helper";\n')
-                  s = s.replace(marker, marker + helper_import, 1)
-
-              pattern = r"async function selectFirstYear\(page: Page\): Promise<string> \{.*?\n\}\n\n(?=async function loginSquadron|const base =)"
-              replacement = "async function selectFirstYear(page: Page): Promise<string> {\n  return selectConnectedPlanningYear(page);\n}\n\n"
-              s, n = re.subn(pattern, replacement, s, count=1, flags=re.S)
+          def once(s, old, new, label):
+              n = s.count(old)
               if n != 1:
-                  raise SystemExit(f"{path}: selectFirstYear replacement count {n}")
+                  raise SystemExit(f"{label}: expected 1 occurrence, found {n}")
+              return s.replace(old, new, 1)
 
-              if path.endswith("training-class-progress.spec.ts"):
-                  stale = '    await page.locator("#py-select").selectOption(yearId);\n    await page.waitForTimeout(600);'
-                  if stale in s:
-                      s = s.replace(stale, '    await refreshConnectedPlanningYear(page, yearId);')
-              if "#py-select" in s:
-                  raise SystemExit(f"{path}: stale #py-select reference remains")
-              write_if_changed(path, before, s)
+          # Correct the first patch: AAFC brand red remains the border visual;
+          # the semantic dark red is the small-text foreground.
+          p = Path('connected-frontend/index.html')
+          s = p.read_text(encoding='utf-8')
+          s = once(
+              s,
+              '.cea-conflict-toggle.replace{border-color:var(--danger-text);color:var(--red);}',
+              '.cea-conflict-toggle.replace{border-color:var(--red);color:var(--danger-text);}',
+              'CEA replacement styling',
+          )
+          s = s.replace('  --red:    #e51937;\n      --danger-text:#b5122f;   /* Red — danger, errors, must-attend only */',
+                        '  --red:    #e51937;   /* Red — AAFC brand/danger visual accent */\n  --danger-text:#b5122f; /* Accessible danger foreground for normal text */', 1)
+          p.write_text(s, encoding='utf-8')
 
-          replacements = {
-              "frontend/e2e-connected/training-dashboard.spec.ts": [
-                  ('await expect(page.getByText("System Overview")).toBeVisible({ timeout: 10000 });',
-                   'await expect(page.locator("#page-system-console").getByText("System Overview", { exact: true })).toBeVisible({ timeout: 10000 });'),
-              ],
-              "frontend/e2e-connected/units-type-filter-rem107.spec.ts": [
-                  ('await expect(page.getByText("System Overview")).toBeVisible({ timeout: 10000 });',
-                   'await expect(page.locator("#page-system-console").getByText("System Overview", { exact: true })).toBeVisible({ timeout: 10000 });'),
-              ],
-          }
-          for path, pairs in replacements.items():
-              s = Path(path).read_text(encoding="utf-8")
-              before = s
-              for old,new in pairs:
-                  s = replace_once(s, old, new, f"{path} scoped System Overview")
-              write_if_changed(path, before, s)
-
-          idx = Path("connected-frontend/index.html").read_text(encoding="utf-8")
-          print("\nWeekly Program selector / term-filter source lines:")
-          for i,line in enumerate(idx.splitlines(), 1):
-              low=line.lower()
-              if ("wp-sel" in low or ("weekly" in low and "term" in low) or ("all terms" in low and "option" in low)):
-                  print(f"{i}: {line[:320]}")
-          print("\nRemaining color:var(--red) foreground declarations:")
-          for i,line in enumerate(idx.splitlines(), 1):
-              if re.search(r"\bcolor\s*:\s*var\(--red\)", line):
-                  print(f"{i}: {line[:320]}")
+          # Weekly Program fixtures intentionally live far outside current terms.
+          # Select All terms before requiring the exact ISO-valued night option.
+          p = Path('frontend/e2e-connected/weekly-program-classes.spec.ts')
+          s = p.read_text(encoding='utf-8')
+          needle = '''  await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });\n  await page.locator("#wp-sel").selectOption(testDate);'''
+          replacement = '''  await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });\n  await page.locator("#wp-f-term").selectOption("all");\n  const exactNight = page.locator(`#wp-sel option[value="${testDate}"]`);\n  await expect(exactNight).toHaveCount(1, { timeout: 8000 });\n  await page.locator("#wp-sel").selectOption({ value: testDate });'''
+          n = s.count(needle)
+          if n != 3:
+              raise SystemExit(f'Weekly Program stale fixture pattern: expected 3, found {n}')
+          s = s.replace(needle, replacement)
+          p.write_text(s, encoding='utf-8')
           PY
 
-      - name: Show patch
-        run: git diff --check && git diff --stat && git diff -- connected-frontend/index.html frontend/e2e-connected/year-bar.spec.ts frontend/e2e-connected/training-class-progress.spec.ts frontend/e2e-connected/training-class-split-merge.spec.ts frontend/e2e-connected/training-dashboard.spec.ts frontend/e2e-connected/units-type-filter-rem107.spec.ts
-
-      - name: Commit generated source patch
+      - name: Verify targeted patch
         run: |
-          if git diff --quiet; then
-            echo "No generated patch required."
-            exit 0
-          fi
+          git diff --check
+          grep -n -- '--danger-text\|cea-conflict-toggle.replace' connected-frontend/index.html | head -10
+          grep -n 'wp-f-term.*selectOption\|exactNight' frontend/e2e-connected/weekly-program-classes.spec.ts
+          git diff --stat
+
+      - name: Commit targeted correction
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add connected-frontend/index.html frontend/e2e-connected/year-bar.spec.ts frontend/e2e-connected/training-class-progress.spec.ts frontend/e2e-connected/training-class-split-merge.spec.ts frontend/e2e-connected/training-dashboard.spec.ts frontend/e2e-connected/units-type-filter-rem107.spec.ts
-          git commit -m "chore(qualification): apply source-level stale-test and contrast fixes"
+          git add connected-frontend/index.html frontend/e2e-connected/weekly-program-classes.spec.ts
+          git commit -m "fix(qualification): correct danger foreground and weekly fixtures"
           git push origin HEAD:${GITHUB_REF_NAME}
