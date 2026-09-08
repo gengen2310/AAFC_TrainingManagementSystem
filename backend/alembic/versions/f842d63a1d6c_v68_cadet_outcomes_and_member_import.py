@@ -5,7 +5,7 @@ Adds:
   - cadet_session_outcomes table (per-cadet per-session completion tracking)
   - cadet_member_import_batches table (CEA member upsert import with rollback delta)
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: f842d63a1d6c
 Revises: d61e0844186f
 Create Date: 2026-09-07
 """
