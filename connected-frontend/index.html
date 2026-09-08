@@ -20,7 +20,8 @@
   --steel:  #455560;   /* Gunmetal grey — body text, secondary surfaces */
   --lgrey:  #b0b7bb;   /* Light grey — borders, table headers, quiet backgrounds */
   --pale:   #7db2ce;   /* Pale blue — subtle information backgrounds */
-  --red:    #e51937;   /* Red — danger, errors, must-attend only */
+  --red:    #e51937;
+      --danger-text:#b5122f;   /* Red — danger, errors, must-attend only */
   /* Surface and layout */
   --bg:           #f4f8fc;
   --surface:      #ffffff;
@@ -487,7 +488,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .cea-row-update td{background:#eef6fc;}
 .cea-conflict-toggle{font-size:var(--fs-xs);font-weight:700;font-family:inherit;border:1px solid var(--border);border-radius:4px;padding:3px 8px;cursor:pointer;background:var(--bg);}
 .cea-conflict-toggle.keep{border-color:var(--ok,#1a7f4b);color:var(--ok,#1a7f4b);}
-.cea-conflict-toggle.replace{border-color:var(--red);color:var(--red);}
+.cea-conflict-toggle.replace{border-color:var(--danger-text);color:var(--red);}
 
 /* ── STAT CARDS ── */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
