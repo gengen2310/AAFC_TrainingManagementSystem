@@ -30,6 +30,7 @@
   /* Text hierarchy */
   --text:   #1e2d3d;
   --text-2: #3a4a55;
+  --ink:    var(--text);
   --ink-2:  #44506a;
   --muted:  #5c6a76;   /* WCAG AA 4.5:1+ on --surface, --bg, and sa-scope-bar (#eef4fa) */
   /* WCAG AA accessibility tokens — text foreground use only */
@@ -486,7 +487,7 @@ body{font-family:'Montserrat',Arial,sans-serif;background:var(--bg);color:var(--
 .cea-row-update td{background:#eef6fc;}
 .cea-conflict-toggle{font-size:var(--fs-xs);font-weight:700;font-family:inherit;border:1px solid var(--border);border-radius:4px;padding:3px 8px;cursor:pointer;background:var(--bg);}
 .cea-conflict-toggle.keep{border-color:var(--ok,#1a7f4b);color:var(--ok,#1a7f4b);}
-.cea-conflict-toggle.replace{border-color:#c01530;color:#c01530;}
+.cea-conflict-toggle.replace{border-color:var(--red);color:var(--red);}
 
 /* ── STAT CARDS ── */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
