@@ -305,6 +305,38 @@ def test_create_session_singular_assistant_facilitator_id_syncs_to_join_table(cl
     assert d["assistant_facilitators"][0]["user_id"] == fac_id
 
 
+def test_update_session_singular_assistant_facilitator_id_syncs_to_join_table(client):
+    """Backward-compat: PATCH with singular assistant_facilitator_id also writes SAF row."""
+    facs = _get_facs_for_squadron("703")
+    if not facs:
+        pytest.skip("No facilitators seeded for squadron 703")
+
+    fac_id = facs[0][0]
+    hdr = login(client, "ADMIN703")
+    _, pd_id = _setup_year_with_date(client, hdr)
+
+    rc = client.post(
+        f"/api/planning/parade-dates/{pd_id}/sessions",
+        json={"cadet_group": "junior", "session_number": 7},
+        headers=hdr,
+    )
+    assert rc.status_code == 200, rc.text
+    sess_id = rc.json()["session_id"]
+
+    ru = client.patch(
+        f"/api/planning/sessions/{sess_id}",
+        json={"assistant_facilitator_id": fac_id},
+        headers=hdr,
+    )
+    assert ru.status_code == 200, ru.text
+    d = ru.json()
+    assert "assistant_facilitators" in d, "PATCH response must include assistant_facilitators"
+    assert len(d["assistant_facilitators"]) == 1, (
+        "Singular assistant_facilitator_id on PATCH must write a SAF row"
+    )
+    assert d["assistant_facilitators"][0]["user_id"] == fac_id
+
+
 def test_create_session_response_includes_assistant_facilitators_field(client):
     """_real_session_out always includes assistant_facilitators (may be empty)."""
     hdr = login(client, "ADMIN703")
