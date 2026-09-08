@@ -2,105 +2,78 @@ import { test, expect } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 import { loginPW } from "../e2e-login-helper";
 
-// DEFECT-004: playwright-global-setup.ts resets rate limits once per full
-// suite invocation, which is not always enough for a large suite -- a
-// spec file's own request volume, especially with other files having run
-// immediately before it, can still cross the general API limiter's
-// 300 req/60s budget partway through (observed live running this suite).
-// A per-file reset gives this file its own fresh budget. Best-effort; see
-// e2e-rate-limit-reset.ts for what this does and its known limitations.
+const BACKEND = process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000";
+
 test.beforeAll(async () => {
-  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000");
+  await resetBackendRateLimits(BACKEND);
 });
 
-// ── Auth flows ────────────────────────────────────────────────────────────────
-// Targets the React Planning Workspace (port 5173).
-// Backend must be running and seeded on port 8000 before these tests run.
+/**
+ * Planning Workspace is module-only. Authentication belongs to Main TMS and
+ * the shared backend session; this suite protects that architecture instead of
+ * exercising the retired standalone React login/dashboard shell.
+ */
+test.describe("Planning Workspace session entry", () => {
+  test("unauthenticated entry shows session handoff guidance, not a second login", async ({ page }) => {
+    await page.goto("/planning");
 
-test.describe("Login", () => {
-  test("valid sqn_admin login reaches dashboard", async ({ page }) => {
-    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Session not found" })).toBeVisible();
+    await expect(page.getByText(/return to the Training Management System and log in first/i)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Return to TMS" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /log in/i })).toHaveCount(0);
+    await expect(page.getByLabel("Access code")).toHaveCount(0);
+  });
+
+  test("squadron admin shared session opens the planning module", async ({ page }) => {
     await loginPW(page, "ADMIN703");
-    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
+
+    await expect(page.locator('[role="main"][aria-label="Planning workspace"]')).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Session not found" })).toHaveCount(0);
+    await expect(page.getByLabel("Access code")).toHaveCount(0);
   });
 
-  // REM-84: an invalid CODE for an otherwise-correctly-resolved account (not
-  // an unmapped/unknown code -- that's a different, ordinary "no such
-  // combination" case at the lookup step, not what this test is about) --
-  // exercises the same error path the old single-field flow tested, just
-  // reached via unit/wing/squadron/role selection first.
-  test("invalid code shows error alert and stays on login page", async ({ page }) => {
-    await page.goto("/");
-    await page.getByLabel("Login as").selectOption("squadron");
-    await page.getByLabel("Wing", { exact: true }).selectOption("7WG");
-    await page.getByLabel("Squadron / Unit").selectOption("703");
-    await page.getByLabel("Role", { exact: true }).selectOption("sqn_admin");
-    await page.getByLabel("Access code").fill("NOTACODE");
-    await page.getByRole("button", { name: "Log in" }).click();
-    await expect(page.getByRole("alert")).toBeVisible({ timeout: 5000 });
-    // Must NOT navigate away from login
-    await expect(page.getByRole("button", { name: "Log in" })).toBeVisible();
-  });
-
-  test("empty code keeps login button disabled", async ({ page }) => {
-    await page.goto("/");
-    await expect(page.getByRole("button", { name: "Log in" })).toBeDisabled();
-  });
-
-  test("logout clears session and returns to login", async ({ page }) => {
-    await page.goto("/");
-    await loginPW(page, "ADMIN703");
-    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
-    // Find and click logout (could be in a menu or nav)
-    await page.getByRole("button", { name: /log out|sign out/i }).click();
-    await expect(page.getByRole("button", { name: "Log in" })).toBeVisible({ timeout: 5000 });
-  });
-
-  test("direct route refresh without session shows login", async ({ page }) => {
-    // Navigate directly to an authenticated route without logging in
-    await page.goto("/dashboard");
-    // Should redirect to login or show login form
-    await expect(page.getByRole("button", { name: "Log in" })).toBeVisible({ timeout: 5000 });
-  });
-
-  test("session expiry forces re-login", async ({ page }) => {
-    await page.goto("/");
-    await loginPW(page, "ADMIN703");
-    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
-    // Simulate session expiry: use the Sign out button (which calls the backend logout
-    // endpoint AND clears the HttpOnly session cookie). Clearing sessionStorage alone
-    // does not work — the backend falls back to the cookie on reload.
-    await page.getByRole("button", { name: /sign out/i }).click();
-    await expect(page.getByRole("button", { name: "Log in" })).toBeVisible({ timeout: 5000 });
-    await page.reload();
-    await expect(page.getByRole("button", { name: "Log in" })).toBeVisible({ timeout: 5000 });
-  });
-});
-
-test.describe("Role-based landing", () => {
-  test("sqn_general user reaches dashboard", async ({ page }) => {
-    await page.goto("/");
+  test("read-only squadron role can enter without gaining write-only setup controls", async ({ page }) => {
     await loginPW(page, "703SQN2026");
-    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
+
+    await expect(page.locator('[role="main"][aria-label="Planning workspace"]')).toBeVisible();
+    // The guided setup action is deliberately write-gated by canWriteSquadron.
+    await expect(page.getByRole("button", { name: /set up year|guided/i })).toHaveCount(0);
   });
 
-  test("wing_admin user reaches wing overview", async ({ page }) => {
-    await page.goto("/");
-    await loginPW(page, "ADMIN7WG");
-    // WingOverview renders <h1>Wing Assurance</h1>
-    await expect(page.getByRole("heading", { name: /wing assurance/i })).toBeVisible({ timeout: 10000 });
-  });
+  for (const actor of [
+    { label: "Wing Admin", code: "ADMIN7WG" },
+    { label: "National Admin", code: "ADMINNATIONAL" },
+    { label: "System Admin", code: "SYSADMIN2026" },
+  ]) {
+    test(`${actor.label} must choose a squadron before planning data is shown`, async ({ page }) => {
+      await loginPW(page, actor.code);
 
-  test("national_admin user reaches national overview", async ({ page }) => {
-    await page.goto("/");
-    await loginPW(page, "ADMINNATIONAL");
-    // NationalOverview renders <h1>National Assurance</h1>
-    await expect(page.getByRole("heading", { name: /national assurance/i })).toBeVisible({ timeout: 10000 });
-  });
+      const selector = page.getByLabel("Viewing squadron");
+      await expect(selector).toBeVisible();
+      await expect(page.getByText(/select a squadron above to view its Planning Workspace/i)).toBeVisible();
 
-  test("auditor user reaches audit log", async ({ page }) => {
-    await page.goto("/");
-    await loginPW(page, "AUDITOR2026");
-    await expect(page.getByRole("heading", { name: /audit/i })).toBeVisible({ timeout: 10000 });
+      const values = await selector.locator("option").evaluateAll(options =>
+        options.map(o => (o as HTMLOptionElement).value).filter(Boolean),
+      );
+      expect(values.length).toBeGreaterThan(0);
+      await selector.selectOption(values[0]);
+
+      await expect(selector).toHaveValue(values[0]);
+      await expect(page.getByText(/select a squadron above to view its Planning Workspace/i)).toHaveCount(0, { timeout: 10000 });
+    });
+  }
+
+  test("backend logout invalidates the module session", async ({ page }) => {
+    const { token } = await loginPW(page, "ADMIN703");
+
+    const logout = await page.request.post(`${BACKEND}/api/auth/logout`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(logout.ok()).toBeTruthy();
+
+    await page.evaluate(() => sessionStorage.removeItem("aafc_token"));
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Session not found" })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByLabel("Access code")).toHaveCount(0);
   });
 });
