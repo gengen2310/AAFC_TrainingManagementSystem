@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   patch:
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(qualification): apply source-level') }}
+    if: "${{ github.actor != 'github-actions[bot]' }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,7 +21,6 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          import math
           import re
 
           def write_if_changed(path: str, before: str, after: str) -> None:
@@ -34,9 +33,6 @@ jobs:
                   raise SystemExit(f"{label}: expected exactly one occurrence, found {count}")
               return text.replace(old, new, 1)
 
-          # P0: keep AAFC brand red as the visual brand token, but do not use it
-          # for small danger foreground text. Add a semantic foreground token and
-          # apply it only to the CEA replacement label.
           path = "connected-frontend/index.html"
           s = Path(path).read_text(encoding="utf-8")
           before = s
@@ -45,7 +41,6 @@ jobs:
               if not m:
                   raise SystemExit("connected index: --red token not found")
               s = s[:m.end()] + "\n      --danger-text:#b5122f;" + s[m.end():]
-
           block_match = re.search(r"\.cea-conflict-toggle\.replace\s*\{[^{}]*\}", s, flags=re.S)
           if not block_match:
               raise SystemExit("connected index: .cea-conflict-toggle.replace block not found")
@@ -56,8 +51,6 @@ jobs:
           s = s[:block_match.start()] + new_block + s[block_match.end():]
           write_if_changed(path, before, s)
 
-          # Verify the chosen semantic text colour clears 4.5:1 on the known
-          # light surfaces used by this control and the page.
           def rgb(hexv: str):
               h = hexv.lstrip('#')
               return tuple(int(h[i:i+2], 16) / 255 for i in (0,2,4))
@@ -77,8 +70,6 @@ jobs:
               print(f"danger-text contrast on {bg}: {ratio:.2f}:1")
           print("CEA block after patch:", new_block.replace("\n", " "))
 
-          # Current year navigation is implemented as a genuine >=44px layout
-          # box. The stale <=40 assertion contradicted the production contract.
           path = "frontend/e2e-connected/year-bar.spec.ts"
           s = Path(path).read_text(encoding="utf-8")
           before = s
@@ -96,8 +87,6 @@ jobs:
           )
           write_if_changed(path, before, s)
 
-          # Four connected E2E specs still targeted the removed #py-select. Two
-          # were already updated directly; patch the remaining large files here.
           for path in (
               "frontend/e2e-connected/training-class-progress.spec.ts",
               "frontend/e2e-connected/training-class-split-merge.spec.ts",
@@ -127,8 +116,6 @@ jobs:
                   raise SystemExit(f"{path}: stale #py-select reference remains")
               write_if_changed(path, before, s)
 
-          # Scope readiness locators to the System Console so repeated labels on
-          # other parts of the DOM cannot satisfy/fail the login check.
           replacements = {
               "frontend/e2e-connected/training-dashboard.spec.ts": [
                   ('await expect(page.getByText("System Overview")).toBeVisible({ timeout: 10000 });',
@@ -146,8 +133,6 @@ jobs:
                   s = replace_once(s, old, new, f"{path} scoped System Overview")
               write_if_changed(path, before, s)
 
-          # Diagnostic output used to classify the still-red Weekly Program
-          # fixtures against the current term-filter implementation.
           idx = Path("connected-frontend/index.html").read_text(encoding="utf-8")
           print("\nWeekly Program selector / term-filter source lines:")
           for i,line in enumerate(idx.splitlines(), 1):
