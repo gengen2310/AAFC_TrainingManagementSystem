@@ -1,13 +1,22 @@
 """Regression coverage for the v68 -> v69 SQLite timestamp correction.
 
-This test deliberately runs the real Alembic path against a file-backed SQLite
-DB. It protects existing local/demo databases from being stamped at v69 while
-retaining the v68 VARCHAR(30) timestamp declarations.
+This test runs the *actual v68 revision* against a minimal predecessor SQLite
+schema, marks that resulting database at v68, and then uses the normal Alembic
+command path for v69 upgrade/downgrade/re-upgrade.  We intentionally do not
+replay revisions older than v68 here: several historical pre-v68 migrations
+predate the project's SQLite batch-mode discipline and cannot be replayed from
+an empty SQLite database.  That unrelated historical limitation must not make
+this v68->v69 regression rehearsal synthetic or force a database reset.
 """
 from datetime import datetime, timezone
+import importlib.util
+from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
+import sqlalchemy as sa
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
@@ -36,6 +45,46 @@ def _timestamp_text(engine, table: str, row_id: str) -> tuple[str | None, str | 
     return row[0], row[1]
 
 
+def _build_actual_v68_database(engine) -> None:
+    """Execute the repository's real v68 upgrade on its required predecessor.
+
+    v68 only requires an existing ``sessions`` table: it adds one nullable
+    column there and creates the two new tables under test.  Running the revision
+    through an Alembic Operations context gives us the exact v68 DDL (including
+    the String(30) defect) without replaying unrelated historical migrations.
+    """
+    metadata = sa.MetaData()
+    sa.Table("sessions", metadata, sa.Column("id", sa.String(36), primary_key=True))
+    metadata.create_all(engine)
+
+    revision_path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "f842d63a1d6c_v68_cadet_outcomes_and_member_import.py"
+    )
+    spec = importlib.util.spec_from_file_location("v68_revision_for_test", revision_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    with engine.begin() as conn:
+        migration_context = MigrationContext.configure(conn)
+        with Operations.context(migration_context):
+            module.upgrade()
+
+        # The schema now is the real output of v68.  Record the revision exactly
+        # as an existing deployed v68 database would, so subsequent commands use
+        # the normal Alembic v68 -> v69 path.
+        conn.execute(text(
+            "CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL PRIMARY KEY)"
+        ))
+        conn.execute(
+            text("INSERT INTO alembic_version (version_num) VALUES (:revision)"),
+            {"revision": V68},
+        )
+
+
 def test_v69_sqlite_upgrade_downgrade_reupgrade_preserves_schema_and_data(tmp_path, monkeypatch):
     db_path = tmp_path / "v69.sqlite3"
     url = f"sqlite:///{db_path}"
@@ -48,8 +97,8 @@ def test_v69_sqlite_upgrade_downgrade_reupgrade_preserves_schema_and_data(tmp_pa
     cfg = Config("alembic.ini")
     engine = create_engine(url, future=True)
 
-    # 1. Build an actual v68 database.
-    command.upgrade(cfg, V68)
+    # 1. Build an actual v68 database by executing the real v68 revision.
+    _build_actual_v68_database(engine)
 
     # 2. Verify the defect exists at v68.
     for table in TABLES:
