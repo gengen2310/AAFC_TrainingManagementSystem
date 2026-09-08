@@ -123,7 +123,10 @@ test("Weekly Program shows a session's real Training Class assignment in its own
   await page.evaluate(() => (window as any).reloadAndRender());
   await page.evaluate(() => (window as any).nav("weekly-program"));
   await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });
-  await page.locator("#wp-sel").selectOption(testDate);
+  await page.locator("#wp-f-term").selectOption("all");
+  const exactNight = page.locator(`#wp-sel option[value="${testDate}"]`);
+  await expect(exactNight).toHaveCount(1, { timeout: 8000 });
+  await page.locator("#wp-sel").selectOption({ value: testDate });
 
   const row = page.locator("#wp-content table tr").filter({ hasText: "Sess 1" });
   await expect(row).toBeVisible({ timeout: 8000 });
@@ -155,7 +158,10 @@ test("WORK-10: Publish Program button is visible to sqn_admin on the Weekly Prog
   await page.evaluate(() => (window as any).reloadAndRender());
   await page.evaluate(() => (window as any).nav("weekly-program"));
   await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });
-  await page.locator("#wp-sel").selectOption(testDate);
+  await page.locator("#wp-f-term").selectOption("all");
+  const exactNight = page.locator(`#wp-sel option[value="${testDate}"]`);
+  await expect(exactNight).toHaveCount(1, { timeout: 8000 });
+  await page.locator("#wp-sel").selectOption({ value: testDate });
 
   // The Publish Program button is rendered by renderWP() for S.isAdmin users.
   // It toggles to "✓ Published" style after publish completes.
@@ -195,7 +201,10 @@ test("Weekly Program header shows the Wing's real name from the session (not har
   await page.evaluate(() => (window as any).reloadAndRender());
   await page.evaluate(() => (window as any).nav("weekly-program"));
   await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });
-  await page.locator("#wp-sel").selectOption(testDate);
+  await page.locator("#wp-f-term").selectOption("all");
+  const exactNight = page.locator(`#wp-sel option[value="${testDate}"]`);
+  await expect(exactNight).toHaveCount(1, { timeout: 8000 });
+  await page.locator("#wp-sel").selectOption({ value: testDate });
 
   // The no-print header div (line 8222 of index.html) should render the real wing_name.
   const header = page.locator("#wp-content .no-print").first();
