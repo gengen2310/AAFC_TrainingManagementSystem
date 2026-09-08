@@ -2,10 +2,10 @@
 
 This test runs the *actual v68 revision* against a minimal predecessor SQLite
 schema, marks that resulting database at v68, and then uses the normal Alembic
-command path for v69 upgrade/downgrade/re-upgrade.  We intentionally do not
+command path for v69 upgrade/downgrade/re-upgrade. We intentionally do not
 replay revisions older than v68 here: several historical pre-v68 migrations
 predate the project's SQLite batch-mode discipline and cannot be replayed from
-an empty SQLite database.  That unrelated historical limitation must not make
+an empty SQLite database. That unrelated historical limitation must not make
 this v68->v69 regression rehearsal synthetic or force a database reset.
 """
 from datetime import datetime, timezone
@@ -16,8 +16,10 @@ from alembic import command
 from alembic.config import Config
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
+import pytest
 import sqlalchemy as sa
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 
@@ -25,12 +27,32 @@ V68 = "f842d63a1d6c"
 V69 = "7f61608fa538"
 TABLES = ("cadet_session_outcomes", "cadet_member_import_batches")
 TIMESTAMP_COLUMNS = ("created_at", "updated_at")
+EXPECTED_INDEXES = {
+    "cadet_session_outcomes": {
+        "ix_cadet_session_outcomes_cadet_id",
+        "ix_cadet_session_outcomes_session_id",
+    },
+    "cadet_member_import_batches": {
+        "ix_cadet_member_import_batches_squadron_id",
+    },
+}
 
 
 def _declared_types(engine, table: str) -> dict[str, str]:
     with engine.connect() as conn:
         rows = conn.execute(text(f"PRAGMA table_info({table})")).mappings().all()
     return {row["name"]: row["type"].upper() for row in rows}
+
+
+def _index_names(engine, table: str) -> set[str]:
+    with engine.connect() as conn:
+        rows = conn.execute(text(f"PRAGMA index_list({table})")).mappings().all()
+    return {row["name"] for row in rows if row["name"]}
+
+
+def _assert_expected_indexes(engine) -> None:
+    for table, expected in EXPECTED_INDEXES.items():
+        assert expected.issubset(_index_names(engine, table))
 
 
 def _timestamp_text(engine, table: str, row_id: str) -> tuple[str | None, str | None]:
@@ -45,11 +67,24 @@ def _timestamp_text(engine, table: str, row_id: str) -> tuple[str | None, str | 
     return row[0], row[1]
 
 
+def _assert_outcome_uniqueness(engine) -> None:
+    """The v68 UNIQUE(cadet_id, session_id) contract must survive recreation."""
+    with pytest.raises(IntegrityError):
+        with engine.begin() as conn:
+            conn.execute(text("""
+                INSERT INTO cadet_session_outcomes
+                    (id, cadet_id, session_id, status, source, version)
+                VALUES
+                    ('duplicate-outcome-v69', 'cadet-v69', 'session-v69',
+                     'complete', 'derived', 0)
+            """))
+
+
 def _build_actual_v68_database(engine) -> None:
     """Execute the repository's real v68 upgrade on its required predecessor.
 
     v68 only requires an existing ``sessions`` table: it adds one nullable
-    column there and creates the two new tables under test.  Running the revision
+    column there and creates the two new tables under test. Running the revision
     through an Alembic Operations context gives us the exact v68 DDL (including
     the String(30) defect) without replaying unrelated historical migrations.
     """
@@ -73,7 +108,7 @@ def _build_actual_v68_database(engine) -> None:
         with Operations.context(migration_context):
             module.upgrade()
 
-        # The schema now is the real output of v68.  Record the revision exactly
+        # The schema now is the real output of v68. Record the revision exactly
         # as an existing deployed v68 database would, so subsequent commands use
         # the normal Alembic v68 -> v69 path.
         conn.execute(text(
@@ -100,11 +135,12 @@ def test_v69_sqlite_upgrade_downgrade_reupgrade_preserves_schema_and_data(tmp_pa
     # 1. Build an actual v68 database by executing the real v68 revision.
     _build_actual_v68_database(engine)
 
-    # 2. Verify the defect exists at v68.
+    # 2. Verify the defect and the structural contracts that v69 must preserve.
     for table in TABLES:
         types = _declared_types(engine, table)
         for column in TIMESTAMP_COLUMNS:
             assert types[column] == "VARCHAR(30)"
+    _assert_expected_indexes(engine)
 
     created = "2026-09-08 01:02:03.123456"
     updated = "2026-09-08 04:05:06.654321"
@@ -131,13 +167,16 @@ def test_v69_sqlite_upgrade_downgrade_reupgrade_preserves_schema_and_data(tmp_pa
         "cadet_session_outcomes": _timestamp_text(engine, "cadet_session_outcomes", "outcome-v69"),
         "cadet_member_import_batches": _timestamp_text(engine, "cadet_member_import_batches", "batch-v69"),
     }
+    _assert_outcome_uniqueness(engine)
 
-    # 3. Upgrade to v69 and verify the declared schema now matches ORM metadata.
+    # 3. Upgrade to v69 and verify declared schema plus indexes/constraints.
     command.upgrade(cfg, V69)
     for table in TABLES:
         types = _declared_types(engine, table)
         for column in TIMESTAMP_COLUMNS:
             assert types[column] == "DATETIME"
+    _assert_expected_indexes(engine)
+    _assert_outcome_uniqueness(engine)
 
     # 4. Representative timestamp data must survive byte-for-byte as text.
     assert _timestamp_text(engine, "cadet_session_outcomes", "outcome-v69") == before["cadet_session_outcomes"]
@@ -171,12 +210,15 @@ def test_v69_sqlite_upgrade_downgrade_reupgrade_preserves_schema_and_data(tmp_pa
         assert reread.created_at == datetime(2026, 9, 8, 7, 8, 9, tzinfo=timezone.utc)
         assert reread.updated_at == datetime(2026, 9, 8, 10, 11, 12, tzinfo=timezone.utc)
 
-    # 5/6. Downgrade and re-upgrade must both remain valid and preserve rows.
+    # 5/6. Downgrade and re-upgrade must both remain valid and preserve rows,
+    # indexes and uniqueness, not just the declared timestamp type.
     command.downgrade(cfg, V68)
     for table in TABLES:
         types = _declared_types(engine, table)
         for column in TIMESTAMP_COLUMNS:
             assert types[column] == "VARCHAR(30)"
+    _assert_expected_indexes(engine)
+    _assert_outcome_uniqueness(engine)
     assert _timestamp_text(engine, "cadet_session_outcomes", "outcome-v69") == before["cadet_session_outcomes"]
     assert _timestamp_text(engine, "cadet_member_import_batches", "batch-v69") == before["cadet_member_import_batches"]
 
@@ -185,5 +227,7 @@ def test_v69_sqlite_upgrade_downgrade_reupgrade_preserves_schema_and_data(tmp_pa
         types = _declared_types(engine, table)
         for column in TIMESTAMP_COLUMNS:
             assert types[column] == "DATETIME"
+    _assert_expected_indexes(engine)
+    _assert_outcome_uniqueness(engine)
     assert _timestamp_text(engine, "cadet_session_outcomes", "outcome-v69") == before["cadet_session_outcomes"]
     assert _timestamp_text(engine, "cadet_member_import_batches", "batch-v69") == before["cadet_member_import_batches"]
