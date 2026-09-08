@@ -2,58 +2,61 @@ import { test, expect } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 import { loginPW } from "../e2e-login-helper";
 
-// DEFECT-004: playwright-global-setup.ts resets rate limits once per full
-// suite invocation, which is not always enough for a large suite -- a
-// spec file's own request volume, especially with other files having run
-// immediately before it, can still cross the general API limiter's
-// 300 req/60s budget partway through (observed live running this suite).
-// A per-file reset gives this file its own fresh budget. Best-effort; see
-// e2e-rate-limit-reset.ts for what this does and its known limitations.
+const BACKEND = process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000";
+
 test.beforeAll(async () => {
-  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000");
+  await resetBackendRateLimits(BACKEND);
 });
 
-// ── Cross-interface: Planning Workspace (no second login) ─────────────────────
-// The Planning Workspace (/planning) must be accessible without a second login
-// when the user is already authenticated. This tests the cookie/token sharing
-// between the full React app routes.
-
-test.beforeEach(async ({ page }) => {
-  await page.goto("/");
+/**
+ * Cross-interface contract for the specialised Planning Workspace. The Main
+ * TMS owns login/logout; PW consumes the same backend session and squadron
+ * scope. These tests deliberately avoid the retired React dashboard/shell.
+ */
+test("shared TMS session opens Planning Workspace without any second-login controls", async ({ page }) => {
   await loginPW(page, "ADMIN703");
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible({ timeout: 10000 });
+
+  await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible();
+  await expect(page.getByLabel("Access code")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /log in/i })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Session not found" })).toHaveCount(0);
 });
 
-test("planning workspace loads without second login", async ({ page }) => {
-  await page.goto("/planning");
-  // Should NOT see the login page again
-  await expect(page.getByRole("button", { name: "Log in" })).not.toBeVisible();
-  // Should see the planning workspace content (not the "Session not found" error)
-  await expect(page.getByText(/session not found|please.*log in.*first/i)).not.toBeVisible();
-  // PlanningWorkspace renders <div role="main" aria-label="Planning workspace"> (no h1)
+test("cookie fallback preserves the shared session after bearer state is removed", async ({ page }) => {
+  await loginPW(page, "ADMIN703");
+
+  // A fresh tab opened by Main TMS may have no sessionStorage token. Removing
+  // the bearer token and reloading exercises the shared aafc_session fallback
+  // rather than manufacturing a separate Planning Workspace login.
+  await page.evaluate(() => sessionStorage.removeItem("aafc_token"));
+  await page.reload();
+
   await expect(page.getByRole("main", { name: /planning workspace/i })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole("heading", { name: "Session not found" })).toHaveCount(0);
 });
 
-test("logout from main app also loses planning workspace access", async ({ page }) => {
-  // Confirm planning workspace accessible
-  await page.goto("/planning");
-  await expect(page.getByRole("button", { name: "Log in" })).not.toBeVisible();
+test("Planning Workspace reflects the authenticated squadron role context", async ({ page }) => {
+  await loginPW(page, "ADMIN703");
 
-  // Log out from main app via Sign out button in AppShell
-  await page.goto("/dashboard");
-  await page.getByRole("button", { name: /sign out/i }).click();
-  await expect(page.getByRole("button", { name: "Log in" })).toBeVisible({ timeout: 5000 });
-
-  // Now /planning shows LoginPage (full app mode — not module "Session not found" message)
-  await page.goto("/planning");
-  await expect(page.getByRole("button", { name: "Log in" })).toBeVisible({ timeout: 5000 });
+  const banner = page.getByRole("banner", { name: "Planning workspace context" });
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText(/Sqn Admin/i);
+  // Squadron-scoped users must not be offered the higher-scope context picker.
+  await expect(page.getByLabel("Viewing squadron")).toHaveCount(0);
 });
 
-test("planning workspace shows correct squadron context", async ({ page }) => {
-  await page.goto("/planning");
-  await expect(page.getByRole("button", { name: "Log in" })).not.toBeVisible();
-  // 703 squadron context — planning workspace should not show another squadron's data
-  // At minimum, verify it loads a planning year or is empty for 703's own unit
-  // The NotAuthenticated component shows "Return to TMS" link only if session is missing
-  await expect(page.getByRole("link", { name: /return to tms/i })).not.toBeVisible();
+test("shared backend logout/revocation removes Planning Workspace access", async ({ page }) => {
+  const { token } = await loginPW(page, "ADMIN703");
+
+  const logout = await page.request.post(`${BACKEND}/api/auth/logout`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(logout.ok()).toBeTruthy();
+
+  await page.evaluate(() => sessionStorage.removeItem("aafc_token"));
+  await page.reload();
+
+  await expect(page.getByRole("heading", { name: "Session not found" })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole("link", { name: "Return to TMS" })).toBeVisible();
+  await expect(page.getByLabel("Access code")).toHaveCount(0);
 });
