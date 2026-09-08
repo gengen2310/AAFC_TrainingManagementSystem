@@ -8,6 +8,10 @@ process.env.CONNECTED_LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE || "
 
 export default defineConfig({
   testDir: "./e2e-connected",
+  // Screenshot-capture specs are formal, one-off evidence runs against deployed
+  // staging. They intentionally use the staging-specific Playwright configs and
+  // must not run inside the regular local/CI connected-frontend suite.
+  testIgnore: ["**/capture-screenshots*.spec.ts"],
   timeout: 30000,
   globalSetup: "./playwright-global-setup.ts",
   use: { baseURL: "http://localhost:8080", trace: "on-first-retry" },

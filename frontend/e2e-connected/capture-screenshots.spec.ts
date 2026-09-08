@@ -1,9 +1,10 @@
 import { test, Page } from "@playwright/test";
+import { resolve } from "node:path";
 
 // One-off evidence capture against live staging — not part of the regular verification
 // suite. Run with: npx playwright test --config=playwright.connected.staging.config.ts e2e-connected/capture-screenshots.spec.ts
 const SHA = process.env.CAPTURE_SHA || "unknown-sha";
-const OUT = `/Users/jennydv/Desktop/AAFC_TMS_National_Connected_Pilot_Package_v17_1_source/artifacts/general-release/${SHA}/staging`;
+const OUT = resolve(process.cwd(), "artifacts", "general-release", SHA, "staging");
 
 async function loginSquadron(page: Page, code: string, role: "sqn_admin" | "sqn_general" = "sqn_admin") {
   await page.goto("/");

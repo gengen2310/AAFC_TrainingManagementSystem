@@ -1,5 +1,8 @@
 import re, sys, csv, pathlib
-ROOT = pathlib.Path("/Users/jennydv/Desktop/AAFC_TMS_National_Connected_Pilot_Package_v17_1_source/frontend/src/styles")
+
+SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[2]
+ROOT = REPO_ROOT / "frontend" / "src" / "styles"
 
 def parse_block(text, start):
     """return dict of --var: value inside the brace block starting at index of '{'"""
@@ -134,8 +137,7 @@ for fname, sel, cval, bgval, fs, fw in rules:
                             result='PASS' if r>=need else 'FAIL',how=how,
                             size_known='yes' if fs else 'no'))
 
-import csv
-with open(f"{sys.argv[0].rsplit('/',1)[0]}/planning-text-register.csv","w",newline="") as f:
+with (SCRIPT_DIR / "planning-text-register.csv").open("w", newline="") as f:
     w=csv.DictWriter(f,fieldnames=list(out[0].keys())); w.writeheader(); w.writerows(out)
 
 from collections import Counter

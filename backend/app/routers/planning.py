@@ -469,11 +469,22 @@ def _real_session_out(
         ra = db.get(TrainingArea, s.training_area_id)
         if ra:
             room_name = ra.name
+    from ..models.training import SessionAssistantFacilitator as _SAF
     asst_name: str | None = None
     if s.assistant_facilitator_id:
         af = db.get(Facilitator, s.assistant_facilitator_id)
         if af:
             asst_name = " ".join(x for x in [af.current_rank, af.first_name, af.last_name] if x)
+    # Build assistant_facilitators list from the join table
+    asst_rows = db.query(_SAF).filter_by(session_id=s.id).all()
+    assistant_facilitators_list: list[dict] = []
+    for row in asst_rows:
+        f = db.get(Facilitator, row.user_id)
+        if f:
+            disp = " ".join(x for x in [f.current_rank, f.first_name, f.last_name] if x)
+        else:
+            disp = row.user_id
+        assistant_facilitators_list.append({"user_id": row.user_id, "display_name": disp})
     # CLASS-21: curriculum core_status and is_optional for Foundation/Extension/Optional PW filters.
     # ci_tier pre-loaded by bulk callers (long-range endpoint); falls back to
     # identity-map PK lookup when not supplied (weekly-program, term-planner).
@@ -505,6 +516,7 @@ def _real_session_out(
         "facilitator_name": s.facilitator_display_name_at_time,
         "assistant_facilitator_id": s.assistant_facilitator_id,
         "assistant_facilitator_name": asst_name,
+        "assistant_facilitators": assistant_facilitators_list,
         "location_id": s.training_area_id,
         "location_name": room_name,
         "status": s.status,
@@ -523,6 +535,40 @@ def _real_session_out(
         "core_status": core_status,
         "is_optional": is_optional,
     }
+
+
+def _resolve_assistants(
+    db: DBSession, user_ids: list[str], squadron_id: str
+) -> list[str]:
+    """Validate, deduplicate, and scope-check assistant facilitator IDs.
+
+    Returns a deduplicated list of validated facilitator IDs.
+    Raises 422 for foreign-squadron or nonexistent facilitators.
+    """
+    from ..models import Facilitator as _Fac
+    seen: set[str] = set()
+    validated: list[str] = []
+    for uid in user_ids:
+        if uid in seen:
+            continue
+        seen.add(uid)
+        f = db.get(_Fac, uid)
+        if f is None:
+            raise HTTPException(422, detail={"error": "invalid_assistant", "user_id": uid})
+        if f.squadron_id != squadron_id:
+            raise HTTPException(422, detail={"error": "foreign_assistant", "user_id": uid})
+        validated.append(f.id)
+    return validated
+
+
+def _write_session_assistants(
+    db: DBSession, session_id: str, validated_ids: list[str]
+) -> None:
+    """Replace all SessionAssistantFacilitator rows for session with validated_ids."""
+    from ..models.training import SessionAssistantFacilitator
+    db.query(SessionAssistantFacilitator).filter_by(session_id=session_id).delete()
+    for uid in validated_ids:
+        db.add(SessionAssistantFacilitator(session_id=session_id, user_id=uid))
 
 
 def _conflict_out(c: PlanningConflict) -> dict:
@@ -1981,6 +2027,9 @@ class SessionCreateIn(BaseModel):
     # the same choice made while editing was kept. Same field, two paths, two
     # outcomes.
     assistant_facilitator_id: Optional[str] = None
+    # 0..N assistant facilitators via the join table. When provided, takes
+    # precedence over assistant_facilitator_id for the join table write.
+    assistant_facilitator_ids: Optional[list[str]] = None
     location_id: Optional[str] = None
     is_combined: bool = False
     combined_groups: Optional[list] = None
@@ -2009,6 +2058,9 @@ class SessionUpdateIn(BaseModel):
     activity_title: Optional[str] = None
     facilitator_id: Optional[str] = None
     assistant_facilitator_id: Optional[str] = None
+    # 0..N assistant facilitators via the join table. When provided, replaces the
+    # join table entirely. Takes precedence over assistant_facilitator_id.
+    assistant_facilitator_ids: Optional[list[str]] = None
     location_id: Optional[str] = None
     is_combined: Optional[bool] = None
     combined_groups: Optional[list] = None
@@ -2094,6 +2146,15 @@ def create_session(
         _create_audience_for_class_ids(db, s.id, body.training_class_ids, pn.squadron_id)
     else:
         _upsert_session_audience(db, s.id, body.cadet_group, pn.squadron_id, py.id)
+    # Write join-table assistant facilitators. Plural path takes precedence.
+    if body.assistant_facilitator_ids is not None:
+        validated = _resolve_assistants(db, body.assistant_facilitator_ids, pn.squadron_id)
+        _write_session_assistants(db, s.id, validated)
+        db.commit()
+    elif body.assistant_facilitator_id and s.assistant_facilitator_id:
+        # Sync the legacy single assistant to the join table too.
+        _write_session_assistants(db, s.id, [s.assistant_facilitator_id])
+        db.commit()
     _run_conflict_check(py.id, date_id, db)
     audit(db, p, object_type="session", object_id=s.id, action="create",
           new={"group": resolved_cadet_group, "session": body.session_number})
@@ -2167,13 +2228,21 @@ def update_session(
     # No *_display_name_at_time column here by design: unlike the primary
     # facilitator, the assistant's name is resolved live on read, so only the id
     # is stored. Same scope rule -- Facilitator.squadron_id is a non-nullable FK.
-    if body.assistant_facilitator_id is not None:
+    if body.assistant_facilitator_ids is not None:
+        # Plural path: validate and replace join table; clear legacy column.
+        validated = _resolve_assistants(db, body.assistant_facilitator_ids, s.squadron_id)
+        _write_session_assistants(db, s.id, validated)
+        s.assistant_facilitator_id = validated[0] if validated else None
+    elif body.assistant_facilitator_id is not None:
         if body.assistant_facilitator_id:
             af = scoped_facilitator(db, body.assistant_facilitator_id, s.squadron_id)
             if af:
                 s.assistant_facilitator_id = af.id
+                # Sync to join table.
+                _write_session_assistants(db, s.id, [af.id])
         else:
             s.assistant_facilitator_id = None
+            _write_session_assistants(db, s.id, [])
     if body.location_id is not None:
         if body.location_id:
             ra = scoped_training_area(db, body.location_id, s.squadron_id)
