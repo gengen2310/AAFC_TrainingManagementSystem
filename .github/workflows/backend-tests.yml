@@ -67,6 +67,59 @@ jobs:
         env:
           NODE_ENV: production
 
+  release-static:
+    name: Release static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Fetch main comparison tree
+        run: git fetch --no-tags --depth=1 origin main:refs/remotes/origin/main
+
+      - name: Reject whitespace errors in release diff
+        run: git diff --check origin/main HEAD
+
+      - name: Verify shared design-token sync
+        run: python scripts/check_token_sync.py
+
+      - name: Verify frontend security hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if grep -nE "SYSADMIN2026|ADMIN703|ADMIN7WG|ADMINNATIONAL|703SQN2026|AUDITOR2026" connected-frontend/index.html; then
+            echo "Seeded/demo access code found in Main TMS production frontend"
+            exit 1
+          fi
+
+          if grep -nE "localStorage\.(setItem|getItem)\(['\"]+(token|jwt|role|session|user|scope|access_code|squadron|wing)" connected-frontend/index.html; then
+            echo "Operational/session data found in Main TMS localStorage"
+            exit 1
+          fi
+
+          if grep -nE "code_hash|plain_code|JWT_SECRET|SECRET_KEY" connected-frontend/index.html; then
+            echo "Sensitive backend/auth implementation token found in Main TMS frontend"
+            exit 1
+          fi
+
+          if grep -RInE --include='*.ts' --include='*.tsx' \
+            "localStorage\.(setItem|getItem)\(['\"]+(token|jwt|role|session|user|scope|access_code|squadron|wing)" \
+            frontend/src; then
+            echo "Operational/session data found in Planning Workspace localStorage"
+            exit 1
+          fi
+
+          echo "Frontend security hygiene checks passed"
+
+      - name: Verify deploy control logic
+        run: bash scripts/test_deploy_logic.sh
+
   migration-rehearsal:
     name: PostgreSQL migration rehearsal
     runs-on: ubuntu-latest
