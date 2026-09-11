@@ -67,11 +67,19 @@ test("higher-scope squadron-selection state has no blocking WCAG 2.1 AA violatio
 test("higher-scope selected-squadron workspace has no blocking WCAG 2.1 AA violations", async ({ page }) => {
   await loginPW(page, "ADMIN7WG");
   const selector = page.getByLabel("Viewing squadron");
+  // wingOverview fetch is async — wait for at least one real option (non-empty value)
+  // before evaluating, same pattern as auth.spec.ts wing/national squadron-picker test.
+  await expect.poll(
+    () => selector.locator("option:not([value=''])").count(),
+    { timeout: 15000, message: "squadron selector options did not load" },
+  ).toBeGreaterThan(0);
   const values = await selector.locator("option").evaluateAll(options =>
     options.map(o => (o as HTMLOptionElement).value).filter(Boolean),
   );
   expect(values.length).toBeGreaterThan(0);
   await selector.selectOption(values[0]);
+  // Selector unmounts after selection; verify empty-state is gone instead of
+  // checking the now-detached element's value.
   await expect(page.getByText(/select a squadron above to view its Planning Workspace/i)).toHaveCount(0, { timeout: 10000 });
   await audit(page);
 });

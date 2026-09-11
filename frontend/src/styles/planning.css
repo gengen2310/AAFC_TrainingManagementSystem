@@ -567,15 +567,26 @@ body.pw-active .main {
 .pw-block-hdr {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 10px 14px 9px;
   background: var(--aafc-dark-blue);
   color: #fff;
-  cursor: pointer;
-  user-select: none;
   flex-shrink: 0;
 }
 .pw-block-hdr:hover { background: #003a80; }
+/* Header action button (opens parade night modal) — takes all available space */
+.pw-block-hdr-action {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 0 9px 14px;
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  user-select: none;
+  text-align: left;
+  min-width: 0;
+}
 .pw-block-date {
   font-weight: 800;
   font-size: var(--fs-base);
@@ -769,7 +780,7 @@ body.pw-active .main {
 .pn-conflict-dot.load { background: #ffb300; }
 
 /* ── Compact (sm) overrides — tighter cells, same structure ── */
-.pw-block.pw-block-sm .pw-block-hdr { padding: 7px 10px; }
+.pw-block.pw-block-sm .pw-block-hdr-action { padding: 7px 0 7px 10px; }
 .pw-block.pw-block-sm .pw-block-date { font-size: var(--fs-sm); }
 .pw-block.pw-block-sm .pw-block-band-hdr { padding: 3px 10px; font-size: var(--fs-3xs); }
 .pw-block.pw-block-sm .pw-block-band-body { padding: 3px 10px 5px; }
