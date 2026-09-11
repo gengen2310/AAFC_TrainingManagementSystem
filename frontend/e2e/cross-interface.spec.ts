@@ -53,10 +53,14 @@ test("shared backend logout/revocation removes Planning Workspace access", async
   });
   expect(logout.ok()).toBeTruthy();
 
-  await page.evaluate(() => sessionStorage.removeItem("aafc_token"));
-  await page.reload();
-
-  await expect(page.getByRole("heading", { name: "Session not found" })).toBeVisible({ timeout: 10000 });
-  await expect(page.getByRole("link", { name: "Return to TMS" })).toBeVisible();
-  await expect(page.getByLabel("Access code")).toHaveCount(0);
+  // page.addInitScript() is sticky — reloading this page re-fires it and restores
+  // aafc_token to sessionStorage, defeating the logout check. Open a fresh tab in
+  // the same context: no inherited initScript, no sessionStorage token, and the
+  // session cookie was cleared by the logout Set-Cookie response.
+  const freshPage = await page.context().newPage();
+  await freshPage.goto("/planning");
+  await expect(freshPage.getByRole("heading", { name: "Session not found" })).toBeVisible({ timeout: 10000 });
+  await expect(freshPage.getByRole("link", { name: "Return to TMS" })).toBeVisible();
+  await expect(freshPage.getByLabel("Access code")).toHaveCount(0);
+  await freshPage.close();
 });

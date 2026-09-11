@@ -52,6 +52,11 @@ test.describe("Planning Workspace session entry", () => {
       await expect(selector).toBeVisible();
       await expect(page.getByText(/select a squadron above to view its Planning Workspace/i)).toBeVisible();
 
+      // React Query wingOverview fetch is async — wait for at least one real option
+      await expect.poll(
+        () => selector.locator("option[value]").count(),
+        { timeout: 10000, message: "squadron selector options did not load" },
+      ).toBeGreaterThan(0);
       const values = await selector.locator("option").evaluateAll(options =>
         options.map(o => (o as HTMLOptionElement).value).filter(Boolean),
       );
@@ -71,9 +76,14 @@ test.describe("Planning Workspace session entry", () => {
     });
     expect(logout.ok()).toBeTruthy();
 
-    await page.evaluate(() => sessionStorage.removeItem("aafc_token"));
-    await page.reload();
-    await expect(page.getByRole("heading", { name: "Session not found" })).toBeVisible({ timeout: 10000 });
-    await expect(page.getByLabel("Access code")).toHaveCount(0);
+    // page.addInitScript() is sticky — it re-fires on any reload or navigation of
+    // this page, restoring aafc_token to sessionStorage. Open a fresh tab in the
+    // same context instead: no inherited initScript, no sessionStorage token,
+    // and the session cookie was cleared by the logout response.
+    const freshPage = await page.context().newPage();
+    await freshPage.goto("/planning");
+    await expect(freshPage.getByRole("heading", { name: "Session not found" })).toBeVisible({ timeout: 10000 });
+    await expect(freshPage.getByLabel("Access code")).toHaveCount(0);
+    await freshPage.close();
   });
 });
