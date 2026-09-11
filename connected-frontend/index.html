@@ -15674,7 +15674,7 @@ function renderWing(){
   const medRead=reads.length?(reads.length%2?reads[(reads.length-1)/2]:Math.round((reads[reads.length/2-1]+reads[reads.length/2])/2)):null;
   const highRisk=rows.filter(r=>r.no_published_plan||r.no_future_plan||(+r.not_delivered||0)>2||(+r.coverage_pct||0)<34).length;
   const noData=rows.filter(r=>(+r.nights||0)===0||(+r.sessions||0)===0).length;
-  let html=`<div class="ph"><h1 class="ph-title">${S.scopeName||'Wing'} — Training Assurance</h1><div class="ph-sub">Oversight across ${rows.length} squadrons</div></div>`;
+  let html=`<div class="ph"><h2 class="ph-title">${S.scopeName||'Wing'} — Training Assurance</h2><div class="ph-sub">Oversight across ${rows.length} squadrons</div></div>`;
   html+=`<div class="stats-grid">
     <div class="stat"><div class="sval">${rows.length}</div><div class="slbl">Total SQNs</div></div>
     <div class="stat ${medRead==null?'':(medRead>=67?'s-ok':medRead>=34?'s-warn':'s-red')}"><div class="sval">${medRead==null?'—':medRead}</div><div class="slbl">Median Readiness</div></div>
@@ -15793,7 +15793,7 @@ function renderNational(){
   const delPct=sessions?Math.round(delivered/sessions*100):0;
   const avgCov=wings.length?Math.round(wings.reduce((a,w)=>a+(+w.coverage_pct||0),0)/wings.length):0;
   const atRisk=wings.filter(w=>(+w.not_delivered||0)>2||(+w.coverage_pct||0)<34).length;
-  let html=`<div class="ph"><h1 class="ph-title">National HQ — Assurance Overview</h1><div class="ph-sub">${wings.length} wings · ${sqs} squadrons</div></div>`;
+  let html=`<div class="ph"><h2 class="ph-title">National HQ — Assurance Overview</h2><div class="ph-sub">${wings.length} wings · ${sqs} squadrons</div></div>`;
   html+=`<div class="stats-grid">
     <div class="stat s-purple"><div class="sval">${wings.length}</div><div class="slbl">Wings</div></div>
     <div class="stat"><div class="sval">${sqs}</div><div class="slbl">Squadrons</div></div>
