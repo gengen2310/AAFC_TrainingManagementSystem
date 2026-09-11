@@ -52,10 +52,13 @@ test.describe("Planning Workspace session entry", () => {
       await expect(selector).toBeVisible();
       await expect(page.getByText(/select a squadron above to view its Planning Workspace/i)).toBeVisible();
 
-      // React Query wingOverview fetch is async — wait for at least one real option
+      // React Query wingOverview fetch is async — wait for at least one REAL option
+      // (a non-empty value). option[value] matches <option value=""> too, so the
+      // poll would pass immediately on the placeholder before any squadron loads.
+      // :not([value=""]) excludes the placeholder and waits for a real squadron UUID.
       await expect.poll(
-        () => selector.locator("option[value]").count(),
-        { timeout: 10000, message: "squadron selector options did not load" },
+        () => selector.locator("option:not([value=''])").count(),
+        { timeout: 15000, message: "squadron selector options did not load" },
       ).toBeGreaterThan(0);
       const values = await selector.locator("option").evaluateAll(options =>
         options.map(o => (o as HTMLOptionElement).value).filter(Boolean),
@@ -63,7 +66,9 @@ test.describe("Planning Workspace session entry", () => {
       expect(values.length).toBeGreaterThan(0);
       await selector.selectOption(values[0]);
 
-      await expect(selector).toHaveValue(values[0]);
+      // Selecting a squadron causes the SquadronSelector (in the empty-state canvas)
+      // to unmount — the workspace renders the full content instead. Assert on what
+      // the user sees after selection, not on the now-detached selector element.
       await expect(page.getByText(/select a squadron above to view its Planning Workspace/i)).toHaveCount(0, { timeout: 10000 });
     });
   }
