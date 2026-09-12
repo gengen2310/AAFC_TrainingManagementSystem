@@ -311,6 +311,7 @@ export interface AnnualProgramTerm {
     sessions_summary: NightSessionSummary[];
     conflict_count: number;
     notices: ParadeNotice[];
+    instructional_periods: InstructionalPeriod[];
   })[];
   holidays: HolidayPeriod[];
   activities: AnchorEvent[];
@@ -427,8 +428,8 @@ export interface NightSummary {
   sessions: NightSessionSummary[];
   conflict_count: number;
   notices: ParadeNotice[];
-  /** Available when Plan A backend is deployed; [] for legacy nights. */
-  instructional_periods?: InstructionalPeriod[];
+  /** Instructional periods for the night (from snapshot or fallback). [] for legacy nights. */
+  instructional_periods: InstructionalPeriod[];
   /** Total session slots for this night (from timing template or legacy count). */
   session_count?: number;
 }

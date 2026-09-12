@@ -19,13 +19,19 @@ test.beforeAll(async () => {
   await resetBackendRateLimits(BACKEND);
 });
 
-function assertNoViolations(violations: Array<{ impact?: string | null; id?: string; description?: string }>) {
+function assertNoViolations(violations: Array<{ impact?: string | null; id?: string; description?: string; nodes?: Array<{ html?: string; target?: unknown[] }> }>) {
   const blocking = violations.filter(
     v => v.impact === "critical" || v.impact === "serious" || v.impact === "moderate",
   );
   if (blocking.length) {
     const summary = blocking
-      .map(v => `[${v.impact}] ${v.id}: ${v.description}`)
+      .map(v => {
+        const nodeDetails = (v.nodes ?? [])
+          .slice(0, 3)
+          .map(n => `    - ${n.html ?? ""} (${JSON.stringify(n.target)})`)
+          .join("\n");
+        return `[${v.impact}] ${v.id}: ${v.description}${nodeDetails ? `\n${nodeDetails}` : ""}`;
+      })
       .join("\n");
     throw new Error(`Accessibility violations (critical/serious/moderate):\n${summary}`);
   }

@@ -615,7 +615,7 @@ body.pw-active .main {
   background: none;
   border: none;
   cursor: pointer;
-  color: rgba(255,255,255,.7);
+  color: #b3c1d1;
   font-size: var(--fs-3xs);
   padding: 2px 4px;
   flex-shrink: 0;
@@ -630,7 +630,7 @@ body.pw-active .main {
   border-radius: 4px;
   font-size: var(--fs-2xs);
   font-weight: 700;
-  color: rgba(255,255,255,.75);
+  color: #bfcbd9;
   padding: 2px 7px;
   cursor: pointer;
   transition: all .1s;

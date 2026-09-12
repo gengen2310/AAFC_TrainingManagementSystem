@@ -76,6 +76,7 @@ export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
           sessions: pd.sessions_summary ?? [],
           conflict_count: pd.conflict_count ?? 0,
           notices: pd.notices ?? [],
+          instructional_periods: pd.instructional_periods ?? [],
         } satisfies NightSummary,
       ]),
     );
