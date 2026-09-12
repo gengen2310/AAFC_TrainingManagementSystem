@@ -2271,3 +2271,85 @@ tighter endurance picture is wanted before production, but does not block
 this release given production's own current real usage is far below this
 scale (`squadrons: 1`) and this is a staging-specific, disclosed finding.
 - **Disposition**: GAP-18 fully closed, with no remaining caveats of any kind.
+
+---
+
+## GAP-19: Planning Workspace WCAG 2.1 AA colour-contrast violations
+
+- **Source**: E2E accessibility suite (`e2e/accessibility.spec.ts`) failing on `read-only`
+  and `help drawer` states (tests 59 and 93 in CI run `34659359774`).
+- **Root cause**: Three independent contrast failures:
+  1. `ActivityDetailBlock.tsx` — `#aaa` (2.32:1 on white) used for "not set" field text and
+     location spans in both compact and standard card modes.
+  2. `ActivityDetailBlock.tsx` — "Reviewed" status badge `#1a7f4b` on `#e8f5e9` = 4.47:1
+     (just below the 4.5:1 AA threshold).
+  3. `planning.css` — `.pw-nc-empty { color: #b0b7bb }` (~2.0:1 on `#fafafa` empty-cell
+     background).
+- **Fix** (commit `58b041cd`):
+  - All three `#aaa` instances → `var(--muted-text)` (`#5c6a76`, ≥4.5:1 on white).
+  - "Reviewed" badge `#1a7f4b` → `#145f38` (7.48:1 on `#e8f5e9`).
+  - `.pw-nc-empty` `#b0b7bb` → `var(--muted-text)`.
+- **Verification**: CI run `34694347882` (commit `9c7c43bc`) — all `accessibility.spec.ts`
+  tests pass on Chromium, Firefox, and WebKit.
+- **Status**: CLOSED.
+
+---
+
+## GAP-20: Planning Workspace conflict-indicator dots missing in Term and Custom-range views
+
+- **Source**: `e2e/planning-conflict-indicator.spec.ts` tests 105 (Term) and 135 (Custom
+  range) failing in CI run `34659359774`.
+- **Root cause**: `TermView.tsx` and `EightWeekView.tsx` both rendered `<ParadeNightBlock>`
+  without the `periods` prop. With `effectivePeriods = []`, the block fell through to the
+  "Legacy parade night — no timing template" path and rendered no session grid, so
+  conflict dots (`.pn-conflict-dot.room`) inside `gridRows.map()` were never rendered.
+  `YearView.tsx` already had the fix from commit `70a51332`.
+- **Fix** (commit `58b041cd`):
+  - `TermView.tsx`: added `periods={night.instructional_periods}`.
+  - `EightWeekView.tsx`: added `periods={night?.instructional_periods ?? []}` (using
+    `nightSummaryMap` from the parallel `nightSummaries` query, same source as `notices`).
+- **Verification**: CI run `34694347882` — all `planning-conflict-indicator.spec.ts` tests
+  pass on all three browsers.
+- **Status**: CLOSED.
+
+---
+
+## GAP-21: E2E tests for session archive/restore and drawer-move do not create a TrainingClass
+
+- **Source**: `session-archive-restore.spec.ts:24` and `session-drawer-move.spec.ts:23`
+  failing on all CI runs from `ed321327` forward.
+- **Root cause**: Both tests seeded a session with `cadet_group: "senior"` but no linked
+  `TrainingClass`. The `ParadeNightGridView`'s Task 4 refactor replaced `DISPLAY_GROUPS`
+  (cadet-group string match) with `phaseGroups` (derived from real `TrainingClass` records).
+  With no training classes, `phaseGroups.length === 0` and the grid renders
+  "No training classes configured" with no session cells — the test assertions on
+  `.pn-cell-title` and `.pn-cell-inner[role='button']` never found their elements.
+- **Fix**:
+  - `session-archive-restore.spec.ts` (commit `984723c0`): creates a curriculum phase +
+    training class, links the session via `PUT /api/sessions/{id}/audience`, and archives
+    the class + phase in `finally`.
+  - `session-drawer-move.spec.ts` (commit `9c7c43bc`): same pattern applied.
+- **Verification**: CI run `34694347882` (commit `9c7c43bc`) — both tests pass on all
+  three browsers (Chromium, Firefox, WebKit). Planning Workspace E2E suite fully green.
+- **Status**: CLOSED.
+
+---
+
+## GAP-22: Connected Frontend E2E pre-existing infrastructure failures
+
+- **Source**: CI runs from `ed321327` forward show ~160–176 Connected Frontend E2E
+  failures across all three browsers (Chromium, Firefox, WebKit). These were present
+  before PR #60 was opened and are not introduced by any commit in this branch.
+- **Root cause (characterised)**: The failures span many unrelated test files
+  (`cross-origin-session-handoff`, `activity-local-override`, `dashboard-element-progress`,
+  `facilitator-*`, `nav-redesign`, etc.). The common failure point across many tests is
+  that session-dependant pages do not load within timeout, suggesting the connected
+  frontend CI environment has a persistent authentication or service-startup issue not
+  reproducible locally.
+- **Scope**: No changes in PR #60 touch `connected-frontend/` or the `e2e-connected/`
+  test suite. The failure count decreased from ~176 (run `34659359774`) to ~160 (run
+  `34694347882`) without any connected-frontend changes, consistent with flaky
+  infrastructure rather than a deterministic code regression.
+- **Status**: OPEN — pre-existing, not a PR #60 regression. Requires separate investigation
+  into CI environment (frontend startup timing, auth seed, nginx container health checks).
+  Does not block Planning Workspace release gate.
