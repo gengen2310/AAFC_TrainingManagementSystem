@@ -25,6 +25,9 @@ test("an archived session is hidden from the Night grid, visible via Show archiv
   const hdr = await authHeader(page, ADMIN_CODE);
   const suffix = String(Date.now());
 
+  const me = await (await page.request.get(`${API_BASE}/api/auth/me`, { headers: hdr })).json();
+  const sqnId = me.session.squadron_id as string;
+
   // Dedicated test-only year -- see parade-night-grid-classes.spec.ts's own
   // comment for why the year value must match the parade date's calendar
   // year and stay far outside the range any other suite file would use.
@@ -34,6 +37,26 @@ test("an archived session is hidden from the Night grid, visible via Show archiv
   });
   expect(yearRes.ok()).toBe(true);
   const yearId = (await yearRes.json()).planning_year_id as string;
+
+  // Create a curriculum phase and training class so the parade night grid
+  // renders session cells. The grid now groups by phase/training-class
+  // (Task 4 refactor), not the legacy cadet_group string -- a session with
+  // no linked training class appears in no cell and the test cannot see it
+  // after restore. Pattern mirrors parade-night-grid-classes.spec.ts.
+  const stageName = `REM-133-STAGE-${suffix}`;
+  const stageRes = await page.request.post(`${API_BASE}/api/curriculum/phases`, {
+    data: { name: stageName, display_name: stageName, scope_level: "squadron", squadron_id: sqnId },
+    headers: hdr,
+  });
+  expect(stageRes.ok()).toBe(true);
+  const stageId = (await stageRes.json()).phase_id as string;
+
+  const classRes = await page.request.post(`${API_BASE}/api/training-classes`, {
+    data: { training_year_id: yearId, training_stage_id: stageId, display_name: `REM-133 Class ${suffix}` },
+    headers: hdr,
+  });
+  expect(classRes.ok()).toBe(true);
+  const classId = (await classRes.json()).training_class_id as string;
 
   const pnDate = new Date(testYear, 2, 1 + (Date.now() % 27)).toISOString().slice(0, 10);
   const pdRes = await page.request.post(`${API_BASE}/api/planning/years/${yearId}/parade-dates`, {
@@ -55,6 +78,12 @@ test("an archived session is hidden from the Night grid, visible via Show archiv
   });
   expect(sessRes.ok()).toBe(true);
   const sessionId = (await sessRes.json()).session_id as string;
+
+  // Link session to the training class so the grid cell becomes visible.
+  const audRes = await page.request.put(`${API_BASE}/api/sessions/${sessionId}/audience`, {
+    data: { training_class_ids: [classId] }, headers: hdr,
+  });
+  expect(audRes.ok()).toBe(true);
 
   const deleteRes = await page.request.delete(`${API_BASE}/api/planning/sessions/${sessionId}`, { headers: hdr });
   expect(deleteRes.ok()).toBe(true);
@@ -86,9 +115,11 @@ test("an archived session is hidden from the Night grid, visible via Show archiv
     // Restored session must now render as a live grid cell.
     await expect(page.locator(".pn-cell-title", { hasText: activityTitle })).toBeVisible({ timeout: 5000 });
   } finally {
-    // Clean up -- archive the session and deactivate the year so nothing
-    // lingers as an active PlanningYear for a future test run.
+    // Clean up -- archive the session, delete the training class, archive
+    // the phase, then deactivate the year so nothing lingers.
     await page.request.delete(`${API_BASE}/api/planning/sessions/${sessionId}`, { headers: hdr });
+    await page.request.delete(`${API_BASE}/api/training-classes/${classId}`, { headers: hdr });
+    await page.request.post(`${API_BASE}/api/curriculum/phases/${stageId}/archive`, { headers: hdr });
     const curYearRes = await page.request.get(`${API_BASE}/api/planning/years/${yearId}`, { headers: hdr });
     const curYear = await curYearRes.json();
     await page.request.patch(`${API_BASE}/api/planning/years/${yearId}`, {
