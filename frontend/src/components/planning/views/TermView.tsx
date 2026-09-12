@@ -163,6 +163,7 @@ export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
                     conflictCount={night.conflict_count}
                     inHoliday={!!inHoliday}
                     compact={false}
+                    periods={night.instructional_periods}
                     focusClassId={focusClassId}
                     searchText={searchText}
                     tierFilter={tierFilter}

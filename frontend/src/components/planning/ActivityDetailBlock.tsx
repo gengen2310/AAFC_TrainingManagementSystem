@@ -228,7 +228,7 @@ function Field({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: "flex", gap: 4, fontSize: 'var(--fs-2xs)', lineHeight: 1.4 }}>
       <span style={{ color: "var(--muted-text)", minWidth: 80, flexShrink: 0 }}>{label}</span>
-      <span style={{ color: isNotSet ? "#aaa" : "var(--text)", fontStyle: isNotSet ? "italic" : undefined }}>
+      <span style={{ color: isNotSet ? "var(--muted-text)" : "var(--text)", fontStyle: isNotSet ? "italic" : undefined }}>
         {value}
       </span>
     </div>
@@ -237,7 +237,7 @@ function Field({ label, value }: { label: string; value: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; bg: string; color: string }> = {
-    classified:   { label: "Reviewed",      bg: "#e8f5e9", color: "#1a7f4b" },
+    classified:   { label: "Reviewed",      bg: "#e8f5e9", color: "#145f38" },
     needs_review: { label: "Needs review",  bg: "#fff8e1", color: "#c97a00" },
     irrelevant:   { label: "Irrelevant",    bg: "#f5f5f5", color: "var(--muted-text)" },
   };
@@ -306,7 +306,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
         {/* Location */}
         <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: 1 }}>
           <span style={{ color: "var(--muted-text)" }}>Location: </span>
-          <span style={{ fontStyle: a.location ? undefined : "italic", color: a.location ? "var(--text)" : "#aaa" }}>
+          <span style={{ fontStyle: a.location ? undefined : "italic", color: a.location ? "var(--text)" : "var(--muted-text)" }}>
             {or(a.location)}
           </span>
         </div>
@@ -414,7 +414,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
         <span style={{ color: "var(--muted-text)" }}>Location: </span>
         <span style={{
           fontStyle: a.location ? undefined : "italic",
-          color: a.location ? "var(--text)" : "#aaa",
+          color: a.location ? "var(--text)" : "var(--muted-text)",
         }}>
           {or(a.location)}
         </span>

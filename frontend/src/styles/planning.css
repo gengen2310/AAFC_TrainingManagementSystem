@@ -767,7 +767,7 @@ body.pw-active .main {
 .pw-night-cell.conflict-fac { border-color: var(--warning); background: #fffbf0; }
 .pw-night-cell:not(.empty):hover { background: #f0f7ff; }
 .pw-night-cell-inner { padding: 8px 10px; min-height: 72px; position: relative; }
-.pw-nc-empty { font-size: var(--fs-xs); color: #b0b7bb; font-style: italic; }
+.pw-nc-empty { font-size: var(--fs-xs); color: var(--muted-text); font-style: italic; }
 .pw-nc-code { font-size: var(--fs-2xs); font-weight: 700; color: var(--aafc-royal-blue); margin-bottom: 2px; }
 .pw-nc-title { font-weight: 700; font-size: var(--fs-sm); margin-bottom: 2px; line-height: 1.3; }
 .pw-nc-detail { font-size: var(--fs-2xs); color: var(--muted-text); margin-bottom: 1px; }

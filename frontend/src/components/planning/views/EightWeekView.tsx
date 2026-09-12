@@ -206,6 +206,7 @@ export function EightWeekView({
             term={pd.term}
             notices={night?.notices ?? []}
             sessions={displaySessions}
+            periods={night?.instructional_periods ?? []}
             sessionCount={row.session_count}
             filledSlots={row.filled_slots}
             conflictCount={unresolvedCount}
