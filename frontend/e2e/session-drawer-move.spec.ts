@@ -24,6 +24,9 @@ test("WORK-08: 'Move to another night' button is visible in Planning Workspace s
   const hdr = await authHeader(page, ADMIN_CODE);
   const suffix = String(Date.now());
 
+  const me = await (await page.request.get(`${API_BASE}/api/auth/me`, { headers: hdr })).json();
+  const sqnId = me.session.squadron_id as string;
+
   // Use a far-future year so the date's calendar year matches the planning year
   // (required for term computation in Year view — confirmed in parade-night-grid-classes.spec.ts).
   const testYear = 2620 + (Date.now() % 50);
@@ -32,6 +35,24 @@ test("WORK-08: 'Move to another night' button is visible in Planning Workspace s
   });
   expect(yearRes.ok()).toBe(true);
   const yearId = (await yearRes.json()).planning_year_id as string;
+
+  // Create a curriculum phase and training class so the parade night grid
+  // renders session cells. The grid groups by phase/training-class (Task 4
+  // refactor) — a session with no linked training class appears in no cell.
+  const stageName = `WORK-08-STAGE-${suffix}`;
+  const stageRes = await page.request.post(`${API_BASE}/api/curriculum/phases`, {
+    data: { name: stageName, display_name: stageName, scope_level: "squadron", squadron_id: sqnId },
+    headers: hdr,
+  });
+  expect(stageRes.ok()).toBe(true);
+  const stageId = (await stageRes.json()).phase_id as string;
+
+  const classRes = await page.request.post(`${API_BASE}/api/training-classes`, {
+    data: { training_year_id: yearId, training_stage_id: stageId, display_name: `WORK-08 Class ${suffix}` },
+    headers: hdr,
+  });
+  expect(classRes.ok()).toBe(true);
+  const classId = (await classRes.json()).training_class_id as string;
 
   // POST /api/planning/years/{id}/parade-dates auto-links a real ParadeNight.
   const pnDate = new Date(testYear, 2, 1).toISOString().slice(0, 10);
@@ -42,13 +63,18 @@ test("WORK-08: 'Move to another night' button is visible in Planning Workspace s
   const pnId = (await pdRes.json()).parade_night_id as string;
   expect(pnId, "parade-dates create must auto-link a real ParadeNight").toBeTruthy();
 
-  // Add a session on period 1, senior group — this matches the first instructional
-  // timing block so it appears in the Night view grid.
+  // Add a session and link it to the training class so the grid cell renders.
   const sessRes = await page.request.post(`${API_BASE}/api/sessions`, {
     data: { parade_night_id: pnId, period_number: 1, cadet_group: "senior" },
     headers: hdr,
   });
   expect(sessRes.ok()).toBe(true);
+  const sessionId = (await sessRes.json()).session_id as string;
+
+  const audRes = await page.request.put(`${API_BASE}/api/sessions/${sessionId}/audience`, {
+    data: { training_class_ids: [classId] }, headers: hdr,
+  });
+  expect(audRes.ok()).toBe(true);
 
   try {
     // authHeader()'s login call set the aafc_session fallback cookie in this
@@ -82,7 +108,10 @@ test("WORK-08: 'Move to another night' button is visible in Planning Workspace s
     // partial match so "Move to another night" is sufficient.
     await expect(page.locator("button", { hasText: "Move to another night" })).toBeVisible({ timeout: 3000 });
   } finally {
-    // Deactivate the test year to avoid it appearing as an active year in future runs.
+    // Clean up — delete the training class, archive the phase, then deactivate
+    // the year so nothing lingers as an active PlanningYear for future runs.
+    await page.request.delete(`${API_BASE}/api/training-classes/${classId}`, { headers: hdr });
+    await page.request.post(`${API_BASE}/api/curriculum/phases/${stageId}/archive`, { headers: hdr });
     const curYearRes = await page.request.get(`${API_BASE}/api/planning/years/${yearId}`, { headers: hdr });
     const curYear = await curYearRes.json();
     await page.request.patch(`${API_BASE}/api/planning/years/${yearId}`, {
