@@ -918,12 +918,17 @@ def delete_planning_year(
         require_can_write_squadron(p, py.unit_id, py.wing_id)
 
     dependents = {
-        "parade_dates": db.query(ParadeNight).filter(ParadeNight.planning_year_id == year_id).count(),
+        # Only non-archived (active) parade nights block deletion; archived ones are
+        # already soft-deleted and should not prevent permanent year removal.
+        "parade_dates": db.query(ParadeNight).filter(
+            ParadeNight.planning_year_id == year_id,
+            ParadeNight.is_archived == False,  # noqa: E712
+        ).count(),
         "holidays": db.query(HolidayPeriod).filter(HolidayPeriod.planning_year_id == year_id).count(),
         "anchor_events": db.query(AnchorEvent).filter(AnchorEvent.planning_year_id == year_id).count(),
         "notices": db.query(PlanningNotice).join(
             ParadeNight, PlanningNotice.parade_night_id == ParadeNight.id
-        ).filter(ParadeNight.planning_year_id == year_id).count(),
+        ).filter(ParadeNight.planning_year_id == year_id, ParadeNight.is_archived == False).count(),  # noqa: E712
         "cea_activities": db.query(CeaActivity).filter(CeaActivity.planning_year_id == year_id).count(),
         "cea_import_batches": db.query(CeaImportBatch).filter(CeaImportBatch.planning_year_id == year_id).count(),
         "facilitator_leave": db.query(PlanningFacilitatorLeave).filter(PlanningFacilitatorLeave.planning_year_id == year_id).count(),
@@ -935,6 +940,25 @@ def delete_planning_year(
             "error": "has_dependents", "dependents": blockers,
             "message": "This Training Year has linked records and cannot be permanently deleted. Archive it instead.",
         })
+
+    # Physically remove archived (soft-deleted) parade nights for this year so
+    # the ORM does not try to NULL out their NOT NULL planning_year_id FK.
+    # Their sessions must be deleted first; in PostgreSQL the session_audience
+    # ON DELETE CASCADE handles grandchildren automatically; in SQLite (FK
+    # enforcement off) orphaned grandchild rows cause no integrity error.
+    archived_pn_ids = [
+        pn.id for pn in db.query(ParadeNight).filter(
+            ParadeNight.planning_year_id == year_id,
+            ParadeNight.is_archived == True,  # noqa: E712
+        )
+    ]
+    if archived_pn_ids:
+        db.query(TrainingSession).filter(
+            TrainingSession.parade_night_id.in_(archived_pn_ids)
+        ).delete(synchronize_session="fetch")
+        db.query(ParadeNight).filter(
+            ParadeNight.id.in_(archived_pn_ids)
+        ).delete(synchronize_session="fetch")
 
     name, year_num = py.name, py.year
     db.delete(py)

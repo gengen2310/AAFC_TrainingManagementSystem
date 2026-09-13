@@ -13,6 +13,9 @@ export default defineConfig({
   // must not run inside the regular local/CI connected-frontend suite.
   testIgnore: ["**/capture-screenshots*.spec.ts"],
   timeout: 30000,
+  // Tests share a single SQLite dev DB, so browsers must run sequentially to
+  // avoid year-creation/deletion race conditions across browser workers.
+  workers: 1,
   globalSetup: "./playwright-global-setup.ts",
   use: { baseURL: "http://localhost:8080", trace: "on-first-retry" },
   webServer: {
