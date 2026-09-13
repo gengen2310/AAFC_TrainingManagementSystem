@@ -40,7 +40,7 @@ async function loginNational(page: Page, code: string, role: "system_admin" | "n
   // this suite's established page.evaluate(() => nav(...)) convention (see
   // main-tms.spec.ts) rather than clicking the sidenav item, so this helper
   // also works regardless of viewport/hamburger-menu state.
-  await expect(page.getByText("System Overview")).toBeVisible({ timeout: 10000 });
+  await expect(page.locator("#page-system-console").getByText("System Overview", { exact: true })).toBeVisible({ timeout: 10000 });
   await page.evaluate(() => (window as any).nav("national"));
   // #dash-title is the pre-existing (always-in-DOM, statically-labelled)
   // Squadron Dashboard title — ".ph-title:has-text('Training Dashboard')"

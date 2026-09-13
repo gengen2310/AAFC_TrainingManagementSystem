@@ -1,5 +1,6 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+import { selectConnectedPlanningYear } from "./year-context-helper";
 
 // CLASS-10: Training Class split/merge lifecycle (addendum §62/§63). Split =
 // create a new class + move selected cadets into it. Merge = move every
@@ -46,18 +47,7 @@ async function loginSquadron(page: Page, code: string) {
 
 // Same "choose a real Training Year" helper as training-classes.spec.ts.
 async function selectFirstYear(page: Page): Promise<string> {
-  const yearSelect = page.locator("#py-select");
-  await expect(yearSelect).toBeVisible();
-  let firstRealValue = "";
-  await expect(async () => {
-    const options = await yearSelect.locator("option").all();
-    expect(options.length).toBeGreaterThan(1);
-    firstRealValue = (await options[1].getAttribute("value")) || "";
-    expect(firstRealValue).not.toBe("");
-  }).toPass({ timeout: 8000 });
-  await yearSelect.selectOption(firstRealValue);
-  await page.waitForTimeout(600);
-  return firstRealValue;
+  return selectConnectedPlanningYear(page);
 }
 
 const base = LOCAL_API_BASE || "http://localhost:8000";

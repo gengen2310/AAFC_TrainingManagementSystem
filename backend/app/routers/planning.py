@@ -4107,6 +4107,17 @@ def get_annual_program(
     # Build per-date-id session index (pn_id == date_id now — same record)
     ts_by_date_id: dict[str, list] = ts_by_pn  # direct alias: same keys
 
+    # Batch-load timing snapshots (v65) for all parade nights
+    snaps_by_pn: dict[str, list] = {}
+    if all_pn_ids_pre:
+        for snap in db.query(ParadeNightTimingSnapshot).filter(
+            ParadeNightTimingSnapshot.parade_night_id.in_(all_pn_ids_pre),
+        ).order_by(
+            ParadeNightTimingSnapshot.parade_night_id,
+            ParadeNightTimingSnapshot.display_order,
+        ).all():
+            snaps_by_pn.setdefault(snap.parade_night_id, []).append(snap)
+
     # Bulk-load conflict counts and notices per parade night (2 extra queries, no N+1)
     all_pn_ids = all_pn_ids_pre
     conflict_counts_map: dict[str, int] = {}
@@ -4166,6 +4177,32 @@ def get_annual_program(
                 }
                 for s in date_sessions
             ]
+            # Build instructional_periods from snapshots (same logic as night_summaries)
+            pn_snaps = snaps_by_pn.get(pn_obj.id, [])
+            instructional_periods = [
+                {
+                    "period_number": s.period_number,
+                    "label": s.block_label,
+                    "start_time": s.start_time,
+                    "end_time": s.end_time,
+                }
+                for s in pn_snaps if s.is_instructional and s.period_number is not None
+            ]
+            if not instructional_periods and pn_obj.session_count:
+                instructional_periods = [
+                    {"period_number": i, "label": f"Period {i}", "start_time": None, "end_time": None}
+                    for i in range(1, pn_obj.session_count + 1)
+                ]
+            if not instructional_periods and sessions:
+                seen_periods = sorted(
+                    set(s.period_number for s in sessions if s.period_number is not None)
+                )
+                if seen_periods:
+                    instructional_periods = [
+                        {"period_number": p, "label": f"Period {p}", "start_time": None, "end_time": None}
+                        for p in seen_periods
+                    ]
+
             date_summaries.append({
                 **_night_out_as_date(pn_obj),
                 "term": term_label,
@@ -4175,6 +4212,7 @@ def get_annual_program(
                 "sessions_summary": sessions_summary,
                 "conflict_count": conflict_counts_map.get(pn_obj.id, 0),
                 "notices": [_notice_out(n) for n in notices_by_date_id.get(pn_obj.id, [])],
+                "instructional_periods": instructional_periods,
             })
 
         def _anchor_v14_out(a: AnchorEvent) -> dict:
@@ -5536,12 +5574,23 @@ def night_summaries(
             }
             for s in snaps
         ]
-        # Fallback for legacy nights without snapshots
+        # Fallback for legacy nights without snapshots (session_count-based)
         if not instructional_periods and pn.session_count:
             instructional_periods = [
                 {"period_number": i, "label": f"Period {i}", "start_time": None, "end_time": None}
                 for i in range(1, pn.session_count + 1)
             ]
+        # Secondary fallback: derive periods from actual sessions (covers nights without
+        # timing templates, e.g. manually-created or test-fixture nights)
+        if not instructional_periods and pn_sessions:
+            seen_periods = sorted(
+                set(s.period_number for s in pn_sessions if s.period_number is not None)
+            )
+            if seen_periods:
+                instructional_periods = [
+                    {"period_number": p, "label": f"Period {p}", "start_time": None, "end_time": None}
+                    for p in seen_periods
+                ]
 
         summaries.append({
             "parade_date_id": pn.id,  # backward-compat alias

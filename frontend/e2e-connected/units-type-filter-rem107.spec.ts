@@ -24,7 +24,7 @@ async function loginNational(page: Page, code: string) {
   await page.locator("#auth-continue-btn").click();
   await page.locator("#auth-code").fill(code);
   await page.locator("#auth-btn").click();
-  await expect(page.getByText("System Overview")).toBeVisible({ timeout: 10000 });
+  await expect(page.locator("#page-system-console").getByText("System Overview", { exact: true })).toBeVisible({ timeout: 10000 });
 }
 
 test("Units table can be filtered to a single unit type, and a Specialist Flight created via the UI shows its type badge", async ({ page }) => {

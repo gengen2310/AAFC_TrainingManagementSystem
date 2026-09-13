@@ -426,26 +426,27 @@ export function ParadeNightBlock({
   return (
     <div className={blockCls}>
       {/* ── Header — dark blue bar ──────────────────────────────────────────── */}
-      <div
-        className="pw-block-hdr"
-        onClick={onHeaderClick}
-        role="button"
-        tabIndex={0}
-        onKeyDown={e => e.key === "Enter" && onHeaderClick()}
-        aria-label={`Parade night ${date}`}
-      >
-        <span className="pw-block-date">{dateLabel}</span>
-        {inHoliday && <span className="pw-block-standdown">Stand-down</span>}
-        {fillLabel && !compact && <span className="pw-block-fill">{fillLabel}</span>}
-        {conflictCount > 0 && (
-          <span
-            className="pw-conflict-badge room"
-            title={`${conflictCount} unresolved conflict${conflictCount !== 1 ? "s" : ""} (room, facilitator, or workload double-booking) — open this parade night to see and resolve each one`}
-          >
-            ⚠ {conflictCount}
-          </span>
-        )}
-        {/* CLASS-23: collapse toggle — stops propagation so header nav doesn't fire */}
+      {/* Two sibling buttons: header action + collapse toggle. No nesting of
+          interactive elements — avoids nested-interactive WCAG 4.1.2 violation. */}
+      <div className="pw-block-hdr">
+        <button
+          className="pw-block-hdr-action"
+          onClick={onHeaderClick}
+          aria-label={`Parade night ${date}`}
+        >
+          <span className="pw-block-date">{dateLabel}</span>
+          {inHoliday && <span className="pw-block-standdown">Stand-down</span>}
+          {fillLabel && !compact && <span className="pw-block-fill">{fillLabel}</span>}
+          {conflictCount > 0 && (
+            <span
+              className="pw-conflict-badge room"
+              title={`${conflictCount} unresolved conflict${conflictCount !== 1 ? "s" : ""} (room, facilitator, or workload double-booking) — open this parade night to see and resolve each one`}
+            >
+              ⚠ {conflictCount}
+            </span>
+          )}
+        </button>
+        {/* CLASS-23: collapse toggle — sibling of the header button, never nested */}
         <button
           className="pw-block-collapse-btn"
           onClick={e => { e.stopPropagation(); setCollapsed(v => !v); }}

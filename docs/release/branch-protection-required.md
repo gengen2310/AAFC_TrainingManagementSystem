@@ -1,49 +1,48 @@
 # MANUAL ACTION REQUIRED: GitHub Branch Protection
 
-**Status:** NOT YET CONFIGURED — requires repository admin access.
+**Status:** NOT CONFIGURED. The `main` branch currently reports protection disabled and has no required status checks.
 
-The following branch protection settings must be configured by a repository admin at:
-GitHub → Settings → Branches → Add branch protection rule → Branch name: `main`
+Configure a branch protection rule for `main` before beta/release approval.
 
 ## Required settings
 
-- [x] Require a pull request before merging
-  - Required approvals: 1
-  - Dismiss stale pull request approvals when new commits are pushed: Yes
-- [x] Require status checks to pass before merging
-  - Require branches to be up to date before merging: Yes
-  - Required checks:
+- Require a pull request before merging.
+  - Required approvals: 1.
+  - Dismiss stale approvals when new commits are pushed.
+- Require status checks to pass before merging.
+  - Require branches to be up to date before merging.
+  - Require all release-qualification checks below:
     - `pytest (Python 3.13, SQLite)`
     - `TypeScript typecheck (Planning Workspace)`
     - `Frontend build (Planning Workspace)`
+    - `Release static checks`
     - `PostgreSQL migration rehearsal`
     - `Planning Workspace E2E (chromium)`
+    - `Planning Workspace E2E (firefox)`
+    - `Planning Workspace E2E (webkit)`
+    - `Connected Frontend E2E (chromium)`
+    - `Connected Frontend E2E (firefox)`
+    - `Connected Frontend E2E (webkit)`
     - `pip-audit (backend)`
     - `npm audit (Planning Workspace)`
-- [x] Require conversation resolution before merging
-- [x] Do not allow force pushes
-- [x] Do not allow deletions
+- Require conversation resolution before merging.
+- Do not allow force pushes.
+- Do not allow branch deletion.
 
-## Why each requirement matters
+## Why these checks are required
 
-- **pytest**: catches backend regressions before merge; was previously not gated (CI-001)
-- **typecheck**: prevents broken TypeScript from reaching main
-- **build**: confirms the Planning Workspace actually builds before merge
-- **migration rehearsal**: the project experienced a migration that passed SQLite
-  but failed against populated PostgreSQL — this gate prevents that class of error
-- **E2E (chromium)**: minimum browser coverage gate
-- **pip-audit / npm audit**: catches new dependency CVEs before they enter main
-- **Force push protection**: prevents history rewriting of the release branch
+- `pytest` protects backend behaviour, tenancy and RBAC contracts and includes SQLite migration regressions.
+- TypeScript and build checks prove the Planning Workspace compiles as the module that is actually deployed.
+- `Release static checks` rejects whitespace errors, verifies shared design-token synchronisation, scans both production frontends for prohibited credential/session-storage patterns, and exercises the deployment-control unit tests.
+- PostgreSQL migration rehearsal exercises the production database dialect before a merge.
+- All three Planning Workspace browsers validate the `/planning` module contract rather than a retired React TMS shell.
+- All three Connected Frontend browsers validate the authoritative Main TMS surface and its cross-interface handoff.
+- Dependency audits prevent known backend or production-frontend High/Critical vulnerabilities from entering `main` unnoticed.
 
-## Workflow file locations
+## Workflow ownership
 
-The required CI checks are defined in:
-- `.github/workflows/backend-tests.yml` — pytest, typecheck, build, migration rehearsal
-- `.github/workflows/e2e-tests.yml` — Playwright E2E
-- `.github/workflows/dependency-audit.yml` — pip-audit, npm audit
+- `.github/workflows/backend-tests.yml`: pytest, typecheck, build, release static checks, PostgreSQL migration rehearsal.
+- `.github/workflows/e2e-tests.yml`: Planning Workspace and Connected Frontend matrices for Chromium, Firefox and WebKit.
+- `.github/workflows/dependency-audit.yml`: pip-audit and npm audit.
 
-## Note on automated configuration
-
-Claude Code does not have sufficient GitHub permissions to configure branch protection
-rules programmatically on this repository. This document serves as the specification
-for the admin action required before the beta release.
+This file is a release-control specification only. It does not claim the repository is protected until GitHub reports the rule as enabled.

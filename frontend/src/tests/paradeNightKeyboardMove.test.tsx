@@ -20,6 +20,16 @@ const TC_JUNIOR = { training_class_id: "tc-j1", display_name: "Junior", class_nu
   start_date: null, end_date: null, expected_count: null, notes: null,
   is_archived: false, version: 1 };
 
+// ParadeNightBlock intentionally treats an empty instructional-period snapshot as
+// a legacy read-only night. Keyboard movement must be exercised against the real,
+// editable template-backed contract, not a fixture that silently takes the legacy
+// placeholder path.
+const PERIODS = [
+  { period_number: 1, label: "P1", start_time: "18:30", end_time: "19:10" },
+  { period_number: 2, label: "P2", start_time: "19:15", end_time: "19:55" },
+  { period_number: 3, label: "P3", start_time: "20:00", end_time: "20:40" },
+];
+
 const session = (id: string, _group: string, period: number, title: string): DisplaySession => ({
   session_id: id,
   period,
@@ -51,6 +61,7 @@ function Harness({ onMove }: { onMove: (p: DragSessionPayload, d: string, per: n
     },
     onHeaderClick: () => {},
     onSessionClick: () => {},
+    periods: PERIODS,
   };
   return (
     <div>

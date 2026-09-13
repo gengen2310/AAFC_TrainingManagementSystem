@@ -1,5 +1,6 @@
 import { test, expect, Page } from "@playwright/test";
 import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
+import { selectConnectedPlanningYear, refreshConnectedPlanningYear } from "./year-context-helper";
 
 // CLASS-04 dedicated UI: the Training Classes card on the Activities page
 // gains a "Curriculum Progress" coverage pill per class (via the existing
@@ -63,18 +64,7 @@ test.afterAll(async ({ request }) => {
 let _dayCounter = 0;
 
 async function selectFirstYear(page: Page): Promise<string> {
-  const yearSelect = page.locator("#py-select");
-  await expect(yearSelect).toBeVisible();
-  let firstRealValue = "";
-  await expect(async () => {
-    const options = await yearSelect.locator("option").all();
-    expect(options.length).toBeGreaterThan(1);
-    firstRealValue = (await options[1].getAttribute("value")) || "";
-    expect(firstRealValue).not.toBe("");
-  }).toPass({ timeout: 8000 });
-  await yearSelect.selectOption(firstRealValue);
-  await page.waitForTimeout(600);
-  return firstRealValue;
+  return selectConnectedPlanningYear(page);
 }
 
 async function loginSquadron(page: Page, code: string) {
@@ -192,8 +182,7 @@ test.describe("Training Class curriculum progress UI (CLASS-04 dedicated UI)", (
     const { className, item2Title } = await seedHalfDeliveredClass(page, token, yearId, suffix);
 
     // Re-select the year to force a fresh render including the new class.
-    await page.locator("#py-select").selectOption(yearId);
-    await page.waitForTimeout(600);
+    await refreshConnectedPlanningYear(page, yearId);
 
     const row = page.locator("#py-classes-body tr", { hasText: className });
     await expect(row).toBeVisible({ timeout: 8000 });

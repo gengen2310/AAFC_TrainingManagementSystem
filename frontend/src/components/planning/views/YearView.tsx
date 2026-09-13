@@ -78,6 +78,7 @@ export function YearView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
           sessions: pd.sessions_summary ?? [],
           conflict_count: pd.conflict_count ?? 0,
           notices: pd.notices ?? [],
+          instructional_periods: pd.instructional_periods ?? [],
         } satisfies NightSummary,
       ]),
     );
@@ -198,6 +199,7 @@ export function YearView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
                             inHoliday={!!inHoliday}
                             compact={false}
                             blockSize="sm"
+                            periods={night.instructional_periods}
                             onHeaderClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
                             onSessionClick={onSessionClick
                               ? (ds) => onSessionClick(ds.session_id, pd.parade_date_id, pd.parade_date)

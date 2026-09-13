@@ -100,11 +100,9 @@ test("the year numeral is tabular: stepping does not change its width", async ({
 });
 
 test("every year-bar control offers a 44px hit target", async ({ page }) => {
-  // Measured by HIT-TESTING, not by boundingBox(). The control is deliberately
-  // 36px tall so it matches the buttons beside it, and reaches 44px through a
-  // transparent ::after. boundingBox() reports the layout box and cannot see
-  // that, so it would report a false failure -- and, on a control that grew its
-  // box instead, a false pass is just as possible.
+  // The current control contract is a genuine 44px-or-larger layout box.
+  // Keep edge hit-testing as a second guard: minimum size alone would not catch
+  // a neighbouring element intercepting the top or bottom of the target.
   await loginSquadron(page, "ADMIN703");
   await openYearBar(page);
 
@@ -114,7 +112,7 @@ test("every year-bar control offers a 44px hit target", async ({ page }) => {
     const cy = box.y + box.height / 2;
 
     // the control must still be visually consistent with its neighbours
-    expect.soft(Math.round(box.height), `${sel} visual height`).toBeLessThanOrEqual(40);
+    expect.soft(Math.round(box.height), `${sel} layout-box height`).toBeGreaterThanOrEqual(44);
 
     for (const [dx, dy, edge] of [[0, -21, "top"], [0, 21, "bottom"]] as const) {
       const hit = await page.evaluate(([x, y, want]) => {
@@ -159,7 +157,7 @@ async function apiToken(page: Page): Promise<string> {
  *  for the "no row at all" test above, which needs 2027 unmaterialised. */
 async function deleteYear(page: Page, year: number) {
   const token = await apiToken(page);
-  const base = LOCAL_API_BASE!;
+  const base = LOCAL_API_BASE || process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000";
   const rows = await (await page.request.get(
     `${base}/api/planning/years`, { headers: { Authorization: `Bearer ${token}` } })).json();
   const row = rows.find((r: any) => r.year === year);

@@ -34,16 +34,11 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Seed demo database
-        # Creates aafc_tms.db with the full 16-squadron demo dataset,
-        # which the E2E tests authenticate against (ADMIN703, ADMIN7WG, etc.).
         working-directory: backend
         run: python manage.py --seed
 
       - name: Start backend
         working-directory: backend
-        # ENVIRONMENT=development so fail-closed production checks don't fire.
-        # JWT_SECRET and SECRET_KEY use their defaults from config.py — fine for
-        # an ephemeral local SQLite test database, never for production.
         run: uvicorn app.main:app --port 8000 &
         env:
           ENVIRONMENT: development
@@ -69,9 +64,10 @@ jobs:
 
       - name: Run Planning Workspace E2E
         # playwright.config.ts: testDir=./e2e, webServer starts Vite on :5173.
-        # Covers: auth, nav, dashboard, session-lifecycle, cross-interface,
-        # accessibility (axe WCAG 2.1 AA), mission-backlog, training-classes,
-        # facilitators, reports, rollover, and more (21 spec files).
+        # This suite is intentionally module-only: shared-session auth/handoff,
+        # RBAC/squadron scope, planning grid/backlog/filters/session lifecycle,
+        # facilitator leave, rollover visibility and WCAG accessibility states.
+        # Full TMS pages are owned by the Connected Frontend suite below.
         working-directory: frontend
         run: npx playwright test --project=${{ matrix.browser }} --reporter=list,html
         env:
@@ -135,8 +131,6 @@ jobs:
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Start Planning Workspace dev server
-        # Required by cross-origin-session-handoff.spec.ts which navigates from TMS
-        # (:8080) to the Planning Workspace (:5173) to prove cookie-based handoff.
         working-directory: frontend
         run: npx vite &
         env:
@@ -150,11 +144,9 @@ jobs:
           done
 
       - name: Run Connected Frontend (Main TMS) E2E
-        # playwright.connected.config.ts: testDir=./e2e-connected, webServer starts
-        # python3 -m http.server 8080 --directory ../connected-frontend.
-        # Covers: accounts, activities, curriculum, dashboard, facilitators,
-        # navigation, parade nights, training classes, reports, and more (35 spec files,
-        # including cross-origin-session-handoff.spec.ts which needs PW on :5173).
+        # playwright.connected.config.ts: testDir=./e2e-connected, webServer
+        # starts connected-frontend on :8080. This is the authoritative browser
+        # suite for Main TMS pages and also verifies cross-origin handoff to PW.
         working-directory: frontend
         run: npx playwright test --config playwright.connected.config.ts --project=${{ matrix.browser }} --reporter=list,html
         env:

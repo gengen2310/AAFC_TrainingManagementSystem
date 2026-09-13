@@ -199,7 +199,7 @@ export function HelpDrawer({ onClose }: Props) {
         ))}
       </div>
 
-      <div className="pw-help-body">
+      <div className="pw-help-body" tabIndex={0}>
         {tab === "overview" && (
           <div className="pw-help-section">
             <h3>Two systems, one program</h3>
