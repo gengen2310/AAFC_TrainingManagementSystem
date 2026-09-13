@@ -79,7 +79,7 @@ test("WORK-11: copy session modal opens from parade night card", async ({ page }
   await copyBtn.click();
 
   // Modal should open with a night selector
-  const modal = page.locator("#m-copy-pn");
+  const modal = page.locator("#m-pn-copy-sessions");
   await expect(modal).toBeVisible({ timeout: 5000 });
   await expect(modal.locator("select, [role='listbox']")).toBeAttached();
 });

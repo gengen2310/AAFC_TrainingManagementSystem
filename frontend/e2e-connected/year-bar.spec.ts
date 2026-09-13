@@ -157,7 +157,7 @@ async function apiToken(page: Page): Promise<string> {
  *  for the "no row at all" test above, which needs 2027 unmaterialised. */
 async function deleteYear(page: Page, year: number) {
   const token = await apiToken(page);
-  const base = LOCAL_API_BASE!;
+  const base = LOCAL_API_BASE || process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000";
   const rows = await (await page.request.get(
     `${base}/api/planning/years`, { headers: { Authorization: `Bearer ${token}` } })).json();
   const row = rows.find((r: any) => r.year === year);

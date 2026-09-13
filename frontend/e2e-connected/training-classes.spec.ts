@@ -80,9 +80,11 @@ test.describe("Training Classes panel on the Activities page", () => {
     // Archive it via the real UI control, and confirm it disappears from
     // the default (active-only) list -- cleans up after itself, matching
     // this program's established test-hygiene discipline (REM-128/131).
-    page.once("dialog", (d) => d.accept());
+    // archiveTrainingClass() uses the custom #m-confirm modal, not a native dialog.
     const row = page.locator("#py-classes-body tr", { hasText: uniqueName });
     await row.getByRole("button", { name: "Archive" }).click();
+    await page.locator("#m-confirm").waitFor({ state: "visible", timeout: 5000 });
+    await page.locator("#confirm-yes-btn").click();
     await expect(page.locator("#py-classes-body")).not.toContainText(uniqueName, { timeout: 5000 });
 
     expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
@@ -109,9 +111,10 @@ test.describe("Training Classes panel on the Activities page", () => {
     await expect(editModal).toBeHidden({ timeout: 5000 });
     await expect(page.locator("#py-classes-body")).toContainText(renamed, { timeout: 5000 });
 
-    // Clean up.
-    page.once("dialog", (d) => d.accept());
+    // Clean up. archiveTrainingClass() uses #m-confirm, not a native dialog.
     await page.locator("#py-classes-body tr", { hasText: renamed }).getByRole("button", { name: "Archive" }).click();
+    await page.locator("#m-confirm").waitFor({ state: "visible", timeout: 5000 });
+    await page.locator("#confirm-yes-btn").click();
     await expect(page.locator("#py-classes-body")).not.toContainText(renamed, { timeout: 5000 });
   });
 

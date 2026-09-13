@@ -1487,8 +1487,8 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="nav-item" role="link" tabindex="0" onclick="nav('help')">Help &amp; Reference</div>
       <div class="nav-item active" role="link" tabindex="0" onclick="nav('dashboard')">Training Dashboard</div>
       <div class="nav-item" role="link" tabindex="0" onclick="nav('calendar')">Training Calendar</div>
-      <div class="nav-lbl" id="admin-lbl" style="display:none">Unit Setup</div>
-      <div class="nav-item admin-el" role="link" tabindex="-1" style="display:none" onclick="nav('settings')">Unit Setup</div>
+      <div class="nav-lbl" id="admin-lbl" style="display:none">Settings</div>
+      <div class="nav-item admin-el" role="link" tabindex="-1" style="display:none" onclick="nav('settings')">Unit Settings</div>
       <div class="nav-lbl">Plan Training</div>
       <div class="nav-item" role="link" tabindex="0" onclick="nav('curriculum')">Curriculum</div>
       <div class="nav-item" role="link" tabindex="0" onclick="nav('activities')">Activities</div>
@@ -1496,7 +1496,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
       <div class="nav-item" role="link" tabindex="0" onclick="nav('weekly-program')">Weekly Program</div>
       <div class="nav-lbl">People and Resources</div>
       <div class="nav-item" role="link" tabindex="0" onclick="nav('facilitators')">Facilitators</div>
-      <div class="nav-item" role="link" tabindex="0" onclick="nav('resources')">Resources & Training Areas</div>
+      <div class="nav-item" role="link" tabindex="0" onclick="nav('resources')">Locations and Resources</div>
       <div class="nav-lbl">Cadets &amp; Training</div>
       <div class="nav-item" role="link" tabindex="0" onclick="nav('cadets')">Cadet Rosters</div>
       <div class="nav-item" role="link" tabindex="0" onclick="nav('training-records')">Training Records</div>
@@ -1986,6 +1986,7 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <div id="yn-rollover" class="no-print" role="status" hidden></div>
         <div id="yn-year-notice" class="no-print"></div>
+        <div id="py-action-btns" class="no-print" style="display:flex;gap:8px;margin-bottom:8px"></div>
         <div class="fbar no-print">
           <select id="act-f-type" aria-label="Filter by activity type" onchange="renderActs()">
             <option value="all">All Types</option>
@@ -2018,6 +2019,25 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           <h2 class="ctitle">Class Forecasts</h2>
           <p class="muted" style="font-size:var(--fs-xs);margin:0 0 10px">Planning status per training class — unplanned requirements, nights remaining, and available time blocks.</p>
           <div id="fc-cards-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px"></div>
+        </div>
+
+        <!-- Training Classes — shown when a year is selected; populated by _tcLoadForYear() -->
+        <div class="card" id="settings-training-classes-wrap" style="display:none;margin-top:0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <h2 class="ctitle" style="margin:0">Training Classes</h2>
+            <div style="display:flex;align-items:center;gap:10px">
+              <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="tc-show-archived" onchange="_tcToggleShowArchived(P.currentYearId)"> Show archived</label>
+              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
+            </div>
+          </div>
+          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 8px">
+            A Training Class is a local group completing a Training Stage — for example, Senior 1
+            and Senior 2 can both complete Senior training on the same Parade Night. Associate Training
+            Classes with a year.
+          </p>
+          <div id="py-classes-card" style="display:none">
+            <div id="py-classes-body"></div>
+          </div>
         </div>
 
         <!-- Wing HQ Events overlay — squadron scope; hidden until _loadAndRenderWingEventsOverlay()
@@ -2491,30 +2511,6 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
           </p>
           <div id="settings-yn-table-wrap"><p class="muted" style="padding:12px 0;font-size:var(--fs-xs)">Loading…</p></div>
           <div id="settings-yn-postcreate" style="display:none" class="alert a-info mt-2"></div>
-        </div>
-        <!-- Training Classes (unit configuration per planning year) -->
-        <div class="card admin-el" id="settings-training-classes-wrap" style="display:none">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <h2 class="ctitle" style="margin:0">Training Classes</h2>
-            <div style="display:flex;align-items:center;gap:10px">
-              <label style="font-size:var(--fs-xs);font-weight:400;display:flex;align-items:center;gap:4px"><input type="checkbox" id="tc-show-archived" onchange="_tcToggleShowArchived(P.currentYearId)"> Show archived</label>
-              <button class="btn btn-sky plan-write-el" style="display:none" onclick="openAddTrainingClassModal()">+ Add Training Class</button>
-            </div>
-          </div>
-          <p class="muted" style="font-size:var(--fs-xs);margin:0 0 8px">
-            A Training Class is a local group completing a Training Stage — for example, Senior 1
-            and Senior 2 can both complete Senior training on the same Parade Night. Associate Training
-            Classes with a year.
-          </p>
-          <div style="margin-bottom:10px">
-            <label style="font-size:var(--fs-xs);font-weight:700;color:var(--muted);margin-right:8px" for="tc-year-sel">Year:</label>
-            <select id="tc-year-sel" aria-label="Select year for classes" onchange="_tcLoadForYear(this.value)" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
-              <option value="">— select year —</option>
-            </select>
-          </div>
-          <div id="py-classes-card" style="display:none">
-            <div id="py-classes-body"></div>
-          </div>
         </div>
         <!-- Custom Training Phases (Task 10) -->
         <div class="card admin-el" id="settings-custom-phases-wrap">
@@ -5875,7 +5871,7 @@ function _jobPollToast(label, jobId) {
 }
 
 function exportProgramItemsCSV() {
-  _downloadExport('/api/export/curriculum-items.csv','curriculum-items.csv');
+  _downloadExport('/api/export/program-items.csv','program-items.csv');
 }
 
 // Shared manual-refresh pattern for primary pages (Training Dashboard,
@@ -6402,13 +6398,14 @@ function nav(id){
     const matTab=document.getElementById('tab-matrix');
     if(matTab)matTab.style.display=(effectiveScope()==='squadron')?'':'none';
   }
+  if(id==='parade-nights'){reloadAndRender();}
   if(id==='dashboard')renderDash();
   if(id==='wing-overview'){renderWing();loadCommandDashboard('wing');}
   if(id==='national'){renderNational();loadCommandDashboard('national');}
   if(id==='wing-activities'){_actTabLoad('act-tab-wing','wing', (S.role==='system_admin')?saBrowseWingId():null);}
   if(id==='national-activities'){_actTabLoad('act-tab-national','national',null);}
   if(id==='audit')renderAudit();
-  if(id==='settings'){renderSettings();_loadSettingsTrainingClasses();}
+  if(id==='settings'){renderSettings();}
   if(id==='accounts')renderAccounts();
   if(id==='system-console')loadSystemConsole();
   if(id==='action-items'){loadRecentChanges();loadNeedsAttentionSessions();}
@@ -9690,10 +9687,10 @@ function buildPNCard(pn){
         ${allDel?stBadge('delivered'):stBadge('planned')}
         ${pn.published?'<span class="badge b-ok" title="Weekly Program published">Published</span>':''}
         <button class="btn btn-xs btn-sky" onclick="showPNDetail('${pn.date}')" title="Open this parade night to edit its sessions, facilitators, rooms and periods">Open / edit</button>
+        ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="${tplName?'Change timing template (current: '+esc(tplName)+')':'Set timing template'}" onclick="openPNTimingOverrideModal('${esc(pn.id)}')">Timing…</button>`:''}
+        ${canWriteSquadron()?`<button class="btn btn-xs btn-out" title="Copy sessions to another parade night" onclick="openCopyPNModal('${pn.date}')">Copy to…</button>`:''}
         ${canWriteSquadron()?`<button class="btn btn-xs btn-out" aria-expanded="false" aria-controls="pnmore-${esc(pn.id)}" title="More actions for ${esc(fmtDL(pn.date))}" onclick="togglePNMore(this,'${esc(pn.id)}')">More ▾</button>`:''}
         ${canWriteSquadron()?`<span class="pn-more" id="pnmore-${esc(pn.id)}">
-          ${tplName?`<button class="btn btn-xs" onclick="openPNTimingOverrideModal('${esc(pn.id)}')" title="Change template">📋 ${esc(tplName)} ▾</button>`:`<button class="btn btn-xs" style="color:var(--muted)" onclick="openPNTimingOverrideModal('${esc(pn.id)}')" title="Set template">+ Template</button>`}
-          <button class="btn btn-xs btn-out" title="Copy sessions to another parade night" onclick="openCopyPNModal('${pn.date}')">Copy to…</button>
           ${(pn.sessions||[]).length>0?`<button class="btn btn-xs btn-out" title="Save this night's sessions as a reusable template" onclick="doSaveAsTemplate('${esc(pn.id)}')">Save as Tpl</button>`:''}
           <button class="btn btn-xs btn-out" title="Apply a saved session template to this parade night" onclick="openApplyTemplateModal('${esc(pn.id)}')">Apply Tpl…</button>
           <button class="btn btn-xs btn-red" aria-label="Delete parade night ${esc(fmtDL(pn.date))}" onclick="delPN('${pn.date}')">×</button>
@@ -12339,6 +12336,7 @@ async function _loadActivitiesPage(){
     const _actWid = _actYr.wing_id||(S.session&&S.session.wing_id)||'';
     _renderHolidays(P.currentYearId);
     _loadClassForecasts(P.currentYearId);
+    _tcLoadForYear(P.currentYearId);
     if(_actWid) _loadAndRenderWingEventsOverlay(_actWid, _actYr.year||new Date().getFullYear());
     loadAnchors(P.currentYearId);
     loadMissions(P.currentYearId);
@@ -12348,6 +12346,7 @@ async function _loadActivitiesPage(){
     // is worse than showing nothing, because it is quietly wrong.
     _renderHolidays(null);
     _loadClassForecasts(null);
+    _tcLoadForYear(null);
     loadAnchors(null);
     loadMissions(null);
     // Wing HQ events are keyed by the year NUMBER, not a planning-year row, so
@@ -13103,9 +13102,15 @@ async function _loadSettingsTrainingClasses(){
 }
 function _tcLoadForYear(yearId){
   const card=document.getElementById('py-classes-card');
+  const wrap=document.getElementById('settings-training-classes-wrap');
   if(!card)return;
-  if(!yearId){card.style.display='none';return;}
+  if(!yearId){
+    card.style.display='none';
+    if(wrap)wrap.style.display='none';
+    return;
+  }
   P.currentYearId=yearId;
+  if(wrap)wrap.style.display='block';
   card.style.display='block';
   _tcToggleShowArchived(yearId);
 }
@@ -17053,7 +17058,7 @@ async function _renderTrainingClasses(yearId){
       const tid=esc(c.training_class_id), yid=esc(yearId);
       let items=`<button class="btn btn-xs" onclick="openSplitTrainingClassModal('${tid}')">Split</button>`;
       if(hasMergeTarget(c,grp)) items+=`<button class="btn btn-xs" onclick="openMergeTrainingClassModal('${tid}')">Merge into…</button>`;
-      if(canWrite) items+=`<hr><button class="btn btn-xs btn-danger" onclick="archiveTrainingClass('${tid}','${yid}')">Archive</button>`;
+      // Archive is a direct row button (not in overflow); nothing extra here
       return `<details class="tc-overflow"><summary title="More actions">⋮</summary><div class="tc-overflow-menu">${items}</div></details>`;
     };
     const cols=showArchived?4:5;
@@ -17074,6 +17079,7 @@ async function _renderTrainingClasses(yearId){
           <td style="white-space:nowrap;text-align:right">
             ${!c.is_archived?`<button class="btn btn-xs" onclick="openTrainingClassProgressModal('${tid}')" style="margin-right:4px">Progress</button>`:''}
             ${!c.is_archived&&canWrite?`<button class="btn btn-xs" onclick="openEditTrainingClassModal('${tid}')" style="margin-right:4px">Edit</button>`:''}
+            ${!c.is_archived&&canWrite?`<button class="btn btn-xs btn-danger" onclick="archiveTrainingClass('${tid}','${esc(yearId)}')">Archive</button>`:''}
             ${overflowMenu(c,grp)}
           </td>
         </tr>`;
