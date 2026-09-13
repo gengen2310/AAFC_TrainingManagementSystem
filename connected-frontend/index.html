@@ -2098,8 +2098,11 @@ body.nav-collapsed .sidenav{width:0;overflow:hidden;min-width:0;transition:width
         </div>
         <div class="card" id="missions-filters-card" style="display:none;margin-top:0">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
-            <h2 class="ctitle" style="margin:0">Mission Backlog</h2>
-            <span id="missions-count" style="font-size:var(--fs-xs);color:var(--muted)"></span>
+            <h2 class="ctitle" style="margin:0">Mission Backlog<button class="ht" tabindex="0" aria-label="About Mission Backlog" data-tip="Lists all curriculum sessions for the active training year. Use the filters to find unscheduled sessions and schedule them across parade nights.">?</button></h2>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span id="missions-count" style="font-size:var(--fs-xs);color:var(--muted)"></span>
+              <button class="btn btn-xs btn-out" onclick="exportPerClassDeliveryCSV()" aria-label="Export per-class delivery CSV">Per-Class CSV</button>
+            </div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <select id="mission-filter-phase" aria-label="Filter by training phase" onchange="renderMissions()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm)">
@@ -11264,18 +11267,16 @@ function _wpSyncNightOptions(){
   if(!sel) return;
   const prev=sel.value;
   const nights=_wpNightsInTerm();
-  sel.innerHTML=nights.length
+  // REM-92: prepend a placeholder so the user sees "choose a parade night"
+  // guidance before making a selection, rather than a blank area.
+  sel.innerHTML='<option value="">— Choose a parade night —</option>'+(nights.length
     ? nights.map(function(pn){
         return '<option value="'+esc(pn.date)+'">'+esc(fmtD(pn.date,{weekday:'short',day:'numeric',month:'short',year:'numeric'}))+'</option>';
       }).join('')
-    : '<option value="">No nights this term</option>';
+    : '');
+  // Restore the previous selection if the night is still in this term.
   if(prev && nights.some(function(n){return n.date===prev;})){
     sel.value=prev;
-  } else if(nights.length){
-    // Auto-select nearest upcoming night (or last night if all are past).
-    const today=new Date().toISOString().slice(0,10);
-    const upcoming=nights.filter(function(n){return n.date>=today;});
-    sel.value=(upcoming.length ? upcoming[0] : nights[nights.length-1]).date;
   }
   _wpUpdateNavBtns();
 }
@@ -11330,7 +11331,12 @@ function _wpPaint() {
 
     // Always show exactly one night — no multi-night view.
     if (!oneNight) {
-        wrap.innerHTML = '<p class="muted p-4">No parade nights for this term. Choose a different term above.</p>';
+        // REM-92: distinguish "nights exist but none chosen" from "no nights at all"
+        if (_wpData && _wpData.pns && _wpData.pns.length) {
+            wrap.innerHTML = '<p class="muted p-4">Choose a parade night from the dropdown above to view its programme.</p>';
+        } else {
+            wrap.innerHTML = '<p class="muted p-4">No parade nights for this term. Choose a different term above.</p>';
+        }
         _wpUpdateNavBtns();
         return;
     }
@@ -14343,7 +14349,7 @@ function saveFac(confirmDuplicate){
       .then(async()=>{
         const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false});
         _setFacSaveState('Saved at '+savedAt,'var(--ok)');
-        await reloadAndRender(); loadFacilitatorStats(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
+        await reloadAndRender(); await loadFacilitatorStats(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
         showToast('Facilitator profile saved.', false);
       })
       .catch(e=>{
@@ -14369,8 +14375,8 @@ function saveFac(confirmDuplicate){
       // persists indefinitely, since nothing else ever resets it). Clear it so
       // the new facilitator is guaranteed visible immediately.
       const facSearch=document.getElementById('fac-search'); if(facSearch)facSearch.value='';
-      await reloadAndRender(); loadFacilitatorStats(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
-      showToast('Facilitator added.', false);
+      await reloadAndRender(); await loadFacilitatorStats(); closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
+      showToast('Facilitator added at '+savedAt+'.', false);
     })
     .catch(e=>{
       if(e&&e.code==='possible_duplicate'&&!confirmDuplicate){
@@ -14463,7 +14469,7 @@ async function _facDupConfirmMerge(){
     document.getElementById('fac-modal-title').textContent='+ Add Facilitator';
     _clearFacDupWarning();
     _facDupDetail=null; _facDupPending=null;
-    await reloadAndRender(); loadFacilitatorStats();
+    await reloadAndRender(); await loadFacilitatorStats();
     showToast('Existing Facilitator record updated.');
   }catch(e){showToast('Could not update: '+apiErr(e),true);}
 }
@@ -14561,7 +14567,7 @@ function editFac(id){
 }
 async function delFac(id){
   confirmAction('Archive this facilitator? Past session records are preserved, and this can be undone from "Show archived".',async()=>{
-    try{ await api('/api/facilitators/'+id,{method:'DELETE'}); await reloadAndRender(); loadFacilitatorStats(); }
+    try{ await api('/api/facilitators/'+id,{method:'DELETE'}); await reloadAndRender(); await loadFacilitatorStats(); }
     catch(e){ showToast(apiErr(e),true); }
   });
 }
@@ -17053,13 +17059,15 @@ async function _renderTrainingClasses(yearId){
       if(sp&&sp.classes) sp.classes.forEach(cp=>{ pctByClass[cp.training_class_id]=cp.coverage_pct; });
     });
     const hasMergeTarget=(c,grp)=>grp.some(o=>o.training_class_id!==c.training_class_id);
-    const overflowMenu=(c,grp)=>{
+    const rowActions=(c,grp)=>{
       if(c.is_archived) return canWrite?`<button class="btn btn-xs btn-ok" onclick="doRestoreTrainingClass('${esc(c.training_class_id)}','${esc(yearId)}')">Restore</button>`:'';
-      const tid=esc(c.training_class_id), yid=esc(yearId);
-      let items=`<button class="btn btn-xs" onclick="openSplitTrainingClassModal('${tid}')">Split</button>`;
-      if(hasMergeTarget(c,grp)) items+=`<button class="btn btn-xs" onclick="openMergeTrainingClassModal('${tid}')">Merge into…</button>`;
-      // Archive is a direct row button (not in overflow); nothing extra here
-      return `<details class="tc-overflow"><summary title="More actions">⋮</summary><div class="tc-overflow-menu">${items}</div></details>`;
+      const tid=esc(c.training_class_id);
+      let btns=`<button class="btn btn-xs" onclick="openTrainingClassProgressModal('${tid}')" style="margin-right:4px">View Progress</button>`;
+      if(canWrite) btns+=`<button class="btn btn-xs" onclick="openEditTrainingClassModal('${tid}')" style="margin-right:4px">Edit</button>`;
+      if(canWrite) btns+=`<button class="btn btn-xs" onclick="openSplitTrainingClassModal('${tid}')" style="margin-right:4px">Split</button>`;
+      if(canWrite&&hasMergeTarget(c,grp)) btns+=`<button class="btn btn-xs" onclick="openMergeTrainingClassModal('${tid}')" style="margin-right:4px">Merge into…</button>`;
+      if(canWrite) btns+=`<button class="btn btn-xs btn-danger" onclick="archiveTrainingClass('${tid}','${esc(yearId)}')">Archive</button>`;
+      return btns;
     };
     const cols=showArchived?4:5;
     let html=`<table class="data-table"><thead><tr><th>Class</th><th>Code</th><th style="text-align:right">Expected</th>${showArchived?'':'<th>Progress</th>'}<th></th></tr></thead><tbody>`;
@@ -17077,10 +17085,7 @@ async function _renderTrainingClasses(yearId){
           <td style="text-align:right">${c.expected_count!=null?esc(String(c.expected_count)):'—'}</td>
           ${showArchived?'':`<td>${_tcCoveragePill(pctByClass[c.training_class_id])}</td>`}
           <td style="white-space:nowrap;text-align:right">
-            ${!c.is_archived?`<button class="btn btn-xs" onclick="openTrainingClassProgressModal('${tid}')" style="margin-right:4px">Progress</button>`:''}
-            ${!c.is_archived&&canWrite?`<button class="btn btn-xs" onclick="openEditTrainingClassModal('${tid}')" style="margin-right:4px">Edit</button>`:''}
-            ${!c.is_archived&&canWrite?`<button class="btn btn-xs btn-danger" onclick="archiveTrainingClass('${tid}','${esc(yearId)}')">Archive</button>`:''}
-            ${overflowMenu(c,grp)}
+            ${rowActions(c,grp)}
           </td>
         </tr>`;
       });

@@ -121,6 +121,10 @@ test("Weekly Program shows a session's real Training Class assignment in its own
   expect(audRes.ok()).toBe(true);
 
   await page.evaluate(() => (window as any).reloadAndRender());
+  // renderWP() filters by P.currentYearId when set. The test parade night is in
+  // a far-future year to avoid seed-data collisions, so clearing the year filter
+  // lets renderWP() fetch all parade nights rather than just the current year's.
+  await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate(() => (window as any).nav("weekly-program"));
   await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });
   await page.locator("#wp-f-term").selectOption("all");
@@ -156,6 +160,7 @@ test("WORK-10: Publish Program button is visible to sqn_admin on the Weekly Prog
   if (pnRes.ok()) _createdPnIds.push((await pnRes.json()).parade_night_id as string);
 
   await page.evaluate(() => (window as any).reloadAndRender());
+  await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate(() => (window as any).nav("weekly-program"));
   await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });
   await page.locator("#wp-f-term").selectOption("all");
@@ -199,6 +204,7 @@ test("Weekly Program header shows the Wing's real name from the session (not har
   if (pnRes.ok()) _createdPnIds.push((await pnRes.json()).parade_night_id as string);
 
   await page.evaluate(() => (window as any).reloadAndRender());
+  await page.evaluate(() => { (window as any).P.currentYearId = null; });
   await page.evaluate(() => (window as any).nav("weekly-program"));
   await expect(page.locator("#wp-sel")).toBeVisible({ timeout: 8000 });
   await page.locator("#wp-f-term").selectOption("all");

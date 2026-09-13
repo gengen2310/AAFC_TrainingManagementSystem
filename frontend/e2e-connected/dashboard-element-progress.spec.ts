@@ -116,7 +116,7 @@ test.describe("Squadron Dashboard — Progress by element (CLASS-12)", () => {
     // appear -- this was the exact bug found during implementation: the
     // shared bar-chart renderer only ever checked row.phase, so every row in
     // this new chart silently rendered as "—" until fixed.
-    await expect(chart.getByText("Drill", { exact: true })).toBeVisible();
+    await expect(chart.getByText("Drill", { exact: true }).first()).toBeVisible();
     // The delivered session's bar must actually be non-empty for the Drill
     // row -- proven via the row's own aria-label (role="img"), which encodes
     // "<name>: <pct>% delivered" and is unaffected by the 14-char name
@@ -145,7 +145,7 @@ test.describe("Squadron Dashboard — Progress by element (CLASS-12)", () => {
     // PH_S remaps phase display labels ("A. Orientation" -> "Orientation");
     // elements have no such remap, so "Drill" renders verbatim.
     await expect(phaseCard.getByText("Orientation", { exact: true })).toBeVisible();
-    await expect(elementCard.getByText("Drill", { exact: true })).toBeVisible();
+    await expect(elementCard.getByText("Drill", { exact: true }).first()).toBeVisible();
     expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
   });
 });

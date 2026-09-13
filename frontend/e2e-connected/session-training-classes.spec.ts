@@ -91,10 +91,18 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   if (yearRes.ok()) {
     yearId = (await yearRes.json()).planning_year_id as string;
   } else {
-    const years = await (await page.request.get(`${base}/api/planning/years`, { headers: auth })).json();
-    const existing = years.find((y: any) => y.year === 2064);
-    if (!existing) throw new Error(`Could not create or find 2064 planning year: ${await yearRes.text()}`);
-    yearId = existing.planning_year_id;
+    // 409 includes existing_id when year already exists — use it directly.
+    const errBody = await yearRes.json().catch(() => null);
+    if (errBody?.existing_id) {
+      yearId = errBody.existing_id as string;
+    } else {
+      const yearsResp = await page.request.get(`${base}/api/planning/years`, { headers: auth });
+      const years = await yearsResp.json();
+      const yearsArr = Array.isArray(years) ? years : [];
+      const existing = yearsArr.find((y: any) => y.year === 2064);
+      if (!existing) throw new Error(`Could not create or find 2064 planning year: ${JSON.stringify(errBody)}`);
+      yearId = existing.planning_year_id;
+    }
   }
 
   const phases = await (await page.request.get(`${base}/api/curriculum/phases`, { headers: auth })).json();

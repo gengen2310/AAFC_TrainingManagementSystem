@@ -26,8 +26,20 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 const PW_BASE = process.env.PW_BASE_URL || "http://localhost:5173";
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE || "";
 
-test.beforeAll(async () => {
+// Skip the entire suite when the Planning Workspace dev server isn't running.
+let _pwReachable = false;
+test.beforeAll(async ({ request }) => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000");
+  try {
+    const resp = await request.get(PW_BASE, { timeout: 3000 });
+    _pwReachable = resp.ok() || resp.status() === 404 /* Vite's own 404 is fine */;
+  } catch {
+    _pwReachable = false;
+  }
+});
+
+test.beforeEach(async () => {
+  test.skip(!_pwReachable, `Planning Workspace server not running at ${PW_BASE} — skipping cross-origin handoff tests`);
 });
 
 async function loginViaTMS(page: Page, code: string) {
