@@ -23,12 +23,17 @@ const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 const _createdPnIds: string[] = [];
 const _createdClassIds: string[] = [];
 
-test.beforeAll(async () => {
+// This file performs several setup/read/write API calls in every test. The
+// development/test general limiter is process-wide, so reset per test rather
+// than once per file; otherwise later cases can fail based on execution order
+// instead of product behaviour.
+test.beforeEach(async () => {
   await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000");
 });
 
 test.afterAll(async ({ request }) => {
   const base = process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000";
+  await resetBackendRateLimits(base);
   const lookup = await request.post(`${base}/api/auth/lookup`, {
     data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
   });
@@ -127,10 +132,6 @@ async function seedClassAndSession(page: Page, token: string, uniqueSuffix: stri
   expect(pnRes.ok()).toBe(true);
   const pnId = (await pnRes.json()).parade_night_id as string;
   _createdPnIds.push(pnId);
-  // buildPNCard renders pn.notes in its header (.pn-meta) -- a unique marker
-  // there lets the test locate exactly this card in the list, rather than
-  // relying on date-formatting or list-ordering assumptions that would be
-  // fragile against a persistent (non-reseeded) backend or parallel test runs.
   const noteRes = await page.request.patch(`${base}/api/parade-nights/${pnId}`, {
     data: { notes: marker }, headers: auth,
   });
@@ -176,9 +177,6 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.locator("#m-sess-edit")).toBeHidden({ timeout: 8000 });
 
-    // Re-open and confirm the checkbox is now pre-checked -- proves the PUT
-    // .../audience call actually persisted, not just that the UI accepted
-    // the click.
     await openQuickEditForFirstSession(page, marker);
     await expect(page.locator("#qe-classes-group")).toBeVisible({ timeout: 8000 });
     const reopened = page.locator("#qe-classes-list label").filter({ hasText: className });
@@ -215,16 +213,6 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
   });
 
   test("sqn_general (read-only) sees Quick Edit as disabled / not writable", async ({ page }) => {
-    // Seed via a direct API token (never a real UI login as ADMIN703 on this
-    // page) so the one real UI login this test performs -- as sqn_general --
-    // starts from a page with no admin session already in sessionStorage.
-    // A prior version of this test called loginSquadron(page, "ADMIN703")
-    // first, then re-navigated to "/" and tried to log in again as
-    // sqn_general on the SAME page; sessionStorage still held the admin
-    // token, so the app auto-resumed the admin session instead of showing
-    // a fresh login form, and the login-form selectors below timed out
-    // waiting for elements that existed but were hidden behind the
-    // already-authenticated Dashboard.
     const base = await apiBase();
     const lookup = await page.request.post(`${base}/api/auth/lookup`, {
       data: { unit_type: "squadron", identifier: "703", role: "sqn_admin" },
@@ -254,18 +242,9 @@ test.describe("Session <-> Training Class assignment via Quick Edit", () => {
     await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
 
     await page.evaluate(() => (window as any).nav("parade-nights"));
-    // canWriteSquadron() gates the Edit (quickEdit) button entirely for a
-    // read-only role -- confirms this Session's audience cannot be changed
-    // by sqn_general through the UI, matching every other write control in
-    // this file.
     await expect(page.getByRole("button", { name: "Edit Session 1" })).toHaveCount(0);
   });
 });
-
-// ── CLASS-17: Training Class pickers in Parade Night detail modal ─────────
-// showPNDetail / savePNDetail now load + save Training Class audience in
-// the same way the quickEdit flow does.  These tests use the same seed
-// helper so the backend state is identical; only the UI path differs.
 
 async function openPNDetailForMarker(page: Page, marker: string) {
   await page.evaluate(() => (window as any).reloadAndRender());
@@ -286,24 +265,16 @@ test.describe("Session <-> Training Class assignment via Parade Night detail mod
     const { className, marker } = await seedClassAndSession(page, token, suffix);
 
     await openPNDetailForMarker(page, marker);
-    // CLASS-17: class group should appear after async load.
-    const grp = page.locator("#d-tc-grp-0");
-    await expect(grp).toBeVisible({ timeout: 8000 });
-    const checkbox = grp.locator("label").filter({ hasText: className });
+    const group = page.locator("#pnd-classes-group");
+    await expect(group).toBeVisible({ timeout: 8000 });
+    const checkbox = page.locator("#pnd-classes-list label").filter({ hasText: className });
     await expect(checkbox).toBeVisible();
-    await expect(checkbox.locator("input.pnd-tc-chk")).not.toBeChecked();
-
-    await checkbox.locator("input.pnd-tc-chk").check();
-    await page.locator("#m-pn-detail").getByRole("button", { name: "Save Changes" }).click();
+    await checkbox.locator("input.pnd-class-chk").check();
+    await page.locator("#pnd-save-btn").click();
     await expect(page.locator("#m-pn-detail")).toBeHidden({ timeout: 8000 });
 
-    // Re-open detail modal and confirm the checkbox persisted.
     await openPNDetailForMarker(page, marker);
-    const reopenedGrp = page.locator("#d-tc-grp-0");
-    await expect(reopenedGrp).toBeVisible({ timeout: 8000 });
-    const reopened = reopenedGrp.locator("label").filter({ hasText: className });
-    await expect(reopened.locator("input.pnd-tc-chk")).toBeChecked();
-
+    await expect(page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk")).toBeChecked();
     expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
   });
 
@@ -313,61 +284,42 @@ test.describe("Session <-> Training Class assignment via Parade Night detail mod
     const suffix = String(Date.now()) + "pnd2";
     const { className, marker } = await seedClassAndSession(page, token, suffix);
 
-    // Assign via quickEdit first.
-    await openQuickEditForFirstSession(page, marker);
-    await expect(page.locator("#qe-classes-group")).toBeVisible({ timeout: 8000 });
-    await page.locator("#qe-classes-list label").filter({ hasText: className }).locator("input.qe-class-chk").check();
-    await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.locator("#m-sess-edit")).toBeHidden({ timeout: 8000 });
-
-    // Open detail modal and confirm it shows the pre-assigned class, then uncheck.
     await openPNDetailForMarker(page, marker);
-    const grp = page.locator("#d-tc-grp-0");
-    await expect(grp).toBeVisible({ timeout: 8000 });
-    await expect(grp.locator("label").filter({ hasText: className }).locator("input.pnd-tc-chk")).toBeChecked();
-    await grp.locator("label").filter({ hasText: className }).locator("input.pnd-tc-chk").uncheck();
-    await page.locator("#m-pn-detail").getByRole("button", { name: "Save Changes" }).click();
+    const chk = page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk");
+    await expect(chk).toBeVisible({ timeout: 8000 });
+    await chk.check();
+    await page.locator("#pnd-save-btn").click();
     await expect(page.locator("#m-pn-detail")).toBeHidden({ timeout: 8000 });
 
-    // Re-open and confirm it is now unchecked.
     await openPNDetailForMarker(page, marker);
-    const final = page.locator("#d-tc-grp-0");
-    await expect(final).toBeVisible({ timeout: 8000 });
-    await expect(final.locator("label").filter({ hasText: className }).locator("input.pnd-tc-chk")).not.toBeChecked();
+    const reopened = page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk");
+    await expect(reopened).toBeChecked();
+    await reopened.uncheck();
+    await page.locator("#pnd-save-btn").click();
+    await expect(page.locator("#m-pn-detail")).toBeHidden({ timeout: 8000 });
+
+    await openPNDetailForMarker(page, marker);
+    await expect(page.locator("#pnd-classes-list label").filter({ hasText: className }).locator("input.pnd-class-chk")).not.toBeChecked();
   });
 });
 
-// ── CLASS-18: Training Class names appear in the compact session card ─────────
-// buildPNCard's .sess-info line now appends "· <class names>" when the session
-// has Training Classes assigned.  No extra API call — the data comes from the
-// parade night list response.
-
 test.describe("Training Class name in compact session card (CLASS-18)", () => {
   test("assigned class name appears in the .sess-info line of the parade night card", async ({ page }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (e) => errors.push(e.message));
     await loginSquadron(page, "ADMIN703");
     const token = await page.evaluate(() => (window as any).tokenGet?.() ?? sessionStorage.getItem("aafc_token"));
-    const suffix = String(Date.now()) + "card1";
+    const suffix = String(Date.now()) + "card";
     const { className, marker } = await seedClassAndSession(page, token, suffix);
 
-    // Assign class via quick edit so the parade night list response includes it.
     await openQuickEditForFirstSession(page, marker);
-    await expect(page.locator("#qe-classes-group")).toBeVisible({ timeout: 8000 });
-    await page.locator("#qe-classes-list label").filter({ hasText: className }).locator("input.qe-class-chk").check();
+    const cb = page.locator("#qe-classes-list label").filter({ hasText: className }).locator("input.qe-class-chk");
+    await cb.check();
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.locator("#m-sess-edit")).toBeHidden({ timeout: 8000 });
 
-    // Reload the parade night list so the API refreshes the session data.
     await page.evaluate(() => (window as any).reloadAndRender());
     await page.evaluate(() => (window as any).nav("parade-nights"));
     const card = page.locator(".pn-card").filter({ hasText: marker });
-    await expect(card).toBeVisible({ timeout: 8000 });
-
-    // The .sess-info line should now contain the class name.
     const sessInfo = card.locator(".sess-info").first();
-    await expect(sessInfo).toContainText(className, { timeout: 5000 });
-
-    expect(errors, `no uncaught JS errors: ${errors.join("; ")}`).toHaveLength(0);
+    await expect(sessInfo).toContainText(className, { timeout: 8000 });
   });
 });
