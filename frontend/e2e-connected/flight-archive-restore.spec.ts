@@ -3,8 +3,8 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 // REM-108: Flight archive existed with no restore counterpart, and archived
 // flights were entirely invisible in the SA console (no way to even see one
-// to restore it). Added a "Show archived" toggle (matching the existing
-// Wings/Squadrons pattern) plus a Restore button.
+// to restore it). Added a "Show archived" toggle plus a Restore button in
+// Account Management > Configuration.
 
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE;
 
@@ -49,7 +49,12 @@ test("an archived Flight is hidden by default, visible via Show archived, and Re
   expect(archiveRes.ok()).toBe(true);
 
   await page.evaluate(() => (window as any).nav("accounts"));
-  await page.waitForTimeout(500);
+  // Flights are configuration data, not part of the default Accounts tab.
+  // Enter the real panel before asserting visibility so a hidden tab cannot
+  // produce a false positive for "archived flight is hidden".
+  await page.getByRole("tab", { name: "Configuration" }).click();
+  await expect(page.getByRole("tabpanel", { name: "Configuration" })).toBeVisible({ timeout: 5000 });
+  await expect(page.locator("#flight-table")).toBeVisible({ timeout: 5000 });
 
   // Hidden by default.
   await expect(page.locator("#flight-table")).not.toContainText(flightName);
