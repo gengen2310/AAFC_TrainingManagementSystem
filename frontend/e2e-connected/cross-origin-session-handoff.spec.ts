@@ -15,6 +15,10 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 //   3. The PW must auto-authenticate via the cookie (AuthProvider calls /api/me
 //      on mount with credentials:include — cookie is same-site with localhost)
 //
+// Planning Workspace is module-only. It intentionally has no independent nav
+// shell and no second login form. When the shared TMS session is absent it
+// shows "Session not found" + "Return to TMS" instead.
+//
 // Note: In local dev, COOKIE_SAMESITE defaults to "lax" (not "none"). Browsers
 // treat localhost as a single site regardless of port, so SameSite=Lax is
 // sufficient for same-browser cross-port navigation. In production, "none" +
@@ -25,11 +29,12 @@ import { resetBackendRateLimits } from "../e2e-rate-limit-reset";
 
 const PW_BASE = process.env.PW_BASE_URL || "http://localhost:5173";
 const LOCAL_API_BASE = process.env.CONNECTED_LOCAL_API_BASE || "";
+const API_BASE = process.env.E2E_BACKEND_BASE_URL || LOCAL_API_BASE || "http://localhost:8000";
 
 // Skip the entire suite when the Planning Workspace dev server isn't running.
 let _pwReachable = false;
 test.beforeAll(async ({ request }) => {
-  await resetBackendRateLimits(process.env.E2E_BACKEND_BASE_URL || "http://localhost:8000");
+  await resetBackendRateLimits(API_BASE);
   try {
     const resp = await request.get(PW_BASE, { timeout: 3000 });
     _pwReachable = resp.ok() || resp.status() === 404 /* Vite's own 404 is fine */;
@@ -57,6 +62,12 @@ async function loginViaTMS(page: Page, code: string) {
   await expect(page.locator(".ph-title", { hasText: "Training Dashboard" })).toBeVisible({ timeout: 10000 });
 }
 
+async function sharedCookieSession(page: Page) {
+  const resp = await page.request.get(`${API_BASE}/api/auth/me`);
+  expect(resp.ok()).toBe(true);
+  return (await resp.json()).session as { role: string; squadron_id?: string | null; wing_id?: string | null };
+}
+
 test("Planning Workspace auto-authenticates via cookie after TMS login (no second login needed)", async ({ page }) => {
   // Step 1: Log in via TMS (localhost:8080)
   // This sets the aafc_session httpOnly cookie on localhost.
@@ -68,31 +79,36 @@ test("Planning Workspace auto-authenticates via cookie after TMS login (no secon
   // the backend validates the cookie and returns the session without a second login.
   await page.goto(PW_BASE);
 
-  // Step 3: The PW must be visible — NOT the login form.
-  const loginBtn = page.getByRole("button", { name: "Log in" });
+  // Step 3: The module workspace itself must render. A module-only PW does not
+  // have its own login button or independent application navigation shell.
   const pwMain = page.locator('[role="main"][aria-label="Planning workspace"]');
-
-  // Allow up to 10s for the PW to resolve the cookie session and render.
   await expect(pwMain).toBeVisible({ timeout: 10000 });
-  await expect(loginBtn).not.toBeVisible();
+  await expect(page.getByRole("heading", { name: "Session not found" })).not.toBeVisible();
+  await expect(page.getByRole("link", { name: /return to tms/i })).not.toBeVisible();
 });
 
 test("Planning Workspace shows correct squadron context after TMS login (no scope leak)", async ({ page }) => {
   await loginViaTMS(page, "ADMIN703");
+  const tmsSession = await sharedCookieSession(page);
+  expect(tmsSession.role).toBe("sqn_admin");
+  expect(tmsSession.squadron_id).toBeTruthy();
+
   await page.goto(PW_BASE);
+  await expect(page.locator('[role="main"][aria-label="Planning workspace"]')).toBeVisible({ timeout: 10000 });
 
-  // The "Return to TMS" link is only shown when there is NO authenticated session.
-  // Its presence would indicate the cookie handoff failed.
-  await expect(page.getByRole("link", { name: /return to tms/i })).not.toBeVisible({ timeout: 10000 });
-
-  // Navigation is visible, confirming authenticated state.
-  await expect(page.getByRole("navigation")).toBeVisible({ timeout: 10000 });
+  // Re-read the server-side session after crossing origins. The PW must use the
+  // exact same tenant scope established by TMS; it must not substitute a wider
+  // or different squadron context during the handoff.
+  const pwSession = await sharedCookieSession(page);
+  expect(pwSession.role).toBe(tmsSession.role);
+  expect(pwSession.squadron_id).toBe(tmsSession.squadron_id);
+  expect(pwSession.wing_id).toBe(tmsSession.wing_id);
 });
 
 test("Logging out of TMS invalidates the Planning Workspace session", async ({ page }) => {
   await loginViaTMS(page, "ADMIN703");
 
-  // Confirm PW is accessible before logout
+  // Confirm PW is accessible before logout.
   await page.goto(PW_BASE);
   await expect(page.locator('[role="main"][aria-label="Planning workspace"]')).toBeVisible({ timeout: 10000 });
 
@@ -106,7 +122,10 @@ test("Logging out of TMS invalidates the Planning Workspace session", async ({ p
   // After logout the TMS shows the login form; #auth-type is always the first visible element.
   await expect(page.locator("#auth-type")).toBeVisible({ timeout: 8000 });
 
-  // Now open the PW — the cookie is gone, so /api/me returns 401, and the login form appears.
+  // Module-only PW must NOT offer a second independent login. With the shared
+  // cookie gone it renders its explicit unauthenticated hand-back state.
   await page.goto(PW_BASE);
-  await expect(page.getByRole("button", { name: "Log in" })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole("heading", { name: "Session not found" })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole("link", { name: /return to tms/i })).toBeVisible();
+  await expect(page.locator('[role="main"][aria-label="Planning workspace"]')).not.toBeVisible();
 });
