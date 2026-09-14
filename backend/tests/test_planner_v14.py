@@ -1012,3 +1012,116 @@ def test_prep_suggestions_for_anchor_event(client):
     assert r.status_code == 200
     d = r.json()
     assert "suggestions" in d
+
+
+def test_annual_program_instructional_periods_for_fresh_parade_night(client):
+    """A fresh parade night (no timing snapshot) must return instructional_periods
+    derived from session_count (default 3) — not an empty list that causes the
+    frontend to show 'Legacy parade night — no timing template'.
+
+    Regression for the PW E2E failures in planning-workspace-filters and
+    year-view-classes tests.
+    """
+    hdr = _sqn_admin(client)
+    year = next_test_year()
+    py_r = client.post(
+        "/api/planning/years",
+        json={"year": year, "name": f"IP Test {year}"},
+        headers=hdr,
+    )
+    assert py_r.status_code in (200, 201), py_r.text
+    year_id = py_r.json()["planning_year_id"]
+
+    # T3 date for this test year (WA term 3: ~Jul 14 – Sep 19)
+    pn_date = f"{year}-08-06"
+    pd_r = client.post(
+        f"/api/planning/years/{year_id}/parade-dates",
+        json={"parade_date": pn_date},
+        headers=hdr,
+    )
+    assert pd_r.status_code == 200, pd_r.text
+    pn_id = pd_r.json()["parade_night_id"]
+    assert pn_id, "parade-dates endpoint must return a parade_night_id"
+
+    ap_r = client.get(f"/api/planning/years/{year_id}/annual-program", headers=hdr)
+    assert ap_r.status_code == 200, ap_r.text
+    d = ap_r.json()
+
+    # Find the parade night in the annual program
+    all_pds = [pd for t in d["terms"] for pd in t["parade_dates"]]
+    matching = [pd for pd in all_pds if pd["parade_night_id"] == pn_id]
+    assert matching, f"Parade night {pn_id} not found in annual program for year {year}"
+    pd = matching[0]
+
+    # Key assertion: instructional_periods must be non-empty for a fresh parade night
+    # (derived from session_count default of 3)
+    ips = pd.get("instructional_periods", [])
+    assert len(ips) == 3, (
+        f"Expected 3 instructional_periods (from session_count default=3), got {len(ips)}. "
+        f"Raw pd: session_count={pd.get('session_count')}, "
+        f"instructional_periods={ips}"
+    )
+    assert ips[0]["period_number"] == 1
+    assert ips[1]["period_number"] == 2
+    assert ips[2]["period_number"] == 3
+
+
+def test_annual_program_instructional_periods_with_sessions(client):
+    """Instructional_periods must remain non-empty even after sessions are added.
+
+    Mirrors the E2E test flow (CLASS-22/CLASS-23/year-view-classes): creates a
+    planning year, 2 training classes, 1 parade night, 2 sessions with distinct
+    period_number values — then verifies the annual program returns 3 periods
+    (from session_count fallback, not the 2-period session-derived fallback).
+
+    Regression: if session_count is NULL in the DB the session_count fallback
+    is skipped, but the session-period fallback should still catch it.
+    """
+    hdr = _sqn_admin(client)
+    year = next_test_year()
+    py_r = client.post(
+        "/api/planning/years",
+        json={"year": year, "name": f"IP With Sessions {year}"},
+        headers=hdr,
+    )
+    assert py_r.status_code in (200, 201), py_r.text
+    year_id = py_r.json()["planning_year_id"]
+
+    # Parade night in T3
+    pn_date = f"{year}-08-06"
+    pd_r = client.post(
+        f"/api/planning/years/{year_id}/parade-dates",
+        json={"parade_date": pn_date},
+        headers=hdr,
+    )
+    assert pd_r.status_code == 200, pd_r.text
+    pn_id = pd_r.json()["parade_night_id"]
+
+    # Two sessions with period_number 1 and 2 (mirrors CLASS-22 setup)
+    for period in (1, 2):
+        s_r = client.post(
+            "/api/sessions",
+            json={"parade_night_id": pn_id, "period_number": period, "cadet_group": "senior"},
+            headers=hdr,
+        )
+        assert s_r.status_code in (200, 201), s_r.text
+
+    ap_r = client.get(f"/api/planning/years/{year_id}/annual-program", headers=hdr)
+    assert ap_r.status_code == 200, ap_r.text
+    d = ap_r.json()
+
+    all_pds = [pd for t in d["terms"] for pd in t["parade_dates"]]
+    matching = [pd for pd in all_pds if pd["parade_night_id"] == pn_id]
+    assert matching, f"Parade night {pn_id} not found in annual program"
+    pd = matching[0]
+
+    ips = pd.get("instructional_periods", [])
+    # Prefer the session_count fallback (3 periods) — but if session_count is NULL
+    # in the DB the session-period fallback fires and we get at least 2 periods.
+    assert len(ips) >= 2, (
+        f"Expected at least 2 instructional_periods, got {len(ips)}. "
+        f"session_count={pd.get('session_count')}, periods={ips}"
+    )
+    assert {p["period_number"] for p in ips} >= {1, 2}, (
+        f"Expected period_number 1 and 2 to appear in periods, got {[p['period_number'] for p in ips]}"
+    )

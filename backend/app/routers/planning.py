@@ -4297,6 +4297,30 @@ def get_annual_program(
                 }
                 for s in date_sessions
             ]
+            spill_snaps = snaps_by_pn.get(pn_obj.id, [])
+            spill_ips = [
+                {
+                    "period_number": s.period_number,
+                    "label": s.block_label,
+                    "start_time": s.start_time,
+                    "end_time": s.end_time,
+                }
+                for s in spill_snaps if s.is_instructional and s.period_number is not None
+            ]
+            if not spill_ips and pn_obj.session_count:
+                spill_ips = [
+                    {"period_number": i, "label": f"Period {i}", "start_time": None, "end_time": None}
+                    for i in range(1, pn_obj.session_count + 1)
+                ]
+            if not spill_ips and sessions:
+                spill_seen = sorted(
+                    set(s.period_number for s in sessions if s.period_number is not None)
+                )
+                if spill_seen:
+                    spill_ips = [
+                        {"period_number": p, "label": f"Period {p}", "start_time": None, "end_time": None}
+                        for p in spill_seen
+                    ]
             terms[target_idx]["parade_dates"].append({
                 **_night_out_as_date(pn_obj),
                 "term": terms[target_idx]["term"],
@@ -4306,6 +4330,7 @@ def get_annual_program(
                 "sessions_summary": sessions_summary,
                 "conflict_count": conflict_counts_map.get(pn_obj.id, 0),
                 "notices": [_notice_out(n) for n in notices_by_date_id.get(pn_obj.id, [])],
+                "instructional_periods": spill_ips,
             })
             terms[target_idx]["parade_count"] += 1
 

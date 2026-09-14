@@ -15999,6 +15999,7 @@ const P = {
   facilitators: [],
   builderSessions: [],
 };
+window.P = P; // expose for test access and internal navigation helpers
 
 const _IMPORTANCE_LABELS = { must_attend:'Must Attend', key_event:'Key Event', optional:'Optional' };
 const _EVENT_TYPE_LABELS = {
