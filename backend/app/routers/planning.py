@@ -2645,9 +2645,20 @@ def get_long_range(
             for aud, tc in aud_rows_lr:
                 _cb[aud.session_id].append({"training_class_id": tc.id, "display_name": tc.display_name})
             classes_by_session_lr = dict(_cb)
+
+        # Bulk-load timing snapshots for instructional_periods (same logic as annual-program).
+        snaps_by_pn_lr: dict[str, list] = {}
+        for snap in db.query(ParadeNightTimingSnapshot).filter(
+            ParadeNightTimingSnapshot.parade_night_id.in_(pn_ids_lr),
+        ).order_by(
+            ParadeNightTimingSnapshot.parade_night_id,
+            ParadeNightTimingSnapshot.display_order,
+        ).all():
+            snaps_by_pn_lr.setdefault(snap.parade_night_id, []).append(snap)
     else:
         ts_by_night_lr = {}
         classes_by_session_lr = {}
+        snaps_by_pn_lr = {}
 
     rows = []
     for pn_obj in parade_dates:
@@ -2663,12 +2674,36 @@ def get_long_range(
             PlanningConflict.is_resolved == False,  # noqa: E712
         ).all()
 
+        pn_snaps_lr = snaps_by_pn_lr.get(pn_obj.id, [])
+        instructional_periods = [
+            {
+                "period_number": s.period_number,
+                "label": s.block_label,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+            }
+            for s in pn_snaps_lr if s.is_instructional and s.period_number is not None
+        ]
+        if not instructional_periods and pn_obj.session_count:
+            instructional_periods = [
+                {"period_number": i, "label": f"Period {i}", "start_time": None, "end_time": None}
+                for i in range(1, pn_obj.session_count + 1)
+            ]
+        if not instructional_periods and ts:
+            seen_periods = sorted(set(s.period_number for s in ts if s.period_number is not None))
+            if seen_periods:
+                instructional_periods = [
+                    {"period_number": p, "label": f"Period {p}", "start_time": None, "end_time": None}
+                    for p in seen_periods
+                ]
+
         rows.append({
             "parade_date": _night_out_as_date(pn_obj),
             "sessions": real_sessions,
             "session_count": len(real_sessions),
             "filled_slots": len([s for s in real_sessions if s.get("curriculum_title") or s.get("activity_title")]),
             "conflicts": [_conflict_out(c) for c in conflicts],
+            "instructional_periods": instructional_periods,
         })
 
     return {

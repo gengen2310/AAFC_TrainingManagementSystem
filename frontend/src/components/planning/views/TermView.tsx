@@ -157,13 +157,13 @@ export function TermView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
                     weekNumber={night.week_number}
                     term={night.term}
                     notices={night.notices}
+                    periods={night.instructional_periods}
                     sessions={fromNightSummary(night.sessions, conflicts)}
                     sessionCount={pd.session_count}
                     filledSlots={pd.filled_count}
                     conflictCount={night.conflict_count}
                     inHoliday={!!inHoliday}
                     compact={false}
-                    periods={night.instructional_periods}
                     focusClassId={focusClassId}
                     searchText={searchText}
                     tierFilter={tierFilter}

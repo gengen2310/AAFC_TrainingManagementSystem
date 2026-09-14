@@ -240,10 +240,10 @@ export function ParadeNightGridView({ dateId, facilitators, onCellClick }: Props
     setRestoreErr(null);
     try {
       await planningApi.restoreSession(sessionId);
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ["planning-weekly", dateId] }),
-        refetchArchived(),
-      ]);
+      // Fire-and-forget: spinner clears as soon as the POST completes;
+      // the grid and archived list update reactively when the queries settle.
+      void qc.invalidateQueries({ queryKey: ["planning-weekly", dateId] });
+      void refetchArchived();
     } catch (e: unknown) {
       setRestoreErr(friendlyMessage(e, "Could not restore this session"));
     } finally {

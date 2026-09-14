@@ -192,6 +192,7 @@ export function YearView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
                             weekNumber={night.week_number}
                             term={night.term}
                             notices={night.notices}
+                            periods={night.instructional_periods}
                             sessions={fromNightSummary(night.sessions, conflicts)}
                             sessionCount={pd.session_count}
                             filledSlots={pd.filled_count}
@@ -199,7 +200,6 @@ export function YearView({ yearId, onDateClick, onSessionClick, onEmptyCellClick
                             inHoliday={!!inHoliday}
                             compact={false}
                             blockSize="sm"
-                            periods={night.instructional_periods}
                             onHeaderClick={() => onDateClick(pd.parade_date_id, pd.parade_date)}
                             onSessionClick={onSessionClick
                               ? (ds) => onSessionClick(ds.session_id, pd.parade_date_id, pd.parade_date)

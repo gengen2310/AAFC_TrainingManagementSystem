@@ -571,22 +571,23 @@ body.pw-active .main {
   color: #fff;
   flex-shrink: 0;
 }
-.pw-block-hdr:hover { background: #003a80; }
-/* Header action button (opens parade night modal) — takes all available space */
-.pw-block-hdr-action {
-  flex: 1;
+/* Nav button: fills header space, resets <button> defaults, keeps dark-blue look. */
+.pw-block-hdr-nav {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 10px 0 9px 14px;
+  flex: 1;
+  padding: 10px 14px 9px;
   background: none;
   border: none;
   color: #fff;
   cursor: pointer;
   user-select: none;
   text-align: left;
+  font: inherit;
   min-width: 0;
 }
+.pw-block-hdr-nav:hover { background: #003a80; }
 .pw-block-date {
   font-weight: 800;
   font-size: var(--fs-base);
@@ -615,7 +616,7 @@ body.pw-active .main {
   background: none;
   border: none;
   cursor: pointer;
-  color: #b3c1d1;
+  color: rgba(255,255,255,.7);
   font-size: var(--fs-3xs);
   padding: 2px 4px;
   flex-shrink: 0;
@@ -630,7 +631,7 @@ body.pw-active .main {
   border-radius: 4px;
   font-size: var(--fs-2xs);
   font-weight: 700;
-  color: #bfcbd9;
+  color: rgba(255,255,255,.75);
   padding: 2px 7px;
   cursor: pointer;
   transition: all .1s;
@@ -767,7 +768,7 @@ body.pw-active .main {
 .pw-night-cell.conflict-fac { border-color: var(--warning); background: #fffbf0; }
 .pw-night-cell:not(.empty):hover { background: #f0f7ff; }
 .pw-night-cell-inner { padding: 8px 10px; min-height: 72px; position: relative; }
-.pw-nc-empty { font-size: var(--fs-xs); color: var(--muted-text); font-style: italic; }
+.pw-nc-empty { font-size: var(--fs-xs); color: #6b7073; font-style: italic; }
 .pw-nc-code { font-size: var(--fs-2xs); font-weight: 700; color: var(--aafc-royal-blue); margin-bottom: 2px; }
 .pw-nc-title { font-weight: 700; font-size: var(--fs-sm); margin-bottom: 2px; line-height: 1.3; }
 .pw-nc-detail { font-size: var(--fs-2xs); color: var(--muted-text); margin-bottom: 1px; }
@@ -780,7 +781,7 @@ body.pw-active .main {
 .pn-conflict-dot.load { background: #ffb300; }
 
 /* ── Compact (sm) overrides — tighter cells, same structure ── */
-.pw-block.pw-block-sm .pw-block-hdr-action { padding: 7px 0 7px 10px; }
+.pw-block.pw-block-sm .pw-block-hdr-nav { padding: 7px 10px; }
 .pw-block.pw-block-sm .pw-block-date { font-size: var(--fs-sm); }
 .pw-block.pw-block-sm .pw-block-band-hdr { padding: 3px 10px; font-size: var(--fs-3xs); }
 .pw-block.pw-block-sm .pw-block-band-body { padding: 3px 10px 5px; }

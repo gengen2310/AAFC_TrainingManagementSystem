@@ -228,7 +228,7 @@ function Field({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: "flex", gap: 4, fontSize: 'var(--fs-2xs)', lineHeight: 1.4 }}>
       <span style={{ color: "var(--muted-text)", minWidth: 80, flexShrink: 0 }}>{label}</span>
-      <span style={{ color: isNotSet ? "var(--muted-text)" : "var(--text)", fontStyle: isNotSet ? "italic" : undefined }}>
+      <span style={{ color: isNotSet ? "#6b7073" : "var(--text)", fontStyle: isNotSet ? "italic" : undefined }}>
         {value}
       </span>
     </div>
@@ -306,7 +306,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
         {/* Location */}
         <div style={{ fontSize: 'var(--fs-2xs)', marginBottom: 1 }}>
           <span style={{ color: "var(--muted-text)" }}>Location: </span>
-          <span style={{ fontStyle: a.location ? undefined : "italic", color: a.location ? "var(--text)" : "var(--muted-text)" }}>
+          <span style={{ fontStyle: a.location ? undefined : "italic", color: a.location ? "var(--text)" : "#6b7073" }}>
             {or(a.location)}
           </span>
         </div>
@@ -414,7 +414,7 @@ export function ActivityDetailBlock({ activity: a, compact = false, onClick }: C
         <span style={{ color: "var(--muted-text)" }}>Location: </span>
         <span style={{
           fontStyle: a.location ? undefined : "italic",
-          color: a.location ? "var(--text)" : "var(--muted-text)",
+          color: a.location ? "var(--text)" : "#6b7073",
         }}>
           {or(a.location)}
         </span>
