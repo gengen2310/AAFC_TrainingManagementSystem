@@ -44,9 +44,6 @@ test("a facilitator created while an unrelated search term is still in #fac-sear
   const first = `E2E-REM99-${suffix}`;
   const last = `Regression-${suffix}`;
 
-  // Simulate the real-world trigger: type a search term for something
-  // unrelated (checking for a duplicate of a completely different name)
-  // before opening Add Facilitator -- this must not survive a successful add.
   await page.locator("#fac-search").fill("ZZZ_no_such_facilitator_ZZZ");
   await expect(page.locator("#fac-tbody")).toContainText("No facilitators");
 
@@ -58,14 +55,17 @@ test("a facilitator created while an unrelated search term is still in #fac-sear
   await page.locator("#fac-save-btn").click();
 
   await expect(page.locator("#m-add-fac")).toBeHidden({ timeout: 8000 });
-  // The old search term must be gone, and the new facilitator visible
-  // without the user having to clear it themselves.
   await expect(page.locator("#fac-search")).toHaveValue("");
   await expect(page.locator("#fac-tbody")).toContainText(first);
   await expect(page.locator("#fac-tbody")).toContainText(last);
 
-  // Cleanup: archive the row we just created (confirm() dialog auto-accepted).
-  page.on("dialog", (d) => d.accept());
+  // Cleanup through the same accessible archive action exposed by the row.
+  // The glyph is visually "×", but its accessible name is deliberately
+  // "Archive facilitator"; target the user-facing control contract.
   const row = page.locator("#fac-tbody tr", { hasText: last });
-  await row.getByRole("button", { name: "×" }).click();
+  await row.getByRole("button", { name: "Archive facilitator" }).click();
+  const confirmModal = page.locator("#m-confirm");
+  if (await confirmModal.isVisible().catch(() => false)) {
+    await confirmModal.getByRole("button", { name: /confirm|archive/i }).click();
+  }
 });
