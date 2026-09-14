@@ -104,9 +104,16 @@ test.describe("Session Status Reason tags (REM-23 continuation)", () => {
     await page.getByRole("button", { name: "Save" }).click();
     await expect(page.locator("#m-outcome-reason")).toBeVisible({ timeout: 5000 });
 
+    // HARD-09 replaced native prompt() with the accessible promptText() modal.
+    // Exercise that real UI instead of accepting a native browser dialog that
+    // no longer exists.
     const reasonName = `E2E Custom Reason ${Date.now()}`;
-    page.once("dialog", (d) => d.accept(reasonName));
     await page.locator("#or-reason").selectOption("__add_new__");
+    const textModal = page.locator("#m-text-input");
+    await expect(textModal).toBeVisible({ timeout: 5000 });
+    await page.locator("#ti-input").fill(reasonName);
+    await page.locator("#ti-ok-btn").click();
+    await expect(textModal).toBeHidden({ timeout: 5000 });
     await expect(page.locator("#or-reason")).toHaveValue(reasonName, { timeout: 5000 });
 
     // Cleanup.
