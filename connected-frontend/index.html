@@ -14350,7 +14350,7 @@ function saveFac(confirmDuplicate){
       .then(async()=>{
         const savedAt=new Date().toLocaleTimeString('en-AU',{hour:'2-digit',minute:'2-digit',hour12:false});
         _setFacSaveState('Saved at '+savedAt,'var(--ok)');
-        await reloadAndRender(); try{await loadFacilitatorStats();}catch(_){} closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
+        try{await reloadAndRender();}catch(_){} try{await loadFacilitatorStats();}catch(_){} closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
         showToast('Facilitator profile saved.', false);
       })
       .catch(e=>{
@@ -14376,7 +14376,7 @@ function saveFac(confirmDuplicate){
       // persists indefinitely, since nothing else ever resets it). Clear it so
       // the new facilitator is guaranteed visible immediately.
       const facSearch=document.getElementById('fac-search'); if(facSearch)facSearch.value='';
-      await reloadAndRender(); try{await loadFacilitatorStats();}catch(_){} closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
+      try{await reloadAndRender();}catch(_){} try{await loadFacilitatorStats();}catch(_){} closeModal('m-add-fac'); document.getElementById('fac-modal-title').textContent='+ Add Facilitator'; _clearFacDupWarning();
       showToast('Facilitator added at '+savedAt+'.', false);
     })
     .catch(e=>{
@@ -14415,7 +14415,7 @@ function _openFacDupModal(detail,pending){
     <div style="font-size:var(--fs-xs);color:var(--muted)">Rank does not determine identity — two people may share a name, and one person may change rank over time.</div>`;
   document.getElementById('fac-dup-merge-panel').style.display='none';
   document.getElementById('fac-dup-actions').style.display='';
-  openModal('m-fac-dup');
+  closeModal('m-add-fac'); openModal('m-fac-dup');
 }
 
 function _facDupUseExisting(){
